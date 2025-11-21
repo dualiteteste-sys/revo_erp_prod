@@ -121,7 +121,7 @@ dist-ssr
 
 # Vite build output
 /dist
-
+dist-ssr/
 # Environment variables
 .env
 .env.*
