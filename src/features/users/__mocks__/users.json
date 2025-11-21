@@ -1,0 +1,68 @@
+[
+  {
+    "user_id": "a1b2c3d4-e5f6-7890-1234-567890abcdef",
+    "email": "owner@revo.erp",
+    "name": "Sócio Proprietário",
+    "role": "OWNER",
+    "status": "ACTIVE",
+    "invited_at": "2024-01-15T10:00:00Z",
+    "last_sign_in_at": "2025-11-10T09:30:00Z",
+    "created_at": "2024-01-15T10:00:00Z",
+    "updated_at": "2025-11-10T09:30:00Z"
+  },
+  {
+    "user_id": "b2c3d4e5-f6a7-8901-2345-67890abcdef0",
+    "email": "admin@revo.erp",
+    "name": "Administrador Geral",
+    "role": "ADMIN",
+    "status": "ACTIVE",
+    "invited_at": "2024-02-20T11:00:00Z",
+    "last_sign_in_at": "2025-11-09T14:00:00Z",
+    "created_at": "2024-02-20T11:00:00Z",
+    "updated_at": "2025-11-09T14:00:00Z"
+  },
+  {
+    "user_id": "c3d4e5f6-a7b8-9012-3456-7890abcdef01",
+    "email": "financeiro@revo.erp",
+    "name": "Analista Financeiro",
+    "role": "FINANCE",
+    "status": "ACTIVE",
+    "invited_at": "2024-03-10T09:00:00Z",
+    "last_sign_in_at": "2025-11-08T18:00:00Z",
+    "created_at": "2024-03-10T09:00:00Z",
+    "updated_at": "2025-11-08T18:00:00Z"
+  },
+  {
+    "user_id": "d4e5f6a7-b8c9-0123-4567-890abcdef012",
+    "email": "operacoes@revo.erp",
+    "name": "Coordenador de Operações",
+    "role": "OPS",
+    "status": "ACTIVE",
+    "invited_at": "2024-05-01T14:00:00Z",
+    "last_sign_in_at": "2025-11-07T11:00:00Z",
+    "created_at": "2024-05-01T14:00:00Z",
+    "updated_at": "2025-11-07T11:00:00Z"
+  },
+  {
+    "user_id": "e5f6a7b8-c9d0-1234-5678-90abcdef0123",
+    "email": "leitura@revo.erp",
+    "name": "Auditor Externo",
+    "role": "READONLY",
+    "status": "INACTIVE",
+    "invited_at": "2024-06-15T16:00:00Z",
+    "last_sign_in_at": "2025-09-01T10:00:00Z",
+    "created_at": "2024-06-15T16:00:00Z",
+    "updated_at": "2025-09-01T10:00:00Z"
+  },
+  {
+    "user_id": "f6a7b8c9-d0e1-2345-6789-0abcdef01234",
+    "email": "pendente@revo.erp",
+    "name": null,
+    "role": "ADMIN",
+    "status": "PENDING",
+    "invited_at": "2025-11-10T15:00:00Z",
+    "last_sign_in_at": null,
+    "created_at": "2025-11-10T15:00:00Z",
+    "updated_at": "2025-11-10T15:00:00Z"
+  }
+]

@@ -1,0 +1,7 @@
+[functions]
+  verify_jwt = true
+
+[functions.manual-create-user]
+  cors_origins = ["http://localhost:5173"]
+  cors_methods = ["POST", "OPTIONS"]
+  cors_headers = ["authorization", "content-type"]
