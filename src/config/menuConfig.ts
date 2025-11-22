@@ -5,7 +5,7 @@ import {
   FileSignature, HeartHandshake, Store, Receipt, Truck, Percent,
   Bot, Undo2, ClipboardCheck, Banknote, Wallet, TrendingUp,
   TrendingDown, Landmark, FileSpreadsheet, LogOut, Search, Building, Code, Database, Target,
-  Briefcase, BookOpen, Grid, GraduationCap, PieChart
+  Briefcase, BookOpen, Grid, GraduationCap, PieChart, Factory, Hammer, Layers, FileCog
 } from 'lucide-react';
 
 export interface MenuItem {
@@ -40,6 +40,18 @@ export const menuConfig: { name: string; icon: React.ElementType; href: string; 
       { name: 'Embalagens', icon: Box, href: '#' },
       { name: 'Relatórios', icon: BarChart2, href: '#' },
     ],
+  },
+  {
+    name: 'Indústria',
+    icon: Factory,
+    href: '#',
+    gradient: 'from-zinc-500 to-neutral-600',
+    children: [
+        { name: 'Dashboard Produção', icon: PieChart, href: '/app/industria/dashboard' },
+        { name: 'Ordens de Produção', icon: Hammer, href: '/app/industria/producao' },
+        { name: 'Ordens de Beneficiamento', icon: Layers, href: '/app/industria/beneficiamento' },
+        { name: 'Fichas Técnicas / BOM', icon: FileCog, href: '/app/industria/boms' },
+    ]
   },
   {
     name: 'Suprimentos',
@@ -108,9 +120,9 @@ export const menuConfig: { name: string; icon: React.ElementType; href: string; 
     gradient: 'from-pink-500 to-rose-600',
     children: [
       { name: 'Dashboard RH', icon: PieChart, href: '/app/rh/dashboard' },
+      { name: 'Colaboradores', icon: Users, href: '/app/rh/colaboradores' },
       { name: 'Cargos e Funções', icon: Briefcase, href: '/app/rh/cargos' },
       { name: 'Competências', icon: BookOpen, href: '/app/rh/competencias' },
-      { name: 'Colaboradores', icon: Users, href: '/app/rh/colaboradores' },
       { name: 'Matriz de Competências', icon: Grid, href: '/app/rh/matriz' },
       { name: 'Treinamentos', icon: GraduationCap, href: '/app/rh/treinamentos' },
     ],

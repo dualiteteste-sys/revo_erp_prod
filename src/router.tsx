@@ -45,6 +45,12 @@ import MatrizCompetenciasPage from "./pages/rh/MatrizCompetenciasPage";
 import TreinamentosPage from "./pages/rh/TreinamentosPage";
 import RHDashboard from "./pages/rh/RHDashboard";
 
+// Indústria Pages
+import IndustriaDashboardPage from "./pages/industria/IndustriaDashboardPage";
+import ProducaoPage from "./pages/industria/producao/ProducaoPage";
+import BeneficiamentoPage from "./pages/industria/beneficiamento/BeneficiamentoPage";
+import BomsPage from "./pages/industria/boms/BomsPage";
+
 // Suprimentos Pages
 import EstoquePage from "./pages/suprimentos/EstoquePage";
 import ComprasPage from "./pages/suprimentos/ComprasPage";
@@ -93,6 +99,12 @@ export const router = createBrowserRouter([
         { path: "partners", element: <PartnersPage /> },
         { path: "carriers", element: <CarriersPage /> },
         { path: "services", element: <ServicesPage /> },
+
+        // Indústria
+        { path: "industria/dashboard", element: <IndustriaDashboardPage /> },
+        { path: "industria/producao", element: <ProducaoPage /> },
+        { path: "industria/beneficiamento", element: <BeneficiamentoPage /> },
+        { path: "industria/boms", element: <BomsPage /> },
 
         // Vendas
         { path: "sales-dashboard", element: <SalesDashboard /> },
