@@ -1,0 +1,263 @@
+import React, { useState, useEffect } from 'react';
+import { Loader2, Save, AlertCircle, TrendingUp, TrendingDown, Minus } from 'lucide-react';
+import { ColaboradorDetails, ColaboradorPayload, saveColaborador, Cargo, listCargos, Competencia, listCompetencias } from '@/services/rh';
+import { useToast } from '@/contexts/ToastProvider';
+import Section from '@/components/ui/forms/Section';
+import Input from '@/components/ui/forms/Input';
+import Select from '@/components/ui/forms/Select';
+import Toggle from '@/components/ui/forms/Toggle';
+import { motion } from 'framer-motion';
+
+interface ColaboradorFormPanelProps {
+  colaborador: ColaboradorDetails | null;
+  onSaveSuccess: () => void;
+  onClose: () => void;
+}
+
+const ColaboradorFormPanel: React.FC<ColaboradorFormPanelProps> = ({ colaborador, onSaveSuccess, onClose }) => {
+  const { addToast } = useToast();
+  const [isSaving, setIsSaving] = useState(false);
+  const [formData, setFormData] = useState<ColaboradorPayload>({});
+  const [cargos, setCargos] = useState<Cargo[]>([]);
+  const [allCompetencias, setAllCompetencias] = useState<Competencia[]>([]);
+  const [activeTab, setActiveTab] = useState<'dados' | 'competencias'>('dados');
+
+  useEffect(() => {
+    const loadData = async () => {
+      const [cargosData, compData] = await Promise.all([listCargos(), listCompetencias()]);
+      setCargos(cargosData);
+      setAllCompetencias(compData);
+    };
+    loadData();
+
+    if (colaborador) {
+      setFormData(colaborador);
+    } else {
+      setFormData({ ativo: true, competencias: [] });
+    }
+  }, [colaborador]);
+
+  const handleFormChange = (field: keyof ColaboradorPayload, value: any) => {
+    setFormData(prev => ({ ...prev, [field]: value }));
+  };
+
+  const handleCompetenciaChange = (compId: string, field: string, value: any) => {
+    const currentComps = formData.competencias || [];
+    const existingIndex = currentComps.findIndex(c => c.competencia_id === compId);
+    
+    let newComps = [...currentComps];
+    
+    if (existingIndex >= 0) {
+      newComps[existingIndex] = { ...newComps[existingIndex], [field]: value };
+    } else {
+      // Se não existe na lista (ex: adicionando uma competência extra não requerida)
+      const compInfo = allCompetencias.find(c => c.id === compId);
+      if (compInfo) {
+        newComps.push({
+          competencia_id: compId,
+          nome: compInfo.nome,
+          tipo: compInfo.tipo,
+          nivel_requerido: 0,
+          nivel_atual: field === 'nivel_atual' ? value : 0,
+          gap: 0,
+          obrigatorio: false,
+          data_avaliacao: new Date().toISOString(),
+          origem: null
+        });
+      }
+    }
+    setFormData(prev => ({ ...prev, competencias: newComps }));
+  };
+
+  const handleSave = async () => {
+    if (!formData.nome) {
+      addToast('O nome é obrigatório.', 'error');
+      return;
+    }
+    if (!formData.cargo_id) {
+      addToast('O cargo é obrigatório.', 'error');
+      return;
+    }
+
+    setIsSaving(true);
+    try {
+      await saveColaborador(formData);
+      addToast('Colaborador salvo com sucesso!', 'success');
+      onSaveSuccess();
+    } catch (error: any) {
+      addToast(error.message, 'error');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const renderGapIndicator = (gap: number, required: number) => {
+    if (required === 0) return <span className="text-gray-400 text-xs">N/A</span>;
+    if (gap >= 0) return <span className="flex items-center text-green-600 text-xs font-bold"><TrendingUp size={14} className="mr-1" /> Adequado</span>;
+    return <span className="flex items-center text-red-600 text-xs font-bold"><TrendingDown size={14} className="mr-1" /> Gap: {gap}</span>;
+  };
+
+  return (
+    <div className="flex flex-col h-full">
+      <div className="border-b border-gray-200 px-6">
+        <nav className="-mb-px flex space-x-6">
+          <button
+            onClick={() => setActiveTab('dados')}
+            className={`py-4 px-1 border-b-2 font-medium text-sm ${activeTab === 'dados' ? 'border-blue-500 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'}`}
+          >
+            Dados Pessoais
+          </button>
+          <button
+            onClick={() => setActiveTab('competencias')}
+            className={`py-4 px-1 border-b-2 font-medium text-sm ${activeTab === 'competencias' ? 'border-blue-500 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'}`}
+          >
+            Competências & Avaliação
+          </button>
+        </nav>
+      </div>
+
+      <div className="flex-grow p-6 overflow-y-auto scrollbar-styled">
+        {activeTab === 'dados' && (
+          <Section title="Identificação" description="Dados cadastrais do colaborador.">
+            <Input 
+              label="Nome Completo" 
+              name="nome" 
+              value={formData.nome || ''} 
+              onChange={e => handleFormChange('nome', e.target.value)} 
+              required 
+              className="sm:col-span-4" 
+            />
+            <div className="sm:col-span-2">
+              <Toggle 
+                label="Ativo" 
+                name="ativo" 
+                checked={formData.ativo !== false} 
+                onChange={checked => handleFormChange('ativo', checked)} 
+              />
+            </div>
+            <Input 
+              label="E-mail Corporativo" 
+              name="email" 
+              type="email"
+              value={formData.email || ''} 
+              onChange={e => handleFormChange('email', e.target.value)} 
+              className="sm:col-span-3" 
+            />
+            <Input 
+              label="CPF / Documento" 
+              name="documento" 
+              value={formData.documento || ''} 
+              onChange={e => handleFormChange('documento', e.target.value)} 
+              className="sm:col-span-3" 
+            />
+            <Select 
+              label="Cargo" 
+              name="cargo_id" 
+              value={formData.cargo_id || ''} 
+              onChange={e => handleFormChange('cargo_id', e.target.value)}
+              required
+              className="sm:col-span-3"
+            >
+              <option value="">Selecione...</option>
+              {cargos.map(c => (
+                <option key={c.id} value={c.id}>{c.nome}</option>
+              ))}
+            </Select>
+            <Input 
+              label="Data de Admissão" 
+              name="data_admissao" 
+              type="date"
+              value={formData.data_admissao || ''} 
+              onChange={e => handleFormChange('data_admissao', e.target.value)} 
+              className="sm:col-span-3" 
+            />
+          </Section>
+        )}
+
+        {activeTab === 'competencias' && (
+          <div className="space-y-6">
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 flex items-start gap-3">
+              <AlertCircle className="text-blue-600 mt-0.5" size={20} />
+              <div>
+                <h4 className="font-semibold text-blue-800">Matriz de Competências</h4>
+                <p className="text-sm text-blue-700">
+                  Avalie o nível atual do colaborador (1-5) em relação ao exigido pelo cargo.
+                  Gaps negativos indicam necessidade de treinamento.
+                </p>
+              </div>
+            </div>
+
+            <div className="space-y-4">
+              {formData.competencias?.map((comp) => (
+                <motion.div 
+                  key={comp.competencia_id}
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  className={`border rounded-lg p-4 ${comp.gap < 0 ? 'bg-red-50 border-red-200' : 'bg-white border-gray-200'}`}
+                >
+                  <div className="flex flex-wrap justify-between items-center gap-4 mb-3">
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <h4 className="font-bold text-gray-800">{comp.nome}</h4>
+                        {comp.obrigatorio && <span className="bg-red-100 text-red-800 text-xs px-2 py-0.5 rounded-full">Obrigatório</span>}
+                      </div>
+                      <p className="text-xs text-gray-500 capitalize">{comp.tipo}</p>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-xs text-gray-500">Requerido</p>
+                      <p className="font-bold text-lg">{comp.nivel_requerido}</p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-4 bg-white/50 p-3 rounded-md">
+                    <div className="flex-grow">
+                      <label className="block text-xs font-medium text-gray-700 mb-1">Nível Atual (Avaliação)</label>
+                      <input 
+                        type="range" 
+                        min="0" 
+                        max="5" 
+                        step="1"
+                        value={comp.nivel_atual} 
+                        onChange={e => handleCompetenciaChange(comp.competencia_id, 'nivel_atual', parseInt(e.target.value))}
+                        className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-blue-600"
+                      />
+                      <div className="flex justify-between text-xs text-gray-400 px-1 mt-1">
+                        <span>0</span><span>1</span><span>2</span><span>3</span><span>4</span><span>5</span>
+                      </div>
+                    </div>
+                    <div className="min-w-[60px] text-center">
+                      <span className="text-2xl font-bold text-blue-600">{comp.nivel_atual}</span>
+                    </div>
+                    <div className="min-w-[100px] text-right">
+                      {renderGapIndicator(comp.nivel_atual - comp.nivel_requerido, comp.nivel_requerido)}
+                    </div>
+                  </div>
+                </motion.div>
+              ))}
+
+              {(!formData.competencias || formData.competencias.length === 0) && (
+                <div className="text-center py-12 text-gray-500">
+                  <Minus className="mx-auto h-8 w-8 mb-2 text-gray-300" />
+                  <p>Nenhuma competência mapeada para este cargo ainda.</p>
+                  <p className="text-xs">Edite o Cargo para adicionar requisitos.</p>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+      </div>
+
+      <footer className="flex-shrink-0 p-4 flex justify-end items-center border-t border-white/20">
+        <div className="flex gap-3">
+          <button type="button" onClick={onClose} className="rounded-md border border-gray-300 bg-white py-2 px-4 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50">Cancelar</button>
+          <button onClick={handleSave} disabled={isSaving} className="flex items-center gap-2 bg-blue-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50">
+            {isSaving ? <Loader2 className="animate-spin" size={20} /> : <Save size={20} />}
+            Salvar
+          </button>
+        </div>
+      </footer>
+    </div>
+  );
+};
+
+export default ColaboradorFormPanel;

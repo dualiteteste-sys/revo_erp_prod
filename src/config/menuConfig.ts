@@ -4,7 +4,8 @@ import {
   Users2, Plug, UserSquare, Box, BarChart2, FileDown, ClipboardList,
   FileSignature, HeartHandshake, Store, Receipt, Truck, Percent,
   Bot, Undo2, ClipboardCheck, Banknote, Wallet, TrendingUp,
-  TrendingDown, Landmark, FileSpreadsheet, LogOut, Search, Building, Code, Database, Target
+  TrendingDown, Landmark, FileSpreadsheet, LogOut, Search, Building, Code, Database, Target,
+  Briefcase, BookOpen, Grid, GraduationCap, PieChart
 } from 'lucide-react';
 
 export interface MenuItem {
@@ -46,9 +47,9 @@ export const menuConfig: { name: string; icon: React.ElementType; href: string; 
     href: '#',
     gradient: 'from-orange-500 to-orange-600',
     children: [
-      { name: 'Ordens de Compra', icon: ShoppingCart, href: '#' },
+      { name: 'Controle de Estoques', icon: Warehouse, href: '/app/suprimentos/estoque' },
+      { name: 'Ordens de Compra', icon: ShoppingCart, href: '/app/suprimentos/compras' },
       { name: 'NFe de Entrada', icon: FileDown, href: '/app/nfe-input' },
-      { name: 'Controle de Estoques', icon: Warehouse, href: '#' },
       { name: 'Relatórios', icon: BarChart2, href: '#' },
     ]
   },
@@ -59,8 +60,8 @@ export const menuConfig: { name: string; icon: React.ElementType; href: string; 
     gradient: 'from-red-500 to-red-600',
     children: [
         { name: 'Painel de Vendas', icon: BarChart2, href: '/app/sales-dashboard' },
+        { name: 'Pedidos de Vendas', icon: ClipboardList, href: '/app/vendas/pedidos' },
         { name: 'Metas de Vendas', icon: Target, href: '/app/vendas/metas' },
-        { name: 'Pedidos de Vendas', icon: ClipboardList, href: '#' },
         { name: 'Propostas Comerciais', icon: FileSignature, href: '#' },
         { name: 'CRM', icon: HeartHandshake, href: '#' },
         { name: 'PDV', icon: Store, href: '#' },
@@ -99,6 +100,20 @@ export const menuConfig: { name: string; icon: React.ElementType; href: string; 
         { name: 'Extrato Bancário', icon: FileSpreadsheet, href: '#' },
         { name: 'Relatórios', icon: BarChart2, href: '#' },
     ]
+  },
+  {
+    name: 'RH & Qualidade',
+    icon: Briefcase,
+    href: '#',
+    gradient: 'from-pink-500 to-rose-600',
+    children: [
+      { name: 'Dashboard RH', icon: PieChart, href: '/app/rh/dashboard' },
+      { name: 'Cargos e Funções', icon: Briefcase, href: '/app/rh/cargos' },
+      { name: 'Competências', icon: BookOpen, href: '/app/rh/competencias' },
+      { name: 'Colaboradores', icon: Users, href: '/app/rh/colaboradores' },
+      { name: 'Matriz de Competências', icon: Grid, href: '/app/rh/matriz' },
+      { name: 'Treinamentos', icon: GraduationCap, href: '/app/rh/treinamentos' },
+    ],
   },
   {
     name: 'Ferramentas',
