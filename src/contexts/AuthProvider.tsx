@@ -174,6 +174,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setUserId(null);
     setEmpresas([]);
     setActiveEmpresaId(null);
+    bootRef.current = false; // Garante que o próximo login dispare o bootstrap novamente
   }, [supabase]);
 
   // ===== Effects =====
@@ -195,6 +196,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       console.log("[AUTH] onAuthStateChange", { event, hasSession: !!sess });
       setSession(sess ?? null);
       setUserId(sess?.user?.id ?? null);
+
+      // Reset bootRef on explicit sign out event to be safe
+      if (event === 'SIGNED_OUT') {
+        bootRef.current = false;
+        setEmpresas([]);
+        setActiveEmpresaId(null);
+      }
     });
     return () => sub.subscription.unsubscribe();
   }, [supabase]);
