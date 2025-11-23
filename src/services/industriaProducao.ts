@@ -1,4 +1,6 @@
 import { callRpc } from '@/lib/api';
+import { faker } from '@faker-js/faker';
+import { getProducts } from './products';
 import { OrdemComponente, OrdemEntrega } from './industria';
 
 export type StatusProducao = 'rascunho' | 'planejada' | 'em_programacao' | 'em_producao' | 'em_inspecao' | 'concluida' | 'cancelada';
@@ -95,4 +97,31 @@ export async function manageEntregaProducao(
     p_observacoes: obs || null,
     p_action: action,
   });
+}
+
+export async function seedOrdensProducao(): Promise<void> {
+  // 1. Fetch products
+  const { data: products } = await getProducts({ page: 1, pageSize: 100, searchTerm: '', status: 'ativo', sortBy: { column: 'nome', ascending: true } });
+  if (products.length === 0) throw new Error('Crie produtos antes de gerar ordens de produção.');
+
+  // 2. Generate 5 Orders
+  for (let i = 0; i < 5; i++) {
+    const product = faker.helpers.arrayElement(products);
+    const status = faker.helpers.arrayElement(['planejada', 'em_producao', 'concluida', 'em_programacao']) as StatusProducao;
+    
+    const payload: OrdemProducaoPayload = {
+      origem_ordem: 'manual',
+      produto_final_id: product.id,
+      quantidade_planejada: faker.number.int({ min: 10, max: 1000 }),
+      unidade: product.unidade || 'un',
+      status: status,
+      prioridade: faker.number.int({ min: 0, max: 100 }),
+      data_prevista_inicio: faker.date.soon().toISOString(),
+      data_prevista_entrega: faker.date.future().toISOString(),
+      documento_ref: `PED-${faker.string.numeric(4)}`,
+      observacoes: faker.lorem.sentence(),
+    };
+
+    await saveOrdemProducao(payload);
+  }
 }

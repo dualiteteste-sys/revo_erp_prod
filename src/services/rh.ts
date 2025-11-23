@@ -1,4 +1,5 @@
 import { callRpc } from '@/lib/api';
+import { faker } from '@faker-js/faker';
 
 // --- Types ---
 
@@ -158,6 +159,22 @@ export async function saveCargo(payload: CargoPayload): Promise<CargoDetails> {
   return callRpc<CargoDetails>('rh_upsert_cargo', { p_payload: payload });
 }
 
+export async function seedCargos(): Promise<void> {
+  const promises = Array.from({ length: 5 }).map(() => {
+    const payload: CargoPayload = {
+      nome: faker.person.jobTitle(),
+      setor: faker.commerce.department(),
+      ativo: true,
+      descricao: faker.lorem.sentence(),
+      responsabilidades: faker.lorem.paragraph(),
+      autoridades: faker.lorem.sentence(),
+      competencias: []
+    };
+    return saveCargo(payload);
+  });
+  await Promise.all(promises);
+}
+
 // Competências
 export async function listCompetencias(search?: string): Promise<Competencia[]> {
   return callRpc<Competencia[]>('rh_list_competencias', { p_search: search || null });
@@ -165,6 +182,20 @@ export async function listCompetencias(search?: string): Promise<Competencia[]> 
 
 export async function saveCompetencia(payload: CompetenciaPayload): Promise<Competencia> {
   return callRpc<Competencia>('rh_upsert_competencia', { p_payload: payload });
+}
+
+export async function seedCompetencias(): Promise<void> {
+  const promises = Array.from({ length: 5 }).map(() => {
+    const payload: CompetenciaPayload = {
+      nome: faker.word.words(2),
+      tipo: faker.helpers.arrayElement(['tecnica', 'comportamental', 'idioma']),
+      descricao: faker.lorem.sentence(),
+      critico_sgq: faker.datatype.boolean(),
+      ativo: true,
+    };
+    return saveCompetencia(payload);
+  });
+  await Promise.all(promises);
 }
 
 // Colaboradores
@@ -182,6 +213,26 @@ export async function getColaboradorDetails(id: string): Promise<ColaboradorDeta
 
 export async function saveColaborador(payload: ColaboradorPayload): Promise<ColaboradorDetails> {
   return callRpc<ColaboradorDetails>('rh_upsert_colaborador', { p_payload: payload });
+}
+
+export async function seedColaboradores(): Promise<void> {
+  const cargos = await listCargos(undefined, true);
+  if (cargos.length === 0) throw new Error('Crie cargos antes de gerar colaboradores.');
+
+  const promises = Array.from({ length: 5 }).map(() => {
+    const cargo = faker.helpers.arrayElement(cargos);
+    const payload: ColaboradorPayload = {
+      nome: faker.person.fullName(),
+      email: faker.internet.email(),
+      documento: faker.string.numeric(11),
+      data_admissao: faker.date.past().toISOString(),
+      cargo_id: cargo.id,
+      ativo: true,
+      competencias: []
+    };
+    return saveColaborador(payload);
+  });
+  await Promise.all(promises);
 }
 
 // Matriz
@@ -203,6 +254,25 @@ export async function getTreinamentoDetails(id: string): Promise<TreinamentoDeta
 
 export async function saveTreinamento(payload: TreinamentoPayload): Promise<TreinamentoDetails> {
   return callRpc<TreinamentoDetails>('rh_upsert_treinamento', { p_payload: payload });
+}
+
+export async function seedTreinamentos(): Promise<void> {
+  const promises = Array.from({ length: 5 }).map(() => {
+    const payload: TreinamentoPayload = {
+      nome: `Treinamento de ${faker.word.words(2)}`,
+      tipo: faker.helpers.arrayElement(['interno', 'externo', 'online']),
+      status: faker.helpers.arrayElement(['planejado', 'agendado', 'concluido']),
+      instrutor: faker.person.fullName(),
+      data_inicio: faker.date.soon().toISOString(),
+      data_fim: faker.date.soon({ days: 5 }).toISOString(),
+      carga_horaria_horas: faker.number.int({ min: 2, max: 40 }),
+      custo_estimado: faker.number.float({ min: 0, max: 2000, precision: 0.01 }),
+      objetivo: faker.lorem.sentence(),
+      descricao: faker.lorem.paragraph(),
+    };
+    return saveTreinamento(payload);
+  });
+  await Promise.all(promises);
 }
 
 export async function manageParticipante(

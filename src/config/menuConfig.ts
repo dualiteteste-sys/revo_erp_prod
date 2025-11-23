@@ -5,7 +5,7 @@ import {
   FileSignature, HeartHandshake, Store, Receipt, Truck, Percent,
   Bot, Undo2, ClipboardCheck, Banknote, Wallet, TrendingUp,
   TrendingDown, Landmark, FileSpreadsheet, LogOut, Search, Building, Code, Database, Target,
-  Briefcase, BookOpen, Grid, GraduationCap, PieChart, Factory, Hammer, Layers, FileCog
+  Briefcase, BookOpen, Grid, GraduationCap, PieChart, Factory, Hammer, Layers, FileCog, Route, PlayCircle, HardHat
 } from 'lucide-react';
 
 export interface MenuItem {
@@ -50,7 +50,11 @@ export const menuConfig: { name: string; icon: React.ElementType; href: string; 
         { name: 'Dashboard Produção', icon: PieChart, href: '/app/industria/dashboard' },
         { name: 'Ordens de Produção', icon: Hammer, href: '/app/industria/producao' },
         { name: 'Ordens de Beneficiamento', icon: Layers, href: '/app/industria/beneficiamento' },
+        { name: 'Execução (Operações)', icon: PlayCircle, href: '/app/industria/execucao' },
+        { name: 'Chão de Fábrica', icon: HardHat, href: '/app/industria/chao-de-fabrica' },
+        { name: 'Roteiros', icon: Route, href: '/app/industria/roteiros' },
         { name: 'Fichas Técnicas / BOM', icon: FileCog, href: '/app/industria/boms' },
+        { name: 'Centros de Trabalho', icon: Settings, href: '/app/industria/centros-trabalho' },
     ]
   },
   {

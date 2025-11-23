@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useCarriers } from '../../hooks/useCarriers';
 import { useToast } from '../../contexts/ToastProvider';
 import * as carriersService from '../../services/carriers';
-import { Loader2, PlusCircle, Search, Truck } from 'lucide-react';
+import { Loader2, PlusCircle, Search, Truck, DatabaseBackup } from 'lucide-react';
 import Pagination from '../../components/ui/Pagination';
 import ConfirmationModal from '../../components/ui/ConfirmationModal';
 import Modal from '../../components/ui/Modal';
@@ -30,11 +30,12 @@ const CarriersPage: React.FC = () => {
   const { addToast } = useToast();
 
   const [isFormOpen, setIsFormOpen] = useState(false);
-  const [selectedCarrier, setSelectedCarrier] = useState<carriersService.Carrier | null>(null);
+  const [selectedCarrier, setSelectedCarrier] = useState<carriersService.CarrierPayload | null>(null);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [carrierToDelete, setCarrierToDelete] = useState<carriersService.CarrierListItem | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
   const [isFetchingDetails, setIsFetchingDetails] = useState(false);
+  const [isSeeding, setIsSeeding] = useState(false);
 
   const handleOpenForm = async (carrier: carriersService.CarrierListItem | null = null) => {
     if (carrier?.id) {
@@ -98,28 +99,54 @@ const CarriersPage: React.FC = () => {
     }));
   };
 
+  const handleSeed = async () => {
+    setIsSeeding(true);
+    try {
+      await carriersService.seedCarriers();
+      addToast('5 Transportadoras criadas com sucesso!', 'success');
+      refresh();
+    } catch (e: any) {
+      addToast(e.message || 'Erro ao popular dados.', 'error');
+    } finally {
+      setIsSeeding(false);
+    }
+  };
+
   return (
     <div className="p-1">
       <div className="flex justify-between items-center mb-6">
-        <h1 className="text-3xl font-bold text-gray-800">Transportadoras</h1>
-        <button
-          onClick={() => handleOpenForm()}
-          className="flex items-center gap-2 bg-blue-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-blue-700 transition-colors"
-        >
-          <PlusCircle size={20} />
-          Nova Transportadora
-        </button>
+        <div>
+            <h1 className="text-3xl font-bold text-gray-800">Transportadoras</h1>
+            <p className="text-gray-600 text-sm mt-1">Gerencie as empresas responsáveis pelo transporte de suas mercadorias.</p>
+        </div>
+        <div className="flex items-center gap-2">
+            <button
+              onClick={handleSeed}
+              disabled={isSeeding || loading}
+              className="flex items-center gap-2 bg-gray-100 text-gray-700 font-semibold py-2 px-4 rounded-lg hover:bg-gray-200 transition-colors disabled:opacity-50"
+            >
+              {isSeeding ? <Loader2 className="animate-spin" size={20} /> : <DatabaseBackup size={20} />}
+              Popular Dados
+            </button>
+            <button
+              onClick={() => handleOpenForm()}
+              className="flex items-center gap-2 bg-blue-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-blue-700 transition-colors shadow-sm"
+            >
+              <PlusCircle size={20} />
+              Nova Transportadora
+            </button>
+        </div>
       </div>
 
-      <div className="mb-4 flex gap-4">
-        <div className="relative">
+      <div className="mb-6 flex gap-4">
+        <div className="relative flex-grow max-w-md">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={20} />
           <input
             type="text"
             placeholder="Buscar por nome ou CNPJ..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full max-w-xs p-3 pl-10 border border-gray-300 rounded-lg"
+            className="w-full p-3 pl-10 border border-gray-300 rounded-xl shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
           />
         </div>
         <Select
@@ -133,18 +160,39 @@ const CarriersPage: React.FC = () => {
         </Select>
       </div>
 
-      <div className="bg-white rounded-lg shadow overflow-hidden">
+      <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
         {loading && carriers.length === 0 ? (
           <div className="h-96 flex items-center justify-center">
             <Loader2 className="animate-spin text-blue-500" size={32} />
           </div>
         ) : error ? (
-          <div className="h-96 flex items-center justify-center text-red-500">{error}</div>
+          <div className="h-96 flex flex-col items-center justify-center text-red-500 p-4">
+            <p className="font-semibold">Erro ao carregar dados</p>
+            <p className="text-sm">{error}</p>
+          </div>
         ) : carriers.length === 0 ? (
-          <div className="h-96 flex flex-col items-center justify-center text-gray-500">
-            <Truck size={48} className="mb-4" />
-            <p>Nenhuma transportadora encontrada.</p>
-            {searchTerm && <p className="text-sm">Tente ajustar sua busca.</p>}
+          <div className="h-96 flex flex-col items-center justify-center text-gray-500 p-4">
+            <div className="bg-gray-100 p-4 rounded-full mb-4">
+                <Truck size={48} className="text-gray-400" />
+            </div>
+            <p className="font-semibold text-lg text-gray-700">Nenhuma transportadora encontrada.</p>
+            <p className="text-sm mb-6">Comece cadastrando uma nova transportadora ou popule com dados de exemplo.</p>
+            <div className="flex gap-3">
+                <button
+                    onClick={handleSeed}
+                    disabled={isSeeding}
+                    className="flex items-center gap-2 bg-blue-100 text-blue-700 font-bold py-2 px-4 rounded-lg hover:bg-blue-200 transition-colors disabled:opacity-50"
+                >
+                    {isSeeding ? <Loader2 className="animate-spin" size={20} /> : <DatabaseBackup size={20} />}
+                    Popular Dados
+                </button>
+                <button
+                    onClick={() => handleOpenForm()}
+                    className="text-blue-600 hover:text-blue-800 font-medium hover:underline flex items-center"
+                >
+                    Cadastrar manualmente
+                </button>
+            </div>
           </div>
         ) : (
           <CarriersTable carriers={carriers} onEdit={handleOpenForm} onDelete={handleOpenDeleteModal} sortBy={sortBy} onSort={handleSort} />
@@ -155,7 +203,7 @@ const CarriersPage: React.FC = () => {
         <Pagination currentPage={page} totalCount={count} pageSize={pageSize} onPageChange={setPage} />
       )}
 
-      <Modal isOpen={isFormOpen} onClose={handleCloseForm} title={selectedCarrier ? 'Editar Transportadora' : 'Nova Transportadora'}>
+      <Modal isOpen={isFormOpen} onClose={handleCloseForm} title={selectedCarrier ? 'Editar Transportadora' : 'Nova Transportadora'} size="lg">
         {isFetchingDetails ? (
           <div className="flex items-center justify-center h-full min-h-[400px]">
             <Loader2 className="animate-spin text-blue-600" size={48} />
@@ -170,7 +218,7 @@ const CarriersPage: React.FC = () => {
         onClose={handleCloseDeleteModal}
         onConfirm={handleDelete}
         title="Confirmar Exclusão"
-        description={`Tem certeza que deseja excluir a transportadora "${carrierToDelete?.nome_razao_social}"? Esta ação não pode ser desfeita.`}
+        description={`Tem certeza que deseja excluir a transportadora "${carrierToDelete?.nome}"? Esta ação não pode ser desfeita.`}
         confirmText="Sim, Excluir"
         isLoading={isDeleting}
         variant="danger"

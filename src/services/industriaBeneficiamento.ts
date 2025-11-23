@@ -1,4 +1,7 @@
 import { callRpc } from '@/lib/api';
+import { faker } from '@faker-js/faker';
+import { getProducts } from './products';
+import { getPartners } from './partners';
 import { OrdemComponente, OrdemEntrega } from './industria';
 
 export type StatusBeneficiamento = 'rascunho' | 'aguardando_material' | 'em_beneficiamento' | 'em_inspecao' | 'parcialmente_entregue' | 'concluida' | 'cancelada';
@@ -105,4 +108,36 @@ export async function manageEntregaBenef(
     p_observacoes: obs || null,
     p_action: action,
   });
+}
+
+export async function seedOrdensBeneficiamento(): Promise<void> {
+  // 1. Fetch dependencies
+  const { data: partners } = await getPartners({ page: 1, pageSize: 100, searchTerm: '', filterType: 'cliente', sortBy: { column: 'nome', ascending: true } });
+  const { data: products } = await getProducts({ page: 1, pageSize: 100, searchTerm: '', status: 'ativo', sortBy: { column: 'nome', ascending: true } });
+
+  if (partners.length === 0) throw new Error('Crie clientes antes de gerar ordens de beneficiamento.');
+  if (products.length === 0) throw new Error('Crie produtos/serviços antes de gerar ordens de beneficiamento.');
+
+  // 2. Generate 5 Orders
+  for (let i = 0; i < 5; i++) {
+    const client = faker.helpers.arrayElement(partners);
+    const service = faker.helpers.arrayElement(products);
+    const status = faker.helpers.arrayElement(['aguardando_material', 'em_beneficiamento', 'concluida']) as StatusBeneficiamento;
+
+    const payload: OrdemBeneficiamentoPayload = {
+      cliente_id: client.id,
+      produto_servico_id: service.id,
+      usa_material_cliente: true,
+      quantidade_planejada: faker.number.int({ min: 50, max: 5000 }),
+      unidade: service.unidade || 'un',
+      status: status,
+      prioridade: faker.number.int({ min: 0, max: 100 }),
+      data_prevista_entrega: faker.date.future().toISOString(),
+      pedido_cliente_ref: `PED-${faker.string.numeric(5)}`,
+      lote_cliente: `LOTE-${faker.string.alphanumeric(4).toUpperCase()}`,
+      observacoes: faker.lorem.sentence(),
+    };
+
+    await saveOrdemBeneficiamento(payload);
+  }
 }

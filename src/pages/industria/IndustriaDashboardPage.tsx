@@ -1,6 +1,6 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { getDashboardStats, DashboardStats } from '@/services/industria';
-import { Loader2, AlertCircle, CheckCircle, Clock, Factory } from 'lucide-react';
+import { Loader2, AlertCircle, CheckCircle, Factory, RefreshCw, Layers } from 'lucide-react';
 import GlassCard from '@/components/ui/GlassCard';
 import ReactECharts from 'echarts-for-react';
 import { motion } from 'framer-motion';
@@ -8,31 +8,92 @@ import { motion } from 'framer-motion';
 export default function IndustriaDashboardPage() {
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    const fetchStats = async () => {
-      try {
-        const data = await getDashboardStats();
-        setStats(data);
-      } catch (error) {
-        console.error(error);
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchStats();
+  const fetchStats = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const data = await getDashboardStats();
+      // Validação básica para garantir que não recebemos null/undefined
+      if (!data) throw new Error("Dados não recebidos do servidor.");
+      setStats(data);
+    } catch (err: any) {
+      console.error("Erro ao carregar dashboard:", err);
+      // Tratamento de erro amigável
+      setError(err.message || "Não foi possível carregar os dados do dashboard.");
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
-  if (loading || !stats) {
+  useEffect(() => {
+    fetchStats();
+  }, [fetchStats]);
+
+  // UI de Carregamento (Skeleton)
+  if (loading) {
     return (
-      <div className="flex justify-center h-full items-center">
-        <Loader2 className="animate-spin text-blue-600 w-12 h-12" />
+      <div className="p-1 space-y-6 animate-pulse">
+        <div className="h-8 w-64 bg-gray-200 rounded mb-2"></div>
+        <div className="h-4 w-48 bg-gray-200 rounded mb-6"></div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+          {[...Array(4)].map((_, i) => (
+            <div key={i} className="bg-gray-100 rounded-2xl p-6 h-32 border border-gray-200"></div>
+          ))}
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <div className="h-[350px] bg-gray-100 rounded-2xl border border-gray-200"></div>
+          <div className="h-[350px] bg-gray-100 rounded-2xl border border-gray-200"></div>
+        </div>
       </div>
     );
   }
 
+  // UI de Erro com Botão de Retry
+  if (error) {
+    return (
+      <div className="flex flex-col items-center justify-center h-[60vh] p-4">
+        <div className="bg-red-50 border border-red-200 rounded-2xl p-8 max-w-md text-center shadow-sm">
+          <AlertCircle className="w-12 h-12 text-red-500 mx-auto mb-4" />
+          <h3 className="text-lg font-bold text-red-800 mb-2">Erro ao carregar dashboard</h3>
+          <p className="text-red-600 mb-6 text-sm">{error}</p>
+          <button
+            onClick={fetchStats}
+            className="inline-flex items-center gap-2 px-5 py-2.5 bg-red-100 text-red-700 rounded-lg hover:bg-red-200 transition-colors font-medium text-sm"
+          >
+            <RefreshCw size={16} /> Tentar Novamente
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // Cálculos seguros com Nullish Coalescing (??) para evitar crash
+  const totalProducao = stats?.total_producao ?? 0;
+  const totalBeneficiamento = stats?.total_beneficiamento ?? 0;
+  const totalGeral = totalProducao + totalBeneficiamento;
+
+  // Agregar status de produção e beneficiamento para o gráfico de pizza
+  // Usa optional chaining (?.) e fallback para array vazio (?? [])
+  const statusMap = new Map<string, number>();
+  
+  (stats?.producao_status ?? []).forEach(s => {
+    statusMap.set(s.status, (statusMap.get(s.status) || 0) + Number(s.total));
+  });
+  (stats?.beneficiamento_status ?? []).forEach(s => {
+    statusMap.set(s.status, (statusMap.get(s.status) || 0) + Number(s.total));
+  });
+
+  const chartDataStatus = Array.from(statusMap.entries()).map(([status, total]) => ({
+    value: total,
+    name: status.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())
+  }));
+
   const statusChartOption = {
-    title: { text: 'Ordens por Status', left: 'center', textStyle: { fontSize: 14 } },
+    title: { text: 'Ordens por Status', left: 'center', textStyle: { fontSize: 14, color: '#4b5563' } },
     tooltip: { trigger: 'item' },
     legend: { bottom: '0%' },
     series: [
@@ -42,29 +103,36 @@ export default function IndustriaDashboardPage() {
         radius: ['40%', '70%'],
         center: ['50%', '45%'],
         itemStyle: { borderRadius: 5, borderColor: '#fff', borderWidth: 2 },
-        data: stats.by_status.map(s => ({
-          value: s.total,
-          name: s.status.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())
-        }))
+        data: chartDataStatus.length > 0 ? chartDataStatus : [{ value: 0, name: 'Sem dados' }]
       }
     ]
   };
 
   const typeChartOption = {
-    title: { text: 'Tipo de Produção', left: 'center', textStyle: { fontSize: 14 } },
+    title: { text: 'Tipo de Produção', left: 'center', textStyle: { fontSize: 14, color: '#4b5563' } },
     tooltip: { trigger: 'item' },
+    legend: { bottom: '0%' },
     series: [
       {
         name: 'Tipo',
         type: 'pie',
         radius: '60%',
-        data: stats.by_type.map(t => ({
-          value: t.total,
-          name: t.tipo_ordem === 'industrializacao' ? 'Industrialização' : 'Beneficiamento'
-        }))
+        center: ['50%', '45%'],
+        data: [
+          { value: totalProducao, name: 'Industrialização', itemStyle: { color: '#3b82f6' } },
+          { value: totalBeneficiamento, name: 'Beneficiamento', itemStyle: { color: '#8b5cf6' } }
+        ]
       }
     ]
   };
+
+  // KPI Calculations (Safe)
+  const concluidasProd = (stats?.producao_status ?? []).find(s => s.status === 'concluida')?.total ?? 0;
+  const concluidasBenef = (stats?.beneficiamento_status ?? []).find(s => s.status === 'concluida')?.total ?? 0;
+  const totalConcluidas = concluidasProd + concluidasBenef;
+  
+  // Eficiência (Exemplo simples: Concluídas / Total)
+  const eficiencia = totalGeral > 0 ? Math.round((totalConcluidas / totalGeral) * 100) : 0;
 
   return (
     <div className="p-1 space-y-6">
@@ -75,32 +143,32 @@ export default function IndustriaDashboardPage() {
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         <KPICard 
-          title="Total Planejado" 
-          value={stats.total_planejado} 
+          title="Total em Carteira" 
+          value={totalGeral} 
           icon={Factory} 
           color="bg-blue-100 text-blue-600" 
-          subtext="Unidades em carteira"
+          subtext="Ordens ativas"
         />
         <KPICard 
-          title="Total Entregue" 
-          value={stats.total_entregue} 
+          title="Produção Própria" 
+          value={totalProducao} 
+          icon={Factory} 
+          color="bg-indigo-100 text-indigo-600" 
+          subtext="Industrialização"
+        />
+        <KPICard 
+          title="Beneficiamento" 
+          value={totalBeneficiamento} 
+          icon={Layers} 
+          color="bg-purple-100 text-purple-600" 
+          subtext="Serviços em terceiros"
+        />
+        <KPICard 
+          title="Taxa de Conclusão" 
+          value={`${eficiencia}%`} 
           icon={CheckCircle} 
           color="bg-green-100 text-green-600" 
-          subtext="Produção realizada"
-        />
-        <KPICard 
-          title="Ordens Atrasadas" 
-          value={stats.total_atrasadas} 
-          icon={AlertCircle} 
-          color="bg-red-100 text-red-600" 
-          subtext="Prazo de entrega vencido"
-        />
-        <KPICard 
-          title="Eficiência Global" 
-          value={`${stats.total_planejado > 0 ? Math.round((stats.total_entregue / stats.total_planejado) * 100) : 0}%`} 
-          icon={Clock} 
-          color="bg-purple-100 text-purple-600" 
-          subtext="Entregue vs Planejado"
+          subtext={`${totalConcluidas} ordens finalizadas`}
         />
       </div>
 

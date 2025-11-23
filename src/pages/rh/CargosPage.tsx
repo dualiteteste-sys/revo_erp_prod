@@ -1,21 +1,24 @@
 import React, { useState, useEffect } from 'react';
-import { listCargos, Cargo, getCargoDetails, CargoDetails } from '@/services/rh';
-import { PlusCircle, Search, Briefcase, Edit, Users } from 'lucide-react';
+import { listCargos, Cargo, getCargoDetails, CargoDetails, seedCargos } from '@/services/rh';
+import { PlusCircle, Search, Briefcase, Edit, Users, DatabaseBackup } from 'lucide-react';
 import GlassCard from '@/components/ui/GlassCard';
 import Modal from '@/components/ui/Modal';
 import CargoFormPanel from '@/components/rh/CargoFormPanel';
 import { Loader2 } from 'lucide-react';
 import { useDebounce } from '@/hooks/useDebounce';
+import { useToast } from '@/contexts/ToastProvider';
 
 export default function CargosPage() {
   const [cargos, setCargos] = useState<Cargo[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const debouncedSearch = useDebounce(search, 500);
+  const { addToast } = useToast();
   
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [selectedCargo, setSelectedCargo] = useState<CargoDetails | null>(null);
   const [loadingDetails, setLoadingDetails] = useState(false);
+  const [isSeeding, setIsSeeding] = useState(false);
 
   const fetchCargos = async () => {
     setLoading(true);
@@ -58,6 +61,19 @@ export default function CargosPage() {
     fetchCargos();
   };
 
+  const handleSeed = async () => {
+    setIsSeeding(true);
+    try {
+      await seedCargos();
+      addToast('5 Cargos criados com sucesso!', 'success');
+      fetchCargos();
+    } catch (e: any) {
+      addToast(e.message || 'Erro ao popular dados.', 'error');
+    } finally {
+      setIsSeeding(false);
+    }
+  };
+
   return (
     <div className="p-1">
       <div className="flex justify-between items-center mb-6">
@@ -65,13 +81,23 @@ export default function CargosPage() {
           <h1 className="text-3xl font-bold text-gray-800">Cargos e Funções</h1>
           <p className="text-gray-600 text-sm mt-1">Gestão de responsabilidades e autoridades (ISO 9001)</p>
         </div>
-        <button
-          onClick={handleNew}
-          className="flex items-center gap-2 bg-blue-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-blue-700 transition-colors"
-        >
-          <PlusCircle size={20} />
-          Novo Cargo
-        </button>
+        <div className="flex items-center gap-2">
+            <button
+              onClick={handleSeed}
+              disabled={isSeeding || loading}
+              className="flex items-center gap-2 bg-gray-100 text-gray-700 font-semibold py-2 px-4 rounded-lg hover:bg-gray-200 transition-colors disabled:opacity-50"
+            >
+              {isSeeding ? <Loader2 className="animate-spin" size={20} /> : <DatabaseBackup size={20} />}
+              Popular Dados
+            </button>
+            <button
+              onClick={handleNew}
+              className="flex items-center gap-2 bg-blue-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-blue-700 transition-colors"
+            >
+              <PlusCircle size={20} />
+              Novo Cargo
+            </button>
+        </div>
       </div>
 
       <div className="mb-6 relative max-w-md">

@@ -1,12 +1,13 @@
 import React, { useState, useEffect } from 'react';
-import { listTreinamentos, Treinamento, getTreinamentoDetails, TreinamentoDetails } from '@/services/rh';
-import { PlusCircle, Search, GraduationCap, Edit, Calendar, User } from 'lucide-react';
+import { listTreinamentos, Treinamento, getTreinamentoDetails, TreinamentoDetails, seedTreinamentos } from '@/services/rh';
+import { PlusCircle, Search, GraduationCap, Edit, Calendar, User, DatabaseBackup } from 'lucide-react';
 import GlassCard from '@/components/ui/GlassCard';
 import Modal from '@/components/ui/Modal';
 import TreinamentoFormPanel from '@/components/rh/TreinamentoFormPanel';
 import { Loader2 } from 'lucide-react';
 import { useDebounce } from '@/hooks/useDebounce';
 import Select from '@/components/ui/forms/Select';
+import { useToast } from '@/contexts/ToastProvider';
 
 export default function TreinamentosPage() {
   const [treinamentos, setTreinamentos] = useState<Treinamento[]>([]);
@@ -14,10 +15,12 @@ export default function TreinamentosPage() {
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('');
   const debouncedSearch = useDebounce(search, 500);
+  const { addToast } = useToast();
   
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [selectedTreinamento, setSelectedTreinamento] = useState<TreinamentoDetails | null>(null);
   const [loadingDetails, setLoadingDetails] = useState(false);
+  const [isSeeding, setIsSeeding] = useState(false);
 
   const fetchTreinamentos = async () => {
     setLoading(true);
@@ -60,6 +63,19 @@ export default function TreinamentosPage() {
     fetchTreinamentos();
   };
 
+  const handleSeed = async () => {
+    setIsSeeding(true);
+    try {
+      await seedTreinamentos();
+      addToast('5 Treinamentos criados com sucesso!', 'success');
+      fetchTreinamentos();
+    } catch (e: any) {
+      addToast(e.message || 'Erro ao popular dados.', 'error');
+    } finally {
+      setIsSeeding(false);
+    }
+  };
+
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'planejado': return 'bg-gray-100 text-gray-800';
@@ -82,13 +98,23 @@ export default function TreinamentosPage() {
           <h1 className="text-3xl font-bold text-gray-800">Treinamentos e Desenvolvimento</h1>
           <p className="text-gray-600 text-sm mt-1">Gestão de capacitação e eficácia (ISO 9001: 7.2)</p>
         </div>
-        <button
-          onClick={handleNew}
-          className="flex items-center gap-2 bg-blue-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-blue-700 transition-colors"
-        >
-          <PlusCircle size={20} />
-          Novo Treinamento
-        </button>
+        <div className="flex items-center gap-2">
+            <button
+              onClick={handleSeed}
+              disabled={isSeeding || loading}
+              className="flex items-center gap-2 bg-gray-100 text-gray-700 font-semibold py-2 px-4 rounded-lg hover:bg-gray-200 transition-colors disabled:opacity-50"
+            >
+              {isSeeding ? <Loader2 className="animate-spin" size={20} /> : <DatabaseBackup size={20} />}
+              Popular Dados
+            </button>
+            <button
+              onClick={handleNew}
+              className="flex items-center gap-2 bg-blue-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-blue-700 transition-colors"
+            >
+              <PlusCircle size={20} />
+              Novo Treinamento
+            </button>
+        </div>
       </div>
 
       <div className="mb-6 flex gap-4">

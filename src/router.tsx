@@ -50,6 +50,10 @@ import IndustriaDashboardPage from "./pages/industria/IndustriaDashboardPage";
 import ProducaoPage from "./pages/industria/producao/ProducaoPage";
 import BeneficiamentoPage from "./pages/industria/beneficiamento/BeneficiamentoPage";
 import BomsPage from "./pages/industria/boms/BomsPage";
+import RoteirosPage from "./pages/industria/RoteirosPage";
+import CentrosTrabalhoPage from "./pages/industria/CentrosTrabalhoPage";
+import ExecucaoPage from "./pages/industria/ExecucaoPage";
+import ChaoDeFabricaPage from "./pages/industria/ChaoDeFabricaPage";
 
 // Suprimentos Pages
 import EstoquePage from "./pages/suprimentos/EstoquePage";
@@ -105,6 +109,10 @@ export const router = createBrowserRouter([
         { path: "industria/producao", element: <ProducaoPage /> },
         { path: "industria/beneficiamento", element: <BeneficiamentoPage /> },
         { path: "industria/boms", element: <BomsPage /> },
+        { path: "industria/roteiros", element: <RoteirosPage /> },
+        { path: "industria/centros-trabalho", element: <CentrosTrabalhoPage /> },
+        { path: "industria/execucao", element: <ExecucaoPage /> },
+        { path: "industria/chao-de-fabrica", element: <ChaoDeFabricaPage /> },
 
         // Vendas
         { path: "sales-dashboard", element: <SalesDashboard /> },

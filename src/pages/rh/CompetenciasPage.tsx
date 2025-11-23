@@ -1,20 +1,23 @@
 import React, { useState, useEffect } from 'react';
-import { listCompetencias, Competencia } from '@/services/rh';
-import { PlusCircle, Search, BookOpen, Edit, ShieldCheck } from 'lucide-react';
+import { listCompetencias, Competencia, seedCompetencias } from '@/services/rh';
+import { PlusCircle, Search, BookOpen, Edit, ShieldCheck, DatabaseBackup } from 'lucide-react';
 import GlassCard from '@/components/ui/GlassCard';
 import Modal from '@/components/ui/Modal';
 import CompetenciaFormPanel from '@/components/rh/CompetenciaFormPanel';
 import { Loader2 } from 'lucide-react';
 import { useDebounce } from '@/hooks/useDebounce';
+import { useToast } from '@/contexts/ToastProvider';
 
 export default function CompetenciasPage() {
   const [competencias, setCompetencias] = useState<Competencia[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const debouncedSearch = useDebounce(search, 500);
+  const { addToast } = useToast();
   
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [selectedCompetencia, setSelectedCompetencia] = useState<Competencia | null>(null);
+  const [isSeeding, setIsSeeding] = useState(false);
 
   const fetchCompetencias = async () => {
     setLoading(true);
@@ -47,6 +50,19 @@ export default function CompetenciasPage() {
     fetchCompetencias();
   };
 
+  const handleSeed = async () => {
+    setIsSeeding(true);
+    try {
+      await seedCompetencias();
+      addToast('5 Competências criadas com sucesso!', 'success');
+      fetchCompetencias();
+    } catch (e: any) {
+      addToast(e.message || 'Erro ao popular dados.', 'error');
+    } finally {
+      setIsSeeding(false);
+    }
+  };
+
   return (
     <div className="p-1">
       <div className="flex justify-between items-center mb-6">
@@ -54,13 +70,23 @@ export default function CompetenciasPage() {
           <h1 className="text-3xl font-bold text-gray-800">Banco de Competências</h1>
           <p className="text-gray-600 text-sm mt-1">Habilidades, conhecimentos e certificações.</p>
         </div>
-        <button
-          onClick={handleNew}
-          className="flex items-center gap-2 bg-blue-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-blue-700 transition-colors"
-        >
-          <PlusCircle size={20} />
-          Nova Competência
-        </button>
+        <div className="flex items-center gap-2">
+            <button
+              onClick={handleSeed}
+              disabled={isSeeding || loading}
+              className="flex items-center gap-2 bg-gray-100 text-gray-700 font-semibold py-2 px-4 rounded-lg hover:bg-gray-200 transition-colors disabled:opacity-50"
+            >
+              {isSeeding ? <Loader2 className="animate-spin" size={20} /> : <DatabaseBackup size={20} />}
+              Popular Dados
+            </button>
+            <button
+              onClick={handleNew}
+              className="flex items-center gap-2 bg-blue-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-blue-700 transition-colors"
+            >
+              <PlusCircle size={20} />
+              Nova Competência
+            </button>
+        </div>
       </div>
 
       <div className="mb-6 relative max-w-md">

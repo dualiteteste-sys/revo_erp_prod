@@ -18,19 +18,20 @@ export const useCarriers = () => {
   const [pageSize] = useState(15);
 
   const [sortBy, setSortBy] = useState<{ column: keyof carriersService.CarrierListItem; ascending: boolean }>({
-    column: 'nome_razao_social',
+    column: 'nome',
     ascending: true,
   });
 
   const fetchCarriers = useCallback(async () => {
     if (!activeEmpresa) {
-        setCarriers([]);
-        setCount(0);
-        return;
+      setCarriers([]);
+      setCount(0);
+      return;
     }
     setLoading(true);
     setError(null);
     try {
+      // Fix: Ensure debouncedSearchTerm is used correctly
       const { data, count } = await carriersService.getCarriers({
         page,
         pageSize,

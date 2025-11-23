@@ -1,16 +1,16 @@
 import React, { useState, useEffect } from 'react';
-import { listBoms, BomListItem, seedBoms } from '@/services/industriaBom';
-import { PlusCircle, Search, FileCog, DatabaseBackup } from 'lucide-react';
+import { listRoteiros, RoteiroListItem, seedRoteiros } from '@/services/industriaRoteiros';
+import { PlusCircle, Search, Route, DatabaseBackup } from 'lucide-react';
 import { Loader2 } from 'lucide-react';
 import { useDebounce } from '@/hooks/useDebounce';
 import Modal from '@/components/ui/Modal';
 import Select from '@/components/ui/forms/Select';
-import BomsTable from '@/components/industria/boms/BomsTable';
-import BomFormPanel from '@/components/industria/boms/BomFormPanel';
+import RoteirosTable from '@/components/industria/roteiros/RoteirosTable';
+import RoteiroFormPanel from '@/components/industria/roteiros/RoteiroFormPanel';
 import { useToast } from '@/contexts/ToastProvider';
 
-export default function BomsPage() {
-  const [boms, setBoms] = useState<BomListItem[]>([]);
+export default function RoteirosPage() {
+  const [roteiros, setRoteiros] = useState<RoteiroListItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [typeFilter, setTypeFilter] = useState('');
@@ -21,11 +21,11 @@ export default function BomsPage() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [isSeeding, setIsSeeding] = useState(false);
 
-  const fetchBoms = async () => {
+  const fetchRoteiros = async () => {
     setLoading(true);
     try {
-      const data = await listBoms(debouncedSearch, undefined, typeFilter as any || undefined);
-      setBoms(data);
+      const data = await listRoteiros(debouncedSearch, undefined, typeFilter as any || undefined);
+      setRoteiros(data);
     } catch (e) {
       console.error(e);
     } finally {
@@ -34,7 +34,7 @@ export default function BomsPage() {
   };
 
   useEffect(() => {
-    fetchBoms();
+    fetchRoteiros();
   }, [debouncedSearch, typeFilter]);
 
   const handleNew = () => {
@@ -42,8 +42,8 @@ export default function BomsPage() {
     setIsFormOpen(true);
   };
 
-  const handleEdit = (bom: BomListItem) => {
-    setSelectedId(bom.id);
+  const handleEdit = (roteiro: RoteiroListItem) => {
+    setSelectedId(roteiro.id);
     setIsFormOpen(true);
   };
 
@@ -53,16 +53,16 @@ export default function BomsPage() {
   };
 
   const handleSuccess = () => {
-    fetchBoms();
+    fetchRoteiros();
     if (!selectedId) handleClose();
   };
 
   const handleSeed = async () => {
     setIsSeeding(true);
     try {
-      await seedBoms();
-      addToast('5 Fichas Técnicas (com componentes) criadas com sucesso!', 'success');
-      fetchBoms();
+      await seedRoteiros();
+      addToast('5 Roteiros (com etapas) criados com sucesso!', 'success');
+      fetchRoteiros();
     } catch (e: any) {
       addToast(e.message || 'Erro ao popular dados.', 'error');
     } finally {
@@ -75,9 +75,9 @@ export default function BomsPage() {
       <div className="flex justify-between items-center mb-6 flex-shrink-0">
         <div>
           <h1 className="text-3xl font-bold text-gray-800 flex items-center gap-2">
-            <FileCog className="text-blue-600" /> Fichas Técnicas (BOM)
+            <Route className="text-blue-600" /> Roteiros de Produção
           </h1>
-          <p className="text-gray-600 text-sm mt-1">Estruturas de produtos e listas de materiais.</p>
+          <p className="text-gray-600 text-sm mt-1">Sequência de operações e centros de trabalho.</p>
         </div>
         <div className="flex items-center gap-2">
             <button
@@ -93,7 +93,7 @@ export default function BomsPage() {
               className="flex items-center gap-2 bg-blue-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-blue-700 transition-colors"
             >
               <PlusCircle size={20} />
-              Nova Ficha Técnica
+              Novo Roteiro
             </button>
         </div>
       </div>
@@ -126,12 +126,12 @@ export default function BomsPage() {
             <Loader2 className="animate-spin text-blue-600 w-10 h-10" />
           </div>
         ) : (
-          <BomsTable boms={boms} onEdit={handleEdit} />
+          <RoteirosTable roteiros={roteiros} onEdit={handleEdit} />
         )}
       </div>
 
-      <Modal isOpen={isFormOpen} onClose={handleClose} title={selectedId ? 'Editar Ficha Técnica' : 'Nova Ficha Técnica'} size="5xl">
-        <BomFormPanel bomId={selectedId} onSaveSuccess={handleSuccess} onClose={handleClose} />
+      <Modal isOpen={isFormOpen} onClose={handleClose} title={selectedId ? 'Editar Roteiro' : 'Novo Roteiro'} size="5xl">
+        <RoteiroFormPanel roteiroId={selectedId} onSaveSuccess={handleSuccess} onClose={handleClose} />
       </Modal>
     </div>
   );
