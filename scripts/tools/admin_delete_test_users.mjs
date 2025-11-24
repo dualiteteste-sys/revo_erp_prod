@@ -21,7 +21,7 @@ import { createClient } from "@supabase/supabase-js";
 const args = process.argv.slice(2);
 const getArg = (name, def = null) => {
   const i = args.findIndex(a => a === `--${name}`);
-  if (i &gt;= 0 && i + 1 &lt; args.length) return args[i + 1];
+  if (i >= 0 && i + 1 < args.length) return args[i + 1];
   if (args.some(a => a === `--${name}`)) return true; // flags booleanas (ex: --dry-run)
   return def;
 };
@@ -31,7 +31,7 @@ const PREFIX = getArg("prefix");
 const DRY_RUN = !!getArg("dry-run", false);
 
 if (!DOMAIN || !PREFIX) {
-  console.error("Params obrigatórios: --domain &lt;domínio&gt; --prefix &lt;prefixo&gt;  [--dry-run]");
+  console.error("Params obrigatórios: --domain <domínio> --prefix <prefixo>  [--dry-run]");
   process.exit(1);
 }
 
@@ -63,7 +63,7 @@ async function listAllUsers() {
     if (error) throw error;
     const batch = data?.users ?? [];
     acc.push(...batch);
-    if (batch.length &lt; perPage) break;
+    if (batch.length < perPage) break;
     page++;
   }
   return acc;

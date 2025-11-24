@@ -61,6 +61,9 @@ export default function EstoquePage() {
     }
   };
 
+  // Tipos de movimento que somam ao estoque
+  const entryTypes = ['entrada', 'ajuste_entrada', 'entrada_beneficiamento'];
+
   return (
     <div className="p-1">
       <div className="flex flex-col md:flex-row justify-between items-center mb-6 gap-4">
@@ -178,13 +181,19 @@ export default function EstoquePage() {
                             {kardexData.map(mov => (
                                 <tr key={mov.id}>
                                     <td className="p-3">{new Date(mov.created_at).toLocaleString('pt-BR')}</td>
-                                    <td className="p-3 capitalize">{mov.tipo.replace(/_/g, ' ')}</td>
-                                    <td className={`p-3 text-right font-bold ${['entrada', 'ajuste_entrada'].includes(mov.tipo) ? 'text-green-600' : 'text-red-600'}`}>
-                                        {['entrada', 'ajuste_entrada'].includes(mov.tipo) ? '+' : '-'}{mov.quantidade}
+                                    <td className="p-3 capitalize">
+                                        {mov.tipo === 'entrada_beneficiamento' 
+                                            ? 'Entrada Benef.' 
+                                            : mov.tipo.replace(/_/g, ' ')}
+                                    </td>
+                                    <td className={`p-3 text-right font-bold ${entryTypes.includes(mov.tipo) ? 'text-green-600' : 'text-red-600'}`}>
+                                        {entryTypes.includes(mov.tipo) ? '+' : '-'}{mov.quantidade}
                                     </td>
                                     <td className="p-3 text-right text-gray-500">{mov.saldo_anterior}</td>
                                     <td className="p-3 text-right font-semibold">{mov.saldo_novo}</td>
-                                    <td className="p-3 text-gray-600">{mov.documento_ref || '-'}</td>
+                                    <td className="p-3 text-gray-600 max-w-xs truncate" title={mov.observacao || ''}>
+                                        {mov.documento_ref || mov.observacao || '-'}
+                                    </td>
                                     <td className="p-3 text-gray-500 text-xs">{mov.usuario_email}</td>
                                 </tr>
                             ))}

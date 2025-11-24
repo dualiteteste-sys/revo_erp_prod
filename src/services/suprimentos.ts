@@ -13,7 +13,7 @@ export type EstoquePosicao = {
 
 export type EstoqueMovimento = {
   id: string;
-  tipo: 'entrada' | 'saida' | 'ajuste_entrada' | 'ajuste_saida' | 'perda' | 'inventario';
+  tipo: 'entrada' | 'saida' | 'ajuste_entrada' | 'ajuste_saida' | 'perda' | 'inventario' | 'entrada_beneficiamento';
   quantidade: number;
   saldo_anterior: number;
   saldo_novo: number;
@@ -30,6 +30,32 @@ export type RegistrarMovimentoPayload = {
   custo_unitario?: number;
   documento_ref?: string;
   observacao?: string;
+};
+
+// Novos tipos para relatórios
+export type RelatorioValorizacaoItem = {
+  produto_id: string;
+  nome: string;
+  sku: string | null;
+  unidade: string;
+  saldo: number;
+  custo_medio: number;
+  valor_total: number;
+  percentual: number;
+  acumulado: number;
+  classe: 'A' | 'B' | 'C';
+};
+
+export type RelatorioBaixoEstoqueItem = {
+  produto_id: string;
+  nome: string;
+  sku: string | null;
+  unidade: string;
+  saldo: number;
+  estoque_min: number | null;
+  estoque_max: number | null;
+  sugestao_compra: number;
+  fornecedor_nome: string | null;
 };
 
 export async function listPosicaoEstoque(search?: string, baixoEstoque?: boolean): Promise<EstoquePosicao[]> {
@@ -54,5 +80,18 @@ export async function registrarMovimento(payload: RegistrarMovimentoPayload): Pr
     p_custo_unitario: payload.custo_unitario || null,
     p_documento_ref: payload.documento_ref || null,
     p_observacao: payload.observacao || null,
+  });
+}
+
+// Novas funções de relatório
+export async function getRelatorioValorizacao(search?: string): Promise<RelatorioValorizacaoItem[]> {
+  return callRpc<RelatorioValorizacaoItem[]>('suprimentos_relatorio_valorizacao', {
+    p_search: search || null,
+  });
+}
+
+export async function getRelatorioBaixoEstoque(search?: string): Promise<RelatorioBaixoEstoqueItem[]> {
+  return callRpc<RelatorioBaixoEstoqueItem[]>('suprimentos_relatorio_baixo_estoque', {
+    p_search: search || null,
   });
 }
