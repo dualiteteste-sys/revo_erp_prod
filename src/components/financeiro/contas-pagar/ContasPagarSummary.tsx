@@ -1,6 +1,6 @@
 import React from 'react';
 import { motion } from 'framer-motion';
-import { DollarSign, AlertCircle, CheckCircle } from 'lucide-react';
+import { DollarSign, AlertCircle, CheckCircle, Clock } from 'lucide-react';
 import GlassCard from '@/components/ui/GlassCard';
 import { ContasPagarSummary as SummaryData } from '@/services/financeiro';
 
@@ -39,27 +39,33 @@ const SummaryCard: React.FC<{ title: string; value: string; icon: React.ElementT
 const ContasPagarSummary: React.FC<ContasPagarSummaryProps> = ({ summary }) => {
     const summaryData = [
         {
-            title: 'Pendente',
-            value: formatCurrency(summary.total_pendente),
+            title: 'Em Aberto',
+            value: formatCurrency(summary.abertas),
             icon: DollarSign,
             color: 'bg-yellow-100/70',
         },
         {
-            title: 'Pago (este mês)',
-            value: formatCurrency(summary.total_pago_mes),
+            title: 'Vencidas',
+            value: formatCurrency(summary.vencidas),
+            icon: AlertCircle,
+            color: 'bg-red-100/70',
+        },
+        {
+            title: 'Pagas',
+            value: formatCurrency(summary.pagas),
             icon: CheckCircle,
             color: 'bg-green-100/70',
         },
         {
-            title: 'Vencido',
-            value: formatCurrency(summary.total_vencido),
-            icon: AlertCircle,
-            color: 'bg-red-100/70',
+            title: 'Parciais',
+            value: formatCurrency(summary.parciais),
+            icon: Clock,
+            color: 'bg-blue-100/70',
         },
     ];
 
     return (
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
             {summaryData.map((item, index) => (
                 <SummaryCard key={item.title} {...item} index={index} />
             ))}

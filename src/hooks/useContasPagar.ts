@@ -7,10 +7,12 @@ export const useContasPagar = () => {
     const { activeEmpresa } = useAuth();
     const [contas, setContas] = useState<financeiroService.ContaPagar[]>([]);
     const [summary, setSummary] = useState<financeiroService.ContasPagarSummary>({
-        total_pendente: 0,
-        total_pago_mes: 0,
-        total_vencido: 0,
-    });
+        total_pendente: 0, // Mantendo compatibilidade se a UI usar nomes antigos, mas o serviço retorna abertas/vencidas/etc
+        abertas: 0,
+        parciais: 0,
+        pagas: 0,
+        vencidas: 0,
+    } as any);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [count, setCount] = useState(0);
@@ -19,6 +21,9 @@ export const useContasPagar = () => {
     const debouncedSearchTerm = useDebounce(searchTerm, 500);
 
     const [filterStatus, setFilterStatus] = useState<string | null>(null);
+    const [filterStartDate, setFilterStartDate] = useState<Date | null>(null);
+    const [filterEndDate, setFilterEndDate] = useState<Date | null>(null);
+    
     const [page, setPage] = useState(1);
     const [pageSize] = useState(15);
 
@@ -42,9 +47,11 @@ export const useContasPagar = () => {
                     pageSize,
                     searchTerm: debouncedSearchTerm,
                     status: filterStatus,
+                    startDate: filterStartDate,
+                    endDate: filterEndDate,
                     sortBy,
                 }),
-                financeiroService.getContasPagarSummary(),
+                financeiroService.getContasPagarSummary(filterStartDate, filterEndDate),
             ]);
             setContas(data);
             setCount(count);
@@ -56,7 +63,7 @@ export const useContasPagar = () => {
         } finally {
             setLoading(false);
         }
-    }, [page, pageSize, debouncedSearchTerm, filterStatus, sortBy, activeEmpresa]);
+    }, [page, pageSize, debouncedSearchTerm, filterStatus, filterStartDate, filterEndDate, sortBy, activeEmpresa]);
 
     useEffect(() => {
         fetchContas();
@@ -76,10 +83,14 @@ export const useContasPagar = () => {
         pageSize,
         searchTerm,
         filterStatus,
+        filterStartDate,
+        filterEndDate,
         sortBy,
         setPage,
         setSearchTerm,
         setFilterStatus,
+        setFilterStartDate,
+        setFilterEndDate,
         setSortBy,
         refresh,
     };

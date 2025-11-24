@@ -1,5 +1,7 @@
 import { callRpc } from '@/lib/api';
 import { Database } from '@/types/database.types';
+import { faker } from '@faker-js/faker';
+import { getPartners } from './partners';
 
 export type ContaAReceber = Database['public']['Tables']['contas_a_receber']['Row'] & {
     cliente_nome?: string;
@@ -84,4 +86,41 @@ export async function getContasAReceberSummary(): Promise<ContasAReceberSummary>
         console.error('[SERVICE][GET_CONTAS_A_RECEBER_SUMMARY]', error);
         throw new Error('Erro ao buscar o resumo financeiro.');
     }
+}
+
+export async function seedContasAReceber(): Promise<void> {
+  // Busca clientes existentes para vincular
+  const { data: partners } = await getPartners({ 
+    page: 1, 
+    pageSize: 100, 
+    searchTerm: '', 
+    filterType: 'cliente', 
+    sortBy: { column: 'nome', ascending: true } 
+  });
+  
+  if (partners.length === 0) throw new Error('Crie clientes antes de gerar contas a receber.');
+
+  const promises = Array.from({ length: 5 }).map(() => {
+    const partner = faker.helpers.arrayElement(partners);
+    const status = faker.helpers.arrayElement(['pendente', 'pago', 'vencido']);
+    const valor = parseFloat(faker.finance.amount(100, 5000, 2));
+    
+    let dataVencimento = faker.date.soon({ days: 30 });
+    if (status === 'vencido') {
+        dataVencimento = faker.date.recent({ days: 30 });
+    }
+
+    const payload: ContaAReceberPayload = {
+      cliente_id: partner.id,
+      descricao: `Venda de ${faker.commerce.productName()}`,
+      valor: valor,
+      data_vencimento: dataVencimento.toISOString().split('T')[0],
+      status: status as any,
+      observacoes: 'Gerado automaticamente',
+      data_pagamento: status === 'pago' ? faker.date.recent({ days: 5 }).toISOString().split('T')[0] : undefined,
+      valor_pago: status === 'pago' ? valor : undefined,
+    };
+    return saveContaAReceber(payload);
+  });
+  await Promise.all(promises);
 }

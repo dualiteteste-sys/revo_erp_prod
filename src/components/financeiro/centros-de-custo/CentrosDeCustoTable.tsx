@@ -1,7 +1,7 @@
 import React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { CentroDeCustoListItem } from '@/services/centrosDeCusto';
-import { Edit, Trash2, ArrowUpDown } from 'lucide-react';
+import { Edit, Trash2, ArrowUpDown, CornerDownRight } from 'lucide-react';
 
 interface CentrosDeCustoTableProps {
   centros: CentroDeCustoListItem[];
@@ -40,7 +40,9 @@ const CentrosDeCustoTable: React.FC<CentrosDeCustoTableProps> = ({ centros, onEd
           <tr>
             <SortableHeader column="nome" label="Nome" sortBy={sortBy} onSort={onSort} />
             <SortableHeader column="codigo" label="Código" sortBy={sortBy} onSort={onSort} />
-            <SortableHeader column="status" label="Status" sortBy={sortBy} onSort={onSort} />
+            <SortableHeader column="tipo" label="Tipo" sortBy={sortBy} onSort={onSort} />
+            <SortableHeader column="nivel" label="Nível" sortBy={sortBy} onSort={onSort} />
+            <th scope="col" className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
             <th scope="col" className="relative px-6 py-3"><span className="sr-only">Ações</span></th>
           </tr>
         </thead>
@@ -56,13 +58,20 @@ const CentrosDeCustoTable: React.FC<CentrosDeCustoTableProps> = ({ centros, onEd
                 transition={{ duration: 0.3 }}
                 className="hover:bg-gray-50"
               >
-                <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{centro.nome}</td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{centro.codigo || '-'}</td>
-                <td className="px-6 py-4 whitespace-nowrap">
+                <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                    <div className="flex items-center" style={{ paddingLeft: `${(centro.nivel - 1) * 20}px` }}>
+                        {centro.nivel > 1 && <CornerDownRight size={14} className="mr-2 text-gray-400" />}
+                        {centro.nome}
+                    </div>
+                </td>
+                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 font-mono">{centro.codigo || '-'}</td>
+                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 capitalize">{centro.tipo}</td>
+                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{centro.nivel}</td>
+                <td className="px-6 py-4 whitespace-nowrap text-center">
                   <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                    centro.status === 'ativo' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+                    centro.ativo ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
                   }`}>
-                    {centro.status === 'ativo' ? 'Ativo' : 'Inativo'}
+                    {centro.ativo ? 'Ativo' : 'Inativo'}
                   </span>
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">

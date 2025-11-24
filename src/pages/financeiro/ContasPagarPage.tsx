@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useContasPagar } from '@/hooks/useContasPagar';
 import { useToast } from '@/contexts/ToastProvider';
 import * as financeiroService from '@/services/financeiro';
-import { Loader2, PlusCircle, Search, TrendingDown } from 'lucide-react';
+import { Loader2, PlusCircle, Search, TrendingDown, X, DatabaseBackup } from 'lucide-react';
 import Pagination from '@/components/ui/Pagination';
 import ConfirmationModal from '@/components/ui/ConfirmationModal';
 import Modal from '@/components/ui/Modal';
@@ -10,6 +10,8 @@ import ContasPagarTable from '@/components/financeiro/contas-pagar/ContasPagarTa
 import ContasPagarFormPanel from '@/components/financeiro/contas-pagar/ContasPagarFormPanel';
 import ContasPagarSummary from '@/components/financeiro/contas-pagar/ContasPagarSummary';
 import Select from '@/components/ui/forms/Select';
+import DatePicker from '@/components/ui/DatePicker';
+import ErrorAlert from '@/components/ui/ErrorAlert';
 
 const ContasPagarPage: React.FC = () => {
   const {
@@ -22,10 +24,14 @@ const ContasPagarPage: React.FC = () => {
     pageSize,
     searchTerm,
     filterStatus,
+    filterStartDate,
+    filterEndDate,
     sortBy,
     setPage,
     setSearchTerm,
     setFilterStatus,
+    setFilterStartDate,
+    setFilterEndDate,
     setSortBy,
     refresh,
   } = useContasPagar();
@@ -37,6 +43,7 @@ const ContasPagarPage: React.FC = () => {
   const [contaToDelete, setContaToDelete] = useState<financeiroService.ContaPagar | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
   const [isFetchingDetails, setIsFetchingDetails] = useState(false);
+  const [isSeeding, setIsSeeding] = useState(false);
 
   const handleOpenForm = async (conta: financeiroService.ContaPagar | null = null) => {
     if (conta?.id) {
@@ -100,65 +107,130 @@ const ContasPagarPage: React.FC = () => {
     }));
   };
 
+  const clearDateFilters = () => {
+    setFilterStartDate(null);
+    setFilterEndDate(null);
+  };
+
+  const handleSeed = async () => {
+    setIsSeeding(true);
+    try {
+      await financeiroService.seedContasPagar();
+      addToast('5 Contas a Pagar criadas com sucesso!', 'success');
+      refresh();
+    } catch (e: any) {
+      addToast(e.message || 'Erro ao popular dados.', 'error');
+    } finally {
+      setIsSeeding(false);
+    }
+  };
+
   return (
     <div className="p-1">
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-3xl font-bold text-gray-800">Contas a Pagar</h1>
-        <button
-          onClick={() => handleOpenForm()}
-          className="flex items-center gap-2 bg-blue-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-blue-700 transition-colors"
-        >
-          <PlusCircle size={20} />
-          Nova Conta
-        </button>
+        <div className="flex items-center gap-2">
+            <button
+              onClick={handleSeed}
+              disabled={isSeeding || loading}
+              className="flex items-center gap-2 bg-gray-100 text-gray-700 font-semibold py-2 px-4 rounded-lg hover:bg-gray-200 transition-colors disabled:opacity-50"
+            >
+              {isSeeding ? <Loader2 className="animate-spin" size={20} /> : <DatabaseBackup size={20} />}
+              Popular Dados
+            </button>
+            <button
+              onClick={() => handleOpenForm()}
+              className="flex items-center gap-2 bg-blue-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-blue-700 transition-colors"
+            >
+              <PlusCircle size={20} />
+              Nova Conta
+            </button>
+        </div>
       </div>
 
-      <ContasPagarSummary summary={summary} />
-
-      <div className="mt-6 mb-4 flex gap-4">
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={20} />
-          <input
-            type="text"
-            placeholder="Buscar por descrição ou fornecedor..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full max-w-xs p-3 pl-10 border border-gray-300 rounded-lg"
+      {error ? (
+        <div className="my-8">
+          <ErrorAlert 
+            title="Erro ao carregar dados" 
+            message={error} 
+            onRetry={refresh} 
           />
         </div>
-        <Select
-          value={filterStatus || ''}
-          onChange={(e) => setFilterStatus(e.target.value || null)}
-          className="min-w-[200px]"
-        >
-          <option value="">Todos os status</option>
-          <option value="pendente">Pendente</option>
-          <option value="pago">Pago</option>
-          <option value="vencido">Vencido</option>
-          <option value="cancelado">Cancelado</option>
-        </Select>
-      </div>
+      ) : (
+        <>
+          <ContasPagarSummary summary={summary} />
 
-      <div className="bg-white rounded-lg shadow overflow-hidden">
-        {loading && contas.length === 0 ? (
-          <div className="h-96 flex items-center justify-center">
-            <Loader2 className="animate-spin text-blue-500" size={32} />
-          </div>
-        ) : error ? (
-          <div className="h-96 flex items-center justify-center text-red-500">{error}</div>
-        ) : contas.length === 0 ? (
-          <div className="h-96 flex flex-col items-center justify-center text-gray-500">
-            <TrendingDown size={48} className="mb-4" />
-            <p>Nenhuma conta a pagar encontrada.</p>
-            {searchTerm && <p className="text-sm">Tente ajustar sua busca.</p>}
-          </div>
-        ) : (
-          <ContasPagarTable contas={contas} onEdit={handleOpenForm} onDelete={handleOpenDeleteModal} sortBy={sortBy} onSort={handleSort} />
-        )}
-      </div>
+          <div className="mt-6 mb-4 flex flex-wrap gap-4 items-end">
+            <div className="relative flex-grow max-w-xs">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={20} />
+              <input
+                type="text"
+                placeholder="Buscar por descrição ou fornecedor..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="w-full p-3 pl-10 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              />
+            </div>
+            
+            <Select
+              value={filterStatus || ''}
+              onChange={(e) => setFilterStatus(e.target.value || null)}
+              className="min-w-[180px]"
+            >
+              <option value="">Todos os status</option>
+              <option value="aberta">Aberta</option>
+              <option value="pendente">Pendente (Aberta)</option>
+              <option value="parcial">Parcial</option>
+              <option value="paga">Paga</option>
+              <option value="cancelada">Cancelada</option>
+            </Select>
 
-      {count > pageSize && (
-        <Pagination currentPage={page} totalCount={count} pageSize={pageSize} onPageChange={setPage} />
+            <div className="flex items-center gap-2">
+                <DatePicker 
+                    label="" 
+                    value={filterStartDate} 
+                    onChange={setFilterStartDate} 
+                    className="w-[160px]"
+                />
+                <span className="text-gray-500">até</span>
+                <DatePicker 
+                    label="" 
+                    value={filterEndDate} 
+                    onChange={setFilterEndDate} 
+                    className="w-[160px]"
+                />
+                {(filterStartDate || filterEndDate) && (
+                    <button 
+                        onClick={clearDateFilters}
+                        className="p-2 text-gray-500 hover:text-red-500 hover:bg-red-50 rounded-full transition-colors"
+                        title="Limpar datas"
+                    >
+                        <X size={18} />
+                    </button>
+                )}
+            </div>
+          </div>
+
+          <div className="bg-white rounded-lg shadow overflow-hidden">
+            {loading && contas.length === 0 ? (
+              <div className="h-96 flex items-center justify-center">
+                <Loader2 className="animate-spin text-blue-500" size={32} />
+              </div>
+            ) : contas.length === 0 ? (
+              <div className="h-96 flex flex-col items-center justify-center text-gray-500">
+                <TrendingDown size={48} className="mb-4" />
+                <p>Nenhuma conta a pagar encontrada.</p>
+                {searchTerm && <p className="text-sm">Tente ajustar sua busca.</p>}
+              </div>
+            ) : (
+              <ContasPagarTable contas={contas} onEdit={handleOpenForm} onDelete={handleOpenDeleteModal} sortBy={sortBy} onSort={handleSort} />
+            )}
+          </div>
+
+          {count > pageSize && (
+            <Pagination currentPage={page} totalCount={count} pageSize={pageSize} onPageChange={setPage} />
+          )}
+        </>
       )}
 
       <Modal isOpen={isFormOpen} onClose={handleCloseForm} title={selectedConta ? 'Editar Conta a Pagar' : 'Nova Conta a Pagar'}>

@@ -12,10 +12,10 @@ interface ContasPagarTableProps {
 }
 
 const statusConfig: Record<string, { label: string; color: string }> = {
-  pendente: { label: 'Pendente', color: 'bg-yellow-100 text-yellow-800' },
-  pago: { label: 'Pago', color: 'bg-green-100 text-green-800' },
-  vencido: { label: 'Vencido', color: 'bg-red-100 text-red-800' },
-  cancelado: { label: 'Cancelado', color: 'bg-gray-100 text-gray-800' },
+  aberta: { label: 'Aberta', color: 'bg-yellow-100 text-yellow-800' },
+  parcial: { label: 'Parcial', color: 'bg-blue-100 text-blue-800' },
+  paga: { label: 'Paga', color: 'bg-green-100 text-green-800' },
+  cancelada: { label: 'Cancelada', color: 'bg-gray-100 text-gray-800' },
 };
 
 const SortableHeader: React.FC<{
@@ -49,7 +49,8 @@ const ContasPagarTable: React.FC<ContasPagarTableProps> = ({ contas, onEdit, onD
             <SortableHeader column="descricao" label="Descrição" sortBy={sortBy} onSort={onSort} />
             <SortableHeader column="fornecedor_nome" label="Fornecedor" sortBy={sortBy} onSort={onSort} />
             <SortableHeader column="data_vencimento" label="Vencimento" sortBy={sortBy} onSort={onSort} />
-            <SortableHeader column="valor" label="Valor" sortBy={sortBy} onSort={onSort} />
+            <SortableHeader column="valor_total" label="Valor Total" sortBy={sortBy} onSort={onSort} />
+            <SortableHeader column="saldo" label="Saldo" sortBy={sortBy} onSort={onSort} />
             <SortableHeader column="status" label="Status" sortBy={sortBy} onSort={onSort} />
             <th scope="col" className="relative px-6 py-3"><span className="sr-only">Ações</span></th>
           </tr>
@@ -69,7 +70,8 @@ const ContasPagarTable: React.FC<ContasPagarTableProps> = ({ contas, onEdit, onD
                 <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{conta.descricao}</td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{conta.fornecedor_nome || '-'}</td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{new Date(conta.data_vencimento).toLocaleDateString('pt-BR')}</td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 font-semibold">{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(conta.valor)}</td>
+                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 font-semibold">{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(conta.valor_total)}</td>
+                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(conta.saldo || 0)}</td>
                 <td className="px-6 py-4 whitespace-nowrap">
                   <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${statusConfig[conta.status]?.color || 'bg-gray-100 text-gray-800'}`}>
                     {statusConfig[conta.status]?.label || conta.status}

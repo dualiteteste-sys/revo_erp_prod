@@ -108,12 +108,12 @@ export const menuConfig: { name: string; icon: React.ElementType; href: string; 
     href: '#',
     gradient: 'from-emerald-500 to-emerald-600',
     children: [
-        { name: 'Caixa', icon: Wallet, href: '#' },
+        { name: 'Tesouraria', icon: Wallet, href: '/app/financeiro/tesouraria' },
         { name: 'Contas a Receber', icon: TrendingUp, href: '/app/financeiro/contas-a-receber' },
         { name: 'Contas a Pagar', icon: TrendingDown, href: '/app/financeiro/contas-a-pagar' },
         { name: 'Centro de Custos', icon: Landmark, href: '/app/financeiro/centros-de-custo' },
-        { name: 'Cobranças Bancárias', icon: Landmark, href: '#' },
-        { name: 'Extrato Bancário', icon: FileSpreadsheet, href: '#' },
+        { name: 'Cobranças Bancárias', icon: Banknote, href: '/app/financeiro/cobrancas' },
+        { name: 'Extrato Bancário', icon: FileSpreadsheet, href: '/app/financeiro/extrato' },
         { name: 'Relatórios', icon: BarChart2, href: '#' },
     ]
   },
