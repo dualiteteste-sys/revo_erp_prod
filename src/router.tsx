@@ -31,6 +31,9 @@ import OSPage from "./pages/os/OSPage";
 import ContasAReceberPage from "./pages/financeiro/ContasAReceberPage";
 import ContasPagarPage from "./pages/financeiro/ContasPagarPage";
 import CentrosDeCustoPage from "./pages/financeiro/CentrosDeCustoPage";
+import TesourariaPage from "./pages/financeiro/TesourariaPage";
+import CobrancasBancariasPage from "./pages/financeiro/CobrancasBancariasPage";
+import ExtratoPage from "./pages/financeiro/ExtratoPage";
 import CepSearchPage from "./pages/tools/CepSearchPage";
 import CnpjSearchPage from "./pages/tools/CnpjSearchPage";
 import NfeInputPage from "./pages/tools/NfeInputPage";
@@ -128,9 +131,12 @@ export const router = createBrowserRouter([
         { path: "nfe-input", element: <NfeInputPage /> },
 
         // Financeiro
+        { path: "financeiro/tesouraria", element: <TesourariaPage /> },
         { path: "financeiro/contas-a-receber", element: <ContasAReceberPage /> },
         { path: "financeiro/contas-a-pagar", element: <ContasPagarPage /> },
         { path: "financeiro/centros-de-custo", element: <CentrosDeCustoPage /> },
+        { path: "financeiro/cobrancas", element: <CobrancasBancariasPage /> },
+        { path: "financeiro/extrato", element: <ExtratoPage /> },
 
         // RH
         { path: "rh/dashboard", element: <RHDashboard /> },

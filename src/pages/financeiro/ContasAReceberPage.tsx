@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useContasAReceber } from '@/hooks/useContasAReceber';
 import { useToast } from '@/contexts/ToastProvider';
 import * as contasAReceberService from '@/services/contasAReceber';
-import { Loader2, PlusCircle, Search, TrendingUp } from 'lucide-react';
+import { Loader2, PlusCircle, Search, TrendingUp, DatabaseBackup } from 'lucide-react';
 import Pagination from '@/components/ui/Pagination';
 import ConfirmationModal from '@/components/ui/ConfirmationModal';
 import Modal from '@/components/ui/Modal';
@@ -37,6 +37,7 @@ const ContasAReceberPage: React.FC = () => {
   const [contaToDelete, setContaToDelete] = useState<contasAReceberService.ContaAReceber | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
   const [isFetchingDetails, setIsFetchingDetails] = useState(false);
+  const [isSeeding, setIsSeeding] = useState(false);
 
   const handleOpenForm = async (conta: contasAReceberService.ContaAReceber | null = null) => {
     if (conta?.id) {
@@ -100,17 +101,40 @@ const ContasAReceberPage: React.FC = () => {
     }));
   };
 
+  const handleSeed = async () => {
+    setIsSeeding(true);
+    try {
+      await contasAReceberService.seedContasAReceber();
+      addToast('5 Contas a Receber criadas com sucesso!', 'success');
+      refresh();
+    } catch (e: any) {
+      addToast(e.message || 'Erro ao popular dados.', 'error');
+    } finally {
+      setIsSeeding(false);
+    }
+  };
+
   return (
     <div className="p-1">
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-3xl font-bold text-gray-800">Contas a Receber</h1>
-        <button
-          onClick={() => handleOpenForm()}
-          className="flex items-center gap-2 bg-blue-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-blue-700 transition-colors"
-        >
-          <PlusCircle size={20} />
-          Nova Conta
-        </button>
+        <div className="flex items-center gap-2">
+            <button
+              onClick={handleSeed}
+              disabled={isSeeding || loading}
+              className="flex items-center gap-2 bg-gray-100 text-gray-700 font-semibold py-2 px-4 rounded-lg hover:bg-gray-200 transition-colors disabled:opacity-50"
+            >
+              {isSeeding ? <Loader2 className="animate-spin" size={20} /> : <DatabaseBackup size={20} />}
+              Popular Dados
+            </button>
+            <button
+              onClick={() => handleOpenForm()}
+              className="flex items-center gap-2 bg-blue-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-blue-700 transition-colors"
+            >
+              <PlusCircle size={20} />
+              Nova Conta
+            </button>
+        </div>
       </div>
 
       <ContasAReceberSummary summary={summary} />
