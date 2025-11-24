@@ -9,6 +9,7 @@ import Modal from '@/components/ui/Modal';
 import SalesGoalsTable from '@/components/sales-goals/SalesGoalsTable';
 import SalesGoalFormPanel from '@/components/sales-goals/SalesGoalFormPanel';
 import Select from '@/components/ui/forms/Select';
+import { SeedButton } from '@/components/common/SeedButton';
 
 const SalesGoalsPage: React.FC = () => {
   const {
@@ -35,6 +36,7 @@ const SalesGoalsPage: React.FC = () => {
   const [goalToDelete, setGoalToDelete] = useState<salesGoalsService.SalesGoal | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
   const [isFetchingDetails, setIsFetchingDetails] = useState(false);
+  const [isSeeding, setIsSeeding] = useState(false);
 
   const handleOpenForm = async (goal: salesGoalsService.SalesGoal | null = null) => {
     if (goal?.id) {
@@ -98,17 +100,37 @@ const SalesGoalsPage: React.FC = () => {
     }));
   };
 
+  const handleSeed = async () => {
+    setIsSeeding(true);
+    try {
+      await salesGoalsService.seedSalesGoals();
+      addToast('5 Metas de Venda criadas com sucesso!', 'success');
+      refresh();
+    } catch (e: any) {
+      addToast(e.message || 'Erro ao popular dados.', 'error');
+    } finally {
+      setIsSeeding(false);
+    }
+  };
+
   return (
     <div className="p-1">
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-3xl font-bold text-gray-800">Metas de Vendas</h1>
-        <button
-          onClick={() => handleOpenForm()}
-          className="flex items-center gap-2 bg-blue-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-blue-700 transition-colors"
-        >
-          <PlusCircle size={20} />
-          Nova Meta
-        </button>
+        <div className="flex items-center gap-2">
+            <SeedButton 
+              onSeed={handleSeed} 
+              isSeeding={isSeeding} 
+              disabled={loading} 
+            />
+            <button
+              onClick={() => handleOpenForm()}
+              className="flex items-center gap-2 bg-blue-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-blue-700 transition-colors"
+            >
+              <PlusCircle size={20} />
+              Nova Meta
+            </button>
+        </div>
       </div>
 
       <div className="mb-4 flex gap-4">

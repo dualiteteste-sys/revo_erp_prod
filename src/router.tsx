@@ -61,9 +61,11 @@ import ChaoDeFabricaPage from "./pages/industria/ChaoDeFabricaPage";
 // Suprimentos Pages
 import EstoquePage from "./pages/suprimentos/EstoquePage";
 import ComprasPage from "./pages/suprimentos/ComprasPage";
+import RelatoriosSuprimentosPage from "./pages/suprimentos/RelatoriosPage";
 
 // Vendas Pages
 import PedidosVendasPage from "./pages/vendas/PedidosVendasPage";
+import CrmPage from "./pages/vendas/crm/CrmPage";
 
 export const router = createBrowserRouter([
   // Public routes
@@ -121,6 +123,7 @@ export const router = createBrowserRouter([
         { path: "sales-dashboard", element: <SalesDashboard /> },
         { path: "vendas/metas", element: <SalesGoalsPage /> },
         { path: "vendas/pedidos", element: <PedidosVendasPage /> },
+        { path: "vendas/crm", element: <CrmPage /> },
 
         // Serviços (Módulo)
         { path: "ordens-de-servico", element: <OSPage /> },
@@ -129,6 +132,7 @@ export const router = createBrowserRouter([
         { path: "suprimentos/estoque", element: <EstoquePage /> },
         { path: "suprimentos/compras", element: <ComprasPage /> },
         { path: "nfe-input", element: <NfeInputPage /> },
+        { path: "suprimentos/relatorios", element: <RelatoriosSuprimentosPage /> },
 
         // Financeiro
         { path: "financeiro/tesouraria", element: <TesourariaPage /> },

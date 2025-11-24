@@ -9,9 +9,11 @@ import TextArea from '@/components/ui/forms/TextArea';
 import Toggle from '@/components/ui/forms/Toggle';
 import ClientAutocomplete from '@/components/common/ClientAutocomplete';
 import ItemAutocomplete from '@/components/os/ItemAutocomplete';
+import ServiceAutocomplete from '@/components/common/ServiceAutocomplete';
 import OrdemFormItems from '../ordens/OrdemFormItems';
 import OrdemEntregas from '../ordens/OrdemEntregas';
 import BomSelector from '../ordens/BomSelector';
+import { Service } from '@/services/services';
 
 interface Props {
   ordemId: string | null;
@@ -58,9 +60,15 @@ export default function BeneficiamentoFormPanel({ ordemId, onSaveSuccess, onClos
     setFormData(prev => ({ ...prev, [field]: value }));
   };
 
-  const handleProductSelect = (item: any) => {
-    handleHeaderChange('produto_servico_id', item.id);
-    handleHeaderChange('produto_servico_nome', item.descricao);
+  const handleServiceSelect = (id: string | null, service?: Service) => {
+    handleHeaderChange('produto_servico_id', id);
+    if (service) {
+        handleHeaderChange('produto_servico_nome', service.descricao);
+        // Opcional: preencher unidade se disponível no serviço
+        if (service.unidade) {
+            handleHeaderChange('unidade', service.unidade);
+        }
+    }
   };
 
   const handleMaterialSelect = (item: any) => {
@@ -264,7 +272,13 @@ export default function BeneficiamentoFormPanel({ ordemId, onSaveSuccess, onClos
                                 {formData.produto_servico_nome}
                             </div>
                         ) : (
-                            <ItemAutocomplete onSelect={handleProductSelect} />
+                            <ServiceAutocomplete 
+                                value={formData.produto_servico_id || null}
+                                initialName={formData.produto_servico_nome}
+                                onChange={handleServiceSelect}
+                                disabled={isLocked}
+                                placeholder="Buscar serviço..."
+                            />
                         )}
                     </div>
                     <div className="sm:col-span-2">

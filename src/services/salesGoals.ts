@@ -1,4 +1,6 @@
 import { callRpc } from '@/lib/api';
+import { faker } from '@faker-js/faker';
+import { getPartners } from './partners';
 
 export type SalesGoal = {
   id: string;
@@ -58,4 +60,33 @@ export async function saveSalesGoal(payload: SalesGoalPayload): Promise<SalesGoa
 
 export async function deleteSalesGoal(id: string): Promise<void> {
     return callRpc('delete_meta_venda', { p_id: id });
+}
+
+export async function seedSalesGoals(): Promise<void> {
+  // Busca parceiros para usar como vendedores
+  const { data: partners } = await getPartners({ 
+    page: 1, 
+    pageSize: 100, 
+    searchTerm: '', 
+    filterType: null, // Qualquer parceiro pode ser vendedor no seed
+    sortBy: { column: 'nome', ascending: true } 
+  });
+  
+  if (partners.length === 0) throw new Error('Crie parceiros/vendedores antes de gerar metas.');
+
+  const promises = Array.from({ length: 5 }).map(() => {
+    const vendedor = faker.helpers.arrayElement(partners);
+    const startDate = faker.date.recent({ days: 30 });
+    const endDate = new Date(startDate);
+    endDate.setMonth(endDate.getMonth() + 1);
+
+    const payload: SalesGoalPayload = {
+      vendedor_id: vendedor.id,
+      data_inicio: startDate.toISOString().split('T')[0],
+      data_fim: endDate.toISOString().split('T')[0],
+      valor_meta: parseFloat(faker.finance.amount(5000, 50000, 2)),
+    };
+    return saveSalesGoal(payload);
+  });
+  await Promise.all(promises);
 }

@@ -66,7 +66,7 @@ export const menuConfig: { name: string; icon: React.ElementType; href: string; 
       { name: 'Controle de Estoques', icon: Warehouse, href: '/app/suprimentos/estoque' },
       { name: 'Ordens de Compra', icon: ShoppingCart, href: '/app/suprimentos/compras' },
       { name: 'NFe de Entrada', icon: FileDown, href: '/app/nfe-input' },
-      { name: 'Relatórios', icon: BarChart2, href: '#' },
+      { name: 'Relatórios', icon: BarChart2, href: '/app/suprimentos/relatorios' },
     ]
   },
   {
@@ -76,10 +76,10 @@ export const menuConfig: { name: string; icon: React.ElementType; href: string; 
     gradient: 'from-red-500 to-red-600',
     children: [
         { name: 'Painel de Vendas', icon: BarChart2, href: '/app/sales-dashboard' },
+        { name: 'CRM', icon: HeartHandshake, href: '/app/vendas/crm' },
         { name: 'Pedidos de Vendas', icon: ClipboardList, href: '/app/vendas/pedidos' },
         { name: 'Metas de Vendas', icon: Target, href: '/app/vendas/metas' },
         { name: 'Propostas Comerciais', icon: FileSignature, href: '#' },
-        { name: 'CRM', icon: HeartHandshake, href: '#' },
         { name: 'PDV', icon: Store, href: '#' },
         { name: 'Notas Fiscais', icon: Receipt, href: '#' },
         { name: 'Expedição', icon: Truck, href: '#' },

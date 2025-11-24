@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Loader2, Save, Trash2, CheckCircle } from 'lucide-react';
+import { Loader2, Save, CheckCircle, Trash2, AlertTriangle } from 'lucide-react';
 import { VendaDetails, VendaPayload, saveVenda, manageVendaItem, getVendaDetails, aprovarVenda } from '@/services/vendas';
 import { useToast } from '@/contexts/ToastProvider';
 import Section from '@/components/ui/forms/Section';
@@ -75,6 +75,7 @@ export default function PedidoVendaFormPanel({ vendaId, onSaveSuccess, onClose }
       };
       const saved = await saveVenda(payload);
       setFormData(prev => ({ ...prev, ...saved }));
+      
       if (!formData.id) {
         addToast('Pedido criado! Agora adicione os itens.', 'success');
       } else {
@@ -90,6 +91,11 @@ export default function PedidoVendaFormPanel({ vendaId, onSaveSuccess, onClose }
   };
 
   const handleAddItem = async (item: any) => {
+    if (item.type !== 'product') {
+        addToast('Apenas produtos podem ser adicionados a pedidos de venda.', 'warning');
+        return;
+    }
+
     let currentId = formData.id;
     if (!currentId) {
       currentId = await handleSaveHeader();
@@ -97,7 +103,7 @@ export default function PedidoVendaFormPanel({ vendaId, onSaveSuccess, onClose }
     }
 
     try {
-      await manageVendaItem(currentId!, null, item.id, 1, item.preco_venda || 0, 0, 'upsert');
+      await manageVendaItem(currentId!, null, item.id, 1, item.preco_venda || 0, 0, 'add');
       await loadDetails();
       addToast('Item adicionado.', 'success');
     } catch (e: any) {
@@ -107,7 +113,7 @@ export default function PedidoVendaFormPanel({ vendaId, onSaveSuccess, onClose }
 
   const handleRemoveItem = async (itemId: string) => {
     try {
-      await manageVendaItem(formData.id!, itemId, '', 0, 0, 0, 'delete');
+      await manageVendaItem(formData.id!, itemId, '', 0, 0, 0, 'remove');
       await loadDetails();
       addToast('Item removido.', 'success');
     } catch (e: any) {
@@ -126,18 +132,24 @@ export default function PedidoVendaFormPanel({ vendaId, onSaveSuccess, onClose }
     };
 
     try {
-      await manageVendaItem(formData.id!, itemId, item.produto_id, updates.quantidade, updates.preco_unitario, updates.desconto, 'upsert');
+      await manageVendaItem(formData.id!, itemId, item.produto_id, updates.quantidade, updates.preco_unitario, updates.desconto, 'update');
+      // Atualização otimista
       setFormData(prev => ({
         ...prev,
-        itens: prev.itens?.map(i => i.id === itemId ? { ...i, ...updates, total: (updates.quantidade * updates.preco_unitario) - updates.desconto } : i)
+        itens: prev.itens?.map(i => i.id === itemId ? { 
+            ...i, 
+            ...updates, 
+            total: (updates.quantidade * updates.preco_unitario) - updates.desconto 
+        } : i)
       }));
+      // Recarregar totais no blur ou debounce seria ideal, aqui faremos reload completo ao salvar o cabeçalho novamente
     } catch (e: any) {
       addToast(e.message, 'error');
     }
   };
 
   const handleAprovar = async () => {
-    if (!confirm('Confirmar aprovação? Isso irá baixar o estoque e gerar o financeiro.')) return;
+    if (!confirm('Confirmar aprovação do pedido?')) return;
     setIsSaving(true);
     try {
       await aprovarVenda(formData.id!);
@@ -159,8 +171,12 @@ export default function PedidoVendaFormPanel({ vendaId, onSaveSuccess, onClose }
       <div className="flex-grow p-6 overflow-y-auto scrollbar-styled">
         {formData.numero && (
           <div className="mb-4 flex justify-between items-center">
-            <h2 className="text-2xl font-bold text-gray-800">Pedido #{formData.numero}</h2>
-            <span className={`px-3 py-1 rounded-full text-sm font-bold uppercase ${formData.status === 'aprovado' ? 'bg-green-100 text-green-800' : 'bg-gray-100'}`}>
+            <h2 className="text-2xl font-bold text-gray-800">Pedido {formData.numero}</h2>
+            <span className={`px-3 py-1 rounded-full text-sm font-bold uppercase ${
+                formData.status === 'aprovado' ? 'bg-green-100 text-green-800' : 
+                formData.status === 'cancelado' ? 'bg-red-100 text-red-800' :
+                'bg-gray-100 text-gray-800'
+            }`}>
               {formData.status}
             </span>
           </div>
@@ -179,15 +195,15 @@ export default function PedidoVendaFormPanel({ vendaId, onSaveSuccess, onClose }
               disabled={isLocked}
             />
           </div>
-          <Select label="Status" name="status" value={formData.status} onChange={e => handleHeaderChange('status', e.target.value)} disabled={true} className="sm:col-span-2">
-            <option value="orcamento">Orçamento</option>
-            <option value="aprovado">Aprovado</option>
-            <option value="concluido">Concluído</option>
-            <option value="cancelado">Cancelado</option>
-          </Select>
-          <Input label="Data Emissão" type="date" value={formData.data_emissao} onChange={e => handleHeaderChange('data_emissao', e.target.value)} disabled={isLocked} className="sm:col-span-3" />
-          <Input label="Data Entrega" type="date" value={formData.data_entrega || ''} onChange={e => handleHeaderChange('data_entrega', e.target.value)} disabled={isLocked} className="sm:col-span-3" />
-          <Input label="Condição Pagamento" name="condicao_pagamento" value={formData.condicao_pagamento || ''} onChange={e => handleHeaderChange('condicao_pagamento', e.target.value)} disabled={isLocked} className="sm:col-span-6" placeholder="Ex: 30/60 dias" />
+          <div className="sm:col-span-2">
+             <Input label="Data Emissão" type="date" value={formData.data_emissao} onChange={e => handleHeaderChange('data_emissao', e.target.value)} disabled={isLocked} />
+          </div>
+          <div className="sm:col-span-3">
+             <Input label="Data Entrega" type="date" value={formData.data_entrega || ''} onChange={e => handleHeaderChange('data_entrega', e.target.value)} disabled={isLocked} />
+          </div>
+          <div className="sm:col-span-3">
+             <Input label="Condição Pagamento" name="condicao_pagamento" value={formData.condicao_pagamento || ''} onChange={e => handleHeaderChange('condicao_pagamento', e.target.value)} disabled={isLocked} placeholder="Ex: 30/60 dias" />
+          </div>
         </Section>
 
         <Section title="Itens" description="Produtos vendidos.">
@@ -197,24 +213,23 @@ export default function PedidoVendaFormPanel({ vendaId, onSaveSuccess, onClose }
             </div>
           )}
           
-          <div className="sm:col-span-6 overflow-x-auto">
+          <div className="sm:col-span-6 overflow-x-auto border rounded-lg">
             <table className="min-w-full divide-y divide-gray-200">
               <thead className="bg-gray-50">
                 <tr>
                   <th className="px-3 py-2 text-left text-xs font-medium text-gray-500">Produto</th>
-                  <th className="px-3 py-2 text-right text-xs font-medium text-gray-500 w-20">Qtd</th>
-                  <th className="px-3 py-2 text-right text-xs font-medium text-gray-500 w-28">Preço</th>
+                  <th className="px-3 py-2 text-right text-xs font-medium text-gray-500 w-24">Qtd</th>
+                  <th className="px-3 py-2 text-right text-xs font-medium text-gray-500 w-32">Preço Unit.</th>
                   <th className="px-3 py-2 text-right text-xs font-medium text-gray-500 w-24">Desc.</th>
                   <th className="px-3 py-2 text-right text-xs font-medium text-gray-500 w-32">Total</th>
                   {!isLocked && <th className="px-3 py-2 w-10"></th>}
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-200">
+              <tbody className="divide-y divide-gray-200 bg-white">
                 {formData.itens?.map(item => (
                   <tr key={item.id}>
                     <td className="px-3 py-2 text-sm text-gray-900">
                       {item.produto_nome}
-                      <span className="text-xs text-gray-500 ml-1">({item.sku})</span>
                     </td>
                     <td className="px-3 py-2">
                       <input 
@@ -222,7 +237,7 @@ export default function PedidoVendaFormPanel({ vendaId, onSaveSuccess, onClose }
                         value={item.quantidade} 
                         onChange={e => handleUpdateItem(item.id, 'quantidade', parseFloat(e.target.value))}
                         disabled={isLocked}
-                        className="w-full text-right p-1 border rounded"
+                        className="w-full text-right p-1 border rounded text-sm"
                         min="0.001"
                         step="any"
                       />
@@ -233,7 +248,7 @@ export default function PedidoVendaFormPanel({ vendaId, onSaveSuccess, onClose }
                         value={item.preco_unitario} 
                         onChange={e => handleUpdateItem(item.id, 'preco', parseFloat(e.target.value))}
                         disabled={isLocked}
-                        className="w-full text-right p-1 border rounded"
+                        className="w-full text-right p-1 border rounded text-sm"
                         step="0.01"
                       />
                     </td>
@@ -243,7 +258,7 @@ export default function PedidoVendaFormPanel({ vendaId, onSaveSuccess, onClose }
                         value={item.desconto} 
                         onChange={e => handleUpdateItem(item.id, 'desconto', parseFloat(e.target.value))}
                         disabled={isLocked}
-                        className="w-full text-right p-1 border rounded"
+                        className="w-full text-right p-1 border rounded text-sm"
                         step="0.01"
                       />
                     </td>
@@ -252,7 +267,7 @@ export default function PedidoVendaFormPanel({ vendaId, onSaveSuccess, onClose }
                     </td>
                     {!isLocked && (
                       <td className="px-3 py-2 text-center">
-                        <button onClick={() => handleRemoveItem(item.id)} className="text-red-500 hover:text-red-700">
+                        <button onClick={() => handleRemoveItem(item.id)} className="text-red-500 hover:text-red-700 p-1 rounded hover:bg-red-50">
                           <Trash2 size={16} />
                         </button>
                       </td>
@@ -260,7 +275,7 @@ export default function PedidoVendaFormPanel({ vendaId, onSaveSuccess, onClose }
                   </tr>
                 ))}
                 {formData.itens?.length === 0 && (
-                  <tr><td colSpan={6} className="text-center py-4 text-gray-500">Nenhum item adicionado.</td></tr>
+                  <tr><td colSpan={6} className="text-center py-8 text-gray-500">Nenhum item adicionado.</td></tr>
                 )}
               </tbody>
             </table>
@@ -270,15 +285,15 @@ export default function PedidoVendaFormPanel({ vendaId, onSaveSuccess, onClose }
         <Section title="Totais" description="Valores finais.">
           <div className="sm:col-span-2">
             <label className="block text-sm font-medium text-gray-700 mb-1">Total Produtos</label>
-            <div className="p-3 bg-gray-100 rounded-lg text-right font-semibold">
+            <div className="p-3 bg-gray-100 rounded-lg text-right font-semibold text-gray-700">
               {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(formData.itens?.reduce((acc, i) => acc + i.total, 0) || 0)}
             </div>
           </div>
           <Input label="Frete (R$)" name="frete" {...freteProps} disabled={isLocked} className="sm:col-span-2" />
           <Input label="Desconto Extra (R$)" name="desconto" {...descontoProps} disabled={isLocked} className="sm:col-span-2" />
           
-          <div className="sm:col-span-6 flex justify-end mt-2">
-            <div className="text-xl font-bold text-blue-800">
+          <div className="sm:col-span-6 flex justify-end mt-4 pt-4 border-t border-gray-100">
+            <div className="text-2xl font-bold text-blue-800">
               Total Geral: {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(formData.total_geral || 0)}
             </div>
           </div>
@@ -295,7 +310,7 @@ export default function PedidoVendaFormPanel({ vendaId, onSaveSuccess, onClose }
           {formData.id && !isLocked && (
             <button 
               onClick={handleAprovar} 
-              disabled={isSaving}
+              disabled={isSaving || (formData.itens?.length || 0) === 0}
               className="flex items-center gap-2 bg-green-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-green-700 disabled:opacity-50"
             >
               <CheckCircle size={20} /> Aprovar Venda
