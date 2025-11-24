@@ -8,12 +8,13 @@ import Select from '@/components/ui/forms/Select';
 import TextArea from '@/components/ui/forms/TextArea';
 import Toggle from '@/components/ui/forms/Toggle';
 import ClientAutocomplete from '@/components/common/ClientAutocomplete';
-import ItemAutocomplete from '@/components/os/ItemAutocomplete';
 import ServiceAutocomplete from '@/components/common/ServiceAutocomplete';
 import OrdemFormItems from '../ordens/OrdemFormItems';
 import OrdemEntregas from '../ordens/OrdemEntregas';
 import BomSelector from '../ordens/BomSelector';
 import { Service } from '@/services/services';
+import MaterialClienteAutocomplete from '../materiais/MaterialClienteAutocomplete';
+import { MaterialClienteListItem } from '@/services/industriaMateriais';
 
 interface Props {
   ordemId: string | null;
@@ -71,9 +72,14 @@ export default function BeneficiamentoFormPanel({ ordemId, onSaveSuccess, onClos
     }
   };
 
-  const handleMaterialSelect = (item: any) => {
-    handleHeaderChange('produto_material_cliente_id', item.id);
-    handleHeaderChange('produto_material_nome', item.descricao);
+  const handleMaterialSelect = (item: MaterialClienteListItem | null) => {
+    if (item) {
+        handleHeaderChange('produto_material_cliente_id', item.id);
+        handleHeaderChange('produto_material_nome', item.nome_cliente || item.produto_nome);
+    } else {
+        handleHeaderChange('produto_material_cliente_id', null);
+        handleHeaderChange('produto_material_nome', null);
+    }
   };
 
   const handleSaveHeader = async () => {
@@ -89,6 +95,12 @@ export default function BeneficiamentoFormPanel({ ordemId, onSaveSuccess, onClos
       addToast('A quantidade planejada deve ser maior que zero.', 'error');
       return;
     }
+    
+    // Validação do Material do Cliente
+    if (formData.usa_material_cliente && !formData.produto_material_cliente_id) {
+        addToast('Selecione o material do cliente ou desmarque a opção "Usa material do cliente".', 'error');
+        return;
+    }
 
     setIsSaving(true);
     try {
@@ -96,7 +108,7 @@ export default function BeneficiamentoFormPanel({ ordemId, onSaveSuccess, onClos
         id: formData.id,
         cliente_id: formData.cliente_id,
         produto_servico_id: formData.produto_servico_id,
-        produto_material_cliente_id: formData.produto_material_cliente_id,
+        produto_material_cliente_id: formData.usa_material_cliente ? formData.produto_material_cliente_id : null,
         usa_material_cliente: formData.usa_material_cliente,
         quantidade_planejada: formData.quantidade_planejada,
         unidade: formData.unidade,
@@ -261,6 +273,9 @@ export default function BeneficiamentoFormPanel({ ordemId, onSaveSuccess, onClos
                             onChange={(id, name) => {
                                 handleHeaderChange('cliente_id', id);
                                 if (name) handleHeaderChange('cliente_nome', name);
+                                // Limpa o material se o cliente mudar
+                                handleHeaderChange('produto_material_cliente_id', null);
+                                handleHeaderChange('produto_material_nome', null);
                             }}
                             disabled={isLocked}
                         />
@@ -300,11 +315,6 @@ export default function BeneficiamentoFormPanel({ ordemId, onSaveSuccess, onClos
                             disabled={isLocked}
                         />
                     </div>
-                    <div className="sm:col-span-3">
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Material do Cliente (Opcional)</label>
-                        <ItemAutocomplete onSelect={handleMaterialSelect} disabled={isLocked} />
-                        {formData.produto_material_nome && <p className="text-xs text-gray-500 mt-1">Selecionado: {formData.produto_material_nome}</p>}
-                    </div>
                     <div className="sm:col-span-6">
                         <Toggle 
                             label="Usa material do cliente" 
@@ -313,6 +323,19 @@ export default function BeneficiamentoFormPanel({ ordemId, onSaveSuccess, onClos
                             onChange={checked => handleHeaderChange('usa_material_cliente', checked)}
                         />
                     </div>
+                    {formData.usa_material_cliente && (
+                        <div className="sm:col-span-6">
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Material do Cliente</label>
+                            <MaterialClienteAutocomplete 
+                                clienteId={formData.cliente_id}
+                                value={formData.produto_material_cliente_id || null}
+                                initialName={formData.produto_material_nome}
+                                onChange={handleMaterialSelect}
+                                disabled={isLocked || !formData.cliente_id}
+                                placeholder={!formData.cliente_id ? "Selecione um cliente primeiro" : "Buscar material..."}
+                            />
+                        </div>
+                    )}
                 </Section>
 
                 <Section title="Controle" description="Rastreabilidade e Prazos.">

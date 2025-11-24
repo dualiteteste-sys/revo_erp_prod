@@ -57,6 +57,7 @@ import RoteirosPage from "./pages/industria/RoteirosPage";
 import CentrosTrabalhoPage from "./pages/industria/CentrosTrabalhoPage";
 import ExecucaoPage from "./pages/industria/ExecucaoPage";
 import ChaoDeFabricaPage from "./pages/industria/ChaoDeFabricaPage";
+import MateriaisClientePage from "./pages/industria/MateriaisClientePage";
 
 // Suprimentos Pages
 import EstoquePage from "./pages/suprimentos/EstoquePage";
@@ -118,6 +119,7 @@ export const router = createBrowserRouter([
         { path: "industria/centros-trabalho", element: <CentrosTrabalhoPage /> },
         { path: "industria/execucao", element: <ExecucaoPage /> },
         { path: "industria/chao-de-fabrica", element: <ChaoDeFabricaPage /> },
+        { path: "industria/materiais-cliente", element: <MateriaisClientePage /> },
 
         // Vendas
         { path: "sales-dashboard", element: <SalesDashboard /> },
