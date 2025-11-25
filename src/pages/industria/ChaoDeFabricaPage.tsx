@@ -7,6 +7,7 @@ import GlassCard from '@/components/ui/GlassCard';
 import Modal from '@/components/ui/Modal';
 import Input from '@/components/ui/forms/Input';
 import TextArea from '@/components/ui/forms/TextArea';
+import { formatOrderNumber } from '@/lib/utils';
 
 export default function ChaoDeFabricaPage() {
   const { addToast } = useToast();
@@ -129,7 +130,7 @@ export default function ChaoDeFabricaPage() {
                             }`}
                         >
                             <div className="flex justify-between items-start mb-2">
-                                <span className="font-bold text-gray-800">#{op.ordem_numero}</span>
+                                <span className="font-bold text-gray-800">{formatOrderNumber(op.ordem_numero)}</span>
                                 <span className={`text-xs px-2 py-0.5 rounded-full font-semibold uppercase ${
                                     op.status === 'em_execucao' ? 'bg-green-100 text-green-800' : 
                                     op.status === 'em_espera' ? 'bg-orange-100 text-orange-800' : 
@@ -160,7 +161,7 @@ export default function ChaoDeFabricaPage() {
                         <div className="border-b border-gray-200 pb-4 mb-6">
                             <div className="flex justify-between items-start">
                                 <div>
-                                    <h2 className="text-2xl font-bold text-gray-800 mb-1">Ordem #{selectedOp.ordem_numero}</h2>
+                                    <h2 className="text-2xl font-bold text-gray-800 mb-1">Ordem {formatOrderNumber(selectedOp.ordem_numero)}</h2>
                                     <p className="text-lg text-gray-600">{selectedOp.produto_nome}</p>
                                 </div>
                                 <div className="text-right">

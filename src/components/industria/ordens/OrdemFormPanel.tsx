@@ -10,6 +10,8 @@ import ClientAutocomplete from '@/components/common/ClientAutocomplete';
 import ItemAutocomplete from '@/components/os/ItemAutocomplete';
 import OrdemFormItems from './OrdemFormItems';
 import OrdemEntregas from './OrdemEntregas';
+import BomSelector from './BomSelector';
+import { formatOrderNumber } from '@/lib/utils';
 
 interface Props {
   ordemId: string | null;
@@ -193,11 +195,11 @@ export default function OrdemFormPanel({ ordemId, onSaveSuccess, onClose }: Prop
 
   return (
     <div className="flex flex-col h-full">
-      <div className="border-b border-gray-200 px-6 bg-gray-50">
-        <div className="flex items-center justify-between py-4">
+      <div className="border-b border-white/20">
+        <div className="flex items-center justify-between py-4 px-6 bg-gray-50 border-b border-gray-200">
             <div>
                 <h2 className="text-xl font-bold text-gray-800">
-                    {formData.numero ? `Ordem #${formData.numero}` : 'Nova Ordem de Produção'}
+                    {formData.numero ? `Ordem ${formatOrderNumber(formData.numero)}` : 'Nova Ordem de Produção'}
                 </h2>
                 <p className="text-sm text-gray-500">{formData.tipo_ordem === 'industrializacao' ? 'Industrialização' : 'Beneficiamento'}</p>
             </div>
@@ -207,23 +209,35 @@ export default function OrdemFormPanel({ ordemId, onSaveSuccess, onClose }: Prop
                 </span>
             )}
         </div>
-        <nav className="-mb-px flex space-x-6">
+        <nav className="-mb-px flex space-x-6 p-4 overflow-x-auto" aria-label="Tabs">
           <button
             onClick={() => setActiveTab('dados')}
-            className={`py-3 px-1 border-b-2 font-medium text-sm ${activeTab === 'dados' ? 'border-blue-500 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'}`}
+            className={`whitespace-nowrap py-2 px-3 border-b-2 font-medium text-sm transition-colors ${
+              activeTab === 'dados' 
+                ? 'border-blue-500 text-blue-600' 
+                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+            }`}
           >
             Dados Gerais
           </button>
           <button
             onClick={() => setActiveTab('componentes')}
-            className={`py-3 px-1 border-b-2 font-medium text-sm ${activeTab === 'componentes' ? 'border-blue-500 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'}`}
+            className={`whitespace-nowrap py-2 px-3 border-b-2 font-medium text-sm transition-colors ${
+              activeTab === 'componentes' 
+                ? 'border-blue-500 text-blue-600' 
+                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+            }`}
             disabled={!formData.id}
           >
             Insumos / Componentes
           </button>
           <button
             onClick={() => setActiveTab('entregas')}
-            className={`py-3 px-1 border-b-2 font-medium text-sm ${activeTab === 'entregas' ? 'border-blue-500 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'}`}
+            className={`whitespace-nowrap py-2 px-3 border-b-2 font-medium text-sm transition-colors ${
+              activeTab === 'entregas' 
+                ? 'border-blue-500 text-blue-600' 
+                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+            }`}
             disabled={!formData.id}
           >
             Entregas ({formData.entregas?.length || 0})
@@ -315,21 +329,33 @@ export default function OrdemFormPanel({ ordemId, onSaveSuccess, onClose }: Prop
                 </Section>
 
                 <Section title="Outros" description="Detalhes adicionais.">
-                    <Input label="Ref. Documento" name="doc_ref" value={formData.documento_ref || ''} onChange={e => handleHeaderChange('documento_ref', e.target.value)} disabled={isLocked} className="sm:col-span-2" placeholder="Pedido, Contrato..." />
+                    <Input label="Ref. Documento" name="doc_ref" value={formData.documento_ref || ''} onChange={e => handleHeaderChange('documento_ref', e.target.value)} disabled={isLocked} className="sm:col-span-2" placeholder="Pedido, Lote..." />
                     <TextArea label="Observações" name="obs" value={formData.observacoes || ''} onChange={e => handleHeaderChange('observacoes', e.target.value)} rows={3} disabled={isLocked} className="sm:col-span-6" />
                 </Section>
             </>
         )}
 
         {activeTab === 'componentes' && (
-            <OrdemFormItems 
-                items={formData.componentes || []} 
-                onAddItem={handleAddComponente} 
-                onRemoveItem={handleRemoveComponente}
-                onUpdateItem={handleUpdateComponente}
-                isAddingItem={false}
-                readOnly={isLocked}
-            />
+            <>
+                {!isLocked && formData.id && formData.produto_final_id && (
+                    <div className="mb-4 flex justify-end">
+                        <BomSelector 
+                            ordemId={formData.id} 
+                            produtoId={formData.produto_final_id} 
+                            tipoOrdem="producao"
+                            onApplied={loadDetails} 
+                        />
+                    </div>
+                )}
+                <OrdemFormItems 
+                    items={formData.componentes || []} 
+                    onAddItem={handleAddComponente} 
+                    onRemoveItem={handleRemoveComponente}
+                    onUpdateItem={handleUpdateComponente}
+                    isAddingItem={false}
+                    readOnly={isLocked}
+                />
+            </>
         )}
 
         {activeTab === 'entregas' && (
@@ -340,11 +366,12 @@ export default function OrdemFormPanel({ ordemId, onSaveSuccess, onClose }: Prop
                 readOnly={isLocked}
                 maxQuantity={formData.quantidade_planejada || 0}
                 currentTotal={totalEntregue}
+                showBillingStatus={false}
             />
         )}
       </div>
 
-      <footer className="flex-shrink-0 p-4 flex justify-between items-center border-t border-white/20 bg-gray-50">
+      <footer className="flex-shrink-0 p-4 flex justify-between items-center border-t border-white/20">
         <button onClick={onClose} className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-white">
           Fechar
         </button>

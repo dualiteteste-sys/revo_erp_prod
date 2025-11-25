@@ -1,6 +1,7 @@
 import React from 'react';
 import { Operacao } from '@/services/industriaExecucao';
 import { Package, User, Calendar, Clock } from 'lucide-react';
+import { formatOrderNumber } from '@/lib/utils';
 
 interface Props {
   operacoes: Operacao[];
@@ -35,7 +36,7 @@ export default function OperacoesTable({ operacoes, onUpdateStatus }: Props) {
           {operacoes.map(op => (
             <tr key={op.id} className="hover:bg-gray-50 transition-colors">
               <td className="px-6 py-4">
-                <div className="font-bold text-gray-900">#{op.ordem_numero}</div>
+                <div className="font-bold text-gray-900">{formatOrderNumber(op.ordem_numero)}</div>
                 <div className="text-xs text-gray-500 capitalize">{op.tipo_ordem}</div>
               </td>
               <td className="px-6 py-4">

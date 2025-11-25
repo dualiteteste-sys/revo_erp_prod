@@ -15,6 +15,7 @@ import BomSelector from '../ordens/BomSelector';
 import { Service } from '@/services/services';
 import MaterialClienteAutocomplete from '../materiais/MaterialClienteAutocomplete';
 import { MaterialClienteListItem } from '@/services/industriaMateriais';
+import { formatOrderNumber } from '@/lib/utils';
 
 interface Props {
   ordemId: string | null;
@@ -410,10 +411,13 @@ export default function BeneficiamentoFormPanel({ ordemId, onSaveSuccess, onClos
       </div>
 
       <footer className="flex-shrink-0 p-4 flex justify-between items-center border-t border-white/20">
-        <button onClick={onClose} className="rounded-md border border-gray-300 bg-white py-2 px-4 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2">
-          Fechar
-        </button>
+        <div className="text-sm text-gray-500">
+            {formData.numero && `Ordem ${formatOrderNumber(formData.numero)}`}
+        </div>
         <div className="flex gap-3">
+            <button onClick={onClose} className="rounded-md border border-gray-300 bg-white py-2 px-4 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2">
+            Fechar
+            </button>
           {!isLocked && (
             <button 
               onClick={handleSaveHeader} 

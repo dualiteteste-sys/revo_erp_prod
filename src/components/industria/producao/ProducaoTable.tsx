@@ -1,6 +1,7 @@
 import React from 'react';
 import { OrdemProducao } from '@/services/industriaProducao';
 import { Edit, Eye, Calendar, Package } from 'lucide-react';
+import { formatOrderNumber } from '@/lib/utils';
 
 interface Props {
   orders: OrdemProducao[];
@@ -40,7 +41,7 @@ export default function ProducaoTable({ orders, onEdit }: Props) {
         <tbody className="bg-white divide-y divide-gray-200">
           {orders.map(order => (
             <tr key={order.id} className="hover:bg-gray-50 transition-colors">
-              <td className="px-6 py-4 text-sm font-medium text-gray-900">#{order.numero}</td>
+              <td className="px-6 py-4 text-sm font-medium text-gray-900">{formatOrderNumber(order.numero)}</td>
               <td className="px-6 py-4">
                 <div className="flex items-center gap-2">
                   <Package size={16} className="text-gray-400" />

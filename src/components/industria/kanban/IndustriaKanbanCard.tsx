@@ -2,6 +2,7 @@ import React from 'react';
 import { Draggable } from '@hello-pangea/dnd';
 import { OrdemIndustria } from '@/services/industria';
 import { User, Calendar, Package } from 'lucide-react';
+import { formatOrderNumber } from '@/lib/utils';
 
 interface Props {
   item: OrdemIndustria;
@@ -19,7 +20,7 @@ const IndustriaKanbanCard: React.FC<Props> = ({ item, index }) => {
           className={`p-3 mb-2 bg-white rounded-lg shadow-sm border border-gray-200 hover:shadow-md transition-shadow ${snapshot.isDragging ? 'shadow-lg ring-2 ring-blue-400 rotate-2' : ''}`}
         >
           <div className="flex justify-between items-start mb-1">
-            <span className="text-xs font-bold text-blue-600">#{item.numero}</span>
+            <span className="text-xs font-bold text-blue-600">{formatOrderNumber(item.numero)}</span>
             <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium ${item.tipo_ordem === 'industrializacao' ? 'bg-gray-100 text-gray-600' : 'bg-purple-50 text-purple-600'}`}>
                 {item.tipo_ordem === 'industrializacao' ? 'IND' : 'BEN'}
             </span>
