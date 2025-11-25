@@ -10,6 +10,7 @@ import ItemAutocomplete from '@/components/os/ItemAutocomplete';
 import OrdemFormItems from '../ordens/OrdemFormItems';
 import OrdemEntregas from '../ordens/OrdemEntregas';
 import BomSelector from '../ordens/BomSelector';
+import { formatOrderNumber } from '@/lib/utils';
 
 interface Props {
   ordemId: string | null;
@@ -191,6 +192,19 @@ export default function ProducaoFormPanel({ ordemId, onSaveSuccess, onClose }: P
   return (
     <div className="flex flex-col h-full">
       <div className="border-b border-white/20">
+        <div className="flex items-center justify-between py-4 px-6 bg-gray-50 border-b border-gray-200">
+            <div>
+                <h2 className="text-xl font-bold text-gray-800">
+                    {formData.numero ? `Ordem ${formatOrderNumber(formData.numero)}` : 'Nova Ordem de Produção'}
+                </h2>
+                <p className="text-sm text-gray-500">Industrialização</p>
+            </div>
+            {formData.status && (
+                <span className={`px-3 py-1 rounded-full text-sm font-bold uppercase ${formData.status === 'concluida' ? 'bg-green-100 text-green-800' : 'bg-blue-100 text-blue-800'}`}>
+                    {formData.status.replace(/_/g, ' ')}
+                </span>
+            )}
+        </div>
         <nav className="-mb-px flex space-x-6 p-4 overflow-x-auto" aria-label="Tabs">
           <button
             onClick={() => setActiveTab('dados')}
