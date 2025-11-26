@@ -18,26 +18,13 @@ export class RpcError extends Error {
 }
 
 export async function callRpc<T = unknown>(fn: string, args: RpcArgs = {}): Promise<T> {
-  const correlationId = crypto.randomUUID();
-  // Pass correlation ID via custom header if supported by Supabase client config, 
-  // or just log it. Since Supabase client global headers are static, we can't easily inject per-request headers 
-  // without creating a new client or using a specific overload if available.
-  // However, for debugging, logging it here is the first step.
-  // To actually send it to the server, we would need to use `supabase.functions.invoke` or similar, 
-  // but `rpc` uses PostgREST. PostgREST allows `Accept-Profile` etc but custom headers might need 
-  // `options: { head: { ... } }` if the SDK supports it. 
-  // Checking SDK types: rpc(fn, args, { count, head, ... })
-
-  const { data, error, status } = await supabase.rpc(fn, args, {
-    count: null,
-    head: { 'x-correlation-id': correlationId }
-  });
+  const { data, error, status } = await supabase.rpc(fn, args);
 
   if (error) {
     const msg = error.message || "RPC_ERROR";
     const details = (error as any).details ?? null;
 
-    console.error("[RPC][ERROR]", fn, `HTTP_${status}`, msg, { message: msg, details, correlationId });
+    console.error("[RPC][ERROR]", fn, `HTTP_${status}`, msg, { message: msg, details });
 
     if (/Invalid API key/i.test(msg)) {
       throw new RpcError(

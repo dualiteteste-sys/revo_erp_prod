@@ -91,7 +91,7 @@ export default function MediaTab({ produtoId, empresaId }: Props) {
 
   const onDrop = useCallback(async (acceptedFiles: File[]) => {
     if (!acceptedFiles.length) return;
-
+    
     setUploading(true);
     addToast(`Enviando ${acceptedFiles.length} imagem(ns)...`, 'info');
 
@@ -102,12 +102,15 @@ export default function MediaTab({ produtoId, empresaId }: Props) {
         try {
           const { key } = await uploadProductImage(empresaId, produtoId, file);
 
-          const { error: insErr } = await supabase.rpc('upload_product_image_meta', {
-            p_produto_id: produtoId,
-            p_url: key,
-            p_ordem: baseOrder + idx,
-            p_principal: imagens.length === 0 && idx === 0,
-          });
+          const payload = {
+            empresa_id: empresaId,
+            produto_id: produtoId,
+            url: key,
+            ordem: baseOrder + idx,
+            principal: imagens.length === 0 && idx === 0,
+          };
+
+          const { error: insErr } = await supabase.from("produto_imagens").insert(payload);
           if (insErr) throw insErr;
 
         } catch (uploadError: any) {
