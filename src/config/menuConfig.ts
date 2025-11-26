@@ -5,7 +5,7 @@ import {
   FileSignature, HeartHandshake, Store, Receipt, Truck, Percent,
   Bot, Undo2, ClipboardCheck, Banknote, Wallet, TrendingUp,
   TrendingDown, Landmark, FileSpreadsheet, LogOut, Search, Building, Code, Database, Target,
-  Briefcase, BookOpen, Grid, GraduationCap, PieChart, Factory, Hammer, Layers, FileCog, Route, PlayCircle, HardHat
+  Briefcase, BookOpen, Grid, GraduationCap, PieChart, Factory, Hammer, Layers, FileCog, Route, PlayCircle, HardHat, FileCode
 } from 'lucide-react';
 
 export interface MenuItem {
@@ -47,15 +47,15 @@ export const menuConfig: { name: string; icon: React.ElementType; href: string; 
     href: '#',
     gradient: 'from-zinc-500 to-neutral-600',
     children: [
-        { name: 'Dashboard Produção', icon: PieChart, href: '/app/industria/dashboard' },
-        { name: 'Ordens de Produção', icon: Hammer, href: '/app/industria/producao' },
-        { name: 'Ordens de Beneficiamento', icon: Layers, href: '/app/industria/beneficiamento' },
-        { name: 'Materiais de Clientes', icon: Package, href: '/app/industria/materiais-cliente' },
-        { name: 'Execução (Operações)', icon: PlayCircle, href: '/app/industria/execucao' },
-        { name: 'Chão de Fábrica', icon: HardHat, href: '/app/industria/chao-de-fabrica' },
-        { name: 'Roteiros', icon: Route, href: '/app/industria/roteiros' },
-        { name: 'Fichas Técnicas / BOM', icon: FileCog, href: '/app/industria/boms' },
-        { name: 'Centros de Trabalho', icon: Settings, href: '/app/industria/centros-trabalho' },
+      { name: 'Dashboard Produção', icon: PieChart, href: '/app/industria/dashboard' },
+      { name: 'Ordens de Produção', icon: Hammer, href: '/app/industria/producao' },
+      { name: 'Ordens de Beneficiamento', icon: Layers, href: '/app/industria/beneficiamento' },
+      { name: 'Materiais de Clientes', icon: Package, href: '/app/industria/materiais-cliente' },
+      { name: 'Execução (Operações)', icon: PlayCircle, href: '/app/industria/execucao' },
+      { name: 'Chão de Fábrica', icon: HardHat, href: '/app/industria/chao-de-fabrica' },
+      { name: 'Roteiros', icon: Route, href: '/app/industria/roteiros' },
+      { name: 'Fichas Técnicas / BOM', icon: FileCog, href: '/app/industria/boms' },
+      { name: 'Centros de Trabalho', icon: Settings, href: '/app/industria/centros-trabalho' },
     ]
   },
   {
@@ -76,18 +76,18 @@ export const menuConfig: { name: string; icon: React.ElementType; href: string; 
     href: '#',
     gradient: 'from-red-500 to-red-600',
     children: [
-        { name: 'Painel de Vendas', icon: BarChart2, href: '/app/sales-dashboard' },
-        { name: 'CRM', icon: HeartHandshake, href: '/app/vendas/crm' },
-        { name: 'Pedidos de Vendas', icon: ClipboardList, href: '/app/vendas/pedidos' },
-        { name: 'Metas de Vendas', icon: Target, href: '/app/vendas/metas' },
-        { name: 'Propostas Comerciais', icon: FileSignature, href: '#' },
-        { name: 'PDV', icon: Store, href: '#' },
-        { name: 'Notas Fiscais', icon: Receipt, href: '#' },
-        { name: 'Expedição', icon: Truck, href: '#' },
-        { name: 'Comissões', icon: Percent, href: '#' },
-        { name: 'Painel de Automações', icon: Bot, href: '#' },
-        { name: 'Devolução de Venda', icon: Undo2, href: '#' },
-        { name: 'Relatórios', icon: BarChart2, href: '#' },
+      { name: 'Painel de Vendas', icon: BarChart2, href: '/app/sales-dashboard' },
+      { name: 'CRM', icon: HeartHandshake, href: '/app/vendas/crm' },
+      { name: 'Pedidos de Vendas', icon: ClipboardList, href: '/app/vendas/pedidos' },
+      { name: 'Metas de Vendas', icon: Target, href: '/app/vendas/metas' },
+      { name: 'Propostas Comerciais', icon: FileSignature, href: '#' },
+      { name: 'PDV', icon: Store, href: '#' },
+      { name: 'Notas Fiscais', icon: Receipt, href: '#' },
+      { name: 'Expedição', icon: Truck, href: '#' },
+      { name: 'Comissões', icon: Percent, href: '#' },
+      { name: 'Painel de Automações', icon: Bot, href: '#' },
+      { name: 'Devolução de Venda', icon: Undo2, href: '#' },
+      { name: 'Relatórios', icon: BarChart2, href: '#' },
     ]
   },
   {
@@ -96,11 +96,11 @@ export const menuConfig: { name: string; icon: React.ElementType; href: string; 
     href: '#',
     gradient: 'from-amber-500 to-amber-600',
     children: [
-        { name: 'Ordens de Serviço', icon: ClipboardCheck, href: '/app/ordens-de-servico' },
-        { name: 'Contratos', icon: FileText, href: '#' },
-        { name: 'Notas de Serviço', icon: Receipt, href: '#' },
-        { name: 'Cobranças', icon: Banknote, href: '#' },
-        { name: 'Relatórios', icon: BarChart2, href: '#' },
+      { name: 'Ordens de Serviço', icon: ClipboardCheck, href: '/app/ordens-de-servico' },
+      { name: 'Contratos', icon: FileText, href: '#' },
+      { name: 'Notas de Serviço', icon: Receipt, href: '#' },
+      { name: 'Cobranças', icon: Banknote, href: '#' },
+      { name: 'Relatórios', icon: BarChart2, href: '#' },
     ]
   },
   {
@@ -109,13 +109,13 @@ export const menuConfig: { name: string; icon: React.ElementType; href: string; 
     href: '#',
     gradient: 'from-emerald-500 to-emerald-600',
     children: [
-        { name: 'Tesouraria', icon: Wallet, href: '/app/financeiro/tesouraria' },
-        { name: 'Contas a Receber', icon: TrendingUp, href: '/app/financeiro/contas-a-receber' },
-        { name: 'Contas a Pagar', icon: TrendingDown, href: '/app/financeiro/contas-a-pagar' },
-        { name: 'Centro de Custos', icon: Landmark, href: '/app/financeiro/centros-de-custo' },
-        { name: 'Cobranças Bancárias', icon: Banknote, href: '/app/financeiro/cobrancas' },
-        { name: 'Extrato Bancário', icon: FileSpreadsheet, href: '/app/financeiro/extrato' },
-        { name: 'Relatórios', icon: BarChart2, href: '#' },
+      { name: 'Tesouraria', icon: Wallet, href: '/app/financeiro/tesouraria' },
+      { name: 'Contas a Receber', icon: TrendingUp, href: '/app/financeiro/contas-a-receber' },
+      { name: 'Contas a Pagar', icon: TrendingDown, href: '/app/financeiro/contas-a-pagar' },
+      { name: 'Centro de Custos', icon: Landmark, href: '/app/financeiro/centros-de-custo' },
+      { name: 'Cobranças Bancárias', icon: Banknote, href: '/app/financeiro/cobrancas' },
+      { name: 'Extrato Bancário', icon: FileSpreadsheet, href: '/app/financeiro/extrato' },
+      { name: 'Relatórios', icon: BarChart2, href: '#' },
     ]
   },
   {
@@ -140,6 +140,7 @@ export const menuConfig: { name: string; icon: React.ElementType; href: string; 
     children: [
       { name: 'Consulta CEP', icon: Search, href: '/app/cep-search' },
       { name: 'Consulta CNPJ', icon: Building, href: '/app/cnpj-search' },
+      { name: 'Testador XML', icon: FileCode, href: '/app/tools/xml-tester' },
     ],
   },
   {

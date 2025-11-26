@@ -23,6 +23,7 @@ const ExtratoPage = lazy(() => import("../pages/financeiro/ExtratoPage"));
 const CepSearchPage = lazy(() => import("../pages/tools/CepSearchPage"));
 const CnpjSearchPage = lazy(() => import("../pages/tools/CnpjSearchPage"));
 const NfeInputPage = lazy(() => import("../pages/tools/NfeInputPage"));
+const XmlTesterPage = lazy(() => import('../pages/tools/XmlTesterPage'));
 const LogsPage = lazy(() => import("../pages/dev/LogsPage"));
 const SupabaseDemoPage = lazy(() => import("../pages/tools/SupabaseDemoPage"));
 
@@ -126,6 +127,14 @@ export const appRoutes: RouteObject[] = [
             // Desenvolvedor
             { path: "desenvolvedor/logs", element: <Suspense fallback={<PageLoader />}><LogsPage /></Suspense> },
             { path: "desenvolvedor/supabase-demo", element: <Suspense fallback={<PageLoader />}><SupabaseDemoPage /></Suspense> },
+            {
+                path: 'tools/xml-tester',
+                element: (
+                    <Suspense fallback={<PageLoader />}>
+                        <XmlTesterPage />
+                    </Suspense>
+                ),
+            },
 
             // Fallback: Redireciona qualquer rota não encontrada dentro de /app para o dashboard
             { path: "*", element: <Navigate to="dashboard" replace /> },
