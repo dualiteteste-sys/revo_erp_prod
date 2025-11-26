@@ -5,13 +5,13 @@ import { XMLParser } from 'fast-xml-parser';
 import { FileUp, Loader2, AlertTriangle, CheckCircle, Save, Link as LinkIcon, ArrowRight, RefreshCw } from 'lucide-react';
 import GlassCard from '@/components/ui/GlassCard';
 import { useToast } from '@/contexts/ToastProvider';
-import { 
-  registerNfeImport, 
-  previewBeneficiamento, 
-  processBeneficiamentoImport, 
-  NfeImportPayload, 
-  PreviewResult, 
-  MatchItem 
+import {
+  registerNfeImport,
+  previewBeneficiamento,
+  processBeneficiamentoImport,
+  NfeImportPayload,
+  PreviewResult,
+  MatchItem
 } from '@/services/nfeInput';
 import ItemAutocomplete from '@/components/os/ItemAutocomplete';
 
@@ -31,11 +31,11 @@ const InfoItem: React.FC<{ label: string; value?: string | null }> = ({ label, v
 
 export default function NfeInputPage() {
   const { addToast } = useToast();
-  
+
   // Estado do Arquivo e Parsing
   const [xmlFile, setXmlFile] = useState<File | null>(null);
   const [nfeData, setNfeData] = useState<any | null>(null);
-  
+
   // Estado do Processo
   const [step, setStep] = useState<'upload' | 'review' | 'matching' | 'success'>('upload');
   const [loading, setLoading] = useState(false);
@@ -55,9 +55,12 @@ export default function NfeInputPage() {
     reader.onload = (e) => {
       try {
         const xmlData = e.target?.result as string;
+        // Remove namespaces via regex before parsing to handle <ns:tag>
+        const cleanXml = xmlData.replace(/<(\/?)[a-zA-Z0-9]+:/g, '<$1');
+
         const parser = new XMLParser({ ignoreAttributes: false, attributeNamePrefix: "@_" });
-        const jsonData = parser.parse(xmlData);
-        
+        const jsonData = parser.parse(cleanXml);
+
         // Suporte a nfeProc (com protocolo) ou NFe direta
         const root = jsonData.nfeProc ? jsonData.nfeProc.NFe : jsonData.NFe;
         const infNFe = root?.infNFe;
@@ -94,7 +97,7 @@ export default function NfeInputPage() {
     try {
       const root = nfeData.nfeProc ? nfeData.nfeProc.NFe : nfeData.NFe;
       const infNFe = root.infNFe;
-      
+
       // Extração de itens (pode ser array ou objeto único)
       let det = infNFe.det;
       if (!Array.isArray(det)) det = [det];
@@ -131,19 +134,19 @@ export default function NfeInputPage() {
 
       const id = await registerNfeImport(payload);
       setImportId(id);
-      
+
       // Carregar preview para matching
       const preview = await previewBeneficiamento(id);
       setPreviewData(preview);
-      
+
       setStep('matching');
       addToast('Nota registrada! Verifique os vínculos dos produtos.', 'success');
     } catch (e: any) {
       console.error('[NFE_IMPORT_ERROR]', e);
-      
+
       // Tratamento específico para erro de cache do PostgREST
       if (
-        e.message?.includes('Could not find the function') || 
+        e.message?.includes('Could not find the function') ||
         e.message?.includes('schema cache') ||
         e.message?.includes('function public.fiscal_nfe_import_register')
       ) {
@@ -163,7 +166,7 @@ export default function NfeInputPage() {
     if (!importId || !previewData) return;
 
     // Verificar se todos os itens têm match
-    const missingMatch = previewData.itens.some(item => 
+    const missingMatch = previewData.itens.some(item =>
       !item.match_produto_id && !manualMatches[item.item_id]
     );
 
@@ -225,7 +228,7 @@ export default function NfeInputPage() {
       </div>
 
       <GlassCard className="p-6 md:p-8 min-h-[400px]">
-        
+
         {/* STEP 1: UPLOAD */}
         {step === 'upload' && (
           <div
@@ -280,13 +283,13 @@ export default function NfeInputPage() {
             </div>
 
             <div className="flex justify-end gap-3 pt-4 border-t">
-              <button 
+              <button
                 onClick={() => { setStep('upload'); setNfeData(null); }}
                 className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50"
               >
                 Cancelar
               </button>
-              <button 
+              <button
                 onClick={handleRegister}
                 disabled={loading}
                 className="flex items-center gap-2 bg-blue-600 text-white font-bold py-2 px-6 rounded-lg hover:bg-blue-700 disabled:opacity-50"
@@ -341,7 +344,7 @@ export default function NfeInputPage() {
                             </div>
                           ) : (
                             <div className="w-full max-w-xs">
-                              <ItemAutocomplete 
+                              <ItemAutocomplete
                                 onSelect={(prod) => handleMatchSelect(item.item_id, prod)}
                                 placeholder="Buscar produto para vincular..."
                               />
@@ -367,7 +370,7 @@ export default function NfeInputPage() {
             </div>
 
             <div className="flex justify-end gap-3 pt-4 border-t">
-              <button 
+              <button
                 onClick={handleProcess}
                 disabled={loading}
                 className="flex items-center gap-2 bg-green-600 text-white font-bold py-2 px-6 rounded-lg hover:bg-green-700 disabled:opacity-50"
@@ -390,13 +393,13 @@ export default function NfeInputPage() {
               A entrada de beneficiamento foi registrada e o estoque foi atualizado com sucesso.
             </p>
             <div className="flex gap-4">
-              <button 
+              <button
                 onClick={() => { setStep('upload'); setNfeData(null); setXmlFile(null); setPreviewData(null); setManualMatches({}); }}
                 className="px-6 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50"
               >
                 Importar Outra Nota
               </button>
-              <a 
+              <a
                 href="/app/suprimentos/estoque"
                 className="px-6 py-2 bg-blue-600 text-white font-bold rounded-lg hover:bg-blue-700"
               >

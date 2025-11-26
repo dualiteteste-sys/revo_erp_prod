@@ -14,9 +14,9 @@ type Empresa = Database['public']['Tables']['empresas']['Row'];
 
 type Session =
   | {
-      user: { id: string } | null;
-      access_token?: string | null;
-    }
+    user: { id: string } | null;
+    access_token?: string | null;
+  }
   | null;
 
 type AuthContextType = {
@@ -57,13 +57,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   // ===== Helpers =====
 
   const getSession = useCallback(async () => {
-    console.log("[AUTH] getSession:init");
+    // console.log("[AUTH] getSession:init");
     const { data, error } = await supabase.auth.getSession();
     if (error) {
       console.warn("[AUTH] getSession:error", error);
       return null;
     }
-    console.log("[AUTH] getSession:done", data);
+    // console.log("[AUTH] getSession:done", data);
     return data.session ?? null;
   }, [supabase]);
 
@@ -72,6 +72,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       // Garante criação/ativação de empresa para o usuário atual (idempotente)
       try {
         console.log("[AUTH][EMPRESAS] bootstrap:start");
+        // @ts-ignore - RPC types mismatch
         const { error } = await supabase.rpc("secure_bootstrap_empresa_for_current_user", {
           p_razao_social: "Empresa sem Nome",
           p_fantasia: null,
@@ -97,6 +98,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         .select("empresa_id")
         .single();
       if (!uae.error && uae.data?.empresa_id) {
+        // @ts-ignore - Table types missing
         setActiveEmpresaId(uae.data.empresa_id);
       } else {
         setActiveEmpresaId(null);
@@ -118,11 +120,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const loadedEmpresas = (eu.data ?? [])
         .map((r: any) => r.empresa)
         .filter((e: any) => e !== null) as Empresa[];
-      
+
       setEmpresas(loadedEmpresas);
 
       console.log("[AUTH][EMPRESAS] fetch:ok", {
         count: loadedEmpresas.length,
+        // @ts-ignore - Table types missing
         activeEmpresaId: uae.data?.empresa_id ?? null,
       });
     },
@@ -140,7 +143,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       // Se não há nenhuma, tenta bootstrap e recarrega
       // Note: We check activeEmpresaId as a proxy for "has access to a company"
       // but we should also check if the list is empty to trigger bootstrap for new users
-      if (!activeEmpresaId) { 
+      if (!activeEmpresaId) {
         await ensureBootstrapEmpresa();
         await loadEmpresas();
       }
@@ -155,11 +158,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       // Optimistic update
       setActiveEmpresaId(empresa.id);
-      
+
+      // @ts-ignore - RPC types mismatch
       const { error } = await supabase.rpc('set_active_empresa_for_current_user', {
         p_empresa_id: empresa.id
       });
-      
+
       if (error) {
         console.error("[AUTH] Failed to set active company", error);
       }
@@ -193,7 +197,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   // Observa mudanças de auth
   useEffect(() => {
     const { data: sub } = supabase.auth.onAuthStateChange((event, sess) => {
-      console.log("[AUTH] onAuthStateChange", { event, hasSession: !!sess });
+      // console.log("[AUTH] onAuthStateChange", { event, hasSession: !!sess });
       setSession(sess ?? null);
       setUserId(sess?.user?.id ?? null);
 

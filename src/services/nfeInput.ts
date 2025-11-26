@@ -22,6 +22,7 @@ export type NfeImportItem = {
   cprod: string | null;
   ean: string | null;
   xprod: string | null;
+  ucom: string | null;
   qcom: number;
   vuncom: number;
   vprod: number;
@@ -58,8 +59,8 @@ export async function previewBeneficiamento(importId: string): Promise<PreviewRe
  * Requer que todos os itens tenham match (automático ou fornecido em p_matches).
  */
 export async function processBeneficiamentoImport(importId: string, matches: MatchItem[] = []): Promise<void> {
-  return callRpc<void>('beneficiamento_process_from_import', { 
+  return callRpc<void>('beneficiamento_process_from_import', {
     p_import_id: importId,
-    p_matches: matches 
+    p_matches: matches
   });
 }

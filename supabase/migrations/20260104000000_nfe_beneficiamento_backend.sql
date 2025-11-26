@@ -365,14 +365,14 @@ begin
              (
                select p.id
                from public.produtos p
-               where (p.codigo = fi.cprod and fi.cprod is not null and fi.cprod <> '')
+               where (p.sku = fi.cprod and fi.cprod is not null and fi.cprod <> '')
                   or (p.ean = fi.ean and fi.ean is not null and fi.ean <> '')
                limit 1
              ),
              'match_strategy',
              case
-               when exists (select 1 from public.produtos p where p.codigo = fi.cprod and fi.cprod is not null and fi.cprod <> '')
-                 then 'codigo'
+               when exists (select 1 from public.produtos p where p.sku = fi.cprod and fi.cprod is not null and fi.cprod <> '')
+                 then 'sku'
                when exists (select 1 from public.produtos p where p.ean = fi.ean and fi.ean is not null and fi.ean <> '')
                  then 'ean'
                else 'none'
@@ -433,7 +433,7 @@ begin
     -- resolve produto:
     select p.id into v_prod
     from public.produtos p
-    where (p.codigo = v_row.cprod and v_row.cprod is not null and v_row.cprod <> '')
+    where (p.sku = v_row.cprod and v_row.cprod is not null and v_row.cprod <> '')
        or (p.ean    = v_row.ean   and v_row.ean   is not null and v_row.ean   <> '')
     limit 1;
 
