@@ -39,13 +39,13 @@ export async function provisionCompany(input: ProvisionEmpresaInput): Promise<Em
             p_fantasia: input.fantasia,
             p_email: input.email ?? null,
         });
-
+        
         // Handle potential array return if RPC behavior varies (PostgREST quirks)
         if (Array.isArray(data)) {
-            if (data.length === 0) throw new Error("A criação da empresa não retornou dados.");
-            return data[0];
+             if (data.length === 0) throw new Error("A criação da empresa não retornou dados.");
+             return data[0];
         }
-
+        
         if (!data) {
             throw new Error("A criação da empresa não retornou dados.");
         }
@@ -107,12 +107,17 @@ export async function deleteCompanyLogo(logoPath: string): Promise<void> {
  * Remove o usuário atual da empresa especificada.
  */
 export async function leaveCompany(empresaId: string): Promise<void> {
-    try {
-        await callRpc('leave_company', {
-            p_empresa_id: empresaId,
-        });
-    } catch (error) {
-        console.error('Error leaving company via RPC:', error);
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error("Usuário não autenticado.");
+
+    const { error } = await supabase
+        .from('empresa_usuarios')
+        .delete()
+        .eq('empresa_id', empresaId)
+        .eq('user_id', user.id);
+
+    if (error) {
+        console.error('Error leaving company:', error);
         throw new Error('Falha ao sair da empresa.');
     }
 }

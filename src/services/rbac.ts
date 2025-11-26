@@ -26,14 +26,28 @@ interface UpdatePayload {
 }
 
 export async function updateRolePermissions({ roleId, permissionsToAdd, permissionsToRemove }: UpdatePayload): Promise<void> {
-  const toAdd = permissionsToAdd.map(p => p.permission_id);
-  const toRemove = permissionsToRemove.map(p => p.permission_id);
+  const promises = [];
 
-  const { error } = await supabase.rpc('manage_role_permissions', {
-    p_role_id: roleId,
-    p_permissions_to_add: toAdd,
-    p_permissions_to_remove: toRemove,
-  });
+  if (permissionsToRemove.length > 0) {
+    const removePromise = supabase
+      .from('role_permissions')
+      .delete()
+      .eq('role_id', roleId)
+      .in('permission_id', permissionsToRemove.map(p => p.permission_id));
+    promises.push(removePromise);
+  }
 
-  if (error) throw error;
+  if (permissionsToAdd.length > 0) {
+    const addPromise = supabase
+      .from('role_permissions')
+      .insert(permissionsToAdd);
+    promises.push(addPromise);
+  }
+
+  const results = await Promise.all(promises);
+  const firstError = results.find(res => res.error);
+
+  if (firstError?.error) {
+    throw firstError.error;
+  }
 }
