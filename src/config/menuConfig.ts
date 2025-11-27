@@ -5,7 +5,8 @@ import {
   FileSignature, HeartHandshake, Store, Receipt, Truck, Percent,
   Bot, Undo2, ClipboardCheck, Banknote, Wallet, TrendingUp,
   TrendingDown, Landmark, FileSpreadsheet, LogOut, Search, Building, Code, Database, Target,
-  Briefcase, BookOpen, Grid, GraduationCap, PieChart, Factory, Hammer, Layers, FileCog, Route, PlayCircle, HardHat, FileCode
+  Briefcase, BookOpen, Grid, GraduationCap, PieChart, Factory, Hammer, Layers, FileCog, Route, PlayCircle, HardHat, FileCode,
+  PackageCheck, FileUp
 } from 'lucide-react';
 
 export interface MenuItem {
@@ -66,7 +67,8 @@ export const menuConfig: { name: string; icon: React.ElementType; href: string; 
     children: [
       { name: 'Controle de Estoques', icon: Warehouse, href: '/app/suprimentos/estoque' },
       { name: 'Ordens de Compra', icon: ShoppingCart, href: '/app/suprimentos/compras' },
-      { name: 'NFe de Entrada', icon: FileDown, href: '/app/nfe-input' },
+      { name: 'Recebimentos', icon: PackageCheck, href: '/app/suprimentos/recebimentos' },
+      { name: 'Importar XML', icon: FileUp, href: '/app/nfe-input' },
       { name: 'Relatórios', icon: BarChart2, href: '/app/suprimentos/relatorios' },
     ]
   },
@@ -140,6 +142,7 @@ export const menuConfig: { name: string; icon: React.ElementType; href: string; 
     children: [
       { name: 'Consulta CEP', icon: Search, href: '/app/cep-search' },
       { name: 'Consulta CNPJ', icon: Building, href: '/app/cnpj-search' },
+      { name: 'Importar XML', icon: FileUp, href: '/app/nfe-input' },
       { name: 'Testador XML', icon: FileCode, href: '/app/tools/xml-tester' },
     ],
   },

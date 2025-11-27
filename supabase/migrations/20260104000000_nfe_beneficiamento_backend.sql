@@ -366,24 +366,23 @@ begin
                select p.id
                from public.produtos p
                where (p.sku = fi.cprod and fi.cprod is not null and fi.cprod <> '')
-                  or (p.ean = fi.ean and fi.ean is not null and fi.ean <> '')
+                  or (p.gtin = fi.ean and fi.ean is not null and fi.ean <> '')
                limit 1
              ),
              'match_strategy',
              case
                when exists (select 1 from public.produtos p where p.sku = fi.cprod and fi.cprod is not null and fi.cprod <> '')
                  then 'sku'
-               when exists (select 1 from public.produtos p where p.ean = fi.ean and fi.ean is not null and fi.ean <> '')
+               when exists (select 1 from public.produtos p where p.gtin = fi.ean and fi.ean is not null and fi.ean <> '')
                  then 'ean'
                else 'none'
              end
-           )
+           ) order by fi.n_item
          ), '[]'::jsonb)
   into v_itens
   from public.fiscal_nfe_import_items fi
   where fi.import_id = p_import_id
-    and fi.empresa_id = v_emp
-  order by fi.n_item;
+    and fi.empresa_id = v_emp;
 
   return jsonb_build_object('import', v_head, 'itens', v_itens);
 end;
@@ -434,7 +433,7 @@ begin
     select p.id into v_prod
     from public.produtos p
     where (p.sku = v_row.cprod and v_row.cprod is not null and v_row.cprod <> '')
-       or (p.ean    = v_row.ean   and v_row.ean   is not null and v_row.ean   <> '')
+       or (p.gtin    = v_row.ean   and v_row.ean   is not null and v_row.ean   <> '')
     limit 1;
 
     if v_prod is null and p_matches is not null then

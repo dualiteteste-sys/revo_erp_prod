@@ -1,11 +1,14 @@
 /*
-  FIX RPC COLUMN ERROR (V3 - FINAL)
-  Run this script in Supabase SQL Editor to update the functions with:
-  1. Correct column names (p.sku, p.gtin).
-  2. Correct aggregation logic (ORDER BY inside jsonb_agg).
+  # Fix Beneficiamento RPC (Production)
+  
+  ## Description
+  Updates the 'beneficiamento_process_from_import' and 'beneficiamento_preview' RPCs to:
+  1. Correctly map products using SKU/GTIN.
+  2. Update 'estoque_saldos' (upsert) to ensure stock visibility.
+  3. Insert into 'estoque_movimentos' with correct columns and types.
 */
 
--- 3.2) Preview (tenta casar itens com produtos por codigo ou ean)
+-- 1. Preview Function
 create or replace function public.beneficiamento_preview(
   p_import_id uuid
 )
@@ -68,10 +71,10 @@ $$;
 revoke all on function public.beneficiamento_preview from public;
 grant execute on function public.beneficiamento_preview to authenticated, service_role;
 
--- 3.3) Processar import → gerar entradas de beneficiamento (idempotente)
+-- 2. Process Function
 create or replace function public.beneficiamento_process_from_import(
   p_import_id uuid,
-  p_matches   jsonb default '[]'::jsonb  -- [{item_id, produto_id}] para resolver pendências
+  p_matches   jsonb default '[]'::jsonb
 )
 returns void
 language plpgsql
@@ -94,7 +97,6 @@ begin
     raise exception 'Import não encontrado.';
   end if;
 
-  -- idempotência: se já processado, apenas retorna
   if v_stat = 'processado' then
     return;
   end if;
@@ -106,7 +108,7 @@ begin
       and fi.empresa_id = v_emp
     order by fi.n_item
   loop
-    -- resolve produto:
+    -- Resolve Product
     select p.id into v_prod
     from public.produtos p
     where (p.sku = v_row.cprod and v_row.cprod is not null and v_row.cprod <> '')
@@ -123,7 +125,7 @@ begin
       raise exception 'Item % sem mapeamento de produto. Utilize preview e envie p_matches.', v_row.n_item;
     end if;
 
-    -- 1. Atualizar ou Criar Saldo (Upsert)
+    -- 1. Update or Create Balance (Upsert)
     insert into public.estoque_saldos (empresa_id, produto_id, saldo, updated_at)
     values (v_emp, v_prod, v_row.qcom, now())
     on conflict (empresa_id, produto_id)
@@ -131,12 +133,12 @@ begin
       saldo = estoque_saldos.saldo + excluded.saldo,
       updated_at = now();
 
-    -- 2. Registrar Movimento
+    -- 2. Register Movement
     insert into public.estoque_movimentos (
       empresa_id, produto_id, data_movimento,
       tipo_mov, tipo, quantidade, valor_unitario,
       origem_tipo, origem_id, observacoes,
-      saldo_novo -- Opcional, mas bom ter se possível
+      saldo_novo
     ) values (
       v_emp, v_prod, current_date,
       'entrada_beneficiamento', 'entrada', v_row.qcom, v_row.vuncom,
@@ -144,7 +146,7 @@ begin
       'NF-e entrada para beneficiamento - chave='||(
         select chave_acesso from public.fiscal_nfe_imports where id = p_import_id
       ),
-      (select saldo from public.estoque_saldos where empresa_id = v_emp and produto_id = v_prod) -- Pega o saldo atualizado
+      (select saldo from public.estoque_saldos where empresa_id = v_emp and produto_id = v_prod)
     )
     on conflict (empresa_id, origem_tipo, origem_id, produto_id, tipo_mov) do update set
       quantidade     = excluded.quantidade,

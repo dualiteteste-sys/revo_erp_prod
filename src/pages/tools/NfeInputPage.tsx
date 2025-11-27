@@ -5,14 +5,15 @@ import { XMLParser } from 'fast-xml-parser';
 import { FileUp, Loader2, AlertTriangle, CheckCircle, Save, Link as LinkIcon, ArrowRight, RefreshCw } from 'lucide-react';
 import GlassCard from '@/components/ui/GlassCard';
 import { useToast } from '@/contexts/ToastProvider';
+import { useNavigate } from 'react-router-dom';
 import {
   registerNfeImport,
   previewBeneficiamento,
-  processBeneficiamentoImport,
   NfeImportPayload,
   PreviewResult,
   MatchItem
 } from '@/services/nfeInput';
+import { createRecebimentoFromXml, listRecebimentoItens, updateRecebimentoItemProduct } from '@/services/recebimento';
 import ItemAutocomplete from '@/components/os/ItemAutocomplete';
 
 // Helper para acesso seguro a propriedades aninhadas
@@ -31,6 +32,7 @@ const InfoItem: React.FC<{ label: string; value?: string | null }> = ({ label, v
 
 export default function NfeInputPage() {
   const { addToast } = useToast();
+  const navigate = useNavigate();
 
   // Estado do Arquivo e Parsing
   const [xmlFile, setXmlFile] = useState<File | null>(null);
@@ -41,7 +43,7 @@ export default function NfeInputPage() {
   const [loading, setLoading] = useState(false);
   const [importId, setImportId] = useState<string | null>(null);
   const [previewData, setPreviewData] = useState<PreviewResult | null>(null);
-  const [manualMatches, setManualMatches] = useState<Record<string, string>>({}); // item_id -> produto_id
+  const [manualMatches, setManualMatches] = useState<Record<string, { id: string, name: string }>>({}); // item_id -> { id, name }
 
   // Parsing do XML
   const onDrop = useCallback((acceptedFiles: File[]) => {
@@ -161,41 +163,54 @@ export default function NfeInputPage() {
     }
   };
 
-  // Passo 2: Processar Entrada
+  // Passo 2: Processar Entrada (Criar Recebimento)
   const handleProcess = async () => {
     if (!importId || !previewData) return;
 
-    // Verificar se todos os itens têm match
-    const missingMatch = previewData.itens.some(item =>
-      !item.match_produto_id && !manualMatches[item.item_id]
-    );
-
-    if (missingMatch) {
-      addToast('Existem itens sem produto vinculado. Por favor, vincule todos os itens.', 'warning');
-      return;
-    }
-
     setLoading(true);
     try {
-      // Preparar array de matches manuais
-      const matches: MatchItem[] = Object.entries(manualMatches).map(([itemId, prodId]) => ({
-        item_id: itemId,
-        produto_id: prodId
-      }));
+      // 1. Criar o Recebimento (Pré-Nota)
+      const { id: recebimentoId, status } = await createRecebimentoFromXml(importId);
 
-      await processBeneficiamentoImport(importId, matches);
-      setStep('success');
-      addToast('Entrada de beneficiamento processada com sucesso!', 'success');
+      if (status === 'exists') {
+        addToast('Já existe um recebimento para esta nota. Redirecionando...', 'info');
+        navigate(`/app/suprimentos/recebimento/${recebimentoId}`);
+        return;
+      }
+
+      // 2. Aplicar Matches Manuais (se houver)
+      const manualMatchKeys = Object.keys(manualMatches);
+      if (manualMatchKeys.length > 0) {
+        // Buscar itens criados para saber seus IDs
+        const itensCriados = await listRecebimentoItens(recebimentoId);
+
+        // Para cada match manual, encontrar o item correspondente e atualizar
+        const updatePromises = manualMatchKeys.map(async (fiscalItemId) => {
+          const match = manualMatches[fiscalItemId];
+          // Encontrar o item do recebimento que aponta para este item fiscal
+          const itemRecebimento = itensCriados.find(i => i.fiscal_nfe_item_id === fiscalItemId);
+
+          if (itemRecebimento) {
+            await updateRecebimentoItemProduct(itemRecebimento.id, match.id);
+          }
+        });
+
+        await Promise.all(updatePromises);
+      }
+
+      addToast('Recebimento criado com sucesso! Iniciando conferência...', 'success');
+      navigate(`/app/suprimentos/recebimento/${recebimentoId}`);
+
     } catch (e: any) {
       console.error(e);
-      addToast(e.message || 'Erro ao processar entrada.', 'error');
+      addToast(e.message || 'Erro ao criar recebimento.', 'error');
     } finally {
       setLoading(false);
     }
   };
 
   const handleMatchSelect = (itemId: string, product: any) => {
-    setManualMatches(prev => ({ ...prev, [itemId]: product.id }));
+    setManualMatches(prev => ({ ...prev, [itemId]: { id: product.id, name: product.descricao } }));
   };
 
   // Renderização
@@ -334,19 +349,41 @@ export default function NfeInputPage() {
                           {item.qcom} <span className="text-xs text-gray-500">{item.ucom}</span>
                         </td>
                         <td className="px-4 py-3">
-                          {item.match_produto_id ? (
+                          {item.match_produto_id || manualMatches[item.item_id] ? (
                             <div className="flex items-center gap-2 text-sm text-green-700">
                               <CheckCircle size={16} />
-                              <span>Produto encontrado automaticamente</span>
-                              <span className="text-xs bg-green-100 px-2 py-0.5 rounded-full capitalize">
-                                {item.match_strategy}
-                              </span>
+                              <div>
+                                <p className="font-medium">
+                                  {item.match_produto_id
+                                    ? 'Produto encontrado automaticamente'
+                                    : manualMatches[item.item_id]?.name || 'Produto vinculado manualmente'}
+                                </p>
+                                {item.match_strategy && (
+                                  <span className="text-xs bg-green-100 px-2 py-0.5 rounded-full capitalize">
+                                    {item.match_strategy}
+                                  </span>
+                                )}
+                              </div>
+                              {!item.match_produto_id && (
+                                <button
+                                  onClick={() => {
+                                    const newMatches = { ...manualMatches };
+                                    delete newMatches[item.item_id];
+                                    setManualMatches(newMatches);
+                                  }}
+                                  className="ml-2 text-xs text-red-500 hover:text-red-700 underline"
+                                >
+                                  Desvincular
+                                </button>
+                              )}
                             </div>
                           ) : (
                             <div className="w-full max-w-xs">
                               <ItemAutocomplete
                                 onSelect={(prod) => handleMatchSelect(item.item_id, prod)}
                                 placeholder="Buscar produto para vincular..."
+                                onlySales={false}
+                                type="product"
                               />
                             </div>
                           )}
@@ -376,13 +413,13 @@ export default function NfeInputPage() {
                 className="flex items-center gap-2 bg-green-600 text-white font-bold py-2 px-6 rounded-lg hover:bg-green-700 disabled:opacity-50"
               >
                 {loading ? <Loader2 className="animate-spin" /> : <Save />}
-                Processar Entrada no Estoque
+                Criar Recebimento e Conferir
               </button>
             </div>
           </div>
         )}
 
-        {/* STEP 4: SUCCESS */}
+        {/* STEP 4: SUCCESS (Redundant now, but kept for fallback) */}
         {step === 'success' && (
           <div className="flex flex-col items-center justify-center py-12 text-center">
             <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mb-6">

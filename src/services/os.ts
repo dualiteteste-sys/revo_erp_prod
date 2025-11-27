@@ -28,20 +28,20 @@ export type OrdemServico = {
 };
 
 export type OrdemServicoItem = {
-    id: string;
-    ordem_servico_id: string;
-    empresa_id: string;
-    servico_id: string | null;
-    produto_id: string | null;
-    descricao: string;
-    codigo: string | null;
-    quantidade: number;
-    preco: number;
-    desconto_pct: number;
-    total: number;
-    orcar: boolean;
-    created_at: string;
-    updated_at: string;
+  id: string;
+  ordem_servico_id: string;
+  empresa_id: string;
+  servico_id: string | null;
+  produto_id: string | null;
+  descricao: string;
+  codigo: string | null;
+  quantidade: number;
+  preco: number;
+  desconto_pct: number;
+  total: number;
+  orcar: boolean;
+  created_at: string;
+  updated_at: string;
 };
 // --- End Placeholder Types ---
 
@@ -59,15 +59,17 @@ export type OsItemSearchResult = {
   descricao: string;
   codigo: string | null;
   preco_venda: number | null;
+  sku?: string | null;
+  unidade?: string | null;
 };
 
 export type KanbanOs = {
-    id: string;
-    numero: bigint;
-    descricao: string;
-    status: status_os;
-    data_prevista: string | null;
-    cliente_nome: string | null;
+  id: string;
+  numero: bigint;
+  descricao: string;
+  status: status_os;
+  data_prevista: string | null;
+  cliente_nome: string | null;
 };
 
 // --- OS Header Functions ---
@@ -104,7 +106,7 @@ export async function deleteOs(id: string): Promise<void> {
 }
 
 export async function updateOsOrder(osIds: string[]): Promise<void> {
-    return callRpc('update_os_order', { p_os_ids: osIds });
+  return callRpc('update_os_order', { p_os_ids: osIds });
 }
 
 
@@ -138,8 +140,13 @@ export async function deleteOsItem(itemId: string) {
 
 // --- Autocomplete Functions ---
 
-export async function searchItemsForOs(q: string, limit = 20): Promise<OsItemSearchResult[]> {
-    return callRpc<OsItemSearchResult[]>('search_items_for_os', { p_search: q, p_limit: limit });
+export async function searchItemsForOs(q: string, limit = 20, onlySales = true, type: 'all' | 'product' | 'service' = 'all'): Promise<OsItemSearchResult[]> {
+  return callRpc<OsItemSearchResult[]>('search_items_for_os', {
+    p_search: q,
+    p_limit: limit,
+    p_only_sales: onlySales,
+    p_type: type
+  });
 }
 
 // --- Composite Functions ---
@@ -162,16 +169,16 @@ export async function saveOs(osData: Partial<OrdemServicoDetails>): Promise<Orde
 }
 
 export async function seedDefaultOs(): Promise<OrdemServico[]> {
-    console.log('[RPC] seed_os_for_current_user');
-    return callRpc<OrdemServico[]>('seed_os_for_current_user', { p_count: 20 });
+  console.log('[RPC] seed_os_for_current_user');
+  return callRpc<OrdemServico[]>('seed_os_for_current_user', { p_count: 20 });
 }
 
 // --- Kanban Functions ---
 
 export async function listKanbanOs(): Promise<KanbanOs[]> {
-    return callRpc<KanbanOs[]>('list_kanban_os');
+  return callRpc<KanbanOs[]>('list_kanban_os');
 }
 
 export async function updateOsDataPrevista(osId: string, newDate: string | null): Promise<void> {
-    return callRpc('update_os_data_prevista', { p_os_id: osId, p_new_date: newDate });
+  return callRpc('update_os_data_prevista', { p_os_id: osId, p_new_date: newDate });
 }
