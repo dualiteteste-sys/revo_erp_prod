@@ -41,14 +41,18 @@ export default function OrdemFormPanel({ ordemId, onSaveSuccess, onClose }: Prop
     }
   }, [ordemId]);
 
-  const loadDetails = async () => {
+  const loadDetails = async (idOverride?: string) => {
+    // FIX: Use idOverride or formData.id if ordemId is null (newly created order)
+    const idToLoad = idOverride || ordemId || formData.id;
+    if (!idToLoad) return;
+
     try {
-      const data = await getOrdemDetails(ordemId!);
+      const data = await getOrdemDetails(idToLoad);
       setFormData(data);
     } catch (e) {
       console.error(e);
       addToast('Erro ao carregar ordem.', 'error');
-      onClose();
+      if (ordemId) onClose();
     } finally {
       setLoading(false);
     }
@@ -119,7 +123,7 @@ export default function OrdemFormPanel({ ordemId, onSaveSuccess, onClose }: Prop
 
     try {
       await manageComponente(currentId!, null, item.id, 1, 'un', 'upsert');
-      await loadDetails();
+      await loadDetails(currentId);
       addToast('Componente adicionado.', 'success');
     } catch (e: any) {
       addToast(e.message, 'error');
@@ -129,7 +133,7 @@ export default function OrdemFormPanel({ ordemId, onSaveSuccess, onClose }: Prop
   const handleRemoveComponente = async (itemId: string) => {
     try {
       await manageComponente(formData.id!, itemId, '', 0, '', 'delete');
-      await loadDetails();
+      await loadDetails(formData.id);
       addToast('Componente removido.', 'success');
     } catch (e: any) {
       addToast(e.message, 'error');
@@ -171,7 +175,7 @@ export default function OrdemFormPanel({ ordemId, onSaveSuccess, onClose }: Prop
         data.observacoes,
         'upsert'
       );
-      await loadDetails();
+      await loadDetails(formData.id);
       addToast('Entrega registrada.', 'success');
     } catch (e: any) {
       throw e; 
@@ -181,7 +185,7 @@ export default function OrdemFormPanel({ ordemId, onSaveSuccess, onClose }: Prop
   const handleRemoveEntrega = async (entregaId: string) => {
     try {
       await manageEntrega(formData.id!, entregaId, '', 0, 'nao_faturado', undefined, undefined, 'delete');
-      await loadDetails();
+      await loadDetails(formData.id);
       addToast('Entrega removida.', 'success');
     } catch (e: any) {
       addToast(e.message, 'error');
@@ -343,7 +347,7 @@ export default function OrdemFormPanel({ ordemId, onSaveSuccess, onClose }: Prop
                             ordemId={formData.id} 
                             produtoId={formData.produto_final_id} 
                             tipoOrdem="producao"
-                            onApplied={loadDetails} 
+                            onApplied={() => loadDetails(formData.id)} 
                         />
                     </div>
                 )}
@@ -372,7 +376,7 @@ export default function OrdemFormPanel({ ordemId, onSaveSuccess, onClose }: Prop
       </div>
 
       <footer className="flex-shrink-0 p-4 flex justify-between items-center border-t border-white/20">
-        <button onClick={onClose} className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-white">
+        <button onClick={onClose} className="rounded-md border border-gray-300 bg-white py-2 px-4 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2">
           Fechar
         </button>
         <div className="flex gap-3">

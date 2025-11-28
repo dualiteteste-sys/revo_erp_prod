@@ -40,14 +40,17 @@ export default function ProducaoFormPanel({ ordemId, onSaveSuccess, onClose }: P
     }
   }, [ordemId]);
 
-  const loadDetails = async () => {
+  const loadDetails = async (idOverride?: string) => {
+    const idToLoad = idOverride || ordemId || formData.id;
+    if (!idToLoad) return;
+
     try {
-      const data = await getOrdemProducaoDetails(ordemId!);
+      const data = await getOrdemProducaoDetails(idToLoad);
       setFormData(data);
     } catch (e) {
       console.error(e);
       addToast('Erro ao carregar ordem.', 'error');
-      onClose();
+      if (ordemId) onClose();
     } finally {
       setLoading(false);
     }
@@ -107,7 +110,6 @@ export default function ProducaoFormPanel({ ordemId, onSaveSuccess, onClose }: P
     }
   };
 
-  // --- Componentes ---
   const handleAddComponente = async (item: any) => {
     let currentId = formData.id;
     if (!currentId) {
@@ -117,7 +119,7 @@ export default function ProducaoFormPanel({ ordemId, onSaveSuccess, onClose }: P
 
     try {
       await manageComponenteProducao(currentId!, null, item.id, 1, 'un', 'upsert');
-      await loadDetails();
+      await loadDetails(currentId);
       addToast('Componente adicionado.', 'success');
     } catch (e: any) {
       addToast(e.message, 'error');
@@ -127,7 +129,7 @@ export default function ProducaoFormPanel({ ordemId, onSaveSuccess, onClose }: P
   const handleRemoveComponente = async (itemId: string) => {
     try {
       await manageComponenteProducao(formData.id!, itemId, '', 0, '', 'delete');
-      await loadDetails();
+      await loadDetails(formData.id);
       addToast('Componente removido.', 'success');
     } catch (e: any) {
       addToast(e.message, 'error');
@@ -154,7 +156,6 @@ export default function ProducaoFormPanel({ ordemId, onSaveSuccess, onClose }: P
     }
   };
 
-  // --- Entregas ---
   const handleAddEntrega = async (data: any) => {
     if (!formData.id) return;
     try {
@@ -167,17 +168,17 @@ export default function ProducaoFormPanel({ ordemId, onSaveSuccess, onClose }: P
         data.observacoes,
         'upsert'
       );
-      await loadDetails();
+      await loadDetails(formData.id);
       addToast('Entrega registrada.', 'success');
     } catch (e: any) {
-      throw e; 
+      addToast(e.message, 'error');
     }
   };
 
   const handleRemoveEntrega = async (entregaId: string) => {
     try {
       await manageEntregaProducao(formData.id!, entregaId, '', 0, undefined, undefined, 'delete');
-      await loadDetails();
+      await loadDetails(formData.id);
       addToast('Entrega removida.', 'success');
     } catch (e: any) {
       addToast(e.message, 'error');
@@ -187,7 +188,6 @@ export default function ProducaoFormPanel({ ordemId, onSaveSuccess, onClose }: P
   if (loading) return <div className="flex justify-center p-8"><Loader2 className="animate-spin" /></div>;
 
   const isLocked = formData.status === 'concluida' || formData.status === 'cancelada';
-  const totalEntregue = formData.entregas?.reduce((acc, e) => acc + Number(e.quantidade_entregue), 0) || 0;
 
   return (
     <div className="flex flex-col h-full">
@@ -246,9 +246,8 @@ export default function ProducaoFormPanel({ ordemId, onSaveSuccess, onClose }: P
             <>
                 <Section title="O que produzir?" description="Definição do produto e quantidades.">
                     <div className="sm:col-span-2">
-                        <Select label="Tipo de Ordem" name="tipo_ordem" value={formData.tipo_ordem} onChange={e => handleHeaderChange('tipo_ordem', e.target.value)} disabled={!!formData.id}>
+                        <Select label="Tipo de Ordem" name="tipo_ordem" value="industrializacao" disabled>
                             <option value="industrializacao">Industrialização</option>
-                            <option value="beneficiamento">Beneficiamento</option>
                         </Select>
                     </div>
                     <div className="sm:col-span-4">
@@ -334,7 +333,7 @@ export default function ProducaoFormPanel({ ordemId, onSaveSuccess, onClose }: P
                             ordemId={formData.id} 
                             produtoId={formData.produto_final_id} 
                             tipoOrdem="producao"
-                            onApplied={loadDetails} 
+                            onApplied={() => loadDetails(formData.id)} 
                         />
                     </div>
                 )}
@@ -356,7 +355,6 @@ export default function ProducaoFormPanel({ ordemId, onSaveSuccess, onClose }: P
                 onRemoveEntrega={handleRemoveEntrega}
                 readOnly={isLocked}
                 maxQuantity={formData.quantidade_planejada || 0}
-                currentTotal={totalEntregue}
                 showBillingStatus={false}
             />
         )}
