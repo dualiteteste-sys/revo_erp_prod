@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { getRecebimento, listRecebimentoItens, conferirItem, finalizarRecebimento, updateRecebimentoItemProduct, Recebimento, RecebimentoItem } from '@/services/recebimento';
-import { Loader2, ArrowLeft, CheckCircle, AlertTriangle, Save } from 'lucide-react';
+import { Loader2, ArrowLeft, CheckCircle, AlertTriangle, Save, Layers } from 'lucide-react';
 import { useToast } from '@/contexts/ToastProvider';
 import ItemAutocomplete from '@/components/os/ItemAutocomplete';
 
@@ -72,15 +72,43 @@ export default function ConferenciaPage() {
             const result = await finalizarRecebimento(id);
             if (result.status === 'concluido') {
                 addToast(result.message, 'success');
-                navigate('/app/suprimentos/recebimentos');
+                // Recarrega para atualizar o status e habilitar os botões
+                loadData(id);
             } else {
                 addToast(result.message, 'warning');
-                // Recarrega para mostrar status atualizado (ex: divergente)
                 loadData(id);
             }
         } catch (error) {
             addToast('Erro ao finalizar recebimento.', 'error');
         }
+    };
+
+    const handleGerarOB = (item: RecebimentoItem) => {
+        if (!recebimento) return;
+        
+        if (!item.produto_id) {
+            addToast('Vincule um produto do sistema antes de gerar a OB.', 'warning');
+            return;
+        }
+
+        navigate('/app/industria/beneficiamento', {
+            state: {
+                createFromRecebimento: {
+                    recebimento: {
+                        numero: recebimento.fiscal_nfe_imports?.numero,
+                        serie: recebimento.fiscal_nfe_imports?.serie,
+                        emitente_nome: recebimento.fiscal_nfe_imports?.emitente_nome,
+                        emitente_cnpj: recebimento.fiscal_nfe_imports?.emitente_cnpj, // Passando CNPJ
+                    },
+                    item: {
+                        produto_id: item.produto_id,
+                        produto_nome: item.produtos?.nome,
+                        quantidade: item.quantidade_conferida > 0 ? item.quantidade_conferida : item.quantidade_xml,
+                        unidade: item.produtos?.unidade || 'UN'
+                    }
+                }
+            }
+        });
     };
 
     if (loading) return <div className="flex justify-center p-12"><Loader2 className="animate-spin text-blue-600" /></div>;
@@ -111,6 +139,12 @@ export default function ConferenciaPage() {
                             Finalizar Recebimento
                         </button>
                     )}
+                    {isConcluido && (
+                        <span className="bg-green-100 text-green-800 px-4 py-2 rounded-lg font-bold flex items-center gap-2">
+                            <CheckCircle size={20} />
+                            Recebimento Concluído
+                        </span>
+                    )}
                 </div>
             </div>
 
@@ -123,6 +157,7 @@ export default function ConferenciaPage() {
                             <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Qtd. Nota</th>
                             <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Qtd. Conferida</th>
                             <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase">Status</th>
+                            <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase">Ações</th>
                         </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-200">
@@ -158,6 +193,7 @@ export default function ConferenciaPage() {
                                                 placeholder="Vincular produto..."
                                                 onlySales={false}
                                                 type="product"
+                                                disabled={isConcluido}
                                             />
                                         </div>
                                     )}
@@ -182,6 +218,21 @@ export default function ConferenciaPage() {
                                     {item.status === 'divergente' && item.quantidade_conferida > 0 && <AlertTriangle className="mx-auto text-red-500" size={20} />}
                                     {item.status === 'pendente' && <span className="text-gray-400">-</span>}
                                     {saving === item.id && <Loader2 className="mx-auto animate-spin text-blue-500" size={20} />}
+                                </td>
+                                <td className="px-6 py-4 text-center">
+                                    <button
+                                        onClick={() => handleGerarOB(item)}
+                                        disabled={!isConcluido}
+                                        className={`p-2 rounded-lg transition-colors flex items-center gap-1 mx-auto text-xs font-medium ${
+                                            isConcluido 
+                                            ? 'text-purple-600 hover:text-purple-800 hover:bg-purple-50' 
+                                            : 'text-gray-400 cursor-not-allowed'
+                                        }`}
+                                        title={isConcluido ? "Gerar Ordem de Beneficiamento" : "Finalize a conferência para gerar OB"}
+                                    >
+                                        <Layers size={16} />
+                                        Gerar OB
+                                    </button>
                                 </td>
                             </tr>
                         ))}

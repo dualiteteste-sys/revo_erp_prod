@@ -70,6 +70,34 @@ export async function deleteMaterialCliente(id: string): Promise<void> {
   await callRpc('industria_materiais_cliente_delete', { p_id: id });
 }
 
+/**
+ * Garante que existe um vínculo de Material do Cliente para o Produto/Cliente informados.
+ * Se não existir, cria um automaticamente.
+ */
+export async function ensureMaterialCliente(clienteId: string, produtoId: string, produtoNome: string, unidade: string): Promise<string> {
+  // 1. Tenta encontrar existente
+  const { data } = await listMateriaisCliente(undefined, clienteId, true, 1, 100);
+  const existing = data.find(m => m.produto_id === produtoId);
+  
+  if (existing) {
+    return existing.id;
+  }
+
+  // 2. Se não existir, cria um novo
+  const payload: MaterialClientePayload = {
+    cliente_id: clienteId,
+    produto_id: produtoId,
+    nome_cliente: produtoNome, // Usa o nome interno como padrão
+    codigo_cliente: null,      // Sem código específico por enquanto
+    unidade: unidade,
+    ativo: true,
+    observacoes: 'Gerado automaticamente via Ordem de Beneficiamento'
+  };
+
+  const saved = await saveMaterialCliente(payload);
+  return saved.id;
+}
+
 export async function seedMateriaisCliente(): Promise<void> {
   // 1. Fetch dependencies
   const { data: partners } = await getPartners({ page: 1, pageSize: 100, searchTerm: '', filterType: 'cliente', sortBy: { column: 'nome', ascending: true } });

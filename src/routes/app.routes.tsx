@@ -52,6 +52,7 @@ const ComprasPage = lazy(() => import("../pages/suprimentos/ComprasPage"));
 const RelatoriosSuprimentosPage = lazy(() => import("../pages/suprimentos/RelatoriosPage"));
 const RecebimentoListPage = lazy(() => import("../pages/suprimentos/RecebimentoListPage"));
 const ConferenciaPage = lazy(() => import("../pages/suprimentos/ConferenciaPage"));
+const RecebimentoManualPage = lazy(() => import("../pages/suprimentos/RecebimentoManualPage"));
 
 // Vendas Pages
 const PedidosVendasPage = lazy(() => import("../pages/vendas/PedidosVendasPage"));
@@ -106,6 +107,7 @@ export const appRoutes: RouteObject[] = [
             { path: "nfe-input", element: <Suspense fallback={<PageLoader />}><NfeInputPage /></Suspense> },
             { path: "suprimentos/relatorios", element: <Suspense fallback={<PageLoader />}><RelatoriosSuprimentosPage /></Suspense> },
             { path: "suprimentos/recebimentos", element: <Suspense fallback={<PageLoader />}><RecebimentoListPage /></Suspense> },
+            { path: "suprimentos/recebimento-manual", element: <Suspense fallback={<PageLoader />}><RecebimentoManualPage /></Suspense> },
             { path: "suprimentos/recebimento/:id", element: <Suspense fallback={<PageLoader />}><ConferenciaPage /></Suspense> },
 
             // Financeiro

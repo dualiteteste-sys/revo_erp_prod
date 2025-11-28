@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { listRecebimentos, Recebimento } from '@/services/recebimento';
 import { useNavigate } from 'react-router-dom';
-import { Loader2, PackageCheck, AlertTriangle, CheckCircle, Clock } from 'lucide-react';
+import { Loader2, PackageCheck, AlertTriangle, CheckCircle, Clock, Plus, FileText } from 'lucide-react';
 
 export default function RecebimentoListPage() {
     const [recebimentos, setRecebimentos] = useState<Recebimento[]>([]);
@@ -41,13 +41,22 @@ export default function RecebimentoListPage() {
                     <h1 className="text-2xl font-bold text-gray-800">Recebimento de Mercadorias</h1>
                     <p className="text-gray-600">Gerencie a entrada e conferência de notas fiscais.</p>
                 </div>
-                <button
-                    onClick={() => navigate('/app/nfe-input')}
-                    className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2"
-                >
-                    <PackageCheck size={18} />
-                    Nova Importação
-                </button>
+                <div className="flex gap-3">
+                    <button
+                        onClick={() => navigate('/app/suprimentos/recebimento-manual')}
+                        className="bg-white border border-gray-300 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-50 transition-colors flex items-center gap-2 font-medium"
+                    >
+                        <FileText size={18} />
+                        Entrada Manual
+                    </button>
+                    <button
+                        onClick={() => navigate('/app/nfe-input')}
+                        className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2 font-bold shadow-sm"
+                    >
+                        <PackageCheck size={18} />
+                        Importar XML
+                    </button>
+                </div>
             </div>
 
             <div className="bg-white rounded-xl shadow overflow-hidden">
@@ -56,8 +65,8 @@ export default function RecebimentoListPage() {
                         <thead className="bg-gray-50">
                             <tr>
                                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Data</th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Fornecedor</th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Nota Fiscal</th>
+                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Fornecedor / Cliente</th>
+                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Documento</th>
                                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Valor Total</th>
                                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
                                 <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Ações</th>
@@ -70,7 +79,7 @@ export default function RecebimentoListPage() {
                                 <tr><td colSpan={6} className="p-8 text-center text-gray-500">Nenhum recebimento registrado.</td></tr>
                             ) : (
                                 recebimentos.map((rec) => (
-                                    <tr key={rec.id} className="hover:bg-gray-50">
+                                    <tr key={rec.id} className="hover:bg-gray-50 transition-colors">
                                         <td className="px-6 py-4 text-sm text-gray-900">
                                             {new Date(rec.data_recebimento).toLocaleDateString()}
                                         </td>
@@ -78,7 +87,11 @@ export default function RecebimentoListPage() {
                                             {rec.fiscal_nfe_imports?.emitente_nome || 'Desconhecido'}
                                         </td>
                                         <td className="px-6 py-4 text-sm text-gray-500">
-                                            Nº {rec.fiscal_nfe_imports?.numero} <span className="text-xs text-gray-400">(Série {rec.fiscal_nfe_imports?.serie})</span>
+                                            {rec.fiscal_nfe_imports?.numero ? (
+                                                <>Nº {rec.fiscal_nfe_imports.numero} <span className="text-xs text-gray-400">(Série {rec.fiscal_nfe_imports.serie})</span></>
+                                            ) : (
+                                                <span className="italic text-gray-400">Sem número</span>
+                                            )}
                                         </td>
                                         <td className="px-6 py-4 text-sm text-gray-900 font-medium">
                                             R$ {rec.fiscal_nfe_imports?.total_nf?.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
@@ -89,7 +102,7 @@ export default function RecebimentoListPage() {
                                         <td className="px-6 py-4 text-right">
                                             <button
                                                 onClick={() => navigate(`/app/suprimentos/recebimento/${rec.id}`)}
-                                                className="text-blue-600 hover:text-blue-800 font-medium text-sm"
+                                                className="text-blue-600 hover:text-blue-800 font-medium text-sm hover:underline"
                                             >
                                                 {rec.status === 'concluido' ? 'Visualizar' : 'Conferir'}
                                             </button>

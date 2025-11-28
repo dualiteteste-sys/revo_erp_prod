@@ -17,6 +17,7 @@ export type Recebimento = {
     fiscal_nfe_imports?: {
         chave_acesso: string;
         emitente_nome: string;
+        emitente_cnpj: string; // Adicionado
         numero: string;
         serie: string;
         total_nf: number;
@@ -52,6 +53,7 @@ export async function listRecebimentos(status?: RecebimentoStatus): Promise<Rece
       fiscal_nfe_imports (
         chave_acesso,
         emitente_nome,
+        emitente_cnpj,
         numero,
         serie,
         total_nf
@@ -76,6 +78,7 @@ export async function getRecebimento(id: string): Promise<Recebimento> {
       fiscal_nfe_imports (
         chave_acesso,
         emitente_nome,
+        emitente_cnpj,
         numero,
         serie,
         total_nf
