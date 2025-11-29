@@ -9,6 +9,22 @@
 -- =============================================================================
 
 -- current_user_id()
+
+set local search_path = pg_catalog, public;
+
+do $$
+begin
+  -- Garante que o schema "audit" exista antes de criar/recriar funções
+  if not exists (
+    select 1
+    from pg_namespace
+    where nspname = 'audit'
+  ) then
+    execute 'create schema audit';
+  end if;
+end
+$$;
+
 create or replace function public.current_user_id()
 returns uuid
 language plpgsql
