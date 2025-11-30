@@ -8,7 +8,7 @@ on:
 
 jobs:
   apply-baseline-verify:
-    name: Apply BASELINE to VERIFY via psql
+    name: Apply BASELINE to VERIFY via psql (with prelude)
     runs-on: ubuntu-latest
     env:
       SUPABASE_DB_URL_VERIFY: ${{ secrets.SUPABASE_DB_URL_VERIFY }}
@@ -22,10 +22,11 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y postgresql-client
 
-      - name: Apply BASELINE to VERIFY via psql
+      - name: Apply BASELINE to VERIFY via psql (prelude + baseline)
         shell: bash
         run: |
           set -euo pipefail
+
           echo "[MIGRATE][VERIFY] Procurando baseline em supabase/migrations..."
           BASELINE="$(ls -1 supabase/migrations/*_baseline.sql | tail -n 1)"
           if [ -z "$BASELINE" ]; then
@@ -33,6 +34,74 @@ jobs:
             exit 1
           fi
           echo "[MIGRATE][VERIFY] BASELINE => ${BASELINE}"
+
+          echo "[MIGRATE][VERIFY] Rodando PRELUDE idempotente..."
+          psql "$SUPABASE_DB_URL_VERIFY" -v ON_ERROR_STOP=1 <<'SQL'
+          -- search_path neutro
+          SET search_path = pg_catalog, public;
+
+          -- 1) DROPS idempotentes de tipos que possam já existir no VERIFY
+          DO $$
+          DECLARE
+            t text;
+          BEGIN
+            FOR t IN SELECT unnest(ARRAY[
+              'billing_cycle'   -- adicione aqui outros enums se aparecerem erros semelhantes
+            ])
+            LOOP
+              IF EXISTS (SELECT 1 FROM pg_type WHERE typname = t) THEN
+                EXECUTE format('DROP TYPE %I CASCADE;', t);
+                RAISE NOTICE 'Dropped pre-existing type: %', t;
+              END IF;
+            END LOOP;
+          END$$;
+
+          -- 2) Funções auxiliares exigidas por defaults/rls (idempotentes)
+
+          -- current_user_id(): lê sub do JWT (preferência claim direta; fallback ao blob JSON)
+          CREATE OR REPLACE FUNCTION public.current_user_id()
+          RETURNS uuid
+          LANGUAGE sql
+          STABLE
+          SET search_path = pg_catalog, public
+          AS $$
+            SELECT
+              COALESCE(
+                NULLIF(current_setting('request.jwt.claim.sub', true), '')::uuid,
+                NULLIF( (current_setting('request.jwt.claims', true))::jsonb ->> 'sub', '' )::uuid
+              )
+          $$;
+
+          -- current_empresa_id(): tenta variável de sessão; fallback para claim empresa_id; senão NULL
+          CREATE OR REPLACE FUNCTION public.current_empresa_id()
+          RETURNS uuid
+          LANGUAGE sql
+          STABLE
+          SET search_path = pg_catalog, public
+          AS $$
+            SELECT
+              COALESCE(
+                NULLIF(current_setting('app.current_empresa_id', true), '')::uuid,
+                NULLIF( (current_setting('request.jwt.claims', true))::jsonb ->> 'empresa_id', '' )::uuid
+              )
+          $$;
+
+          -- Compat: algumas migrações usam public.current_user_id() com nome diferente
+          -- (se já existir, mantém)
+          DO $$
+          BEGIN
+            IF NOT EXISTS (
+              SELECT 1 FROM pg_proc p
+              JOIN pg_namespace n ON n.oid = p.pronamespace
+              WHERE n.nspname='public' AND p.proname='current_empresa_id'
+            ) THEN
+              -- já garantido acima via CREATE OR REPLACE, este bloco só exemplifica a checagem
+              NULL;
+            END IF;
+          END$$;
+          SQL
+
+          echo "[MIGRATE][VERIFY] Aplicando BASELINE..."
           psql "$SUPABASE_DB_URL_VERIFY" -v ON_ERROR_STOP=1 -f "$BASELINE"
           echo "[MIGRATE][VERIFY] Baseline aplicada no VERIFY."
 
