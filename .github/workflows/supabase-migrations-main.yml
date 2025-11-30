@@ -39,7 +39,36 @@ jobs:
           END $$;
           SQL
           echo "[VERIFY][RESET] public recriado. Prosseguir com a baseline no próximo step."
-    
+
+      - name: [VERIFY] Pré-criar stubs de funções de contexto
+          run: |
+            set -euo pipefail
+            echo "[VERIFY][STUBS] Criando stubs para funções usadas como DEFAULT..."
+            psql "$SUPABASE_DB_URL_VERIFY" -v ON_ERROR_STOP=1 <<'SQL'
+            -- search_path consistente
+            SET search_path = pg_catalog, public;
+  
+            -- Stub: current_empresa_id() (usada em DEFAULT de colunas)
+            create or replace function public.current_empresa_id()
+            returns uuid
+            language sql
+            stable
+            set search_path = pg_catalog, public
+            as $$
+              select null::uuid
+            $$;
+  
+            -- Opcionalmente já deixamos também current_user_id(), se a baseline referenciar:
+            create or replace function public.current_user_id()
+            returns uuid
+            language sql
+            stable
+            set search_path = pg_catalog, public
+            as $$
+              select null::uuid
+            $$;
+            SQL
+            echo "[VERIFY][STUBS] Ok. Baseline pode rodar em seguida."
 
       - name: Apply BASELINE to VERIFY via psql
         run: |
