@@ -4,43 +4,52 @@ on:
   push:
     branches:
       - main
-  # opcional: permitir rodar manualmente
   workflow_dispatch:
 
 jobs:
   migrate-verify:
     name: Apply migrations to DR VERIFY
     runs-on: ubuntu-latest
-
     env:
-      # URL do banco VERIFY (revo-dr-verify)
       SUPABASE_DB_URL_VERIFY: ${{ secrets.SUPABASE_DB_URL_VERIFY }}
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      - name: Install PostgreSQL client (psql)
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y postgresql-client
+
       - name: Install Supabase CLI
         uses: supabase/setup-cli@v1
         with:
           version: latest
 
-      - name: Apply migrations to VERIFY (dr-verify)
+      - name: Clean public schema on VERIFY (idempotent)
         run: |
           set -euo pipefail
-          echo "[MIGRATE][VERIFY] Aplicando migrations com supabase db push..."
-          supabase db push --db-url "$SUPABASE_DB_URL_VERIFY"
-          echo "[MIGRATE][VERIFY] Migrations aplicadas com sucesso."
+          echo "[VERIFY] Dropping and recreating schema public..."
+          psql "$SUPABASE_DB_URL_VERIFY" -v ON_ERROR_STOP=1 -c $'DO $$\nBEGIN\n  IF EXISTS (SELECT 1 FROM pg_namespace WHERE nspname = \'public\') THEN\n    EXECUTE \'DROP SCHEMA public CASCADE\';\n  END IF;\n  EXECUTE \'CREATE SCHEMA public\';\nEND $$;'
+          echo "[VERIFY] public recreated."
+
+      - name: Apply migrations to VERIFY (baseline only)
+        run: |
+          set -euo pipefail
+          echo "[MIGRATE][VERIFY] Aplicando baseline com Supabase CLI..."
+          yes | supabase db push --db-url "$SUPABASE_DB_URL_VERIFY"
+          echo "[MIGRATE][VERIFY] Baseline aplicada com sucesso no VERIFY."
 
   migrate-prod:
     name: Apply migrations to PROD (sistema revo estável)
     runs-on: ubuntu-latest
     needs: migrate-verify
     environment:
-      name: production          # vamos configurar isso no próximo passo
+      name: production   # requer aprovação manual no Environment
 
     env:
-      # URL do banco PROD (sistema revo estável)
       SUPABASE_DB_URL_PROD: ${{ secrets.SUPABASE_DB_URL_PROD }}
 
     steps:
@@ -55,6 +64,6 @@ jobs:
       - name: Apply migrations to PROD
         run: |
           set -euo pipefail
-          echo "[MIGRATE][PROD] Aplicando migrations com supabase db push..."
-          supabase db push --db-url "$SUPABASE_DB_URL_PROD"
-          echo "[MIGRATE][PROD] Migrations aplicadas com sucesso em produção."
+          echo "[MIGRATE][PROD] Aplicando baseline com Supabase CLI..."
+          yes | supabase db push --db-url "$SUPABASE_DB_URL_PROD"
+          echo "[MIGRATE][PROD] Baseline aplicada com sucesso em PRODUÇÃO."
