@@ -8,10 +8,11 @@ on:
 
 jobs:
   apply-baseline-verify:
-    name: Apply BASELINE to VERIFY via psql (with prelude)
+    name: Apply BASELINE to VERIFY (prelude + audit bootstrap)
     runs-on: ubuntu-latest
     env:
       SUPABASE_DB_URL_VERIFY: ${{ secrets.SUPABASE_DB_URL_VERIFY }}
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -22,43 +23,45 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y postgresql-client
 
-      - name: Apply BASELINE to VERIFY via psql (prelude + baseline)
-        shell: bash
+      # PRELUDE: dropar enums conflitantes já existentes no VERIFY (idempotente)
+      - name: [VERIFY] Prelude - drop conflicting enums (idempotent)
         run: |
           set -euo pipefail
-
-          echo "[MIGRATE][VERIFY] Procurando baseline em supabase/migrations..."
-          BASELINE="$(ls -1 supabase/migrations/*_baseline.sql | tail -n 1)"
-          if [ -z "$BASELINE" ]; then
-            echo "[MIGRATE][VERIFY] Nenhum arquivo *_baseline.sql encontrado."
-            exit 1
-          fi
-          echo "[MIGRATE][VERIFY] BASELINE => ${BASELINE}"
-
-          echo "[MIGRATE][VERIFY] Rodando PRELUDE idempotente..."
+          echo "[VERIFY][PRELUDE] Dropping pre-existing enums if any..."
           psql "$SUPABASE_DB_URL_VERIFY" -v ON_ERROR_STOP=1 <<'SQL'
-          -- search_path neutro
           SET search_path = pg_catalog, public;
 
-          -- 1) DROPS idempotentes de tipos que possam já existir no VERIFY
           DO $$
-          DECLARE
-            t text;
+          DECLARE t text;
           BEGIN
-            FOR t IN SELECT unnest(ARRAY[
-              'billing_cycle'   -- adicione aqui outros enums se aparecerem erros semelhantes
-            ])
+            FOREACH t IN ARRAY ARRAY[
+              'billing_cycle',
+              'contribuinte_icms_enum'
+              -- se surgir outro "type <X> already exists", incluir aqui: 'outro_enum',
+            ]
             LOOP
-              IF EXISTS (SELECT 1 FROM pg_type WHERE typname = t) THEN
-                EXECUTE format('DROP TYPE %I CASCADE;', t);
-                RAISE NOTICE 'Dropped pre-existing type: %', t;
+              IF EXISTS (
+                SELECT 1 FROM pg_type ty
+                WHERE ty.typname = t
+                  AND ty.typtype = 'e'
+                  AND ty.typnamespace = 'public'::regnamespace
+              ) THEN
+                EXECUTE format('DROP TYPE %I.%I CASCADE;', 'public', t);
+                RAISE NOTICE 'Dropped pre-existing type: public.%', t;
               END IF;
             END LOOP;
           END$$;
+          SQL
+          echo "[VERIFY][PRELUDE] OK"
 
-          -- 2) Funções auxiliares exigidas por defaults/rls (idempotentes)
+      # STUBS: funções usadas em DEFAULTs antes da baseline (idempotente)
+      - name: [VERIFY] Create context function stubs (idempotent)
+        run: |
+          set -euo pipefail
+          echo "[VERIFY][STUBS] Creating stubs for context functions..."
+          psql "$SUPABASE_DB_URL_VERIFY" -v ON_ERROR_STOP=1 <<'SQL'
+          SET search_path = pg_catalog, public;
 
-          -- current_user_id(): lê sub do JWT (preferência claim direta; fallback ao blob JSON)
           CREATE OR REPLACE FUNCTION public.current_user_id()
           RETURNS uuid
           LANGUAGE sql
@@ -72,7 +75,6 @@ jobs:
               )
           $$;
 
-          -- current_empresa_id(): tenta variável de sessão; fallback para claim empresa_id; senão NULL
           CREATE OR REPLACE FUNCTION public.current_empresa_id()
           RETURNS uuid
           LANGUAGE sql
@@ -85,25 +87,62 @@ jobs:
                 NULLIF( (current_setting('request.jwt.claims', true))::jsonb ->> 'empresa_id', '' )::uuid
               )
           $$;
+          SQL
+          echo "[VERIFY][STUBS] OK"
 
-          -- Compat: algumas migrações usam public.current_user_id() com nome diferente
-          -- (se já existir, mantém)
+      # BOOTSTRAP: garantir schema audit mínimo exigido pela baseline (idempotente)
+      - name: [VERIFY] Bootstrap AUDIT schema (idempotent)
+        run: |
+          set -euo pipefail
+          echo "[VERIFY][AUDIT] Ensuring audit schema/table exist..."
+          psql "$SUPABASE_DB_URL_VERIFY" -v ON_ERROR_STOP=1 <<'SQL'
+          SET search_path = pg_catalog, public;
+
+          DO $$
+          BEGIN
+            IF NOT EXISTS (SELECT 1 FROM pg_namespace WHERE nspname = 'audit') THEN
+              EXECUTE 'CREATE SCHEMA audit';
+            END IF;
+          END $$;
+
+          CREATE TABLE IF NOT EXISTS audit.events (
+            occurred_at timestamptz NOT NULL DEFAULT now(),
+            source      text,
+            table_name  text,
+            op          text,
+            pk          jsonb,
+            row_old     jsonb,
+            row_new     jsonb,
+            diff        jsonb,
+            meta        jsonb
+          );
+
           DO $$
           BEGIN
             IF NOT EXISTS (
-              SELECT 1 FROM pg_proc p
-              JOIN pg_namespace n ON n.oid = p.pronamespace
-              WHERE n.nspname='public' AND p.proname='current_empresa_id'
+              SELECT 1 FROM pg_indexes
+              WHERE schemaname='audit' AND indexname='events__occurred_at_desc'
             ) THEN
-              -- já garantido acima via CREATE OR REPLACE, este bloco só exemplifica a checagem
-              NULL;
+              EXECUTE 'CREATE INDEX events__occurred_at_desc ON audit.events (occurred_at DESC)';
             END IF;
-          END$$;
+          END $$;
           SQL
+          echo "[VERIFY][AUDIT] OK"
 
-          echo "[MIGRATE][VERIFY] Aplicando BASELINE..."
+      # APLICAÇÃO DA BASELINE
+      - name: [VERIFY] Apply BASELINE via psql
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "[MIGRATE][VERIFY] Locating baseline in supabase/migrations..."
+          BASELINE="$(ls -1 supabase/migrations/*_baseline.sql | head -n 1)"
+          if [ -z "$BASELINE" ]; then
+            echo "::error::No *_baseline.sql found in supabase/migrations"
+            exit 1
+          fi
+          echo "[MIGRATE][VERIFY] BASELINE => ${BASELINE}"
           psql "$SUPABASE_DB_URL_VERIFY" -v ON_ERROR_STOP=1 -f "$BASELINE"
-          echo "[MIGRATE][VERIFY] Baseline aplicada no VERIFY."
+          echo "[MIGRATE][VERIFY] Baseline applied successfully."
 
   migrate-sync-history:
     name: Sync migration history (VERIFY → PROD)
@@ -114,6 +153,7 @@ jobs:
     env:
       SUPABASE_DB_URL_VERIFY: ${{ secrets.SUPABASE_DB_URL_VERIFY }}
       SUPABASE_DB_URL_PROD:   ${{ secrets.SUPABASE_DB_URL_PROD }}
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -126,13 +166,13 @@ jobs:
       - name: supabase db push (VERIFY)
         run: |
           set -euo pipefail
-          echo "[MIGRATE][VERIFY] Rodando supabase db push no VERIFY para alinhar histórico..."
+          echo "[MIGRATE][VERIFY] Running supabase db push on VERIFY to align migration history..."
           supabase db push --db-url "$SUPABASE_DB_URL_VERIFY"
-          echo "[MIGRATE][VERIFY] Histórico sincronizado."
+          echo "[MIGRATE][VERIFY] History aligned."
 
       - name: supabase db push (PROD)
         run: |
           set -euo pipefail
-          echo "[MIGRATE][PROD] Rodando supabase db push no PROD para alinhar histórico..."
+          echo "[MIGRATE][PROD] Running supabase db push on PROD to align migration history..."
           supabase db push --db-url "$SUPABASE_DB_URL_PROD"
-          echo "[MIGRATE][PROD] Histórico sincronizado."
+          echo "[MIGRATE][PROD] History aligned."
