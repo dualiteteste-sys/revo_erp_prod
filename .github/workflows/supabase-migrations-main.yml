@@ -8,29 +8,16 @@ on:
 
 jobs:
   migrate-verify:
-    name: Apply migrations to DR VERIFY
+    name: Apply BASELINE to DR VERIFY (psql only)
     runs-on: ubuntu-latest
+
     env:
+      # URL do banco VERIFY (revo-dr-verify)
       SUPABASE_DB_URL_VERIFY: ${{ secrets.SUPABASE_DB_URL_VERIFY }}
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-
-      - name: Sanity check repo tree (CI)
-        run: |
-          set -euo pipefail
-          echo "[CI] HEAD -> $(git rev-parse HEAD)"
-          echo "[CI] branch -> $(git branch --show-current || echo 'detached')"
-          echo "[CI] listing supabase/*"
-          ls -la supabase || true
-          echo "[CI] listing supabase/migrations"
-          ls -la supabase/migrations || true
-          echo "[CI] recursive find of .sql under supabase/"
-          find supabase -type f -name "*.sql" -maxdepth 3 -printf "%p\n" | sort || true
-          echo "[CI] grep pelo arquivo problemático"
-          grep -R "1762465200002_02_logs_rpc.sql" -n supabase || echo "[CI] não encontrado"
-
 
       - name: Install PostgreSQL client (psql)
         run: |
@@ -38,31 +25,33 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y postgresql-client
 
-      - name: Install Supabase CLI
-        uses: supabase/setup-cli@v1
-        with:
-          version: latest
-
-      - name: Clean public schema on VERIFY (idempotent)
+      - name: Apply BASELINE to VERIFY via psql
         run: |
           set -euo pipefail
-          echo "[VERIFY] Dropping and recreating schema public..."
-          psql "$SUPABASE_DB_URL_VERIFY" -v ON_ERROR_STOP=1 -c $'DO $$\nBEGIN\n  IF EXISTS (SELECT 1 FROM pg_namespace WHERE nspname = \'public\') THEN\n    EXECUTE \'DROP SCHEMA public CASCADE\';\n  END IF;\n  EXECUTE \'CREATE SCHEMA public\';\nEND $$;'
-          echo "[VERIFY] public recreated."
+          echo "[MIGRATE][VERIFY] Procurando baseline em supabase/migrations..."
+          # tenta achar um arquivo .sql (prioriza algo com 'baseline' no nome)
+          BASELINE_FILE="$( \
+            { find supabase/migrations -maxdepth 1 -type f -name '*baseline*.sql'; \
+              find supabase/migrations -maxdepth 1 -type f -name '*.sql'; } \
+            | head -n1 \
+          )"
 
-      - name: Apply migrations to VERIFY (baseline only)
-        run: |
-          set -euo pipefail
-          echo "[MIGRATE][VERIFY] Aplicando baseline com Supabase CLI..."
-          yes | supabase db push --db-url "$SUPABASE_DB_URL_VERIFY"
-          echo "[MIGRATE][VERIFY] Baseline aplicada com sucesso no VERIFY."
+          if [ -z "${BASELINE_FILE:-}" ]; then
+            echo "::error::Baseline .sql não encontrado em supabase/migrations"
+            exit 1
+          fi
+
+          echo "[MIGRATE][VERIFY] BASELINE => $BASELINE_FILE"
+          echo "[MIGRATE][VERIFY] Aplicando baseline via psql (ON_ERROR_STOP=1)..."
+          psql "$SUPABASE_DB_URL_VERIFY" -v ON_ERROR_STOP=1 -f "$BASELINE_FILE"
+          echo "[MIGRATE][VERIFY] Baseline aplicada com sucesso em VERIFY."
 
   migrate-prod:
     name: Apply migrations to PROD (sistema revo estável)
     runs-on: ubuntu-latest
     needs: migrate-verify
     environment:
-      name: production   # requer aprovação manual no Environment
+      name: production
 
     env:
       SUPABASE_DB_URL_PROD: ${{ secrets.SUPABASE_DB_URL_PROD }}
@@ -71,14 +60,28 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Install Supabase CLI
+      - name: Install Supabase CLI (for future incremental pushes)
         uses: supabase/setup-cli@v1
         with:
           version: latest
 
-      - name: Apply migrations to PROD
+      - name: Sanity check on PROD (no schema changes yet)
         run: |
           set -euo pipefail
-          echo "[MIGRATE][PROD] Aplicando baseline com Supabase CLI..."
-          yes | supabase db push --db-url "$SUPABASE_DB_URL_PROD"
-          echo "[MIGRATE][PROD] Baseline aplicada com sucesso em PRODUÇÃO."
+          echo "[MIGRATE][PROD] Nenhuma alteração de schema aplicada agora."
+          echo "[MIGRATE][PROD] Estratégia atual: baseline já consolidada; aguardar 'migration repair' e novas migrations incrementais."
+          # Se quiser apenas validar conectividade:
+          psql "$SUPABASE_DB_URL_PROD" -c "select current_timestamp as connected_at;"
+          echo "[MIGRATE][PROD] OK."
+
+      # ────────────────────────────────────────────────────────────────────────────
+      # QUANDO habilitarmos migrations incrementais após 'supabase migration repair',
+      # troque o step acima por um 'db push' (ou adicione um novo step condicional):
+      #
+      # - name: Apply new migrations to PROD (incremental)
+      #   if: ${{ always() }}
+      #   run: |
+      #     set -euo pipefail
+      #     supabase db push --db-url "$SUPABASE_DB_URL_PROD"
+      #     echo "[MIGRATE][PROD] Migrations aplicadas com sucesso."
+      # ────────────────────────────────────────────────────────────────────────────
