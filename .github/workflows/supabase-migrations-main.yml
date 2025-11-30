@@ -25,6 +25,22 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y postgresql-client
 
+      - name: Reset PUBLIC schema in VERIFY (destrutivo)
+        run: |
+          set -euo pipefail
+          echo "[VERIFY][RESET] Drop + create do schema public..."
+          psql "$SUPABASE_DB_URL_VERIFY" -v ON_ERROR_STOP=1 <<'SQL'
+          DO $$
+          BEGIN
+            IF EXISTS (SELECT 1 FROM pg_namespace WHERE nspname = 'public') THEN
+              EXECUTE 'DROP SCHEMA public CASCADE';
+            END IF;
+            EXECUTE 'CREATE SCHEMA public';
+          END $$;
+          SQL
+          echo "[VERIFY][RESET] public recriado. Prosseguir com a baseline no próximo step."
+    
+
       - name: Apply BASELINE to VERIFY via psql
         run: |
           set -euo pipefail
