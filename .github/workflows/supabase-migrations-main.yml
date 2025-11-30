@@ -28,15 +28,19 @@ jobs:
       - name: Apply BASELINE to VERIFY via psql
         run: |
           set -euo pipefail
-          echo "[MIGRATE][VERIFY] Procurando baseline em supabase/migrations..."
-          # tenta achar um arquivo .sql (prioriza algo com 'baseline' no nome)
-          BASELINE_FILE="$( \
-            { find supabase/migrations -maxdepth 1 -type f -name '*baseline*.sql'; \
-              find supabase/migrations -maxdepth 1 -type f -name '*.sql'; } \
-            | head -n1 \
-          )"
 
-          if [ -z "${BASELINE_FILE:-}" ]; then
+          echo "[MIGRATE][VERIFY] Procurando baseline em supabase/migrations..."
+
+          # Evita 'Broken pipe': usar glob em array em vez de 'find | head'
+          shopt -s nullglob
+          files_baseline=(supabase/migrations/*baseline*.sql)
+          files_all=(supabase/migrations/*.sql)
+
+          if [ ${#files_baseline[@]} -gt 0 ]; then
+            BASELINE_FILE="${files_baseline[0]}"
+          elif [ ${#files_all[@]} -gt 0 ]; then
+            BASELINE_FILE="${files_all[0]}"
+          else
             echo "::error::Baseline .sql não encontrado em supabase/migrations"
             exit 1
           fi
@@ -45,6 +49,7 @@ jobs:
           echo "[MIGRATE][VERIFY] Aplicando baseline via psql (ON_ERROR_STOP=1)..."
           psql "$SUPABASE_DB_URL_VERIFY" -v ON_ERROR_STOP=1 -f "$BASELINE_FILE"
           echo "[MIGRATE][VERIFY] Baseline aplicada com sucesso em VERIFY."
+
 
   migrate-prod:
     name: Apply migrations to PROD (sistema revo estável)
