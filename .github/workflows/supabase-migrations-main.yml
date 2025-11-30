@@ -17,6 +17,21 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      - name: Sanity check repo tree (CI)
+        run: |
+          set -euo pipefail
+          echo "[CI] HEAD -> $(git rev-parse HEAD)"
+          echo "[CI] branch -> $(git branch --show-current || echo 'detached')"
+          echo "[CI] listing supabase/*"
+          ls -la supabase || true
+          echo "[CI] listing supabase/migrations"
+          ls -la supabase/migrations || true
+          echo "[CI] recursive find of .sql under supabase/"
+          find supabase -type f -name "*.sql" -maxdepth 3 -printf "%p\n" | sort || true
+          echo "[CI] grep pelo arquivo problemático"
+          grep -R "1762465200002_02_logs_rpc.sql" -n supabase || echo "[CI] não encontrado"
+
+
       - name: Install PostgreSQL client (psql)
         run: |
           set -euo pipefail
