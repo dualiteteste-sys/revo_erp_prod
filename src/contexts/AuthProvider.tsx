@@ -53,6 +53,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const loading = isLoadingEmpresas || isLoadingActiveId;
 
+
   const bootRef = useRef(false);
 
   const activeEmpresa = useMemo(() => {
@@ -135,7 +136,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   // Observa mudanças de auth
   useEffect(() => {
     const { data: sub } = supabase.auth.onAuthStateChange((event, sess) => {
-      // console.log("[AUTH] onAuthStateChange", { event, hasSession: !!sess });
       setSession(sess ?? null);
       setUserId(sess?.user?.id ?? null);
 
