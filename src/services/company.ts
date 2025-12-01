@@ -21,8 +21,21 @@ export async function updateCompany(updateData: EmpresaUpdate): Promise<Empresa>
             p_patch: updateData,
         });
         return data;
-    } catch (error) {
+    } catch (error: any) {
         console.error('Error updating company via RPC:', error);
+
+        // Check for duplicate CNPJ error
+        const msg = error?.message || '';
+        const details = error?.details || '';
+        if (
+            msg.includes('duplicate key') ||
+            details.includes('duplicate key') ||
+            msg.includes('empresas_cnpj_key') ||
+            details.includes('empresas_cnpj_key')
+        ) {
+            throw new Error('Empresa já foi cadastrada em nosso sistema.');
+        }
+
         throw new Error('Não foi possível atualizar os dados da empresa.');
     }
 }
@@ -39,13 +52,13 @@ export async function provisionCompany(input: ProvisionEmpresaInput): Promise<Em
             p_fantasia: input.fantasia,
             p_email: input.email ?? null,
         });
-        
+
         // Handle potential array return if RPC behavior varies (PostgREST quirks)
         if (Array.isArray(data)) {
-             if (data.length === 0) throw new Error("A criação da empresa não retornou dados.");
-             return data[0];
+            if (data.length === 0) throw new Error("A criação da empresa não retornou dados.");
+            return data[0];
         }
-        
+
         if (!data) {
             throw new Error("A criação da empresa não retornou dados.");
         }
