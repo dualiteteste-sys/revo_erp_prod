@@ -13,28 +13,28 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Install PostgreSQL client (psql)
+      - name: Install PostgreSQL client
         run: |
           set -euo pipefail
           sudo apt-get update
           sudo apt-get install -y postgresql-client
 
-      - name: Locate baseline file
+      - name: Locate baseline
         id: locate
         run: |
           set -euo pipefail
           BASELINE="$(ls -1 supabase/migrations/*_baseline.sql | head -n 1 || true)"
           if [ -z "${BASELINE:-}" ]; then
-            echo "Nenhum *_baseline.sql encontrado em supabase/migrations"; exit 1
+            echo "Nenhum *_baseline.sql em supabase/migrations"; exit 1
           fi
-          echo "BASELINE=$BASELINE" | tee -a "$GITHUB_ENV"
-          echo "Baseline localizado: $BASELINE"
+          echo "BASELINE=$BASELINE" >> "$GITHUB_ENV"
+          echo "Baseline: $BASELINE"
 
-      - name: Prelude on VERIFY (schema audit + ENUMs condicionalmente)
+      - name: Prelude (audit + ENUMs se faltarem)
         run: |
           set -euo pipefail
           psql "$SUPABASE_DB_URL_VERIFY" -v ON_ERROR_STOP=1 <<'SQL'
-          -- 1) schema audit
+          -- schema audit
           DO $$
           BEGIN
             IF NOT EXISTS (SELECT 1 FROM pg_namespace WHERE nspname='audit') THEN
@@ -42,40 +42,44 @@ jobs:
             END IF;
           END $$;
 
-          -- 2) ENUMs que o baseline tenta criar. Cria APENAS se não existirem.
+          -- ENUM: meta_tipo
           DO $$ BEGIN
             IF NOT EXISTS (
-              SELECT 1 FROM pg_type t
+              SELECT 1
+              FROM pg_type t
               JOIN pg_namespace n ON n.oid = t.typnamespace
               WHERE t.typtype='e' AND t.typname='meta_tipo' AND n.nspname='public'
             ) THEN
-              -- Ajuste os valores conforme seu baseline, se necessário
-              EXECUTE 'CREATE TYPE public.meta_tipo AS ENUM (''mensal'', ''trimestral'', ''anual'')';
+              EXECUTE $$CREATE TYPE public.meta_tipo AS ENUM ('mensal','trimestral','anual')$$;
             END IF;
           END $$;
 
+          -- ENUM: billing_cycle
           DO $$ BEGIN
             IF NOT EXISTS (
-              SELECT 1 FROM pg_type t
+              SELECT 1
+              FROM pg_type t
               JOIN pg_namespace n ON n.oid = t.typnamespace
               WHERE t.typtype='e' AND t.typname='billing_cycle' AND n.nspname='public'
             ) THEN
-              EXECUTE 'CREATE TYPE public.billing_cycle AS ENUM (''monthly'', ''yearly'')';
+              EXECUTE $$CREATE TYPE public.billing_cycle AS ENUM ('monthly','yearly')$$;
             END IF;
           END $$;
 
+          -- ENUM: contribuinte_icms_enum
           DO $$ BEGIN
             IF NOT EXISTS (
-              SELECT 1 FROM pg_type t
+              SELECT 1
+              FROM pg_type t
               JOIN pg_namespace n ON n.oid = t.typnamespace
               WHERE t.typtype='e' AND t.typname='contribuinte_icms_enum' AND n.nspname='public'
             ) THEN
-              EXECUTE 'CREATE TYPE public.contribuinte_icms_enum AS ENUM (''contribuinte'', ''nao_contribuinte'')';
+              EXECUTE $$CREATE TYPE public.contribuinte_icms_enum AS ENUM ('contribuinte','nao_contribuinte')$$;
             END IF;
           END $$;
           SQL
 
-      - name: Build PATCHED copy of baseline (remove CREATE TYPE blocks que já existem)
+      - name: Patch baseline (remover CREATE TYPE)
         run: |
           set -euo pipefail
           IN="$BASELINE"
@@ -84,37 +88,30 @@ jobs:
 
           strip_enum () {
             local ENUM="$1"
-            # Remove o bloco "CREATE TYPE <enum> AS ENUM ( ... );"
             awk -v ENUM="$ENUM" '
               BEGIN { inblk=0 }
               # início do bloco CREATE TYPE <enum> AS ENUM (
-              $0 ~ "^[[:space:]]*CREATE[[:space:]]+TYPE[[:space:]]+"ENUM"[[:space:]]+AS[[:space:]]+ENUM[[:space:]]*\\(" {
-                inblk=1; next
-              }
-              # dentro do bloco (até fechar com ");")
+              $0 ~ "^[[:space:]]*CREATE[[:space:]]+TYPE[[:space:]]+(public\\.)?"ENUM"[[:space:]]+AS[[:space:]]+ENUM[[:space:]]*\\(" { inblk=1; next }
+              # fim do bloco
               inblk && /\)\s*;\s*$/ { inblk=0; next }
+              # linhas dentro do bloco
               inblk { next }
+              # demais linhas
               { print }
             ' "$OUT" > "${OUT}.tmp" && mv "${OUT}.tmp" "$OUT"
           }
 
-          # Liste todos os ENUMs que o baseline cria
-          ENUMS=(meta_tipo billing_cycle contribuinte_icms_enum)
-
-          for e in "${ENUMS[@]}"; do
-            echo "[PATCH] Removendo bloco CREATE TYPE para: $e"
+          for e in meta_tipo billing_cycle contribuinte_icms_enum; do
+            echo "[PATCH] Removendo CREATE TYPE de: $e"
             strip_enum "$e"
           done
 
           echo "PATCHED_BASELINE=$OUT" >> "$GITHUB_ENV"
           echo "Arquivo patchado: $OUT"
-          echo "Primeiras linhas do patch:"
           head -n 40 "$OUT" || true
 
-      - name: Apply PATCHED BASELINE to VERIFY
+      - name: Apply PATCHED BASELINE
         run: |
           set -euo pipefail
-          FILE="${PATCHED_BASELINE:-$BASELINE}"
-          echo "[MIGRATE][VERIFY] Aplicando $FILE"
-          psql "$SUPABASE_DB_URL_VERIFY" -v ON_ERROR_STOP=1 -f "$FILE"
-          echo "[MIGRATE][VERIFY] Baseline aplicada com sucesso."
+          psql "$SUPABASE_DB_URL_VERIFY" -v ON_ERROR_STOP=1 -f "$PATCHED_BASELINE"
+          echo "[VERIFY] Baseline aplicada com sucesso."
