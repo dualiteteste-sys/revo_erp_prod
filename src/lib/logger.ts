@@ -1,80 +1,68 @@
-/**
- * Logger Utility
- * Centralizes application logging to allow easy integration with external services (Sentry, Datadog, etc).
- */
+import * as Sentry from "@sentry/react";
 
-type LogLevel = 'info' | 'warn' | 'error' | 'debug';
+type LogLevel = "info" | "warn" | "error" | "debug";
 
-interface LogEntry {
-    level: LogLevel;
-    message: string;
-    data?: any;
-    timestamp: string;
+interface LogContext {
+    [key: string]: any;
 }
 
-class LoggerService {
-    private isDev: boolean;
+class Logger {
+    private isDev = import.meta.env.DEV;
 
-    constructor() {
-        this.isDev = import.meta.env.DEV;
-    }
-
-    private format(level: LogLevel, message: string, data?: any): LogEntry {
+    private formatMessage(level: LogLevel, message: string, context?: LogContext) {
+        const timestamp = new Date().toISOString();
         return {
+            timestamp,
             level,
             message,
-            data,
-            timestamp: new Date().toISOString(),
+            ...context,
         };
     }
 
-    private print(entry: LogEntry) {
+    info(message: string, context?: LogContext) {
         if (this.isDev) {
-            const style = {
-                info: 'color: #3b82f6',
-                warn: 'color: #f59e0b',
-                error: 'color: #ef4444',
-                debug: 'color: #6b7280',
-            };
-
-            console.groupCollapsed(`%c[${entry.level.toUpperCase()}] ${entry.message}`, style[entry.level]);
-            console.log('Timestamp:', entry.timestamp);
-            if (entry.data) console.log('Data:', entry.data);
-            console.groupEnd();
-        } else {
-            // In production, we might want to be less verbose in the console
-            // or only print errors/warnings.
-            if (entry.level === 'error' || entry.level === 'warn') {
-                console[entry.level](entry.message, entry.data);
-            }
+            console.info(`[INFO] ${message}`, context || "");
         }
+        // We generally don't send info logs to Sentry to save quota, 
+        // unless breadcrumbs are desired.
+        Sentry.addBreadcrumb({
+            category: "log",
+            message,
+            level: "info",
+            data: context,
+        });
     }
 
-    public info(message: string, data?: any) {
-        const entry = this.format('info', message, data);
-        this.print(entry);
-        // TODO: Send to Sentry/Analytics
-    }
-
-    public warn(message: string, data?: any) {
-        const entry = this.format('warn', message, data);
-        this.print(entry);
-        // TODO: Send to Sentry
-    }
-
-    public error(message: string, error?: any, data?: any) {
-        const entry = this.format('error', message, { error, ...data });
-        this.print(entry);
-        // TODO: Send to Sentry
-        // if (window.Sentry) window.Sentry.captureException(error);
-    }
-
-    public debug(message: string, data?: any) {
+    warn(message: string, context?: LogContext) {
         if (this.isDev) {
-            const entry = this.format('debug', message, data);
-            this.print(entry);
+            console.warn(`[WARN] ${message}`, context || "");
+        }
+        Sentry.addBreadcrumb({
+            category: "log",
+            message,
+            level: "warning",
+            data: context,
+        });
+    }
+
+    error(message: string, error?: any, context?: LogContext) {
+        if (this.isDev) {
+            console.error(`[ERROR] ${message}`, error || "", context || "");
+        }
+
+        Sentry.captureException(error || new Error(message), {
+            extra: {
+                message,
+                ...context,
+            },
+        });
+    }
+
+    debug(message: string, context?: LogContext) {
+        if (this.isDev) {
+            console.debug(`[DEBUG] ${message}`, context || "");
         }
     }
 }
 
-export const Logger = new LoggerService();
+export const logger = new Logger();

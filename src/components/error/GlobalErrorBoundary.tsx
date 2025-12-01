@@ -1,5 +1,5 @@
 import React, { Component, ErrorInfo, ReactNode } from 'react';
-import { Logger } from '@/lib/logger';
+import { logger } from '@/lib/logger';
 import { AlertTriangle, RefreshCw } from 'lucide-react';
 
 interface Props {
@@ -22,7 +22,7 @@ export class GlobalErrorBoundary extends Component<Props, State> {
     }
 
     public componentDidCatch(error: Error, errorInfo: ErrorInfo) {
-        Logger.error('Uncaught error in React component tree', error, {
+        logger.error('Uncaught error in React component tree', error, {
             componentStack: errorInfo.componentStack,
         });
     }
