@@ -1,0 +1,106 @@
+name: apply-baseline-to-verify
+
+on:
+  workflow_dispatch:
+
+jobs:
+  baseline-verify:
+    name: Apply BASELINE to VERIFY
+    runs-on: ubuntu-latest
+
+    env:
+      SUPABASE_DB_URL_VERIFY: ${{ secrets.SUPABASE_DB_URL_VERIFY }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install PostgreSQL client (psql)
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y postgresql-client
+
+      - name: Locate baseline file
+        id: locate
+        run: |
+          set -euo pipefail
+          ls -lah supabase/migrations || true
+          BASELINE="$(ls -1 supabase/migrations/*_baseline.sql | head -n 1)"
+          if [ -z "${BASELINE:-}" ]; then
+            echo "Nenhum *_baseline.sql encontrado em supabase/migrations"; exit 1
+          fi
+          echo "BASELINE=$BASELINE" | tee -a "$GITHUB_ENV"
+          echo "Baseline localizado: $BASELINE"
+
+      - name: Minimal prelude on VERIFY (schemas básicos)
+        run: |
+          set -euo pipefail
+          # Evita falhas posteriores por ausência do schema audit
+          psql "$SUPABASE_DB_URL_VERIFY" -v ON_ERROR_STOP=1 <<'SQL'
+          DO $$
+          BEGIN
+            IF NOT EXISTS (SELECT 1 FROM pg_namespace WHERE nspname='audit') THEN
+              EXECUTE 'CREATE SCHEMA audit';
+            END IF;
+          END $$;
+          SQL
+
+      - name: Patch BASELINE (guard ENUM CREATE TYPE with IF NOT EXISTS)
+        run: |
+          set -euo pipefail
+          IN="$BASELINE"
+          OUT="${IN%.sql}.patched.sql"
+          cp "$IN" "$OUT"
+
+          # Adicione aqui outros ENUMs que possam existir
+          ENUMS=(meta_tipo billing_cycle contribuinte_icms_enum)
+
+          patch_enum () {
+            local ENUM="$1"
+            # Envolve o bloco CREATE TYPE <enum> AS ENUM (...) com DO $$ IF NOT EXISTS ... END $$;
+            awk -v ENUM="$ENUM" '
+              BEGIN { inblk=0 }
+              # Início do bloco CREATE TYPE <enum> AS ENUM (
+              $0 ~ "^[[:space:]]*CREATE[[:space:]]+TYPE[[:space:]]+"ENUM"[[:space:]]+AS[[:space:]]+ENUM[[:space:]]*\\(" {
+                inblk=1
+                print "DO $$"
+                print "BEGIN"
+                print "  IF NOT EXISTS ("
+                print "    SELECT 1 FROM pg_type t"
+                print "    JOIN pg_namespace n ON n.oid = t.typnamespace"
+                print "   WHERE t.typtype = ''e'' AND t.typname = '''"ENUM"''' AND n.nspname = ''public''"
+                print "  ) THEN"
+                print $0
+                next
+              }
+              # Fim do bloco (fecha com ");") — encerramos o DO $$
+              inblk && /\)\s*;\s*$/ {
+                print $0
+                print "  END IF;"
+                print "END $$;"
+                inblk=0
+                next
+              }
+              # Linhas dentro do bloco original
+              inblk { print; next }
+              # Linhas fora do bloco
+              { print }
+            ' "$OUT" > "${OUT}.tmp" && mv "${OUT}.tmp" "$OUT"
+          }
+
+          for e in "${ENUMS[@]}"; do
+            echo "[PATCH] Guardando ENUM: $e"
+            patch_enum "$e"
+          done
+
+          echo "PATCHED_BASELINE=$OUT" >> "$GITHUB_ENV"
+          echo "Baseline patchado: $OUT"
+
+      - name: Apply BASELINE to VERIFY (psql)
+        run: |
+          set -euo pipefail
+          FILE="${PATCHED_BASELINE:-$BASELINE}"
+          echo "[MIGRATE][VERIFY] Aplicando $FILE"
+          psql "$SUPABASE_DB_URL_VERIFY" -v ON_ERROR_STOP=1 -f "$FILE"
+          echo "[MIGRATE][VERIFY] Baseline aplicada com sucesso."
