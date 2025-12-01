@@ -30,7 +30,7 @@ jobs:
           echo "BASELINE=$BASELINE" >> "$GITHUB_ENV"
           echo "Baseline: $BASELINE"
 
-      - name: Prelude (audit + ENUMs se faltarem)
+      - name: Prelude (cria schema audit e ENUMs se faltarem)
         run: |
           set -euo pipefail
           psql "$SUPABASE_DB_URL_VERIFY" -v ON_ERROR_STOP=1 <<'SQL'
@@ -47,8 +47,7 @@ jobs:
           BEGIN
             IF NOT EXISTS (
               SELECT 1
-              FROM pg_type t
-              JOIN pg_namespace n ON n.oid = t.typnamespace
+              FROM pg_type t JOIN pg_namespace n ON n.oid = t.typnamespace
               WHERE t.typtype='e' AND t.typname='meta_tipo' AND n.nspname='public'
             ) THEN
               EXECUTE 'CREATE TYPE public.meta_tipo AS ENUM (''mensal'',''trimestral'',''anual'')';
@@ -60,8 +59,7 @@ jobs:
           BEGIN
             IF NOT EXISTS (
               SELECT 1
-              FROM pg_type t
-              JOIN pg_namespace n ON n.oid = t.typnamespace
+              FROM pg_type t JOIN pg_namespace n ON n.oid = t.typnamespace
               WHERE t.typtype='e' AND t.typname='billing_cycle' AND n.nspname='public'
             ) THEN
               EXECUTE 'CREATE TYPE public.billing_cycle AS ENUM (''monthly'',''yearly'')';
@@ -73,8 +71,7 @@ jobs:
           BEGIN
             IF NOT EXISTS (
               SELECT 1
-              FROM pg_type t
-              JOIN pg_namespace n ON n.oid = t.typnamespace
+              FROM pg_type t JOIN pg_namespace n ON n.oid = t.typnamespace
               WHERE t.typtype='e' AND t.typname='contribuinte_icms_enum' AND n.nspname='public'
             ) THEN
               EXECUTE 'CREATE TYPE public.contribuinte_icms_enum AS ENUM (''contribuinte'',''nao_contribuinte'')';
@@ -82,32 +79,49 @@ jobs:
           END $$;
           SQL
 
-      - name: Patch baseline (remover CREATE TYPE)
+      - name: Patch baseline (remover quaisquer CREATE TYPE dos 3 ENUMs)
         run: |
           set -euo pipefail
           IN="$BASELINE"
           OUT="${IN%.sql}.patched.sql"
           cp "$IN" "$OUT"
 
+          # Stripper robusto: ignora CREATE TYPE (com ou sem aspas/schema) até a linha de fechamento );
           strip_enum () {
             local ENUM="$1"
-            awk -v ENUM="$ENUM" '
+            awk -v IGNORECASE=1 -v ENUM="$ENUM" '
               BEGIN { inblk=0 }
-              $0 ~ "^[[:space:]]*CREATE[[:space:]]+TYPE[[:space:]]+(public\\.)?"ENUM"[[:space:]]+AS[[:space:]]+ENUM[[:space:]]*\\(" { inblk=1; next }
-              inblk && /\)\s*;\s*$/ { inblk=0; next }
-              inblk { next }
-              { print }
+              {
+                if (inblk) {
+                  if ($0 ~ /\)\s*;\s*$/) { inblk=0 }
+                  next
+                }
+                # MATCH exemplos:
+                # CREATE TYPE billing_cycle AS ENUM (
+                # CREATE TYPE "billing_cycle" AS ENUM (
+                # CREATE TYPE public.billing_cycle AS ENUM (
+                # CREATE TYPE "public"."billing_cycle" AS ENUM (
+                if ($0 ~ /^[[:space:]]*CREATE[[:space:]]+TYPE[[:space:]]+.*([."[:space:]]|^) *"?ENUM"?"? *$/) { } # só pra não dar erro de sintaxe no awk antigo
+                if ($0 ~ /^[[:space:]]*CREATE[[:space:]]+TYPE[[:space:]]+/) {
+                  # procura o nome do enum na linha
+                  if ($0 ~ ("[[:<:]]" ENUM "[[:>:]]")) {
+                    # e exige AS ENUM na mesma linha
+                    if ($0 ~ /AS[[:space:]]+ENUM[[:space:]]*\(/) { inblk=1; next }
+                  }
+                }
+                print
+              }
             ' "$OUT" > "${OUT}.tmp" && mv "${OUT}.tmp" "$OUT"
           }
 
           for e in meta_tipo billing_cycle contribuinte_icms_enum; do
-            echo "[PATCH] Removendo CREATE TYPE de: $e"
+            echo "[PATCH] Removendo bloco CREATE TYPE: $e"
             strip_enum "$e"
           done
 
           echo "PATCHED_BASELINE=$OUT" >> "$GITHUB_ENV"
-          echo "Arquivo patchado: $OUT"
-          head -n 40 "$OUT" || true
+          echo "Arquivo patchado em: $OUT"
+          sed -n '1,40p' "$OUT" || true
 
       - name: Apply PATCHED BASELINE
         run: |
