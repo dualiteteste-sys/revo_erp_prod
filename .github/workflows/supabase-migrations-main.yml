@@ -23,21 +23,17 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y postgresql-client
 
-      # PRELUDE: dropar enums conflitantes já existentes no VERIFY (idempotente)
-      - name: [VERIFY] Prelude - drop conflicting enums (idempotent)
+      - name: Prelude - drop conflicting enums (idempotent)
         run: |
           set -euo pipefail
-          echo "[VERIFY][PRELUDE] Dropping pre-existing enums if any..."
           psql "$SUPABASE_DB_URL_VERIFY" -v ON_ERROR_STOP=1 <<'SQL'
           SET search_path = pg_catalog, public;
-
           DO $$
           DECLARE t text;
           BEGIN
             FOREACH t IN ARRAY ARRAY[
               'billing_cycle',
               'contribuinte_icms_enum'
-              -- se surgir outro "type <X> already exists", incluir aqui: 'outro_enum',
             ]
             LOOP
               IF EXISTS (
@@ -52,13 +48,10 @@ jobs:
             END LOOP;
           END$$;
           SQL
-          echo "[VERIFY][PRELUDE] OK"
 
-      # STUBS: funções usadas em DEFAULTs antes da baseline (idempotente)
-      - name: [VERIFY] Create context function stubs (idempotent)
+      - name: Create context function stubs
         run: |
           set -euo pipefail
-          echo "[VERIFY][STUBS] Creating stubs for context functions..."
           psql "$SUPABASE_DB_URL_VERIFY" -v ON_ERROR_STOP=1 <<'SQL'
           SET search_path = pg_catalog, public;
 
@@ -88,13 +81,10 @@ jobs:
               )
           $$;
           SQL
-          echo "[VERIFY][STUBS] OK"
 
-      # BOOTSTRAP: garantir schema audit mínimo exigido pela baseline (idempotente)
-      - name: [VERIFY] Bootstrap AUDIT schema (idempotent)
+      - name: Bootstrap AUDIT schema
         run: |
           set -euo pipefail
-          echo "[VERIFY][AUDIT] Ensuring audit schema/table exist..."
           psql "$SUPABASE_DB_URL_VERIFY" -v ON_ERROR_STOP=1 <<'SQL'
           SET search_path = pg_catalog, public;
 
@@ -127,32 +117,26 @@ jobs:
             END IF;
           END $$;
           SQL
-          echo "[VERIFY][AUDIT] OK"
 
-      # APLICAÇÃO DA BASELINE
-      - name: [VERIFY] Apply BASELINE via psql
-        shell: bash
+      - name: Apply BASELINE to VERIFY
         run: |
           set -euo pipefail
-          echo "[MIGRATE][VERIFY] Locating baseline in supabase/migrations..."
           BASELINE="$(ls -1 supabase/migrations/*_baseline.sql | head -n 1)"
           if [ -z "$BASELINE" ]; then
-            echo "::error::No *_baseline.sql found in supabase/migrations"
+            echo "No *_baseline.sql found in supabase/migrations"
             exit 1
           fi
-          echo "[MIGRATE][VERIFY] BASELINE => ${BASELINE}"
           psql "$SUPABASE_DB_URL_VERIFY" -v ON_ERROR_STOP=1 -f "$BASELINE"
-          echo "[MIGRATE][VERIFY] Baseline applied successfully."
 
   migrate-sync-history:
-    name: Sync migration history (VERIFY → PROD)
+    name: Sync migration history (VERIFY and PROD)
     runs-on: ubuntu-latest
     needs: apply-baseline-verify
     environment:
       name: production
     env:
       SUPABASE_DB_URL_VERIFY: ${{ secrets.SUPABASE_DB_URL_VERIFY }}
-      SUPABASE_DB_URL_PROD:   ${{ secrets.SUPABASE_DB_URL_PROD }}
+      SUPABASE_DB_URL_PROD: ${{ secrets.SUPABASE_DB_URL_PROD }}
 
     steps:
       - name: Checkout repository
@@ -166,13 +150,9 @@ jobs:
       - name: supabase db push (VERIFY)
         run: |
           set -euo pipefail
-          echo "[MIGRATE][VERIFY] Running supabase db push on VERIFY to align migration history..."
           supabase db push --db-url "$SUPABASE_DB_URL_VERIFY"
-          echo "[MIGRATE][VERIFY] History aligned."
 
       - name: supabase db push (PROD)
         run: |
           set -euo pipefail
-          echo "[MIGRATE][PROD] Running supabase db push on PROD to align migration history..."
           supabase db push --db-url "$SUPABASE_DB_URL_PROD"
-          echo "[MIGRATE][PROD] History aligned."
