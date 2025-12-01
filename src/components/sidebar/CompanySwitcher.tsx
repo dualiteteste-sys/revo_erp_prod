@@ -35,11 +35,11 @@ const CompanySwitcher: React.FC<CompanySwitcherProps> = ({ isCollapsed, onOpenCr
       >
         <div className="flex items-center gap-3 overflow-hidden">
           <div className="w-10 h-10 bg-gray-200 rounded-lg flex items-center justify-center flex-shrink-0">
-             <Building2 className="h-6 w-6 text-gray-600" />
+            <Building2 className="h-6 w-6 text-gray-600" />
           </div>
           <div className="flex-1 text-left overflow-hidden">
             <p className="text-sm font-semibold text-gray-800 truncate">
-              {activeEmpresa?.fantasia || activeEmpresa?.razao_social}
+              {activeEmpresa?.nome_fantasia || activeEmpresa?.nome_razao_social}
             </p>
             {trialEndDate ? (
               <div className="flex items-center gap-1">
@@ -74,7 +74,7 @@ const CompanySwitcher: React.FC<CompanySwitcherProps> = ({ isCollapsed, onOpenCr
                 >
                   <div className="flex items-center gap-2">
                     <Building2 size={16} />
-                    <span className="truncate">{empresa.fantasia || empresa.razao_social}</span>
+                    <span className="truncate">{empresa.nome_fantasia || empresa.nome_razao_social}</span>
                   </div>
                   {activeEmpresa?.id === empresa.id && <Check size={16} className="text-blue-600" />}
                 </button>

@@ -56,9 +56,11 @@ const MainLayout: React.FC = () => {
     ];
 
     const isProfileIncomplete = requiredFields.some(field => !field || field.trim() === '');
+    console.log('[MainLayout] Profile Check:', { isProfileIncomplete, activeEmpresa });
 
     if (isProfileIncomplete || activeEmpresa.nome_razao_social === 'Empresa sem Nome') {
       if (!isSettingsPanelOpen) {
+        console.log('[MainLayout] Forcing Settings Open');
         setSettingsCanClose(false);
         setSettingsInitialTab('Geral');
         setSettingsInitialItem('Empresa');

@@ -1,0 +1,69 @@
+
+Running 1 test using 1 worker
+
+[1A[2K[1/1] [chromium] › e2e/auth.spec.ts:3:1 › should allow user to log in and view products
+[1A[2K[chromium] › e2e/auth.spec.ts:3:1 › should allow user to log in and view products
+BROWSER LOG: [vite] connecting...
+
+[1A[2KBROWSER LOG: [vite] connected.
+
+[1A[2KBROWSER LOG: %cDownload the React DevTools for a better development experience: https://reactjs.org/link/react-devtools font-weight:bold
+
+[1A[2KBROWSER LOG: ⚠️ React Router Future Flag Warning: React Router will begin wrapping state updates in `React.startTransition` in v7. You can use the `v7_startTransition` future flag to opt-in early. For more information, see https://reactrouter.com/v6/upgrading/future#v7_starttransition.
+
+[1A[2KBROWSER LOG: [AUTH][LOGIN] start {email: test@example.com}
+
+[1A[2KBROWSER LOG: [DEBUG] [QUERY][empresas] fetching list 
+
+[1A[2KBROWSER LOG: [DEBUG] [QUERY][active_empresa] fetching 
+
+[1A[2KBROWSER LOG: [INFO] [AUTH][LOGIN] start {email: exists}
+
+[1A[2KBROWSER LOG: [MainLayout] Profile Check: {isProfileIncomplete: false, activeEmpresa: Object}
+
+[1A[2KBROWSER LOG: [MainLayout] Profile Check: {isProfileIncomplete: false, activeEmpresa: Object}
+
+[1A[2KBROWSER LOG: [vite] connecting...
+
+[1A[2KBROWSER LOG: [vite] connected.
+
+[1A[2KBROWSER LOG: %cDownload the React DevTools for a better development experience: https://reactjs.org/link/react-devtools font-weight:bold
+
+[1A[2KBROWSER LOG: ⚠️ React Router Future Flag Warning: React Router will begin wrapping state updates in `React.startTransition` in v7. You can use the `v7_startTransition` future flag to opt-in early. For more information, see https://reactrouter.com/v6/upgrading/future#v7_starttransition.
+
+[1A[2KBROWSER LOG: [DEBUG] [QUERY][empresas] fetching list 
+
+[1A[2KBROWSER LOG: [DEBUG] [QUERY][active_empresa] fetching 
+
+[1A[2KBROWSER LOG: [INFO] [AUTH][LOGIN] start {email: exists}
+
+[1A[2K  1) [chromium] › e2e/auth.spec.ts:3:1 › should allow user to log in and view products ─────────────
+
+    Error: [2mexpect([22m[31mlocator[39m[2m).[22mtoBeVisible[2m([22m[2m)[22m failed
+
+    Locator: getByText('Fantasia E2E')
+    Expected: visible
+    Timeout: 5000ms
+    Error: element(s) not found
+
+    Call log:
+    [2m  - Expect "toBeVisible" with timeout 5000ms[22m
+    [2m  - waiting for getByText('Fantasia E2E')[22m
+
+
+      93 |
+      94 |     // Check if the active company is loaded
+    > 95 |     await expect(page.getByText('Fantasia E2E')).toBeVisible();
+         |                                                  ^
+      96 |
+      97 |     // Check if the mocked product is visible
+      98 |     await expect(page.getByText('Produto E2E')).toBeVisible();
+        at /Users/leandrofmarques/Downloads/revo_erp_prod_8yumh0_dualiteproject/e2e/auth.spec.ts:95:50
+
+    Error Context: test-results/auth-should-allow-user-to-log-in-and-view-products-chromium/error-context.md
+
+
+[1A[2K  1 failed
+    [chromium] › e2e/auth.spec.ts:3:1 › should allow user to log in and view products ──────────────
+
+[36m  Serving HTML report at http://localhost:56631. Press Ctrl+C to quit.[39m

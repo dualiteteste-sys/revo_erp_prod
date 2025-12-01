@@ -1,0 +1,34 @@
+
+Running 1 test using 1 worker
+
+[1A[2K[1/1] [chromium] › e2e/auth.spec.ts:3:1 › should allow user to log in and view products
+[1A[2K  1) [chromium] › e2e/auth.spec.ts:3:1 › should allow user to log in and view products ─────────────
+
+    Error: [2mexpect([22m[31mlocator[39m[2m).[22mtoBeVisible[2m([22m[2m)[22m failed
+
+    Locator: getByText('Fantasia E2E')
+    Expected: visible
+    Timeout: 5000ms
+    Error: element(s) not found
+
+    Call log:
+    [2m  - Expect "toBeVisible" with timeout 5000ms[22m
+    [2m  - waiting for getByText('Fantasia E2E')[22m
+
+
+      90 |
+      91 |     // Check if the active company is loaded
+    > 92 |     await expect(page.getByText('Fantasia E2E')).toBeVisible();
+         |                                                  ^
+      93 |
+      94 |     // Check if the mocked product is visible
+      95 |     await expect(page.getByText('Produto E2E')).toBeVisible();
+        at /Users/leandrofmarques/Downloads/revo_erp_prod_8yumh0_dualiteproject/e2e/auth.spec.ts:92:50
+
+    Error Context: test-results/auth-should-allow-user-to-log-in-and-view-products-chromium/error-context.md
+
+
+[1A[2K  1 failed
+    [chromium] › e2e/auth.spec.ts:3:1 › should allow user to log in and view products ──────────────
+
+[36m  Serving HTML report at http://localhost:56519. Press Ctrl+C to quit.[39m

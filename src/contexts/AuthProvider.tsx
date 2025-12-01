@@ -51,13 +51,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const bootstrapMutation = useBootstrapEmpresa();
   const setActiveMutation = useSetActiveEmpresa();
 
-  const loading = isLoadingEmpresas || isLoadingActiveId;
+  const [authLoading, setAuthLoading] = useState(true);
+
+  const loading = authLoading || isLoadingEmpresas || isLoadingActiveId;
 
 
   const bootRef = useRef(false);
 
   const activeEmpresa = useMemo(() => {
-    return empresas.find((e) => e.id === activeEmpresaId) || null;
+    const found = empresas.find((e) => e.id === activeEmpresaId) || null;
+    console.log('[AuthProvider] activeEmpresa calc:', {
+      empresasCount: empresas.length,
+      activeEmpresaId,
+      foundId: found?.id
+    });
+    return found;
   }, [empresas, activeEmpresaId]);
 
   // ===== Helpers =====
@@ -128,7 +136,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const s = await getSession();
       setSession(s);
       setUserId(s?.user?.id ?? null);
-      // Loading is now derived from queries
+      setAuthLoading(false);
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
