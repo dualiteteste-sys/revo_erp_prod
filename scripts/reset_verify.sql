@@ -4,6 +4,9 @@
 DROP SCHEMA IF EXISTS public CASCADE;
 CREATE SCHEMA public;
 
+-- Limpar histórico de migrations para garantir Clean Slate real
+DROP SCHEMA IF EXISTS supabase_migrations CASCADE;
+
 -- Restaurar permissões padrão (ajuste conforme necessário para seu ambiente Supabase)
 GRANT USAGE ON SCHEMA public TO postgres;
 GRANT USAGE ON SCHEMA public TO anon;
@@ -28,5 +31,5 @@ ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON SEQUENCES TO service_role
 -- Comentário para log
 DO $$
 BEGIN
-    RAISE NOTICE 'Schema public resetado com sucesso.';
+    RAISE NOTICE 'Schema public e histórico de migrations resetados com sucesso.';
 END $$;
