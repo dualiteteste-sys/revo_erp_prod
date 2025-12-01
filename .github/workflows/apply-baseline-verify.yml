@@ -43,38 +43,41 @@ jobs:
           END $$;
 
           -- ENUM: meta_tipo
-          DO $$ BEGIN
+          DO $$
+          BEGIN
             IF NOT EXISTS (
               SELECT 1
               FROM pg_type t
               JOIN pg_namespace n ON n.oid = t.typnamespace
               WHERE t.typtype='e' AND t.typname='meta_tipo' AND n.nspname='public'
             ) THEN
-              EXECUTE $$CREATE TYPE public.meta_tipo AS ENUM ('mensal','trimestral','anual')$$;
+              EXECUTE 'CREATE TYPE public.meta_tipo AS ENUM (''mensal'',''trimestral'',''anual'')';
             END IF;
           END $$;
 
           -- ENUM: billing_cycle
-          DO $$ BEGIN
+          DO $$
+          BEGIN
             IF NOT EXISTS (
               SELECT 1
               FROM pg_type t
               JOIN pg_namespace n ON n.oid = t.typnamespace
               WHERE t.typtype='e' AND t.typname='billing_cycle' AND n.nspname='public'
             ) THEN
-              EXECUTE $$CREATE TYPE public.billing_cycle AS ENUM ('monthly','yearly')$$;
+              EXECUTE 'CREATE TYPE public.billing_cycle AS ENUM (''monthly'',''yearly'')';
             END IF;
           END $$;
 
           -- ENUM: contribuinte_icms_enum
-          DO $$ BEGIN
+          DO $$
+          BEGIN
             IF NOT EXISTS (
               SELECT 1
               FROM pg_type t
               JOIN pg_namespace n ON n.oid = t.typnamespace
               WHERE t.typtype='e' AND t.typname='contribuinte_icms_enum' AND n.nspname='public'
             ) THEN
-              EXECUTE $$CREATE TYPE public.contribuinte_icms_enum AS ENUM ('contribuinte','nao_contribuinte')$$;
+              EXECUTE 'CREATE TYPE public.contribuinte_icms_enum AS ENUM (''contribuinte'',''nao_contribuinte'')';
             END IF;
           END $$;
           SQL
@@ -90,13 +93,9 @@ jobs:
             local ENUM="$1"
             awk -v ENUM="$ENUM" '
               BEGIN { inblk=0 }
-              # início do bloco CREATE TYPE <enum> AS ENUM (
               $0 ~ "^[[:space:]]*CREATE[[:space:]]+TYPE[[:space:]]+(public\\.)?"ENUM"[[:space:]]+AS[[:space:]]+ENUM[[:space:]]*\\(" { inblk=1; next }
-              # fim do bloco
               inblk && /\)\s*;\s*$/ { inblk=0; next }
-              # linhas dentro do bloco
               inblk { next }
-              # demais linhas
               { print }
             ' "$OUT" > "${OUT}.tmp" && mv "${OUT}.tmp" "$OUT"
           }
