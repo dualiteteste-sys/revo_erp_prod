@@ -2453,522 +2453,609 @@ CREATE UNIQUE INDEX if not exists vendas_pedidos_pkey ON public.vendas_pedidos U
 alter table "public"."addons" add constraint "addons_pkey" PRIMARY KEY using index "addons_pkey";
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
 alter table "public"."atributos" add constraint "atributos_pkey" PRIMARY KEY using index "atributos_pkey";
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
 alter table "public"."centros_de_custo" add constraint "centros_de_custo_pkey" PRIMARY KEY using index "centros_de_custo_pkey";
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
 alter table "public"."compras_itens" add constraint "compras_itens_pkey" PRIMARY KEY using index "compras_itens_pkey";
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
 alter table "public"."compras_pedidos" add constraint "compras_pedidos_pkey" PRIMARY KEY using index "compras_pedidos_pkey";
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
 alter table "public"."contas_a_receber" add constraint "contas_a_receber_pkey" PRIMARY KEY using index "contas_a_receber_pkey";
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
 alter table "public"."crm_etapas" add constraint "crm_etapas_pkey" PRIMARY KEY using index "crm_etapas_pkey";
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
 alter table "public"."crm_funis" add constraint "crm_funis_pkey" PRIMARY KEY using index "crm_funis_pkey";
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
 alter table "public"."crm_oportunidades" add constraint "crm_oportunidades_pkey" PRIMARY KEY using index "crm_oportunidades_pkey";
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
 alter table "public"."ecommerces" add constraint "ecommerces_pkey" PRIMARY KEY using index "ecommerces_pkey";
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
 alter table "public"."empresa_addons" add constraint "empresa_addons_pkey" PRIMARY KEY using index "empresa_addons_pkey";
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
 alter table "public"."empresa_usuarios" add constraint "empresa_usuarios_pkey" PRIMARY KEY using index "empresa_usuarios_pkey";
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
 alter table "public"."empresas" add constraint "empresas_pkey" PRIMARY KEY using index "empresas_pkey";
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
 alter table "public"."estoque_movimentos" add constraint "estoque_movimentos_pkey" PRIMARY KEY using index "estoque_movimentos_pkey";
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
 alter table "public"."estoque_saldos" add constraint "estoque_saldos_pkey" PRIMARY KEY using index "estoque_saldos_pkey";
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
 alter table "public"."financeiro_centros_custos" add constraint "financeiro_centros_custos_pkey" PRIMARY KEY using index "financeiro_centros_custos_pkey";
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
 alter table "public"."financeiro_cobrancas_bancarias" add constraint "financeiro_cobrancas_bancarias_pkey" PRIMARY KEY using index "financeiro_cobrancas_bancarias_pkey";
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
 alter table "public"."financeiro_cobrancas_bancarias_eventos" add constraint "financeiro_cobrancas_bancarias_eventos_pkey" PRIMARY KEY using index "financeiro_cobrancas_bancarias_eventos_pkey";
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
 alter table "public"."financeiro_contas_correntes" add constraint "financeiro_contas_correntes_pkey" PRIMARY KEY using index "financeiro_contas_correntes_pkey";
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
 alter table "public"."financeiro_contas_pagar" add constraint "financeiro_contas_pagar_pkey" PRIMARY KEY using index "financeiro_contas_pagar_pkey";
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
 alter table "public"."financeiro_extratos_bancarios" add constraint "financeiro_extratos_bancarios_pkey" PRIMARY KEY using index "financeiro_extratos_bancarios_pkey";
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
 alter table "public"."financeiro_movimentacoes" add constraint "financeiro_movimentacoes_pkey" PRIMARY KEY using index "financeiro_movimentacoes_pkey";
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
 alter table "public"."fiscal_nfe_import_items" add constraint "fiscal_nfe_import_items_pkey" PRIMARY KEY using index "fiscal_nfe_import_items_pkey";
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
 alter table "public"."fiscal_nfe_imports" add constraint "fiscal_nfe_imports_pkey" PRIMARY KEY using index "fiscal_nfe_imports_pkey";
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
 alter table "public"."fornecedores" add constraint "fornecedores_pkey" PRIMARY KEY using index "fornecedores_pkey";
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
 alter table "public"."industria_benef_componentes" add constraint "ind_benef_comp_pkey" PRIMARY KEY using index "ind_benef_comp_pkey";
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
 alter table "public"."industria_benef_entregas" add constraint "ind_benef_entregas_pkey" PRIMARY KEY using index "ind_benef_entregas_pkey";
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
 alter table "public"."industria_benef_ordens" add constraint "ind_benef_ordens_pkey" PRIMARY KEY using index "ind_benef_ordens_pkey";
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
 alter table "public"."industria_boms" add constraint "industria_boms_pkey" PRIMARY KEY using index "industria_boms_pkey";
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
 alter table "public"."industria_boms_componentes" add constraint "industria_boms_comp_pkey" PRIMARY KEY using index "industria_boms_comp_pkey";
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
 alter table "public"."industria_centros_trabalho" add constraint "industria_centros_trabalho_pkey" PRIMARY KEY using index "industria_centros_trabalho_pkey";
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
 alter table "public"."industria_materiais_cliente" add constraint "industria_materiais_cliente_pkey" PRIMARY KEY using index "industria_materiais_cliente_pkey";
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
 alter table "public"."industria_operacoes" add constraint "industria_operacoes_pkey" PRIMARY KEY using index "industria_operacoes_pkey";
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
 alter table "public"."industria_operacoes_apontamentos" add constraint "industria_operacoes_apontamentos_pkey" PRIMARY KEY using index "industria_operacoes_apontamentos_pkey";
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
 alter table "public"."industria_ordem_componentes" add constraint "industria_ordem_componentes_pkey" PRIMARY KEY using index "industria_ordem_componentes_pkey";
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
 alter table "public"."industria_ordem_entregas" add constraint "industria_ordem_entregas_pkey" PRIMARY KEY using index "industria_ordem_entregas_pkey";
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
 alter table "public"."industria_ordens" add constraint "industria_ordens_pkey" PRIMARY KEY using index "industria_ordens_pkey";
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
 alter table "public"."industria_ordens_componentes" add constraint "industria_componentes_pkey" PRIMARY KEY using index "industria_componentes_pkey";
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
 alter table "public"."industria_ordens_entregas" add constraint "industria_entregas_pkey" PRIMARY KEY using index "industria_entregas_pkey";
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
 alter table "public"."industria_producao_componentes" add constraint "ind_prod_comp_pkey" PRIMARY KEY using index "ind_prod_comp_pkey";
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
 alter table "public"."industria_producao_entregas" add constraint "ind_prod_entregas_pkey" PRIMARY KEY using index "ind_prod_entregas_pkey";
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
 alter table "public"."industria_producao_ordens" add constraint "ind_prod_ordens_pkey" PRIMARY KEY using index "ind_prod_ordens_pkey";
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
 alter table "public"."industria_roteiros" add constraint "industria_roteiros_pkey" PRIMARY KEY using index "industria_roteiros_pkey";
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
 alter table "public"."industria_roteiros_etapas" add constraint "industria_roteiros_etapas_pkey" PRIMARY KEY using index "industria_roteiros_etapas_pkey";
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
 alter table "public"."linhas_produto" add constraint "linhas_produto_pkey" PRIMARY KEY using index "linhas_produto_pkey";
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
 alter table "public"."logistica_transportadoras" add constraint "logistica_transportadoras_pkey" PRIMARY KEY using index "logistica_transportadoras_pkey";
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
 alter table "public"."marcas" add constraint "marcas_pkey" PRIMARY KEY using index "marcas_pkey";
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
 alter table "public"."metas_vendas" add constraint "metas_vendas_pkey" PRIMARY KEY using index "metas_vendas_pkey";
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
 alter table "public"."ordem_servico_itens" add constraint "ordem_servico_itens_pkey" PRIMARY KEY using index "ordem_servico_itens_pkey";
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
 alter table "public"."ordem_servico_parcelas" add constraint "ordem_servico_parcelas_pkey" PRIMARY KEY using index "ordem_servico_parcelas_pkey";
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
 alter table "public"."ordem_servicos" add constraint "ordem_servicos_pkey" PRIMARY KEY using index "ordem_servicos_pkey";
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
 alter table "public"."permissions" add constraint "permissions_pkey" PRIMARY KEY using index "permissions_pkey";
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
 alter table "public"."pessoa_contatos" add constraint "pessoa_contatos_pkey" PRIMARY KEY using index "pessoa_contatos_pkey";
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
 alter table "public"."pessoa_enderecos" add constraint "pessoa_enderecos_pkey" PRIMARY KEY using index "pessoa_enderecos_pkey";
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
 alter table "public"."pessoas" add constraint "pessoas_pkey" PRIMARY KEY using index "pessoas_pkey";
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
 alter table "public"."plans" add constraint "plans_pkey" PRIMARY KEY using index "plans_pkey";
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
 alter table "public"."products_legacy_archive" add constraint "products_legacy_archive_pkey" PRIMARY KEY using index "products_legacy_archive_pkey";
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
 alter table "public"."produto_anuncios" add constraint "produto_anuncios_pkey" PRIMARY KEY using index "produto_anuncios_pkey";
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
 alter table "public"."produto_atributos" add constraint "produto_atributos_pkey" PRIMARY KEY using index "produto_atributos_pkey";
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
 alter table "public"."produto_componentes" add constraint "produto_componentes_pkey" PRIMARY KEY using index "produto_componentes_pkey";
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
 alter table "public"."produto_fornecedores" add constraint "produto_fornecedores_pkey" PRIMARY KEY using index "produto_fornecedores_pkey";
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
 alter table "public"."produto_imagens" add constraint "produto_imagens_pkey" PRIMARY KEY using index "produto_imagens_pkey";
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
 alter table "public"."produto_tags" add constraint "produto_tags_pkey" PRIMARY KEY using index "produto_tags_pkey";
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
 alter table "public"."produtos" add constraint "produtos_pkey" PRIMARY KEY using index "produtos_pkey";
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
 alter table "public"."profiles" add constraint "profiles_pkey" PRIMARY KEY using index "profiles_pkey";
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
 alter table "public"."recebimento_conferencias" add constraint "recebimento_conferencias_pkey" PRIMARY KEY using index "recebimento_conferencias_pkey";
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
 alter table "public"."recebimento_itens" add constraint "recebimento_itens_pkey" PRIMARY KEY using index "recebimento_itens_pkey";
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
 alter table "public"."recebimentos" add constraint "recebimentos_pkey" PRIMARY KEY using index "recebimentos_pkey";
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
 alter table "public"."rh_cargo_competencias" add constraint "rh_cargo_competencias_pkey" PRIMARY KEY using index "rh_cargo_competencias_pkey";
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
 alter table "public"."rh_cargos" add constraint "rh_cargos_pkey" PRIMARY KEY using index "rh_cargos_pkey";
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
 alter table "public"."rh_colaborador_competencias" add constraint "rh_col_competencias_pkey" PRIMARY KEY using index "rh_col_competencias_pkey";
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
 alter table "public"."rh_colaboradores" add constraint "rh_colaboradores_pkey" PRIMARY KEY using index "rh_colaboradores_pkey";
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
 alter table "public"."rh_competencias" add constraint "rh_competencias_pkey" PRIMARY KEY using index "rh_competencias_pkey";
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
 alter table "public"."rh_treinamento_participantes" add constraint "rh_treinamento_part_pkey" PRIMARY KEY using index "rh_treinamento_part_pkey";
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
 alter table "public"."rh_treinamentos" add constraint "rh_treinamentos_pkey" PRIMARY KEY using index "rh_treinamentos_pkey";
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
 alter table "public"."role_permissions" add constraint "role_permissions_pkey" PRIMARY KEY using index "role_permissions_pkey";
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
 alter table "public"."roles" add constraint "roles_pkey" PRIMARY KEY using index "roles_pkey";
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
 alter table "public"."servicos" add constraint "servicos_pkey" PRIMARY KEY using index "servicos_pkey";
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
 alter table "public"."subscriptions" add constraint "subscriptions_pkey" PRIMARY KEY using index "subscriptions_pkey";
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
 alter table "public"."tabelas_medidas" add constraint "tabelas_medidas_pkey" PRIMARY KEY using index "tabelas_medidas_pkey";
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
 alter table "public"."tags" add constraint "tags_pkey" PRIMARY KEY using index "tags_pkey";
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
 alter table "public"."transportadoras" add constraint "transportadoras_pkey" PRIMARY KEY using index "transportadoras_pkey";
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
 alter table "public"."user_active_empresa" add constraint "user_active_empresa_pkey" PRIMARY KEY using index "user_active_empresa_pkey";
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
 alter table "public"."user_permission_overrides" add constraint "user_permission_overrides_pkey" PRIMARY KEY using index "user_permission_overrides_pkey";
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
 alter table "public"."vendas_itens_pedido" add constraint "vendas_itens_pedido_pkey" PRIMARY KEY using index "vendas_itens_pedido_pkey";
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
 alter table "public"."vendas_pedidos" add constraint "vendas_pedidos_pkey" PRIMARY KEY using index "vendas_pedidos_pkey";
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
 alter table "public"."addons" add constraint "addons_billing_cycle_check" CHECK ((billing_cycle = ANY (ARRAY['monthly'::text, 'yearly'::text]))) not valid;
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
@@ -2977,24 +3064,28 @@ alter table "public"."addons" validate constraint "addons_billing_cycle_check";
 alter table "public"."addons" add constraint "addons_slug_billing_cycle_key" UNIQUE using index "addons_slug_billing_cycle_key";
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
 alter table "public"."addons" add constraint "addons_stripe_price_id_key" UNIQUE using index "addons_stripe_price_id_key";
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
 alter table "public"."atributos" add constraint "atributos_unique_per_company" UNIQUE using index "atributos_unique_per_company";
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
 alter table "public"."centros_de_custo" add constraint "centros_de_custo_empresa_id_fkey" FOREIGN KEY (empresa_id) REFERENCES public.empresas(id) ON DELETE CASCADE not valid;
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
@@ -3003,18 +3094,21 @@ alter table "public"."centros_de_custo" validate constraint "centros_de_custo_em
 alter table "public"."centros_de_custo" add constraint "uq_centros_de_custo_empresa_codigo" UNIQUE using index "uq_centros_de_custo_empresa_codigo";
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
 alter table "public"."centros_de_custo" add constraint "uq_centros_de_custo_empresa_nome" UNIQUE using index "uq_centros_de_custo_empresa_nome";
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
 alter table "public"."compras_itens" add constraint "compras_itens_empresa_fkey" FOREIGN KEY (empresa_id) REFERENCES public.empresas(id) ON DELETE CASCADE not valid;
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
@@ -3023,6 +3117,7 @@ alter table "public"."compras_itens" validate constraint "compras_itens_empresa_
 alter table "public"."compras_itens" add constraint "compras_itens_pedido_fkey" FOREIGN KEY (pedido_id) REFERENCES public.compras_pedidos(id) ON DELETE CASCADE not valid;
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
@@ -3031,6 +3126,7 @@ alter table "public"."compras_itens" validate constraint "compras_itens_pedido_f
 alter table "public"."compras_itens" add constraint "compras_itens_produto_fkey" FOREIGN KEY (produto_id) REFERENCES public.produtos(id) ON DELETE RESTRICT not valid;
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
@@ -3039,6 +3135,7 @@ alter table "public"."compras_itens" validate constraint "compras_itens_produto_
 alter table "public"."compras_itens" add constraint "compras_itens_quantidade_check" CHECK ((quantidade > (0)::numeric)) not valid;
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
@@ -3047,6 +3144,7 @@ alter table "public"."compras_itens" validate constraint "compras_itens_quantida
 alter table "public"."compras_pedidos" add constraint "compras_pedidos_empresa_fkey" FOREIGN KEY (empresa_id) REFERENCES public.empresas(id) ON DELETE CASCADE not valid;
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
@@ -3055,6 +3153,7 @@ alter table "public"."compras_pedidos" validate constraint "compras_pedidos_empr
 alter table "public"."compras_pedidos" add constraint "compras_pedidos_fornecedor_fkey" FOREIGN KEY (fornecedor_id) REFERENCES public.fornecedores(id) ON DELETE RESTRICT not valid;
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
@@ -3063,6 +3162,7 @@ alter table "public"."compras_pedidos" validate constraint "compras_pedidos_forn
 alter table "public"."compras_pedidos" add constraint "compras_pedidos_status_check" CHECK ((status = ANY (ARRAY['rascunho'::text, 'enviado'::text, 'recebido'::text, 'cancelado'::text]))) not valid;
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
@@ -3071,6 +3171,7 @@ alter table "public"."compras_pedidos" validate constraint "compras_pedidos_stat
 alter table "public"."contas_a_receber" add constraint "contas_a_receber_cliente_id_fkey" FOREIGN KEY (cliente_id) REFERENCES public.pessoas(id) ON DELETE SET NULL not valid;
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
@@ -3079,6 +3180,7 @@ alter table "public"."contas_a_receber" validate constraint "contas_a_receber_cl
 alter table "public"."contas_a_receber" add constraint "contas_a_receber_empresa_id_fkey" FOREIGN KEY (empresa_id) REFERENCES public.empresas(id) ON DELETE CASCADE not valid;
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
@@ -3087,6 +3189,7 @@ alter table "public"."contas_a_receber" validate constraint "contas_a_receber_em
 alter table "public"."crm_etapas" add constraint "crm_etapas_empresa_fkey" FOREIGN KEY (empresa_id) REFERENCES public.empresas(id) ON DELETE CASCADE not valid;
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
@@ -3095,6 +3198,7 @@ alter table "public"."crm_etapas" validate constraint "crm_etapas_empresa_fkey";
 alter table "public"."crm_etapas" add constraint "crm_etapas_funil_fkey" FOREIGN KEY (funil_id) REFERENCES public.crm_funis(id) ON DELETE CASCADE not valid;
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
@@ -3103,12 +3207,14 @@ alter table "public"."crm_etapas" validate constraint "crm_etapas_funil_fkey";
 alter table "public"."crm_etapas" add constraint "crm_etapas_funil_nome_uk" UNIQUE using index "crm_etapas_funil_nome_uk";
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
 alter table "public"."crm_funis" add constraint "crm_funis_empresa_fkey" FOREIGN KEY (empresa_id) REFERENCES public.empresas(id) ON DELETE CASCADE not valid;
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
@@ -3117,6 +3223,7 @@ alter table "public"."crm_funis" validate constraint "crm_funis_empresa_fkey";
 alter table "public"."crm_oportunidades" add constraint "crm_oportunidades_cliente_fkey" FOREIGN KEY (cliente_id) REFERENCES public.pessoas(id) ON DELETE SET NULL not valid;
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
@@ -3125,6 +3232,7 @@ alter table "public"."crm_oportunidades" validate constraint "crm_oportunidades_
 alter table "public"."crm_oportunidades" add constraint "crm_oportunidades_empresa_fkey" FOREIGN KEY (empresa_id) REFERENCES public.empresas(id) ON DELETE CASCADE not valid;
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
@@ -3133,6 +3241,7 @@ alter table "public"."crm_oportunidades" validate constraint "crm_oportunidades_
 alter table "public"."crm_oportunidades" add constraint "crm_oportunidades_etapa_fkey" FOREIGN KEY (etapa_id) REFERENCES public.crm_etapas(id) ON DELETE CASCADE not valid;
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
@@ -3141,6 +3250,7 @@ alter table "public"."crm_oportunidades" validate constraint "crm_oportunidades_
 alter table "public"."crm_oportunidades" add constraint "crm_oportunidades_funil_fkey" FOREIGN KEY (funil_id) REFERENCES public.crm_funis(id) ON DELETE CASCADE not valid;
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
@@ -3149,6 +3259,7 @@ alter table "public"."crm_oportunidades" validate constraint "crm_oportunidades_
 alter table "public"."crm_oportunidades" add constraint "crm_oportunidades_prioridade_check" CHECK ((prioridade = ANY (ARRAY['baixa'::text, 'media'::text, 'alta'::text]))) not valid;
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
@@ -3157,6 +3268,7 @@ alter table "public"."crm_oportunidades" validate constraint "crm_oportunidades_
 alter table "public"."crm_oportunidades" add constraint "crm_oportunidades_status_check" CHECK ((status = ANY (ARRAY['aberto'::text, 'ganho'::text, 'perdido'::text]))) not valid;
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
@@ -3165,12 +3277,14 @@ alter table "public"."crm_oportunidades" validate constraint "crm_oportunidades_
 alter table "public"."ecommerces" add constraint "ecommerces_unique_per_company" UNIQUE using index "ecommerces_unique_per_company";
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
 alter table "public"."empresa_addons" add constraint "empresa_addons_billing_cycle_check" CHECK ((billing_cycle = ANY (ARRAY['monthly'::text, 'yearly'::text]))) not valid;
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
@@ -3179,6 +3293,7 @@ alter table "public"."empresa_addons" validate constraint "empresa_addons_billin
 alter table "public"."empresa_addons" add constraint "empresa_addons_empresa_id_fkey" FOREIGN KEY (empresa_id) REFERENCES public.empresas(id) ON DELETE CASCADE not valid;
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
@@ -3187,6 +3302,7 @@ alter table "public"."empresa_addons" validate constraint "empresa_addons_empres
 alter table "public"."empresa_addons" add constraint "empresa_addons_fk_addon" FOREIGN KEY (addon_slug, billing_cycle) REFERENCES public.addons(slug, billing_cycle) ON UPDATE RESTRICT ON DELETE RESTRICT not valid;
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
@@ -3195,6 +3311,7 @@ alter table "public"."empresa_addons" validate constraint "empresa_addons_fk_add
 alter table "public"."empresa_addons" add constraint "empresa_addons_status_check" CHECK ((status = ANY (ARRAY['trialing'::text, 'active'::text, 'past_due'::text, 'canceled'::text, 'unpaid'::text, 'incomplete'::text, 'incomplete_expired'::text]))) not valid;
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
@@ -3203,6 +3320,7 @@ alter table "public"."empresa_addons" validate constraint "empresa_addons_status
 alter table "public"."empresa_usuarios" add constraint "empresa_usuarios_empresa_id_fkey" FOREIGN KEY (empresa_id) REFERENCES public.empresas(id) ON DELETE CASCADE not valid;
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
@@ -3211,6 +3329,7 @@ alter table "public"."empresa_usuarios" validate constraint "empresa_usuarios_em
 alter table "public"."empresa_usuarios" add constraint "empresa_usuarios_role_chk" CHECK ((role = ANY (ARRAY['admin'::text, 'member'::text]))) not valid;
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
@@ -3219,6 +3338,7 @@ alter table "public"."empresa_usuarios" validate constraint "empresa_usuarios_ro
 alter table "public"."empresa_usuarios" add constraint "empresa_usuarios_role_id_fkey" FOREIGN KEY (role_id) REFERENCES public.roles(id) ON DELETE SET NULL not valid;
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
@@ -3227,6 +3347,7 @@ alter table "public"."empresa_usuarios" validate constraint "empresa_usuarios_ro
 alter table "public"."empresa_usuarios" add constraint "empresa_usuarios_user_id_fkey" FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE not valid;
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
@@ -3235,18 +3356,21 @@ alter table "public"."empresa_usuarios" validate constraint "empresa_usuarios_us
 alter table "public"."empresas" add constraint "empresas_stripe_customer_id_key" UNIQUE using index "empresas_stripe_customer_id_key";
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
 alter table "public"."estoque_movimentos" add constraint "est_mov_emp_origem_uk" UNIQUE using index "est_mov_emp_origem_uk";
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
 alter table "public"."estoque_movimentos" add constraint "estoque_movimentos_empresa_fkey" FOREIGN KEY (empresa_id) REFERENCES public.empresas(id) ON DELETE CASCADE not valid;
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
@@ -3255,6 +3379,7 @@ alter table "public"."estoque_movimentos" validate constraint "estoque_movimento
 alter table "public"."estoque_movimentos" add constraint "estoque_movimentos_produto_fkey" FOREIGN KEY (produto_id) REFERENCES public.produtos(id) ON DELETE CASCADE not valid;
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
@@ -3263,6 +3388,7 @@ alter table "public"."estoque_movimentos" validate constraint "estoque_movimento
 alter table "public"."estoque_movimentos" add constraint "estoque_movimentos_tipo_check" CHECK ((tipo = ANY (ARRAY['entrada'::text, 'saida'::text, 'ajuste_entrada'::text, 'ajuste_saida'::text, 'perda'::text, 'inventario'::text]))) not valid;
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
@@ -3271,6 +3397,7 @@ alter table "public"."estoque_movimentos" validate constraint "estoque_movimento
 alter table "public"."estoque_saldos" add constraint "estoque_saldos_empresa_fkey" FOREIGN KEY (empresa_id) REFERENCES public.empresas(id) ON DELETE CASCADE not valid;
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
@@ -3279,6 +3406,7 @@ alter table "public"."estoque_saldos" validate constraint "estoque_saldos_empres
 alter table "public"."estoque_saldos" add constraint "estoque_saldos_produto_fkey" FOREIGN KEY (produto_id) REFERENCES public.produtos(id) ON DELETE CASCADE not valid;
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
@@ -3287,18 +3415,21 @@ alter table "public"."estoque_saldos" validate constraint "estoque_saldos_produt
 alter table "public"."estoque_saldos" add constraint "estoque_saldos_unique_produto" UNIQUE using index "estoque_saldos_unique_produto";
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
 alter table "public"."financeiro_centros_custos" add constraint "fin_ccustos_empresa_codigo_uk" UNIQUE using index "fin_ccustos_empresa_codigo_uk";
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
 alter table "public"."financeiro_centros_custos" add constraint "fin_ccustos_empresa_fkey" FOREIGN KEY (empresa_id) REFERENCES public.empresas(id) ON DELETE CASCADE not valid;
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
@@ -3307,12 +3438,14 @@ alter table "public"."financeiro_centros_custos" validate constraint "fin_ccusto
 alter table "public"."financeiro_centros_custos" add constraint "fin_ccustos_empresa_nome_parent_uk" UNIQUE using index "fin_ccustos_empresa_nome_parent_uk";
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
 alter table "public"."financeiro_centros_custos" add constraint "fin_ccustos_parent_fkey" FOREIGN KEY (parent_id) REFERENCES public.financeiro_centros_custos(id) ON DELETE RESTRICT not valid;
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
@@ -3321,6 +3454,7 @@ alter table "public"."financeiro_centros_custos" validate constraint "fin_ccusto
 alter table "public"."financeiro_centros_custos" add constraint "financeiro_centros_custos_tipo_check" CHECK ((tipo = ANY (ARRAY['receita'::text, 'despesa'::text, 'investimento'::text, 'outro'::text]))) not valid;
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
@@ -3329,6 +3463,7 @@ alter table "public"."financeiro_centros_custos" validate constraint "financeiro
 alter table "public"."financeiro_cobrancas_bancarias" add constraint "fin_cobr_cc_fkey" FOREIGN KEY (conta_corrente_id) REFERENCES public.financeiro_contas_correntes(id) ON DELETE SET NULL not valid;
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
@@ -3337,6 +3472,7 @@ alter table "public"."financeiro_cobrancas_bancarias" validate constraint "fin_c
 alter table "public"."financeiro_cobrancas_bancarias" add constraint "fin_cobr_cliente_fkey" FOREIGN KEY (cliente_id) REFERENCES public.pessoas(id) ON DELETE RESTRICT not valid;
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
@@ -3345,6 +3481,7 @@ alter table "public"."financeiro_cobrancas_bancarias" validate constraint "fin_c
 alter table "public"."financeiro_cobrancas_bancarias" add constraint "fin_cobr_emp_fkey" FOREIGN KEY (empresa_id) REFERENCES public.empresas(id) ON DELETE CASCADE not valid;
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
@@ -3353,6 +3490,7 @@ alter table "public"."financeiro_cobrancas_bancarias" validate constraint "fin_c
 alter table "public"."financeiro_cobrancas_bancarias" add constraint "financeiro_cobrancas_bancarias_status_check" CHECK ((status = ANY (ARRAY['pendente_emissao'::text, 'emitida'::text, 'registrada'::text, 'enviada'::text, 'liquidada'::text, 'baixada'::text, 'cancelada'::text, 'erro'::text]))) not valid;
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
@@ -3361,6 +3499,7 @@ alter table "public"."financeiro_cobrancas_bancarias" validate constraint "finan
 alter table "public"."financeiro_cobrancas_bancarias" add constraint "financeiro_cobrancas_bancarias_tipo_cobranca_check" CHECK ((tipo_cobranca = ANY (ARRAY['boleto'::text, 'pix'::text, 'carne'::text, 'link_pagamento'::text, 'outro'::text]))) not valid;
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
@@ -3369,6 +3508,7 @@ alter table "public"."financeiro_cobrancas_bancarias" validate constraint "finan
 alter table "public"."financeiro_cobrancas_bancarias" add constraint "financeiro_cobrancas_bancarias_valor_atual_check" CHECK ((valor_atual >= (0)::numeric)) not valid;
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
@@ -3377,6 +3517,7 @@ alter table "public"."financeiro_cobrancas_bancarias" validate constraint "finan
 alter table "public"."financeiro_cobrancas_bancarias" add constraint "financeiro_cobrancas_bancarias_valor_original_check" CHECK ((valor_original >= (0)::numeric)) not valid;
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
@@ -3385,6 +3526,7 @@ alter table "public"."financeiro_cobrancas_bancarias" validate constraint "finan
 alter table "public"."financeiro_cobrancas_bancarias_eventos" add constraint "fin_cobr_evt_cobr_fkey" FOREIGN KEY (cobranca_id) REFERENCES public.financeiro_cobrancas_bancarias(id) ON DELETE CASCADE not valid;
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
@@ -3393,6 +3535,7 @@ alter table "public"."financeiro_cobrancas_bancarias_eventos" validate constrain
 alter table "public"."financeiro_cobrancas_bancarias_eventos" add constraint "fin_cobr_evt_emp_fkey" FOREIGN KEY (empresa_id) REFERENCES public.empresas(id) ON DELETE CASCADE not valid;
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
@@ -3401,6 +3544,7 @@ alter table "public"."financeiro_cobrancas_bancarias_eventos" validate constrain
 alter table "public"."financeiro_contas_correntes" add constraint "fin_cc_empresa_fkey" FOREIGN KEY (empresa_id) REFERENCES public.empresas(id) ON DELETE CASCADE not valid;
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
@@ -3409,12 +3553,14 @@ alter table "public"."financeiro_contas_correntes" validate constraint "fin_cc_e
 alter table "public"."financeiro_contas_correntes" add constraint "fin_cc_empresa_nome_uk" UNIQUE using index "fin_cc_empresa_nome_uk";
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
 alter table "public"."financeiro_contas_correntes" add constraint "financeiro_contas_correntes_tipo_conta_check" CHECK ((tipo_conta = ANY (ARRAY['corrente'::text, 'poupanca'::text, 'carteira'::text, 'caixa'::text, 'outro'::text]))) not valid;
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
@@ -3423,6 +3569,7 @@ alter table "public"."financeiro_contas_correntes" validate constraint "financei
 alter table "public"."financeiro_contas_pagar" add constraint "financeiro_contas_pagar_desconto_check" CHECK ((desconto >= (0)::numeric)) not valid;
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
@@ -3431,6 +3578,7 @@ alter table "public"."financeiro_contas_pagar" validate constraint "financeiro_c
 alter table "public"."financeiro_contas_pagar" add constraint "financeiro_contas_pagar_juros_check" CHECK ((juros >= (0)::numeric)) not valid;
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
@@ -3439,6 +3587,7 @@ alter table "public"."financeiro_contas_pagar" validate constraint "financeiro_c
 alter table "public"."financeiro_contas_pagar" add constraint "financeiro_contas_pagar_multa_check" CHECK ((multa >= (0)::numeric)) not valid;
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
@@ -3447,6 +3596,7 @@ alter table "public"."financeiro_contas_pagar" validate constraint "financeiro_c
 alter table "public"."financeiro_contas_pagar" add constraint "financeiro_contas_pagar_status_check" CHECK ((status = ANY (ARRAY['aberta'::text, 'parcial'::text, 'paga'::text, 'cancelada'::text]))) not valid;
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
@@ -3455,6 +3605,7 @@ alter table "public"."financeiro_contas_pagar" validate constraint "financeiro_c
 alter table "public"."financeiro_contas_pagar" add constraint "financeiro_contas_pagar_valor_pago_check" CHECK ((valor_pago >= (0)::numeric)) not valid;
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
@@ -3463,6 +3614,7 @@ alter table "public"."financeiro_contas_pagar" validate constraint "financeiro_c
 alter table "public"."financeiro_contas_pagar" add constraint "financeiro_contas_pagar_valor_total_check" CHECK ((valor_total >= (0)::numeric)) not valid;
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
@@ -3471,6 +3623,7 @@ alter table "public"."financeiro_contas_pagar" validate constraint "financeiro_c
 alter table "public"."financeiro_contas_pagar" add constraint "financeiro_cp_empresa_fkey" FOREIGN KEY (empresa_id) REFERENCES public.empresas(id) ON DELETE CASCADE not valid;
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
@@ -3479,6 +3632,7 @@ alter table "public"."financeiro_contas_pagar" validate constraint "financeiro_c
 alter table "public"."financeiro_contas_pagar" add constraint "financeiro_cp_fornecedor_fkey" FOREIGN KEY (fornecedor_id) REFERENCES public.pessoas(id) ON DELETE RESTRICT not valid;
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
@@ -3487,6 +3641,7 @@ alter table "public"."financeiro_contas_pagar" validate constraint "financeiro_c
 alter table "public"."financeiro_extratos_bancarios" add constraint "fin_extrato_cc_fkey" FOREIGN KEY (conta_corrente_id) REFERENCES public.financeiro_contas_correntes(id) ON DELETE CASCADE not valid;
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
@@ -3495,6 +3650,7 @@ alter table "public"."financeiro_extratos_bancarios" validate constraint "fin_ex
 alter table "public"."financeiro_extratos_bancarios" add constraint "fin_extrato_empresa_fkey" FOREIGN KEY (empresa_id) REFERENCES public.empresas(id) ON DELETE CASCADE not valid;
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
@@ -3503,6 +3659,7 @@ alter table "public"."financeiro_extratos_bancarios" validate constraint "fin_ex
 alter table "public"."financeiro_extratos_bancarios" add constraint "fin_extrato_mov_fkey" FOREIGN KEY (movimentacao_id) REFERENCES public.financeiro_movimentacoes(id) ON DELETE SET NULL not valid;
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
@@ -3511,6 +3668,7 @@ alter table "public"."financeiro_extratos_bancarios" validate constraint "fin_ex
 alter table "public"."financeiro_extratos_bancarios" add constraint "financeiro_extratos_bancarios_tipo_lancamento_check" CHECK ((tipo_lancamento = ANY (ARRAY['credito'::text, 'debito'::text]))) not valid;
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
@@ -3519,6 +3677,7 @@ alter table "public"."financeiro_extratos_bancarios" validate constraint "financ
 alter table "public"."financeiro_extratos_bancarios" add constraint "financeiro_extratos_bancarios_valor_check" CHECK ((valor > (0)::numeric)) not valid;
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
@@ -3527,6 +3686,7 @@ alter table "public"."financeiro_extratos_bancarios" validate constraint "financ
 alter table "public"."financeiro_movimentacoes" add constraint "fin_mov_cc_fkey" FOREIGN KEY (conta_corrente_id) REFERENCES public.financeiro_contas_correntes(id) ON DELETE CASCADE not valid;
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
@@ -3535,6 +3695,7 @@ alter table "public"."financeiro_movimentacoes" validate constraint "fin_mov_cc_
 alter table "public"."financeiro_movimentacoes" add constraint "fin_mov_empresa_fkey" FOREIGN KEY (empresa_id) REFERENCES public.empresas(id) ON DELETE CASCADE not valid;
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
@@ -3543,6 +3704,7 @@ alter table "public"."financeiro_movimentacoes" validate constraint "fin_mov_emp
 alter table "public"."financeiro_movimentacoes" add constraint "financeiro_movimentacoes_tipo_mov_check" CHECK ((tipo_mov = ANY (ARRAY['entrada'::text, 'saida'::text]))) not valid;
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
@@ -3551,6 +3713,7 @@ alter table "public"."financeiro_movimentacoes" validate constraint "financeiro_
 alter table "public"."financeiro_movimentacoes" add constraint "financeiro_movimentacoes_valor_check" CHECK ((valor > (0)::numeric)) not valid;
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
@@ -3559,6 +3722,7 @@ alter table "public"."financeiro_movimentacoes" validate constraint "financeiro_
 alter table "public"."fiscal_nfe_import_items" add constraint "fiscal_nfe_imp_item_emp_fkey" FOREIGN KEY (empresa_id) REFERENCES public.empresas(id) ON DELETE CASCADE not valid;
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
@@ -3567,6 +3731,7 @@ alter table "public"."fiscal_nfe_import_items" validate constraint "fiscal_nfe_i
 alter table "public"."fiscal_nfe_import_items" add constraint "fiscal_nfe_imp_item_imp_fkey" FOREIGN KEY (import_id) REFERENCES public.fiscal_nfe_imports(id) ON DELETE CASCADE not valid;
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
@@ -3575,12 +3740,14 @@ alter table "public"."fiscal_nfe_import_items" validate constraint "fiscal_nfe_i
 alter table "public"."fiscal_nfe_imports" add constraint "fiscal_nfe_imp_emp_chave_uk" UNIQUE using index "fiscal_nfe_imp_emp_chave_uk";
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
 alter table "public"."fiscal_nfe_imports" add constraint "fiscal_nfe_imp_emp_fkey" FOREIGN KEY (empresa_id) REFERENCES public.empresas(id) ON DELETE CASCADE not valid;
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
@@ -3589,6 +3756,7 @@ alter table "public"."fiscal_nfe_imports" validate constraint "fiscal_nfe_imp_em
 alter table "public"."fiscal_nfe_imports" add constraint "fiscal_nfe_imports_origem_upload_check" CHECK ((origem_upload = ANY (ARRAY['xml'::text, 'danfe'::text]))) not valid;
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
@@ -3597,6 +3765,7 @@ alter table "public"."fiscal_nfe_imports" validate constraint "fiscal_nfe_import
 alter table "public"."fiscal_nfe_imports" add constraint "fiscal_nfe_imports_status_check" CHECK ((status = ANY (ARRAY['registrado'::text, 'processado'::text, 'erro'::text]))) not valid;
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
@@ -3605,12 +3774,14 @@ alter table "public"."fiscal_nfe_imports" validate constraint "fiscal_nfe_import
 alter table "public"."fornecedores" add constraint "fornecedores_unq" UNIQUE using index "fornecedores_unq";
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
 alter table "public"."industria_benef_componentes" add constraint "ind_benef_comp_empresa_fkey" FOREIGN KEY (empresa_id) REFERENCES public.empresas(id) ON DELETE CASCADE not valid;
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
@@ -3619,6 +3790,7 @@ alter table "public"."industria_benef_componentes" validate constraint "ind_bene
 alter table "public"."industria_benef_componentes" add constraint "ind_benef_comp_ordem_fkey" FOREIGN KEY (ordem_id) REFERENCES public.industria_benef_ordens(id) ON DELETE CASCADE not valid;
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
@@ -3627,6 +3799,7 @@ alter table "public"."industria_benef_componentes" validate constraint "ind_bene
 alter table "public"."industria_benef_componentes" add constraint "ind_benef_comp_produto_fkey" FOREIGN KEY (produto_id) REFERENCES public.produtos(id) ON DELETE RESTRICT not valid;
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
@@ -3635,6 +3808,7 @@ alter table "public"."industria_benef_componentes" validate constraint "ind_bene
 alter table "public"."industria_benef_entregas" add constraint "ind_benef_entregas_empresa_fkey" FOREIGN KEY (empresa_id) REFERENCES public.empresas(id) ON DELETE CASCADE not valid;
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
@@ -3643,6 +3817,7 @@ alter table "public"."industria_benef_entregas" validate constraint "ind_benef_e
 alter table "public"."industria_benef_entregas" add constraint "ind_benef_entregas_ordem_fkey" FOREIGN KEY (ordem_id) REFERENCES public.industria_benef_ordens(id) ON DELETE CASCADE not valid;
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
@@ -3651,6 +3826,7 @@ alter table "public"."industria_benef_entregas" validate constraint "ind_benef_e
 alter table "public"."industria_benef_entregas" add constraint "industria_benef_entregas_quantidade_entregue_check" CHECK ((quantidade_entregue > (0)::numeric)) not valid;
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
@@ -3659,6 +3835,7 @@ alter table "public"."industria_benef_entregas" validate constraint "industria_b
 alter table "public"."industria_benef_entregas" add constraint "industria_benef_entregas_status_faturamento_check" CHECK ((status_faturamento = ANY (ARRAY['nao_faturado'::text, 'pronto_para_faturar'::text, 'faturado'::text]))) not valid;
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
@@ -3667,6 +3844,7 @@ alter table "public"."industria_benef_entregas" validate constraint "industria_b
 alter table "public"."industria_benef_ordens" add constraint "ind_benef_ordens_cliente_fkey" FOREIGN KEY (cliente_id) REFERENCES public.pessoas(id) ON DELETE RESTRICT not valid;
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
@@ -3675,6 +3853,7 @@ alter table "public"."industria_benef_ordens" validate constraint "ind_benef_ord
 alter table "public"."industria_benef_ordens" add constraint "ind_benef_ordens_empresa_fkey" FOREIGN KEY (empresa_id) REFERENCES public.empresas(id) ON DELETE CASCADE not valid;
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
@@ -3683,6 +3862,7 @@ alter table "public"."industria_benef_ordens" validate constraint "ind_benef_ord
 alter table "public"."industria_benef_ordens" add constraint "ind_benef_ordens_matcli_fkey" FOREIGN KEY (produto_material_cliente_id) REFERENCES public.industria_materiais_cliente(id) ON DELETE RESTRICT not valid;
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
@@ -3691,6 +3871,7 @@ alter table "public"."industria_benef_ordens" validate constraint "ind_benef_ord
 alter table "public"."industria_benef_ordens" add constraint "ind_benef_ordens_servico_fkey" FOREIGN KEY (produto_servico_id) REFERENCES public.servicos(id) ON DELETE RESTRICT not valid;
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
@@ -3699,6 +3880,7 @@ alter table "public"."industria_benef_ordens" validate constraint "ind_benef_ord
 alter table "public"."industria_benef_ordens" add constraint "industria_benef_ordens_quantidade_planejada_check" CHECK ((quantidade_planejada > (0)::numeric)) not valid;
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
@@ -3707,6 +3889,7 @@ alter table "public"."industria_benef_ordens" validate constraint "industria_ben
 alter table "public"."industria_benef_ordens" add constraint "industria_benef_ordens_status_check" CHECK ((status = ANY (ARRAY['rascunho'::text, 'aguardando_material'::text, 'em_beneficiamento'::text, 'em_inspecao'::text, 'parcialmente_entregue'::text, 'concluida'::text, 'cancelada'::text]))) not valid;
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
@@ -3715,6 +3898,7 @@ alter table "public"."industria_benef_ordens" validate constraint "industria_ben
 alter table "public"."industria_boms" add constraint "industria_boms_empresa_fkey" FOREIGN KEY (empresa_id) REFERENCES public.empresas(id) ON DELETE CASCADE not valid;
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
@@ -3723,6 +3907,7 @@ alter table "public"."industria_boms" validate constraint "industria_boms_empres
 alter table "public"."industria_boms" add constraint "industria_boms_produto_fkey" FOREIGN KEY (produto_final_id) REFERENCES public.produtos(id) ON DELETE RESTRICT not valid;
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
@@ -3731,6 +3916,7 @@ alter table "public"."industria_boms" validate constraint "industria_boms_produt
 alter table "public"."industria_boms" add constraint "industria_boms_tipo_bom_check" CHECK ((tipo_bom = ANY (ARRAY['producao'::text, 'beneficiamento'::text]))) not valid;
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
@@ -3739,6 +3925,7 @@ alter table "public"."industria_boms" validate constraint "industria_boms_tipo_b
 alter table "public"."industria_boms_componentes" add constraint "industria_boms_comp_bom_fkey" FOREIGN KEY (bom_id) REFERENCES public.industria_boms(id) ON DELETE CASCADE not valid;
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
@@ -3747,6 +3934,7 @@ alter table "public"."industria_boms_componentes" validate constraint "industria
 alter table "public"."industria_boms_componentes" add constraint "industria_boms_comp_empresa_fkey" FOREIGN KEY (empresa_id) REFERENCES public.empresas(id) ON DELETE CASCADE not valid;
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
@@ -3755,6 +3943,7 @@ alter table "public"."industria_boms_componentes" validate constraint "industria
 alter table "public"."industria_boms_componentes" add constraint "industria_boms_comp_produto_fkey" FOREIGN KEY (produto_id) REFERENCES public.produtos(id) ON DELETE RESTRICT not valid;
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
@@ -3763,6 +3952,7 @@ alter table "public"."industria_boms_componentes" validate constraint "industria
 alter table "public"."industria_boms_componentes" add constraint "industria_boms_componentes_perda_percentual_check" CHECK (((perda_percentual >= (0)::numeric) AND (perda_percentual <= (100)::numeric))) not valid;
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
@@ -3771,6 +3961,7 @@ alter table "public"."industria_boms_componentes" validate constraint "industria
 alter table "public"."industria_boms_componentes" add constraint "industria_boms_componentes_quantidade_check" CHECK ((quantidade > (0)::numeric)) not valid;
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
@@ -3779,6 +3970,7 @@ alter table "public"."industria_boms_componentes" validate constraint "industria
 alter table "public"."industria_centros_trabalho" add constraint "industria_centros_trabalho_empresa_fkey" FOREIGN KEY (empresa_id) REFERENCES public.empresas(id) ON DELETE CASCADE not valid;
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
@@ -3787,6 +3979,7 @@ alter table "public"."industria_centros_trabalho" validate constraint "industria
 alter table "public"."industria_centros_trabalho" add constraint "industria_centros_trabalho_tipo_uso_check" CHECK ((tipo_uso = ANY (ARRAY['producao'::text, 'beneficiamento'::text, 'ambos'::text]))) not valid;
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
@@ -3795,6 +3988,7 @@ alter table "public"."industria_centros_trabalho" validate constraint "industria
 alter table "public"."industria_materiais_cliente" add constraint "ind_matcli_cliente_fkey" FOREIGN KEY (cliente_id) REFERENCES public.pessoas(id) ON DELETE RESTRICT not valid;
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
@@ -3803,12 +3997,14 @@ alter table "public"."industria_materiais_cliente" validate constraint "ind_matc
 alter table "public"."industria_materiais_cliente" add constraint "ind_matcli_emp_cli_prod_uk" UNIQUE using index "ind_matcli_emp_cli_prod_uk";
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
 alter table "public"."industria_materiais_cliente" add constraint "ind_matcli_empresa_fkey" FOREIGN KEY (empresa_id) REFERENCES public.empresas(id) ON DELETE CASCADE not valid;
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
@@ -3817,6 +4013,7 @@ alter table "public"."industria_materiais_cliente" validate constraint "ind_matc
 alter table "public"."industria_materiais_cliente" add constraint "ind_matcli_produto_fkey" FOREIGN KEY (produto_id) REFERENCES public.produtos(id) ON DELETE RESTRICT not valid;
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
@@ -3825,6 +4022,7 @@ alter table "public"."industria_materiais_cliente" validate constraint "ind_matc
 alter table "public"."industria_operacoes" add constraint "industria_operacoes_ct_fkey" FOREIGN KEY (centro_trabalho_id) REFERENCES public.industria_centros_trabalho(id) ON DELETE RESTRICT not valid;
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
@@ -3833,6 +4031,7 @@ alter table "public"."industria_operacoes" validate constraint "industria_operac
 alter table "public"."industria_operacoes" add constraint "industria_operacoes_empresa_fkey" FOREIGN KEY (empresa_id) REFERENCES public.empresas(id) ON DELETE CASCADE not valid;
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
@@ -3841,6 +4040,7 @@ alter table "public"."industria_operacoes" validate constraint "industria_operac
 alter table "public"."industria_operacoes" add constraint "industria_operacoes_roteiro_etapa_fkey" FOREIGN KEY (roteiro_etapa_id) REFERENCES public.industria_roteiros_etapas(id) ON DELETE RESTRICT not valid;
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
@@ -3849,6 +4049,7 @@ alter table "public"."industria_operacoes" validate constraint "industria_operac
 alter table "public"."industria_operacoes" add constraint "industria_operacoes_roteiro_fkey" FOREIGN KEY (roteiro_id) REFERENCES public.industria_roteiros(id) ON DELETE RESTRICT not valid;
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
@@ -3857,6 +4058,7 @@ alter table "public"."industria_operacoes" validate constraint "industria_operac
 alter table "public"."industria_operacoes" add constraint "industria_operacoes_status_check" CHECK ((status = ANY (ARRAY['planejada'::text, 'liberada'::text, 'em_execucao'::text, 'em_espera'::text, 'em_inspecao'::text, 'concluida'::text, 'cancelada'::text]))) not valid;
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
@@ -3865,6 +4067,7 @@ alter table "public"."industria_operacoes" validate constraint "industria_operac
 alter table "public"."industria_operacoes" add constraint "industria_operacoes_tipo_ordem_check" CHECK ((tipo_ordem = ANY (ARRAY['producao'::text, 'beneficiamento'::text]))) not valid;
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
@@ -3873,6 +4076,7 @@ alter table "public"."industria_operacoes" validate constraint "industria_operac
 alter table "public"."industria_operacoes_apontamentos" add constraint "industria_operacoes_apontamentos_acao_check" CHECK ((acao = ANY (ARRAY['iniciar'::text, 'pausar'::text, 'concluir'::text]))) not valid;
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
@@ -3881,6 +4085,7 @@ alter table "public"."industria_operacoes_apontamentos" validate constraint "ind
 alter table "public"."industria_operacoes_apontamentos" add constraint "industria_operacoes_apontamentos_empresa_fkey" FOREIGN KEY (empresa_id) REFERENCES public.empresas(id) ON DELETE CASCADE not valid;
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
@@ -3889,6 +4094,7 @@ alter table "public"."industria_operacoes_apontamentos" validate constraint "ind
 alter table "public"."industria_operacoes_apontamentos" add constraint "industria_operacoes_apontamentos_operacao_fkey" FOREIGN KEY (operacao_id) REFERENCES public.industria_operacoes(id) ON DELETE CASCADE not valid;
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
@@ -3897,6 +4103,7 @@ alter table "public"."industria_operacoes_apontamentos" validate constraint "ind
 alter table "public"."industria_ordem_componentes" add constraint "ind_ord_comp_empresa_fkey" FOREIGN KEY (empresa_id) REFERENCES public.empresas(id) ON DELETE CASCADE not valid;
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
@@ -3905,6 +4112,7 @@ alter table "public"."industria_ordem_componentes" validate constraint "ind_ord_
 alter table "public"."industria_ordem_componentes" add constraint "ind_ord_comp_ordem_fkey" FOREIGN KEY (ordem_id) REFERENCES public.industria_benef_ordens(id) ON DELETE CASCADE not valid;
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
@@ -3913,6 +4121,7 @@ alter table "public"."industria_ordem_componentes" validate constraint "ind_ord_
 alter table "public"."industria_ordem_componentes" add constraint "ind_ord_comp_produto_fkey" FOREIGN KEY (produto_id) REFERENCES public.produtos(id) ON DELETE RESTRICT not valid;
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
@@ -3921,6 +4130,7 @@ alter table "public"."industria_ordem_componentes" validate constraint "ind_ord_
 alter table "public"."industria_ordem_componentes" add constraint "industria_ordem_componentes_quantidade_check" CHECK ((quantidade > (0)::numeric)) not valid;
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
@@ -3929,6 +4139,7 @@ alter table "public"."industria_ordem_componentes" validate constraint "industri
 alter table "public"."industria_ordem_entregas" add constraint "ind_ord_ent_empresa_fkey" FOREIGN KEY (empresa_id) REFERENCES public.empresas(id) ON DELETE CASCADE not valid;
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
@@ -3937,6 +4148,7 @@ alter table "public"."industria_ordem_entregas" validate constraint "ind_ord_ent
 alter table "public"."industria_ordem_entregas" add constraint "ind_ord_ent_ordem_fkey" FOREIGN KEY (ordem_id) REFERENCES public.industria_benef_ordens(id) ON DELETE CASCADE not valid;
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
@@ -3945,6 +4157,7 @@ alter table "public"."industria_ordem_entregas" validate constraint "ind_ord_ent
 alter table "public"."industria_ordem_entregas" add constraint "industria_ordem_entregas_quantidade_entregue_check" CHECK ((quantidade_entregue >= (0)::numeric)) not valid;
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
@@ -3953,6 +4166,7 @@ alter table "public"."industria_ordem_entregas" validate constraint "industria_o
 alter table "public"."industria_ordens" add constraint "industria_ordens_cliente_fkey" FOREIGN KEY (cliente_id) REFERENCES public.pessoas(id) ON DELETE RESTRICT not valid;
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
@@ -3961,6 +4175,7 @@ alter table "public"."industria_ordens" validate constraint "industria_ordens_cl
 alter table "public"."industria_ordens" add constraint "industria_ordens_empresa_fkey" FOREIGN KEY (empresa_id) REFERENCES public.empresas(id) ON DELETE CASCADE not valid;
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
@@ -3969,6 +4184,7 @@ alter table "public"."industria_ordens" validate constraint "industria_ordens_em
 alter table "public"."industria_ordens" add constraint "industria_ordens_produto_fkey" FOREIGN KEY (produto_final_id) REFERENCES public.produtos(id) ON DELETE RESTRICT not valid;
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
@@ -3977,6 +4193,7 @@ alter table "public"."industria_ordens" validate constraint "industria_ordens_pr
 alter table "public"."industria_ordens" add constraint "industria_ordens_quantidade_planejada_check" CHECK ((quantidade_planejada > (0)::numeric)) not valid;
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
@@ -3985,6 +4202,7 @@ alter table "public"."industria_ordens" validate constraint "industria_ordens_qu
 alter table "public"."industria_ordens" add constraint "industria_ordens_status_check" CHECK ((status = ANY (ARRAY['rascunho'::text, 'planejada'::text, 'em_programacao'::text, 'em_producao'::text, 'em_inspecao'::text, 'parcialmente_concluida'::text, 'concluida'::text, 'cancelada'::text]))) not valid;
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
@@ -3993,6 +4211,7 @@ alter table "public"."industria_ordens" validate constraint "industria_ordens_st
 alter table "public"."industria_ordens" add constraint "industria_ordens_tipo_ordem_check" CHECK ((tipo_ordem = ANY (ARRAY['industrializacao'::text, 'beneficiamento'::text]))) not valid;
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
@@ -4001,6 +4220,7 @@ alter table "public"."industria_ordens" validate constraint "industria_ordens_ti
 alter table "public"."industria_ordens_componentes" add constraint "industria_componentes_empresa_fkey" FOREIGN KEY (empresa_id) REFERENCES public.empresas(id) ON DELETE CASCADE not valid;
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
@@ -4009,6 +4229,7 @@ alter table "public"."industria_ordens_componentes" validate constraint "industr
 alter table "public"."industria_ordens_componentes" add constraint "industria_componentes_ordem_fkey" FOREIGN KEY (ordem_id) REFERENCES public.industria_ordens(id) ON DELETE CASCADE not valid;
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
@@ -4017,6 +4238,7 @@ alter table "public"."industria_ordens_componentes" validate constraint "industr
 alter table "public"."industria_ordens_componentes" add constraint "industria_componentes_produto_fkey" FOREIGN KEY (produto_id) REFERENCES public.produtos(id) ON DELETE RESTRICT not valid;
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
@@ -4025,6 +4247,7 @@ alter table "public"."industria_ordens_componentes" validate constraint "industr
 alter table "public"."industria_ordens_entregas" add constraint "industria_entregas_empresa_fkey" FOREIGN KEY (empresa_id) REFERENCES public.empresas(id) ON DELETE CASCADE not valid;
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
@@ -4033,6 +4256,7 @@ alter table "public"."industria_ordens_entregas" validate constraint "industria_
 alter table "public"."industria_ordens_entregas" add constraint "industria_entregas_ordem_fkey" FOREIGN KEY (ordem_id) REFERENCES public.industria_ordens(id) ON DELETE CASCADE not valid;
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
@@ -4041,6 +4265,7 @@ alter table "public"."industria_ordens_entregas" validate constraint "industria_
 alter table "public"."industria_ordens_entregas" add constraint "industria_ordens_entregas_quantidade_entregue_check" CHECK ((quantidade_entregue > (0)::numeric)) not valid;
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
@@ -4049,6 +4274,7 @@ alter table "public"."industria_ordens_entregas" validate constraint "industria_
 alter table "public"."industria_ordens_entregas" add constraint "industria_ordens_entregas_status_faturamento_check" CHECK ((status_faturamento = ANY (ARRAY['nao_faturado'::text, 'pronto_para_faturar'::text, 'faturado'::text]))) not valid;
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
@@ -4057,6 +4283,7 @@ alter table "public"."industria_ordens_entregas" validate constraint "industria_
 alter table "public"."industria_producao_componentes" add constraint "ind_prod_comp_empresa_fkey" FOREIGN KEY (empresa_id) REFERENCES public.empresas(id) ON DELETE CASCADE not valid;
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
@@ -4065,6 +4292,7 @@ alter table "public"."industria_producao_componentes" validate constraint "ind_p
 alter table "public"."industria_producao_componentes" add constraint "ind_prod_comp_ordem_fkey" FOREIGN KEY (ordem_id) REFERENCES public.industria_producao_ordens(id) ON DELETE CASCADE not valid;
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
@@ -4073,6 +4301,7 @@ alter table "public"."industria_producao_componentes" validate constraint "ind_p
 alter table "public"."industria_producao_componentes" add constraint "ind_prod_comp_produto_fkey" FOREIGN KEY (produto_id) REFERENCES public.produtos(id) ON DELETE RESTRICT not valid;
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
@@ -4081,6 +4310,7 @@ alter table "public"."industria_producao_componentes" validate constraint "ind_p
 alter table "public"."industria_producao_entregas" add constraint "ind_prod_entregas_empresa_fkey" FOREIGN KEY (empresa_id) REFERENCES public.empresas(id) ON DELETE CASCADE not valid;
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
@@ -4089,6 +4319,7 @@ alter table "public"."industria_producao_entregas" validate constraint "ind_prod
 alter table "public"."industria_producao_entregas" add constraint "ind_prod_entregas_ordem_fkey" FOREIGN KEY (ordem_id) REFERENCES public.industria_producao_ordens(id) ON DELETE CASCADE not valid;
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
@@ -4097,6 +4328,7 @@ alter table "public"."industria_producao_entregas" validate constraint "ind_prod
 alter table "public"."industria_producao_entregas" add constraint "industria_producao_entregas_quantidade_entregue_check" CHECK ((quantidade_entregue > (0)::numeric)) not valid;
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
@@ -4105,6 +4337,7 @@ alter table "public"."industria_producao_entregas" validate constraint "industri
 alter table "public"."industria_producao_ordens" add constraint "ind_prod_ordens_empresa_fkey" FOREIGN KEY (empresa_id) REFERENCES public.empresas(id) ON DELETE CASCADE not valid;
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
@@ -4113,6 +4346,7 @@ alter table "public"."industria_producao_ordens" validate constraint "ind_prod_o
 alter table "public"."industria_producao_ordens" add constraint "ind_prod_ordens_produto_fkey" FOREIGN KEY (produto_final_id) REFERENCES public.produtos(id) ON DELETE RESTRICT not valid;
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
@@ -4121,6 +4355,7 @@ alter table "public"."industria_producao_ordens" validate constraint "ind_prod_o
 alter table "public"."industria_producao_ordens" add constraint "industria_producao_ordens_origem_ordem_check" CHECK ((origem_ordem = ANY (ARRAY['manual'::text, 'venda'::text, 'reposicao'::text, 'mrp'::text]))) not valid;
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
@@ -4129,6 +4364,7 @@ alter table "public"."industria_producao_ordens" validate constraint "industria_
 alter table "public"."industria_producao_ordens" add constraint "industria_producao_ordens_quantidade_planejada_check" CHECK ((quantidade_planejada > (0)::numeric)) not valid;
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
@@ -4137,6 +4373,7 @@ alter table "public"."industria_producao_ordens" validate constraint "industria_
 alter table "public"."industria_producao_ordens" add constraint "industria_producao_ordens_status_check" CHECK ((status = ANY (ARRAY['rascunho'::text, 'planejada'::text, 'em_programacao'::text, 'em_producao'::text, 'em_inspecao'::text, 'concluida'::text, 'cancelada'::text]))) not valid;
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
@@ -4145,6 +4382,7 @@ alter table "public"."industria_producao_ordens" validate constraint "industria_
 alter table "public"."industria_roteiros" add constraint "industria_roteiros_empresa_fkey" FOREIGN KEY (empresa_id) REFERENCES public.empresas(id) ON DELETE CASCADE not valid;
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
@@ -4153,6 +4391,7 @@ alter table "public"."industria_roteiros" validate constraint "industria_roteiro
 alter table "public"."industria_roteiros" add constraint "industria_roteiros_produto_fkey" FOREIGN KEY (produto_id) REFERENCES public.produtos(id) ON DELETE RESTRICT not valid;
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
@@ -4161,6 +4400,7 @@ alter table "public"."industria_roteiros" validate constraint "industria_roteiro
 alter table "public"."industria_roteiros" add constraint "industria_roteiros_tipo_bom_check" CHECK ((tipo_bom = ANY (ARRAY['producao'::text, 'beneficiamento'::text]))) not valid;
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
@@ -4169,6 +4409,7 @@ alter table "public"."industria_roteiros" validate constraint "industria_roteiro
 alter table "public"."industria_roteiros_etapas" add constraint "industria_roteiros_etapas_ct_fkey" FOREIGN KEY (centro_trabalho_id) REFERENCES public.industria_centros_trabalho(id) ON DELETE RESTRICT not valid;
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
@@ -4177,6 +4418,7 @@ alter table "public"."industria_roteiros_etapas" validate constraint "industria_
 alter table "public"."industria_roteiros_etapas" add constraint "industria_roteiros_etapas_empresa_fkey" FOREIGN KEY (empresa_id) REFERENCES public.empresas(id) ON DELETE CASCADE not valid;
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
@@ -4185,6 +4427,7 @@ alter table "public"."industria_roteiros_etapas" validate constraint "industria_
 alter table "public"."industria_roteiros_etapas" add constraint "industria_roteiros_etapas_roteiro_fkey" FOREIGN KEY (roteiro_id) REFERENCES public.industria_roteiros(id) ON DELETE CASCADE not valid;
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
@@ -4193,6 +4436,7 @@ alter table "public"."industria_roteiros_etapas" validate constraint "industria_
 alter table "public"."industria_roteiros_etapas" add constraint "industria_roteiros_etapas_tipo_operacao_check" CHECK ((tipo_operacao = ANY (ARRAY['setup'::text, 'producao'::text, 'inspecao'::text, 'embalagem'::text, 'outro'::text]))) not valid;
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
@@ -4201,18 +4445,21 @@ alter table "public"."industria_roteiros_etapas" validate constraint "industria_
 alter table "public"."linhas_produto" add constraint "linhas_produto_unq" UNIQUE using index "linhas_produto_unq";
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
 alter table "public"."logistica_transportadoras" add constraint "logistica_transportadoras_empresa_codigo_uk" UNIQUE using index "logistica_transportadoras_empresa_codigo_uk";
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
 alter table "public"."logistica_transportadoras" add constraint "logistica_transportadoras_empresa_fkey" FOREIGN KEY (empresa_id) REFERENCES public.empresas(id) ON DELETE CASCADE not valid;
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
@@ -4221,6 +4468,7 @@ alter table "public"."logistica_transportadoras" validate constraint "logistica_
 alter table "public"."logistica_transportadoras" add constraint "logistica_transportadoras_frete_tipo_padrao_check" CHECK ((frete_tipo_padrao = ANY (ARRAY['cif'::text, 'fob'::text, 'terceiros'::text, 'nao_definido'::text]))) not valid;
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
@@ -4229,6 +4477,7 @@ alter table "public"."logistica_transportadoras" validate constraint "logistica_
 alter table "public"."logistica_transportadoras" add constraint "logistica_transportadoras_modal_principal_check" CHECK ((modal_principal = ANY (ARRAY['rodoviario'::text, 'aereo'::text, 'maritimo'::text, 'ferroviario'::text, 'courier'::text, 'outro'::text]))) not valid;
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
@@ -4237,6 +4486,7 @@ alter table "public"."logistica_transportadoras" validate constraint "logistica_
 alter table "public"."logistica_transportadoras" add constraint "logistica_transportadoras_pessoa_fkey" FOREIGN KEY (pessoa_id) REFERENCES public.pessoas(id) ON DELETE RESTRICT not valid;
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
@@ -4245,6 +4495,7 @@ alter table "public"."logistica_transportadoras" validate constraint "logistica_
 alter table "public"."logistica_transportadoras" add constraint "logistica_transportadoras_tipo_pessoa_check" CHECK ((tipo_pessoa = ANY (ARRAY['pf'::text, 'pj'::text, 'nao_definido'::text]))) not valid;
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
@@ -4253,12 +4504,14 @@ alter table "public"."logistica_transportadoras" validate constraint "logistica_
 alter table "public"."marcas" add constraint "marcas_nome_unique_per_company" UNIQUE using index "marcas_nome_unique_per_company";
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
 alter table "public"."metas_vendas" add constraint "data_fim_maior_que_inicio" CHECK ((data_fim >= data_inicio)) not valid;
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
@@ -4267,6 +4520,7 @@ alter table "public"."metas_vendas" validate constraint "data_fim_maior_que_inic
 alter table "public"."metas_vendas" add constraint "metas_vendas_empresa_id_fkey" FOREIGN KEY (empresa_id) REFERENCES public.empresas(id) ON DELETE CASCADE not valid;
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
@@ -4275,6 +4529,7 @@ alter table "public"."metas_vendas" validate constraint "metas_vendas_empresa_id
 alter table "public"."metas_vendas" add constraint "metas_vendas_responsavel_id_fkey" FOREIGN KEY (responsavel_id) REFERENCES auth.users(id) ON DELETE SET NULL not valid;
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
@@ -4283,6 +4538,7 @@ alter table "public"."metas_vendas" validate constraint "metas_vendas_responsave
 alter table "public"."metas_vendas" add constraint "metas_vendas_valor_atingido_check" CHECK ((valor_atingido >= (0)::numeric)) not valid;
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
@@ -4291,6 +4547,7 @@ alter table "public"."metas_vendas" validate constraint "metas_vendas_valor_atin
 alter table "public"."metas_vendas" add constraint "metas_vendas_valor_meta_check" CHECK ((valor_meta >= (0)::numeric)) not valid;
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
@@ -4299,6 +4556,7 @@ alter table "public"."metas_vendas" validate constraint "metas_vendas_valor_meta
 alter table "public"."metas_vendas" add constraint "valor_meta_maior_que_atingido" CHECK ((valor_meta >= valor_atingido)) not valid;
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
@@ -4307,6 +4565,7 @@ alter table "public"."metas_vendas" validate constraint "valor_meta_maior_que_at
 alter table "public"."ordem_servico_itens" add constraint "ordem_servico_itens_empresa_id_fkey" FOREIGN KEY (empresa_id) REFERENCES public.empresas(id) ON DELETE CASCADE not valid;
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
@@ -4315,6 +4574,7 @@ alter table "public"."ordem_servico_itens" validate constraint "ordem_servico_it
 alter table "public"."ordem_servico_itens" add constraint "ordem_servico_itens_ordem_servico_id_fkey" FOREIGN KEY (ordem_servico_id) REFERENCES public.ordem_servicos(id) ON DELETE CASCADE not valid;
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
@@ -4323,6 +4583,7 @@ alter table "public"."ordem_servico_itens" validate constraint "ordem_servico_it
 alter table "public"."ordem_servico_parcelas" add constraint "ordem_servico_parcelas_empresa_id_fkey" FOREIGN KEY (empresa_id) REFERENCES public.empresas(id) ON DELETE CASCADE not valid;
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
@@ -4331,12 +4592,14 @@ alter table "public"."ordem_servico_parcelas" validate constraint "ordem_servico
 alter table "public"."ordem_servico_parcelas" add constraint "ordem_servico_parcelas_empresa_id_ordem_servico_id_numero_p_key" UNIQUE using index "ordem_servico_parcelas_empresa_id_ordem_servico_id_numero_p_key";
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
 alter table "public"."ordem_servico_parcelas" add constraint "ordem_servico_parcelas_ordem_servico_id_fkey" FOREIGN KEY (ordem_servico_id) REFERENCES public.ordem_servicos(id) ON DELETE CASCADE not valid;
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
@@ -4345,6 +4608,7 @@ alter table "public"."ordem_servico_parcelas" validate constraint "ordem_servico
 alter table "public"."ordem_servicos" add constraint "ordem_servicos_empresa_id_fkey" FOREIGN KEY (empresa_id) REFERENCES public.empresas(id) ON DELETE CASCADE not valid;
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
@@ -4353,12 +4617,14 @@ alter table "public"."ordem_servicos" validate constraint "ordem_servicos_empres
 alter table "public"."ordem_servicos" add constraint "ordem_servicos_empresa_id_numero_key" UNIQUE using index "ordem_servicos_empresa_id_numero_key";
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
 alter table "public"."permissions" add constraint "ck_action" CHECK ((action = ANY (ARRAY['view'::text, 'create'::text, 'update'::text, 'delete'::text, 'manage'::text]))) not valid;
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
@@ -4367,12 +4633,14 @@ alter table "public"."permissions" validate constraint "ck_action";
 alter table "public"."permissions" add constraint "uq_permissions" UNIQUE using index "uq_permissions";
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
 alter table "public"."pessoa_contatos" add constraint "pessoa_contatos_empresa_id_fkey" FOREIGN KEY (empresa_id) REFERENCES public.empresas(id) ON DELETE CASCADE not valid;
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
@@ -4381,6 +4649,7 @@ alter table "public"."pessoa_contatos" validate constraint "pessoa_contatos_empr
 alter table "public"."pessoa_contatos" add constraint "pessoa_contatos_pessoa_id_fkey" FOREIGN KEY (pessoa_id) REFERENCES public.pessoas(id) ON DELETE CASCADE not valid;
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
@@ -4389,6 +4658,7 @@ alter table "public"."pessoa_contatos" validate constraint "pessoa_contatos_pess
 alter table "public"."pessoa_enderecos" add constraint "pessoa_enderecos_empresa_id_fkey" FOREIGN KEY (empresa_id) REFERENCES public.empresas(id) ON DELETE CASCADE not valid;
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
@@ -4397,6 +4667,7 @@ alter table "public"."pessoa_enderecos" validate constraint "pessoa_enderecos_em
 alter table "public"."pessoa_enderecos" add constraint "pessoa_enderecos_pessoa_id_fkey" FOREIGN KEY (pessoa_id) REFERENCES public.pessoas(id) ON DELETE CASCADE not valid;
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
@@ -4405,6 +4676,7 @@ alter table "public"."pessoa_enderecos" validate constraint "pessoa_enderecos_pe
 alter table "public"."pessoas" add constraint "pessoas_empresa_id_fkey" FOREIGN KEY (empresa_id) REFERENCES public.empresas(id) ON DELETE CASCADE not valid;
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
@@ -4413,6 +4685,7 @@ alter table "public"."pessoas" validate constraint "pessoas_empresa_id_fkey";
 alter table "public"."plans" add constraint "plans_billing_cycle_check" CHECK ((billing_cycle = ANY (ARRAY['monthly'::text, 'yearly'::text]))) not valid;
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
@@ -4421,24 +4694,28 @@ alter table "public"."plans" validate constraint "plans_billing_cycle_check";
 alter table "public"."plans" add constraint "plans_slug_billing_cycle_key" UNIQUE using index "plans_slug_billing_cycle_key";
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
 alter table "public"."plans" add constraint "plans_stripe_price_id_key" UNIQUE using index "plans_stripe_price_id_key";
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
 alter table "public"."produto_anuncios" add constraint "anuncio_identificador_unique" UNIQUE using index "anuncio_identificador_unique";
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
 alter table "public"."produto_anuncios" add constraint "produto_anuncios_ecommerce_id_fkey" FOREIGN KEY (ecommerce_id) REFERENCES public.ecommerces(id) ON DELETE CASCADE not valid;
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
@@ -4447,6 +4724,7 @@ alter table "public"."produto_anuncios" validate constraint "produto_anuncios_ec
 alter table "public"."produto_anuncios" add constraint "produto_anuncios_preco_especifico_check" CHECK (((preco_especifico IS NULL) OR (preco_especifico >= (0)::numeric))) not valid;
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
@@ -4455,6 +4733,7 @@ alter table "public"."produto_anuncios" validate constraint "produto_anuncios_pr
 alter table "public"."produto_anuncios" add constraint "produto_anuncios_produto_id_fkey" FOREIGN KEY (produto_id) REFERENCES public.produtos(id) ON DELETE CASCADE not valid;
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
@@ -4463,6 +4742,7 @@ alter table "public"."produto_anuncios" validate constraint "produto_anuncios_pr
 alter table "public"."produto_atributos" add constraint "produto_atributos_atributo_id_fkey" FOREIGN KEY (atributo_id) REFERENCES public.atributos(id) ON DELETE CASCADE not valid;
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
@@ -4471,6 +4751,7 @@ alter table "public"."produto_atributos" validate constraint "produto_atributos_
 alter table "public"."produto_atributos" add constraint "produto_atributos_produto_id_fkey" FOREIGN KEY (produto_id) REFERENCES public.produtos(id) ON DELETE CASCADE not valid;
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
@@ -4479,12 +4760,14 @@ alter table "public"."produto_atributos" validate constraint "produto_atributos_
 alter table "public"."produto_atributos" add constraint "produto_atributos_unq" UNIQUE using index "produto_atributos_unq";
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
 alter table "public"."produto_componentes" add constraint "produto_componentes_componente_id_fkey" FOREIGN KEY (componente_id) REFERENCES public.produtos(id) ON DELETE RESTRICT not valid;
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
@@ -4493,6 +4776,7 @@ alter table "public"."produto_componentes" validate constraint "produto_componen
 alter table "public"."produto_componentes" add constraint "produto_componentes_kit_id_fkey" FOREIGN KEY (kit_id) REFERENCES public.produtos(id) ON DELETE CASCADE not valid;
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
@@ -4501,6 +4785,7 @@ alter table "public"."produto_componentes" validate constraint "produto_componen
 alter table "public"."produto_componentes" add constraint "produto_componentes_quantidade_check" CHECK ((quantidade > (0)::numeric)) not valid;
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
@@ -4509,6 +4794,7 @@ alter table "public"."produto_componentes" validate constraint "produto_componen
 alter table "public"."produto_fornecedores" add constraint "produto_fornecedores_fornecedor_id_fkey" FOREIGN KEY (fornecedor_id) REFERENCES public.fornecedores(id) ON DELETE RESTRICT not valid;
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
@@ -4517,6 +4803,7 @@ alter table "public"."produto_fornecedores" validate constraint "produto_fornece
 alter table "public"."produto_fornecedores" add constraint "produto_fornecedores_produto_id_fkey" FOREIGN KEY (produto_id) REFERENCES public.produtos(id) ON DELETE CASCADE not valid;
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
@@ -4525,6 +4812,7 @@ alter table "public"."produto_fornecedores" validate constraint "produto_fornece
 alter table "public"."produto_imagens" add constraint "produto_imagens_produto_id_fkey" FOREIGN KEY (produto_id) REFERENCES public.produtos(id) ON DELETE CASCADE not valid;
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
@@ -4533,6 +4821,7 @@ alter table "public"."produto_imagens" validate constraint "produto_imagens_prod
 alter table "public"."produto_tags" add constraint "produto_tags_produto_id_fkey" FOREIGN KEY (produto_id) REFERENCES public.produtos(id) ON DELETE CASCADE not valid;
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
@@ -4541,6 +4830,7 @@ alter table "public"."produto_tags" validate constraint "produto_tags_produto_id
 alter table "public"."produto_tags" add constraint "produto_tags_tag_id_fkey" FOREIGN KEY (tag_id) REFERENCES public.tags(id) ON DELETE CASCADE not valid;
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
@@ -4555,6 +4845,7 @@ CASE
 END) not valid;
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
@@ -4563,6 +4854,7 @@ alter table "public"."produtos" validate constraint "ck_env_pack_dims";
 alter table "public"."produtos" add constraint "fk_produto_pai" FOREIGN KEY (produto_pai_id) REFERENCES public.produtos(id) ON DELETE SET NULL not valid;
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
@@ -4571,6 +4863,7 @@ alter table "public"."produtos" validate constraint "fk_produto_pai";
 alter table "public"."produtos" add constraint "fk_produtos_linha_produto" FOREIGN KEY (linha_produto_id) REFERENCES public.linhas_produto(id) ON DELETE SET NULL not valid;
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
@@ -4579,6 +4872,7 @@ alter table "public"."produtos" validate constraint "fk_produtos_linha_produto";
 alter table "public"."produtos" add constraint "produtos_altura_cm_check" CHECK ((altura_cm >= (0)::numeric)) not valid;
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
@@ -4587,6 +4881,7 @@ alter table "public"."produtos" validate constraint "produtos_altura_cm_check";
 alter table "public"."produtos" add constraint "produtos_comprimento_cm_check" CHECK ((comprimento_cm >= (0)::numeric)) not valid;
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
@@ -4595,6 +4890,7 @@ alter table "public"."produtos" validate constraint "produtos_comprimento_cm_che
 alter table "public"."produtos" add constraint "produtos_diametro_cm_check" CHECK ((diametro_cm >= (0)::numeric)) not valid;
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
@@ -4603,6 +4899,7 @@ alter table "public"."produtos" validate constraint "produtos_diametro_cm_check"
 alter table "public"."produtos" add constraint "produtos_dias_preparacao_check" CHECK (((dias_preparacao >= 0) AND (dias_preparacao <= 365))) not valid;
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
@@ -4611,6 +4908,7 @@ alter table "public"."produtos" validate constraint "produtos_dias_preparacao_ch
 alter table "public"."produtos" add constraint "produtos_estoque_max_check" CHECK ((estoque_max >= (0)::numeric)) not valid;
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
@@ -4619,6 +4917,7 @@ alter table "public"."produtos" validate constraint "produtos_estoque_max_check"
 alter table "public"."produtos" add constraint "produtos_estoque_min_check" CHECK ((estoque_min >= (0)::numeric)) not valid;
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
@@ -4627,6 +4926,7 @@ alter table "public"."produtos" validate constraint "produtos_estoque_min_check"
 alter table "public"."produtos" add constraint "produtos_fator_conversao_check" CHECK (((fator_conversao IS NULL) OR (fator_conversao > (0)::numeric))) not valid;
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
@@ -4635,6 +4935,7 @@ alter table "public"."produtos" validate constraint "produtos_fator_conversao_ch
 alter table "public"."produtos" add constraint "produtos_garantia_meses_check" CHECK (((garantia_meses IS NULL) OR ((garantia_meses >= 0) AND (garantia_meses <= 120)))) not valid;
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
@@ -4643,6 +4944,7 @@ alter table "public"."produtos" validate constraint "produtos_garantia_meses_che
 alter table "public"."produtos" add constraint "produtos_icms_origem_check" CHECK (((icms_origem >= 0) AND (icms_origem <= 8))) not valid;
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
@@ -4651,6 +4953,7 @@ alter table "public"."produtos" validate constraint "produtos_icms_origem_check"
 alter table "public"."produtos" add constraint "produtos_itens_por_caixa_check" CHECK ((itens_por_caixa >= 0)) not valid;
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
@@ -4659,6 +4962,7 @@ alter table "public"."produtos" validate constraint "produtos_itens_por_caixa_ch
 alter table "public"."produtos" add constraint "produtos_largura_cm_check" CHECK ((largura_cm >= (0)::numeric)) not valid;
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
@@ -4667,6 +4971,7 @@ alter table "public"."produtos" validate constraint "produtos_largura_cm_check";
 alter table "public"."produtos" add constraint "produtos_markup_check" CHECK ((markup >= (0)::numeric)) not valid;
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
@@ -4675,6 +4980,7 @@ alter table "public"."produtos" validate constraint "produtos_markup_check";
 alter table "public"."produtos" add constraint "produtos_nome_check" CHECK (((char_length(nome) >= 1) AND (char_length(nome) <= 255))) not valid;
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
@@ -4683,6 +4989,7 @@ alter table "public"."produtos" validate constraint "produtos_nome_check";
 alter table "public"."produtos" add constraint "produtos_num_volumes_check" CHECK ((num_volumes >= 0)) not valid;
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
@@ -4691,6 +4998,7 @@ alter table "public"."produtos" validate constraint "produtos_num_volumes_check"
 alter table "public"."produtos" add constraint "produtos_peso_bruto_kg_check" CHECK ((peso_bruto_kg >= (0)::numeric)) not valid;
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
@@ -4699,6 +5007,7 @@ alter table "public"."produtos" validate constraint "produtos_peso_bruto_kg_chec
 alter table "public"."produtos" add constraint "produtos_peso_liquido_kg_check" CHECK ((peso_liquido_kg >= (0)::numeric)) not valid;
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
@@ -4707,6 +5016,7 @@ alter table "public"."produtos" validate constraint "produtos_peso_liquido_kg_ch
 alter table "public"."produtos" add constraint "produtos_preco_custo_check" CHECK (((preco_custo IS NULL) OR (preco_custo >= (0)::numeric))) not valid;
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
@@ -4715,6 +5025,7 @@ alter table "public"."produtos" validate constraint "produtos_preco_custo_check"
 alter table "public"."produtos" add constraint "produtos_preco_venda_check" CHECK ((preco_venda >= (0)::numeric)) not valid;
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
@@ -4723,6 +5034,7 @@ alter table "public"."produtos" validate constraint "produtos_preco_venda_check"
 alter table "public"."produtos" add constraint "produtos_unidade_check" CHECK (((char_length(unidade) >= 1) AND (char_length(unidade) <= 8))) not valid;
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
@@ -4731,6 +5043,7 @@ alter table "public"."produtos" validate constraint "produtos_unidade_check";
 alter table "public"."produtos" add constraint "produtos_valor_ipi_fixo_check" CHECK (((valor_ipi_fixo IS NULL) OR (valor_ipi_fixo >= (0)::numeric))) not valid;
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
@@ -4739,6 +5052,7 @@ alter table "public"."produtos" validate constraint "produtos_valor_ipi_fixo_che
 alter table "public"."profiles" add constraint "profiles_id_fkey" FOREIGN KEY (id) REFERENCES auth.users(id) ON DELETE CASCADE not valid;
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
@@ -4747,6 +5061,7 @@ alter table "public"."profiles" validate constraint "profiles_id_fkey";
 alter table "public"."recebimento_conferencias" add constraint "recebimento_conf_empresa_fkey" FOREIGN KEY (empresa_id) REFERENCES public.empresas(id) ON DELETE CASCADE not valid;
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
@@ -4755,6 +5070,7 @@ alter table "public"."recebimento_conferencias" validate constraint "recebimento
 alter table "public"."recebimento_conferencias" add constraint "recebimento_conf_item_fkey" FOREIGN KEY (recebimento_item_id) REFERENCES public.recebimento_itens(id) ON DELETE CASCADE not valid;
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
@@ -4763,12 +5079,14 @@ alter table "public"."recebimento_conferencias" validate constraint "recebimento
 alter table "public"."recebimento_conferencias" add constraint "recebimento_conf_unique" UNIQUE using index "recebimento_conf_unique";
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
 alter table "public"."recebimento_itens" add constraint "recebimento_itens_empresa_fkey" FOREIGN KEY (empresa_id) REFERENCES public.empresas(id) ON DELETE CASCADE not valid;
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
@@ -4777,6 +5095,7 @@ alter table "public"."recebimento_itens" validate constraint "recebimento_itens_
 alter table "public"."recebimento_itens" add constraint "recebimento_itens_fiscal_item_fkey" FOREIGN KEY (fiscal_nfe_item_id) REFERENCES public.fiscal_nfe_import_items(id) ON DELETE CASCADE not valid;
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
@@ -4785,6 +5104,7 @@ alter table "public"."recebimento_itens" validate constraint "recebimento_itens_
 alter table "public"."recebimento_itens" add constraint "recebimento_itens_produto_fkey" FOREIGN KEY (produto_id) REFERENCES public.produtos(id) ON DELETE SET NULL not valid;
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
@@ -4793,6 +5113,7 @@ alter table "public"."recebimento_itens" validate constraint "recebimento_itens_
 alter table "public"."recebimento_itens" add constraint "recebimento_itens_recebimento_fkey" FOREIGN KEY (recebimento_id) REFERENCES public.recebimentos(id) ON DELETE CASCADE not valid;
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
@@ -4801,6 +5122,7 @@ alter table "public"."recebimento_itens" validate constraint "recebimento_itens_
 alter table "public"."recebimento_itens" add constraint "recebimento_itens_status_check" CHECK ((status = ANY (ARRAY['pendente'::text, 'ok'::text, 'divergente'::text]))) not valid;
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
@@ -4809,6 +5131,7 @@ alter table "public"."recebimento_itens" validate constraint "recebimento_itens_
 alter table "public"."recebimentos" add constraint "recebimentos_empresa_fkey" FOREIGN KEY (empresa_id) REFERENCES public.empresas(id) ON DELETE CASCADE not valid;
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
@@ -4817,6 +5140,7 @@ alter table "public"."recebimentos" validate constraint "recebimentos_empresa_fk
 alter table "public"."recebimentos" add constraint "recebimentos_import_fkey" FOREIGN KEY (fiscal_nfe_import_id) REFERENCES public.fiscal_nfe_imports(id) ON DELETE CASCADE not valid;
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
@@ -4825,12 +5149,14 @@ alter table "public"."recebimentos" validate constraint "recebimentos_import_fke
 alter table "public"."recebimentos" add constraint "recebimentos_import_unique" UNIQUE using index "recebimentos_import_unique";
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
 alter table "public"."recebimentos" add constraint "recebimentos_responsavel_id_fkey" FOREIGN KEY (responsavel_id) REFERENCES auth.users(id) not valid;
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
@@ -4839,6 +5165,7 @@ alter table "public"."recebimentos" validate constraint "recebimentos_responsave
 alter table "public"."recebimentos" add constraint "recebimentos_status_check" CHECK ((status = ANY (ARRAY['pendente'::text, 'em_conferencia'::text, 'divergente'::text, 'concluido'::text, 'cancelado'::text]))) not valid;
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
@@ -4847,6 +5174,7 @@ alter table "public"."recebimentos" validate constraint "recebimentos_status_che
 alter table "public"."rh_cargo_competencias" add constraint "rh_cargo_competencias_cargo_fkey" FOREIGN KEY (cargo_id) REFERENCES public.rh_cargos(id) ON DELETE CASCADE not valid;
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
@@ -4855,6 +5183,7 @@ alter table "public"."rh_cargo_competencias" validate constraint "rh_cargo_compe
 alter table "public"."rh_cargo_competencias" add constraint "rh_cargo_competencias_comp_fkey" FOREIGN KEY (competencia_id) REFERENCES public.rh_competencias(id) ON DELETE CASCADE not valid;
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
@@ -4863,6 +5192,7 @@ alter table "public"."rh_cargo_competencias" validate constraint "rh_cargo_compe
 alter table "public"."rh_cargo_competencias" add constraint "rh_cargo_competencias_empresa_id_fkey" FOREIGN KEY (empresa_id) REFERENCES public.empresas(id) ON DELETE CASCADE not valid;
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
@@ -4871,6 +5201,7 @@ alter table "public"."rh_cargo_competencias" validate constraint "rh_cargo_compe
 alter table "public"."rh_cargo_competencias" add constraint "rh_cargo_competencias_nivel_requerido_check" CHECK (((nivel_requerido >= 1) AND (nivel_requerido <= 5))) not valid;
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
@@ -4879,12 +5210,14 @@ alter table "public"."rh_cargo_competencias" validate constraint "rh_cargo_compe
 alter table "public"."rh_cargo_competencias" add constraint "rh_cargo_competencias_unique" UNIQUE using index "rh_cargo_competencias_unique";
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
 alter table "public"."rh_cargos" add constraint "rh_cargos_empresa_id_fkey" FOREIGN KEY (empresa_id) REFERENCES public.empresas(id) ON DELETE CASCADE not valid;
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
@@ -4893,12 +5226,14 @@ alter table "public"."rh_cargos" validate constraint "rh_cargos_empresa_id_fkey"
 alter table "public"."rh_cargos" add constraint "rh_cargos_empresa_nome_key" UNIQUE using index "rh_cargos_empresa_nome_key";
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
 alter table "public"."rh_colaborador_competencias" add constraint "rh_col_competencias_colab_fkey" FOREIGN KEY (colaborador_id) REFERENCES public.rh_colaboradores(id) ON DELETE CASCADE not valid;
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
@@ -4907,6 +5242,7 @@ alter table "public"."rh_colaborador_competencias" validate constraint "rh_col_c
 alter table "public"."rh_colaborador_competencias" add constraint "rh_col_competencias_comp_fkey" FOREIGN KEY (competencia_id) REFERENCES public.rh_competencias(id) ON DELETE CASCADE not valid;
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
@@ -4915,6 +5251,7 @@ alter table "public"."rh_colaborador_competencias" validate constraint "rh_col_c
 alter table "public"."rh_colaborador_competencias" add constraint "rh_col_competencias_empresa_id_fkey" FOREIGN KEY (empresa_id) REFERENCES public.empresas(id) ON DELETE CASCADE not valid;
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
@@ -4923,12 +5260,14 @@ alter table "public"."rh_colaborador_competencias" validate constraint "rh_col_c
 alter table "public"."rh_colaborador_competencias" add constraint "rh_col_competencias_unique" UNIQUE using index "rh_col_competencias_unique";
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
 alter table "public"."rh_colaborador_competencias" add constraint "rh_colaborador_competencias_nivel_atual_check" CHECK (((nivel_atual >= 1) AND (nivel_atual <= 5))) not valid;
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
@@ -4937,6 +5276,7 @@ alter table "public"."rh_colaborador_competencias" validate constraint "rh_colab
 alter table "public"."rh_colaboradores" add constraint "rh_colaboradores_cargo_id_fkey" FOREIGN KEY (cargo_id) REFERENCES public.rh_cargos(id) ON DELETE SET NULL not valid;
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
@@ -4945,6 +5285,7 @@ alter table "public"."rh_colaboradores" validate constraint "rh_colaboradores_ca
 alter table "public"."rh_colaboradores" add constraint "rh_colaboradores_empresa_id_fkey" FOREIGN KEY (empresa_id) REFERENCES public.empresas(id) ON DELETE CASCADE not valid;
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
@@ -4953,6 +5294,7 @@ alter table "public"."rh_colaboradores" validate constraint "rh_colaboradores_em
 alter table "public"."rh_colaboradores" add constraint "rh_colaboradores_user_id_fkey" FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE SET NULL not valid;
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
@@ -4961,6 +5303,7 @@ alter table "public"."rh_colaboradores" validate constraint "rh_colaboradores_us
 alter table "public"."rh_competencias" add constraint "rh_competencias_empresa_id_fkey" FOREIGN KEY (empresa_id) REFERENCES public.empresas(id) ON DELETE CASCADE not valid;
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
@@ -4969,12 +5312,14 @@ alter table "public"."rh_competencias" validate constraint "rh_competencias_empr
 alter table "public"."rh_competencias" add constraint "rh_competencias_empresa_nome_key" UNIQUE using index "rh_competencias_empresa_nome_key";
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
 alter table "public"."rh_competencias" add constraint "rh_competencias_tipo_check" CHECK ((tipo = ANY (ARRAY['tecnica'::text, 'comportamental'::text, 'certificacao'::text, 'idioma'::text, 'outros'::text]))) not valid;
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
@@ -4983,6 +5328,7 @@ alter table "public"."rh_competencias" validate constraint "rh_competencias_tipo
 alter table "public"."rh_treinamento_participantes" add constraint "rh_treinamento_part_colab_fkey" FOREIGN KEY (colaborador_id) REFERENCES public.rh_colaboradores(id) ON DELETE CASCADE not valid;
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
@@ -4991,6 +5337,7 @@ alter table "public"."rh_treinamento_participantes" validate constraint "rh_trei
 alter table "public"."rh_treinamento_participantes" add constraint "rh_treinamento_part_empresa_fkey" FOREIGN KEY (empresa_id) REFERENCES public.empresas(id) ON DELETE CASCADE not valid;
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
@@ -4999,6 +5346,7 @@ alter table "public"."rh_treinamento_participantes" validate constraint "rh_trei
 alter table "public"."rh_treinamento_participantes" add constraint "rh_treinamento_part_treino_fkey" FOREIGN KEY (treinamento_id) REFERENCES public.rh_treinamentos(id) ON DELETE CASCADE not valid;
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
@@ -5007,6 +5355,7 @@ alter table "public"."rh_treinamento_participantes" validate constraint "rh_trei
 alter table "public"."rh_treinamento_participantes" add constraint "rh_treinamento_participantes_status_check" CHECK ((status = ANY (ARRAY['inscrito'::text, 'confirmado'::text, 'concluido'::text, 'reprovado'::text, 'ausente'::text]))) not valid;
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
@@ -5015,12 +5364,14 @@ alter table "public"."rh_treinamento_participantes" validate constraint "rh_trei
 alter table "public"."rh_treinamento_participantes" add constraint "rh_treinamento_participantes_unique" UNIQUE using index "rh_treinamento_participantes_unique";
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
 alter table "public"."rh_treinamentos" add constraint "rh_treinamentos_empresa_fkey" FOREIGN KEY (empresa_id) REFERENCES public.empresas(id) ON DELETE CASCADE not valid;
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
@@ -5029,6 +5380,7 @@ alter table "public"."rh_treinamentos" validate constraint "rh_treinamentos_empr
 alter table "public"."rh_treinamentos" add constraint "rh_treinamentos_status_check" CHECK ((status = ANY (ARRAY['planejado'::text, 'agendado'::text, 'em_andamento'::text, 'concluido'::text, 'cancelado'::text]))) not valid;
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
@@ -5037,6 +5389,7 @@ alter table "public"."rh_treinamentos" validate constraint "rh_treinamentos_stat
 alter table "public"."rh_treinamentos" add constraint "rh_treinamentos_tipo_check" CHECK ((tipo = ANY (ARRAY['interno'::text, 'externo'::text, 'online'::text, 'on_the_job'::text]))) not valid;
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
@@ -5045,6 +5398,7 @@ alter table "public"."rh_treinamentos" validate constraint "rh_treinamentos_tipo
 alter table "public"."role_permissions" add constraint "role_permissions_permission_id_fkey" FOREIGN KEY (permission_id) REFERENCES public.permissions(id) ON DELETE CASCADE not valid;
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
@@ -5053,6 +5407,7 @@ alter table "public"."role_permissions" validate constraint "role_permissions_pe
 alter table "public"."role_permissions" add constraint "role_permissions_role_id_fkey" FOREIGN KEY (role_id) REFERENCES public.roles(id) ON DELETE CASCADE not valid;
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
@@ -5061,12 +5416,14 @@ alter table "public"."role_permissions" validate constraint "role_permissions_ro
 alter table "public"."roles" add constraint "roles_slug_key" UNIQUE using index "roles_slug_key";
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
 alter table "public"."servicos" add constraint "servicos_empresa_id_fkey" FOREIGN KEY (empresa_id) REFERENCES public.empresas(id) ON DELETE CASCADE not valid;
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
@@ -5075,6 +5432,7 @@ alter table "public"."servicos" validate constraint "servicos_empresa_id_fkey";
 alter table "public"."subscriptions" add constraint "subscriptions_billing_cycle_check" CHECK ((billing_cycle = ANY (ARRAY['monthly'::text, 'yearly'::text]))) not valid;
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
@@ -5083,6 +5441,7 @@ alter table "public"."subscriptions" validate constraint "subscriptions_billing_
 alter table "public"."subscriptions" add constraint "subscriptions_empresa_id_fkey" FOREIGN KEY (empresa_id) REFERENCES public.empresas(id) ON DELETE CASCADE not valid;
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
@@ -5091,12 +5450,14 @@ alter table "public"."subscriptions" validate constraint "subscriptions_empresa_
 alter table "public"."subscriptions" add constraint "subscriptions_empresa_id_key" UNIQUE using index "subscriptions_empresa_id_key";
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
 alter table "public"."subscriptions" add constraint "subscriptions_status_check" CHECK ((status = ANY (ARRAY['trialing'::text, 'active'::text, 'past_due'::text, 'canceled'::text, 'unpaid'::text, 'incomplete'::text, 'incomplete_expired'::text]))) not valid;
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
@@ -5105,24 +5466,28 @@ alter table "public"."subscriptions" validate constraint "subscriptions_status_c
 alter table "public"."subscriptions" add constraint "subscriptions_stripe_subscription_id_key" UNIQUE using index "subscriptions_stripe_subscription_id_key";
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
 alter table "public"."tabelas_medidas" add constraint "tabelas_medidas_nome_unique_per_company" UNIQUE using index "tabelas_medidas_nome_unique_per_company";
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
 alter table "public"."tags" add constraint "tags_unique_per_company" UNIQUE using index "tags_unique_per_company";
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
 alter table "public"."transportadoras" add constraint "transportadoras_empresa_id_fkey" FOREIGN KEY (empresa_id) REFERENCES public.empresas(id) ON DELETE CASCADE not valid;
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
@@ -5131,6 +5496,7 @@ alter table "public"."transportadoras" validate constraint "transportadoras_empr
 alter table "public"."user_active_empresa" add constraint "user_active_empresa_empresa_id_fkey" FOREIGN KEY (empresa_id) REFERENCES public.empresas(id) ON DELETE CASCADE not valid;
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
@@ -5139,6 +5505,7 @@ alter table "public"."user_active_empresa" validate constraint "user_active_empr
 alter table "public"."user_active_empresa" add constraint "user_active_empresa_user_id_fkey" FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE not valid;
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
@@ -5147,6 +5514,7 @@ alter table "public"."user_active_empresa" validate constraint "user_active_empr
 alter table "public"."user_permission_overrides" add constraint "user_permission_overrides_empresa_id_fkey" FOREIGN KEY (empresa_id) REFERENCES public.empresas(id) ON DELETE CASCADE not valid;
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
@@ -5155,6 +5523,7 @@ alter table "public"."user_permission_overrides" validate constraint "user_permi
 alter table "public"."user_permission_overrides" add constraint "user_permission_overrides_permission_id_fkey" FOREIGN KEY (permission_id) REFERENCES public.permissions(id) ON DELETE CASCADE not valid;
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
@@ -5163,6 +5532,7 @@ alter table "public"."user_permission_overrides" validate constraint "user_permi
 alter table "public"."vendas_itens_pedido" add constraint "vendas_itens_pedido_desconto_check" CHECK ((desconto >= (0)::numeric)) not valid;
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
@@ -5171,6 +5541,7 @@ alter table "public"."vendas_itens_pedido" validate constraint "vendas_itens_ped
 alter table "public"."vendas_itens_pedido" add constraint "vendas_itens_pedido_empresa_fkey" FOREIGN KEY (empresa_id) REFERENCES public.empresas(id) ON DELETE CASCADE not valid;
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
@@ -5179,6 +5550,7 @@ alter table "public"."vendas_itens_pedido" validate constraint "vendas_itens_ped
 alter table "public"."vendas_itens_pedido" add constraint "vendas_itens_pedido_pedido_fkey" FOREIGN KEY (pedido_id) REFERENCES public.vendas_pedidos(id) ON DELETE CASCADE not valid;
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
@@ -5187,6 +5559,7 @@ alter table "public"."vendas_itens_pedido" validate constraint "vendas_itens_ped
 alter table "public"."vendas_itens_pedido" add constraint "vendas_itens_pedido_preco_unitario_check" CHECK ((preco_unitario >= (0)::numeric)) not valid;
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
@@ -5195,6 +5568,7 @@ alter table "public"."vendas_itens_pedido" validate constraint "vendas_itens_ped
 alter table "public"."vendas_itens_pedido" add constraint "vendas_itens_pedido_produto_fkey" FOREIGN KEY (produto_id) REFERENCES public.produtos(id) ON DELETE RESTRICT not valid;
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
@@ -5203,6 +5577,7 @@ alter table "public"."vendas_itens_pedido" validate constraint "vendas_itens_ped
 alter table "public"."vendas_itens_pedido" add constraint "vendas_itens_pedido_quantidade_check" CHECK ((quantidade > (0)::numeric)) not valid;
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
@@ -5211,6 +5586,7 @@ alter table "public"."vendas_itens_pedido" validate constraint "vendas_itens_ped
 alter table "public"."vendas_itens_pedido" add constraint "vendas_itens_pedido_total_check" CHECK ((total >= (0)::numeric)) not valid;
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
@@ -5219,6 +5595,7 @@ alter table "public"."vendas_itens_pedido" validate constraint "vendas_itens_ped
 alter table "public"."vendas_pedidos" add constraint "vendas_pedidos_cliente_fkey" FOREIGN KEY (cliente_id) REFERENCES public.pessoas(id) ON DELETE RESTRICT not valid;
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
@@ -5227,6 +5604,7 @@ alter table "public"."vendas_pedidos" validate constraint "vendas_pedidos_client
 alter table "public"."vendas_pedidos" add constraint "vendas_pedidos_desconto_check" CHECK ((desconto >= (0)::numeric)) not valid;
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
@@ -5235,6 +5613,7 @@ alter table "public"."vendas_pedidos" validate constraint "vendas_pedidos_descon
 alter table "public"."vendas_pedidos" add constraint "vendas_pedidos_empresa_fkey" FOREIGN KEY (empresa_id) REFERENCES public.empresas(id) ON DELETE CASCADE not valid;
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
@@ -5243,12 +5622,14 @@ alter table "public"."vendas_pedidos" validate constraint "vendas_pedidos_empres
 alter table "public"."vendas_pedidos" add constraint "vendas_pedidos_empresa_numero_uk" UNIQUE using index "vendas_pedidos_empresa_numero_uk";
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
 alter table "public"."vendas_pedidos" add constraint "vendas_pedidos_frete_check" CHECK ((frete >= (0)::numeric)) not valid;
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
@@ -5257,6 +5638,7 @@ alter table "public"."vendas_pedidos" validate constraint "vendas_pedidos_frete_
 alter table "public"."vendas_pedidos" add constraint "vendas_pedidos_status_check" CHECK ((status = ANY (ARRAY['orcamento'::text, 'aprovado'::text, 'cancelado'::text, 'concluido'::text]))) not valid;
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
@@ -5265,6 +5647,7 @@ alter table "public"."vendas_pedidos" validate constraint "vendas_pedidos_status
 alter table "public"."vendas_pedidos" add constraint "vendas_pedidos_total_geral_check" CHECK ((total_geral >= (0)::numeric)) not valid;
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 DO $$ BEGIN
 
@@ -5273,6 +5656,7 @@ alter table "public"."vendas_pedidos" validate constraint "vendas_pedidos_total_
 alter table "public"."vendas_pedidos" add constraint "vendas_pedidos_total_produtos_check" CHECK ((total_produtos >= (0)::numeric)) not valid;
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
 END $$;
 
 alter table "public"."vendas_pedidos" validate constraint "vendas_pedidos_total_produtos_check";
