@@ -1,11 +1,13 @@
-name: apply-baseline-to-verify
+name: apply-baseline-verify
+
 on:
   workflow_dispatch:
 
 jobs:
-  baseline-verify:
-    name: Apply BASELINE to VERIFY (patched)
+  apply-baseline-to-verify:
+    name: Apply BASELINE to VERIFY (patched ENUMs)
     runs-on: ubuntu-latest
+
     env:
       SUPABASE_DB_URL_VERIFY: ${{ secrets.SUPABASE_DB_URL_VERIFY }}
 
@@ -16,115 +18,73 @@ jobs:
       - name: Install PostgreSQL client
         run: |
           set -euo pipefail
-          sudo apt-get update
+          sudo apt-get update -y
           sudo apt-get install -y postgresql-client
 
-      - name: Locate baseline
-        id: locate
+      - name: Patch baseline (remove CREATE TYPE dos 3 ENUMs)
+        id: patch
+        shell: bash
         run: |
           set -euo pipefail
-          BASELINE="$(ls -1 supabase/migrations/*_baseline.sql | head -n 1 || true)"
-          if [ -z "${BASELINE:-}" ]; then
-            echo "Nenhum *_baseline.sql em supabase/migrations"; exit 1
+
+          # Localiza o primeiro baseline no diretório
+          BASELINE="$(ls -1 supabase/migrations/*_baseline.sql | head -n 1)"
+          if [[ -z "${BASELINE:-}" || ! -f "$BASELINE" ]]; then
+            echo "Baseline não encontrado em supabase/migrations/*_baseline.sql"
+            exit 1
           fi
-          echo "BASELINE=$BASELINE" >> "$GITHUB_ENV"
-          echo "Baseline: $BASELINE"
 
-      - name: Prelude (cria schema audit e ENUMs se faltarem)
-        run: |
-          set -euo pipefail
-          psql "$SUPABASE_DB_URL_VERIFY" -v ON_ERROR_STOP=1 <<'SQL'
-          -- schema audit
-          DO $$
-          BEGIN
-            IF NOT EXISTS (SELECT 1 FROM pg_namespace WHERE nspname='audit') THEN
-              EXECUTE 'CREATE SCHEMA audit';
-            END IF;
-          END $$;
+          OUT="${BASELINE%.sql}.patched.sql"
+          cp "$BASELINE" "$OUT"
 
-          -- ENUM: meta_tipo
-          DO $$
-          BEGIN
-            IF NOT EXISTS (
-              SELECT 1
-              FROM pg_type t JOIN pg_namespace n ON n.oid = t.typnamespace
-              WHERE t.typtype='e' AND t.typname='meta_tipo' AND n.nspname='public'
-            ) THEN
-              EXECUTE 'CREATE TYPE public.meta_tipo AS ENUM (''mensal'',''trimestral'',''anual'')';
-            END IF;
-          END $$;
-
-          -- ENUM: billing_cycle
-          DO $$
-          BEGIN
-            IF NOT EXISTS (
-              SELECT 1
-              FROM pg_type t JOIN pg_namespace n ON n.oid = t.typnamespace
-              WHERE t.typtype='e' AND t.typname='billing_cycle' AND n.nspname='public'
-            ) THEN
-              EXECUTE 'CREATE TYPE public.billing_cycle AS ENUM (''monthly'',''yearly'')';
-            END IF;
-          END $$;
-
-          -- ENUM: contribuinte_icms_enum
-          DO $$
-          BEGIN
-            IF NOT EXISTS (
-              SELECT 1
-              FROM pg_type t JOIN pg_namespace n ON n.oid = t.typnamespace
-              WHERE t.typtype='e' AND t.typname='contribuinte_icms_enum' AND n.nspname='public'
-            ) THEN
-              EXECUTE 'CREATE TYPE public.contribuinte_icms_enum AS ENUM (''contribuinte'',''nao_contribuinte'')';
-            END IF;
-          END $$;
-          SQL
-
-      - name: Patch baseline (remover quaisquer CREATE TYPE dos 3 ENUMs)
-        run: |
-          set -euo pipefail
-          IN="$BASELINE"
-          OUT="${IN%.sql}.patched.sql"
-          cp "$IN" "$OUT"
-
-          # Stripper robusto: ignora CREATE TYPE (com ou sem aspas/schema) até a linha de fechamento );
+          # Função: remove bloco CREATE TYPE ... AS ENUM (...) até a linha que fecha com ');
           strip_enum () {
-            local ENUM="$1"
-            awk -v IGNORECASE=1 -v ENUM="$ENUM" '
+            local ENUM_NAME="$1"
+            local TMP="${OUT}.tmp"
+
+            # Explicação:
+            #  - Match simples por 'CREATE TYPE (public.)?ENUM_NAME AS ENUM (' (ignorando espaços)
+            #  - Entra em 'inblk=1' e ignora até encontrar linha com ');'
+            #  - Evita classes [:<:] [:>:] que quebram em alguns awk
+            awk -v ENUM_NAME="$ENUM_NAME" '
               BEGIN { inblk=0 }
               {
-                if (inblk) {
-                  if ($0 ~ /\)\s*;\s*$/) { inblk=0 }
-                  next
-                }
-                # MATCH exemplos:
-                # CREATE TYPE billing_cycle AS ENUM (
-                # CREATE TYPE "billing_cycle" AS ENUM (
-                # CREATE TYPE public.billing_cycle AS ENUM (
-                # CREATE TYPE "public"."billing_cycle" AS ENUM (
-                if ($0 ~ /^[[:space:]]*CREATE[[:space:]]+TYPE[[:space:]]+.*([."[:space:]]|^) *"?ENUM"?"? *$/) { } # só pra não dar erro de sintaxe no awk antigo
-                if ($0 ~ /^[[:space:]]*CREATE[[:space:]]+TYPE[[:space:]]+/) {
-                  # procura o nome do enum na linha
-                  if ($0 ~ ("[[:<:]]" ENUM "[[:>:]]")) {
-                    # e exige AS ENUM na mesma linha
-                    if ($0 ~ /AS[[:space:]]+ENUM[[:space:]]*\(/) { inblk=1; next }
-                  }
-                }
-                print
+                line=$0
+                # normaliza múltiplos espaços para comparação (somente para detecção)
+                norm=line
+                gsub(/\t/," ",norm)
+                gsub(/  +/," ",norm)
               }
-            ' "$OUT" > "${OUT}.tmp" && mv "${OUT}.tmp" "$OUT"
+              inblk == 0 && norm ~ /^[[:space:]]*CREATE TYPE[[:space:]]+(public\.)?/ && norm ~ (" " ENUM_NAME " ") && norm ~ / AS ENUM[[:space:]]*\(/ {
+                inblk=1
+                next
+              }
+              inblk == 1 {
+                if ($0 ~ /\)\s*;\s*$/) { inblk=0 }
+                next
+              }
+              { print }
+            ' "$OUT" > "$TMP"
+
+            mv "$TMP" "$OUT"
           }
 
+          # Remove os 3 enums problemáticos (idempotente; se não existir, nada é removido)
           for e in meta_tipo billing_cycle contribuinte_icms_enum; do
             echo "[PATCH] Removendo bloco CREATE TYPE: $e"
             strip_enum "$e"
           done
 
-          echo "PATCHED_BASELINE=$OUT" >> "$GITHUB_ENV"
-          echo "Arquivo patchado em: $OUT"
-          sed -n '1,40p' "$OUT" || true
+          echo "baseline_patched=$OUT" >> "$GITHUB_OUTPUT"
 
       - name: Apply PATCHED BASELINE
+        shell: bash
         run: |
           set -euo pipefail
-          psql "$SUPABASE_DB_URL_VERIFY" -v ON_ERROR_STOP=1 -f "$PATCHED_BASELINE"
-          echo "[VERIFY] Baseline aplicada com sucesso."
+          FILE="${{ steps.patch.outputs.baseline_patched }}"
+          if [[ -z "${FILE:-}" || ! -f "$FILE" ]]; then
+            echo "Arquivo patchado não encontrado."
+            exit 1
+          fi
+          # Aplica com falha imediata em qualquer erro
+          psql "$SUPABASE_DB_URL_VERIFY" -v ON_ERROR_STOP=1 -f "$FILE"
