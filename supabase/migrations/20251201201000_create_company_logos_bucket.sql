@@ -6,8 +6,8 @@ INSERT INTO storage.buckets (id, name, public)
 VALUES ('company_logos', 'company_logos', true)
 ON CONFLICT (id) DO NOTHING;
 
--- 2. Enable RLS on storage.objects (standard practice, usually already enabled)
-ALTER TABLE storage.objects ENABLE ROW LEVEL SECURITY;
+-- 2. Enable RLS on storage.objects (Skipped: usually already enabled and requires high privileges)
+-- ALTER TABLE storage.objects ENABLE ROW LEVEL SECURITY;
 
 -- 3. Policies
 
