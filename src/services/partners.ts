@@ -69,20 +69,24 @@ export async function savePartner(payload: PartnerPayload): Promise<PartnerDetai
       limite_credito: payload.pessoa.limite_credito,
       condicao_pagamento: payload.pessoa.condicao_pagamento,
       informacoes_bancarias: payload.pessoa.informacoes_bancarias,
+      contato_tags: payload.pessoa.contato_tags || [], // Ensure array to avoid scalar error
     };
 
     const cleanedPayload = {
       pessoa: pessoaPayload,
-      enderecos: payload.enderecos?.map(e => ({...e, cep: e.cep?.replace(/\D/g, '') || null})) || [],
-      contatos: payload.contatos?.map(c => ({...c, telefone: c.telefone?.replace(/\D/g, '') || null})) || [],
+      enderecos: payload.enderecos?.map(e => ({ ...e, cep: e.cep?.replace(/\D/g, '') || null })) || [],
+      contatos: payload.contatos?.map(c => ({ ...c, telefone: c.telefone?.replace(/\D/g, '') || null })) || [],
     };
 
     const data = await callRpc<PartnerDetails>('create_update_partner', { p_payload: cleanedPayload });
     return data;
   } catch (error: any) {
     console.error('[SERVICE][SAVE_PARTNER][ERROR]', error);
-    if (error.message && error.message.includes('ux_pessoas_empresa_id_doc_unico')) {
-        throw new Error('Já existe um parceiro com este documento (CPF/CNPJ).');
+    if (error.message && (
+      error.message.includes('ux_pessoas_empresa_id_doc_unico') ||
+      error.message.includes('idx_pessoas_empresa_id_doc_unico_not_null')
+    )) {
+      throw new Error('Já existe um parceiro com este documento (CPF/CNPJ).');
     }
     throw error;
   }
@@ -127,12 +131,12 @@ export async function getPartners(options: {
 export async function getPartnerDetails(id: string): Promise<PartnerDetails | null> {
   try {
     const rpcResponse = await callRpc<PartnerDetails | PartnerDetails[]>('get_partner_details', { p_id: id });
-    
+
     const data = Array.isArray(rpcResponse) ? rpcResponse[0] : rpcResponse;
 
     if (data) {
-        data.enderecos = data.enderecos || [];
-        data.contatos = data.contatos || [];
+      data.enderecos = data.enderecos || [];
+      data.contatos = data.contatos || [];
     }
     return data || null;
   } catch (error) {
