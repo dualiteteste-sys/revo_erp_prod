@@ -19,8 +19,8 @@ const tipoProdutoOptions: { value: tipo_produto; label: string }[] = [
 ];
 
 const statusProdutoOptions: { value: status_produto; label: string }[] = [
-    { value: 'ativo', label: 'Ativo' },
-    { value: 'inativo', label: 'Inativo' },
+  { value: 'ativo', label: 'Ativo' },
+  { value: 'inativo', label: 'Inativo' },
 ];
 
 interface FormErrors {
@@ -31,9 +31,10 @@ interface DadosGeraisTabProps {
   data: ProductFormData;
   onChange: (field: keyof ProductFormData, value: any) => void;
   errors: FormErrors;
+  isService?: boolean;
 }
 
-const DadosGeraisTab: React.FC<DadosGeraisTabProps> = ({ data, onChange, errors }) => {
+const DadosGeraisTab: React.FC<DadosGeraisTabProps> = ({ data, onChange, errors, isService }) => {
   const precoVendaProps = useNumericField(data.preco_venda, (value) => onChange('preco_venda', value));
   const estoqueMinProps = useNumericField(data.estoque_min, (value) => onChange('estoque_min', value));
   const estoqueMaxProps = useNumericField(data.estoque_max, (value) => onChange('estoque_max', value));
@@ -42,136 +43,142 @@ const DadosGeraisTab: React.FC<DadosGeraisTabProps> = ({ data, onChange, errors 
     <div>
       <Section
         title="Identificação"
-        description="Informações básicas para identificar seu produto."
+        description={`Informações básicas para identificar seu ${isService ? 'serviço' : 'produto'}.`}
       >
         <Input
-            label={<>Nome do Produto <span className="text-red-500">*</span></>}
-            name="nome"
-            value={data.nome || ''}
-            onChange={(e) => onChange('nome', e.target.value)}
-            required
-            className="sm:col-span-6"
-            placeholder="Ex: Camiseta de Algodão Pima"
-            error={errors.nome}
+          label={<>Nome do {isService ? 'Serviço' : 'Produto'} <span className="text-red-500">*</span></>}
+          name="nome"
+          value={data.nome || ''}
+          onChange={(e) => onChange('nome', e.target.value)}
+          required
+          className="sm:col-span-6"
+          placeholder={isService ? "Ex: Corte e Costura" : "Ex: Camiseta de Algodão Pima"}
+          error={errors.nome}
         />
         <Input
-            label="Unidade"
-            name="unidade"
-            value={data.unidade || 'un'}
-            onChange={(e) => onChange('unidade', e.target.value)}
-            className="sm:col-span-2"
-            placeholder="Ex: un, kg, m, pç"
+          label="Unidade"
+          name="unidade"
+          value={data.unidade || 'un'}
+          onChange={(e) => onChange('unidade', e.target.value)}
+          className="sm:col-span-2"
+          placeholder="Ex: un, kg, m, pç"
         />
         <Input
-            label="Preço de Venda"
-            name="preco_venda"
-            type="text"
-            {...precoVendaProps}
-            className="sm:col-span-2"
-            placeholder="0,00"
-            endAdornment="R$"
+          label="Preço de Venda"
+          name="preco_venda"
+          type="text"
+          {...precoVendaProps}
+          className="sm:col-span-2"
+          placeholder="0,00"
+          endAdornment="R$"
         />
         <div className="sm:col-span-2" />
         <Input
-            label="SKU"
-            name="sku"
-            value={data.sku || ''}
-            onChange={(e) => onChange('sku', e.target.value)}
-            className="sm:col-span-3"
-            placeholder="Código interno do produto"
+          label={isService ? "Código" : "SKU"}
+          name="sku"
+          value={data.sku || ''}
+          onChange={(e) => onChange('sku', e.target.value)}
+          className="sm:col-span-3"
+          placeholder={isService ? "Código interno do serviço" : "Código interno do produto"}
         />
-        <Input
+        {!isService && (
+          <Input
             label="GTIN / EAN"
             name="gtin"
             value={data.gtin || ''}
             onChange={(e) => onChange('gtin', e.target.value)}
             className="sm:col-span-3"
             placeholder="Código de barras"
-        />
+          />
+        )}
         <Select
-            label="Status"
-            name="status"
-            value={data.status || 'ativo'}
-            onChange={(e) => onChange('status', e.target.value)}
-            className="sm:col-span-3"
+          label="Status"
+          name="status"
+          value={data.status || 'ativo'}
+          onChange={(e) => onChange('status', e.target.value)}
+          className="sm:col-span-3"
         >
-            {statusProdutoOptions.map(opt => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
+          {statusProdutoOptions.map(opt => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
         </Select>
-        <Select
+        {!isService && (
+          <Select
             label="Tipo do produto"
             name="tipo"
             value={data.tipo || 'simples'}
             onChange={(e) => onChange('tipo', e.target.value)}
             className="sm:col-span-3"
-        >
+          >
             {tipoProdutoOptions.map(opt => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
-        </Select>
+          </Select>
+        )}
         <TextArea
-            label="Descrição"
-            name="descricao"
-            value={data.descricao || ''}
-            onChange={(e) => onChange('descricao', e.target.value)}
-            rows={3}
-            className="sm:col-span-6"
-            placeholder="Detalhes do produto, características, etc."
+          label="Descrição"
+          name="descricao"
+          value={data.descricao || ''}
+          onChange={(e) => onChange('descricao', e.target.value)}
+          rows={3}
+          className="sm:col-span-6"
+          placeholder={`Detalhes do ${isService ? 'serviço' : 'produto'}, características, etc.`}
         />
       </Section>
 
       <FiscalFields data={data} onChange={onChange} />
 
-      <PackagingFields data={data} onChange={onChange} />
-      
-      <Section
-        title="Estoque"
-        description="Configurações de controle de estoque e disponibilidade."
-      >
-        <div className="sm:col-span-6">
+      {!isService && <PackagingFields data={data} onChange={onChange} />}
+
+      {!isService && (
+        <Section
+          title="Estoque"
+          description="Configurações de controle de estoque e disponibilidade."
+        >
+          <div className="sm:col-span-6">
             <Toggle
-                label="Controlar estoque deste item?"
-                name="controla_estoque"
-                checked={!!data.controla_estoque}
-                onChange={(checked) => onChange('controla_estoque', checked)}
-                description="Habilite para gerenciar o saldo de estoque do produto."
+              label="Controlar estoque deste item?"
+              name="controla_estoque"
+              checked={!!data.controla_estoque}
+              onChange={(checked) => onChange('controla_estoque', checked)}
+              description="Habilite para gerenciar o saldo de estoque do produto."
             />
-        </div>
-        {data.controla_estoque && (
+          </div>
+          {data.controla_estoque && (
             <>
-                <Input
-                    label="Estoque mínimo"
-                    name="estoque_min"
-                    type="text"
-                    {...estoqueMinProps}
-                    className="sm:col-span-3"
-                    placeholder="Nível para alerta de reposição"
-                />
-                <Input
-                    label="Estoque máximo"
-                    name="estoque_max"
-                    type="text"
-                    {...estoqueMaxProps}
-                    className="sm:col-span-3"
-                />
-                <Input
-                    label="Localização"
-                    name="localizacao"
-                    type="text"
-                    value={data.localizacao || ''}
-                    onChange={(e) => onChange('localizacao', e.target.value)}
-                    placeholder="Ex: Corredor A, Prateleira 3"
-                    className="sm:col-span-3"
-                />
-                <Input
-                    label="Dias para preparação"
-                    name="dias_preparacao"
-                    type="number"
-                    value={data.dias_preparacao || ''}
-                    onChange={(e) => onChange('dias_preparacao', parseInt(e.target.value, 10) || 0)}
-                    className="sm:col-span-3"
-                    placeholder="Tempo para envio após a compra"
-                />
+              <Input
+                label="Estoque mínimo"
+                name="estoque_min"
+                type="text"
+                {...estoqueMinProps}
+                className="sm:col-span-3"
+                placeholder="Nível para alerta de reposição"
+              />
+              <Input
+                label="Estoque máximo"
+                name="estoque_max"
+                type="text"
+                {...estoqueMaxProps}
+                className="sm:col-span-3"
+              />
+              <Input
+                label="Localização"
+                name="localizacao"
+                type="text"
+                value={data.localizacao || ''}
+                onChange={(e) => onChange('localizacao', e.target.value)}
+                placeholder="Ex: Corredor A, Prateleira 3"
+                className="sm:col-span-3"
+              />
+              <Input
+                label="Dias para preparação"
+                name="dias_preparacao"
+                type="number"
+                value={data.dias_preparacao || ''}
+                onChange={(e) => onChange('dias_preparacao', parseInt(e.target.value, 10) || 0)}
+                className="sm:col-span-3"
+                placeholder="Tempo para envio após a compra"
+              />
             </>
-        )}
-      </Section>
+          )}
+        </Section>
+      )}
     </div>
   );
 };

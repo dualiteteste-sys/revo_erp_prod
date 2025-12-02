@@ -69,6 +69,21 @@ const ProductFormPanel: React.FC<ProductFormPanelProps> = ({ product, onSaveSucc
     setFormData(prev => ({ ...prev, [field]: value }));
   };
 
+  const isService = useMemo(() => formData.tipo === 'servico', [formData.tipo]);
+
+  const visibleTabs = useMemo(() => {
+    if (isService) {
+      return ['Dados Gerais', 'Outros']; // Services usually don't need Media, SEO, Additional Data in this context
+    }
+    return tabs;
+  }, [isService]);
+
+  useEffect(() => {
+    if (!visibleTabs.includes(activeTab)) {
+      setActiveTab(visibleTabs[0]);
+    }
+  }, [visibleTabs, activeTab]);
+
   const handleSave = async () => {
     if (Object.keys(errors).length > 0) {
       addToast('Por favor, corrija os erros no formulário.', 'warning');
@@ -76,19 +91,22 @@ const ProductFormPanel: React.FC<ProductFormPanelProps> = ({ product, onSaveSucc
       return;
     }
 
-    const normalizedForSubmit = normalizeProductPayload(formData);
-    const finalValidationErrors = validatePackaging(normalizedForSubmit);
+    // Skip packaging validation for services
+    if (!isService) {
+      const normalizedForSubmit = normalizeProductPayload(formData);
+      const finalValidationErrors = validatePackaging(normalizedForSubmit);
 
-    if (finalValidationErrors.length > 0) {
-      addToast(`Dados de embalagem inválidos: ${finalValidationErrors.join(', ')}`, 'warning');
-      setActiveTab('Dados Gerais');
-      return;
+      if (finalValidationErrors.length > 0) {
+        addToast(`Dados de embalagem inválidos: ${finalValidationErrors.join(', ')}`, 'warning');
+        setActiveTab('Dados Gerais');
+        return;
+      }
     }
 
     setIsSaving(true);
     try {
       const savedProduct = await saveProduct(formData);
-      addToast('Produto salvo com sucesso!', 'success');
+      addToast(`${isService ? 'Serviço' : 'Produto'} salvo com sucesso!`, 'success');
       setFormData(savedProduct);
       onSaveSuccess(savedProduct);
     } catch (error: any) {
@@ -97,7 +115,7 @@ const ProductFormPanel: React.FC<ProductFormPanelProps> = ({ product, onSaveSucc
         addToast(error.message.replace('[VALIDATION] ', ''), 'warning');
         setActiveTab('Dados Gerais');
       } else {
-        addToast(error.message || 'Erro ao salvar o produto', 'error');
+        addToast(error.message || `Erro ao salvar o ${isService ? 'serviço' : 'produto'}`, 'error');
       }
     } finally {
       setIsSaving(false);
@@ -107,7 +125,7 @@ const ProductFormPanel: React.FC<ProductFormPanelProps> = ({ product, onSaveSucc
   const renderTabContent = () => {
     switch (activeTab) {
       case 'Dados Gerais':
-        return <DadosGeraisTab data={formData} onChange={handleFormChange} errors={errors} />;
+        return <DadosGeraisTab data={formData} onChange={handleFormChange} errors={errors} isService={isService} />;
       case 'Outros':
         return <OthersTab data={formData} onChange={handleFormChange} />;
       case 'Dados Complementares':
@@ -119,9 +137,9 @@ const ProductFormPanel: React.FC<ProductFormPanelProps> = ({ product, onSaveSucc
         return (
           <div className="flex flex-col items-center justify-center text-center p-8 h-full bg-gray-50 rounded-lg">
             <AlertTriangle className="w-12 h-12 text-yellow-500 mb-4" />
-            <h3 className="text-lg font-semibold text-gray-800">Salve o produto primeiro</h3>
+            <h3 className="text-lg font-semibold text-gray-800">Salve o {isService ? 'serviço' : 'produto'} primeiro</h3>
             <p className="text-gray-600 mt-2">
-              Você precisa salvar o produto na aba "Dados Gerais" antes de poder adicionar imagens.
+              Você precisa salvar o {isService ? 'serviço' : 'produto'} na aba "Dados Gerais" antes de poder adicionar imagens.
             </p>
           </div>
         );
@@ -136,15 +154,14 @@ const ProductFormPanel: React.FC<ProductFormPanelProps> = ({ product, onSaveSucc
     <div className="flex flex-col h-full">
       <div className="border-b border-white/20">
         <nav className="-mb-px flex space-x-4 overflow-x-auto p-4" aria-label="Tabs">
-          {tabs.map((tab) => (
+          {visibleTabs.map((tab) => (
             <button
               key={tab}
               onClick={() => setActiveTab(tab)}
-              className={`${
-                activeTab === tab
+              className={`${activeTab === tab
                   ? 'border-blue-500 text-blue-600'
                   : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-              } whitespace-nowrap py-2 px-3 border-b-2 font-medium text-sm transition-colors`}
+                } whitespace-nowrap py-2 px-3 border-b-2 font-medium text-sm transition-colors`}
             >
               {tab}
             </button>
@@ -169,7 +186,7 @@ const ProductFormPanel: React.FC<ProductFormPanelProps> = ({ product, onSaveSucc
             className="flex items-center gap-2 bg-blue-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-blue-700 transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed"
           >
             {isSaving ? <Loader2 className="animate-spin" size={20} /> : <Save size={20} />}
-            Salvar Produto
+            Salvar {isService ? 'Serviço' : 'Produto'}
           </button>
         </div>
       </footer>
