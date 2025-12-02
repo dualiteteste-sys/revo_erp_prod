@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { searchOsItems, OsItemSearchResult } from '@/services/os';
+import { searchItemsForOs, OsItemSearchResult } from '@/services/os';
 import { useDebounce } from '@/hooks/useDebounce';
 import { Loader2, Search, Wrench, Package, Plus } from 'lucide-react';
 import Modal from '@/components/ui/Modal';
@@ -86,7 +86,7 @@ export default function ItemAutocomplete({ onSelect, disabled, onlySales = true,
 
       setLoading(true);
       try {
-        const data = await searchOsItems(debouncedQuery, 20, onlySales, type);
+        const data = await searchItemsForOs(debouncedQuery, 20, onlySales, type);
         setResults(data);
         setOpen(true);
       } catch (e) {
