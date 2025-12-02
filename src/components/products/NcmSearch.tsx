@@ -29,11 +29,14 @@ const NcmSearch: React.FC<NcmSearchProps> = ({ value, onChange }) => {
   };
 
   const handleSelectNcm = (ncm: string) => {
-    let maskedValue = ncm;
-    if (ncm.length > 4) {
-      maskedValue = ncm.replace(/^(\d{4})/, '$1.');
+    // Ensure we have only digits before formatting
+    const cleanNcm = ncm.replace(/\D/g, '');
+    let maskedValue = cleanNcm;
+
+    if (cleanNcm.length > 4) {
+      maskedValue = cleanNcm.replace(/^(\d{4})/, '$1.');
     }
-    if (ncm.length > 6) {
+    if (cleanNcm.length > 6) {
       maskedValue = maskedValue.replace(/^(\d{4})\.(\d{2})/, '$1.$2.');
     }
     onChange(maskedValue);
