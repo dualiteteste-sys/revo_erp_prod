@@ -23,7 +23,7 @@ export default function ProducaoFormPanel({ ordemId, onSaveSuccess, onClose }: P
   const [loading, setLoading] = useState(!!ordemId);
   const [isSaving, setIsSaving] = useState(false);
   const [activeTab, setActiveTab] = useState<'dados' | 'componentes' | 'entregas'>('dados');
-  
+
   const [formData, setFormData] = useState<Partial<OrdemProducaoDetails>>({
     status: 'rascunho',
     origem_ordem: 'manual',
@@ -94,7 +94,7 @@ export default function ProducaoFormPanel({ ordemId, onSaveSuccess, onClose }: P
 
       const saved = await saveOrdemProducao(payload);
       setFormData(prev => ({ ...prev, ...saved }));
-      
+
       if (!formData.id) {
         addToast('Ordem criada! Configure os componentes.', 'success');
         setActiveTab('componentes');
@@ -193,47 +193,44 @@ export default function ProducaoFormPanel({ ordemId, onSaveSuccess, onClose }: P
     <div className="flex flex-col h-full">
       <div className="border-b border-white/20">
         <div className="flex items-center justify-between py-4 px-6 bg-gray-50 border-b border-gray-200">
-            <div>
-                <h2 className="text-xl font-bold text-gray-800">
-                    {formData.numero ? `Ordem ${formatOrderNumber(formData.numero)}` : 'Nova Ordem de Produção'}
-                </h2>
-                <p className="text-sm text-gray-500">Industrialização</p>
-            </div>
-            {formData.status && (
-                <span className={`px-3 py-1 rounded-full text-sm font-bold uppercase ${formData.status === 'concluida' ? 'bg-green-100 text-green-800' : 'bg-blue-100 text-blue-800'}`}>
-                    {formData.status.replace(/_/g, ' ')}
-                </span>
-            )}
+          <div>
+            <h2 className="text-xl font-bold text-gray-800">
+              {formData.numero ? `Ordem ${formatOrderNumber(formData.numero)}` : 'Nova Ordem de Produção'}
+            </h2>
+            <p className="text-sm text-gray-500">Industrialização</p>
+          </div>
+          {formData.status && (
+            <span className={`px-3 py-1 rounded-full text-sm font-bold uppercase ${formData.status === 'concluida' ? 'bg-green-100 text-green-800' : 'bg-blue-100 text-blue-800'}`}>
+              {formData.status.replace(/_/g, ' ')}
+            </span>
+          )}
         </div>
         <nav className="-mb-px flex space-x-6 p-4 overflow-x-auto" aria-label="Tabs">
           <button
             onClick={() => setActiveTab('dados')}
-            className={`whitespace-nowrap py-2 px-3 border-b-2 font-medium text-sm transition-colors ${
-              activeTab === 'dados' 
-                ? 'border-blue-500 text-blue-600' 
+            className={`whitespace-nowrap py-2 px-3 border-b-2 font-medium text-sm transition-colors ${activeTab === 'dados'
+                ? 'border-blue-500 text-blue-600'
                 : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-            }`}
+              }`}
           >
             Dados Gerais
           </button>
           <button
             onClick={() => setActiveTab('componentes')}
-            className={`whitespace-nowrap py-2 px-3 border-b-2 font-medium text-sm transition-colors ${
-              activeTab === 'componentes' 
-                ? 'border-blue-500 text-blue-600' 
+            className={`whitespace-nowrap py-2 px-3 border-b-2 font-medium text-sm transition-colors ${activeTab === 'componentes'
+                ? 'border-blue-500 text-blue-600'
                 : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-            }`}
+              }`}
             disabled={!formData.id}
           >
             BOM (Insumos)
           </button>
           <button
             onClick={() => setActiveTab('entregas')}
-            className={`whitespace-nowrap py-2 px-3 border-b-2 font-medium text-sm transition-colors ${
-              activeTab === 'entregas' 
-                ? 'border-blue-500 text-blue-600' 
+            className={`whitespace-nowrap py-2 px-3 border-b-2 font-medium text-sm transition-colors ${activeTab === 'entregas'
+                ? 'border-blue-500 text-blue-600'
                 : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-            }`}
+              }`}
             disabled={!formData.id}
           >
             Entregas ({formData.entregas?.length || 0})
@@ -243,120 +240,120 @@ export default function ProducaoFormPanel({ ordemId, onSaveSuccess, onClose }: P
 
       <div className="flex-grow p-6 overflow-y-auto scrollbar-styled">
         {activeTab === 'dados' && (
-            <>
-                <Section title="O que produzir?" description="Definição do produto e quantidades.">
-                    <div className="sm:col-span-2">
-                        <Select label="Tipo de Ordem" name="tipo_ordem" value="industrializacao" disabled>
-                            <option value="industrializacao">Industrialização</option>
-                        </Select>
-                    </div>
-                    <div className="sm:col-span-4">
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Produto Final</label>
-                        {formData.id ? (
-                            <div className="p-3 bg-gray-100 border border-gray-300 rounded-lg text-gray-700">
-                                {formData.produto_nome}
-                            </div>
-                        ) : (
-                            <ItemAutocomplete onSelect={handleProductSelect} />
-                        )}
-                    </div>
-                    <div className="sm:col-span-2">
-                        <Input 
-                            label="Quantidade Planejada" 
-                            name="qtd" 
-                            type="number" 
-                            value={formData.quantidade_planejada || ''} 
-                            onChange={e => handleHeaderChange('quantidade_planejada', parseFloat(e.target.value))}
-                            disabled={isLocked}
-                        />
-                    </div>
-                    <div className="sm:col-span-1">
-                        <Input 
-                            label="Unidade" 
-                            name="unidade" 
-                            value={formData.unidade || ''} 
-                            onChange={e => handleHeaderChange('unidade', e.target.value)}
-                            disabled={isLocked}
-                        />
-                    </div>
-                    <div className="sm:col-span-2">
-                        <Select label="Origem" name="origem" value={formData.origem_ordem} onChange={e => handleHeaderChange('origem_ordem', e.target.value)} disabled={isLocked}>
-                            <option value="manual">Manual</option>
-                            <option value="venda">Venda</option>
-                            <option value="reposicao">Reposição</option>
-                            <option value="mrp">MRP</option>
-                        </Select>
-                    </div>
-                </Section>
+          <>
+            <Section title="O que produzir?" description="Definição do produto e quantidades.">
+              <div className="sm:col-span-2">
+                <Select label="Tipo de Ordem" name="tipo_ordem" value="industrializacao" disabled>
+                  <option value="industrializacao">Industrialização</option>
+                </Select>
+              </div>
+              <div className="sm:col-span-4">
+                <label className="block text-sm font-medium text-gray-700 mb-1">Produto Final</label>
+                {formData.id ? (
+                  <div className="p-3 bg-gray-100 border border-gray-300 rounded-lg text-gray-700">
+                    {formData.produto_nome}
+                  </div>
+                ) : (
+                  <ItemAutocomplete onSelect={handleProductSelect} clearOnSelect={false} />
+                )}
+              </div>
+              <div className="sm:col-span-2">
+                <Input
+                  label="Quantidade Planejada"
+                  name="qtd"
+                  type="number"
+                  value={formData.quantidade_planejada || ''}
+                  onChange={e => handleHeaderChange('quantidade_planejada', parseFloat(e.target.value))}
+                  disabled={isLocked}
+                />
+              </div>
+              <div className="sm:col-span-1">
+                <Input
+                  label="Unidade"
+                  name="unidade"
+                  value={formData.unidade || ''}
+                  onChange={e => handleHeaderChange('unidade', e.target.value)}
+                  disabled={isLocked}
+                />
+              </div>
+              <div className="sm:col-span-2">
+                <Select label="Origem" name="origem" value={formData.origem_ordem} onChange={e => handleHeaderChange('origem_ordem', e.target.value)} disabled={isLocked}>
+                  <option value="manual">Manual</option>
+                  <option value="venda">Venda</option>
+                  <option value="reposicao">Reposição</option>
+                  <option value="mrp">MRP</option>
+                </Select>
+              </div>
+            </Section>
 
-                <Section title="Programação" description="Prazos e status.">
-                    <div className="sm:col-span-2">
-                        <Select label="Status" name="status" value={formData.status} onChange={e => handleHeaderChange('status', e.target.value)} disabled={isLocked}>
-                            <option value="rascunho">Rascunho</option>
-                            <option value="planejada">Planejada</option>
-                            <option value="em_programacao">Em Programação</option>
-                            <option value="em_producao">Em Produção</option>
-                            <option value="em_inspecao">Em Inspeção</option>
-                            <option value="concluida">Concluída</option>
-                            <option value="cancelada">Cancelada</option>
-                        </Select>
-                    </div>
-                    <div className="sm:col-span-2">
-                        <Input 
-                            label="Prioridade (0-100)" 
-                            name="prioridade" 
-                            type="number" 
-                            value={formData.prioridade || 0} 
-                            onChange={e => handleHeaderChange('prioridade', parseInt(e.target.value))}
-                            disabled={isLocked}
-                        />
-                    </div>
-                    <div className="sm:col-span-2"></div>
-                    
-                    <Input label="Início Previsto" type="date" value={formData.data_prevista_inicio || ''} onChange={e => handleHeaderChange('data_prevista_inicio', e.target.value)} disabled={isLocked} className="sm:col-span-2" />
-                    <Input label="Fim Previsto" type="date" value={formData.data_prevista_fim || ''} onChange={e => handleHeaderChange('data_prevista_fim', e.target.value)} disabled={isLocked} className="sm:col-span-2" />
-                    <Input label="Entrega Prevista" type="date" value={formData.data_prevista_entrega || ''} onChange={e => handleHeaderChange('data_prevista_entrega', e.target.value)} disabled={isLocked} className="sm:col-span-2" />
-                </Section>
+            <Section title="Programação" description="Prazos e status.">
+              <div className="sm:col-span-2">
+                <Select label="Status" name="status" value={formData.status} onChange={e => handleHeaderChange('status', e.target.value)} disabled={isLocked}>
+                  <option value="rascunho">Rascunho</option>
+                  <option value="planejada">Planejada</option>
+                  <option value="em_programacao">Em Programação</option>
+                  <option value="em_producao">Em Produção</option>
+                  <option value="em_inspecao">Em Inspeção</option>
+                  <option value="concluida">Concluída</option>
+                  <option value="cancelada">Cancelada</option>
+                </Select>
+              </div>
+              <div className="sm:col-span-2">
+                <Input
+                  label="Prioridade (0-100)"
+                  name="prioridade"
+                  type="number"
+                  value={formData.prioridade || 0}
+                  onChange={e => handleHeaderChange('prioridade', parseInt(e.target.value))}
+                  disabled={isLocked}
+                />
+              </div>
+              <div className="sm:col-span-2"></div>
 
-                <Section title="Outros" description="Detalhes adicionais.">
-                    <Input label="Ref. Documento" name="doc_ref" value={formData.documento_ref || ''} onChange={e => handleHeaderChange('documento_ref', e.target.value)} disabled={isLocked} className="sm:col-span-2" placeholder="Pedido, Lote..." />
-                    <TextArea label="Observações" name="obs" value={formData.observacoes || ''} onChange={e => handleHeaderChange('observacoes', e.target.value)} rows={3} disabled={isLocked} className="sm:col-span-6" />
-                </Section>
-            </>
+              <Input label="Início Previsto" type="date" value={formData.data_prevista_inicio || ''} onChange={e => handleHeaderChange('data_prevista_inicio', e.target.value)} disabled={isLocked} className="sm:col-span-2" />
+              <Input label="Fim Previsto" type="date" value={formData.data_prevista_fim || ''} onChange={e => handleHeaderChange('data_prevista_fim', e.target.value)} disabled={isLocked} className="sm:col-span-2" />
+              <Input label="Entrega Prevista" type="date" value={formData.data_prevista_entrega || ''} onChange={e => handleHeaderChange('data_prevista_entrega', e.target.value)} disabled={isLocked} className="sm:col-span-2" />
+            </Section>
+
+            <Section title="Outros" description="Detalhes adicionais.">
+              <Input label="Ref. Documento" name="doc_ref" value={formData.documento_ref || ''} onChange={e => handleHeaderChange('documento_ref', e.target.value)} disabled={isLocked} className="sm:col-span-2" placeholder="Pedido, Lote..." />
+              <TextArea label="Observações" name="obs" value={formData.observacoes || ''} onChange={e => handleHeaderChange('observacoes', e.target.value)} rows={3} disabled={isLocked} className="sm:col-span-6" />
+            </Section>
+          </>
         )}
 
         {activeTab === 'componentes' && (
-            <>
-                {!isLocked && formData.id && formData.produto_final_id && (
-                    <div className="mb-4 flex justify-end">
-                        <BomSelector 
-                            ordemId={formData.id} 
-                            produtoId={formData.produto_final_id} 
-                            tipoOrdem="producao"
-                            onApplied={() => loadDetails(formData.id)} 
-                        />
-                    </div>
-                )}
-                <OrdemFormItems 
-                    items={formData.componentes || []} 
-                    onAddItem={handleAddComponente} 
-                    onRemoveItem={handleRemoveComponente}
-                    onUpdateItem={handleUpdateComponente}
-                    isAddingItem={false}
-                    readOnly={isLocked}
+          <>
+            {!isLocked && formData.id && formData.produto_final_id && (
+              <div className="mb-4 flex justify-end">
+                <BomSelector
+                  ordemId={formData.id}
+                  produtoId={formData.produto_final_id}
+                  tipoOrdem="producao"
+                  onApplied={() => loadDetails(formData.id)}
                 />
-            </>
+              </div>
+            )}
+            <OrdemFormItems
+              items={formData.componentes || []}
+              onAddItem={handleAddComponente}
+              onRemoveItem={handleRemoveComponente}
+              onUpdateItem={handleUpdateComponente}
+              isAddingItem={false}
+              readOnly={isLocked}
+            />
+          </>
         )}
 
         {activeTab === 'entregas' && (
-            <OrdemEntregas 
-                entregas={formData.entregas || []}
-                onAddEntrega={handleAddEntrega}
-                onRemoveEntrega={handleRemoveEntrega}
-                readOnly={isLocked}
-                maxQuantity={formData.quantidade_planejada || 0}
-                showBillingStatus={false}
-            />
+          <OrdemEntregas
+            entregas={formData.entregas || []}
+            onAddEntrega={handleAddEntrega}
+            onRemoveEntrega={handleRemoveEntrega}
+            readOnly={isLocked}
+            maxQuantity={formData.quantidade_planejada || 0}
+            showBillingStatus={false}
+          />
         )}
       </div>
 
@@ -366,8 +363,8 @@ export default function ProducaoFormPanel({ ordemId, onSaveSuccess, onClose }: P
         </button>
         <div className="flex gap-3">
           {!isLocked && (
-            <button 
-              onClick={handleSaveHeader} 
+            <button
+              onClick={handleSaveHeader}
               disabled={isSaving}
               className="flex items-center gap-2 bg-blue-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-blue-700 disabled:opacity-50"
             >

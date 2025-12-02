@@ -10,9 +10,10 @@ type Props = {
   onlySales?: boolean;
   placeholder?: string;
   type?: 'all' | 'product' | 'service';
+  clearOnSelect?: boolean;
 };
 
-export default function ItemAutocomplete({ onSelect, disabled, onlySales = true, placeholder, type = 'all' }: Props) {
+export default function ItemAutocomplete({ onSelect, disabled, onlySales = true, placeholder, type = 'all', clearOnSelect = true }: Props) {
   const [query, setQuery] = useState('');
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -93,7 +94,11 @@ export default function ItemAutocomplete({ onSelect, disabled, onlySales = true,
 
   const handleSelect = (item: OsItemSearchResult) => {
     onSelect(item);
-    setQuery('');
+    if (clearOnSelect) {
+      setQuery('');
+    } else {
+      setQuery(item.descricao);
+    }
     setResults([]);
     setOpen(false);
   };
