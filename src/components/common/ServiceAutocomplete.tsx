@@ -203,10 +203,35 @@ export default function ServiceAutocomplete({
         size="2xl"
       >
         <ProductFormPanel
-          product={{ tipo: 'servico' }}
+          product={{ tipo: 'servico' as any }} // Cast to any to avoid TS error with strict enum
           onSaveSuccess={handleCreateSuccess}
           onClose={() => setIsCreateModalOpen(false)}
-          saveProduct={(data) => saveProduct(data, '')}
+          saveProduct={async (data) => {
+            // Map ProductFormData to Service payload
+            const payload = {
+              descricao: data.nome,
+              codigo: data.sku,
+              preco_venda: data.preco_venda,
+              unidade: data.unidade,
+              status: data.status as 'ativo' | 'inativo',
+              observacoes: data.descricao // Mapping description to observations or complementary description if needed
+            };
+
+            // Import dynamically to avoid circular dependencies if any, or just use the imported one
+            const { createService } = await import('@/services/services');
+            const savedService = await createService(payload);
+
+            // Map back to ProductFormData for the form panel to update state
+            return {
+              id: savedService.id,
+              nome: savedService.descricao,
+              sku: savedService.codigo || undefined,
+              preco_venda: Number(savedService.preco_venda),
+              unidade: savedService.unidade || undefined,
+              status: savedService.status,
+              tipo: 'servico' as any
+            };
+          }}
         />
       </Modal>
     </div>
