@@ -13,6 +13,7 @@ ON CONFLICT (id) DO NOTHING;
 
 -- Policy: Allow public access to view logos
 -- Anyone can view a logo if they have the URL (public bucket)
+DROP POLICY IF EXISTS "Public Access to Company Logos" ON storage.objects;
 CREATE POLICY "Public Access to Company Logos"
 ON storage.objects FOR SELECT
 USING ( bucket_id = 'company_logos' );
@@ -20,6 +21,7 @@ USING ( bucket_id = 'company_logos' );
 -- Policy: Allow authenticated users to upload logos for their company
 -- Path convention: {empresa_id}/{filename}
 -- We verify if the user belongs to the company in the path.
+DROP POLICY IF EXISTS "Authenticated Users can Upload Company Logos" ON storage.objects;
 CREATE POLICY "Authenticated Users can Upload Company Logos"
 ON storage.objects FOR INSERT
 TO authenticated
@@ -38,6 +40,7 @@ WITH CHECK (
 );
 
 -- Policy: Allow authenticated users to update logos for their company
+DROP POLICY IF EXISTS "Authenticated Users can Update Company Logos" ON storage.objects;
 CREATE POLICY "Authenticated Users can Update Company Logos"
 ON storage.objects FOR UPDATE
 TO authenticated
@@ -56,6 +59,7 @@ USING (
 );
 
 -- Policy: Allow authenticated users to delete logos for their company
+DROP POLICY IF EXISTS "Authenticated Users can Delete Company Logos" ON storage.objects;
 CREATE POLICY "Authenticated Users can Delete Company Logos"
 ON storage.objects FOR DELETE
 TO authenticated

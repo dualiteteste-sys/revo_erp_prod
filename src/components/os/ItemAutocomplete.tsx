@@ -2,7 +2,11 @@ import React, { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { searchItemsForOs, OsItemSearchResult } from '@/services/os';
 import { useDebounce } from '@/hooks/useDebounce';
-import { Loader2, Search, Wrench, Package } from 'lucide-react';
+import { Loader2, Search, Wrench, Package, Plus } from 'lucide-react';
+import Modal from '@/components/ui/Modal';
+import ProductFormPanel from '@/components/products/ProductFormPanel';
+import { saveProduct } from '@/services/products';
+import { useToast } from '@/contexts/ToastProvider';
 
 type Props = {
   onSelect: (item: OsItemSearchResult) => void;
@@ -10,13 +14,16 @@ type Props = {
   onlySales?: boolean;
   placeholder?: string;
   type?: 'all' | 'product' | 'service';
+  clearOnSelect?: boolean;
 };
 
-export default function ItemAutocomplete({ onSelect, disabled, onlySales = true, placeholder, type = 'all' }: Props) {
+export default function ItemAutocomplete({ onSelect, disabled, onlySales = true, placeholder, type = 'all', clearOnSelect = true }: Props) {
   const [query, setQuery] = useState('');
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [results, setResults] = useState<OsItemSearchResult[]>([]);
+  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const { addToast } = useToast();
   const [dropdownStyle, setDropdownStyle] = useState<React.CSSProperties>({});
 
   const inputRef = useRef<HTMLInputElement>(null);
@@ -93,13 +100,33 @@ export default function ItemAutocomplete({ onSelect, disabled, onlySales = true,
 
   const handleSelect = (item: OsItemSearchResult) => {
     onSelect(item);
-    setQuery('');
+    if (clearOnSelect) {
+      setQuery('');
+    } else {
+      setQuery(item.descricao);
+    }
     setResults([]);
     setOpen(false);
   };
 
+  const handleCreateSuccess = (savedProduct: any) => {
+    // Map the saved product to OsItemSearchResult format
+    const newItem: OsItemSearchResult = {
+      id: savedProduct.id,
+      descricao: savedProduct.nome || 'Novo Produto',
+      unidade: savedProduct.unidade || 'un',
+      preco_venda: savedProduct.preco_venda || 0,
+      type: 'product',
+      codigo: savedProduct.codigo || null,
+    };
+
+    handleSelect(newItem);
+    setIsCreateModalOpen(false);
+    addToast('Produto criado e selecionado!', 'success');
+  };
+
   const renderDropdown = () => {
-    if (!open || (results.length === 0 && query.length < 2)) return null;
+    if (!open || (results.length === 0 && query.length < 2 && !loading)) return null;
 
     const content = (
       <div
@@ -150,8 +177,8 @@ export default function ItemAutocomplete({ onSelect, disabled, onlySales = true,
   };
 
   return (
-    <div className="relative">
-      <div className="relative">
+    <div className="relative flex gap-2">
+      <div className="relative flex-grow">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={20} />
         <input
           ref={inputRef}
@@ -168,7 +195,32 @@ export default function ItemAutocomplete({ onSelect, disabled, onlySales = true,
           </div>
         )}
       </div>
+
+      <button
+        type="button"
+        onClick={() => setIsCreateModalOpen(true)}
+        className="flex-shrink-0 p-3 bg-blue-100 text-blue-600 rounded-lg hover:bg-blue-200 transition-colors"
+        title="Novo Produto"
+        disabled={disabled}
+      >
+        <Plus size={20} />
+      </button>
+
       {renderDropdown()}
+
+      <Modal
+        isOpen={isCreateModalOpen}
+        onClose={() => setIsCreateModalOpen(false)}
+        title="Novo Produto"
+        size="4xl"
+      >
+        <ProductFormPanel
+          product={null}
+          onSaveSuccess={handleCreateSuccess}
+          onClose={() => setIsCreateModalOpen(false)}
+          saveProduct={(data) => saveProduct(data, '')} // empresaId is handled in service if empty/context
+        />
+      </Modal>
     </div>
   );
 }

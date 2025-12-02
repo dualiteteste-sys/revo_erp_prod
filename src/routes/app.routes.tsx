@@ -1,62 +1,63 @@
-import React, { Suspense, lazy } from "react";
+import React, { Suspense } from "react";
 import { RouteObject, Navigate } from "react-router-dom";
 import MainLayout from '../components/layout/MainLayout';
 import ProtectedRoute from '../components/layout/ProtectedRoute';
 import OnboardingGuard from "../components/auth/OnboardingGuard";
 import PageLoader from "../components/ui/PageLoader";
+import { lazyImport } from "../utils/lazyImport";
 
 // App Pages (Lazy Loaded)
-const Dashboard = lazy(() => import('../pages/Dashboard'));
-const ProductsPage = lazy(() => import('../pages/products/ProductsPage'));
-const PartnersPage = lazy(() => import('../pages/partners/PartnersPage'));
-const CarriersPage = lazy(() => import("../pages/carriers/CarriersPage"));
-const ServicesPage = lazy(() => import("../pages/services/ServicesPage"));
-const SalesDashboard = lazy(() => import("../pages/SalesDashboard"));
-const SalesGoalsPage = lazy(() => import("../pages/sales/SalesGoalsPage"));
-const OSPage = lazy(() => import("../pages/os/OSPage"));
-const ContasAReceberPage = lazy(() => import("../pages/financeiro/ContasAReceberPage"));
-const ContasPagarPage = lazy(() => import("../pages/financeiro/ContasPagarPage"));
-const CentrosDeCustoPage = lazy(() => import("../pages/financeiro/CentrosDeCustoPage"));
-const TesourariaPage = lazy(() => import("../pages/financeiro/TesourariaPage"));
-const CobrancasBancariasPage = lazy(() => import("../pages/financeiro/CobrancasBancariasPage"));
-const ExtratoPage = lazy(() => import("../pages/financeiro/ExtratoPage"));
-const CepSearchPage = lazy(() => import("../pages/tools/CepSearchPage"));
-const CnpjSearchPage = lazy(() => import("../pages/tools/CnpjSearchPage"));
-const NfeInputPage = lazy(() => import("../pages/tools/NfeInputPage"));
-const XmlTesterPage = lazy(() => import('../pages/tools/XmlTesterPage'));
-const LogsPage = lazy(() => import("../pages/dev/LogsPage"));
-const SupabaseDemoPage = lazy(() => import("../pages/tools/SupabaseDemoPage"));
+const Dashboard = lazyImport(() => import('../pages/Dashboard'));
+const ProductsPage = lazyImport(() => import('../pages/products/ProductsPage'));
+const PartnersPage = lazyImport(() => import('../pages/partners/PartnersPage'));
+const CarriersPage = lazyImport(() => import("../pages/carriers/CarriersPage"));
+const ServicesPage = lazyImport(() => import("../pages/services/ServicesPage"));
+const SalesDashboard = lazyImport(() => import("../pages/SalesDashboard"));
+const SalesGoalsPage = lazyImport(() => import("../pages/sales/SalesGoalsPage"));
+const OSPage = lazyImport(() => import("../pages/os/OSPage"));
+const ContasAReceberPage = lazyImport(() => import("../pages/financeiro/ContasAReceberPage"));
+const ContasPagarPage = lazyImport(() => import("../pages/financeiro/ContasPagarPage"));
+const CentrosDeCustoPage = lazyImport(() => import("../pages/financeiro/CentrosDeCustoPage"));
+const TesourariaPage = lazyImport(() => import("../pages/financeiro/TesourariaPage"));
+const CobrancasBancariasPage = lazyImport(() => import("../pages/financeiro/CobrancasBancariasPage"));
+const ExtratoPage = lazyImport(() => import("../pages/financeiro/ExtratoPage"));
+const CepSearchPage = lazyImport(() => import("../pages/tools/CepSearchPage"));
+const CnpjSearchPage = lazyImport(() => import("../pages/tools/CnpjSearchPage"));
+const NfeInputPage = lazyImport(() => import("../pages/tools/NfeInputPage"));
+const XmlTesterPage = lazyImport(() => import('../pages/tools/XmlTesterPage'));
+const LogsPage = lazyImport(() => import("../pages/dev/LogsPage"));
+const SupabaseDemoPage = lazyImport(() => import("../pages/tools/SupabaseDemoPage"));
 
 // RH Pages
-const CargosPage = lazy(() => import("../pages/rh/CargosPage"));
-const CompetenciasPage = lazy(() => import("../pages/rh/CompetenciasPage"));
-const ColaboradoresPage = lazy(() => import("../pages/rh/ColaboradoresPage"));
-const MatrizCompetenciasPage = lazy(() => import("../pages/rh/MatrizCompetenciasPage"));
-const TreinamentosPage = lazy(() => import("../pages/rh/TreinamentosPage"));
-const RHDashboard = lazy(() => import("../pages/rh/RHDashboard"));
+const CargosPage = lazyImport(() => import("../pages/rh/CargosPage"));
+const CompetenciasPage = lazyImport(() => import("../pages/rh/CompetenciasPage"));
+const ColaboradoresPage = lazyImport(() => import("../pages/rh/ColaboradoresPage"));
+const MatrizCompetenciasPage = lazyImport(() => import("../pages/rh/MatrizCompetenciasPage"));
+const TreinamentosPage = lazyImport(() => import("../pages/rh/TreinamentosPage"));
+const RHDashboard = lazyImport(() => import("../pages/rh/RHDashboard"));
 
 // Indústria Pages
-const IndustriaDashboardPage = lazy(() => import("../pages/industria/IndustriaDashboardPage"));
-const ProducaoPage = lazy(() => import("../pages/industria/producao/ProducaoPage"));
-const BeneficiamentoPage = lazy(() => import("../pages/industria/beneficiamento/BeneficiamentoPage"));
-const BomsPage = lazy(() => import("../pages/industria/boms/BomsPage"));
-const RoteirosPage = lazy(() => import("../pages/industria/RoteirosPage"));
-const CentrosTrabalhoPage = lazy(() => import("../pages/industria/CentrosTrabalhoPage"));
-const ExecucaoPage = lazy(() => import("../pages/industria/ExecucaoPage"));
-const ChaoDeFabricaPage = lazy(() => import("../pages/industria/ChaoDeFabricaPage"));
-const MateriaisClientePage = lazy(() => import("../pages/industria/MateriaisClientePage"));
+const IndustriaDashboardPage = lazyImport(() => import("../pages/industria/IndustriaDashboardPage"));
+const ProducaoPage = lazyImport(() => import("../pages/industria/producao/ProducaoPage"));
+const BeneficiamentoPage = lazyImport(() => import("../pages/industria/beneficiamento/BeneficiamentoPage"));
+const BomsPage = lazyImport(() => import("../pages/industria/boms/BomsPage"));
+const RoteirosPage = lazyImport(() => import("../pages/industria/RoteirosPage"));
+const CentrosTrabalhoPage = lazyImport(() => import("../pages/industria/CentrosTrabalhoPage"));
+const ExecucaoPage = lazyImport(() => import("../pages/industria/ExecucaoPage"));
+const ChaoDeFabricaPage = lazyImport(() => import("../pages/industria/ChaoDeFabricaPage"));
+const MateriaisClientePage = lazyImport(() => import("../pages/industria/MateriaisClientePage"));
 
 // Suprimentos Pages
-const EstoquePage = lazy(() => import("../pages/suprimentos/EstoquePage"));
-const ComprasPage = lazy(() => import("../pages/suprimentos/ComprasPage"));
-const RelatoriosSuprimentosPage = lazy(() => import("../pages/suprimentos/RelatoriosPage"));
-const RecebimentoListPage = lazy(() => import("../pages/suprimentos/RecebimentoListPage"));
-const ConferenciaPage = lazy(() => import("../pages/suprimentos/ConferenciaPage"));
-const RecebimentoManualPage = lazy(() => import("../pages/suprimentos/RecebimentoManualPage"));
+const EstoquePage = lazyImport(() => import("../pages/suprimentos/EstoquePage"));
+const ComprasPage = lazyImport(() => import("../pages/suprimentos/ComprasPage"));
+const RelatoriosSuprimentosPage = lazyImport(() => import("../pages/suprimentos/RelatoriosPage"));
+const RecebimentoListPage = lazyImport(() => import("../pages/suprimentos/RecebimentoListPage"));
+const ConferenciaPage = lazyImport(() => import("../pages/suprimentos/ConferenciaPage"));
+const RecebimentoManualPage = lazyImport(() => import("../pages/suprimentos/RecebimentoManualPage"));
 
 // Vendas Pages
-const PedidosVendasPage = lazy(() => import("../pages/vendas/PedidosVendasPage"));
-const CrmPage = lazy(() => import("../pages/vendas/crm/CrmPage"));
+const PedidosVendasPage = lazyImport(() => import("../pages/vendas/PedidosVendasPage"));
+const CrmPage = lazyImport(() => import("../pages/vendas/crm/CrmPage"));
 
 export const appRoutes: RouteObject[] = [
     {

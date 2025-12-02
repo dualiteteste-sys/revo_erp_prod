@@ -394,8 +394,8 @@ export default function BeneficiamentoFormPanel({ ordemId, initialData, onSaveSu
           <button
             onClick={() => setActiveTab('dados')}
             className={`whitespace-nowrap py-2 px-3 border-b-2 font-medium text-sm transition-colors ${activeTab === 'dados'
-                ? 'border-blue-500 text-blue-600'
-                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+              ? 'border-blue-500 text-blue-600'
+              : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
               }`}
           >
             Dados Gerais
@@ -403,8 +403,8 @@ export default function BeneficiamentoFormPanel({ ordemId, initialData, onSaveSu
           <button
             onClick={() => setActiveTab('componentes')}
             className={`whitespace-nowrap py-2 px-3 border-b-2 font-medium text-sm transition-colors ${activeTab === 'componentes'
-                ? 'border-blue-500 text-blue-600'
-                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+              ? 'border-blue-500 text-blue-600'
+              : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
               }`}
             disabled={!formData.id}
           >
@@ -413,8 +413,8 @@ export default function BeneficiamentoFormPanel({ ordemId, initialData, onSaveSu
           <button
             onClick={() => setActiveTab('entregas')}
             className={`whitespace-nowrap py-2 px-3 border-b-2 font-medium text-sm transition-colors ${activeTab === 'entregas'
-                ? 'border-blue-500 text-blue-600'
-                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+              ? 'border-blue-500 text-blue-600'
+              : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
               }`}
             disabled={!formData.id}
           >
@@ -457,13 +457,7 @@ export default function BeneficiamentoFormPanel({ ordemId, initialData, onSaveSu
                     />
                   </div>
                   {!isLocked && (
-                    <button
-                      onClick={handleOpenClientModal}
-                      className="p-2 bg-blue-100 text-blue-600 rounded-lg hover:bg-blue-200 transition-colors"
-                      title="Cadastrar Novo Cliente"
-                    >
-                      <PlusCircle size={20} />
-                    </button>
+                    <div className="hidden" />
                   )}
                 </div>
               </div>
