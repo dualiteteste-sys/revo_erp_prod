@@ -9,6 +9,8 @@ import React, {
 } from "react";
 import { useSupabase } from "@/providers/SupabaseProvider";
 import { Database } from "@/types/database.types";
+import { logger } from "@/lib/logger";
+import { useEmpresas, useActiveEmpresaId, useBootstrapEmpresa, useSetActiveEmpresa } from "@/hooks/useEmpresas";
 
 type Empresa = Database['public']['Tables']['empresas']['Row'];
 
@@ -43,15 +45,27 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const supabase = useSupabase(); // SupabaseClient único da app
   const [session, setSession] = useState<Session>(null);
   const [userId, setUserId] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
+  const { data: empresas = [], refetch: refetchEmpresas, isLoading: isLoadingEmpresas } = useEmpresas(userId);
+  const { data: activeEmpresaId, refetch: refetchActiveId, isLoading: isLoadingActiveId } = useActiveEmpresaId(userId);
 
-  const [empresas, setEmpresas] = useState<Empresa[]>([]);
-  const [activeEmpresaId, setActiveEmpresaId] = useState<string | null>(null);
+  const bootstrapMutation = useBootstrapEmpresa();
+  const setActiveMutation = useSetActiveEmpresa();
+
+  const [authLoading, setAuthLoading] = useState(true);
+
+  const loading = authLoading || isLoadingEmpresas || isLoadingActiveId;
+
 
   const bootRef = useRef(false);
 
   const activeEmpresa = useMemo(() => {
-    return empresas.find((e) => e.id === activeEmpresaId) || null;
+    const found = empresas.find((e) => e.id === activeEmpresaId) || null;
+    console.log('[AuthProvider] activeEmpresa calc:', {
+      empresasCount: empresas.length,
+      activeEmpresaId,
+      foundId: found?.id
+    });
+    return found;
   }, [empresas, activeEmpresaId]);
 
   // ===== Helpers =====
@@ -60,115 +74,47 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // console.log("[AUTH] getSession:init");
     const { data, error } = await supabase.auth.getSession();
     if (error) {
-      console.warn("[AUTH] getSession:error", error);
+      logger.warn("[AUTH] getSession:error", { error });
       return null;
     }
     // console.log("[AUTH] getSession:done", data);
     return data.session ?? null;
   }, [supabase]);
 
-  const ensureBootstrapEmpresa = useCallback(
-    async () => {
-      // Garante criação/ativação de empresa para o usuário atual (idempotente)
-      try {
-        console.log("[AUTH][EMPRESAS] bootstrap:start");
-        // @ts-ignore - RPC types mismatch
-        const { error } = await supabase.rpc("secure_bootstrap_empresa_for_current_user", {
-          p_razao_social: "Empresa sem Nome",
-          p_fantasia: null,
-        });
-        if (error) {
-          // Erros de contexto anônimo, RLS brandas, etc: loga e segue.
-          console.warn("[AUTH][EMPRESAS][WARN] bootstrap rpc error", error);
-        } else {
-          console.log("[AUTH][EMPRESAS] bootstrap:ok");
-        }
-      } catch (e) {
-        console.warn("[AUTH][EMPRESAS][WARN] bootstrap exception", e);
-      }
-    },
-    [supabase]
-  );
-
-  const loadEmpresas = useCallback(
-    async () => {
-      // 1) tenta pegar a empresa ativa persistida
-      const uae = await supabase
-        .from("user_active_empresa")
-        .select("empresa_id")
-        .single();
-      if (!uae.error && uae.data?.empresa_id) {
-        // @ts-ignore - Table types missing
-        setActiveEmpresaId(uae.data.empresa_id);
-      } else {
-        setActiveEmpresaId(null);
-      }
-
-      // 2) lista memberships do usuário (RLS deve permitir por user_id)
-      // DUALITE ADAPTATION: Fetching full company objects via join to support UI components
-      const eu = await supabase
-        .from("empresa_usuarios")
-        .select("empresa:empresas(*)")
-        .order("created_at", { ascending: false });
-
-      if (eu.error) {
-        console.warn("[AUTH][EMPRESAS][WARN] list empresas", eu.error);
-        setEmpresas([]);
-        return;
-      }
-
-      const loadedEmpresas = (eu.data ?? [])
-        .map((r: any) => r.empresa)
-        .filter((e: any) => e !== null) as Empresa[];
-
-      setEmpresas(loadedEmpresas);
-
-      console.log("[AUTH][EMPRESAS] fetch:ok", {
-        count: loadedEmpresas.length,
-        // @ts-ignore - Table types missing
-        activeEmpresaId: uae.data?.empresa_id ?? null,
-      });
-    },
-    [supabase]
-  );
-
   const refreshEmpresas = useCallback(
     async () => {
       if (!userId) return;
-      setLoading(true);
 
-      // Primeira leitura
-      await loadEmpresas();
+      // Force refetch both
+      const [empresasResult, activeResult] = await Promise.all([
+        refetchEmpresas(),
+        refetchActiveId()
+      ]);
+
+      const currentEmpresas = empresasResult.data || [];
+      const currentActiveId = activeResult.data;
 
       // Se não há nenhuma, tenta bootstrap e recarrega
-      // Note: We check activeEmpresaId as a proxy for "has access to a company"
-      // but we should also check if the list is empty to trigger bootstrap for new users
-      if (!activeEmpresaId) {
-        await ensureBootstrapEmpresa();
-        await loadEmpresas();
+      if (currentEmpresas.length === 0 && !currentActiveId) {
+        try {
+          await bootstrapMutation.mutateAsync();
+          // Invalidation happens automatically in mutation onSuccess, 
+          // but we might want to wait or refetch manually to update local state immediately if needed
+          await Promise.all([refetchEmpresas(), refetchActiveId()]);
+        } catch (e) {
+          // Logger already handled in mutation
+        }
       }
-
-      setLoading(false);
     },
-    [userId, activeEmpresaId, ensureBootstrapEmpresa, loadEmpresas]
+    [userId, refetchEmpresas, refetchActiveId, bootstrapMutation]
   );
 
   const setActiveEmpresa = async (empresa: Empresa) => {
     if (!userId) return;
     try {
-      // Optimistic update
-      setActiveEmpresaId(empresa.id);
-
-      // @ts-ignore - RPC types mismatch
-      const { error } = await supabase.rpc('set_active_empresa_for_current_user', {
-        p_empresa_id: empresa.id
-      });
-
-      if (error) {
-        console.error("[AUTH] Failed to set active company", error);
-      }
+      await setActiveMutation.mutateAsync(empresa.id);
     } catch (e) {
-      console.error("[AUTH] Exception setting active company", e);
+      // Logger handled in mutation
     }
   };
 
@@ -176,9 +122,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     await supabase.auth.signOut();
     setSession(null);
     setUserId(null);
-    setEmpresas([]);
-    setActiveEmpresaId(null);
-    bootRef.current = false; // Garante que o próximo login dispare o bootstrap novamente
+    // React Query cache clearing is handled by the query client, 
+    // but we can manually reset if needed.
+    // For now, just resetting local state refs.
+    bootRef.current = false;
   }, [supabase]);
 
   // ===== Effects =====
@@ -189,7 +136,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const s = await getSession();
       setSession(s);
       setUserId(s?.user?.id ?? null);
-      setLoading(false);
+      setAuthLoading(false);
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -197,15 +144,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   // Observa mudanças de auth
   useEffect(() => {
     const { data: sub } = supabase.auth.onAuthStateChange((event, sess) => {
-      // console.log("[AUTH] onAuthStateChange", { event, hasSession: !!sess });
       setSession(sess ?? null);
       setUserId(sess?.user?.id ?? null);
 
       // Reset bootRef on explicit sign out event to be safe
       if (event === 'SIGNED_OUT') {
         bootRef.current = false;
-        setEmpresas([]);
-        setActiveEmpresaId(null);
+        // setEmpresas([]); // Handled by query key change (userId becomes null)
+        // setActiveEmpresaId(null);
       }
     });
     return () => sub.subscription.unsubscribe();
@@ -217,7 +163,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (bootRef.current) return;
     bootRef.current = true;
     (async () => {
-      console.log("[AUTH][LOGIN] start", { email: session?.user ? "exists" : "anonymous" });
+      logger.info("[AUTH][LOGIN] start", { email: session?.user ? "exists" : "anonymous" });
       await refreshEmpresas();
       // Se ainda assim não há empresa ativa, o consumidor (AppShell) decide exibir modal de erro
     })();
@@ -231,7 +177,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       loading,
       empresas,
       activeEmpresa,
-      activeEmpresaId,
+      activeEmpresaId: activeEmpresaId ?? null,
       refreshEmpresas,
       setActiveEmpresa,
       signOut,

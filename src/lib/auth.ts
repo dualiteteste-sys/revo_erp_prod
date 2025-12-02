@@ -1,11 +1,12 @@
 import { supabase } from './supabaseClient';
+import { logger } from './logger';
 
 /**
  * Faz signup por e-mail/senha.
  * O e-mail de confirmação será enviado para a URL de produção.
  */
 export async function signUpWithEmail(email: string, password: string) {
-  console.log("[AUTH] signUpWithEmail", { email });
+  logger.info("[AUTH] signUpWithEmail", { email });
   const { data, error } = await supabase.auth.signUp({
     email,
     password,
@@ -14,7 +15,7 @@ export async function signUpWithEmail(email: string, password: string) {
     },
   });
   if (error) {
-    console.error("[AUTH] signUp error", error);
+    logger.error("[AUTH] signUp error", error);
     throw error;
   }
   return data;
@@ -32,22 +33,22 @@ export async function signInWithEmail(email: string) {
     },
   });
   if (error) {
-    console.error('[AUTH][SIGNIN][ERR]', error);
+    logger.error('[AUTH][SIGNIN][ERR]', error);
     throw error;
   }
   return data;
 }
 
 export async function sendPasswordResetEmail(email: string) {
-    const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: `${window.location.origin}/auth/update-password`,
-    });
-    if (error) {
-      console.error('[AUTH] resetPasswordForEmail error', error);
-      throw error;
-    }
+  const { error } = await supabase.auth.resetPasswordForEmail(email, {
+    redirectTo: `${window.location.origin}/auth/update-password`,
+  });
+  if (error) {
+    logger.error('[AUTH] resetPasswordForEmail error', error);
+    throw error;
+  }
 }
 
 export async function signOut() {
-    await supabase.auth.signOut();
+  await supabase.auth.signOut();
 }

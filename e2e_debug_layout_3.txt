@@ -1,0 +1,1145 @@
+
+Running 1 test using 1 worker
+
+[1A[2K[1/1] [chromium] › e2e/auth.spec.ts:3:1 › should allow user to log in and view products
+[1A[2K[chromium] › e2e/auth.spec.ts:3:1 › should allow user to log in and view products
+>> GET http://localhost:5173/auth/login
+
+[1A[2K<< [33m200[39m http://localhost:5173/auth/login
+
+[1A[2K>> GET http://localhost:5173/@vite/client
+
+[1A[2K>> GET http://localhost:5173/src/main.tsx
+
+[1A[2K>> GET http://localhost:5173/@react-refresh
+
+[1A[2K<< [33m200[39m http://localhost:5173/src/main.tsx
+
+[1A[2K>> GET http://localhost:5173/node_modules/.vite/deps/react_jsx-dev-runtime.js?v=fbfc99d6
+
+[1A[2K>> GET http://localhost:5173/node_modules/.vite/deps/react.js?v=fbfc99d6
+
+[1A[2K>> GET http://localhost:5173/node_modules/.vite/deps/react-dom_client.js?v=fbfc99d6
+
+[1A[2K>> GET http://localhost:5173/node_modules/.vite/deps/react-router-dom.js?v=fbfc99d6
+
+[1A[2K>> GET http://localhost:5173/src/router.tsx
+
+[1A[2K>> GET http://localhost:5173/src/index.css
+
+[1A[2K>> GET http://localhost:5173/src/contexts/ToastProvider.tsx
+
+[1A[2K>> GET http://localhost:5173/src/contexts/AuthProvider.tsx
+
+[1A[2K>> GET http://localhost:5173/src/providers/SupabaseProvider.tsx
+
+[1A[2K>> GET http://localhost:5173/node_modules/.vite/deps/@tanstack_react-query.js?v=fbfc99d6
+
+[1A[2K>> GET http://localhost:5173/src/components/error/GlobalErrorBoundary.tsx
+
+[1A[2K>> GET http://localhost:5173/node_modules/.vite/deps/@sentry_react.js?v=fbfc99d6
+
+[1A[2K<< [33m200[39m http://localhost:5173/@react-refresh
+
+[1A[2K<< [33m200[39m http://localhost:5173/@vite/client
+
+[1A[2K<< [33m200[39m http://localhost:5173/src/index.css
+
+[1A[2K>> GET http://localhost:5173/node_modules/vite/dist/client/env.mjs
+
+[1A[2K<< [33m200[39m http://localhost:5173/src/router.tsx
+
+[1A[2K>> GET http://localhost:5173/src/routes/public.routes.tsx
+
+[1A[2K>> GET http://localhost:5173/src/routes/auth.routes.tsx
+
+[1A[2K>> GET http://localhost:5173/src/routes/app.routes.tsx
+
+[1A[2K<< [33m200[39m http://localhost:5173/node_modules/.vite/deps/react_jsx-dev-runtime.js?v=fbfc99d6
+
+[1A[2K>> GET http://localhost:5173/node_modules/.vite/deps/chunk-ZMLY2J2T.js?v=fbfc99d6
+
+[1A[2K<< [33m200[39m http://localhost:5173/src/contexts/ToastProvider.tsx
+
+[1A[2K>> GET http://localhost:5173/node_modules/.vite/deps/chunk-4B2QHNJT.js?v=fbfc99d6
+
+[1A[2K>> GET http://localhost:5173/node_modules/.vite/deps/framer-motion.js?v=fbfc99d6
+
+[1A[2K>> GET http://localhost:5173/src/components/ui/Toast.tsx
+
+[1A[2K<< [33m200[39m http://localhost:5173/src/contexts/AuthProvider.tsx
+
+[1A[2K>> GET http://localhost:5173/src/lib/logger.ts
+
+[1A[2K>> GET http://localhost:5173/src/hooks/useEmpresas.ts
+
+[1A[2K<< [33m200[39m http://localhost:5173/node_modules/.vite/deps/react.js?v=fbfc99d6
+
+[1A[2K<< [33m200[39m http://localhost:5173/node_modules/.vite/deps/@tanstack_react-query.js?v=fbfc99d6
+
+[1A[2K<< [33m200[39m http://localhost:5173/src/components/error/GlobalErrorBoundary.tsx
+
+[1A[2K>> GET http://localhost:5173/node_modules/.vite/deps/chunk-CRNJR6QK.js?v=fbfc99d6
+
+[1A[2K<< [33m200[39m http://localhost:5173/src/providers/SupabaseProvider.tsx
+
+[1A[2K>> GET http://localhost:5173/node_modules/.vite/deps/lucide-react.js?v=fbfc99d6
+
+[1A[2K<< [33m200[39m http://localhost:5173/node_modules/.vite/deps/react-dom_client.js?v=fbfc99d6
+
+[1A[2K>> GET http://localhost:5173/src/lib/supabaseClient.ts
+
+[1A[2K>> GET http://localhost:5173/node_modules/.vite/deps/chunk-F34GCA6J.js?v=fbfc99d6
+
+[1A[2K<< [33m200[39m http://localhost:5173/src/routes/public.routes.tsx
+
+[1A[2K>> GET http://localhost:5173/src/pages/landing/LandingPage.tsx
+
+[1A[2K<< [33m200[39m http://localhost:5173/src/routes/auth.routes.tsx
+
+[1A[2K>> GET http://localhost:5173/src/pages/auth/AuthLayout.tsx
+
+[1A[2K>> GET http://localhost:5173/src/pages/auth/LoginPage.tsx
+
+[1A[2K>> GET http://localhost:5173/src/pages/auth/SignUpPage.tsx
+
+[1A[2K>> GET http://localhost:5173/src/pages/auth/ForgotPasswordPage.tsx
+
+[1A[2K>> GET http://localhost:5173/src/pages/auth/PendingVerificationPage.tsx
+
+[1A[2K>> GET http://localhost:5173/src/pages/auth/Callback.tsx
+
+[1A[2K>> GET http://localhost:5173/src/pages/auth/UpdatePasswordPage.tsx
+
+[1A[2K>> GET http://localhost:5173/src/pages/auth/Confirmed.tsx
+
+[1A[2K>> GET http://localhost:5173/src/pages/onboarding/AcceptInvite.tsx
+
+[1A[2K<< [33m200[39m http://localhost:5173/node_modules/.vite/deps/chunk-ZMLY2J2T.js?v=fbfc99d6
+
+[1A[2K<< [33m200[39m http://localhost:5173/node_modules/.vite/deps/react-router-dom.js?v=fbfc99d6
+
+[1A[2K<< [33m200[39m http://localhost:5173/node_modules/.vite/deps/chunk-4B2QHNJT.js?v=fbfc99d6
+
+[1A[2K<< [33m200[39m http://localhost:5173/node_modules/vite/dist/client/env.mjs
+
+[1A[2KBROWSER LOG: [vite] connecting...
+
+[1A[2K<< [33m200[39m http://localhost:5173/src/routes/app.routes.tsx
+
+[1A[2K<< [33m200[39m http://localhost:5173/src/lib/logger.ts
+
+[1A[2K<< [33m200[39m http://localhost:5173/src/components/ui/Toast.tsx
+
+[1A[2K<< [33m200[39m http://localhost:5173/src/hooks/useEmpresas.ts
+
+[1A[2K<< [33m200[39m http://localhost:5173/node_modules/.vite/deps/chunk-CRNJR6QK.js?v=fbfc99d6
+
+[1A[2K<< [33m200[39m http://localhost:5173/node_modules/.vite/deps/framer-motion.js?v=fbfc99d6
+
+[1A[2K<< [33m200[39m http://localhost:5173/src/lib/supabaseClient.ts
+
+[1A[2K<< [33m200[39m http://localhost:5173/node_modules/.vite/deps/@sentry_react.js?v=fbfc99d6
+
+[1A[2K<< [33m200[39m http://localhost:5173/src/pages/landing/LandingPage.tsx
+
+[1A[2K<< [33m200[39m http://localhost:5173/src/pages/auth/AuthLayout.tsx
+
+[1A[2K<< [33m200[39m http://localhost:5173/src/pages/auth/LoginPage.tsx
+
+[1A[2K<< [33m200[39m http://localhost:5173/src/pages/auth/SignUpPage.tsx
+
+[1A[2K<< [33m200[39m http://localhost:5173/src/pages/auth/ForgotPasswordPage.tsx
+
+[1A[2K>> GET http://localhost:5173/src/components/layout/MainLayout.tsx
+
+[1A[2K>> GET http://localhost:5173/src/components/layout/ProtectedRoute.tsx
+
+[1A[2K>> GET http://localhost:5173/src/components/auth/OnboardingGuard.tsx
+
+[1A[2K>> GET http://localhost:5173/src/components/ui/PageLoader.tsx
+
+[1A[2K>> GET http://localhost:5173/node_modules/.vite/deps/@supabase_supabase-js.js?v=fbfc99d6
+
+[1A[2K>> GET http://localhost:5173/node_modules/.vite/deps/chunk-DHYJUWQK.js?v=fbfc99d6
+
+[1A[2K>> GET http://localhost:5173/src/components/landing/Header.tsx
+
+[1A[2K<< [33m200[39m http://localhost:5173/src/pages/auth/PendingVerificationPage.tsx
+
+[1A[2K<< [33m200[39m http://localhost:5173/src/pages/auth/UpdatePasswordPage.tsx
+
+[1A[2K>> GET http://localhost:5173/src/components/landing/Hero.tsx
+
+[1A[2K<< [33m200[39m http://localhost:5173/src/pages/auth/Callback.tsx
+
+[1A[2K>> GET http://localhost:5173/src/components/landing/Features.tsx
+
+[1A[2K>> GET http://localhost:5173/src/components/landing/Pricing.tsx
+
+[1A[2K<< [33m200[39m http://localhost:5173/src/pages/auth/Confirmed.tsx
+
+[1A[2K>> GET http://localhost:5173/src/components/landing/FAQ.tsx
+
+[1A[2K>> GET http://localhost:5173/src/components/landing/Footer.tsx
+
+[1A[2K<< [33m200[39m http://localhost:5173/node_modules/.vite/deps/chunk-F34GCA6J.js?v=fbfc99d6
+
+[1A[2K>> GET http://localhost:5173/src/components/landing/RevoLogo.tsx
+
+[1A[2K>> GET http://localhost:5173/src/components/ui/forms/Input.tsx
+
+[1A[2K>> GET http://localhost:5173/src/lib/auth.ts
+
+[1A[2K>> GET http://localhost:5173/src/components/ui/button.tsx
+
+[1A[2KBROWSER LOG: [vite] connected.
+
+[1A[2K<< [33m200[39m http://localhost:5173/src/pages/onboarding/AcceptInvite.tsx
+
+[1A[2K<< [33m200[39m http://localhost:5173/src/components/layout/MainLayout.tsx
+
+[1A[2K<< [33m200[39m http://localhost:5173/node_modules/.vite/deps/lucide-react.js?v=fbfc99d6
+
+[1A[2K<< [33m200[39m http://localhost:5173/src/components/layout/ProtectedRoute.tsx
+
+[1A[2K<< [33m200[39m http://localhost:5173/src/components/auth/OnboardingGuard.tsx
+
+[1A[2K<< [33m200[39m http://localhost:5173/src/components/ui/PageLoader.tsx
+
+[1A[2K>> GET http://localhost:5173/src/services/session.ts
+
+[1A[2K>> GET http://localhost:5173/src/components/ui/GlassCard.tsx
+
+[1A[2K>> GET http://localhost:5173/src/components/layout/Sidebar.tsx
+
+[1A[2K>> GET http://localhost:5173/src/pages/settings/SettingsPanel.tsx
+
+[1A[2K>> GET http://localhost:5173/src/contexts/SubscriptionProvider.tsx
+
+[1A[2K>> GET http://localhost:5173/src/components/layout/SubscriptionGuard.tsx
+
+[1A[2K>> GET http://localhost:5173/src/config/menuConfig.ts
+
+[1A[2K<< [33m200[39m http://localhost:5173/node_modules/.vite/deps/chunk-DHYJUWQK.js?v=fbfc99d6
+
+[1A[2K<< [33m200[39m http://localhost:5173/src/components/landing/Hero.tsx
+
+[1A[2K<< [33m200[39m http://localhost:5173/src/components/landing/Pricing.tsx
+
+[1A[2K<< [33m200[39m http://localhost:5173/src/components/landing/Features.tsx
+
+[1A[2K>> GET http://localhost:5173/src/config/pricingConfig.ts
+
+[1A[2K<< [33m200[39m http://localhost:5173/src/components/landing/Header.tsx
+
+[1A[2K<< [33m200[39m http://localhost:5173/src/components/landing/RevoLogo.tsx
+
+[1A[2K<< [33m200[39m http://localhost:5173/src/components/ui/forms/Input.tsx
+
+[1A[2K<< [33m200[39m http://localhost:5173/src/lib/auth.ts
+
+[1A[2K<< [33m200[39m http://localhost:5173/node_modules/.vite/deps/@supabase_supabase-js.js?v=fbfc99d6
+
+[1A[2K<< [33m200[39m http://localhost:5173/src/components/landing/FAQ.tsx
+
+[1A[2K<< [33m200[39m http://localhost:5173/src/components/landing/Footer.tsx
+
+[1A[2K>> GET http://localhost:5173/node_modules/.vite/deps/chunk-4FMFHQAA.js?v=fbfc99d6
+
+[1A[2K<< [33m200[39m http://localhost:5173/src/services/session.ts
+
+[1A[2K>> GET http://localhost:5173/src/lib/api.ts
+
+[1A[2K<< [33m200[39m http://localhost:5173/src/components/ui/GlassCard.tsx
+
+[1A[2K<< [33m200[39m http://localhost:5173/src/components/layout/Sidebar.tsx
+
+[1A[2K<< [33m200[39m http://localhost:5173/src/pages/settings/SettingsPanel.tsx
+
+[1A[2K>> GET http://localhost:5173/src/components/sidebar/SidebarGroup.tsx
+
+[1A[2K>> GET http://localhost:5173/src/components/sidebar/FloatingSubmenu.tsx
+
+[1A[2K>> GET http://localhost:5173/src/components/sidebar/SidebarSwitch.tsx
+
+[1A[2K>> GET http://localhost:5173/src/components/sidebar/CompanySwitcher.tsx
+
+[1A[2K>> GET http://localhost:5173/src/components/settings/SettingsHeader.tsx
+
+[1A[2K>> GET http://localhost:5173/src/components/settings/SettingsSidebar.tsx
+
+[1A[2K>> GET http://localhost:5173/src/components/settings/SettingsContent.tsx
+
+[1A[2K>> GET http://localhost:5173/src/config/settingsMenuConfig.ts
+
+[1A[2K<< [33m200[39m http://localhost:5173/src/components/ui/button.tsx
+
+[1A[2K<< [33m200[39m http://localhost:5173/src/contexts/SubscriptionProvider.tsx
+
+[1A[2K>> GET http://localhost:5173/node_modules/.vite/deps/@radix-ui_react-slot.js?v=fbfc99d6
+
+[1A[2K>> GET http://localhost:5173/node_modules/.vite/deps/class-variance-authority.js?v=fbfc99d6
+
+[1A[2K>> GET http://localhost:5173/src/lib/utils.ts
+
+[1A[2K<< [33m200[39m http://localhost:5173/src/config/menuConfig.ts
+
+[1A[2K<< [33m200[39m http://localhost:5173/src/components/layout/SubscriptionGuard.tsx
+
+[1A[2K>> GET http://localhost:5173/src/pages/billing/BillingBlockPage.tsx
+
+[1A[2K<< [33m200[39m http://localhost:5173/src/config/pricingConfig.ts
+
+[1A[2K<< [33m200[39m http://localhost:5173/node_modules/.vite/deps/chunk-4FMFHQAA.js?v=fbfc99d6
+
+[1A[2K<< [33m200[39m http://localhost:5173/src/lib/api.ts
+
+[1A[2K<< [33m200[39m http://localhost:5173/src/components/sidebar/SidebarGroup.tsx
+
+[1A[2K>> GET http://localhost:5173/src/components/sidebar/SidebarItem.tsx
+
+[1A[2K<< [33m200[39m http://localhost:5173/src/components/sidebar/FloatingSubmenu.tsx
+
+[1A[2K<< [33m200[39m http://localhost:5173/src/components/sidebar/SidebarSwitch.tsx
+
+[1A[2K<< [33m200[39m http://localhost:5173/src/components/sidebar/CompanySwitcher.tsx
+
+[1A[2K<< [33m200[39m http://localhost:5173/src/components/settings/SettingsHeader.tsx
+
+[1A[2K<< [33m200[39m http://localhost:5173/src/components/settings/SettingsSidebar.tsx
+
+[1A[2K<< [33m200[39m http://localhost:5173/src/components/settings/SettingsContent.tsx
+
+[1A[2K>> GET http://localhost:5173/src/components/settings/company/CompanySettingsForm.tsx
+
+[1A[2K>> GET http://localhost:5173/src/pages/billing/SubscriptionPage.tsx
+
+[1A[2K>> GET http://localhost:5173/src/components/settings/data-management/DataManagementContent.tsx
+
+[1A[2K>> GET http://localhost:5173/src/pages/settings/roles/RolesPage.tsx
+
+[1A[2K>> GET http://localhost:5173/src/pages/settings/general/UsersPage.tsx
+
+[1A[2K<< [33m200[39m http://localhost:5173/src/config/settingsMenuConfig.ts
+
+[1A[2K<< [33m200[39m http://localhost:5173/node_modules/.vite/deps/@radix-ui_react-slot.js?v=fbfc99d6
+
+[1A[2K>> GET http://localhost:5173/node_modules/.vite/deps/chunk-HKFJJYQE.js?v=fbfc99d6
+
+[1A[2K<< [33m200[39m http://localhost:5173/node_modules/.vite/deps/class-variance-authority.js?v=fbfc99d6
+
+[1A[2K>> GET http://localhost:5173/node_modules/.vite/deps/chunk-U7P2NEEE.js?v=fbfc99d6
+
+[1A[2K<< [33m200[39m http://localhost:5173/src/lib/utils.ts
+
+[1A[2K>> GET http://localhost:5173/node_modules/.vite/deps/clsx.js?v=fbfc99d6
+
+[1A[2K>> GET http://localhost:5173/node_modules/.vite/deps/tailwind-merge.js?v=fbfc99d6
+
+[1A[2K<< [33m200[39m http://localhost:5173/src/pages/billing/BillingBlockPage.tsx
+
+[1A[2K<< [33m200[39m http://localhost:5173/src/components/sidebar/SidebarItem.tsx
+
+[1A[2K<< [33m200[39m http://localhost:5173/src/pages/billing/SubscriptionPage.tsx
+
+[1A[2K<< [33m200[39m http://localhost:5173/src/components/settings/company/CompanySettingsForm.tsx
+
+[1A[2K>> GET http://localhost:5173/src/components/settings/billing/SubscriptionSettings.tsx
+
+[1A[2K>> GET http://localhost:5173/src/components/billing/SubscriptionPlans.tsx
+
+[1A[2K>> GET http://localhost:5173/src/services/company.ts
+
+[1A[2K>> GET http://localhost:5173/src/services/externalApis.ts
+
+[1A[2K>> GET http://localhost:5173/src/components/settings/company/LogoUploader.tsx
+
+[1A[2K<< [33m200[39m http://localhost:5173/src/components/settings/data-management/DataManagementContent.tsx
+
+[1A[2K>> GET http://localhost:5173/src/lib/masks.ts
+
+[1A[2K<< [33m200[39m http://localhost:5173/src/pages/settings/roles/RolesPage.tsx
+
+[1A[2K<< [33m200[39m http://localhost:5173/src/pages/settings/general/UsersPage.tsx
+
+[1A[2K>> GET http://localhost:5173/src/features/roles/RolesList.tsx
+
+[1A[2K>> GET http://localhost:5173/src/features/roles/PermissionsMatrix.tsx
+
+[1A[2K>> GET http://localhost:5173/src/features/roles/hooks/useRbac.ts
+
+[1A[2K>> GET http://localhost:5173/src/hooks/useHasPermission.ts
+
+[1A[2K>> GET http://localhost:5173/src/features/users/hooks/useUsersQuery.ts
+
+[1A[2K>> GET http://localhost:5173/src/features/users/components/UsersTable.tsx
+
+[1A[2K<< [33m200[39m http://localhost:5173/node_modules/.vite/deps/chunk-HKFJJYQE.js?v=fbfc99d6
+
+[1A[2K<< [33m200[39m http://localhost:5173/node_modules/.vite/deps/chunk-U7P2NEEE.js?v=fbfc99d6
+
+[1A[2K>> GET http://localhost:5173/src/features/users/EditUserRoleDrawer.tsx
+
+[1A[2K>> GET http://localhost:5173/src/hooks/useCan.ts
+
+[1A[2K>> GET http://localhost:5173/src/features/users/InviteUserDialog.tsx
+
+[1A[2K>> GET http://localhost:5173/src/components/ui/dialog.tsx
+
+[1A[2K>> GET http://localhost:5173/src/features/users/components/UsersFilters.tsx
+
+[1A[2K>> GET http://localhost:5173/src/components/ui/Pagination.tsx
+
+[1A[2K>> GET http://localhost:5173/src/features/users/components/UsersTableSkeleton.tsx
+
+[1A[2K<< [33m200[39m http://localhost:5173/node_modules/.vite/deps/clsx.js?v=fbfc99d6
+
+[1A[2K<< [33m200[39m http://localhost:5173/node_modules/.vite/deps/tailwind-merge.js?v=fbfc99d6
+
+[1A[2K<< [33m200[39m http://localhost:5173/src/components/billing/SubscriptionPlans.tsx
+
+[1A[2K<< [33m200[39m http://localhost:5173/src/components/settings/billing/SubscriptionSettings.tsx
+
+[1A[2K>> GET http://localhost:5173/src/components/billing/PricingCard.tsx
+
+[1A[2K<< [33m200[39m http://localhost:5173/src/services/company.ts
+
+[1A[2K<< [33m200[39m http://localhost:5173/src/services/externalApis.ts
+
+[1A[2K>> GET http://localhost:5173/node_modules/.vite/deps/axios.js?v=fbfc99d6
+
+[1A[2K<< [33m200[39m http://localhost:5173/src/components/settings/company/LogoUploader.tsx
+
+[1A[2K>> GET http://localhost:5173/node_modules/.vite/deps/react-dropzone.js?v=fbfc99d6
+
+[1A[2K<< [33m200[39m http://localhost:5173/src/lib/masks.ts
+
+[1A[2K>> GET http://localhost:5173/src/components/settings/company/LogoCropperModal.tsx
+
+[1A[2K>> GET http://localhost:5173/src/lib/imageUtils.ts
+
+[1A[2K<< [33m200[39m http://localhost:5173/src/features/roles/RolesList.tsx
+
+[1A[2K<< [33m200[39m http://localhost:5173/src/features/roles/PermissionsMatrix.tsx
+
+[1A[2K<< [33m200[39m http://localhost:5173/src/features/roles/hooks/useRbac.ts
+
+[1A[2K>> GET http://localhost:5173/src/services/rbac.ts
+
+[1A[2K<< [33m200[39m http://localhost:5173/src/hooks/useHasPermission.ts
+
+[1A[2K<< [33m200[39m http://localhost:5173/src/features/users/hooks/useUsersQuery.ts
+
+[1A[2K>> GET http://localhost:5173/src/services/users.ts
+
+[1A[2K<< [33m200[39m http://localhost:5173/src/features/users/components/UsersTable.tsx
+
+[1A[2K>> GET http://localhost:5173/src/features/users/components/UserActionsMenu.tsx
+
+[1A[2K<< [33m200[39m http://localhost:5173/src/features/users/EditUserRoleDrawer.tsx
+
+[1A[2K>> GET http://localhost:5173/src/components/ui/Modal.tsx
+
+[1A[2K>> GET http://localhost:5173/src/components/ui/forms/Select.tsx
+
+[1A[2K<< [33m200[39m http://localhost:5173/src/hooks/useCan.ts
+
+[1A[2K>> GET http://localhost:5173/src/features/users/DangerZoneUser.tsx
+
+[1A[2K<< [33m200[39m http://localhost:5173/src/features/users/InviteUserDialog.tsx
+
+[1A[2K>> GET http://localhost:5173/node_modules/.vite/deps/zod.js?v=fbfc99d6
+
+[1A[2K<< [33m200[39m http://localhost:5173/src/components/ui/Pagination.tsx
+
+[1A[2K<< [33m200[39m http://localhost:5173/src/components/ui/dialog.tsx
+
+[1A[2K>> GET http://localhost:5173/node_modules/.vite/deps/@radix-ui_react-dialog.js?v=fbfc99d6
+
+[1A[2K<< [33m200[39m http://localhost:5173/src/features/users/components/UsersFilters.tsx
+
+[1A[2K>> GET http://localhost:5173/src/components/ui/MultiSelect.tsx
+
+[1A[2K<< [33m200[39m http://localhost:5173/src/features/users/components/UsersTableSkeleton.tsx
+
+[1A[2K<< [33m200[39m http://localhost:5173/src/components/billing/PricingCard.tsx
+
+[1A[2K<< [33m200[39m http://localhost:5173/src/components/settings/company/LogoCropperModal.tsx
+
+[1A[2K<< [33m200[39m http://localhost:5173/node_modules/.vite/deps/axios.js?v=fbfc99d6
+
+[1A[2K>> GET http://localhost:5173/node_modules/.vite/deps/react-easy-crop.js?v=fbfc99d6
+
+[1A[2K<< [33m200[39m http://localhost:5173/src/lib/imageUtils.ts
+
+[1A[2K<< [33m200[39m http://localhost:5173/src/services/rbac.ts
+
+[1A[2K<< [33m200[39m http://localhost:5173/node_modules/.vite/deps/react-dropzone.js?v=fbfc99d6
+
+[1A[2K<< [33m200[39m http://localhost:5173/src/services/users.ts
+
+[1A[2K<< [33m200[39m http://localhost:5173/src/features/users/components/UserActionsMenu.tsx
+
+[1A[2K>> GET http://localhost:5173/src/components/ui/dropdown-menu.tsx
+
+[1A[2K<< [33m200[39m http://localhost:5173/src/components/ui/Modal.tsx
+
+[1A[2K<< [33m200[39m http://localhost:5173/src/components/ui/forms/Select.tsx
+
+[1A[2K<< [33m200[39m http://localhost:5173/src/features/users/DangerZoneUser.tsx
+
+[1A[2K>> GET http://localhost:5173/src/components/ui/ConfirmationModal.tsx
+
+[1A[2K<< [33m200[39m http://localhost:5173/node_modules/.vite/deps/@radix-ui_react-dialog.js?v=fbfc99d6
+
+[1A[2K>> GET http://localhost:5173/node_modules/.vite/deps/chunk-PWYGQ56K.js?v=fbfc99d6
+
+[1A[2K>> GET http://localhost:5173/node_modules/.vite/deps/chunk-XIWII2CM.js?v=fbfc99d6
+
+[1A[2K<< [33m200[39m http://localhost:5173/src/components/ui/MultiSelect.tsx
+
+[1A[2K>> GET http://localhost:5173/src/components/ui/popover.tsx
+
+[1A[2K>> GET http://localhost:5173/src/components/ui/command.tsx
+
+[1A[2K<< [33m200[39m http://localhost:5173/node_modules/.vite/deps/react-easy-crop.js?v=fbfc99d6
+
+[1A[2K<< [33m200[39m http://localhost:5173/src/components/ui/dropdown-menu.tsx
+
+[1A[2K>> GET http://localhost:5173/node_modules/.vite/deps/@radix-ui_react-dropdown-menu.js?v=fbfc99d6
+
+[1A[2K<< [33m200[39m http://localhost:5173/src/components/ui/ConfirmationModal.tsx
+
+[1A[2K<< [33m200[39m http://localhost:5173/node_modules/.vite/deps/chunk-PWYGQ56K.js?v=fbfc99d6
+
+[1A[2K<< [33m200[39m http://localhost:5173/node_modules/.vite/deps/zod.js?v=fbfc99d6
+
+[1A[2K<< [33m200[39m http://localhost:5173/src/components/ui/popover.tsx
+
+[1A[2K>> GET http://localhost:5173/node_modules/.vite/deps/@radix-ui_react-popover.js?v=fbfc99d6
+
+[1A[2K<< [33m200[39m http://localhost:5173/src/components/ui/command.tsx
+
+[1A[2K<< [33m200[39m http://localhost:5173/node_modules/.vite/deps/chunk-XIWII2CM.js?v=fbfc99d6
+
+[1A[2K>> GET http://localhost:5173/node_modules/.vite/deps/cmdk.js?v=fbfc99d6
+
+[1A[2K<< [33m200[39m http://localhost:5173/node_modules/.vite/deps/@radix-ui_react-dropdown-menu.js?v=fbfc99d6
+
+[1A[2K<< [33m200[39m http://localhost:5173/node_modules/.vite/deps/@radix-ui_react-popover.js?v=fbfc99d6
+
+[1A[2K>> GET http://localhost:5173/node_modules/.vite/deps/chunk-SRAXREPR.js?v=fbfc99d6
+
+[1A[2K<< [33m200[39m http://localhost:5173/node_modules/.vite/deps/cmdk.js?v=fbfc99d6
+
+[1A[2K<< [33m200[39m http://localhost:5173/node_modules/.vite/deps/chunk-SRAXREPR.js?v=fbfc99d6
+
+[1A[2KBROWSER LOG: %cDownload the React DevTools for a better development experience: https://reactjs.org/link/react-devtools font-weight:bold
+
+[1A[2KBROWSER LOG: ⚠️ React Router Future Flag Warning: React Router will begin wrapping state updates in `React.startTransition` in v7. You can use the `v7_startTransition` future flag to opt-in early. For more information, see https://reactrouter.com/v6/upgrading/future#v7_starttransition.
+
+[1A[2KBROWSER LOG: [AUTH][LOGIN] start {email: test@example.com}
+
+[1A[2K>> POST https://lrfwiaekipwkjkzvcnfd.supabase.co/auth/v1/token?grant_type=password
+
+[1A[2K<< [33m200[39m https://lrfwiaekipwkjkzvcnfd.supabase.co/auth/v1/token?grant_type=password
+
+[1A[2KBROWSER LOG: [DEBUG] [QUERY][empresas] fetching list 
+
+[1A[2KBROWSER LOG: [DEBUG] [QUERY][active_empresa] fetching 
+
+[1A[2KBROWSER LOG: [INFO] [AUTH][LOGIN] start {email: exists}
+
+[1A[2K>> GET https://lrfwiaekipwkjkzvcnfd.supabase.co/rest/v1/empresa_usuarios?select=empresa%3Aempresas%28*%29&order=created_at.desc
+
+[1A[2K>> GET https://lrfwiaekipwkjkzvcnfd.supabase.co/rest/v1/user_active_empresa?select=empresa_id
+
+[1A[2K>> GET http://localhost:5173/app/products
+
+[1A[2K<< [33m200[39m https://lrfwiaekipwkjkzvcnfd.supabase.co/rest/v1/empresa_usuarios?select=empresa%3Aempresas%28*%29&order=created_at.desc
+
+[1A[2K<< [33m200[39m https://lrfwiaekipwkjkzvcnfd.supabase.co/rest/v1/user_active_empresa?select=empresa_id
+
+[1A[2KBROWSER LOG: [MainLayout] Profile Check: {isProfileIncomplete: false, activeEmpresa: Object}
+
+[1A[2KBROWSER LOG: [MainLayout] Profile Check: {isProfileIncomplete: false, activeEmpresa: Object}
+
+[1A[2K<< [33m200[39m http://localhost:5173/app/products
+
+[1A[2K>> GET http://localhost:5173/@vite/client
+
+[1A[2K>> GET http://localhost:5173/src/main.tsx
+
+[1A[2K>> GET http://localhost:5173/@react-refresh
+
+[1A[2K<< [33m200[39m http://localhost:5173/src/main.tsx
+
+[1A[2K>> GET http://localhost:5173/node_modules/.vite/deps/react_jsx-dev-runtime.js?v=fbfc99d6
+
+[1A[2K>> GET http://localhost:5173/node_modules/.vite/deps/react.js?v=fbfc99d6
+
+[1A[2K<< [33m200[39m http://localhost:5173/@vite/client
+
+[1A[2K>> GET http://localhost:5173/node_modules/.vite/deps/react-dom_client.js?v=fbfc99d6
+
+[1A[2K>> GET http://localhost:5173/node_modules/.vite/deps/react-router-dom.js?v=fbfc99d6
+
+[1A[2K>> GET http://localhost:5173/src/router.tsx
+
+[1A[2K>> GET http://localhost:5173/src/index.css
+
+[1A[2K>> GET http://localhost:5173/src/contexts/ToastProvider.tsx
+
+[1A[2K>> GET http://localhost:5173/src/contexts/AuthProvider.tsx
+
+[1A[2K>> GET http://localhost:5173/src/providers/SupabaseProvider.tsx
+
+[1A[2K>> GET http://localhost:5173/node_modules/.vite/deps/@tanstack_react-query.js?v=fbfc99d6
+
+[1A[2K>> GET http://localhost:5173/src/components/error/GlobalErrorBoundary.tsx
+
+[1A[2K>> GET http://localhost:5173/node_modules/.vite/deps/@sentry_react.js?v=fbfc99d6
+
+[1A[2K>> GET http://localhost:5173/node_modules/vite/dist/client/env.mjs
+
+[1A[2K<< [33m200[39m http://localhost:5173/@react-refresh
+
+[1A[2K<< [33m200[39m http://localhost:5173/node_modules/.vite/deps/react.js?v=fbfc99d6
+
+[1A[2K>> GET http://localhost:5173/node_modules/.vite/deps/chunk-ZMLY2J2T.js?v=fbfc99d6
+
+[1A[2K>> GET http://localhost:5173/node_modules/.vite/deps/chunk-4B2QHNJT.js?v=fbfc99d6
+
+[1A[2K<< [33m200[39m http://localhost:5173/node_modules/.vite/deps/react_jsx-dev-runtime.js?v=fbfc99d6
+
+[1A[2K<< [33m200[39m http://localhost:5173/src/index.css
+
+[1A[2K<< [33m200[39m http://localhost:5173/node_modules/.vite/deps/react-dom_client.js?v=fbfc99d6
+
+[1A[2K>> GET http://localhost:5173/node_modules/.vite/deps/chunk-F34GCA6J.js?v=fbfc99d6
+
+[1A[2K<< [33m200[39m http://localhost:5173/src/router.tsx
+
+[1A[2K>> GET http://localhost:5173/src/routes/public.routes.tsx
+
+[1A[2K>> GET http://localhost:5173/src/routes/auth.routes.tsx
+
+[1A[2K>> GET http://localhost:5173/src/routes/app.routes.tsx
+
+[1A[2K<< [33m200[39m http://localhost:5173/src/contexts/ToastProvider.tsx
+
+[1A[2K>> GET http://localhost:5173/node_modules/.vite/deps/framer-motion.js?v=fbfc99d6
+
+[1A[2K>> GET http://localhost:5173/src/components/ui/Toast.tsx
+
+[1A[2K<< [33m200[39m http://localhost:5173/src/contexts/AuthProvider.tsx
+
+[1A[2K>> GET http://localhost:5173/src/lib/logger.ts
+
+[1A[2K<< [33m200[39m http://localhost:5173/src/providers/SupabaseProvider.tsx
+
+[1A[2K>> GET http://localhost:5173/src/hooks/useEmpresas.ts
+
+[1A[2K<< [33m200[39m http://localhost:5173/node_modules/.vite/deps/react-router-dom.js?v=fbfc99d6
+
+[1A[2K>> GET http://localhost:5173/src/lib/supabaseClient.ts
+
+[1A[2K<< [33m200[39m http://localhost:5173/node_modules/vite/dist/client/env.mjs
+
+[1A[2KBROWSER LOG: [vite] connecting...
+
+[1A[2K<< [33m200[39m http://localhost:5173/node_modules/.vite/deps/@tanstack_react-query.js?v=fbfc99d6
+
+[1A[2K<< [33m200[39m http://localhost:5173/node_modules/.vite/deps/chunk-ZMLY2J2T.js?v=fbfc99d6
+
+[1A[2K>> GET http://localhost:5173/node_modules/.vite/deps/chunk-CRNJR6QK.js?v=fbfc99d6
+
+[1A[2K<< [33m200[39m http://localhost:5173/node_modules/.vite/deps/chunk-4B2QHNJT.js?v=fbfc99d6
+
+[1A[2K<< [33m200[39m http://localhost:5173/src/components/error/GlobalErrorBoundary.tsx
+
+[1A[2K>> GET http://localhost:5173/node_modules/.vite/deps/lucide-react.js?v=fbfc99d6
+
+[1A[2K<< [33m200[39m http://localhost:5173/src/routes/public.routes.tsx
+
+[1A[2K<< [33m200[39m http://localhost:5173/src/routes/auth.routes.tsx
+
+[1A[2K>> GET http://localhost:5173/src/pages/landing/LandingPage.tsx
+
+[1A[2K>> GET http://localhost:5173/src/pages/auth/AuthLayout.tsx
+
+[1A[2K>> GET http://localhost:5173/src/pages/auth/LoginPage.tsx
+
+[1A[2K>> GET http://localhost:5173/src/pages/auth/SignUpPage.tsx
+
+[1A[2K>> GET http://localhost:5173/src/pages/auth/ForgotPasswordPage.tsx
+
+[1A[2K>> GET http://localhost:5173/src/pages/auth/PendingVerificationPage.tsx
+
+[1A[2K>> GET http://localhost:5173/src/pages/auth/Callback.tsx
+
+[1A[2K>> GET http://localhost:5173/src/pages/auth/UpdatePasswordPage.tsx
+
+[1A[2K>> GET http://localhost:5173/src/pages/auth/Confirmed.tsx
+
+[1A[2K>> GET http://localhost:5173/src/pages/onboarding/AcceptInvite.tsx
+
+[1A[2K<< [33m200[39m http://localhost:5173/src/routes/app.routes.tsx
+
+[1A[2K>> GET http://localhost:5173/src/components/layout/MainLayout.tsx
+
+[1A[2K>> GET http://localhost:5173/src/components/layout/ProtectedRoute.tsx
+
+[1A[2K>> GET http://localhost:5173/src/components/auth/OnboardingGuard.tsx
+
+[1A[2K>> GET http://localhost:5173/src/components/ui/PageLoader.tsx
+
+[1A[2K<< [33m200[39m http://localhost:5173/node_modules/.vite/deps/@sentry_react.js?v=fbfc99d6
+
+[1A[2K>> GET http://localhost:5173/node_modules/.vite/deps/chunk-DHYJUWQK.js?v=fbfc99d6
+
+[1A[2K<< [33m200[39m http://localhost:5173/node_modules/.vite/deps/framer-motion.js?v=fbfc99d6
+
+[1A[2K<< [33m200[39m http://localhost:5173/src/components/ui/Toast.tsx
+
+[1A[2K<< [33m200[39m http://localhost:5173/src/lib/logger.ts
+
+[1A[2K<< [33m200[39m http://localhost:5173/src/lib/supabaseClient.ts
+
+[1A[2K>> GET http://localhost:5173/node_modules/.vite/deps/@supabase_supabase-js.js?v=fbfc99d6
+
+[1A[2K<< [33m200[39m http://localhost:5173/node_modules/.vite/deps/chunk-CRNJR6QK.js?v=fbfc99d6
+
+[1A[2K<< [33m200[39m http://localhost:5173/src/hooks/useEmpresas.ts
+
+[1A[2KBROWSER LOG: [vite] connected.
+
+[1A[2K<< [33m200[39m http://localhost:5173/node_modules/.vite/deps/chunk-F34GCA6J.js?v=fbfc99d6
+
+[1A[2K<< [33m200[39m http://localhost:5173/src/pages/landing/LandingPage.tsx
+
+[1A[2K>> GET http://localhost:5173/src/components/landing/Header.tsx
+
+[1A[2K<< [33m200[39m http://localhost:5173/src/pages/auth/AuthLayout.tsx
+
+[1A[2K>> GET http://localhost:5173/src/components/landing/Hero.tsx
+
+[1A[2K>> GET http://localhost:5173/src/components/landing/Features.tsx
+
+[1A[2K>> GET http://localhost:5173/src/components/landing/Pricing.tsx
+
+[1A[2K>> GET http://localhost:5173/src/components/landing/FAQ.tsx
+
+[1A[2K>> GET http://localhost:5173/src/components/landing/Footer.tsx
+
+[1A[2K>> GET http://localhost:5173/src/components/landing/RevoLogo.tsx
+
+[1A[2K<< [33m200[39m http://localhost:5173/src/pages/auth/LoginPage.tsx
+
+[1A[2K<< [33m200[39m http://localhost:5173/src/pages/auth/ForgotPasswordPage.tsx
+
+[1A[2K<< [33m200[39m http://localhost:5173/src/pages/auth/SignUpPage.tsx
+
+[1A[2K>> GET http://localhost:5173/src/components/ui/forms/Input.tsx
+
+[1A[2K>> GET http://localhost:5173/src/lib/auth.ts
+
+[1A[2K<< [33m200[39m http://localhost:5173/src/pages/auth/Confirmed.tsx
+
+[1A[2K>> GET http://localhost:5173/src/services/session.ts
+
+[1A[2K<< [33m200[39m http://localhost:5173/src/pages/auth/PendingVerificationPage.tsx
+
+[1A[2K<< [33m200[39m http://localhost:5173/src/pages/auth/Callback.tsx
+
+[1A[2K<< [33m200[39m http://localhost:5173/src/pages/auth/UpdatePasswordPage.tsx
+
+[1A[2K>> GET http://localhost:5173/src/components/ui/button.tsx
+
+[1A[2K<< [33m200[39m http://localhost:5173/src/pages/onboarding/AcceptInvite.tsx
+
+[1A[2K>> GET http://localhost:5173/src/components/ui/GlassCard.tsx
+
+[1A[2K<< [33m200[39m http://localhost:5173/src/components/layout/ProtectedRoute.tsx
+
+[1A[2K<< [33m200[39m http://localhost:5173/src/components/auth/OnboardingGuard.tsx
+
+[1A[2K<< [33m200[39m http://localhost:5173/src/components/ui/PageLoader.tsx
+
+[1A[2K<< [33m200[39m http://localhost:5173/node_modules/.vite/deps/chunk-DHYJUWQK.js?v=fbfc99d6
+
+[1A[2K<< [33m200[39m http://localhost:5173/src/components/layout/MainLayout.tsx
+
+[1A[2K>> GET http://localhost:5173/src/components/layout/Sidebar.tsx
+
+[1A[2K>> GET http://localhost:5173/src/pages/settings/SettingsPanel.tsx
+
+[1A[2K>> GET http://localhost:5173/src/contexts/SubscriptionProvider.tsx
+
+[1A[2K>> GET http://localhost:5173/src/components/layout/SubscriptionGuard.tsx
+
+[1A[2K>> GET http://localhost:5173/src/config/menuConfig.ts
+
+[1A[2K<< [33m200[39m http://localhost:5173/src/components/landing/Header.tsx
+
+[1A[2K<< [33m200[39m http://localhost:5173/src/components/landing/Hero.tsx
+
+[1A[2K<< [33m200[39m http://localhost:5173/src/components/landing/Features.tsx
+
+[1A[2K<< [33m200[39m http://localhost:5173/src/components/landing/Pricing.tsx
+
+[1A[2K>> GET http://localhost:5173/src/config/pricingConfig.ts
+
+[1A[2K<< [33m200[39m http://localhost:5173/node_modules/.vite/deps/lucide-react.js?v=fbfc99d6
+
+[1A[2K<< [33m200[39m http://localhost:5173/src/components/landing/Footer.tsx
+
+[1A[2K<< [33m200[39m http://localhost:5173/src/components/landing/RevoLogo.tsx
+
+[1A[2K<< [33m200[39m http://localhost:5173/src/components/ui/forms/Input.tsx
+
+[1A[2K<< [33m200[39m http://localhost:5173/src/lib/auth.ts
+
+[1A[2K<< [33m200[39m http://localhost:5173/src/components/landing/FAQ.tsx
+
+[1A[2K<< [33m200[39m http://localhost:5173/src/components/ui/button.tsx
+
+[1A[2K<< [33m200[39m http://localhost:5173/src/components/ui/GlassCard.tsx
+
+[1A[2K>> GET http://localhost:5173/node_modules/.vite/deps/@radix-ui_react-slot.js?v=fbfc99d6
+
+[1A[2K>> GET http://localhost:5173/node_modules/.vite/deps/class-variance-authority.js?v=fbfc99d6
+
+[1A[2K>> GET http://localhost:5173/src/lib/utils.ts
+
+[1A[2K<< [33m200[39m http://localhost:5173/node_modules/.vite/deps/@supabase_supabase-js.js?v=fbfc99d6
+
+[1A[2K<< [33m200[39m http://localhost:5173/src/components/layout/Sidebar.tsx
+
+[1A[2K<< [33m200[39m http://localhost:5173/src/services/session.ts
+
+[1A[2K<< [33m200[39m http://localhost:5173/src/components/layout/SubscriptionGuard.tsx
+
+[1A[2K>> GET http://localhost:5173/node_modules/.vite/deps/chunk-4FMFHQAA.js?v=fbfc99d6
+
+[1A[2K<< [33m200[39m http://localhost:5173/src/config/menuConfig.ts
+
+[1A[2K>> GET http://localhost:5173/src/components/sidebar/SidebarGroup.tsx
+
+[1A[2K>> GET http://localhost:5173/src/components/sidebar/FloatingSubmenu.tsx
+
+[1A[2K>> GET http://localhost:5173/src/components/sidebar/SidebarSwitch.tsx
+
+[1A[2K>> GET http://localhost:5173/src/components/sidebar/CompanySwitcher.tsx
+
+[1A[2K>> GET http://localhost:5173/src/lib/api.ts
+
+[1A[2K<< [33m200[39m http://localhost:5173/src/pages/settings/SettingsPanel.tsx
+
+[1A[2K>> GET http://localhost:5173/src/pages/billing/BillingBlockPage.tsx
+
+[1A[2K<< [33m200[39m http://localhost:5173/src/contexts/SubscriptionProvider.tsx
+
+[1A[2K>> GET http://localhost:5173/src/components/settings/SettingsHeader.tsx
+
+[1A[2K>> GET http://localhost:5173/src/components/settings/SettingsSidebar.tsx
+
+[1A[2K>> GET http://localhost:5173/src/components/settings/SettingsContent.tsx
+
+[1A[2K>> GET http://localhost:5173/src/config/settingsMenuConfig.ts
+
+[1A[2K<< [33m200[39m http://localhost:5173/node_modules/.vite/deps/@radix-ui_react-slot.js?v=fbfc99d6
+
+[1A[2K<< [33m200[39m http://localhost:5173/src/config/pricingConfig.ts
+
+[1A[2K>> GET http://localhost:5173/node_modules/.vite/deps/chunk-HKFJJYQE.js?v=fbfc99d6
+
+[1A[2K<< [33m200[39m http://localhost:5173/node_modules/.vite/deps/class-variance-authority.js?v=fbfc99d6
+
+[1A[2K>> GET http://localhost:5173/node_modules/.vite/deps/chunk-U7P2NEEE.js?v=fbfc99d6
+
+[1A[2K<< [33m200[39m http://localhost:5173/src/lib/utils.ts
+
+[1A[2K>> GET http://localhost:5173/node_modules/.vite/deps/clsx.js?v=fbfc99d6
+
+[1A[2K>> GET http://localhost:5173/node_modules/.vite/deps/tailwind-merge.js?v=fbfc99d6
+
+[1A[2K<< [33m200[39m http://localhost:5173/node_modules/.vite/deps/chunk-4FMFHQAA.js?v=fbfc99d6
+
+[1A[2K<< [33m200[39m http://localhost:5173/src/components/sidebar/SidebarGroup.tsx
+
+[1A[2K>> GET http://localhost:5173/src/components/sidebar/SidebarItem.tsx
+
+[1A[2K<< [33m200[39m http://localhost:5173/src/components/sidebar/FloatingSubmenu.tsx
+
+[1A[2K<< [33m200[39m http://localhost:5173/src/components/sidebar/SidebarSwitch.tsx
+
+[1A[2K<< [33m200[39m http://localhost:5173/src/components/sidebar/CompanySwitcher.tsx
+
+[1A[2K<< [33m200[39m http://localhost:5173/src/lib/api.ts
+
+[1A[2K<< [33m200[39m http://localhost:5173/src/pages/billing/BillingBlockPage.tsx
+
+[1A[2K<< [33m200[39m http://localhost:5173/src/components/settings/SettingsHeader.tsx
+
+[1A[2K<< [33m200[39m http://localhost:5173/src/components/settings/SettingsSidebar.tsx
+
+[1A[2K<< [33m200[39m http://localhost:5173/src/components/settings/SettingsContent.tsx
+
+[1A[2K>> GET http://localhost:5173/src/components/settings/company/CompanySettingsForm.tsx
+
+[1A[2K<< [33m200[39m http://localhost:5173/src/config/settingsMenuConfig.ts
+
+[1A[2K>> GET http://localhost:5173/src/pages/billing/SubscriptionPage.tsx
+
+[1A[2K>> GET http://localhost:5173/src/components/settings/data-management/DataManagementContent.tsx
+
+[1A[2K>> GET http://localhost:5173/src/pages/settings/roles/RolesPage.tsx
+
+[1A[2K>> GET http://localhost:5173/src/pages/settings/general/UsersPage.tsx
+
+[1A[2K<< [33m200[39m http://localhost:5173/node_modules/.vite/deps/chunk-HKFJJYQE.js?v=fbfc99d6
+
+[1A[2K<< [33m200[39m http://localhost:5173/node_modules/.vite/deps/chunk-U7P2NEEE.js?v=fbfc99d6
+
+[1A[2K<< [33m200[39m http://localhost:5173/node_modules/.vite/deps/clsx.js?v=fbfc99d6
+
+[1A[2K<< [33m200[39m http://localhost:5173/src/components/sidebar/SidebarItem.tsx
+
+[1A[2K<< [33m200[39m http://localhost:5173/node_modules/.vite/deps/tailwind-merge.js?v=fbfc99d6
+
+[1A[2K<< [33m200[39m http://localhost:5173/src/components/settings/company/CompanySettingsForm.tsx
+
+[1A[2K<< [33m200[39m http://localhost:5173/src/pages/billing/SubscriptionPage.tsx
+
+[1A[2K>> GET http://localhost:5173/src/services/company.ts
+
+[1A[2K>> GET http://localhost:5173/src/services/externalApis.ts
+
+[1A[2K>> GET http://localhost:5173/src/components/settings/company/LogoUploader.tsx
+
+[1A[2K>> GET http://localhost:5173/src/lib/masks.ts
+
+[1A[2K>> GET http://localhost:5173/src/components/settings/billing/SubscriptionSettings.tsx
+
+[1A[2K>> GET http://localhost:5173/src/components/billing/SubscriptionPlans.tsx
+
+[1A[2K<< [33m200[39m http://localhost:5173/src/components/settings/data-management/DataManagementContent.tsx
+
+[1A[2K<< [33m200[39m http://localhost:5173/src/pages/settings/roles/RolesPage.tsx
+
+[1A[2K>> GET http://localhost:5173/src/features/roles/RolesList.tsx
+
+[1A[2K>> GET http://localhost:5173/src/features/roles/PermissionsMatrix.tsx
+
+[1A[2K>> GET http://localhost:5173/src/features/roles/hooks/useRbac.ts
+
+[1A[2K>> GET http://localhost:5173/src/hooks/useHasPermission.ts
+
+[1A[2K<< [33m200[39m http://localhost:5173/src/pages/settings/general/UsersPage.tsx
+
+[1A[2K>> GET http://localhost:5173/src/features/users/hooks/useUsersQuery.ts
+
+[1A[2K>> GET http://localhost:5173/src/features/users/components/UsersTable.tsx
+
+[1A[2K>> GET http://localhost:5173/src/features/users/EditUserRoleDrawer.tsx
+
+[1A[2K>> GET http://localhost:5173/src/hooks/useCan.ts
+
+[1A[2K>> GET http://localhost:5173/src/features/users/InviteUserDialog.tsx
+
+[1A[2K>> GET http://localhost:5173/src/components/ui/dialog.tsx
+
+[1A[2K>> GET http://localhost:5173/src/features/users/components/UsersFilters.tsx
+
+[1A[2K>> GET http://localhost:5173/src/components/ui/Pagination.tsx
+
+[1A[2K>> GET http://localhost:5173/src/features/users/components/UsersTableSkeleton.tsx
+
+[1A[2K<< [33m200[39m http://localhost:5173/src/services/company.ts
+
+[1A[2K<< [33m200[39m http://localhost:5173/src/services/externalApis.ts
+
+[1A[2K>> GET http://localhost:5173/node_modules/.vite/deps/axios.js?v=fbfc99d6
+
+[1A[2K<< [33m200[39m http://localhost:5173/src/components/settings/company/LogoUploader.tsx
+
+[1A[2K<< [33m200[39m http://localhost:5173/src/lib/masks.ts
+
+[1A[2K>> GET http://localhost:5173/node_modules/.vite/deps/react-dropzone.js?v=fbfc99d6
+
+[1A[2K>> GET http://localhost:5173/src/components/settings/company/LogoCropperModal.tsx
+
+[1A[2K>> GET http://localhost:5173/src/lib/imageUtils.ts
+
+[1A[2K<< [33m200[39m http://localhost:5173/src/features/roles/RolesList.tsx
+
+[1A[2K<< [33m200[39m http://localhost:5173/src/features/roles/hooks/useRbac.ts
+
+[1A[2K>> GET http://localhost:5173/src/services/rbac.ts
+
+[1A[2K<< [33m200[39m http://localhost:5173/src/components/settings/billing/SubscriptionSettings.tsx
+
+[1A[2K<< [33m200[39m http://localhost:5173/src/components/billing/SubscriptionPlans.tsx
+
+[1A[2K>> GET http://localhost:5173/src/components/billing/PricingCard.tsx
+
+[1A[2K<< [33m200[39m http://localhost:5173/src/features/roles/PermissionsMatrix.tsx
+
+[1A[2K<< [33m200[39m http://localhost:5173/src/features/users/hooks/useUsersQuery.ts
+
+[1A[2K<< [33m200[39m http://localhost:5173/src/features/users/components/UsersTable.tsx
+
+[1A[2K>> GET http://localhost:5173/src/services/users.ts
+
+[1A[2K>> GET http://localhost:5173/src/features/users/components/UserActionsMenu.tsx
+
+[1A[2K<< [33m200[39m http://localhost:5173/src/features/users/EditUserRoleDrawer.tsx
+
+[1A[2K<< [33m200[39m http://localhost:5173/src/hooks/useHasPermission.ts
+
+[1A[2K>> GET http://localhost:5173/src/components/ui/Modal.tsx
+
+[1A[2K>> GET http://localhost:5173/src/components/ui/forms/Select.tsx
+
+[1A[2K>> GET http://localhost:5173/src/features/users/DangerZoneUser.tsx
+
+[1A[2K<< [33m200[39m http://localhost:5173/src/components/ui/dialog.tsx
+
+[1A[2K>> GET http://localhost:5173/node_modules/.vite/deps/@radix-ui_react-dialog.js?v=fbfc99d6
+
+[1A[2K<< [33m200[39m http://localhost:5173/src/features/users/components/UsersFilters.tsx
+
+[1A[2K<< [33m200[39m http://localhost:5173/src/hooks/useCan.ts
+
+[1A[2K>> GET http://localhost:5173/src/components/ui/MultiSelect.tsx
+
+[1A[2K<< [33m200[39m http://localhost:5173/src/features/users/InviteUserDialog.tsx
+
+[1A[2K>> GET http://localhost:5173/node_modules/.vite/deps/zod.js?v=fbfc99d6
+
+[1A[2K<< [33m200[39m http://localhost:5173/node_modules/.vite/deps/axios.js?v=fbfc99d6
+
+[1A[2K<< [33m200[39m http://localhost:5173/node_modules/.vite/deps/react-dropzone.js?v=fbfc99d6
+
+[1A[2K<< [33m200[39m http://localhost:5173/src/components/settings/company/LogoCropperModal.tsx
+
+[1A[2K>> GET http://localhost:5173/node_modules/.vite/deps/react-easy-crop.js?v=fbfc99d6
+
+[1A[2K<< [33m200[39m http://localhost:5173/src/components/ui/Pagination.tsx
+
+[1A[2K<< [33m200[39m http://localhost:5173/src/features/users/components/UsersTableSkeleton.tsx
+
+[1A[2K<< [33m200[39m http://localhost:5173/src/services/rbac.ts
+
+[1A[2K<< [33m200[39m http://localhost:5173/src/components/billing/PricingCard.tsx
+
+[1A[2K<< [33m200[39m http://localhost:5173/src/services/users.ts
+
+[1A[2K<< [33m200[39m http://localhost:5173/src/features/users/components/UserActionsMenu.tsx
+
+[1A[2K<< [33m200[39m http://localhost:5173/src/lib/imageUtils.ts
+
+[1A[2K>> GET http://localhost:5173/src/components/ui/dropdown-menu.tsx
+
+[1A[2K<< [33m200[39m http://localhost:5173/src/components/ui/forms/Select.tsx
+
+[1A[2K<< [33m200[39m http://localhost:5173/src/features/users/DangerZoneUser.tsx
+
+[1A[2K>> GET http://localhost:5173/src/components/ui/ConfirmationModal.tsx
+
+[1A[2K<< [33m200[39m http://localhost:5173/node_modules/.vite/deps/@radix-ui_react-dialog.js?v=fbfc99d6
+
+[1A[2K>> GET http://localhost:5173/node_modules/.vite/deps/chunk-PWYGQ56K.js?v=fbfc99d6
+
+[1A[2K>> GET http://localhost:5173/node_modules/.vite/deps/chunk-XIWII2CM.js?v=fbfc99d6
+
+[1A[2K<< [33m200[39m http://localhost:5173/src/components/ui/Modal.tsx
+
+[1A[2K<< [33m200[39m http://localhost:5173/node_modules/.vite/deps/react-easy-crop.js?v=fbfc99d6
+
+[1A[2K<< [33m200[39m http://localhost:5173/src/components/ui/MultiSelect.tsx
+
+[1A[2K>> GET http://localhost:5173/src/components/ui/popover.tsx
+
+[1A[2K>> GET http://localhost:5173/src/components/ui/command.tsx
+
+[1A[2K<< [33m200[39m http://localhost:5173/src/components/ui/dropdown-menu.tsx
+
+[1A[2K>> GET http://localhost:5173/node_modules/.vite/deps/@radix-ui_react-dropdown-menu.js?v=fbfc99d6
+
+[1A[2K<< [33m200[39m http://localhost:5173/src/components/ui/ConfirmationModal.tsx
+
+[1A[2K<< [33m200[39m http://localhost:5173/node_modules/.vite/deps/chunk-PWYGQ56K.js?v=fbfc99d6
+
+[1A[2K<< [33m200[39m http://localhost:5173/src/components/ui/popover.tsx
+
+[1A[2K>> GET http://localhost:5173/node_modules/.vite/deps/@radix-ui_react-popover.js?v=fbfc99d6
+
+[1A[2K<< [33m200[39m http://localhost:5173/src/components/ui/command.tsx
+
+[1A[2K>> GET http://localhost:5173/node_modules/.vite/deps/cmdk.js?v=fbfc99d6
+
+[1A[2K<< [33m200[39m http://localhost:5173/node_modules/.vite/deps/chunk-XIWII2CM.js?v=fbfc99d6
+
+[1A[2K<< [33m200[39m http://localhost:5173/node_modules/.vite/deps/@radix-ui_react-dropdown-menu.js?v=fbfc99d6
+
+[1A[2K>> GET http://localhost:5173/node_modules/.vite/deps/chunk-SRAXREPR.js?v=fbfc99d6
+
+[1A[2K<< [33m200[39m http://localhost:5173/node_modules/.vite/deps/@radix-ui_react-popover.js?v=fbfc99d6
+
+[1A[2K<< [33m200[39m http://localhost:5173/node_modules/.vite/deps/zod.js?v=fbfc99d6
+
+[1A[2K<< [33m200[39m http://localhost:5173/node_modules/.vite/deps/cmdk.js?v=fbfc99d6
+
+[1A[2K<< [33m200[39m http://localhost:5173/node_modules/.vite/deps/chunk-SRAXREPR.js?v=fbfc99d6
+
+[1A[2KBROWSER LOG: %cDownload the React DevTools for a better development experience: https://reactjs.org/link/react-devtools font-weight:bold
+
+[1A[2KBROWSER LOG: ⚠️ React Router Future Flag Warning: React Router will begin wrapping state updates in `React.startTransition` in v7. You can use the `v7_startTransition` future flag to opt-in early. For more information, see https://reactrouter.com/v6/upgrading/future#v7_starttransition.
+
+[1A[2KBROWSER LOG: [DEBUG] [QUERY][empresas] fetching list 
+
+[1A[2KBROWSER LOG: [DEBUG] [QUERY][active_empresa] fetching 
+
+[1A[2KBROWSER LOG: [INFO] [AUTH][LOGIN] start {email: exists}
+
+[1A[2K>> GET https://lrfwiaekipwkjkzvcnfd.supabase.co/rest/v1/empresa_usuarios?select=empresa%3Aempresas%28*%29&order=created_at.desc
+
+[1A[2K>> GET https://lrfwiaekipwkjkzvcnfd.supabase.co/rest/v1/user_active_empresa?select=empresa_id
+
+[1A[2K<< [33m200[39m https://lrfwiaekipwkjkzvcnfd.supabase.co/rest/v1/empresa_usuarios?select=empresa%3Aempresas%28*%29&order=created_at.desc
+
+[1A[2K<< [33m200[39m https://lrfwiaekipwkjkzvcnfd.supabase.co/rest/v1/user_active_empresa?select=empresa_id
+
+[1A[2K  1) [chromium] › e2e/auth.spec.ts:3:1 › should allow user to log in and view products ─────────────
+
+    Error: [2mexpect([22m[31mlocator[39m[2m).[22mtoBeVisible[2m([22m[2m)[22m failed
+
+    Locator: getByText('Fantasia E2E')
+    Expected: visible
+    Timeout: 5000ms
+    Error: element(s) not found
+
+    Call log:
+    [2m  - Expect "toBeVisible" with timeout 5000ms[22m
+    [2m  - waiting for getByText('Fantasia E2E')[22m
+
+
+       96 |
+       97 |     // Check if the active company is loaded
+    >  98 |     await expect(page.getByText('Fantasia E2E')).toBeVisible();
+          |                                                  ^
+       99 |
+      100 |     // Check if the mocked product is visible
+      101 |     await expect(page.getByText('Produto E2E')).toBeVisible();
+        at /Users/leandrofmarques/Downloads/revo_erp_prod_8yumh0_dualiteproject/e2e/auth.spec.ts:98:50
+
+    Error Context: test-results/auth-should-allow-user-to-log-in-and-view-products-chromium/error-context.md
+
+
+[1A[2K  1 failed
+    [chromium] › e2e/auth.spec.ts:3:1 › should allow user to log in and view products ──────────────
+
+[36m  Serving HTML report at http://localhost:56739. Press Ctrl+C to quit.[39m

@@ -1,3 +1,37 @@
+SET check_function_bodies = off;
+
+-- 0) Helper: current_user_id (robust)
+create or replace function public.current_user_id()
+returns uuid
+language plpgsql
+stable
+security definer
+set search_path = pg_catalog, public
+as $$
+declare
+  v_sub text;
+  v_id uuid;
+begin
+  select nullif(current_setting('request.jwt.claim.sub', true), '') into v_sub;
+  if v_sub is null then
+    begin
+      select nullif(current_setting('request.jwt.claims', true), '')::jsonb ->> 'sub' into v_sub;
+    exception when others then
+      v_sub := null;
+    end;
+  end if;
+  if v_sub is null then
+    select auth.uid()::text into v_sub;
+  end if;
+  begin
+    v_id := v_sub::uuid;
+  exception when others then
+    v_id := null;
+  end;
+  return v_id;
+end;
+$$;
+
 DO $$ BEGIN
 create type "public"."billing_cycle" as enum ('monthly', 'yearly');
 EXCEPTION

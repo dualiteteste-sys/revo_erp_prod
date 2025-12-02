@@ -1,4 +1,5 @@
 import { callRpc } from "@/lib/api";
+import { logger } from "@/lib/logger";
 
 /**
  * Executa a RPC bootstrap_empresa_for_current_user para garantir:
@@ -23,7 +24,7 @@ export async function bootstrapEmpresaParaUsuarioAtual(opts?: {
 
     // Caso 1: Retorno direto de string (UUID)
     if (typeof data === 'string') {
-      console.log("[RPC][bootstrap_empresa_for_current_user][OK] String returned:", data);
+      logger.info("[RPC][bootstrap_empresa_for_current_user] String returned", { data });
       return { empresa_id: data, status: 'unknown' };
     }
 
@@ -31,14 +32,14 @@ export async function bootstrapEmpresaParaUsuarioAtual(opts?: {
     const row = Array.isArray(data) ? data[0] : data;
 
     if (!row || !row.empresa_id) {
-      console.error("[RPC][bootstrap_empresa_for_current_user] Data returned:", data);
+      logger.error("[RPC][bootstrap_empresa_for_current_user] Invalid data returned", null, { data });
       throw new Error("Falha ao bootstrapar empresa.");
     }
 
-    console.log("[RPC][bootstrap_empresa_for_current_user][OK]", row);
+    logger.info("[RPC][bootstrap_empresa_for_current_user] OK", { row });
     return { empresa_id: row.empresa_id, status: row.status };
   } catch (error) {
-    console.error("[RPC][bootstrap_empresa_for_current_user][ERROR]", error);
+    logger.error("[RPC][bootstrap_empresa_for_current_user] Error", error);
     throw error;
   }
 }
@@ -52,7 +53,7 @@ export async function whoAmI(): Promise<{ user_id: string | null; email: string 
     const data = await callRpc<{ user_id: string, email: string }>('whoami');
     return data;
   } catch (error) {
-    console.error("[RPC][whoami][ERROR]", error);
+    logger.error("[RPC][whoami] Error", error);
     return { user_id: null, email: null };
   }
 }

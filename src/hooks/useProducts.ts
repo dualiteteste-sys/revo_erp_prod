@@ -1,82 +1,70 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState } from 'react';
 import { useAuth } from '../contexts/AuthProvider';
 import { useDebounce } from './useDebounce';
 import { Product, getProducts, saveProduct, deleteProductById, FullProduct } from '../services/products';
+import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query';
+
+export const PRODUCTS_KEYS = {
+  all: ['products'] as const,
+  list: (filters: any) => [...PRODUCTS_KEYS.all, 'list', filters] as const,
+  detail: (id: string) => [...PRODUCTS_KEYS.all, 'detail', id] as const,
+};
 
 export const useProducts = () => {
   const { activeEmpresa } = useAuth();
-  const [products, setProducts] = useState<Product[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [count, setCount] = useState(0);
+  const queryClient = useQueryClient();
 
+  // Local state for filters
   const [searchTerm, setSearchTerm] = useState('');
   const debouncedSearchTerm = useDebounce(searchTerm, 500);
-
   const [filterStatus, setFilterStatus] = useState<'ativo' | 'inativo' | null>(null);
   const [page, setPage] = useState(1);
   const [pageSize] = useState(10);
-
   const [sortBy, setSortBy] = useState<{ column: keyof Product; ascending: boolean }>({
     column: 'nome',
     ascending: true,
   });
 
-  const fetchProducts = useCallback(async () => {
-    if (!activeEmpresa) {
-      setProducts([]);
-      setCount(0);
-      return;
-    }
+  // Query options
+  const queryOptions = {
+    page,
+    pageSize,
+    searchTerm: debouncedSearchTerm,
+    status: filterStatus,
+    sortBy,
+  };
 
-    setLoading(true);
-    setError(null);
+  // Fetch products using TanStack Query
+  const { data, isLoading, isError, error: queryError } = useQuery({
+    queryKey: PRODUCTS_KEYS.list({ ...queryOptions, empresaId: activeEmpresa?.id }),
+    queryFn: () => getProducts(queryOptions),
+    placeholderData: keepPreviousData,
+    enabled: !!activeEmpresa,
+  });
 
-    try {
-      const { data, count } = await getProducts({
-        page,
-        pageSize,
-        searchTerm: debouncedSearchTerm,
-        status: filterStatus,
-        sortBy,
-      });
-      setProducts(data);
-      setCount(count);
-    } catch (e: any) {
-      setError(e.message);
-      setProducts([]);
-      setCount(0);
-    } finally {
-      setLoading(false);
-    }
-  }, [activeEmpresa, page, pageSize, debouncedSearchTerm, filterStatus, sortBy]);
-
-  useEffect(() => {
-    fetchProducts();
-  }, [fetchProducts]);
-
-  const saveProductCallback = useCallback(async (formData: Partial<FullProduct>) => {
-    if (!activeEmpresa) {
-      throw new Error('Nenhuma empresa ativa selecionada.');
-    }
-    const savedProduct = await saveProduct(formData, activeEmpresa.id);
-    await fetchProducts(); // Refresh list after saving
-    return savedProduct;
-  }, [activeEmpresa, fetchProducts]);
-
-  const deleteProductCallback = useCallback(
-    async (id: string) => {
-      await deleteProductById(id);
-      await fetchProducts(); // Refresh list after deleting
+  // Mutations
+  const saveMutation = useMutation({
+    mutationFn: (formData: Partial<FullProduct>) => {
+      if (!activeEmpresa) throw new Error('Nenhuma empresa ativa selecionada.');
+      return saveProduct(formData, activeEmpresa.id);
     },
-    [fetchProducts]
-  );
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: PRODUCTS_KEYS.all });
+    },
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: deleteProductById,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: PRODUCTS_KEYS.all });
+    },
+  });
 
   return {
-    products,
-    loading,
-    error,
-    count,
+    products: data?.data ?? [],
+    loading: isLoading,
+    error: isError ? (queryError as Error).message : null,
+    count: data?.count ?? 0,
     page,
     pageSize,
     searchTerm,
@@ -86,8 +74,8 @@ export const useProducts = () => {
     setSearchTerm,
     setFilterStatus,
     setSortBy,
-    saveProduct: saveProductCallback,
-    deleteProduct: deleteProductCallback,
+    saveProduct: saveMutation.mutateAsync,
+    deleteProduct: deleteMutation.mutateAsync,
   };
 };
 

@@ -1,0 +1,978 @@
+
+> vite-react-typescript-starter@0.0.0 test
+> vitest src/contexts/AuthProvider.test.tsx
+
+[sentry-vite-plugin] Info: Sending telemetry data on issues and performance to Sentry. To disable telemetry, set `options.telemetry` to `false`.
+
+ DEV  v1.6.1 /Users/leandrofmarques/Downloads/revo_erp_prod_8yumh0_dualiteproject
+
+stdout | Logger.info (/Users/leandrofmarques/Downloads/revo_erp_prod_8yumh0_dualiteproject/src/lib/logger.ts:24:21)
+[INFO] [SUPABASE][CLIENT_INIT] {
+  supabaseUrl: 'https://lrfwiaekipwkjkzvcnfd.supabase.co',
+  anonKeyPrefix: 'eyJhbGci'
+}
+
+stdout | src/test/setup.ts:8:9
+[SETUP] Initializing MSW server...
+
+stdout | src/contexts/AuthProvider.test.tsx
+[SETUP] Starting MSW server...
+
+stdout | src/contexts/AuthProvider.test.tsx > AuthProvider Integration > initializes with user and active empresa from MSW
+[AUTH] Render {
+  userId: null,
+  loading: false,
+  empresasCount: 0,
+  activeEmpresaId: undefined
+}
+[AUTH] onAuthStateChange { event: 'SIGNED_IN', hasSession: true }
+[AUTH] Render {
+  userId: 'user-123',
+  loading: true,
+  empresasCount: 0,
+  activeEmpresaId: undefined
+}
+[DEBUG] [QUERY][empresas] fetching list 
+[DEBUG] [QUERY][active_empresa] fetching 
+[INFO] [AUTH][LOGIN] start { email: 'exists' }
+[MSW] GET user_active_empresa https://lrfwiaekipwkjkzvcnfd.supabase.co/rest/v1/user_active_empresa?select=empresa_id
+[MSW] GET empresa_usuarios https://lrfwiaekipwkjkzvcnfd.supabase.co/rest/v1/empresa_usuarios?select=empresa%3Aempresas%28*%29&order=created_at.desc
+[AUTH] Render {
+  userId: 'user-123',
+  loading: false,
+  empresasCount: 1,
+  activeEmpresaId: 'empresa-1'
+}
+
+stderr | src/contexts/AuthProvider.test.tsx > AuthProvider Integration > initializes with user and active empresa from MSW
+⚠️ React Router Future Flag Warning: React Router will begin wrapping state updates in `React.startTransition` in v7. You can use the `v7_startTransition` future flag to opt-in early. For more information, see https://reactrouter.com/v6/upgrading/future#v7_starttransition.
+⚠️ React Router Future Flag Warning: Relative route resolution within Splat routes is changing in v7. You can use the `v7_relativeSplatPath` future flag to opt-in early. For more information, see https://reactrouter.com/v6/upgrading/future#v7_relativesplatpath.
+
+ ✓ src/contexts/AuthProvider.test.tsx  (1 test) 39ms
+
+ Test Files  1 passed (1)
+      Tests  1 passed (1)
+   Start at  17:58:04
+   Duration  1.10s (transform 65ms, setup 239ms, collect 149ms, tests 39ms, environment 342ms, prepare 54ms)
+
+
+ PASS  Waiting for file changes...
+       press h to show help, press q to quit
+[3Jc
+ RERUN  src/contexts/AuthProvider.tsx x1
+
+stdout | Logger.info (/Users/leandrofmarques/Downloads/revo_erp_prod_8yumh0_dualiteproject/src/lib/logger.ts:24:21)
+[INFO] [SUPABASE][CLIENT_INIT] {
+  supabaseUrl: 'https://lrfwiaekipwkjkzvcnfd.supabase.co',
+  anonKeyPrefix: 'eyJhbGci'
+}
+
+stdout | src/test/setup.ts:8:9
+[SETUP] Initializing MSW server...
+
+stdout | src/contexts/AuthProvider.test.tsx
+[SETUP] Starting MSW server...
+
+stdout | src/contexts/AuthProvider.test.tsx > AuthProvider Integration > initializes with user and active empresa from MSW
+[AUTH] Render {
+  userId: null,
+  loading: false,
+  empresasCount: 0,
+  activeEmpresaId: undefined
+}
+[AUTH] Render {
+  userId: 'user-123',
+  loading: true,
+  empresasCount: 0,
+  activeEmpresaId: undefined
+}
+[DEBUG] [QUERY][empresas] fetching list 
+[DEBUG] [QUERY][active_empresa] fetching 
+[INFO] [AUTH][LOGIN] start { email: 'exists' }
+[MSW] GET user_active_empresa https://lrfwiaekipwkjkzvcnfd.supabase.co/rest/v1/user_active_empresa?select=empresa_id
+[MSW] GET empresa_usuarios https://lrfwiaekipwkjkzvcnfd.supabase.co/rest/v1/empresa_usuarios?select=empresa%3Aempresas%28*%29&order=created_at.desc
+[AUTH] Render {
+  userId: 'user-123',
+  loading: false,
+  empresasCount: 1,
+  activeEmpresaId: 'empresa-1'
+}
+[AUTH] Render {
+  userId: 'user-123',
+  loading: false,
+  empresasCount: 1,
+  activeEmpresaId: 'empresa-1'
+}
+
+stderr | src/contexts/AuthProvider.test.tsx > AuthProvider Integration > initializes with user and active empresa from MSW
+⚠️ React Router Future Flag Warning: React Router will begin wrapping state updates in `React.startTransition` in v7. You can use the `v7_startTransition` future flag to opt-in early. For more information, see https://reactrouter.com/v6/upgrading/future#v7_starttransition.
+⚠️ React Router Future Flag Warning: Relative route resolution within Splat routes is changing in v7. You can use the `v7_relativeSplatPath` future flag to opt-in early. For more information, see https://reactrouter.com/v6/upgrading/future#v7_relativesplatpath.
+
+ ✓ src/contexts/AuthProvider.test.tsx  (1 test) 147ms
+
+ Test Files  1 passed (1)
+      Tests  1 passed (1)
+   Start at  17:58:54
+   Duration  2.63s
+
+
+ PASS  Waiting for file changes...
+       press h to show help, press q to quit
+       rerun x1
+[2K[1A[2K[G[3Jc
+ RERUN  src/contexts/AuthProvider.tsx x2
+
+stdout | Logger.info (/Users/leandrofmarques/Downloads/revo_erp_prod_8yumh0_dualiteproject/src/lib/logger.ts:24:21)
+[INFO] [SUPABASE][CLIENT_INIT] {
+  supabaseUrl: 'https://lrfwiaekipwkjkzvcnfd.supabase.co',
+  anonKeyPrefix: 'eyJhbGci'
+}
+
+stdout | src/test/setup.ts:8:9
+[SETUP] Initializing MSW server...
+
+stdout | src/contexts/AuthProvider.test.tsx
+[SETUP] Starting MSW server...
+
+stdout | src/contexts/AuthProvider.test.tsx > AuthProvider Integration > initializes with user and active empresa from MSW
+[DEBUG] [QUERY][empresas] fetching list 
+[DEBUG] [QUERY][active_empresa] fetching 
+[INFO] [AUTH][LOGIN] start { email: 'exists' }
+[MSW] GET user_active_empresa https://lrfwiaekipwkjkzvcnfd.supabase.co/rest/v1/user_active_empresa?select=empresa_id
+[MSW] GET empresa_usuarios https://lrfwiaekipwkjkzvcnfd.supabase.co/rest/v1/empresa_usuarios?select=empresa%3Aempresas%28*%29&order=created_at.desc
+
+stderr | src/contexts/AuthProvider.test.tsx > AuthProvider Integration > initializes with user and active empresa from MSW
+⚠️ React Router Future Flag Warning: React Router will begin wrapping state updates in `React.startTransition` in v7. You can use the `v7_startTransition` future flag to opt-in early. For more information, see https://reactrouter.com/v6/upgrading/future#v7_starttransition.
+⚠️ React Router Future Flag Warning: Relative route resolution within Splat routes is changing in v7. You can use the `v7_relativeSplatPath` future flag to opt-in early. For more information, see https://reactrouter.com/v6/upgrading/future#v7_relativesplatpath.
+
+ ✓ src/contexts/AuthProvider.test.tsx  (1 test) 272ms
+
+ Test Files  1 passed (1)
+      Tests  1 passed (1)
+   Start at  17:59:06
+   Duration  2.84s
+
+
+ PASS  Waiting for file changes...
+       press h to show help, press q to quit
+       rerun x2
+[2K[1A[2K[G[3Jc
+ RERUN  src/test/setup.ts x3
+
+stdout | Logger.info (/Users/leandrofmarques/Downloads/revo_erp_prod_8yumh0_dualiteproject/src/lib/logger.ts:24:21)
+[INFO] [SUPABASE][CLIENT_INIT] {
+  supabaseUrl: 'https://lrfwiaekipwkjkzvcnfd.supabase.co',
+  anonKeyPrefix: 'eyJhbGci'
+}
+
+stdout | src/test/setup.ts:8:9
+[SETUP] Initializing MSW server...
+
+stdout | src/contexts/AuthProvider.test.tsx > AuthProvider Integration > initializes with user and active empresa from MSW
+[DEBUG] [QUERY][empresas] fetching list 
+[DEBUG] [QUERY][active_empresa] fetching 
+[INFO] [AUTH][LOGIN] start { email: 'exists' }
+[MSW] GET user_active_empresa https://lrfwiaekipwkjkzvcnfd.supabase.co/rest/v1/user_active_empresa?select=empresa_id
+[MSW] GET empresa_usuarios https://lrfwiaekipwkjkzvcnfd.supabase.co/rest/v1/empresa_usuarios?select=empresa%3Aempresas%28*%29&order=created_at.desc
+
+stderr | src/contexts/AuthProvider.test.tsx > AuthProvider Integration > initializes with user and active empresa from MSW
+⚠️ React Router Future Flag Warning: React Router will begin wrapping state updates in `React.startTransition` in v7. You can use the `v7_startTransition` future flag to opt-in early. For more information, see https://reactrouter.com/v6/upgrading/future#v7_starttransition.
+⚠️ React Router Future Flag Warning: Relative route resolution within Splat routes is changing in v7. You can use the `v7_relativeSplatPath` future flag to opt-in early. For more information, see https://reactrouter.com/v6/upgrading/future#v7_relativesplatpath.
+
+ ✓ src/contexts/AuthProvider.test.tsx  (1 test) 1162ms
+
+ Test Files  1 passed (1)
+      Tests  1 passed (1)
+   Start at  17:59:13
+   Duration  7.70s
+
+
+ PASS  Waiting for file changes...
+       press h to show help, press q to quit
+       rerun x3
+[2K[1A[2K[G[3Jc
+ RERUN  src/lib/supabaseClient.ts x4
+
+stdout | src/test/setup.ts:8:9
+[SETUP] Initializing MSW server...
+
+stdout | src/contexts/AuthProvider.test.tsx > AuthProvider Integration > initializes with user and active empresa from MSW
+[DEBUG] [QUERY][empresas] fetching list 
+[DEBUG] [QUERY][active_empresa] fetching 
+[INFO] [AUTH][LOGIN] start { email: 'exists' }
+[MSW] GET user_active_empresa https://lrfwiaekipwkjkzvcnfd.supabase.co/rest/v1/user_active_empresa?select=empresa_id
+[MSW] GET empresa_usuarios https://lrfwiaekipwkjkzvcnfd.supabase.co/rest/v1/empresa_usuarios?select=empresa%3Aempresas%28*%29&order=created_at.desc
+
+stderr | src/contexts/AuthProvider.test.tsx > AuthProvider Integration > initializes with user and active empresa from MSW
+⚠️ React Router Future Flag Warning: React Router will begin wrapping state updates in `React.startTransition` in v7. You can use the `v7_startTransition` future flag to opt-in early. For more information, see https://reactrouter.com/v6/upgrading/future#v7_starttransition.
+⚠️ React Router Future Flag Warning: Relative route resolution within Splat routes is changing in v7. You can use the `v7_relativeSplatPath` future flag to opt-in early. For more information, see https://reactrouter.com/v6/upgrading/future#v7_relativesplatpath.
+
+ ✓ src/contexts/AuthProvider.test.tsx  (1 test) 377ms
+
+ Test Files  1 passed (1)
+      Tests  1 passed (1)
+   Start at  17:59:23
+   Duration  5.24s
+
+
+ PASS  Waiting for file changes...
+       press h to show help, press q to quit
+       rerun x4
+[2K[1A[2K[G[3Jc
+ RERUN  package.json x5
+
+stdout | src/test/setup.ts:8:9
+[SETUP] Initializing MSW server...
+
+stdout | src/contexts/AuthProvider.test.tsx > AuthProvider Integration > initializes with user and active empresa from MSW
+[DEBUG] [QUERY][empresas] fetching list 
+[DEBUG] [QUERY][active_empresa] fetching 
+[INFO] [AUTH][LOGIN] start { email: 'exists' }
+[MSW] GET user_active_empresa https://lrfwiaekipwkjkzvcnfd.supabase.co/rest/v1/user_active_empresa?select=empresa_id
+[MSW] GET empresa_usuarios https://lrfwiaekipwkjkzvcnfd.supabase.co/rest/v1/empresa_usuarios?select=empresa%3Aempresas%28*%29&order=created_at.desc
+
+stderr | src/contexts/AuthProvider.test.tsx > AuthProvider Integration > initializes with user and active empresa from MSW
+⚠️ React Router Future Flag Warning: React Router will begin wrapping state updates in `React.startTransition` in v7. You can use the `v7_startTransition` future flag to opt-in early. For more information, see https://reactrouter.com/v6/upgrading/future#v7_starttransition.
+⚠️ React Router Future Flag Warning: Relative route resolution within Splat routes is changing in v7. You can use the `v7_relativeSplatPath` future flag to opt-in early. For more information, see https://reactrouter.com/v6/upgrading/future#v7_relativesplatpath.
+
+ ✓ src/contexts/AuthProvider.test.tsx  (1 test) 278ms
+
+ Test Files  1 passed (1)
+      Tests  1 passed (1)
+   Start at  18:27:00
+   Duration  3.06s
+
+
+ PASS  Waiting for file changes...
+       press h to show help, press q to quit
+       rerun x5
+[2K[1A[2K[G[3Jc
+ RERUN  e2e/auth.spec.ts x1
+
+stdout | src/test/setup.ts:8:9
+[SETUP] Initializing MSW server...
+
+ ❯ e2e/auth.spec.ts  (0 test)
+
+⎯⎯⎯⎯⎯⎯ Failed Suites 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  e2e/auth.spec.ts [ e2e/auth.spec.ts ]
+Error: Playwright Test did not expect test() to be called here.
+Most common reasons include:
+- You are calling test() in a configuration file.
+- You are calling test() in a file that is imported by the configuration file.
+- You have two different versions of @playwright/test. This usually happens
+  when one of the dependencies in your package.json depends on @playwright/test.
+ ❯ TestTypeImpl._currentSuite node_modules/playwright/lib/common/testType.js:75:13
+ ❯ TestTypeImpl._createTest node_modules/playwright/lib/common/testType.js:88:24
+ ❯ Module.<anonymous> node_modules/playwright/lib/transform/transform.js:275:12
+ ❯ e2e/auth.spec.ts:3:1
+      1| import { test, expect } from '@playwright/test';
+      2| 
+      3| test('should allow user to log in and view products', async ({ page })…
+       | ^
+      4|     // Mock Supabase Auth Token Endpoint
+      5|     await page.route('**/auth/v1/token?grant_type=password', async rou…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+ Test Files  1 failed (1)
+      Tests  no tests
+   Start at  18:27:49
+   Duration  2.35s
+
+
+ FAIL  Tests failed. Watching for file changes...
+       press h to show help, press q to quit
+       rerun x1
+[2K[1A[2K[G[3Jc
+ RERUN  e2e/auth.spec.ts x2
+
+stdout | src/test/setup.ts:8:9
+[SETUP] Initializing MSW server...
+
+ ❯ e2e/auth.spec.ts  (0 test)
+
+⎯⎯⎯⎯⎯⎯ Failed Suites 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  e2e/auth.spec.ts [ e2e/auth.spec.ts ]
+Error: Playwright Test did not expect test() to be called here.
+Most common reasons include:
+- You are calling test() in a configuration file.
+- You are calling test() in a file that is imported by the configuration file.
+- You have two different versions of @playwright/test. This usually happens
+  when one of the dependencies in your package.json depends on @playwright/test.
+ ❯ TestTypeImpl._currentSuite node_modules/playwright/lib/common/testType.js:75:13
+ ❯ TestTypeImpl._createTest node_modules/playwright/lib/common/testType.js:88:24
+ ❯ Module.<anonymous> node_modules/playwright/lib/transform/transform.js:275:12
+ ❯ e2e/auth.spec.ts:3:1
+      1| import { test, expect } from '@playwright/test';
+      2| 
+      3| test('should allow user to log in and view products', async ({ page })…
+       | ^
+      4|     // Mock Supabase Auth Token Endpoint
+      5|     await page.route('**/auth/v1/token?grant_type=password', async rou…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+ Test Files  1 failed (1)
+      Tests  no tests
+   Start at  18:27:59
+   Duration  764ms
+
+
+ FAIL  Tests failed. Watching for file changes...
+       press h to show help, press q to quit
+       rerun x2
+[2K[1A[2K[G[3Jc
+ RERUN  e2e/auth.spec.ts x3
+
+stdout | src/test/setup.ts:8:9
+[SETUP] Initializing MSW server...
+
+ ❯ e2e/auth.spec.ts  (0 test)
+
+⎯⎯⎯⎯⎯⎯ Failed Suites 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  e2e/auth.spec.ts [ e2e/auth.spec.ts ]
+Error: Playwright Test did not expect test() to be called here.
+Most common reasons include:
+- You are calling test() in a configuration file.
+- You are calling test() in a file that is imported by the configuration file.
+- You have two different versions of @playwright/test. This usually happens
+  when one of the dependencies in your package.json depends on @playwright/test.
+ ❯ TestTypeImpl._currentSuite node_modules/playwright/lib/common/testType.js:75:13
+ ❯ TestTypeImpl._createTest node_modules/playwright/lib/common/testType.js:88:24
+ ❯ Module.<anonymous> node_modules/playwright/lib/transform/transform.js:275:12
+ ❯ e2e/auth.spec.ts:3:1
+      1| import { test, expect } from '@playwright/test';
+      2| 
+      3| test('should allow user to log in and view products', async ({ page })…
+       | ^
+      4|     // Mock Supabase Auth Token Endpoint
+      5|     await page.route('**/auth/v1/token?grant_type=password', async rou…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+ Test Files  1 failed (1)
+      Tests  no tests
+   Start at  18:30:00
+   Duration  703ms
+
+
+ FAIL  Tests failed. Watching for file changes...
+       press h to show help, press q to quit
+       rerun x3
+[2K[1A[2K[G[3Jc
+ RERUN  e2e/auth.spec.ts x4
+
+stdout | src/test/setup.ts:8:9
+[SETUP] Initializing MSW server...
+
+ ❯ e2e/auth.spec.ts  (0 test)
+
+⎯⎯⎯⎯⎯⎯ Failed Suites 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  e2e/auth.spec.ts [ e2e/auth.spec.ts ]
+Error: Playwright Test did not expect test() to be called here.
+Most common reasons include:
+- You are calling test() in a configuration file.
+- You are calling test() in a file that is imported by the configuration file.
+- You have two different versions of @playwright/test. This usually happens
+  when one of the dependencies in your package.json depends on @playwright/test.
+ ❯ TestTypeImpl._currentSuite node_modules/playwright/lib/common/testType.js:75:13
+ ❯ TestTypeImpl._createTest node_modules/playwright/lib/common/testType.js:88:24
+ ❯ Module.<anonymous> node_modules/playwright/lib/transform/transform.js:275:12
+ ❯ e2e/auth.spec.ts:3:1
+      1| import { test, expect } from '@playwright/test';
+      2| 
+      3| test('should allow user to log in and view products', async ({ page })…
+       | ^
+      4|     // Mock Supabase Auth Token Endpoint
+      5|     await page.route('**/auth/v1/token?grant_type=password', async rou…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+ Test Files  1 failed (1)
+      Tests  no tests
+   Start at  18:32:11
+   Duration  1.45s
+
+
+ FAIL  Tests failed. Watching for file changes...
+       press h to show help, press q to quit
+       rerun x4
+[2K[1A[2K[G[3Jc
+ RERUN  e2e/auth.spec.ts x5
+
+stdout | src/test/setup.ts:8:9
+[SETUP] Initializing MSW server...
+
+ ❯ e2e/auth.spec.ts  (0 test)
+
+⎯⎯⎯⎯⎯⎯ Failed Suites 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  e2e/auth.spec.ts [ e2e/auth.spec.ts ]
+Error: Playwright Test did not expect test() to be called here.
+Most common reasons include:
+- You are calling test() in a configuration file.
+- You are calling test() in a file that is imported by the configuration file.
+- You have two different versions of @playwright/test. This usually happens
+  when one of the dependencies in your package.json depends on @playwright/test.
+ ❯ TestTypeImpl._currentSuite node_modules/playwright/lib/common/testType.js:75:13
+ ❯ TestTypeImpl._createTest node_modules/playwright/lib/common/testType.js:88:24
+ ❯ Module.<anonymous> node_modules/playwright/lib/transform/transform.js:275:12
+ ❯ e2e/auth.spec.ts:3:1
+      1| import { test, expect } from '@playwright/test';
+      2| 
+      3| test('should allow user to log in and view products', async ({ page })…
+       | ^
+      4|     // Mock Supabase Auth Token Endpoint
+      5|     await page.route('**/auth/v1/token?grant_type=password', async rou…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+ Test Files  1 failed (1)
+      Tests  no tests
+   Start at  18:33:07
+   Duration  929ms
+
+
+ FAIL  Tests failed. Watching for file changes...
+       press h to show help, press q to quit
+       rerun x5
+[2K[1A[2K[G[3Jc
+ RERUN  e2e/auth.spec.ts x6
+
+stdout | src/test/setup.ts:8:9
+[SETUP] Initializing MSW server...
+
+ ❯ e2e/auth.spec.ts  (0 test)
+
+⎯⎯⎯⎯⎯⎯ Failed Suites 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  e2e/auth.spec.ts [ e2e/auth.spec.ts ]
+Error: Playwright Test did not expect test() to be called here.
+Most common reasons include:
+- You are calling test() in a configuration file.
+- You are calling test() in a file that is imported by the configuration file.
+- You have two different versions of @playwright/test. This usually happens
+  when one of the dependencies in your package.json depends on @playwright/test.
+ ❯ TestTypeImpl._currentSuite node_modules/playwright/lib/common/testType.js:75:13
+ ❯ TestTypeImpl._createTest node_modules/playwright/lib/common/testType.js:88:24
+ ❯ Module.<anonymous> node_modules/playwright/lib/transform/transform.js:275:12
+ ❯ e2e/auth.spec.ts:3:1
+      1| import { test, expect } from '@playwright/test';
+      2| 
+      3| test('should allow user to log in and view products', async ({ page })…
+       | ^
+      4|     // Mock Supabase Auth Token Endpoint
+      5|     await page.route('**/auth/v1/token?grant_type=password', async rou…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+ Test Files  1 failed (1)
+      Tests  no tests
+   Start at  18:33:14
+   Duration  1.09s
+
+
+ FAIL  Tests failed. Watching for file changes...
+       press h to show help, press q to quit
+       rerun x6
+[2K[1A[2K[G[3Jc
+ RERUN  e2e/auth.spec.ts x7
+
+stdout | src/test/setup.ts:8:9
+[SETUP] Initializing MSW server...
+
+ ❯ e2e/auth.spec.ts  (0 test)
+
+⎯⎯⎯⎯⎯⎯ Failed Suites 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  e2e/auth.spec.ts [ e2e/auth.spec.ts ]
+Error: Playwright Test did not expect test() to be called here.
+Most common reasons include:
+- You are calling test() in a configuration file.
+- You are calling test() in a file that is imported by the configuration file.
+- You have two different versions of @playwright/test. This usually happens
+  when one of the dependencies in your package.json depends on @playwright/test.
+ ❯ TestTypeImpl._currentSuite node_modules/playwright/lib/common/testType.js:75:13
+ ❯ TestTypeImpl._createTest node_modules/playwright/lib/common/testType.js:88:24
+ ❯ Module.<anonymous> node_modules/playwright/lib/transform/transform.js:275:12
+ ❯ e2e/auth.spec.ts:3:1
+      1| import { test, expect } from '@playwright/test';
+      2| 
+      3| test('should allow user to log in and view products', async ({ page })…
+       | ^
+      4|     // Mock Supabase Auth Token Endpoint
+      5|     await page.route('**/auth/v1/token?grant_type=password', async rou…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+ Test Files  1 failed (1)
+      Tests  no tests
+   Start at  18:35:25
+   Duration  1.25s
+
+
+ FAIL  Tests failed. Watching for file changes...
+       press h to show help, press q to quit
+       rerun x7
+[2K[1A[2K[G[3Jc
+ RERUN  e2e/auth.spec.ts x8
+
+stdout | src/test/setup.ts:8:9
+[SETUP] Initializing MSW server...
+
+ ❯ e2e/auth.spec.ts  (0 test)
+
+⎯⎯⎯⎯⎯⎯ Failed Suites 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  e2e/auth.spec.ts [ e2e/auth.spec.ts ]
+Error: Playwright Test did not expect test() to be called here.
+Most common reasons include:
+- You are calling test() in a configuration file.
+- You are calling test() in a file that is imported by the configuration file.
+- You have two different versions of @playwright/test. This usually happens
+  when one of the dependencies in your package.json depends on @playwright/test.
+ ❯ TestTypeImpl._currentSuite node_modules/playwright/lib/common/testType.js:75:13
+ ❯ TestTypeImpl._createTest node_modules/playwright/lib/common/testType.js:88:24
+ ❯ Module.<anonymous> node_modules/playwright/lib/transform/transform.js:275:12
+ ❯ e2e/auth.spec.ts:3:1
+      1| import { test, expect } from '@playwright/test';
+      2| 
+      3| test('should allow user to log in and view products', async ({ page })…
+       | ^
+      4|     // Mock Supabase Auth Token Endpoint
+      5|     await page.route('**/auth/v1/token?grant_type=password', async rou…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+ Test Files  1 failed (1)
+      Tests  no tests
+   Start at  18:36:28
+   Duration  866ms
+
+
+ FAIL  Tests failed. Watching for file changes...
+       press h to show help, press q to quit
+       rerun x8
+[2K[1A[2K[G[3Jc
+ RERUN  e2e/auth.spec.ts x9
+
+stdout | src/test/setup.ts:8:9
+[SETUP] Initializing MSW server...
+
+ ❯ e2e/auth.spec.ts  (0 test)
+
+⎯⎯⎯⎯⎯⎯ Failed Suites 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  e2e/auth.spec.ts [ e2e/auth.spec.ts ]
+Error: Playwright Test did not expect test() to be called here.
+Most common reasons include:
+- You are calling test() in a configuration file.
+- You are calling test() in a file that is imported by the configuration file.
+- You have two different versions of @playwright/test. This usually happens
+  when one of the dependencies in your package.json depends on @playwright/test.
+ ❯ TestTypeImpl._currentSuite node_modules/playwright/lib/common/testType.js:75:13
+ ❯ TestTypeImpl._createTest node_modules/playwright/lib/common/testType.js:88:24
+ ❯ Module.<anonymous> node_modules/playwright/lib/transform/transform.js:275:12
+ ❯ e2e/auth.spec.ts:3:1
+      1| import { test, expect } from '@playwright/test';
+      2| 
+      3| test('should allow user to log in and view products', async ({ page })…
+       | ^
+      4|     // Mock Supabase Auth Token Endpoint
+      5|     await page.route('**/auth/v1/token?grant_type=password', async rou…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+ Test Files  1 failed (1)
+      Tests  no tests
+   Start at  18:37:24
+   Duration  1.45s
+
+
+ FAIL  Tests failed. Watching for file changes...
+       press h to show help, press q to quit
+       rerun x9
+[2K[1A[2K[G[3Jc
+ RERUN  e2e/auth.spec.ts x10
+
+stdout | src/test/setup.ts:8:9
+[SETUP] Initializing MSW server...
+
+ ❯ e2e/auth.spec.ts  (0 test)
+
+⎯⎯⎯⎯⎯⎯ Failed Suites 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  e2e/auth.spec.ts [ e2e/auth.spec.ts ]
+Error: Playwright Test did not expect test() to be called here.
+Most common reasons include:
+- You are calling test() in a configuration file.
+- You are calling test() in a file that is imported by the configuration file.
+- You have two different versions of @playwright/test. This usually happens
+  when one of the dependencies in your package.json depends on @playwright/test.
+ ❯ TestTypeImpl._currentSuite node_modules/playwright/lib/common/testType.js:75:13
+ ❯ TestTypeImpl._createTest node_modules/playwright/lib/common/testType.js:88:24
+ ❯ Module.<anonymous> node_modules/playwright/lib/transform/transform.js:275:12
+ ❯ e2e/auth.spec.ts:3:1
+      1| import { test, expect } from '@playwright/test';
+      2| 
+      3| test('should allow user to log in and view products', async ({ page })…
+       | ^
+      4|     // Mock Supabase Auth Token Endpoint
+      5|     await page.route('**/auth/v1/token?grant_type=password', async rou…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+ Test Files  1 failed (1)
+      Tests  no tests
+   Start at  18:41:10
+   Duration  745ms
+
+
+ FAIL  Tests failed. Watching for file changes...
+       press h to show help, press q to quit
+       rerun x10
+[2K[1A[2K[G[3Jc
+ RERUN  e2e/auth.spec.ts x11
+
+stdout | src/test/setup.ts:8:9
+[SETUP] Initializing MSW server...
+
+ ❯ e2e/auth.spec.ts  (0 test)
+
+⎯⎯⎯⎯⎯⎯ Failed Suites 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  e2e/auth.spec.ts [ e2e/auth.spec.ts ]
+Error: Playwright Test did not expect test() to be called here.
+Most common reasons include:
+- You are calling test() in a configuration file.
+- You are calling test() in a file that is imported by the configuration file.
+- You have two different versions of @playwright/test. This usually happens
+  when one of the dependencies in your package.json depends on @playwright/test.
+ ❯ TestTypeImpl._currentSuite node_modules/playwright/lib/common/testType.js:75:13
+ ❯ TestTypeImpl._createTest node_modules/playwright/lib/common/testType.js:88:24
+ ❯ Module.<anonymous> node_modules/playwright/lib/transform/transform.js:275:12
+ ❯ e2e/auth.spec.ts:3:1
+      1| import { test, expect } from '@playwright/test';
+      2| 
+      3| test('should allow user to log in and view products', async ({ page })…
+       | ^
+      4|     // Mock Supabase Auth Token Endpoint
+      5|     await page.route('**/auth/v1/token?grant_type=password', async rou…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+ Test Files  1 failed (1)
+      Tests  no tests
+   Start at  18:44:34
+   Duration  650ms
+
+
+ FAIL  Tests failed. Watching for file changes...
+       press h to show help, press q to quit
+       rerun x11
+[2K[1A[2K[G[3Jc
+ RERUN  e2e/auth.spec.ts x12
+
+stdout | src/test/setup.ts:8:9
+[SETUP] Initializing MSW server...
+
+ ❯ e2e/auth.spec.ts  (0 test)
+
+⎯⎯⎯⎯⎯⎯ Failed Suites 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  e2e/auth.spec.ts [ e2e/auth.spec.ts ]
+Error: Playwright Test did not expect test() to be called here.
+Most common reasons include:
+- You are calling test() in a configuration file.
+- You are calling test() in a file that is imported by the configuration file.
+- You have two different versions of @playwright/test. This usually happens
+  when one of the dependencies in your package.json depends on @playwright/test.
+ ❯ TestTypeImpl._currentSuite node_modules/playwright/lib/common/testType.js:75:13
+ ❯ TestTypeImpl._createTest node_modules/playwright/lib/common/testType.js:88:24
+ ❯ Module.<anonymous> node_modules/playwright/lib/transform/transform.js:275:12
+ ❯ e2e/auth.spec.ts:3:1
+      1| import { test, expect } from '@playwright/test';
+      2| 
+      3| test('should allow user to log in and view products', async ({ page })…
+       | ^
+      4|     // Log console messages
+      5|     page.on('console', msg => console.log('BROWSER LOG:', msg.text()));
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+ Test Files  1 failed (1)
+      Tests  no tests
+   Start at  18:48:51
+   Duration  886ms
+
+
+ FAIL  Tests failed. Watching for file changes...
+       press h to show help, press q to quit
+       rerun x12
+[2K[1A[2K[G[3Jc
+ RERUN  e2e/auth.spec.ts x13
+
+stdout | src/test/setup.ts:8:9
+[SETUP] Initializing MSW server...
+
+ ❯ e2e/auth.spec.ts  (0 test)
+
+⎯⎯⎯⎯⎯⎯ Failed Suites 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  e2e/auth.spec.ts [ e2e/auth.spec.ts ]
+Error: Playwright Test did not expect test() to be called here.
+Most common reasons include:
+- You are calling test() in a configuration file.
+- You are calling test() in a file that is imported by the configuration file.
+- You have two different versions of @playwright/test. This usually happens
+  when one of the dependencies in your package.json depends on @playwright/test.
+ ❯ TestTypeImpl._currentSuite node_modules/playwright/lib/common/testType.js:75:13
+ ❯ TestTypeImpl._createTest node_modules/playwright/lib/common/testType.js:88:24
+ ❯ Module.<anonymous> node_modules/playwright/lib/transform/transform.js:275:12
+ ❯ e2e/auth.spec.ts:3:1
+      1| import { test, expect } from '@playwright/test';
+      2| 
+      3| test('should allow user to log in and view products', async ({ page })…
+       | ^
+      4|     // Log console messages
+      5|     page.on('console', msg => console.log('BROWSER LOG:', msg.text()));
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+ Test Files  1 failed (1)
+      Tests  no tests
+   Start at  18:50:34
+   Duration  859ms
+
+
+ FAIL  Tests failed. Watching for file changes...
+       press h to show help, press q to quit
+       rerun x13
+[2K[1A[2K[G[3Jc
+ RERUN  src/contexts/AuthProvider.tsx x6
+
+stdout | src/test/setup.ts:8:9
+[SETUP] Initializing MSW server...
+
+stdout | src/contexts/AuthProvider.test.tsx > AuthProvider Integration > initializes with user and active empresa from MSW
+[AuthProvider] activeEmpresa calc: { empresasCount: 0, activeEmpresaId: undefined, foundId: undefined }
+[AuthProvider] activeEmpresa calc: { empresasCount: 0, activeEmpresaId: undefined, foundId: undefined }
+[DEBUG] [QUERY][empresas] fetching list 
+[DEBUG] [QUERY][active_empresa] fetching 
+[INFO] [AUTH][LOGIN] start { email: 'exists' }
+[MSW] GET user_active_empresa https://lrfwiaekipwkjkzvcnfd.supabase.co/rest/v1/user_active_empresa?select=empresa_id
+[MSW] GET empresa_usuarios https://lrfwiaekipwkjkzvcnfd.supabase.co/rest/v1/empresa_usuarios?select=empresa%3Aempresas%28*%29&order=created_at.desc
+[AuthProvider] activeEmpresa calc: {
+  empresasCount: 1,
+  activeEmpresaId: 'empresa-1',
+  foundId: 'empresa-1'
+}
+
+stderr | src/contexts/AuthProvider.test.tsx > AuthProvider Integration > initializes with user and active empresa from MSW
+⚠️ React Router Future Flag Warning: React Router will begin wrapping state updates in `React.startTransition` in v7. You can use the `v7_startTransition` future flag to opt-in early. For more information, see https://reactrouter.com/v6/upgrading/future#v7_starttransition.
+⚠️ React Router Future Flag Warning: Relative route resolution within Splat routes is changing in v7. You can use the `v7_relativeSplatPath` future flag to opt-in early. For more information, see https://reactrouter.com/v6/upgrading/future#v7_relativesplatpath.
+
+ ✓ src/contexts/AuthProvider.test.tsx  (1 test) 7680ms
+
+ Test Files  1 passed (1)
+      Tests  1 passed (1)
+   Start at  18:52:28
+   Duration  35.20s
+
+
+ PASS  Waiting for file changes...
+       press h to show help, press q to quit
+       rerun x6
+[2K[1A[2K[G[3Jc
+ RERUN  e2e/auth.spec.ts x14
+
+stdout | src/test/setup.ts:8:9
+[SETUP] Initializing MSW server...
+
+ ❯ e2e/auth.spec.ts  (0 test)
+
+⎯⎯⎯⎯⎯⎯ Failed Suites 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  e2e/auth.spec.ts [ e2e/auth.spec.ts ]
+Error: Playwright Test did not expect test() to be called here.
+Most common reasons include:
+- You are calling test() in a configuration file.
+- You are calling test() in a file that is imported by the configuration file.
+- You have two different versions of @playwright/test. This usually happens
+  when one of the dependencies in your package.json depends on @playwright/test.
+ ❯ TestTypeImpl._currentSuite node_modules/playwright/lib/common/testType.js:75:13
+ ❯ TestTypeImpl._createTest node_modules/playwright/lib/common/testType.js:88:24
+ ❯ Module.<anonymous> node_modules/playwright/lib/transform/transform.js:275:12
+ ❯ e2e/auth.spec.ts:3:1
+      1| import { test, expect } from '@playwright/test';
+      2| 
+      3| test('should allow user to log in and view products', async ({ page })…
+       | ^
+      4|     // Log console messages
+      5|     page.on('console', msg => console.log('BROWSER LOG:', msg.text()));
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+ Test Files  1 failed (1)
+      Tests  no tests
+   Start at  18:56:45
+   Duration  1.45s
+
+
+ FAIL  Tests failed. Watching for file changes...
+       press h to show help, press q to quit
+       rerun x14
+[2K[1A[2K[G[3Jc
+ RERUN  e2e/auth.spec.ts x15
+
+stdout | src/test/setup.ts:8:9
+[SETUP] Initializing MSW server...
+
+ ❯ e2e/auth.spec.ts  (0 test)
+
+⎯⎯⎯⎯⎯⎯ Failed Suites 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  e2e/auth.spec.ts [ e2e/auth.spec.ts ]
+Error: Playwright Test did not expect test() to be called here.
+Most common reasons include:
+- You are calling test() in a configuration file.
+- You are calling test() in a file that is imported by the configuration file.
+- You have two different versions of @playwright/test. This usually happens
+  when one of the dependencies in your package.json depends on @playwright/test.
+ ❯ TestTypeImpl._currentSuite node_modules/playwright/lib/common/testType.js:75:13
+ ❯ TestTypeImpl._createTest node_modules/playwright/lib/common/testType.js:88:24
+ ❯ Module.<anonymous> node_modules/playwright/lib/transform/transform.js:275:12
+ ❯ e2e/auth.spec.ts:3:1
+      1| import { test, expect } from '@playwright/test';
+      2| 
+      3| test('should allow user to log in and view products', async ({ page })…
+       | ^
+      4|     // Log console messages
+      5|     page.on('console', msg => console.log('BROWSER LOG:', msg.text()));
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+ Test Files  1 failed (1)
+      Tests  no tests
+   Start at  18:58:59
+   Duration  1.20s
+
+
+ FAIL  Tests failed. Watching for file changes...
+       press h to show help, press q to quit
+       rerun x15
+[2K[1A[2K[G[3Jc
+ RERUN  e2e/auth.spec.ts x16
+
+stdout | src/test/setup.ts:8:9
+[SETUP] Initializing MSW server...
+
+ ❯ e2e/auth.spec.ts  (0 test)
+
+⎯⎯⎯⎯⎯⎯ Failed Suites 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  e2e/auth.spec.ts [ e2e/auth.spec.ts ]
+Error: Playwright Test did not expect test() to be called here.
+Most common reasons include:
+- You are calling test() in a configuration file.
+- You are calling test() in a file that is imported by the configuration file.
+- You have two different versions of @playwright/test. This usually happens
+  when one of the dependencies in your package.json depends on @playwright/test.
+ ❯ TestTypeImpl._currentSuite node_modules/playwright/lib/common/testType.js:75:13
+ ❯ TestTypeImpl._createTest node_modules/playwright/lib/common/testType.js:88:24
+ ❯ Module.<anonymous> node_modules/playwright/lib/transform/transform.js:275:12
+ ❯ e2e/auth.spec.ts:3:1
+      1| import { test, expect } from '@playwright/test';
+      2| 
+      3| test('should allow user to log in and view products', async ({ page })…
+       | ^
+      4|     // Log console messages
+      5|     page.on('console', msg => console.log('BROWSER LOG:', msg.text()));
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+ Test Files  1 failed (1)
+      Tests  no tests
+   Start at  19:02:21
+   Duration  1.60s
+
+
+ FAIL  Tests failed. Watching for file changes...
+       press h to show help, press q to quit
+       rerun x16
+[2K[1A[2K[G[3Jc
+ RERUN  src/contexts/AuthProvider.tsx x7
+
+stdout | src/test/setup.ts:8:9
+[SETUP] Initializing MSW server...
+
+stdout | src/contexts/AuthProvider.test.tsx > AuthProvider Integration > initializes with user and active empresa from MSW
+[AuthProvider] activeEmpresa calc: { empresasCount: 0, activeEmpresaId: undefined, foundId: undefined }
+[AuthProvider] activeEmpresa calc: { empresasCount: 0, activeEmpresaId: undefined, foundId: undefined }
+[DEBUG] [QUERY][empresas] fetching list 
+[DEBUG] [QUERY][active_empresa] fetching 
+[INFO] [AUTH][LOGIN] start { email: 'exists' }
+[MSW] GET user_active_empresa https://lrfwiaekipwkjkzvcnfd.supabase.co/rest/v1/user_active_empresa?select=empresa_id
+[MSW] GET empresa_usuarios https://lrfwiaekipwkjkzvcnfd.supabase.co/rest/v1/empresa_usuarios?select=empresa%3Aempresas%28*%29&order=created_at.desc
+[AuthProvider] activeEmpresa calc: {
+  empresasCount: 1,
+  activeEmpresaId: 'empresa-1',
+  foundId: 'empresa-1'
+}
+
+stderr | src/contexts/AuthProvider.test.tsx > AuthProvider Integration > initializes with user and active empresa from MSW
+⚠️ React Router Future Flag Warning: React Router will begin wrapping state updates in `React.startTransition` in v7. You can use the `v7_startTransition` future flag to opt-in early. For more information, see https://reactrouter.com/v6/upgrading/future#v7_starttransition.
+⚠️ React Router Future Flag Warning: Relative route resolution within Splat routes is changing in v7. You can use the `v7_relativeSplatPath` future flag to opt-in early. For more information, see https://reactrouter.com/v6/upgrading/future#v7_relativesplatpath.
+
+ ✓ src/contexts/AuthProvider.test.tsx  (1 test) 1004ms
+
+ Test Files  1 passed (1)
+      Tests  1 passed (1)
+   Start at  19:06:48
+   Duration  6.28s
+
+
+ PASS  Waiting for file changes...
+       press h to show help, press q to quit
+       rerun x7
+[2K[1A[2K[G[3Jc
+ RERUN  src/contexts/AuthProvider.tsx x8
+
+stdout | src/test/setup.ts:8:9
+[SETUP] Initializing MSW server...
+
+stdout | src/contexts/AuthProvider.test.tsx > AuthProvider Integration > initializes with user and active empresa from MSW
+[AuthProvider] activeEmpresa calc: { empresasCount: 0, activeEmpresaId: undefined, foundId: undefined }
+[AuthProvider] activeEmpresa calc: { empresasCount: 0, activeEmpresaId: undefined, foundId: undefined }
+[DEBUG] [QUERY][empresas] fetching list 
+[DEBUG] [QUERY][active_empresa] fetching 
+[INFO] [AUTH][LOGIN] start { email: 'exists' }
+[MSW] GET user_active_empresa https://lrfwiaekipwkjkzvcnfd.supabase.co/rest/v1/user_active_empresa?select=empresa_id
+[MSW] GET empresa_usuarios https://lrfwiaekipwkjkzvcnfd.supabase.co/rest/v1/empresa_usuarios?select=empresa%3Aempresas%28*%29&order=created_at.desc
+[AuthProvider] activeEmpresa calc: {
+  empresasCount: 1,
+  activeEmpresaId: 'empresa-1',
+  foundId: 'empresa-1'
+}
+
+stderr | src/contexts/AuthProvider.test.tsx > AuthProvider Integration > initializes with user and active empresa from MSW
+⚠️ React Router Future Flag Warning: React Router will begin wrapping state updates in `React.startTransition` in v7. You can use the `v7_startTransition` future flag to opt-in early. For more information, see https://reactrouter.com/v6/upgrading/future#v7_starttransition.
+⚠️ React Router Future Flag Warning: Relative route resolution within Splat routes is changing in v7. You can use the `v7_relativeSplatPath` future flag to opt-in early. For more information, see https://reactrouter.com/v6/upgrading/future#v7_relativesplatpath.
+
+ ✓ src/contexts/AuthProvider.test.tsx  (1 test) 1073ms
+
+ Test Files  1 passed (1)
+      Tests  1 passed (1)
+   Start at  19:06:59
+   Duration  15.98s
+
+
+ PASS  Waiting for file changes...
+       press h to show help, press q to quit
+       rerun x8
+[2K[1A[2K[G

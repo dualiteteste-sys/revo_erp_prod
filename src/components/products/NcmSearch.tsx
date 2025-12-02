@@ -24,7 +24,7 @@ const NcmSearch: React.FC<NcmSearchProps> = ({ value, onChange }) => {
     if (val.length > 6) {
       maskedValue = maskedValue.replace(/^(\d{4})\.(\d{2})/, '$1.$2.');
     }
-    
+
     onChange(maskedValue);
   };
 
@@ -66,7 +66,10 @@ const NcmSearch: React.FC<NcmSearchProps> = ({ value, onChange }) => {
       <NcmSearchModal
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
-        onSelect={handleSelectNcm}
+        onSelect={(ncm) => {
+          handleSelectNcm(ncm);
+          setIsModalOpen(false);
+        }}
       />
     </>
   );

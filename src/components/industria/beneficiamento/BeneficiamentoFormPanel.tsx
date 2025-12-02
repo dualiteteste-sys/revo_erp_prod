@@ -145,7 +145,6 @@ export default function BeneficiamentoFormPanel({ ordemId, initialData, onSaveSu
 
     try {
       const data = await getOrdemBeneficiamentoDetails(idToLoad);
-
       setFormData(data);
     } catch (e) {
       console.error(e);
@@ -253,7 +252,7 @@ export default function BeneficiamentoFormPanel({ ordemId, initialData, onSaveSu
           manageEntregaBenef(
             savedId,
             null,
-            d.data_entrega,
+            d.data_entrega ? d.data_entrega : null,
             d.quantidade_entregue,
             d.status_faturamento || 'nao_faturado',
             d.documento_entrega,
@@ -269,7 +268,6 @@ export default function BeneficiamentoFormPanel({ ordemId, initialData, onSaveSu
       await loadDetails(savedId);
 
       addToast('Ordem salva com sucesso!', 'success');
-      onSaveSuccess();
       return savedId;
 
     } catch (e: any) {
@@ -292,7 +290,7 @@ export default function BeneficiamentoFormPanel({ ordemId, initialData, onSaveSu
       if (!currentId) return;
     }
     try {
-      await manageComponenteBenef(currentId!, null, item.id, 1, 'un', 'upsert');
+      await manageComponenteBenef(currentId!, null, item.id, 1, item.unidade || 'un', 'upsert');
       await loadDetails(currentId);
       addToast('Insumo adicionado.', 'success');
     } catch (e: any) {
@@ -396,8 +394,8 @@ export default function BeneficiamentoFormPanel({ ordemId, initialData, onSaveSu
           <button
             onClick={() => setActiveTab('dados')}
             className={`whitespace-nowrap py-2 px-3 border-b-2 font-medium text-sm transition-colors ${activeTab === 'dados'
-              ? 'border-blue-500 text-blue-600'
-              : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                ? 'border-blue-500 text-blue-600'
+                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
               }`}
           >
             Dados Gerais
@@ -405,8 +403,8 @@ export default function BeneficiamentoFormPanel({ ordemId, initialData, onSaveSu
           <button
             onClick={() => setActiveTab('componentes')}
             className={`whitespace-nowrap py-2 px-3 border-b-2 font-medium text-sm transition-colors ${activeTab === 'componentes'
-              ? 'border-blue-500 text-blue-600'
-              : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                ? 'border-blue-500 text-blue-600'
+                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
               }`}
             disabled={!formData.id}
           >
@@ -415,8 +413,8 @@ export default function BeneficiamentoFormPanel({ ordemId, initialData, onSaveSu
           <button
             onClick={() => setActiveTab('entregas')}
             className={`whitespace-nowrap py-2 px-3 border-b-2 font-medium text-sm transition-colors ${activeTab === 'entregas'
-              ? 'border-blue-500 text-blue-600'
-              : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                ? 'border-blue-500 text-blue-600'
+                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
               }`}
             disabled={!formData.id}
           >

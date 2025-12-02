@@ -31,9 +31,10 @@ export const SubscriptionProvider = ({ children }: { children: ReactNode }) => {
         .from('subscriptions')
         .select('*')
         .eq('empresa_id', empresaId)
-        .single();
+        .eq('empresa_id', empresaId)
+        .maybeSingle();
 
-      if (subError && subError.code !== 'PGRST116') {
+      if (subError) {
         throw subError;
       }
 
@@ -47,7 +48,7 @@ export const SubscriptionProvider = ({ children }: { children: ReactNode }) => {
         if (planError) {
           console.warn('Plano não encontrado para a assinatura:', planError);
         }
-        
+
         setSubscription({ ...subData, plan: planData || null });
 
       } else {

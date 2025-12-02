@@ -3,6 +3,7 @@ import { usePartners } from '../../hooks/usePartners';
 import { useToast } from '../../contexts/ToastProvider';
 import * as partnersService from '../../services/partners';
 import { Loader2, PlusCircle, Search, Users2, DatabaseBackup } from 'lucide-react';
+import { useQueryClient } from '@tanstack/react-query';
 import Pagination from '../../components/ui/Pagination';
 import ConfirmationModal from '../../components/ui/ConfirmationModal';
 import Modal from '../../components/ui/Modal';
@@ -62,7 +63,10 @@ const PartnersPage: React.FC = () => {
     setSelectedPartner(null);
   };
 
+  const queryClient = useQueryClient();
+
   const handleSaveSuccess = () => {
+    queryClient.invalidateQueries({ queryKey: ['partners'] });
     refresh();
     handleCloseForm();
   };
@@ -117,21 +121,21 @@ const PartnersPage: React.FC = () => {
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-3xl font-bold text-gray-800">Clientes e Fornecedores</h1>
         <div className="flex items-center gap-2">
-            <button
-              onClick={handleSeedPartners}
-              disabled={isSeeding || loading}
-              className="flex items-center gap-2 bg-gray-100 text-gray-700 font-semibold py-2 px-4 rounded-lg hover:bg-gray-200 transition-colors disabled:opacity-50"
-            >
-              {isSeeding ? <Loader2 className="animate-spin" size={20} /> : <DatabaseBackup size={20} />}
-              Popular Dados
-            </button>
-            <button
-              onClick={() => handleOpenForm()}
-              className="flex items-center gap-2 bg-blue-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-blue-700 transition-colors"
-            >
-              <PlusCircle size={20} />
-              Novo Cliente/Fornecedor
-            </button>
+          <button
+            onClick={handleSeedPartners}
+            disabled={isSeeding || loading}
+            className="flex items-center gap-2 bg-gray-100 text-gray-700 font-semibold py-2 px-4 rounded-lg hover:bg-gray-200 transition-colors disabled:opacity-50"
+          >
+            {isSeeding ? <Loader2 className="animate-spin" size={20} /> : <DatabaseBackup size={20} />}
+            Popular Dados
+          </button>
+          <button
+            onClick={() => handleOpenForm()}
+            className="flex items-center gap-2 bg-blue-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-blue-700 transition-colors"
+          >
+            <PlusCircle size={20} />
+            Novo Cliente/Fornecedor
+          </button>
         </div>
       </div>
 
