@@ -300,7 +300,7 @@ export default function BeneficiamentoFormPanel({ ordemId, initialData, onSaveSu
 
   const handleRemoveComponente = async (itemId: string) => {
     try {
-      await manageComponenteBenef(formData.id!, itemId, '', 0, '', 'delete');
+      await manageComponenteBenef(formData.id!, itemId, null, 0, '', 'delete');
       await loadDetails(formData.id);
       addToast('Insumo removido.', 'success');
     } catch (e: any) {
