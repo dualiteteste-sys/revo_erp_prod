@@ -1,3 +1,109 @@
+SET check_function_bodies = off;
+
+-- 0) Helper: current_user_id (robust)
+create or replace function public.current_user_id()
+returns uuid
+language plpgsql
+stable
+security definer
+set search_path = pg_catalog, public
+as $$
+declare
+  v_sub text;
+  v_id uuid;
+begin
+  select nullif(current_setting('request.jwt.claim.sub', true), '') into v_sub;
+  if v_sub is null then
+    begin
+      select nullif(current_setting('request.jwt.claims', true), '')::jsonb ->> 'sub' into v_sub;
+    exception when others then
+      v_sub := null;
+    end;
+  end if;
+  if v_sub is null then
+    select auth.uid()::text into v_sub;
+  end if;
+  begin
+    v_id := v_sub::uuid;
+  exception when others then
+    v_id := null;
+  end;
+  return v_id;
+end;
+$$;
+
+-- 1) Helper: get_preferred_empresa_for_user
+create or replace function public.get_preferred_empresa_for_user(p_user_id uuid)
+returns uuid
+language plpgsql
+stable
+security definer
+set search_path = pg_catalog, public
+as $fn$
+declare
+  v_emp uuid;
+  v_cnt int;
+begin
+  begin
+    select empresa_id into v_emp
+      from public.user_active_empresa
+     where user_id = p_user_id
+     limit 1;
+  exception when others then
+    v_emp := null;
+  end;
+
+  if v_emp is not null then
+    return v_emp;
+  end if;
+
+  select count(*) into v_cnt
+    from public.empresa_usuarios eu
+   where eu.user_id = p_user_id;
+
+  if v_cnt = 1 then
+    select eu.empresa_id into v_emp
+      from public.empresa_usuarios eu
+     where eu.user_id = p_user_id
+     limit 1;
+    return v_emp;
+  end if;
+
+  return null;
+end;
+$fn$;
+
+-- 2) current_empresa_id
+create or replace function public.current_empresa_id()
+returns uuid
+language plpgsql
+stable
+security definer
+set search_path = pg_catalog, public
+as $fn$
+declare
+  v_emp uuid;
+  v_uid uuid := public.current_user_id();
+begin
+  if v_uid is null then
+    return null;
+  end if;
+
+  begin
+    v_emp := nullif(current_setting('app.current_empresa_id', true), '')::uuid;
+  exception when others then
+    v_emp := null;
+  end;
+
+  if v_emp is not null then
+    return v_emp;
+  end if;
+
+  v_emp := public.get_preferred_empresa_for_user(v_uid);
+  return v_emp;
+end;
+$fn$;
+
 create type "public"."billing_cycle" as enum ('monthly', 'yearly');
 
 create type "public"."contribuinte_icms_enum" as enum ('1', '2', '9');

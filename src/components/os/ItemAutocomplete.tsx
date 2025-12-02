@@ -55,7 +55,7 @@ export default function ItemAutocomplete({ onSelect, disabled, onlySales = true,
           left: `${rect.left}px`,
           width: `${rect.width}px`,
           maxHeight: `${Math.max(200, spaceBelow)}px`, // At least 200px, or available space
-          zIndex: 9999,
+          zIndex: 100000,
         });
       };
 
