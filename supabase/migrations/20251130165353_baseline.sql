@@ -11131,17 +11131,17 @@ end;
 $function$
 ;
 
-CREATE OR REPLACE FUNCTION public.list_events_for_current_user(p_from timestamp with time zone DEFAULT (now() - '30 days'::interval), p_to timestamp with time zone DEFAULT now(), p_source text[] DEFAULT NULL::text[], p_table text[] DEFAULT NULL::text[], p_op text[] DEFAULT NULL::text[], p_q text DEFAULT NULL::text, p_after timestamp with time zone DEFAULT NULL::timestamp with time zone, p_limit integer DEFAULT 50)
- RETURNS SETOF audit.events
- LANGUAGE sql
- SET search_path TO 'pg_catalog', 'public'
-AS $function$
-  SELECT *
-  FROM audit.list_events_for_current_user(
-    p_from, p_to, p_source, p_table, p_op, p_q, p_after, p_limit
-  );
-$function$
-;
+-- CREATE OR REPLACE FUNCTION public.list_events_for_current_user(p_from timestamp with time zone DEFAULT (now() - '30 days'::interval), p_to timestamp with time zone DEFAULT now(), p_source text[] DEFAULT NULL::text[], p_table text[] DEFAULT NULL::text[], p_op text[] DEFAULT NULL::text[], p_q text DEFAULT NULL::text, p_after timestamp with time zone DEFAULT NULL::timestamp with time zone, p_limit integer DEFAULT 50)
+--  RETURNS SETOF audit.events
+--  LANGUAGE sql
+--  SET search_path TO 'pg_catalog', 'public'
+-- AS $function$
+--   SELECT *
+--   FROM audit.list_events_for_current_user(
+--     p_from, p_to, p_source, p_table, p_op, p_q, p_after, p_limit
+--   );
+-- $function$
+-- ;
 
 CREATE OR REPLACE FUNCTION public.list_kanban_os()
  RETURNS TABLE(id uuid, numero bigint, descricao text, status public.status_os, data_prevista date, cliente_nome text)
