@@ -137,7 +137,7 @@ const NcmSearch: React.FC<NcmSearchProps> = ({ value, onChange }) => {
           </button>
         </PopoverTrigger>
         <PopoverContent className="w-[400px] p-0 bg-white rounded-lg shadow-xl border border-gray-200 z-[9999]" align="start">
-          <Command className="rounded-lg border shadow-md overflow-hidden" shouldFilter={false}>
+          <Command className="rounded-lg border shadow-md overflow-hidden" shouldFilter={false} filter={() => 1}>
             <div className="flex items-center border-b px-3" cmdk-input-wrapper="">
               <Search className="mr-2 h-4 w-4 shrink-0 opacity-50" />
               <CommandInput
@@ -172,7 +172,7 @@ const NcmSearch: React.FC<NcmSearchProps> = ({ value, onChange }) => {
                         value={`${item.codigo} ${item.descricao}`} // Searchable string
                         onSelect={() => handleSelect(item)}
                         className={cn(
-                          "relative flex cursor-default select-none items-center rounded-sm px-2 py-2 text-sm outline-none aria-selected:bg-blue-50 aria-selected:text-blue-700 data-[disabled]:pointer-events-none data-[disabled]:opacity-50 cursor-pointer transition-colors",
+                          "relative flex cursor-default select-none items-center rounded-sm px-2 py-2 text-sm outline-none aria-selected:bg-blue-50 aria-selected:text-blue-700 cursor-pointer transition-colors",
                           isSelectable ? "font-medium" : "text-gray-600"
                         )}
                       >
