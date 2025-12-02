@@ -32,122 +32,114 @@ begin
 end;
 $$;
 
--- 1) Helper: get_preferred_empresa_for_user
-create or replace function public.get_preferred_empresa_for_user(p_user_id uuid)
-returns uuid
-language plpgsql
-stable
-security definer
-set search_path = pg_catalog, public
-as $fn$
-declare
-  v_emp uuid;
-  v_cnt int;
-begin
-  begin
-    select empresa_id into v_emp
-      from public.user_active_empresa
-     where user_id = p_user_id
-     limit 1;
-  exception when others then
-    v_emp := null;
-  end;
-
-  if v_emp is not null then
-    return v_emp;
-  end if;
-
-  select count(*) into v_cnt
-    from public.empresa_usuarios eu
-   where eu.user_id = p_user_id;
-
-  if v_cnt = 1 then
-    select eu.empresa_id into v_emp
-      from public.empresa_usuarios eu
-     where eu.user_id = p_user_id
-     limit 1;
-    return v_emp;
-  end if;
-
-  return null;
-end;
-$fn$;
-
--- 2) current_empresa_id
-create or replace function public.current_empresa_id()
-returns uuid
-language plpgsql
-stable
-security definer
-set search_path = pg_catalog, public
-as $fn$
-declare
-  v_emp uuid;
-  v_uid uuid := public.current_user_id();
-begin
-  if v_uid is null then
-    return null;
-  end if;
-
-  begin
-    v_emp := nullif(current_setting('app.current_empresa_id', true), '')::uuid;
-  exception when others then
-    v_emp := null;
-  end;
-
-  if v_emp is not null then
-    return v_emp;
-  end if;
-
-  v_emp := public.get_preferred_empresa_for_user(v_uid);
-  return v_emp;
-end;
-$fn$;
-
+DO $$ BEGIN
 create type "public"."billing_cycle" as enum ('monthly', 'yearly');
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 create type "public"."contribuinte_icms_enum" as enum ('1', '2', '9');
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 create type "public"."meta_tipo" as enum ('valor', 'quantidade');
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 create type "public"."pessoa_tipo" as enum ('cliente', 'fornecedor', 'ambos');
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 create type "public"."status_centro_custo" as enum ('ativo', 'inativo');
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 create type "public"."status_conta_receber" as enum ('pendente', 'pago', 'vencido', 'cancelado');
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 create type "public"."status_os" as enum ('orcamento', 'aberta', 'concluida', 'cancelada');
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 create type "public"."status_parcela" as enum ('aberta', 'paga', 'cancelada');
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 create type "public"."status_produto" as enum ('ativo', 'inativo');
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 create type "public"."status_servico" as enum ('ativo', 'inativo');
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 create type "public"."status_transportadora" as enum ('ativa', 'inativa');
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 create type "public"."sub_status" as enum ('trialing', 'active', 'past_due', 'canceled', 'unpaid', 'incomplete', 'incomplete_expired');
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 create type "public"."tipo_embalagem" as enum ('pacote_caixa', 'envelope', 'rolo_cilindro', 'outro');
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 create type "public"."tipo_pessoa_enum" as enum ('fisica', 'juridica', 'estrangeiro');
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 create type "public"."tipo_produto" as enum ('simples', 'kit', 'variacoes', 'fabricado', 'materia_prima');
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 create type "public"."user_status_in_empresa" as enum ('ACTIVE', 'PENDING', 'INACTIVE');
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
 
-create sequence "public"."compras_pedidos_numero_seq";
+create sequence if not exists "public"."compras_pedidos_numero_seq";
 
-create sequence "public"."industria_benef_ordens_numero_seq";
+create sequence if not exists "public"."industria_benef_ordens_numero_seq";
 
-create sequence "public"."industria_ordens_numero_seq";
+create sequence if not exists "public"."industria_ordens_numero_seq";
 
-create sequence "public"."industria_producao_ordens_numero_seq";
+create sequence if not exists "public"."industria_producao_ordens_numero_seq";
 
-create sequence "public"."vendas_pedidos_numero_seq";
+create sequence if not exists "public"."vendas_pedidos_numero_seq";
 
 
-  create table "public"."_bak_empresa_usuarios" (
+  create table if not exists "public"."_bak_empresa_usuarios" (
     "empresa_id" uuid,
     "user_id" uuid,
     "role" text,
@@ -156,12 +148,13 @@ create sequence "public"."vendas_pedidos_numero_seq";
     "status" public.user_status_in_empresa,
     "deleted_at" timestamp with time zone
       );
+DO $$ BEGIN
 
 
 alter table "public"."_bak_empresa_usuarios" enable row level security;
 
 
-  create table "public"."addons" (
+  create table if not exists "public"."addons" (
     "id" uuid not null default gen_random_uuid(),
     "slug" text not null,
     "name" text not null,
@@ -178,7 +171,7 @@ alter table "public"."_bak_empresa_usuarios" enable row level security;
 alter table "public"."addons" enable row level security;
 
 
-  create table "public"."atributos" (
+  create table if not exists "public"."atributos" (
     "id" uuid not null default gen_random_uuid(),
     "empresa_id" uuid not null,
     "nome" text not null,
@@ -191,7 +184,7 @@ alter table "public"."addons" enable row level security;
 alter table "public"."atributos" enable row level security;
 
 
-  create table "public"."centros_de_custo" (
+  create table if not exists "public"."centros_de_custo" (
     "id" uuid not null default gen_random_uuid(),
     "empresa_id" uuid not null,
     "nome" text not null,
@@ -205,7 +198,7 @@ alter table "public"."atributos" enable row level security;
 alter table "public"."centros_de_custo" enable row level security;
 
 
-  create table "public"."compras_itens" (
+  create table if not exists "public"."compras_itens" (
     "id" uuid not null default gen_random_uuid(),
     "empresa_id" uuid not null default public.current_empresa_id(),
     "pedido_id" uuid not null,
@@ -221,7 +214,7 @@ alter table "public"."centros_de_custo" enable row level security;
 alter table "public"."compras_itens" enable row level security;
 
 
-  create table "public"."compras_pedidos" (
+  create table if not exists "public"."compras_pedidos" (
     "id" uuid not null default gen_random_uuid(),
     "empresa_id" uuid not null default public.current_empresa_id(),
     "numero" integer not null default nextval('public.compras_pedidos_numero_seq'::regclass),
@@ -242,7 +235,7 @@ alter table "public"."compras_itens" enable row level security;
 alter table "public"."compras_pedidos" enable row level security;
 
 
-  create table "public"."contas_a_receber" (
+  create table if not exists "public"."contas_a_receber" (
     "id" uuid not null default gen_random_uuid(),
     "empresa_id" uuid not null,
     "cliente_id" uuid,
@@ -261,7 +254,7 @@ alter table "public"."compras_pedidos" enable row level security;
 alter table "public"."contas_a_receber" enable row level security;
 
 
-  create table "public"."crm_etapas" (
+  create table if not exists "public"."crm_etapas" (
     "id" uuid not null default gen_random_uuid(),
     "empresa_id" uuid not null default public.current_empresa_id(),
     "funil_id" uuid not null,
@@ -277,7 +270,7 @@ alter table "public"."contas_a_receber" enable row level security;
 alter table "public"."crm_etapas" enable row level security;
 
 
-  create table "public"."crm_funis" (
+  create table if not exists "public"."crm_funis" (
     "id" uuid not null default gen_random_uuid(),
     "empresa_id" uuid not null default public.current_empresa_id(),
     "nome" text not null,
@@ -292,7 +285,7 @@ alter table "public"."crm_etapas" enable row level security;
 alter table "public"."crm_funis" enable row level security;
 
 
-  create table "public"."crm_oportunidades" (
+  create table if not exists "public"."crm_oportunidades" (
     "id" uuid not null default gen_random_uuid(),
     "empresa_id" uuid not null default public.current_empresa_id(),
     "funil_id" uuid not null,
@@ -314,7 +307,7 @@ alter table "public"."crm_funis" enable row level security;
 alter table "public"."crm_oportunidades" enable row level security;
 
 
-  create table "public"."ecommerces" (
+  create table if not exists "public"."ecommerces" (
     "id" uuid not null default gen_random_uuid(),
     "empresa_id" uuid not null,
     "nome" text not null,
@@ -326,7 +319,7 @@ alter table "public"."crm_oportunidades" enable row level security;
 alter table "public"."ecommerces" enable row level security;
 
 
-  create table "public"."empresa_addons" (
+  create table if not exists "public"."empresa_addons" (
     "empresa_id" uuid not null,
     "addon_slug" text not null,
     "billing_cycle" text not null,
@@ -343,7 +336,7 @@ alter table "public"."ecommerces" enable row level security;
 alter table "public"."empresa_addons" enable row level security;
 
 
-  create table "public"."empresa_usuarios" (
+  create table if not exists "public"."empresa_usuarios" (
     "empresa_id" uuid not null,
     "user_id" uuid not null,
     "role" text not null default 'member'::text,
@@ -358,7 +351,7 @@ alter table "public"."empresa_addons" enable row level security;
 alter table "public"."empresa_usuarios" enable row level security;
 
 
-  create table "public"."empresas" (
+  create table if not exists "public"."empresas" (
     "id" uuid not null default gen_random_uuid(),
     "created_at" timestamp with time zone not null default now(),
     "updated_at" timestamp with time zone not null default now(),
@@ -383,7 +376,7 @@ alter table "public"."empresa_usuarios" enable row level security;
 alter table "public"."empresas" enable row level security;
 
 
-  create table "public"."estoque_movimentos" (
+  create table if not exists "public"."estoque_movimentos" (
     "id" uuid not null default gen_random_uuid(),
     "empresa_id" uuid not null default public.current_empresa_id(),
     "produto_id" uuid not null,
@@ -409,7 +402,7 @@ alter table "public"."empresas" enable row level security;
 alter table "public"."estoque_movimentos" enable row level security;
 
 
-  create table "public"."estoque_saldos" (
+  create table if not exists "public"."estoque_saldos" (
     "id" uuid not null default gen_random_uuid(),
     "empresa_id" uuid not null default public.current_empresa_id(),
     "produto_id" uuid not null,
@@ -423,7 +416,7 @@ alter table "public"."estoque_movimentos" enable row level security;
 alter table "public"."estoque_saldos" enable row level security;
 
 
-  create table "public"."financeiro_centros_custos" (
+  create table if not exists "public"."financeiro_centros_custos" (
     "id" uuid not null default gen_random_uuid(),
     "empresa_id" uuid not null default public.current_empresa_id(),
     "parent_id" uuid,
@@ -442,7 +435,7 @@ alter table "public"."estoque_saldos" enable row level security;
 alter table "public"."financeiro_centros_custos" enable row level security;
 
 
-  create table "public"."financeiro_cobrancas_bancarias" (
+  create table if not exists "public"."financeiro_cobrancas_bancarias" (
     "id" uuid not null default gen_random_uuid(),
     "empresa_id" uuid not null default public.current_empresa_id(),
     "conta_receber_id" uuid,
@@ -475,7 +468,7 @@ alter table "public"."financeiro_centros_custos" enable row level security;
 alter table "public"."financeiro_cobrancas_bancarias" enable row level security;
 
 
-  create table "public"."financeiro_cobrancas_bancarias_eventos" (
+  create table if not exists "public"."financeiro_cobrancas_bancarias_eventos" (
     "id" uuid not null default gen_random_uuid(),
     "empresa_id" uuid not null default public.current_empresa_id(),
     "cobranca_id" uuid not null,
@@ -491,7 +484,7 @@ alter table "public"."financeiro_cobrancas_bancarias" enable row level security;
 alter table "public"."financeiro_cobrancas_bancarias_eventos" enable row level security;
 
 
-  create table "public"."financeiro_contas_correntes" (
+  create table if not exists "public"."financeiro_contas_correntes" (
     "id" uuid not null default gen_random_uuid(),
     "empresa_id" uuid not null default public.current_empresa_id(),
     "nome" text not null,
@@ -519,7 +512,7 @@ alter table "public"."financeiro_cobrancas_bancarias_eventos" enable row level s
 alter table "public"."financeiro_contas_correntes" enable row level security;
 
 
-  create table "public"."financeiro_contas_pagar" (
+  create table if not exists "public"."financeiro_contas_pagar" (
     "id" uuid not null default gen_random_uuid(),
     "empresa_id" uuid not null default public.current_empresa_id(),
     "fornecedor_id" uuid,
@@ -546,7 +539,7 @@ alter table "public"."financeiro_contas_correntes" enable row level security;
 alter table "public"."financeiro_contas_pagar" enable row level security;
 
 
-  create table "public"."financeiro_extratos_bancarios" (
+  create table if not exists "public"."financeiro_extratos_bancarios" (
     "id" uuid not null default gen_random_uuid(),
     "empresa_id" uuid not null default public.current_empresa_id(),
     "conta_corrente_id" uuid not null,
@@ -570,7 +563,7 @@ alter table "public"."financeiro_contas_pagar" enable row level security;
 alter table "public"."financeiro_extratos_bancarios" enable row level security;
 
 
-  create table "public"."financeiro_movimentacoes" (
+  create table if not exists "public"."financeiro_movimentacoes" (
     "id" uuid not null default gen_random_uuid(),
     "empresa_id" uuid not null default public.current_empresa_id(),
     "conta_corrente_id" uuid not null,
@@ -594,7 +587,7 @@ alter table "public"."financeiro_extratos_bancarios" enable row level security;
 alter table "public"."financeiro_movimentacoes" enable row level security;
 
 
-  create table "public"."fiscal_nfe_import_items" (
+  create table if not exists "public"."fiscal_nfe_import_items" (
     "id" uuid not null default gen_random_uuid(),
     "empresa_id" uuid not null default public.current_empresa_id(),
     "import_id" uuid not null,
@@ -620,7 +613,7 @@ alter table "public"."financeiro_movimentacoes" enable row level security;
 alter table "public"."fiscal_nfe_import_items" enable row level security;
 
 
-  create table "public"."fiscal_nfe_imports" (
+  create table if not exists "public"."fiscal_nfe_imports" (
     "id" uuid not null default gen_random_uuid(),
     "empresa_id" uuid not null default public.current_empresa_id(),
     "origem_upload" text not null default 'xml'::text,
@@ -646,7 +639,7 @@ alter table "public"."fiscal_nfe_import_items" enable row level security;
 alter table "public"."fiscal_nfe_imports" enable row level security;
 
 
-  create table "public"."fornecedores" (
+  create table if not exists "public"."fornecedores" (
     "id" uuid not null default gen_random_uuid(),
     "empresa_id" uuid not null,
     "nome" text not null,
@@ -658,7 +651,7 @@ alter table "public"."fiscal_nfe_imports" enable row level security;
 alter table "public"."fornecedores" enable row level security;
 
 
-  create table "public"."industria_benef_componentes" (
+  create table if not exists "public"."industria_benef_componentes" (
     "id" uuid not null default gen_random_uuid(),
     "empresa_id" uuid not null default public.current_empresa_id(),
     "ordem_id" uuid not null,
@@ -675,7 +668,7 @@ alter table "public"."fornecedores" enable row level security;
 alter table "public"."industria_benef_componentes" enable row level security;
 
 
-  create table "public"."industria_benef_entregas" (
+  create table if not exists "public"."industria_benef_entregas" (
     "id" uuid not null default gen_random_uuid(),
     "empresa_id" uuid not null default public.current_empresa_id(),
     "ordem_id" uuid not null,
@@ -693,7 +686,7 @@ alter table "public"."industria_benef_componentes" enable row level security;
 alter table "public"."industria_benef_entregas" enable row level security;
 
 
-  create table "public"."industria_benef_ordens" (
+  create table if not exists "public"."industria_benef_ordens" (
     "id" uuid not null default gen_random_uuid(),
     "empresa_id" uuid not null default public.current_empresa_id(),
     "numero" integer not null default nextval('public.industria_benef_ordens_numero_seq'::regclass),
@@ -718,7 +711,7 @@ alter table "public"."industria_benef_entregas" enable row level security;
 alter table "public"."industria_benef_ordens" enable row level security;
 
 
-  create table "public"."industria_boms" (
+  create table if not exists "public"."industria_boms" (
     "id" uuid not null default gen_random_uuid(),
     "empresa_id" uuid not null default public.current_empresa_id(),
     "produto_final_id" uuid not null,
@@ -740,7 +733,7 @@ alter table "public"."industria_benef_ordens" enable row level security;
 alter table "public"."industria_boms" enable row level security;
 
 
-  create table "public"."industria_boms_componentes" (
+  create table if not exists "public"."industria_boms_componentes" (
     "id" uuid not null default gen_random_uuid(),
     "empresa_id" uuid not null default public.current_empresa_id(),
     "bom_id" uuid not null,
@@ -758,7 +751,7 @@ alter table "public"."industria_boms" enable row level security;
 alter table "public"."industria_boms_componentes" enable row level security;
 
 
-  create table "public"."industria_centros_trabalho" (
+  create table if not exists "public"."industria_centros_trabalho" (
     "id" uuid not null default gen_random_uuid(),
     "empresa_id" uuid not null default public.current_empresa_id(),
     "nome" text not null,
@@ -775,7 +768,7 @@ alter table "public"."industria_boms_componentes" enable row level security;
 alter table "public"."industria_centros_trabalho" enable row level security;
 
 
-  create table "public"."industria_materiais_cliente" (
+  create table if not exists "public"."industria_materiais_cliente" (
     "id" uuid not null default gen_random_uuid(),
     "empresa_id" uuid not null default public.current_empresa_id(),
     "cliente_id" uuid not null,
@@ -793,7 +786,7 @@ alter table "public"."industria_centros_trabalho" enable row level security;
 alter table "public"."industria_materiais_cliente" enable row level security;
 
 
-  create table "public"."industria_operacoes" (
+  create table if not exists "public"."industria_operacoes" (
     "id" uuid not null default gen_random_uuid(),
     "empresa_id" uuid not null default public.current_empresa_id(),
     "tipo_ordem" text not null,
@@ -816,7 +809,7 @@ alter table "public"."industria_materiais_cliente" enable row level security;
 alter table "public"."industria_operacoes" enable row level security;
 
 
-  create table "public"."industria_operacoes_apontamentos" (
+  create table if not exists "public"."industria_operacoes_apontamentos" (
     "id" uuid not null default gen_random_uuid(),
     "empresa_id" uuid not null default public.current_empresa_id(),
     "operacao_id" uuid not null,
@@ -833,7 +826,7 @@ alter table "public"."industria_operacoes" enable row level security;
 alter table "public"."industria_operacoes_apontamentos" enable row level security;
 
 
-  create table "public"."industria_ordem_componentes" (
+  create table if not exists "public"."industria_ordem_componentes" (
     "id" uuid not null default gen_random_uuid(),
     "empresa_id" uuid not null default public.current_empresa_id(),
     "ordem_id" uuid not null,
@@ -849,7 +842,7 @@ alter table "public"."industria_operacoes_apontamentos" enable row level securit
 alter table "public"."industria_ordem_componentes" enable row level security;
 
 
-  create table "public"."industria_ordem_entregas" (
+  create table if not exists "public"."industria_ordem_entregas" (
     "id" uuid not null default gen_random_uuid(),
     "empresa_id" uuid not null default public.current_empresa_id(),
     "ordem_id" uuid not null,
@@ -865,7 +858,7 @@ alter table "public"."industria_ordem_componentes" enable row level security;
 alter table "public"."industria_ordem_entregas" enable row level security;
 
 
-  create table "public"."industria_ordens" (
+  create table if not exists "public"."industria_ordens" (
     "id" uuid not null default gen_random_uuid(),
     "empresa_id" uuid not null default public.current_empresa_id(),
     "numero" integer not null default nextval('public.industria_ordens_numero_seq'::regclass),
@@ -890,7 +883,7 @@ alter table "public"."industria_ordem_entregas" enable row level security;
 alter table "public"."industria_ordens" enable row level security;
 
 
-  create table "public"."industria_ordens_componentes" (
+  create table if not exists "public"."industria_ordens_componentes" (
     "id" uuid not null default gen_random_uuid(),
     "empresa_id" uuid not null default public.current_empresa_id(),
     "ordem_id" uuid not null,
@@ -907,7 +900,7 @@ alter table "public"."industria_ordens" enable row level security;
 alter table "public"."industria_ordens_componentes" enable row level security;
 
 
-  create table "public"."industria_ordens_entregas" (
+  create table if not exists "public"."industria_ordens_entregas" (
     "id" uuid not null default gen_random_uuid(),
     "empresa_id" uuid not null default public.current_empresa_id(),
     "ordem_id" uuid not null,
@@ -924,7 +917,7 @@ alter table "public"."industria_ordens_componentes" enable row level security;
 alter table "public"."industria_ordens_entregas" enable row level security;
 
 
-  create table "public"."industria_producao_componentes" (
+  create table if not exists "public"."industria_producao_componentes" (
     "id" uuid not null default gen_random_uuid(),
     "empresa_id" uuid not null default public.current_empresa_id(),
     "ordem_id" uuid not null,
@@ -941,7 +934,7 @@ alter table "public"."industria_ordens_entregas" enable row level security;
 alter table "public"."industria_producao_componentes" enable row level security;
 
 
-  create table "public"."industria_producao_entregas" (
+  create table if not exists "public"."industria_producao_entregas" (
     "id" uuid not null default gen_random_uuid(),
     "empresa_id" uuid not null default public.current_empresa_id(),
     "ordem_id" uuid not null,
@@ -958,7 +951,7 @@ alter table "public"."industria_producao_componentes" enable row level security;
 alter table "public"."industria_producao_entregas" enable row level security;
 
 
-  create table "public"."industria_producao_ordens" (
+  create table if not exists "public"."industria_producao_ordens" (
     "id" uuid not null default gen_random_uuid(),
     "empresa_id" uuid not null default public.current_empresa_id(),
     "numero" integer not null default nextval('public.industria_producao_ordens_numero_seq'::regclass),
@@ -982,7 +975,7 @@ alter table "public"."industria_producao_entregas" enable row level security;
 alter table "public"."industria_producao_ordens" enable row level security;
 
 
-  create table "public"."industria_roteiros" (
+  create table if not exists "public"."industria_roteiros" (
     "id" uuid not null default gen_random_uuid(),
     "empresa_id" uuid not null default public.current_empresa_id(),
     "produto_id" uuid not null,
@@ -1002,7 +995,7 @@ alter table "public"."industria_producao_ordens" enable row level security;
 alter table "public"."industria_roteiros" enable row level security;
 
 
-  create table "public"."industria_roteiros_etapas" (
+  create table if not exists "public"."industria_roteiros_etapas" (
     "id" uuid not null default gen_random_uuid(),
     "empresa_id" uuid not null default public.current_empresa_id(),
     "roteiro_id" uuid not null,
@@ -1021,7 +1014,7 @@ alter table "public"."industria_roteiros" enable row level security;
 alter table "public"."industria_roteiros_etapas" enable row level security;
 
 
-  create table "public"."linhas_produto" (
+  create table if not exists "public"."linhas_produto" (
     "id" uuid not null default gen_random_uuid(),
     "empresa_id" uuid not null,
     "nome" text not null,
@@ -1033,7 +1026,7 @@ alter table "public"."industria_roteiros_etapas" enable row level security;
 alter table "public"."linhas_produto" enable row level security;
 
 
-  create table "public"."logistica_transportadoras" (
+  create table if not exists "public"."logistica_transportadoras" (
     "id" uuid not null default gen_random_uuid(),
     "empresa_id" uuid not null default public.current_empresa_id(),
     "pessoa_id" uuid,
@@ -1069,7 +1062,7 @@ alter table "public"."linhas_produto" enable row level security;
 alter table "public"."logistica_transportadoras" enable row level security;
 
 
-  create table "public"."marcas" (
+  create table if not exists "public"."marcas" (
     "id" uuid not null default gen_random_uuid(),
     "empresa_id" uuid not null,
     "nome" text not null,
@@ -1081,7 +1074,7 @@ alter table "public"."logistica_transportadoras" enable row level security;
 alter table "public"."marcas" enable row level security;
 
 
-  create table "public"."metas_vendas" (
+  create table if not exists "public"."metas_vendas" (
     "id" uuid not null default gen_random_uuid(),
     "empresa_id" uuid not null,
     "nome" text not null,
@@ -1100,7 +1093,7 @@ alter table "public"."marcas" enable row level security;
 alter table "public"."metas_vendas" enable row level security;
 
 
-  create table "public"."ordem_servico_itens" (
+  create table if not exists "public"."ordem_servico_itens" (
     "id" uuid not null default gen_random_uuid(),
     "empresa_id" uuid not null,
     "ordem_servico_id" uuid not null,
@@ -1123,7 +1116,7 @@ alter table "public"."metas_vendas" enable row level security;
 alter table "public"."ordem_servico_itens" enable row level security;
 
 
-  create table "public"."ordem_servico_parcelas" (
+  create table if not exists "public"."ordem_servico_parcelas" (
     "id" uuid not null default gen_random_uuid(),
     "empresa_id" uuid not null,
     "ordem_servico_id" uuid not null,
@@ -1141,7 +1134,7 @@ alter table "public"."ordem_servico_itens" enable row level security;
 alter table "public"."ordem_servico_parcelas" enable row level security;
 
 
-  create table "public"."ordem_servicos" (
+  create table if not exists "public"."ordem_servicos" (
     "id" uuid not null default gen_random_uuid(),
     "empresa_id" uuid not null,
     "numero" bigint not null,
@@ -1180,7 +1173,7 @@ alter table "public"."ordem_servico_parcelas" enable row level security;
 alter table "public"."ordem_servicos" enable row level security;
 
 
-  create table "public"."permissions" (
+  create table if not exists "public"."permissions" (
     "id" uuid not null default gen_random_uuid(),
     "module" text not null,
     "action" text not null,
@@ -1192,7 +1185,7 @@ alter table "public"."ordem_servicos" enable row level security;
 alter table "public"."permissions" enable row level security;
 
 
-  create table "public"."pessoa_contatos" (
+  create table if not exists "public"."pessoa_contatos" (
     "id" uuid not null default gen_random_uuid(),
     "empresa_id" uuid not null,
     "pessoa_id" uuid not null,
@@ -1209,7 +1202,7 @@ alter table "public"."permissions" enable row level security;
 alter table "public"."pessoa_contatos" enable row level security;
 
 
-  create table "public"."pessoa_enderecos" (
+  create table if not exists "public"."pessoa_enderecos" (
     "id" uuid not null default gen_random_uuid(),
     "empresa_id" uuid not null,
     "pessoa_id" uuid not null,
@@ -1230,7 +1223,7 @@ alter table "public"."pessoa_contatos" enable row level security;
 alter table "public"."pessoa_enderecos" enable row level security;
 
 
-  create table "public"."pessoas" (
+  create table if not exists "public"."pessoas" (
     "id" uuid not null default gen_random_uuid(),
     "empresa_id" uuid not null,
     "tipo" public.pessoa_tipo not null,
@@ -1263,7 +1256,7 @@ alter table "public"."pessoa_enderecos" enable row level security;
 alter table "public"."pessoas" enable row level security;
 
 
-  create table "public"."plans" (
+  create table if not exists "public"."plans" (
     "id" uuid not null default gen_random_uuid(),
     "slug" text not null,
     "name" text not null,
@@ -1279,7 +1272,7 @@ alter table "public"."pessoas" enable row level security;
 alter table "public"."plans" enable row level security;
 
 
-  create table "public"."products_legacy_archive" (
+  create table if not exists "public"."products_legacy_archive" (
     "id" uuid not null,
     "empresa_id" uuid not null,
     "name" text not null,
@@ -1298,7 +1291,7 @@ alter table "public"."plans" enable row level security;
 alter table "public"."products_legacy_archive" enable row level security;
 
 
-  create table "public"."produto_anuncios" (
+  create table if not exists "public"."produto_anuncios" (
     "id" uuid not null default gen_random_uuid(),
     "empresa_id" uuid not null,
     "produto_id" uuid not null,
@@ -1315,7 +1308,7 @@ alter table "public"."products_legacy_archive" enable row level security;
 alter table "public"."produto_anuncios" enable row level security;
 
 
-  create table "public"."produto_atributos" (
+  create table if not exists "public"."produto_atributos" (
     "id" uuid not null default gen_random_uuid(),
     "empresa_id" uuid not null,
     "produto_id" uuid not null,
@@ -1332,7 +1325,7 @@ alter table "public"."produto_anuncios" enable row level security;
 alter table "public"."produto_atributos" enable row level security;
 
 
-  create table "public"."produto_componentes" (
+  create table if not exists "public"."produto_componentes" (
     "kit_id" uuid not null,
     "componente_id" uuid not null,
     "empresa_id" uuid not null,
@@ -1343,7 +1336,7 @@ alter table "public"."produto_atributos" enable row level security;
 alter table "public"."produto_componentes" enable row level security;
 
 
-  create table "public"."produto_fornecedores" (
+  create table if not exists "public"."produto_fornecedores" (
     "produto_id" uuid not null,
     "fornecedor_id" uuid not null,
     "empresa_id" uuid not null,
@@ -1356,7 +1349,7 @@ alter table "public"."produto_componentes" enable row level security;
 alter table "public"."produto_fornecedores" enable row level security;
 
 
-  create table "public"."produto_imagens" (
+  create table if not exists "public"."produto_imagens" (
     "id" uuid not null default gen_random_uuid(),
     "empresa_id" uuid not null,
     "produto_id" uuid not null,
@@ -1371,7 +1364,7 @@ alter table "public"."produto_fornecedores" enable row level security;
 alter table "public"."produto_imagens" enable row level security;
 
 
-  create table "public"."produto_tags" (
+  create table if not exists "public"."produto_tags" (
     "produto_id" uuid not null,
     "tag_id" uuid not null,
     "empresa_id" uuid not null
@@ -1381,7 +1374,7 @@ alter table "public"."produto_imagens" enable row level security;
 alter table "public"."produto_tags" enable row level security;
 
 
-  create table "public"."produtos" (
+  create table if not exists "public"."produtos" (
     "id" uuid not null default gen_random_uuid(),
     "empresa_id" uuid not null,
     "tipo" public.tipo_produto not null default 'simples'::public.tipo_produto,
@@ -1442,7 +1435,7 @@ alter table "public"."produto_tags" enable row level security;
 alter table "public"."produtos" enable row level security;
 
 
-  create table "public"."profiles" (
+  create table if not exists "public"."profiles" (
     "id" uuid not null,
     "created_at" timestamp with time zone not null default now(),
     "updated_at" timestamp with time zone not null default now(),
@@ -1454,7 +1447,7 @@ alter table "public"."produtos" enable row level security;
 alter table "public"."profiles" enable row level security;
 
 
-  create table "public"."recebimento_conferencias" (
+  create table if not exists "public"."recebimento_conferencias" (
     "id" uuid not null default gen_random_uuid(),
     "empresa_id" uuid not null default public.current_empresa_id(),
     "recebimento_item_id" uuid not null,
@@ -1467,7 +1460,7 @@ alter table "public"."profiles" enable row level security;
 alter table "public"."recebimento_conferencias" enable row level security;
 
 
-  create table "public"."recebimento_itens" (
+  create table if not exists "public"."recebimento_itens" (
     "id" uuid not null default gen_random_uuid(),
     "empresa_id" uuid not null default public.current_empresa_id(),
     "recebimento_id" uuid not null,
@@ -1484,7 +1477,7 @@ alter table "public"."recebimento_conferencias" enable row level security;
 alter table "public"."recebimento_itens" enable row level security;
 
 
-  create table "public"."recebimentos" (
+  create table if not exists "public"."recebimentos" (
     "id" uuid not null default gen_random_uuid(),
     "empresa_id" uuid not null default public.current_empresa_id(),
     "fiscal_nfe_import_id" uuid not null,
@@ -1500,7 +1493,7 @@ alter table "public"."recebimento_itens" enable row level security;
 alter table "public"."recebimentos" enable row level security;
 
 
-  create table "public"."rh_cargo_competencias" (
+  create table if not exists "public"."rh_cargo_competencias" (
     "id" uuid not null default gen_random_uuid(),
     "empresa_id" uuid not null default public.current_empresa_id(),
     "cargo_id" uuid not null,
@@ -1515,7 +1508,7 @@ alter table "public"."recebimentos" enable row level security;
 alter table "public"."rh_cargo_competencias" enable row level security;
 
 
-  create table "public"."rh_cargos" (
+  create table if not exists "public"."rh_cargos" (
     "id" uuid not null default gen_random_uuid(),
     "empresa_id" uuid not null default public.current_empresa_id(),
     "nome" text not null,
@@ -1532,7 +1525,7 @@ alter table "public"."rh_cargo_competencias" enable row level security;
 alter table "public"."rh_cargos" enable row level security;
 
 
-  create table "public"."rh_colaborador_competencias" (
+  create table if not exists "public"."rh_colaborador_competencias" (
     "id" uuid not null default gen_random_uuid(),
     "empresa_id" uuid not null default public.current_empresa_id(),
     "colaborador_id" uuid not null,
@@ -1549,7 +1542,7 @@ alter table "public"."rh_cargos" enable row level security;
 alter table "public"."rh_colaborador_competencias" enable row level security;
 
 
-  create table "public"."rh_colaboradores" (
+  create table if not exists "public"."rh_colaboradores" (
     "id" uuid not null default gen_random_uuid(),
     "empresa_id" uuid not null default public.current_empresa_id(),
     "nome" text not null,
@@ -1567,7 +1560,7 @@ alter table "public"."rh_colaborador_competencias" enable row level security;
 alter table "public"."rh_colaboradores" enable row level security;
 
 
-  create table "public"."rh_competencias" (
+  create table if not exists "public"."rh_competencias" (
     "id" uuid not null default gen_random_uuid(),
     "empresa_id" uuid not null default public.current_empresa_id(),
     "nome" text not null,
@@ -1583,7 +1576,7 @@ alter table "public"."rh_colaboradores" enable row level security;
 alter table "public"."rh_competencias" enable row level security;
 
 
-  create table "public"."rh_treinamento_participantes" (
+  create table if not exists "public"."rh_treinamento_participantes" (
     "id" uuid not null default gen_random_uuid(),
     "empresa_id" uuid not null default public.current_empresa_id(),
     "treinamento_id" uuid not null,
@@ -1602,7 +1595,7 @@ alter table "public"."rh_competencias" enable row level security;
 alter table "public"."rh_treinamento_participantes" enable row level security;
 
 
-  create table "public"."rh_treinamentos" (
+  create table if not exists "public"."rh_treinamentos" (
     "id" uuid not null default gen_random_uuid(),
     "empresa_id" uuid not null default public.current_empresa_id(),
     "nome" text not null,
@@ -1625,7 +1618,7 @@ alter table "public"."rh_treinamento_participantes" enable row level security;
 alter table "public"."rh_treinamentos" enable row level security;
 
 
-  create table "public"."role_permissions" (
+  create table if not exists "public"."role_permissions" (
     "role_id" uuid not null,
     "permission_id" uuid not null,
     "allow" boolean not null default true,
@@ -1637,7 +1630,7 @@ alter table "public"."rh_treinamentos" enable row level security;
 alter table "public"."role_permissions" enable row level security;
 
 
-  create table "public"."roles" (
+  create table if not exists "public"."roles" (
     "id" uuid not null default gen_random_uuid(),
     "slug" text not null,
     "name" text not null,
@@ -1650,7 +1643,7 @@ alter table "public"."role_permissions" enable row level security;
 alter table "public"."roles" enable row level security;
 
 
-  create table "public"."servicos" (
+  create table if not exists "public"."servicos" (
     "id" uuid not null default gen_random_uuid(),
     "empresa_id" uuid not null,
     "descricao" text not null,
@@ -1671,7 +1664,7 @@ alter table "public"."roles" enable row level security;
 alter table "public"."servicos" enable row level security;
 
 
-  create table "public"."subscriptions" (
+  create table if not exists "public"."subscriptions" (
     "id" uuid not null default gen_random_uuid(),
     "empresa_id" uuid not null,
     "status" text not null default 'trialing'::text,
@@ -1689,7 +1682,7 @@ alter table "public"."servicos" enable row level security;
 alter table "public"."subscriptions" enable row level security;
 
 
-  create table "public"."tabelas_medidas" (
+  create table if not exists "public"."tabelas_medidas" (
     "id" uuid not null default gen_random_uuid(),
     "empresa_id" uuid not null,
     "nome" text not null,
@@ -1701,7 +1694,7 @@ alter table "public"."subscriptions" enable row level security;
 alter table "public"."tabelas_medidas" enable row level security;
 
 
-  create table "public"."tags" (
+  create table if not exists "public"."tags" (
     "id" uuid not null default gen_random_uuid(),
     "empresa_id" uuid not null,
     "nome" text not null,
@@ -1713,7 +1706,7 @@ alter table "public"."tabelas_medidas" enable row level security;
 alter table "public"."tags" enable row level security;
 
 
-  create table "public"."transportadoras" (
+  create table if not exists "public"."transportadoras" (
     "id" uuid not null default gen_random_uuid(),
     "empresa_id" uuid not null,
     "nome_razao_social" text not null,
@@ -1729,7 +1722,7 @@ alter table "public"."tags" enable row level security;
 alter table "public"."transportadoras" enable row level security;
 
 
-  create table "public"."user_active_empresa" (
+  create table if not exists "public"."user_active_empresa" (
     "user_id" uuid not null,
     "empresa_id" uuid not null,
     "updated_at" timestamp with time zone not null default now()
@@ -1739,7 +1732,7 @@ alter table "public"."transportadoras" enable row level security;
 alter table "public"."user_active_empresa" enable row level security;
 
 
-  create table "public"."user_permission_overrides" (
+  create table if not exists "public"."user_permission_overrides" (
     "empresa_id" uuid not null,
     "user_id" uuid not null,
     "permission_id" uuid not null,
@@ -1752,7 +1745,7 @@ alter table "public"."user_active_empresa" enable row level security;
 alter table "public"."user_permission_overrides" enable row level security;
 
 
-  create table "public"."vendas_itens_pedido" (
+  create table if not exists "public"."vendas_itens_pedido" (
     "id" uuid not null default gen_random_uuid(),
     "empresa_id" uuid not null default public.current_empresa_id(),
     "pedido_id" uuid not null,
@@ -1770,7 +1763,7 @@ alter table "public"."user_permission_overrides" enable row level security;
 alter table "public"."vendas_itens_pedido" enable row level security;
 
 
-  create table "public"."vendas_pedidos" (
+  create table if not exists "public"."vendas_pedidos" (
     "id" uuid not null default gen_random_uuid(),
     "empresa_id" uuid not null default public.current_empresa_id(),
     "numero" integer not null default nextval('public.vendas_pedidos_numero_seq'::regclass),
@@ -1799,1631 +1792,3081 @@ alter sequence "public"."industria_ordens_numero_seq" owned by "public"."industr
 
 alter sequence "public"."industria_producao_ordens_numero_seq" owned by "public"."industria_producao_ordens"."numero";
 
-CREATE UNIQUE INDEX addons_pkey ON public.addons USING btree (id);
+CREATE UNIQUE INDEX if not exists addons_pkey ON public.addons USING btree (id);
 
-CREATE UNIQUE INDEX addons_slug_billing_cycle_key ON public.addons USING btree (slug, billing_cycle);
+CREATE UNIQUE INDEX if not exists addons_slug_billing_cycle_key ON public.addons USING btree (slug, billing_cycle);
 
-CREATE UNIQUE INDEX addons_stripe_price_id_key ON public.addons USING btree (stripe_price_id);
+CREATE UNIQUE INDEX if not exists addons_stripe_price_id_key ON public.addons USING btree (stripe_price_id);
 
-CREATE UNIQUE INDEX anuncio_identificador_unique ON public.produto_anuncios USING btree (ecommerce_id, identificador);
+CREATE UNIQUE INDEX if not exists anuncio_identificador_unique ON public.produto_anuncios USING btree (ecommerce_id, identificador);
 
-CREATE UNIQUE INDEX atributos_pkey ON public.atributos USING btree (id);
+CREATE UNIQUE INDEX if not exists atributos_pkey ON public.atributos USING btree (id);
 
-CREATE UNIQUE INDEX atributos_unique_per_company ON public.atributos USING btree (empresa_id, nome);
+CREATE UNIQUE INDEX if not exists atributos_unique_per_company ON public.atributos USING btree (empresa_id, nome);
 
-CREATE UNIQUE INDEX centros_de_custo_pkey ON public.centros_de_custo USING btree (id);
+CREATE UNIQUE INDEX if not exists centros_de_custo_pkey ON public.centros_de_custo USING btree (id);
 
-CREATE UNIQUE INDEX compras_itens_pkey ON public.compras_itens USING btree (id);
+CREATE UNIQUE INDEX if not exists compras_itens_pkey ON public.compras_itens USING btree (id);
 
-CREATE UNIQUE INDEX compras_pedidos_pkey ON public.compras_pedidos USING btree (id);
+CREATE UNIQUE INDEX if not exists compras_pedidos_pkey ON public.compras_pedidos USING btree (id);
 
-CREATE UNIQUE INDEX contas_a_receber_pkey ON public.contas_a_receber USING btree (id);
+CREATE UNIQUE INDEX if not exists contas_a_receber_pkey ON public.contas_a_receber USING btree (id);
 
-CREATE UNIQUE INDEX crm_etapas_funil_nome_uk ON public.crm_etapas USING btree (funil_id, nome);
+CREATE UNIQUE INDEX if not exists crm_etapas_funil_nome_uk ON public.crm_etapas USING btree (funil_id, nome);
 
-CREATE UNIQUE INDEX crm_etapas_pkey ON public.crm_etapas USING btree (id);
+CREATE UNIQUE INDEX if not exists crm_etapas_pkey ON public.crm_etapas USING btree (id);
 
-CREATE UNIQUE INDEX crm_funis_pkey ON public.crm_funis USING btree (id);
+CREATE UNIQUE INDEX if not exists crm_funis_pkey ON public.crm_funis USING btree (id);
 
-CREATE UNIQUE INDEX crm_oportunidades_pkey ON public.crm_oportunidades USING btree (id);
+CREATE UNIQUE INDEX if not exists crm_oportunidades_pkey ON public.crm_oportunidades USING btree (id);
 
-CREATE UNIQUE INDEX ecommerces_pkey ON public.ecommerces USING btree (id);
+CREATE UNIQUE INDEX if not exists ecommerces_pkey ON public.ecommerces USING btree (id);
 
-CREATE UNIQUE INDEX ecommerces_unique_per_company ON public.ecommerces USING btree (empresa_id, nome);
+CREATE UNIQUE INDEX if not exists ecommerces_unique_per_company ON public.ecommerces USING btree (empresa_id, nome);
 
-CREATE UNIQUE INDEX empresa_addons_pkey ON public.empresa_addons USING btree (empresa_id, addon_slug);
+CREATE UNIQUE INDEX if not exists empresa_addons_pkey ON public.empresa_addons USING btree (empresa_id, addon_slug);
 
-CREATE INDEX empresa_addons_sub_idx ON public.empresa_addons USING btree (stripe_subscription_id);
+CREATE INDEX if not exists empresa_addons_sub_idx ON public.empresa_addons USING btree (stripe_subscription_id);
 
-CREATE UNIQUE INDEX empresa_usuarios_pkey ON public.empresa_usuarios USING btree (empresa_id, user_id);
+CREATE UNIQUE INDEX if not exists empresa_usuarios_pkey ON public.empresa_usuarios USING btree (empresa_id, user_id);
 
-CREATE INDEX empresa_usuarios_user_id_idx ON public.empresa_usuarios USING btree (user_id);
+CREATE INDEX if not exists empresa_usuarios_user_id_idx ON public.empresa_usuarios USING btree (user_id);
 
-CREATE UNIQUE INDEX empresas_cnpj_unique_not_null ON public.empresas USING btree (cnpj) WHERE (cnpj IS NOT NULL);
+CREATE UNIQUE INDEX if not exists empresas_cnpj_unique_not_null ON public.empresas USING btree (cnpj) WHERE (cnpj IS NOT NULL);
 
-CREATE UNIQUE INDEX empresas_pkey ON public.empresas USING btree (id);
+CREATE UNIQUE INDEX if not exists empresas_pkey ON public.empresas USING btree (id);
 
-CREATE UNIQUE INDEX empresas_stripe_customer_id_key ON public.empresas USING btree (stripe_customer_id);
+CREATE UNIQUE INDEX if not exists empresas_stripe_customer_id_key ON public.empresas USING btree (stripe_customer_id);
 
-CREATE UNIQUE INDEX est_mov_emp_origem_uk ON public.estoque_movimentos USING btree (empresa_id, origem_tipo, origem_id, produto_id, tipo_mov);
+CREATE UNIQUE INDEX if not exists est_mov_emp_origem_uk ON public.estoque_movimentos USING btree (empresa_id, origem_tipo, origem_id, produto_id, tipo_mov);
 
-CREATE UNIQUE INDEX estoque_movimentos_pkey ON public.estoque_movimentos USING btree (id);
+CREATE UNIQUE INDEX if not exists estoque_movimentos_pkey ON public.estoque_movimentos USING btree (id);
 
-CREATE UNIQUE INDEX estoque_saldos_pkey ON public.estoque_saldos USING btree (id);
+CREATE UNIQUE INDEX if not exists estoque_saldos_pkey ON public.estoque_saldos USING btree (id);
 
-CREATE UNIQUE INDEX estoque_saldos_unique_produto ON public.estoque_saldos USING btree (empresa_id, produto_id);
+CREATE UNIQUE INDEX if not exists estoque_saldos_unique_produto ON public.estoque_saldos USING btree (empresa_id, produto_id);
 
-CREATE UNIQUE INDEX fin_cc_empresa_nome_uk ON public.financeiro_contas_correntes USING btree (empresa_id, nome);
+CREATE UNIQUE INDEX if not exists fin_cc_empresa_nome_uk ON public.financeiro_contas_correntes USING btree (empresa_id, nome);
 
-CREATE UNIQUE INDEX fin_ccustos_empresa_codigo_uk ON public.financeiro_centros_custos USING btree (empresa_id, codigo);
+CREATE UNIQUE INDEX if not exists fin_ccustos_empresa_codigo_uk ON public.financeiro_centros_custos USING btree (empresa_id, codigo);
 
-CREATE UNIQUE INDEX fin_ccustos_empresa_nome_parent_uk ON public.financeiro_centros_custos USING btree (empresa_id, parent_id, nome);
+CREATE UNIQUE INDEX if not exists fin_ccustos_empresa_nome_parent_uk ON public.financeiro_centros_custos USING btree (empresa_id, parent_id, nome);
 
-CREATE UNIQUE INDEX financeiro_centros_custos_pkey ON public.financeiro_centros_custos USING btree (id);
+CREATE UNIQUE INDEX if not exists financeiro_centros_custos_pkey ON public.financeiro_centros_custos USING btree (id);
 
-CREATE UNIQUE INDEX financeiro_cobrancas_bancarias_eventos_pkey ON public.financeiro_cobrancas_bancarias_eventos USING btree (id);
+CREATE UNIQUE INDEX if not exists financeiro_cobrancas_bancarias_eventos_pkey ON public.financeiro_cobrancas_bancarias_eventos USING btree (id);
 
-CREATE UNIQUE INDEX financeiro_cobrancas_bancarias_pkey ON public.financeiro_cobrancas_bancarias USING btree (id);
+CREATE UNIQUE INDEX if not exists financeiro_cobrancas_bancarias_pkey ON public.financeiro_cobrancas_bancarias USING btree (id);
 
-CREATE UNIQUE INDEX financeiro_contas_correntes_pkey ON public.financeiro_contas_correntes USING btree (id);
+CREATE UNIQUE INDEX if not exists financeiro_contas_correntes_pkey ON public.financeiro_contas_correntes USING btree (id);
 
-CREATE UNIQUE INDEX financeiro_contas_pagar_pkey ON public.financeiro_contas_pagar USING btree (id);
+CREATE UNIQUE INDEX if not exists financeiro_contas_pagar_pkey ON public.financeiro_contas_pagar USING btree (id);
 
-CREATE UNIQUE INDEX financeiro_extratos_bancarios_pkey ON public.financeiro_extratos_bancarios USING btree (id);
+CREATE UNIQUE INDEX if not exists financeiro_extratos_bancarios_pkey ON public.financeiro_extratos_bancarios USING btree (id);
 
-CREATE UNIQUE INDEX financeiro_movimentacoes_pkey ON public.financeiro_movimentacoes USING btree (id);
+CREATE UNIQUE INDEX if not exists financeiro_movimentacoes_pkey ON public.financeiro_movimentacoes USING btree (id);
 
-CREATE UNIQUE INDEX fiscal_nfe_imp_emp_chave_uk ON public.fiscal_nfe_imports USING btree (empresa_id, chave_acesso);
+CREATE UNIQUE INDEX if not exists fiscal_nfe_imp_emp_chave_uk ON public.fiscal_nfe_imports USING btree (empresa_id, chave_acesso);
 
-CREATE UNIQUE INDEX fiscal_nfe_import_items_pkey ON public.fiscal_nfe_import_items USING btree (id);
+CREATE UNIQUE INDEX if not exists fiscal_nfe_import_items_pkey ON public.fiscal_nfe_import_items USING btree (id);
 
-CREATE UNIQUE INDEX fiscal_nfe_imports_pkey ON public.fiscal_nfe_imports USING btree (id);
+CREATE UNIQUE INDEX if not exists fiscal_nfe_imports_pkey ON public.fiscal_nfe_imports USING btree (id);
 
-CREATE UNIQUE INDEX fornecedores_pkey ON public.fornecedores USING btree (id);
+CREATE UNIQUE INDEX if not exists fornecedores_pkey ON public.fornecedores USING btree (id);
 
-CREATE UNIQUE INDEX fornecedores_unq ON public.fornecedores USING btree (empresa_id, nome);
+CREATE UNIQUE INDEX if not exists fornecedores_unq ON public.fornecedores USING btree (empresa_id, nome);
 
-CREATE INDEX idx__bak_empresa_usuarios_empresa_status_created ON public._bak_empresa_usuarios USING btree (empresa_id, status, created_at);
+CREATE INDEX if not exists idx__bak_empresa_usuarios_empresa_status_created ON public._bak_empresa_usuarios USING btree (empresa_id, status, created_at);
 
-CREATE INDEX idx_atributos_empresa_created ON public.atributos USING btree (empresa_id, created_at);
+CREATE INDEX if not exists idx_atributos_empresa_created ON public.atributos USING btree (empresa_id, created_at);
 
-CREATE INDEX idx_benef_ordens_usa_matcli ON public.industria_benef_ordens USING btree (usa_material_cliente);
+CREATE INDEX if not exists idx_benef_ordens_usa_matcli ON public.industria_benef_ordens USING btree (usa_material_cliente);
 
-CREATE INDEX idx_centros_de_custo_empresa_status_created ON public.centros_de_custo USING btree (empresa_id, status, created_at);
+CREATE INDEX if not exists idx_centros_de_custo_empresa_status_created ON public.centros_de_custo USING btree (empresa_id, status, created_at);
 
-CREATE INDEX idx_centros_de_custo_status ON public.centros_de_custo USING btree (status);
+CREATE INDEX if not exists idx_centros_de_custo_status ON public.centros_de_custo USING btree (status);
 
-CREATE INDEX idx_compras_itens_empresa_id_114b3b ON public.compras_itens USING btree (empresa_id);
+CREATE INDEX if not exists idx_compras_itens_empresa_id_114b3b ON public.compras_itens USING btree (empresa_id);
 
-CREATE INDEX idx_compras_itens_pedido_id_8ab9b0 ON public.compras_itens USING btree (pedido_id);
+CREATE INDEX if not exists idx_compras_itens_pedido_id_8ab9b0 ON public.compras_itens USING btree (pedido_id);
 
-CREATE INDEX idx_compras_itens_produto_id_0ba593 ON public.compras_itens USING btree (produto_id);
+CREATE INDEX if not exists idx_compras_itens_produto_id_0ba593 ON public.compras_itens USING btree (produto_id);
 
-CREATE INDEX idx_compras_pedidos_empresa_status_created ON public.compras_pedidos USING btree (empresa_id, status, created_at);
+CREATE INDEX if not exists idx_compras_pedidos_empresa_status_created ON public.compras_pedidos USING btree (empresa_id, status, created_at);
 
-CREATE INDEX idx_compras_pedidos_fornecedor_id_7d5f9e ON public.compras_pedidos USING btree (fornecedor_id);
+CREATE INDEX if not exists idx_compras_pedidos_fornecedor_id_7d5f9e ON public.compras_pedidos USING btree (fornecedor_id);
 
-CREATE INDEX idx_contas_a_receber_cliente_id_7e25f4 ON public.contas_a_receber USING btree (cliente_id);
+CREATE INDEX if not exists idx_contas_a_receber_cliente_id_7e25f4 ON public.contas_a_receber USING btree (cliente_id);
 
-CREATE INDEX idx_contas_a_receber_empresa_status_created ON public.contas_a_receber USING btree (empresa_id, status, created_at);
+CREATE INDEX if not exists idx_contas_a_receber_empresa_status_created ON public.contas_a_receber USING btree (empresa_id, status, created_at);
 
-CREATE INDEX idx_contas_a_receber_status ON public.contas_a_receber USING btree (status);
+CREATE INDEX if not exists idx_contas_a_receber_status ON public.contas_a_receber USING btree (status);
 
-CREATE INDEX idx_crm_etapas_empresa_funil ON public.crm_etapas USING btree (empresa_id, funil_id, ordem);
+CREATE INDEX if not exists idx_crm_etapas_empresa_funil ON public.crm_etapas USING btree (empresa_id, funil_id, ordem);
 
-CREATE INDEX idx_crm_etapas_funil ON public.crm_etapas USING btree (funil_id, ordem);
+CREATE INDEX if not exists idx_crm_etapas_funil ON public.crm_etapas USING btree (funil_id, ordem);
 
-CREATE INDEX idx_crm_funis_empresa_padrao ON public.crm_funis USING btree (empresa_id, padrao);
+CREATE INDEX if not exists idx_crm_funis_empresa_padrao ON public.crm_funis USING btree (empresa_id, padrao);
 
-CREATE INDEX idx_crm_oportunidades_cliente_id_1767ea ON public.crm_oportunidades USING btree (cliente_id);
+CREATE INDEX if not exists idx_crm_oportunidades_cliente_id_1767ea ON public.crm_oportunidades USING btree (cliente_id);
 
-CREATE INDEX idx_crm_oportunidades_empresa_status_created ON public.crm_oportunidades USING btree (empresa_id, status, created_at);
+CREATE INDEX if not exists idx_crm_oportunidades_empresa_status_created ON public.crm_oportunidades USING btree (empresa_id, status, created_at);
 
-CREATE INDEX idx_crm_oportunidades_etapa_id_57d18e ON public.crm_oportunidades USING btree (etapa_id);
+CREATE INDEX if not exists idx_crm_oportunidades_etapa_id_57d18e ON public.crm_oportunidades USING btree (etapa_id);
 
-CREATE INDEX idx_crm_oportunidades_funil_id_35d633 ON public.crm_oportunidades USING btree (funil_id);
+CREATE INDEX if not exists idx_crm_oportunidades_funil_id_35d633 ON public.crm_oportunidades USING btree (funil_id);
 
-CREATE INDEX idx_ecommerces_empresa_created ON public.ecommerces USING btree (empresa_id, created_at);
+CREATE INDEX if not exists idx_ecommerces_empresa_created ON public.ecommerces USING btree (empresa_id, created_at);
 
-CREATE INDEX idx_empresa_addons_addon_slug_billing_cycle_8463e2 ON public.empresa_addons USING btree (addon_slug, billing_cycle);
+CREATE INDEX if not exists idx_empresa_addons_addon_slug_billing_cycle_8463e2 ON public.empresa_addons USING btree (addon_slug, billing_cycle);
 
-CREATE INDEX idx_empresa_addons_empresa_status_created ON public.empresa_addons USING btree (empresa_id, status, created_at);
+CREATE INDEX if not exists idx_empresa_addons_empresa_status_created ON public.empresa_addons USING btree (empresa_id, status, created_at);
 
-CREATE INDEX idx_empresa_usuarios__empresa_created_at ON public.empresa_usuarios USING btree (empresa_id, created_at DESC);
+CREATE INDEX if not exists idx_empresa_usuarios__empresa_created_at ON public.empresa_usuarios USING btree (empresa_id, created_at DESC);
 
-CREATE INDEX idx_empresa_usuarios__empresa_role ON public.empresa_usuarios USING btree (empresa_id, role_id);
+CREATE INDEX if not exists idx_empresa_usuarios__empresa_role ON public.empresa_usuarios USING btree (empresa_id, role_id);
 
-CREATE INDEX idx_empresa_usuarios_empresa_status_created ON public.empresa_usuarios USING btree (empresa_id, status, created_at);
+CREATE INDEX if not exists idx_empresa_usuarios_empresa_status_created ON public.empresa_usuarios USING btree (empresa_id, status, created_at);
 
-CREATE INDEX idx_empresa_usuarios_empresa_status_role ON public.empresa_usuarios USING btree (empresa_id, status, role_id, created_at);
+CREATE INDEX if not exists idx_empresa_usuarios_empresa_status_role ON public.empresa_usuarios USING btree (empresa_id, status, role_id, created_at);
 
-CREATE INDEX idx_empresa_usuarios_role_id_b5c8a7 ON public.empresa_usuarios USING btree (role_id);
+CREATE INDEX if not exists idx_empresa_usuarios_role_id_b5c8a7 ON public.empresa_usuarios USING btree (role_id);
 
-CREATE INDEX idx_est_mov_emp_prod_data ON public.estoque_movimentos USING btree (empresa_id, produto_id, data_movimento);
+CREATE INDEX if not exists idx_est_mov_emp_prod_data ON public.estoque_movimentos USING btree (empresa_id, produto_id, data_movimento);
 
-CREATE INDEX idx_estoque_movimentos_data ON public.estoque_movimentos USING btree (created_at DESC);
+CREATE INDEX if not exists idx_estoque_movimentos_data ON public.estoque_movimentos USING btree (created_at DESC);
 
-CREATE INDEX idx_estoque_movimentos_produto ON public.estoque_movimentos USING btree (produto_id);
+CREATE INDEX if not exists idx_estoque_movimentos_produto ON public.estoque_movimentos USING btree (produto_id);
 
-CREATE INDEX idx_estoque_saldos_produto ON public.estoque_saldos USING btree (produto_id);
+CREATE INDEX if not exists idx_estoque_saldos_produto ON public.estoque_saldos USING btree (produto_id);
 
-CREATE INDEX idx_fin_cc_empresa_ativo ON public.financeiro_contas_correntes USING btree (empresa_id, ativo);
+CREATE INDEX if not exists idx_fin_cc_empresa_ativo ON public.financeiro_contas_correntes USING btree (empresa_id, ativo);
 
-CREATE INDEX idx_fin_cc_empresa_banco ON public.financeiro_contas_correntes USING btree (empresa_id, banco_codigo);
+CREATE INDEX if not exists idx_fin_cc_empresa_banco ON public.financeiro_contas_correntes USING btree (empresa_id, banco_codigo);
 
-CREATE INDEX idx_fin_ccustos_empresa_parent ON public.financeiro_centros_custos USING btree (empresa_id, parent_id, ordem);
+CREATE INDEX if not exists idx_fin_ccustos_empresa_parent ON public.financeiro_centros_custos USING btree (empresa_id, parent_id, ordem);
 
-CREATE INDEX idx_fin_ccustos_empresa_tipo_ativo ON public.financeiro_centros_custos USING btree (empresa_id, tipo, ativo);
+CREATE INDEX if not exists idx_fin_ccustos_empresa_tipo_ativo ON public.financeiro_centros_custos USING btree (empresa_id, tipo, ativo);
 
-CREATE INDEX idx_fin_cobr_empresa_cc ON public.financeiro_cobrancas_bancarias USING btree (empresa_id, conta_corrente_id);
+CREATE INDEX if not exists idx_fin_cobr_empresa_cc ON public.financeiro_cobrancas_bancarias USING btree (empresa_id, conta_corrente_id);
 
-CREATE INDEX idx_fin_cobr_empresa_cliente ON public.financeiro_cobrancas_bancarias USING btree (empresa_id, cliente_id);
+CREATE INDEX if not exists idx_fin_cobr_empresa_cliente ON public.financeiro_cobrancas_bancarias USING btree (empresa_id, cliente_id);
 
-CREATE INDEX idx_fin_cobr_empresa_conta_receber ON public.financeiro_cobrancas_bancarias USING btree (empresa_id, conta_receber_id);
+CREATE INDEX if not exists idx_fin_cobr_empresa_conta_receber ON public.financeiro_cobrancas_bancarias USING btree (empresa_id, conta_receber_id);
 
-CREATE INDEX idx_fin_cobr_empresa_tipo ON public.financeiro_cobrancas_bancarias USING btree (empresa_id, tipo_cobranca);
+CREATE INDEX if not exists idx_fin_cobr_empresa_tipo ON public.financeiro_cobrancas_bancarias USING btree (empresa_id, tipo_cobranca);
 
-CREATE INDEX idx_fin_cobr_empresa_venc ON public.financeiro_cobrancas_bancarias USING btree (empresa_id, data_vencimento);
+CREATE INDEX if not exists idx_fin_cobr_empresa_venc ON public.financeiro_cobrancas_bancarias USING btree (empresa_id, data_vencimento);
 
-CREATE INDEX idx_fin_cobr_evt_empresa_cobr ON public.financeiro_cobrancas_bancarias_eventos USING btree (empresa_id, cobranca_id, criado_em);
+CREATE INDEX if not exists idx_fin_cobr_evt_empresa_cobr ON public.financeiro_cobrancas_bancarias_eventos USING btree (empresa_id, cobranca_id, criado_em);
 
-CREATE INDEX idx_fin_cp_empresa_busca ON public.financeiro_contas_pagar USING btree (empresa_id, documento_ref, descricao);
+CREATE INDEX if not exists idx_fin_cp_empresa_busca ON public.financeiro_contas_pagar USING btree (empresa_id, documento_ref, descricao);
 
-CREATE INDEX idx_fin_cp_empresa_fornecedor ON public.financeiro_contas_pagar USING btree (empresa_id, fornecedor_id);
+CREATE INDEX if not exists idx_fin_cp_empresa_fornecedor ON public.financeiro_contas_pagar USING btree (empresa_id, fornecedor_id);
 
-CREATE INDEX idx_fin_cp_empresa_status_venc ON public.financeiro_contas_pagar USING btree (empresa_id, status, data_vencimento);
+CREATE INDEX if not exists idx_fin_cp_empresa_status_venc ON public.financeiro_contas_pagar USING btree (empresa_id, status, data_vencimento);
 
-CREATE INDEX idx_fin_extrato_empresa_cc_conciliado ON public.financeiro_extratos_bancarios USING btree (empresa_id, conta_corrente_id, conciliado);
+CREATE INDEX if not exists idx_fin_extrato_empresa_cc_conciliado ON public.financeiro_extratos_bancarios USING btree (empresa_id, conta_corrente_id, conciliado);
 
-CREATE INDEX idx_fin_extrato_empresa_cc_data ON public.financeiro_extratos_bancarios USING btree (empresa_id, conta_corrente_id, data_lancamento);
+CREATE INDEX if not exists idx_fin_extrato_empresa_cc_data ON public.financeiro_extratos_bancarios USING btree (empresa_id, conta_corrente_id, data_lancamento);
 
-CREATE INDEX idx_fin_mov_empresa_cc_conciliado ON public.financeiro_movimentacoes USING btree (empresa_id, conta_corrente_id, conciliado);
+CREATE INDEX if not exists idx_fin_mov_empresa_cc_conciliado ON public.financeiro_movimentacoes USING btree (empresa_id, conta_corrente_id, conciliado);
 
-CREATE INDEX idx_fin_mov_empresa_cc_data ON public.financeiro_movimentacoes USING btree (empresa_id, conta_corrente_id, data_movimento);
+CREATE INDEX if not exists idx_fin_mov_empresa_cc_data ON public.financeiro_movimentacoes USING btree (empresa_id, conta_corrente_id, data_movimento);
 
-CREATE INDEX idx_financeiro_centros_custos_parent_id_47af81 ON public.financeiro_centros_custos USING btree (parent_id);
+CREATE INDEX if not exists idx_financeiro_centros_custos_parent_id_47af81 ON public.financeiro_centros_custos USING btree (parent_id);
 
-CREATE INDEX idx_financeiro_cobrancas_bancarias_cliente_id_e97989 ON public.financeiro_cobrancas_bancarias USING btree (cliente_id);
+CREATE INDEX if not exists idx_financeiro_cobrancas_bancarias_cliente_id_e97989 ON public.financeiro_cobrancas_bancarias USING btree (cliente_id);
 
-CREATE INDEX idx_financeiro_cobrancas_bancarias_conta_corrente_id_8898fe ON public.financeiro_cobrancas_bancarias USING btree (conta_corrente_id);
+CREATE INDEX if not exists idx_financeiro_cobrancas_bancarias_conta_corrente_id_8898fe ON public.financeiro_cobrancas_bancarias USING btree (conta_corrente_id);
 
-CREATE INDEX idx_financeiro_cobrancas_bancarias_empresa_status_created ON public.financeiro_cobrancas_bancarias USING btree (empresa_id, status, created_at);
+CREATE INDEX if not exists idx_financeiro_cobrancas_bancarias_empresa_status_created ON public.financeiro_cobrancas_bancarias USING btree (empresa_id, status, created_at);
 
-CREATE INDEX idx_financeiro_cobrancas_bancarias_eventos_cobranca_id_ca78b2 ON public.financeiro_cobrancas_bancarias_eventos USING btree (cobranca_id);
+CREATE INDEX if not exists idx_financeiro_cobrancas_bancarias_eventos_cobranca_id_ca78b2 ON public.financeiro_cobrancas_bancarias_eventos USING btree (cobranca_id);
 
-CREATE INDEX idx_financeiro_contas_pagar_empresa_status_created ON public.financeiro_contas_pagar USING btree (empresa_id, status, created_at);
+CREATE INDEX if not exists idx_financeiro_contas_pagar_empresa_status_created ON public.financeiro_contas_pagar USING btree (empresa_id, status, created_at);
 
-CREATE INDEX idx_financeiro_contas_pagar_fornecedor_id_910ae7 ON public.financeiro_contas_pagar USING btree (fornecedor_id);
+CREATE INDEX if not exists idx_financeiro_contas_pagar_fornecedor_id_910ae7 ON public.financeiro_contas_pagar USING btree (fornecedor_id);
 
-CREATE INDEX idx_financeiro_extratos_bancarios_conta_corrente_id_7bba86 ON public.financeiro_extratos_bancarios USING btree (conta_corrente_id);
+CREATE INDEX if not exists idx_financeiro_extratos_bancarios_conta_corrente_id_7bba86 ON public.financeiro_extratos_bancarios USING btree (conta_corrente_id);
 
-CREATE INDEX idx_financeiro_extratos_bancarios_movimentacao_id_d3d9ac ON public.financeiro_extratos_bancarios USING btree (movimentacao_id);
+CREATE INDEX if not exists idx_financeiro_extratos_bancarios_movimentacao_id_d3d9ac ON public.financeiro_extratos_bancarios USING btree (movimentacao_id);
 
-CREATE INDEX idx_financeiro_movimentacoes_conta_corrente_id_011dac ON public.financeiro_movimentacoes USING btree (conta_corrente_id);
+CREATE INDEX if not exists idx_financeiro_movimentacoes_conta_corrente_id_011dac ON public.financeiro_movimentacoes USING btree (conta_corrente_id);
 
-CREATE INDEX idx_fk_industria_ordens_ent_empresa_id_0fc9b6 ON public.industria_ordens_entregas USING btree (empresa_id);
+CREATE INDEX if not exists idx_fk_industria_ordens_ent_empresa_id_0fc9b6 ON public.industria_ordens_entregas USING btree (empresa_id);
 
-CREATE INDEX idx_fk_industria_ordens_ent_ordem_id_dfb6ce ON public.industria_ordens_entregas USING btree (ordem_id);
+CREATE INDEX if not exists idx_fk_industria_ordens_ent_ordem_id_dfb6ce ON public.industria_ordens_entregas USING btree (ordem_id);
 
-CREATE INDEX idx_fk_rh_colaborador_compe_competencia_id_faf9af ON public.rh_colaborador_competencias USING btree (competencia_id);
+CREATE INDEX if not exists idx_fk_rh_colaborador_compe_competencia_id_faf9af ON public.rh_colaborador_competencias USING btree (competencia_id);
 
-CREATE INDEX idx_fk_rh_colaboradores_cargo_id_b0a22b ON public.rh_colaboradores USING btree (cargo_id);
+CREATE INDEX if not exists idx_fk_rh_colaboradores_cargo_id_b0a22b ON public.rh_colaboradores USING btree (cargo_id);
 
-CREATE INDEX idx_fk_rh_colaboradores_empresa_id_5d6e0b ON public.rh_colaboradores USING btree (empresa_id);
+CREATE INDEX if not exists idx_fk_rh_colaboradores_empresa_id_5d6e0b ON public.rh_colaboradores USING btree (empresa_id);
 
-CREATE INDEX idx_fk_rh_colaboradores_user_id_48ffff ON public.rh_colaboradores USING btree (user_id);
+CREATE INDEX if not exists idx_fk_rh_colaboradores_user_id_48ffff ON public.rh_colaboradores USING btree (user_id);
 
-CREATE INDEX idx_fk_rh_treinamento_parti_colaborador_id_e99352 ON public.rh_treinamento_participantes USING btree (colaborador_id);
+CREATE INDEX if not exists idx_fk_rh_treinamento_parti_colaborador_id_e99352 ON public.rh_treinamento_participantes USING btree (colaborador_id);
 
-CREATE INDEX idx_fk_user_active_empresa_empresa_id_93c5cf ON public.user_active_empresa USING btree (empresa_id);
+CREATE INDEX if not exists idx_fk_user_active_empresa_empresa_id_93c5cf ON public.user_active_empresa USING btree (empresa_id);
 
-CREATE INDEX idx_fk_user_permission_over_permission_id_125dcb ON public.user_permission_overrides USING btree (permission_id);
+CREATE INDEX if not exists idx_fk_user_permission_over_permission_id_125dcb ON public.user_permission_overrides USING btree (permission_id);
 
-CREATE INDEX idx_fornecedores_empresa_created ON public.fornecedores USING btree (empresa_id, created_at);
+CREATE INDEX if not exists idx_fornecedores_empresa_created ON public.fornecedores USING btree (empresa_id, created_at);
 
-CREATE INDEX idx_ind_benef_ordens_status ON public.industria_benef_ordens USING btree (status);
+CREATE INDEX if not exists idx_ind_benef_ordens_status ON public.industria_benef_ordens USING btree (status);
 
-CREATE INDEX idx_ind_boms_comp_empresa_bom ON public.industria_boms_componentes USING btree (empresa_id, bom_id);
+CREATE INDEX if not exists idx_ind_boms_comp_empresa_bom ON public.industria_boms_componentes USING btree (empresa_id, bom_id);
 
-CREATE INDEX idx_ind_boms_comp_empresa_produto ON public.industria_boms_componentes USING btree (empresa_id, produto_id);
+CREATE INDEX if not exists idx_ind_boms_comp_empresa_produto ON public.industria_boms_componentes USING btree (empresa_id, produto_id);
 
-CREATE UNIQUE INDEX idx_ind_boms_empresa_produto_tipo_versao ON public.industria_boms USING btree (empresa_id, produto_final_id, tipo_bom, versao);
+CREATE UNIQUE INDEX if not exists idx_ind_boms_empresa_produto_tipo_versao ON public.industria_boms USING btree (empresa_id, produto_final_id, tipo_bom, versao);
 
-CREATE INDEX idx_ind_ct_empresa_ativo ON public.industria_centros_trabalho USING btree (empresa_id, ativo);
+CREATE INDEX if not exists idx_ind_ct_empresa_ativo ON public.industria_centros_trabalho USING btree (empresa_id, ativo);
 
-CREATE INDEX idx_ind_ct_empresa_nome ON public.industria_centros_trabalho USING btree (empresa_id, nome);
+CREATE INDEX if not exists idx_ind_ct_empresa_nome ON public.industria_centros_trabalho USING btree (empresa_id, nome);
 
-CREATE UNIQUE INDEX idx_ind_matcli_emp_cli_codigo_uk ON public.industria_materiais_cliente USING btree (empresa_id, cliente_id, codigo_cliente) WHERE (codigo_cliente IS NOT NULL);
+CREATE UNIQUE INDEX if not exists idx_ind_matcli_emp_cli_codigo_uk ON public.industria_materiais_cliente USING btree (empresa_id, cliente_id, codigo_cliente) WHERE (codigo_cliente IS NOT NULL);
 
-CREATE INDEX idx_ind_matcli_empresa_cliente ON public.industria_materiais_cliente USING btree (empresa_id, cliente_id, ativo);
+CREATE INDEX if not exists idx_ind_matcli_empresa_cliente ON public.industria_materiais_cliente USING btree (empresa_id, cliente_id, ativo);
 
-CREATE INDEX idx_ind_matcli_empresa_produto ON public.industria_materiais_cliente USING btree (empresa_id, produto_id);
+CREATE INDEX if not exists idx_ind_matcli_empresa_produto ON public.industria_materiais_cliente USING btree (empresa_id, produto_id);
 
-CREATE INDEX idx_ind_op_apont_empresa_op ON public.industria_operacoes_apontamentos USING btree (empresa_id, operacao_id);
+CREATE INDEX if not exists idx_ind_op_apont_empresa_op ON public.industria_operacoes_apontamentos USING btree (empresa_id, operacao_id);
 
-CREATE INDEX idx_ind_op_empresa_ct_status ON public.industria_operacoes USING btree (empresa_id, centro_trabalho_id, status);
+CREATE INDEX if not exists idx_ind_op_empresa_ct_status ON public.industria_operacoes USING btree (empresa_id, centro_trabalho_id, status);
 
-CREATE INDEX idx_ind_op_empresa_ordem ON public.industria_operacoes USING btree (empresa_id, tipo_ordem, ordem_id);
+CREATE INDEX if not exists idx_ind_op_empresa_ordem ON public.industria_operacoes USING btree (empresa_id, tipo_ordem, ordem_id);
 
-CREATE INDEX idx_ind_op_empresa_prioridade ON public.industria_operacoes USING btree (empresa_id, prioridade);
+CREATE INDEX if not exists idx_ind_op_empresa_prioridade ON public.industria_operacoes USING btree (empresa_id, prioridade);
 
-CREATE INDEX idx_ind_ord_comp_emp_ordem ON public.industria_ordem_componentes USING btree (empresa_id, ordem_id);
+CREATE INDEX if not exists idx_ind_ord_comp_emp_ordem ON public.industria_ordem_componentes USING btree (empresa_id, ordem_id);
 
-CREATE INDEX idx_ind_ord_comp_emp_produto ON public.industria_ordem_componentes USING btree (empresa_id, produto_id);
+CREATE INDEX if not exists idx_ind_ord_comp_emp_produto ON public.industria_ordem_componentes USING btree (empresa_id, produto_id);
 
-CREATE INDEX idx_ind_ord_ent_emp_data ON public.industria_ordem_entregas USING btree (empresa_id, data_entrega);
+CREATE INDEX if not exists idx_ind_ord_ent_emp_data ON public.industria_ordem_entregas USING btree (empresa_id, data_entrega);
 
-CREATE INDEX idx_ind_ord_ent_emp_ordem ON public.industria_ordem_entregas USING btree (empresa_id, ordem_id);
+CREATE INDEX if not exists idx_ind_ord_ent_emp_ordem ON public.industria_ordem_entregas USING btree (empresa_id, ordem_id);
 
-CREATE INDEX idx_ind_prod_comp_ordem ON public.industria_producao_componentes USING btree (ordem_id);
+CREATE INDEX if not exists idx_ind_prod_comp_ordem ON public.industria_producao_componentes USING btree (ordem_id);
 
-CREATE INDEX idx_ind_prod_entregas_ordem ON public.industria_producao_entregas USING btree (ordem_id);
+CREATE INDEX if not exists idx_ind_prod_entregas_ordem ON public.industria_producao_entregas USING btree (ordem_id);
 
-CREATE INDEX idx_ind_prod_ordens_status ON public.industria_producao_ordens USING btree (status);
+CREATE INDEX if not exists idx_ind_prod_ordens_status ON public.industria_producao_ordens USING btree (status);
 
-CREATE UNIQUE INDEX idx_ind_rot_empresa_produto_tipo_versao ON public.industria_roteiros USING btree (empresa_id, produto_id, tipo_bom, versao);
+CREATE UNIQUE INDEX if not exists idx_ind_rot_empresa_produto_tipo_versao ON public.industria_roteiros USING btree (empresa_id, produto_id, tipo_bom, versao);
 
-CREATE UNIQUE INDEX idx_ind_rot_etapas_seq ON public.industria_roteiros_etapas USING btree (empresa_id, roteiro_id, sequencia);
+CREATE UNIQUE INDEX if not exists idx_ind_rot_etapas_seq ON public.industria_roteiros_etapas USING btree (empresa_id, roteiro_id, sequencia);
 
-CREATE INDEX idx_industria_benef_componentes_empresa_id_16aa8e ON public.industria_benef_componentes USING btree (empresa_id);
+CREATE INDEX if not exists idx_industria_benef_componentes_empresa_id_16aa8e ON public.industria_benef_componentes USING btree (empresa_id);
 
-CREATE INDEX idx_industria_benef_componentes_ordem_id_6052c0 ON public.industria_benef_componentes USING btree (ordem_id);
+CREATE INDEX if not exists idx_industria_benef_componentes_ordem_id_6052c0 ON public.industria_benef_componentes USING btree (ordem_id);
 
-CREATE INDEX idx_industria_benef_componentes_produto_id_081c4a ON public.industria_benef_componentes USING btree (produto_id);
+CREATE INDEX if not exists idx_industria_benef_componentes_produto_id_081c4a ON public.industria_benef_componentes USING btree (produto_id);
 
-CREATE INDEX idx_industria_benef_entregas_empresa_id_eca06b ON public.industria_benef_entregas USING btree (empresa_id);
+CREATE INDEX if not exists idx_industria_benef_entregas_empresa_id_eca06b ON public.industria_benef_entregas USING btree (empresa_id);
 
-CREATE INDEX idx_industria_benef_entregas_ordem_id_82d66b ON public.industria_benef_entregas USING btree (ordem_id);
+CREATE INDEX if not exists idx_industria_benef_entregas_ordem_id_82d66b ON public.industria_benef_entregas USING btree (ordem_id);
 
-CREATE INDEX idx_industria_benef_ordens_cliente_id_1d7a4b ON public.industria_benef_ordens USING btree (cliente_id);
+CREATE INDEX if not exists idx_industria_benef_ordens_cliente_id_1d7a4b ON public.industria_benef_ordens USING btree (cliente_id);
 
-CREATE INDEX idx_industria_benef_ordens_empresa_status_created ON public.industria_benef_ordens USING btree (empresa_id, status, created_at);
+CREATE INDEX if not exists idx_industria_benef_ordens_empresa_status_created ON public.industria_benef_ordens USING btree (empresa_id, status, created_at);
 
-CREATE INDEX idx_industria_benef_ordens_produto_material_cliente_id_0809a8 ON public.industria_benef_ordens USING btree (produto_material_cliente_id);
+CREATE INDEX if not exists idx_industria_benef_ordens_produto_material_cliente_id_0809a8 ON public.industria_benef_ordens USING btree (produto_material_cliente_id);
 
-CREATE INDEX idx_industria_benef_ordens_produto_servico_id_2c1f82 ON public.industria_benef_ordens USING btree (produto_servico_id);
+CREATE INDEX if not exists idx_industria_benef_ordens_produto_servico_id_2c1f82 ON public.industria_benef_ordens USING btree (produto_servico_id);
 
-CREATE INDEX idx_industria_boms_componentes_bom_id_2fa6d6 ON public.industria_boms_componentes USING btree (bom_id);
+CREATE INDEX if not exists idx_industria_boms_componentes_bom_id_2fa6d6 ON public.industria_boms_componentes USING btree (bom_id);
 
-CREATE INDEX idx_industria_boms_componentes_produto_id_802149 ON public.industria_boms_componentes USING btree (produto_id);
+CREATE INDEX if not exists idx_industria_boms_componentes_produto_id_802149 ON public.industria_boms_componentes USING btree (produto_id);
 
-CREATE INDEX idx_industria_boms_produto_final_id_cc55d1 ON public.industria_boms USING btree (produto_final_id);
+CREATE INDEX if not exists idx_industria_boms_produto_final_id_cc55d1 ON public.industria_boms USING btree (produto_final_id);
 
-CREATE INDEX idx_industria_comp_empresa ON public.industria_ordens_componentes USING btree (empresa_id);
+CREATE INDEX if not exists idx_industria_comp_empresa ON public.industria_ordens_componentes USING btree (empresa_id);
 
-CREATE INDEX idx_industria_materiais_cliente_cliente_id_cf5bee ON public.industria_materiais_cliente USING btree (cliente_id);
+CREATE INDEX if not exists idx_industria_materiais_cliente_cliente_id_cf5bee ON public.industria_materiais_cliente USING btree (cliente_id);
 
-CREATE INDEX idx_industria_materiais_cliente_produto_id_2b50d3 ON public.industria_materiais_cliente USING btree (produto_id);
+CREATE INDEX if not exists idx_industria_materiais_cliente_produto_id_2b50d3 ON public.industria_materiais_cliente USING btree (produto_id);
 
-CREATE INDEX idx_industria_operacoes_apontamentos_operacao_id_47b4c7 ON public.industria_operacoes_apontamentos USING btree (operacao_id);
+CREATE INDEX if not exists idx_industria_operacoes_apontamentos_operacao_id_47b4c7 ON public.industria_operacoes_apontamentos USING btree (operacao_id);
 
-CREATE INDEX idx_industria_operacoes_centro_trabalho_id_87a1b5 ON public.industria_operacoes USING btree (centro_trabalho_id);
+CREATE INDEX if not exists idx_industria_operacoes_centro_trabalho_id_87a1b5 ON public.industria_operacoes USING btree (centro_trabalho_id);
 
-CREATE INDEX idx_industria_operacoes_empresa_status_created ON public.industria_operacoes USING btree (empresa_id, status, created_at);
+CREATE INDEX if not exists idx_industria_operacoes_empresa_status_created ON public.industria_operacoes USING btree (empresa_id, status, created_at);
 
-CREATE INDEX idx_industria_operacoes_roteiro_etapa_id_7d3283 ON public.industria_operacoes USING btree (roteiro_etapa_id);
+CREATE INDEX if not exists idx_industria_operacoes_roteiro_etapa_id_7d3283 ON public.industria_operacoes USING btree (roteiro_etapa_id);
 
-CREATE INDEX idx_industria_operacoes_roteiro_id_0ca081 ON public.industria_operacoes USING btree (roteiro_id);
+CREATE INDEX if not exists idx_industria_operacoes_roteiro_id_0ca081 ON public.industria_operacoes USING btree (roteiro_id);
 
-CREATE INDEX idx_industria_ordem_componentes_ordem_id_f4c99a ON public.industria_ordem_componentes USING btree (ordem_id);
+CREATE INDEX if not exists idx_industria_ordem_componentes_ordem_id_f4c99a ON public.industria_ordem_componentes USING btree (ordem_id);
 
-CREATE INDEX idx_industria_ordem_componentes_produto_id_56ac86 ON public.industria_ordem_componentes USING btree (produto_id);
+CREATE INDEX if not exists idx_industria_ordem_componentes_produto_id_56ac86 ON public.industria_ordem_componentes USING btree (produto_id);
 
-CREATE INDEX idx_industria_ordem_entregas_ordem_id_26d5ca ON public.industria_ordem_entregas USING btree (ordem_id);
+CREATE INDEX if not exists idx_industria_ordem_entregas_ordem_id_26d5ca ON public.industria_ordem_entregas USING btree (ordem_id);
 
-CREATE INDEX idx_industria_ordens_cliente_id_9aa899 ON public.industria_ordens USING btree (cliente_id);
+CREATE INDEX if not exists idx_industria_ordens_cliente_id_9aa899 ON public.industria_ordens USING btree (cliente_id);
 
-CREATE INDEX idx_industria_ordens_componentes_ordem_id_0a15f7 ON public.industria_ordens_componentes USING btree (ordem_id);
+CREATE INDEX if not exists idx_industria_ordens_componentes_ordem_id_0a15f7 ON public.industria_ordens_componentes USING btree (ordem_id);
 
-CREATE INDEX idx_industria_ordens_componentes_produto_id_f28249 ON public.industria_ordens_componentes USING btree (produto_id);
+CREATE INDEX if not exists idx_industria_ordens_componentes_produto_id_f28249 ON public.industria_ordens_componentes USING btree (produto_id);
 
-CREATE INDEX idx_industria_ordens_empresa_status_created ON public.industria_ordens USING btree (empresa_id, status, created_at);
+CREATE INDEX if not exists idx_industria_ordens_empresa_status_created ON public.industria_ordens USING btree (empresa_id, status, created_at);
 
-CREATE INDEX idx_industria_ordens_produto_final_id_febfd1 ON public.industria_ordens USING btree (produto_final_id);
+CREATE INDEX if not exists idx_industria_ordens_produto_final_id_febfd1 ON public.industria_ordens USING btree (produto_final_id);
 
-CREATE INDEX idx_industria_ordens_status ON public.industria_ordens USING btree (status);
+CREATE INDEX if not exists idx_industria_ordens_status ON public.industria_ordens USING btree (status);
 
-CREATE INDEX idx_industria_producao_componentes_empresa_id_35174b ON public.industria_producao_componentes USING btree (empresa_id);
+CREATE INDEX if not exists idx_industria_producao_componentes_empresa_id_35174b ON public.industria_producao_componentes USING btree (empresa_id);
 
-CREATE INDEX idx_industria_producao_componentes_produto_id_10674d ON public.industria_producao_componentes USING btree (produto_id);
+CREATE INDEX if not exists idx_industria_producao_componentes_produto_id_10674d ON public.industria_producao_componentes USING btree (produto_id);
 
-CREATE INDEX idx_industria_producao_entregas_empresa_id_774fa8 ON public.industria_producao_entregas USING btree (empresa_id);
+CREATE INDEX if not exists idx_industria_producao_entregas_empresa_id_774fa8 ON public.industria_producao_entregas USING btree (empresa_id);
 
-CREATE INDEX idx_industria_producao_ordens_empresa_status_created ON public.industria_producao_ordens USING btree (empresa_id, status, created_at);
+CREATE INDEX if not exists idx_industria_producao_ordens_empresa_status_created ON public.industria_producao_ordens USING btree (empresa_id, status, created_at);
 
-CREATE INDEX idx_industria_producao_ordens_produto_final_id_bb0003 ON public.industria_producao_ordens USING btree (produto_final_id);
+CREATE INDEX if not exists idx_industria_producao_ordens_produto_final_id_bb0003 ON public.industria_producao_ordens USING btree (produto_final_id);
 
-CREATE INDEX idx_industria_roteiros_etapas_centro_trabalho_id_3623bc ON public.industria_roteiros_etapas USING btree (centro_trabalho_id);
+CREATE INDEX if not exists idx_industria_roteiros_etapas_centro_trabalho_id_3623bc ON public.industria_roteiros_etapas USING btree (centro_trabalho_id);
 
-CREATE INDEX idx_industria_roteiros_etapas_roteiro_id_72b583 ON public.industria_roteiros_etapas USING btree (roteiro_id);
+CREATE INDEX if not exists idx_industria_roteiros_etapas_roteiro_id_72b583 ON public.industria_roteiros_etapas USING btree (roteiro_id);
 
-CREATE INDEX idx_industria_roteiros_produto_id_e0230e ON public.industria_roteiros USING btree (produto_id);
+CREATE INDEX if not exists idx_industria_roteiros_produto_id_e0230e ON public.industria_roteiros USING btree (produto_id);
 
-CREATE INDEX idx_linhas_produto_empresa_created ON public.linhas_produto USING btree (empresa_id, created_at);
+CREATE INDEX if not exists idx_linhas_produto_empresa_created ON public.linhas_produto USING btree (empresa_id, created_at);
 
-CREATE INDEX idx_log_transp_empresa_ativo ON public.logistica_transportadoras USING btree (empresa_id, ativo);
+CREATE INDEX if not exists idx_log_transp_empresa_ativo ON public.logistica_transportadoras USING btree (empresa_id, ativo);
 
-CREATE INDEX idx_log_transp_empresa_nome ON public.logistica_transportadoras USING btree (empresa_id, nome);
+CREATE INDEX if not exists idx_log_transp_empresa_nome ON public.logistica_transportadoras USING btree (empresa_id, nome);
 
-CREATE INDEX idx_logistica_transportadoras_pessoa_id_5b1746 ON public.logistica_transportadoras USING btree (pessoa_id);
+CREATE INDEX if not exists idx_logistica_transportadoras_pessoa_id_5b1746 ON public.logistica_transportadoras USING btree (pessoa_id);
 
-CREATE INDEX idx_marcas_empresa_created ON public.marcas USING btree (empresa_id, created_at);
+CREATE INDEX if not exists idx_marcas_empresa_created ON public.marcas USING btree (empresa_id, created_at);
 
-CREATE INDEX idx_metas_vendas_empresa_id_96b435 ON public.metas_vendas USING btree (empresa_id);
+CREATE INDEX if not exists idx_metas_vendas_empresa_id_96b435 ON public.metas_vendas USING btree (empresa_id);
 
-CREATE INDEX idx_nfe_imp_empresa_chave ON public.fiscal_nfe_imports USING btree (empresa_id, chave_acesso);
+CREATE INDEX if not exists idx_nfe_imp_empresa_chave ON public.fiscal_nfe_imports USING btree (empresa_id, chave_acesso);
 
-CREATE INDEX idx_nfe_imp_empresa_status ON public.fiscal_nfe_imports USING btree (empresa_id, status);
+CREATE INDEX if not exists idx_nfe_imp_empresa_status ON public.fiscal_nfe_imports USING btree (empresa_id, status);
 
-CREATE INDEX idx_nfe_imp_items_emp_imp ON public.fiscal_nfe_import_items USING btree (empresa_id, import_id, n_item);
+CREATE INDEX if not exists idx_nfe_imp_items_emp_imp ON public.fiscal_nfe_import_items USING btree (empresa_id, import_id, n_item);
 
-CREATE INDEX idx_ordem_servico_itens_empresa_id_9af1f4 ON public.ordem_servico_itens USING btree (empresa_id);
+CREATE INDEX if not exists idx_ordem_servico_itens_empresa_id_9af1f4 ON public.ordem_servico_itens USING btree (empresa_id);
 
-CREATE INDEX idx_ordem_servico_parcelas_empresa_status_created ON public.ordem_servico_parcelas USING btree (empresa_id, status, created_at);
+CREATE INDEX if not exists idx_ordem_servico_parcelas_empresa_status_created ON public.ordem_servico_parcelas USING btree (empresa_id, status, created_at);
 
-CREATE INDEX idx_ordem_servicos_empresa_status_created ON public.ordem_servicos USING btree (empresa_id, status, created_at);
+CREATE INDEX if not exists idx_ordem_servicos_empresa_status_created ON public.ordem_servicos USING btree (empresa_id, status, created_at);
 
-CREATE INDEX idx_os_emp_status_prevista ON public.ordem_servicos USING btree (empresa_id, status, data_prevista);
+CREATE INDEX if not exists idx_os_emp_status_prevista ON public.ordem_servicos USING btree (empresa_id, status, data_prevista);
 
-CREATE INDEX idx_os_empresa_cliente ON public.ordem_servicos USING btree (empresa_id, cliente_id);
+CREATE INDEX if not exists idx_os_empresa_cliente ON public.ordem_servicos USING btree (empresa_id, cliente_id);
 
-CREATE INDEX idx_os_empresa_created_at ON public.ordem_servicos USING btree (empresa_id, created_at DESC);
+CREATE INDEX if not exists idx_os_empresa_created_at ON public.ordem_servicos USING btree (empresa_id, created_at DESC);
 
-CREATE INDEX idx_os_empresa_ordem ON public.ordem_servicos USING btree (empresa_id, ordem);
+CREATE INDEX if not exists idx_os_empresa_ordem ON public.ordem_servicos USING btree (empresa_id, ordem);
 
-CREATE INDEX idx_os_itens_os ON public.ordem_servico_itens USING btree (ordem_servico_id);
+CREATE INDEX if not exists idx_os_itens_os ON public.ordem_servico_itens USING btree (ordem_servico_id);
 
-CREATE INDEX idx_os_parcela_os ON public.ordem_servico_parcelas USING btree (ordem_servico_id);
+CREATE INDEX if not exists idx_os_parcela_os ON public.ordem_servico_parcelas USING btree (ordem_servico_id);
 
-CREATE INDEX idx_pessoa_contatos_empresa_pessoa ON public.pessoa_contatos USING btree (empresa_id, pessoa_id);
+CREATE INDEX if not exists idx_pessoa_contatos_empresa_pessoa ON public.pessoa_contatos USING btree (empresa_id, pessoa_id);
 
-CREATE INDEX idx_pessoa_contatos_pessoa_id_0253c9 ON public.pessoa_contatos USING btree (pessoa_id);
+CREATE INDEX if not exists idx_pessoa_contatos_pessoa_id_0253c9 ON public.pessoa_contatos USING btree (pessoa_id);
 
-CREATE INDEX idx_pessoa_enderecos_empresa_pessoa ON public.pessoa_enderecos USING btree (empresa_id, pessoa_id);
+CREATE INDEX if not exists idx_pessoa_enderecos_empresa_pessoa ON public.pessoa_enderecos USING btree (empresa_id, pessoa_id);
 
-CREATE INDEX idx_pessoa_enderecos_pessoa_id_75595d ON public.pessoa_enderecos USING btree (pessoa_id);
+CREATE INDEX if not exists idx_pessoa_enderecos_pessoa_id_75595d ON public.pessoa_enderecos USING btree (pessoa_id);
 
-CREATE INDEX idx_pessoas_emp_nome ON public.pessoas USING btree (empresa_id, nome);
+CREATE INDEX if not exists idx_pessoas_emp_nome ON public.pessoas USING btree (empresa_id, nome);
 
-CREATE INDEX idx_pessoas_empresa_created_at ON public.pessoas USING btree (empresa_id, created_at DESC);
+CREATE INDEX if not exists idx_pessoas_empresa_created_at ON public.pessoas USING btree (empresa_id, created_at DESC);
 
-CREATE UNIQUE INDEX idx_pessoas_empresa_id_doc_unico_not_null ON public.pessoas USING btree (empresa_id, doc_unico) WHERE (doc_unico IS NOT NULL);
+CREATE UNIQUE INDEX if not exists idx_pessoas_empresa_id_doc_unico_not_null ON public.pessoas USING btree (empresa_id, doc_unico) WHERE (doc_unico IS NOT NULL);
 
-CREATE INDEX idx_pessoas_empresa_tipo ON public.pessoas USING btree (empresa_id, tipo);
+CREATE INDEX if not exists idx_pessoas_empresa_tipo ON public.pessoas USING btree (empresa_id, tipo);
 
-CREATE INDEX idx_products_legacy_archive_deleted_at ON public.products_legacy_archive USING btree (deleted_at);
+CREATE INDEX if not exists idx_products_legacy_archive_deleted_at ON public.products_legacy_archive USING btree (deleted_at);
 
-CREATE INDEX idx_products_legacy_archive_emp ON public.products_legacy_archive USING btree (empresa_id);
+CREATE INDEX if not exists idx_products_legacy_archive_emp ON public.products_legacy_archive USING btree (empresa_id);
 
-CREATE INDEX idx_produto_anuncios_produto_id_bc4ab2 ON public.produto_anuncios USING btree (produto_id);
+CREATE INDEX if not exists idx_produto_anuncios_produto_id_bc4ab2 ON public.produto_anuncios USING btree (produto_id);
 
-CREATE INDEX idx_produto_atributos_atributo_id_7a106e ON public.produto_atributos USING btree (atributo_id);
+CREATE INDEX if not exists idx_produto_atributos_atributo_id_7a106e ON public.produto_atributos USING btree (atributo_id);
 
-CREATE INDEX idx_produto_atributos_empresa_created ON public.produto_atributos USING btree (empresa_id, created_at);
+CREATE INDEX if not exists idx_produto_atributos_empresa_created ON public.produto_atributos USING btree (empresa_id, created_at);
 
-CREATE INDEX idx_produto_atributos_produto ON public.produto_atributos USING btree (produto_id);
+CREATE INDEX if not exists idx_produto_atributos_produto ON public.produto_atributos USING btree (produto_id);
 
-CREATE INDEX idx_produto_componentes_componente_id_b16e1b ON public.produto_componentes USING btree (componente_id);
+CREATE INDEX if not exists idx_produto_componentes_componente_id_b16e1b ON public.produto_componentes USING btree (componente_id);
 
-CREATE INDEX idx_produto_fornecedores_fornecedor_id_cacf44 ON public.produto_fornecedores USING btree (fornecedor_id);
+CREATE INDEX if not exists idx_produto_fornecedores_fornecedor_id_cacf44 ON public.produto_fornecedores USING btree (fornecedor_id);
 
-CREATE INDEX idx_produto_imagens_produto_id_d6415e ON public.produto_imagens USING btree (produto_id);
+CREATE INDEX if not exists idx_produto_imagens_produto_id_d6415e ON public.produto_imagens USING btree (produto_id);
 
-CREATE INDEX idx_produto_tags_empresa ON public.produto_tags USING btree (empresa_id);
+CREATE INDEX if not exists idx_produto_tags_empresa ON public.produto_tags USING btree (empresa_id);
 
-CREATE INDEX idx_produto_tags_tag_id_5008ae ON public.produto_tags USING btree (tag_id);
+CREATE INDEX if not exists idx_produto_tags_tag_id_5008ae ON public.produto_tags USING btree (tag_id);
 
-CREATE INDEX idx_produtos_empresa_linha ON public.produtos USING btree (empresa_id, linha_produto_id);
+CREATE INDEX if not exists idx_produtos_empresa_linha ON public.produtos USING btree (empresa_id, linha_produto_id);
 
-CREATE UNIQUE INDEX idx_produtos_empresa_sku_unique ON public.produtos USING btree (empresa_id, sku) WHERE (sku IS NOT NULL);
+CREATE UNIQUE INDEX if not exists idx_produtos_empresa_sku_unique ON public.produtos USING btree (empresa_id, sku) WHERE (sku IS NOT NULL);
 
-CREATE INDEX idx_produtos_empresa_slug_unique ON public.produtos USING btree (empresa_id, slug);
+CREATE INDEX if not exists idx_produtos_empresa_slug_unique ON public.produtos USING btree (empresa_id, slug);
 
-CREATE INDEX idx_produtos_empresa_status_created ON public.produtos USING btree (empresa_id, status, created_at);
+CREATE INDEX if not exists idx_produtos_empresa_status_created ON public.produtos USING btree (empresa_id, status, created_at);
 
-CREATE INDEX idx_produtos_gtin_tributavel ON public.produtos USING btree (gtin_tributavel);
+CREATE INDEX if not exists idx_produtos_gtin_tributavel ON public.produtos USING btree (gtin_tributavel);
 
-CREATE UNIQUE INDEX idx_produtos_gtin_unique ON public.produtos USING btree (gtin) WHERE (gtin IS NOT NULL);
+CREATE UNIQUE INDEX if not exists idx_produtos_gtin_unique ON public.produtos USING btree (gtin) WHERE (gtin IS NOT NULL);
 
-CREATE INDEX idx_produtos_linha_produto_id_d06206 ON public.produtos USING btree (linha_produto_id);
+CREATE INDEX if not exists idx_produtos_linha_produto_id_d06206 ON public.produtos USING btree (linha_produto_id);
 
-CREATE INDEX idx_produtos_produto_pai_id_e96ae9 ON public.produtos USING btree (produto_pai_id);
+CREATE INDEX if not exists idx_produtos_produto_pai_id_e96ae9 ON public.produtos USING btree (produto_pai_id);
 
-CREATE INDEX idx_recebimento_itens_produto ON public.recebimento_itens USING btree (produto_id);
+CREATE INDEX if not exists idx_recebimento_itens_produto ON public.recebimento_itens USING btree (produto_id);
 
-CREATE INDEX idx_recebimento_itens_recebimento ON public.recebimento_itens USING btree (recebimento_id);
+CREATE INDEX if not exists idx_recebimento_itens_recebimento ON public.recebimento_itens USING btree (recebimento_id);
 
-CREATE INDEX idx_recebimentos_empresa_status ON public.recebimentos USING btree (empresa_id, status);
+CREATE INDEX if not exists idx_recebimentos_empresa_status ON public.recebimentos USING btree (empresa_id, status);
 
-CREATE INDEX idx_recebimentos_import ON public.recebimentos USING btree (fiscal_nfe_import_id);
+CREATE INDEX if not exists idx_recebimentos_import ON public.recebimentos USING btree (fiscal_nfe_import_id);
 
-CREATE INDEX idx_rh_cargo_comp_cargo ON public.rh_cargo_competencias USING btree (cargo_id);
+CREATE INDEX if not exists idx_rh_cargo_comp_cargo ON public.rh_cargo_competencias USING btree (cargo_id);
 
-CREATE INDEX idx_rh_cargo_comp_empresa ON public.rh_cargo_competencias USING btree (empresa_id);
+CREATE INDEX if not exists idx_rh_cargo_comp_empresa ON public.rh_cargo_competencias USING btree (empresa_id);
 
-CREATE INDEX idx_rh_cargo_competencias_competencia_id_cd3407 ON public.rh_cargo_competencias USING btree (competencia_id);
+CREATE INDEX if not exists idx_rh_cargo_competencias_competencia_id_cd3407 ON public.rh_cargo_competencias USING btree (competencia_id);
 
-CREATE INDEX idx_rh_cargos_empresa ON public.rh_cargos USING btree (empresa_id);
+CREATE INDEX if not exists idx_rh_cargos_empresa ON public.rh_cargos USING btree (empresa_id);
 
-CREATE INDEX idx_rh_colab_comp_colab ON public.rh_colaborador_competencias USING btree (colaborador_id);
+CREATE INDEX if not exists idx_rh_colab_comp_colab ON public.rh_colaborador_competencias USING btree (colaborador_id);
 
-CREATE INDEX idx_rh_colab_comp_empresa ON public.rh_colaborador_competencias USING btree (empresa_id);
+CREATE INDEX if not exists idx_rh_colab_comp_empresa ON public.rh_colaborador_competencias USING btree (empresa_id);
 
-CREATE INDEX idx_rh_colaboradores_cargo ON public.rh_colaboradores USING btree (cargo_id);
+CREATE INDEX if not exists idx_rh_colaboradores_cargo ON public.rh_colaboradores USING btree (cargo_id);
 
-CREATE INDEX idx_rh_colaboradores_empresa ON public.rh_colaboradores USING btree (empresa_id);
+CREATE INDEX if not exists idx_rh_colaboradores_empresa ON public.rh_colaboradores USING btree (empresa_id);
 
-CREATE INDEX idx_rh_competencias_empresa ON public.rh_competencias USING btree (empresa_id);
+CREATE INDEX if not exists idx_rh_competencias_empresa ON public.rh_competencias USING btree (empresa_id);
 
-CREATE INDEX idx_rh_part_colaborador ON public.rh_treinamento_participantes USING btree (colaborador_id);
+CREATE INDEX if not exists idx_rh_part_colaborador ON public.rh_treinamento_participantes USING btree (colaborador_id);
 
-CREATE INDEX idx_rh_part_empresa ON public.rh_treinamento_participantes USING btree (empresa_id);
+CREATE INDEX if not exists idx_rh_part_empresa ON public.rh_treinamento_participantes USING btree (empresa_id);
 
-CREATE INDEX idx_rh_part_treinamento ON public.rh_treinamento_participantes USING btree (treinamento_id);
+CREATE INDEX if not exists idx_rh_part_treinamento ON public.rh_treinamento_participantes USING btree (treinamento_id);
 
-CREATE INDEX idx_rh_treinamento_participantes_empresa_status_created ON public.rh_treinamento_participantes USING btree (empresa_id, status, created_at);
+CREATE INDEX if not exists idx_rh_treinamento_participantes_empresa_status_created ON public.rh_treinamento_participantes USING btree (empresa_id, status, created_at);
 
-CREATE INDEX idx_rh_treinamentos_empresa ON public.rh_treinamentos USING btree (empresa_id);
+CREATE INDEX if not exists idx_rh_treinamentos_empresa ON public.rh_treinamentos USING btree (empresa_id);
 
-CREATE INDEX idx_rh_treinamentos_empresa_status_created ON public.rh_treinamentos USING btree (empresa_id, status, created_at);
+CREATE INDEX if not exists idx_rh_treinamentos_empresa_status_created ON public.rh_treinamentos USING btree (empresa_id, status, created_at);
 
-CREATE INDEX idx_rh_treinamentos_status ON public.rh_treinamentos USING btree (status);
+CREATE INDEX if not exists idx_rh_treinamentos_status ON public.rh_treinamentos USING btree (status);
 
-CREATE INDEX idx_role_permissions__perm ON public.role_permissions USING btree (permission_id);
+CREATE INDEX if not exists idx_role_permissions__perm ON public.role_permissions USING btree (permission_id);
 
-CREATE INDEX idx_servicos_empresa_descricao ON public.servicos USING btree (empresa_id, descricao);
+CREATE INDEX if not exists idx_servicos_empresa_descricao ON public.servicos USING btree (empresa_id, descricao);
 
-CREATE INDEX idx_servicos_empresa_status_created ON public.servicos USING btree (empresa_id, status, created_at);
+CREATE INDEX if not exists idx_servicos_empresa_status_created ON public.servicos USING btree (empresa_id, status, created_at);
 
-CREATE INDEX idx_subscriptions_empresa_status_created ON public.subscriptions USING btree (empresa_id, status, created_at);
+CREATE INDEX if not exists idx_subscriptions_empresa_status_created ON public.subscriptions USING btree (empresa_id, status, created_at);
 
-CREATE INDEX idx_tabelas_medidas_empresa_created ON public.tabelas_medidas USING btree (empresa_id, created_at);
+CREATE INDEX if not exists idx_tabelas_medidas_empresa_created ON public.tabelas_medidas USING btree (empresa_id, created_at);
 
-CREATE INDEX idx_tags_empresa_created ON public.tags USING btree (empresa_id, created_at);
+CREATE INDEX if not exists idx_tags_empresa_created ON public.tags USING btree (empresa_id, created_at);
 
-CREATE INDEX idx_transportadoras_empresa_status_created ON public.transportadoras USING btree (empresa_id, status, created_at);
+CREATE INDEX if not exists idx_transportadoras_empresa_status_created ON public.transportadoras USING btree (empresa_id, status, created_at);
 
-CREATE INDEX idx_user_active_empresa__user_updated_at ON public.user_active_empresa USING btree (user_id, updated_at DESC);
+CREATE INDEX if not exists idx_user_active_empresa__user_updated_at ON public.user_active_empresa USING btree (user_id, updated_at DESC);
 
-CREATE INDEX idx_vendas_itens_empresa_pedido ON public.vendas_itens_pedido USING btree (empresa_id, pedido_id);
+CREATE INDEX if not exists idx_vendas_itens_empresa_pedido ON public.vendas_itens_pedido USING btree (empresa_id, pedido_id);
 
-CREATE INDEX idx_vendas_itens_empresa_produto ON public.vendas_itens_pedido USING btree (empresa_id, produto_id);
+CREATE INDEX if not exists idx_vendas_itens_empresa_produto ON public.vendas_itens_pedido USING btree (empresa_id, produto_id);
 
-CREATE INDEX idx_vendas_itens_pedido_pedido_id_f08419 ON public.vendas_itens_pedido USING btree (pedido_id);
+CREATE INDEX if not exists idx_vendas_itens_pedido_pedido_id_f08419 ON public.vendas_itens_pedido USING btree (pedido_id);
 
-CREATE INDEX idx_vendas_itens_pedido_produto_id_ed598c ON public.vendas_itens_pedido USING btree (produto_id);
+CREATE INDEX if not exists idx_vendas_itens_pedido_produto_id_ed598c ON public.vendas_itens_pedido USING btree (produto_id);
 
-CREATE INDEX idx_vendas_pedidos_cliente_id_78a483 ON public.vendas_pedidos USING btree (cliente_id);
+CREATE INDEX if not exists idx_vendas_pedidos_cliente_id_78a483 ON public.vendas_pedidos USING btree (cliente_id);
 
-CREATE INDEX idx_vendas_pedidos_empresa_cliente ON public.vendas_pedidos USING btree (empresa_id, cliente_id);
+CREATE INDEX if not exists idx_vendas_pedidos_empresa_cliente ON public.vendas_pedidos USING btree (empresa_id, cliente_id);
 
-CREATE INDEX idx_vendas_pedidos_empresa_data ON public.vendas_pedidos USING btree (empresa_id, data_emissao);
+CREATE INDEX if not exists idx_vendas_pedidos_empresa_data ON public.vendas_pedidos USING btree (empresa_id, data_emissao);
 
-CREATE INDEX idx_vendas_pedidos_empresa_status_created ON public.vendas_pedidos USING btree (empresa_id, status, created_at);
+CREATE INDEX if not exists idx_vendas_pedidos_empresa_status_created ON public.vendas_pedidos USING btree (empresa_id, status, created_at);
 
-CREATE UNIQUE INDEX ind_benef_comp_pkey ON public.industria_benef_componentes USING btree (id);
+CREATE UNIQUE INDEX if not exists ind_benef_comp_pkey ON public.industria_benef_componentes USING btree (id);
 
-CREATE UNIQUE INDEX ind_benef_entregas_pkey ON public.industria_benef_entregas USING btree (id);
+CREATE UNIQUE INDEX if not exists ind_benef_entregas_pkey ON public.industria_benef_entregas USING btree (id);
 
-CREATE UNIQUE INDEX ind_benef_ordens_pkey ON public.industria_benef_ordens USING btree (id);
+CREATE UNIQUE INDEX if not exists ind_benef_ordens_pkey ON public.industria_benef_ordens USING btree (id);
 
-CREATE UNIQUE INDEX ind_matcli_emp_cli_prod_uk ON public.industria_materiais_cliente USING btree (empresa_id, cliente_id, produto_id);
+CREATE UNIQUE INDEX if not exists ind_matcli_emp_cli_prod_uk ON public.industria_materiais_cliente USING btree (empresa_id, cliente_id, produto_id);
 
-CREATE UNIQUE INDEX ind_prod_comp_pkey ON public.industria_producao_componentes USING btree (id);
+CREATE UNIQUE INDEX if not exists ind_prod_comp_pkey ON public.industria_producao_componentes USING btree (id);
 
-CREATE UNIQUE INDEX ind_prod_entregas_pkey ON public.industria_producao_entregas USING btree (id);
+CREATE UNIQUE INDEX if not exists ind_prod_entregas_pkey ON public.industria_producao_entregas USING btree (id);
 
-CREATE UNIQUE INDEX ind_prod_ordens_pkey ON public.industria_producao_ordens USING btree (id);
+CREATE UNIQUE INDEX if not exists ind_prod_ordens_pkey ON public.industria_producao_ordens USING btree (id);
 
-CREATE UNIQUE INDEX industria_boms_comp_pkey ON public.industria_boms_componentes USING btree (id);
+CREATE UNIQUE INDEX if not exists industria_boms_comp_pkey ON public.industria_boms_componentes USING btree (id);
 
-CREATE UNIQUE INDEX industria_boms_pkey ON public.industria_boms USING btree (id);
+CREATE UNIQUE INDEX if not exists industria_boms_pkey ON public.industria_boms USING btree (id);
 
-CREATE UNIQUE INDEX industria_centros_trabalho_pkey ON public.industria_centros_trabalho USING btree (id);
+CREATE UNIQUE INDEX if not exists industria_centros_trabalho_pkey ON public.industria_centros_trabalho USING btree (id);
 
-CREATE UNIQUE INDEX industria_componentes_pkey ON public.industria_ordens_componentes USING btree (id);
+CREATE UNIQUE INDEX if not exists industria_componentes_pkey ON public.industria_ordens_componentes USING btree (id);
 
-CREATE UNIQUE INDEX industria_entregas_pkey ON public.industria_ordens_entregas USING btree (id);
+CREATE UNIQUE INDEX if not exists industria_entregas_pkey ON public.industria_ordens_entregas USING btree (id);
 
-CREATE UNIQUE INDEX industria_materiais_cliente_pkey ON public.industria_materiais_cliente USING btree (id);
+CREATE UNIQUE INDEX if not exists industria_materiais_cliente_pkey ON public.industria_materiais_cliente USING btree (id);
 
-CREATE UNIQUE INDEX industria_operacoes_apontamentos_pkey ON public.industria_operacoes_apontamentos USING btree (id);
+CREATE UNIQUE INDEX if not exists industria_operacoes_apontamentos_pkey ON public.industria_operacoes_apontamentos USING btree (id);
 
-CREATE UNIQUE INDEX industria_operacoes_pkey ON public.industria_operacoes USING btree (id);
+CREATE UNIQUE INDEX if not exists industria_operacoes_pkey ON public.industria_operacoes USING btree (id);
 
-CREATE UNIQUE INDEX industria_ordem_componentes_pkey ON public.industria_ordem_componentes USING btree (id);
+CREATE UNIQUE INDEX if not exists industria_ordem_componentes_pkey ON public.industria_ordem_componentes USING btree (id);
 
-CREATE UNIQUE INDEX industria_ordem_entregas_pkey ON public.industria_ordem_entregas USING btree (id);
+CREATE UNIQUE INDEX if not exists industria_ordem_entregas_pkey ON public.industria_ordem_entregas USING btree (id);
 
-CREATE UNIQUE INDEX industria_ordens_pkey ON public.industria_ordens USING btree (id);
+CREATE UNIQUE INDEX if not exists industria_ordens_pkey ON public.industria_ordens USING btree (id);
 
-CREATE UNIQUE INDEX industria_roteiros_etapas_pkey ON public.industria_roteiros_etapas USING btree (id);
+CREATE UNIQUE INDEX if not exists industria_roteiros_etapas_pkey ON public.industria_roteiros_etapas USING btree (id);
 
-CREATE UNIQUE INDEX industria_roteiros_pkey ON public.industria_roteiros USING btree (id);
+CREATE UNIQUE INDEX if not exists industria_roteiros_pkey ON public.industria_roteiros USING btree (id);
 
-CREATE INDEX ix_metas_vendas_responsavel_id ON public.metas_vendas USING btree (responsavel_id);
+CREATE INDEX if not exists ix_metas_vendas_responsavel_id ON public.metas_vendas USING btree (responsavel_id);
 
-CREATE UNIQUE INDEX linhas_produto_pkey ON public.linhas_produto USING btree (id);
+CREATE UNIQUE INDEX if not exists linhas_produto_pkey ON public.linhas_produto USING btree (id);
 
-CREATE UNIQUE INDEX linhas_produto_unq ON public.linhas_produto USING btree (empresa_id, nome);
+CREATE UNIQUE INDEX if not exists linhas_produto_unq ON public.linhas_produto USING btree (empresa_id, nome);
 
-CREATE UNIQUE INDEX logistica_transportadoras_empresa_codigo_uk ON public.logistica_transportadoras USING btree (empresa_id, codigo);
+CREATE UNIQUE INDEX if not exists logistica_transportadoras_empresa_codigo_uk ON public.logistica_transportadoras USING btree (empresa_id, codigo);
 
-CREATE UNIQUE INDEX logistica_transportadoras_pkey ON public.logistica_transportadoras USING btree (id);
+CREATE UNIQUE INDEX if not exists logistica_transportadoras_pkey ON public.logistica_transportadoras USING btree (id);
 
-CREATE UNIQUE INDEX marcas_nome_unique_per_company ON public.marcas USING btree (empresa_id, nome);
+CREATE UNIQUE INDEX if not exists marcas_nome_unique_per_company ON public.marcas USING btree (empresa_id, nome);
 
-CREATE UNIQUE INDEX marcas_pkey ON public.marcas USING btree (id);
+CREATE UNIQUE INDEX if not exists marcas_pkey ON public.marcas USING btree (id);
 
-CREATE UNIQUE INDEX metas_vendas_pkey ON public.metas_vendas USING btree (id);
+CREATE UNIQUE INDEX if not exists metas_vendas_pkey ON public.metas_vendas USING btree (id);
 
-CREATE UNIQUE INDEX ordem_servico_itens_pkey ON public.ordem_servico_itens USING btree (id);
+CREATE UNIQUE INDEX if not exists ordem_servico_itens_pkey ON public.ordem_servico_itens USING btree (id);
 
-CREATE UNIQUE INDEX ordem_servico_parcelas_empresa_id_ordem_servico_id_numero_p_key ON public.ordem_servico_parcelas USING btree (empresa_id, ordem_servico_id, numero_parcela);
+CREATE UNIQUE INDEX if not exists ordem_servico_parcelas_empresa_id_ordem_servico_id_numero_p_key ON public.ordem_servico_parcelas USING btree (empresa_id, ordem_servico_id, numero_parcela);
 
-CREATE UNIQUE INDEX ordem_servico_parcelas_pkey ON public.ordem_servico_parcelas USING btree (id);
+CREATE UNIQUE INDEX if not exists ordem_servico_parcelas_pkey ON public.ordem_servico_parcelas USING btree (id);
 
-CREATE UNIQUE INDEX ordem_servicos_empresa_id_numero_key ON public.ordem_servicos USING btree (empresa_id, numero);
+CREATE UNIQUE INDEX if not exists ordem_servicos_empresa_id_numero_key ON public.ordem_servicos USING btree (empresa_id, numero);
 
-CREATE UNIQUE INDEX ordem_servicos_pkey ON public.ordem_servicos USING btree (id);
+CREATE UNIQUE INDEX if not exists ordem_servicos_pkey ON public.ordem_servicos USING btree (id);
 
-CREATE UNIQUE INDEX permissions_pkey ON public.permissions USING btree (id);
+CREATE UNIQUE INDEX if not exists permissions_pkey ON public.permissions USING btree (id);
 
-CREATE UNIQUE INDEX pessoa_contatos_pkey ON public.pessoa_contatos USING btree (id);
+CREATE UNIQUE INDEX if not exists pessoa_contatos_pkey ON public.pessoa_contatos USING btree (id);
 
-CREATE UNIQUE INDEX pessoa_enderecos_pkey ON public.pessoa_enderecos USING btree (id);
+CREATE UNIQUE INDEX if not exists pessoa_enderecos_pkey ON public.pessoa_enderecos USING btree (id);
 
-CREATE UNIQUE INDEX pessoas_pkey ON public.pessoas USING btree (id);
+CREATE UNIQUE INDEX if not exists pessoas_pkey ON public.pessoas USING btree (id);
 
-CREATE UNIQUE INDEX plans_pkey ON public.plans USING btree (id);
+CREATE UNIQUE INDEX if not exists plans_pkey ON public.plans USING btree (id);
 
-CREATE UNIQUE INDEX plans_slug_billing_cycle_key ON public.plans USING btree (slug, billing_cycle);
+CREATE UNIQUE INDEX if not exists plans_slug_billing_cycle_key ON public.plans USING btree (slug, billing_cycle);
 
-CREATE UNIQUE INDEX plans_stripe_price_id_key ON public.plans USING btree (stripe_price_id);
+CREATE UNIQUE INDEX if not exists plans_stripe_price_id_key ON public.plans USING btree (stripe_price_id);
 
-CREATE UNIQUE INDEX products_legacy_archive_pkey ON public.products_legacy_archive USING btree (id);
+CREATE UNIQUE INDEX if not exists products_legacy_archive_pkey ON public.products_legacy_archive USING btree (id);
 
-CREATE INDEX produto_anuncios__empresa_id ON public.produto_anuncios USING btree (empresa_id);
+CREATE INDEX if not exists produto_anuncios__empresa_id ON public.produto_anuncios USING btree (empresa_id);
 
-CREATE UNIQUE INDEX produto_anuncios_pkey ON public.produto_anuncios USING btree (id);
+CREATE UNIQUE INDEX if not exists produto_anuncios_pkey ON public.produto_anuncios USING btree (id);
 
-CREATE UNIQUE INDEX produto_atributos_pkey ON public.produto_atributos USING btree (id);
+CREATE UNIQUE INDEX if not exists produto_atributos_pkey ON public.produto_atributos USING btree (id);
 
-CREATE UNIQUE INDEX produto_atributos_unq ON public.produto_atributos USING btree (empresa_id, produto_id, atributo_id);
+CREATE UNIQUE INDEX if not exists produto_atributos_unq ON public.produto_atributos USING btree (empresa_id, produto_id, atributo_id);
 
-CREATE INDEX produto_componentes__empresa_id ON public.produto_componentes USING btree (empresa_id);
+CREATE INDEX if not exists produto_componentes__empresa_id ON public.produto_componentes USING btree (empresa_id);
 
-CREATE UNIQUE INDEX produto_componentes_pkey ON public.produto_componentes USING btree (kit_id, componente_id);
+CREATE UNIQUE INDEX if not exists produto_componentes_pkey ON public.produto_componentes USING btree (kit_id, componente_id);
 
-CREATE INDEX produto_fornecedores__empresa_id ON public.produto_fornecedores USING btree (empresa_id);
+CREATE INDEX if not exists produto_fornecedores__empresa_id ON public.produto_fornecedores USING btree (empresa_id);
 
-CREATE UNIQUE INDEX produto_fornecedores_pkey ON public.produto_fornecedores USING btree (produto_id, fornecedor_id);
+CREATE UNIQUE INDEX if not exists produto_fornecedores_pkey ON public.produto_fornecedores USING btree (produto_id, fornecedor_id);
 
-CREATE INDEX produto_imagens__empresa_id ON public.produto_imagens USING btree (empresa_id);
+CREATE INDEX if not exists produto_imagens__empresa_id ON public.produto_imagens USING btree (empresa_id);
 
-CREATE UNIQUE INDEX produto_imagens_pkey ON public.produto_imagens USING btree (id);
+CREATE UNIQUE INDEX if not exists produto_imagens_pkey ON public.produto_imagens USING btree (id);
 
-CREATE UNIQUE INDEX produto_tags_pkey ON public.produto_tags USING btree (produto_id, tag_id);
+CREATE UNIQUE INDEX if not exists produto_tags_pkey ON public.produto_tags USING btree (produto_id, tag_id);
 
-CREATE UNIQUE INDEX produtos_pkey ON public.produtos USING btree (id);
+CREATE UNIQUE INDEX if not exists produtos_pkey ON public.produtos USING btree (id);
 
-CREATE UNIQUE INDEX profiles_cpf_unique_not_null ON public.profiles USING btree (cpf) WHERE (cpf IS NOT NULL);
+CREATE UNIQUE INDEX if not exists profiles_cpf_unique_not_null ON public.profiles USING btree (cpf) WHERE (cpf IS NOT NULL);
 
-CREATE UNIQUE INDEX profiles_pkey ON public.profiles USING btree (id);
+CREATE UNIQUE INDEX if not exists profiles_pkey ON public.profiles USING btree (id);
 
-CREATE UNIQUE INDEX recebimento_conf_unique ON public.recebimento_conferencias USING btree (recebimento_item_id, usuario_id);
+CREATE UNIQUE INDEX if not exists recebimento_conf_unique ON public.recebimento_conferencias USING btree (recebimento_item_id, usuario_id);
 
-CREATE UNIQUE INDEX recebimento_conferencias_pkey ON public.recebimento_conferencias USING btree (id);
+CREATE UNIQUE INDEX if not exists recebimento_conferencias_pkey ON public.recebimento_conferencias USING btree (id);
 
-CREATE UNIQUE INDEX recebimento_itens_pkey ON public.recebimento_itens USING btree (id);
+CREATE UNIQUE INDEX if not exists recebimento_itens_pkey ON public.recebimento_itens USING btree (id);
 
-CREATE UNIQUE INDEX recebimentos_import_unique ON public.recebimentos USING btree (empresa_id, fiscal_nfe_import_id);
+CREATE UNIQUE INDEX if not exists recebimentos_import_unique ON public.recebimentos USING btree (empresa_id, fiscal_nfe_import_id);
 
-CREATE UNIQUE INDEX recebimentos_pkey ON public.recebimentos USING btree (id);
+CREATE UNIQUE INDEX if not exists recebimentos_pkey ON public.recebimentos USING btree (id);
 
-CREATE UNIQUE INDEX rh_cargo_competencias_pkey ON public.rh_cargo_competencias USING btree (id);
+CREATE UNIQUE INDEX if not exists rh_cargo_competencias_pkey ON public.rh_cargo_competencias USING btree (id);
 
-CREATE UNIQUE INDEX rh_cargo_competencias_unique ON public.rh_cargo_competencias USING btree (empresa_id, cargo_id, competencia_id);
+CREATE UNIQUE INDEX if not exists rh_cargo_competencias_unique ON public.rh_cargo_competencias USING btree (empresa_id, cargo_id, competencia_id);
 
-CREATE UNIQUE INDEX rh_cargos_empresa_nome_key ON public.rh_cargos USING btree (empresa_id, nome);
+CREATE UNIQUE INDEX if not exists rh_cargos_empresa_nome_key ON public.rh_cargos USING btree (empresa_id, nome);
 
-CREATE UNIQUE INDEX rh_cargos_pkey ON public.rh_cargos USING btree (id);
+CREATE UNIQUE INDEX if not exists rh_cargos_pkey ON public.rh_cargos USING btree (id);
 
-CREATE UNIQUE INDEX rh_col_competencias_pkey ON public.rh_colaborador_competencias USING btree (id);
+CREATE UNIQUE INDEX if not exists rh_col_competencias_pkey ON public.rh_colaborador_competencias USING btree (id);
 
-CREATE UNIQUE INDEX rh_col_competencias_unique ON public.rh_colaborador_competencias USING btree (empresa_id, colaborador_id, competencia_id);
+CREATE UNIQUE INDEX if not exists rh_col_competencias_unique ON public.rh_colaborador_competencias USING btree (empresa_id, colaborador_id, competencia_id);
 
-CREATE UNIQUE INDEX rh_colaboradores_pkey ON public.rh_colaboradores USING btree (id);
+CREATE UNIQUE INDEX if not exists rh_colaboradores_pkey ON public.rh_colaboradores USING btree (id);
 
-CREATE UNIQUE INDEX rh_competencias_empresa_nome_key ON public.rh_competencias USING btree (empresa_id, nome);
+CREATE UNIQUE INDEX if not exists rh_competencias_empresa_nome_key ON public.rh_competencias USING btree (empresa_id, nome);
 
-CREATE UNIQUE INDEX rh_competencias_pkey ON public.rh_competencias USING btree (id);
+CREATE UNIQUE INDEX if not exists rh_competencias_pkey ON public.rh_competencias USING btree (id);
 
-CREATE UNIQUE INDEX rh_treinamento_part_pkey ON public.rh_treinamento_participantes USING btree (id);
+CREATE UNIQUE INDEX if not exists rh_treinamento_part_pkey ON public.rh_treinamento_participantes USING btree (id);
 
-CREATE UNIQUE INDEX rh_treinamento_participantes_unique ON public.rh_treinamento_participantes USING btree (empresa_id, treinamento_id, colaborador_id);
+CREATE UNIQUE INDEX if not exists rh_treinamento_participantes_unique ON public.rh_treinamento_participantes USING btree (empresa_id, treinamento_id, colaborador_id);
 
-CREATE UNIQUE INDEX rh_treinamentos_pkey ON public.rh_treinamentos USING btree (id);
+CREATE UNIQUE INDEX if not exists rh_treinamentos_pkey ON public.rh_treinamentos USING btree (id);
 
-CREATE UNIQUE INDEX role_permissions_pkey ON public.role_permissions USING btree (role_id, permission_id);
+CREATE UNIQUE INDEX if not exists role_permissions_pkey ON public.role_permissions USING btree (role_id, permission_id);
 
-CREATE UNIQUE INDEX roles_pkey ON public.roles USING btree (id);
+CREATE UNIQUE INDEX if not exists roles_pkey ON public.roles USING btree (id);
 
-CREATE UNIQUE INDEX roles_slug_key ON public.roles USING btree (slug);
+CREATE UNIQUE INDEX if not exists roles_slug_key ON public.roles USING btree (slug);
 
-CREATE UNIQUE INDEX servicos_pkey ON public.servicos USING btree (id);
+CREATE UNIQUE INDEX if not exists servicos_pkey ON public.servicos USING btree (id);
 
-CREATE UNIQUE INDEX subscriptions_empresa_id_key ON public.subscriptions USING btree (empresa_id);
+CREATE UNIQUE INDEX if not exists subscriptions_empresa_id_key ON public.subscriptions USING btree (empresa_id);
 
-CREATE UNIQUE INDEX subscriptions_pkey ON public.subscriptions USING btree (id);
+CREATE UNIQUE INDEX if not exists subscriptions_pkey ON public.subscriptions USING btree (id);
 
-CREATE UNIQUE INDEX subscriptions_stripe_subscription_id_key ON public.subscriptions USING btree (stripe_subscription_id);
+CREATE UNIQUE INDEX if not exists subscriptions_stripe_subscription_id_key ON public.subscriptions USING btree (stripe_subscription_id);
 
-CREATE UNIQUE INDEX tabelas_medidas_nome_unique_per_company ON public.tabelas_medidas USING btree (empresa_id, nome);
+CREATE UNIQUE INDEX if not exists tabelas_medidas_nome_unique_per_company ON public.tabelas_medidas USING btree (empresa_id, nome);
 
-CREATE UNIQUE INDEX tabelas_medidas_pkey ON public.tabelas_medidas USING btree (id);
+CREATE UNIQUE INDEX if not exists tabelas_medidas_pkey ON public.tabelas_medidas USING btree (id);
 
-CREATE UNIQUE INDEX tags_pkey ON public.tags USING btree (id);
+CREATE UNIQUE INDEX if not exists tags_pkey ON public.tags USING btree (id);
 
-CREATE UNIQUE INDEX tags_unique_per_company ON public.tags USING btree (empresa_id, nome);
+CREATE UNIQUE INDEX if not exists tags_unique_per_company ON public.tags USING btree (empresa_id, nome);
 
-CREATE UNIQUE INDEX transportadoras_pkey ON public.transportadoras USING btree (id);
+CREATE UNIQUE INDEX if not exists transportadoras_pkey ON public.transportadoras USING btree (id);
 
-CREATE UNIQUE INDEX uq_centros_de_custo_empresa_codigo ON public.centros_de_custo USING btree (empresa_id, codigo);
+CREATE UNIQUE INDEX if not exists uq_centros_de_custo_empresa_codigo ON public.centros_de_custo USING btree (empresa_id, codigo);
 
-CREATE UNIQUE INDEX uq_centros_de_custo_empresa_nome ON public.centros_de_custo USING btree (empresa_id, nome);
+CREATE UNIQUE INDEX if not exists uq_centros_de_custo_empresa_nome ON public.centros_de_custo USING btree (empresa_id, nome);
 
-CREATE UNIQUE INDEX uq_permissions ON public.permissions USING btree (module, action);
+CREATE UNIQUE INDEX if not exists uq_permissions ON public.permissions USING btree (module, action);
 
-CREATE UNIQUE INDEX uq_servicos_empresa_codigo ON public.servicos USING btree (empresa_id, codigo) WHERE (codigo IS NOT NULL);
+CREATE UNIQUE INDEX if not exists uq_servicos_empresa_codigo ON public.servicos USING btree (empresa_id, codigo) WHERE (codigo IS NOT NULL);
 
-CREATE UNIQUE INDEX user_active_empresa_pkey ON public.user_active_empresa USING btree (user_id);
+CREATE UNIQUE INDEX if not exists user_active_empresa_pkey ON public.user_active_empresa USING btree (user_id);
 
-CREATE UNIQUE INDEX user_permission_overrides_pkey ON public.user_permission_overrides USING btree (empresa_id, user_id, permission_id);
+CREATE UNIQUE INDEX if not exists user_permission_overrides_pkey ON public.user_permission_overrides USING btree (empresa_id, user_id, permission_id);
 
-CREATE UNIQUE INDEX ux_produto_imagens_principal ON public.produto_imagens USING btree (produto_id) WHERE (principal = true);
+CREATE UNIQUE INDEX if not exists ux_produto_imagens_principal ON public.produto_imagens USING btree (produto_id) WHERE (principal = true);
 
-CREATE UNIQUE INDEX ux_transportadoras_empresa_cnpj ON public.transportadoras USING btree (empresa_id, cnpj) WHERE (cnpj IS NOT NULL);
+CREATE UNIQUE INDEX if not exists ux_transportadoras_empresa_cnpj ON public.transportadoras USING btree (empresa_id, cnpj) WHERE (cnpj IS NOT NULL);
 
-CREATE UNIQUE INDEX vendas_itens_pedido_pkey ON public.vendas_itens_pedido USING btree (id);
+CREATE UNIQUE INDEX if not exists vendas_itens_pedido_pkey ON public.vendas_itens_pedido USING btree (id);
 
-CREATE UNIQUE INDEX vendas_pedidos_empresa_numero_uk ON public.vendas_pedidos USING btree (empresa_id, numero);
+CREATE UNIQUE INDEX if not exists vendas_pedidos_empresa_numero_uk ON public.vendas_pedidos USING btree (empresa_id, numero);
 
-CREATE UNIQUE INDEX vendas_pedidos_pkey ON public.vendas_pedidos USING btree (id);
+CREATE UNIQUE INDEX if not exists vendas_pedidos_pkey ON public.vendas_pedidos USING btree (id);
 
 alter table "public"."addons" add constraint "addons_pkey" PRIMARY KEY using index "addons_pkey";
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."atributos" add constraint "atributos_pkey" PRIMARY KEY using index "atributos_pkey";
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."centros_de_custo" add constraint "centros_de_custo_pkey" PRIMARY KEY using index "centros_de_custo_pkey";
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."compras_itens" add constraint "compras_itens_pkey" PRIMARY KEY using index "compras_itens_pkey";
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."compras_pedidos" add constraint "compras_pedidos_pkey" PRIMARY KEY using index "compras_pedidos_pkey";
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."contas_a_receber" add constraint "contas_a_receber_pkey" PRIMARY KEY using index "contas_a_receber_pkey";
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."crm_etapas" add constraint "crm_etapas_pkey" PRIMARY KEY using index "crm_etapas_pkey";
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."crm_funis" add constraint "crm_funis_pkey" PRIMARY KEY using index "crm_funis_pkey";
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."crm_oportunidades" add constraint "crm_oportunidades_pkey" PRIMARY KEY using index "crm_oportunidades_pkey";
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."ecommerces" add constraint "ecommerces_pkey" PRIMARY KEY using index "ecommerces_pkey";
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."empresa_addons" add constraint "empresa_addons_pkey" PRIMARY KEY using index "empresa_addons_pkey";
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."empresa_usuarios" add constraint "empresa_usuarios_pkey" PRIMARY KEY using index "empresa_usuarios_pkey";
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."empresas" add constraint "empresas_pkey" PRIMARY KEY using index "empresas_pkey";
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."estoque_movimentos" add constraint "estoque_movimentos_pkey" PRIMARY KEY using index "estoque_movimentos_pkey";
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."estoque_saldos" add constraint "estoque_saldos_pkey" PRIMARY KEY using index "estoque_saldos_pkey";
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."financeiro_centros_custos" add constraint "financeiro_centros_custos_pkey" PRIMARY KEY using index "financeiro_centros_custos_pkey";
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."financeiro_cobrancas_bancarias" add constraint "financeiro_cobrancas_bancarias_pkey" PRIMARY KEY using index "financeiro_cobrancas_bancarias_pkey";
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."financeiro_cobrancas_bancarias_eventos" add constraint "financeiro_cobrancas_bancarias_eventos_pkey" PRIMARY KEY using index "financeiro_cobrancas_bancarias_eventos_pkey";
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."financeiro_contas_correntes" add constraint "financeiro_contas_correntes_pkey" PRIMARY KEY using index "financeiro_contas_correntes_pkey";
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."financeiro_contas_pagar" add constraint "financeiro_contas_pagar_pkey" PRIMARY KEY using index "financeiro_contas_pagar_pkey";
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."financeiro_extratos_bancarios" add constraint "financeiro_extratos_bancarios_pkey" PRIMARY KEY using index "financeiro_extratos_bancarios_pkey";
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."financeiro_movimentacoes" add constraint "financeiro_movimentacoes_pkey" PRIMARY KEY using index "financeiro_movimentacoes_pkey";
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."fiscal_nfe_import_items" add constraint "fiscal_nfe_import_items_pkey" PRIMARY KEY using index "fiscal_nfe_import_items_pkey";
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."fiscal_nfe_imports" add constraint "fiscal_nfe_imports_pkey" PRIMARY KEY using index "fiscal_nfe_imports_pkey";
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."fornecedores" add constraint "fornecedores_pkey" PRIMARY KEY using index "fornecedores_pkey";
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."industria_benef_componentes" add constraint "ind_benef_comp_pkey" PRIMARY KEY using index "ind_benef_comp_pkey";
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."industria_benef_entregas" add constraint "ind_benef_entregas_pkey" PRIMARY KEY using index "ind_benef_entregas_pkey";
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."industria_benef_ordens" add constraint "ind_benef_ordens_pkey" PRIMARY KEY using index "ind_benef_ordens_pkey";
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."industria_boms" add constraint "industria_boms_pkey" PRIMARY KEY using index "industria_boms_pkey";
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."industria_boms_componentes" add constraint "industria_boms_comp_pkey" PRIMARY KEY using index "industria_boms_comp_pkey";
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."industria_centros_trabalho" add constraint "industria_centros_trabalho_pkey" PRIMARY KEY using index "industria_centros_trabalho_pkey";
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."industria_materiais_cliente" add constraint "industria_materiais_cliente_pkey" PRIMARY KEY using index "industria_materiais_cliente_pkey";
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."industria_operacoes" add constraint "industria_operacoes_pkey" PRIMARY KEY using index "industria_operacoes_pkey";
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."industria_operacoes_apontamentos" add constraint "industria_operacoes_apontamentos_pkey" PRIMARY KEY using index "industria_operacoes_apontamentos_pkey";
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."industria_ordem_componentes" add constraint "industria_ordem_componentes_pkey" PRIMARY KEY using index "industria_ordem_componentes_pkey";
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."industria_ordem_entregas" add constraint "industria_ordem_entregas_pkey" PRIMARY KEY using index "industria_ordem_entregas_pkey";
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."industria_ordens" add constraint "industria_ordens_pkey" PRIMARY KEY using index "industria_ordens_pkey";
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."industria_ordens_componentes" add constraint "industria_componentes_pkey" PRIMARY KEY using index "industria_componentes_pkey";
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."industria_ordens_entregas" add constraint "industria_entregas_pkey" PRIMARY KEY using index "industria_entregas_pkey";
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."industria_producao_componentes" add constraint "ind_prod_comp_pkey" PRIMARY KEY using index "ind_prod_comp_pkey";
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."industria_producao_entregas" add constraint "ind_prod_entregas_pkey" PRIMARY KEY using index "ind_prod_entregas_pkey";
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."industria_producao_ordens" add constraint "ind_prod_ordens_pkey" PRIMARY KEY using index "ind_prod_ordens_pkey";
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."industria_roteiros" add constraint "industria_roteiros_pkey" PRIMARY KEY using index "industria_roteiros_pkey";
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."industria_roteiros_etapas" add constraint "industria_roteiros_etapas_pkey" PRIMARY KEY using index "industria_roteiros_etapas_pkey";
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."linhas_produto" add constraint "linhas_produto_pkey" PRIMARY KEY using index "linhas_produto_pkey";
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."logistica_transportadoras" add constraint "logistica_transportadoras_pkey" PRIMARY KEY using index "logistica_transportadoras_pkey";
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."marcas" add constraint "marcas_pkey" PRIMARY KEY using index "marcas_pkey";
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."metas_vendas" add constraint "metas_vendas_pkey" PRIMARY KEY using index "metas_vendas_pkey";
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."ordem_servico_itens" add constraint "ordem_servico_itens_pkey" PRIMARY KEY using index "ordem_servico_itens_pkey";
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."ordem_servico_parcelas" add constraint "ordem_servico_parcelas_pkey" PRIMARY KEY using index "ordem_servico_parcelas_pkey";
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."ordem_servicos" add constraint "ordem_servicos_pkey" PRIMARY KEY using index "ordem_servicos_pkey";
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."permissions" add constraint "permissions_pkey" PRIMARY KEY using index "permissions_pkey";
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."pessoa_contatos" add constraint "pessoa_contatos_pkey" PRIMARY KEY using index "pessoa_contatos_pkey";
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."pessoa_enderecos" add constraint "pessoa_enderecos_pkey" PRIMARY KEY using index "pessoa_enderecos_pkey";
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."pessoas" add constraint "pessoas_pkey" PRIMARY KEY using index "pessoas_pkey";
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."plans" add constraint "plans_pkey" PRIMARY KEY using index "plans_pkey";
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."products_legacy_archive" add constraint "products_legacy_archive_pkey" PRIMARY KEY using index "products_legacy_archive_pkey";
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."produto_anuncios" add constraint "produto_anuncios_pkey" PRIMARY KEY using index "produto_anuncios_pkey";
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."produto_atributos" add constraint "produto_atributos_pkey" PRIMARY KEY using index "produto_atributos_pkey";
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."produto_componentes" add constraint "produto_componentes_pkey" PRIMARY KEY using index "produto_componentes_pkey";
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."produto_fornecedores" add constraint "produto_fornecedores_pkey" PRIMARY KEY using index "produto_fornecedores_pkey";
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."produto_imagens" add constraint "produto_imagens_pkey" PRIMARY KEY using index "produto_imagens_pkey";
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."produto_tags" add constraint "produto_tags_pkey" PRIMARY KEY using index "produto_tags_pkey";
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."produtos" add constraint "produtos_pkey" PRIMARY KEY using index "produtos_pkey";
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."profiles" add constraint "profiles_pkey" PRIMARY KEY using index "profiles_pkey";
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."recebimento_conferencias" add constraint "recebimento_conferencias_pkey" PRIMARY KEY using index "recebimento_conferencias_pkey";
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."recebimento_itens" add constraint "recebimento_itens_pkey" PRIMARY KEY using index "recebimento_itens_pkey";
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."recebimentos" add constraint "recebimentos_pkey" PRIMARY KEY using index "recebimentos_pkey";
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."rh_cargo_competencias" add constraint "rh_cargo_competencias_pkey" PRIMARY KEY using index "rh_cargo_competencias_pkey";
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."rh_cargos" add constraint "rh_cargos_pkey" PRIMARY KEY using index "rh_cargos_pkey";
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."rh_colaborador_competencias" add constraint "rh_col_competencias_pkey" PRIMARY KEY using index "rh_col_competencias_pkey";
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."rh_colaboradores" add constraint "rh_colaboradores_pkey" PRIMARY KEY using index "rh_colaboradores_pkey";
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."rh_competencias" add constraint "rh_competencias_pkey" PRIMARY KEY using index "rh_competencias_pkey";
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."rh_treinamento_participantes" add constraint "rh_treinamento_part_pkey" PRIMARY KEY using index "rh_treinamento_part_pkey";
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."rh_treinamentos" add constraint "rh_treinamentos_pkey" PRIMARY KEY using index "rh_treinamentos_pkey";
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."role_permissions" add constraint "role_permissions_pkey" PRIMARY KEY using index "role_permissions_pkey";
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."roles" add constraint "roles_pkey" PRIMARY KEY using index "roles_pkey";
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."servicos" add constraint "servicos_pkey" PRIMARY KEY using index "servicos_pkey";
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."subscriptions" add constraint "subscriptions_pkey" PRIMARY KEY using index "subscriptions_pkey";
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."tabelas_medidas" add constraint "tabelas_medidas_pkey" PRIMARY KEY using index "tabelas_medidas_pkey";
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."tags" add constraint "tags_pkey" PRIMARY KEY using index "tags_pkey";
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."transportadoras" add constraint "transportadoras_pkey" PRIMARY KEY using index "transportadoras_pkey";
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."user_active_empresa" add constraint "user_active_empresa_pkey" PRIMARY KEY using index "user_active_empresa_pkey";
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."user_permission_overrides" add constraint "user_permission_overrides_pkey" PRIMARY KEY using index "user_permission_overrides_pkey";
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."vendas_itens_pedido" add constraint "vendas_itens_pedido_pkey" PRIMARY KEY using index "vendas_itens_pedido_pkey";
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."vendas_pedidos" add constraint "vendas_pedidos_pkey" PRIMARY KEY using index "vendas_pedidos_pkey";
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."addons" add constraint "addons_billing_cycle_check" CHECK ((billing_cycle = ANY (ARRAY['monthly'::text, 'yearly'::text]))) not valid;
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."addons" validate constraint "addons_billing_cycle_check";
 
 alter table "public"."addons" add constraint "addons_slug_billing_cycle_key" UNIQUE using index "addons_slug_billing_cycle_key";
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."addons" add constraint "addons_stripe_price_id_key" UNIQUE using index "addons_stripe_price_id_key";
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."atributos" add constraint "atributos_unique_per_company" UNIQUE using index "atributos_unique_per_company";
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."centros_de_custo" add constraint "centros_de_custo_empresa_id_fkey" FOREIGN KEY (empresa_id) REFERENCES public.empresas(id) ON DELETE CASCADE not valid;
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."centros_de_custo" validate constraint "centros_de_custo_empresa_id_fkey";
 
 alter table "public"."centros_de_custo" add constraint "uq_centros_de_custo_empresa_codigo" UNIQUE using index "uq_centros_de_custo_empresa_codigo";
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."centros_de_custo" add constraint "uq_centros_de_custo_empresa_nome" UNIQUE using index "uq_centros_de_custo_empresa_nome";
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."compras_itens" add constraint "compras_itens_empresa_fkey" FOREIGN KEY (empresa_id) REFERENCES public.empresas(id) ON DELETE CASCADE not valid;
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."compras_itens" validate constraint "compras_itens_empresa_fkey";
 
 alter table "public"."compras_itens" add constraint "compras_itens_pedido_fkey" FOREIGN KEY (pedido_id) REFERENCES public.compras_pedidos(id) ON DELETE CASCADE not valid;
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."compras_itens" validate constraint "compras_itens_pedido_fkey";
 
 alter table "public"."compras_itens" add constraint "compras_itens_produto_fkey" FOREIGN KEY (produto_id) REFERENCES public.produtos(id) ON DELETE RESTRICT not valid;
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."compras_itens" validate constraint "compras_itens_produto_fkey";
 
 alter table "public"."compras_itens" add constraint "compras_itens_quantidade_check" CHECK ((quantidade > (0)::numeric)) not valid;
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."compras_itens" validate constraint "compras_itens_quantidade_check";
 
 alter table "public"."compras_pedidos" add constraint "compras_pedidos_empresa_fkey" FOREIGN KEY (empresa_id) REFERENCES public.empresas(id) ON DELETE CASCADE not valid;
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."compras_pedidos" validate constraint "compras_pedidos_empresa_fkey";
 
 alter table "public"."compras_pedidos" add constraint "compras_pedidos_fornecedor_fkey" FOREIGN KEY (fornecedor_id) REFERENCES public.fornecedores(id) ON DELETE RESTRICT not valid;
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."compras_pedidos" validate constraint "compras_pedidos_fornecedor_fkey";
 
 alter table "public"."compras_pedidos" add constraint "compras_pedidos_status_check" CHECK ((status = ANY (ARRAY['rascunho'::text, 'enviado'::text, 'recebido'::text, 'cancelado'::text]))) not valid;
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."compras_pedidos" validate constraint "compras_pedidos_status_check";
 
 alter table "public"."contas_a_receber" add constraint "contas_a_receber_cliente_id_fkey" FOREIGN KEY (cliente_id) REFERENCES public.pessoas(id) ON DELETE SET NULL not valid;
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."contas_a_receber" validate constraint "contas_a_receber_cliente_id_fkey";
 
 alter table "public"."contas_a_receber" add constraint "contas_a_receber_empresa_id_fkey" FOREIGN KEY (empresa_id) REFERENCES public.empresas(id) ON DELETE CASCADE not valid;
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."contas_a_receber" validate constraint "contas_a_receber_empresa_id_fkey";
 
 alter table "public"."crm_etapas" add constraint "crm_etapas_empresa_fkey" FOREIGN KEY (empresa_id) REFERENCES public.empresas(id) ON DELETE CASCADE not valid;
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."crm_etapas" validate constraint "crm_etapas_empresa_fkey";
 
 alter table "public"."crm_etapas" add constraint "crm_etapas_funil_fkey" FOREIGN KEY (funil_id) REFERENCES public.crm_funis(id) ON DELETE CASCADE not valid;
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."crm_etapas" validate constraint "crm_etapas_funil_fkey";
 
 alter table "public"."crm_etapas" add constraint "crm_etapas_funil_nome_uk" UNIQUE using index "crm_etapas_funil_nome_uk";
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."crm_funis" add constraint "crm_funis_empresa_fkey" FOREIGN KEY (empresa_id) REFERENCES public.empresas(id) ON DELETE CASCADE not valid;
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."crm_funis" validate constraint "crm_funis_empresa_fkey";
 
 alter table "public"."crm_oportunidades" add constraint "crm_oportunidades_cliente_fkey" FOREIGN KEY (cliente_id) REFERENCES public.pessoas(id) ON DELETE SET NULL not valid;
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."crm_oportunidades" validate constraint "crm_oportunidades_cliente_fkey";
 
 alter table "public"."crm_oportunidades" add constraint "crm_oportunidades_empresa_fkey" FOREIGN KEY (empresa_id) REFERENCES public.empresas(id) ON DELETE CASCADE not valid;
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."crm_oportunidades" validate constraint "crm_oportunidades_empresa_fkey";
 
 alter table "public"."crm_oportunidades" add constraint "crm_oportunidades_etapa_fkey" FOREIGN KEY (etapa_id) REFERENCES public.crm_etapas(id) ON DELETE CASCADE not valid;
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."crm_oportunidades" validate constraint "crm_oportunidades_etapa_fkey";
 
 alter table "public"."crm_oportunidades" add constraint "crm_oportunidades_funil_fkey" FOREIGN KEY (funil_id) REFERENCES public.crm_funis(id) ON DELETE CASCADE not valid;
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."crm_oportunidades" validate constraint "crm_oportunidades_funil_fkey";
 
 alter table "public"."crm_oportunidades" add constraint "crm_oportunidades_prioridade_check" CHECK ((prioridade = ANY (ARRAY['baixa'::text, 'media'::text, 'alta'::text]))) not valid;
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."crm_oportunidades" validate constraint "crm_oportunidades_prioridade_check";
 
 alter table "public"."crm_oportunidades" add constraint "crm_oportunidades_status_check" CHECK ((status = ANY (ARRAY['aberto'::text, 'ganho'::text, 'perdido'::text]))) not valid;
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."crm_oportunidades" validate constraint "crm_oportunidades_status_check";
 
 alter table "public"."ecommerces" add constraint "ecommerces_unique_per_company" UNIQUE using index "ecommerces_unique_per_company";
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."empresa_addons" add constraint "empresa_addons_billing_cycle_check" CHECK ((billing_cycle = ANY (ARRAY['monthly'::text, 'yearly'::text]))) not valid;
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."empresa_addons" validate constraint "empresa_addons_billing_cycle_check";
 
 alter table "public"."empresa_addons" add constraint "empresa_addons_empresa_id_fkey" FOREIGN KEY (empresa_id) REFERENCES public.empresas(id) ON DELETE CASCADE not valid;
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."empresa_addons" validate constraint "empresa_addons_empresa_id_fkey";
 
 alter table "public"."empresa_addons" add constraint "empresa_addons_fk_addon" FOREIGN KEY (addon_slug, billing_cycle) REFERENCES public.addons(slug, billing_cycle) ON UPDATE RESTRICT ON DELETE RESTRICT not valid;
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."empresa_addons" validate constraint "empresa_addons_fk_addon";
 
 alter table "public"."empresa_addons" add constraint "empresa_addons_status_check" CHECK ((status = ANY (ARRAY['trialing'::text, 'active'::text, 'past_due'::text, 'canceled'::text, 'unpaid'::text, 'incomplete'::text, 'incomplete_expired'::text]))) not valid;
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."empresa_addons" validate constraint "empresa_addons_status_check";
 
 alter table "public"."empresa_usuarios" add constraint "empresa_usuarios_empresa_id_fkey" FOREIGN KEY (empresa_id) REFERENCES public.empresas(id) ON DELETE CASCADE not valid;
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."empresa_usuarios" validate constraint "empresa_usuarios_empresa_id_fkey";
 
 alter table "public"."empresa_usuarios" add constraint "empresa_usuarios_role_chk" CHECK ((role = ANY (ARRAY['admin'::text, 'member'::text]))) not valid;
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."empresa_usuarios" validate constraint "empresa_usuarios_role_chk";
 
 alter table "public"."empresa_usuarios" add constraint "empresa_usuarios_role_id_fkey" FOREIGN KEY (role_id) REFERENCES public.roles(id) ON DELETE SET NULL not valid;
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."empresa_usuarios" validate constraint "empresa_usuarios_role_id_fkey";
 
 alter table "public"."empresa_usuarios" add constraint "empresa_usuarios_user_id_fkey" FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE not valid;
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."empresa_usuarios" validate constraint "empresa_usuarios_user_id_fkey";
 
 alter table "public"."empresas" add constraint "empresas_stripe_customer_id_key" UNIQUE using index "empresas_stripe_customer_id_key";
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."estoque_movimentos" add constraint "est_mov_emp_origem_uk" UNIQUE using index "est_mov_emp_origem_uk";
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."estoque_movimentos" add constraint "estoque_movimentos_empresa_fkey" FOREIGN KEY (empresa_id) REFERENCES public.empresas(id) ON DELETE CASCADE not valid;
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."estoque_movimentos" validate constraint "estoque_movimentos_empresa_fkey";
 
 alter table "public"."estoque_movimentos" add constraint "estoque_movimentos_produto_fkey" FOREIGN KEY (produto_id) REFERENCES public.produtos(id) ON DELETE CASCADE not valid;
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."estoque_movimentos" validate constraint "estoque_movimentos_produto_fkey";
 
 alter table "public"."estoque_movimentos" add constraint "estoque_movimentos_tipo_check" CHECK ((tipo = ANY (ARRAY['entrada'::text, 'saida'::text, 'ajuste_entrada'::text, 'ajuste_saida'::text, 'perda'::text, 'inventario'::text]))) not valid;
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."estoque_movimentos" validate constraint "estoque_movimentos_tipo_check";
 
 alter table "public"."estoque_saldos" add constraint "estoque_saldos_empresa_fkey" FOREIGN KEY (empresa_id) REFERENCES public.empresas(id) ON DELETE CASCADE not valid;
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."estoque_saldos" validate constraint "estoque_saldos_empresa_fkey";
 
 alter table "public"."estoque_saldos" add constraint "estoque_saldos_produto_fkey" FOREIGN KEY (produto_id) REFERENCES public.produtos(id) ON DELETE CASCADE not valid;
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."estoque_saldos" validate constraint "estoque_saldos_produto_fkey";
 
 alter table "public"."estoque_saldos" add constraint "estoque_saldos_unique_produto" UNIQUE using index "estoque_saldos_unique_produto";
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."financeiro_centros_custos" add constraint "fin_ccustos_empresa_codigo_uk" UNIQUE using index "fin_ccustos_empresa_codigo_uk";
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."financeiro_centros_custos" add constraint "fin_ccustos_empresa_fkey" FOREIGN KEY (empresa_id) REFERENCES public.empresas(id) ON DELETE CASCADE not valid;
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."financeiro_centros_custos" validate constraint "fin_ccustos_empresa_fkey";
 
 alter table "public"."financeiro_centros_custos" add constraint "fin_ccustos_empresa_nome_parent_uk" UNIQUE using index "fin_ccustos_empresa_nome_parent_uk";
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."financeiro_centros_custos" add constraint "fin_ccustos_parent_fkey" FOREIGN KEY (parent_id) REFERENCES public.financeiro_centros_custos(id) ON DELETE RESTRICT not valid;
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."financeiro_centros_custos" validate constraint "fin_ccustos_parent_fkey";
 
 alter table "public"."financeiro_centros_custos" add constraint "financeiro_centros_custos_tipo_check" CHECK ((tipo = ANY (ARRAY['receita'::text, 'despesa'::text, 'investimento'::text, 'outro'::text]))) not valid;
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."financeiro_centros_custos" validate constraint "financeiro_centros_custos_tipo_check";
 
 alter table "public"."financeiro_cobrancas_bancarias" add constraint "fin_cobr_cc_fkey" FOREIGN KEY (conta_corrente_id) REFERENCES public.financeiro_contas_correntes(id) ON DELETE SET NULL not valid;
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."financeiro_cobrancas_bancarias" validate constraint "fin_cobr_cc_fkey";
 
 alter table "public"."financeiro_cobrancas_bancarias" add constraint "fin_cobr_cliente_fkey" FOREIGN KEY (cliente_id) REFERENCES public.pessoas(id) ON DELETE RESTRICT not valid;
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."financeiro_cobrancas_bancarias" validate constraint "fin_cobr_cliente_fkey";
 
 alter table "public"."financeiro_cobrancas_bancarias" add constraint "fin_cobr_emp_fkey" FOREIGN KEY (empresa_id) REFERENCES public.empresas(id) ON DELETE CASCADE not valid;
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."financeiro_cobrancas_bancarias" validate constraint "fin_cobr_emp_fkey";
 
 alter table "public"."financeiro_cobrancas_bancarias" add constraint "financeiro_cobrancas_bancarias_status_check" CHECK ((status = ANY (ARRAY['pendente_emissao'::text, 'emitida'::text, 'registrada'::text, 'enviada'::text, 'liquidada'::text, 'baixada'::text, 'cancelada'::text, 'erro'::text]))) not valid;
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."financeiro_cobrancas_bancarias" validate constraint "financeiro_cobrancas_bancarias_status_check";
 
 alter table "public"."financeiro_cobrancas_bancarias" add constraint "financeiro_cobrancas_bancarias_tipo_cobranca_check" CHECK ((tipo_cobranca = ANY (ARRAY['boleto'::text, 'pix'::text, 'carne'::text, 'link_pagamento'::text, 'outro'::text]))) not valid;
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."financeiro_cobrancas_bancarias" validate constraint "financeiro_cobrancas_bancarias_tipo_cobranca_check";
 
 alter table "public"."financeiro_cobrancas_bancarias" add constraint "financeiro_cobrancas_bancarias_valor_atual_check" CHECK ((valor_atual >= (0)::numeric)) not valid;
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."financeiro_cobrancas_bancarias" validate constraint "financeiro_cobrancas_bancarias_valor_atual_check";
 
 alter table "public"."financeiro_cobrancas_bancarias" add constraint "financeiro_cobrancas_bancarias_valor_original_check" CHECK ((valor_original >= (0)::numeric)) not valid;
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."financeiro_cobrancas_bancarias" validate constraint "financeiro_cobrancas_bancarias_valor_original_check";
 
 alter table "public"."financeiro_cobrancas_bancarias_eventos" add constraint "fin_cobr_evt_cobr_fkey" FOREIGN KEY (cobranca_id) REFERENCES public.financeiro_cobrancas_bancarias(id) ON DELETE CASCADE not valid;
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."financeiro_cobrancas_bancarias_eventos" validate constraint "fin_cobr_evt_cobr_fkey";
 
 alter table "public"."financeiro_cobrancas_bancarias_eventos" add constraint "fin_cobr_evt_emp_fkey" FOREIGN KEY (empresa_id) REFERENCES public.empresas(id) ON DELETE CASCADE not valid;
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."financeiro_cobrancas_bancarias_eventos" validate constraint "fin_cobr_evt_emp_fkey";
 
 alter table "public"."financeiro_contas_correntes" add constraint "fin_cc_empresa_fkey" FOREIGN KEY (empresa_id) REFERENCES public.empresas(id) ON DELETE CASCADE not valid;
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."financeiro_contas_correntes" validate constraint "fin_cc_empresa_fkey";
 
 alter table "public"."financeiro_contas_correntes" add constraint "fin_cc_empresa_nome_uk" UNIQUE using index "fin_cc_empresa_nome_uk";
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."financeiro_contas_correntes" add constraint "financeiro_contas_correntes_tipo_conta_check" CHECK ((tipo_conta = ANY (ARRAY['corrente'::text, 'poupanca'::text, 'carteira'::text, 'caixa'::text, 'outro'::text]))) not valid;
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."financeiro_contas_correntes" validate constraint "financeiro_contas_correntes_tipo_conta_check";
 
 alter table "public"."financeiro_contas_pagar" add constraint "financeiro_contas_pagar_desconto_check" CHECK ((desconto >= (0)::numeric)) not valid;
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."financeiro_contas_pagar" validate constraint "financeiro_contas_pagar_desconto_check";
 
 alter table "public"."financeiro_contas_pagar" add constraint "financeiro_contas_pagar_juros_check" CHECK ((juros >= (0)::numeric)) not valid;
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."financeiro_contas_pagar" validate constraint "financeiro_contas_pagar_juros_check";
 
 alter table "public"."financeiro_contas_pagar" add constraint "financeiro_contas_pagar_multa_check" CHECK ((multa >= (0)::numeric)) not valid;
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."financeiro_contas_pagar" validate constraint "financeiro_contas_pagar_multa_check";
 
 alter table "public"."financeiro_contas_pagar" add constraint "financeiro_contas_pagar_status_check" CHECK ((status = ANY (ARRAY['aberta'::text, 'parcial'::text, 'paga'::text, 'cancelada'::text]))) not valid;
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."financeiro_contas_pagar" validate constraint "financeiro_contas_pagar_status_check";
 
 alter table "public"."financeiro_contas_pagar" add constraint "financeiro_contas_pagar_valor_pago_check" CHECK ((valor_pago >= (0)::numeric)) not valid;
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."financeiro_contas_pagar" validate constraint "financeiro_contas_pagar_valor_pago_check";
 
 alter table "public"."financeiro_contas_pagar" add constraint "financeiro_contas_pagar_valor_total_check" CHECK ((valor_total >= (0)::numeric)) not valid;
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."financeiro_contas_pagar" validate constraint "financeiro_contas_pagar_valor_total_check";
 
 alter table "public"."financeiro_contas_pagar" add constraint "financeiro_cp_empresa_fkey" FOREIGN KEY (empresa_id) REFERENCES public.empresas(id) ON DELETE CASCADE not valid;
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."financeiro_contas_pagar" validate constraint "financeiro_cp_empresa_fkey";
 
 alter table "public"."financeiro_contas_pagar" add constraint "financeiro_cp_fornecedor_fkey" FOREIGN KEY (fornecedor_id) REFERENCES public.pessoas(id) ON DELETE RESTRICT not valid;
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."financeiro_contas_pagar" validate constraint "financeiro_cp_fornecedor_fkey";
 
 alter table "public"."financeiro_extratos_bancarios" add constraint "fin_extrato_cc_fkey" FOREIGN KEY (conta_corrente_id) REFERENCES public.financeiro_contas_correntes(id) ON DELETE CASCADE not valid;
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."financeiro_extratos_bancarios" validate constraint "fin_extrato_cc_fkey";
 
 alter table "public"."financeiro_extratos_bancarios" add constraint "fin_extrato_empresa_fkey" FOREIGN KEY (empresa_id) REFERENCES public.empresas(id) ON DELETE CASCADE not valid;
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."financeiro_extratos_bancarios" validate constraint "fin_extrato_empresa_fkey";
 
 alter table "public"."financeiro_extratos_bancarios" add constraint "fin_extrato_mov_fkey" FOREIGN KEY (movimentacao_id) REFERENCES public.financeiro_movimentacoes(id) ON DELETE SET NULL not valid;
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."financeiro_extratos_bancarios" validate constraint "fin_extrato_mov_fkey";
 
 alter table "public"."financeiro_extratos_bancarios" add constraint "financeiro_extratos_bancarios_tipo_lancamento_check" CHECK ((tipo_lancamento = ANY (ARRAY['credito'::text, 'debito'::text]))) not valid;
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."financeiro_extratos_bancarios" validate constraint "financeiro_extratos_bancarios_tipo_lancamento_check";
 
 alter table "public"."financeiro_extratos_bancarios" add constraint "financeiro_extratos_bancarios_valor_check" CHECK ((valor > (0)::numeric)) not valid;
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."financeiro_extratos_bancarios" validate constraint "financeiro_extratos_bancarios_valor_check";
 
 alter table "public"."financeiro_movimentacoes" add constraint "fin_mov_cc_fkey" FOREIGN KEY (conta_corrente_id) REFERENCES public.financeiro_contas_correntes(id) ON DELETE CASCADE not valid;
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."financeiro_movimentacoes" validate constraint "fin_mov_cc_fkey";
 
 alter table "public"."financeiro_movimentacoes" add constraint "fin_mov_empresa_fkey" FOREIGN KEY (empresa_id) REFERENCES public.empresas(id) ON DELETE CASCADE not valid;
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."financeiro_movimentacoes" validate constraint "fin_mov_empresa_fkey";
 
 alter table "public"."financeiro_movimentacoes" add constraint "financeiro_movimentacoes_tipo_mov_check" CHECK ((tipo_mov = ANY (ARRAY['entrada'::text, 'saida'::text]))) not valid;
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."financeiro_movimentacoes" validate constraint "financeiro_movimentacoes_tipo_mov_check";
 
 alter table "public"."financeiro_movimentacoes" add constraint "financeiro_movimentacoes_valor_check" CHECK ((valor > (0)::numeric)) not valid;
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."financeiro_movimentacoes" validate constraint "financeiro_movimentacoes_valor_check";
 
 alter table "public"."fiscal_nfe_import_items" add constraint "fiscal_nfe_imp_item_emp_fkey" FOREIGN KEY (empresa_id) REFERENCES public.empresas(id) ON DELETE CASCADE not valid;
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."fiscal_nfe_import_items" validate constraint "fiscal_nfe_imp_item_emp_fkey";
 
 alter table "public"."fiscal_nfe_import_items" add constraint "fiscal_nfe_imp_item_imp_fkey" FOREIGN KEY (import_id) REFERENCES public.fiscal_nfe_imports(id) ON DELETE CASCADE not valid;
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."fiscal_nfe_import_items" validate constraint "fiscal_nfe_imp_item_imp_fkey";
 
 alter table "public"."fiscal_nfe_imports" add constraint "fiscal_nfe_imp_emp_chave_uk" UNIQUE using index "fiscal_nfe_imp_emp_chave_uk";
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."fiscal_nfe_imports" add constraint "fiscal_nfe_imp_emp_fkey" FOREIGN KEY (empresa_id) REFERENCES public.empresas(id) ON DELETE CASCADE not valid;
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."fiscal_nfe_imports" validate constraint "fiscal_nfe_imp_emp_fkey";
 
 alter table "public"."fiscal_nfe_imports" add constraint "fiscal_nfe_imports_origem_upload_check" CHECK ((origem_upload = ANY (ARRAY['xml'::text, 'danfe'::text]))) not valid;
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."fiscal_nfe_imports" validate constraint "fiscal_nfe_imports_origem_upload_check";
 
 alter table "public"."fiscal_nfe_imports" add constraint "fiscal_nfe_imports_status_check" CHECK ((status = ANY (ARRAY['registrado'::text, 'processado'::text, 'erro'::text]))) not valid;
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."fiscal_nfe_imports" validate constraint "fiscal_nfe_imports_status_check";
 
 alter table "public"."fornecedores" add constraint "fornecedores_unq" UNIQUE using index "fornecedores_unq";
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."industria_benef_componentes" add constraint "ind_benef_comp_empresa_fkey" FOREIGN KEY (empresa_id) REFERENCES public.empresas(id) ON DELETE CASCADE not valid;
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."industria_benef_componentes" validate constraint "ind_benef_comp_empresa_fkey";
 
 alter table "public"."industria_benef_componentes" add constraint "ind_benef_comp_ordem_fkey" FOREIGN KEY (ordem_id) REFERENCES public.industria_benef_ordens(id) ON DELETE CASCADE not valid;
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."industria_benef_componentes" validate constraint "ind_benef_comp_ordem_fkey";
 
 alter table "public"."industria_benef_componentes" add constraint "ind_benef_comp_produto_fkey" FOREIGN KEY (produto_id) REFERENCES public.produtos(id) ON DELETE RESTRICT not valid;
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."industria_benef_componentes" validate constraint "ind_benef_comp_produto_fkey";
 
 alter table "public"."industria_benef_entregas" add constraint "ind_benef_entregas_empresa_fkey" FOREIGN KEY (empresa_id) REFERENCES public.empresas(id) ON DELETE CASCADE not valid;
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."industria_benef_entregas" validate constraint "ind_benef_entregas_empresa_fkey";
 
 alter table "public"."industria_benef_entregas" add constraint "ind_benef_entregas_ordem_fkey" FOREIGN KEY (ordem_id) REFERENCES public.industria_benef_ordens(id) ON DELETE CASCADE not valid;
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."industria_benef_entregas" validate constraint "ind_benef_entregas_ordem_fkey";
 
 alter table "public"."industria_benef_entregas" add constraint "industria_benef_entregas_quantidade_entregue_check" CHECK ((quantidade_entregue > (0)::numeric)) not valid;
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."industria_benef_entregas" validate constraint "industria_benef_entregas_quantidade_entregue_check";
 
 alter table "public"."industria_benef_entregas" add constraint "industria_benef_entregas_status_faturamento_check" CHECK ((status_faturamento = ANY (ARRAY['nao_faturado'::text, 'pronto_para_faturar'::text, 'faturado'::text]))) not valid;
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."industria_benef_entregas" validate constraint "industria_benef_entregas_status_faturamento_check";
 
 alter table "public"."industria_benef_ordens" add constraint "ind_benef_ordens_cliente_fkey" FOREIGN KEY (cliente_id) REFERENCES public.pessoas(id) ON DELETE RESTRICT not valid;
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."industria_benef_ordens" validate constraint "ind_benef_ordens_cliente_fkey";
 
 alter table "public"."industria_benef_ordens" add constraint "ind_benef_ordens_empresa_fkey" FOREIGN KEY (empresa_id) REFERENCES public.empresas(id) ON DELETE CASCADE not valid;
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."industria_benef_ordens" validate constraint "ind_benef_ordens_empresa_fkey";
 
 alter table "public"."industria_benef_ordens" add constraint "ind_benef_ordens_matcli_fkey" FOREIGN KEY (produto_material_cliente_id) REFERENCES public.industria_materiais_cliente(id) ON DELETE RESTRICT not valid;
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."industria_benef_ordens" validate constraint "ind_benef_ordens_matcli_fkey";
 
 alter table "public"."industria_benef_ordens" add constraint "ind_benef_ordens_servico_fkey" FOREIGN KEY (produto_servico_id) REFERENCES public.servicos(id) ON DELETE RESTRICT not valid;
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."industria_benef_ordens" validate constraint "ind_benef_ordens_servico_fkey";
 
 alter table "public"."industria_benef_ordens" add constraint "industria_benef_ordens_quantidade_planejada_check" CHECK ((quantidade_planejada > (0)::numeric)) not valid;
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."industria_benef_ordens" validate constraint "industria_benef_ordens_quantidade_planejada_check";
 
 alter table "public"."industria_benef_ordens" add constraint "industria_benef_ordens_status_check" CHECK ((status = ANY (ARRAY['rascunho'::text, 'aguardando_material'::text, 'em_beneficiamento'::text, 'em_inspecao'::text, 'parcialmente_entregue'::text, 'concluida'::text, 'cancelada'::text]))) not valid;
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."industria_benef_ordens" validate constraint "industria_benef_ordens_status_check";
 
 alter table "public"."industria_boms" add constraint "industria_boms_empresa_fkey" FOREIGN KEY (empresa_id) REFERENCES public.empresas(id) ON DELETE CASCADE not valid;
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."industria_boms" validate constraint "industria_boms_empresa_fkey";
 
 alter table "public"."industria_boms" add constraint "industria_boms_produto_fkey" FOREIGN KEY (produto_final_id) REFERENCES public.produtos(id) ON DELETE RESTRICT not valid;
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."industria_boms" validate constraint "industria_boms_produto_fkey";
 
 alter table "public"."industria_boms" add constraint "industria_boms_tipo_bom_check" CHECK ((tipo_bom = ANY (ARRAY['producao'::text, 'beneficiamento'::text]))) not valid;
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."industria_boms" validate constraint "industria_boms_tipo_bom_check";
 
 alter table "public"."industria_boms_componentes" add constraint "industria_boms_comp_bom_fkey" FOREIGN KEY (bom_id) REFERENCES public.industria_boms(id) ON DELETE CASCADE not valid;
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."industria_boms_componentes" validate constraint "industria_boms_comp_bom_fkey";
 
 alter table "public"."industria_boms_componentes" add constraint "industria_boms_comp_empresa_fkey" FOREIGN KEY (empresa_id) REFERENCES public.empresas(id) ON DELETE CASCADE not valid;
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."industria_boms_componentes" validate constraint "industria_boms_comp_empresa_fkey";
 
 alter table "public"."industria_boms_componentes" add constraint "industria_boms_comp_produto_fkey" FOREIGN KEY (produto_id) REFERENCES public.produtos(id) ON DELETE RESTRICT not valid;
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."industria_boms_componentes" validate constraint "industria_boms_comp_produto_fkey";
 
 alter table "public"."industria_boms_componentes" add constraint "industria_boms_componentes_perda_percentual_check" CHECK (((perda_percentual >= (0)::numeric) AND (perda_percentual <= (100)::numeric))) not valid;
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."industria_boms_componentes" validate constraint "industria_boms_componentes_perda_percentual_check";
 
 alter table "public"."industria_boms_componentes" add constraint "industria_boms_componentes_quantidade_check" CHECK ((quantidade > (0)::numeric)) not valid;
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."industria_boms_componentes" validate constraint "industria_boms_componentes_quantidade_check";
 
 alter table "public"."industria_centros_trabalho" add constraint "industria_centros_trabalho_empresa_fkey" FOREIGN KEY (empresa_id) REFERENCES public.empresas(id) ON DELETE CASCADE not valid;
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."industria_centros_trabalho" validate constraint "industria_centros_trabalho_empresa_fkey";
 
 alter table "public"."industria_centros_trabalho" add constraint "industria_centros_trabalho_tipo_uso_check" CHECK ((tipo_uso = ANY (ARRAY['producao'::text, 'beneficiamento'::text, 'ambos'::text]))) not valid;
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."industria_centros_trabalho" validate constraint "industria_centros_trabalho_tipo_uso_check";
 
 alter table "public"."industria_materiais_cliente" add constraint "ind_matcli_cliente_fkey" FOREIGN KEY (cliente_id) REFERENCES public.pessoas(id) ON DELETE RESTRICT not valid;
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."industria_materiais_cliente" validate constraint "ind_matcli_cliente_fkey";
 
 alter table "public"."industria_materiais_cliente" add constraint "ind_matcli_emp_cli_prod_uk" UNIQUE using index "ind_matcli_emp_cli_prod_uk";
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."industria_materiais_cliente" add constraint "ind_matcli_empresa_fkey" FOREIGN KEY (empresa_id) REFERENCES public.empresas(id) ON DELETE CASCADE not valid;
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."industria_materiais_cliente" validate constraint "ind_matcli_empresa_fkey";
 
 alter table "public"."industria_materiais_cliente" add constraint "ind_matcli_produto_fkey" FOREIGN KEY (produto_id) REFERENCES public.produtos(id) ON DELETE RESTRICT not valid;
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."industria_materiais_cliente" validate constraint "ind_matcli_produto_fkey";
 
 alter table "public"."industria_operacoes" add constraint "industria_operacoes_ct_fkey" FOREIGN KEY (centro_trabalho_id) REFERENCES public.industria_centros_trabalho(id) ON DELETE RESTRICT not valid;
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."industria_operacoes" validate constraint "industria_operacoes_ct_fkey";
 
 alter table "public"."industria_operacoes" add constraint "industria_operacoes_empresa_fkey" FOREIGN KEY (empresa_id) REFERENCES public.empresas(id) ON DELETE CASCADE not valid;
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."industria_operacoes" validate constraint "industria_operacoes_empresa_fkey";
 
 alter table "public"."industria_operacoes" add constraint "industria_operacoes_roteiro_etapa_fkey" FOREIGN KEY (roteiro_etapa_id) REFERENCES public.industria_roteiros_etapas(id) ON DELETE RESTRICT not valid;
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."industria_operacoes" validate constraint "industria_operacoes_roteiro_etapa_fkey";
 
 alter table "public"."industria_operacoes" add constraint "industria_operacoes_roteiro_fkey" FOREIGN KEY (roteiro_id) REFERENCES public.industria_roteiros(id) ON DELETE RESTRICT not valid;
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."industria_operacoes" validate constraint "industria_operacoes_roteiro_fkey";
 
 alter table "public"."industria_operacoes" add constraint "industria_operacoes_status_check" CHECK ((status = ANY (ARRAY['planejada'::text, 'liberada'::text, 'em_execucao'::text, 'em_espera'::text, 'em_inspecao'::text, 'concluida'::text, 'cancelada'::text]))) not valid;
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."industria_operacoes" validate constraint "industria_operacoes_status_check";
 
 alter table "public"."industria_operacoes" add constraint "industria_operacoes_tipo_ordem_check" CHECK ((tipo_ordem = ANY (ARRAY['producao'::text, 'beneficiamento'::text]))) not valid;
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."industria_operacoes" validate constraint "industria_operacoes_tipo_ordem_check";
 
 alter table "public"."industria_operacoes_apontamentos" add constraint "industria_operacoes_apontamentos_acao_check" CHECK ((acao = ANY (ARRAY['iniciar'::text, 'pausar'::text, 'concluir'::text]))) not valid;
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."industria_operacoes_apontamentos" validate constraint "industria_operacoes_apontamentos_acao_check";
 
 alter table "public"."industria_operacoes_apontamentos" add constraint "industria_operacoes_apontamentos_empresa_fkey" FOREIGN KEY (empresa_id) REFERENCES public.empresas(id) ON DELETE CASCADE not valid;
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."industria_operacoes_apontamentos" validate constraint "industria_operacoes_apontamentos_empresa_fkey";
 
 alter table "public"."industria_operacoes_apontamentos" add constraint "industria_operacoes_apontamentos_operacao_fkey" FOREIGN KEY (operacao_id) REFERENCES public.industria_operacoes(id) ON DELETE CASCADE not valid;
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."industria_operacoes_apontamentos" validate constraint "industria_operacoes_apontamentos_operacao_fkey";
 
 alter table "public"."industria_ordem_componentes" add constraint "ind_ord_comp_empresa_fkey" FOREIGN KEY (empresa_id) REFERENCES public.empresas(id) ON DELETE CASCADE not valid;
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."industria_ordem_componentes" validate constraint "ind_ord_comp_empresa_fkey";
 
 alter table "public"."industria_ordem_componentes" add constraint "ind_ord_comp_ordem_fkey" FOREIGN KEY (ordem_id) REFERENCES public.industria_benef_ordens(id) ON DELETE CASCADE not valid;
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."industria_ordem_componentes" validate constraint "ind_ord_comp_ordem_fkey";
 
 alter table "public"."industria_ordem_componentes" add constraint "ind_ord_comp_produto_fkey" FOREIGN KEY (produto_id) REFERENCES public.produtos(id) ON DELETE RESTRICT not valid;
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."industria_ordem_componentes" validate constraint "ind_ord_comp_produto_fkey";
 
 alter table "public"."industria_ordem_componentes" add constraint "industria_ordem_componentes_quantidade_check" CHECK ((quantidade > (0)::numeric)) not valid;
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."industria_ordem_componentes" validate constraint "industria_ordem_componentes_quantidade_check";
 
 alter table "public"."industria_ordem_entregas" add constraint "ind_ord_ent_empresa_fkey" FOREIGN KEY (empresa_id) REFERENCES public.empresas(id) ON DELETE CASCADE not valid;
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."industria_ordem_entregas" validate constraint "ind_ord_ent_empresa_fkey";
 
 alter table "public"."industria_ordem_entregas" add constraint "ind_ord_ent_ordem_fkey" FOREIGN KEY (ordem_id) REFERENCES public.industria_benef_ordens(id) ON DELETE CASCADE not valid;
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."industria_ordem_entregas" validate constraint "ind_ord_ent_ordem_fkey";
 
 alter table "public"."industria_ordem_entregas" add constraint "industria_ordem_entregas_quantidade_entregue_check" CHECK ((quantidade_entregue >= (0)::numeric)) not valid;
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."industria_ordem_entregas" validate constraint "industria_ordem_entregas_quantidade_entregue_check";
 
 alter table "public"."industria_ordens" add constraint "industria_ordens_cliente_fkey" FOREIGN KEY (cliente_id) REFERENCES public.pessoas(id) ON DELETE RESTRICT not valid;
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."industria_ordens" validate constraint "industria_ordens_cliente_fkey";
 
 alter table "public"."industria_ordens" add constraint "industria_ordens_empresa_fkey" FOREIGN KEY (empresa_id) REFERENCES public.empresas(id) ON DELETE CASCADE not valid;
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."industria_ordens" validate constraint "industria_ordens_empresa_fkey";
 
 alter table "public"."industria_ordens" add constraint "industria_ordens_produto_fkey" FOREIGN KEY (produto_final_id) REFERENCES public.produtos(id) ON DELETE RESTRICT not valid;
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."industria_ordens" validate constraint "industria_ordens_produto_fkey";
 
 alter table "public"."industria_ordens" add constraint "industria_ordens_quantidade_planejada_check" CHECK ((quantidade_planejada > (0)::numeric)) not valid;
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."industria_ordens" validate constraint "industria_ordens_quantidade_planejada_check";
 
 alter table "public"."industria_ordens" add constraint "industria_ordens_status_check" CHECK ((status = ANY (ARRAY['rascunho'::text, 'planejada'::text, 'em_programacao'::text, 'em_producao'::text, 'em_inspecao'::text, 'parcialmente_concluida'::text, 'concluida'::text, 'cancelada'::text]))) not valid;
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."industria_ordens" validate constraint "industria_ordens_status_check";
 
 alter table "public"."industria_ordens" add constraint "industria_ordens_tipo_ordem_check" CHECK ((tipo_ordem = ANY (ARRAY['industrializacao'::text, 'beneficiamento'::text]))) not valid;
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."industria_ordens" validate constraint "industria_ordens_tipo_ordem_check";
 
 alter table "public"."industria_ordens_componentes" add constraint "industria_componentes_empresa_fkey" FOREIGN KEY (empresa_id) REFERENCES public.empresas(id) ON DELETE CASCADE not valid;
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."industria_ordens_componentes" validate constraint "industria_componentes_empresa_fkey";
 
 alter table "public"."industria_ordens_componentes" add constraint "industria_componentes_ordem_fkey" FOREIGN KEY (ordem_id) REFERENCES public.industria_ordens(id) ON DELETE CASCADE not valid;
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."industria_ordens_componentes" validate constraint "industria_componentes_ordem_fkey";
 
 alter table "public"."industria_ordens_componentes" add constraint "industria_componentes_produto_fkey" FOREIGN KEY (produto_id) REFERENCES public.produtos(id) ON DELETE RESTRICT not valid;
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."industria_ordens_componentes" validate constraint "industria_componentes_produto_fkey";
 
 alter table "public"."industria_ordens_entregas" add constraint "industria_entregas_empresa_fkey" FOREIGN KEY (empresa_id) REFERENCES public.empresas(id) ON DELETE CASCADE not valid;
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."industria_ordens_entregas" validate constraint "industria_entregas_empresa_fkey";
 
 alter table "public"."industria_ordens_entregas" add constraint "industria_entregas_ordem_fkey" FOREIGN KEY (ordem_id) REFERENCES public.industria_ordens(id) ON DELETE CASCADE not valid;
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."industria_ordens_entregas" validate constraint "industria_entregas_ordem_fkey";
 
 alter table "public"."industria_ordens_entregas" add constraint "industria_ordens_entregas_quantidade_entregue_check" CHECK ((quantidade_entregue > (0)::numeric)) not valid;
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."industria_ordens_entregas" validate constraint "industria_ordens_entregas_quantidade_entregue_check";
 
 alter table "public"."industria_ordens_entregas" add constraint "industria_ordens_entregas_status_faturamento_check" CHECK ((status_faturamento = ANY (ARRAY['nao_faturado'::text, 'pronto_para_faturar'::text, 'faturado'::text]))) not valid;
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."industria_ordens_entregas" validate constraint "industria_ordens_entregas_status_faturamento_check";
 
 alter table "public"."industria_producao_componentes" add constraint "ind_prod_comp_empresa_fkey" FOREIGN KEY (empresa_id) REFERENCES public.empresas(id) ON DELETE CASCADE not valid;
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."industria_producao_componentes" validate constraint "ind_prod_comp_empresa_fkey";
 
 alter table "public"."industria_producao_componentes" add constraint "ind_prod_comp_ordem_fkey" FOREIGN KEY (ordem_id) REFERENCES public.industria_producao_ordens(id) ON DELETE CASCADE not valid;
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."industria_producao_componentes" validate constraint "ind_prod_comp_ordem_fkey";
 
 alter table "public"."industria_producao_componentes" add constraint "ind_prod_comp_produto_fkey" FOREIGN KEY (produto_id) REFERENCES public.produtos(id) ON DELETE RESTRICT not valid;
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."industria_producao_componentes" validate constraint "ind_prod_comp_produto_fkey";
 
 alter table "public"."industria_producao_entregas" add constraint "ind_prod_entregas_empresa_fkey" FOREIGN KEY (empresa_id) REFERENCES public.empresas(id) ON DELETE CASCADE not valid;
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."industria_producao_entregas" validate constraint "ind_prod_entregas_empresa_fkey";
 
 alter table "public"."industria_producao_entregas" add constraint "ind_prod_entregas_ordem_fkey" FOREIGN KEY (ordem_id) REFERENCES public.industria_producao_ordens(id) ON DELETE CASCADE not valid;
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."industria_producao_entregas" validate constraint "ind_prod_entregas_ordem_fkey";
 
 alter table "public"."industria_producao_entregas" add constraint "industria_producao_entregas_quantidade_entregue_check" CHECK ((quantidade_entregue > (0)::numeric)) not valid;
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."industria_producao_entregas" validate constraint "industria_producao_entregas_quantidade_entregue_check";
 
 alter table "public"."industria_producao_ordens" add constraint "ind_prod_ordens_empresa_fkey" FOREIGN KEY (empresa_id) REFERENCES public.empresas(id) ON DELETE CASCADE not valid;
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."industria_producao_ordens" validate constraint "ind_prod_ordens_empresa_fkey";
 
 alter table "public"."industria_producao_ordens" add constraint "ind_prod_ordens_produto_fkey" FOREIGN KEY (produto_final_id) REFERENCES public.produtos(id) ON DELETE RESTRICT not valid;
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."industria_producao_ordens" validate constraint "ind_prod_ordens_produto_fkey";
 
 alter table "public"."industria_producao_ordens" add constraint "industria_producao_ordens_origem_ordem_check" CHECK ((origem_ordem = ANY (ARRAY['manual'::text, 'venda'::text, 'reposicao'::text, 'mrp'::text]))) not valid;
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."industria_producao_ordens" validate constraint "industria_producao_ordens_origem_ordem_check";
 
 alter table "public"."industria_producao_ordens" add constraint "industria_producao_ordens_quantidade_planejada_check" CHECK ((quantidade_planejada > (0)::numeric)) not valid;
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."industria_producao_ordens" validate constraint "industria_producao_ordens_quantidade_planejada_check";
 
 alter table "public"."industria_producao_ordens" add constraint "industria_producao_ordens_status_check" CHECK ((status = ANY (ARRAY['rascunho'::text, 'planejada'::text, 'em_programacao'::text, 'em_producao'::text, 'em_inspecao'::text, 'concluida'::text, 'cancelada'::text]))) not valid;
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."industria_producao_ordens" validate constraint "industria_producao_ordens_status_check";
 
 alter table "public"."industria_roteiros" add constraint "industria_roteiros_empresa_fkey" FOREIGN KEY (empresa_id) REFERENCES public.empresas(id) ON DELETE CASCADE not valid;
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."industria_roteiros" validate constraint "industria_roteiros_empresa_fkey";
 
 alter table "public"."industria_roteiros" add constraint "industria_roteiros_produto_fkey" FOREIGN KEY (produto_id) REFERENCES public.produtos(id) ON DELETE RESTRICT not valid;
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."industria_roteiros" validate constraint "industria_roteiros_produto_fkey";
 
 alter table "public"."industria_roteiros" add constraint "industria_roteiros_tipo_bom_check" CHECK ((tipo_bom = ANY (ARRAY['producao'::text, 'beneficiamento'::text]))) not valid;
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."industria_roteiros" validate constraint "industria_roteiros_tipo_bom_check";
 
 alter table "public"."industria_roteiros_etapas" add constraint "industria_roteiros_etapas_ct_fkey" FOREIGN KEY (centro_trabalho_id) REFERENCES public.industria_centros_trabalho(id) ON DELETE RESTRICT not valid;
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."industria_roteiros_etapas" validate constraint "industria_roteiros_etapas_ct_fkey";
 
 alter table "public"."industria_roteiros_etapas" add constraint "industria_roteiros_etapas_empresa_fkey" FOREIGN KEY (empresa_id) REFERENCES public.empresas(id) ON DELETE CASCADE not valid;
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."industria_roteiros_etapas" validate constraint "industria_roteiros_etapas_empresa_fkey";
 
 alter table "public"."industria_roteiros_etapas" add constraint "industria_roteiros_etapas_roteiro_fkey" FOREIGN KEY (roteiro_id) REFERENCES public.industria_roteiros(id) ON DELETE CASCADE not valid;
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."industria_roteiros_etapas" validate constraint "industria_roteiros_etapas_roteiro_fkey";
 
 alter table "public"."industria_roteiros_etapas" add constraint "industria_roteiros_etapas_tipo_operacao_check" CHECK ((tipo_operacao = ANY (ARRAY['setup'::text, 'producao'::text, 'inspecao'::text, 'embalagem'::text, 'outro'::text]))) not valid;
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."industria_roteiros_etapas" validate constraint "industria_roteiros_etapas_tipo_operacao_check";
 
 alter table "public"."linhas_produto" add constraint "linhas_produto_unq" UNIQUE using index "linhas_produto_unq";
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."logistica_transportadoras" add constraint "logistica_transportadoras_empresa_codigo_uk" UNIQUE using index "logistica_transportadoras_empresa_codigo_uk";
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."logistica_transportadoras" add constraint "logistica_transportadoras_empresa_fkey" FOREIGN KEY (empresa_id) REFERENCES public.empresas(id) ON DELETE CASCADE not valid;
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."logistica_transportadoras" validate constraint "logistica_transportadoras_empresa_fkey";
 
 alter table "public"."logistica_transportadoras" add constraint "logistica_transportadoras_frete_tipo_padrao_check" CHECK ((frete_tipo_padrao = ANY (ARRAY['cif'::text, 'fob'::text, 'terceiros'::text, 'nao_definido'::text]))) not valid;
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."logistica_transportadoras" validate constraint "logistica_transportadoras_frete_tipo_padrao_check";
 
 alter table "public"."logistica_transportadoras" add constraint "logistica_transportadoras_modal_principal_check" CHECK ((modal_principal = ANY (ARRAY['rodoviario'::text, 'aereo'::text, 'maritimo'::text, 'ferroviario'::text, 'courier'::text, 'outro'::text]))) not valid;
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."logistica_transportadoras" validate constraint "logistica_transportadoras_modal_principal_check";
 
 alter table "public"."logistica_transportadoras" add constraint "logistica_transportadoras_pessoa_fkey" FOREIGN KEY (pessoa_id) REFERENCES public.pessoas(id) ON DELETE RESTRICT not valid;
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."logistica_transportadoras" validate constraint "logistica_transportadoras_pessoa_fkey";
 
 alter table "public"."logistica_transportadoras" add constraint "logistica_transportadoras_tipo_pessoa_check" CHECK ((tipo_pessoa = ANY (ARRAY['pf'::text, 'pj'::text, 'nao_definido'::text]))) not valid;
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."logistica_transportadoras" validate constraint "logistica_transportadoras_tipo_pessoa_check";
 
 alter table "public"."marcas" add constraint "marcas_nome_unique_per_company" UNIQUE using index "marcas_nome_unique_per_company";
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."metas_vendas" add constraint "data_fim_maior_que_inicio" CHECK ((data_fim >= data_inicio)) not valid;
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."metas_vendas" validate constraint "data_fim_maior_que_inicio";
 
 alter table "public"."metas_vendas" add constraint "metas_vendas_empresa_id_fkey" FOREIGN KEY (empresa_id) REFERENCES public.empresas(id) ON DELETE CASCADE not valid;
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."metas_vendas" validate constraint "metas_vendas_empresa_id_fkey";
 
 alter table "public"."metas_vendas" add constraint "metas_vendas_responsavel_id_fkey" FOREIGN KEY (responsavel_id) REFERENCES auth.users(id) ON DELETE SET NULL not valid;
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."metas_vendas" validate constraint "metas_vendas_responsavel_id_fkey";
 
 alter table "public"."metas_vendas" add constraint "metas_vendas_valor_atingido_check" CHECK ((valor_atingido >= (0)::numeric)) not valid;
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."metas_vendas" validate constraint "metas_vendas_valor_atingido_check";
 
 alter table "public"."metas_vendas" add constraint "metas_vendas_valor_meta_check" CHECK ((valor_meta >= (0)::numeric)) not valid;
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."metas_vendas" validate constraint "metas_vendas_valor_meta_check";
 
 alter table "public"."metas_vendas" add constraint "valor_meta_maior_que_atingido" CHECK ((valor_meta >= valor_atingido)) not valid;
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."metas_vendas" validate constraint "valor_meta_maior_que_atingido";
 
 alter table "public"."ordem_servico_itens" add constraint "ordem_servico_itens_empresa_id_fkey" FOREIGN KEY (empresa_id) REFERENCES public.empresas(id) ON DELETE CASCADE not valid;
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."ordem_servico_itens" validate constraint "ordem_servico_itens_empresa_id_fkey";
 
 alter table "public"."ordem_servico_itens" add constraint "ordem_servico_itens_ordem_servico_id_fkey" FOREIGN KEY (ordem_servico_id) REFERENCES public.ordem_servicos(id) ON DELETE CASCADE not valid;
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."ordem_servico_itens" validate constraint "ordem_servico_itens_ordem_servico_id_fkey";
 
 alter table "public"."ordem_servico_parcelas" add constraint "ordem_servico_parcelas_empresa_id_fkey" FOREIGN KEY (empresa_id) REFERENCES public.empresas(id) ON DELETE CASCADE not valid;
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."ordem_servico_parcelas" validate constraint "ordem_servico_parcelas_empresa_id_fkey";
 
 alter table "public"."ordem_servico_parcelas" add constraint "ordem_servico_parcelas_empresa_id_ordem_servico_id_numero_p_key" UNIQUE using index "ordem_servico_parcelas_empresa_id_ordem_servico_id_numero_p_key";
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."ordem_servico_parcelas" add constraint "ordem_servico_parcelas_ordem_servico_id_fkey" FOREIGN KEY (ordem_servico_id) REFERENCES public.ordem_servicos(id) ON DELETE CASCADE not valid;
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."ordem_servico_parcelas" validate constraint "ordem_servico_parcelas_ordem_servico_id_fkey";
 
 alter table "public"."ordem_servicos" add constraint "ordem_servicos_empresa_id_fkey" FOREIGN KEY (empresa_id) REFERENCES public.empresas(id) ON DELETE CASCADE not valid;
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."ordem_servicos" validate constraint "ordem_servicos_empresa_id_fkey";
 
 alter table "public"."ordem_servicos" add constraint "ordem_servicos_empresa_id_numero_key" UNIQUE using index "ordem_servicos_empresa_id_numero_key";
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."permissions" add constraint "ck_action" CHECK ((action = ANY (ARRAY['view'::text, 'create'::text, 'update'::text, 'delete'::text, 'manage'::text]))) not valid;
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."permissions" validate constraint "ck_action";
 
 alter table "public"."permissions" add constraint "uq_permissions" UNIQUE using index "uq_permissions";
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."pessoa_contatos" add constraint "pessoa_contatos_empresa_id_fkey" FOREIGN KEY (empresa_id) REFERENCES public.empresas(id) ON DELETE CASCADE not valid;
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."pessoa_contatos" validate constraint "pessoa_contatos_empresa_id_fkey";
 
 alter table "public"."pessoa_contatos" add constraint "pessoa_contatos_pessoa_id_fkey" FOREIGN KEY (pessoa_id) REFERENCES public.pessoas(id) ON DELETE CASCADE not valid;
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."pessoa_contatos" validate constraint "pessoa_contatos_pessoa_id_fkey";
 
 alter table "public"."pessoa_enderecos" add constraint "pessoa_enderecos_empresa_id_fkey" FOREIGN KEY (empresa_id) REFERENCES public.empresas(id) ON DELETE CASCADE not valid;
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."pessoa_enderecos" validate constraint "pessoa_enderecos_empresa_id_fkey";
 
 alter table "public"."pessoa_enderecos" add constraint "pessoa_enderecos_pessoa_id_fkey" FOREIGN KEY (pessoa_id) REFERENCES public.pessoas(id) ON DELETE CASCADE not valid;
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."pessoa_enderecos" validate constraint "pessoa_enderecos_pessoa_id_fkey";
 
 alter table "public"."pessoas" add constraint "pessoas_empresa_id_fkey" FOREIGN KEY (empresa_id) REFERENCES public.empresas(id) ON DELETE CASCADE not valid;
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."pessoas" validate constraint "pessoas_empresa_id_fkey";
 
 alter table "public"."plans" add constraint "plans_billing_cycle_check" CHECK ((billing_cycle = ANY (ARRAY['monthly'::text, 'yearly'::text]))) not valid;
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."plans" validate constraint "plans_billing_cycle_check";
 
 alter table "public"."plans" add constraint "plans_slug_billing_cycle_key" UNIQUE using index "plans_slug_billing_cycle_key";
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."plans" add constraint "plans_stripe_price_id_key" UNIQUE using index "plans_stripe_price_id_key";
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."produto_anuncios" add constraint "anuncio_identificador_unique" UNIQUE using index "anuncio_identificador_unique";
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."produto_anuncios" add constraint "produto_anuncios_ecommerce_id_fkey" FOREIGN KEY (ecommerce_id) REFERENCES public.ecommerces(id) ON DELETE CASCADE not valid;
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."produto_anuncios" validate constraint "produto_anuncios_ecommerce_id_fkey";
 
 alter table "public"."produto_anuncios" add constraint "produto_anuncios_preco_especifico_check" CHECK (((preco_especifico IS NULL) OR (preco_especifico >= (0)::numeric))) not valid;
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."produto_anuncios" validate constraint "produto_anuncios_preco_especifico_check";
 
 alter table "public"."produto_anuncios" add constraint "produto_anuncios_produto_id_fkey" FOREIGN KEY (produto_id) REFERENCES public.produtos(id) ON DELETE CASCADE not valid;
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."produto_anuncios" validate constraint "produto_anuncios_produto_id_fkey";
 
 alter table "public"."produto_atributos" add constraint "produto_atributos_atributo_id_fkey" FOREIGN KEY (atributo_id) REFERENCES public.atributos(id) ON DELETE CASCADE not valid;
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."produto_atributos" validate constraint "produto_atributos_atributo_id_fkey";
 
 alter table "public"."produto_atributos" add constraint "produto_atributos_produto_id_fkey" FOREIGN KEY (produto_id) REFERENCES public.produtos(id) ON DELETE CASCADE not valid;
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."produto_atributos" validate constraint "produto_atributos_produto_id_fkey";
 
 alter table "public"."produto_atributos" add constraint "produto_atributos_unq" UNIQUE using index "produto_atributos_unq";
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."produto_componentes" add constraint "produto_componentes_componente_id_fkey" FOREIGN KEY (componente_id) REFERENCES public.produtos(id) ON DELETE RESTRICT not valid;
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."produto_componentes" validate constraint "produto_componentes_componente_id_fkey";
 
 alter table "public"."produto_componentes" add constraint "produto_componentes_kit_id_fkey" FOREIGN KEY (kit_id) REFERENCES public.produtos(id) ON DELETE CASCADE not valid;
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."produto_componentes" validate constraint "produto_componentes_kit_id_fkey";
 
 alter table "public"."produto_componentes" add constraint "produto_componentes_quantidade_check" CHECK ((quantidade > (0)::numeric)) not valid;
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."produto_componentes" validate constraint "produto_componentes_quantidade_check";
 
 alter table "public"."produto_fornecedores" add constraint "produto_fornecedores_fornecedor_id_fkey" FOREIGN KEY (fornecedor_id) REFERENCES public.fornecedores(id) ON DELETE RESTRICT not valid;
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."produto_fornecedores" validate constraint "produto_fornecedores_fornecedor_id_fkey";
 
 alter table "public"."produto_fornecedores" add constraint "produto_fornecedores_produto_id_fkey" FOREIGN KEY (produto_id) REFERENCES public.produtos(id) ON DELETE CASCADE not valid;
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."produto_fornecedores" validate constraint "produto_fornecedores_produto_id_fkey";
 
 alter table "public"."produto_imagens" add constraint "produto_imagens_produto_id_fkey" FOREIGN KEY (produto_id) REFERENCES public.produtos(id) ON DELETE CASCADE not valid;
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."produto_imagens" validate constraint "produto_imagens_produto_id_fkey";
 
 alter table "public"."produto_tags" add constraint "produto_tags_produto_id_fkey" FOREIGN KEY (produto_id) REFERENCES public.produtos(id) ON DELETE CASCADE not valid;
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."produto_tags" validate constraint "produto_tags_produto_id_fkey";
 
 alter table "public"."produto_tags" add constraint "produto_tags_tag_id_fkey" FOREIGN KEY (tag_id) REFERENCES public.tags(id) ON DELETE CASCADE not valid;
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."produto_tags" validate constraint "produto_tags_tag_id_fkey";
 
@@ -3434,352 +4877,821 @@ CASE
     WHEN (tipo_embalagem = 'rolo_cilindro'::public.tipo_embalagem) THEN ((comprimento_cm IS NOT NULL) AND (diametro_cm IS NOT NULL))
     ELSE true
 END) not valid;
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."produtos" validate constraint "ck_env_pack_dims";
 
 alter table "public"."produtos" add constraint "fk_produto_pai" FOREIGN KEY (produto_pai_id) REFERENCES public.produtos(id) ON DELETE SET NULL not valid;
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."produtos" validate constraint "fk_produto_pai";
 
 alter table "public"."produtos" add constraint "fk_produtos_linha_produto" FOREIGN KEY (linha_produto_id) REFERENCES public.linhas_produto(id) ON DELETE SET NULL not valid;
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."produtos" validate constraint "fk_produtos_linha_produto";
 
 alter table "public"."produtos" add constraint "produtos_altura_cm_check" CHECK ((altura_cm >= (0)::numeric)) not valid;
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."produtos" validate constraint "produtos_altura_cm_check";
 
 alter table "public"."produtos" add constraint "produtos_comprimento_cm_check" CHECK ((comprimento_cm >= (0)::numeric)) not valid;
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."produtos" validate constraint "produtos_comprimento_cm_check";
 
 alter table "public"."produtos" add constraint "produtos_diametro_cm_check" CHECK ((diametro_cm >= (0)::numeric)) not valid;
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."produtos" validate constraint "produtos_diametro_cm_check";
 
 alter table "public"."produtos" add constraint "produtos_dias_preparacao_check" CHECK (((dias_preparacao >= 0) AND (dias_preparacao <= 365))) not valid;
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."produtos" validate constraint "produtos_dias_preparacao_check";
 
 alter table "public"."produtos" add constraint "produtos_estoque_max_check" CHECK ((estoque_max >= (0)::numeric)) not valid;
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."produtos" validate constraint "produtos_estoque_max_check";
 
 alter table "public"."produtos" add constraint "produtos_estoque_min_check" CHECK ((estoque_min >= (0)::numeric)) not valid;
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."produtos" validate constraint "produtos_estoque_min_check";
 
 alter table "public"."produtos" add constraint "produtos_fator_conversao_check" CHECK (((fator_conversao IS NULL) OR (fator_conversao > (0)::numeric))) not valid;
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."produtos" validate constraint "produtos_fator_conversao_check";
 
 alter table "public"."produtos" add constraint "produtos_garantia_meses_check" CHECK (((garantia_meses IS NULL) OR ((garantia_meses >= 0) AND (garantia_meses <= 120)))) not valid;
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."produtos" validate constraint "produtos_garantia_meses_check";
 
 alter table "public"."produtos" add constraint "produtos_icms_origem_check" CHECK (((icms_origem >= 0) AND (icms_origem <= 8))) not valid;
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."produtos" validate constraint "produtos_icms_origem_check";
 
 alter table "public"."produtos" add constraint "produtos_itens_por_caixa_check" CHECK ((itens_por_caixa >= 0)) not valid;
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."produtos" validate constraint "produtos_itens_por_caixa_check";
 
 alter table "public"."produtos" add constraint "produtos_largura_cm_check" CHECK ((largura_cm >= (0)::numeric)) not valid;
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."produtos" validate constraint "produtos_largura_cm_check";
 
 alter table "public"."produtos" add constraint "produtos_markup_check" CHECK ((markup >= (0)::numeric)) not valid;
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."produtos" validate constraint "produtos_markup_check";
 
 alter table "public"."produtos" add constraint "produtos_nome_check" CHECK (((char_length(nome) >= 1) AND (char_length(nome) <= 255))) not valid;
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."produtos" validate constraint "produtos_nome_check";
 
 alter table "public"."produtos" add constraint "produtos_num_volumes_check" CHECK ((num_volumes >= 0)) not valid;
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."produtos" validate constraint "produtos_num_volumes_check";
 
 alter table "public"."produtos" add constraint "produtos_peso_bruto_kg_check" CHECK ((peso_bruto_kg >= (0)::numeric)) not valid;
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."produtos" validate constraint "produtos_peso_bruto_kg_check";
 
 alter table "public"."produtos" add constraint "produtos_peso_liquido_kg_check" CHECK ((peso_liquido_kg >= (0)::numeric)) not valid;
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."produtos" validate constraint "produtos_peso_liquido_kg_check";
 
 alter table "public"."produtos" add constraint "produtos_preco_custo_check" CHECK (((preco_custo IS NULL) OR (preco_custo >= (0)::numeric))) not valid;
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."produtos" validate constraint "produtos_preco_custo_check";
 
 alter table "public"."produtos" add constraint "produtos_preco_venda_check" CHECK ((preco_venda >= (0)::numeric)) not valid;
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."produtos" validate constraint "produtos_preco_venda_check";
 
 alter table "public"."produtos" add constraint "produtos_unidade_check" CHECK (((char_length(unidade) >= 1) AND (char_length(unidade) <= 8))) not valid;
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."produtos" validate constraint "produtos_unidade_check";
 
 alter table "public"."produtos" add constraint "produtos_valor_ipi_fixo_check" CHECK (((valor_ipi_fixo IS NULL) OR (valor_ipi_fixo >= (0)::numeric))) not valid;
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."produtos" validate constraint "produtos_valor_ipi_fixo_check";
 
 alter table "public"."profiles" add constraint "profiles_id_fkey" FOREIGN KEY (id) REFERENCES auth.users(id) ON DELETE CASCADE not valid;
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."profiles" validate constraint "profiles_id_fkey";
 
 alter table "public"."recebimento_conferencias" add constraint "recebimento_conf_empresa_fkey" FOREIGN KEY (empresa_id) REFERENCES public.empresas(id) ON DELETE CASCADE not valid;
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."recebimento_conferencias" validate constraint "recebimento_conf_empresa_fkey";
 
 alter table "public"."recebimento_conferencias" add constraint "recebimento_conf_item_fkey" FOREIGN KEY (recebimento_item_id) REFERENCES public.recebimento_itens(id) ON DELETE CASCADE not valid;
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."recebimento_conferencias" validate constraint "recebimento_conf_item_fkey";
 
 alter table "public"."recebimento_conferencias" add constraint "recebimento_conf_unique" UNIQUE using index "recebimento_conf_unique";
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."recebimento_itens" add constraint "recebimento_itens_empresa_fkey" FOREIGN KEY (empresa_id) REFERENCES public.empresas(id) ON DELETE CASCADE not valid;
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."recebimento_itens" validate constraint "recebimento_itens_empresa_fkey";
 
 alter table "public"."recebimento_itens" add constraint "recebimento_itens_fiscal_item_fkey" FOREIGN KEY (fiscal_nfe_item_id) REFERENCES public.fiscal_nfe_import_items(id) ON DELETE CASCADE not valid;
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."recebimento_itens" validate constraint "recebimento_itens_fiscal_item_fkey";
 
 alter table "public"."recebimento_itens" add constraint "recebimento_itens_produto_fkey" FOREIGN KEY (produto_id) REFERENCES public.produtos(id) ON DELETE SET NULL not valid;
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."recebimento_itens" validate constraint "recebimento_itens_produto_fkey";
 
 alter table "public"."recebimento_itens" add constraint "recebimento_itens_recebimento_fkey" FOREIGN KEY (recebimento_id) REFERENCES public.recebimentos(id) ON DELETE CASCADE not valid;
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."recebimento_itens" validate constraint "recebimento_itens_recebimento_fkey";
 
 alter table "public"."recebimento_itens" add constraint "recebimento_itens_status_check" CHECK ((status = ANY (ARRAY['pendente'::text, 'ok'::text, 'divergente'::text]))) not valid;
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."recebimento_itens" validate constraint "recebimento_itens_status_check";
 
 alter table "public"."recebimentos" add constraint "recebimentos_empresa_fkey" FOREIGN KEY (empresa_id) REFERENCES public.empresas(id) ON DELETE CASCADE not valid;
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."recebimentos" validate constraint "recebimentos_empresa_fkey";
 
 alter table "public"."recebimentos" add constraint "recebimentos_import_fkey" FOREIGN KEY (fiscal_nfe_import_id) REFERENCES public.fiscal_nfe_imports(id) ON DELETE CASCADE not valid;
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."recebimentos" validate constraint "recebimentos_import_fkey";
 
 alter table "public"."recebimentos" add constraint "recebimentos_import_unique" UNIQUE using index "recebimentos_import_unique";
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."recebimentos" add constraint "recebimentos_responsavel_id_fkey" FOREIGN KEY (responsavel_id) REFERENCES auth.users(id) not valid;
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."recebimentos" validate constraint "recebimentos_responsavel_id_fkey";
 
 alter table "public"."recebimentos" add constraint "recebimentos_status_check" CHECK ((status = ANY (ARRAY['pendente'::text, 'em_conferencia'::text, 'divergente'::text, 'concluido'::text, 'cancelado'::text]))) not valid;
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."recebimentos" validate constraint "recebimentos_status_check";
 
 alter table "public"."rh_cargo_competencias" add constraint "rh_cargo_competencias_cargo_fkey" FOREIGN KEY (cargo_id) REFERENCES public.rh_cargos(id) ON DELETE CASCADE not valid;
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."rh_cargo_competencias" validate constraint "rh_cargo_competencias_cargo_fkey";
 
 alter table "public"."rh_cargo_competencias" add constraint "rh_cargo_competencias_comp_fkey" FOREIGN KEY (competencia_id) REFERENCES public.rh_competencias(id) ON DELETE CASCADE not valid;
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."rh_cargo_competencias" validate constraint "rh_cargo_competencias_comp_fkey";
 
 alter table "public"."rh_cargo_competencias" add constraint "rh_cargo_competencias_empresa_id_fkey" FOREIGN KEY (empresa_id) REFERENCES public.empresas(id) ON DELETE CASCADE not valid;
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."rh_cargo_competencias" validate constraint "rh_cargo_competencias_empresa_id_fkey";
 
 alter table "public"."rh_cargo_competencias" add constraint "rh_cargo_competencias_nivel_requerido_check" CHECK (((nivel_requerido >= 1) AND (nivel_requerido <= 5))) not valid;
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."rh_cargo_competencias" validate constraint "rh_cargo_competencias_nivel_requerido_check";
 
 alter table "public"."rh_cargo_competencias" add constraint "rh_cargo_competencias_unique" UNIQUE using index "rh_cargo_competencias_unique";
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."rh_cargos" add constraint "rh_cargos_empresa_id_fkey" FOREIGN KEY (empresa_id) REFERENCES public.empresas(id) ON DELETE CASCADE not valid;
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."rh_cargos" validate constraint "rh_cargos_empresa_id_fkey";
 
 alter table "public"."rh_cargos" add constraint "rh_cargos_empresa_nome_key" UNIQUE using index "rh_cargos_empresa_nome_key";
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."rh_colaborador_competencias" add constraint "rh_col_competencias_colab_fkey" FOREIGN KEY (colaborador_id) REFERENCES public.rh_colaboradores(id) ON DELETE CASCADE not valid;
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."rh_colaborador_competencias" validate constraint "rh_col_competencias_colab_fkey";
 
 alter table "public"."rh_colaborador_competencias" add constraint "rh_col_competencias_comp_fkey" FOREIGN KEY (competencia_id) REFERENCES public.rh_competencias(id) ON DELETE CASCADE not valid;
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."rh_colaborador_competencias" validate constraint "rh_col_competencias_comp_fkey";
 
 alter table "public"."rh_colaborador_competencias" add constraint "rh_col_competencias_empresa_id_fkey" FOREIGN KEY (empresa_id) REFERENCES public.empresas(id) ON DELETE CASCADE not valid;
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."rh_colaborador_competencias" validate constraint "rh_col_competencias_empresa_id_fkey";
 
 alter table "public"."rh_colaborador_competencias" add constraint "rh_col_competencias_unique" UNIQUE using index "rh_col_competencias_unique";
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."rh_colaborador_competencias" add constraint "rh_colaborador_competencias_nivel_atual_check" CHECK (((nivel_atual >= 1) AND (nivel_atual <= 5))) not valid;
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."rh_colaborador_competencias" validate constraint "rh_colaborador_competencias_nivel_atual_check";
 
 alter table "public"."rh_colaboradores" add constraint "rh_colaboradores_cargo_id_fkey" FOREIGN KEY (cargo_id) REFERENCES public.rh_cargos(id) ON DELETE SET NULL not valid;
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."rh_colaboradores" validate constraint "rh_colaboradores_cargo_id_fkey";
 
 alter table "public"."rh_colaboradores" add constraint "rh_colaboradores_empresa_id_fkey" FOREIGN KEY (empresa_id) REFERENCES public.empresas(id) ON DELETE CASCADE not valid;
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."rh_colaboradores" validate constraint "rh_colaboradores_empresa_id_fkey";
 
 alter table "public"."rh_colaboradores" add constraint "rh_colaboradores_user_id_fkey" FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE SET NULL not valid;
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."rh_colaboradores" validate constraint "rh_colaboradores_user_id_fkey";
 
 alter table "public"."rh_competencias" add constraint "rh_competencias_empresa_id_fkey" FOREIGN KEY (empresa_id) REFERENCES public.empresas(id) ON DELETE CASCADE not valid;
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."rh_competencias" validate constraint "rh_competencias_empresa_id_fkey";
 
 alter table "public"."rh_competencias" add constraint "rh_competencias_empresa_nome_key" UNIQUE using index "rh_competencias_empresa_nome_key";
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."rh_competencias" add constraint "rh_competencias_tipo_check" CHECK ((tipo = ANY (ARRAY['tecnica'::text, 'comportamental'::text, 'certificacao'::text, 'idioma'::text, 'outros'::text]))) not valid;
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."rh_competencias" validate constraint "rh_competencias_tipo_check";
 
 alter table "public"."rh_treinamento_participantes" add constraint "rh_treinamento_part_colab_fkey" FOREIGN KEY (colaborador_id) REFERENCES public.rh_colaboradores(id) ON DELETE CASCADE not valid;
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."rh_treinamento_participantes" validate constraint "rh_treinamento_part_colab_fkey";
 
 alter table "public"."rh_treinamento_participantes" add constraint "rh_treinamento_part_empresa_fkey" FOREIGN KEY (empresa_id) REFERENCES public.empresas(id) ON DELETE CASCADE not valid;
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."rh_treinamento_participantes" validate constraint "rh_treinamento_part_empresa_fkey";
 
 alter table "public"."rh_treinamento_participantes" add constraint "rh_treinamento_part_treino_fkey" FOREIGN KEY (treinamento_id) REFERENCES public.rh_treinamentos(id) ON DELETE CASCADE not valid;
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."rh_treinamento_participantes" validate constraint "rh_treinamento_part_treino_fkey";
 
 alter table "public"."rh_treinamento_participantes" add constraint "rh_treinamento_participantes_status_check" CHECK ((status = ANY (ARRAY['inscrito'::text, 'confirmado'::text, 'concluido'::text, 'reprovado'::text, 'ausente'::text]))) not valid;
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."rh_treinamento_participantes" validate constraint "rh_treinamento_participantes_status_check";
 
 alter table "public"."rh_treinamento_participantes" add constraint "rh_treinamento_participantes_unique" UNIQUE using index "rh_treinamento_participantes_unique";
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."rh_treinamentos" add constraint "rh_treinamentos_empresa_fkey" FOREIGN KEY (empresa_id) REFERENCES public.empresas(id) ON DELETE CASCADE not valid;
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."rh_treinamentos" validate constraint "rh_treinamentos_empresa_fkey";
 
 alter table "public"."rh_treinamentos" add constraint "rh_treinamentos_status_check" CHECK ((status = ANY (ARRAY['planejado'::text, 'agendado'::text, 'em_andamento'::text, 'concluido'::text, 'cancelado'::text]))) not valid;
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."rh_treinamentos" validate constraint "rh_treinamentos_status_check";
 
 alter table "public"."rh_treinamentos" add constraint "rh_treinamentos_tipo_check" CHECK ((tipo = ANY (ARRAY['interno'::text, 'externo'::text, 'online'::text, 'on_the_job'::text]))) not valid;
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."rh_treinamentos" validate constraint "rh_treinamentos_tipo_check";
 
 alter table "public"."role_permissions" add constraint "role_permissions_permission_id_fkey" FOREIGN KEY (permission_id) REFERENCES public.permissions(id) ON DELETE CASCADE not valid;
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."role_permissions" validate constraint "role_permissions_permission_id_fkey";
 
 alter table "public"."role_permissions" add constraint "role_permissions_role_id_fkey" FOREIGN KEY (role_id) REFERENCES public.roles(id) ON DELETE CASCADE not valid;
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."role_permissions" validate constraint "role_permissions_role_id_fkey";
 
 alter table "public"."roles" add constraint "roles_slug_key" UNIQUE using index "roles_slug_key";
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."servicos" add constraint "servicos_empresa_id_fkey" FOREIGN KEY (empresa_id) REFERENCES public.empresas(id) ON DELETE CASCADE not valid;
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."servicos" validate constraint "servicos_empresa_id_fkey";
 
 alter table "public"."subscriptions" add constraint "subscriptions_billing_cycle_check" CHECK ((billing_cycle = ANY (ARRAY['monthly'::text, 'yearly'::text]))) not valid;
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."subscriptions" validate constraint "subscriptions_billing_cycle_check";
 
 alter table "public"."subscriptions" add constraint "subscriptions_empresa_id_fkey" FOREIGN KEY (empresa_id) REFERENCES public.empresas(id) ON DELETE CASCADE not valid;
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."subscriptions" validate constraint "subscriptions_empresa_id_fkey";
 
 alter table "public"."subscriptions" add constraint "subscriptions_empresa_id_key" UNIQUE using index "subscriptions_empresa_id_key";
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."subscriptions" add constraint "subscriptions_status_check" CHECK ((status = ANY (ARRAY['trialing'::text, 'active'::text, 'past_due'::text, 'canceled'::text, 'unpaid'::text, 'incomplete'::text, 'incomplete_expired'::text]))) not valid;
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."subscriptions" validate constraint "subscriptions_status_check";
 
 alter table "public"."subscriptions" add constraint "subscriptions_stripe_subscription_id_key" UNIQUE using index "subscriptions_stripe_subscription_id_key";
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."tabelas_medidas" add constraint "tabelas_medidas_nome_unique_per_company" UNIQUE using index "tabelas_medidas_nome_unique_per_company";
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."tags" add constraint "tags_unique_per_company" UNIQUE using index "tags_unique_per_company";
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."transportadoras" add constraint "transportadoras_empresa_id_fkey" FOREIGN KEY (empresa_id) REFERENCES public.empresas(id) ON DELETE CASCADE not valid;
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."transportadoras" validate constraint "transportadoras_empresa_id_fkey";
 
 alter table "public"."user_active_empresa" add constraint "user_active_empresa_empresa_id_fkey" FOREIGN KEY (empresa_id) REFERENCES public.empresas(id) ON DELETE CASCADE not valid;
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."user_active_empresa" validate constraint "user_active_empresa_empresa_id_fkey";
 
 alter table "public"."user_active_empresa" add constraint "user_active_empresa_user_id_fkey" FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE not valid;
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."user_active_empresa" validate constraint "user_active_empresa_user_id_fkey";
 
 alter table "public"."user_permission_overrides" add constraint "user_permission_overrides_empresa_id_fkey" FOREIGN KEY (empresa_id) REFERENCES public.empresas(id) ON DELETE CASCADE not valid;
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."user_permission_overrides" validate constraint "user_permission_overrides_empresa_id_fkey";
 
 alter table "public"."user_permission_overrides" add constraint "user_permission_overrides_permission_id_fkey" FOREIGN KEY (permission_id) REFERENCES public.permissions(id) ON DELETE CASCADE not valid;
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."user_permission_overrides" validate constraint "user_permission_overrides_permission_id_fkey";
 
 alter table "public"."vendas_itens_pedido" add constraint "vendas_itens_pedido_desconto_check" CHECK ((desconto >= (0)::numeric)) not valid;
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."vendas_itens_pedido" validate constraint "vendas_itens_pedido_desconto_check";
 
 alter table "public"."vendas_itens_pedido" add constraint "vendas_itens_pedido_empresa_fkey" FOREIGN KEY (empresa_id) REFERENCES public.empresas(id) ON DELETE CASCADE not valid;
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."vendas_itens_pedido" validate constraint "vendas_itens_pedido_empresa_fkey";
 
 alter table "public"."vendas_itens_pedido" add constraint "vendas_itens_pedido_pedido_fkey" FOREIGN KEY (pedido_id) REFERENCES public.vendas_pedidos(id) ON DELETE CASCADE not valid;
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."vendas_itens_pedido" validate constraint "vendas_itens_pedido_pedido_fkey";
 
 alter table "public"."vendas_itens_pedido" add constraint "vendas_itens_pedido_preco_unitario_check" CHECK ((preco_unitario >= (0)::numeric)) not valid;
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."vendas_itens_pedido" validate constraint "vendas_itens_pedido_preco_unitario_check";
 
 alter table "public"."vendas_itens_pedido" add constraint "vendas_itens_pedido_produto_fkey" FOREIGN KEY (produto_id) REFERENCES public.produtos(id) ON DELETE RESTRICT not valid;
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."vendas_itens_pedido" validate constraint "vendas_itens_pedido_produto_fkey";
 
 alter table "public"."vendas_itens_pedido" add constraint "vendas_itens_pedido_quantidade_check" CHECK ((quantidade > (0)::numeric)) not valid;
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."vendas_itens_pedido" validate constraint "vendas_itens_pedido_quantidade_check";
 
 alter table "public"."vendas_itens_pedido" add constraint "vendas_itens_pedido_total_check" CHECK ((total >= (0)::numeric)) not valid;
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."vendas_itens_pedido" validate constraint "vendas_itens_pedido_total_check";
 
 alter table "public"."vendas_pedidos" add constraint "vendas_pedidos_cliente_fkey" FOREIGN KEY (cliente_id) REFERENCES public.pessoas(id) ON DELETE RESTRICT not valid;
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."vendas_pedidos" validate constraint "vendas_pedidos_cliente_fkey";
 
 alter table "public"."vendas_pedidos" add constraint "vendas_pedidos_desconto_check" CHECK ((desconto >= (0)::numeric)) not valid;
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."vendas_pedidos" validate constraint "vendas_pedidos_desconto_check";
 
 alter table "public"."vendas_pedidos" add constraint "vendas_pedidos_empresa_fkey" FOREIGN KEY (empresa_id) REFERENCES public.empresas(id) ON DELETE CASCADE not valid;
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."vendas_pedidos" validate constraint "vendas_pedidos_empresa_fkey";
 
 alter table "public"."vendas_pedidos" add constraint "vendas_pedidos_empresa_numero_uk" UNIQUE using index "vendas_pedidos_empresa_numero_uk";
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."vendas_pedidos" add constraint "vendas_pedidos_frete_check" CHECK ((frete >= (0)::numeric)) not valid;
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."vendas_pedidos" validate constraint "vendas_pedidos_frete_check";
 
 alter table "public"."vendas_pedidos" add constraint "vendas_pedidos_status_check" CHECK ((status = ANY (ARRAY['orcamento'::text, 'aprovado'::text, 'cancelado'::text, 'concluido'::text]))) not valid;
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."vendas_pedidos" validate constraint "vendas_pedidos_status_check";
 
 alter table "public"."vendas_pedidos" add constraint "vendas_pedidos_total_geral_check" CHECK ((total_geral >= (0)::numeric)) not valid;
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
+DO $$ BEGIN
 
 alter table "public"."vendas_pedidos" validate constraint "vendas_pedidos_total_geral_check";
 
 alter table "public"."vendas_pedidos" add constraint "vendas_pedidos_total_produtos_check" CHECK ((total_produtos >= (0)::numeric)) not valid;
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN SQLSTATE '55000' THEN null;
+END $$;
 
 alter table "public"."vendas_pedidos" validate constraint "vendas_pedidos_total_produtos_check";
 
@@ -11131,17 +13043,17 @@ end;
 $function$
 ;
 
--- CREATE OR REPLACE FUNCTION public.list_events_for_current_user(p_from timestamp with time zone DEFAULT (now() - '30 days'::interval), p_to timestamp with time zone DEFAULT now(), p_source text[] DEFAULT NULL::text[], p_table text[] DEFAULT NULL::text[], p_op text[] DEFAULT NULL::text[], p_q text DEFAULT NULL::text, p_after timestamp with time zone DEFAULT NULL::timestamp with time zone, p_limit integer DEFAULT 50)
---  RETURNS SETOF audit.events
---  LANGUAGE sql
---  SET search_path TO 'pg_catalog', 'public'
--- AS $function$
---   SELECT *
---   FROM audit.list_events_for_current_user(
---     p_from, p_to, p_source, p_table, p_op, p_q, p_after, p_limit
---   );
--- $function$
--- ;
+CREATE OR REPLACE FUNCTION public.list_events_for_current_user(p_from timestamp with time zone DEFAULT (now() - '30 days'::interval), p_to timestamp with time zone DEFAULT now(), p_source text[] DEFAULT NULL::text[], p_table text[] DEFAULT NULL::text[], p_op text[] DEFAULT NULL::text[], p_q text DEFAULT NULL::text, p_after timestamp with time zone DEFAULT NULL::timestamp with time zone, p_limit integer DEFAULT 50)
+ RETURNS SETOF audit.events
+ LANGUAGE sql
+ SET search_path TO 'pg_catalog', 'public'
+AS $function$
+  SELECT *
+  FROM audit.list_events_for_current_user(
+    p_from, p_to, p_source, p_table, p_op, p_q, p_after, p_limit
+  );
+$function$
+;
 
 CREATE OR REPLACE FUNCTION public.list_kanban_os()
  RETURNS TABLE(id uuid, numero bigint, descricao text, status public.status_os, data_prevista date, cliente_nome text)
@@ -15375,6 +17287,7 @@ grant insert on table "public"."user_active_empresa" to "service_role";
 grant select on table "public"."user_active_empresa" to "service_role";
 
 grant update on table "public"."user_active_empresa" to "service_role";
+DO $$ BEGIN
 
 
   create policy "deny_all_on_bak_empresa_usuarios"
@@ -15384,6 +17297,10 @@ grant update on table "public"."user_active_empresa" to "service_role";
   to authenticated, anon
 using (false)
 with check (false);
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -15393,6 +17310,10 @@ with check (false);
   for delete
   to public
 using ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -15402,6 +17323,10 @@ using ((empresa_id = public.current_empresa_id()));
   for insert
   to public
 with check ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -15411,6 +17336,10 @@ with check ((empresa_id = public.current_empresa_id()));
   for select
   to public
 using ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -15421,6 +17350,10 @@ using ((empresa_id = public.current_empresa_id()));
   to public
 using ((empresa_id = public.current_empresa_id()))
 with check ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -15430,6 +17363,10 @@ with check ((empresa_id = public.current_empresa_id()));
   for select
   to authenticated
 using (true);
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -15440,6 +17377,10 @@ using (true);
   to public
 using (false)
 with check (false);
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -15449,6 +17390,10 @@ with check (false);
   for select
   to public
 using (true);
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -15458,6 +17403,10 @@ using (true);
   for delete
   to authenticated
 using ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -15467,6 +17416,10 @@ using ((empresa_id = public.current_empresa_id()));
   for insert
   to authenticated
 with check ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -15476,6 +17429,10 @@ with check ((empresa_id = public.current_empresa_id()));
   for select
   to authenticated
 using ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -15486,6 +17443,10 @@ using ((empresa_id = public.current_empresa_id()));
   to authenticated
 using ((empresa_id = public.current_empresa_id()))
 with check ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -15495,6 +17456,10 @@ with check ((empresa_id = public.current_empresa_id()));
   for delete
   to public
 using ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -15504,6 +17469,10 @@ using ((empresa_id = public.current_empresa_id()));
   for insert
   to public
 with check ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -15513,6 +17482,10 @@ with check ((empresa_id = public.current_empresa_id()));
   for select
   to public
 using ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -15523,6 +17496,10 @@ using ((empresa_id = public.current_empresa_id()));
   to public
 using ((empresa_id = public.current_empresa_id()))
 with check ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -15532,6 +17509,10 @@ with check ((empresa_id = public.current_empresa_id()));
   for delete
   to authenticated
 using ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -15541,6 +17522,10 @@ using ((empresa_id = public.current_empresa_id()));
   for insert
   to authenticated
 with check ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -15550,6 +17535,10 @@ with check ((empresa_id = public.current_empresa_id()));
   for select
   to authenticated
 using ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -15560,6 +17549,10 @@ using ((empresa_id = public.current_empresa_id()));
   to authenticated
 using ((empresa_id = public.current_empresa_id()))
 with check ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -15569,6 +17562,10 @@ with check ((empresa_id = public.current_empresa_id()));
   for delete
   to public
 using ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -15578,6 +17575,10 @@ using ((empresa_id = public.current_empresa_id()));
   for insert
   to public
 with check ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -15587,6 +17588,10 @@ with check ((empresa_id = public.current_empresa_id()));
   for select
   to public
 using ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -15597,6 +17602,10 @@ using ((empresa_id = public.current_empresa_id()));
   to public
 using ((empresa_id = public.current_empresa_id()))
 with check ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -15606,6 +17615,10 @@ with check ((empresa_id = public.current_empresa_id()));
   for delete
   to public
 using ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -15615,6 +17628,10 @@ using ((empresa_id = public.current_empresa_id()));
   for insert
   to public
 with check ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -15624,6 +17641,10 @@ with check ((empresa_id = public.current_empresa_id()));
   for select
   to public
 using ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -15634,6 +17655,10 @@ using ((empresa_id = public.current_empresa_id()));
   to public
 using ((empresa_id = public.current_empresa_id()))
 with check ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -15643,6 +17668,10 @@ with check ((empresa_id = public.current_empresa_id()));
   for delete
   to public
 using ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -15652,6 +17681,10 @@ using ((empresa_id = public.current_empresa_id()));
   for insert
   to public
 with check ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -15661,6 +17694,10 @@ with check ((empresa_id = public.current_empresa_id()));
   for select
   to public
 using ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -15671,6 +17708,10 @@ using ((empresa_id = public.current_empresa_id()));
   to public
 using ((empresa_id = public.current_empresa_id()))
 with check ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -15680,6 +17721,10 @@ with check ((empresa_id = public.current_empresa_id()));
   for delete
   to public
 using ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -15689,6 +17734,10 @@ using ((empresa_id = public.current_empresa_id()));
   for insert
   to public
 with check ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -15698,6 +17747,10 @@ with check ((empresa_id = public.current_empresa_id()));
   for select
   to public
 using ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -15708,6 +17761,10 @@ using ((empresa_id = public.current_empresa_id()));
   to public
 using ((empresa_id = public.current_empresa_id()))
 with check ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -15717,6 +17774,10 @@ with check ((empresa_id = public.current_empresa_id()));
   for delete
   to public
 using ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -15726,6 +17787,10 @@ using ((empresa_id = public.current_empresa_id()));
   for insert
   to public
 with check ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -15735,6 +17800,10 @@ with check ((empresa_id = public.current_empresa_id()));
   for select
   to public
 using ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -15745,6 +17814,10 @@ using ((empresa_id = public.current_empresa_id()));
   to public
 using ((empresa_id = public.current_empresa_id()))
 with check ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -15754,6 +17827,10 @@ with check ((empresa_id = public.current_empresa_id()));
   for delete
   to authenticated
 using ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -15763,6 +17840,10 @@ using ((empresa_id = public.current_empresa_id()));
   for insert
   to authenticated
 with check ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -15772,6 +17853,10 @@ with check ((empresa_id = public.current_empresa_id()));
   for select
   to authenticated
 using ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -15782,6 +17867,10 @@ using ((empresa_id = public.current_empresa_id()));
   to authenticated
 using ((empresa_id = public.current_empresa_id()))
 with check ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -15791,6 +17880,10 @@ with check ((empresa_id = public.current_empresa_id()));
   for delete
   to public
 using ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -15800,6 +17893,10 @@ using ((empresa_id = public.current_empresa_id()));
   for insert
   to public
 with check ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -15809,6 +17906,10 @@ with check ((empresa_id = public.current_empresa_id()));
   for select
   to public
 using ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -15819,6 +17920,10 @@ using ((empresa_id = public.current_empresa_id()));
   to public
 using ((empresa_id = public.current_empresa_id()))
 with check ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -15828,6 +17933,10 @@ with check ((empresa_id = public.current_empresa_id()));
   for delete
   to public
 using ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -15837,6 +17946,10 @@ using ((empresa_id = public.current_empresa_id()));
   for insert
   to public
 with check ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -15846,6 +17959,10 @@ with check ((empresa_id = public.current_empresa_id()));
   for select
   to public
 using ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -15856,6 +17973,10 @@ using ((empresa_id = public.current_empresa_id()));
   to public
 using ((empresa_id = public.current_empresa_id()))
 with check ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -15865,6 +17986,10 @@ with check ((empresa_id = public.current_empresa_id()));
   for delete
   to public
 using ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -15874,6 +17999,10 @@ using ((empresa_id = public.current_empresa_id()));
   for insert
   to public
 with check ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -15883,6 +18012,10 @@ with check ((empresa_id = public.current_empresa_id()));
   for select
   to public
 using ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -15893,6 +18026,10 @@ using ((empresa_id = public.current_empresa_id()));
   to public
 using ((empresa_id = public.current_empresa_id()))
 with check ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -15902,6 +18039,10 @@ with check ((empresa_id = public.current_empresa_id()));
   for delete
   to public
 using ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -15911,6 +18052,10 @@ using ((empresa_id = public.current_empresa_id()));
   for insert
   to public
 with check ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -15920,6 +18065,10 @@ with check ((empresa_id = public.current_empresa_id()));
   for select
   to public
 using ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -15930,6 +18079,10 @@ using ((empresa_id = public.current_empresa_id()));
   to public
 using ((empresa_id = public.current_empresa_id()))
 with check ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -15939,6 +18092,10 @@ with check ((empresa_id = public.current_empresa_id()));
   for delete
   to public
 using ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -15948,6 +18105,10 @@ using ((empresa_id = public.current_empresa_id()));
   for insert
   to public
 with check ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -15957,6 +18118,10 @@ with check ((empresa_id = public.current_empresa_id()));
   for select
   to public
 using ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -15967,6 +18132,10 @@ using ((empresa_id = public.current_empresa_id()));
   to public
 using ((empresa_id = public.current_empresa_id()))
 with check ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -15976,6 +18145,10 @@ with check ((empresa_id = public.current_empresa_id()));
   for delete
   to public
 using ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -15985,6 +18158,10 @@ using ((empresa_id = public.current_empresa_id()));
   for insert
   to public
 with check ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -15994,6 +18171,10 @@ with check ((empresa_id = public.current_empresa_id()));
   for select
   to public
 using ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -16004,6 +18185,10 @@ using ((empresa_id = public.current_empresa_id()));
   to public
 using ((empresa_id = public.current_empresa_id()))
 with check ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -16013,6 +18198,10 @@ with check ((empresa_id = public.current_empresa_id()));
   for delete
   to public
 using ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -16022,6 +18211,10 @@ using ((empresa_id = public.current_empresa_id()));
   for insert
   to public
 with check ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -16031,6 +18224,10 @@ with check ((empresa_id = public.current_empresa_id()));
   for select
   to public
 using ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -16041,6 +18238,10 @@ using ((empresa_id = public.current_empresa_id()));
   to public
 using ((empresa_id = public.current_empresa_id()))
 with check ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -16050,6 +18251,10 @@ with check ((empresa_id = public.current_empresa_id()));
   for delete
   to authenticated
 using ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -16059,6 +18264,10 @@ using ((empresa_id = public.current_empresa_id()));
   for insert
   to authenticated
 with check ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -16068,6 +18277,10 @@ with check ((empresa_id = public.current_empresa_id()));
   for select
   to authenticated
 using ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -16078,6 +18291,10 @@ using ((empresa_id = public.current_empresa_id()));
   to authenticated
 using ((empresa_id = public.current_empresa_id()))
 with check ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -16087,6 +18304,10 @@ with check ((empresa_id = public.current_empresa_id()));
   for delete
   to public
 using ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -16096,6 +18317,10 @@ using ((empresa_id = public.current_empresa_id()));
   for insert
   to public
 with check ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -16105,6 +18330,10 @@ with check ((empresa_id = public.current_empresa_id()));
   for select
   to public
 using ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -16115,6 +18344,10 @@ using ((empresa_id = public.current_empresa_id()));
   to public
 using ((empresa_id = public.current_empresa_id()))
 with check ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -16124,6 +18357,10 @@ with check ((empresa_id = public.current_empresa_id()));
   for delete
   to public
 using ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -16133,6 +18370,10 @@ using ((empresa_id = public.current_empresa_id()));
   for insert
   to public
 with check ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -16142,6 +18383,10 @@ with check ((empresa_id = public.current_empresa_id()));
   for select
   to public
 using ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -16153,6 +18398,10 @@ using ((empresa_id = public.current_empresa_id()));
 using ((EXISTS ( SELECT 1
    FROM public.empresa_usuarios eu
   WHERE ((eu.empresa_id = empresa_addons.empresa_id) AND (eu.user_id = auth.uid())))));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -16163,6 +18412,10 @@ using ((EXISTS ( SELECT 1
   to public
 using ((empresa_id = public.current_empresa_id()))
 with check ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -16172,6 +18425,10 @@ with check ((empresa_id = public.current_empresa_id()));
   for delete
   to public
 using ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -16181,6 +18438,10 @@ using ((empresa_id = public.current_empresa_id()));
   for insert
   to public
 with check ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -16190,6 +18451,10 @@ with check ((empresa_id = public.current_empresa_id()));
   for select
   to public
 using ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -16200,6 +18465,10 @@ using ((empresa_id = public.current_empresa_id()));
   to public
 using ((empresa_id = public.current_empresa_id()))
 with check ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -16209,6 +18478,10 @@ with check ((empresa_id = public.current_empresa_id()));
   for delete
   to authenticated
 using (((empresa_id = public.current_empresa_id()) AND (status = 'PENDING'::public.user_status_in_empresa) AND public.has_permission('usuarios'::text, 'manage'::text)));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -16218,6 +18491,10 @@ using (((empresa_id = public.current_empresa_id()) AND (status = 'PENDING'::publ
   for delete
   to public
 using ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -16227,6 +18504,10 @@ using ((empresa_id = public.current_empresa_id()));
   for insert
   to public
 with check ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -16236,6 +18517,10 @@ with check ((empresa_id = public.current_empresa_id()));
   for select
   to public
 using ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -16245,6 +18530,10 @@ using ((empresa_id = public.current_empresa_id()));
   for select
   to authenticated
 using ((user_id = auth.uid()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -16255,6 +18544,10 @@ using ((user_id = auth.uid()));
   to public
 using ((empresa_id = public.current_empresa_id()))
 with check ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -16264,6 +18557,10 @@ with check ((empresa_id = public.current_empresa_id()));
   for delete
   to public
 using ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -16273,6 +18570,10 @@ using ((empresa_id = public.current_empresa_id()));
   for insert
   to public
 with check ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -16282,6 +18583,10 @@ with check ((empresa_id = public.current_empresa_id()));
   for select
   to public
 using ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -16292,6 +18597,10 @@ using ((empresa_id = public.current_empresa_id()));
   to public
 using ((empresa_id = public.current_empresa_id()))
 with check ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -16303,6 +18612,10 @@ with check ((empresa_id = public.current_empresa_id()));
 using ((EXISTS ( SELECT 1
    FROM public.empresa_usuarios eu
   WHERE ((eu.empresa_id = empresas.id) AND (eu.user_id = auth.uid())))));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -16314,6 +18627,10 @@ using ((EXISTS ( SELECT 1
 using ((id IN ( SELECT eu.empresa_id
    FROM public.empresa_usuarios eu
   WHERE (eu.user_id = auth.uid()))));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -16328,6 +18645,10 @@ using ((id IN ( SELECT eu.empresa_id
 with check ((id IN ( SELECT eu.empresa_id
    FROM public.empresa_usuarios eu
   WHERE (eu.user_id = auth.uid()))));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -16337,6 +18658,10 @@ with check ((id IN ( SELECT eu.empresa_id
   for delete
   to public
 using (false);
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -16346,6 +18671,10 @@ using (false);
   for insert
   to public
 with check (false);
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -16355,6 +18684,10 @@ with check (false);
   for delete
   to public
 using ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -16364,6 +18697,10 @@ using ((empresa_id = public.current_empresa_id()));
   for insert
   to public
 with check ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -16373,6 +18710,10 @@ with check ((empresa_id = public.current_empresa_id()));
   for select
   to public
 using ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -16383,6 +18724,10 @@ using ((empresa_id = public.current_empresa_id()));
   to public
 using ((empresa_id = public.current_empresa_id()))
 with check ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -16392,6 +18737,10 @@ with check ((empresa_id = public.current_empresa_id()));
   for insert
   to public
 with check ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -16401,6 +18750,10 @@ with check ((empresa_id = public.current_empresa_id()));
   for select
   to public
 using ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -16410,6 +18763,10 @@ using ((empresa_id = public.current_empresa_id()));
   for delete
   to public
 using ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -16419,6 +18776,10 @@ using ((empresa_id = public.current_empresa_id()));
   for insert
   to public
 with check ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -16428,6 +18789,10 @@ with check ((empresa_id = public.current_empresa_id()));
   for select
   to public
 using ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -16438,6 +18803,10 @@ using ((empresa_id = public.current_empresa_id()));
   to public
 using ((empresa_id = public.current_empresa_id()))
 with check ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -16448,6 +18817,10 @@ with check ((empresa_id = public.current_empresa_id()));
   to public
 using ((empresa_id = public.current_empresa_id()))
 with check ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -16457,6 +18830,10 @@ with check ((empresa_id = public.current_empresa_id()));
   for select
   to public
 using ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -16466,6 +18843,10 @@ using ((empresa_id = public.current_empresa_id()));
   for delete
   to public
 using ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -16475,6 +18856,10 @@ using ((empresa_id = public.current_empresa_id()));
   for insert
   to public
 with check ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -16484,6 +18869,10 @@ with check ((empresa_id = public.current_empresa_id()));
   for select
   to public
 using ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -16494,6 +18883,10 @@ using ((empresa_id = public.current_empresa_id()));
   to public
 using ((empresa_id = public.current_empresa_id()))
 with check ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -16503,6 +18896,10 @@ with check ((empresa_id = public.current_empresa_id()));
   for delete
   to public
 using ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -16512,6 +18909,10 @@ using ((empresa_id = public.current_empresa_id()));
   for insert
   to public
 with check ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -16521,6 +18922,10 @@ with check ((empresa_id = public.current_empresa_id()));
   for select
   to public
 using ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -16531,6 +18936,10 @@ using ((empresa_id = public.current_empresa_id()));
   to public
 using ((empresa_id = public.current_empresa_id()))
 with check ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -16540,6 +18949,10 @@ with check ((empresa_id = public.current_empresa_id()));
   for delete
   to public
 using ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -16549,6 +18962,10 @@ using ((empresa_id = public.current_empresa_id()));
   for insert
   to public
 with check ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -16558,6 +18975,10 @@ with check ((empresa_id = public.current_empresa_id()));
   for select
   to public
 using ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -16568,6 +18989,10 @@ using ((empresa_id = public.current_empresa_id()));
   to public
 using ((empresa_id = public.current_empresa_id()))
 with check ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -16577,6 +19002,10 @@ with check ((empresa_id = public.current_empresa_id()));
   for delete
   to public
 using ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -16586,6 +19015,10 @@ using ((empresa_id = public.current_empresa_id()));
   for insert
   to public
 with check ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -16595,6 +19028,10 @@ with check ((empresa_id = public.current_empresa_id()));
   for select
   to public
 using ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -16605,6 +19042,10 @@ using ((empresa_id = public.current_empresa_id()));
   to public
 using ((empresa_id = public.current_empresa_id()))
 with check ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -16614,6 +19055,10 @@ with check ((empresa_id = public.current_empresa_id()));
   for delete
   to public
 using ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -16623,6 +19068,10 @@ using ((empresa_id = public.current_empresa_id()));
   for insert
   to public
 with check ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -16632,6 +19081,10 @@ with check ((empresa_id = public.current_empresa_id()));
   for select
   to public
 using ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -16642,6 +19095,10 @@ using ((empresa_id = public.current_empresa_id()));
   to public
 using ((empresa_id = public.current_empresa_id()))
 with check ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -16651,6 +19108,10 @@ with check ((empresa_id = public.current_empresa_id()));
   for delete
   to public
 using ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -16660,6 +19121,10 @@ using ((empresa_id = public.current_empresa_id()));
   for insert
   to public
 with check ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -16669,6 +19134,10 @@ with check ((empresa_id = public.current_empresa_id()));
   for select
   to public
 using ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -16679,6 +19148,10 @@ using ((empresa_id = public.current_empresa_id()));
   to public
 using ((empresa_id = public.current_empresa_id()))
 with check ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -16688,6 +19161,10 @@ with check ((empresa_id = public.current_empresa_id()));
   for delete
   to public
 using ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -16697,6 +19174,10 @@ using ((empresa_id = public.current_empresa_id()));
   for insert
   to public
 with check ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -16706,6 +19187,10 @@ with check ((empresa_id = public.current_empresa_id()));
   for select
   to public
 using ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -16716,6 +19201,10 @@ using ((empresa_id = public.current_empresa_id()));
   to public
 using ((empresa_id = public.current_empresa_id()))
 with check ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -16725,6 +19214,10 @@ with check ((empresa_id = public.current_empresa_id()));
   for delete
   to public
 using ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -16734,6 +19227,10 @@ using ((empresa_id = public.current_empresa_id()));
   for insert
   to public
 with check ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -16743,6 +19240,10 @@ with check ((empresa_id = public.current_empresa_id()));
   for select
   to public
 using ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -16753,6 +19254,10 @@ using ((empresa_id = public.current_empresa_id()));
   to public
 using ((empresa_id = public.current_empresa_id()))
 with check ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -16762,6 +19267,10 @@ with check ((empresa_id = public.current_empresa_id()));
   for delete
   to public
 using ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -16771,6 +19280,10 @@ using ((empresa_id = public.current_empresa_id()));
   for insert
   to public
 with check ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -16780,6 +19293,10 @@ with check ((empresa_id = public.current_empresa_id()));
   for select
   to public
 using ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -16790,6 +19307,10 @@ using ((empresa_id = public.current_empresa_id()));
   to public
 using ((empresa_id = public.current_empresa_id()))
 with check ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -16799,6 +19320,10 @@ with check ((empresa_id = public.current_empresa_id()));
   for delete
   to public
 using ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -16808,6 +19333,10 @@ using ((empresa_id = public.current_empresa_id()));
   for insert
   to public
 with check ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -16817,6 +19346,10 @@ with check ((empresa_id = public.current_empresa_id()));
   for select
   to public
 using ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -16827,6 +19360,10 @@ using ((empresa_id = public.current_empresa_id()));
   to public
 using ((empresa_id = public.current_empresa_id()))
 with check ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -16836,6 +19373,10 @@ with check ((empresa_id = public.current_empresa_id()));
   for delete
   to public
 using ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -16845,6 +19386,10 @@ using ((empresa_id = public.current_empresa_id()));
   for insert
   to public
 with check ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -16854,6 +19399,10 @@ with check ((empresa_id = public.current_empresa_id()));
   for select
   to public
 using ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -16864,6 +19413,10 @@ using ((empresa_id = public.current_empresa_id()));
   to public
 using ((empresa_id = public.current_empresa_id()))
 with check ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -16873,6 +19426,10 @@ with check ((empresa_id = public.current_empresa_id()));
   for delete
   to public
 using ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -16882,6 +19439,10 @@ using ((empresa_id = public.current_empresa_id()));
   for insert
   to public
 with check ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -16891,6 +19452,10 @@ with check ((empresa_id = public.current_empresa_id()));
   for select
   to public
 using ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -16901,6 +19466,10 @@ using ((empresa_id = public.current_empresa_id()));
   to public
 using ((empresa_id = public.current_empresa_id()))
 with check ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -16910,6 +19479,10 @@ with check ((empresa_id = public.current_empresa_id()));
   for delete
   to public
 using ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -16919,6 +19492,10 @@ using ((empresa_id = public.current_empresa_id()));
   for insert
   to public
 with check ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -16928,6 +19505,10 @@ with check ((empresa_id = public.current_empresa_id()));
   for select
   to public
 using ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -16938,6 +19519,10 @@ using ((empresa_id = public.current_empresa_id()));
   to public
 using ((empresa_id = public.current_empresa_id()))
 with check ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -16947,6 +19532,10 @@ with check ((empresa_id = public.current_empresa_id()));
   for delete
   to public
 using ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -16956,6 +19545,10 @@ using ((empresa_id = public.current_empresa_id()));
   for insert
   to public
 with check ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -16965,6 +19558,10 @@ with check ((empresa_id = public.current_empresa_id()));
   for select
   to public
 using ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -16975,6 +19572,10 @@ using ((empresa_id = public.current_empresa_id()));
   to public
 using ((empresa_id = public.current_empresa_id()))
 with check ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -16984,6 +19585,10 @@ with check ((empresa_id = public.current_empresa_id()));
   for delete
   to public
 using ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -16993,6 +19598,10 @@ using ((empresa_id = public.current_empresa_id()));
   for insert
   to public
 with check ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -17002,6 +19611,10 @@ with check ((empresa_id = public.current_empresa_id()));
   for select
   to public
 using ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -17012,6 +19625,10 @@ using ((empresa_id = public.current_empresa_id()));
   to public
 using ((empresa_id = public.current_empresa_id()))
 with check ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -17021,6 +19638,10 @@ with check ((empresa_id = public.current_empresa_id()));
   for delete
   to public
 using ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -17030,6 +19651,10 @@ using ((empresa_id = public.current_empresa_id()));
   for insert
   to public
 with check ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -17039,6 +19664,10 @@ with check ((empresa_id = public.current_empresa_id()));
   for select
   to public
 using ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -17049,6 +19678,10 @@ using ((empresa_id = public.current_empresa_id()));
   to public
 using ((empresa_id = public.current_empresa_id()))
 with check ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -17058,6 +19691,10 @@ with check ((empresa_id = public.current_empresa_id()));
   for delete
   to public
 using ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -17067,6 +19704,10 @@ using ((empresa_id = public.current_empresa_id()));
   for insert
   to public
 with check ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -17076,6 +19717,10 @@ with check ((empresa_id = public.current_empresa_id()));
   for select
   to public
 using ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -17086,6 +19731,10 @@ using ((empresa_id = public.current_empresa_id()));
   to public
 using ((empresa_id = public.current_empresa_id()))
 with check ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -17095,6 +19744,10 @@ with check ((empresa_id = public.current_empresa_id()));
   for delete
   to authenticated
 using ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -17104,6 +19757,10 @@ using ((empresa_id = public.current_empresa_id()));
   for insert
   to authenticated
 with check ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -17113,6 +19770,10 @@ with check ((empresa_id = public.current_empresa_id()));
   for select
   to authenticated
 using ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -17123,6 +19784,10 @@ using ((empresa_id = public.current_empresa_id()));
   to authenticated
 using ((empresa_id = public.current_empresa_id()))
 with check ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -17132,6 +19797,10 @@ with check ((empresa_id = public.current_empresa_id()));
   for delete
   to public
 using ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -17141,6 +19810,10 @@ using ((empresa_id = public.current_empresa_id()));
   for insert
   to public
 with check ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -17150,6 +19823,10 @@ with check ((empresa_id = public.current_empresa_id()));
   for select
   to public
 using ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -17160,6 +19837,10 @@ using ((empresa_id = public.current_empresa_id()));
   to public
 using ((empresa_id = public.current_empresa_id()))
 with check ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -17169,6 +19850,10 @@ with check ((empresa_id = public.current_empresa_id()));
   for delete
   to public
 using ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -17178,6 +19863,10 @@ using ((empresa_id = public.current_empresa_id()));
   for insert
   to public
 with check ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -17187,6 +19876,10 @@ with check ((empresa_id = public.current_empresa_id()));
   for select
   to public
 using ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -17197,6 +19890,10 @@ using ((empresa_id = public.current_empresa_id()));
   to public
 using ((empresa_id = public.current_empresa_id()))
 with check ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -17206,6 +19903,10 @@ with check ((empresa_id = public.current_empresa_id()));
   for delete
   to public
 using ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -17215,6 +19916,10 @@ using ((empresa_id = public.current_empresa_id()));
   for insert
   to public
 with check ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -17224,6 +19929,10 @@ with check ((empresa_id = public.current_empresa_id()));
   for select
   to public
 using ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -17234,6 +19943,10 @@ using ((empresa_id = public.current_empresa_id()));
   to public
 using ((empresa_id = public.current_empresa_id()))
 with check ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -17243,6 +19956,10 @@ with check ((empresa_id = public.current_empresa_id()));
   for delete
   to public
 using ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -17252,6 +19969,10 @@ using ((empresa_id = public.current_empresa_id()));
   for insert
   to public
 with check ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -17261,6 +19982,10 @@ with check ((empresa_id = public.current_empresa_id()));
   for select
   to public
 using ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -17271,6 +19996,10 @@ using ((empresa_id = public.current_empresa_id()));
   to public
 using ((empresa_id = public.current_empresa_id()))
 with check ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -17280,6 +20009,10 @@ with check ((empresa_id = public.current_empresa_id()));
   for delete
   to public
 using ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -17289,6 +20022,10 @@ using ((empresa_id = public.current_empresa_id()));
   for insert
   to public
 with check ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -17298,6 +20035,10 @@ with check ((empresa_id = public.current_empresa_id()));
   for select
   to public
 using ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -17308,6 +20049,10 @@ using ((empresa_id = public.current_empresa_id()));
   to public
 using ((empresa_id = public.current_empresa_id()))
 with check ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -17317,6 +20062,10 @@ with check ((empresa_id = public.current_empresa_id()));
   for delete
   to public
 using ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -17326,6 +20075,10 @@ using ((empresa_id = public.current_empresa_id()));
   for insert
   to public
 with check ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -17335,6 +20088,10 @@ with check ((empresa_id = public.current_empresa_id()));
   for select
   to public
 using ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -17345,6 +20102,10 @@ using ((empresa_id = public.current_empresa_id()));
   to public
 using ((empresa_id = public.current_empresa_id()))
 with check ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -17354,6 +20115,10 @@ with check ((empresa_id = public.current_empresa_id()));
   for delete
   to public
 using ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -17363,6 +20128,10 @@ using ((empresa_id = public.current_empresa_id()));
   for insert
   to public
 with check ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -17372,6 +20141,10 @@ with check ((empresa_id = public.current_empresa_id()));
   for select
   to public
 using ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -17382,6 +20155,10 @@ using ((empresa_id = public.current_empresa_id()));
   to public
 using ((empresa_id = public.current_empresa_id()))
 with check ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -17391,6 +20168,10 @@ with check ((empresa_id = public.current_empresa_id()));
   for delete
   to public
 using ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -17400,6 +20181,10 @@ using ((empresa_id = public.current_empresa_id()));
   for insert
   to public
 with check ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -17409,6 +20194,10 @@ with check ((empresa_id = public.current_empresa_id()));
   for select
   to public
 using ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -17419,6 +20208,10 @@ using ((empresa_id = public.current_empresa_id()));
   to public
 using ((empresa_id = public.current_empresa_id()))
 with check ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -17428,6 +20221,10 @@ with check ((empresa_id = public.current_empresa_id()));
   for delete
   to public
 using ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -17437,6 +20234,10 @@ using ((empresa_id = public.current_empresa_id()));
   for insert
   to public
 with check ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -17446,6 +20247,10 @@ with check ((empresa_id = public.current_empresa_id()));
   for select
   to public
 using ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -17456,6 +20261,10 @@ using ((empresa_id = public.current_empresa_id()));
   to public
 using ((empresa_id = public.current_empresa_id()))
 with check ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -17465,6 +20274,10 @@ with check ((empresa_id = public.current_empresa_id()));
   for delete
   to public
 using ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -17474,6 +20287,10 @@ using ((empresa_id = public.current_empresa_id()));
   for insert
   to public
 with check ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -17483,6 +20300,10 @@ with check ((empresa_id = public.current_empresa_id()));
   for select
   to public
 using ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -17493,6 +20314,10 @@ using ((empresa_id = public.current_empresa_id()));
   to public
 using ((empresa_id = public.current_empresa_id()))
 with check ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -17502,6 +20327,10 @@ with check ((empresa_id = public.current_empresa_id()));
   for delete
   to public
 using ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -17511,6 +20340,10 @@ using ((empresa_id = public.current_empresa_id()));
   for insert
   to public
 with check ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -17520,6 +20353,10 @@ with check ((empresa_id = public.current_empresa_id()));
   for select
   to public
 using ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -17530,6 +20367,10 @@ using ((empresa_id = public.current_empresa_id()));
   to public
 using ((empresa_id = public.current_empresa_id()))
 with check ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -17539,6 +20380,10 @@ with check ((empresa_id = public.current_empresa_id()));
   for delete
   to public
 using ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -17548,6 +20393,10 @@ using ((empresa_id = public.current_empresa_id()));
   for insert
   to public
 with check ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -17557,6 +20406,10 @@ with check ((empresa_id = public.current_empresa_id()));
   for select
   to public
 using ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -17567,6 +20420,10 @@ using ((empresa_id = public.current_empresa_id()));
   to public
 using ((empresa_id = public.current_empresa_id()))
 with check ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -17576,6 +20433,10 @@ with check ((empresa_id = public.current_empresa_id()));
   for delete
   to public
 using ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -17585,6 +20446,10 @@ using ((empresa_id = public.current_empresa_id()));
   for insert
   to public
 with check ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -17594,6 +20459,10 @@ with check ((empresa_id = public.current_empresa_id()));
   for select
   to public
 using ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -17604,6 +20473,10 @@ using ((empresa_id = public.current_empresa_id()));
   to public
 using ((empresa_id = public.current_empresa_id()))
 with check ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -17613,6 +20486,10 @@ with check ((empresa_id = public.current_empresa_id()));
   for delete
   to public
 using ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -17622,6 +20499,10 @@ using ((empresa_id = public.current_empresa_id()));
   for insert
   to public
 with check ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -17631,6 +20512,10 @@ with check ((empresa_id = public.current_empresa_id()));
   for select
   to public
 using ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -17641,6 +20526,10 @@ using ((empresa_id = public.current_empresa_id()));
   to public
 using ((empresa_id = public.current_empresa_id()))
 with check ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -17650,6 +20539,10 @@ with check ((empresa_id = public.current_empresa_id()));
   for delete
   to public
 using ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -17659,6 +20552,10 @@ using ((empresa_id = public.current_empresa_id()));
   for insert
   to public
 with check ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -17668,6 +20565,10 @@ with check ((empresa_id = public.current_empresa_id()));
   for select
   to public
 using ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -17678,6 +20579,10 @@ using ((empresa_id = public.current_empresa_id()));
   to public
 using ((empresa_id = public.current_empresa_id()))
 with check ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -17687,6 +20592,10 @@ with check ((empresa_id = public.current_empresa_id()));
   for delete
   to public
 using ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -17696,6 +20605,10 @@ using ((empresa_id = public.current_empresa_id()));
   for insert
   to public
 with check ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -17705,6 +20618,10 @@ with check ((empresa_id = public.current_empresa_id()));
   for select
   to public
 using ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -17715,6 +20632,10 @@ using ((empresa_id = public.current_empresa_id()));
   to public
 using ((empresa_id = public.current_empresa_id()))
 with check ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -17724,6 +20645,10 @@ with check ((empresa_id = public.current_empresa_id()));
   for delete
   to public
 using ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -17733,6 +20658,10 @@ using ((empresa_id = public.current_empresa_id()));
   for insert
   to public
 with check ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -17742,6 +20671,10 @@ with check ((empresa_id = public.current_empresa_id()));
   for select
   to public
 using ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -17752,6 +20685,10 @@ using ((empresa_id = public.current_empresa_id()));
   to public
 using ((empresa_id = public.current_empresa_id()))
 with check ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -17761,6 +20698,10 @@ with check ((empresa_id = public.current_empresa_id()));
   for delete
   to public
 using ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -17770,6 +20711,10 @@ using ((empresa_id = public.current_empresa_id()));
   for insert
   to public
 with check ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -17779,6 +20724,10 @@ with check ((empresa_id = public.current_empresa_id()));
   for select
   to public
 using ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -17789,6 +20738,10 @@ using ((empresa_id = public.current_empresa_id()));
   to public
 using ((empresa_id = public.current_empresa_id()))
 with check ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -17798,6 +20751,10 @@ with check ((empresa_id = public.current_empresa_id()));
   for delete
   to public
 using ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -17807,6 +20764,10 @@ using ((empresa_id = public.current_empresa_id()));
   for insert
   to public
 with check ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -17816,6 +20777,10 @@ with check ((empresa_id = public.current_empresa_id()));
   for select
   to public
 using ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -17826,6 +20791,10 @@ using ((empresa_id = public.current_empresa_id()));
   to public
 using ((empresa_id = public.current_empresa_id()))
 with check ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -17835,6 +20804,10 @@ with check ((empresa_id = public.current_empresa_id()));
   for delete
   to public
 using ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -17844,6 +20817,10 @@ using ((empresa_id = public.current_empresa_id()));
   for insert
   to public
 with check ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -17853,6 +20830,10 @@ with check ((empresa_id = public.current_empresa_id()));
   for select
   to public
 using ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -17863,6 +20844,10 @@ using ((empresa_id = public.current_empresa_id()));
   to public
 using ((empresa_id = public.current_empresa_id()))
 with check ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -17872,6 +20857,10 @@ with check ((empresa_id = public.current_empresa_id()));
   for delete
   to public
 using ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -17881,6 +20870,10 @@ using ((empresa_id = public.current_empresa_id()));
   for insert
   to public
 with check ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -17890,6 +20883,10 @@ with check ((empresa_id = public.current_empresa_id()));
   for select
   to public
 using ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -17900,6 +20897,10 @@ using ((empresa_id = public.current_empresa_id()));
   to public
 using ((empresa_id = public.current_empresa_id()))
 with check ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -17909,6 +20910,10 @@ with check ((empresa_id = public.current_empresa_id()));
   for delete
   to public
 using ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -17918,6 +20923,10 @@ using ((empresa_id = public.current_empresa_id()));
   for insert
   to public
 with check ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -17927,6 +20936,10 @@ with check ((empresa_id = public.current_empresa_id()));
   for select
   to public
 using ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -17937,6 +20950,10 @@ using ((empresa_id = public.current_empresa_id()));
   to public
 using ((empresa_id = public.current_empresa_id()))
 with check ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -17946,6 +20963,10 @@ with check ((empresa_id = public.current_empresa_id()));
   for delete
   to public
 using ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -17955,6 +20976,10 @@ using ((empresa_id = public.current_empresa_id()));
   for insert
   to public
 with check ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -17964,6 +20989,10 @@ with check ((empresa_id = public.current_empresa_id()));
   for select
   to public
 using ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -17974,6 +21003,10 @@ using ((empresa_id = public.current_empresa_id()));
   to public
 using ((empresa_id = public.current_empresa_id()))
 with check ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -17983,6 +21016,10 @@ with check ((empresa_id = public.current_empresa_id()));
   for delete
   to public
 using ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -17992,6 +21029,10 @@ using ((empresa_id = public.current_empresa_id()));
   for insert
   to public
 with check ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -18001,6 +21042,10 @@ with check ((empresa_id = public.current_empresa_id()));
   for select
   to public
 using ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -18011,6 +21056,10 @@ using ((empresa_id = public.current_empresa_id()));
   to public
 using ((empresa_id = public.current_empresa_id()))
 with check ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -18020,6 +21069,10 @@ with check ((empresa_id = public.current_empresa_id()));
   for delete
   to public
 using ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -18029,6 +21082,10 @@ using ((empresa_id = public.current_empresa_id()));
   for insert
   to public
 with check ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -18038,6 +21095,10 @@ with check ((empresa_id = public.current_empresa_id()));
   for select
   to public
 using ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -18048,6 +21109,10 @@ using ((empresa_id = public.current_empresa_id()));
   to public
 using ((empresa_id = public.current_empresa_id()))
 with check ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -18057,6 +21122,10 @@ with check ((empresa_id = public.current_empresa_id()));
   for delete
   to public
 using ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -18066,6 +21135,10 @@ using ((empresa_id = public.current_empresa_id()));
   for insert
   to public
 with check ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -18075,6 +21148,10 @@ with check ((empresa_id = public.current_empresa_id()));
   for select
   to public
 using ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -18085,6 +21162,10 @@ using ((empresa_id = public.current_empresa_id()));
   to public
 using ((empresa_id = public.current_empresa_id()))
 with check ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -18094,6 +21175,10 @@ with check ((empresa_id = public.current_empresa_id()));
   for delete
   to public
 using ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -18103,6 +21188,10 @@ using ((empresa_id = public.current_empresa_id()));
   for insert
   to public
 with check ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -18112,6 +21201,10 @@ with check ((empresa_id = public.current_empresa_id()));
   for select
   to public
 using ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -18122,6 +21215,10 @@ using ((empresa_id = public.current_empresa_id()));
   to public
 using ((empresa_id = public.current_empresa_id()))
 with check ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -18131,6 +21228,10 @@ with check ((empresa_id = public.current_empresa_id()));
   for delete
   to public
 using ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -18140,6 +21241,10 @@ using ((empresa_id = public.current_empresa_id()));
   for insert
   to public
 with check ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -18149,6 +21254,10 @@ with check ((empresa_id = public.current_empresa_id()));
   for select
   to public
 using ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -18159,6 +21268,10 @@ using ((empresa_id = public.current_empresa_id()));
   to public
 using ((empresa_id = public.current_empresa_id()))
 with check ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -18168,6 +21281,10 @@ with check ((empresa_id = public.current_empresa_id()));
   for delete
   to public
 using ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -18177,6 +21294,10 @@ using ((empresa_id = public.current_empresa_id()));
   for insert
   to public
 with check ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -18186,6 +21307,10 @@ with check ((empresa_id = public.current_empresa_id()));
   for select
   to public
 using ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -18196,6 +21321,10 @@ using ((empresa_id = public.current_empresa_id()));
   to public
 using ((empresa_id = public.current_empresa_id()))
 with check ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -18205,6 +21334,10 @@ with check ((empresa_id = public.current_empresa_id()));
   for delete
   to public
 using ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -18214,6 +21347,10 @@ using ((empresa_id = public.current_empresa_id()));
   for insert
   to public
 with check ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -18223,6 +21360,10 @@ with check ((empresa_id = public.current_empresa_id()));
   for select
   to public
 using ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -18233,6 +21374,10 @@ using ((empresa_id = public.current_empresa_id()));
   to public
 using ((empresa_id = public.current_empresa_id()))
 with check ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -18242,6 +21387,10 @@ with check ((empresa_id = public.current_empresa_id()));
   for delete
   to public
 using ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -18251,6 +21400,10 @@ using ((empresa_id = public.current_empresa_id()));
   for insert
   to public
 with check ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -18260,6 +21413,10 @@ with check ((empresa_id = public.current_empresa_id()));
   for select
   to public
 using ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -18270,6 +21427,10 @@ using ((empresa_id = public.current_empresa_id()));
   to public
 using ((empresa_id = public.current_empresa_id()))
 with check ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -18279,6 +21440,10 @@ with check ((empresa_id = public.current_empresa_id()));
   for delete
   to public
 using ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -18288,6 +21453,10 @@ using ((empresa_id = public.current_empresa_id()));
   for insert
   to public
 with check ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -18297,6 +21466,10 @@ with check ((empresa_id = public.current_empresa_id()));
   for select
   to public
 using ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -18307,6 +21480,10 @@ using ((empresa_id = public.current_empresa_id()));
   to public
 using ((empresa_id = public.current_empresa_id()))
 with check ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -18316,6 +21493,10 @@ with check ((empresa_id = public.current_empresa_id()));
   for delete
   to public
 using ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -18325,6 +21506,10 @@ using ((empresa_id = public.current_empresa_id()));
   for insert
   to public
 with check ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -18334,6 +21519,10 @@ with check ((empresa_id = public.current_empresa_id()));
   for select
   to public
 using ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -18344,6 +21533,10 @@ using ((empresa_id = public.current_empresa_id()));
   to public
 using ((empresa_id = public.current_empresa_id()))
 with check ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -18353,6 +21546,10 @@ with check ((empresa_id = public.current_empresa_id()));
   for delete
   to public
 using ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -18362,6 +21559,10 @@ using ((empresa_id = public.current_empresa_id()));
   for insert
   to public
 with check ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -18371,6 +21572,10 @@ with check ((empresa_id = public.current_empresa_id()));
   for select
   to public
 using ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -18381,6 +21586,10 @@ using ((empresa_id = public.current_empresa_id()));
   to public
 using ((empresa_id = public.current_empresa_id()))
 with check ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -18390,6 +21599,10 @@ with check ((empresa_id = public.current_empresa_id()));
   for delete
   to public
 using ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -18399,6 +21612,10 @@ using ((empresa_id = public.current_empresa_id()));
   for insert
   to public
 with check ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -18408,6 +21625,10 @@ with check ((empresa_id = public.current_empresa_id()));
   for select
   to public
 using ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -18418,6 +21639,10 @@ using ((empresa_id = public.current_empresa_id()));
   to public
 using ((empresa_id = public.current_empresa_id()))
 with check ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -18427,6 +21652,10 @@ with check ((empresa_id = public.current_empresa_id()));
   for delete
   to public
 using ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -18436,6 +21665,10 @@ using ((empresa_id = public.current_empresa_id()));
   for insert
   to public
 with check ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -18445,6 +21678,10 @@ with check ((empresa_id = public.current_empresa_id()));
   for select
   to public
 using ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -18455,6 +21692,10 @@ using ((empresa_id = public.current_empresa_id()));
   to public
 using ((empresa_id = public.current_empresa_id()))
 with check ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -18464,6 +21705,10 @@ with check ((empresa_id = public.current_empresa_id()));
   for delete
   to public
 using ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -18473,6 +21718,10 @@ using ((empresa_id = public.current_empresa_id()));
   for insert
   to public
 with check ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -18482,6 +21731,10 @@ with check ((empresa_id = public.current_empresa_id()));
   for select
   to public
 using ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -18492,6 +21745,10 @@ using ((empresa_id = public.current_empresa_id()));
   to public
 using ((empresa_id = public.current_empresa_id()))
 with check ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -18501,6 +21758,10 @@ with check ((empresa_id = public.current_empresa_id()));
   for delete
   to public
 using ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -18510,6 +21771,10 @@ using ((empresa_id = public.current_empresa_id()));
   for insert
   to public
 with check ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -18519,6 +21784,10 @@ with check ((empresa_id = public.current_empresa_id()));
   for select
   to public
 using ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -18529,6 +21798,10 @@ using ((empresa_id = public.current_empresa_id()));
   to public
 using ((empresa_id = public.current_empresa_id()))
 with check ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -18538,6 +21811,10 @@ with check ((empresa_id = public.current_empresa_id()));
   for delete
   to public
 using ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -18547,6 +21824,10 @@ using ((empresa_id = public.current_empresa_id()));
   for insert
   to public
 with check ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -18556,6 +21837,10 @@ with check ((empresa_id = public.current_empresa_id()));
   for select
   to public
 using ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -18566,6 +21851,10 @@ using ((empresa_id = public.current_empresa_id()));
   to public
 using ((empresa_id = public.current_empresa_id()))
 with check ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -18575,6 +21864,10 @@ with check ((empresa_id = public.current_empresa_id()));
   for delete
   to authenticated
 using ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -18584,6 +21877,10 @@ using ((empresa_id = public.current_empresa_id()));
   for insert
   to authenticated
 with check ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -18593,6 +21890,10 @@ with check ((empresa_id = public.current_empresa_id()));
   for select
   to authenticated
 using ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -18603,6 +21904,10 @@ using ((empresa_id = public.current_empresa_id()));
   to authenticated
 using ((empresa_id = public.current_empresa_id()))
 with check ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -18612,6 +21917,10 @@ with check ((empresa_id = public.current_empresa_id()));
   for delete
   to public
 using ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -18621,6 +21930,10 @@ using ((empresa_id = public.current_empresa_id()));
   for insert
   to public
 with check ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -18630,6 +21943,10 @@ with check ((empresa_id = public.current_empresa_id()));
   for select
   to public
 using ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -18640,6 +21957,10 @@ using ((empresa_id = public.current_empresa_id()));
   to public
 using ((empresa_id = public.current_empresa_id()))
 with check ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -18649,6 +21970,10 @@ with check ((empresa_id = public.current_empresa_id()));
   for delete
   to public
 using ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -18658,6 +21983,10 @@ using ((empresa_id = public.current_empresa_id()));
   for insert
   to public
 with check ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -18667,6 +21996,10 @@ with check ((empresa_id = public.current_empresa_id()));
   for select
   to public
 using ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -18677,6 +22010,10 @@ using ((empresa_id = public.current_empresa_id()));
   to public
 using ((empresa_id = public.current_empresa_id()))
 with check ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -18686,6 +22023,10 @@ with check ((empresa_id = public.current_empresa_id()));
   for delete
   to public
 using ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -18695,6 +22036,10 @@ using ((empresa_id = public.current_empresa_id()));
   for insert
   to public
 with check ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -18704,6 +22049,10 @@ with check ((empresa_id = public.current_empresa_id()));
   for select
   to public
 using ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -18714,6 +22063,10 @@ using ((empresa_id = public.current_empresa_id()));
   to public
 using ((empresa_id = public.current_empresa_id()))
 with check ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -18723,6 +22076,10 @@ with check ((empresa_id = public.current_empresa_id()));
   for delete
   to authenticated
 using ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -18732,6 +22089,10 @@ using ((empresa_id = public.current_empresa_id()));
   for insert
   to authenticated
 with check ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -18741,6 +22102,10 @@ with check ((empresa_id = public.current_empresa_id()));
   for select
   to authenticated
 using ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -18751,6 +22116,10 @@ using ((empresa_id = public.current_empresa_id()));
   to authenticated
 using ((empresa_id = public.current_empresa_id()))
 with check ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -18760,6 +22129,10 @@ with check ((empresa_id = public.current_empresa_id()));
   for delete
   to public
 using ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -18769,6 +22142,10 @@ using ((empresa_id = public.current_empresa_id()));
   for insert
   to public
 with check ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -18778,6 +22155,10 @@ with check ((empresa_id = public.current_empresa_id()));
   for select
   to public
 using ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -18788,6 +22169,10 @@ using ((empresa_id = public.current_empresa_id()));
   to public
 using ((empresa_id = public.current_empresa_id()))
 with check ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -18798,6 +22183,10 @@ with check ((empresa_id = public.current_empresa_id()));
   to public
 using ((empresa_id = public.current_empresa_id()))
 with check ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -18807,6 +22196,10 @@ with check ((empresa_id = public.current_empresa_id()));
   for delete
   to public
 using ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -18816,6 +22209,10 @@ using ((empresa_id = public.current_empresa_id()));
   for insert
   to public
 with check ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -18825,6 +22222,10 @@ with check ((empresa_id = public.current_empresa_id()));
   for select
   to public
 using ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -18835,6 +22236,10 @@ using ((empresa_id = public.current_empresa_id()));
   to public
 using ((empresa_id = public.current_empresa_id()))
 with check ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -18844,6 +22249,10 @@ with check ((empresa_id = public.current_empresa_id()));
   for delete
   to public
 using ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -18853,6 +22262,10 @@ using ((empresa_id = public.current_empresa_id()));
   for insert
   to public
 with check ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -18862,6 +22275,10 @@ with check ((empresa_id = public.current_empresa_id()));
   for select
   to public
 using ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -18872,6 +22289,10 @@ using ((empresa_id = public.current_empresa_id()));
   to public
 using ((empresa_id = public.current_empresa_id()))
 with check ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -18881,6 +22302,10 @@ with check ((empresa_id = public.current_empresa_id()));
   for delete
   to authenticated
 using ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -18890,6 +22315,10 @@ using ((empresa_id = public.current_empresa_id()));
   for insert
   to authenticated
 with check ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -18899,6 +22328,10 @@ with check ((empresa_id = public.current_empresa_id()));
   for select
   to authenticated
 using ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -18909,6 +22342,10 @@ using ((empresa_id = public.current_empresa_id()));
   to authenticated
 using ((empresa_id = public.current_empresa_id()))
 with check ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -18918,6 +22355,10 @@ with check ((empresa_id = public.current_empresa_id()));
   for delete
   to public
 using ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -18927,6 +22368,10 @@ using ((empresa_id = public.current_empresa_id()));
   for insert
   to public
 with check ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -18936,6 +22381,10 @@ with check ((empresa_id = public.current_empresa_id()));
   for select
   to public
 using ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -18946,6 +22395,10 @@ using ((empresa_id = public.current_empresa_id()));
   to public
 using ((empresa_id = public.current_empresa_id()))
 with check ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -18955,6 +22408,10 @@ with check ((empresa_id = public.current_empresa_id()));
   for delete
   to authenticated
 using ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -18964,6 +22421,10 @@ using ((empresa_id = public.current_empresa_id()));
   for insert
   to authenticated
 with check ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -18973,6 +22434,10 @@ with check ((empresa_id = public.current_empresa_id()));
   for select
   to authenticated
 using ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -18983,6 +22448,10 @@ using ((empresa_id = public.current_empresa_id()));
   to authenticated
 using ((empresa_id = public.current_empresa_id()))
 with check ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -18992,6 +22461,10 @@ with check ((empresa_id = public.current_empresa_id()));
   for delete
   to public
 using ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -19001,6 +22474,10 @@ using ((empresa_id = public.current_empresa_id()));
   for insert
   to public
 with check ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -19010,6 +22487,10 @@ with check ((empresa_id = public.current_empresa_id()));
   for select
   to public
 using ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -19020,6 +22501,10 @@ using ((empresa_id = public.current_empresa_id()));
   to public
 using ((empresa_id = public.current_empresa_id()))
 with check ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -19029,6 +22514,10 @@ with check ((empresa_id = public.current_empresa_id()));
   for delete
   to authenticated
 using ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -19038,6 +22527,10 @@ using ((empresa_id = public.current_empresa_id()));
   for insert
   to authenticated
 with check ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -19047,6 +22540,10 @@ with check ((empresa_id = public.current_empresa_id()));
   for select
   to authenticated
 using ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -19057,6 +22554,10 @@ using ((empresa_id = public.current_empresa_id()));
   to authenticated
 using ((empresa_id = public.current_empresa_id()))
 with check ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -19066,6 +22567,10 @@ with check ((empresa_id = public.current_empresa_id()));
   for delete
   to public
 using ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -19075,6 +22580,10 @@ using ((empresa_id = public.current_empresa_id()));
   for insert
   to public
 with check ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -19084,6 +22593,10 @@ with check ((empresa_id = public.current_empresa_id()));
   for select
   to public
 using ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -19094,6 +22607,10 @@ using ((empresa_id = public.current_empresa_id()));
   to public
 using ((empresa_id = public.current_empresa_id()))
 with check ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -19103,6 +22620,10 @@ with check ((empresa_id = public.current_empresa_id()));
   for select
   to authenticated
 using (true);
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -19113,6 +22634,10 @@ using (true);
   to public
 using (false)
 with check (false);
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -19122,6 +22647,10 @@ with check (false);
   for select
   to public
 using (true);
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -19131,6 +22660,10 @@ using (true);
   for delete
   to authenticated
 using ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -19140,6 +22673,10 @@ using ((empresa_id = public.current_empresa_id()));
   for insert
   to authenticated
 with check ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -19149,6 +22686,10 @@ with check ((empresa_id = public.current_empresa_id()));
   for select
   to authenticated
 using ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -19159,6 +22700,10 @@ using ((empresa_id = public.current_empresa_id()));
   to authenticated
 using ((empresa_id = public.current_empresa_id()))
 with check ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -19168,6 +22713,10 @@ with check ((empresa_id = public.current_empresa_id()));
   for delete
   to public
 using ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -19177,6 +22726,10 @@ using ((empresa_id = public.current_empresa_id()));
   for insert
   to public
 with check ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -19186,6 +22739,10 @@ with check ((empresa_id = public.current_empresa_id()));
   for select
   to public
 using ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -19196,6 +22753,10 @@ using ((empresa_id = public.current_empresa_id()));
   to public
 using ((empresa_id = public.current_empresa_id()))
 with check ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -19205,6 +22766,10 @@ with check ((empresa_id = public.current_empresa_id()));
   for delete
   to authenticated
 using ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -19214,6 +22779,10 @@ using ((empresa_id = public.current_empresa_id()));
   for insert
   to authenticated
 with check ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -19223,6 +22792,10 @@ with check ((empresa_id = public.current_empresa_id()));
   for select
   to authenticated
 using ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -19233,6 +22806,10 @@ using ((empresa_id = public.current_empresa_id()));
   to authenticated
 using ((empresa_id = public.current_empresa_id()))
 with check ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -19242,6 +22819,10 @@ with check ((empresa_id = public.current_empresa_id()));
   for delete
   to public
 using ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -19251,6 +22832,10 @@ using ((empresa_id = public.current_empresa_id()));
   for insert
   to public
 with check ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -19260,6 +22845,10 @@ with check ((empresa_id = public.current_empresa_id()));
   for select
   to public
 using ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -19270,6 +22859,10 @@ using ((empresa_id = public.current_empresa_id()));
   to public
 using ((empresa_id = public.current_empresa_id()))
 with check ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -19279,6 +22872,10 @@ with check ((empresa_id = public.current_empresa_id()));
   for delete
   to public
 using ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -19288,6 +22885,10 @@ using ((empresa_id = public.current_empresa_id()));
   for delete
   to authenticated
 using ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -19297,6 +22898,10 @@ using ((empresa_id = public.current_empresa_id()));
   for insert
   to public
 with check ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -19306,6 +22911,10 @@ with check ((empresa_id = public.current_empresa_id()));
   for insert
   to authenticated
 with check ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -19315,6 +22924,10 @@ with check ((empresa_id = public.current_empresa_id()));
   for select
   to public
 using ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -19326,6 +22939,10 @@ using ((empresa_id = public.current_empresa_id()));
 using ((EXISTS ( SELECT 1
    FROM public.empresa_usuarios eu
   WHERE ((eu.empresa_id = pessoas.empresa_id) AND (eu.user_id = auth.uid())))));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -19335,6 +22952,10 @@ using ((EXISTS ( SELECT 1
   for select
   to authenticated
 using ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -19345,6 +22966,10 @@ using ((empresa_id = public.current_empresa_id()));
   to public
 using ((empresa_id = public.current_empresa_id()))
 with check ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -19355,6 +22980,10 @@ with check ((empresa_id = public.current_empresa_id()));
   to authenticated
 using ((empresa_id = public.current_empresa_id()))
 with check ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -19364,6 +22993,10 @@ with check ((empresa_id = public.current_empresa_id()));
   for delete
   to public
 using ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -19373,6 +23006,10 @@ using ((empresa_id = public.current_empresa_id()));
   for insert
   to public
 with check ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -19382,6 +23019,10 @@ with check ((empresa_id = public.current_empresa_id()));
   for select
   to public
 using ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -19392,6 +23033,10 @@ using ((empresa_id = public.current_empresa_id()));
   to public
 using ((empresa_id = public.current_empresa_id()))
 with check ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -19401,6 +23046,10 @@ with check ((empresa_id = public.current_empresa_id()));
   for select
   to authenticated, anon
 using ((active = true));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -19410,6 +23059,10 @@ using ((active = true));
   for select
   to public
 using (true);
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -19419,6 +23072,10 @@ using (true);
   for select
   to public
 using (true);
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -19428,6 +23085,10 @@ using (true);
   for select
   to public
 using (true);
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -19437,6 +23098,10 @@ using (true);
   for select
   to authenticated, anon
 using ((active = true));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -19447,6 +23112,10 @@ using ((active = true));
   to public
 using (false)
 with check (false);
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -19456,6 +23125,10 @@ with check (false);
   for select
   to public
 using (true);
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -19465,6 +23138,10 @@ using (true);
   for delete
   to public
 using ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -19474,6 +23151,10 @@ using ((empresa_id = public.current_empresa_id()));
   for insert
   to public
 with check ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -19483,6 +23164,10 @@ with check ((empresa_id = public.current_empresa_id()));
   for select
   to public
 using ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -19493,6 +23178,10 @@ using ((empresa_id = public.current_empresa_id()));
   to public
 using ((empresa_id = public.current_empresa_id()))
 with check ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -19502,6 +23191,10 @@ with check ((empresa_id = public.current_empresa_id()));
   for delete
   to public
 using ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -19511,6 +23204,10 @@ using ((empresa_id = public.current_empresa_id()));
   for insert
   to public
 with check ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -19520,6 +23217,10 @@ with check ((empresa_id = public.current_empresa_id()));
   for select
   to public
 using ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -19529,6 +23230,10 @@ using ((empresa_id = public.current_empresa_id()));
   for select
   to authenticated
 using ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -19539,6 +23244,10 @@ using ((empresa_id = public.current_empresa_id()));
   to public
 using ((empresa_id = public.current_empresa_id()))
 with check ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -19548,6 +23257,10 @@ with check ((empresa_id = public.current_empresa_id()));
   for delete
   to public
 using ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -19557,6 +23270,10 @@ using ((empresa_id = public.current_empresa_id()));
   for insert
   to public
 with check ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -19566,6 +23283,10 @@ with check ((empresa_id = public.current_empresa_id()));
   for select
   to public
 using ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -19576,6 +23297,10 @@ using ((empresa_id = public.current_empresa_id()));
   to public
 using ((empresa_id = public.current_empresa_id()))
 with check ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -19585,6 +23310,10 @@ with check ((empresa_id = public.current_empresa_id()));
   for delete
   to authenticated
 using ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -19594,6 +23323,10 @@ using ((empresa_id = public.current_empresa_id()));
   for insert
   to authenticated
 with check ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -19603,6 +23336,10 @@ with check ((empresa_id = public.current_empresa_id()));
   for select
   to authenticated
 using ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -19613,6 +23350,10 @@ using ((empresa_id = public.current_empresa_id()));
   to authenticated
 using ((empresa_id = public.current_empresa_id()))
 with check ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -19622,6 +23363,10 @@ with check ((empresa_id = public.current_empresa_id()));
   for delete
   to public
 using ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -19631,6 +23376,10 @@ using ((empresa_id = public.current_empresa_id()));
   for insert
   to public
 with check ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -19640,6 +23389,10 @@ with check ((empresa_id = public.current_empresa_id()));
   for select
   to public
 using ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -19650,6 +23403,10 @@ using ((empresa_id = public.current_empresa_id()));
   to public
 using ((empresa_id = public.current_empresa_id()))
 with check ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -19659,6 +23416,10 @@ with check ((empresa_id = public.current_empresa_id()));
   for delete
   to authenticated
 using ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -19668,6 +23429,10 @@ using ((empresa_id = public.current_empresa_id()));
   for insert
   to authenticated
 with check ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -19677,6 +23442,10 @@ with check ((empresa_id = public.current_empresa_id()));
   for select
   to authenticated
 using ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -19687,6 +23456,10 @@ using ((empresa_id = public.current_empresa_id()));
   to authenticated
 using ((empresa_id = public.current_empresa_id()))
 with check ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -19696,6 +23469,10 @@ with check ((empresa_id = public.current_empresa_id()));
   for delete
   to public
 using ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -19705,6 +23482,10 @@ using ((empresa_id = public.current_empresa_id()));
   for insert
   to public
 with check ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -19714,6 +23495,10 @@ with check ((empresa_id = public.current_empresa_id()));
   for select
   to public
 using ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -19724,6 +23509,10 @@ using ((empresa_id = public.current_empresa_id()));
   to public
 using ((empresa_id = public.current_empresa_id()))
 with check ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -19733,6 +23522,10 @@ with check ((empresa_id = public.current_empresa_id()));
   for delete
   to authenticated
 using ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -19742,6 +23535,10 @@ using ((empresa_id = public.current_empresa_id()));
   for insert
   to authenticated
 with check ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -19751,6 +23548,10 @@ with check ((empresa_id = public.current_empresa_id()));
   for select
   to authenticated
 using ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -19761,6 +23562,10 @@ using ((empresa_id = public.current_empresa_id()));
   to authenticated
 using ((empresa_id = public.current_empresa_id()))
 with check ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -19770,6 +23575,10 @@ with check ((empresa_id = public.current_empresa_id()));
   for delete
   to public
 using ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -19779,6 +23588,10 @@ using ((empresa_id = public.current_empresa_id()));
   for insert
   to public
 with check ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -19788,6 +23601,10 @@ with check ((empresa_id = public.current_empresa_id()));
   for select
   to public
 using ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -19798,6 +23615,10 @@ using ((empresa_id = public.current_empresa_id()));
   to public
 using ((empresa_id = public.current_empresa_id()))
 with check ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -19807,6 +23628,10 @@ with check ((empresa_id = public.current_empresa_id()));
   for delete
   to authenticated
 using ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -19816,6 +23641,10 @@ using ((empresa_id = public.current_empresa_id()));
   for insert
   to authenticated
 with check ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -19825,6 +23654,10 @@ with check ((empresa_id = public.current_empresa_id()));
   for select
   to authenticated
 using ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -19835,6 +23668,10 @@ using ((empresa_id = public.current_empresa_id()));
   to authenticated
 using ((empresa_id = public.current_empresa_id()))
 with check ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -19844,6 +23681,10 @@ with check ((empresa_id = public.current_empresa_id()));
   for delete
   to public
 using ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -19853,6 +23694,10 @@ using ((empresa_id = public.current_empresa_id()));
   for insert
   to public
 with check ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -19862,6 +23707,10 @@ with check ((empresa_id = public.current_empresa_id()));
   for select
   to public
 using ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -19872,6 +23721,10 @@ using ((empresa_id = public.current_empresa_id()));
   to public
 using ((empresa_id = public.current_empresa_id()))
 with check ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -19881,6 +23734,10 @@ with check ((empresa_id = public.current_empresa_id()));
   for delete
   to authenticated
 using ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -19890,6 +23747,10 @@ using ((empresa_id = public.current_empresa_id()));
   for insert
   to authenticated
 with check ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -19899,6 +23760,10 @@ with check ((empresa_id = public.current_empresa_id()));
   for select
   to authenticated
 using ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -19909,6 +23774,10 @@ using ((empresa_id = public.current_empresa_id()));
   to authenticated
 using ((empresa_id = public.current_empresa_id()))
 with check ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -19918,6 +23787,10 @@ with check ((empresa_id = public.current_empresa_id()));
   for delete
   to public
 using ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -19927,6 +23800,10 @@ using ((empresa_id = public.current_empresa_id()));
   for insert
   to public
 with check ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -19936,6 +23813,10 @@ with check ((empresa_id = public.current_empresa_id()));
   for select
   to public
 using ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -19946,6 +23827,10 @@ using ((empresa_id = public.current_empresa_id()));
   to public
 using ((empresa_id = public.current_empresa_id()))
 with check ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -19955,6 +23840,10 @@ with check ((empresa_id = public.current_empresa_id()));
   for delete
   to authenticated
 using ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -19964,6 +23853,10 @@ using ((empresa_id = public.current_empresa_id()));
   for insert
   to authenticated
 with check ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -19973,6 +23866,10 @@ with check ((empresa_id = public.current_empresa_id()));
   for select
   to authenticated
 using ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -19983,6 +23880,10 @@ using ((empresa_id = public.current_empresa_id()));
   to authenticated
 using ((empresa_id = public.current_empresa_id()))
 with check ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -19992,6 +23893,10 @@ with check ((empresa_id = public.current_empresa_id()));
   for delete
   to public
 using ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -20001,6 +23906,10 @@ using ((empresa_id = public.current_empresa_id()));
   for insert
   to public
 with check ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -20010,6 +23919,10 @@ with check ((empresa_id = public.current_empresa_id()));
   for select
   to public
 using ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -20020,6 +23933,10 @@ using ((empresa_id = public.current_empresa_id()));
   to public
 using ((empresa_id = public.current_empresa_id()))
 with check ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -20029,6 +23946,10 @@ with check ((empresa_id = public.current_empresa_id()));
   for delete
   to public
 using ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -20038,6 +23959,10 @@ using ((empresa_id = public.current_empresa_id()));
   for delete
   to authenticated
 using ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -20047,6 +23972,10 @@ using ((empresa_id = public.current_empresa_id()));
   for insert
   to public
 with check ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -20056,6 +23985,10 @@ with check ((empresa_id = public.current_empresa_id()));
   for insert
   to authenticated
 with check ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -20065,6 +23998,10 @@ with check ((empresa_id = public.current_empresa_id()));
   for select
   to public
 using ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -20074,6 +24011,10 @@ using ((empresa_id = public.current_empresa_id()));
   for select
   to authenticated
 using ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -20084,6 +24025,10 @@ using ((empresa_id = public.current_empresa_id()));
   to public
 using ((empresa_id = public.current_empresa_id()))
 with check ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -20094,6 +24039,10 @@ with check ((empresa_id = public.current_empresa_id()));
   to authenticated
 using ((empresa_id = public.current_empresa_id()))
 with check ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -20103,6 +24052,10 @@ with check ((empresa_id = public.current_empresa_id()));
   for delete
   to public
 using (false);
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -20112,6 +24065,10 @@ using (false);
   for insert
   to public
 with check (false);
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -20121,6 +24078,10 @@ with check (false);
   for select
   to authenticated
 using ((id = auth.uid()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -20131,6 +24092,10 @@ using ((id = auth.uid()));
   to authenticated
 using ((id = auth.uid()))
 with check ((id = auth.uid()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -20140,6 +24105,10 @@ with check ((id = auth.uid()));
   for all
   to public
 using ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -20149,6 +24118,10 @@ using ((empresa_id = public.current_empresa_id()));
   for all
   to public
 using ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -20158,6 +24131,10 @@ using ((empresa_id = public.current_empresa_id()));
   for all
   to public
 using ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -20167,6 +24144,10 @@ using ((empresa_id = public.current_empresa_id()));
   for delete
   to public
 using ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -20176,6 +24157,10 @@ using ((empresa_id = public.current_empresa_id()));
   for insert
   to public
 with check ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -20185,6 +24170,10 @@ with check ((empresa_id = public.current_empresa_id()));
   for select
   to public
 using ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -20195,6 +24184,10 @@ using ((empresa_id = public.current_empresa_id()));
   to public
 using ((empresa_id = public.current_empresa_id()))
 with check ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -20204,6 +24197,10 @@ with check ((empresa_id = public.current_empresa_id()));
   for delete
   to public
 using ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -20213,6 +24210,10 @@ using ((empresa_id = public.current_empresa_id()));
   for insert
   to public
 with check ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -20222,6 +24223,10 @@ with check ((empresa_id = public.current_empresa_id()));
   for select
   to public
 using ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -20232,6 +24237,10 @@ using ((empresa_id = public.current_empresa_id()));
   to public
 using ((empresa_id = public.current_empresa_id()))
 with check ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -20241,6 +24250,10 @@ with check ((empresa_id = public.current_empresa_id()));
   for delete
   to public
 using ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -20250,6 +24263,10 @@ using ((empresa_id = public.current_empresa_id()));
   for insert
   to public
 with check ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -20259,6 +24276,10 @@ with check ((empresa_id = public.current_empresa_id()));
   for select
   to public
 using ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -20269,6 +24290,10 @@ using ((empresa_id = public.current_empresa_id()));
   to public
 using ((empresa_id = public.current_empresa_id()))
 with check ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -20278,6 +24303,10 @@ with check ((empresa_id = public.current_empresa_id()));
   for delete
   to public
 using ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -20287,6 +24316,10 @@ using ((empresa_id = public.current_empresa_id()));
   for insert
   to public
 with check ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -20296,6 +24329,10 @@ with check ((empresa_id = public.current_empresa_id()));
   for select
   to public
 using ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -20306,6 +24343,10 @@ using ((empresa_id = public.current_empresa_id()));
   to public
 using ((empresa_id = public.current_empresa_id()))
 with check ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -20315,6 +24356,10 @@ with check ((empresa_id = public.current_empresa_id()));
   for delete
   to public
 using ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -20324,6 +24369,10 @@ using ((empresa_id = public.current_empresa_id()));
   for insert
   to public
 with check ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -20333,6 +24382,10 @@ with check ((empresa_id = public.current_empresa_id()));
   for select
   to public
 using ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -20343,6 +24396,10 @@ using ((empresa_id = public.current_empresa_id()));
   to public
 using ((empresa_id = public.current_empresa_id()))
 with check ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -20352,6 +24409,10 @@ with check ((empresa_id = public.current_empresa_id()));
   for delete
   to public
 using ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -20361,6 +24422,10 @@ using ((empresa_id = public.current_empresa_id()));
   for insert
   to public
 with check ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -20370,6 +24435,10 @@ with check ((empresa_id = public.current_empresa_id()));
   for select
   to public
 using ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -20380,6 +24449,10 @@ using ((empresa_id = public.current_empresa_id()));
   to public
 using ((empresa_id = public.current_empresa_id()))
 with check ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -20389,6 +24462,10 @@ with check ((empresa_id = public.current_empresa_id()));
   for delete
   to public
 using ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -20398,6 +24475,10 @@ using ((empresa_id = public.current_empresa_id()));
   for insert
   to public
 with check ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -20407,6 +24488,10 @@ with check ((empresa_id = public.current_empresa_id()));
   for select
   to public
 using ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -20417,6 +24502,10 @@ using ((empresa_id = public.current_empresa_id()));
   to public
 using ((empresa_id = public.current_empresa_id()))
 with check ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -20426,6 +24515,10 @@ with check ((empresa_id = public.current_empresa_id()));
   for delete
   to public
 using ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -20435,6 +24528,10 @@ using ((empresa_id = public.current_empresa_id()));
   for insert
   to public
 with check ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -20444,6 +24541,10 @@ with check ((empresa_id = public.current_empresa_id()));
   for select
   to public
 using ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -20454,6 +24555,10 @@ using ((empresa_id = public.current_empresa_id()));
   to public
 using ((empresa_id = public.current_empresa_id()))
 with check ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -20463,6 +24568,10 @@ with check ((empresa_id = public.current_empresa_id()));
   for delete
   to public
 using ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -20472,6 +24581,10 @@ using ((empresa_id = public.current_empresa_id()));
   for insert
   to public
 with check ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -20481,6 +24594,10 @@ with check ((empresa_id = public.current_empresa_id()));
   for select
   to public
 using ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -20491,6 +24608,10 @@ using ((empresa_id = public.current_empresa_id()));
   to public
 using ((empresa_id = public.current_empresa_id()))
 with check ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -20500,6 +24621,10 @@ with check ((empresa_id = public.current_empresa_id()));
   for delete
   to public
 using ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -20509,6 +24634,10 @@ using ((empresa_id = public.current_empresa_id()));
   for insert
   to public
 with check ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -20518,6 +24647,10 @@ with check ((empresa_id = public.current_empresa_id()));
   for select
   to public
 using ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -20528,6 +24661,10 @@ using ((empresa_id = public.current_empresa_id()));
   to public
 using ((empresa_id = public.current_empresa_id()))
 with check ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -20537,6 +24674,10 @@ with check ((empresa_id = public.current_empresa_id()));
   for delete
   to public
 using ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -20546,6 +24687,10 @@ using ((empresa_id = public.current_empresa_id()));
   for insert
   to public
 with check ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -20555,6 +24700,10 @@ with check ((empresa_id = public.current_empresa_id()));
   for select
   to public
 using ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -20565,6 +24714,10 @@ using ((empresa_id = public.current_empresa_id()));
   to public
 using ((empresa_id = public.current_empresa_id()))
 with check ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -20574,6 +24727,10 @@ with check ((empresa_id = public.current_empresa_id()));
   for delete
   to public
 using ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -20583,6 +24740,10 @@ using ((empresa_id = public.current_empresa_id()));
   for insert
   to public
 with check ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -20592,6 +24753,10 @@ with check ((empresa_id = public.current_empresa_id()));
   for select
   to public
 using ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -20602,6 +24767,10 @@ using ((empresa_id = public.current_empresa_id()));
   to public
 using ((empresa_id = public.current_empresa_id()))
 with check ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -20611,6 +24780,10 @@ with check ((empresa_id = public.current_empresa_id()));
   for delete
   to public
 using ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -20620,6 +24793,10 @@ using ((empresa_id = public.current_empresa_id()));
   for insert
   to public
 with check ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -20629,6 +24806,10 @@ with check ((empresa_id = public.current_empresa_id()));
   for select
   to public
 using ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -20639,6 +24820,10 @@ using ((empresa_id = public.current_empresa_id()));
   to public
 using ((empresa_id = public.current_empresa_id()))
 with check ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -20648,6 +24833,10 @@ with check ((empresa_id = public.current_empresa_id()));
   for delete
   to public
 using ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -20657,6 +24846,10 @@ using ((empresa_id = public.current_empresa_id()));
   for insert
   to public
 with check ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -20666,6 +24859,10 @@ with check ((empresa_id = public.current_empresa_id()));
   for select
   to public
 using ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -20676,6 +24873,10 @@ using ((empresa_id = public.current_empresa_id()));
   to public
 using ((empresa_id = public.current_empresa_id()))
 with check ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -20686,6 +24887,10 @@ with check ((empresa_id = public.current_empresa_id()));
   to public
 using (false)
 with check (false);
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -20695,6 +24900,10 @@ with check (false);
   for select
   to public
 using (true);
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -20704,6 +24913,10 @@ using (true);
   for select
   to authenticated
 using (true);
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -20714,6 +24927,10 @@ using (true);
   to public
 using (false)
 with check (false);
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -20723,6 +24940,10 @@ with check (false);
   for select
   to public
 using (true);
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -20732,6 +24953,10 @@ using (true);
   for select
   to authenticated
 using (true);
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -20741,6 +24966,10 @@ using (true);
   for delete
   to public
 using ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -20750,6 +24979,10 @@ using ((empresa_id = public.current_empresa_id()));
   for insert
   to public
 with check ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -20759,6 +24992,10 @@ with check ((empresa_id = public.current_empresa_id()));
   for select
   to public
 using ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -20769,6 +25006,10 @@ using ((empresa_id = public.current_empresa_id()));
   to public
 using ((empresa_id = public.current_empresa_id()))
 with check ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -20778,6 +25019,10 @@ with check ((empresa_id = public.current_empresa_id()));
   for delete
   to authenticated
 using ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -20787,6 +25032,10 @@ using ((empresa_id = public.current_empresa_id()));
   for insert
   to authenticated
 with check ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -20796,6 +25045,10 @@ with check ((empresa_id = public.current_empresa_id()));
   for select
   to authenticated
 using ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -20806,6 +25059,10 @@ using ((empresa_id = public.current_empresa_id()));
   to authenticated
 using ((empresa_id = public.current_empresa_id()))
 with check ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -20815,6 +25072,10 @@ with check ((empresa_id = public.current_empresa_id()));
   for delete
   to public
 using ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -20824,6 +25085,10 @@ using ((empresa_id = public.current_empresa_id()));
   for insert
   to public
 with check ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -20833,6 +25098,10 @@ with check ((empresa_id = public.current_empresa_id()));
   for select
   to public
 using ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -20843,6 +25112,10 @@ using ((empresa_id = public.current_empresa_id()));
   to public
 using ((empresa_id = public.current_empresa_id()))
 with check ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -20854,6 +25127,10 @@ with check ((empresa_id = public.current_empresa_id()));
 using ((EXISTS ( SELECT 1
    FROM public.empresa_usuarios eu
   WHERE ((eu.empresa_id = subscriptions.empresa_id) AND (eu.user_id = auth.uid())))));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -20865,6 +25142,10 @@ using ((EXISTS ( SELECT 1
 using (((empresa_id = public.current_empresa_id()) AND (EXISTS ( SELECT 1
    FROM public.empresa_usuarios eu
   WHERE ((eu.empresa_id = subscriptions.empresa_id) AND (eu.user_id = auth.uid()))))));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -20876,6 +25157,10 @@ using (((empresa_id = public.current_empresa_id()) AND (EXISTS ( SELECT 1
 with check (((empresa_id = public.current_empresa_id()) AND (EXISTS ( SELECT 1
    FROM public.empresa_usuarios eu
   WHERE ((eu.empresa_id = subscriptions.empresa_id) AND (eu.user_id = auth.uid()))))));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -20888,6 +25173,10 @@ using (((empresa_id = public.current_empresa_id()) AND (EXISTS ( SELECT 1
    FROM public.empresa_usuarios eu
   WHERE ((eu.empresa_id = subscriptions.empresa_id) AND (eu.user_id = auth.uid()))))))
 with check ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -20897,6 +25186,10 @@ with check ((empresa_id = public.current_empresa_id()));
   for delete
   to public
 using ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -20906,6 +25199,10 @@ using ((empresa_id = public.current_empresa_id()));
   for insert
   to public
 with check ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -20915,6 +25212,10 @@ with check ((empresa_id = public.current_empresa_id()));
   for select
   to public
 using ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -20925,6 +25226,10 @@ using ((empresa_id = public.current_empresa_id()));
   to public
 using ((empresa_id = public.current_empresa_id()))
 with check ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -20934,6 +25239,10 @@ with check ((empresa_id = public.current_empresa_id()));
   for delete
   to authenticated
 using ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -20943,6 +25252,10 @@ using ((empresa_id = public.current_empresa_id()));
   for insert
   to authenticated
 with check ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -20952,6 +25265,10 @@ with check ((empresa_id = public.current_empresa_id()));
   for select
   to authenticated
 using ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -20962,6 +25279,10 @@ using ((empresa_id = public.current_empresa_id()));
   to authenticated
 using ((empresa_id = public.current_empresa_id()))
 with check ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -20971,6 +25292,10 @@ with check ((empresa_id = public.current_empresa_id()));
   for delete
   to public
 using ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -20980,6 +25305,10 @@ using ((empresa_id = public.current_empresa_id()));
   for insert
   to public
 with check ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -20989,6 +25318,10 @@ with check ((empresa_id = public.current_empresa_id()));
   for select
   to public
 using ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -20999,6 +25332,10 @@ using ((empresa_id = public.current_empresa_id()));
   to public
 using ((empresa_id = public.current_empresa_id()))
 with check ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -21008,6 +25345,10 @@ with check ((empresa_id = public.current_empresa_id()));
   for delete
   to authenticated
 using ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -21017,6 +25358,10 @@ using ((empresa_id = public.current_empresa_id()));
   for insert
   to authenticated
 with check ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -21026,6 +25371,10 @@ with check ((empresa_id = public.current_empresa_id()));
   for select
   to authenticated
 using ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -21036,6 +25385,10 @@ using ((empresa_id = public.current_empresa_id()));
   to authenticated
 using ((empresa_id = public.current_empresa_id()))
 with check ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -21045,6 +25398,10 @@ with check ((empresa_id = public.current_empresa_id()));
   for delete
   to public
 using ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -21054,6 +25411,10 @@ using ((empresa_id = public.current_empresa_id()));
   for insert
   to public
 with check ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -21063,6 +25424,10 @@ with check ((empresa_id = public.current_empresa_id()));
   for select
   to public
 using ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -21073,6 +25438,10 @@ using ((empresa_id = public.current_empresa_id()));
   to public
 using ((empresa_id = public.current_empresa_id()))
 with check ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -21082,6 +25451,10 @@ with check ((empresa_id = public.current_empresa_id()));
   for delete
   to authenticated
 using ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -21091,6 +25464,10 @@ using ((empresa_id = public.current_empresa_id()));
   for insert
   to authenticated
 with check ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -21100,6 +25477,10 @@ with check ((empresa_id = public.current_empresa_id()));
   for select
   to authenticated
 using ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -21110,6 +25491,10 @@ using ((empresa_id = public.current_empresa_id()));
   to authenticated
 using ((empresa_id = public.current_empresa_id()))
 with check ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -21119,6 +25504,10 @@ with check ((empresa_id = public.current_empresa_id()));
   for delete
   to public
 using ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -21128,6 +25517,10 @@ using ((empresa_id = public.current_empresa_id()));
   for insert
   to public
 with check ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -21137,6 +25530,10 @@ with check ((empresa_id = public.current_empresa_id()));
   for select
   to public
 using ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -21147,6 +25544,10 @@ using ((empresa_id = public.current_empresa_id()));
   to public
 using ((empresa_id = public.current_empresa_id()))
 with check ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -21156,6 +25557,10 @@ with check ((empresa_id = public.current_empresa_id()));
   for delete
   to public
 using ((user_id = auth.uid()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -21165,6 +25570,10 @@ using ((user_id = auth.uid()));
   for insert
   to public
 with check ((user_id = auth.uid()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -21174,6 +25583,10 @@ with check ((user_id = auth.uid()));
   for select
   to public
 using ((user_id = auth.uid()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -21184,6 +25597,10 @@ using ((user_id = auth.uid()));
   to public
 using ((user_id = auth.uid()))
 with check ((user_id = auth.uid()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -21193,6 +25610,10 @@ with check ((user_id = auth.uid()));
   for delete
   to authenticated
 using ((user_id = auth.uid()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -21202,6 +25623,10 @@ using ((user_id = auth.uid()));
   for insert
   to authenticated
 with check ((user_id = auth.uid()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -21211,6 +25636,10 @@ with check ((user_id = auth.uid()));
   for select
   to authenticated
 using ((user_id = auth.uid()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -21221,6 +25650,10 @@ using ((user_id = auth.uid()));
   to authenticated
 using ((user_id = auth.uid()))
 with check ((user_id = auth.uid()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -21230,6 +25663,10 @@ with check ((user_id = auth.uid()));
   for delete
   to public
 using ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -21239,6 +25676,10 @@ using ((empresa_id = public.current_empresa_id()));
   for insert
   to public
 with check ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -21248,6 +25689,10 @@ with check ((empresa_id = public.current_empresa_id()));
   for select
   to public
 using ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -21258,6 +25703,10 @@ using ((empresa_id = public.current_empresa_id()));
   to public
 using ((empresa_id = public.current_empresa_id()))
 with check ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -21267,6 +25716,10 @@ with check ((empresa_id = public.current_empresa_id()));
   for delete
   to authenticated
 using ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -21276,6 +25729,10 @@ using ((empresa_id = public.current_empresa_id()));
   for insert
   to authenticated
 with check ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -21285,6 +25742,10 @@ with check ((empresa_id = public.current_empresa_id()));
   for select
   to authenticated
 using ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -21295,6 +25756,10 @@ using ((empresa_id = public.current_empresa_id()));
   to authenticated
 using ((empresa_id = public.current_empresa_id()))
 with check ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -21304,6 +25769,10 @@ with check ((empresa_id = public.current_empresa_id()));
   for delete
   to public
 using ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -21313,6 +25782,10 @@ using ((empresa_id = public.current_empresa_id()));
   for insert
   to public
 with check ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -21322,6 +25795,10 @@ with check ((empresa_id = public.current_empresa_id()));
   for select
   to public
 using ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -21332,6 +25809,10 @@ using ((empresa_id = public.current_empresa_id()));
   to public
 using ((empresa_id = public.current_empresa_id()))
 with check ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -21341,6 +25822,10 @@ with check ((empresa_id = public.current_empresa_id()));
   for delete
   to public
 using ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -21350,6 +25835,10 @@ using ((empresa_id = public.current_empresa_id()));
   for insert
   to public
 with check ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -21359,6 +25848,10 @@ with check ((empresa_id = public.current_empresa_id()));
   for select
   to public
 using ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -21369,6 +25862,10 @@ using ((empresa_id = public.current_empresa_id()));
   to public
 using ((empresa_id = public.current_empresa_id()))
 with check ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -21378,6 +25875,10 @@ with check ((empresa_id = public.current_empresa_id()));
   for delete
   to public
 using ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -21387,6 +25888,10 @@ using ((empresa_id = public.current_empresa_id()));
   for insert
   to public
 with check ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -21396,6 +25901,10 @@ with check ((empresa_id = public.current_empresa_id()));
   for select
   to public
 using ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -21406,6 +25915,10 @@ using ((empresa_id = public.current_empresa_id()));
   to public
 using ((empresa_id = public.current_empresa_id()))
 with check ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -21415,6 +25928,10 @@ with check ((empresa_id = public.current_empresa_id()));
   for delete
   to public
 using ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -21424,6 +25941,10 @@ using ((empresa_id = public.current_empresa_id()));
   for insert
   to public
 with check ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -21433,6 +25954,10 @@ with check ((empresa_id = public.current_empresa_id()));
   for select
   to public
 using ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 
@@ -21443,176 +25968,519 @@ using ((empresa_id = public.current_empresa_id()));
   to public
 using ((empresa_id = public.current_empresa_id()))
 with check ((empresa_id = public.current_empresa_id()));
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 
 CREATE TRIGGER tg_set_updated_at BEFORE UPDATE ON public.atributos FOR EACH ROW EXECUTE FUNCTION public.touch_updated_at();
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 CREATE TRIGGER on_centros_de_custo_updated BEFORE UPDATE ON public.centros_de_custo FOR EACH ROW EXECUTE FUNCTION public.tg_set_updated_at();
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 CREATE TRIGGER handle_updated_at_compras_itens BEFORE UPDATE ON public.compras_itens FOR EACH ROW EXECUTE FUNCTION public.tg_set_updated_at();
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 CREATE TRIGGER handle_updated_at_compras_pedidos BEFORE UPDATE ON public.compras_pedidos FOR EACH ROW EXECUTE FUNCTION public.tg_set_updated_at();
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 CREATE TRIGGER on_contas_a_receber_updated BEFORE UPDATE ON public.contas_a_receber FOR EACH ROW EXECUTE FUNCTION public.tg_set_updated_at();
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 CREATE TRIGGER handle_updated_at_crm_etapas BEFORE UPDATE ON public.crm_etapas FOR EACH ROW EXECUTE FUNCTION public.tg_set_updated_at();
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 CREATE TRIGGER handle_updated_at_crm_funis BEFORE UPDATE ON public.crm_funis FOR EACH ROW EXECUTE FUNCTION public.tg_set_updated_at();
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 CREATE TRIGGER handle_updated_at_crm_oportunidades BEFORE UPDATE ON public.crm_oportunidades FOR EACH ROW EXECUTE FUNCTION public.tg_set_updated_at();
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 CREATE TRIGGER tg_set_updated_at BEFORE UPDATE ON public.ecommerces FOR EACH ROW EXECUTE FUNCTION public.touch_updated_at();
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 CREATE TRIGGER tg_set_updated_at BEFORE UPDATE ON public.empresa_addons FOR EACH ROW EXECUTE FUNCTION public.touch_updated_at();
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 CREATE TRIGGER tg_set_updated_at BEFORE UPDATE ON public.empresa_usuarios FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 CREATE TRIGGER tg_set_updated_at BEFORE UPDATE ON public.empresas FOR EACH ROW EXECUTE FUNCTION public.touch_updated_at();
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 CREATE TRIGGER handle_updated_at_estoque_movimentos BEFORE UPDATE ON public.estoque_movimentos FOR EACH ROW EXECUTE FUNCTION public.tg_set_updated_at();
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 CREATE TRIGGER handle_updated_at_estoque_saldos BEFORE UPDATE ON public.estoque_saldos FOR EACH ROW EXECUTE FUNCTION public.tg_set_updated_at();
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 CREATE TRIGGER handle_updated_at_financeiro_centros_custos BEFORE UPDATE ON public.financeiro_centros_custos FOR EACH ROW EXECUTE FUNCTION public.tg_set_updated_at();
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 CREATE TRIGGER handle_updated_at_financeiro_cobrancas_bancarias BEFORE UPDATE ON public.financeiro_cobrancas_bancarias FOR EACH ROW EXECUTE FUNCTION public.tg_set_updated_at();
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 CREATE TRIGGER handle_updated_at_financeiro_contas_correntes BEFORE UPDATE ON public.financeiro_contas_correntes FOR EACH ROW EXECUTE FUNCTION public.tg_set_updated_at();
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 CREATE TRIGGER handle_updated_at_financeiro_contas_pagar BEFORE UPDATE ON public.financeiro_contas_pagar FOR EACH ROW EXECUTE FUNCTION public.tg_set_updated_at();
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 CREATE TRIGGER handle_updated_at_financeiro_extratos_bancarios BEFORE UPDATE ON public.financeiro_extratos_bancarios FOR EACH ROW EXECUTE FUNCTION public.tg_set_updated_at();
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 CREATE TRIGGER handle_updated_at_financeiro_movimentacoes BEFORE UPDATE ON public.financeiro_movimentacoes FOR EACH ROW EXECUTE FUNCTION public.tg_set_updated_at();
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 CREATE TRIGGER handle_updated_at_fiscal_nfe_import_items BEFORE UPDATE ON public.fiscal_nfe_import_items FOR EACH ROW EXECUTE FUNCTION public.tg_set_updated_at();
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 CREATE TRIGGER handle_updated_at_fiscal_nfe_imports BEFORE UPDATE ON public.fiscal_nfe_imports FOR EACH ROW EXECUTE FUNCTION public.tg_set_updated_at();
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 CREATE TRIGGER tg_set_updated_at BEFORE UPDATE ON public.fornecedores FOR EACH ROW EXECUTE FUNCTION public.touch_updated_at();
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 CREATE TRIGGER handle_updated_at_ind_benef_comp BEFORE UPDATE ON public.industria_benef_componentes FOR EACH ROW EXECUTE FUNCTION public.tg_set_updated_at();
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 CREATE TRIGGER handle_updated_at_ind_benef_entregas BEFORE UPDATE ON public.industria_benef_entregas FOR EACH ROW EXECUTE FUNCTION public.tg_set_updated_at();
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 CREATE TRIGGER handle_updated_at_ind_benef_ordens BEFORE UPDATE ON public.industria_benef_ordens FOR EACH ROW EXECUTE FUNCTION public.tg_set_updated_at();
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 CREATE TRIGGER handle_updated_at_industria_boms BEFORE UPDATE ON public.industria_boms FOR EACH ROW EXECUTE FUNCTION public.tg_set_updated_at();
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 CREATE TRIGGER handle_updated_at_industria_boms_componentes BEFORE UPDATE ON public.industria_boms_componentes FOR EACH ROW EXECUTE FUNCTION public.tg_set_updated_at();
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 CREATE TRIGGER handle_updated_at_ind_ct BEFORE UPDATE ON public.industria_centros_trabalho FOR EACH ROW EXECUTE FUNCTION public.tg_set_updated_at();
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 CREATE TRIGGER handle_updated_at_industria_materiais_cliente BEFORE UPDATE ON public.industria_materiais_cliente FOR EACH ROW EXECUTE FUNCTION public.tg_set_updated_at();
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 CREATE TRIGGER handle_updated_at_ind_operacoes BEFORE UPDATE ON public.industria_operacoes FOR EACH ROW EXECUTE FUNCTION public.tg_set_updated_at();
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 CREATE TRIGGER handle_updated_at_industria_ordem_componentes BEFORE UPDATE ON public.industria_ordem_componentes FOR EACH ROW EXECUTE FUNCTION public.tg_set_updated_at();
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 CREATE TRIGGER handle_updated_at_industria_ordem_entregas BEFORE UPDATE ON public.industria_ordem_entregas FOR EACH ROW EXECUTE FUNCTION public.tg_set_updated_at();
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 CREATE TRIGGER handle_updated_at_industria_ordens BEFORE UPDATE ON public.industria_ordens FOR EACH ROW EXECUTE FUNCTION public.tg_set_updated_at();
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 CREATE TRIGGER handle_updated_at_industria_componentes BEFORE UPDATE ON public.industria_ordens_componentes FOR EACH ROW EXECUTE FUNCTION public.tg_set_updated_at();
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 CREATE TRIGGER handle_updated_at_industria_entregas BEFORE UPDATE ON public.industria_ordens_entregas FOR EACH ROW EXECUTE FUNCTION public.tg_set_updated_at();
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 CREATE TRIGGER handle_updated_at_ind_prod_comp BEFORE UPDATE ON public.industria_producao_componentes FOR EACH ROW EXECUTE FUNCTION public.tg_set_updated_at();
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 CREATE TRIGGER handle_updated_at_ind_prod_entregas BEFORE UPDATE ON public.industria_producao_entregas FOR EACH ROW EXECUTE FUNCTION public.tg_set_updated_at();
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 CREATE TRIGGER handle_updated_at_ind_prod_ordens BEFORE UPDATE ON public.industria_producao_ordens FOR EACH ROW EXECUTE FUNCTION public.tg_set_updated_at();
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 CREATE TRIGGER handle_updated_at_ind_roteiros BEFORE UPDATE ON public.industria_roteiros FOR EACH ROW EXECUTE FUNCTION public.tg_set_updated_at();
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 CREATE TRIGGER handle_updated_at_ind_roteiros_etapas BEFORE UPDATE ON public.industria_roteiros_etapas FOR EACH ROW EXECUTE FUNCTION public.tg_set_updated_at();
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 CREATE TRIGGER tg_set_updated_at BEFORE UPDATE ON public.linhas_produto FOR EACH ROW EXECUTE FUNCTION public.touch_updated_at();
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 CREATE TRIGGER handle_updated_at_logistica_transportadoras BEFORE UPDATE ON public.logistica_transportadoras FOR EACH ROW EXECUTE FUNCTION public.tg_set_updated_at();
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 CREATE TRIGGER tg_set_updated_at BEFORE UPDATE ON public.marcas FOR EACH ROW EXECUTE FUNCTION public.touch_updated_at();
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 CREATE TRIGGER tg_metas_vendas_updated BEFORE UPDATE ON public.metas_vendas FOR EACH ROW EXECUTE FUNCTION public.tg_set_updated_at();
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 CREATE TRIGGER tg_os_item_after_change AFTER INSERT OR DELETE OR UPDATE ON public.ordem_servico_itens FOR EACH ROW EXECUTE FUNCTION public.tg_os_item_after_recalc();
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 CREATE TRIGGER tg_os_item_before BEFORE INSERT OR UPDATE ON public.ordem_servico_itens FOR EACH ROW EXECUTE FUNCTION public.tg_os_item_total_and_recalc();
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 CREATE TRIGGER tg_set_updated_at BEFORE UPDATE ON public.ordem_servico_itens FOR EACH ROW EXECUTE FUNCTION public.touch_updated_at();
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 CREATE TRIGGER tg_set_updated_at BEFORE UPDATE ON public.ordem_servico_parcelas FOR EACH ROW EXECUTE FUNCTION public.touch_updated_at();
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 CREATE TRIGGER tg_os_set_numero BEFORE INSERT ON public.ordem_servicos FOR EACH ROW EXECUTE FUNCTION public.tg_os_set_numero();
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 CREATE TRIGGER tg_set_updated_at BEFORE UPDATE ON public.ordem_servicos FOR EACH ROW EXECUTE FUNCTION public.touch_updated_at();
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 CREATE TRIGGER tg_permissions_updated BEFORE UPDATE ON public.permissions FOR EACH ROW EXECUTE FUNCTION public.tg_set_updated_at();
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 CREATE TRIGGER tg_check_empresa_pessoa_contatos BEFORE INSERT OR UPDATE ON public.pessoa_contatos FOR EACH ROW EXECUTE FUNCTION public.enforce_same_empresa_pessoa();
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 CREATE TRIGGER tg_set_updated_at BEFORE UPDATE ON public.pessoa_contatos FOR EACH ROW EXECUTE FUNCTION public.touch_updated_at();
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 CREATE TRIGGER tg_check_empresa_pessoa_enderecos BEFORE INSERT OR UPDATE ON public.pessoa_enderecos FOR EACH ROW EXECUTE FUNCTION public.enforce_same_empresa_pessoa();
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 CREATE TRIGGER tg_set_updated_at BEFORE UPDATE ON public.pessoa_enderecos FOR EACH ROW EXECUTE FUNCTION public.touch_updated_at();
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 CREATE TRIGGER tg_set_updated_at BEFORE UPDATE ON public.pessoas FOR EACH ROW EXECUTE FUNCTION public.touch_updated_at();
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 CREATE TRIGGER tg_set_updated_at BEFORE UPDATE ON public.products_legacy_archive FOR EACH ROW EXECUTE FUNCTION public.touch_updated_at();
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 CREATE TRIGGER tg_set_updated_at BEFORE UPDATE ON public.produto_anuncios FOR EACH ROW EXECUTE FUNCTION public.touch_updated_at();
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 CREATE TRIGGER tg_set_updated_at BEFORE UPDATE ON public.produto_atributos FOR EACH ROW EXECUTE FUNCTION public.touch_updated_at();
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 CREATE TRIGGER tg_emp_match_produto_fornecedores BEFORE INSERT OR UPDATE ON public.produto_fornecedores FOR EACH ROW EXECUTE FUNCTION public.enforce_same_empresa_produto_ou_fornecedor();
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 CREATE TRIGGER tg_set_updated_at BEFORE UPDATE ON public.produto_fornecedores FOR EACH ROW EXECUTE FUNCTION public.touch_updated_at();
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 CREATE TRIGGER tg_set_updated_at BEFORE UPDATE ON public.produto_imagens FOR EACH ROW EXECUTE FUNCTION public.touch_updated_at();
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 CREATE TRIGGER tg_set_updated_at BEFORE UPDATE ON public.produtos FOR EACH ROW EXECUTE FUNCTION public.touch_updated_at();
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 CREATE TRIGGER tg_set_updated_at BEFORE UPDATE ON public.profiles FOR EACH ROW EXECUTE FUNCTION public.touch_updated_at();
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 CREATE TRIGGER handle_updated_at_recebimento_itens BEFORE UPDATE ON public.recebimento_itens FOR EACH ROW EXECUTE FUNCTION public.tg_set_updated_at();
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 CREATE TRIGGER handle_updated_at_recebimentos BEFORE UPDATE ON public.recebimentos FOR EACH ROW EXECUTE FUNCTION public.tg_set_updated_at();
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 CREATE TRIGGER handle_updated_at_rh_cargo_comp BEFORE UPDATE ON public.rh_cargo_competencias FOR EACH ROW EXECUTE FUNCTION public.tg_set_updated_at();
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 CREATE TRIGGER handle_updated_at_rh_cargos BEFORE UPDATE ON public.rh_cargos FOR EACH ROW EXECUTE FUNCTION public.tg_set_updated_at();
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 CREATE TRIGGER handle_updated_at_rh_colab_comp BEFORE UPDATE ON public.rh_colaborador_competencias FOR EACH ROW EXECUTE FUNCTION public.tg_set_updated_at();
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 CREATE TRIGGER handle_updated_at_rh_colaboradores BEFORE UPDATE ON public.rh_colaboradores FOR EACH ROW EXECUTE FUNCTION public.tg_set_updated_at();
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 CREATE TRIGGER handle_updated_at_rh_competencias BEFORE UPDATE ON public.rh_competencias FOR EACH ROW EXECUTE FUNCTION public.tg_set_updated_at();
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 CREATE TRIGGER handle_updated_at_rh_treinamento_part BEFORE UPDATE ON public.rh_treinamento_participantes FOR EACH ROW EXECUTE FUNCTION public.tg_set_updated_at();
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 CREATE TRIGGER handle_updated_at_rh_treinamentos BEFORE UPDATE ON public.rh_treinamentos FOR EACH ROW EXECUTE FUNCTION public.tg_set_updated_at();
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 CREATE TRIGGER tg_role_permissions_updated BEFORE UPDATE ON public.role_permissions FOR EACH ROW EXECUTE FUNCTION public.tg_set_updated_at();
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 CREATE TRIGGER tg_roles_updated BEFORE UPDATE ON public.roles FOR EACH ROW EXECUTE FUNCTION public.tg_set_updated_at();
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 CREATE TRIGGER tg_set_updated_at BEFORE UPDATE ON public.servicos FOR EACH ROW EXECUTE FUNCTION public.touch_updated_at();
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 CREATE TRIGGER tg_set_updated_at BEFORE UPDATE ON public.subscriptions FOR EACH ROW EXECUTE FUNCTION public.touch_updated_at();
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 CREATE TRIGGER tg_set_updated_at BEFORE UPDATE ON public.tabelas_medidas FOR EACH ROW EXECUTE FUNCTION public.touch_updated_at();
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 CREATE TRIGGER tg_set_updated_at BEFORE UPDATE ON public.tags FOR EACH ROW EXECUTE FUNCTION public.touch_updated_at();
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 CREATE TRIGGER tg_set_updated_at BEFORE UPDATE ON public.transportadoras FOR EACH ROW EXECUTE FUNCTION public.touch_updated_at();
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 CREATE TRIGGER tg_set_updated_at BEFORE UPDATE ON public.user_active_empresa FOR EACH ROW EXECUTE FUNCTION public.touch_updated_at();
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 CREATE TRIGGER tg_upo_updated BEFORE UPDATE ON public.user_permission_overrides FOR EACH ROW EXECUTE FUNCTION public.tg_set_updated_at();
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 CREATE TRIGGER handle_updated_at_vendas_itens_pedido BEFORE UPDATE ON public.vendas_itens_pedido FOR EACH ROW EXECUTE FUNCTION public.tg_set_updated_at();
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
 
 CREATE TRIGGER handle_updated_at_vendas_pedidos BEFORE UPDATE ON public.vendas_pedidos FOR EACH ROW EXECUTE FUNCTION public.tg_set_updated_at();
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
 
 
