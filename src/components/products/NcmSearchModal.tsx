@@ -16,7 +16,7 @@ interface NcmResult {
 interface NcmSearchModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSelect: (ncm: string) => void;
+  onSelect: (ncm: string, description: string) => void;
 }
 
 const NcmSearchModal: React.FC<NcmSearchModalProps> = ({ isOpen, onClose, onSelect }) => {
@@ -97,7 +97,7 @@ const NcmSearchModal: React.FC<NcmSearchModalProps> = ({ isOpen, onClose, onSele
 
   const handleSelectNcm = (item: NcmResult) => {
     const rawCode = item.codigo.replace(/\D/g, '');
-    onSelect(rawCode);
+    onSelect(rawCode, item.descricao);
     onClose();
   };
 

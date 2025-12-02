@@ -1,6 +1,8 @@
-import React, { useState } from 'react';
-import { Sparkles } from 'lucide-react';
+import React, { useState, useEffect, useCallback } from 'react';
+import { Sparkles, Loader2 } from 'lucide-react';
 import NcmSearchModal from './NcmSearchModal';
+import axios from 'axios';
+import { useDebounce } from '@/hooks/useDebounce';
 
 interface NcmSearchProps {
   value: string;
@@ -9,6 +11,44 @@ interface NcmSearchProps {
 
 const NcmSearch: React.FC<NcmSearchProps> = ({ value, onChange }) => {
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [description, setDescription] = useState<string | null>(null);
+  const [isLoadingDescription, setIsLoadingDescription] = useState(false);
+
+  // Debounce value to avoid too many API calls while typing
+  const debouncedValue = useDebounce(value, 800);
+
+  const fetchDescription = useCallback(async (ncmCode: string) => {
+    const cleanCode = ncmCode.replace(/\D/g, '');
+    if (cleanCode.length !== 8) {
+      setDescription(null);
+      return;
+    }
+
+    setIsLoadingDescription(true);
+    try {
+      // We search for the specific NCM code to get its details
+      const response = await axios.get(`https://brasilapi.com.br/api/ncm/v1/${cleanCode}`);
+      if (response.data && response.data.descricao) {
+        setDescription(response.data.descricao);
+      } else {
+        setDescription(null);
+      }
+    } catch (error) {
+      console.error("Error fetching NCM description:", error);
+      setDescription(null);
+    } finally {
+      setIsLoadingDescription(false);
+    }
+  }, []);
+
+  // Effect to auto-fetch description when value changes (e.g. manual typing)
+  useEffect(() => {
+    if (debouncedValue && !description) {
+      fetchDescription(debouncedValue);
+    } else if (!debouncedValue) {
+      setDescription(null);
+    }
+  }, [debouncedValue, description, fetchDescription]);
 
   const handleNcmChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const rawValue = e.target.value;
@@ -25,10 +65,14 @@ const NcmSearch: React.FC<NcmSearchProps> = ({ value, onChange }) => {
       maskedValue = maskedValue.replace(/^(\d{4})\.(\d{2})/, '$1.$2.');
     }
 
+    // If user changes value manually, clear description so effect can re-fetch
+    if (maskedValue !== value) {
+      setDescription(null);
+    }
     onChange(maskedValue);
   };
 
-  const handleSelectNcm = (ncm: string) => {
+  const handleSelectNcm = (ncm: string, desc: string) => {
     // Ensure we have only digits before formatting
     const cleanNcm = ncm.replace(/\D/g, '');
     let maskedValue = cleanNcm;
@@ -39,6 +83,8 @@ const NcmSearch: React.FC<NcmSearchProps> = ({ value, onChange }) => {
     if (cleanNcm.length > 6) {
       maskedValue = maskedValue.replace(/^(\d{4})\.(\d{2})/, '$1.$2.');
     }
+
+    setDescription(desc);
     onChange(maskedValue);
   };
 
@@ -65,14 +111,26 @@ const NcmSearch: React.FC<NcmSearchProps> = ({ value, onChange }) => {
             <Sparkles size={20} />
           </button>
         </div>
+
+        {/* Description Display */}
+        <div className="mt-2 min-h-[20px]">
+          {isLoadingDescription ? (
+            <div className="flex items-center gap-2 text-xs text-gray-500 animate-pulse">
+              <Loader2 size={12} className="animate-spin" />
+              Buscando descrição...
+            </div>
+          ) : description ? (
+            <p className="text-xs text-gray-600 bg-gray-50 p-2 rounded border border-gray-100">
+              {description}
+            </p>
+          ) : null}
+        </div>
+
       </div>
       <NcmSearchModal
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
-        onSelect={(ncm) => {
-          handleSelectNcm(ncm);
-          setIsModalOpen(false);
-        }}
+        onSelect={handleSelectNcm}
       />
     </>
   );
