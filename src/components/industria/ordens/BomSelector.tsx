@@ -16,13 +16,18 @@ export default function BomSelector({ ordemId, produtoId, tipoOrdem, onApplied }
   const [boms, setBoms] = useState<BomListItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [applying, setApplying] = useState<string | null>(null);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [filterByProduct, setFilterByProduct] = useState(true);
   const { addToast } = useToast();
 
   const loadBoms = async () => {
-    if (!produtoId) return;
     setLoading(true);
     try {
-      const data = await listBoms(undefined, produtoId, tipoOrdem, true);
+      // Se filterByProduct for true, usa o produtoId recebido via prop.
+      // Caso contrário, passa undefined para listar BOMs de qualquer produto.
+      const targetProdutoId = filterByProduct ? produtoId : undefined;
+
+      const data = await listBoms(searchTerm, targetProdutoId, tipoOrdem, true);
       setBoms(data);
     } catch (e) {
       console.error(e);
@@ -35,11 +40,11 @@ export default function BomSelector({ ordemId, produtoId, tipoOrdem, onApplied }
     if (isOpen) {
       loadBoms();
     }
-  }, [isOpen, produtoId]);
+  }, [isOpen, filterByProduct, searchTerm]); // Recarrega ao mudar filtros
 
   const handleApply = async (bomId: string, mode: 'substituir' | 'adicionar') => {
     if (!confirm(`Tem certeza que deseja aplicar esta BOM? ${mode === 'substituir' ? 'Isso substituirá os componentes atuais.' : ''}`)) return;
-    
+
     setApplying(bomId);
     try {
       if (tipoOrdem === 'producao') {
@@ -62,29 +67,53 @@ export default function BomSelector({ ordemId, produtoId, tipoOrdem, onApplied }
       <button
         onClick={() => setIsOpen(true)}
         className="flex items-center gap-2 text-sm font-medium text-blue-600 hover:text-blue-800 hover:bg-blue-50 px-3 py-2 rounded-lg transition-colors"
-        disabled={!ordemId || !produtoId}
+        disabled={!ordemId}
       >
         <FileCog size={16} /> Aplicar BOM
       </button>
 
       <Modal isOpen={isOpen} onClose={() => setIsOpen(false)} title="Selecionar Ficha Técnica (BOM)" size="lg">
         <div className="p-6">
+          <div className="mb-4 space-y-3">
+            <input
+              type="text"
+              placeholder="Buscar por nome ou código..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="w-full p-2 border border-gray-300 rounded-md"
+            />
+            <div className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                id="filterByProduct"
+                checked={filterByProduct}
+                onChange={(e) => setFilterByProduct(e.target.checked)}
+                className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+              />
+              <label htmlFor="filterByProduct" className="text-sm text-gray-700">
+                Filtrar pelo produto/serviço selecionado na ordem
+              </label>
+            </div>
+          </div>
+
           {loading ? (
             <div className="flex justify-center p-8"><Loader2 className="animate-spin text-blue-500" /></div>
           ) : boms.length === 0 ? (
             <div className="text-center text-gray-500 p-8">
-              <p>Nenhuma ficha técnica ativa encontrada para este produto.</p>
+              <p>Nenhuma ficha técnica encontrada.</p>
+              {filterByProduct && <p className="text-xs mt-2">Tente desmarcar o filtro de produto acima.</p>}
             </div>
           ) : (
-            <div className="space-y-4">
+            <div className="space-y-4 max-h-96 overflow-y-auto">
               {boms.map(bom => (
                 <div key={bom.id} className="border rounded-lg p-4 hover:bg-gray-50 flex justify-between items-center">
                   <div>
                     <div className="flex items-center gap-2">
-                        <h4 className="font-bold text-gray-800">{bom.codigo || 'Sem código'} (v{bom.versao})</h4>
-                        {bom.padrao_para_producao && <span className="text-xs bg-green-100 text-green-800 px-2 py-0.5 rounded-full">Padrão</span>}
+                      <h4 className="font-bold text-gray-800">{bom.codigo || 'Sem código'} (v{bom.versao})</h4>
+                      {bom.padrao_para_producao && <span className="text-xs bg-green-100 text-green-800 px-2 py-0.5 rounded-full">Padrão</span>}
                     </div>
                     <p className="text-sm text-gray-600">{bom.descricao}</p>
+                    <p className="text-xs text-gray-500 mt-1">Produto: {bom.produto_nome}</p>
                   </div>
                   <div className="flex gap-2">
                     <button

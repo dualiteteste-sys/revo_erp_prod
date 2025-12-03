@@ -71,7 +71,7 @@ export async function updateStatusBeneficiamento(id: string, status: StatusBenef
 export async function manageComponenteBenef(
   ordemId: string,
   componenteId: string | null,
-  produtoId: string,
+  produtoId: string | null,
   qtdPlanejada: number,
   unidade: string,
   action: 'upsert' | 'delete' = 'upsert'
