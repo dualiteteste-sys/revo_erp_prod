@@ -12,6 +12,7 @@ const ProductsPage = lazyImport(() => import('../pages/products/ProductsPage'));
 const PartnersPage = lazyImport(() => import('../pages/partners/PartnersPage'));
 const CarriersPage = lazyImport(() => import("../pages/carriers/CarriersPage"));
 const ServicesPage = lazyImport(() => import("../pages/services/ServicesPage"));
+const GrupoProdutosPage = lazyImport(() => import("../pages/cadastros/GrupoProdutosPage"));
 const SalesDashboard = lazyImport(() => import("../pages/SalesDashboard"));
 const SalesGoalsPage = lazyImport(() => import("../pages/sales/SalesGoalsPage"));
 const OSPage = lazyImport(() => import("../pages/os/OSPage"));
@@ -81,6 +82,7 @@ export const appRoutes: RouteObject[] = [
             { path: "partners", element: <Suspense fallback={<PageLoader />}><PartnersPage /></Suspense> },
             { path: "carriers", element: <Suspense fallback={<PageLoader />}><CarriersPage /></Suspense> },
             { path: "services", element: <Suspense fallback={<PageLoader />}><ServicesPage /></Suspense> },
+            { path: "cadastros/grupos-produtos", element: <Suspense fallback={<PageLoader />}><GrupoProdutosPage /></Suspense> },
 
             // Indústria
             { path: "industria/dashboard", element: <Suspense fallback={<PageLoader />}><IndustriaDashboardPage /></Suspense> },
