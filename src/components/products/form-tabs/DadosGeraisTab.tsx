@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { ProductFormData } from '../ProductFormPanel';
 import { tipo_produto, status_produto } from '../../../types/database.types';
 import Section from '../../ui/forms/Section';
@@ -9,6 +9,8 @@ import TextArea from '../../ui/forms/TextArea';
 import { useNumericField } from '../../../hooks/useNumericField';
 import FiscalFields from '../form-sections/FiscalFields';
 import PackagingFields from '../form-sections/PackagingFields';
+import { listProdutoGrupos, ProdutoGrupo } from '../../../services/produtoGrupos';
+import { listUnidades, UnidadeMedida } from '../../../services/unidades';
 
 const tipoProdutoOptions: { value: tipo_produto; label: string }[] = [
   { value: 'simples', label: 'Simples' },
@@ -27,9 +29,12 @@ interface FormErrors {
   nome?: string;
 }
 
+// Extend ProductFormData to include grupo_id until database types are updated
+type ExtendedProductFormData = ProductFormData & { grupo_id?: string | null };
+
 interface DadosGeraisTabProps {
-  data: ProductFormData;
-  onChange: (field: keyof ProductFormData, value: any) => void;
+  data: ExtendedProductFormData;
+  onChange: (field: keyof ExtendedProductFormData, value: any) => void;
   errors: FormErrors;
   isService?: boolean;
 }
@@ -38,6 +43,14 @@ const DadosGeraisTab: React.FC<DadosGeraisTabProps> = ({ data, onChange, errors,
   const precoVendaProps = useNumericField(data.preco_venda, (value) => onChange('preco_venda', value));
   const estoqueMinProps = useNumericField(data.estoque_min, (value) => onChange('estoque_min', value));
   const estoqueMaxProps = useNumericField(data.estoque_max, (value) => onChange('estoque_max', value));
+
+  const [grupos, setGrupos] = useState<ProdutoGrupo[]>([]);
+  const [unidades, setUnidades] = useState<UnidadeMedida[]>([]);
+
+  useEffect(() => {
+    listProdutoGrupos().then(setGrupos).catch(console.error);
+    listUnidades().then(setUnidades).catch(console.error);
+  }, []);
 
   return (
     <div>
@@ -55,14 +68,18 @@ const DadosGeraisTab: React.FC<DadosGeraisTabProps> = ({ data, onChange, errors,
           placeholder={isService ? "Ex: Corte e Costura" : "Ex: Camiseta de Algodão Pima"}
           error={errors.nome}
         />
-        <Input
+        <Select
           label="Unidade"
           name="unidade"
-          value={data.unidade || 'un'}
+          value={data.unidade || ''}
           onChange={(e) => onChange('unidade', e.target.value)}
           className="sm:col-span-2"
-          placeholder="Ex: un, kg, m, pç"
-        />
+        >
+          <option value="">Selecione...</option>
+          {unidades.map(u => (
+            <option key={u.id} value={u.sigla}>{u.sigla} - {u.descricao}</option>
+          ))}
+        </Select>
         <Input
           label="Preço de Venda"
           name="preco_venda"
@@ -100,6 +117,20 @@ const DadosGeraisTab: React.FC<DadosGeraisTabProps> = ({ data, onChange, errors,
         >
           {statusProdutoOptions.map(opt => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
         </Select>
+
+        <Select
+          label="Grupo"
+          name="grupo_id"
+          value={data.grupo_id || ''}
+          onChange={(e) => onChange('grupo_id', e.target.value || null)}
+          className="sm:col-span-3"
+        >
+          <option value="">Selecione um grupo...</option>
+          {grupos.map(g => (
+            <option key={g.id} value={g.id}>{g.nome}</option>
+          ))}
+        </Select>
+
         {!isService && (
           <Select
             label="Tipo do produto"

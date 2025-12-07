@@ -6,7 +6,7 @@ import {
   Bot, Undo2, ClipboardCheck, Banknote, Wallet, TrendingUp,
   TrendingDown, Landmark, FileSpreadsheet, LogOut, Search, Building, Code, Database, Target,
   Briefcase, BookOpen, Grid, GraduationCap, PieChart, Factory, Hammer, Layers, FileCog, Route, PlayCircle, HardHat, FileCode,
-  PackageCheck, FileUp
+  PackageCheck, FileUp, FolderTree, Ruler
 } from 'lucide-react';
 
 export interface MenuItem {
@@ -35,6 +35,8 @@ export const menuConfig: { name: string; icon: React.ElementType; href: string; 
     children: [
       { name: 'Clientes e Fornecedores', icon: Users2, href: '/app/partners' },
       { name: 'Produtos', icon: Package, href: '/app/products' },
+      { name: 'Grupos de Produtos', icon: FolderTree, href: '/app/cadastros/grupos-produtos' },
+      { name: 'Unidades de Medida', icon: Ruler, href: '/app/cadastros/unidades-medida' },
       { name: 'Transportadoras', icon: Truck, href: '/app/carriers' },
       { name: 'Serviços', icon: Wrench, href: '/app/services' },
       { name: 'Vendedores', icon: UserSquare, href: '#' },

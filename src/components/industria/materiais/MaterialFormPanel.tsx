@@ -8,7 +8,9 @@ import TextArea from '@/components/ui/forms/TextArea';
 import Toggle from '@/components/ui/forms/Toggle';
 import ClientAutocomplete from '@/components/common/ClientAutocomplete';
 import ItemAutocomplete from '@/components/os/ItemAutocomplete';
+import Select from '@/components/ui/forms/Select';
 import { OsItemSearchResult } from '@/services/os';
+import { listUnidades, UnidadeMedida } from '@/services/unidades';
 
 interface Props {
   materialId: string | null;
@@ -20,13 +22,16 @@ export default function MaterialFormPanel({ materialId, onSaveSuccess, onClose }
   const { addToast } = useToast();
   const [loading, setLoading] = useState(!!materialId);
   const [isSaving, setIsSaving] = useState(false);
-  
+
   const [formData, setFormData] = useState<Partial<MaterialClienteDetails>>({
     ativo: true,
     unidade: 'un'
   });
 
+  const [unidades, setUnidades] = useState<UnidadeMedida[]>([]);
+
   useEffect(() => {
+    listUnidades().then(setUnidades).catch(console.error);
     if (materialId) {
       loadDetails();
     }
@@ -51,11 +56,11 @@ export default function MaterialFormPanel({ materialId, onSaveSuccess, onClose }
 
   const handleProductSelect = (item: OsItemSearchResult) => {
     if (item.type !== 'product') {
-        addToast('Selecione apenas produtos para vincular.', 'warning');
-        return;
+      addToast('Selecione apenas produtos para vincular.', 'warning');
+      return;
     }
     handleChange('produto_id', item.id);
-    handleChange('produto_nome', item.descricao);
+    handleChange('produto_nome' as any, item.descricao);
   };
 
   const handleSave = async () => {
@@ -97,70 +102,75 @@ export default function MaterialFormPanel({ materialId, onSaveSuccess, onClose }
     <div className="flex flex-col h-full">
       <div className="flex-grow p-6 overflow-y-auto scrollbar-styled">
         <Section title="Vínculo" description="Associe o material do cliente a um produto interno.">
-            <div className="sm:col-span-3">
-                <label className="block text-sm font-medium text-gray-700 mb-1">Cliente</label>
-                <ClientAutocomplete
-                    value={formData.cliente_id || null}
-                    initialName={formData.cliente_nome}
-                    onChange={(id, name) => {
-                        handleChange('cliente_id', id);
-                        if (name) handleChange('cliente_nome', name);
-                    }}
-                />
-            </div>
-            <div className="sm:col-span-3">
-                <label className="block text-sm font-medium text-gray-700 mb-1">Produto Interno (Nosso)</label>
-                {formData.id ? (
-                    <div className="p-3 bg-gray-100 border border-gray-300 rounded-lg text-gray-700">
-                        {formData.produto_nome}
-                    </div>
-                ) : (
-                    <ItemAutocomplete onSelect={handleProductSelect} />
-                )}
-                {formData.produto_nome && !formData.id && <p className="text-xs text-gray-500 mt-1">Selecionado: {formData.produto_nome}</p>}
-            </div>
+          <div className="sm:col-span-3">
+            <label className="block text-sm font-medium text-gray-700 mb-1">Cliente</label>
+            <ClientAutocomplete
+              value={formData.cliente_id || null}
+              initialName={formData.cliente_nome}
+              onChange={(id, name) => {
+                handleChange('cliente_id', id);
+                if (name) handleChange('cliente_nome' as any, name);
+              }}
+            />
+          </div>
+          <div className="sm:col-span-3">
+            <label className="block text-sm font-medium text-gray-700 mb-1">Produto Interno (Nosso)</label>
+            {formData.id ? (
+              <div className="p-3 bg-gray-100 border border-gray-300 rounded-lg text-gray-700">
+                {formData.produto_nome}
+              </div>
+            ) : (
+              <ItemAutocomplete onSelect={handleProductSelect} />
+            )}
+            {formData.produto_nome && !formData.id && <p className="text-xs text-gray-500 mt-1">Selecionado: {formData.produto_nome}</p>}
+          </div>
         </Section>
 
         <Section title="Dados do Cliente" description="Como este material é identificado pelo cliente.">
-            <Input 
-                label="Código no Cliente" 
-                name="cod_cli" 
-                value={formData.codigo_cliente || ''} 
-                onChange={e => handleChange('codigo_cliente', e.target.value)} 
-                className="sm:col-span-2"
-                placeholder="Ex: MAT-001"
+          <Input
+            label="Código no Cliente"
+            name="cod_cli"
+            value={formData.codigo_cliente || ''}
+            onChange={e => handleChange('codigo_cliente', e.target.value)}
+            className="sm:col-span-2"
+            placeholder="Ex: MAT-001"
+          />
+          <Input
+            label="Nome/Descrição no Cliente"
+            name="nome_cli"
+            value={formData.nome_cliente || ''}
+            onChange={e => handleChange('nome_cliente', e.target.value)}
+            className="sm:col-span-4"
+            placeholder="Descrição conforme nota fiscal do cliente"
+          />
+          <Select
+            label="Unidade"
+            name="unidade"
+            value={formData.unidade || ''}
+            onChange={e => handleChange('unidade', e.target.value)}
+            className="sm:col-span-2"
+          >
+            <option value="">Selecione...</option>
+            {unidades.map(u => (
+              <option key={u.id} value={u.sigla}>{u.sigla} - {u.descricao}</option>
+            ))}
+          </Select>
+          <div className="sm:col-span-4 flex items-center pt-6">
+            <Toggle
+              label="Ativo"
+              name="ativo"
+              checked={formData.ativo !== false}
+              onChange={checked => handleChange('ativo', checked)}
             />
-            <Input 
-                label="Nome/Descrição no Cliente" 
-                name="nome_cli" 
-                value={formData.nome_cliente || ''} 
-                onChange={e => handleChange('nome_cliente', e.target.value)} 
-                className="sm:col-span-4"
-                placeholder="Descrição conforme nota fiscal do cliente"
-            />
-            <Input 
-                label="Unidade" 
-                name="unidade" 
-                value={formData.unidade || ''} 
-                onChange={e => handleChange('unidade', e.target.value)} 
-                className="sm:col-span-2"
-            />
-            <div className="sm:col-span-4 flex items-center pt-6">
-                <Toggle 
-                    label="Ativo" 
-                    name="ativo" 
-                    checked={formData.ativo !== false} 
-                    onChange={checked => handleChange('ativo', checked)} 
-                />
-            </div>
-            <TextArea 
-                label="Observações" 
-                name="obs" 
-                value={formData.observacoes || ''} 
-                onChange={e => handleChange('observacoes', e.target.value)} 
-                rows={3} 
-                className="sm:col-span-6" 
-            />
+          </div>
+          <TextArea
+            label="Observações"
+            name="obs"
+            value={formData.observacoes || ''}
+            onChange={e => handleChange('observacoes', e.target.value)}
+            rows={3}
+            className="sm:col-span-6"
+          />
         </Section>
       </div>
 
@@ -169,8 +179,8 @@ export default function MaterialFormPanel({ materialId, onSaveSuccess, onClose }
           <button onClick={onClose} className="rounded-md border border-gray-300 bg-white py-2 px-4 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50">
             Cancelar
           </button>
-          <button 
-            onClick={handleSave} 
+          <button
+            onClick={handleSave}
             disabled={isSaving}
             className="flex items-center gap-2 bg-blue-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-blue-700 disabled:opacity-50"
           >
