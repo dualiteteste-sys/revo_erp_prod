@@ -22,6 +22,7 @@ import ItemAutocomplete from '@/components/os/ItemAutocomplete';
 import { ensureMaterialCliente } from '@/services/industriaMateriais';
 import { OsItemSearchResult } from '@/services/os';
 import { OrdemEntrega } from '@/services/industria';
+import { listUnidades, UnidadeMedida } from '@/services/unidades';
 
 interface Props {
   ordemId: string | null;
@@ -38,6 +39,11 @@ export default function BeneficiamentoFormPanel({ ordemId, initialData, onSaveSu
 
   const [isClientModalOpen, setIsClientModalOpen] = useState(false);
   const [clientModalData, setClientModalData] = useState<PartnerDetails | null>(null);
+  const [unidades, setUnidades] = useState<UnidadeMedida[]>([]);
+
+  useEffect(() => {
+    listUnidades().then(setUnidades).catch(console.error);
+  }, []);
 
   const [selectedProduto, setSelectedProduto] = useState<{ id: string, nome: string, unidade: string } | null>(null);
 
@@ -62,7 +68,7 @@ export default function BeneficiamentoFormPanel({ ordemId, initialData, onSaveSu
         quantidade_planejada: item.quantidade,
         unidade: item.unidade,
         documento_ref: recebimento.numero ? `NF ${recebimento.numero}` : undefined,
-        produto_material_cliente_id: null,
+        produto_material_cliente_id: null as any,
         produto_material_nome: item.produto_nome,
       }));
 
@@ -162,7 +168,7 @@ export default function BeneficiamentoFormPanel({ ordemId, initialData, onSaveSu
   const handleServiceSelect = (id: string | null, service?: Service) => {
     handleHeaderChange('produto_servico_id', id);
     if (service) {
-      handleHeaderChange('produto_servico_nome', service.descricao);
+      handleHeaderChange('produto_servico_nome' as any, service.descricao);
       if (service.unidade) {
         handleHeaderChange('unidade', service.unidade);
       }
@@ -179,7 +185,7 @@ export default function BeneficiamentoFormPanel({ ordemId, initialData, onSaveSu
       nome: item.descricao,
       unidade: item.unidade || 'un'
     });
-    handleHeaderChange('produto_material_nome', item.descricao);
+    handleHeaderChange('produto_material_nome' as any, item.descricao);
     handleHeaderChange('produto_material_cliente_id', null);
   };
 
@@ -227,7 +233,7 @@ export default function BeneficiamentoFormPanel({ ordemId, initialData, onSaveSu
         id: formData.id,
         cliente_id: formData.cliente_id,
         produto_servico_id: formData.produto_servico_id,
-        produto_material_cliente_id: formData.usa_material_cliente ? materialClienteId : null,
+        produto_material_cliente_id: formData.usa_material_cliente ? (materialClienteId || null) : null,
         usa_material_cliente: formData.usa_material_cliente,
         quantidade_planejada: formData.quantidade_planejada,
         unidade: formData.unidade,
@@ -448,10 +454,10 @@ export default function BeneficiamentoFormPanel({ ordemId, initialData, onSaveSu
                       initialName={formData.cliente_nome}
                       onChange={(id, name) => {
                         handleHeaderChange('cliente_id', id);
-                        if (name) handleHeaderChange('cliente_nome', name);
+                        if (name) handleHeaderChange('cliente_nome' as any, name);
                         handleHeaderChange('produto_material_cliente_id', null);
                         setSelectedProduto(null);
-                        handleHeaderChange('produto_material_nome', null);
+                        handleHeaderChange('produto_material_nome' as any, null);
                       }}
                       disabled={isLocked}
                     />
@@ -488,13 +494,18 @@ export default function BeneficiamentoFormPanel({ ordemId, initialData, onSaveSu
                 />
               </div>
               <div className="sm:col-span-1">
-                <Input
+                <Select
                   label="Unidade"
                   name="unidade"
                   value={formData.unidade || ''}
                   onChange={e => handleHeaderChange('unidade', e.target.value)}
                   disabled={isLocked}
-                />
+                >
+                  <option value="">Selecione...</option>
+                  {unidades.map(u => (
+                    <option key={u.id} value={u.sigla}>{u.sigla} - {u.descricao}</option>
+                  ))}
+                </Select>
               </div>
               <div className="sm:col-span-6">
                 <Toggle

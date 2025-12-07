@@ -11,6 +11,7 @@ import OrdemFormItems from '../ordens/OrdemFormItems';
 import OrdemEntregas from '../ordens/OrdemEntregas';
 import BomSelector from '../ordens/BomSelector';
 import { formatOrderNumber } from '@/lib/utils';
+import { listUnidades, UnidadeMedida } from '@/services/unidades';
 
 interface Props {
   ordemId: string | null;
@@ -23,6 +24,11 @@ export default function ProducaoFormPanel({ ordemId, onSaveSuccess, onClose }: P
   const [loading, setLoading] = useState(!!ordemId);
   const [isSaving, setIsSaving] = useState(false);
   const [activeTab, setActiveTab] = useState<'dados' | 'componentes' | 'entregas'>('dados');
+  const [unidades, setUnidades] = useState<UnidadeMedida[]>([]);
+
+  useEffect(() => {
+    listUnidades().then(setUnidades).catch(console.error);
+  }, []);
 
   const [formData, setFormData] = useState<Partial<OrdemProducaoDetails>>({
     status: 'rascunho',
@@ -62,7 +68,7 @@ export default function ProducaoFormPanel({ ordemId, onSaveSuccess, onClose }: P
 
   const handleProductSelect = (item: any) => {
     handleHeaderChange('produto_final_id', item.id);
-    handleHeaderChange('produto_nome', item.descricao);
+    handleHeaderChange('produto_nome' as any, item.descricao);
   };
 
   const handleSaveHeader = async () => {
@@ -209,8 +215,8 @@ export default function ProducaoFormPanel({ ordemId, onSaveSuccess, onClose }: P
           <button
             onClick={() => setActiveTab('dados')}
             className={`whitespace-nowrap py-2 px-3 border-b-2 font-medium text-sm transition-colors ${activeTab === 'dados'
-                ? 'border-blue-500 text-blue-600'
-                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+              ? 'border-blue-500 text-blue-600'
+              : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
               }`}
           >
             Dados Gerais
@@ -218,8 +224,8 @@ export default function ProducaoFormPanel({ ordemId, onSaveSuccess, onClose }: P
           <button
             onClick={() => setActiveTab('componentes')}
             className={`whitespace-nowrap py-2 px-3 border-b-2 font-medium text-sm transition-colors ${activeTab === 'componentes'
-                ? 'border-blue-500 text-blue-600'
-                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+              ? 'border-blue-500 text-blue-600'
+              : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
               }`}
             disabled={!formData.id}
           >
@@ -228,8 +234,8 @@ export default function ProducaoFormPanel({ ordemId, onSaveSuccess, onClose }: P
           <button
             onClick={() => setActiveTab('entregas')}
             className={`whitespace-nowrap py-2 px-3 border-b-2 font-medium text-sm transition-colors ${activeTab === 'entregas'
-                ? 'border-blue-500 text-blue-600'
-                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+              ? 'border-blue-500 text-blue-600'
+              : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
               }`}
             disabled={!formData.id}
           >
@@ -268,13 +274,18 @@ export default function ProducaoFormPanel({ ordemId, onSaveSuccess, onClose }: P
                 />
               </div>
               <div className="sm:col-span-1">
-                <Input
+                <Select
                   label="Unidade"
                   name="unidade"
                   value={formData.unidade || ''}
                   onChange={e => handleHeaderChange('unidade', e.target.value)}
                   disabled={isLocked}
-                />
+                >
+                  <option value="">Selecione...</option>
+                  {unidades.map(u => (
+                    <option key={u.id} value={u.sigla}>{u.sigla} - {u.descricao}</option>
+                  ))}
+                </Select>
               </div>
               <div className="sm:col-span-2">
                 <Select label="Origem" name="origem" value={formData.origem_ordem} onChange={e => handleHeaderChange('origem_ordem', e.target.value)} disabled={isLocked}>

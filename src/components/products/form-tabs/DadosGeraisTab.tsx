@@ -10,6 +10,7 @@ import { useNumericField } from '../../../hooks/useNumericField';
 import FiscalFields from '../form-sections/FiscalFields';
 import PackagingFields from '../form-sections/PackagingFields';
 import { listProdutoGrupos, ProdutoGrupo } from '../../../services/produtoGrupos';
+import { listUnidades, UnidadeMedida } from '../../../services/unidades';
 
 const tipoProdutoOptions: { value: tipo_produto; label: string }[] = [
   { value: 'simples', label: 'Simples' },
@@ -44,9 +45,11 @@ const DadosGeraisTab: React.FC<DadosGeraisTabProps> = ({ data, onChange, errors,
   const estoqueMaxProps = useNumericField(data.estoque_max, (value) => onChange('estoque_max', value));
 
   const [grupos, setGrupos] = useState<ProdutoGrupo[]>([]);
+  const [unidades, setUnidades] = useState<UnidadeMedida[]>([]);
 
   useEffect(() => {
     listProdutoGrupos().then(setGrupos).catch(console.error);
+    listUnidades().then(setUnidades).catch(console.error);
   }, []);
 
   return (
@@ -65,14 +68,18 @@ const DadosGeraisTab: React.FC<DadosGeraisTabProps> = ({ data, onChange, errors,
           placeholder={isService ? "Ex: Corte e Costura" : "Ex: Camiseta de Algodão Pima"}
           error={errors.nome}
         />
-        <Input
+        <Select
           label="Unidade"
           name="unidade"
-          value={data.unidade || 'un'}
+          value={data.unidade || ''}
           onChange={(e) => onChange('unidade', e.target.value)}
           className="sm:col-span-2"
-          placeholder="Ex: un, kg, m, pç"
-        />
+        >
+          <option value="">Selecione...</option>
+          {unidades.map(u => (
+            <option key={u.id} value={u.sigla}>{u.sigla} - {u.descricao}</option>
+          ))}
+        </Select>
         <Input
           label="Preço de Venda"
           name="preco_venda"
