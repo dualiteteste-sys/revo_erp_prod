@@ -20,7 +20,7 @@ export const listUnidades = async () => {
     return data as UnidadeMedida[];
 };
 
-export const createUnidade = async (unidade: Omit<UnidadeMedida, 'id' | 'created_at' | 'updated_at' | 'empresa_id'>) => {
+export const createUnidade = async (unidade: Omit<UnidadeMedida, 'id' | 'created_at' | 'updated_at'>) => {
     const { data, error } = await supabase
         .from('unidades_medida' as any)
         .insert(unidade as any)

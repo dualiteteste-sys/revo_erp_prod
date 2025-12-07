@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Loader2, Save } from 'lucide-react';
 import { useToast } from '@/contexts/ToastProvider';
+import { useAuth } from '@/contexts/AuthProvider';
 import Section from '@/components/ui/forms/Section';
 import Input from '@/components/ui/forms/Input';
 import Toggle from '@/components/ui/forms/Toggle';
@@ -14,6 +15,7 @@ interface Props {
 
 export default function UnidadeFormPanel({ data, onSaveSuccess, onClose }: Props) {
     const { addToast } = useToast();
+    const { activeEmpresaId } = useAuth();
     const [isSaving, setIsSaving] = useState(false);
 
     const [formData, setFormData] = useState<Partial<UnidadeMedida>>({
@@ -52,10 +54,17 @@ export default function UnidadeFormPanel({ data, onSaveSuccess, onClose }: Props
                 });
                 addToast('Unidade atualizada com sucesso!', 'success');
             } else {
+                if (!activeEmpresaId) {
+                    addToast('Empresa ativa não identificada.', 'error');
+                    setIsSaving(false);
+                    return;
+                }
+
                 await createUnidade({
                     sigla: formData.sigla!,
                     descricao: formData.descricao!,
-                    ativo: formData.ativo ?? true
+                    ativo: formData.ativo ?? true,
+                    empresa_id: activeEmpresaId
                 });
                 addToast('Unidade criada com sucesso!', 'success');
             }

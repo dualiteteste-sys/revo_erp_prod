@@ -7,7 +7,7 @@ interface InputProps extends React.InputHTMLAttributes<HTMLInputElement> {
   error?: string;
 }
 
-const Input: React.FC<InputProps> = ({ label, name, className, startAdornment, endAdornment, error, ...props }) => {
+const Input = React.forwardRef<HTMLInputElement, InputProps>(({ label, name, className, startAdornment, endAdornment, error, ...props }, ref) => {
   const errorClasses = error
     ? 'border-red-500 focus:border-red-500 focus:ring-red-500'
     : 'border-gray-300 focus:ring-blue-500 focus:border-blue-500';
@@ -25,6 +25,7 @@ const Input: React.FC<InputProps> = ({ label, name, className, startAdornment, e
           </div>
         )}
         <input
+          ref={ref}
           id={name}
           name={name}
           {...props}
@@ -39,6 +40,8 @@ const Input: React.FC<InputProps> = ({ label, name, className, startAdornment, e
       {error && <p className="text-red-500 text-xs mt-1">{error}</p>}
     </div>
   );
-};
+});
+
+Input.displayName = 'Input';
 
 export default Input;

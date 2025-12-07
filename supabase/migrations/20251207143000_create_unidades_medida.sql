@@ -22,7 +22,7 @@ CREATE POLICY "Enable read access for authenticated users" ON public.unidades_me
     USING (
         empresa_id IS NULL 
         OR 
-        empresa_id = (SELECT auth.user_empresa_id())
+        empresa_id = public.current_empresa_id()
     );
 
 -- 2. Insert: Allow authenticated users to insert units for their own company
@@ -30,7 +30,7 @@ CREATE POLICY "Enable insert for authenticated users" ON public.unidades_medida
     FOR INSERT
     TO authenticated
     WITH CHECK (
-        empresa_id = (SELECT auth.user_empresa_id())
+        empresa_id = public.current_empresa_id()
     );
 
 -- 3. Update: Allow authenticated users to update units for their own company
@@ -38,10 +38,10 @@ CREATE POLICY "Enable update for authenticated users" ON public.unidades_medida
     FOR UPDATE
     TO authenticated
     USING (
-        empresa_id = (SELECT auth.user_empresa_id())
+        empresa_id = public.current_empresa_id()
     )
     WITH CHECK (
-        empresa_id = (SELECT auth.user_empresa_id())
+        empresa_id = public.current_empresa_id()
     );
 
 -- 4. Delete: Allow authenticated users to delete units for their own company
@@ -49,7 +49,7 @@ CREATE POLICY "Enable delete for authenticated users" ON public.unidades_medida
     FOR DELETE
     TO authenticated
     USING (
-        empresa_id = (SELECT auth.user_empresa_id())
+        empresa_id = public.current_empresa_id()
     );
 
 -- Seed default data
