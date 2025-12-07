@@ -32,17 +32,30 @@ create table if not exists audit.events (
   changed_fields text[]
 );
 
-create or replace function audit.list_events_for_current_user(
-  p_from timestamptz,
-  p_to timestamptz,
-  p_source text[],
-  p_table text[],
-  p_op text[],
-  p_q text,
-  p_after timestamptz,
-  p_limit int
-) returns setof audit.events
-language sql stable
-as $$
-  select * from audit.events limit p_limit;
-$$;
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 
+        FROM pg_proc p 
+        JOIN pg_namespace n ON p.pronamespace = n.oid 
+        WHERE n.nspname = 'audit' 
+        AND p.proname = 'list_events_for_current_user'
+    ) THEN
+        EXECUTE '
+            create function audit.list_events_for_current_user(
+              p_from timestamptz,
+              p_to timestamptz,
+              p_source text[],
+              p_table text[],
+              p_op text[],
+              p_q text,
+              p_after timestamptz,
+              p_limit int
+            ) returns setof audit.events
+            language sql stable
+            as $func$
+              select * from audit.events limit p_limit;
+            $func$;
+        ';
+    END IF;
+END $$;
