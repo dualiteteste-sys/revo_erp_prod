@@ -102,6 +102,47 @@ export interface Database {
           updated_at?: string
         }
       }
+      embalagens: {
+        Row: {
+          id: string
+          empresa_id: string | null
+          nome: string
+          tipo: tipo_embalagem
+          ativo: boolean
+          largura: number | null
+          altura: number | null
+          comprimento: number | null
+          diametro: number | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          empresa_id?: string | null
+          nome: string
+          tipo?: tipo_embalagem
+          ativo?: boolean
+          largura?: number | null
+          altura?: number | null
+          comprimento?: number | null
+          diametro?: number | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          empresa_id?: string | null
+          nome?: string
+          tipo?: tipo_embalagem
+          ativo?: boolean
+          largura?: number | null
+          altura?: number | null
+          comprimento?: number | null
+          diametro?: number | null
+          created_at?: string
+          updated_at?: string
+        }
+      }
       empresa_addons: {
         Row: {
           empresa_id: string
