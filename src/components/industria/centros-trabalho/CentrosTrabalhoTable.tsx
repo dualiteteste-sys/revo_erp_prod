@@ -1,13 +1,15 @@
 import React from 'react';
 import { CentroTrabalho } from '@/services/industriaCentros';
-import { Edit, CheckCircle, XCircle } from 'lucide-react';
+import { Edit, CheckCircle, XCircle, Copy, Trash2 } from 'lucide-react';
 
 interface Props {
   centros: CentroTrabalho[];
   onEdit: (centro: CentroTrabalho) => void;
+  onClone: (centro: CentroTrabalho) => void;
+  onDelete: (centro: CentroTrabalho) => void;
 }
 
-export default function CentrosTrabalhoTable({ centros, onEdit }: Props) {
+export default function CentrosTrabalhoTable({ centros, onEdit, onClone, onDelete }: Props) {
   return (
     <div className="overflow-x-auto">
       <table className="min-w-full divide-y divide-gray-200">
@@ -31,9 +33,9 @@ export default function CentrosTrabalhoTable({ centros, onEdit }: Props) {
               <td className="px-6 py-4 text-sm text-gray-600">{centro.codigo || '-'}</td>
               <td className="px-6 py-4">
                 <span className={`px-2 py-1 rounded-full text-xs font-semibold uppercase 
-                  ${centro.tipo_uso === 'producao' ? 'bg-blue-100 text-blue-800' : 
-                    centro.tipo_uso === 'beneficiamento' ? 'bg-purple-100 text-purple-800' : 
-                    'bg-gray-100 text-gray-800'}`}>
+                  ${centro.tipo_uso === 'producao' ? 'bg-blue-100 text-blue-800' :
+                    centro.tipo_uso === 'beneficiamento' ? 'bg-purple-100 text-purple-800' :
+                      'bg-gray-100 text-gray-800'}`}>
                   {centro.tipo_uso}
                 </span>
               </td>
@@ -48,9 +50,29 @@ export default function CentrosTrabalhoTable({ centros, onEdit }: Props) {
                 )}
               </td>
               <td className="px-6 py-4 text-right">
-                <button onClick={() => onEdit(centro)} className="text-blue-600 hover:text-blue-800 p-2 hover:bg-blue-50 rounded-full transition-colors">
-                  <Edit size={18} />
-                </button>
+                <div className="flex justify-end gap-2">
+                  <button
+                    onClick={() => onClone(centro)}
+                    className="text-gray-500 hover:text-gray-700 p-2 hover:bg-gray-100 rounded-full transition-colors"
+                    title="Clonar"
+                  >
+                    <Copy size={18} />
+                  </button>
+                  <button
+                    onClick={() => onEdit(centro)}
+                    className="text-blue-600 hover:text-blue-800 p-2 hover:bg-blue-50 rounded-full transition-colors"
+                    title="Editar"
+                  >
+                    <Edit size={18} />
+                  </button>
+                  <button
+                    onClick={() => onDelete(centro)}
+                    className="text-red-600 hover:text-red-800 p-2 hover:bg-red-50 rounded-full transition-colors"
+                    title="Excluir"
+                  >
+                    <Trash2 size={18} />
+                  </button>
+                </div>
               </td>
             </tr>
           ))}

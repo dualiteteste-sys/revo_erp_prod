@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { listCentrosTrabalho, CentroTrabalho, seedCentrosTrabalho } from '@/services/industriaCentros';
+import { listCentrosTrabalho, CentroTrabalho, seedCentrosTrabalho, deleteCentroTrabalho } from '@/services/industriaCentros';
 import { PlusCircle, Search, Settings, DatabaseBackup } from 'lucide-react';
 import { Loader2 } from 'lucide-react';
 import { useDebounce } from '@/hooks/useDebounce';
@@ -45,6 +45,25 @@ export default function CentrosTrabalhoPage() {
     setIsFormOpen(true);
   };
 
+  const handleClone = (centro: CentroTrabalho) => {
+    const { id, ...rest } = centro;
+    // Cast to any to bypass strict type check for missing ID, ensuring it's treated as new by the form
+    setSelectedCentro(rest as any);
+    setIsFormOpen(true);
+  };
+
+  const handleDelete = async (centro: CentroTrabalho) => {
+    if (!confirm(`Tem certeza que deseja excluir "${centro.nome}"?`)) return;
+
+    try {
+      await deleteCentroTrabalho(centro.id);
+      addToast('Centro de trabalho excluído com sucesso!', 'success');
+      fetchCentros();
+    } catch (e: any) {
+      addToast(e.message || 'Erro ao excluir.', 'error');
+    }
+  };
+
   const handleClose = () => {
     setIsFormOpen(false);
     setSelectedCentro(null);
@@ -78,21 +97,21 @@ export default function CentrosTrabalhoPage() {
           <p className="text-gray-600 text-sm mt-1">Locais onde as operações são executadas.</p>
         </div>
         <div className="flex items-center gap-2">
-            <button
-              onClick={handleSeed}
-              disabled={isSeeding || loading}
-              className="flex items-center gap-2 bg-gray-100 text-gray-700 font-semibold py-2 px-4 rounded-lg hover:bg-gray-200 transition-colors disabled:opacity-50"
-            >
-              {isSeeding ? <Loader2 className="animate-spin" size={20} /> : <DatabaseBackup size={20} />}
-              Popular Dados
-            </button>
-            <button
-              onClick={handleNew}
-              className="flex items-center gap-2 bg-blue-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-blue-700 transition-colors"
-            >
-              <PlusCircle size={20} />
-              Novo Centro
-            </button>
+          <button
+            onClick={handleSeed}
+            disabled={isSeeding || loading}
+            className="flex items-center gap-2 bg-gray-100 text-gray-700 font-semibold py-2 px-4 rounded-lg hover:bg-gray-200 transition-colors disabled:opacity-50"
+          >
+            {isSeeding ? <Loader2 className="animate-spin" size={20} /> : <DatabaseBackup size={20} />}
+            Popular Dados
+          </button>
+          <button
+            onClick={handleNew}
+            className="flex items-center gap-2 bg-blue-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-blue-700 transition-colors"
+          >
+            <PlusCircle size={20} />
+            Novo Centro
+          </button>
         </div>
       </div>
 
@@ -115,7 +134,12 @@ export default function CentrosTrabalhoPage() {
             <Loader2 className="animate-spin text-blue-600 w-10 h-10" />
           </div>
         ) : (
-          <CentrosTrabalhoTable centros={centros} onEdit={handleEdit} />
+          <CentrosTrabalhoTable
+            centros={centros}
+            onEdit={handleEdit}
+            onClone={handleClone}
+            onDelete={handleDelete}
+          />
         )}
       </div>
 

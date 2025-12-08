@@ -17,6 +17,7 @@ export type RoteiroListItem = {
   ativo: boolean;
   padrao_para_producao: boolean;
   padrao_para_beneficiamento: boolean;
+  observacoes?: string | null;
 };
 
 export type RoteiroEtapa = {
@@ -60,6 +61,10 @@ export async function saveRoteiro(payload: RoteiroPayload): Promise<RoteiroDetai
   return callRpc<RoteiroDetails>('industria_roteiros_upsert', { p_payload: payload });
 }
 
+export async function deleteRoteiro(id: string): Promise<void> {
+  return callRpc<void>('industria_roteiros_delete', { p_id: id });
+}
+
 export async function manageRoteiroEtapa(
   roteiroId: string,
   etapaId: string | null,
@@ -86,7 +91,7 @@ export async function seedRoteiros(): Promise<void> {
   for (let i = 0; i < 5; i++) {
     const product = faker.helpers.arrayElement(products);
     const tipo = faker.helpers.arrayElement(['producao', 'beneficiamento']) as TipoBom;
-    
+
     const payload: RoteiroPayload = {
       produto_id: product.id,
       tipo_bom: tipo,

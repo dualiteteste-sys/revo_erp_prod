@@ -12,35 +12,46 @@ import RoteiroEtapasGrid from './RoteiroEtapasGrid';
 
 interface Props {
   roteiroId: string | null;
+  initialData?: Partial<RoteiroDetails> | null;
   onSaveSuccess: () => void;
   onClose: () => void;
 }
 
-export default function RoteiroFormPanel({ roteiroId, onSaveSuccess, onClose }: Props) {
+export default function RoteiroFormPanel({ roteiroId, initialData, onSaveSuccess, onClose }: Props) {
   const { addToast } = useToast();
   const [loading, setLoading] = useState(!!roteiroId);
   const [isSaving, setIsSaving] = useState(false);
   const [activeTab, setActiveTab] = useState<'dados' | 'etapas'>('dados');
 
-  const [formData, setFormData] = useState<Partial<RoteiroDetails>>({
+  const INITIAL_DATA: Partial<RoteiroDetails> = {
     tipo_bom: 'producao',
     versao: 1,
     ativo: true,
     padrao_para_producao: true,
     padrao_para_beneficiamento: false,
     etapas: []
-  });
+  };
+
+  const [formData, setFormData] = useState<Partial<RoteiroDetails>>(INITIAL_DATA);
 
   useEffect(() => {
     if (roteiroId) {
       loadDetails();
+    } else if (initialData) {
+      setFormData(initialData);
+    } else {
+      setFormData(INITIAL_DATA);
     }
-  }, [roteiroId]);
+  }, [roteiroId, initialData]);
 
   const loadDetails = async () => {
     try {
       const data = await getRoteiroDetails(roteiroId!);
-      setFormData(data);
+      if (data) {
+        setFormData(data);
+      } else {
+        throw new Error('Roteiro não encontrado');
+      }
     } catch (e) {
       console.error(e);
       addToast('Erro ao carregar roteiro.', 'error');
@@ -85,10 +96,12 @@ export default function RoteiroFormPanel({ roteiroId, onSaveSuccess, onClose }: 
 
       if (!formData.id) {
         addToast('Roteiro criado! Adicione as etapas.', 'success');
-        setActiveTab('etapas');
+        // setActiveTab('etapas'); // User functionality preference override: close window
       } else {
         addToast('Roteiro salvo.', 'success');
       }
+
+      onSaveSuccess();
       return saved.id;
     } catch (e: any) {
       addToast(e.message, 'error');
@@ -107,8 +120,8 @@ export default function RoteiroFormPanel({ roteiroId, onSaveSuccess, onClose }: 
           <button
             onClick={() => setActiveTab('dados')}
             className={`whitespace-nowrap py-2 px-3 border-b-2 font-medium text-sm transition-colors ${activeTab === 'dados'
-                ? 'border-blue-500 text-blue-600'
-                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+              ? 'border-blue-500 text-blue-600'
+              : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
               }`}
           >
             Dados Gerais
@@ -116,12 +129,12 @@ export default function RoteiroFormPanel({ roteiroId, onSaveSuccess, onClose }: 
           <button
             onClick={() => setActiveTab('etapas')}
             className={`whitespace-nowrap py-2 px-3 border-b-2 font-medium text-sm transition-colors ${activeTab === 'etapas'
-                ? 'border-blue-500 text-blue-600'
-                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+              ? 'border-blue-500 text-blue-600'
+              : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
               }`}
-            disabled={!formData.id}
+            disabled={!formData?.id}
           >
-            Etapas ({formData.etapas?.length || 0})
+            Etapas ({formData?.etapas?.length || 0})
           </button>
         </nav>
       </div>
@@ -131,7 +144,7 @@ export default function RoteiroFormPanel({ roteiroId, onSaveSuccess, onClose }: 
           <Section title="Identificação" description="Produto e configurações do roteiro.">
             <div className="sm:col-span-4">
               <label className="block text-sm font-medium text-gray-700 mb-1">Produto</label>
-              {formData.id ? (
+              {formData?.id ? (
                 <div className="p-3 bg-gray-100 border border-gray-300 rounded-lg text-gray-700">
                   {formData.produto_nome}
                 </div>
@@ -140,7 +153,7 @@ export default function RoteiroFormPanel({ roteiroId, onSaveSuccess, onClose }: 
               )}
             </div>
             <div className="sm:col-span-2">
-              <Select label="Tipo" name="tipo_bom" value={formData.tipo_bom} onChange={e => handleHeaderChange('tipo_bom', e.target.value)} disabled={!!formData.id}>
+              <Select label="Tipo" name="tipo_bom" value={formData?.tipo_bom} onChange={e => handleHeaderChange('tipo_bom', e.target.value)} disabled={!!formData?.id}>
                 <option value="producao">Produção</option>
                 <option value="beneficiamento">Beneficiamento</option>
               </Select>

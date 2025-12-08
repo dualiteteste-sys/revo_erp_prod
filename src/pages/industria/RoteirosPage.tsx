@@ -54,7 +54,7 @@ export default function RoteirosPage() {
 
   const handleSuccess = () => {
     fetchRoteiros();
-    if (!selectedId) handleClose();
+    handleClose();
   };
 
   const handleSeed = async () => {
@@ -80,21 +80,21 @@ export default function RoteirosPage() {
           <p className="text-gray-600 text-sm mt-1">Sequência de operações e centros de trabalho.</p>
         </div>
         <div className="flex items-center gap-2">
-            <button
-              onClick={handleSeed}
-              disabled={isSeeding || loading}
-              className="flex items-center gap-2 bg-gray-100 text-gray-700 font-semibold py-2 px-4 rounded-lg hover:bg-gray-200 transition-colors disabled:opacity-50"
-            >
-              {isSeeding ? <Loader2 className="animate-spin" size={20} /> : <DatabaseBackup size={20} />}
-              Popular Dados
-            </button>
-            <button
-              onClick={handleNew}
-              className="flex items-center gap-2 bg-blue-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-blue-700 transition-colors"
-            >
-              <PlusCircle size={20} />
-              Novo Roteiro
-            </button>
+          <button
+            onClick={handleSeed}
+            disabled={isSeeding || loading}
+            className="flex items-center gap-2 bg-gray-100 text-gray-700 font-semibold py-2 px-4 rounded-lg hover:bg-gray-200 transition-colors disabled:opacity-50"
+          >
+            {isSeeding ? <Loader2 className="animate-spin" size={20} /> : <DatabaseBackup size={20} />}
+            Popular Dados
+          </button>
+          <button
+            onClick={handleNew}
+            className="flex items-center gap-2 bg-blue-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-blue-700 transition-colors"
+          >
+            <PlusCircle size={20} />
+            Novo Roteiro
+          </button>
         </div>
       </div>
 
@@ -126,12 +126,22 @@ export default function RoteirosPage() {
             <Loader2 className="animate-spin text-blue-600 w-10 h-10" />
           </div>
         ) : (
-          <RoteirosTable roteiros={roteiros} onEdit={handleEdit} />
+          <RoteirosTable
+            roteiros={roteiros}
+            onEdit={handleEdit}
+            onClone={handleClone}
+            onDelete={handleDelete}
+          />
         )}
       </div>
 
       <Modal isOpen={isFormOpen} onClose={handleClose} title={selectedId ? 'Editar Roteiro' : 'Novo Roteiro'} size="5xl">
-        <RoteiroFormPanel roteiroId={selectedId} onSaveSuccess={handleSuccess} onClose={handleClose} />
+        <RoteiroFormPanel
+          roteiroId={selectedId}
+          initialData={initialFormData}
+          onSaveSuccess={handleSuccess}
+          onClose={handleClose}
+        />
       </Modal>
     </div>
   );
