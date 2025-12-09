@@ -12,11 +12,12 @@ import { motion, AnimatePresence } from 'framer-motion';
 
 interface Props {
   bomId: string | null;
+  initialData?: Partial<BomDetails> | null;
   onSaveSuccess: () => void;
   onClose: () => void;
 }
 
-export default function BomFormPanel({ bomId, onSaveSuccess, onClose }: Props) {
+export default function BomFormPanel({ bomId, initialData, onSaveSuccess, onClose }: Props) {
   const { addToast } = useToast();
   const [loading, setLoading] = useState(!!bomId);
   const [isSaving, setIsSaving] = useState(false);
@@ -34,8 +35,31 @@ export default function BomFormPanel({ bomId, onSaveSuccess, onClose }: Props) {
   useEffect(() => {
     if (bomId) {
       loadDetails();
+    } else if (initialData) {
+      setFormData({
+        ...initialData,
+        componentes: initialData.componentes || []
+      });
+      console.log('Dados iniciais carregados (Clonagem):', initialData);
+      setLoading(false);
+
+      // If cloning, we might want to ensure components tab is accessible if there are components
+      if (initialData.componentes && initialData.componentes.length > 0) {
+        // Just let them start at dados, but maybe verify IDs are stripped
+      }
+    } else {
+      // Reset for new
+      setFormData({
+        tipo_bom: 'producao',
+        versao: 1,
+        ativo: true,
+        padrao_para_producao: true,
+        padrao_para_beneficiamento: false,
+        componentes: []
+      });
+      setLoading(false);
     }
-  }, [bomId]);
+  }, [bomId, initialData]);
 
   const loadDetails = async () => {
     try {
@@ -56,7 +80,8 @@ export default function BomFormPanel({ bomId, onSaveSuccess, onClose }: Props) {
 
   const handleProductSelect = (item: any) => {
     handleHeaderChange('produto_final_id', item.id);
-    handleHeaderChange('produto_nome', item.descricao);
+    // produto_nome is not in BomPayload, need to handle separately if needed for UI, but formData is Partial<BomDetails>
+    setFormData(prev => ({ ...prev, produto_nome: item.descricao }));
   };
 
   const handleSaveHeader = async () => {
@@ -167,8 +192,8 @@ export default function BomFormPanel({ bomId, onSaveSuccess, onClose }: Props) {
           <button
             onClick={() => setActiveTab('dados')}
             className={`whitespace-nowrap py-2 px-3 border-b-2 font-medium text-sm transition-colors ${activeTab === 'dados'
-                ? 'border-blue-500 text-blue-600'
-                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+              ? 'border-blue-500 text-blue-600'
+              : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
               }`}
           >
             Dados Gerais
@@ -176,8 +201,8 @@ export default function BomFormPanel({ bomId, onSaveSuccess, onClose }: Props) {
           <button
             onClick={() => setActiveTab('componentes')}
             className={`whitespace-nowrap py-2 px-3 border-b-2 font-medium text-sm transition-colors ${activeTab === 'componentes'
-                ? 'border-blue-500 text-blue-600'
-                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+              ? 'border-blue-500 text-blue-600'
+              : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
               }`}
             disabled={!formData.id}
           >

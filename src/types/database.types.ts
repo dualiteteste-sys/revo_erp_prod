@@ -7,7 +7,7 @@ export type Json =
   | Json[]
 export type status_produto = "ativo" | "inativo"
 export type tipo_embalagem = "pacote_caixa" | "envelope" | "rolo_cilindro" | "outro"
-export type tipo_produto = "simples" | "kit" | "variacoes" | "fabricado" | "materia_prima"
+export type tipo_produto = "simples" | "kit" | "variacoes" | "fabricado" | "materia_prima" | "semiacabado" | "consumivel" | "fantasma"
 export type pessoa_tipo = "cliente" | "fornecedor" | "ambos"
 export type status_transportadora = "ativa" | "inativa"
 export type tipo_pessoa_enum = "fisica" | "juridica" | "estrangeiro"
@@ -1165,7 +1165,7 @@ export interface Database {
     Enums: {
       status_produto: "ativo" | "inativo"
       tipo_embalagem: "pacote_caixa" | "envelope" | "rolo_cilindro" | "outro"
-      tipo_produto: "simples" | "kit" | "variacoes" | "fabricado" | "materia_prima"
+      tipo_produto: "simples" | "kit" | "variacoes" | "fabricado" | "materia_prima" | "semiacabado" | "consumivel" | "fantasma"
       pessoa_tipo: "cliente" | "fornecedor" | "ambos"
       status_transportadora: "ativa" | "inativa"
       tipo_pessoa_enum: "fisica" | "juridica" | "estrangeiro"

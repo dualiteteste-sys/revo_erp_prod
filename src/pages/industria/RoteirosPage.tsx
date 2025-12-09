@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { listRoteiros, RoteiroListItem, seedRoteiros } from '@/services/industriaRoteiros';
+import { listRoteiros, RoteiroListItem, seedRoteiros, deleteRoteiro, getRoteiroDetails, RoteiroDetails } from '@/services/industriaRoteiros';
 import { PlusCircle, Search, Route, DatabaseBackup } from 'lucide-react';
 import { Loader2 } from 'lucide-react';
 import { useDebounce } from '@/hooks/useDebounce';
@@ -19,6 +19,7 @@ export default function RoteirosPage() {
 
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [initialFormData, setInitialFormData] = useState<Partial<RoteiroDetails> | null>(null);
   const [isSeeding, setIsSeeding] = useState(false);
 
   const fetchRoteiros = async () => {
@@ -39,17 +40,61 @@ export default function RoteirosPage() {
 
   const handleNew = () => {
     setSelectedId(null);
+    setInitialFormData(null);
     setIsFormOpen(true);
   };
 
   const handleEdit = (roteiro: RoteiroListItem) => {
     setSelectedId(roteiro.id);
+    setInitialFormData(null);
     setIsFormOpen(true);
+  };
+
+  const handleClone = async (roteiro: RoteiroListItem) => {
+    setLoading(true);
+    try {
+      const fullData = await getRoteiroDetails(roteiro.id);
+
+      // Deep copy and strip IDs to treat as new
+      const { id, ...rest } = fullData;
+      const clonedEtapas = rest.etapas?.map(etapa => {
+        const { id, ...etapaRest } = etapa;
+        return { ...etapaRest, id: undefined }; // Ensure ID is undefined for new insertion
+      }) || [];
+
+      const clonedData: Partial<RoteiroDetails> = {
+        ...rest,
+        id: undefined, // Explicitly undefined
+        descricao: `${rest.descricao} (Cópia)`,
+        etapas: clonedEtapas as any
+      };
+
+      setSelectedId(null);
+      setInitialFormData(clonedData);
+      setIsFormOpen(true);
+    } catch (e: any) {
+      addToast('Erro ao preparar clonagem.', 'error');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleDelete = async (roteiro: RoteiroListItem) => {
+    if (!confirm(`Tem certeza que deseja excluir o roteiro "${roteiro.descricao}"?`)) return;
+
+    try {
+      await deleteRoteiro(roteiro.id);
+      addToast('Roteiro excluído com sucesso!', 'success');
+      fetchRoteiros();
+    } catch (e: any) {
+      addToast(e.message || 'Erro ao excluir.', 'error');
+    }
   };
 
   const handleClose = () => {
     setIsFormOpen(false);
     setSelectedId(null);
+    setInitialFormData(null);
   };
 
   const handleSuccess = () => {

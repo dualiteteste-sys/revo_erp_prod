@@ -1,13 +1,15 @@
 import React from 'react';
 import { BomListItem } from '@/services/industriaBom';
-import { Edit, CheckCircle, XCircle, Package } from 'lucide-react';
+import { Edit, CheckCircle, XCircle, Package, Copy, Trash2 } from 'lucide-react';
 
 interface Props {
   boms: BomListItem[];
   onEdit: (bom: BomListItem) => void;
+  onClone?: (bom: BomListItem) => void;
+  onDelete?: (bom: BomListItem) => void;
 }
 
-export default function BomsTable({ boms, onEdit }: Props) {
+export default function BomsTable({ boms, onEdit, onClone, onDelete }: Props) {
   return (
     <div className="overflow-x-auto">
       <table className="min-w-full divide-y divide-gray-200">
@@ -35,29 +37,49 @@ export default function BomsTable({ boms, onEdit }: Props) {
               </td>
               <td className="px-6 py-4">
                 <span className={`px-2 py-1 rounded-full text-xs font-semibold uppercase ${bom.tipo_bom === 'producao' ? 'bg-blue-100 text-blue-800' : 'bg-purple-100 text-purple-800'}`}>
-                    {bom.tipo_bom}
+                  {bom.tipo_bom}
                 </span>
               </td>
               <td className="px-6 py-4 text-center">
                 {(bom.padrao_para_producao || bom.padrao_para_beneficiamento) && (
-                    <CheckCircle size={16} className="text-green-500 mx-auto" />
+                  <CheckCircle size={16} className="text-green-500 mx-auto" />
                 )}
               </td>
               <td className="px-6 py-4 text-center">
                 {bom.ativo ? (
-                    <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-800">
-                        Ativo
-                    </span>
+                  <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-800">
+                    Ativo
+                  </span>
                 ) : (
-                    <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-800">
-                        Inativo
-                    </span>
+                  <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-800">
+                    Inativo
+                  </span>
                 )}
               </td>
               <td className="px-6 py-4 text-right">
-                <button onClick={() => onEdit(bom)} className="text-blue-600 hover:text-blue-800 p-2 hover:bg-blue-50 rounded-full transition-colors">
-                  <Edit size={18} />
-                </button>
+                <div className="flex justify-end gap-2">
+                  <button
+                    onClick={() => onClone && onClone(bom)}
+                    className="text-gray-600 hover:text-blue-600 p-2 hover:bg-blue-50 rounded-full transition-colors"
+                    title="Clonar Ficha Técnica"
+                  >
+                    <Copy size={18} />
+                  </button>
+                  <button
+                    onClick={() => onEdit(bom)}
+                    className="text-blue-600 hover:text-blue-800 p-2 hover:bg-blue-50 rounded-full transition-colors"
+                    title="Editar"
+                  >
+                    <Edit size={18} />
+                  </button>
+                  <button
+                    onClick={() => onDelete && onDelete(bom)}
+                    className="text-red-400 hover:text-red-600 p-2 hover:bg-red-50 rounded-full transition-colors"
+                    title="Excluir"
+                  >
+                    <Trash2 size={18} />
+                  </button>
+                </div>
               </td>
             </tr>
           ))}

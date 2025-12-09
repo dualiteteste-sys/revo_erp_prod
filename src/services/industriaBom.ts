@@ -74,6 +74,10 @@ export async function saveBom(payload: BomPayload): Promise<BomDetails> {
   return callRpc<BomDetails>('industria_bom_upsert', { p_payload: payload });
 }
 
+export async function deleteBom(id: string): Promise<void> {
+  await callRpc('industria_bom_delete', { p_id: id });
+}
+
 export async function manageBomComponente(
   bomId: string,
   componenteId: string | null,
@@ -125,7 +129,7 @@ export async function aplicarBomBeneficiamento(
 export async function seedBoms(): Promise<void> {
   // 1. Fetch potential products
   const { data: products } = await getProducts({ page: 1, pageSize: 100, searchTerm: '', status: 'ativo', sortBy: { column: 'nome', ascending: true } });
-  
+
   if (products.length < 2) throw new Error('Necessário pelo menos 2 produtos cadastrados para criar uma BOM (1 pai, 1 filho).');
 
   // 2. Generate 5 BOMs
@@ -142,7 +146,7 @@ export async function seedBoms(): Promise<void> {
       produto_final_id: parent.id,
       tipo_bom: tipo,
       codigo: `FT-${faker.string.numeric(4)}`,
-      descricao: `Ficha Técnica v${faker.number.int({min: 1, max: 9})}`,
+      descricao: `Ficha Técnica v${faker.number.int({ min: 1, max: 9 })}`,
       versao: faker.number.int({ min: 1, max: 10 }),
       ativo: true,
       padrao_para_producao: tipo === 'producao',

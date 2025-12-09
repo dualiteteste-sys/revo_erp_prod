@@ -8316,43 +8316,8 @@ stdout | src/pages/products/ProductsPage.test.tsx > ProductsPage Integration > f
  PASS  Waiting for file changes...
        press h to show help, press q to quit
        rerun x11
-[2K[1A[2K[Gse the `v7_relativeSplatPath` future flag to opt-in early. For more information, see https://reactrouter.com/v6/upgrading/future#v7_relativesplatpath.
-
-stdout | src/pages/products/ProductsPage.test.tsx > ProductsPage Integration > filters products by search term
-[AuthProvider] activeEmpresa calc: { empresasCount: 0, activeEmpresaId: undefined, foundId: undefined }
-[AuthProvider] activeEmpresa calc: { empresasCount: 0, activeEmpresaId: undefined, foundId: undefined }
-[DEBUG] [QUERY][empresas] fetching list 
-[DEBUG] [QUERY][active_empresa] fetching 
-[INFO] [AUTH][LOGIN] start { email: 'exists' }
-[MSW] GET user_active_empresa https://lrfwiaekipwkjkzvcnfd.supabase.co/rest/v1/user_active_empresa?select=empresa_id
-[MSW] GET empresa_usuarios https://lrfwiaekipwkjkzvcnfd.supabase.co/rest/v1/empresa_usuarios?select=empresa%3Aempresas%28*%29&order=created_at.desc
-[AuthProvider] activeEmpresa calc: {
-  empresasCount: 1,
-  activeEmpresaId: 'empresa-1',
-  foundId: 'empresa-1'
-}
-[MSW] Intercepted RPC: produtos_count_for_current_user { p_q: null, p_status: null }
-[MSW] Intercepted RPC: produtos_list_for_current_user {
-  p_limit: 10,
-  p_offset: 0,
-  p_q: null,
-  p_status: null,
-  p_order: 'nome asc'
-}
-
- ✓ src/pages/products/ProductsPage.test.tsx  (2 tests) 2372ms
-
- Test Files  1 passed (1)
-      Tests  2 passed (2)
-   Start at  19:06:48
-   Duration  9.83s
-
-
- PASS  Waiting for file changes...
-       press h to show help, press q to quit
-       rerun x14
 [2K[1A[2K[G[3Jc
- RERUN  src/contexts/AuthProvider.tsx x15
+ RERUN  src/components/products/NcmSearch.tsx x12
 
 stdout | src/test/setup.ts:8:9
 [SETUP] Initializing MSW server...
@@ -8405,141 +8370,178 @@ stdout | src/pages/products/ProductsPage.test.tsx > ProductsPage Integration > f
   p_order: 'nome asc'
 }
 
- ✓ src/pages/products/ProductsPage.test.tsx  (2 tests) 2666ms
+ ✓ src/pages/products/ProductsPage.test.tsx  (2 tests) 843ms
 
  Test Files  1 passed (1)
       Tests  2 passed (2)
-   Start at  19:07:03
-   Duration  16.62s
+   Start at  21:55:20
+   Duration  8.87s
 
 
  PASS  Waiting for file changes...
        press h to show help, press q to quit
-       rerun x15
-[2K[1A[2K[G9m
-            [36m<input[39m
-              [33mclass[39m=[32m"w-full max-w-sm p-3 pl-10 border border-gray-300 rounded-lg"[39m
-              [33mplaceholder[39m=[32m"Buscar por nome ou SKU..."[39m
-              [33mtype[39m=[32m"text"[39m
-              [33mvalue[39m=[32m""[39m
-            [36m/>[39m
-          [36m</div>[39m
-          [36m<div[39m
-            [33mclass[39m=[32m"min-w-[200px]"[39m
-          [36m>[39m
-            [36m<div[39m
-              [33mclass[39m=[32m"relative"[39m
-            [36m>[39m
-              [36m<select[39m
-                [33mclass[39m=[32m"w-full p-3 pr-10 bg-white/80 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition shadow-sm appearance-none"[39m
-              [36m>[39m
-                [36m<option[39m
-                  [33mvalue[39m=[32m""[39m
-                [36m>[39m
-                  [0mTodos os status[0m
-                [36m</option>[39m
-                [36m<option[39m
-                  [33mvalue[39m=[32m"ativo"[39m
-                [36m>[39m
-                  [0mAtivo[0m
-                [36m</option>[39m
-                [36m<option[39m
-                  [33mvalue[39m=[32m"inativo"[39m
-                [36m>[39m
-                  [0mInativo[0m
-                [36m</option>[39m
-              [36m</select>[39m
-              [36m<div[39m
-                [33mclass[39m=[32m"pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-gray-700"[39m
-              [36m>[39m
-                [36m<svg[39m
-                  [33maria-hidden[39m=[32m"true"[39m
-                  [33mclass[39m=[32m"lucide lucide-chevron-down"[39m
-                  [33mfill[39m=[32m"none"[39m
-                  [33mheight[39m=[32m"20"[39m
-                  [33mstroke[39m=[32m"currentColor"[39m
-                  [33mstroke-linecap[39m=[32m"round"[39m
-                  [33mstroke-linejoin[39m=[32m"round"[39m
-                  [33mstroke-width[39m=[32m"2"[39m
-                  [33mviewBox[39m=[32m"0 0 24 24"[39m
-                  [33mwidth[39m=[32m"20"[39m
-                  [33mxmlns[39m=[32m"http://www.w3.org/2000/svg"[39m
-                [36m>[39m
-                  [36m<path[39m
-                    [33md[39m=[32m"m6 9 6 6 6-6"[39m
-                  [36m/>[39m
-                [36m</svg>[39m
-              [36m</div>[39m
-            [36m</div>[39m
-          [36m</div>[39m
-        [36m</div>[39m
-        [36m<div[39m
-          [33mclass[39m=[32m"bg-white rounded-lg shadow overflow-hidden"[39m
-        [36m>[39m
-          [36m<div[39m
-            [33mclass[39m=[32m"h-96 flex items-center justify-center"[39m
-          [36m>[39m
-            [36m<svg[39m
-              [33maria-hidden[39m=[32m"true"[39m
-              [33mclass[39m=[32m"lucide lucide-loader-circle animate-spin text-blue-500"[39m
-              [33mfill[39m=[32m"none"[39m
-              [33mheight[39m=[32m"32"[39m
-              [33mstroke[39m=[32m"currentColor"[39m
-              [33mstroke-linecap[39m=[32m"round"[39m
-              [33mstroke-linejoin[39m=[32m"round"[39m
-              [33mstroke-width[39m=[32m"2"[39m
-              [33mviewBox[39m=[32m"0 0 24 24"[39m
-              [33mwidth[39m=[32m"32"[39m
-              [33mxmlns[39m=[32m"http://www.w3.org/2000/svg"[39m
-            [36m>[39m
-              [36m<path[39m
-                [33md[39m=[32m"M21 12a9 9 0 1 1-6.219-8.56"[39m
-              [36m/>[39m
-            [36m</svg>[39m
-          [36m</div>[39m
-        [36m</div>[39m
-      [36m</div>[39m
-      [36m<div[39m
-        [33mclass[39m=[32m"fixed top-5 right-5 z-50 space-y-3"[39m
-      [36m/>[39m
-    [36m</div>[39m
-  [36m</body>[39m
-[36m</html>[39m
+       rerun x12
+[2K[1A[2K[G[3Jc
+ RERUN  e2e/bug_fixes.spec.ts x1
 
-⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+stdout | src/test/setup.ts:8:9
+[SETUP] Initializing MSW server...
 
- FAIL  src/pages/products/ProductsPage.test.tsx > ProductsPage Integration > renders the product list with data from MSW
-TestingLibraryElementError: Unable to find an element with the text: Produto Teste 1. This could be because the text is broken up by multiple elements. In this case, you can provide a function for your text matcher to make your matcher more flexible.
+stderr | new GoTrueClient (/Users/leandrofmarques/Downloads/revo_erp_prod_8yumh0_dualiteproject/node_modules/@supabase/auth-js/src/GoTrueClient.ts:306:15)
+GoTrueClient@sb-lrfwiaekipwkjkzvcnfd-auth-token:1 (2.86.0) 2025-12-02T00:56:15.852Z Multiple GoTrueClient instances detected in the same browser context. It is not an error, but this should be avoided as it may produce undefined behavior when used concurrently under the same storage key.
 
-Ignored nodes: comments, script, style
-[36m<body>[39m
-  [36m<div>[39m
-    [36m<div[39m
-      [33mclass[39m=[32m"p-1"[39m
-    [36m>[39m
-      [36m<div[39m
-        [33mclass[39m=[32m"flex justify-between items-center mb-6"[39m
-      [36m>[39m
-        [36m<h1[39m
-          [33mclass[39m=[32m"text-3xl font-bold text-gray-800"[39m
-        [36m>[39m
-          [0mProdutos[0m
-        [36m</h1>[39m
-        [36m<div[39m
-          [33mclass[39m=[32m"flex items-center gap-2"[39m
-        [36m>[39m
-          [36m<button[39m
-            [33mclass[39m=[32m"flex items-center gap-2 bg-gray-100 text-gray-700 font-semibold py-2 px-4 rounded-lg hover:bg-gray-200 transition-colors disabled:opacity-50"[39m
-            [33mdisabled[39m=[32m""[39m
-          [36m>[39m
-            [36m<svg[39m
-              [33maria-hidden[39m=[32m"true"[39m
-              [33mclass[39m=[32m"lucide lucide-database-backup"[39m
-              [33mfill[39m=[32m"none"[39m
-              [33mheight[39m=[32m"20"[39m
-              [33mstroke[39m=[32m"currentColor"[39m
-              [33mstroke-linecap[39m=[32m"round"[39m
-              [33mstroke-linejoin[39m=[32m"round"[39m
+ ❯ e2e/bug_fixes.spec.ts  (0 test)
+
+⎯⎯⎯⎯⎯⎯ Failed Suites 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  e2e/bug_fixes.spec.ts [ e2e/bug_fixes.spec.ts ]
+Error: Playwright Test did not expect test.describe() to be called here.
+Most common reasons include:
+- You are calling test.describe() in a configuration file.
+- You are calling test.describe() in a file that is imported by the configuration file.
+- You have two different versions of @playwright/test. This usually happens
+  when one of the dependencies in your package.json depends on @playwright/test.
+ ❯ TestTypeImpl._currentSuite node_modules/playwright/lib/common/testType.js:75:13
+ ❯ TestTypeImpl._describe node_modules/playwright/lib/common/testType.js:115:24
+ ❯ Function.describe node_modules/playwright/lib/transform/transform.js:275:12
+ ❯ e2e/bug_fixes.spec.ts:8:6
+      6| const supabase = createClient(supabaseUrl, supabaseKey);
+      7| 
+      8| test.describe('Bug Fix Verification', () => {
+       |      ^
+      9|     let session;
+     10| 
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+ Test Files  1 failed (1)
+      Tests  no tests
+   Start at  21:56:01
+   Duration  1.08s
+
+
+ FAIL  Tests failed. Watching for file changes...
+       press h to show help, press q to quit
+       rerun x1
+[2K[1A[2K[G[1;1H[JTest removed... [ e2e/bug_fixes.spec.ts ]
+
+
+⎯⎯⎯⎯ Unhandled Rejection ⎯⎯⎯⎯⎯
+TypeError: Cannot read properties of undefined (reading 'logUpdate')
+ ❯ createListRenderer node_modules/vitest/dist/vendor/index.-xs08BYx.js:1936:30
+ ❯ DefaultReporter.onTestRemoved node_modules/vitest/dist/vendor/index.-xs08BYx.js:2007:5
+ ❯ Vitest.report node_modules/vitest/dist/vendor/cli-api.OdDWuB7Y.js:11537:5
+
+
+
+
+9&order=created_at.desc
+[AuthProvider] activeEmpresa calc: {
+  empresasCount: 1,
+  activeEmpresaId: 'empresa-1',
+  foundId: 'empresa-1'
+}
+[MSW] Intercepted RPC: produtos_count_for_current_user { p_q: null, p_status: null }
+[MSW] Intercepted RPC: produtos_list_for_current_user {
+  p_limit: 10,
+  p_offset: 0,
+  p_q: null,
+  p_status: null,
+  p_order: 'nome asc'
+}
+
+stderr | src/pages/products/ProductsPage.test.tsx > ProductsPage Integration > renders the product list with data from MSW
+⚠️ React Router Future Flag Warning: React Router will begin wrapping state updates in `React.startTransition` in v7. You can use the `v7_startTransition` future flag to opt-in early. For more information, see https://reactrouter.com/v6/upgrading/future#v7_starttransition.
+⚠️ React Router Future Flag Warning: Relative route resolution within Splat routes is changing in v7. You can use the `v7_relativeSplatPath` future flag to opt-in early. For more information, see https://reactrouter.com/v6/upgrading/future#v7_relativesplatpath.
+
+stdout | src/pages/products/ProductsPage.test.tsx > ProductsPage Integration > filters products by search term
+[AuthProvider] activeEmpresa calc: { empresasCount: 0, activeEmpresaId: undefined, foundId: undefined }
+[AuthProvider] activeEmpresa calc: { empresasCount: 0, activeEmpresaId: undefined, foundId: undefined }
+[DEBUG] [QUERY][empresas] fetching list 
+[DEBUG] [QUERY][active_empresa] fetching 
+[INFO] [AUTH][LOGIN] start { email: 'exists' }
+[MSW] GET user_active_empresa https://lrfwiaekipwkjkzvcnfd.supabase.co/rest/v1/user_active_empresa?select=empresa_id
+[MSW] GET empresa_usuarios https://lrfwiaekipwkjkzvcnfd.supabase.co/rest/v1/empresa_usuarios?select=empresa%3Aempresas%28*%29&order=created_at.desc
+[AuthProvider] activeEmpresa calc: {
+  empresasCount: 1,
+  activeEmpresaId: 'empresa-1',
+  foundId: 'empresa-1'
+}
+[MSW] Intercepted RPC: produtos_count_for_current_user { p_q: null, p_status: null }
+[MSW] Intercepted RPC: produtos_list_for_current_user {
+  p_limit: 10,
+  p_offset: 0,
+  p_q: null,
+  p_status: null,
+  p_order: 'nome asc'
+}
+
+ ✓ src/pages/products/ProductsPage.test.tsx  (2 tests) 1138ms
+
+ Test Files  1 passed (1)
+      Tests  2 passed (2)
+   Start at  21:55:20
+   Duration  8.73s
+
+
+ PASS  Waiting for file changes...
+       press h to show help, press q to quit
+       rerun x16
+[2K[1A[2K[G[3Jc
+ RERUN  e2e/bug_fixes.spec.ts x1
+
+stdout | src/test/setup.ts:8:9
+[SETUP] Initializing MSW server...
+
+stderr | new GoTrueClient (/Users/leandrofmarques/Downloads/revo_erp_prod_8yumh0_dualiteproject/node_modules/@supabase/auth-js/src/GoTrueClient.ts:306:15)
+GoTrueClient@sb-lrfwiaekipwkjkzvcnfd-auth-token:1 (2.86.0) 2025-12-02T00:56:15.850Z Multiple GoTrueClient instances detected in the same browser context. It is not an error, but this should be avoided as it may produce undefined behavior when used concurrently under the same storage key.
+
+ ❯ e2e/bug_fixes.spec.ts  (0 test)
+
+⎯⎯⎯⎯⎯⎯ Failed Suites 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  e2e/bug_fixes.spec.ts [ e2e/bug_fixes.spec.ts ]
+Error: Playwright Test did not expect test.describe() to be called here.
+Most common reasons include:
+- You are calling test.describe() in a configuration file.
+- You are calling test.describe() in a file that is imported by the configuration file.
+- You have two different versions of @playwright/test. This usually happens
+  when one of the dependencies in your package.json depends on @playwright/test.
+ ❯ TestTypeImpl._currentSuite node_modules/playwright/lib/common/testType.js:75:13
+ ❯ TestTypeImpl._describe node_modules/playwright/lib/common/testType.js:115:24
+ ❯ Function.describe node_modules/playwright/lib/transform/transform.js:275:12
+ ❯ e2e/bug_fixes.spec.ts:8:6
+      6| const supabase = createClient(supabaseUrl, supabaseKey);
+      7| 
+      8| test.describe('Bug Fix Verification', () => {
+       |      ^
+      9|     let session;
+     10| 
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+ Test Files  1 failed (1)
+      Tests  no tests
+   Start at  21:56:01
+   Duration  1.10s
+
+
+ FAIL  Tests failed. Watching for file changes...
+       press h to show help, press q to quit
+       rerun x1
+[2K[1A[2K[G[1;1H[JTest removed... [ e2e/bug_fixes.spec.ts ]
+
+
+⎯⎯⎯⎯ Unhandled Rejection ⎯⎯⎯⎯⎯
+TypeError: Cannot read properties of undefined (reading 'logUpdate')
+ ❯ createListRenderer node_modules/vitest/dist/vendor/index.-xs08BYx.js:1936:30
+ ❯ DefaultReporter.onTestRemoved node_modules/vitest/dist/vendor/index.-xs08BYx.js:2007:5
+ ❯ Vitest.report node_modules/vitest/dist/vendor/cli-api.OdDWuB7Y.js:11537:5
+
+
+
+
+         [33mstroke-linejoin[39m=[32m"round"[39m
               [33mstroke-width[39m=[32m"2"[39m
               [33mviewBox[39m=[32m"0 0 24 24"[39m
               [33mwidth[39m=[32m"20"[39m
@@ -9192,4 +9194,122 @@ stdout | src/pages/products/ProductsPage.test.tsx > ProductsPage Integration > f
  PASS  Waiting for file changes...
        press h to show help, press q to quit
        rerun x13
-[2K[1A[2K[G
+[2K[1A[2K[G[3Jc
+ RERUN  src/components/products/NcmSearch.tsx x14
+
+stdout | src/test/setup.ts:8:9
+[SETUP] Initializing MSW server...
+
+stdout | src/pages/products/ProductsPage.test.tsx > ProductsPage Integration > renders the product list with data from MSW
+[AuthProvider] activeEmpresa calc: { empresasCount: 0, activeEmpresaId: undefined, foundId: undefined }
+[AuthProvider] activeEmpresa calc: { empresasCount: 0, activeEmpresaId: undefined, foundId: undefined }
+[DEBUG] [QUERY][empresas] fetching list 
+[DEBUG] [QUERY][active_empresa] fetching 
+[INFO] [AUTH][LOGIN] start { email: 'exists' }
+[MSW] GET user_active_empresa https://lrfwiaekipwkjkzvcnfd.supabase.co/rest/v1/user_active_empresa?select=empresa_id
+[MSW] GET empresa_usuarios https://lrfwiaekipwkjkzvcnfd.supabase.co/rest/v1/empresa_usuarios?select=empresa%3Aempresas%28*%29&order=created_at.desc
+[AuthProvider] activeEmpresa calc: {
+  empresasCount: 1,
+  activeEmpresaId: 'empresa-1',
+  foundId: 'empresa-1'
+}
+[MSW] Intercepted RPC: produtos_count_for_current_user { p_q: null, p_status: null }
+[MSW] Intercepted RPC: produtos_list_for_current_user {
+  p_limit: 10,
+  p_offset: 0,
+  p_q: null,
+  p_status: null,
+  p_order: 'nome asc'
+}
+
+stderr | src/pages/products/ProductsPage.test.tsx > ProductsPage Integration > renders the product list with data from MSW
+⚠️ React Router Future Flag Warning: React Router will begin wrapping state updates in `React.startTransition` in v7. You can use the `v7_startTransition` future flag to opt-in early. For more information, see https://reactrouter.com/v6/upgrading/future#v7_starttransition.
+⚠️ React Router Future Flag Warning: Relative route resolution within Splat routes is changing in v7. You can use the `v7_relativeSplatPath` future flag to opt-in early. For more information, see https://reactrouter.com/v6/upgrading/future#v7_relativesplatpath.
+
+stdout | src/pages/products/ProductsPage.test.tsx > ProductsPage Integration > filters products by search term
+[AuthProvider] activeEmpresa calc: { empresasCount: 0, activeEmpresaId: undefined, foundId: undefined }
+[AuthProvider] activeEmpresa calc: { empresasCount: 0, activeEmpresaId: undefined, foundId: undefined }
+[DEBUG] [QUERY][empresas] fetching list 
+[DEBUG] [QUERY][active_empresa] fetching 
+[INFO] [AUTH][LOGIN] start { email: 'exists' }
+[MSW] GET user_active_empresa https://lrfwiaekipwkjkzvcnfd.supabase.co/rest/v1/user_active_empresa?select=empresa_id
+[MSW] GET empresa_usuarios https://lrfwiaekipwkjkzvcnfd.supabase.co/rest/v1/empresa_usuarios?select=empresa%3Aempresas%28*%29&order=created_at.desc
+[AuthProvider] activeEmpresa calc: {
+  empresasCount: 1,
+  activeEmpresaId: 'empresa-1',
+  foundId: 'empresa-1'
+}
+[MSW] Intercepted RPC: produtos_count_for_current_user { p_q: null, p_status: null }
+[MSW] Intercepted RPC: produtos_list_for_current_user {
+  p_limit: 10,
+  p_offset: 0,
+  p_q: null,
+  p_status: null,
+  p_order: 'nome asc'
+}
+
+ ✓ src/pages/products/ProductsPage.test.tsx  (2 tests) 1335ms
+
+ Test Files  1 passed (1)
+      Tests  2 passed (2)
+   Start at  21:55:20
+   Duration  8.76s
+
+
+ PASS  Waiting for file changes...
+       press h to show help, press q to quit
+       rerun x14
+[2K[1A[2K[G[3Jc
+ RERUN  e2e/bug_fixes.spec.ts x1
+
+stdout | src/test/setup.ts:8:9
+[SETUP] Initializing MSW server...
+
+stderr | new GoTrueClient (/Users/leandrofmarques/Downloads/revo_erp_prod_8yumh0_dualiteproject/node_modules/@supabase/auth-js/src/GoTrueClient.ts:306:15)
+GoTrueClient@sb-lrfwiaekipwkjkzvcnfd-auth-token:1 (2.86.0) 2025-12-02T00:56:15.848Z Multiple GoTrueClient instances detected in the same browser context. It is not an error, but this should be avoided as it may produce undefined behavior when used concurrently under the same storage key.
+
+ ❯ e2e/bug_fixes.spec.ts  (0 test)
+
+⎯⎯⎯⎯⎯⎯ Failed Suites 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  e2e/bug_fixes.spec.ts [ e2e/bug_fixes.spec.ts ]
+Error: Playwright Test did not expect test.describe() to be called here.
+Most common reasons include:
+- You are calling test.describe() in a configuration file.
+- You are calling test.describe() in a file that is imported by the configuration file.
+- You have two different versions of @playwright/test. This usually happens
+  when one of the dependencies in your package.json depends on @playwright/test.
+ ❯ TestTypeImpl._currentSuite node_modules/playwright/lib/common/testType.js:75:13
+ ❯ TestTypeImpl._describe node_modules/playwright/lib/common/testType.js:115:24
+ ❯ Function.describe node_modules/playwright/lib/transform/transform.js:275:12
+ ❯ e2e/bug_fixes.spec.ts:8:6
+      6| const supabase = createClient(supabaseUrl, supabaseKey);
+      7| 
+      8| test.describe('Bug Fix Verification', () => {
+       |      ^
+      9|     let session;
+     10| 
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+ Test Files  1 failed (1)
+      Tests  no tests
+   Start at  21:56:01
+   Duration  1.03s
+
+
+ FAIL  Tests failed. Watching for file changes...
+       press h to show help, press q to quit
+       rerun x1
+[2K[1A[2K[G[1;1H[JTest removed... [ e2e/bug_fixes.spec.ts ]
+
+
+⎯⎯⎯⎯ Unhandled Rejection ⎯⎯⎯⎯⎯
+TypeError: Cannot read properties of undefined (reading 'logUpdate')
+ ❯ createListRenderer node_modules/vitest/dist/vendor/index.-xs08BYx.js:1936:30
+ ❯ DefaultReporter.onTestRemoved node_modules/vitest/dist/vendor/index.-xs08BYx.js:2007:5
+ ❯ Vitest.report node_modules/vitest/dist/vendor/cli-api.OdDWuB7Y.js:11537:5
+
+
+
+

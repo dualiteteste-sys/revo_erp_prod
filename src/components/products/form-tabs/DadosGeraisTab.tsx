@@ -13,11 +13,14 @@ import { listProdutoGrupos, ProdutoGrupo } from '../../../services/produtoGrupos
 import { listUnidades, UnidadeMedida } from '../../../services/unidades';
 
 const tipoProdutoOptions: { value: tipo_produto; label: string }[] = [
-  { value: 'simples', label: 'Simples' },
-  { value: 'kit', label: 'Kit' },
-  { value: 'variacoes', label: 'Com Variações' },
-  { value: 'fabricado', label: 'Fabricado' },
-  { value: 'materia_prima', label: 'Matéria-Prima' },
+  { value: 'simples', label: 'SP - Simples' },
+  { value: 'kit', label: 'KT - Kit' },
+  { value: 'variacoes', label: 'CV - Com variações' },
+  { value: 'fabricado', label: 'PA - Produto Acabado' },
+  { value: 'materia_prima', label: 'MP - Matéria Prima' },
+  { value: 'semiacabado', label: 'SA - Semiacabado' },
+  { value: 'consumivel', label: 'CP - Consumível de Processo' },
+  { value: 'fantasma', label: 'FNT - Fantasma' },
 ];
 
 const statusProdutoOptions: { value: status_produto; label: string }[] = [
