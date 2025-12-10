@@ -13,11 +13,14 @@ import { listProdutoGrupos, ProdutoGrupo } from '../../../services/produtoGrupos
 import { listUnidades, UnidadeMedida } from '../../../services/unidades';
 
 const tipoProdutoOptions: { value: tipo_produto; label: string }[] = [
-  { value: 'simples', label: 'Simples' },
-  { value: 'kit', label: 'Kit' },
-  { value: 'variacoes', label: 'Com Variações' },
-  { value: 'fabricado', label: 'Fabricado' },
-  { value: 'materia_prima', label: 'Matéria-Prima' },
+  { value: 'simples', label: 'SP - Simples' },
+  { value: 'kit', label: 'KT - Kit' },
+  { value: 'variacoes', label: 'CV - Com variações' },
+  { value: 'fabricado', label: 'PA - Produto Acabado' },
+  { value: 'materia_prima', label: 'MP - Matéria Prima' },
+  { value: 'semiacabado', label: 'SA - Semiacabado' },
+  { value: 'consumivel', label: 'CP - Consumível de Processo' },
+  { value: 'fantasma', label: 'FNT - Fantasma' },
 ];
 
 const statusProdutoOptions: { value: status_produto; label: string }[] = [
@@ -210,6 +213,56 @@ const DadosGeraisTab: React.FC<DadosGeraisTabProps> = ({ data, onChange, errors,
           )}
         </Section>
       )}
+      <Section
+        title="Definições Operacionais"
+        description="Configure as permissões e rastreabilidade deste item."
+      >
+        <div className="sm:col-span-2">
+          <Toggle
+            label="Pode Comprar?"
+            name="pode_comprar"
+            checked={!!data.pode_comprar}
+            onChange={(checked) => onChange('pode_comprar', checked)}
+            description="Item disponível para compras."
+          />
+        </div>
+        <div className="sm:col-span-2">
+          <Toggle
+            label="Pode Vender?"
+            name="pode_vender"
+            checked={!!data.pode_vender}
+            onChange={(checked) => onChange('pode_vender', checked)}
+            description="Item disponível para vendas."
+          />
+        </div>
+        <div className="sm:col-span-2">
+          <Toggle
+            label="Pode Produzir?"
+            name="pode_produzir"
+            checked={!!data.pode_produzir}
+            onChange={(checked) => onChange('pode_produzir', checked)}
+            description="Item fabricado internamente."
+          />
+        </div>
+        <div className="sm:col-span-3 mt-4">
+          <Toggle
+            label="Rastreio por Lote"
+            name="rastreio_lote"
+            checked={!!data.rastreio_lote}
+            onChange={(checked) => onChange('rastreio_lote', checked)}
+            description="Exige controle de lotes nas movimentações."
+          />
+        </div>
+        <div className="sm:col-span-3 mt-4">
+          <Toggle
+            label="Rastreio por Serial"
+            name="rastreio_serial"
+            checked={!!data.rastreio_serial}
+            onChange={(checked) => onChange('rastreio_serial', checked)}
+            description="Exige número de série único para cada unidade."
+          />
+        </div>
+      </Section>
     </div>
   );
 };

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { listRoteiros, RoteiroListItem, seedRoteiros } from '@/services/industriaRoteiros';
+import { listRoteiros, RoteiroListItem, seedRoteiros, deleteRoteiro, getRoteiroDetails, RoteiroDetails } from '@/services/industriaRoteiros';
 import { PlusCircle, Search, Route, DatabaseBackup } from 'lucide-react';
 import { Loader2 } from 'lucide-react';
 import { useDebounce } from '@/hooks/useDebounce';
@@ -19,6 +19,7 @@ export default function RoteirosPage() {
 
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [initialFormData, setInitialFormData] = useState<Partial<RoteiroDetails> | null>(null);
   const [isSeeding, setIsSeeding] = useState(false);
 
   const fetchRoteiros = async () => {
@@ -39,22 +40,66 @@ export default function RoteirosPage() {
 
   const handleNew = () => {
     setSelectedId(null);
+    setInitialFormData(null);
     setIsFormOpen(true);
   };
 
   const handleEdit = (roteiro: RoteiroListItem) => {
     setSelectedId(roteiro.id);
+    setInitialFormData(null);
     setIsFormOpen(true);
+  };
+
+  const handleClone = async (roteiro: RoteiroListItem) => {
+    setLoading(true);
+    try {
+      const fullData = await getRoteiroDetails(roteiro.id);
+
+      // Deep copy and strip IDs to treat as new
+      const { id, ...rest } = fullData;
+      const clonedEtapas = rest.etapas?.map(etapa => {
+        const { id, ...etapaRest } = etapa;
+        return { ...etapaRest, id: undefined }; // Ensure ID is undefined for new insertion
+      }) || [];
+
+      const clonedData: Partial<RoteiroDetails> = {
+        ...rest,
+        id: undefined, // Explicitly undefined
+        descricao: `${rest.descricao} (Cópia)`,
+        etapas: clonedEtapas as any
+      };
+
+      setSelectedId(null);
+      setInitialFormData(clonedData);
+      setIsFormOpen(true);
+    } catch (e: any) {
+      addToast('Erro ao preparar clonagem.', 'error');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleDelete = async (roteiro: RoteiroListItem) => {
+    if (!confirm(`Tem certeza que deseja excluir o roteiro "${roteiro.descricao}"?`)) return;
+
+    try {
+      await deleteRoteiro(roteiro.id);
+      addToast('Roteiro excluído com sucesso!', 'success');
+      fetchRoteiros();
+    } catch (e: any) {
+      addToast(e.message || 'Erro ao excluir.', 'error');
+    }
   };
 
   const handleClose = () => {
     setIsFormOpen(false);
     setSelectedId(null);
+    setInitialFormData(null);
   };
 
   const handleSuccess = () => {
     fetchRoteiros();
-    if (!selectedId) handleClose();
+    handleClose();
   };
 
   const handleSeed = async () => {
@@ -80,21 +125,21 @@ export default function RoteirosPage() {
           <p className="text-gray-600 text-sm mt-1">Sequência de operações e centros de trabalho.</p>
         </div>
         <div className="flex items-center gap-2">
-            <button
-              onClick={handleSeed}
-              disabled={isSeeding || loading}
-              className="flex items-center gap-2 bg-gray-100 text-gray-700 font-semibold py-2 px-4 rounded-lg hover:bg-gray-200 transition-colors disabled:opacity-50"
-            >
-              {isSeeding ? <Loader2 className="animate-spin" size={20} /> : <DatabaseBackup size={20} />}
-              Popular Dados
-            </button>
-            <button
-              onClick={handleNew}
-              className="flex items-center gap-2 bg-blue-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-blue-700 transition-colors"
-            >
-              <PlusCircle size={20} />
-              Novo Roteiro
-            </button>
+          <button
+            onClick={handleSeed}
+            disabled={isSeeding || loading}
+            className="flex items-center gap-2 bg-gray-100 text-gray-700 font-semibold py-2 px-4 rounded-lg hover:bg-gray-200 transition-colors disabled:opacity-50"
+          >
+            {isSeeding ? <Loader2 className="animate-spin" size={20} /> : <DatabaseBackup size={20} />}
+            Popular Dados
+          </button>
+          <button
+            onClick={handleNew}
+            className="flex items-center gap-2 bg-blue-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-blue-700 transition-colors"
+          >
+            <PlusCircle size={20} />
+            Novo Roteiro
+          </button>
         </div>
       </div>
 
@@ -126,12 +171,22 @@ export default function RoteirosPage() {
             <Loader2 className="animate-spin text-blue-600 w-10 h-10" />
           </div>
         ) : (
-          <RoteirosTable roteiros={roteiros} onEdit={handleEdit} />
+          <RoteirosTable
+            roteiros={roteiros}
+            onEdit={handleEdit}
+            onClone={handleClone}
+            onDelete={handleDelete}
+          />
         )}
       </div>
 
-      <Modal isOpen={isFormOpen} onClose={handleClose} title={selectedId ? 'Editar Roteiro' : 'Novo Roteiro'} size="5xl">
-        <RoteiroFormPanel roteiroId={selectedId} onSaveSuccess={handleSuccess} onClose={handleClose} />
+      <Modal isOpen={isFormOpen} onClose={handleClose} title={selectedId ? 'Editar Roteiro' : 'Novo Roteiro'} size="90pct">
+        <RoteiroFormPanel
+          roteiroId={selectedId}
+          initialData={initialFormData}
+          onSaveSuccess={handleSuccess}
+          onClose={handleClose}
+        />
       </Modal>
     </div>
   );

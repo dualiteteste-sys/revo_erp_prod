@@ -975,4 +975,57 @@ stderr | src/contexts/AuthProvider.test.tsx > AuthProvider Integration > initial
  PASS  Waiting for file changes...
        press h to show help, press q to quit
        rerun x8
-[2K[1A[2K[G
+[2K[1A[2K[G[3Jc
+ RERUN  e2e/bug_fixes.spec.ts x1
+
+stdout | src/test/setup.ts:8:9
+[SETUP] Initializing MSW server...
+
+stderr | new GoTrueClient (/Users/leandrofmarques/Downloads/revo_erp_prod_8yumh0_dualiteproject/node_modules/@supabase/auth-js/src/GoTrueClient.ts:306:15)
+GoTrueClient@sb-lrfwiaekipwkjkzvcnfd-auth-token:1 (2.86.0) 2025-12-02T00:56:15.853Z Multiple GoTrueClient instances detected in the same browser context. It is not an error, but this should be avoided as it may produce undefined behavior when used concurrently under the same storage key.
+
+ ❯ e2e/bug_fixes.spec.ts  (0 test)
+
+⎯⎯⎯⎯⎯⎯ Failed Suites 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  e2e/bug_fixes.spec.ts [ e2e/bug_fixes.spec.ts ]
+Error: Playwright Test did not expect test.describe() to be called here.
+Most common reasons include:
+- You are calling test.describe() in a configuration file.
+- You are calling test.describe() in a file that is imported by the configuration file.
+- You have two different versions of @playwright/test. This usually happens
+  when one of the dependencies in your package.json depends on @playwright/test.
+ ❯ TestTypeImpl._currentSuite node_modules/playwright/lib/common/testType.js:75:13
+ ❯ TestTypeImpl._describe node_modules/playwright/lib/common/testType.js:115:24
+ ❯ Function.describe node_modules/playwright/lib/transform/transform.js:275:12
+ ❯ e2e/bug_fixes.spec.ts:8:6
+      6| const supabase = createClient(supabaseUrl, supabaseKey);
+      7| 
+      8| test.describe('Bug Fix Verification', () => {
+       |      ^
+      9|     let session;
+     10| 
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+ Test Files  1 failed (1)
+      Tests  no tests
+   Start at  21:56:01
+   Duration  1.10s
+
+
+ FAIL  Tests failed. Watching for file changes...
+       press h to show help, press q to quit
+       rerun x1
+[2K[1A[2K[G[1;1H[JTest removed... [ e2e/bug_fixes.spec.ts ]
+
+
+⎯⎯⎯⎯ Unhandled Rejection ⎯⎯⎯⎯⎯
+TypeError: Cannot read properties of undefined (reading 'logUpdate')
+ ❯ createListRenderer node_modules/vitest/dist/vendor/index.-xs08BYx.js:1936:30
+ ❯ DefaultReporter.onTestRemoved node_modules/vitest/dist/vendor/index.-xs08BYx.js:2007:5
+ ❯ Vitest.report node_modules/vitest/dist/vendor/cli-api.OdDWuB7Y.js:11537:5
+
+
+
+

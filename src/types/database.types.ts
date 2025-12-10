@@ -6,8 +6,8 @@ export type Json =
   | { [key: string]: Json | undefined }
   | Json[]
 export type status_produto = "ativo" | "inativo"
-export type tipo_embalagem = "pacote_caixa" | "envelope" | "rolo_cilindro" | "outro"
-export type tipo_produto = "simples" | "kit" | "variacoes" | "fabricado" | "materia_prima"
+export type tipo_embalagem = "pacote_caixa" | "envelope" | "rolo_cilindro" | "outro" | "pacote"
+export type tipo_produto = "simples" | "kit" | "variacoes" | "fabricado" | "materia_prima" | "semiacabado" | "consumivel" | "fantasma"
 export type pessoa_tipo = "cliente" | "fornecedor" | "ambos"
 export type status_transportadora = "ativa" | "inativa"
 export type tipo_pessoa_enum = "fisica" | "juridica" | "estrangeiro"
@@ -98,6 +98,50 @@ export interface Database {
           id?: string
           empresa_id?: string
           nome?: string
+          created_at?: string
+          updated_at?: string
+        }
+      }
+      embalagens: {
+        Row: {
+          id: string
+          empresa_id: string | null
+          nome: string
+          tipo: tipo_embalagem
+          ativo: boolean
+          largura: number | null
+          altura: number | null
+          comprimento: number | null
+          diametro: number | null
+          codigo_interno: string | null
+          unidade_base: string | null
+          capacidade_embalagem: number | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          empresa_id?: string | null
+          nome: string
+          tipo?: tipo_embalagem
+          ativo?: boolean
+          largura?: number | null
+          altura?: number | null
+          comprimento?: number | null
+          diametro?: number | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          empresa_id?: string | null
+          nome?: string
+          tipo?: tipo_embalagem
+          ativo?: boolean
+          largura?: number | null
+          altura?: number | null
+          comprimento?: number | null
+          diametro?: number | null
           created_at?: string
           updated_at?: string
         }
@@ -481,6 +525,11 @@ export interface Database {
           tipo: tipo_produto
           status: status_produto
           nome: string
+          pode_comprar: boolean
+          pode_vender: boolean
+          pode_produzir: boolean
+          rastreio_lote: boolean
+          rastreio_serial: boolean
           descricao: string | null
           sku: string | null
           gtin: string | null
@@ -536,6 +585,11 @@ export interface Database {
           tipo?: tipo_produto
           status?: status_produto
           nome: string
+          pode_comprar: boolean
+          pode_vender: boolean
+          pode_produzir: boolean
+          rastreio_lote: boolean
+          rastreio_serial: boolean
           descricao?: string | null
           sku?: string | null
           gtin?: string | null
@@ -591,6 +645,11 @@ export interface Database {
           tipo?: tipo_produto
           status?: status_produto
           nome?: string
+          pode_comprar?: boolean
+          pode_vender?: boolean
+          pode_produzir?: boolean
+          rastreio_lote?: boolean
+          rastreio_serial?: boolean
           descricao?: string | null
           sku?: string | null
           gtin?: string | null
@@ -1124,7 +1183,7 @@ export interface Database {
     Enums: {
       status_produto: "ativo" | "inativo"
       tipo_embalagem: "pacote_caixa" | "envelope" | "rolo_cilindro" | "outro"
-      tipo_produto: "simples" | "kit" | "variacoes" | "fabricado" | "materia_prima"
+      tipo_produto: "simples" | "kit" | "variacoes" | "fabricado" | "materia_prima" | "semiacabado" | "consumivel" | "fantasma"
       pessoa_tipo: "cliente" | "fornecedor" | "ambos"
       status_transportadora: "ativa" | "inativa"
       tipo_pessoa_enum: "fisica" | "juridica" | "estrangeiro"

@@ -1,13 +1,15 @@
 import React from 'react';
 import { RoteiroListItem } from '@/services/industriaRoteiros';
-import { Edit, CheckCircle, XCircle, Package } from 'lucide-react';
+import { Edit, CheckCircle, XCircle, Package, Copy, Trash2 } from 'lucide-react';
 
 interface Props {
   roteiros: RoteiroListItem[];
   onEdit: (roteiro: RoteiroListItem) => void;
+  onClone: (roteiro: RoteiroListItem) => void;
+  onDelete: (roteiro: RoteiroListItem) => void;
 }
 
-export default function RoteirosTable({ roteiros, onEdit }: Props) {
+export default function RoteirosTable({ roteiros, onEdit, onClone, onDelete }: Props) {
   return (
     <div className="overflow-x-auto">
       <table className="min-w-full divide-y divide-gray-200">
@@ -35,29 +37,48 @@ export default function RoteirosTable({ roteiros, onEdit }: Props) {
               </td>
               <td className="px-6 py-4">
                 <span className={`px-2 py-1 rounded-full text-xs font-semibold uppercase ${roteiro.tipo_bom === 'producao' ? 'bg-blue-100 text-blue-800' : 'bg-purple-100 text-purple-800'}`}>
-                    {roteiro.tipo_bom}
+                  {roteiro.tipo_bom}
                 </span>
               </td>
               <td className="px-6 py-4 text-center">
                 {(roteiro.padrao_para_producao || roteiro.padrao_para_beneficiamento) && (
-                    <CheckCircle size={16} className="text-green-500 mx-auto" />
+                  <CheckCircle size={16} className="text-green-500 mx-auto" />
                 )}
               </td>
               <td className="px-6 py-4 text-center">
                 {roteiro.ativo ? (
-                    <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-800">
-                        Ativo
-                    </span>
+                  <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-800">
+                    Ativo
+                  </span>
                 ) : (
-                    <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-800">
-                        Inativo
-                    </span>
+                  <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-800">
+                    Inativo
+                  </span>
                 )}
               </td>
               <td className="px-6 py-4 text-right">
-                <button onClick={() => onEdit(roteiro)} className="text-blue-600 hover:text-blue-800 p-2 hover:bg-blue-50 rounded-full transition-colors">
-                  <Edit size={18} />
-                </button>
+                <div className="flex justify-end gap-2">
+                  <button
+                    onClick={() => onClone(roteiro)}
+                    className="text-gray-500 hover:text-gray-700 p-2 hover:bg-gray-100 rounded-full transition-colors"
+                    title="Clonar"
+                  >
+                    <Copy size={18} />
+                  </button>
+                  <button
+                    onClick={() => onEdit(roteiro)}
+                    className="text-blue-600 hover:text-blue-800 p-2 hover:bg-blue-50 rounded-full transition-colors"
+                  >
+                    <Edit size={18} />
+                  </button>
+                  <button
+                    onClick={() => onDelete(roteiro)}
+                    className="text-red-600 hover:text-red-800 p-2 hover:bg-red-50 rounded-full transition-colors"
+                    title="Excluir"
+                  >
+                    <Trash2 size={18} />
+                  </button>
+                </div>
               </td>
             </tr>
           ))}

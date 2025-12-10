@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { listBoms, BomListItem, seedBoms } from '@/services/industriaBom';
+import { listBoms, BomListItem, seedBoms, deleteBom, getBomDetails, BomDetails } from '@/services/industriaBom';
 import { PlusCircle, Search, FileCog, DatabaseBackup } from 'lucide-react';
 import { Loader2 } from 'lucide-react';
 import { useDebounce } from '@/hooks/useDebounce';
@@ -19,6 +19,7 @@ export default function BomsPage() {
 
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [initialFormData, setInitialFormData] = useState<Partial<BomDetails> | null>(null);
   const [isSeeding, setIsSeeding] = useState(false);
 
   const fetchBoms = async () => {
@@ -39,22 +40,65 @@ export default function BomsPage() {
 
   const handleNew = () => {
     setSelectedId(null);
+    setInitialFormData(null);
     setIsFormOpen(true);
   };
 
   const handleEdit = (bom: BomListItem) => {
     setSelectedId(bom.id);
+    setInitialFormData(null);
     setIsFormOpen(true);
+  };
+
+  const handleClone = async (bom: BomListItem) => {
+    setLoading(true);
+    try {
+      const fullData = await getBomDetails(bom.id);
+
+      const { id, ...rest } = fullData;
+      const clonedComponents = rest.componentes?.map(comp => {
+        const { id, ...compRest } = comp;
+        return { ...compRest, id: undefined, bom_id: undefined };
+      }) || [];
+
+      const clonedData: Partial<BomDetails> = {
+        ...rest,
+        id: undefined,
+        descricao: `${rest.descricao} (Cópia)`,
+        componentes: clonedComponents as any
+      };
+
+      setSelectedId(null);
+      setInitialFormData(clonedData);
+      setIsFormOpen(true);
+    } catch (e: any) {
+      addToast('Erro ao preparar clonagem.', 'error');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleDelete = async (bom: BomListItem) => {
+    if (!confirm(`Tem certeza que deseja excluir a BOM do produto "${bom.produto_nome}"?`)) return;
+
+    try {
+      await deleteBom(bom.id);
+      addToast('BOM excluída com sucesso!', 'success');
+      fetchBoms();
+    } catch (e: any) {
+      addToast(e.message || 'Erro ao excluir.', 'error');
+    }
   };
 
   const handleClose = () => {
     setIsFormOpen(false);
     setSelectedId(null);
+    setInitialFormData(null);
   };
 
   const handleSuccess = () => {
     fetchBoms();
-    if (!selectedId) handleClose();
+    handleClose();
   };
 
   const handleSeed = async () => {
@@ -80,21 +124,21 @@ export default function BomsPage() {
           <p className="text-gray-600 text-sm mt-1">Estruturas de produtos e listas de materiais.</p>
         </div>
         <div className="flex items-center gap-2">
-            <button
-              onClick={handleSeed}
-              disabled={isSeeding || loading}
-              className="flex items-center gap-2 bg-gray-100 text-gray-700 font-semibold py-2 px-4 rounded-lg hover:bg-gray-200 transition-colors disabled:opacity-50"
-            >
-              {isSeeding ? <Loader2 className="animate-spin" size={20} /> : <DatabaseBackup size={20} />}
-              Popular Dados
-            </button>
-            <button
-              onClick={handleNew}
-              className="flex items-center gap-2 bg-blue-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-blue-700 transition-colors"
-            >
-              <PlusCircle size={20} />
-              Nova Ficha Técnica
-            </button>
+          <button
+            onClick={handleSeed}
+            disabled={isSeeding || loading}
+            className="flex items-center gap-2 bg-gray-100 text-gray-700 font-semibold py-2 px-4 rounded-lg hover:bg-gray-200 transition-colors disabled:opacity-50"
+          >
+            {isSeeding ? <Loader2 className="animate-spin" size={20} /> : <DatabaseBackup size={20} />}
+            Popular Dados
+          </button>
+          <button
+            onClick={handleNew}
+            className="flex items-center gap-2 bg-blue-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-blue-700 transition-colors"
+          >
+            <PlusCircle size={20} />
+            Nova Ficha Técnica
+          </button>
         </div>
       </div>
 
@@ -126,12 +170,22 @@ export default function BomsPage() {
             <Loader2 className="animate-spin text-blue-600 w-10 h-10" />
           </div>
         ) : (
-          <BomsTable boms={boms} onEdit={handleEdit} />
+          <BomsTable
+            boms={boms}
+            onEdit={handleEdit}
+            onClone={handleClone}
+            onDelete={handleDelete}
+          />
         )}
       </div>
 
       <Modal isOpen={isFormOpen} onClose={handleClose} title={selectedId ? 'Editar Ficha Técnica' : 'Nova Ficha Técnica'} size="5xl">
-        <BomFormPanel bomId={selectedId} onSaveSuccess={handleSuccess} onClose={handleClose} />
+        <BomFormPanel
+          bomId={selectedId}
+          initialData={initialFormData}
+          onSaveSuccess={handleSuccess}
+          onClose={handleClose}
+        />
       </Modal>
     </div>
   );

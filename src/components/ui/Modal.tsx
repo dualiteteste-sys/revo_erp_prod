@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { X } from 'lucide-react';
 import GlassCard from './GlassCard';
 
-type ModalSize = 'sm' | 'md' | 'lg' | 'xl' | '2xl' | '3xl' | '4xl' | '5xl' | '6xl' | '7xl';
+type ModalSize = 'sm' | 'md' | 'lg' | 'xl' | '2xl' | '3xl' | '4xl' | '5xl' | '6xl' | '7xl' | 'full' | '60pct' | '70pct' | '80pct' | '90pct';
 
 interface ModalProps {
   isOpen: boolean;
@@ -24,6 +24,11 @@ const sizeClasses: Record<ModalSize, string> = {
   '5xl': 'max-w-5xl',
   '6xl': 'max-w-6xl',
   '7xl': 'max-w-7xl',
+  'full': 'max-w-[98vw]',
+  '60pct': 'max-w-[60vw]',
+  '70pct': 'max-w-[70vw]',
+  '80pct': 'max-w-[80vw]',
+  '90pct': 'max-w-[90vw]',
 };
 
 

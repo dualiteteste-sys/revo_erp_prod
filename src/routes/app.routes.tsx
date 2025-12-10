@@ -14,6 +14,7 @@ const CarriersPage = lazyImport(() => import("../pages/carriers/CarriersPage"));
 const ServicesPage = lazyImport(() => import("../pages/services/ServicesPage"));
 const GrupoProdutosPage = lazyImport(() => import("../pages/cadastros/GrupoProdutosPage"));
 const UnidadesPage = lazyImport(() => import("../pages/cadastros/UnidadesPage"));
+const EmbalagensPage = lazyImport(() => import("../pages/cadastros/EmbalagensPage"));
 const SalesDashboard = lazyImport(() => import("../pages/SalesDashboard"));
 const SalesGoalsPage = lazyImport(() => import("../pages/sales/SalesGoalsPage"));
 const OSPage = lazyImport(() => import("../pages/os/OSPage"));
@@ -85,6 +86,7 @@ export const appRoutes: RouteObject[] = [
             { path: "services", element: <Suspense fallback={<PageLoader />}><ServicesPage /></Suspense> },
             { path: "cadastros/grupos-produtos", element: <Suspense fallback={<PageLoader />}><GrupoProdutosPage /></Suspense> },
             { path: "cadastros/unidades-medida", element: <Suspense fallback={<PageLoader />}><UnidadesPage /></Suspense> },
+            { path: "cadastros/embalagens", element: <Suspense fallback={<PageLoader />}><EmbalagensPage /></Suspense> },
 
             // Indústria
             { path: "industria/dashboard", element: <Suspense fallback={<PageLoader />}><IndustriaDashboardPage /></Suspense> },

@@ -1,0 +1,53 @@
+ mailpit Skipped - Image is already present locally 
+ realtime Skipped - Image is already present locally 
+ pgmeta Skipped - Image is already present locally 
+ analytics Skipped - Image is already present locally 
+ vector Skipped - Image is already present locally 
+ api Skipped - Image is already present locally 
+ auth Skipped - Image is already present locally 
+ storage Skipped - Image is already present locally 
+ imgProxy Skipped - Image is already present locally 
+ edgeRuntime Skipped - Image is already present locally 
+ studio Skipped - Image is already present locally 
+ db Skipped - Image is already present locally 
+ gateway Skipped - Image is already present locally 
+Starting database...
+Initialising schema...
+Seeding globals from roles.sql...
+Skipping migration .DS_Store... (file name must match pattern "<timestamp>_name.sql")
+Applying migration 20251130165352_prelude.sql...
+Applying migration 20251130165353_baseline.sql...
+Applying migration 20251201193000_fix_security_lints.sql...
+Applying migration 20251201201000_create_company_logos_bucket.sql...
+NOTICE (00000): policy "Public Access to Company Logos" for relation "storage.objects" does not exist, skipping
+NOTICE (00000): policy "Authenticated Users can Upload Company Logos" for relation "storage.objects" does not exist, skipping
+NOTICE (00000): policy "Authenticated Users can Update Company Logos" for relation "storage.objects" does not exist, skipping
+NOTICE (00000): policy "Authenticated Users can Delete Company Logos" for relation "storage.objects" does not exist, skipping
+Applying migration 20251202120000_fix_product_clone_and_images.sql...
+Applying migration 20251202130000_create_product_images_bucket.sql...
+NOTICE (00000): policy "Public Access to Product Images" for relation "storage.objects" does not exist, skipping
+NOTICE (00000): policy "Authenticated Users can Upload Product Images" for relation "storage.objects" does not exist, skipping
+NOTICE (00000): policy "Authenticated Users can Update Product Images" for relation "storage.objects" does not exist, skipping
+NOTICE (00000): policy "Authenticated Users can Delete Product Images" for relation "storage.objects" does not exist, skipping
+Applying migration 20251202140000_fix_storage_and_rls.sql...
+Applying migration 20251204180000_create_produto_grupos.sql...
+WARN: no files matched pattern: supabase/seed.sql
+Starting containers...
+WARNING: analytics requires mounting default docker socket: /var/run/docker.sock
+Waiting for health checks...
+Started supabase local development setup.
+
+         API URL: http://127.0.0.1:54321
+     GraphQL URL: http://127.0.0.1:54321/graphql/v1
+  S3 Storage URL: http://127.0.0.1:54321/storage/v1/s3
+         MCP URL: http://127.0.0.1:54321/mcp
+    Database URL: postgresql://postgres:postgres@127.0.0.1:54322/postgres
+      Studio URL: http://127.0.0.1:54323
+     Mailpit URL: http://127.0.0.1:54324
+ Publishable key: sb_publishable_ACJWlzQHlZjBrEguHvfOxg_3BJgxAaH
+      Secret key: sb_secret_N7UND0UgjKTVK-Uodkm0Hg_xSvEMPvz
+   S3 Access Key: 625729a08b95bf1b7ff351a663f3a23c
+   S3 Secret Key: 850181e4652dd023b7a98c58ae0d2d34bd487ee0cc3254aed6eda37307425907
+       S3 Region: local
+A new version of Supabase CLI is available: v2.65.5 (currently installed v2.62.10)
+We recommend updating regularly for new features and bug fixes: https://supabase.com/docs/guides/cli/getting-started#updating-the-supabase-cli

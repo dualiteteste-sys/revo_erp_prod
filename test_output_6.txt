@@ -5950,4 +5950,122 @@ stdout | src/pages/products/ProductsPage.test.tsx > ProductsPage Integration > f
  PASS  Waiting for file changes...
        press h to show help, press q to quit
        rerun x10
-[2K[1A[2K[G
+[2K[1A[2K[G[3Jc
+ RERUN  src/components/products/NcmSearch.tsx x11
+
+stdout | src/test/setup.ts:8:9
+[SETUP] Initializing MSW server...
+
+stdout | src/pages/products/ProductsPage.test.tsx > ProductsPage Integration > renders the product list with data from MSW
+[AuthProvider] activeEmpresa calc: { empresasCount: 0, activeEmpresaId: undefined, foundId: undefined }
+[AuthProvider] activeEmpresa calc: { empresasCount: 0, activeEmpresaId: undefined, foundId: undefined }
+[DEBUG] [QUERY][empresas] fetching list 
+[DEBUG] [QUERY][active_empresa] fetching 
+[INFO] [AUTH][LOGIN] start { email: 'exists' }
+[MSW] GET user_active_empresa https://lrfwiaekipwkjkzvcnfd.supabase.co/rest/v1/user_active_empresa?select=empresa_id
+[MSW] GET empresa_usuarios https://lrfwiaekipwkjkzvcnfd.supabase.co/rest/v1/empresa_usuarios?select=empresa%3Aempresas%28*%29&order=created_at.desc
+[AuthProvider] activeEmpresa calc: {
+  empresasCount: 1,
+  activeEmpresaId: 'empresa-1',
+  foundId: 'empresa-1'
+}
+[MSW] Intercepted RPC: produtos_count_for_current_user { p_q: null, p_status: null }
+[MSW] Intercepted RPC: produtos_list_for_current_user {
+  p_limit: 10,
+  p_offset: 0,
+  p_q: null,
+  p_status: null,
+  p_order: 'nome asc'
+}
+
+stderr | src/pages/products/ProductsPage.test.tsx > ProductsPage Integration > renders the product list with data from MSW
+⚠️ React Router Future Flag Warning: React Router will begin wrapping state updates in `React.startTransition` in v7. You can use the `v7_startTransition` future flag to opt-in early. For more information, see https://reactrouter.com/v6/upgrading/future#v7_starttransition.
+⚠️ React Router Future Flag Warning: Relative route resolution within Splat routes is changing in v7. You can use the `v7_relativeSplatPath` future flag to opt-in early. For more information, see https://reactrouter.com/v6/upgrading/future#v7_relativesplatpath.
+
+stdout | src/pages/products/ProductsPage.test.tsx > ProductsPage Integration > filters products by search term
+[AuthProvider] activeEmpresa calc: { empresasCount: 0, activeEmpresaId: undefined, foundId: undefined }
+[AuthProvider] activeEmpresa calc: { empresasCount: 0, activeEmpresaId: undefined, foundId: undefined }
+[DEBUG] [QUERY][empresas] fetching list 
+[DEBUG] [QUERY][active_empresa] fetching 
+[INFO] [AUTH][LOGIN] start { email: 'exists' }
+[MSW] GET user_active_empresa https://lrfwiaekipwkjkzvcnfd.supabase.co/rest/v1/user_active_empresa?select=empresa_id
+[MSW] GET empresa_usuarios https://lrfwiaekipwkjkzvcnfd.supabase.co/rest/v1/empresa_usuarios?select=empresa%3Aempresas%28*%29&order=created_at.desc
+[AuthProvider] activeEmpresa calc: {
+  empresasCount: 1,
+  activeEmpresaId: 'empresa-1',
+  foundId: 'empresa-1'
+}
+[MSW] Intercepted RPC: produtos_count_for_current_user { p_q: null, p_status: null }
+[MSW] Intercepted RPC: produtos_list_for_current_user {
+  p_limit: 10,
+  p_offset: 0,
+  p_q: null,
+  p_status: null,
+  p_order: 'nome asc'
+}
+
+ ✓ src/pages/products/ProductsPage.test.tsx  (2 tests) 831ms
+
+ Test Files  1 passed (1)
+      Tests  2 passed (2)
+   Start at  21:55:20
+   Duration  8.87s
+
+
+ PASS  Waiting for file changes...
+       press h to show help, press q to quit
+       rerun x11
+[2K[1A[2K[G[3Jc
+ RERUN  e2e/bug_fixes.spec.ts x1
+
+stdout | src/test/setup.ts:8:9
+[SETUP] Initializing MSW server...
+
+stderr | new GoTrueClient (/Users/leandrofmarques/Downloads/revo_erp_prod_8yumh0_dualiteproject/node_modules/@supabase/auth-js/src/GoTrueClient.ts:306:15)
+GoTrueClient@sb-lrfwiaekipwkjkzvcnfd-auth-token:1 (2.86.0) 2025-12-02T00:56:15.848Z Multiple GoTrueClient instances detected in the same browser context. It is not an error, but this should be avoided as it may produce undefined behavior when used concurrently under the same storage key.
+
+ ❯ e2e/bug_fixes.spec.ts  (0 test)
+
+⎯⎯⎯⎯⎯⎯ Failed Suites 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  e2e/bug_fixes.spec.ts [ e2e/bug_fixes.spec.ts ]
+Error: Playwright Test did not expect test.describe() to be called here.
+Most common reasons include:
+- You are calling test.describe() in a configuration file.
+- You are calling test.describe() in a file that is imported by the configuration file.
+- You have two different versions of @playwright/test. This usually happens
+  when one of the dependencies in your package.json depends on @playwright/test.
+ ❯ TestTypeImpl._currentSuite node_modules/playwright/lib/common/testType.js:75:13
+ ❯ TestTypeImpl._describe node_modules/playwright/lib/common/testType.js:115:24
+ ❯ Function.describe node_modules/playwright/lib/transform/transform.js:275:12
+ ❯ e2e/bug_fixes.spec.ts:8:6
+      6| const supabase = createClient(supabaseUrl, supabaseKey);
+      7| 
+      8| test.describe('Bug Fix Verification', () => {
+       |      ^
+      9|     let session;
+     10| 
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+ Test Files  1 failed (1)
+      Tests  no tests
+   Start at  21:56:01
+   Duration  1.05s
+
+
+ FAIL  Tests failed. Watching for file changes...
+       press h to show help, press q to quit
+       rerun x1
+[2K[1A[2K[G[1;1H[JTest removed... [ e2e/bug_fixes.spec.ts ]
+
+
+⎯⎯⎯⎯ Unhandled Rejection ⎯⎯⎯⎯⎯
+TypeError: Cannot read properties of undefined (reading 'logUpdate')
+ ❯ createListRenderer node_modules/vitest/dist/vendor/index.-xs08BYx.js:1936:30
+ ❯ DefaultReporter.onTestRemoved node_modules/vitest/dist/vendor/index.-xs08BYx.js:2007:5
+ ❯ Vitest.report node_modules/vitest/dist/vendor/cli-api.OdDWuB7Y.js:11537:5
+
+
+
+

@@ -11,6 +11,8 @@ export type CentroTrabalho = {
   ativo: boolean;
   capacidade_unidade_hora: number | null;
   tipo_uso: TipoUsoCentro;
+  tempo_setup_min: number | null;
+  requer_inspecao_final: boolean;
 };
 
 export type CentroTrabalhoPayload = Partial<Omit<CentroTrabalho, 'id'>> & { id?: string };
@@ -24,6 +26,10 @@ export async function listCentrosTrabalho(search?: string, ativo?: boolean): Pro
 
 export async function saveCentroTrabalho(payload: CentroTrabalhoPayload): Promise<CentroTrabalho> {
   return callRpc<CentroTrabalho>('industria_centros_trabalho_upsert', { p_payload: payload });
+}
+
+export async function deleteCentroTrabalho(id: string): Promise<void> {
+  return callRpc<void>('industria_centros_trabalho_delete', { p_id: id });
 }
 
 export async function seedCentrosTrabalho(): Promise<CentroTrabalho[]> {
