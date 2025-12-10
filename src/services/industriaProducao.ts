@@ -173,7 +173,7 @@ export async function gerarOperacoes(ordemId: string): Promise<void> {
 
 export async function registrarEventoOperacao(
   operacaoId: string,
-  tipo: 'inicio_setup' | 'fim_setup' | 'inicio_producao' | 'parada' | 'retorno' | 'conclusao',
+  tipo: 'iniciar' | 'pausar' | 'retomar' | 'concluir' | 'inicio_setup' | 'fim_setup',
   obs?: string
 ): Promise<void> {
   await callRpc('industria_producao_registrar_evento', {
@@ -298,6 +298,11 @@ export async function registrarEntrega(payload: RegistrarEntregaPayload): Promis
 export async function fecharOrdemProducao(ordemId: string): Promise<void> {
   await callRpc('industria_producao_fechar', { p_ordem_id: ordemId });
 }
+
+export async function deleteOrdemProducao(ordemId: string): Promise<void> {
+  await callRpc('industria_producao_ordens_delete', { p_id: ordemId });
+}
+
 
 // --- Quality Management Types ---
 

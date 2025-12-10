@@ -73,7 +73,7 @@ export default function ApontamentoModal({ isOpen, onClose, operacao, onSuccess 
             isOpen={isOpen}
             onClose={onClose}
             title={`Apontar Produção - Seq ${operacao.sequencia} ${operacao.centro_trabalho_nome || ''}`}
-            size="md"
+            size="lg"
         >
             <div className="space-y-4">
 

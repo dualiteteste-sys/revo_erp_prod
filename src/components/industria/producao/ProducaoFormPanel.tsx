@@ -9,6 +9,7 @@ import {
   manageEntregaProducao,
   gerarOperacoes,
   registrarEntrega,
+  deleteOrdemProducao,
   fecharOrdemProducao
 } from '@/services/industriaProducao';
 import { useToast } from '@/contexts/ToastProvider';
@@ -37,10 +38,7 @@ export default function ProducaoFormPanel({ ordemId, onSaveSuccess, onClose }: P
   const [isSaving, setIsSaving] = useState(false);
   const [activeTab, setActiveTab] = useState<'dados' | 'componentes' | 'entregas' | 'operacoes'>('dados');
   const [unidades, setUnidades] = useState<UnidadeMedida[]>([]);
-
-  useEffect(() => {
-    listUnidades().then(setUnidades).catch(console.error);
-  }, []);
+  const [showClosureModal, setShowClosureModal] = useState(false);
 
   const [formData, setFormData] = useState<Partial<OrdemProducaoDetails>>({
     status: 'rascunho',
@@ -54,6 +52,10 @@ export default function ProducaoFormPanel({ ordemId, onSaveSuccess, onClose }: P
     tolerancia_overrun_percent: 0,
     lote_producao: ''
   });
+
+  useEffect(() => {
+    listUnidades().then(setUnidades).catch(console.error);
+  }, []);
 
   useEffect(() => {
     if (ordemId) {
@@ -105,7 +107,7 @@ export default function ProducaoFormPanel({ ordemId, onSaveSuccess, onClose }: P
         quantidade_planejada: formData.quantidade_planejada,
         unidade: formData.unidade,
         status: formData.status,
-        prioridade: formData.prioridade,
+        prioridade: formData.prioridade || 0,
         data_prevista_inicio: formData.data_prevista_inicio,
         data_prevista_fim: formData.data_prevista_fim,
         data_prevista_entrega: formData.data_prevista_entrega,
@@ -187,19 +189,17 @@ export default function ProducaoFormPanel({ ordemId, onSaveSuccess, onClose }: P
   const handleAddEntrega = async (data: any) => {
     if (!formData.id) return;
     try {
-      // Use new RPC for Stock Entry
       await registrarEntrega({
         ordem_id: formData.id,
         quantidade: data.quantidade_entregue!,
         data_entrega: data.data_entrega!,
-        lote: formData.lote_producao, // Use Order Batch as default if not provided
+        lote: formData.lote_producao,
         documento_ref: data.documento_ref,
         observacoes: data.observacoes
       });
       await loadDetails(formData.id);
       addToast('Entrega registrada com sucesso!', 'success');
     } catch (e: any) {
-      // Fallback to old method if RPC fails? No, better show error.
       addToast('Erro ao registrar entrega: ' + e.message, 'error');
     }
   };
@@ -214,24 +214,9 @@ export default function ProducaoFormPanel({ ordemId, onSaveSuccess, onClose }: P
     }
   };
 
-  const handleFecharOrdem = async () => {
-    if (!formData.id) return;
-    if (!confirm('Tem certeza que deseja fechar esta Ordem? O sistema fará o backflush dos insumos restantes e liberará reservas.')) return;
-
-    try {
-      await fecharOrdemProducao(formData.id);
-      await loadDetails(formData.id);
-      addToast('Ordem Fechada com Sucesso!', 'success');
-      onSaveSuccess(); // Refresh parent list
-    } catch (e: any) {
-      addToast('Erro ao fechar ordem: ' + e.message, 'error');
-    }
-  };
-
   const handleBomApplied = async (bom: any) => {
     if (!formData.id) return;
     try {
-      // Atualiza o header da ordem com a BOM aplicada
       const codigo = bom.codigo || '';
       const descricao = bom.descricao || '';
       await saveOrdemProducao({
@@ -273,9 +258,7 @@ export default function ProducaoFormPanel({ ordemId, onSaveSuccess, onClose }: P
 
     try {
       setIsSaving(true);
-      // Salva status
       await saveOrdemProducao({ ...formData, status: 'em_producao' });
-      // Gera operações
       await gerarOperacoes(formData.id);
 
       addToast('Ordem liberada e operações geradas!', 'success');
@@ -293,8 +276,8 @@ export default function ProducaoFormPanel({ ordemId, onSaveSuccess, onClose }: P
   const isLocked = formData.status === 'concluida' || formData.status === 'cancelada';
 
   return (
-    <div className="flex flex-col h-full">
-      <div className="border-b border-white/20">
+    <div className="flex flex-col h-full bg-white">
+      <div className="border-b border-gray-200">
         <div className="flex items-center justify-between py-4 px-6 bg-gray-50 border-b border-gray-200">
           <div>
             <h2 className="text-xl font-bold text-gray-800">
@@ -557,42 +540,71 @@ export default function ProducaoFormPanel({ ordemId, onSaveSuccess, onClose }: P
         )}
       </div>
 
-      <footer className="flex-shrink-0 p-4 flex justify-between items-center border-t border-white/20">
-        <button onClick={onClose} className="rounded-md border border-gray-300 bg-white py-2 px-4 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2">
-          Fechar
-        </button>
-        <div className="flex gap-2">
-          {!isLocked && formData.id && (formData.status === 'rascunho' || formData.status === 'planejada') && (
+      <div className="flex justify-between p-4 border-t bg-gray-50 rounded-b-lg">
+        {formData.id && !isLocked ? (
+          <button
+            onClick={async () => {
+              if (confirm('Tem certeza que deseja excluir esta Ordem de Produção? Esta ação não pode ser desfeita.')) {
+                setIsSaving(true);
+                try {
+                  await deleteOrdemProducao(formData.id!);
+                  addToast('Ordem excluída com sucesso!', 'success');
+                  onClose();
+                  if (onSaveSuccess) onSaveSuccess();
+                } catch (e: any) {
+                  addToast('Erro ao excluir ordem: ' + e.message, 'error');
+                } finally {
+                  setIsSaving(false);
+                }
+              }
+            }}
+            disabled={isSaving}
+            className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 disabled:opacity-50"
+          >
+            Excluir OP
+          </button>
+        ) : <div></div>}
+
+        <div className="flex space-x-2">
+          <button
+            onClick={onClose}
+            disabled={isSaving}
+            className="rounded-md border border-gray-300 bg-white py-2 px-4 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 disabled:opacity-50"
+          >
+            Fechar
+          </button>
+
+          {formData.id && (formData.status === 'rascunho' || formData.status === 'planejada') && (
             <button
               onClick={handleLiberar}
-              disabled={isSaving}
-              className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
+              disabled={isSaving || !formData.roteiro_aplicado_id}
+              className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 disabled:opacity-50"
             >
               <Play size={20} className="mr-2" />
               Liberar OP
             </button>
           )}
-          {formData.id && formData.status !== 'concluida' && formData.status !== 'cancelada' && (
+
+          {formData.id && (formData.status === 'em_producao' || (formData.status as any) === 'parcialmente_concluida') && (
             <button
-              onClick={handleFecharOrdem}
-              disabled={loading}
-              className="ml-2 inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
+              onClick={() => setShowClosureModal(true)}
+              disabled={isSaving}
+              className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 disabled:opacity-50"
             >
               Encerrar Ordem (Backflush)
             </button>
           )}
-          {!isLocked && (
-            <button
-              onClick={handleSaveHeader}
-              disabled={isSaving}
-              className="ml-3 inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-            >
-              {isSaving ? <Loader2 className="animate-spin h-5 w-5 mr-2" /> : <Save className="h-5 w-5 mr-2" />}
-              Salvar
-            </button>
-          )}
+
+          <button
+            onClick={handleSaveHeader}
+            disabled={isSaving || isLocked}
+            className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50"
+          >
+            {isSaving ? <Loader2 className="animate-spin h-5 w-5 mr-2" /> : <Save className="h-5 w-5 mr-2" />}
+            Salvar
+          </button>
         </div>
-      </footer>
+      </div>
     </div>
   );
 }

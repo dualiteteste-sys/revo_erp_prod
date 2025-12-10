@@ -1,11 +1,12 @@
 import React from 'react';
 import { OrdemProducao } from '@/services/industriaProducao';
-import { Edit, Eye, Calendar, Package } from 'lucide-react';
+import { Edit, Eye, Calendar, Package, Trash2 } from 'lucide-react';
 import { formatOrderNumber } from '@/lib/utils';
 
 interface Props {
   orders: OrdemProducao[];
   onEdit: (order: OrdemProducao) => void;
+  onDelete: (id: string) => void;
 }
 
 const statusColors: Record<string, string> = {
@@ -22,7 +23,7 @@ const formatStatus = (status: string) => {
   return status.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
 };
 
-export default function ProducaoTable({ orders, onEdit }: Props) {
+export default function ProducaoTable({ orders, onEdit, onDelete }: Props) {
   return (
     <div className="overflow-x-auto">
       <table className="min-w-full divide-y divide-gray-200">
@@ -56,7 +57,7 @@ export default function ProducaoTable({ orders, onEdit }: Props) {
               </td>
               <td className="px-6 py-4 text-center">
                 <span className={`text-xs font-bold px-2 py-1 rounded-full ${order.percentual_concluido >= 100 ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-600'}`}>
-                    {order.percentual_concluido}%
+                  {order.percentual_concluido}%
                 </span>
               </td>
               <td className="px-6 py-4 text-sm text-gray-500">
@@ -73,9 +74,16 @@ export default function ProducaoTable({ orders, onEdit }: Props) {
                 </span>
               </td>
               <td className="px-6 py-4 text-right">
-                <button onClick={() => onEdit(order)} className="text-blue-600 hover:text-blue-800 p-2 hover:bg-blue-50 rounded-full transition-colors">
-                  {order.status === 'concluida' || order.status === 'cancelada' ? <Eye size={18} /> : <Edit size={18} />}
-                </button>
+                <div className="flex justify-end gap-2">
+                  <button onClick={() => onEdit(order)} className="text-blue-600 hover:text-blue-800 p-2 hover:bg-blue-50 rounded-full transition-colors" title="Editar / Visualizar">
+                    {order.status === 'concluida' || order.status === 'cancelada' ? <Eye size={18} /> : <Edit size={18} />}
+                  </button>
+                  {order.status !== 'concluida' && order.status !== 'cancelada' && (
+                    <button onClick={() => onDelete(order.id)} className="text-red-500 hover:text-red-700 p-2 hover:bg-red-50 rounded-full transition-colors" title="Excluir">
+                      <Trash2 size={18} />
+                    </button>
+                  )}
+                </div>
               </td>
             </tr>
           ))}
