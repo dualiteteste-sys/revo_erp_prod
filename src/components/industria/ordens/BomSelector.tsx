@@ -8,7 +8,7 @@ interface Props {
   ordemId: string;
   produtoId: string;
   tipoOrdem: 'producao' | 'beneficiamento';
-  onApplied: () => void;
+  onApplied: (bom: BomListItem) => void;
 }
 
 export default function BomSelector({ ordemId, produtoId, tipoOrdem, onApplied }: Props) {
@@ -45,6 +45,9 @@ export default function BomSelector({ ordemId, produtoId, tipoOrdem, onApplied }
   const handleApply = async (bomId: string, mode: 'substituir' | 'adicionar') => {
     if (!confirm(`Tem certeza que deseja aplicar esta BOM? ${mode === 'substituir' ? 'Isso substituirá os componentes atuais.' : ''}`)) return;
 
+    const selectedBom = boms.find(b => b.id === bomId);
+    if (!selectedBom) return;
+
     setApplying(bomId);
     try {
       if (tipoOrdem === 'producao') {
@@ -54,7 +57,7 @@ export default function BomSelector({ ordemId, produtoId, tipoOrdem, onApplied }
       }
       addToast('BOM aplicada com sucesso!', 'success');
       setIsOpen(false);
-      onApplied();
+      onApplied(selectedBom);
     } catch (e: any) {
       addToast(e.message, 'error');
     } finally {
