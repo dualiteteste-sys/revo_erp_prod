@@ -79,7 +79,7 @@ export default function BomsPage() {
   };
 
   const handleDelete = async (bom: BomListItem) => {
-    if (!confirm(`Tem certeza que deseja excluir a BOM "${bom.descricao}"?`)) return;
+    if (!confirm(`Tem certeza que deseja excluir a BOM do produto "${bom.produto_nome}"?`)) return;
 
     try {
       await deleteBom(bom.id);

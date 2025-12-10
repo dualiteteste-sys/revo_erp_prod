@@ -33,6 +33,7 @@ export const getEmbalagem = async (id: string) => {
 export const createEmbalagem = async (embalagem: EmbalagemInsert) => {
     const { data, error } = await supabase
         .from('embalagens')
+        // @ts-ignore
         .insert(embalagem)
         .select()
         .single();
@@ -43,6 +44,7 @@ export const createEmbalagem = async (embalagem: EmbalagemInsert) => {
 export const updateEmbalagem = async (id: string, embalagem: EmbalagemUpdate) => {
     const { data, error } = await supabase
         .from('embalagens')
+        // @ts-ignore
         .update(embalagem)
         .eq('id', id)
         .select()
