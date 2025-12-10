@@ -101,6 +101,15 @@ export default function CentroTrabalhoFormPanel({ centro, onSaveSuccess, onClose
           </Select>
 
           <Input
+            label="Tempo de Setup (min)"
+            name="setup"
+            type="number"
+            value={formData.tempo_setup_min || ''}
+            onChange={e => handleChange('tempo_setup_min', parseInt(e.target.value))}
+            className="sm:col-span-3"
+          />
+
+          <Input
             label="Capacidade (Unidades/Hora)"
             name="capacidade"
             type="number"
@@ -109,14 +118,27 @@ export default function CentroTrabalhoFormPanel({ centro, onSaveSuccess, onClose
             className="sm:col-span-3"
           />
 
-          <Input
-            label="Tempo de Setup (min)"
-            name="setup"
-            type="number"
-            value={formData.tempo_setup_min || ''}
-            onChange={e => handleChange('tempo_setup_min', parseInt(e.target.value))}
-            className="sm:col-span-3"
-          />
+          <div className="sm:col-span-3 flex items-center justify-around bg-gray-50 rounded-lg border border-gray-200 px-4 py-2">
+            <div className="text-center">
+              <span className="block text-xs text-gray-500 font-medium uppercase">Por Minuto</span>
+              <span className="text-lg font-bold text-blue-600">
+                {formData.capacidade_unidade_hora && formData.capacidade_unidade_hora > 0
+                  ? (formData.capacidade_unidade_hora / 60).toFixed(2)
+                  : '-'}
+              </span>
+              <span className="text-xs text-gray-400 ml-1">un/min</span>
+            </div>
+            <div className="h-8 w-px bg-gray-300"></div>
+            <div className="text-center">
+              <span className="block text-xs text-gray-500 font-medium uppercase">Por Segundo</span>
+              <span className="text-lg font-bold text-blue-600">
+                {formData.capacidade_unidade_hora && formData.capacidade_unidade_hora > 0
+                  ? (formData.capacidade_unidade_hora / 3600).toFixed(4)
+                  : '-'}
+              </span>
+              <span className="text-xs text-gray-400 ml-1">un/s</span>
+            </div>
+          </div>
 
           <div className="sm:col-span-6 mt-2">
             <Toggle

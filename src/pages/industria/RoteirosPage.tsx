@@ -180,7 +180,7 @@ export default function RoteirosPage() {
         )}
       </div>
 
-      <Modal isOpen={isFormOpen} onClose={handleClose} title={selectedId ? 'Editar Roteiro' : 'Novo Roteiro'} size="5xl">
+      <Modal isOpen={isFormOpen} onClose={handleClose} title={selectedId ? 'Editar Roteiro' : 'Novo Roteiro'} size="90pct">
         <RoteiroFormPanel
           roteiroId={selectedId}
           initialData={initialFormData}

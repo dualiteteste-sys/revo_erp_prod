@@ -143,7 +143,7 @@ export default function CentrosTrabalhoPage() {
         )}
       </div>
 
-      <Modal isOpen={isFormOpen} onClose={handleClose} title={selectedCentro ? 'Editar Centro de Trabalho' : 'Novo Centro de Trabalho'} size="lg">
+      <Modal isOpen={isFormOpen} onClose={handleClose} title={selectedCentro ? 'Editar Centro de Trabalho' : 'Novo Centro de Trabalho'} size="70pct">
         <CentroTrabalhoFormPanel centro={selectedCentro} onSaveSuccess={handleSuccess} onClose={handleClose} />
       </Modal>
     </div>

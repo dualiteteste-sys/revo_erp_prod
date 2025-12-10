@@ -2,13 +2,19 @@ import React, { useState, useEffect } from 'react';
 import { Loader2, Save, Plus, Trash2, Package } from 'lucide-react';
 import { BomDetails, BomPayload, saveBom, manageBomComponente, getBomDetails, BomComponente } from '@/services/industriaBom';
 import { useToast } from '@/contexts/ToastProvider';
+import { listUnidades, UnidadeMedida } from '@/services/unidades';
 import Section from '@/components/ui/forms/Section';
 import Input from '@/components/ui/forms/Input';
 import Select from '@/components/ui/forms/Select';
 import TextArea from '@/components/ui/forms/TextArea';
 import Toggle from '@/components/ui/forms/Toggle';
 import ItemAutocomplete from '@/components/os/ItemAutocomplete';
+import DecimalInput from '@/components/ui/forms/DecimalInput';
 import { motion, AnimatePresence } from 'framer-motion';
+// ... existing imports
+
+// Inside the component return
+// ... (removed duplicate lines)
 
 interface Props {
   bomId: string | null;
@@ -22,6 +28,7 @@ export default function BomFormPanel({ bomId, initialData, onSaveSuccess, onClos
   const [loading, setLoading] = useState(!!bomId);
   const [isSaving, setIsSaving] = useState(false);
   const [activeTab, setActiveTab] = useState<'dados' | 'componentes'>('dados');
+  const [unidades, setUnidades] = useState<UnidadeMedida[]>([]);
 
   const [formData, setFormData] = useState<Partial<BomDetails>>({
     tipo_bom: 'producao',
@@ -33,6 +40,9 @@ export default function BomFormPanel({ bomId, initialData, onSaveSuccess, onClos
   });
 
   useEffect(() => {
+    // Fetch units
+    listUnidades().then(setUnidades).catch(console.error);
+
     if (bomId) {
       loadDetails();
     } else if (initialData) {
@@ -61,9 +71,12 @@ export default function BomFormPanel({ bomId, initialData, onSaveSuccess, onClos
     }
   }, [bomId, initialData]);
 
-  const loadDetails = async () => {
+  const loadDetails = async (id?: string) => {
+    const targetId = id || bomId || formData.id;
+    if (!targetId) return;
+
     try {
-      const data = await getBomDetails(bomId!);
+      const data = await getBomDetails(targetId);
       setFormData(data);
     } catch (e) {
       console.error(e);
@@ -113,8 +126,10 @@ export default function BomFormPanel({ bomId, initialData, onSaveSuccess, onClos
       if (!formData.id) {
         addToast('BOM criada! Adicione os componentes.', 'success');
         setActiveTab('componentes');
+        onSaveSuccess(); // Notify parent on first save
       } else {
         addToast('BOM salva.', 'success');
+        onSaveSuccess(); // Notify parent on updates too
       }
       return saved.id;
     } catch (e: any) {
@@ -134,8 +149,10 @@ export default function BomFormPanel({ bomId, initialData, onSaveSuccess, onClos
     }
 
     try {
-      await manageBomComponente(currentId!, null, item.id, 1, 'un', 0, true, null, 'upsert');
-      await loadDetails();
+      // Default to 'un' or first available unit if 'un' doesn't exist, though backend defaults too?
+      const defaultUnit = item.unidade || 'un';
+      await manageBomComponente(currentId!, null, item.id, 1, defaultUnit, 0, true, null, 'upsert');
+      await loadDetails(currentId!);
       addToast('Componente adicionado.', 'success');
     } catch (e: any) {
       addToast(e.message, 'error');
@@ -143,9 +160,12 @@ export default function BomFormPanel({ bomId, initialData, onSaveSuccess, onClos
   };
 
   const handleRemoveComponente = async (componenteId: string) => {
+    const item = formData.componentes?.find(c => c.id === componenteId);
+    if (!item) return;
+
     try {
-      await manageBomComponente(formData.id!, componenteId, '', 0, '', 0, false, null, 'delete');
-      await loadDetails();
+      await manageBomComponente(formData.id!, componenteId, item.produto_id, 0, '', 0, false, null, 'delete');
+      await loadDetails(formData.id!);
       addToast('Componente removido.', 'success');
     } catch (e: any) {
       addToast(e.message, 'error');
@@ -153,13 +173,26 @@ export default function BomFormPanel({ bomId, initialData, onSaveSuccess, onClos
   };
 
   const handleUpdateComponente = async (componenteId: string, field: keyof BomComponente, value: any) => {
+    // Immediate local update for responsiveness
+    setFormData(prev => ({
+      ...prev,
+      componentes: prev.componentes?.map(c => c.id === componenteId ? { ...c, [field]: value } : c)
+    }));
+
+    // If it's a select or checkbox, persist immediately (UX expectation)
+    // If it's a text/numeric input, this function shouldn't be called on every keystroke for persistence
+    // But since this function WAS doing both, we need to split usage or handle it here.
+    // For now, let's assume this is called for "commit" actions or we debounce it.
+    // Actually, for Select/Checkbox we call this directly. For Inputs we need a separate handler or use onBlur.
+
+    // Check if value is valid for persistence
+    if (field === 'quantidade' && (value <= 0 || isNaN(value))) return;
+
     const item = formData.componentes?.find(c => c.id === componenteId);
     if (!item) return;
 
-    const updates = {
-      ...item,
-      [field]: value
-    };
+    // Merge with latest local state for the item (in case other fields changed)
+    const updates = { ...item, [field]: value };
 
     try {
       await manageBomComponente(
@@ -173,13 +206,25 @@ export default function BomFormPanel({ bomId, initialData, onSaveSuccess, onClos
         updates.observacoes || null,
         'upsert'
       );
-      // Optimistic update
-      setFormData(prev => ({
-        ...prev,
-        componentes: prev.componentes?.map(c => c.id === componenteId ? { ...c, ...updates } : c)
-      }));
     } catch (e: any) {
       addToast(e.message, 'error');
+    }
+  };
+
+  const handleLocalUpdate = (componenteId: string, field: keyof BomComponente, value: any) => {
+    setFormData(prev => ({
+      ...prev,
+      componentes: prev.componentes?.map(c => c.id === componenteId ? { ...c, [field]: value } : c)
+    }));
+  };
+
+  const handleBlurUpdate = (componenteId: string) => {
+    const item = formData.componentes?.find(c => c.id === componenteId);
+    if (!item) return;
+
+    // Trigger persistence with current state
+    if (item.quantidade > 0) {
+      handleUpdateComponente(componenteId, 'quantidade', item.quantidade);
     }
   };
 
@@ -306,7 +351,7 @@ export default function BomFormPanel({ bomId, initialData, onSaveSuccess, onClos
                     <tr>
                       <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Produto</th>
                       <th className="px-3 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider w-24">Qtd.</th>
-                      <th className="px-3 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider w-20">Un.</th>
+                      <th className="px-3 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider w-28">Un.</th>
                       <th className="px-3 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider w-24">Perda %</th>
                       <th className="px-3 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider w-20">Obrig.</th>
                       <th className="px-3 py-3 w-10"></th>
@@ -327,31 +372,33 @@ export default function BomFormPanel({ bomId, initialData, onSaveSuccess, onClos
                             {item.produto_nome}
                           </td>
                           <td className="px-3 py-2">
-                            <input
-                              type="number"
+                            <DecimalInput
                               value={item.quantidade}
-                              onChange={e => handleUpdateComponente(item.id, 'quantidade', parseFloat(e.target.value))}
-                              className="w-full text-right p-1 border rounded text-sm"
-                              min="0.0001"
-                              step="any"
+                              onChange={val => handleLocalUpdate(item.id, 'quantidade', val)}
+                              onBlur={() => handleBlurUpdate(item.id)}
+                              precision={4}
+                              className="text-right min-w-[80px]"
                             />
                           </td>
                           <td className="px-3 py-2">
-                            <input
-                              type="text"
+                            <select
                               value={item.unidade}
                               onChange={e => handleUpdateComponente(item.id, 'unidade', e.target.value)}
-                              className="w-full text-center p-1 border rounded text-sm"
-                            />
+                              className="w-full text-center p-1 border rounded text-sm bg-white outline-none focus:ring-1 focus:ring-blue-500 appearance-none cursor-pointer"
+                              style={{ textAlignLast: 'center' }}
+                            >
+                              {unidades.map(u => (
+                                <option key={u.id} value={u.sigla}>{u.sigla}</option>
+                              ))}
+                            </select>
                           </td>
                           <td className="px-3 py-2">
-                            <input
-                              type="number"
+                            <DecimalInput
                               value={item.perda_percentual}
-                              onChange={e => handleUpdateComponente(item.id, 'perda_percentual', parseFloat(e.target.value))}
-                              className="w-full text-right p-1 border rounded text-sm"
-                              min="0"
-                              max="100"
+                              onChange={val => handleLocalUpdate(item.id, 'perda_percentual', val)}
+                              onBlur={() => handleBlurUpdate(item.id)}
+                              precision={2}
+                              className="text-right min-w-[80px]"
                             />
                           </td>
                           <td className="px-3 py-2 text-center">
