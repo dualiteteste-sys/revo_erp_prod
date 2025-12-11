@@ -22,6 +22,8 @@ export type OrdemComponente = {
   produto_nome: string;
   quantidade_planejada: number;
   quantidade_consumida: number;
+  quantidade_reservada?: number;
+  perda_percentual?: number;
   unidade: string;
   origem: string;
 };
