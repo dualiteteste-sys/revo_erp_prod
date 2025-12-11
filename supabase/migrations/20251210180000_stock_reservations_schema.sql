@@ -31,15 +31,19 @@ CREATE TABLE IF NOT EXISTS public.estoque_lotes (
 
 ALTER TABLE public.estoque_lotes ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "Enable read access for all users" ON public.estoque_lotes;
 CREATE POLICY "Enable read access for all users" ON public.estoque_lotes
     FOR SELECT USING (empresa_id = public.current_empresa_id());
 
+DROP POLICY IF EXISTS "Enable insert for authenticated users only" ON public.estoque_lotes;
 CREATE POLICY "Enable insert for authenticated users only" ON public.estoque_lotes
     FOR INSERT WITH CHECK (empresa_id = public.current_empresa_id());
 
+DROP POLICY IF EXISTS "Enable update for authenticated users only" ON public.estoque_lotes;
 CREATE POLICY "Enable update for authenticated users only" ON public.estoque_lotes
     FOR UPDATE USING (empresa_id = public.current_empresa_id());
 
+DROP POLICY IF EXISTS "Enable delete for authenticated users only" ON public.estoque_lotes;
 CREATE POLICY "Enable delete for authenticated users only" ON public.estoque_lotes
     FOR DELETE USING (empresa_id = public.current_empresa_id());
 
@@ -66,15 +70,19 @@ CREATE TABLE IF NOT EXISTS public.industria_reservas (
 
 ALTER TABLE public.industria_reservas ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "Enable read access for all users" ON public.industria_reservas;
 CREATE POLICY "Enable read access for all users" ON public.industria_reservas
     FOR SELECT USING (empresa_id = public.current_empresa_id());
 
+DROP POLICY IF EXISTS "Enable insert for authenticated users only" ON public.industria_reservas;
 CREATE POLICY "Enable insert for authenticated users only" ON public.industria_reservas
     FOR INSERT WITH CHECK (empresa_id = public.current_empresa_id());
 
+DROP POLICY IF EXISTS "Enable update for authenticated users only" ON public.industria_reservas;
 CREATE POLICY "Enable update for authenticated users only" ON public.industria_reservas
     FOR UPDATE USING (empresa_id = public.current_empresa_id());
 
+DROP POLICY IF EXISTS "Enable delete for authenticated users only" ON public.industria_reservas;
 CREATE POLICY "Enable delete for authenticated users only" ON public.industria_reservas
     FOR DELETE USING (empresa_id = public.current_empresa_id());
 
@@ -83,10 +91,13 @@ ALTER TABLE public.industria_producao_componentes
 ADD COLUMN IF NOT EXISTS quantidade_reservada numeric(15,4) DEFAULT 0;
 
 -- Trigger to update updated_at on new tables
+-- Trigger to update updated_at on new tables
+DROP TRIGGER IF EXISTS handle_updated_at_estoque_lotes ON public.estoque_lotes;
 CREATE TRIGGER handle_updated_at_estoque_lotes 
 BEFORE UPDATE ON public.estoque_lotes 
 FOR EACH ROW EXECUTE FUNCTION public.tg_set_updated_at();
 
+DROP TRIGGER IF EXISTS handle_updated_at_industria_reservas ON public.industria_reservas;
 CREATE TRIGGER handle_updated_at_industria_reservas 
 BEFORE UPDATE ON public.industria_reservas 
 FOR EACH ROW EXECUTE FUNCTION public.tg_set_updated_at();

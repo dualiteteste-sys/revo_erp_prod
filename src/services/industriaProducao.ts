@@ -133,6 +133,8 @@ export async function seedOrdensProducao(): Promise<void> {
   }
 }
 
+export type StatusInspecaoQA = 'aprovada' | 'reprovada' | 'em_analise';
+
 export interface OrdemOperacao {
   id: string;
   ordem_id: string;
@@ -148,6 +150,12 @@ export interface OrdemOperacao {
   status: 'pendente' | 'em_preparacao' | 'em_processo' | 'pausada' | 'interrompida' | 'concluida' | 'na_fila' | 'em_execucao';
   permite_overlap?: boolean;
   quantidade_transferida?: number;
+  require_ip?: boolean;
+  require_if?: boolean;
+  ip_status?: StatusInspecaoQA | null;
+  if_status?: StatusInspecaoQA | null;
+  ip_last_inspecao?: string | null;
+  if_last_inspecao?: string | null;
 }
 
 export interface OrdemApontamento {
@@ -156,6 +164,7 @@ export interface OrdemApontamento {
   usuario_id: string;
   tipo: 'producao' | 'setup' | 'parada' | 'retorno' | 'conclusao';
   quantidade_produzida?: number;
+  quantidade_boa?: number;
   quantidade_refugo?: number;
   motivo_refugo?: string;
   tempo_apontado_minutos?: number;
@@ -204,19 +213,20 @@ export async function apontarProducao(
   });
 }
 
-export interface TransferirLotePayload {
-  operacao_id: string;
-  centro_trabalho_destino_id: string;
-  quantidade: number;
-  observacoes?: string;
+export async function listApontamentos(operacaoId: string): Promise<OrdemApontamento[]> {
+  return callRpc<OrdemApontamento[]>('industria_producao_list_apontamentos', {
+    p_operacao_id: operacaoId
+  });
 }
 
-export async function transferirLoteOperacao(payload: TransferirLotePayload): Promise<void> {
-  await callRpc('industria_operacao_transferir_lote', {
-    p_operacao_id: payload.operacao_id,
-    p_centro_trabalho_destino_id: payload.centro_trabalho_destino_id,
-    p_quantidade: payload.quantidade,
-    p_observacoes: payload.observacoes
+export async function deleteApontamento(apontamentoId: string): Promise<void> {
+  await callRpc('industria_producao_delete_apontamento', { p_id: apontamentoId });
+}
+
+export async function transferirLoteOperacao(operacaoId: string, quantidade: number): Promise<void> {
+  await callRpc('industria_producao_transferir_lote', {
+    p_operacao_id: operacaoId,
+    p_qtd: quantidade,
   });
 }
 
@@ -312,18 +322,31 @@ export interface QualidadeMotivo {
   id: string;
   codigo: string;
   descricao: string;
+  tipo?: string;
 }
 
 export interface InspecaoPayload {
   ordem_id: string;
   operacao_id: string;
-  lote: string;
-  resultado: StatusQualidade;
+  tipo: 'IP' | 'IF';
+  resultado: StatusInspecaoQA;
   quantidade_inspecionada: number;
   quantidade_aprovada: number;
   quantidade_rejeitada: number;
   motivo_refugo_id?: string;
   observacoes?: string;
+  lote_id?: string | null;
+}
+
+export interface RegistroInspecao {
+  id: string;
+  tipo: 'IP' | 'IF';
+  resultado: StatusInspecaoQA;
+  quantidade_inspecionada: number;
+  quantidade_aprovada: number;
+  quantidade_rejeitada: number;
+  created_at: string;
+  observacoes?: string | null;
 }
 
 // --- Quality Management RPCs ---
@@ -336,21 +359,33 @@ export async function registrarInspecao(payload: InspecaoPayload): Promise<void>
   await callRpc('qualidade_registrar_inspecao', {
     p_ordem_id: payload.ordem_id,
     p_operacao_id: payload.operacao_id,
-    p_lote: payload.lote,
+    p_tipo: payload.tipo,
     p_resultado: payload.resultado,
     p_qtd_inspecionada: payload.quantidade_inspecionada,
     p_qtd_aprovada: payload.quantidade_aprovada,
     p_qtd_rejeitada: payload.quantidade_rejeitada,
     p_motivo_id: payload.motivo_refugo_id || null,
-    p_observacoes: payload.observacoes || null
+    p_observacoes: payload.observacoes || null,
+    p_lote_id: payload.lote_id || null
   });
 }
 
-export async function alterarStatusLote(lote: string, produtoId: string, novoStatus: StatusQualidade, obs?: string): Promise<void> {
+export async function listarInspecoes(operacaoId: string): Promise<RegistroInspecao[]> {
+  return callRpc<RegistroInspecao[]>('qualidade_list_inspecoes', { p_operacao_id: operacaoId });
+}
+
+export async function alterarStatusLote(loteId: string, novoStatus: StatusQualidade, obs?: string): Promise<void> {
   await callRpc('qualidade_alterar_status_lote', {
-    p_lote: lote,
-    p_produto_id: produtoId,
+    p_lote_id: loteId,
     p_novo_status: novoStatus,
     p_observacoes: obs || null
+  });
+}
+
+export async function setOperacaoQARequirements(operacaoId: string, requireIp: boolean, requireIf: boolean): Promise<void> {
+  await callRpc('industria_producao_set_qa_requirements', {
+    p_operacao_id: operacaoId,
+    p_require_ip: requireIp,
+    p_require_if: requireIf
   });
 }
