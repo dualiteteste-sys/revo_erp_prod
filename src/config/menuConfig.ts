@@ -59,6 +59,7 @@ export const menuConfig: { name: string; icon: React.ElementType; href: string; 
       { name: 'Roteiros', icon: Route, href: '/app/industria/roteiros' },
       { name: 'Fichas Técnicas / BOM', icon: FileCog, href: '/app/industria/boms' },
       { name: 'Centros de Trabalho', icon: Settings, href: '/app/industria/centros-trabalho' },
+      { name: 'Motivos de Qualidade', icon: ClipboardCheck, href: '/app/industria/qualidade/motivos' },
     ]
   },
   {

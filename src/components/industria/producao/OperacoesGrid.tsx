@@ -6,9 +6,13 @@ import {
     transferirLoteOperacao
 } from '../../../services/industriaProducao';
 import { Button } from '../../ui/button';
-import { Loader2, Play, Pause, CheckCircle, ArrowRight, ClipboardList } from 'lucide-react';
+import { Loader2, Play, Pause, CheckCircle, ArrowRight, ClipboardList, ShieldAlert } from 'lucide-react';
 import { useToast } from '../../../contexts/ToastProvider';
 import ApontamentoModal from './ApontamentoModal';
+import Modal from '../../ui/Modal';
+import DecimalInput from '../../ui/forms/DecimalInput';
+import OperacaoQaModal from './OperacaoQaModal';
+import RegistrarInspecaoModal from './RegistrarInspecaoModal';
 
 interface Props {
     ordemId: string;
@@ -22,12 +26,31 @@ export default function OperacoesGrid({ ordemId }: Props) {
     // Controle de modal de apontamento
     const [selectedOp, setSelectedOp] = useState<OrdemOperacao | null>(null);
     const [isApontamentoOpen, setIsApontamentoOpen] = useState(false);
+    const [transferOp, setTransferOp] = useState<OrdemOperacao | null>(null);
+    const [transferQty, setTransferQty] = useState<number>(0);
+    const [transferLoading, setTransferLoading] = useState(false);
+    const [qaOp, setQaOp] = useState<OrdemOperacao | null>(null);
+    const [inspectionTipo, setInspectionTipo] = useState<'IP' | 'IF' | null>(null);
+    const [inspectionOp, setInspectionOp] = useState<OrdemOperacao | null>(null);
+    const [qaRefreshToken, setQaRefreshToken] = useState(0);
 
     const loadData = async () => {
         setLoading(true);
         try {
             const data = await getOperacoes(ordemId);
             setOperacoes(data);
+            if (selectedOp) {
+                const refreshed = data.find(item => item.id === selectedOp.id);
+                if (refreshed) {
+                    setSelectedOp(refreshed);
+                }
+            }
+            if (qaOp) {
+                const refreshedQa = data.find(item => item.id === qaOp.id);
+                if (refreshedQa) {
+                    setQaOp(refreshedQa);
+                }
+            }
         } catch (e: any) {
             console.error(e);
             addToast('Erro ao carregar operações', 'error');
@@ -54,28 +77,66 @@ export default function OperacoesGrid({ ordemId }: Props) {
         }
     };
 
-    const handleTransferir = async (op: OrdemOperacao) => {
-        // Regra: Transferir tudo que ja produziu menos o que ja transferiu?
-        // Ou prompt de quantidade?
-        // O user disse: "ação “Transferir lote parcial” aparece quando houver boas >= lote_transferência... move apenas o delta"
-        // Vamos calcular o delta disponível e sugerir, ou transferir tudo disponivel.
-        // Simplificação: Transferir delta disponível (Produzida - Transferida).
-
-        const disponivel = op.quantidade_produzida - op.quantidade_transferida;
-        if (disponivel <= 0) {
-            addToast('Nada disponível para transferir.', 'warning');
+    const handleTransferConfirm = async () => {
+        if (!transferOp) return;
+        const disponivel = Math.max(transferOp.quantidade_produzida - (transferOp.quantidade_transferida || 0), 0);
+        if (transferQty <= 0) {
+            addToast('Informe uma quantidade válida para transferir.', 'error');
             return;
         }
-
-        if (!confirm(`Confirma transferir ${disponivel} unidades para a próxima etapa?`)) return;
-
+        if (transferQty > disponivel) {
+            addToast(`Quantidade excede o disponível (${disponivel}).`, 'error');
+            return;
+        }
+        setTransferLoading(true);
         try {
-            await transferirLoteOperacao(op.id, disponivel);
+            await transferirLoteOperacao(transferOp.id, transferQty);
             addToast('Lote transferido.', 'success');
+            setTransferOp(null);
+            setTransferQty(0);
             loadData();
         } catch (e: any) {
             addToast(e.message, 'error');
+        } finally {
+            setTransferLoading(false);
         }
+    };
+
+    const openTransferModal = (op: OrdemOperacao) => {
+        const disponivel = Math.max(op.quantidade_produzida - (op.quantidade_transferida || 0), 0);
+        setTransferOp(op);
+        setTransferQty(disponivel);
+    };
+
+    const openQaModal = (op: OrdemOperacao) => {
+        setQaOp(op);
+    };
+
+    const renderQaBadge = (label: string, required?: boolean, status?: string | null) => {
+        if (!required) return <span className="text-xs text-gray-400">Livre</span>;
+        if (!status) {
+            return (
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs bg-amber-50 text-amber-700">
+                    <ShieldAlert className="w-3 h-3" />
+                    {label} pendente
+                </span>
+            );
+        }
+        const color = status === 'aprovada'
+            ? 'bg-green-100 text-green-800'
+            : status === 'reprovada'
+                ? 'bg-red-100 text-red-700'
+                : 'bg-yellow-100 text-yellow-800';
+        const text = status === 'aprovada'
+            ? `${label} aprovada`
+            : status === 'reprovada'
+                ? `${label} reprovada`
+                : `${label} em análise`;
+        return (
+            <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs ${color}`}>
+                {text}
+            </span>
+        );
     };
 
     if (loading) return <div className="p-4"><Loader2 className="animate-spin" /></div>;
@@ -97,13 +158,17 @@ export default function OperacoesGrid({ ordemId }: Props) {
                             <th className="px-3 py-2 text-right text-xs font-medium text-gray-500 uppercase">Produzido (Boas)</th>
                             <th className="px-3 py-2 text-right text-xs font-medium text-gray-500 uppercase">Refugo</th>
                             <th className="px-3 py-2 text-right text-xs font-medium text-gray-500 uppercase">Transferido</th>
+                            <th className="px-3 py-2 text-right text-xs font-medium text-gray-500 uppercase">A transferir</th>
+                            <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">QA</th>
                             <th className="px-3 py-2 text-center text-xs font-medium text-gray-500 uppercase">Ações</th>
                         </tr>
                     </thead>
                     <tbody className="bg-white divide-y divide-gray-200">
                         {operacoes.map((op) => {
-                            const disponivelTransferencia = op.quantidade_produzida - op.quantidade_transferida;
-                            const podeTransferir = op.permite_overlap && disponivelTransferencia > 0 && op.status !== 'concluida'; // Se concluida auto transfere? Ou manual? Pela regra do DB, se concluir auto-transfere, mas se tiver overlap e não concluiu, pode transferir manual.
+                            const producao = op.quantidade_produzida || 0;
+                            const transferida = op.quantidade_transferida || 0;
+                            const disponivelTransferencia = producao - transferida;
+                            const podeTransferir = op.permite_overlap && disponivelTransferencia > 0 && op.status !== 'concluida';
 
                             return (
                                 <tr key={op.id}>
@@ -127,6 +192,14 @@ export default function OperacoesGrid({ ordemId }: Props) {
                                     <td className="px-3 py-2 whitespace-nowrap text-sm text-gray-900 text-right">{op.quantidade_produzida}</td>
                                     <td className="px-3 py-2 whitespace-nowrap text-sm text-red-600 text-right">{op.quantidade_refugo}</td>
                                     <td className="px-3 py-2 whitespace-nowrap text-sm text-gray-500 text-right">{op.quantidade_transferida}</td>
+                                    <td className="px-3 py-2 whitespace-nowrap text-sm text-gray-900 text-right">{disponivelTransferencia}</td>
+                                    <td className="px-3 py-2 whitespace-nowrap text-sm space-y-1">
+                                        <div>{renderQaBadge('IP', op.require_ip, op.ip_status)}</div>
+                                        <div>{renderQaBadge('IF', op.require_if, op.if_status)}</div>
+                                        <Button size="xs" variant="ghost" className="text-blue-600" onClick={() => openQaModal(op)}>
+                                            Configurar QA
+                                        </Button>
+                                    </td>
                                     <td className="px-3 py-2 whitespace-nowrap text-sm text-center space-x-2">
                                         {/* Botões de Ação */}
                                         {(op.status === 'na_fila' || op.status === 'pendente' || op.status === 'pausada') && (
@@ -158,7 +231,7 @@ export default function OperacoesGrid({ ordemId }: Props) {
                                         )}
 
                                         {podeTransferir && (
-                                            <Button size="xs" variant="ghost" className="text-blue-600 hover:text-blue-800" title={`Transferir ${disponivelTransferencia}`} onClick={() => handleTransferir(op)}>
+                                            <Button size="xs" variant="ghost" className="text-blue-600 hover:text-blue-800" title={`Transferir ${disponivelTransferencia}`} onClick={() => openTransferModal(op)}>
                                                 <ArrowRight className="w-3 h-3" />
                                             </Button>
                                         )}
@@ -177,6 +250,74 @@ export default function OperacoesGrid({ ordemId }: Props) {
                     operacao={selectedOp}
                     onSuccess={loadData}
                 />
+            )}
+
+            {qaOp && (
+                <OperacaoQaModal
+                    operacao={qaOp}
+                    isOpen={!!qaOp}
+                    onClose={() => setQaOp(null)}
+                    onUpdated={loadData}
+                    refreshToken={qaRefreshToken}
+                    onRequestInspection={(tipo) => {
+                        setInspectionTipo(tipo);
+                        setInspectionOp(qaOp);
+                    }}
+                />
+            )}
+
+            {inspectionOp && inspectionTipo && (
+                <RegistrarInspecaoModal
+                    operacao={inspectionOp}
+                    tipo={inspectionTipo}
+                    isOpen={!!inspectionTipo}
+                    onClose={() => {
+                        setInspectionTipo(null);
+                        setInspectionOp(null);
+                    }}
+                    onSuccess={() => {
+                        setInspectionTipo(null);
+                        setInspectionOp(null);
+                        setQaRefreshToken(prev => prev + 1);
+                        loadData();
+                    }}
+                />
+            )}
+
+            {transferOp && (
+                <Modal
+                    isOpen={!!transferOp}
+                    onClose={() => { if (!transferLoading) { setTransferOp(null); setTransferQty(0); } }}
+                    title={`Transferir lote - Seq ${transferOp.sequencia}`}
+                    size="md"
+                >
+                    <div className="p-6 space-y-4">
+                        <div className="bg-blue-50 border border-blue-100 text-blue-800 p-3 rounded-md text-sm flex flex-wrap gap-4">
+                            <div><strong>Produzido:</strong> {transferOp.quantidade_produzida}</div>
+                            <div><strong>Transferido:</strong> {transferOp.quantidade_transferida}</div>
+                            <div><strong>Disponível:</strong> {Math.max(transferOp.quantidade_produzida - (transferOp.quantidade_transferida || 0), 0)}</div>
+                        </div>
+
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700">Quantidade a transferir</label>
+                            <DecimalInput
+                                precision={2}
+                                value={transferQty}
+                                onChange={setTransferQty}
+                                className="mt-1"
+                            />
+                        </div>
+
+                        <div className="flex justify-end space-x-2">
+                            <Button variant="ghost" onClick={() => { if (!transferLoading) { setTransferOp(null); setTransferQty(0); } }} disabled={transferLoading}>
+                                Cancelar
+                            </Button>
+                            <Button onClick={handleTransferConfirm} disabled={transferLoading}>
+                                {transferLoading ? 'Transferindo...' : 'Confirmar Transferência'}
+                            </Button>
+                        </div>
+                    </div>
+                </Modal>
             )}
         </div>
     );

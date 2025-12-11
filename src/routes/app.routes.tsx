@@ -48,6 +48,7 @@ const RoteirosPage = lazyImport(() => import("../pages/industria/RoteirosPage"))
 const CentrosTrabalhoPage = lazyImport(() => import("../pages/industria/CentrosTrabalhoPage"));
 const ExecucaoPage = lazyImport(() => import("../pages/industria/ExecucaoPage"));
 const ChaoDeFabricaPage = lazyImport(() => import("../pages/industria/ChaoDeFabricaPage"));
+const MotivosRefugoPage = lazyImport(() => import("../pages/industria/qualidade/MotivosRefugoPage"));
 const MateriaisClientePage = lazyImport(() => import("../pages/industria/MateriaisClientePage"));
 
 // Suprimentos Pages
@@ -89,6 +90,7 @@ export const appRoutes: RouteObject[] = [
             { path: "cadastros/embalagens", element: <Suspense fallback={<PageLoader />}><EmbalagensPage /></Suspense> },
 
             // Indústria
+            { path: "industria/qualidade/motivos", element: <Suspense fallback={<PageLoader />}><MotivosRefugoPage /></Suspense> },
             { path: "industria/dashboard", element: <Suspense fallback={<PageLoader />}><IndustriaDashboardPage /></Suspense> },
             { path: "industria/producao", element: <Suspense fallback={<PageLoader />}><ProducaoPage /></Suspense> },
             { path: "industria/beneficiamento", element: <Suspense fallback={<PageLoader />}><BeneficiamentoPage /></Suspense> },

@@ -143,12 +143,19 @@ export default function ProducaoFormPanel({ ordemId, onSaveSuccess, onClose }: P
   const handleAddComponente = async (item: any) => {
     let currentId = formData.id;
     if (!currentId) {
-      currentId = await handleSaveHeader();
-      if (!currentId) return;
+      const savedId = await handleSaveHeader();
+      if (!savedId) return;
+      currentId = savedId;
+    }
+
+    // Double check currentId is set before proceeding
+    if (!currentId) {
+      addToast('Erro: ID da ordem não disponível.', 'error');
+      return;
     }
 
     try {
-      await manageComponenteProducao(currentId!, null, item.id, 1, 'un', 'upsert');
+      await manageComponenteProducao(currentId, null, item.id, 1, 'un', 'upsert');
       await loadDetails(currentId);
       addToast('Componente adicionado.', 'success');
     } catch (e: any) {
@@ -309,7 +316,7 @@ export default function ProducaoFormPanel({ ordemId, onSaveSuccess, onClose }: P
               } `}
             disabled={!formData.id}
           >
-            BOM (Insumos)
+            Roteiro e Insumos (BOM)
           </button>
           <button
             onClick={() => setActiveTab('operacoes')}
@@ -453,92 +460,84 @@ export default function ProducaoFormPanel({ ordemId, onSaveSuccess, onClose }: P
                 />
               </div>
 
-              <div className="sm:col-span-3">
-                <label className="block text-sm font-medium text-gray-700 mb-1">Roteiro Aplicado</label>
-                <div className="flex items-center gap-2">
-                  <div className="flex-grow p-2 bg-gray-100 border border-gray-300 rounded text-sm text-gray-600">
-                    {formData.roteiro_aplicado_desc || 'Nenhum roteiro aplicado.'}
-                  </div>
-                  {!isLocked && formData.id && formData.produto_final_id && (
-                    <RoteiroSelector
-                      ordemId={formData.id}
-                      produtoId={formData.produto_final_id}
-                      onApplied={handleRoteiroApplied}
-                    />
-                  )}
-                </div>
-              </div>
-
-              <div className="sm:col-span-3">
-                <label className="block text-sm font-medium text-gray-700 mb-1">BOM Aplicada</label>
-                <div className="flex items-center gap-2">
-                  <div className="flex-grow p-2 bg-gray-100 border border-gray-300 rounded text-sm text-gray-600">
-                    {formData.bom_aplicado_desc || 'Nenhuma BOM aplicada.'}
-                  </div>
-                  {!isLocked && formData.id && formData.produto_final_id && (
-                    <BomSelector
-                      ordemId={formData.id}
-                      produtoId={formData.produto_final_id}
-                      tipoOrdem="producao"
-                      onApplied={handleBomApplied}
-                    />
-                  )}
-                </div>
-              </div>
             </Section>
+
+
 
             <Section title="Outros" description="Detalhes adicionais.">
               <Input label="Ref. Documento" name="doc_ref" value={formData.documento_ref || ''} onChange={e => handleHeaderChange('documento_ref', e.target.value)} disabled={isLocked} className="sm:col-span-2" placeholder="Pedido, Lote..." />
               <TextArea label="Observações" name="obs" value={formData.observacoes || ''} onChange={e => handleHeaderChange('observacoes', e.target.value)} rows={3} disabled={isLocked} className="sm:col-span-6" />
             </Section>
           </>
-        )}
+        )
+        }
 
-        {activeTab === 'componentes' && (
-          <>
-            {!isLocked && formData.id && formData.produto_final_id && (
-              <div className="mb-4 flex justify-between items-center bg-blue-50 p-3 rounded-lg border border-blue-100">
-                <p className="text-sm text-blue-800">
-                  {formData.bom_aplicado_desc
-                    ? <>BOM atual: <strong>{formData.bom_aplicado_desc}</strong></>
-                    : 'Nenhuma BOM aplicada.'}
-                </p>
-                <BomSelector
-                  ordemId={formData.id}
-                  produtoId={formData.produto_final_id}
-                  tipoOrdem="producao"
-                  onApplied={handleBomApplied}
-                />
-              </div>
-            )}
-            <OrdemFormItems
-              ordemId={formData.id}
-              items={formData.componentes || []}
-              onAddItem={handleAddComponente}
-              onRemoveItem={handleRemoveComponente}
-              onUpdateItem={handleUpdateComponente}
-              onRefresh={() => loadDetails(formData.id)}
-              isAddingItem={false}
+        {
+          activeTab === 'componentes' && (
+            <>
+              {!isLocked && formData.id && formData.produto_final_id && (
+                <div className="mb-4 grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="flex justify-between items-center bg-blue-50 p-3 rounded-lg border border-blue-100">
+                    <p className="text-sm text-blue-800">
+                      {formData.roteiro_aplicado_desc
+                        ? <>Roteiro: <strong>{formData.roteiro_aplicado_desc}</strong></>
+                        : 'Nenhum roteiro aplicado.'}
+                    </p>
+                    <RoteiroSelector
+                      ordemId={formData.id}
+                      produtoId={formData.produto_final_id}
+                      onApplied={handleRoteiroApplied}
+                    />
+                  </div>
+
+                  <div className="flex justify-between items-center bg-blue-50 p-3 rounded-lg border border-blue-100">
+                    <p className="text-sm text-blue-800">
+                      {formData.bom_aplicado_desc
+                        ? <>BOM: <strong>{formData.bom_aplicado_desc}</strong></>
+                        : 'Nenhuma BOM aplicada.'}
+                    </p>
+                    <BomSelector
+                      ordemId={formData.id}
+                      produtoId={formData.produto_final_id}
+                      tipoOrdem="producao"
+                      onApplied={handleBomApplied}
+                    />
+                  </div>
+                </div>
+              )}
+              <OrdemFormItems
+                ordemId={formData.id}
+                items={formData.componentes || []}
+                onAddItem={handleAddComponente}
+                onRemoveItem={handleRemoveComponente}
+                onUpdateItem={handleUpdateComponente}
+                onRefresh={() => loadDetails(formData.id)}
+                isAddingItem={false}
+                readOnly={isLocked}
+              />
+            </>
+          )
+        }
+
+        {
+          activeTab === 'operacoes' && formData.id && (
+            <OperacoesGrid ordemId={formData.id} />
+          )
+        }
+
+        {
+          activeTab === 'entregas' && (
+            <OrdemEntregas
+              entregas={formData.entregas || []}
+              onAddEntrega={handleAddEntrega}
+              onRemoveEntrega={handleRemoveEntrega}
               readOnly={isLocked}
+              maxQuantity={formData.quantidade_planejada || 0}
+              showBillingStatus={false}
             />
-          </>
-        )}
-
-        {activeTab === 'operacoes' && formData.id && (
-          <OperacoesGrid ordemId={formData.id} />
-        )}
-
-        {activeTab === 'entregas' && (
-          <OrdemEntregas
-            entregas={formData.entregas || []}
-            onAddEntrega={handleAddEntrega}
-            onRemoveEntrega={handleRemoveEntrega}
-            readOnly={isLocked}
-            maxQuantity={formData.quantidade_planejada || 0}
-            showBillingStatus={false}
-          />
-        )}
-      </div>
+          )
+        }
+      </div >
 
       <div className="flex justify-between p-4 border-t bg-gray-50 rounded-b-lg">
         {formData.id && !isLocked ? (
@@ -600,11 +599,11 @@ export default function ProducaoFormPanel({ ordemId, onSaveSuccess, onClose }: P
             disabled={isSaving || isLocked}
             className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50"
           >
-            {isSaving ? <Loader2 className="animate-spin h-5 w-5 mr-2" /> : <Save className="h-5 w-5 mr-2" />}
+            <Save size={20} className="mr-2" />
             Salvar
           </button>
         </div>
       </div>
-    </div>
+    </div >
   );
 }
