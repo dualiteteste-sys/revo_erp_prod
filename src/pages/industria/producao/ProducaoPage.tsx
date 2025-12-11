@@ -169,7 +169,7 @@ export default function ProducaoPage() {
         )}
       </div>
 
-      <Modal isOpen={isFormOpen} onClose={handleClose} title={selectedId ? 'Editar Ordem de Produção' : 'Nova Ordem de Produção'} size="6xl">
+      <Modal isOpen={isFormOpen} onClose={handleClose} title={selectedId ? 'Editar Ordem de Produção' : 'Nova Ordem de Produção'} size="90pct">
         <ProducaoFormPanel ordemId={selectedId} onSaveSuccess={handleSuccess} onClose={handleClose} />
       </Modal>
     </div>
