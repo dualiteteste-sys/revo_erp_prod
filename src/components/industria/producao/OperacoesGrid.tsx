@@ -168,7 +168,9 @@ export default function OperacoesGrid({ ordemId }: Props) {
                             const producao = op.quantidade_produzida || 0;
                             const transferida = op.quantidade_transferida || 0;
                             const disponivelTransferencia = producao - transferida;
-                            const podeTransferir = op.permite_overlap && disponivelTransferencia > 0 && op.status !== 'concluida';
+                            const ipLiberado = !op.require_ip || op.ip_status === 'aprovada';
+                            const ifLiberado = !op.require_if || op.if_status === 'aprovada';
+                            const podeTransferir = op.permite_overlap && disponivelTransferencia > 0 && op.status !== 'concluida' && ipLiberado;
 
                             return (
                                 <tr key={op.id}>
@@ -196,6 +198,12 @@ export default function OperacoesGrid({ ordemId }: Props) {
                                     <td className="px-3 py-2 whitespace-nowrap text-sm space-y-1">
                                         <div>{renderQaBadge('IP', op.require_ip, op.ip_status)}</div>
                                         <div>{renderQaBadge('IF', op.require_if, op.if_status)}</div>
+                                        {op.require_ip && op.ip_status !== 'aprovada' && (
+                                            <p className="text-xs text-red-500">IP pendente: libere para transferir.</p>
+                                        )}
+                                        {op.require_if && op.if_status !== 'aprovada' && (
+                                            <p className="text-xs text-amber-600">IF necessária para concluir.</p>
+                                        )}
                                         <Button size="xs" variant="ghost" className="text-blue-600" onClick={() => openQaModal(op)}>
                                             Configurar QA
                                         </Button>
@@ -223,15 +231,28 @@ export default function OperacoesGrid({ ordemId }: Props) {
                                                     <ClipboardList className="w-3 h-3 mr-1" />
                                                     Apontar
                                                 </Button>
-                                                <Button size="xs" variant="outline" onClick={() => handleEvento(op, 'concluir')}>
+                                                <Button
+                                                    size="xs"
+                                                    variant="outline"
+                                                    disabled={!ifLiberado}
+                                                    title={ifLiberado ? 'Concluir operação' : 'IF pendente: realize a inspeção final'}
+                                                    onClick={() => ifLiberado && handleEvento(op, 'concluir')}
+                                                >
                                                     <CheckCircle className="w-3 h-3 mr-1" />
                                                     Concluir
                                                 </Button>
                                             </>
                                         )}
 
-                                        {podeTransferir && (
-                                            <Button size="xs" variant="ghost" className="text-blue-600 hover:text-blue-800" title={`Transferir ${disponivelTransferencia}`} onClick={() => openTransferModal(op)}>
+                                        {op.permite_overlap && disponivelTransferencia > 0 && op.status !== 'concluida' && (
+                                            <Button
+                                                size="xs"
+                                                variant="ghost"
+                                                className={`${podeTransferir ? 'text-blue-600 hover:text-blue-800' : 'text-gray-400 cursor-not-allowed'}`}
+                                                title={podeTransferir ? `Transferir ${disponivelTransferencia}` : 'IP pendente: realize a inspeção para liberar'}
+                                                disabled={!podeTransferir}
+                                                onClick={() => podeTransferir && openTransferModal(op)}
+                                            >
                                                 <ArrowRight className="w-3 h-3" />
                                             </Button>
                                         )}

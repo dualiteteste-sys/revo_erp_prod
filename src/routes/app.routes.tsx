@@ -49,7 +49,10 @@ const CentrosTrabalhoPage = lazyImport(() => import("../pages/industria/CentrosT
 const ExecucaoPage = lazyImport(() => import("../pages/industria/ExecucaoPage"));
 const ChaoDeFabricaPage = lazyImport(() => import("../pages/industria/ChaoDeFabricaPage"));
 const MotivosRefugoPage = lazyImport(() => import("../pages/industria/qualidade/MotivosRefugoPage"));
+const PlanosInspecaoPage = lazyImport(() => import("../pages/industria/qualidade/PlanosInspecaoPage"));
 const MateriaisClientePage = lazyImport(() => import("../pages/industria/MateriaisClientePage"));
+const MrpDemandasPage = lazyImport(() => import("../pages/industria/mrp/MrpDemandasPage"));
+const PcpDashboardPage = lazyImport(() => import("../pages/industria/pcp/PcpDashboardPage"));
 
 // Suprimentos Pages
 const EstoquePage = lazyImport(() => import("../pages/suprimentos/EstoquePage"));
@@ -91,9 +94,12 @@ export const appRoutes: RouteObject[] = [
 
             // Indústria
             { path: "industria/qualidade/motivos", element: <Suspense fallback={<PageLoader />}><MotivosRefugoPage /></Suspense> },
+            { path: "industria/qualidade/planos", element: <Suspense fallback={<PageLoader />}><PlanosInspecaoPage /></Suspense> },
             { path: "industria/dashboard", element: <Suspense fallback={<PageLoader />}><IndustriaDashboardPage /></Suspense> },
             { path: "industria/producao", element: <Suspense fallback={<PageLoader />}><ProducaoPage /></Suspense> },
             { path: "industria/beneficiamento", element: <Suspense fallback={<PageLoader />}><BeneficiamentoPage /></Suspense> },
+            { path: "industria/mrp", element: <Suspense fallback={<PageLoader />}><MrpDemandasPage /></Suspense> },
+            { path: "industria/pcp", element: <Suspense fallback={<PageLoader />}><PcpDashboardPage /></Suspense> },
             { path: "industria/boms", element: <Suspense fallback={<PageLoader />}><BomsPage /></Suspense> },
             { path: "industria/roteiros", element: <Suspense fallback={<PageLoader />}><RoteirosPage /></Suspense> },
             { path: "industria/centros-trabalho", element: <Suspense fallback={<PageLoader />}><CentrosTrabalhoPage /></Suspense> },
