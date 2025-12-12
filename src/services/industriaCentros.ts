@@ -10,6 +10,7 @@ export type CentroTrabalho = {
   descricao: string | null;
   ativo: boolean;
   capacidade_unidade_hora: number | null;
+  capacidade_horas_dia?: number | null;
   tipo_uso: TipoUsoCentro;
   tempo_setup_min: number | null;
   requer_inspecao_final: boolean;
@@ -40,6 +41,7 @@ export async function seedCentrosTrabalho(): Promise<CentroTrabalho[]> {
       descricao: faker.lorem.sentence(),
       ativo: true,
       capacidade_unidade_hora: faker.number.int({ min: 10, max: 500 }),
+      capacidade_horas_dia: faker.number.int({ min: 6, max: 12 }),
       tipo_uso: faker.helpers.arrayElement(['producao', 'beneficiamento', 'ambos']) as TipoUsoCentro,
     };
     return saveCentroTrabalho(payload);

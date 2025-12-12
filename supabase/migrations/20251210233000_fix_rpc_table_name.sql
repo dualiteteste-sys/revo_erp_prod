@@ -40,7 +40,7 @@ BEGIN
         e.sequencia,
         e.centro_trabalho_id,
         ct.nome as centro_trabalho_nome,
-        COALESCE(e.observacoes, 'Operação Padrão') as descricao, -- Map observacoes to descricao
+        COALESCE(e.descricao, 'Operação Padrão') as descricao, -- Map descricao to descricao
         -- Simple logic: (Setup + (Tempo/Un * Qtd))
         (COALESCE(e.tempo_setup_min, 0) + (COALESCE(e.tempo_ciclo_min_por_unidade, 0) * v_qtd_planejada)),
         v_qtd_planejada,

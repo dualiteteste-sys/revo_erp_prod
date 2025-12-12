@@ -117,6 +117,14 @@ export default function CentroTrabalhoFormPanel({ centro, onSaveSuccess, onClose
             onChange={e => handleChange('capacidade_unidade_hora', parseFloat(e.target.value))}
             className="sm:col-span-3"
           />
+          <Input
+            label="Capacidade disponível (horas/dia)"
+            name="capacidade_horas_dia"
+            type="number"
+            value={formData.capacidade_horas_dia ?? ''}
+            onChange={e => handleChange('capacidade_horas_dia', parseFloat(e.target.value))}
+            className="sm:col-span-3"
+          />
 
           <div className="sm:col-span-3 flex items-center justify-around bg-gray-50 rounded-lg border border-gray-200 px-4 py-2">
             <div className="text-center">

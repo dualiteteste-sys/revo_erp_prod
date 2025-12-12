@@ -349,6 +349,174 @@ export interface RegistroInspecao {
   observacoes?: string | null;
 }
 
+export interface PlanoCaracteristica {
+  id: string;
+  descricao: string;
+  tolerancia_min?: number | null;
+  tolerancia_max?: number | null;
+  unidade?: string | null;
+  instrumento?: string | null;
+}
+
+export interface PlanoInspecao {
+  id: string;
+  nome: string;
+  produto_id: string;
+  produto_nome: string;
+  tipo: 'IP' | 'IF';
+  severidade?: string | null;
+  aql?: string | null;
+  amostragem?: string | null;
+  ativo: boolean;
+  roteiro_id?: string | null;
+  roteiro_nome?: string | null;
+  roteiro_etapa_id?: string | null;
+  etapa_nome?: string | null;
+  etapa_sequencia?: number | null;
+  total_caracteristicas: number;
+  updated_at: string;
+}
+
+export interface PlanoInspecaoDetalhe extends PlanoInspecao {
+  caracteristicas: PlanoCaracteristica[];
+}
+
+export interface PlanoInspecaoPayload {
+  id?: string;
+  nome: string;
+  produto_id: string;
+  tipo: 'IP' | 'IF';
+  severidade?: string;
+  aql?: string;
+  amostragem?: string;
+  roteiro_id?: string | null;
+  roteiro_etapa_id?: string | null;
+  ativo?: boolean;
+}
+
+export interface PlanoCaracteristicaPayload {
+  id?: string;
+  plano_id: string;
+  descricao: string;
+  tolerancia_min?: number | null;
+  tolerancia_max?: number | null;
+  unidade?: string | null;
+  instrumento?: string | null;
+}
+
+export interface QualidadeLote {
+  id: string;
+  produto_id: string;
+  produto_nome: string;
+  lote: string;
+  validade?: string | null;
+  saldo: number;
+  status_qa: StatusQualidade;
+  ultima_inspecao_data?: string | null;
+  ultima_inspecao_tipo?: 'IP' | 'IF' | null;
+  ultima_inspecao_resultado?: StatusInspecaoQA | null;
+  total_inspecoes: number;
+}
+
+export interface MrpParametro {
+  id: string;
+  produto_id: string;
+  produto_nome: string;
+  lead_time_dias: number;
+  lote_minimo: number;
+  multiplo_compra: number;
+  estoque_seguranca: number;
+  politica_picking: 'FIFO' | 'FEFO';
+  fornecedor_preferencial_id?: string | null;
+  updated_at: string;
+}
+
+export interface MrpParametroPayload {
+  produto_id: string;
+  lead_time_dias?: number;
+  lote_minimo?: number;
+  multiplo_compra?: number;
+  estoque_seguranca?: number;
+  politica_picking?: 'FIFO' | 'FEFO';
+  fornecedor_preferencial_id?: string | null;
+}
+
+export type MrpAcaoTipo = 'transferencia' | 'requisicao_compra' | 'ordem_compra' | 'ajuste' | 'manual';
+
+export interface MrpDemanda {
+  id: string;
+  produto_id: string;
+  produto_nome: string;
+  ordem_id?: string | null;
+  ordem_numero?: number | null;
+  componente_id?: string | null;
+  quantidade_planejada: number;
+  quantidade_reservada: number;
+  quantidade_disponivel: number;
+  estoque_seguranca: number;
+  necessidade_liquida: number;
+  data_necessidade?: string | null;
+  status: string;
+  origem: string;
+  lead_time_dias: number;
+  mensagem?: string | null;
+  prioridade: 'atrasado' | 'critico' | 'normal';
+  ultima_acao_tipo?: MrpAcaoTipo | null;
+  ultima_acao_data?: string | null;
+  ultima_acao_quantidade?: number | null;
+}
+
+export interface MrpAcaoDemandaPayload {
+  demanda_id: string;
+  tipo: MrpAcaoTipo;
+  quantidade: number;
+  unidade?: string;
+  data_prometida?: string;
+  fornecedor_id?: string | null;
+  observacoes?: string;
+  status?: 'respondida' | 'sugerida' | 'fechada';
+}
+
+export interface MrpDemandaAcao {
+  id: string;
+  tipo: MrpAcaoTipo;
+  quantidade: number;
+  unidade: string;
+  data_prometida?: string | null;
+  observacoes?: string | null;
+  created_at: string;
+  usuario_id?: string | null;
+  usuario_email?: string | null;
+}
+
+export interface PcpCargaCapacidade {
+  dia: string;
+  centro_trabalho_id: string;
+  centro_trabalho_nome: string;
+  capacidade_horas: number;
+  carga_planejada_horas: number;
+  carga_em_execucao_horas: number;
+}
+
+export interface PcpGanttOperacao {
+  ordem_id: string;
+  ordem_numero: number;
+  produto_nome: string;
+  status: StatusProducao;
+  quantidade_planejada: number;
+  data_prevista_inicio?: string | null;
+  data_prevista_fim?: string | null;
+  operacao_id: string;
+  operacao_sequencia: number;
+  centro_trabalho_id?: string | null;
+  centro_trabalho_nome?: string | null;
+  permite_overlap: boolean;
+  status_operacao: string;
+  data_inicio: string;
+  data_fim: string;
+  quantidade_transferida: number;
+}
+
 // --- Quality Management RPCs ---
 
 export async function getMotivosRefugo(): Promise<QualidadeMotivo[]> {
@@ -382,10 +550,127 @@ export async function alterarStatusLote(loteId: string, novoStatus: StatusQualid
   });
 }
 
+export async function listLotesQualidade(search?: string, status?: StatusQualidade): Promise<QualidadeLote[]> {
+  return callRpc<QualidadeLote[]>('qualidade_list_lotes', {
+    p_search: search || null,
+    p_status: status || null
+  });
+}
+
 export async function setOperacaoQARequirements(operacaoId: string, requireIp: boolean, requireIf: boolean): Promise<void> {
   await callRpc('industria_producao_set_qa_requirements', {
     p_operacao_id: operacaoId,
     p_require_ip: requireIp,
     p_require_if: requireIf
+  });
+}
+
+export async function listPlanosInspecao(search?: string): Promise<PlanoInspecao[]> {
+  return callRpc<PlanoInspecao[]>('qualidade_planos_list', {
+    p_search: search || null
+  });
+}
+
+export async function getPlanoInspecao(id: string): Promise<PlanoInspecaoDetalhe> {
+  const result = await callRpc<PlanoInspecaoDetalhe[]>('qualidade_plano_get', { p_id: id });
+  if (!result || result.length === 0) {
+    throw new Error('Plano não encontrado.');
+  }
+  return result[0];
+}
+
+export async function upsertPlanoInspecao(payload: PlanoInspecaoPayload): Promise<string> {
+  return callRpc<string>('qualidade_planos_upsert', {
+    p_id: payload.id || null,
+    p_nome: payload.nome,
+    p_produto_id: payload.produto_id,
+    p_tipo: payload.tipo,
+    p_severidade: payload.severidade || null,
+    p_aql: payload.aql || null,
+    p_amostragem: payload.amostragem || null,
+    p_roteiro_id: payload.roteiro_id || null,
+    p_roteiro_etapa_id: payload.roteiro_etapa_id || null,
+    p_ativo: payload.ativo ?? true
+  });
+}
+
+export async function deletePlanoInspecao(id: string): Promise<void> {
+  await callRpc('qualidade_planos_delete', { p_id: id });
+}
+
+export async function upsertPlanoCaracteristica(payload: PlanoCaracteristicaPayload): Promise<string> {
+  return callRpc<string>('qualidade_plano_upsert_caracteristica', {
+    p_plano_id: payload.plano_id,
+    p_id: payload.id || null,
+    p_descricao: payload.descricao,
+    p_tolerancia_min: payload.tolerancia_min ?? null,
+    p_tolerancia_max: payload.tolerancia_max ?? null,
+    p_unidade: payload.unidade || null,
+    p_instrumento: payload.instrumento || null
+  });
+}
+
+export async function deletePlanoCaracteristica(id: string): Promise<void> {
+  await callRpc('qualidade_plano_delete_caracteristica', { p_id: id });
+}
+
+// --- MRP / Demandas ---
+
+export async function listMrpParametros(search?: string): Promise<MrpParametro[]> {
+  return callRpc<MrpParametro[]>('mrp_item_parametros_list', { p_search: search || null });
+}
+
+export async function upsertMrpParametro(payload: MrpParametroPayload): Promise<string> {
+  return callRpc<string>('mrp_item_parametros_upsert', {
+    p_produto_id: payload.produto_id,
+    p_lead_time: payload.lead_time_dias ?? 0,
+    p_lote_minimo: payload.lote_minimo ?? 0,
+    p_multiplo_compra: payload.multiplo_compra ?? 1,
+    p_estoque_seguranca: payload.estoque_seguranca ?? 0,
+    p_politica_picking: payload.politica_picking || 'FIFO',
+    p_fornecedor_id: payload.fornecedor_preferencial_id || null
+  });
+}
+
+export async function listMrpDemandas(status?: string): Promise<MrpDemanda[]> {
+  return callRpc<MrpDemanda[]>('mrp_list_demandas', {
+    p_status: status || null
+  });
+}
+
+export async function reprocessarMrpOrdem(ordemId: string): Promise<void> {
+  await callRpc('mrp_reprocessar_ordem', { p_ordem_id: ordemId });
+}
+
+export async function registrarAcaoMrpDemanda(payload: MrpAcaoDemandaPayload): Promise<string> {
+  return callRpc<string>('mrp_registrar_acao_demanda', {
+    p_demanda_id: payload.demanda_id,
+    p_tipo: payload.tipo,
+    p_quantidade: payload.quantidade,
+    p_unidade: payload.unidade || null,
+    p_data_prometida: payload.data_prometida || null,
+    p_fornecedor_id: payload.fornecedor_id || null,
+    p_observacoes: payload.observacoes || null,
+    p_status: payload.status || null
+  });
+}
+
+export async function listMrpDemandaAcoes(demandaId: string): Promise<MrpDemandaAcao[]> {
+  return callRpc<MrpDemandaAcao[]>('mrp_list_demanda_acoes', {
+    p_demanda_id: demandaId
+  });
+}
+
+export async function listPcpCargaCapacidade(startDate?: string, endDate?: string): Promise<PcpCargaCapacidade[]> {
+  return callRpc<PcpCargaCapacidade[]>('pcp_carga_capacidade', {
+    p_data_inicial: startDate || null,
+    p_data_final: endDate || null
+  });
+}
+
+export async function listPcpGantt(startDate?: string, endDate?: string): Promise<PcpGanttOperacao[]> {
+  return callRpc<PcpGanttOperacao[]>('pcp_gantt_ordens', {
+    p_data_inicial: startDate || null,
+    p_data_final: endDate || null
   });
 }
