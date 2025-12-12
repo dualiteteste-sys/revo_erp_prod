@@ -404,6 +404,20 @@ export interface PlanoCaracteristicaPayload {
   instrumento?: string | null;
 }
 
+export interface QualidadeLote {
+  id: string;
+  produto_id: string;
+  produto_nome: string;
+  lote: string;
+  validade?: string | null;
+  saldo: number;
+  status_qa: StatusQualidade;
+  ultima_inspecao_data?: string | null;
+  ultima_inspecao_tipo?: 'IP' | 'IF' | null;
+  ultima_inspecao_resultado?: StatusInspecaoQA | null;
+  total_inspecoes: number;
+}
+
 export interface MrpParametro {
   id: string;
   produto_id: string;
@@ -533,6 +547,13 @@ export async function alterarStatusLote(loteId: string, novoStatus: StatusQualid
     p_lote_id: loteId,
     p_novo_status: novoStatus,
     p_observacoes: obs || null
+  });
+}
+
+export async function listLotesQualidade(search?: string, status?: StatusQualidade): Promise<QualidadeLote[]> {
+  return callRpc<QualidadeLote[]>('qualidade_list_lotes', {
+    p_search: search || null,
+    p_status: status || null
   });
 }
 
