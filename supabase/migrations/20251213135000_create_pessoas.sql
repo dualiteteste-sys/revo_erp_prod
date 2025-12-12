@@ -39,7 +39,7 @@ CREATE TABLE IF NOT EXISTS public.pessoas (
     inscr_municipal text,
     observacoes text,
     codigo_externo text,
-    contribuinte_icms public.contribuinte_icms_enum DEFAULT 'nao_contribuinte',
+    contribuinte_icms public.contribuinte_icms_enum DEFAULT '9', -- 9: Não Contribuinte
     contato_tags text[],
     created_at timestamptz DEFAULT now(),
     updated_at timestamptz DEFAULT now(),
