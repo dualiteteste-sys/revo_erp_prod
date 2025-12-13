@@ -22,6 +22,7 @@ import { OsItemSearchResult } from '@/services/os';
 import DecimalInput from '@/components/ui/forms/DecimalInput';
 import { Button } from '@/components/ui/button';
 import TextArea from '@/components/ui/forms/TextArea';
+import { useSearchParams } from 'react-router-dom';
 
 type ParamModalState = {
   open: boolean;
@@ -40,6 +41,7 @@ type HistoricoModalState = {
 
 export default function MrpDemandasPage() {
   const { addToast } = useToast();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [parametros, setParametros] = useState<MrpParametro[]>([]);
   const [demandas, setDemandas] = useState<MrpDemanda[]>([]);
   const [loadingParametros, setLoadingParametros] = useState(true);
@@ -67,6 +69,11 @@ export default function MrpDemandasPage() {
   const [historicoModal, setHistoricoModal] = useState<HistoricoModalState>({ open: false });
   const [historicoAcoes, setHistoricoAcoes] = useState<MrpDemandaAcao[]>([]);
   const [loadingHistorico, setLoadingHistorico] = useState(false);
+  const [pendingFocusProduto, setPendingFocusProduto] = useState<{ id: string; nome?: string } | null>(() => {
+    const produtoId = searchParams.get('produtoId');
+    const produtoNome = searchParams.get('produtoNome') || undefined;
+    return produtoId ? { id: produtoId, nome: produtoNome } : null;
+  });
 
   const loadParametros = async () => {
     setLoadingParametros(true);
@@ -102,6 +109,36 @@ export default function MrpDemandasPage() {
     loadDemandas();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [statusFilter]);
+
+  useEffect(() => {
+    if (!pendingFocusProduto || loadingParametros) return;
+    const existente = parametros.find(param => param.produto_id === pendingFocusProduto.id);
+    if (existente) {
+      openEditarParametro(existente);
+      setSearchParametro(existente.produto_nome);
+    } else {
+      setParamModal({ open: true, editing: null });
+      setSelectedProduto({
+        id: pendingFocusProduto.id,
+        descricao: pendingFocusProduto.nome || 'Produto selecionado',
+        codigo: '',
+        preco_venda: 0,
+        type: 'product'
+      });
+      setParamForm({
+        lead_time_dias: 0,
+        lote_minimo: 0,
+        multiplo_compra: 1,
+        estoque_seguranca: 0,
+        politica_picking: 'FIFO'
+      });
+    }
+    setPendingFocusProduto(null);
+    const next = new URLSearchParams(searchParams);
+    next.delete('produtoId');
+    next.delete('produtoNome');
+    setSearchParams(next, { replace: true });
+  }, [pendingFocusProduto, parametros, loadingParametros, searchParams, setSearchParams]);
 
   const prioridadeClass = (prioridade: string) => {
     switch (prioridade) {

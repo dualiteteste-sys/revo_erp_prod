@@ -6,6 +6,7 @@ import Modal from '@/components/ui/Modal';
 import MovimentoModal from '@/components/suprimentos/MovimentoModal';
 import { useDebounce } from '@/hooks/useDebounce';
 import Toggle from '@/components/ui/forms/Toggle';
+import { useSearchParams } from 'react-router-dom';
 
 export default function EstoquePage() {
   const [produtos, setProdutos] = useState<EstoquePosicao[]>([]);
@@ -13,6 +14,9 @@ export default function EstoquePage() {
   const [search, setSearch] = useState('');
   const [showBaixoEstoque, setShowBaixoEstoque] = useState(false);
   const debouncedSearch = useDebounce(search, 500);
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [pendingFocusTerm, setPendingFocusTerm] = useState<string | null>(null);
+  const [highlightProdutoId, setHighlightProdutoId] = useState<string | null>(null);
 
   const [selectedProduto, setSelectedProduto] = useState<EstoquePosicao | null>(null);
   const [isMovimentoOpen, setIsMovimentoOpen] = useState(false);
@@ -35,6 +39,30 @@ export default function EstoquePage() {
   useEffect(() => {
     fetchEstoque();
   }, [debouncedSearch, showBaixoEstoque]);
+
+  useEffect(() => {
+    const produto = searchParams.get('produto');
+    if (produto) {
+      setSearch(produto);
+      setPendingFocusTerm(produto.toLowerCase());
+      const next = new URLSearchParams(searchParams);
+      next.delete('produto');
+      setSearchParams(next, { replace: true });
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    if (!pendingFocusTerm || loading) return;
+    const match = produtos.find(p =>
+      p.nome.toLowerCase().includes(pendingFocusTerm) ||
+      (p.sku && p.sku.toLowerCase().includes(pendingFocusTerm))
+    );
+    if (!match) return;
+    setHighlightProdutoId(match.produto_id);
+    const timeout = window.setTimeout(() => setHighlightProdutoId(null), 5000);
+    return () => window.clearTimeout(timeout);
+  }, [pendingFocusTerm, produtos, loading]);
 
   const handleOpenMovimento = (produto: EstoquePosicao) => {
     setSelectedProduto(produto);
@@ -111,8 +139,10 @@ export default function EstoquePage() {
               ) : produtos.length === 0 ? (
                 <tr><td colSpan={4} className="p-8 text-center text-gray-500">Nenhum produto encontrado.</td></tr>
               ) : (
-                produtos.map((prod) => (
-                  <tr key={prod.produto_id} className="hover:bg-gray-50">
+                produtos.map((prod) => {
+                  const isHighlighted = highlightProdutoId === prod.produto_id;
+                  return (
+                  <tr key={prod.produto_id} className={`transition-colors ${isHighlighted ? 'bg-amber-50/70 ring-1 ring-amber-200' : 'hover:bg-gray-50'}`}>
                     <td className="px-6 py-4">
                       <div className="font-medium text-gray-900">{prod.nome}</div>
                       <div className="text-xs text-gray-500">SKU: {prod.sku || '-'}</div>
@@ -141,7 +171,8 @@ export default function EstoquePage() {
                       </button>
                     </td>
                   </tr>
-                ))
+                );
+                })
               )}
             </tbody>
           </table>

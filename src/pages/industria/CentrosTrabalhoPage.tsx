@@ -7,6 +7,7 @@ import Modal from '@/components/ui/Modal';
 import CentrosTrabalhoTable from '@/components/industria/centros-trabalho/CentrosTrabalhoTable';
 import CentroTrabalhoFormPanel from '@/components/industria/centros-trabalho/CentroTrabalhoFormPanel';
 import { useToast } from '@/contexts/ToastProvider';
+import { useSearchParams } from 'react-router-dom';
 
 export default function CentrosTrabalhoPage() {
   const [centros, setCentros] = useState<CentroTrabalho[]>([]);
@@ -18,6 +19,9 @@ export default function CentrosTrabalhoPage() {
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [selectedCentro, setSelectedCentro] = useState<CentroTrabalho | null>(null);
   const [isSeeding, setIsSeeding] = useState(false);
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [pendingHighlightTerm, setPendingHighlightTerm] = useState<string | null>(null);
+  const [highlightCentroId, setHighlightCentroId] = useState<string | null>(null);
 
   const fetchCentros = async () => {
     setLoading(true);
@@ -34,6 +38,30 @@ export default function CentrosTrabalhoPage() {
   useEffect(() => {
     fetchCentros();
   }, [debouncedSearch]);
+
+  useEffect(() => {
+    const focusNome = searchParams.get('focus');
+    if (focusNome) {
+      setSearch(focusNome);
+      setPendingHighlightTerm(focusNome.toLowerCase());
+      const next = new URLSearchParams(searchParams);
+      next.delete('focus');
+      setSearchParams(next, { replace: true });
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    if (!pendingHighlightTerm || loading) return;
+    const match = centros.find(centro =>
+      centro.nome.toLowerCase().includes(pendingHighlightTerm) ||
+      (centro.codigo && centro.codigo.toLowerCase().includes(pendingHighlightTerm))
+    );
+    if (!match) return;
+    setHighlightCentroId(match.id);
+    const timeout = window.setTimeout(() => setHighlightCentroId(null), 5000);
+    return () => window.clearTimeout(timeout);
+  }, [pendingHighlightTerm, centros, loading]);
 
   const handleNew = () => {
     setSelectedCentro(null);
@@ -139,6 +167,7 @@ export default function CentrosTrabalhoPage() {
             onEdit={handleEdit}
             onClone={handleClone}
             onDelete={handleDelete}
+            highlightCentroId={highlightCentroId}
           />
         )}
       </div>
