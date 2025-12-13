@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { getDashboardStats, DashboardStats } from '@/services/industria';
-import { Loader2, AlertCircle, CheckCircle, Factory, RefreshCw, Layers } from 'lucide-react';
+import { AlertCircle, CheckCircle, Factory, RefreshCw } from 'lucide-react';
 import GlassCard from '@/components/ui/GlassCard';
 import ReactECharts from 'echarts-for-react';
 import { motion } from 'framer-motion';
@@ -73,27 +73,15 @@ export default function IndustriaDashboardPage() {
 
   // Cálculos seguros com Nullish Coalescing (??) para evitar crash
   const totalProducao = stats?.total_producao ?? 0;
-  const totalBeneficiamento = stats?.total_beneficiamento ?? 0;
-  const totalGeral = totalProducao + totalBeneficiamento;
+  const producaoStatus = stats?.producao_status ?? [];
 
-  // Agregar status de produção e beneficiamento para o gráfico de pizza
-  // Usa optional chaining (?.) e fallback para array vazio (?? [])
-  const statusMap = new Map<string, number>();
-  
-  (stats?.producao_status ?? []).forEach(s => {
-    statusMap.set(s.status, (statusMap.get(s.status) || 0) + Number(s.total));
-  });
-  (stats?.beneficiamento_status ?? []).forEach(s => {
-    statusMap.set(s.status, (statusMap.get(s.status) || 0) + Number(s.total));
-  });
-
-  const chartDataStatus = Array.from(statusMap.entries()).map(([status, total]) => ({
-    value: total,
-    name: status.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())
+  const chartDataStatus = producaoStatus.map(s => ({
+    value: Number(s.total),
+    name: s.status.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())
   }));
 
   const statusChartOption = {
-    title: { text: 'Ordens por Status', left: 'center', textStyle: { fontSize: 14, color: '#4b5563' } },
+    title: { text: 'Ordens de Produção por Status', left: 'center', textStyle: { fontSize: 14, color: '#4b5563' } },
     tooltip: { trigger: 'item' },
     legend: { bottom: '0%' },
     series: [
@@ -108,31 +96,32 @@ export default function IndustriaDashboardPage() {
     ]
   };
 
-  const typeChartOption = {
-    title: { text: 'Tipo de Produção', left: 'center', textStyle: { fontSize: 14, color: '#4b5563' } },
-    tooltip: { trigger: 'item' },
-    legend: { bottom: '0%' },
+  const barChartOption = {
+    title: { text: 'Pipeline de Produção', left: 'center', textStyle: { fontSize: 14, color: '#4b5563' } },
+    tooltip: { trigger: 'axis' },
+    xAxis: {
+      type: 'category',
+      data: producaoStatus.map(s => s.status.replace(/_/g, ' ')),
+      axisLabel: { rotate: 20 }
+    },
+    yAxis: { type: 'value' },
     series: [
       {
-        name: 'Tipo',
-        type: 'pie',
-        radius: '60%',
-        center: ['50%', '45%'],
-        data: [
-          { value: totalProducao, name: 'Industrialização', itemStyle: { color: '#3b82f6' } },
-          { value: totalBeneficiamento, name: 'Beneficiamento', itemStyle: { color: '#8b5cf6' } }
-        ]
+        data: producaoStatus.map(s => Number(s.total)),
+        type: 'bar',
+        itemStyle: { color: '#3b82f6', borderRadius: [4, 4, 0, 0] },
+        label: { show: true, position: 'top' }
       }
     ]
   };
 
   // KPI Calculations (Safe)
-  const concluidasProd = (stats?.producao_status ?? []).find(s => s.status === 'concluida')?.total ?? 0;
-  const concluidasBenef = (stats?.beneficiamento_status ?? []).find(s => s.status === 'concluida')?.total ?? 0;
-  const totalConcluidas = concluidasProd + concluidasBenef;
+  const concluidasProd = producaoStatus.find(s => s.status === 'concluida')?.total ?? 0;
+  const emProducao = producaoStatus.find(s => s.status === 'em_producao')?.total ?? 0;
+  const totalConcluidas = concluidasProd;
   
   // Eficiência (Exemplo simples: Concluídas / Total)
-  const eficiencia = totalGeral > 0 ? Math.round((totalConcluidas / totalGeral) * 100) : 0;
+  const eficiencia = totalProducao > 0 ? Math.round((totalConcluidas / totalProducao) * 100) : 0;
 
   return (
     <div className="p-1 space-y-6">
@@ -141,27 +130,20 @@ export default function IndustriaDashboardPage() {
         <p className="text-gray-600 text-sm mt-1">Visão geral da produção e desempenho.</p>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         <KPICard 
           title="Total em Carteira" 
-          value={totalGeral} 
+          value={totalProducao} 
           icon={Factory} 
           color="bg-blue-100 text-blue-600" 
           subtext="Ordens ativas"
         />
         <KPICard 
-          title="Produção Própria" 
-          value={totalProducao} 
+          title="Em Produção" 
+          value={emProducao} 
           icon={Factory} 
           color="bg-indigo-100 text-indigo-600" 
-          subtext="Industrialização"
-        />
-        <KPICard 
-          title="Beneficiamento" 
-          value={totalBeneficiamento} 
-          icon={Layers} 
-          color="bg-purple-100 text-purple-600" 
-          subtext="Serviços em terceiros"
+          subtext="Ordens liberadas"
         />
         <KPICard 
           title="Taxa de Conclusão" 
@@ -177,7 +159,7 @@ export default function IndustriaDashboardPage() {
           <ReactECharts option={statusChartOption} style={{ height: '100%', width: '100%' }} />
         </GlassCard>
         <GlassCard className="p-4 min-h-[350px]">
-          <ReactECharts option={typeChartOption} style={{ height: '100%', width: '100%' }} />
+          <ReactECharts option={barChartOption} style={{ height: '100%', width: '100%' }} />
         </GlassCard>
       </div>
     </div>

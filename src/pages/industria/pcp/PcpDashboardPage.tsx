@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Activity, AlertTriangle, BarChart3, BellRing, LineChart, Loader2, PackageSearch, RefreshCw, TrendingUp } from 'lucide-react';
+import { Activity, AlertTriangle, BarChart3, BellRing, Filter, LineChart, Loader2, PackageSearch, PieChart, RefreshCw, TrendingUp } from 'lucide-react';
 import { useToast } from '@/contexts/ToastProvider';
 import {
   EstoqueProjetadoPoint,
@@ -9,10 +9,14 @@ import {
   listPcpEstoqueProjetado,
   listPcpGantt,
   listPcpKpis,
+  listPcpOrdensLeadTime,
+  listPcpParetoRefugos,
   PcpAtpCtp,
   PcpCargaCapacidade,
   PcpGanttOperacao,
-  PcpKpis
+  PcpKpis,
+  PcpOrdemLeadTime,
+  PcpParetoItem
 } from '@/services/industriaProducao';
 import { differenceInCalendarDays, format } from 'date-fns';
 
@@ -53,26 +57,34 @@ export default function PcpDashboardPage() {
   const [gantt, setGantt] = useState<PcpGanttOperacao[]>([]);
   const [kpis, setKpis] = useState<PcpKpis | null>(null);
   const [atpCtp, setAtpCtp] = useState<PcpAtpCtp[]>([]);
+  const [pareto, setPareto] = useState<PcpParetoItem[]>([]);
+  const [leadTimes, setLeadTimes] = useState<PcpOrdemLeadTime[]>([]);
   const [selectedProdutoId, setSelectedProdutoId] = useState<string | null>(null);
   const [estoqueProjetado, setEstoqueProjetado] = useState<EstoqueProjetadoPoint[]>([]);
   const [estoqueLoading, setEstoqueLoading] = useState(false);
   const [loading, setLoading] = useState(false);
   const [startDate, setStartDate] = useState(fmtInput(new Date(Date.now() - 3 * 24 * 3600 * 1000)));
   const [endDate, setEndDate] = useState(fmtInput(new Date(Date.now() + 7 * 24 * 3600 * 1000)));
+  const [ganttCtFilter, setGanttCtFilter] = useState<string>('all');
+  const [ganttStatusFilter, setGanttStatusFilter] = useState<string>('all');
 
   const loadData = async () => {
     setLoading(true);
     try {
-      const [cargaData, ganttData, kpisData, atpData] = await Promise.all([
+      const [cargaData, ganttData, kpisData, atpData, paretoData, leadTimeData] = await Promise.all([
         listPcpCargaCapacidade(startDate, endDate),
         listPcpGantt(startDate, endDate),
         listPcpKpis(30),
-        listPcpAtpCtp(endDate)
+        listPcpAtpCtp(endDate),
+        listPcpParetoRefugos(startDate, endDate),
+        listPcpOrdensLeadTime(startDate, endDate)
       ]);
       setCarga(cargaData);
       setGantt(ganttData);
       setKpis(kpisData);
       setAtpCtp(atpData);
+      setPareto(paretoData);
+      setLeadTimes(leadTimeData);
       setSelectedProdutoId(prev => {
         if (prev && atpData.some(item => item.produto_id === prev)) {
           return prev;
@@ -153,6 +165,25 @@ export default function PcpDashboardPage() {
     return maisCritico.id;
   }, [capacitySummary]);
 
+  const weeklySeries = useMemo(() => {
+    const dailyMap = new Map<string, { label: string; carga: number; capacidade: number }>();
+    carga.forEach(item => {
+      const label = format(new Date(item.dia), 'dd/MM');
+      const point = dailyMap.get(item.dia) || { label, carga: 0, capacidade: 0 };
+      point.carga += item.carga_total_horas;
+      point.capacidade += item.capacidade_horas;
+      dailyMap.set(item.dia, point);
+    });
+    const serie = Array.from(dailyMap.entries())
+      .map(([dia, value]) => ({
+        ...value,
+        dia
+      }))
+      .sort((a, b) => new Date(a.dia).getTime() - new Date(b.dia).getTime());
+    const maxCarga = serie.reduce((max, item) => Math.max(max, item.carga, item.capacidade), 0);
+    return { serie, max: maxCarga || 1 };
+  }, [carga]);
+
   const ganttRange = useMemo(() => {
     const start = new Date(startDate);
     const end = new Date(endDate);
@@ -161,7 +192,13 @@ export default function PcpDashboardPage() {
   }, [startDate, endDate]);
 
   const ganttRows = useMemo(() => {
-    return gantt.map(item => {
+    const filtered = gantt.filter(item => {
+      const matchCt = ganttCtFilter === 'all' || item.centro_trabalho_id === ganttCtFilter;
+      const matchStatus = ganttStatusFilter === 'all' || item.status_operacao === ganttStatusFilter;
+      return matchCt && matchStatus;
+    });
+
+    return filtered.map(item => {
       const start = new Date(item.data_inicio);
       const end = new Date(item.data_fim);
       const startOffset = differenceInCalendarDays(start, ganttRange.start);
@@ -175,12 +212,47 @@ export default function PcpDashboardPage() {
         transferPercent: Math.min(item.transfer_ratio * 100, 100)
       };
     });
-  }, [gantt, ganttRange]);
+  }, [gantt, ganttRange, ganttCtFilter, ganttStatusFilter]);
 
   const selectedProdutoInfo = useMemo(
     () => atpCtp.find(item => item.produto_id === selectedProdutoId) || null,
     [atpCtp, selectedProdutoId]
   );
+
+  const ganttCtOptions = useMemo(() => {
+    const options = Array.from(
+      new Map(
+        gantt
+          .filter(item => item.centro_trabalho_id)
+          .map(item => [item.centro_trabalho_id as string, item.centro_trabalho_nome || 'Sem CT'])
+      ).entries()
+    );
+    return options;
+  }, [gantt]);
+
+  const ganttStatusOptions = useMemo(() => {
+    return Array.from(new Set(gantt.map(item => item.status_operacao))).filter(Boolean);
+  }, [gantt]);
+
+  const paretoAggregated = useMemo(() => {
+    const map = new Map<string, { motivo_id: string | null; motivo_nome: string; total: number }>();
+    pareto.forEach(item => {
+      const key = item.motivo_id || 'sem-motivo';
+      const existing = map.get(key) || { motivo_id: item.motivo_id, motivo_nome: item.motivo_nome, total: 0 };
+      existing.total += item.total_refugo;
+      map.set(key, existing);
+    });
+    const total = Array.from(map.values()).reduce((sum, item) => sum + item.total, 0);
+    return {
+      total,
+      itens: Array.from(map.values())
+        .map(item => ({
+          ...item,
+          percentual: total > 0 ? (item.total / total) * 100 : 0
+        }))
+        .sort((a, b) => b.total - a.total)
+    };
+  }, [pareto]);
 
   const estoqueGraph = useMemo(() => {
     if (!estoqueProjetado.length) {
@@ -395,6 +467,118 @@ export default function PcpDashboardPage() {
 
       <section className="bg-white border rounded-lg shadow-sm">
         <div className="border-b px-4 py-3 flex items-center gap-2 text-gray-700 font-semibold">
+          <PieChart className="text-rose-600" size={18} /> Pareto de refugos
+        </div>
+        <div className="p-4">
+          {paretoAggregated.itens.length === 0 ? (
+            <p className="text-sm text-gray-500">Sem refugos registrados no período.</p>
+          ) : (
+            <div className="space-y-3">
+              {paretoAggregated.itens.slice(0, 8).map(item => (
+                <div key={item.motivo_id || item.motivo_nome}>
+                  <div className="flex justify-between text-sm text-gray-700">
+                    <span>{item.motivo_nome}</span>
+                    <span className="font-semibold">{item.total.toFixed(1)} un ({item.percentual.toFixed(1)}%)</span>
+                  </div>
+                  <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
+                    <div
+                      className="h-full bg-rose-500"
+                      style={{ width: `${Math.min(item.percentual, 100)}%` }}
+                    ></div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </section>
+
+      <section className="bg-white border rounded-lg shadow-sm">
+        <div className="border-b px-4 py-3 flex items-center gap-2 text-gray-700 font-semibold">
+          <LineChart className="text-indigo-600" size={18} /> Lead time real x planejado (OP)
+        </div>
+        <div className="overflow-x-auto">
+          <table className="min-w-full text-sm">
+            <thead className="bg-gray-50 text-gray-600">
+              <tr>
+                <th className="px-4 py-2 text-left">OP</th>
+                <th className="px-4 py-2 text-left">Produto</th>
+                <th className="px-4 py-2 text-left">Status</th>
+                <th className="px-4 py-2 text-right">Planejado (h)</th>
+                <th className="px-4 py-2 text-right">Real (h)</th>
+                <th className="px-4 py-2 text-right">Δ horas</th>
+              </tr>
+            </thead>
+            <tbody>
+              {leadTimes.map(item => (
+                <tr key={item.ordem_id} className="border-t">
+                  <td className="px-4 py-2 font-medium text-gray-900">#{item.ordem_numero}</td>
+                  <td className="px-4 py-2 text-gray-700">{item.produto_nome}</td>
+                  <td className="px-4 py-2">
+                    <span
+                      className={`px-2 py-0.5 rounded-full text-xs font-semibold ${
+                        item.cumpriu_prazo === false
+                          ? 'bg-red-100 text-red-700'
+                          : item.cumpriu_prazo === true
+                            ? 'bg-green-100 text-green-700'
+                            : 'bg-gray-100 text-gray-700'
+                      }`}
+                    >
+                      {item.status}
+                    </span>
+                  </td>
+                  <td className="px-4 py-2 text-right">{item.lead_time_planejado_horas.toFixed(1)}</td>
+                  <td className="px-4 py-2 text-right">{item.lead_time_real_horas.toFixed(1)}</td>
+                  <td className={`px-4 py-2 text-right font-semibold ${item.atraso_horas > 0 ? 'text-red-600' : 'text-emerald-600'}`}>
+                    {item.atraso_horas.toFixed(1)}
+                  </td>
+                </tr>
+              ))}
+              {leadTimes.length === 0 && (
+                <tr>
+                  <td colSpan={6} className="text-center text-gray-500 py-6">Nenhuma OP encontrada no período.</td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section className="bg-white border rounded-lg shadow-sm">
+        <div className="border-b px-4 py-3 flex items-center gap-2 text-gray-700 font-semibold">
+          <BarChart3 className="text-emerald-600" size={18} /> Tendência semanal (h)
+        </div>
+        <div className="p-4 overflow-x-auto">
+          <div className="flex gap-4 min-w-full">
+            {weeklySeries.serie.map(point => {
+              const cargaPercent = Math.min((point.carga / weeklySeries.max) * 100, 100);
+              const capacidadePercent = Math.min((point.capacidade / weeklySeries.max) * 100, 100);
+              return (
+                <div key={point.dia} className="flex flex-col items-center flex-1 min-w-[70px]">
+                  <div className="relative h-32 w-6 bg-gray-100 rounded-full overflow-hidden">
+                    <div
+                      className="absolute bottom-0 left-0 right-0 bg-emerald-400"
+                      style={{ height: `${capacidadePercent}%`, opacity: 0.6 }}
+                    ></div>
+                    <div
+                      className="absolute bottom-0 left-1 right-1 bg-indigo-600 rounded-full"
+                      style={{ height: `${cargaPercent}%` }}
+                    ></div>
+                  </div>
+                  <p className="text-xs text-gray-500 mt-2">{point.label}</p>
+                  <p className="text-[11px] text-gray-700">{point.carga.toFixed(1)}h / {point.capacidade.toFixed(1)}h</p>
+                </div>
+              );
+            })}
+            {weeklySeries.serie.length === 0 && (
+              <p className="text-sm text-gray-500">Sem dados no período selecionado.</p>
+            )}
+          </div>
+        </div>
+      </section>
+
+      <section className="bg-white border rounded-lg shadow-sm">
+        <div className="border-b px-4 py-3 flex items-center gap-2 text-gray-700 font-semibold">
           <BarChart3 className="text-blue-600" size={18} /> Carga x Capacidade
         </div>
         {loading && carga.length === 0 ? (
@@ -513,8 +697,39 @@ export default function PcpDashboardPage() {
       </section>
 
       <section className="bg-white border rounded-lg shadow-sm">
-        <div className="border-b px-4 py-3 flex items-center gap-2 text-gray-700 font-semibold">
-          <BarChart3 className="text-purple-600" size={18} /> Gantt simplificado
+        <div className="border-b px-4 py-3 flex flex-col gap-2 text-gray-700 font-semibold md:flex-row md:items-center md:justify-between">
+          <div className="flex items-center gap-2">
+            <BarChart3 className="text-purple-600" size={18} /> Gantt simplificado
+          </div>
+          <div className="flex flex-wrap gap-2 text-sm">
+            <div className="flex items-center gap-1">
+              <Filter size={14} />
+              <select
+                value={ganttCtFilter}
+                onChange={(e) => setGanttCtFilter(e.target.value)}
+                className="border rounded-md px-2 py-1 text-xs"
+              >
+                <option value="all">Todos os CTs</option>
+                {ganttCtOptions.map(([id, nome]) => (
+                  <option key={id} value={id}>
+                    {nome}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <select
+              value={ganttStatusFilter}
+              onChange={(e) => setGanttStatusFilter(e.target.value)}
+              className="border rounded-md px-2 py-1 text-xs"
+            >
+              <option value="all">Todos os status</option>
+              {ganttStatusOptions.map(status => (
+                <option key={status} value={status}>
+                  {status}
+                </option>
+              ))}
+            </select>
+          </div>
         </div>
         {loading && gantt.length === 0 ? (
           <div className="py-10 flex items-center justify-center text-blue-600 gap-2">

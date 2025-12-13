@@ -83,15 +83,17 @@ export default function ConferenciaPage() {
         }
     };
 
-    const handleGerarOB = (item: RecebimentoItem) => {
+    const handleGerarOP = (item: RecebimentoItem) => {
         if (!recebimento) return;
         
         if (!item.produto_id) {
-            addToast('Vincule um produto do sistema antes de gerar a OB.', 'warning');
+            addToast('Vincule um produto do sistema antes de gerar a OP.', 'warning');
             return;
         }
 
-        navigate('/app/industria/beneficiamento', {
+        addToast('Redirecionando para criar uma Ordem de Produção.', 'info');
+
+        navigate('/app/industria/producao', {
             state: {
                 createFromRecebimento: {
                     recebimento: {
@@ -221,17 +223,17 @@ export default function ConferenciaPage() {
                                 </td>
                                 <td className="px-6 py-4 text-center">
                                     <button
-                                        onClick={() => handleGerarOB(item)}
+                                        onClick={() => handleGerarOP(item)}
                                         disabled={!isConcluido}
                                         className={`p-2 rounded-lg transition-colors flex items-center gap-1 mx-auto text-xs font-medium ${
                                             isConcluido 
                                             ? 'text-purple-600 hover:text-purple-800 hover:bg-purple-50' 
                                             : 'text-gray-400 cursor-not-allowed'
                                         }`}
-                                        title={isConcluido ? "Gerar Ordem de Beneficiamento" : "Finalize a conferência para gerar OB"}
+                                        title={isConcluido ? "Gerar Ordem de Produção" : "Finalize a conferência para gerar a ordem"}
                                     >
                                         <Layers size={16} />
-                                        Gerar OB
+                                        Gerar OP
                                     </button>
                                 </td>
                             </tr>

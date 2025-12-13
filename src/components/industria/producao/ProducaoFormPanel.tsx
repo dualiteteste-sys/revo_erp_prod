@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Loader2, Save, Play } from 'lucide-react';
+import { Loader2, Save, Play, ShieldAlert } from 'lucide-react';
 import {
   OrdemProducaoDetails,
   OrdemProducaoPayload,
@@ -39,6 +39,7 @@ export default function ProducaoFormPanel({ ordemId, onSaveSuccess, onClose }: P
   const [activeTab, setActiveTab] = useState<'dados' | 'componentes' | 'entregas' | 'operacoes'>('dados');
   const [unidades, setUnidades] = useState<UnidadeMedida[]>([]);
   const [showClosureModal, setShowClosureModal] = useState(false);
+  const [entregaBloqueada, setEntregaBloqueada] = useState<{ blocked: boolean; reason?: string } | null>(null);
 
   const [formData, setFormData] = useState<Partial<OrdemProducaoDetails>>({
     status: 'rascunho',
@@ -70,6 +71,8 @@ export default function ProducaoFormPanel({ ordemId, onSaveSuccess, onClose }: P
     try {
       const data = await getOrdemProducaoDetails(idToLoad);
       setFormData(data);
+      const bloqueio = checkEntregaBlocked(data);
+      setEntregaBloqueada(bloqueio);
     } catch (e) {
       console.error(e);
       addToast('Erro ao carregar ordem.', 'error');
@@ -330,13 +333,18 @@ export default function ProducaoFormPanel({ ordemId, onSaveSuccess, onClose }: P
           </button>
           <button
             onClick={() => setActiveTab('entregas')}
-            className={`whitespace-nowrap py-2 px-3 border-b-2 font-medium text-sm transition-colors ${activeTab === 'entregas'
+            className={`relative whitespace-nowrap py-2 px-3 border-b-2 font-medium text-sm transition-colors ${activeTab === 'entregas'
               ? 'border-blue-500 text-blue-600'
               : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-              } `}
+            } `}
             disabled={!formData.id}
           >
             Entregas ({formData.entregas?.length || 0})
+            {entregaBloqueada?.blocked && (
+              <span className="absolute -top-1 -right-2 text-rose-600">
+                <ShieldAlert size={14} />
+              </span>
+            )}
           </button>
         </nav>
       </div>
@@ -527,14 +535,25 @@ export default function ProducaoFormPanel({ ordemId, onSaveSuccess, onClose }: P
 
         {
           activeTab === 'entregas' && (
-            <OrdemEntregas
-              entregas={formData.entregas || []}
-              onAddEntrega={handleAddEntrega}
-              onRemoveEntrega={handleRemoveEntrega}
-              readOnly={isLocked}
-              maxQuantity={formData.quantidade_planejada || 0}
-              showBillingStatus={false}
-            />
+            <div className="space-y-4">
+              {entregaBloqueada?.blocked && (
+                <div className="flex items-start gap-2 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">
+                  <ShieldAlert size={18} />
+                  <div>
+                    <p className="font-semibold">Entrega bloqueada por Qualidade</p>
+                    <p>{entregaBloqueada.reason}</p>
+                  </div>
+                </div>
+              )}
+              <OrdemEntregas
+                entregas={formData.entregas || []}
+                onAddEntrega={handleAddEntrega}
+                onRemoveEntrega={handleRemoveEntrega}
+                readOnly={isLocked || entregaBloqueada?.blocked}
+                maxQuantity={formData.quantidade_planejada || 0}
+                showBillingStatus={false}
+              />
+            </div>
           )
         }
       </div >
@@ -607,3 +626,19 @@ export default function ProducaoFormPanel({ ordemId, onSaveSuccess, onClose }: P
     </div >
   );
 }
+  const checkEntregaBlocked = (ordem: OrdemProducaoDetails | null): { blocked: boolean; reason?: string } => {
+    if (!ordem) return { blocked: false };
+    if (!ordem.operacoes || ordem.operacoes.length === 0) return { blocked: false };
+    const pendente = ordem.operacoes.some(op => {
+      if (!op.require_if) return false;
+      if (op.if_status === 'aprovada') return false;
+      return true;
+    });
+    if (pendente) {
+      return {
+        blocked: true,
+        reason: 'Inspeção Final pendente nesta OP. Libere a IF antes de registrar entrega.'
+      };
+    }
+    return { blocked: false };
+  };
