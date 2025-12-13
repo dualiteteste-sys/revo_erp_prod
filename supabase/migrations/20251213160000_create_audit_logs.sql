@@ -115,34 +115,49 @@ $$;
 
 -- 4. Apply Triggers to Critical Tables
 
--- Produtos
-DROP TRIGGER IF EXISTS audit_logs_trigger ON public.produtos;
-CREATE TRIGGER audit_logs_trigger
-AFTER INSERT OR UPDATE OR DELETE ON public.produtos
-FOR EACH ROW EXECUTE FUNCTION public.process_audit_log();
+DO $$
+BEGIN
+    IF to_regclass('public.produtos') IS NOT NULL THEN
+        EXECUTE 'DROP TRIGGER IF EXISTS audit_logs_trigger ON public.produtos';
+        EXECUTE 'CREATE TRIGGER audit_logs_trigger AFTER INSERT OR UPDATE OR DELETE ON public.produtos FOR EACH ROW EXECUTE FUNCTION public.process_audit_log()';
+    END IF;
+END;
+$$;
 
--- Pessoas (Partners)
-DROP TRIGGER IF EXISTS audit_logs_trigger ON public.pessoas;
-CREATE TRIGGER audit_logs_trigger
-AFTER INSERT OR UPDATE OR DELETE ON public.pessoas
-FOR EACH ROW EXECUTE FUNCTION public.process_audit_log();
+DO $$
+BEGIN
+    IF to_regclass('public.pessoas') IS NOT NULL THEN
+        EXECUTE 'DROP TRIGGER IF EXISTS audit_logs_trigger ON public.pessoas';
+        EXECUTE 'CREATE TRIGGER audit_logs_trigger AFTER INSERT OR UPDATE OR DELETE ON public.pessoas FOR EACH ROW EXECUTE FUNCTION public.process_audit_log()';
+    END IF;
+END;
+$$;
 
--- Ordens de Produção
-DROP TRIGGER IF EXISTS audit_logs_trigger ON public.industria_producao_ordens;
-CREATE TRIGGER audit_logs_trigger
-AFTER INSERT OR UPDATE OR DELETE ON public.industria_producao_ordens
-FOR EACH ROW EXECUTE FUNCTION public.process_audit_log();
+DO $$
+BEGIN
+    IF to_regclass('public.industria_producao_ordens') IS NOT NULL THEN
+        EXECUTE 'DROP TRIGGER IF EXISTS audit_logs_trigger ON public.industria_producao_ordens';
+        EXECUTE 'CREATE TRIGGER audit_logs_trigger AFTER INSERT OR UPDATE OR DELETE ON public.industria_producao_ordens FOR EACH ROW EXECUTE FUNCTION public.process_audit_log()';
+    END IF;
+END;
+$$;
 
--- Contas a Receber
-DROP TRIGGER IF EXISTS audit_logs_trigger ON public.financeiro_contas_receber;
-CREATE TRIGGER audit_logs_trigger
-AFTER INSERT OR UPDATE OR DELETE ON public.financeiro_contas_receber
-FOR EACH ROW EXECUTE FUNCTION public.process_audit_log();
+DO $$
+BEGIN
+    IF to_regclass('public.financeiro_contas_receber') IS NOT NULL THEN
+        EXECUTE 'DROP TRIGGER IF EXISTS audit_logs_trigger ON public.financeiro_contas_receber';
+        EXECUTE 'CREATE TRIGGER audit_logs_trigger AFTER INSERT OR UPDATE OR DELETE ON public.financeiro_contas_receber FOR EACH ROW EXECUTE FUNCTION public.process_audit_log()';
+    END IF;
+END;
+$$;
 
--- Contas a Pagar
-DROP TRIGGER IF EXISTS audit_logs_trigger ON public.financeiro_contas_pagar;
-CREATE TRIGGER audit_logs_trigger
-AFTER INSERT OR UPDATE OR DELETE ON public.financeiro_contas_pagar
-FOR EACH ROW EXECUTE FUNCTION public.process_audit_log();
+DO $$
+BEGIN
+    IF to_regclass('public.financeiro_contas_pagar') IS NOT NULL THEN
+        EXECUTE 'DROP TRIGGER IF EXISTS audit_logs_trigger ON public.financeiro_contas_pagar';
+        EXECUTE 'CREATE TRIGGER audit_logs_trigger AFTER INSERT OR UPDATE OR DELETE ON public.financeiro_contas_pagar FOR EACH ROW EXECUTE FUNCTION public.process_audit_log()';
+    END IF;
+END;
+$$;
 
 COMMIT;
