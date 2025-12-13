@@ -188,7 +188,7 @@ AS $$
         p.roteiro_id,
         r.descricao AS roteiro_nome,
         p.roteiro_etapa_id,
-        COALESCE(e.observacoes, 'Etapa ' || e.sequencia::text) AS etapa_nome,
+        COALESCE(e.descricao, 'Etapa ' || e.sequencia::text) AS etapa_nome,
         e.sequencia AS etapa_sequencia,
         COALESCE(c.total, 0) AS total_caracteristicas,
         p.updated_at
@@ -207,7 +207,7 @@ AS $$
            p_search IS NULL
         OR p.nome ILIKE '%' || p_search || '%'
         OR prod.nome ILIKE '%' || p_search || '%'
-        OR COALESCE(e.observacoes, '') ILIKE '%' || p_search || '%'
+        OR COALESCE(e.descricao, '') ILIKE '%' || p_search || '%'
       )
     ORDER BY p.updated_at DESC, p.nome ASC;
 $$;
@@ -248,7 +248,7 @@ AS $$
         p.roteiro_id,
         r.descricao AS roteiro_nome,
         p.roteiro_etapa_id,
-        COALESCE(e.observacoes, 'Etapa ' || e.sequencia::text) AS etapa_nome,
+        COALESCE(e.descricao, 'Etapa ' || e.sequencia::text) AS etapa_nome,
         e.sequencia AS etapa_sequencia,
         COALESCE((
             SELECT jsonb_agg(jsonb_build_object(
