@@ -1,5 +1,23 @@
 
 -- RPC: Registrar Entrega de Produto Acabado
+
+-- Create table for finished product deliveries
+CREATE TABLE IF NOT EXISTS public.industria_producao_entregas (
+    id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
+    empresa_id uuid DEFAULT public.current_empresa_id() NOT NULL,
+    ordem_id uuid REFERENCES public.industria_producao_ordens(id) ON DELETE CASCADE NOT NULL,
+    data_entrega date DEFAULT CURRENT_DATE,
+    quantidade_entregue numeric(15,4) NOT NULL DEFAULT 0,
+    documento_ref text,
+    observacoes text,
+    created_at timestamptz DEFAULT now(),
+    updated_at timestamptz DEFAULT now()
+);
+
+ALTER TABLE public.industria_producao_entregas ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Enable all access" ON public.industria_producao_entregas USING (empresa_id = public.current_empresa_id());
+
+-- RPC: Registrar Entrega de Produto Acabado
 CREATE OR REPLACE FUNCTION public.industria_producao_registrar_entrega(
     p_ordem_id uuid,
     p_quantidade numeric,
