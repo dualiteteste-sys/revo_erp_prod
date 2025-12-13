@@ -63,7 +63,7 @@ export default function OrdensPage() {
       <div className="flex justify-between items-center mb-6 flex-shrink-0">
         <div>
           <h1 className="text-3xl font-bold text-gray-800">Ordens de Produção</h1>
-          <p className="text-gray-600 text-sm mt-1">Gestão de chão de fábrica e beneficiamento.</p>
+          <p className="text-gray-600 text-sm mt-1">Gestão de chão de fábrica.</p>
         </div>
         <div className="flex items-center gap-3">
             <div className="bg-gray-100 p-1 rounded-lg flex">
