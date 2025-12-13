@@ -549,6 +549,29 @@ export interface EstoqueProjetadoPoint {
   entregas_previstas: number;
 }
 
+export interface PcpParetoItem {
+  motivo_id: string | null;
+  motivo_nome: string;
+  centro_trabalho_id?: string | null;
+  centro_trabalho_nome?: string | null;
+  total_refugo: number;
+  percentual: number;
+}
+
+export interface PcpOrdemLeadTime {
+  ordem_id: string;
+  ordem_numero: number;
+  produto_nome: string;
+  status: string;
+  data_prevista_inicio?: string | null;
+  data_prevista_fim?: string | null;
+  data_fim_real?: string | null;
+  lead_time_planejado_horas: number;
+  lead_time_real_horas: number;
+  atraso_horas: number;
+  cumpriu_prazo?: boolean | null;
+}
+
 // --- Quality Management RPCs ---
 
 export async function getMotivosRefugo(): Promise<QualidadeMotivo[]> {
@@ -734,5 +757,19 @@ export async function listPcpEstoqueProjetado(produtoId: string, dias?: number):
   return callRpc<EstoqueProjetadoPoint[]>('pcp_estoque_projetado', {
     p_produto_id: produtoId,
     p_dias: dias || null
+  });
+}
+
+export async function listPcpParetoRefugos(startDate?: string, endDate?: string): Promise<PcpParetoItem[]> {
+  return callRpc<PcpParetoItem[]>('pcp_pareto_refugos', {
+    p_data_inicial: startDate || null,
+    p_data_final: endDate || null
+  });
+}
+
+export async function listPcpOrdensLeadTime(startDate?: string, endDate?: string): Promise<PcpOrdemLeadTime[]> {
+  return callRpc<PcpOrdemLeadTime[]>('pcp_ordens_lead_time', {
+    p_data_inicial: startDate || null,
+    p_data_final: endDate || null
   });
 }
