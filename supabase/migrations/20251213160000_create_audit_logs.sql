@@ -142,22 +142,5 @@ BEGIN
 END;
 $$;
 
-DO $$
-BEGIN
-    IF to_regclass('public.financeiro_contas_receber') IS NOT NULL THEN
-        EXECUTE 'DROP TRIGGER IF EXISTS audit_logs_trigger ON public.financeiro_contas_receber';
-        EXECUTE 'CREATE TRIGGER audit_logs_trigger AFTER INSERT OR UPDATE OR DELETE ON public.financeiro_contas_receber FOR EACH ROW EXECUTE FUNCTION public.process_audit_log()';
-    END IF;
-END;
-$$;
-
-DO $$
-BEGIN
-    IF to_regclass('public.financeiro_contas_pagar') IS NOT NULL THEN
-        EXECUTE 'DROP TRIGGER IF EXISTS audit_logs_trigger ON public.financeiro_contas_pagar';
-        EXECUTE 'CREATE TRIGGER audit_logs_trigger AFTER INSERT OR UPDATE OR DELETE ON public.financeiro_contas_pagar FOR EACH ROW EXECUTE FUNCTION public.process_audit_log()';
-    END IF;
-END;
-$$;
 
 COMMIT;
