@@ -7,9 +7,10 @@ interface Props {
   onEdit: (centro: CentroTrabalho) => void;
   onClone: (centro: CentroTrabalho) => void;
   onDelete: (centro: CentroTrabalho) => void;
+  highlightCentroId?: string | null;
 }
 
-export default function CentrosTrabalhoTable({ centros, onEdit, onClone, onDelete }: Props) {
+export default function CentrosTrabalhoTable({ centros, onEdit, onClone, onDelete, highlightCentroId }: Props) {
   return (
     <div className="overflow-x-auto">
       <table className="min-w-full divide-y divide-gray-200">
@@ -24,8 +25,13 @@ export default function CentrosTrabalhoTable({ centros, onEdit, onClone, onDelet
           </tr>
         </thead>
         <tbody className="bg-white divide-y divide-gray-200">
-          {centros.map(centro => (
-            <tr key={centro.id} className="hover:bg-gray-50 transition-colors">
+          {centros.map(centro => {
+            const isHighlighted = highlightCentroId === centro.id;
+            return (
+            <tr
+              key={centro.id}
+              className={`transition-colors ${isHighlighted ? 'bg-amber-50/70 ring-1 ring-amber-200' : 'hover:bg-gray-50'}`}
+            >
               <td className="px-6 py-4">
                 <div className="text-sm font-medium text-gray-900">{centro.nome}</div>
                 {centro.descricao && <div className="text-xs text-gray-500">{centro.descricao}</div>}
@@ -75,7 +81,8 @@ export default function CentrosTrabalhoTable({ centros, onEdit, onClone, onDelet
                 </div>
               </td>
             </tr>
-          ))}
+          );
+          })}
           {centros.length === 0 && (
             <tr>
               <td colSpan={6} className="px-6 py-12 text-center text-gray-500">Nenhum centro de trabalho encontrado.</td>

@@ -494,7 +494,9 @@ export interface PcpCargaCapacidade {
   centro_trabalho_id: string;
   centro_trabalho_nome: string;
   capacidade_horas: number;
-  carga_planejada_horas: number;
+  carga_total_horas: number;
+  carga_setup_horas: number;
+  carga_producao_horas: number;
   carga_em_execucao_horas: number;
 }
 
@@ -515,6 +517,36 @@ export interface PcpGanttOperacao {
   data_inicio: string;
   data_fim: string;
   quantidade_transferida: number;
+  transfer_ratio: number;
+}
+
+export interface PcpKpis {
+  periodo_dias: number;
+  ordens_concluidas: number;
+  otif_percent: number;
+  lead_time_planejado_horas: number;
+  lead_time_real_horas: number;
+  percentual_refugo: number;
+  aderencia_ciclo: number;
+}
+
+export interface PcpAtpCtp {
+  produto_id: string;
+  produto_nome: string;
+  estoque_atual: number;
+  em_producao: number;
+  demanda_confirmada: number;
+  disponibilidade_atp: number;
+  carga_horas_pendente: number;
+  capacidade_diaria_horas: number;
+  data_ctp?: string | null;
+}
+
+export interface EstoqueProjetadoPoint {
+  dia: string;
+  saldo_projetado: number;
+  producao_prevista: number;
+  entregas_previstas: number;
 }
 
 // --- Quality Management RPCs ---
@@ -672,5 +704,35 @@ export async function listPcpGantt(startDate?: string, endDate?: string): Promis
   return callRpc<PcpGanttOperacao[]>('pcp_gantt_ordens', {
     p_data_inicial: startDate || null,
     p_data_final: endDate || null
+  });
+}
+
+export async function listPcpKpis(periodoDias?: number): Promise<PcpKpis> {
+  const result = await callRpc<PcpKpis[]>('pcp_kpis_execucao', {
+    p_periodo_dias: periodoDias || null
+  });
+  return result && result.length > 0
+    ? result[0]
+    : {
+        periodo_dias: periodoDias || 30,
+        ordens_concluidas: 0,
+        otif_percent: 0,
+        lead_time_planejado_horas: 0,
+        lead_time_real_horas: 0,
+        percentual_refugo: 0,
+        aderencia_ciclo: 0
+      };
+}
+
+export async function listPcpAtpCtp(dataFinal?: string): Promise<PcpAtpCtp[]> {
+  return callRpc<PcpAtpCtp[]>('pcp_atp_ctp_produtos', {
+    p_data_final: dataFinal || null
+  });
+}
+
+export async function listPcpEstoqueProjetado(produtoId: string, dias?: number): Promise<EstoqueProjetadoPoint[]> {
+  return callRpc<EstoqueProjetadoPoint[]>('pcp_estoque_projetado', {
+    p_produto_id: produtoId,
+    p_dias: dias || null
   });
 }
