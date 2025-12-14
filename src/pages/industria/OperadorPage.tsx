@@ -1,6 +1,7 @@
-import React, { useEffect, useMemo, useState, useCallback } from 'react';
+import React, { useEffect, useMemo, useState, useCallback, useRef } from 'react';
 import { listCentrosTrabalho, CentroTrabalho } from '@/services/industriaCentros';
 import { listMinhaFila, OperacaoFila, apontarExecucao } from '@/services/industriaExecucao';
+import { autenticarOperador, OperadorAuthResult } from '@/services/industriaOperadores';
 import { useToast } from '@/contexts/ToastProvider';
 import {
   Loader2,
@@ -21,23 +22,68 @@ import { formatOrderNumber } from '@/lib/utils';
 import QuickScanDialog from '@/components/industria/chao/QuickScanDialog';
 
 const REFRESH_INTERVAL = 10000;
+const STORAGE_LAST_OPERATORS = 'industria:lastOperators';
+const STORAGE_REMEMBERED = 'industria:lastSession';
+const REMEMBER_TTL_MS = 8 * 60 * 60 * 1000; // 8h
 
 const OperadorPage: React.FC = () => {
   const { addToast } = useToast();
   const [centros, setCentros] = useState<CentroTrabalho[]>([]);
   const [selectedCentroId, setSelectedCentroId] = useState('');
+  const [allowedCentros, setAllowedCentros] = useState<string[] | null>(null);
   const [fila, setFila] = useState<OperacaoFila[]>([]);
   const [loadingFila, setLoadingFila] = useState(false);
 
   const [operatorName, setOperatorName] = useState('');
+  const [operatorEmail, setOperatorEmail] = useState('');
   const [operatorPin, setOperatorPin] = useState('');
   const [isLogged, setIsLogged] = useState(false);
+  const [operatorInfo, setOperatorInfo] = useState<OperadorAuthResult | null>(null);
 
   const [autoRefresh, setAutoRefresh] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [highlightCode, setHighlightCode] = useState('');
   const [scannerContext, setScannerContext] = useState<'login' | 'fila' | null>(null);
   const [pinBypass] = useState<string | null>(import.meta.env.VITE_OPERATOR_DEV_PIN || null);
+  const [rememberDevice, setRememberDevice] = useState(true);
+  const [recentOperators, setRecentOperators] = useState<OperadorAuthResult[]>([]);
+  const pinInputRef = useRef<HTMLInputElement>(null);
+  const [loadingToken, setLoadingToken] = useState(false);
+
+  useEffect(() => {
+    pinInputRef.current?.focus();
+  }, []);
+
+  useEffect(() => {
+    const raw = localStorage.getItem(STORAGE_LAST_OPERATORS);
+    if (raw) {
+      try {
+        const parsed = JSON.parse(raw) as OperadorAuthResult[];
+        setRecentOperators(parsed.slice(0, 3));
+      } catch {
+        // ignore
+      }
+    }
+    const remembered = localStorage.getItem(STORAGE_REMEMBERED);
+    if (remembered) {
+      try {
+        const parsed = JSON.parse(remembered) as { exp: number; payload: OperadorAuthResult };
+        if (parsed.exp > Date.now() && parsed.payload) {
+          const op = parsed.payload;
+          setOperatorName(op.nome);
+          setOperatorEmail(op.email || '');
+          setAllowedCentros(op.centros_trabalho_ids || null);
+          if (op.centros_trabalho_ids?.length) {
+            setSelectedCentroId(op.centros_trabalho_ids[0]);
+          }
+        } else {
+          localStorage.removeItem(STORAGE_REMEMBERED);
+        }
+      } catch {
+        localStorage.removeItem(STORAGE_REMEMBERED);
+      }
+    }
+  }, []);
 
   const [modalAction, setModalAction] = useState<'pausar' | 'concluir' | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
@@ -94,13 +140,56 @@ const OperadorPage: React.FC = () => {
     );
   }, [fila, highlightCode]);
 
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!operatorName.trim() || (operatorPin.length < 4 && !pinBypass)) {
+    if (!operatorName.trim() && !operatorEmail.trim() && !pinBypass) {
+      addToast('Informe nome ou e-mail do operador.', 'warning');
+      return;
+    }
+    if (operatorPin.length < 4 && !pinBypass) {
       addToast('Informe nome e PIN (4 dígitos).', 'warning');
       return;
     }
-    setIsLogged(true);
+
+    // Bypass de dev
+    if (pinBypass && operatorPin === pinBypass) {
+      setOperatorInfo(null);
+      setAllowedCentros(null);
+      if (rememberDevice) {
+        localStorage.setItem(
+          STORAGE_REMEMBERED,
+          JSON.stringify({ exp: Date.now() + REMEMBER_TTL_MS, payload: { nome: operatorName, email: operatorEmail } })
+        );
+      }
+      setIsLogged(true);
+      return;
+    }
+
+    try {
+      const auth = await autenticarOperador(operatorPin, operatorEmail || operatorName);
+      if (!auth) {
+        addToast('PIN inválido ou operador inativo.', 'error');
+        return;
+      }
+      setOperatorInfo(auth);
+      setOperatorName(auth.nome);
+      setAllowedCentros(auth.centros_trabalho_ids || null);
+      if (auth.centros_trabalho_ids?.length) {
+        setSelectedCentroId(auth.centros_trabalho_ids[0]);
+      }
+      const updatedList = [auth, ...recentOperators.filter((o) => o.nome !== auth.nome)].slice(0, 3);
+      setRecentOperators(updatedList);
+      localStorage.setItem(STORAGE_LAST_OPERATORS, JSON.stringify(updatedList));
+      if (rememberDevice) {
+        localStorage.setItem(
+          STORAGE_REMEMBERED,
+          JSON.stringify({ exp: Date.now() + REMEMBER_TTL_MS, payload: auth })
+        );
+      }
+      setIsLogged(true);
+    } catch (err: any) {
+      addToast(err.message || 'Falha ao autenticar operador.', 'error');
+    }
   };
 
   const handleLogout = () => {
@@ -156,6 +245,42 @@ const OperadorPage: React.FC = () => {
     setIsRefreshing(false);
   };
 
+  const applyRecentOperator = (op: OperadorAuthResult) => {
+    setOperatorName(op.nome);
+    setOperatorEmail(op.email || '');
+    setAllowedCentros(op.centros_trabalho_ids || null);
+    if (op.centros_trabalho_ids?.length) {
+      setSelectedCentroId(op.centros_trabalho_ids[0]);
+    }
+    setTimeout(() => pinInputRef.current?.focus(), 50);
+  };
+
+  useEffect(() => {
+    const token = localStorage.getItem('industria:op:autoToken');
+    if (token) {
+      (async () => {
+        setLoadingToken(true);
+        try {
+          const auth = await autenticarOperador(token, token); // token como pin + nome fallback
+          if (auth) {
+            setOperatorInfo(auth);
+            setOperatorName(auth.nome);
+            setAllowedCentros(auth.centros_trabalho_ids || null);
+            if (auth.centros_trabalho_ids?.length) {
+              setSelectedCentroId(auth.centros_trabalho_ids[0]);
+            }
+            setIsLogged(true);
+            addToast('Login automático via QR/token.', 'success');
+          }
+        } catch {
+          // ignora token inválido
+        } finally {
+          setLoadingToken(false);
+        }
+      })();
+    }
+  }, [addToast]);
+
   const focusOperationFromCode = useCallback(
     (code: string) => {
       const trimmed = code.trim();
@@ -170,6 +295,30 @@ const OperadorPage: React.FC = () => {
     (payload: string) => {
       const sanitized = payload.trim();
       if (!sanitized) return;
+      try {
+        const obj = JSON.parse(sanitized);
+        if (obj) {
+          if (obj.nome) setOperatorName(obj.nome);
+          if (obj.email) setOperatorEmail(obj.email);
+          if (obj.pin) setOperatorPin(String(obj.pin).replace(/\D/g, '').slice(0, 8));
+          if (obj.token) {
+            localStorage.setItem('industria:op:autoToken', obj.token);
+          }
+          const centroCode = obj.centro || obj.ct || obj.centro_codigo;
+          if (centroCode && centros.length) {
+            const found = centros.find(
+              (c) =>
+                c.id === centroCode ||
+                c.codigo?.toLowerCase() === String(centroCode).toLowerCase()
+            );
+            if (found) setSelectedCentroId(found.id);
+          }
+          addToast('Dados carregados via QR.', 'success');
+          return;
+        }
+      } catch {
+        // not JSON, fallback
+      }
       const segments = sanitized.split(/[\s|,;]+/).filter(Boolean);
       if (segments.length === 1) {
         setOperatorPin(segments[0].replace(/\D/g, '').slice(0, 8));
@@ -215,7 +364,29 @@ const OperadorPage: React.FC = () => {
             <MonitorUp className="mx-auto w-10 h-10 text-blue-400" />
             <h1 className="text-2xl font-bold">Modo Operador</h1>
             <p className="text-slate-400 text-sm">Identifique-se para acessar sua fila de produção.</p>
+            {loadingToken && (
+              <div className="text-xs text-emerald-300 flex items-center justify-center gap-1">
+                <Loader2 className="w-4 h-4 animate-spin" /> Checando token de acesso...
+              </div>
+            )}
           </div>
+          {recentOperators.length > 0 && (
+            <div className="bg-slate-800/60 border border-slate-700 rounded-2xl p-3 space-y-2">
+              <p className="text-xs text-slate-400">Últimos acessos neste dispositivo</p>
+              <div className="flex flex-wrap gap-2">
+                {recentOperators.map((op) => (
+                  <button
+                    key={op.nome}
+                    type="button"
+                    onClick={() => applyRecentOperator(op)}
+                    className="px-3 py-2 rounded-xl bg-slate-900 border border-slate-700 hover:border-blue-500 text-sm"
+                  >
+                    {op.nome}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
           <Input
             label="Nome do Operador"
             name="operadorNome"
@@ -224,11 +395,19 @@ const OperadorPage: React.FC = () => {
             placeholder="Ex: João Silva"
           />
           <Input
+            label="E-mail (opcional)"
+            name="operadorEmail"
+            value={operatorEmail}
+            onChange={(e) => setOperatorEmail(e.target.value)}
+            placeholder="exemplo@empresa.com"
+          />
+          <Input
             label="PIN (4 dígitos)"
             name="operadorPin"
             type="password"
             maxLength={4}
             inputMode="numeric"
+            ref={pinInputRef}
             value={operatorPin}
             onChange={(e) => setOperatorPin(e.target.value.replace(/\D/g, ''))}
             placeholder="0000"
@@ -252,18 +431,29 @@ const OperadorPage: React.FC = () => {
               </button>
             )}
           </div>
-          <select
-            value={selectedCentroId}
-            onChange={(e) => setSelectedCentroId(e.target.value)}
-            className="w-full rounded-xl bg-slate-800 border border-slate-700 p-3"
-          >
-            <option value="">Selecione o centro</option>
-            {centros.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.nome}
-              </option>
+            <select
+              value={selectedCentroId}
+              onChange={(e) => setSelectedCentroId(e.target.value)}
+              className="w-full rounded-xl bg-slate-800 border border-slate-700 p-3"
+            >
+              <option value="">Selecione o centro</option>
+              {centros
+                .filter((c) => !allowedCentros || allowedCentros.includes(c.id))
+                .map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.nome}
+                  </option>
             ))}
-          </select>
+        </select>
+          <label className="flex items-center gap-2 text-sm text-slate-300">
+            <input
+              type="checkbox"
+              checked={rememberDevice}
+              onChange={(e) => setRememberDevice(e.target.checked)}
+              className="w-4 h-4 rounded border-slate-600 bg-slate-800"
+            />
+            Lembrar neste dispositivo por 8h
+          </label>
           <button
             type="submit"
             className="w-full bg-blue-600 hover:bg-blue-500 transition-colors rounded-2xl py-3 font-semibold text-white flex items-center justify-center gap-2"
@@ -488,7 +678,7 @@ const OperadorPage: React.FC = () => {
         }
         helper={
           scannerContext === 'login'
-            ? 'Aponte para o QR do crachá (Formato: Nome|PIN|CT:COD).'
+            ? 'Aponte para o QR do crachá (aceita JSON ou Nome|PIN|CT:COD).'
             : 'Escaneie o QR/Barcode da ficha para localizar a operação.'
         }
         onResult={handleScanResult}

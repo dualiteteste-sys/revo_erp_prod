@@ -12,6 +12,7 @@ import { formatDistanceToNow } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import AndonGrid from '@/components/industria/chao/AndonGrid';
 import { useChaoDeFabricaRealtime } from '@/hooks/useChaoDeFabricaRealtime';
+import { useMemo } from 'react';
 
 export default function ChaoDeFabricaPage() {
   const { addToast } = useToast();
@@ -41,6 +42,28 @@ export default function ChaoDeFabricaPage() {
   const [isSaving, setIsSaving] = useState(false);
 
   const ALERT_COOLDOWN_MS = 3 * 60 * 1000;
+
+  const kpis = useMemo(() => {
+    if (!overview.length) {
+      return {
+        emExecucao: 0,
+        fila: 0,
+        bloqueadas: 0,
+        concluidasHoje: 0,
+        utilizacaoMedia: 0,
+        atrasadas: 0,
+      };
+    }
+    const emExecucao = overview.reduce((sum, c) => sum + c.emExecucao.length, 0);
+    const fila = overview.reduce((sum, c) => sum + c.fila.length, 0);
+    const bloqueadas = overview.reduce((sum, c) => sum + c.bloqueadas.length, 0);
+    const concluidasHoje = overview.reduce((sum, c) => sum + (c.concluidasHoje || 0), 0);
+    const atrasadas = overview.reduce((sum, c) => sum + (c.atrasadas || 0), 0);
+    const utilizacaoMedia = Math.round(
+      overview.reduce((sum, c) => sum + (c.utilizacao || 0), 0) / Math.max(overview.length, 1)
+    );
+    return { emExecucao, fila, bloqueadas, concluidasHoje, utilizacaoMedia, atrasadas };
+  }, [overview]);
 
   const processAlerts = useCallback((data: CentroStatusSnapshot[]) => {
     const now = Date.now();
@@ -219,6 +242,33 @@ export default function ChaoDeFabricaPage() {
             {tvMode ? 'Modo padrão' : 'Modo TV'}
           </button>
         </div>
+      </div>
+
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 mb-6">
+        <GlassCard className="p-3 flex flex-col gap-1">
+          <span className="text-xs text-gray-500">Em execução</span>
+          <span className="text-2xl font-bold">{kpis.emExecucao}</span>
+        </GlassCard>
+        <GlassCard className="p-3 flex flex-col gap-1">
+          <span className="text-xs text-gray-500">Em fila</span>
+          <span className="text-2xl font-bold">{kpis.fila}</span>
+        </GlassCard>
+        <GlassCard className="p-3 flex flex-col gap-1">
+          <span className="text-xs text-gray-500">Bloqueadas</span>
+          <span className={`text-2xl font-bold ${kpis.bloqueadas > 0 ? 'text-amber-600' : ''}`}>{kpis.bloqueadas}</span>
+        </GlassCard>
+        <GlassCard className="p-3 flex flex-col gap-1">
+          <span className="text-xs text-gray-500">Atrasadas</span>
+          <span className={`text-2xl font-bold ${kpis.atrasadas > 0 ? 'text-rose-600' : ''}`}>{kpis.atrasadas}</span>
+        </GlassCard>
+        <GlassCard className="p-3 flex flex-col gap-1">
+          <span className="text-xs text-gray-500">Concluídas hoje</span>
+          <span className="text-2xl font-bold">{kpis.concluidasHoje}</span>
+        </GlassCard>
+        <GlassCard className="p-3 flex flex-col gap-1">
+          <span className="text-xs text-gray-500">Utilização média</span>
+          <span className="text-2xl font-bold">{kpis.utilizacaoMedia}%</span>
+        </GlassCard>
       </div>
 
       <div className="flex flex-wrap gap-3 mb-6">
