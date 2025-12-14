@@ -92,25 +92,34 @@ const CompanySettingsForm: React.FC = () => {
 
     setLoading(true);
 
-    const updateData = {
-      ...formData,
-      nome_razao_social: formData.razao_social,
-      nome_fantasia: formData.fantasia,
-      cnpj: formData.cnpj?.replace(/\D/g, ''),
-      endereco_cep: formData.endereco_cep?.replace(/\D/g, ''),
-      telefone: formData.telefone?.replace(/\D/g, ''),
+    const finalPayload: EmpresaUpdate = {
+      nome_razao_social: formData.razao_social?.trim() || null,
+      nome_fantasia: formData.fantasia?.trim() || null,
+      cnpj: formData.cnpj?.replace(/\D/g, '') || null,
+      endereco_cep: formData.endereco_cep?.replace(/\D/g, '') || null,
+      endereco_logradouro: formData.endereco_logradouro?.trim() || null,
+      endereco_numero: formData.endereco_numero?.trim() || null,
+      endereco_complemento: formData.endereco_complemento?.trim() || null,
+      endereco_bairro: formData.endereco_bairro?.trim() || null,
+      endereco_cidade: formData.endereco_cidade?.trim() || null,
+      endereco_uf: formData.endereco_uf?.trim() || null,
+      telefone: formData.telefone?.replace(/\D/g, '') || null,
+      email: formData.email?.trim() || null,
+      logotipo_url: formData.logotipo_url ?? null,
+      inscr_estadual: formData.inscr_estadual ?? null,
+      inscr_municipal: formData.inscr_municipal ?? null,
     };
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    const { created_at, id, razao_social, fantasia, ...finalPayload } = updateData;
 
     try {
       const updatedCompany = await updateCompany(finalPayload);
       addToast('Dados da empresa atualizados com sucesso!', 'success');
 
+      const fantasiaValue = updatedCompany.nome_fantasia ?? finalPayload.nome_fantasia ?? formData.fantasia ?? '';
+      const razaoValue = updatedCompany.nome_razao_social ?? finalPayload.nome_razao_social ?? formData.razao_social ?? '';
       const newFormState: CompanyFormState = {
         ...updatedCompany,
-        razao_social: updatedCompany.nome_razao_social || '',
-        fantasia: updatedCompany.nome_fantasia || '',
+        razao_social: razaoValue,
+        fantasia: fantasiaValue,
       };
 
       setInitialData(newFormState);

@@ -5,8 +5,8 @@ import {
   FileSignature, HeartHandshake, Store, Receipt, Truck, Percent,
   Bot, Undo2, ClipboardCheck, Banknote, Wallet, TrendingUp,
   TrendingDown, Landmark, FileSpreadsheet, LogOut, Search, Building, Code, Database, Target,
-  Briefcase, BookOpen, Grid, GraduationCap, PieChart, Factory, Hammer, Layers, FileCog, Route, PlayCircle, HardHat, FileCode,
-  PackageCheck, FileUp, FolderTree, Ruler, BarChart3, Shield
+  Briefcase, BookOpen, Grid, GraduationCap, PieChart, Factory, Hammer, Layers, FileCog, Route, PlayCircle, HardHat, FileCode, MonitorUp,
+  PackageCheck, FileUp, FolderTree, Ruler, BarChart3, Shield, ShieldCheck
 } from 'lucide-react';
 
 export interface MenuItem {
@@ -55,6 +55,7 @@ export const menuConfig: { name: string; icon: React.ElementType; href: string; 
       { name: 'Materiais de Clientes', icon: Package, href: '/app/industria/materiais-cliente' },
       { name: 'Execução (Operações)', icon: PlayCircle, href: '/app/industria/execucao' },
       { name: 'Chão de Fábrica', icon: HardHat, href: '/app/industria/chao-de-fabrica' },
+      { name: 'Operador', icon: MonitorUp, href: '/app/industria/operador' },
       { name: 'Planejamento (MRP)', icon: BarChart2, href: '/app/industria/mrp' },
       { name: 'PCP & Capacidade', icon: BarChart3, href: '/app/industria/pcp' },
       { name: 'Roteiros', icon: Route, href: '/app/industria/roteiros' },
@@ -62,6 +63,7 @@ export const menuConfig: { name: string; icon: React.ElementType; href: string; 
       { name: 'Centros de Trabalho', icon: Settings, href: '/app/industria/centros-trabalho' },
       { name: 'Motivos de Qualidade', icon: ClipboardCheck, href: '/app/industria/qualidade/motivos' },
       { name: 'Planos de Inspeção', icon: ClipboardList, href: '/app/industria/qualidade/planos' },
+      { name: 'Operadores', icon: ShieldCheck, href: '/app/industria/operadores' },
       { name: 'Lotes & Bloqueios', icon: Shield, href: '/app/industria/qualidade/lotes' },
     ]
   },

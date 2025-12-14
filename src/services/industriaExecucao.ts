@@ -32,6 +32,7 @@ export type CentroStatusSnapshot = {
   emExecucao: Operacao[];
   fila: Operacao[];
   bloqueadas: Operacao[];
+  atrasadas: number;
   concluidasHoje: number;
   alerta: 'ok' | 'warning' | 'danger';
   utilizacao: number;
@@ -132,6 +133,7 @@ export async function getChaoDeFabricaOverview(): Promise<CentroStatusSnapshot[]
       emExecucao,
       fila,
       bloqueadas,
+      atrasadas,
       concluidasHoje: concluidas.length,
       alerta,
       utilizacao,
