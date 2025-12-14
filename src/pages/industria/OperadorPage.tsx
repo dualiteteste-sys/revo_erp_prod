@@ -37,6 +37,7 @@ const OperadorPage: React.FC = () => {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [highlightCode, setHighlightCode] = useState('');
   const [scannerContext, setScannerContext] = useState<'login' | 'fila' | null>(null);
+  const [pinBypass] = useState<string | null>(import.meta.env.VITE_OPERATOR_DEV_PIN || null);
 
   const [modalAction, setModalAction] = useState<'pausar' | 'concluir' | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
@@ -95,7 +96,7 @@ const OperadorPage: React.FC = () => {
 
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!operatorName.trim() || operatorPin.length < 4) {
+    if (!operatorName.trim() || (operatorPin.length < 4 && !pinBypass)) {
       addToast('Informe nome e PIN (4 dígitos).', 'warning');
       return;
     }
@@ -232,14 +233,25 @@ const OperadorPage: React.FC = () => {
             onChange={(e) => setOperatorPin(e.target.value.replace(/\D/g, ''))}
             placeholder="0000"
           />
-          <button
-            type="button"
-            onClick={() => setScannerContext('login')}
-            className="w-full rounded-2xl border border-slate-800 bg-slate-900/60 py-3 flex items-center justify-center gap-2 text-sm text-slate-300 hover:bg-slate-900"
-          >
-            <QrCode size={18} />
-            Ler QR do crachá
-          </button>
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={() => setScannerContext('login')}
+              className="flex-1 rounded-2xl border border-slate-800 bg-slate-900/60 py-3 flex items-center justify-center gap-2 text-sm text-slate-300 hover:bg-slate-900"
+            >
+              <QrCode size={18} />
+              Ler QR do crachá
+            </button>
+            {pinBypass && (
+              <button
+                type="button"
+                onClick={() => setOperatorPin(pinBypass)}
+                className="px-3 rounded-2xl border border-emerald-500 text-emerald-300 text-xs"
+              >
+                PIN dev
+              </button>
+            )}
+          </div>
           <select
             value={selectedCentroId}
             onChange={(e) => setSelectedCentroId(e.target.value)}

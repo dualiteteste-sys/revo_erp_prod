@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { BrowserMultiFormatReader, IScannerControls } from '@zxing/browser';
-import { Loader2, XCircle, Camera } from 'lucide-react';
+import { Loader2, XCircle, Camera, Clipboard } from 'lucide-react';
 
 type QuickScanDialogProps = {
   open: boolean;
@@ -23,6 +23,7 @@ const QuickScanDialog: React.FC<QuickScanDialogProps> = ({
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [ready, setReady] = useState(false);
+  const [manual, setManual] = useState('');
 
   useEffect(() => {
     if (!open) return;
@@ -104,8 +105,27 @@ const QuickScanDialog: React.FC<QuickScanDialogProps> = ({
           )}
         </div>
 
-        <div className="mt-4 text-xs text-slate-400">
-          Funcionamento ideal apenas em HTTPS/dispositivos com câmera.
+        <div className="mt-4 space-y-2">
+          <label className="block text-xs text-slate-300">
+            Ou cole o conteúdo do QR/etiqueta:
+          </label>
+          <div className="flex gap-2">
+            <input
+              value={manual}
+              onChange={(e) => setManual(e.target.value)}
+              placeholder="Ex: NOME|PIN|CT:COD"
+              className="w-full rounded-xl bg-slate-900 border border-slate-800 px-3 py-2 text-sm text-white outline-none focus:border-slate-600"
+            />
+            <button
+              onClick={() => manual.trim() && onResult(manual)}
+              className="rounded-xl bg-blue-600 px-3 py-2 text-white text-sm font-semibold hover:bg-blue-500 flex items-center gap-1"
+            >
+              <Clipboard size={16} /> Usar
+            </button>
+          </div>
+          <p className="text-xs text-slate-400">
+            Funcionamento ideal apenas em HTTPS/dispositivos com câmera. Se bloquear, cole acima.
+          </p>
         </div>
       </div>
     </div>,
