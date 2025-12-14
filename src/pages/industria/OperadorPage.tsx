@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState, useCallback } from 'react';
 import { listCentrosTrabalho, CentroTrabalho } from '@/services/industriaCentros';
 import { listMinhaFila, OperacaoFila, apontarExecucao } from '@/services/industriaExecucao';
 import { useToast } from '@/contexts/ToastProvider';
@@ -18,6 +18,7 @@ import Modal from '@/components/ui/Modal';
 import Input from '@/components/ui/forms/Input';
 import TextArea from '@/components/ui/forms/TextArea';
 import { formatOrderNumber } from '@/lib/utils';
+import QuickScanDialog from '@/components/industria/chao/QuickScanDialog';
 
 const REFRESH_INTERVAL = 10000;
 
@@ -35,6 +36,7 @@ const OperadorPage: React.FC = () => {
   const [autoRefresh, setAutoRefresh] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [highlightCode, setHighlightCode] = useState('');
+  const [scannerContext, setScannerContext] = useState<'login' | 'fila' | null>(null);
 
   const [modalAction, setModalAction] = useState<'pausar' | 'concluir' | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
@@ -153,6 +155,54 @@ const OperadorPage: React.FC = () => {
     setIsRefreshing(false);
   };
 
+  const focusOperationFromCode = useCallback(
+    (code: string) => {
+      const trimmed = code.trim();
+      if (!trimmed) return;
+      setHighlightCode(trimmed);
+      addToast('Código reconhecido. Buscando operação...', 'success');
+    },
+    [addToast]
+  );
+
+  const applyLoginScan = useCallback(
+    (payload: string) => {
+      const sanitized = payload.trim();
+      if (!sanitized) return;
+      const segments = sanitized.split(/[\s|,;]+/).filter(Boolean);
+      if (segments.length === 1) {
+        setOperatorPin(segments[0].replace(/\D/g, '').slice(0, 8));
+      } else {
+        setOperatorName(segments[0]);
+        setOperatorPin(segments[1].replace(/\D/g, '').slice(0, 8));
+      }
+      const centroToken = segments.find((segment) =>
+        segment.toLowerCase().startsWith('ct:')
+      );
+      if (centroToken) {
+        const code = centroToken.split(':')[1];
+        const found = centros.find(
+          (c) => c.codigo?.toLowerCase() === code?.toLowerCase()
+        );
+        if (found) setSelectedCentroId(found.id);
+      }
+      addToast('Credenciais capturadas via QR.', 'success');
+    },
+    [centros, addToast]
+  );
+
+  const handleScanResult = useCallback(
+    (value: string) => {
+      if (scannerContext === 'login') {
+        applyLoginScan(value);
+      } else if (scannerContext === 'fila') {
+        focusOperationFromCode(value);
+      }
+      setScannerContext(null);
+    },
+    [scannerContext, applyLoginScan, focusOperationFromCode]
+  );
+
   if (!isLogged) {
     return (
       <div className="min-h-screen bg-slate-950 text-white flex items-center justify-center p-6">
@@ -182,6 +232,14 @@ const OperadorPage: React.FC = () => {
             onChange={(e) => setOperatorPin(e.target.value.replace(/\D/g, ''))}
             placeholder="0000"
           />
+          <button
+            type="button"
+            onClick={() => setScannerContext('login')}
+            className="w-full rounded-2xl border border-slate-800 bg-slate-900/60 py-3 flex items-center justify-center gap-2 text-sm text-slate-300 hover:bg-slate-900"
+          >
+            <QrCode size={18} />
+            Ler QR do crachá
+          </button>
           <select
             value={selectedCentroId}
             onChange={(e) => setSelectedCentroId(e.target.value)}
@@ -252,7 +310,14 @@ const OperadorPage: React.FC = () => {
                 placeholder="Número, produto ou código"
                 className="bg-transparent flex-1 outline-none text-white"
               />
-              <QrCode size={18} className="text-slate-500" />
+              <button
+                type="button"
+                onClick={() => setScannerContext('fila')}
+                className="p-2 rounded-xl border border-slate-700 text-slate-400 hover:text-white hover:border-slate-500 transition-colors"
+                title="Escanear QR da ordem"
+              >
+                <QrCode size={18} />
+              </button>
             </div>
           </label>
           <label className="flex items-center gap-3 text-sm">
@@ -402,6 +467,21 @@ const OperadorPage: React.FC = () => {
           </div>
         </div>
       </Modal>
+      <QuickScanDialog
+        open={scannerContext !== null}
+        title={
+          scannerContext === 'login'
+            ? 'Ler QR do operador'
+            : 'Ler QR/Barcode da ordem'
+        }
+        helper={
+          scannerContext === 'login'
+            ? 'Aponte para o QR do crachá (Formato: Nome|PIN|CT:COD).'
+            : 'Escaneie o QR/Barcode da ficha para localizar a operação.'
+        }
+        onResult={handleScanResult}
+        onClose={() => setScannerContext(null)}
+      />
     </div>
   );
 };
