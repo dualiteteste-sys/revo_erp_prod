@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { listMinhaFila, OperacaoFila, apontarExecucao, getChaoDeFabricaOverview, CentroStatusSnapshot } from '@/services/industriaExecucao';
 import { listCentrosTrabalho, CentroTrabalho } from '@/services/industriaCentros';
 import { Loader2, Play, Pause, CheckCircle, AlertTriangle, User, Monitor, RefreshCw, Activity, Package } from 'lucide-react';
@@ -23,6 +23,7 @@ export default function ChaoDeFabricaPage() {
   const [overview, setOverview] = useState<CentroStatusSnapshot[]>([]);
   const [overviewLoading, setOverviewLoading] = useState(true);
   const [lastRealtimePulse, setLastRealtimePulse] = useState<Date | null>(null);
+  const lastAlertRef = useRef<Map<string, number>>(new Map());
 
   const [centros, setCentros] = useState<CentroTrabalho[]>([]);
   const [selectedCentroId, setSelectedCentroId] = useState<string>('');
@@ -39,17 +40,37 @@ export default function ChaoDeFabricaPage() {
   const [observacoes, setObservacoes] = useState('');
   const [isSaving, setIsSaving] = useState(false);
 
+  const ALERT_COOLDOWN_MS = 3 * 60 * 1000;
+
+  const processAlerts = useCallback((data: CentroStatusSnapshot[]) => {
+    const now = Date.now();
+    data.forEach((snap) => {
+      const hasRisk = snap.bloqueadas.length > 0 || snap.atrasadas > 0;
+      if (!hasRisk) return;
+      const last = lastAlertRef.current.get(snap.centro.id) || 0;
+      if (now - last < ALERT_COOLDOWN_MS) return;
+
+      const motivos: string[] = [];
+      if (snap.bloqueadas.length > 0) motivos.push(`${snap.bloqueadas.length} bloqueada(s)`);
+      if (snap.atrasadas > 0) motivos.push(`${snap.atrasadas} atrasada(s)`);
+
+      addToast(`Alerta em ${snap.centro.nome}: ${motivos.join(' • ')}`, 'warning');
+      lastAlertRef.current.set(snap.centro.id, now);
+    });
+  }, [addToast]);
+
   const fetchOverview = useCallback(async (withLoader = true) => {
     if (withLoader) setOverviewLoading(true);
     try {
       const data = await getChaoDeFabricaOverview();
       setOverview(data);
+      processAlerts(data);
     } catch (e: any) {
       addToast(e.message || 'Erro ao carregar o painel.', 'error');
     } finally {
       if (withLoader) setOverviewLoading(false);
     }
-  }, [addToast]);
+  }, [addToast, processAlerts]);
 
   useEffect(() => {
     listCentrosTrabalho(undefined, true).then(data => {
