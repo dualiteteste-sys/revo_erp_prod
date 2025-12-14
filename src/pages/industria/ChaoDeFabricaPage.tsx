@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { listMinhaFila, OperacaoFila, apontarExecucao, getChaoDeFabricaOverview, CentroStatusSnapshot } from '@/services/industriaExecucao';
 import { listCentrosTrabalho, CentroTrabalho } from '@/services/industriaCentros';
 import { Loader2, Play, Pause, CheckCircle, AlertTriangle, User, Monitor, RefreshCw, Activity, Package } from 'lucide-react';
@@ -8,16 +8,21 @@ import Modal from '@/components/ui/Modal';
 import Input from '@/components/ui/forms/Input';
 import TextArea from '@/components/ui/forms/TextArea';
 import { formatOrderNumber } from '@/lib/utils';
+import { formatDistanceToNow } from 'date-fns';
+import { ptBR } from 'date-fns/locale';
+import AndonGrid from '@/components/industria/chao/AndonGrid';
+import { useChaoDeFabricaRealtime } from '@/hooks/useChaoDeFabricaRealtime';
 
 export default function ChaoDeFabricaPage() {
   const { addToast } = useToast();
-  const [mode, setMode] = useState<'overview' | 'fila'>('overview');
+  const [mode, setMode] = useState<'overview' | 'fila' | 'andon'>('overview');
   const [tvMode, setTvMode] = useState(false);
   const [autoRefresh, setAutoRefresh] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
 
   const [overview, setOverview] = useState<CentroStatusSnapshot[]>([]);
   const [overviewLoading, setOverviewLoading] = useState(true);
+  const [lastRealtimePulse, setLastRealtimePulse] = useState<Date | null>(null);
 
   const [centros, setCentros] = useState<CentroTrabalho[]>([]);
   const [selectedCentroId, setSelectedCentroId] = useState<string>('');
@@ -34,16 +39,7 @@ export default function ChaoDeFabricaPage() {
   const [observacoes, setObservacoes] = useState('');
   const [isSaving, setIsSaving] = useState(false);
 
-  useEffect(() => {
-    listCentrosTrabalho(undefined, true).then(data => {
-        setCentros(data);
-        if (data.length > 0) setSelectedCentroId(data[0].id);
-    });
-
-    fetchOverview();
-  }, []);
-
-  const fetchOverview = async (withLoader = true) => {
+  const fetchOverview = useCallback(async (withLoader = true) => {
     if (withLoader) setOverviewLoading(true);
     try {
       const data = await getChaoDeFabricaOverview();
@@ -53,9 +49,18 @@ export default function ChaoDeFabricaPage() {
     } finally {
       if (withLoader) setOverviewLoading(false);
     }
-  };
+  }, [addToast]);
 
-  const fetchFila = async (withLoader = true) => {
+  useEffect(() => {
+    listCentrosTrabalho(undefined, true).then(data => {
+        setCentros(data);
+        if (data.length > 0) setSelectedCentroId(data[0].id);
+    });
+
+    fetchOverview();
+  }, [fetchOverview]);
+
+  const fetchFila = useCallback(async (withLoader = true) => {
     if (!selectedCentroId) return;
     if (withLoader) setLoading(true);
     try {
@@ -71,40 +76,46 @@ export default function ChaoDeFabricaPage() {
     } finally {
       if (withLoader) setLoading(false);
     }
-  };
+  }, [selectedCentroId, selectedOp]);
 
   useEffect(() => {
     fetchFila();
     // Reset selection when changing center
     setSelectedOp(null);
-  }, [selectedCentroId]);
+  }, [selectedCentroId, fetchFila]);
 
   useEffect(() => {
-    if (mode === 'overview') {
+    if (mode === 'overview' || mode === 'andon') {
       fetchOverview(false);
-    } else if (selectedCentroId) {
+    } else {
       fetchFila(false);
     }
-  }, [mode]);
+  }, [mode, fetchOverview, fetchFila]);
 
   useEffect(() => {
     if (!autoRefresh) return;
 
     const interval = setInterval(() => {
       fetchOverview(false);
-      if (mode === 'fila' && selectedCentroId) {
-        fetchFila(false);
-      }
+      fetchFila(false);
     }, 15000);
 
     return () => clearInterval(interval);
-  }, [autoRefresh, mode, selectedCentroId]);
+  }, [autoRefresh, fetchOverview, fetchFila]);
+
+  const handleRealtimePulse = useCallback(() => {
+    fetchOverview(false);
+    fetchFila(false);
+    setLastRealtimePulse(new Date());
+  }, [fetchOverview, fetchFila]);
+
+  const realtimeConnected = useChaoDeFabricaRealtime(handleRealtimePulse);
 
   const handleGlobalRefresh = async () => {
     setIsRefreshing(true);
     await Promise.all([
       fetchOverview(false),
-      selectedCentroId && mode === 'fila' ? fetchFila(false) : Promise.resolve(),
+      fetchFila(false),
     ]);
     setIsRefreshing(false);
   };
@@ -152,6 +163,15 @@ export default function ChaoDeFabricaPage() {
         <div>
           <h1 className="text-3xl font-bold">Chão de Fábrica</h1>
           <p className={`text-sm ${tvMode ? 'text-gray-300' : 'text-gray-600'}`}>Visão em tempo real e fila do operador</p>
+          <div className={`mt-2 flex items-center gap-2 text-xs ${tvMode ? 'text-gray-300' : 'text-gray-500'}`}>
+            <span className={`h-2 w-2 rounded-full ${realtimeConnected ? 'bg-emerald-500 animate-pulse' : 'bg-gray-400'}`} />
+            <span>{realtimeConnected ? 'Streaming em tempo real ativo' : 'Aguardando conexão em tempo real'}</span>
+            {lastRealtimePulse && (
+              <span className="text-[11px]">
+                • Último evento {formatDistanceToNow(lastRealtimePulse, { addSuffix: true, locale: ptBR })}
+              </span>
+            )}
+          </div>
         </div>
         <div className="flex flex-wrap gap-3 items-center">
           <button
@@ -194,6 +214,18 @@ export default function ChaoDeFabricaPage() {
           Painel em Tempo Real
         </button>
         <button
+          onClick={() => setMode('andon')}
+          className={`px-4 py-2 rounded-full text-sm font-semibold transition-colors ${
+            mode === 'andon'
+              ? 'bg-indigo-600 text-white shadow-lg'
+              : tvMode
+                ? 'bg-gray-800 text-gray-300'
+                : 'bg-white text-gray-600 border border-gray-200'
+          }`}
+        >
+          Painel Andon
+        </button>
+        <button
           onClick={() => setMode('fila')}
           className={`px-4 py-2 rounded-full text-sm font-semibold transition-colors ${
             mode === 'fila'
@@ -207,8 +239,21 @@ export default function ChaoDeFabricaPage() {
         </button>
       </div>
 
-      {mode === 'overview' ? (
-        <FactoryOverviewGrid data={overview} loading={overviewLoading} tvMode={tvMode} />
+      {mode === 'overview' || mode === 'andon' ? (
+        overviewLoading ? (
+          <div className="flex-1 flex items-center justify-center">
+            <Loader2 className="w-12 h-12 text-blue-500 animate-spin" />
+          </div>
+        ) : mode === 'overview' ? (
+          <FactoryOverviewGrid data={overview} loading={false} tvMode={tvMode} />
+        ) : (
+          <AndonGrid
+            data={overview}
+            tvMode={tvMode}
+            connected={realtimeConnected}
+            lastPulse={lastRealtimePulse}
+          />
+        )
       ) : (
         <>
           <div className="flex flex-wrap justify-between items-center gap-3 mb-4">
