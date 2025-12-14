@@ -23,20 +23,7 @@ alter table public.estoque_movimentos
 create index if not exists idx_est_mov_emp_prod_data
   on public.estoque_movimentos (empresa_id, produto_id, data_movimento);
 
--- 3) Unique de idempotência (evita duplicação por origem)
-do $$
-begin
-  if not exists (
-    select 1 from pg_constraint
-    where conname = 'est_mov_emp_origem_uk'
-      and conrelid = 'public.estoque_movimentos'::regclass
-  ) then
-    alter table public.estoque_movimentos
-      add constraint est_mov_emp_origem_uk
-      unique (empresa_id, origem_tipo, origem_id, produto_id, tipo_mov);
-  end if;
-end;
-$$;
+
 
 -- 4) Trigger updated_at (se ausente)
 do $$
