@@ -20,6 +20,7 @@ do $$ begin
   alter type public.tipo_produto add value if not exists 'consumivel';
   alter type public.tipo_produto add value if not exists 'fantasma';
   alter type public.tipo_produto add value if not exists 'produto';
+  alter type public.tipo_produto add value if not exists 'servico';
 exception when undefined_object then null; end $$;
 
 do $$ begin
@@ -31,6 +32,10 @@ exception when duplicate_object then null; end $$;
 do $$ begin
   create type public.pessoa_tipo as enum ('cliente', 'fornecedor', 'ambos', 'transportadora', 'colaborador');
 exception when duplicate_object then null; end $$;
+do $$ begin
+  alter type public.pessoa_tipo add value if not exists 'transportadora';
+  alter type public.pessoa_tipo add value if not exists 'colaborador';
+exception when undefined_object then null; end $$;
 
 -- Enum de embalagens (alguns ambientes antigos ficaram sem valores)
 do $$ begin
@@ -166,6 +171,27 @@ begin
     end;
   else
     raise notice 'Tipo de industria_roteiros.versao inesperado (%); default não alterado.', v_typ::text;
+  end if;
+end $$;
+
+-- Convergência de tipo: alguns PROD legados têm industria_roteiros.versao como integer.
+-- O schema esperado usa text. Converte de forma segura.
+do $$
+declare
+  v_typ regtype;
+begin
+  select a.atttypid::regtype into v_typ
+    from pg_attribute a
+    join pg_class c on c.oid = a.attrelid
+    join pg_namespace n on n.oid = c.relnamespace
+   where n.nspname = 'public'
+     and c.relname = 'industria_roteiros'
+     and a.attname = 'versao'
+     and a.attnum > 0
+     and not a.attisdropped;
+
+  if v_typ::text = 'integer' then
+    execute 'alter table public.industria_roteiros alter column versao type text using versao::text';
   end if;
 end $$;
 
