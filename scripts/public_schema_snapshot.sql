@@ -104,10 +104,13 @@ where n.nspname = 'public'
 order by 1;
 
 -- Funções no schema public (definição completa)
-select format('FUNCTION|%s', p.oid::regprocedure);
+select format('FUNCTION|%s', p.oid::regprocedure)
+from pg_proc p
+join pg_namespace n on n.oid = p.pronamespace
+where n.nspname = 'public'
+order by p.oid::regprocedure::text;
 select pg_get_functiondef(p.oid)
 from pg_proc p
 join pg_namespace n on n.oid = p.pronamespace
 where n.nspname = 'public'
 order by p.oid::regprocedure::text;
-
