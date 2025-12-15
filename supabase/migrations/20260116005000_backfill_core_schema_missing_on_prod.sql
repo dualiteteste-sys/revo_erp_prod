@@ -239,6 +239,7 @@ alter table public.produtos add column if not exists tipo text;
 do $$
 declare
   v_typ regtype;
+  v_enum regtype := to_regtype('public.tipo_produto');
 begin
   select a.atttypid::regtype
     into v_typ
@@ -251,7 +252,7 @@ begin
      and a.attnum > 0
      and not a.attisdropped;
 
-  if v_typ::text = 'public.tipo_produto' then
+  if v_enum is not null and v_typ = v_enum then
     execute 'alter table public.produtos alter column tipo set default ''produto''::public.tipo_produto';
   else
     execute 'alter table public.produtos alter column tipo set default ''produto''::text';
