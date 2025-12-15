@@ -69,7 +69,17 @@ BEGIN
 END $$;
 
 -- =================================================================
--- 4. Fix Defaults (Type Sensitive)
+-- 4. Fix ENUMs (Missing Values)
+-- =================================================================
+-- Note: ALTER TYPE ... ADD VALUE cannot run inside a transaction block in older PG versions,
+-- but implies implicit commit. We place them here. Postgres 12+ supports IF NOT EXISTS.
+
+ALTER TYPE public.pessoa_tipo ADD VALUE IF NOT EXISTS 'transportadora';
+ALTER TYPE public.pessoa_tipo ADD VALUE IF NOT EXISTS 'colaborador';
+ALTER TYPE public.tipo_produto ADD VALUE IF NOT EXISTS 'servico';
+
+-- =================================================================
+-- 5. Fix Defaults & Column Types
 -- =================================================================
 
 -- produtos.tipo
@@ -82,7 +92,6 @@ BEGIN
     WHERE attrelid = 'public.produtos'::regclass AND attname = 'tipo';
 
     IF col_type = 'public.tipo_produto' THEN
-        -- Verify 'produto' exists in enum (it should, but safety first)
         BEGIN
             ALTER TABLE public.produtos ALTER COLUMN tipo SET DEFAULT 'produto'::public.tipo_produto;
         EXCEPTION WHEN OTHERS THEN
@@ -96,19 +105,21 @@ BEGIN
 END $$;
 
 -- industria_roteiros.versao
+-- Force conversion to text if it is not already, to match VERIFY schema.
 DO $$
-DECLARE
-    col_type text;
 BEGIN
-    SELECT format_type(atttypid, atttypmod) INTO col_type
-    FROM pg_attribute 
-    WHERE attrelid = 'public.industria_roteiros'::regclass AND attname = 'versao';
-
-    IF col_type = 'integer' THEN
-        ALTER TABLE public.industria_roteiros ALTER COLUMN versao SET DEFAULT 1;
-    ELSIF col_type LIKE '%character%' OR col_type = 'text' THEN
-        ALTER TABLE public.industria_roteiros ALTER COLUMN versao SET DEFAULT '1.0';
-    ELSE
-        RAISE NOTICE 'Skipping industria_roteiros.versao default: unexpected type %', col_type;
+    -- Check if it exists and is not text
+    IF EXISTS (
+        SELECT 1 
+        FROM pg_attribute 
+        WHERE attrelid = 'public.industria_roteiros'::regclass 
+        AND attname = 'versao' 
+        AND format_type(atttypid, atttypmod) NOT LIKE '%text%' 
+        AND format_type(atttypid, atttypmod) NOT LIKE '%character%'
+    ) THEN
+        ALTER TABLE public.industria_roteiros ALTER COLUMN versao TYPE text USING versao::text;
     END IF;
+
+    -- Set default
+    ALTER TABLE public.industria_roteiros ALTER COLUMN versao SET DEFAULT '1.0';
 END $$;
