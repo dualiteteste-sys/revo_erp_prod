@@ -401,6 +401,14 @@ grant execute on function public.industria_automacao_get() to authenticated, ser
 -- -------------------------------------------------------------------
 -- Operações (UI Chão/Operador) apontando para industria_producao_operacoes
 -- -------------------------------------------------------------------
+-- IMPORTANTE: em PROD pode existir uma versão anterior dessas funções com OUT params diferentes.
+-- Para evitar erro 42P13 (cannot change return type), fazemos DROP antes do CREATE/REPLACE.
+drop function if exists public.industria_operacoes_minha_fila(uuid);
+drop function if exists public.industria_operacoes_list(text, uuid, text, text);
+drop function if exists public.industria_operacao_update_status(uuid, text, int, uuid);
+drop function if exists public.industria_operacao_replanejar(uuid, uuid, int);
+drop function if exists public.industria_operacao_apontar_execucao(uuid, text, numeric, numeric, text, text);
+
 create or replace function public.industria_operacoes_list(
   p_view text default 'lista',
   p_centro_id uuid default null,
@@ -904,4 +912,3 @@ grant execute on function public.industria_operacao_docs_list(uuid, boolean) to 
 grant execute on function public.industria_operacao_doc_delete(uuid) to authenticated, service_role;
 
 commit;
-
