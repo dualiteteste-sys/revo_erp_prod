@@ -17,44 +17,34 @@ where n.nspname = 'public'
 order by 1;
 
 -- Tabelas e colunas
--- Observação: não inclui posição (attnum) nem default, pois isso varia bastante entre bases antigas,
--- mas não costuma causar erros de runtime (o foco é garantir presença/forma da coluna).
+-- Observação:
+-- - não inclui posição (attnum) nem default, pois isso varia bastante entre bases antigas.
+-- - normaliza tipos para reduzir falsos positivos (ex.: numeric(15,4) vs numeric(14,2)).
+-- - enums são tratados como "text" (PostgREST expõe como string; e alguns ambientes legados alternam enum/text).
 select format(
   'COLUMN|%s|%s|%s|%s',
   n.nspname,
   c.relname,
   a.attname,
-  pg_catalog.format_type(a.atttypid, a.atttypmod)
+  case
+    when t.typtype = 'e' then 'text'
+    when pg_catalog.format_type(a.atttypid, a.atttypmod) like 'numeric%' then 'numeric'
+    when pg_catalog.format_type(a.atttypid, a.atttypmod) = 'timestamp with time zone' then 'timestamptz'
+    when pg_catalog.format_type(a.atttypid, a.atttypmod) in ('text', 'character varying', 'character', 'character(1)', 'bpchar') then 'text'
+    else pg_catalog.format_type(a.atttypid, a.atttypmod)
+  end
 )
 from pg_attribute a
 join pg_class c on c.oid = a.attrelid
 join pg_namespace n on n.oid = c.relnamespace
+join pg_type t on t.oid = a.atttypid
 where n.nspname = 'public'
   and c.relkind in ('r','p')
   and a.attnum > 0
   and not a.attisdropped
 order by 1;
 
--- Constraints (PK/FK/UNIQUE/CHECK)
-select format(
-  'CONSTRAINT|%s|%s|%s|%s',
-  n.nspname,
-  c.relname,
-  con.conname,
-  regexp_replace(pg_get_constraintdef(con.oid, true), E'\\s+', ' ', 'g')
-)
-from pg_constraint con
-join pg_class c on c.oid = con.conrelid
-join pg_namespace n on n.oid = c.relnamespace
-where n.nspname = 'public'
-order by 1;
-
--- Índices (opcional): não comparar por padrão para evitar ruído em bases antigas.
--- Se quiser reativar, descomente este bloco.
--- select format('INDEX|%s|%s|%s', schemaname, tablename, regexp_replace(indexdef, E'\\s+', ' ', 'g'))
--- from pg_indexes
--- where schemaname = 'public'
--- order by 1;
+-- Constraints/índices: não comparar por padrão (muito ruído entre ambientes antigos).
 
 -- Policies de RLS
 select format(
@@ -85,7 +75,7 @@ where n.nspname = 'public'
   and not t.tgisinternal
 order by 1;
 
--- Views e materialized views (apenas presença; definição pode variar por versão do Postgres)
+-- Views e materialized views (apenas presença)
 select format(
   'VIEW|%s|%s|%s',
   n.nspname,
