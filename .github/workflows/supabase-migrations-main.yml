@@ -77,5 +77,7 @@ jobs:
         run: |
           set -euo pipefail
           echo "[PROD] Applying migrations..."
-          echo "y" | supabase db push --db-url "$SUPABASE_DB_URL_PROD"
+          # PROD pode ter histórico de migrações fora de ordem (aplicadas manualmente).
+          # --include-all permite aplicar migrações com timestamp menor que a última já registrada no PROD.
+          echo "y" | supabase db push --include-all --db-url "$SUPABASE_DB_URL_PROD"
           echo "[PROD] Migrations applied successfully."
