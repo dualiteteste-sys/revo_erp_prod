@@ -638,7 +638,10 @@ do $$
 begin
   if to_regclass('public.industria_roteiros_etapas') is not null then
     execute 'create or replace view public.industria_roteiro_etapas as select * from public.industria_roteiros_etapas';
-    execute $$comment on view public.industria_roteiro_etapas is 'Compat layer: mirror of industria_roteiros_etapas para funções legadas.'$$;
+    execute $c$
+      comment on view public.industria_roteiro_etapas
+        is 'Compat layer: mirror of industria_roteiros_etapas para funções legadas.';
+    $c$;
   end if;
 end $$;
 
