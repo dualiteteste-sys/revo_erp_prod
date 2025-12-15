@@ -42,7 +42,7 @@ select format(
   n.nspname,
   c.relname,
   con.conname,
-  replace(pg_get_constraintdef(con.oid, true), E'\n', ' ')
+  regexp_replace(pg_get_constraintdef(con.oid, true), E'\\s+', ' ', 'g')
 )
 from pg_constraint con
 join pg_class c on c.oid = con.conrelid
@@ -55,7 +55,7 @@ select format(
   'INDEX|%s|%s|%s',
   schemaname,
   tablename,
-  replace(indexdef, E'\n', ' ')
+  regexp_replace(indexdef, E'\\s+', ' ', 'g')
 )
 from pg_indexes
 where schemaname = 'public'
@@ -69,8 +69,8 @@ select format(
   policyname,
   cmd,
   coalesce(array_to_string(roles, ','), ''),
-  coalesce(replace(qual, E'\n', ' '), ''),
-  coalesce(replace(with_check, E'\n', ' '), '')
+  coalesce(regexp_replace(qual, E'\\s+', ' ', 'g'), ''),
+  coalesce(regexp_replace(with_check, E'\\s+', ' ', 'g'), '')
 )
 from pg_policies
 where schemaname = 'public'
@@ -81,7 +81,7 @@ select format(
   'TRIGGER|%s|%s|%s',
   n.nspname,
   c.relname,
-  replace(pg_get_triggerdef(t.oid, true), E'\n', ' ')
+  regexp_replace(pg_get_triggerdef(t.oid, true), E'\\s+', ' ', 'g')
 )
 from pg_trigger t
 join pg_class c on c.oid = t.tgrelid
@@ -92,10 +92,11 @@ order by 1;
 
 -- Views e materialized views
 select format(
-  'VIEW|%s|%s|%s',
+  'VIEW|%s|%s|%s|md5=%s',
   n.nspname,
   c.relname,
-  replace(pg_get_viewdef(c.oid, true), E'\n', ' ')
+  c.relkind,
+  md5(regexp_replace(pg_get_viewdef(c.oid, true), E'\\s+', '', 'g'))
 )
 from pg_class c
 join pg_namespace n on n.oid = c.relnamespace
@@ -103,13 +104,8 @@ where n.nspname = 'public'
   and c.relkind in ('v','m')
 order by 1;
 
--- Funções no schema public (definição completa)
-select format('FUNCTION|%s', p.oid::regprocedure)
-from pg_proc p
-join pg_namespace n on n.oid = p.pronamespace
-where n.nspname = 'public'
-order by p.oid::regprocedure::text;
-select pg_get_functiondef(p.oid)
+-- Funções no schema public (hash da definição, normalizando whitespace)
+select format('FUNCTION|%s|md5=%s', p.oid::regprocedure, md5(regexp_replace(pg_get_functiondef(p.oid), E'\\s+', '', 'g')))
 from pg_proc p
 join pg_namespace n on n.oid = p.pronamespace
 where n.nspname = 'public'
