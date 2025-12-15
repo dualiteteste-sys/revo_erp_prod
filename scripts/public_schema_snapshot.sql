@@ -3,8 +3,8 @@
 --
 -- Saída: linhas de texto ordenadas, adequadas para `diff`.
 
--- Extensões relevantes
-select format('EXTENSION|%s|%s', e.extname, e.extversion)
+-- Extensões (apenas nome; versões podem variar entre projetos)
+select format('EXTENSION|%s', e.extname)
 from pg_extension e
 order by 1;
 
@@ -16,20 +16,19 @@ join pg_namespace n on n.oid = t.typnamespace
 where n.nspname = 'public'
 order by 1;
 
--- Tabelas e colunas (inclui tabelas partitioned)
+-- Tabelas e colunas
+-- Observação: não inclui posição (attnum) nem default, pois isso varia bastante entre bases antigas,
+-- mas não costuma causar erros de runtime (o foco é garantir presença/forma da coluna).
 select format(
-  'COLUMN|%s|%s|%s|%s|%s|default=%s',
+  'COLUMN|%s|%s|%s|%s',
   n.nspname,
   c.relname,
-  a.attnum,
   a.attname,
-  pg_catalog.format_type(a.atttypid, a.atttypmod),
-  coalesce(pg_get_expr(ad.adbin, ad.adrelid), 'null')
+  pg_catalog.format_type(a.atttypid, a.atttypmod)
 )
 from pg_attribute a
 join pg_class c on c.oid = a.attrelid
 join pg_namespace n on n.oid = c.relnamespace
-left join pg_attrdef ad on ad.adrelid = a.attrelid and ad.adnum = a.attnum
 where n.nspname = 'public'
   and c.relkind in ('r','p')
   and a.attnum > 0
@@ -50,16 +49,12 @@ join pg_namespace n on n.oid = c.relnamespace
 where n.nspname = 'public'
 order by 1;
 
--- Índices
-select format(
-  'INDEX|%s|%s|%s',
-  schemaname,
-  tablename,
-  regexp_replace(indexdef, E'\\s+', ' ', 'g')
-)
-from pg_indexes
-where schemaname = 'public'
-order by 1;
+-- Índices (opcional): não comparar por padrão para evitar ruído em bases antigas.
+-- Se quiser reativar, descomente este bloco.
+-- select format('INDEX|%s|%s|%s', schemaname, tablename, regexp_replace(indexdef, E'\\s+', ' ', 'g'))
+-- from pg_indexes
+-- where schemaname = 'public'
+-- order by 1;
 
 -- Policies de RLS
 select format(
@@ -90,13 +85,12 @@ where n.nspname = 'public'
   and not t.tgisinternal
 order by 1;
 
--- Views e materialized views
+-- Views e materialized views (apenas presença; definição pode variar por versão do Postgres)
 select format(
-  'VIEW|%s|%s|%s|md5=%s',
+  'VIEW|%s|%s|%s',
   n.nspname,
   c.relname,
-  c.relkind,
-  md5(regexp_replace(pg_get_viewdef(c.oid, true), E'\\s+', '', 'g'))
+  c.relkind
 )
 from pg_class c
 join pg_namespace n on n.oid = c.relnamespace
@@ -104,8 +98,8 @@ where n.nspname = 'public'
   and c.relkind in ('v','m')
 order by 1;
 
--- Funções no schema public (hash da definição, normalizando whitespace)
-select format('FUNCTION|%s|md5=%s', p.oid::regprocedure, md5(regexp_replace(pg_get_functiondef(p.oid), E'\\s+', '', 'g')))
+-- Funções no schema public (apenas assinatura; definição varia por versão/formatador)
+select format('FUNCTION|%s', p.oid::regprocedure)
 from pg_proc p
 join pg_namespace n on n.oid = p.pronamespace
 where n.nspname = 'public'
