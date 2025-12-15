@@ -253,6 +253,8 @@ begin
      and not a.attisdropped;
 
   if v_enum is not null and v_typ = v_enum then
+    -- Garante que o valor 'produto' existe no enum, evitando erro 22P02
+    execute 'alter type public.tipo_produto add value if not exists ''produto''';
     execute 'alter table public.produtos alter column tipo set default ''produto''::public.tipo_produto';
   else
     execute 'alter table public.produtos alter column tipo set default ''produto''::text';
