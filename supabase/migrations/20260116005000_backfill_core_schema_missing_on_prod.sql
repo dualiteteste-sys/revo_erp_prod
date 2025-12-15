@@ -103,9 +103,17 @@ alter table public.empresa_addons alter column created_at set default now();
 alter table public.empresa_addons add column if not exists updated_at timestamptz;
 alter table public.empresa_addons alter column updated_at set default now();
 
-do $$ begin
-  alter table public.empresa_addons add constraint empresa_addons_pkey primary key (id);
-exception when duplicate_object then null;
+do $$
+begin
+  if to_regclass('public.empresa_addons') is not null
+     and not exists (
+       select 1
+       from pg_constraint
+       where conrelid = 'public.empresa_addons'::regclass
+         and contype = 'p'
+     ) then
+    alter table public.empresa_addons add constraint empresa_addons_pkey primary key (id);
+  end if;
 end $$;
 
 drop policy if exists "Enable all access" on public.empresa_addons;
@@ -133,13 +141,39 @@ alter table public.empresa_usuarios alter column created_at set default now();
 alter table public.empresa_usuarios add column if not exists updated_at timestamptz;
 alter table public.empresa_usuarios alter column updated_at set default now();
 
-do $$ begin
-  alter table public.empresa_usuarios add constraint empresa_usuarios_pkey primary key (id);
-exception when duplicate_object then null;
+do $$
+begin
+  if to_regclass('public.empresa_usuarios') is not null
+     and not exists (
+       select 1
+       from pg_constraint
+       where conrelid = 'public.empresa_usuarios'::regclass
+         and contype = 'p'
+     ) then
+    alter table public.empresa_usuarios add constraint empresa_usuarios_pkey primary key (id);
+  end if;
 end $$;
-do $$ begin
-  alter table public.empresa_usuarios add constraint empresa_usuarios_empresa_id_user_id_key unique (empresa_id, user_id);
-exception when duplicate_object then null;
+-- Garante a constraint UNIQUE (empresa_id, user_id) mesmo em bases que só tinham índice.
+do $$
+begin
+  if to_regclass('public.empresa_usuarios') is not null
+     and not exists (
+       select 1
+       from pg_constraint
+       where conrelid = 'public.empresa_usuarios'::regclass
+         and conname = 'empresa_usuarios_empresa_id_user_id_key'
+     ) then
+    -- Usa o índice se já existir (requer ser UNIQUE e compatível)
+    if to_regclass('public.empresa_usuarios_empresa_id_user_id_key') is not null then
+      alter table public.empresa_usuarios
+        add constraint empresa_usuarios_empresa_id_user_id_key
+        unique using index empresa_usuarios_empresa_id_user_id_key;
+    else
+      alter table public.empresa_usuarios
+        add constraint empresa_usuarios_empresa_id_user_id_key
+        unique (empresa_id, user_id);
+    end if;
+  end if;
 end $$;
 
 drop policy if exists "Users can see their own memberships" on public.empresa_usuarios;
@@ -409,9 +443,17 @@ alter table public.industria_producao_ordens alter column total_entregue set def
 alter table public.industria_producao_ordens add column if not exists percentual_concluido numeric;
 alter table public.industria_producao_ordens alter column percentual_concluido set default 0;
 
-do $$ begin
-  alter table public.industria_producao_ordens add constraint industria_producao_ordens_pkey primary key (id);
-exception when duplicate_object then null;
+do $$
+begin
+  if to_regclass('public.industria_producao_ordens') is not null
+     and not exists (
+       select 1
+       from pg_constraint
+       where conrelid = 'public.industria_producao_ordens'::regclass
+         and contype = 'p'
+     ) then
+    alter table public.industria_producao_ordens add constraint industria_producao_ordens_pkey primary key (id);
+  end if;
 end $$;
 do $$ begin
   alter table public.industria_producao_ordens add constraint industria_producao_ordens_produto_final_id_fkey
@@ -445,9 +487,17 @@ alter table public.industria_producao_componentes alter column updated_at set de
 alter table public.industria_producao_componentes add column if not exists quantidade_reservada numeric(15,4);
 alter table public.industria_producao_componentes alter column quantidade_reservada set default 0;
 
-do $$ begin
-  alter table public.industria_producao_componentes add constraint industria_producao_componentes_pkey primary key (id);
-exception when duplicate_object then null;
+do $$
+begin
+  if to_regclass('public.industria_producao_componentes') is not null
+     and not exists (
+       select 1
+       from pg_constraint
+       where conrelid = 'public.industria_producao_componentes'::regclass
+         and contype = 'p'
+     ) then
+    alter table public.industria_producao_componentes add constraint industria_producao_componentes_pkey primary key (id);
+  end if;
 end $$;
 do $$ begin
   alter table public.industria_producao_componentes add constraint industria_producao_componentes_ordem_id_fkey
@@ -486,9 +536,17 @@ alter table public.industria_producao_entregas alter column created_at set defau
 alter table public.industria_producao_entregas add column if not exists updated_at timestamptz;
 alter table public.industria_producao_entregas alter column updated_at set default now();
 
-do $$ begin
-  alter table public.industria_producao_entregas add constraint industria_producao_entregas_pkey primary key (id);
-exception when duplicate_object then null;
+do $$
+begin
+  if to_regclass('public.industria_producao_entregas') is not null
+     and not exists (
+       select 1
+       from pg_constraint
+       where conrelid = 'public.industria_producao_entregas'::regclass
+         and contype = 'p'
+     ) then
+    alter table public.industria_producao_entregas add constraint industria_producao_entregas_pkey primary key (id);
+  end if;
 end $$;
 do $$ begin
   alter table public.industria_producao_entregas add constraint industria_producao_entregas_ordem_id_fkey
@@ -759,4 +817,3 @@ as $$
 $$;
 
 commit;
-
