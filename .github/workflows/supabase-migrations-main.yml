@@ -125,7 +125,7 @@ jobs:
             echo "::error::PROD está faltando definições presentes no schema esperado (VERIFY)."
             echo "Isso normalmente causa erros de RPC/colunas em produção."
             echo ""
-            echo "$missing" | head -n 200
+            printf '%s\n' "$missing" | head -n 200
             echo ""
             echo "(mostrando até 200 linhas; veja os artifacts para o snapshot completo)"
             exit 1
@@ -137,7 +137,11 @@ jobs:
             echo "::warning::PROD possui objetos extras vs schema esperado (VERIFY)."
             echo "Isso não bloqueia o deploy, mas indica drift/legado; ideal alinhar quando possível."
             echo ""
-            echo "$extra" | head -n 50
+            # evita pipefail em head (SIGPIPE do echo)
+            tmp_extra="$(mktemp)"
+            printf '%s\n' "$extra" > "$tmp_extra"
+            head -n 50 "$tmp_extra"
+            rm -f "$tmp_extra"
           fi
 
       - name: Upload schema snapshots (debug)
