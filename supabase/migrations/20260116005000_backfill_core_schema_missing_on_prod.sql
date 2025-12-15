@@ -255,9 +255,19 @@ begin
   if v_enum is not null and v_typ = v_enum then
     -- Garante que o valor 'produto' existe no enum, evitando erro 22P02
     execute 'alter type public.tipo_produto add value if not exists ''produto''';
-    execute 'alter table public.produtos alter column tipo set default ''produto''::public.tipo_produto';
+    begin
+      execute 'alter table public.produtos alter column tipo set default ''produto''::public.tipo_produto';
+    exception
+      when others then
+        raise notice 'Não foi possível ajustar default de produtos.tipo como enum (%). Mantendo default atual.', SQLERRM;
+    end;
   else
-    execute 'alter table public.produtos alter column tipo set default ''produto''::text';
+    begin
+      execute 'alter table public.produtos alter column tipo set default ''produto''::text';
+    exception
+      when others then
+        raise notice 'Não foi possível ajustar default de produtos.tipo como text (%). Mantendo default atual.', SQLERRM;
+    end;
   end if;
 end $$;
 alter table public.produtos add column if not exists ativo boolean;
