@@ -1,5 +1,6 @@
 import { callRpc } from '@/lib/api';
 import { listCentrosTrabalho, CentroTrabalho } from './industriaCentros';
+import { getAutomacaoConfig } from './industriaAutomacao';
 
 export type StatusOperacao = 'planejada' | 'liberada' | 'em_execucao' | 'em_espera' | 'em_inspecao' | 'concluida' | 'cancelada';
 export type TipoOrdem = 'producao' | 'beneficiamento';
@@ -19,6 +20,7 @@ export type Operacao = {
   data_prevista_fim: string | null;
   percentual_concluido: number;
   atrasada: boolean;
+  updated_at?: string | null;
 };
 
 export type OperacaoFila = Operacao & {
@@ -33,6 +35,7 @@ export type CentroStatusSnapshot = {
   fila: Operacao[];
   bloqueadas: Operacao[];
   atrasadas: number;
+  paradas: number;
   concluidasHoje: number;
   alerta: 'ok' | 'warning' | 'danger';
   utilizacao: number;
@@ -100,12 +103,15 @@ export async function apontarExecucao(
  * Usa as listas existentes (centros + operações) para evitar múltiplos RPCs específicos.
  */
 export async function getChaoDeFabricaOverview(): Promise<CentroStatusSnapshot[]> {
-  const [centros, operacoes] = await Promise.all([
+  const [centros, operacoes, automacao] = await Promise.all([
     listCentrosTrabalho(undefined, true),
     listOperacoes('kanban'),
+    getAutomacaoConfig().catch(() => ({ auto_avancar: true, alerta_parada_minutos: 20, alerta_refugo_percent: 5 })),
   ]);
 
   const nowIso = new Date().toISOString();
+  const paradaMs = Math.max(1, automacao.alerta_parada_minutos || 20) * 60 * 1000;
+  const now = Date.now();
 
   const overview = centros.map((centro) => {
     const ops = operacoes.filter(op => op.centro_trabalho_id === centro.id);
@@ -114,10 +120,16 @@ export async function getChaoDeFabricaOverview(): Promise<CentroStatusSnapshot[]
     const bloqueadas = ops.filter(op => op.status === 'em_espera' || op.status === 'em_inspecao');
     const concluidas = ops.filter(op => op.status === 'concluida');
     const atrasadas = ops.filter(op => op.atrasada).length;
+    const paradas = emExecucao.filter((op) => {
+      if (!op.updated_at) return false;
+      const t = Date.parse(op.updated_at);
+      if (!Number.isFinite(t)) return false;
+      return now - t > paradaMs;
+    }).length;
 
     const alerta: CentroStatusSnapshot['alerta'] =
       bloqueadas.length > 0 ? 'danger' :
-      atrasadas > 0 ? 'warning' :
+      (atrasadas > 0 || paradas > 0) ? 'warning' :
       'ok';
 
     const capacidadeBase = centro.capacidade_unidade_hora || centro.capacidade_horas_dia || 10;
@@ -134,6 +146,7 @@ export async function getChaoDeFabricaOverview(): Promise<CentroStatusSnapshot[]
       fila,
       bloqueadas,
       atrasadas,
+      paradas,
       concluidasHoje: concluidas.length,
       alerta,
       utilizacao,

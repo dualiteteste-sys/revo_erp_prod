@@ -13,6 +13,7 @@ import Modal from '../../ui/Modal';
 import DecimalInput from '../../ui/forms/DecimalInput';
 import OperacaoQaModal from './OperacaoQaModal';
 import RegistrarInspecaoModal from './RegistrarInspecaoModal';
+import OperacaoDocsModal from './OperacaoDocsModal';
 
 interface Props {
     ordemId: string;
@@ -33,6 +34,7 @@ export default function OperacoesGrid({ ordemId }: Props) {
     const [inspectionTipo, setInspectionTipo] = useState<'IP' | 'IF' | null>(null);
     const [inspectionOp, setInspectionOp] = useState<OrdemOperacao | null>(null);
     const [qaRefreshToken, setQaRefreshToken] = useState(0);
+    const [docsOp, setDocsOp] = useState<OrdemOperacao | null>(null);
 
     const loadData = async () => {
         setLoading(true);
@@ -110,6 +112,10 @@ export default function OperacoesGrid({ ordemId }: Props) {
 
     const openQaModal = (op: OrdemOperacao) => {
         setQaOp(op);
+    };
+
+    const openDocsModal = (op: OrdemOperacao) => {
+        setDocsOp(op);
     };
 
     const renderQaBadge = (label: string, required?: boolean, status?: string | null) => {
@@ -206,6 +212,9 @@ export default function OperacoesGrid({ ordemId }: Props) {
                                         )}
                                         <Button size="xs" variant="ghost" className="text-blue-600" onClick={() => openQaModal(op)}>
                                             Configurar QA
+                                        </Button>
+                                        <Button size="xs" variant="ghost" className="text-blue-600" onClick={() => openDocsModal(op)}>
+                                            Instruções / Docs
                                         </Button>
                                     </td>
                                     <td className="px-3 py-2 whitespace-nowrap text-sm text-center space-x-2">
@@ -339,6 +348,14 @@ export default function OperacoesGrid({ ordemId }: Props) {
                         </div>
                     </div>
                 </Modal>
+            )}
+
+            {docsOp && (
+                <OperacaoDocsModal
+                    open={!!docsOp}
+                    operacaoId={docsOp.id}
+                    onClose={() => setDocsOp(null)}
+                />
             )}
         </div>
     );

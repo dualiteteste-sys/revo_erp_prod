@@ -10,14 +10,19 @@ export function useChaoDeFabricaRealtime(onPulse: () => void) {
   const { activeEmpresaId } = useAuth();
   const [connected, setConnected] = useState(false);
   const pulseTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const onPulseRef = useRef(onPulse);
+
+  useEffect(() => {
+    onPulseRef.current = onPulse;
+  }, [onPulse]);
 
   const schedulePulse = useCallback(() => {
     if (pulseTimeout.current) return;
     pulseTimeout.current = setTimeout(() => {
-      onPulse();
+      onPulseRef.current();
       pulseTimeout.current = null;
     }, 600);
-  }, [onPulse]);
+  }, []);
 
   useEffect(() => {
     if (!activeEmpresaId) {
