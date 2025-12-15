@@ -609,7 +609,38 @@ create policy "Enable all access" on public.industria_roteiros for all to public
 
 alter table public.industria_roteiros add column if not exists nome text;
 alter table public.industria_roteiros add column if not exists versao text;
-alter table public.industria_roteiros alter column versao set default '1.0'::text;
+-- Alguns bancos legados têm `versao` como integer; ajusta default de forma tolerante.
+do $$
+declare
+  v_typ regtype;
+begin
+  select a.atttypid::regtype
+    into v_typ
+    from pg_attribute a
+    join pg_class c on c.oid = a.attrelid
+    join pg_namespace n on n.oid = c.relnamespace
+   where n.nspname = 'public'
+     and c.relname = 'industria_roteiros'
+     and a.attname = 'versao'
+     and a.attnum > 0
+     and not a.attisdropped;
+
+  if v_typ::text in ('text','character varying') then
+    begin
+      execute 'alter table public.industria_roteiros alter column versao set default ''1.0''::text';
+    exception when others then
+      raise notice 'Não foi possível ajustar default de industria_roteiros.versao (text): %', SQLERRM;
+    end;
+  elsif v_typ::text = 'integer' then
+    begin
+      execute 'alter table public.industria_roteiros alter column versao set default 1';
+    exception when others then
+      raise notice 'Não foi possível ajustar default de industria_roteiros.versao (integer): %', SQLERRM;
+    end;
+  else
+    raise notice 'Tipo de industria_roteiros.versao inesperado (%); default não alterado.', v_typ::text;
+  end if;
+end $$;
 alter table public.industria_roteiros add column if not exists padrao boolean;
 alter table public.industria_roteiros alter column padrao set default false;
 alter table public.industria_roteiros add column if not exists ativo boolean;
