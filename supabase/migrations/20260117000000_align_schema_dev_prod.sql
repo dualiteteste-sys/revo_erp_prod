@@ -32,6 +32,11 @@ do $$ begin
   create type public.pessoa_tipo as enum ('cliente', 'fornecedor', 'ambos', 'transportadora', 'colaborador');
 exception when duplicate_object then null; end $$;
 
+-- Enum de embalagens (alguns ambientes antigos ficaram sem valores)
+do $$ begin
+  alter type public.tipo_embalagem add value if not exists 'pacote';
+exception when undefined_object then null; end $$;
+
 -- -------------------------------------------------------------------
 -- Tabelas/índices empresa_* (id, PK, defaults, unique)
 -- -------------------------------------------------------------------
@@ -197,6 +202,25 @@ from public.industria_roteiros_etapas;
 comment on view public.industria_roteiro_etapas
   is 'Compat layer: mirror of industria_roteiros_etapas para funções legadas (colunas canônicas).';
 
+-- Trigger de auditoria (alguns PROD antigos ficaram sem esse trigger em tabelas financeiras)
+do $$
+begin
+  if to_regclass('public.financeiro_contas_pagar') is not null
+     and to_regprocedure('public.process_audit_log()') is not null
+     and not exists (
+       select 1
+       from pg_trigger t
+       join pg_class c on c.oid = t.tgrelid
+       join pg_namespace n on n.oid = c.relnamespace
+       where n.nspname = 'public'
+         and c.relname = 'financeiro_contas_pagar'
+         and t.tgname = 'audit_logs_trigger'
+         and not t.tgisinternal
+     ) then
+    execute 'create trigger audit_logs_trigger after insert or update or delete on public.financeiro_contas_pagar for each row execute function public.process_audit_log()';
+  end if;
+end $$;
+
 -- -------------------------------------------------------------------
 -- Colunas/defaults mínimas para produção (alinha com DEV)
 -- -------------------------------------------------------------------
@@ -230,4 +254,3 @@ alter table public.pessoas alter column empresa_id set default current_empresa_i
 alter table public.pessoas alter column tipo set default 'cliente'::public.pessoa_tipo;
 
 commit;
-
