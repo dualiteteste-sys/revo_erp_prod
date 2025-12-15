@@ -114,9 +114,40 @@ jobs:
       - name: Compare expected vs PROD schema (public)
         run: |
           set -euo pipefail
-          if ! diff -u expected_public_schema.txt prod_public_schema.txt; then
+          # Queremos garantir que o PROD contém (no mínimo) tudo que o schema esperado (VERIFY) define.
+          # PROD pode ter objetos extras (legado/feature flags) sem quebrar o app; isso não deve bloquear deploy.
+          sort expected_public_schema.txt > expected_public_schema.sorted.txt
+          sort prod_public_schema.txt > prod_public_schema.sorted.txt
+
+          missing="$(comm -23 expected_public_schema.sorted.txt prod_public_schema.sorted.txt || true)"
+          if [[ -n "${missing}" ]]; then
             echo ""
-            echo "::error::PROD schema drift detectado vs schema esperado (VERIFY)."
-            echo "Resolva o drift antes de considerar o deploy estável (evita erros de RPC/colunas em produção)."
+            echo "::error::PROD está faltando definições presentes no schema esperado (VERIFY)."
+            echo "Isso normalmente causa erros de RPC/colunas em produção."
+            echo ""
+            echo "$missing" | head -n 200
+            echo ""
+            echo "(mostrando até 200 linhas; veja os artifacts para o snapshot completo)"
             exit 1
           fi
+
+          extra="$(comm -13 expected_public_schema.sorted.txt prod_public_schema.sorted.txt || true)"
+          if [[ -n "${extra}" ]]; then
+            echo ""
+            echo "::warning::PROD possui objetos extras vs schema esperado (VERIFY)."
+            echo "Isso não bloqueia o deploy, mas indica drift/legado; ideal alinhar quando possível."
+            echo ""
+            echo "$extra" | head -n 50
+          fi
+
+      - name: Upload schema snapshots (debug)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: public_schema_snapshots
+          path: |
+            expected_public_schema.txt
+            prod_public_schema.txt
+            expected_public_schema.sorted.txt
+            prod_public_schema.sorted.txt
+          retention-days: 7
