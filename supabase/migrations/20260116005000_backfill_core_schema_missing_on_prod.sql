@@ -252,9 +252,9 @@ begin
      and not a.attisdropped;
 
   if v_typ::text = 'public.tipo_produto' then
-    execute $$alter table public.produtos alter column tipo set default 'produto'::public.tipo_produto$$;
+    execute 'alter table public.produtos alter column tipo set default ''produto''::public.tipo_produto';
   else
-    execute $$alter table public.produtos alter column tipo set default 'produto'::text$$;
+    execute 'alter table public.produtos alter column tipo set default ''produto''::text';
   end if;
 end $$;
 alter table public.produtos add column if not exists ativo boolean;
