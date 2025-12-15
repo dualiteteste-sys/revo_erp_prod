@@ -234,7 +234,29 @@ alter table public.produtos alter column preco_custo set default 0;
 alter table public.produtos add column if not exists preco_venda numeric(15,4);
 alter table public.produtos alter column preco_venda set default 0;
 alter table public.produtos add column if not exists tipo text;
-alter table public.produtos alter column tipo set default 'produto'::text;
+-- Em alguns bancos antigos, `produtos.tipo` pode ser enum `public.tipo_produto` (não text).
+-- Ajusta o default de forma compatível com o tipo atual da coluna.
+do $$
+declare
+  v_typ regtype;
+begin
+  select a.atttypid::regtype
+    into v_typ
+    from pg_attribute a
+    join pg_class c on c.oid = a.attrelid
+    join pg_namespace n on n.oid = c.relnamespace
+   where n.nspname = 'public'
+     and c.relname = 'produtos'
+     and a.attname = 'tipo'
+     and a.attnum > 0
+     and not a.attisdropped;
+
+  if v_typ::text = 'public.tipo_produto' then
+    execute 'alter table public.produtos alter column tipo set default ''produto''::public.tipo_produto';
+  else
+    execute 'alter table public.produtos alter column tipo set default ''produto''::text';
+  end if;
+end $$;
 alter table public.produtos add column if not exists ativo boolean;
 alter table public.produtos alter column ativo set default true;
 alter table public.produtos add column if not exists controlar_estoque boolean;
