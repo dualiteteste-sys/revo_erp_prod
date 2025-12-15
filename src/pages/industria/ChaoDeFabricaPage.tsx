@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { listMinhaFila, OperacaoFila, apontarExecucao, getChaoDeFabricaOverview, CentroStatusSnapshot } from '@/services/industriaExecucao';
 import { listCentrosTrabalho, CentroTrabalho } from '@/services/industriaCentros';
+import { replanejarOperacao } from '@/services/industria';
 import { Loader2, Play, Pause, CheckCircle, AlertTriangle, User, Monitor, RefreshCw, Activity, Package } from 'lucide-react';
 import { useToast } from '@/contexts/ToastProvider';
 import GlassCard from '@/components/ui/GlassCard';
@@ -13,6 +14,7 @@ import { ptBR } from 'date-fns/locale';
 import AndonGrid from '@/components/industria/chao/AndonGrid';
 import { useChaoDeFabricaRealtime } from '@/hooks/useChaoDeFabricaRealtime';
 import { useMemo } from 'react';
+import { createOperacaoDocSignedUrl, listOperacaoDocs, OperacaoDoc } from '@/services/industriaOperacaoDocs';
 
 export default function ChaoDeFabricaPage() {
   const { addToast } = useToast();
@@ -25,6 +27,7 @@ export default function ChaoDeFabricaPage() {
   const [overviewLoading, setOverviewLoading] = useState(true);
   const [lastRealtimePulse, setLastRealtimePulse] = useState<Date | null>(null);
   const lastAlertRef = useRef<Map<string, number>>(new Map());
+  const skipNextPulseForReplan = useRef(false);
 
   const [centros, setCentros] = useState<CentroTrabalho[]>([]);
   const [selectedCentroId, setSelectedCentroId] = useState<string>('');
@@ -40,6 +43,11 @@ export default function ChaoDeFabricaPage() {
   const [motivoRefugo, setMotivoRefugo] = useState('');
   const [observacoes, setObservacoes] = useState('');
   const [isSaving, setIsSaving] = useState(false);
+  const [replanCentroId, setReplanCentroId] = useState<string>('');
+  const [replanLoading, setReplanLoading] = useState(false);
+  const [replanDirty, setReplanDirty] = useState(false);
+  const [docs, setDocs] = useState<OperacaoDoc[]>([]);
+  const [docsLoading, setDocsLoading] = useState(false);
 
   const ALERT_COOLDOWN_MS = 3 * 60 * 1000;
 
@@ -68,7 +76,7 @@ export default function ChaoDeFabricaPage() {
   const processAlerts = useCallback((data: CentroStatusSnapshot[]) => {
     const now = Date.now();
     data.forEach((snap) => {
-      const hasRisk = snap.bloqueadas.length > 0 || snap.atrasadas > 0;
+      const hasRisk = snap.bloqueadas.length > 0 || snap.atrasadas > 0 || (snap.paradas || 0) > 0;
       if (!hasRisk) return;
       const last = lastAlertRef.current.get(snap.centro.id) || 0;
       if (now - last < ALERT_COOLDOWN_MS) return;
@@ -76,6 +84,7 @@ export default function ChaoDeFabricaPage() {
       const motivos: string[] = [];
       if (snap.bloqueadas.length > 0) motivos.push(`${snap.bloqueadas.length} bloqueada(s)`);
       if (snap.atrasadas > 0) motivos.push(`${snap.atrasadas} atrasada(s)`);
+      if ((snap.paradas || 0) > 0) motivos.push(`${snap.paradas} parada(s)`);
 
       addToast(`Alerta em ${snap.centro.nome}: ${motivos.join(' • ')}`, 'warning');
       lastAlertRef.current.set(snap.centro.id, now);
@@ -104,29 +113,69 @@ export default function ChaoDeFabricaPage() {
     fetchOverview();
   }, [fetchOverview]);
 
+  const isFetchingFila = useRef(false);
+  const selectedOpRef = useRef<OperacaoFila | null>(null);
+  useEffect(() => {
+    selectedOpRef.current = selectedOp;
+  }, [selectedOp]);
+
   const fetchFila = useCallback(async (withLoader = true) => {
     if (!selectedCentroId) return;
+    if (isFetchingFila.current) return;
+    isFetchingFila.current = true;
     if (withLoader) setLoading(true);
     try {
       const data = await listMinhaFila(selectedCentroId);
       setFila(data);
-      // Se a operação selecionada ainda estiver na fila, atualiza seus dados
-      if (selectedOp) {
-        const updated = data.find(op => op.id === selectedOp.id);
-        setSelectedOp(updated || null);
+      const currentSelectedId = selectedOpRef.current?.id || null;
+      if (currentSelectedId) {
+        const updated = data.find(op => op.id === currentSelectedId);
+        if (updated) {
+          setSelectedOp(updated);
+        } else {
+          setSelectedOp(data[0] || null);
+        }
+      } else {
+        setSelectedOp(data[0] || null);
       }
     } catch (e) {
       console.error(e);
     } finally {
+      isFetchingFila.current = false;
       if (withLoader) setLoading(false);
     }
-  }, [selectedCentroId, selectedOp]);
+  }, [selectedCentroId]);
 
   useEffect(() => {
-    fetchFila();
-    // Reset selection when changing center
     setSelectedOp(null);
+    setReplanCentroId('');
+    setReplanDirty(false);
+    fetchFila();
   }, [selectedCentroId, fetchFila]);
+
+  useEffect(() => {
+    // Ao trocar a operação selecionada, reinicia o replanejamento para o centro atual
+    setReplanCentroId(selectedOp?.centro_trabalho_id || '');
+    setReplanDirty(false);
+  }, [selectedOp?.id]);
+
+  useEffect(() => {
+    if (!selectedOp?.id) {
+      setDocs([]);
+      return;
+    }
+    (async () => {
+      setDocsLoading(true);
+      try {
+        const latest = await listOperacaoDocs(selectedOp.id, true);
+        setDocs(latest);
+      } catch {
+        setDocs([]);
+      } finally {
+        setDocsLoading(false);
+      }
+    })();
+  }, [selectedOp?.id]);
 
   useEffect(() => {
     if (mode === 'overview' || mode === 'andon') {
@@ -148,6 +197,10 @@ export default function ChaoDeFabricaPage() {
   }, [autoRefresh, fetchOverview, fetchFila]);
 
   const handleRealtimePulse = useCallback(() => {
+    if (skipNextPulseForReplan.current) {
+      skipNextPulseForReplan.current = false;
+      return;
+    }
     fetchOverview(false);
     fetchFila(false);
     setLastRealtimePulse(new Date());
@@ -196,6 +249,24 @@ export default function ChaoDeFabricaPage() {
         addToast(e.message, 'error');
     } finally {
         setIsSaving(false);
+    }
+  };
+
+  const handleReplan = async () => {
+    if (!selectedOp || !replanCentroId || selectedOp.centro_trabalho_id === replanCentroId) return;
+    setReplanLoading(true);
+    try {
+      await replanejarOperacao(selectedOp.id, replanCentroId);
+      addToast('Operação movida para o novo centro.', 'success');
+      skipNextPulseForReplan.current = true; // evita sobrescrever seleção logo após replanejar
+      setReplanDirty(false);
+      // Muda a visão para o centro de destino para o usuário "seguir" a operação
+      setSelectedCentroId(replanCentroId);
+      fetchOverview(false);
+    } catch (e: any) {
+      addToast(e.message || 'Falha ao replanejar.', 'error');
+    } finally {
+      setReplanLoading(false);
     }
   };
 
@@ -258,16 +329,18 @@ export default function ChaoDeFabricaPage() {
           <span className={`text-2xl font-bold ${kpis.bloqueadas > 0 ? 'text-amber-600' : ''}`}>{kpis.bloqueadas}</span>
         </GlassCard>
         <GlassCard className="p-3 flex flex-col gap-1">
+          <span className="text-xs text-gray-500">Paradas</span>
+          <span className={`text-2xl font-bold ${overview.reduce((s,c)=>s+(c.paradas||0),0) > 0 ? 'text-amber-600' : ''}`}>
+            {overview.reduce((s,c)=>s+(c.paradas||0),0)}
+          </span>
+        </GlassCard>
+        <GlassCard className="p-3 flex flex-col gap-1">
           <span className="text-xs text-gray-500">Atrasadas</span>
           <span className={`text-2xl font-bold ${kpis.atrasadas > 0 ? 'text-rose-600' : ''}`}>{kpis.atrasadas}</span>
         </GlassCard>
         <GlassCard className="p-3 flex flex-col gap-1">
           <span className="text-xs text-gray-500">Concluídas hoje</span>
           <span className="text-2xl font-bold">{kpis.concluidasHoje}</span>
-        </GlassCard>
-        <GlassCard className="p-3 flex flex-col gap-1">
-          <span className="text-xs text-gray-500">Utilização média</span>
-          <span className="text-2xl font-bold">{kpis.utilizacaoMedia}%</span>
         </GlassCard>
       </div>
 
@@ -398,16 +471,45 @@ export default function ChaoDeFabricaPage() {
               {/* Detalhe da Operação (Direita) */}
               <div className="w-2/3">
                   {selectedOp ? (
-                      <GlassCard className="h-full flex flex-col p-6">
+                      <GlassCard className="h-full flex flex-col p-8 gap-6">
                           <div className="border-b border-gray-200 pb-4 mb-6">
-                              <div className="flex justify-between items-start">
+                              <div className="flex justify-between items-start gap-4 flex-wrap">
                                   <div>
                                       <h2 className="text-2xl font-bold text-gray-800 mb-1">Ordem {formatOrderNumber(selectedOp.ordem_numero)}</h2>
                                       <p className="text-lg text-gray-600">{selectedOp.produto_nome}</p>
+                                      <p className="text-xs text-gray-500">
+                                        Centro atual: {centros.find(c => c.id === selectedOp.centro_trabalho_id)?.nome || '—'}
+                                      </p>
                                   </div>
-                                  <div className="text-right">
-                                      <p className="text-sm text-gray-500">Prioridade</p>
-                                      <p className="text-xl font-bold text-blue-600">{selectedOp.prioridade}</p>
+                                  <div className="flex flex-col items-end gap-2">
+                                      <div className="text-right">
+                                          <p className="text-sm text-gray-500">Prioridade</p>
+                                          <p className="text-xl font-bold text-blue-600">{selectedOp.prioridade}</p>
+                                      </div>
+                                      <div className="flex items-center gap-2">
+                                          <select
+                                              value={replanCentroId}
+                                              onChange={(e) => {
+                                                setReplanCentroId(e.target.value);
+                                                setReplanDirty(true);
+                                              }}
+                                              className="bg-gray-100 border border-gray-300 rounded-lg px-3 py-2 text-sm"
+                                          >
+                                              <option value={selectedOp.centro_trabalho_id}>Manter centro</option>
+                                              {centros
+                                                .filter(c => c.id !== selectedOp.centro_trabalho_id)
+                                                .map(c => (
+                                                  <option key={c.id} value={c.id}>{c.nome}</option>
+                                                ))}
+                                          </select>
+                                          <button
+                                              onClick={handleReplan}
+                                              disabled={replanLoading || !replanCentroId || replanCentroId === selectedOp.centro_trabalho_id}
+                                              className="px-3 py-2 rounded-lg border border-blue-400 text-blue-600 hover:bg-blue-50 disabled:opacity-50 text-sm font-semibold"
+                                          >
+                                              {replanLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Mover'}
+                                          </button>
+                                      </div>
                                   </div>
                               </div>
                               {selectedOp.cliente_nome && (
@@ -417,37 +519,64 @@ export default function ChaoDeFabricaPage() {
                               )}
                           </div>
 
-                          <div className="grid grid-cols-3 gap-4 mb-8">
-                              <div className="bg-gray-50 p-4 rounded-lg text-center border border-gray-200">
+                          <div className="grid grid-cols-3 gap-4">
+                              <div className="bg-gray-50 p-5 rounded-2xl text-center border border-gray-200">
                                   <p className="text-xs text-gray-500 uppercase font-bold">Planejado</p>
                                   <p className="text-2xl font-bold text-gray-800">{selectedOp.quantidade_planejada}</p>
                               </div>
-                              <div className="bg-green-50 p-4 rounded-lg text-center border border-green-200">
+                              <div className="bg-green-50 p-5 rounded-2xl text-center border border-green-200">
                                   <p className="text-xs text-green-600 uppercase font-bold">Produzido</p>
                                   <p className="text-2xl font-bold text-green-700">{selectedOp.quantidade_produzida}</p>
                               </div>
-                              <div className="bg-red-50 p-4 rounded-lg text-center border border-red-200">
+                              <div className="bg-red-50 p-5 rounded-2xl text-center border border-red-200">
                                   <p className="text-xs text-red-600 uppercase font-bold">Refugo</p>
                                   <p className="text-2xl font-bold text-red-700">{selectedOp.quantidade_refugada}</p>
                               </div>
                           </div>
 
-                          <div className="flex-grow bg-yellow-50 rounded-lg p-4 border border-yellow-100 mb-6">
-                              <h4 className="font-bold text-yellow-800 mb-2 flex items-center gap-2">
+                          <div className="flex-grow bg-yellow-50 rounded-2xl p-5 border border-yellow-100 space-y-3">
+                              <h4 className="font-bold text-yellow-800 flex items-center gap-2">
                                   <AlertTriangle size={18} /> Instruções de Trabalho
                               </h4>
-                              <p className="text-sm text-yellow-900">
-                                  Verifique as especificações da ficha técnica antes de iniciar. 
-                                  Utilize os EPIs obrigatórios.
-                                  (Placeholder para instruções reais do roteiro)
-                              </p>
+                              {docsLoading ? (
+                                <div className="text-sm text-yellow-900 flex items-center gap-2">
+                                  <Loader2 className="w-4 h-4 animate-spin" /> Carregando documentos...
+                                </div>
+                              ) : docs.length === 0 ? (
+                                <p className="text-sm text-yellow-900">
+                                  Nenhum documento anexado para esta operação.
+                                </p>
+                              ) : (
+                                <div className="space-y-2">
+                                  {docs.map((d) => (
+                                    <button
+                                      key={d.id}
+                                      onClick={async () => {
+                                        try {
+                                          const url = await createOperacaoDocSignedUrl(d.arquivo_path);
+                                          window.open(url, '_blank', 'noopener,noreferrer');
+                                        } catch (e: any) {
+                                          addToast(e.message || 'Falha ao abrir documento.', 'error');
+                                        }
+                                      }}
+                                      className="w-full text-left bg-white/70 hover:bg-white border border-yellow-200 rounded-xl px-4 py-3 transition flex items-center justify-between gap-3"
+                                    >
+                                      <div>
+                                        <div className="font-semibold text-yellow-900">{d.titulo} <span className="text-xs text-yellow-700">v{d.versao}</span></div>
+                                        {d.descricao && <div className="text-xs text-yellow-700">{d.descricao}</div>}
+                                      </div>
+                                      <span className="text-xs font-semibold text-yellow-800">Abrir</span>
+                                    </button>
+                                  ))}
+                                </div>
+                              )}
                           </div>
 
                           <div className="grid grid-cols-3 gap-4 mt-auto">
                               <button
                                   onClick={handleStart}
                                   disabled={selectedOp.status === 'em_execucao' || selectedOp.status === 'concluida'}
-                                  className="flex flex-col items-center justify-center gap-2 bg-blue-600 text-white p-4 rounded-xl hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                                  className="flex flex-col items-center justify-center gap-2 bg-blue-600 text-white p-5 rounded-2xl hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed shadow-sm"
                               >
                                   <Play size={32} />
                                   <span className="font-bold">INICIAR</span>
@@ -455,7 +584,7 @@ export default function ChaoDeFabricaPage() {
                               <button
                                   onClick={() => openModal('pausar')}
                                   disabled={selectedOp.status !== 'em_execucao'}
-                                  className="flex flex-col items-center justify-center gap-2 bg-orange-500 text-white p-4 rounded-xl hover:bg-orange-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                                  className="flex flex-col items-center justify-center gap-2 bg-orange-500 text-white p-5 rounded-2xl hover:bg-orange-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed shadow-sm"
                               >
                                   <Pause size={32} />
                                   <span className="font-bold">PAUSAR</span>
@@ -463,7 +592,7 @@ export default function ChaoDeFabricaPage() {
                               <button
                                   onClick={() => openModal('concluir')}
                                   disabled={selectedOp.status === 'concluida'}
-                                  className="flex flex-col items-center justify-center gap-2 bg-green-600 text-white p-4 rounded-xl hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                                  className="flex flex-col items-center justify-center gap-2 bg-green-600 text-white p-5 rounded-2xl hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed shadow-sm"
                               >
                                   <CheckCircle size={32} />
                                   <span className="font-bold">CONCLUIR</span>

@@ -20,6 +20,7 @@ import Input from '@/components/ui/forms/Input';
 import TextArea from '@/components/ui/forms/TextArea';
 import { formatOrderNumber } from '@/lib/utils';
 import QuickScanDialog from '@/components/industria/chao/QuickScanDialog';
+import { createOperacaoDocSignedUrl, listOperacaoDocs, OperacaoDoc } from '@/services/industriaOperacaoDocs';
 
 const REFRESH_INTERVAL = 10000;
 const STORAGE_LAST_OPERATORS = 'industria:lastOperators';
@@ -92,6 +93,8 @@ const OperadorPage: React.FC = () => {
   const [motivoRefugo, setMotivoRefugo] = useState('');
   const [observacoes, setObservacoes] = useState('');
   const [isSaving, setIsSaving] = useState(false);
+  const [docs, setDocs] = useState<OperacaoDoc[]>([]);
+  const [docsLoading, setDocsLoading] = useState(false);
 
   useEffect(() => {
     listCentrosTrabalho(undefined, true)
@@ -139,6 +142,24 @@ const OperadorPage: React.FC = () => {
       ) || fila[0] || null
     );
   }, [fila, highlightCode]);
+
+  useEffect(() => {
+    if (!currentOp?.id) {
+      setDocs([]);
+      return;
+    }
+    (async () => {
+      setDocsLoading(true);
+      try {
+        const latest = await listOperacaoDocs(currentOp.id, true);
+        setDocs(latest);
+      } catch {
+        setDocs([]);
+      } finally {
+        setDocsLoading(false);
+      }
+    })();
+  }, [currentOp?.id]);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -601,6 +622,40 @@ const OperadorPage: React.FC = () => {
             </div>
           </section>
         )}
+
+        <section className="bg-slate-900 border border-slate-800 rounded-3xl p-4">
+          <h3 className="text-sm uppercase text-slate-400 mb-3">Instruções de trabalho</h3>
+          {docsLoading ? (
+            <div className="text-slate-400 text-sm flex items-center gap-2">
+              <Loader2 className="w-4 h-4 animate-spin" /> Carregando documentos...
+            </div>
+          ) : docs.length === 0 ? (
+            <div className="text-slate-400 text-sm">Nenhum documento anexado para esta operação.</div>
+          ) : (
+            <div className="space-y-2">
+              {docs.map((d) => (
+                <button
+                  key={d.id}
+                  onClick={async () => {
+                    try {
+                      const url = await createOperacaoDocSignedUrl(d.arquivo_path);
+                      window.open(url, '_blank', 'noopener,noreferrer');
+                    } catch (e: any) {
+                      addToast(e.message || 'Falha ao abrir documento.', 'error');
+                    }
+                  }}
+                  className="w-full text-left bg-slate-800/60 hover:bg-slate-800 border border-slate-700 rounded-2xl px-4 py-3 flex items-center justify-between gap-3"
+                >
+                  <div>
+                    <div className="font-semibold">{d.titulo} <span className="text-xs text-slate-400">v{d.versao}</span></div>
+                    {d.descricao && <div className="text-xs text-slate-400">{d.descricao}</div>}
+                  </div>
+                  <span className="text-xs text-slate-300">Abrir</span>
+                </button>
+              ))}
+            </div>
+          )}
+        </section>
 
         <section>
           <h3 className="text-sm uppercase text-slate-500 mb-2">Próximas operações</h3>

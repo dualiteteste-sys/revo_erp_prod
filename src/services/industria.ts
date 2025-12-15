@@ -41,3 +41,19 @@ export type OrdemEntrega = {
   observacoes?: string;
   created_at: string;
 };
+
+export async function updateOrdemStatus(id: string, status: StatusOrdem, prioridade?: number) {
+  await callRpc('industria_operacao_update_status', {
+    p_id: id,
+    p_status: status,
+    p_prioridade: prioridade ?? null,
+  });
+}
+
+export async function replanejarOperacao(operacaoId: string, centroTrabalhoId: string, prioridade?: number) {
+  await callRpc('industria_operacao_replanejar', {
+    p_operacao_id: operacaoId,
+    p_novo_centro: centroTrabalhoId,
+    p_nova_prioridade: prioridade ?? null,
+  });
+}

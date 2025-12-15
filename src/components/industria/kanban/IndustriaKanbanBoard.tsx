@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { DragDropContext, DropResult } from '@hello-pangea/dnd';
-import { listOrdens, updateOrdemStatus, OrdemIndustria, StatusOrdem } from '@/services/industria';
+import { listOrdens, updateOrdemStatus, OrdemIndustria, StatusOrdem, replanejarOperacao } from '@/services/industria';
 import { useToast } from '@/contexts/ToastProvider';
 import { Loader2 } from 'lucide-react';
 import IndustriaKanbanColumn from './IndustriaKanbanColumn';

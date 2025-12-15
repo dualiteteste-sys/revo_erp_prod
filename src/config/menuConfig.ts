@@ -6,7 +6,7 @@ import {
   Bot, Undo2, ClipboardCheck, Banknote, Wallet, TrendingUp,
   TrendingDown, Landmark, FileSpreadsheet, LogOut, Search, Building, Code, Database, Target,
   Briefcase, BookOpen, Grid, GraduationCap, PieChart, Factory, Hammer, Layers, FileCog, Route, PlayCircle, HardHat, FileCode, MonitorUp,
-  PackageCheck, FileUp, FolderTree, Ruler, BarChart3, Shield, ShieldCheck
+  PackageCheck, FileUp, FolderTree, Ruler, BarChart3, Shield, ShieldCheck, Bot
 } from 'lucide-react';
 
 export interface MenuItem {
@@ -64,6 +64,7 @@ export const menuConfig: { name: string; icon: React.ElementType; href: string; 
       { name: 'Motivos de Qualidade', icon: ClipboardCheck, href: '/app/industria/qualidade/motivos' },
       { name: 'Planos de Inspeção', icon: ClipboardList, href: '/app/industria/qualidade/planos' },
       { name: 'Operadores', icon: ShieldCheck, href: '/app/industria/operadores' },
+      { name: 'Automação', icon: Bot, href: '/app/industria/automacao' },
       { name: 'Lotes & Bloqueios', icon: Shield, href: '/app/industria/qualidade/lotes' },
     ]
   },
