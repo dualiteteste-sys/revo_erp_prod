@@ -53,22 +53,16 @@ jobs:
           echo "y" | supabase db push --db-url "$SUPABASE_DB_URL_VERIFY"
           echo "[VERIFY] All migrations applied successfully."
 
-      - name: Dump expected schema (public) from VERIFY
+      - name: Snapshot expected schema (public) from VERIFY
         run: |
           set -euo pipefail
-          pg_dump "$SUPABASE_DB_URL_VERIFY" \
-            --schema=public \
-            --schema-only \
-            --no-owner \
-            --no-privileges \
-            --no-comments \
-            --file expected_public_schema.sql
+          psql "$SUPABASE_DB_URL_VERIFY" -v ON_ERROR_STOP=1 -X -qAt -f scripts/public_schema_snapshot.sql > expected_public_schema.txt
 
       - name: Upload expected schema artifact
         uses: actions/upload-artifact@v4
         with:
           name: expected_public_schema
-          path: expected_public_schema.sql
+          path: expected_public_schema.txt
           retention-days: 3
 
   deploy-prod:
@@ -86,7 +80,7 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Install PostgreSQL client (pg_dump)
+      - name: Install PostgreSQL client (psql)
         run: |
           set -euo pipefail
           sudo apt-get update
@@ -112,35 +106,15 @@ jobs:
           name: expected_public_schema
           path: .
 
-      - name: Dump current schema (public) from PROD
+      - name: Snapshot current schema (public) from PROD
         run: |
           set -euo pipefail
-          pg_dump "$SUPABASE_DB_URL_PROD" \
-            --schema=public \
-            --schema-only \
-            --no-owner \
-            --no-privileges \
-            --no-comments \
-            --file prod_public_schema.sql
+          psql "$SUPABASE_DB_URL_PROD" -v ON_ERROR_STOP=1 -X -qAt -f scripts/public_schema_snapshot.sql > prod_public_schema.txt
 
       - name: Compare expected vs PROD schema (public)
         run: |
           set -euo pipefail
-          # Normaliza ruído típico do pg_dump (SETs e cabeçalhos variam)
-          normalize() {
-            sed \
-              -e '/^-- Dumped from database version/d' \
-              -e '/^-- Dumped by pg_dump version/d' \
-              -e '/^SET /d' \
-              -e '/^SELECT pg_catalog\\.set_config/d' \
-              -e '/^\\\\connect /d' \
-              "$1"
-          }
-
-          normalize expected_public_schema.sql > expected_public_schema.normalized.sql
-          normalize prod_public_schema.sql > prod_public_schema.normalized.sql
-
-          if ! diff -u expected_public_schema.normalized.sql prod_public_schema.normalized.sql; then
+          if ! diff -u expected_public_schema.txt prod_public_schema.txt; then
             echo ""
             echo "::error::PROD schema drift detectado vs schema esperado (VERIFY)."
             echo "Resolva o drift antes de considerar o deploy estável (evita erros de RPC/colunas em produção)."

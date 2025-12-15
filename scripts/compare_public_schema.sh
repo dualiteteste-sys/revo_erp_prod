@@ -18,23 +18,11 @@ trap cleanup EXIT
 dump_one() {
   local db_url="$1"
   local out="$2"
-  pg_dump "$db_url" \
-    --schema=public \
-    --schema-only \
-    --no-owner \
-    --no-privileges \
-    --no-comments \
-    --file "$out"
+  psql "$db_url" -v ON_ERROR_STOP=1 -X -qAt -f scripts/public_schema_snapshot.sql > "$out"
 }
 
 normalize() {
-  sed \
-    -e '/^-- Dumped from database version/d' \
-    -e '/^-- Dumped by pg_dump version/d' \
-    -e '/^SET /d' \
-    -e '/^SELECT pg_catalog\\.set_config/d' \
-    -e '/^\\\\connect /d' \
-    "$1"
+  cat "$1"
 }
 
 dump_one "$DB_A" "$tmp_dir/a.sql"
@@ -44,4 +32,3 @@ normalize "$tmp_dir/a.sql" > "$tmp_dir/a.norm.sql"
 normalize "$tmp_dir/b.sql" > "$tmp_dir/b.norm.sql"
 
 diff -u "$tmp_dir/a.norm.sql" "$tmp_dir/b.norm.sql"
-
