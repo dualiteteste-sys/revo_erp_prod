@@ -20,13 +20,16 @@ import {
   pcpApsResequenciarCentro,
   pcpApsSequenciarTodosCts,
   pcpReplanejarCentroSobrecarga,
+  pcpReplanCentroSobrecargaPreview,
   setOperacaoApsLock,
   PcpAtpCtp,
+  PcpApsBatchSequencingRow,
   PcpCargaCapacidade,
   PcpGanttOperacao,
   PcpKpis,
   PcpOrdemLeadTime,
-  PcpParetoItem
+  PcpParetoItem,
+  PcpReplanPreviewRow
 } from '@/services/industriaProducao';
 import { getCentroApsConfig } from '@/services/industriaCentros';
 import { differenceInCalendarDays, format } from 'date-fns';
@@ -90,6 +93,7 @@ export default function PcpDashboardPage() {
   const [endDate, setEndDate] = useState(fmtInput(new Date(Date.now() + 7 * 24 * 3600 * 1000)));
   const [ganttCtFilter, setGanttCtFilter] = useState<string>('all');
   const [ganttStatusFilter, setGanttStatusFilter] = useState<string>('all');
+  const [ganttApsFilter, setGanttApsFilter] = useState<string>('all');
   const [applyingCtId, setApplyingCtId] = useState<string | null>(null);
   const [sequencingCtId, setSequencingCtId] = useState<string | null>(null);
 
@@ -114,10 +118,70 @@ export default function PcpDashboardPage() {
   const [manualSeqDirty, setManualSeqDirty] = useState(false);
   const [manualSeqSaving, setManualSeqSaving] = useState(false);
   const [batchSequencing, setBatchSequencing] = useState(false);
+  const [batchModalOpen, setBatchModalOpen] = useState(false);
+  const [batchRows, setBatchRows] = useState<PcpApsBatchSequencingRow[]>([]);
+  const [batchPreviewed, setBatchPreviewed] = useState(false);
+  const [replanModalOpen, setReplanModalOpen] = useState(false);
+  const [replanApplying, setReplanApplying] = useState(false);
+  const [replanResults, setReplanResults] = useState<Record<string, any>>({});
+  const [replanPreview, setReplanPreview] = useState<Record<string, {
+    rows: PcpReplanPreviewRow[];
+    summary: {
+      total: number;
+      canMove: number;
+      locked: number;
+      noSlot: number;
+      zeroHours: number;
+      noOverload: number;
+      freezeUntil?: string;
+    };
+  }>>({});
+  const [replanPreviewingCtId, setReplanPreviewingCtId] = useState<string | null>(null);
+  const [replanPreviewDetails, setReplanPreviewDetails] = useState<{
+    open: boolean;
+    ctId?: string;
+    ctNome?: string;
+    peakDay?: string;
+  }>({ open: false });
+  const [replanPreviewReasonFilter, setReplanPreviewReasonFilter] = useState<string>('all');
+
+  const loadData = useCallback(async () => {
+    setLoading(true);
+    try {
+      const [cargaData, ganttData, kpisData, atpData, paretoData, leadTimeData] = await Promise.all([
+        listPcpCargaCapacidade(startDate, endDate),
+        listPcpGantt(startDate, endDate),
+        listPcpKpis(30),
+        listPcpAtpCtp(endDate),
+        listPcpParetoRefugos(startDate, endDate),
+        listPcpOrdensLeadTime(startDate, endDate)
+      ]);
+      setCarga(cargaData);
+      setGantt(ganttData);
+      setKpis(kpisData);
+      setAtpCtp(atpData);
+      setPareto(paretoData);
+      setLeadTimes(leadTimeData);
+      setSelectedProdutoId(prev => {
+        if (prev && atpData.some(item => item.produto_id === prev)) {
+          return prev;
+        }
+        return atpData[0]?.produto_id || null;
+      });
+      if (atpData.length === 0) {
+        setEstoqueProjetado([]);
+      }
+    } catch (error: any) {
+      addToast(error.message || 'Não foi possível carregar PCP.', 'error');
+    } finally {
+      setLoading(false);
+    }
+  }, [addToast, endDate, startDate]);
 
   const openGanttForCt = useCallback((ctId: string) => {
     setGanttCtFilter(ctId);
     setGanttStatusFilter('all');
+    setGanttApsFilter('all');
     setTimeout(() => ganttSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 50);
   }, []);
 
@@ -218,25 +282,64 @@ export default function PcpDashboardPage() {
     }
   }, [addToast, apsModal.ctId, loadApsRuns, loadData, manualSeqRows]);
 
-  const handleBatchSequencing = useCallback(async () => {
-    if (!confirm('Sequenciar TODOS os Centros de Trabalho no período? Isso vai aplicar o APS para cada CT e gerar runs (com undo).')) return;
+  const runBatchSequencing = useCallback(async (apply: boolean) => {
     setBatchSequencing(true);
     try {
-      const rows = await pcpApsSequenciarTodosCts({ dataInicial: startDate, dataFinal: endDate, apply: true });
-      const total = (rows || []).reduce((acc, r) => acc + (r.total_operacoes || 0), 0);
-      const updated = (rows || []).reduce((acc, r) => acc + (r.updated_operacoes || 0), 0);
-      const unscheduled = (rows || []).reduce((acc, r) => acc + (r.unscheduled_operacoes || 0), 0);
-      addToast(
-        `APS em lote concluído: ${updated}/${total} operações atualizadas.${unscheduled > 0 ? ` ${unscheduled} sem agenda.` : ''}`,
-        unscheduled > 0 ? 'warning' : 'success'
-      );
-      await loadData();
+      const rows = await pcpApsSequenciarTodosCts({ dataInicial: startDate, dataFinal: endDate, apply });
+      setBatchRows(rows || []);
+      setBatchPreviewed(true);
+      if (apply) {
+        const total = (rows || []).reduce((acc, r) => acc + (r.total_operacoes || 0), 0);
+        const updated = (rows || []).reduce((acc, r) => acc + (r.updated_operacoes || 0), 0);
+        const unscheduled = (rows || []).reduce((acc, r) => acc + (r.unscheduled_operacoes || 0), 0);
+        addToast(
+          `APS em lote concluído: ${updated}/${total} operações atualizadas.${unscheduled > 0 ? ` ${unscheduled} sem agenda.` : ''}`,
+          unscheduled > 0 ? 'warning' : 'success'
+        );
+        await loadData();
+      } else {
+        addToast('Preview em lote gerado (nenhuma alteração aplicada).', 'success');
+      }
     } catch (e: any) {
-      addToast(e?.message || 'Falha ao sequenciar todos os CTs.', 'error');
+      addToast(e?.message || 'Falha no APS em lote.', 'error');
     } finally {
       setBatchSequencing(false);
     }
-  }, [addToast, endDate, startDate]);
+  }, [addToast, endDate, loadData, startDate]);
+
+  const openBatchModal = useCallback(() => {
+    setBatchModalOpen(true);
+    setBatchRows([]);
+    setBatchPreviewed(false);
+  }, []);
+
+  const openReplanModal = useCallback(() => {
+    setReplanModalOpen(true);
+    setReplanResults({});
+    setReplanPreview({});
+    setReplanPreviewingCtId(null);
+    setReplanPreviewDetails({ open: false });
+    setReplanPreviewReasonFilter('all');
+  }, []);
+
+  const openApsForCt = useCallback((ctId: string, ctNome?: string) => {
+    setBatchModalOpen(false);
+    setApsModal({ open: true, ctId, ctNome });
+  }, []);
+
+  const undoBatchRun = useCallback(async (runId: string) => {
+    if (!confirm(`Desfazer o run ${runId.slice(0, 8)}?`)) return;
+    setBatchSequencing(true);
+    try {
+      const res = await pcpApsUndo(runId);
+      addToast(`Undo concluído: ${res.restored} revertidas, ${res.skipped} ignoradas.`, res.skipped > 0 ? 'warning' : 'success');
+      await loadData();
+    } catch (e: any) {
+      addToast(e?.message || 'Falha ao desfazer run.', 'error');
+    } finally {
+      setBatchSequencing(false);
+    }
+  }, [addToast, loadData]);
 
   const fetchPreview = useCallback(async (silent = false) => {
     if (!apsModal.ctId) return;
@@ -349,43 +452,9 @@ export default function PcpDashboardPage() {
       .finally(() => setApsLoading(false));
   }, [apsModal.open, apsSelectedRunId]);
 
-  const loadData = async () => {
-    setLoading(true);
-    try {
-      const [cargaData, ganttData, kpisData, atpData, paretoData, leadTimeData] = await Promise.all([
-        listPcpCargaCapacidade(startDate, endDate),
-        listPcpGantt(startDate, endDate),
-        listPcpKpis(30),
-        listPcpAtpCtp(endDate),
-        listPcpParetoRefugos(startDate, endDate),
-        listPcpOrdensLeadTime(startDate, endDate)
-      ]);
-      setCarga(cargaData);
-      setGantt(ganttData);
-      setKpis(kpisData);
-      setAtpCtp(atpData);
-      setPareto(paretoData);
-      setLeadTimes(leadTimeData);
-      setSelectedProdutoId(prev => {
-        if (prev && atpData.some(item => item.produto_id === prev)) {
-          return prev;
-        }
-        return atpData[0]?.produto_id || null;
-      });
-      if (atpData.length === 0) {
-        setEstoqueProjetado([]);
-      }
-    } catch (error: any) {
-      addToast(error.message || 'Não foi possível carregar PCP.', 'error');
-    } finally {
-      setLoading(false);
-    }
-  };
-
   useEffect(() => {
     loadData();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [loadData]);
 
   useEffect(() => {
     if (!selectedProdutoId) {
@@ -505,6 +574,115 @@ export default function PcpDashboardPage() {
     return map;
   }, [capacitySummary]);
 
+  const replanCandidates = useMemo(() => {
+    const rows = capacitySummary
+      .map((ct) => {
+        const sug = capacitySuggestions.get(ct.id);
+        if (!sug?.peakDay || (sug.overloadHours ?? 0) <= 0.01) return null;
+        return {
+          centro_id: ct.id,
+          centro_nome: ct.nome,
+          peak_day: sug.peakDay,
+          peak_ratio: sug.peakRatio,
+          overload_hours: sug.overloadHours,
+          suggested_day: sug.suggestedDay,
+          suggested_span_days: sug.suggestedSpanDays,
+          message: sug.message,
+        };
+      })
+      .filter(Boolean) as Array<{
+        centro_id: string;
+        centro_nome: string;
+        peak_day: string;
+        peak_ratio: number;
+        overload_hours: number;
+        suggested_day?: string;
+        suggested_span_days?: number;
+        message?: string;
+      }>;
+
+    return rows.sort((a, b) => (b.overload_hours || 0) - (a.overload_hours || 0));
+  }, [capacitySummary, capacitySuggestions]);
+
+  const applyReplanBatch = useCallback(async () => {
+    if (replanCandidates.length === 0) return;
+    if (!confirm(`Aplicar replanejamento automático para ${replanCandidates.length} CT(s) com sobrecarga no período?`)) return;
+    setReplanApplying(true);
+    setReplanResults({});
+    try {
+      for (const item of replanCandidates) {
+        try {
+          const res = await pcpReplanejarCentroSobrecarga(item.centro_id, item.peak_day, endDate);
+          setReplanResults((prev) => ({ ...prev, [item.centro_id]: res }));
+        } catch (e: any) {
+          setReplanResults((prev) => ({ ...prev, [item.centro_id]: { message: e?.message || 'Falha', moved: 0 } }));
+        }
+      }
+      addToast('Replanejamento em lote concluído.', 'success');
+      await loadData();
+    } finally {
+      setReplanApplying(false);
+    }
+  }, [addToast, endDate, loadData, replanCandidates]);
+
+  const previewReplanForCt = useCallback(async (ctId: string, ctNome: string, peakDay: string) => {
+    setReplanPreviewingCtId(ctId);
+    try {
+      const rows = await pcpReplanCentroSobrecargaPreview(ctId, peakDay, endDate, 200);
+      const summary = rows.reduce((acc, row) => {
+        acc.total += 1;
+        if (row.can_move) acc.canMove += 1;
+        if (row.reason === 'locked') acc.locked += 1;
+        if (row.reason === 'no_slot') acc.noSlot += 1;
+        if (row.reason === 'zero_hours') acc.zeroHours += 1;
+        if (row.reason === 'no_overload') acc.noOverload += 1;
+        if (!acc.freezeUntil && row.freeze_until) acc.freezeUntil = row.freeze_until;
+        return acc;
+      }, { total: 0, canMove: 0, locked: 0, noSlot: 0, zeroHours: 0, noOverload: 0, freezeUntil: undefined as string | undefined });
+
+      setReplanPreview((prev) => ({ ...prev, [ctId]: { rows, summary } }));
+
+      addToast(
+        `Preview ${ctNome}: ${summary.canMove}/${summary.total} movíveis${summary.locked > 0 ? `, ${summary.locked} locked` : ''}${summary.noSlot > 0 ? `, ${summary.noSlot} sem slot` : ''}${summary.freezeUntil ? ` (Freeze até ${format(new Date(summary.freezeUntil), 'dd/MM')})` : ''}.`,
+        summary.canMove > 0 ? 'success' : 'warning'
+      );
+    } catch (e: any) {
+      addToast(e?.message || 'Falha ao gerar preview do replanejamento.', 'error');
+    } finally {
+      setReplanPreviewingCtId(null);
+    }
+  }, [addToast, endDate]);
+
+  const openReplanPreviewDetailsForCt = useCallback(async (ctId: string, ctNome: string, peakDay: string) => {
+    const existing = replanPreview[ctId]?.rows;
+    if (existing?.length) {
+      setReplanPreviewDetails({ open: true, ctId, ctNome, peakDay });
+      return;
+    }
+
+    setReplanPreviewingCtId(ctId);
+    try {
+      const rows = await pcpReplanCentroSobrecargaPreview(ctId, peakDay, endDate, 200);
+      const summary = rows.reduce((acc, row) => {
+        acc.total += 1;
+        if (row.can_move) acc.canMove += 1;
+        if (row.reason === 'locked') acc.locked += 1;
+        if (row.reason === 'no_slot') acc.noSlot += 1;
+        if (row.reason === 'zero_hours') acc.zeroHours += 1;
+        if (row.reason === 'no_overload') acc.noOverload += 1;
+        if (!acc.freezeUntil && row.freeze_until) acc.freezeUntil = row.freeze_until;
+        return acc;
+      }, { total: 0, canMove: 0, locked: 0, noSlot: 0, zeroHours: 0, noOverload: 0, freezeUntil: undefined as string | undefined });
+
+      setReplanPreview((prev) => ({ ...prev, [ctId]: { rows, summary } }));
+      setReplanPreviewDetails({ open: true, ctId, ctNome, peakDay });
+    } catch (e: any) {
+      addToast(e?.message || 'Falha ao carregar detalhes do preview.', 'error');
+    } finally {
+      setReplanPreviewingCtId(null);
+    }
+  }, [addToast, endDate, replanPreview]);
+
   const weeklySeries = useMemo(() => {
     const dailyMap = new Map<string, { label: string; carga: number; capacidade: number }>();
     carga.forEach(item => {
@@ -535,7 +713,15 @@ export default function PcpDashboardPage() {
     const filtered = gantt.filter(item => {
       const matchCt = ganttCtFilter === 'all' || item.centro_trabalho_id === ganttCtFilter;
       const matchStatus = ganttStatusFilter === 'all' || item.status_operacao === ganttStatusFilter;
-      return matchCt && matchStatus;
+      const isLocked = !!item.aps_locked;
+      const isFreeze = !!item.aps_in_freeze;
+      const matchAps =
+        ganttApsFilter === 'all'
+        || (ganttApsFilter === 'locked' && isLocked)
+        || (ganttApsFilter === 'freeze' && !isLocked && isFreeze)
+        || (ganttApsFilter === 'blocked' && (isLocked || isFreeze))
+        || (ganttApsFilter === 'eligible' && !isLocked && !isFreeze);
+      return matchCt && matchStatus && matchAps;
     });
 
     return filtered.map(item => {
@@ -763,15 +949,390 @@ export default function PcpDashboardPage() {
           </button>
           <button
             className="inline-flex items-center gap-2 px-4 py-2 rounded-md bg-indigo-600 text-white hover:bg-indigo-500 disabled:opacity-50"
-            onClick={handleBatchSequencing}
+            onClick={openBatchModal}
             disabled={loading || batchSequencing}
             title="Aplica APS (sequenciamento) para todos os CTs no período"
           >
             <Activity size={16} className={batchSequencing ? 'animate-spin' : ''} />
             {batchSequencing ? 'APS em lote…' : 'APS: Sequenciar todos'}
           </button>
+          <button
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-md border border-amber-200 bg-amber-50 text-amber-800 hover:bg-amber-100 disabled:opacity-50"
+            onClick={openReplanModal}
+            disabled={loading}
+            title="Sugere e aplica replanejamento (mover menor prioridade) nos CTs com sobrecarga"
+          >
+            <AlertTriangle size={16} />
+            Replan: sobrecarga
+          </button>
         </div>
       </header>
+
+      <Modal
+        isOpen={batchModalOpen}
+        onClose={() => setBatchModalOpen(false)}
+        title="APS • Sequenciar todos os CTs"
+        size="lg"
+      >
+        <div className="p-6 space-y-4">
+          <div className="bg-slate-50 border border-slate-100 rounded-lg p-4 text-sm text-gray-700 space-y-1">
+            <div>Período: <span className="font-semibold">{format(new Date(startDate), 'dd/MM')}</span> → <span className="font-semibold">{format(new Date(endDate), 'dd/MM')}</span></div>
+            <div className="text-xs text-gray-500">
+              Use Preview para estimar impacto. Aplicar cria runs por CT (undo disponível em cada CT via “Sequenciar”).
+            </div>
+          </div>
+
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={() => runBatchSequencing(false)}
+              disabled={batchSequencing}
+              className="px-4 py-2 rounded-lg border bg-white hover:bg-gray-50 text-sm font-semibold disabled:opacity-50"
+            >
+              {batchSequencing ? 'Processando…' : 'Preview'}
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                if (!confirm('Aplicar APS em lote? Isso vai atualizar datas previstas e gerar runs.')) return;
+                runBatchSequencing(true);
+              }}
+              disabled={batchSequencing || !batchPreviewed}
+              className="px-4 py-2 rounded-lg bg-indigo-600 text-white hover:bg-indigo-500 text-sm font-semibold disabled:opacity-50"
+              title={!batchPreviewed ? 'Gere um preview antes de aplicar.' : ''}
+            >
+              {batchSequencing ? 'Aplicando…' : 'Aplicar'}
+            </button>
+          </div>
+
+          <div className="bg-white border rounded-lg overflow-hidden">
+            <div className="border-b px-4 py-2 text-sm font-semibold text-gray-800 flex items-center justify-between">
+              <span>Resumo por CT</span>
+              {batchRows.length > 0 && (
+                <span className="text-xs text-gray-500">
+                  {batchRows.reduce((acc, r) => acc + (r.updated_operacoes || 0), 0)}/
+                  {batchRows.reduce((acc, r) => acc + (r.total_operacoes || 0), 0)} atualizadas
+                </span>
+              )}
+            </div>
+            <div className="overflow-x-auto">
+              <table className="min-w-full text-xs">
+                <thead className="bg-gray-50 text-gray-600">
+                  <tr>
+                    <th className="px-3 py-2 text-left">Centro</th>
+                    <th className="px-3 py-2 text-right">Atualizadas</th>
+                    <th className="px-3 py-2 text-right">Sem agenda</th>
+                    <th className="px-3 py-2 text-right">Freeze</th>
+                    <th className="px-3 py-2 text-left">Run</th>
+                    <th className="px-3 py-2 text-left">Ações</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {batchRows.map((r) => (
+                    <tr key={r.centro_id} className="border-t">
+                      <td className="px-3 py-2 text-gray-900 font-medium">{r.centro_nome}</td>
+                      <td className="px-3 py-2 text-right text-gray-700">{(r.updated_operacoes ?? 0)}/{(r.total_operacoes ?? 0)}</td>
+                      <td className="px-3 py-2 text-right text-gray-700">{r.unscheduled_operacoes ?? 0}</td>
+                      <td className="px-3 py-2 text-right text-gray-700">{r.freeze_dias ?? 0}d</td>
+                      <td className="px-3 py-2 text-gray-500">{r.run_id ? String(r.run_id).slice(0, 8) : '—'}</td>
+                      <td className="px-3 py-2">
+                        <div className="flex items-center gap-2">
+                          <button
+                            type="button"
+                            className="text-[11px] px-2 py-1 rounded-md border bg-white hover:bg-gray-50"
+                            onClick={() => openApsForCt(r.centro_id, r.centro_nome)}
+                          >
+                            Abrir
+                          </button>
+                          <button
+                            type="button"
+                            className="text-[11px] px-2 py-1 rounded-md border border-rose-200 bg-rose-50 text-rose-700 hover:bg-rose-100 disabled:opacity-50"
+                            disabled={!r.run_id || batchSequencing}
+                            onClick={() => r.run_id && undoBatchRun(r.run_id)}
+                            title={!r.run_id ? 'Sem run (nenhuma alteração aplicada)' : 'Desfaz o run deste CT'}
+                          >
+                            Undo
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                  {batchRows.length === 0 && (
+                    <tr>
+                      <td colSpan={6} className="px-3 py-6 text-sm text-gray-500">
+                        {batchSequencing ? 'Processando…' : 'Clique em Preview para carregar o resumo.'}
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </Modal>
+
+      <Modal
+        isOpen={replanModalOpen}
+        onClose={() => setReplanModalOpen(false)}
+        title="PCP • Replanejamento por sobrecarga (lote)"
+        size="lg"
+      >
+        <div className="p-6 space-y-4">
+          <div className="bg-amber-50 border border-amber-100 rounded-lg p-4 text-sm text-amber-900 space-y-1">
+            <div>Período: <span className="font-semibold">{format(new Date(startDate), 'dd/MM')}</span> → <span className="font-semibold">{format(new Date(endDate), 'dd/MM')}</span></div>
+            <div className="text-xs text-amber-800">
+              Move operações de menor prioridade do dia de pico para dias com folga (respeita Freeze/Locked). Gera runs e permite Undo por CT.
+            </div>
+          </div>
+
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={applyReplanBatch}
+              disabled={replanApplying || replanCandidates.length === 0}
+              className="px-4 py-2 rounded-lg bg-amber-600 text-white hover:bg-amber-500 text-sm font-semibold disabled:opacity-50"
+            >
+              {replanApplying ? 'Aplicando…' : `Aplicar em lote (${replanCandidates.length})`}
+            </button>
+          </div>
+
+          <div className="bg-white border rounded-lg overflow-hidden">
+            <div className="border-b px-4 py-2 text-sm font-semibold text-gray-800">CTs com sobrecarga (preview)</div>
+            <div className="overflow-x-auto">
+              <table className="min-w-full text-xs">
+                <thead className="bg-gray-50 text-gray-600">
+                  <tr>
+                    <th className="px-3 py-2 text-left">Centro</th>
+                    <th className="px-3 py-2 text-right">Sobrecarga</th>
+                    <th className="px-3 py-2 text-left">Pico</th>
+                    <th className="px-3 py-2 text-left">Sugestão</th>
+                    <th className="px-3 py-2 text-left">Preview</th>
+                    <th className="px-3 py-2 text-left">Resultado</th>
+                    <th className="px-3 py-2 text-left">Ações</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {replanCandidates.map((r) => {
+                    const res = replanResults[r.centro_id];
+                    const prev = replanPreview[r.centro_id]?.summary;
+                    const runId = res?.run_id as string | undefined;
+                    const moved = Number(res?.moved ?? 0) || 0;
+                    const msg = res?.message as string | undefined;
+                    const freezeUntil = res?.freeze_until as string | undefined;
+                    const previewLoading = replanPreviewingCtId === r.centro_id;
+                    return (
+                      <tr key={r.centro_id} className="border-t">
+                        <td className="px-3 py-2 text-gray-900 font-medium">{r.centro_nome}</td>
+                        <td className="px-3 py-2 text-right text-gray-700">{(r.overload_hours || 0).toFixed(1)}h</td>
+                        <td className="px-3 py-2 text-gray-700">{format(new Date(r.peak_day), 'dd/MM')}</td>
+                        <td className="px-3 py-2 text-gray-700">
+                          {r.suggested_day ? `${format(new Date(r.suggested_day), 'dd/MM')} (${r.suggested_span_days || 1}d)` : '—'}
+                          {r.message ? <div className="text-[11px] text-gray-500">{r.message}</div> : null}
+                        </td>
+                        <td className="px-3 py-2 text-gray-700">
+                          {prev ? (
+                            <div className="space-y-0.5">
+                              <div>{prev.canMove}/{prev.total} movíveis</div>
+                              <div className="text-[11px] text-gray-500">
+                                {prev.locked > 0 ? `${prev.locked} locked` : null}
+                                {prev.locked > 0 && prev.noSlot > 0 ? ' • ' : null}
+                                {prev.noSlot > 0 ? `${prev.noSlot} sem slot` : null}
+                                {(prev.locked > 0 || prev.noSlot > 0) && prev.zeroHours > 0 ? ' • ' : null}
+                                {prev.zeroHours > 0 ? `${prev.zeroHours} 0h` : null}
+                              </div>
+                              {prev.freezeUntil ? <div className="text-[11px] text-gray-500">Freeze até {format(new Date(prev.freezeUntil), 'dd/MM')}</div> : null}
+                            </div>
+                          ) : (
+                            <span className="text-gray-400">{previewLoading ? 'Carregando…' : '—'}</span>
+                          )}
+                        </td>
+                        <td className="px-3 py-2 text-gray-700">
+                          {res ? (
+                            <div className="space-y-0.5">
+                              <div>{moved > 0 ? `${moved} movida(s)` : (msg || 'Sem mudanças')}</div>
+                              {freezeUntil ? <div className="text-[11px] text-gray-500">Freeze até {format(new Date(freezeUntil), 'dd/MM')}</div> : null}
+                              {runId ? <div className="text-[11px] text-gray-500">Run {runId.slice(0, 8)}</div> : null}
+                            </div>
+                          ) : (
+                            <span className="text-gray-400">{replanApplying ? '...' : '—'}</span>
+                          )}
+                        </td>
+                        <td className="px-3 py-2">
+                          <div className="flex items-center gap-2">
+                            <button
+                              type="button"
+                              className="text-[11px] px-2 py-1 rounded-md border bg-white hover:bg-gray-50 disabled:opacity-50"
+                              onClick={() => previewReplanForCt(r.centro_id, r.centro_nome, r.peak_day)}
+                              disabled={replanApplying || previewLoading}
+                              title="Simula o que seria movido e por quê (sem aplicar)"
+                            >
+                              {previewLoading ? 'Preview…' : 'Preview'}
+                            </button>
+                            <button
+                              type="button"
+                              className="text-[11px] px-2 py-1 rounded-md border bg-white hover:bg-gray-50 disabled:opacity-50"
+                              onClick={() => openReplanPreviewDetailsForCt(r.centro_id, r.centro_nome, r.peak_day)}
+                              disabled={replanApplying || previewLoading}
+                              title="Ver operações do preview (motivos, old→new)"
+                            >
+                              Detalhes
+                            </button>
+                            <button
+                              type="button"
+                              className="text-[11px] px-2 py-1 rounded-md border bg-white hover:bg-gray-50"
+                              onClick={() => openGanttForCt(r.centro_id)}
+                            >
+                              Ver Gantt
+                            </button>
+                            <button
+                              type="button"
+                              className="text-[11px] px-2 py-1 rounded-md border border-rose-200 bg-rose-50 text-rose-700 hover:bg-rose-100 disabled:opacity-50"
+                              disabled={!runId || replanApplying}
+                              onClick={() => runId && undoBatchRun(runId)}
+                              title={!runId ? 'Sem run (nada aplicado)' : 'Desfaz o run'}
+                            >
+                              Undo
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                  {replanCandidates.length === 0 && (
+                    <tr>
+                      <td colSpan={7} className="px-3 py-6 text-sm text-gray-500">
+                        Nenhum CT com sobrecarga no período selecionado.
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </Modal>
+
+      <Modal
+        isOpen={replanPreviewDetails.open}
+        onClose={() => setReplanPreviewDetails({ open: false })}
+        title={`PCP • Preview detalhado${replanPreviewDetails.ctNome ? ` • ${replanPreviewDetails.ctNome}` : ''}`}
+        size="xl"
+      >
+        <div className="p-6 space-y-4">
+          {(() => {
+            const ctId = replanPreviewDetails.ctId;
+            const peakDay = replanPreviewDetails.peakDay;
+            const preview = ctId ? replanPreview[ctId] : undefined;
+            const rows = preview?.rows || [];
+            const summary = preview?.summary;
+            const filtered =
+              replanPreviewReasonFilter === 'all'
+                ? rows
+                : rows.filter((r) => (r.reason || 'ok') === replanPreviewReasonFilter);
+
+            const reasonLabel: Record<string, string> = {
+              ok: 'OK',
+              locked: 'Locked',
+              no_slot: 'Sem slot',
+              zero_hours: '0h',
+              no_overload: 'Sem sobrecarga',
+            };
+
+            const fmtDate = (d?: string | null) => (d ? format(new Date(d), 'dd/MM') : '—');
+
+            return (
+              <>
+                <div className="bg-gray-50 border rounded-lg p-4 text-sm text-gray-800 space-y-1">
+                  <div className="flex flex-wrap gap-x-6 gap-y-1">
+                    <div>CT: <span className="font-semibold">{replanPreviewDetails.ctNome || ctId || '—'}</span></div>
+                    <div>Pico: <span className="font-semibold">{peakDay ? format(new Date(peakDay), 'dd/MM') : '—'}</span></div>
+                    <div>
+                      Resumo:{' '}
+                      <span className="font-semibold">
+                        {(summary?.canMove ?? 0)}/{(summary?.total ?? 0)} movíveis
+                      </span>
+                      {summary?.locked ? <span className="text-gray-600"> • {summary.locked} locked</span> : null}
+                      {summary?.noSlot ? <span className="text-gray-600"> • {summary.noSlot} sem slot</span> : null}
+                      {summary?.zeroHours ? <span className="text-gray-600"> • {summary.zeroHours} 0h</span> : null}
+                      {summary?.freezeUntil ? <span className="text-gray-600"> • Freeze até {format(new Date(summary.freezeUntil), 'dd/MM')}</span> : null}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex flex-wrap items-center gap-2">
+                  <label className="text-xs text-gray-600">Filtro:</label>
+                  <select
+                    className="text-xs border rounded-md px-2 py-1 bg-white"
+                    value={replanPreviewReasonFilter}
+                    onChange={(e) => setReplanPreviewReasonFilter(e.target.value)}
+                  >
+                    <option value="all">Todos</option>
+                    <option value="ok">OK</option>
+                    <option value="locked">Locked</option>
+                    <option value="no_slot">Sem slot</option>
+                    <option value="zero_hours">0h</option>
+                    <option value="no_overload">Sem sobrecarga</option>
+                  </select>
+                  <div className="ml-auto text-xs text-gray-500">
+                    {filtered.length}/{rows.length} operações
+                  </div>
+                </div>
+
+                <div className="bg-white border rounded-lg overflow-hidden">
+                  <div className="overflow-x-auto">
+                    <table className="min-w-full text-xs">
+                      <thead className="bg-gray-50 text-gray-600">
+                        <tr>
+                          <th className="px-3 py-2 text-left">Ordem</th>
+                          <th className="px-3 py-2 text-left">Produto</th>
+                          <th className="px-3 py-2 text-right">Horas</th>
+                          <th className="px-3 py-2 text-left">Old</th>
+                          <th className="px-3 py-2 text-left">New</th>
+                          <th className="px-3 py-2 text-left">Status</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {filtered.map((r) => {
+                          const statusText = r.can_move ? 'Movível' : (reasonLabel[r.reason] || r.reason || '—');
+                          const badge =
+                            r.can_move
+                              ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                              : r.reason === 'locked'
+                                ? 'bg-rose-50 text-rose-700 border-rose-200'
+                                : r.reason === 'no_slot'
+                                  ? 'bg-amber-50 text-amber-800 border-amber-200'
+                                  : 'bg-gray-50 text-gray-700 border-gray-200';
+                          return (
+                            <tr key={r.operacao_id} className="border-t">
+                              <td className="px-3 py-2 text-gray-900 font-medium">{r.ordem_numero ?? '—'}</td>
+                              <td className="px-3 py-2 text-gray-700">{r.produto_nome || '—'}</td>
+                              <td className="px-3 py-2 text-right text-gray-700">{formatHours(r.horas)}</td>
+                              <td className="px-3 py-2 text-gray-700">{fmtDate(r.old_ini)} → {fmtDate(r.old_fim)}</td>
+                              <td className="px-3 py-2 text-gray-700">{fmtDate(r.new_ini)} → {fmtDate(r.new_fim)}</td>
+                              <td className="px-3 py-2">
+                                <span className={`inline-flex items-center px-2 py-0.5 rounded-md border ${badge}`}>
+                                  {statusText}
+                                </span>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                        {filtered.length === 0 && (
+                          <tr>
+                            <td colSpan={6} className="px-3 py-6 text-sm text-gray-500">
+                              {rows.length === 0 ? 'Nenhuma operação retornada no preview.' : 'Nenhuma operação neste filtro.'}
+                            </td>
+                          </tr>
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </>
+            );
+          })()}
+        </div>
+      </Modal>
 
       {pcpAlerts.length > 0 && (
         <section className="bg-white border rounded-lg shadow-sm">
@@ -1139,6 +1700,18 @@ export default function PcpDashboardPage() {
                 </option>
               ))}
             </select>
+            <select
+              value={ganttApsFilter}
+              onChange={(e) => setGanttApsFilter(e.target.value)}
+              className="border rounded-md px-2 py-1 text-xs"
+              title="Filtro APS (o que o sequenciador ignora)"
+            >
+              <option value="all">APS: todos</option>
+              <option value="eligible">APS: elegíveis</option>
+              <option value="blocked">APS: bloqueados</option>
+              <option value="freeze">APS: freeze</option>
+              <option value="locked">APS: locked</option>
+            </select>
           </div>
         </div>
         {loading && gantt.length === 0 ? (
@@ -1153,6 +1726,7 @@ export default function PcpDashboardPage() {
                   <th className="px-4 py-2 text-left">OP</th>
                   <th className="px-4 py-2 text-left">Produto</th>
                   <th className="px-4 py-2 text-left">CT / Seq</th>
+                  <th className="px-4 py-2 text-left">APS</th>
                   <th className="px-4 py-2 text-left">Status</th>
                   <th className="px-4 py-2 text-left w-2/5">Linha do tempo</th>
                 </tr>
@@ -1167,6 +1741,27 @@ export default function PcpDashboardPage() {
                       <span className="ml-1 text-xs text-gray-500">seq {item.operacao_sequencia}</span>
                       {item.permite_overlap && (
                         <span className="ml-2 text-[10px] bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full uppercase">Overlap</span>
+                      )}
+                    </td>
+                    <td className="px-4 py-2">
+                      {item.aps_locked ? (
+                        <span
+                          className="inline-flex px-2 py-0.5 rounded-full text-xs font-semibold bg-slate-100 text-slate-700"
+                          title={item.aps_lock_reason || 'Operação bloqueada manualmente para APS'}
+                        >
+                          Locked
+                        </span>
+                      ) : item.aps_in_freeze ? (
+                        <span
+                          className="inline-flex px-2 py-0.5 rounded-full text-xs font-semibold bg-amber-50 text-amber-800"
+                          title="Dentro do horizonte congelado (freeze) do CT"
+                        >
+                          Freeze
+                        </span>
+                      ) : (
+                        <span className="inline-flex px-2 py-0.5 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700" title="Elegível para APS">
+                          OK
+                        </span>
                       )}
                     </td>
                     <td className="px-4 py-2">
@@ -1221,7 +1816,7 @@ export default function PcpDashboardPage() {
                 ))}
                 {ganttRows.length === 0 && (
                   <tr>
-                    <td colSpan={5} className="text-center text-gray-500 py-6">Nenhuma OP encontrada no período selecionado.</td>
+                    <td colSpan={6} className="text-center text-gray-500 py-6">Nenhuma OP encontrada no período selecionado.</td>
                   </tr>
                 )}
               </tbody>
