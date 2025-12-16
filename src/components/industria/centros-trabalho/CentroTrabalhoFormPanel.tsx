@@ -1,6 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { Loader2, Save } from 'lucide-react';
-import { CentroTrabalho, CentroTrabalhoPayload, saveCentroTrabalho } from '@/services/industriaCentros';
+import {
+  CentroTrabalho,
+  CentroTrabalhoPayload,
+  getCentroCalendarioSemanal,
+  upsertCentroCalendarioSemanal,
+  saveCentroTrabalho
+} from '@/services/industriaCentros';
 import { useToast } from '@/contexts/ToastProvider';
 import Section from '@/components/ui/forms/Section';
 import Input from '@/components/ui/forms/Input';
@@ -17,10 +23,21 @@ interface Props {
 export default function CentroTrabalhoFormPanel({ centro, onSaveSuccess, onClose }: Props) {
   const { addToast } = useToast();
   const [isSaving, setIsSaving] = useState(false);
+  const [calendarLoading, setCalendarLoading] = useState(false);
   const [formData, setFormData] = useState<CentroTrabalhoPayload>({
     ativo: true,
     tipo_uso: 'ambos'
   });
+
+  const [calendarHours, setCalendarHours] = useState<number[]>(() => Array.from({ length: 7 }).map(() => 0));
+  const [calendarDirty, setCalendarDirty] = useState(false);
+
+  const DOW_LABELS = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
+
+  const applyDefaultCalendar = (hoursPerWeekday: number) => {
+    // 0=Dom, 6=Sáb
+    setCalendarHours([0, hoursPerWeekday, hoursPerWeekday, hoursPerWeekday, hoursPerWeekday, hoursPerWeekday, 0]);
+  };
 
   useEffect(() => {
     if (centro) {
@@ -28,9 +45,49 @@ export default function CentroTrabalhoFormPanel({ centro, onSaveSuccess, onClose
     }
   }, [centro]);
 
+  useEffect(() => {
+    if (!centro?.id) {
+      const base = Number(centro?.capacidade_horas_dia ?? formData.capacidade_horas_dia ?? 8) || 8;
+      applyDefaultCalendar(base);
+      setCalendarDirty(false);
+      return;
+    }
+
+    setCalendarLoading(true);
+    getCentroCalendarioSemanal(centro.id)
+      .then((rows) => {
+        if (!rows?.length) {
+          const base = Number(centro.capacidade_horas_dia ?? 8) || 8;
+          applyDefaultCalendar(base);
+          setCalendarDirty(false);
+          return;
+        }
+        const next = Array.from({ length: 7 }).map(() => 0);
+        for (const row of rows) {
+          if (row.dow >= 0 && row.dow <= 6) next[row.dow] = Number(row.capacidade_horas) || 0;
+        }
+        setCalendarHours(next);
+        setCalendarDirty(false);
+      })
+      .catch((e: any) => {
+        addToast(e?.message || 'Não foi possível carregar o calendário do centro.', 'error');
+      })
+      .finally(() => setCalendarLoading(false));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [centro?.id]);
+
   const handleChange = (field: keyof CentroTrabalhoPayload, value: any) => {
     setFormData(prev => ({ ...prev, [field]: value }));
   };
+
+  useEffect(() => {
+    if (calendarDirty) return;
+    if (!centro?.id) {
+      const base = Number(formData.capacidade_horas_dia ?? 8) || 8;
+      applyDefaultCalendar(base);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [formData.capacidade_horas_dia]);
 
   const handleSave = async () => {
     if (!formData.nome) {
@@ -40,7 +97,13 @@ export default function CentroTrabalhoFormPanel({ centro, onSaveSuccess, onClose
 
     setIsSaving(true);
     try {
-      await saveCentroTrabalho(formData);
+      const saved = await saveCentroTrabalho(formData);
+      if (saved?.id) {
+        await upsertCentroCalendarioSemanal(
+          saved.id,
+          calendarHours.map((capacidade_horas, dow) => ({ dow, capacidade_horas }))
+        );
+      }
       addToast('Centro de trabalho salvo com sucesso!', 'success');
       onSaveSuccess();
     } catch (e: any) {
@@ -157,6 +220,60 @@ export default function CentroTrabalhoFormPanel({ centro, onSaveSuccess, onClose
             />
           </div>
         </Section>
+
+        <Section
+          title="Calendário semanal (capacidade finita)"
+          description="Defina a capacidade por dia da semana (h/dia). O PCP usa estes valores para calcular carga x capacidade."
+        >
+          <div className="sm:col-span-6 flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              className="text-sm px-3 py-2 rounded-lg border bg-white hover:bg-gray-50"
+              onClick={() => {
+                const base = Number(formData.capacidade_horas_dia ?? 8) || 8;
+                applyDefaultCalendar(base);
+                setCalendarDirty(true);
+              }}
+              disabled={calendarLoading}
+            >
+              Aplicar padrão (Seg–Sex = capacidade/dia)
+            </button>
+            <button
+              type="button"
+              className="text-sm px-3 py-2 rounded-lg border bg-white hover:bg-gray-50"
+              onClick={() => {
+                const base = Number(formData.capacidade_horas_dia ?? 8) || 8;
+                setCalendarHours([0, base, base, base, base, base, base / 2]);
+                setCalendarDirty(true);
+              }}
+              disabled={calendarLoading}
+            >
+              Padrão com sábado (Sáb = 50%)
+            </button>
+            {calendarLoading && (
+              <span className="text-sm text-gray-500 flex items-center gap-2">
+                <Loader2 className="animate-spin" size={16} /> Carregando calendário…
+              </span>
+            )}
+          </div>
+
+          {DOW_LABELS.map((label, dow) => (
+            <Input
+              key={label}
+              label={`${label} (h)`}
+              name={`cal_${dow}`}
+              type="number"
+              step="0.5"
+              value={calendarHours[dow] ?? 0}
+              onChange={(e) => {
+                const value = Math.max(0, Number(e.target.value) || 0);
+                setCalendarHours((prev) => prev.map((v, i) => (i === dow ? value : v)));
+                setCalendarDirty(true);
+              }}
+              className="sm:col-span-2"
+            />
+          ))}
+        </Section>
       </div>
 
       <footer className="flex-shrink-0 p-4 flex justify-end items-center border-t border-white/20 bg-gray-50">
@@ -166,7 +283,7 @@ export default function CentroTrabalhoFormPanel({ centro, onSaveSuccess, onClose
           </button>
           <button
             onClick={handleSave}
-            disabled={isSaving}
+            disabled={isSaving || calendarLoading}
             className="flex items-center gap-2 bg-blue-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-blue-700 disabled:opacity-50"
           >
             {isSaving ? <Loader2 className="animate-spin" size={20} /> : <Save size={20} />}

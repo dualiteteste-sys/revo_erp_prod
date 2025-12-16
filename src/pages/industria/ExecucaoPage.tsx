@@ -4,25 +4,56 @@ import { listCentrosTrabalho, CentroTrabalho } from '@/services/industriaCentros
 import { Search, LayoutGrid, List, PlayCircle } from 'lucide-react';
 import { Loader2 } from 'lucide-react';
 import { useDebounce } from '@/hooks/useDebounce';
+import { useLocalStorageState } from '@/hooks/useLocalStorageState';
+import { useToast } from '@/contexts/ToastProvider';
 import Select from '@/components/ui/forms/Select';
 import OperacoesTable from '@/components/industria/execucao/OperacoesTable';
 import OperacoesKanbanBoard from '@/components/industria/execucao/OperacoesKanbanBoard';
+import { useSearchParams } from 'react-router-dom';
 
 export default function ExecucaoPage() {
-  const [viewMode, setViewMode] = useState<'list' | 'kanban'>('list');
+  const { addToast } = useToast();
+  const [viewMode, setViewMode] = useLocalStorageState<'list' | 'kanban'>('industria:execucao:viewMode', 'list');
   const [operacoes, setOperacoes] = useState<Operacao[]>([]);
   const [centros, setCentros] = useState<CentroTrabalho[]>([]);
   const [loading, setLoading] = useState(true);
   
   const [search, setSearch] = useState('');
-  const [statusFilter, setStatusFilter] = useState('');
-  const [centroFilter, setCentroFilter] = useState('');
+  const [statusFilter, setStatusFilter] = useLocalStorageState<string>('industria:execucao:statusFilter', '');
+  const [centroFilter, setCentroFilter] = useLocalStorageState<string>('industria:execucao:centroFilter', '');
+  const [searchParams, setSearchParams] = useSearchParams();
   
   const debouncedSearch = useDebounce(search, 500);
 
   useEffect(() => {
-    listCentrosTrabalho(undefined, true).then(setCentros);
+    listCentrosTrabalho(undefined, true)
+      .then(setCentros)
+      .catch((e: any) => addToast(e?.message || 'Erro ao carregar centros de trabalho.', 'error'));
+  }, [addToast]);
+
+  // Deep-link/share: persist view/status/centro in URL when present, without forcing it.
+  useEffect(() => {
+    const urlView = searchParams.get('view');
+    const urlStatus = searchParams.get('status');
+    const urlCentro = searchParams.get('centro');
+    const shouldHydrate = urlView || urlStatus || urlCentro;
+    if (!shouldHydrate) return;
+    if (urlView === 'list' || urlView === 'kanban') setViewMode(urlView);
+    if (urlStatus !== null) setStatusFilter(urlStatus);
+    if (urlCentro !== null) setCentroFilter(urlCentro);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  useEffect(() => {
+    const next = new URLSearchParams(searchParams);
+    next.set('view', viewMode);
+    if (statusFilter) next.set('status', statusFilter);
+    else next.delete('status');
+    if (centroFilter) next.set('centro', centroFilter);
+    else next.delete('centro');
+    setSearchParams(next, { replace: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [viewMode, statusFilter, centroFilter]);
 
   const fetchOperacoes = async () => {
     if (viewMode === 'kanban') return;
@@ -30,8 +61,8 @@ export default function ExecucaoPage() {
     try {
       const data = await listOperacoes('lista', centroFilter || undefined, statusFilter || undefined, debouncedSearch);
       setOperacoes(data);
-    } catch (e) {
-      console.error(e);
+    } catch (e: any) {
+      addToast(e?.message || 'Erro ao carregar operações.', 'error');
     } finally {
       setLoading(false);
     }
@@ -114,7 +145,7 @@ export default function ExecucaoPage() {
                 )}
             </div>
         ) : (
-            <OperacoesKanbanBoard centroId={centroFilter} search={debouncedSearch} />
+            <OperacoesKanbanBoard centroId={centroFilter} status={statusFilter} search={debouncedSearch} />
         )}
       </div>
     </div>

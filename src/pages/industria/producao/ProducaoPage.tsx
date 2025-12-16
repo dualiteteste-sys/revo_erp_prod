@@ -3,25 +3,58 @@ import { listOrdensProducao, OrdemProducao, seedOrdensProducao, deleteOrdemProdu
 import { PlusCircle, Search, LayoutGrid, List, Hammer, DatabaseBackup } from 'lucide-react';
 import { Loader2 } from 'lucide-react';
 import { useDebounce } from '@/hooks/useDebounce';
+import { useLocalStorageState } from '@/hooks/useLocalStorageState';
 import Modal from '@/components/ui/Modal';
 import Select from '@/components/ui/forms/Select';
 import ProducaoTable from '@/components/industria/producao/ProducaoTable';
 import ProducaoFormPanel from '@/components/industria/producao/ProducaoFormPanel';
 import ProducaoKanbanBoard from '@/components/industria/producao/ProducaoKanbanBoard';
 import { useToast } from '@/contexts/ToastProvider';
+import { useSearchParams } from 'react-router-dom';
 
 export default function ProducaoPage() {
-  const [viewMode, setViewMode] = useState<'list' | 'kanban'>('list');
+  const [viewMode, setViewMode] = useLocalStorageState<'list' | 'kanban'>('industria:producao:viewMode', 'list');
   const [orders, setOrders] = useState<OrdemProducao[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
-  const [statusFilter, setStatusFilter] = useState('');
+  const [statusFilter, setStatusFilter] = useLocalStorageState<string>('industria:producao:statusFilter', '');
   const debouncedSearch = useDebounce(search, 500);
   const { addToast } = useToast();
+  const [searchParams, setSearchParams] = useSearchParams();
 
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [isSeeding, setIsSeeding] = useState(false);
+
+  // Deep-link: /app/industria/producao?new=1
+  useEffect(() => {
+    if (searchParams.get('new') !== '1') return;
+    setSelectedId(null);
+    setIsFormOpen(true);
+    const next = new URLSearchParams(searchParams);
+    next.delete('new');
+    setSearchParams(next, { replace: true });
+  }, [searchParams, setSearchParams]);
+
+  // Deep-link/share: persist view/status in URL when present, without forcing it.
+  useEffect(() => {
+    const urlView = searchParams.get('view');
+    const urlStatus = searchParams.get('status');
+    const shouldHydrate = urlView || urlStatus;
+    if (!shouldHydrate) return;
+    if (urlView === 'list' || urlView === 'kanban') setViewMode(urlView);
+    if (urlStatus !== null) setStatusFilter(urlStatus);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    const next = new URLSearchParams(searchParams);
+    next.set('view', viewMode);
+    if (statusFilter) next.set('status', statusFilter);
+    else next.delete('status');
+    setSearchParams(next, { replace: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [viewMode, statusFilter]);
 
   const fetchOrders = async () => {
     if (viewMode === 'kanban') return;
@@ -29,8 +62,8 @@ export default function ProducaoPage() {
     try {
       const data = await listOrdensProducao(debouncedSearch, statusFilter || undefined);
       setOrders(data);
-    } catch (e) {
-      console.error(e);
+    } catch (e: any) {
+      addToast(e?.message || 'Erro ao carregar ordens de produção.', 'error');
     } finally {
       setLoading(false);
     }
@@ -128,30 +161,31 @@ export default function ProducaoPage() {
         </div>
       </div>
 
-      {viewMode === 'list' && (
-        <div className="mb-6 flex gap-4 flex-shrink-0">
-          <div className="relative flex-grow max-w-md">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={20} />
-            <input
-              type="text"
-              placeholder="Buscar por número ou produto..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="w-full p-3 pl-10 border border-gray-300 rounded-xl shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-            />
-          </div>
-          <Select
-            value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value)}
-            className="min-w-[200px]"
-          >
-            <option value="">Todos os Status</option>
-            <option value="planejada">Planejada</option>
-            <option value="em_producao">Em Produção</option>
-            <option value="concluida">Concluída</option>
-          </Select>
+      <div className="mb-6 flex gap-4 flex-shrink-0 flex-wrap">
+        <div className="relative flex-grow max-w-md">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={20} />
+          <input
+            type="text"
+            placeholder="Buscar por número ou produto..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="w-full p-3 pl-10 border border-gray-300 rounded-xl shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+          />
         </div>
-      )}
+        <Select
+          value={statusFilter}
+          onChange={(e) => setStatusFilter(e.target.value)}
+          className="min-w-[200px]"
+        >
+          <option value="">Todos os Status</option>
+          <option value="planejada">Planejada</option>
+          <option value="em_programacao">Em Programação</option>
+          <option value="em_producao">Em Produção</option>
+          <option value="em_inspecao">Em Inspeção</option>
+          <option value="concluida">Concluída</option>
+          <option value="cancelada">Cancelada</option>
+        </Select>
+      </div>
 
       <div className="flex-grow overflow-hidden">
         {viewMode === 'list' ? (
@@ -165,7 +199,7 @@ export default function ProducaoPage() {
             )}
           </div>
         ) : (
-          <ProducaoKanbanBoard />
+          <ProducaoKanbanBoard search={debouncedSearch} statusFilter={statusFilter} />
         )}
       </div>
 

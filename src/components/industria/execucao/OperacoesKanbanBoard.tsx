@@ -16,10 +16,11 @@ const COLUMNS: { id: StatusOperacao; title: string }[] = [
 
 interface Props {
     centroId?: string;
+    status?: string;
     search?: string;
 }
 
-const OperacoesKanbanBoard: React.FC<Props> = ({ centroId, search }) => {
+const OperacoesKanbanBoard: React.FC<Props> = ({ centroId, status, search }) => {
   const [items, setItems] = useState<Operacao[]>([]);
   const [loading, setLoading] = useState(true);
   const { addToast } = useToast();
@@ -27,7 +28,7 @@ const OperacoesKanbanBoard: React.FC<Props> = ({ centroId, search }) => {
   const fetchData = async () => {
     setLoading(true);
     try {
-      const data = await listOperacoes('kanban', centroId, undefined, search); 
+      const data = await listOperacoes('kanban', centroId, status || undefined, search);
       setItems(data);
     } catch (error: any) {
       addToast('Erro ao carregar o quadro.', 'error');
@@ -38,7 +39,7 @@ const OperacoesKanbanBoard: React.FC<Props> = ({ centroId, search }) => {
 
   useEffect(() => {
     fetchData();
-  }, [centroId, search]);
+  }, [centroId, status, search]);
 
   const onDragEnd = async (result: DropResult) => {
     const { source, destination, draggableId } = result;

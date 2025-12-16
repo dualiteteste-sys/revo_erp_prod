@@ -164,22 +164,18 @@ export default function OrdemFormPanel({ ordemId, onSaveSuccess, onClose }: Prop
   // --- Entregas ---
   const handleAddEntrega = async (data: Partial<OrdemEntrega>) => {
     if (!formData.id) return;
-    try {
-      await manageEntrega(
-        formData.id,
-        null,
-        data.data_entrega!,
-        data.quantidade_entregue!,
-        data.status_faturamento!,
-        data.documento_ref,
-        data.observacoes,
-        'upsert'
-      );
-      await loadDetails(formData.id);
-      addToast('Entrega registrada.', 'success');
-    } catch (e: any) {
-      throw e;
-    }
+    await manageEntrega(
+      formData.id,
+      null,
+      data.data_entrega!,
+      data.quantidade_entregue!,
+      data.status_faturamento!,
+      data.documento_ref,
+      data.observacoes,
+      'upsert'
+    );
+    await loadDetails(formData.id);
+    addToast('Entrega registrada.', 'success');
   };
 
   const handleRemoveEntrega = async (entregaId: string) => {

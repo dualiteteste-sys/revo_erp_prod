@@ -5,7 +5,7 @@ import {
   RelatorioValorizacaoItem, 
   RelatorioBaixoEstoqueItem 
 } from '@/services/suprimentos';
-import { Loader2, Search, Download, Printer, TrendingUp, AlertTriangle, BarChart3 } from 'lucide-react';
+import { Loader2, Search, Download, Printer, TrendingUp, AlertTriangle, BarChart3, CheckCircle } from 'lucide-react';
 import GlassCard from '@/components/ui/GlassCard';
 import { formatCurrency } from '@/lib/utils';
 import { useDebounce } from '@/hooks/useDebounce';

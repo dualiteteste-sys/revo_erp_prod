@@ -18,6 +18,11 @@ export type CentroTrabalho = {
 
 export type CentroTrabalhoPayload = Partial<Omit<CentroTrabalho, 'id'>> & { id?: string };
 
+export type CentroCalendarioDia = {
+  dow: number; // 0=Dom .. 6=Sáb
+  capacidade_horas: number;
+};
+
 export async function listCentrosTrabalho(search?: string, ativo?: boolean): Promise<CentroTrabalho[]> {
   return callRpc<CentroTrabalho[]>('industria_centros_trabalho_list', {
     p_search: search || null,
@@ -31,6 +36,17 @@ export async function saveCentroTrabalho(payload: CentroTrabalhoPayload): Promis
 
 export async function deleteCentroTrabalho(id: string): Promise<void> {
   return callRpc<void>('industria_centros_trabalho_delete', { p_id: id });
+}
+
+export async function getCentroCalendarioSemanal(centroTrabalhoId: string): Promise<CentroCalendarioDia[]> {
+  return callRpc<CentroCalendarioDia[]>('industria_ct_calendario_get', { p_centro_id: centroTrabalhoId });
+}
+
+export async function upsertCentroCalendarioSemanal(
+  centroTrabalhoId: string,
+  calendario: CentroCalendarioDia[],
+): Promise<void> {
+  await callRpc('industria_ct_calendario_upsert', { p_centro_id: centroTrabalhoId, p_payload: calendario });
 }
 
 export async function seedCentrosTrabalho(): Promise<CentroTrabalho[]> {
