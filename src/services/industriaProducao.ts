@@ -775,6 +775,7 @@ export async function listPcpOrdensLeadTime(startDate?: string, endDate?: string
 }
 
 export type PcpReplanResult = {
+  run_id?: string;
   moved: number;
   remaining_overload_hours?: number;
   peak_day?: string;
@@ -798,6 +799,7 @@ export async function pcpReplanejarCentroSobrecarga(
 
 export type PcpApsSequenciarResult = {
   apply: boolean;
+  run_id?: string;
   centro_id: string;
   data_inicial: string;
   data_final: string;
@@ -818,4 +820,34 @@ export async function pcpApsSequenciarCentro(params: {
     p_data_final: params.dataFinal,
     p_apply: params.apply ?? true,
   });
+}
+
+export type PcpApsRun = {
+  id: string;
+  kind: 'sequencing' | 'replan_overload' | string;
+  created_at: string;
+  created_by: string | null;
+  summary: {
+    total_operacoes?: number;
+    updated_operacoes?: number;
+    unscheduled_operacoes?: number;
+    [key: string]: any;
+  };
+};
+
+export async function pcpApsListRuns(centroTrabalhoId: string, limit = 10): Promise<PcpApsRun[]> {
+  return callRpc<PcpApsRun[]>('pcp_aps_list_runs', {
+    p_centro_id: centroTrabalhoId,
+    p_limit: limit,
+  });
+}
+
+export type PcpApsUndoResult = {
+  run_id: string;
+  restored: number;
+  skipped: number;
+};
+
+export async function pcpApsUndo(runId: string): Promise<PcpApsUndoResult> {
+  return callRpc<PcpApsUndoResult>('pcp_aps_undo', { p_run_id: runId });
 }
