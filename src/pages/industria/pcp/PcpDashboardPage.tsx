@@ -137,6 +137,13 @@ export default function PcpDashboardPage() {
     };
   }>>({});
   const [replanPreviewingCtId, setReplanPreviewingCtId] = useState<string | null>(null);
+  const [replanPreviewDetails, setReplanPreviewDetails] = useState<{
+    open: boolean;
+    ctId?: string;
+    ctNome?: string;
+    peakDay?: string;
+  }>({ open: false });
+  const [replanPreviewReasonFilter, setReplanPreviewReasonFilter] = useState<string>('all');
 
   const loadData = useCallback(async () => {
     setLoading(true);
@@ -311,6 +318,8 @@ export default function PcpDashboardPage() {
     setReplanResults({});
     setReplanPreview({});
     setReplanPreviewingCtId(null);
+    setReplanPreviewDetails({ open: false });
+    setReplanPreviewReasonFilter('all');
   }, []);
 
   const openApsForCt = useCallback((ctId: string, ctNome?: string) => {
@@ -643,6 +652,36 @@ export default function PcpDashboardPage() {
       setReplanPreviewingCtId(null);
     }
   }, [addToast, endDate]);
+
+  const openReplanPreviewDetailsForCt = useCallback(async (ctId: string, ctNome: string, peakDay: string) => {
+    const existing = replanPreview[ctId]?.rows;
+    if (existing?.length) {
+      setReplanPreviewDetails({ open: true, ctId, ctNome, peakDay });
+      return;
+    }
+
+    setReplanPreviewingCtId(ctId);
+    try {
+      const rows = await pcpReplanCentroSobrecargaPreview(ctId, peakDay, endDate, 200);
+      const summary = rows.reduce((acc, row) => {
+        acc.total += 1;
+        if (row.can_move) acc.canMove += 1;
+        if (row.reason === 'locked') acc.locked += 1;
+        if (row.reason === 'no_slot') acc.noSlot += 1;
+        if (row.reason === 'zero_hours') acc.zeroHours += 1;
+        if (row.reason === 'no_overload') acc.noOverload += 1;
+        if (!acc.freezeUntil && row.freeze_until) acc.freezeUntil = row.freeze_until;
+        return acc;
+      }, { total: 0, canMove: 0, locked: 0, noSlot: 0, zeroHours: 0, noOverload: 0, freezeUntil: undefined as string | undefined });
+
+      setReplanPreview((prev) => ({ ...prev, [ctId]: { rows, summary } }));
+      setReplanPreviewDetails({ open: true, ctId, ctNome, peakDay });
+    } catch (e: any) {
+      addToast(e?.message || 'Falha ao carregar detalhes do preview.', 'error');
+    } finally {
+      setReplanPreviewingCtId(null);
+    }
+  }, [addToast, endDate, replanPreview]);
 
   const weeklySeries = useMemo(() => {
     const dailyMap = new Map<string, { label: string; carga: number; capacidade: number }>();
@@ -1131,6 +1170,15 @@ export default function PcpDashboardPage() {
                             </button>
                             <button
                               type="button"
+                              className="text-[11px] px-2 py-1 rounded-md border bg-white hover:bg-gray-50 disabled:opacity-50"
+                              onClick={() => openReplanPreviewDetailsForCt(r.centro_id, r.centro_nome, r.peak_day)}
+                              disabled={replanApplying || previewLoading}
+                              title="Ver operações do preview (motivos, old→new)"
+                            >
+                              Detalhes
+                            </button>
+                            <button
+                              type="button"
                               className="text-[11px] px-2 py-1 rounded-md border bg-white hover:bg-gray-50"
                               onClick={() => openGanttForCt(r.centro_id)}
                             >
@@ -1161,6 +1209,128 @@ export default function PcpDashboardPage() {
               </table>
             </div>
           </div>
+        </div>
+      </Modal>
+
+      <Modal
+        isOpen={replanPreviewDetails.open}
+        onClose={() => setReplanPreviewDetails({ open: false })}
+        title={`PCP • Preview detalhado${replanPreviewDetails.ctNome ? ` • ${replanPreviewDetails.ctNome}` : ''}`}
+        size="xl"
+      >
+        <div className="p-6 space-y-4">
+          {(() => {
+            const ctId = replanPreviewDetails.ctId;
+            const peakDay = replanPreviewDetails.peakDay;
+            const preview = ctId ? replanPreview[ctId] : undefined;
+            const rows = preview?.rows || [];
+            const summary = preview?.summary;
+            const filtered =
+              replanPreviewReasonFilter === 'all'
+                ? rows
+                : rows.filter((r) => (r.reason || 'ok') === replanPreviewReasonFilter);
+
+            const reasonLabel: Record<string, string> = {
+              ok: 'OK',
+              locked: 'Locked',
+              no_slot: 'Sem slot',
+              zero_hours: '0h',
+              no_overload: 'Sem sobrecarga',
+            };
+
+            const fmtDate = (d?: string | null) => (d ? format(new Date(d), 'dd/MM') : '—');
+
+            return (
+              <>
+                <div className="bg-gray-50 border rounded-lg p-4 text-sm text-gray-800 space-y-1">
+                  <div className="flex flex-wrap gap-x-6 gap-y-1">
+                    <div>CT: <span className="font-semibold">{replanPreviewDetails.ctNome || ctId || '—'}</span></div>
+                    <div>Pico: <span className="font-semibold">{peakDay ? format(new Date(peakDay), 'dd/MM') : '—'}</span></div>
+                    <div>
+                      Resumo:{' '}
+                      <span className="font-semibold">
+                        {(summary?.canMove ?? 0)}/{(summary?.total ?? 0)} movíveis
+                      </span>
+                      {summary?.locked ? <span className="text-gray-600"> • {summary.locked} locked</span> : null}
+                      {summary?.noSlot ? <span className="text-gray-600"> • {summary.noSlot} sem slot</span> : null}
+                      {summary?.zeroHours ? <span className="text-gray-600"> • {summary.zeroHours} 0h</span> : null}
+                      {summary?.freezeUntil ? <span className="text-gray-600"> • Freeze até {format(new Date(summary.freezeUntil), 'dd/MM')}</span> : null}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex flex-wrap items-center gap-2">
+                  <label className="text-xs text-gray-600">Filtro:</label>
+                  <select
+                    className="text-xs border rounded-md px-2 py-1 bg-white"
+                    value={replanPreviewReasonFilter}
+                    onChange={(e) => setReplanPreviewReasonFilter(e.target.value)}
+                  >
+                    <option value="all">Todos</option>
+                    <option value="ok">OK</option>
+                    <option value="locked">Locked</option>
+                    <option value="no_slot">Sem slot</option>
+                    <option value="zero_hours">0h</option>
+                    <option value="no_overload">Sem sobrecarga</option>
+                  </select>
+                  <div className="ml-auto text-xs text-gray-500">
+                    {filtered.length}/{rows.length} operações
+                  </div>
+                </div>
+
+                <div className="bg-white border rounded-lg overflow-hidden">
+                  <div className="overflow-x-auto">
+                    <table className="min-w-full text-xs">
+                      <thead className="bg-gray-50 text-gray-600">
+                        <tr>
+                          <th className="px-3 py-2 text-left">Ordem</th>
+                          <th className="px-3 py-2 text-left">Produto</th>
+                          <th className="px-3 py-2 text-right">Horas</th>
+                          <th className="px-3 py-2 text-left">Old</th>
+                          <th className="px-3 py-2 text-left">New</th>
+                          <th className="px-3 py-2 text-left">Status</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {filtered.map((r) => {
+                          const statusText = r.can_move ? 'Movível' : (reasonLabel[r.reason] || r.reason || '—');
+                          const badge =
+                            r.can_move
+                              ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                              : r.reason === 'locked'
+                                ? 'bg-rose-50 text-rose-700 border-rose-200'
+                                : r.reason === 'no_slot'
+                                  ? 'bg-amber-50 text-amber-800 border-amber-200'
+                                  : 'bg-gray-50 text-gray-700 border-gray-200';
+                          return (
+                            <tr key={r.operacao_id} className="border-t">
+                              <td className="px-3 py-2 text-gray-900 font-medium">{r.ordem_numero ?? '—'}</td>
+                              <td className="px-3 py-2 text-gray-700">{r.produto_nome || '—'}</td>
+                              <td className="px-3 py-2 text-right text-gray-700">{formatHours(r.horas)}</td>
+                              <td className="px-3 py-2 text-gray-700">{fmtDate(r.old_ini)} → {fmtDate(r.old_fim)}</td>
+                              <td className="px-3 py-2 text-gray-700">{fmtDate(r.new_ini)} → {fmtDate(r.new_fim)}</td>
+                              <td className="px-3 py-2">
+                                <span className={`inline-flex items-center px-2 py-0.5 rounded-md border ${badge}`}>
+                                  {statusText}
+                                </span>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                        {filtered.length === 0 && (
+                          <tr>
+                            <td colSpan={6} className="px-3 py-6 text-sm text-gray-500">
+                              {rows.length === 0 ? 'Nenhuma operação retornada no preview.' : 'Nenhuma operação neste filtro.'}
+                            </td>
+                          </tr>
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </>
+            );
+          })()}
         </div>
       </Modal>
 
