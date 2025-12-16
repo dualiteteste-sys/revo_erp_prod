@@ -36,11 +36,13 @@ export default function ExecucaoPage() {
     const urlView = searchParams.get('view');
     const urlStatus = searchParams.get('status');
     const urlCentro = searchParams.get('centro');
-    const shouldHydrate = urlView || urlStatus || urlCentro;
+    const urlQ = searchParams.get('q');
+    const shouldHydrate = urlView || urlStatus || urlCentro || urlQ;
     if (!shouldHydrate) return;
     if (urlView === 'list' || urlView === 'kanban') setViewMode(urlView);
     if (urlStatus !== null) setStatusFilter(urlStatus);
     if (urlCentro !== null) setCentroFilter(urlCentro);
+    if (urlQ !== null) setSearch(urlQ);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -51,9 +53,11 @@ export default function ExecucaoPage() {
     else next.delete('status');
     if (centroFilter) next.set('centro', centroFilter);
     else next.delete('centro');
+    if (search) next.set('q', search);
+    else next.delete('q');
     setSearchParams(next, { replace: true });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [viewMode, statusFilter, centroFilter]);
+  }, [viewMode, statusFilter, centroFilter, search]);
 
   const fetchOperacoes = async () => {
     if (viewMode === 'kanban') return;

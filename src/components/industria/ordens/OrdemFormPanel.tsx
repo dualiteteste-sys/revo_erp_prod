@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { ArrowLeft, ArrowRight, Loader2, Save } from 'lucide-react';
-import { OrdemIndustriaDetails, OrdemPayload, saveOrdem, getOrdemDetails, manageComponente, manageEntrega, OrdemEntrega } from '@/services/industria';
+import { OrdemIndustriaDetails, OrdemPayload, saveOrdem, getOrdemDetails, manageComponente, manageEntrega, OrdemEntrega, gerarExecucaoOrdem } from '@/services/industria';
 import { useToast } from '@/contexts/ToastProvider';
 import Section from '@/components/ui/forms/Section';
 import Input from '@/components/ui/forms/Input';
@@ -12,9 +12,11 @@ import MaterialClienteAutocomplete from '@/components/industria/materiais/Materi
 import OrdemFormItems from './OrdemFormItems';
 import OrdemEntregas from './OrdemEntregas';
 import BomSelector from './BomSelector';
+import RoteiroSelector from './RoteiroSelector';
 import { formatOrderNumber } from '@/lib/utils';
 import { ensureMaterialClienteV2 } from '@/services/industriaMateriais';
 import type { MaterialClienteListItem } from '@/services/industriaMateriais';
+import { useNavigate } from 'react-router-dom';
 
 interface Props {
   ordemId: string | null;
@@ -38,8 +40,10 @@ interface Props {
 
 export default function OrdemFormPanel({ ordemId, initialTipoOrdem, initialPrefill, onSaveSuccess, onClose }: Props) {
   const { addToast } = useToast();
+  const navigate = useNavigate();
   const [loading, setLoading] = useState(!!ordemId);
   const [isSaving, setIsSaving] = useState(false);
+  const [isGeneratingExecucao, setIsGeneratingExecucao] = useState(false);
   const [activeTab, setActiveTab] = useState<'dados' | 'componentes' | 'entregas'>('dados');
   const [materialCliente, setMaterialCliente] = useState<MaterialClienteListItem | null>(null);
   const [wizardStep, setWizardStep] = useState<0 | 1 | 2>(0);
@@ -223,7 +227,9 @@ export default function OrdemFormPanel({ ordemId, initialTipoOrdem, initialPrefi
         data_prevista_fim: formData.data_prevista_fim,
         data_prevista_entrega: formData.data_prevista_entrega,
         documento_ref: formData.documento_ref,
-        observacoes: formData.observacoes
+        observacoes: formData.observacoes,
+        roteiro_aplicado_id: formData.roteiro_aplicado_id,
+        roteiro_aplicado_desc: formData.roteiro_aplicado_desc,
       };
 
       const saved = await saveOrdem(payload);
@@ -360,6 +366,34 @@ export default function OrdemFormPanel({ ordemId, initialTipoOrdem, initialPrefi
       total_count: 1,
     });
   }, [formData.tipo_ordem, formData.material_cliente_id, formData.cliente_id]);
+
+  const handleGoToExecucao = (q?: string) => {
+    const next = new URLSearchParams();
+    next.set('view', 'list');
+    if (q) next.set('q', q);
+    navigate(`/app/industria/execucao?${next.toString()}`);
+  };
+
+  const handleGerarExecucao = async () => {
+    if (isLocked) return;
+    setIsGeneratingExecucao(true);
+    try {
+      let currentId = formData.id;
+      if (!currentId) {
+        currentId = await handleSaveHeader();
+        if (!currentId) return;
+      }
+
+      const result = await gerarExecucaoOrdem(currentId, formData.roteiro_aplicado_id ?? null);
+      await loadDetails(currentId);
+      addToast(`Operações geradas (${result.operacoes}).`, 'success');
+      handleGoToExecucao(result.producao_ordem_numero ? String(result.producao_ordem_numero) : formData.produto_nome || undefined);
+    } catch (e: any) {
+      addToast(e?.message || 'Não foi possível gerar operações.', 'error');
+    } finally {
+      setIsGeneratingExecucao(false);
+    }
+  };
 
   return (
     <div className="flex flex-col h-full">
@@ -574,6 +608,52 @@ export default function OrdemFormPanel({ ordemId, initialTipoOrdem, initialPrefi
             </Section>
 
             {(!isWizard || wizardStep === 2) && (
+              <Section
+                title="Processo"
+                description="Selecione o roteiro para gerar as operações de Execução (Chão/Tela do Operador)."
+              >
+                <div className="sm:col-span-6 flex flex-col gap-2">
+                  <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-gray-200 bg-white px-3 py-2">
+                    <div className="min-w-[220px]">
+                      <div className="text-xs font-semibold text-gray-500">Roteiro aplicado</div>
+                      <div className="text-sm font-medium text-gray-800">
+                        {formData.roteiro_aplicado_desc
+                          ? formData.roteiro_aplicado_desc
+                          : 'Nenhum selecionado (usará o padrão do produto, se existir)'}
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <RoteiroSelector
+                        ordemId={formData.id || 'new'}
+                        produtoId={formData.produto_final_id || ''}
+                        tipoBom={formData.tipo_ordem === 'beneficiamento' ? 'beneficiamento' : 'producao'}
+                        onApplied={(roteiro) => {
+                          handleHeaderChange('roteiro_aplicado_id', roteiro.id);
+                          const label = `${roteiro.codigo || 'Sem código'} (v${roteiro.versao})${roteiro.descricao ? ` - ${roteiro.descricao}` : ''}`;
+                          handleHeaderChange('roteiro_aplicado_desc', label);
+                        }}
+                      />
+                      {formData.execucao_ordem_id && (
+                        <button
+                          type="button"
+                          onClick={() => handleGoToExecucao(formData.execucao_ordem_numero ? String(formData.execucao_ordem_numero) : undefined)}
+                          className="text-sm font-medium text-gray-700 hover:text-gray-900 hover:bg-gray-50 px-3 py-2 rounded-lg transition-colors border border-gray-200"
+                        >
+                          Ir para Execução
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                  {!!formData.execucao_ordem_id && (
+                    <div className="text-xs text-gray-500">
+                      Execução gerada{formData.execucao_ordem_numero ? ` (OP ${formatOrderNumber(formData.execucao_ordem_numero)})` : ''}.
+                    </div>
+                  )}
+                </div>
+              </Section>
+            )}
+
+            {(!isWizard || wizardStep === 2) && (
             <Section title="Programação" description="Prazos e status.">
               <div className="sm:col-span-2">
                 <Select label="Status" name="status" value={formData.status} onChange={e => handleHeaderChange('status', e.target.value)} disabled={isLocked}>
@@ -659,6 +739,29 @@ export default function OrdemFormPanel({ ordemId, initialTipoOrdem, initialPrefi
           Fechar
         </button>
         <div className="flex gap-3">
+          {!isLocked && formData.id && !formData.execucao_ordem_id && (
+            <button
+              type="button"
+              onClick={handleGerarExecucao}
+              disabled={isGeneratingExecucao}
+              className="flex items-center gap-2 border border-blue-200 bg-blue-50 text-blue-800 font-bold py-2 px-4 rounded-lg hover:bg-blue-100 disabled:opacity-50"
+              title="Gera operações e abre Execução"
+            >
+              {isGeneratingExecucao ? <Loader2 className="animate-spin" size={20} /> : <ArrowRight size={18} />}
+              Gerar operações
+            </button>
+          )}
+          {!isLocked && formData.execucao_ordem_id && (
+            <button
+              type="button"
+              onClick={() => handleGoToExecucao(formData.execucao_ordem_numero ? String(formData.execucao_ordem_numero) : undefined)}
+              className="flex items-center gap-2 border border-gray-200 bg-white text-gray-800 font-bold py-2 px-4 rounded-lg hover:bg-gray-50"
+              title="Abrir Execução"
+            >
+              <ArrowRight size={18} />
+              Abrir Execução
+            </button>
+          )}
           {!isLocked && !isWizard && (
             <button
               onClick={handleSaveHeader}

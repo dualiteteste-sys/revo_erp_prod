@@ -65,6 +65,11 @@ export type OrdemIndustriaDetails = {
   tipo_ordem: TipoOrdemIndustria;
   produto_final_id: string;
   produto_nome: string;
+  roteiro_aplicado_id?: string | null;
+  roteiro_aplicado_desc?: string | null;
+  execucao_ordem_id?: string | null;
+  execucao_ordem_numero?: number | null;
+  execucao_gerada_em?: string | null;
   usa_material_cliente?: boolean | null;
   material_cliente_id?: string | null;
   material_cliente_nome?: string | null;
@@ -164,5 +169,18 @@ export async function replanejarOperacao(operacaoId: string, centroTrabalhoId: s
     p_operacao_id: operacaoId,
     p_novo_centro: centroTrabalhoId,
     p_nova_prioridade: prioridade ?? null,
+  });
+}
+
+export type GerarExecucaoResult = {
+  producao_ordem_id: string;
+  producao_ordem_numero: number | null;
+  operacoes: number;
+};
+
+export async function gerarExecucaoOrdem(ordemId: string, roteiroId?: string | null): Promise<GerarExecucaoResult> {
+  return callRpc<GerarExecucaoResult>('industria_ordem_gerar_execucao', {
+    p_ordem_id: ordemId,
+    p_roteiro_id: roteiroId ?? null,
   });
 }

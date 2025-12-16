@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { cloneOrdem, listOrdens, OrdemIndustria } from '@/services/industria';
 import { PlusCircle, Search, LayoutGrid, List } from 'lucide-react';
 import { Loader2 } from 'lucide-react';
@@ -9,14 +9,17 @@ import OrdemFormPanel from '@/components/industria/ordens/OrdemFormPanel';
 import IndustriaKanbanBoard from '@/components/industria/kanban/IndustriaKanbanBoard';
 import Select from '@/components/ui/forms/Select';
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
+import { useToast } from '@/contexts/ToastProvider';
 
 export default function OrdensPage() {
+  const { addToast } = useToast();
   const [viewMode, setViewMode] = useState<'list' | 'kanban'>('list');
   const [orders, setOrders] = useState<OrdemIndustria[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
   const debouncedSearch = useDebounce(search, 500);
+  const hasShownRpcHint = useRef(false);
 
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -53,6 +56,21 @@ export default function OrdensPage() {
       setOrders(data);
     } catch (e) {
       console.error(e);
+      const message = (e as any)?.message || 'Erro ao carregar ordens.';
+      if (
+        !hasShownRpcHint.current &&
+        typeof message === 'string' &&
+        message.includes('industria_list_ordens') &&
+        message.includes('HTTP_404')
+      ) {
+        hasShownRpcHint.current = true;
+        addToast(
+          "RPC 'industria_list_ordens' não encontrada. Verifique se as migrações do módulo OP/OB foram aplicadas e recarregue o schema cache do Supabase (NOTIFY pgrst, 'reload schema').",
+          'error'
+        );
+      } else {
+        addToast(message, 'error');
+      }
     } finally {
       setLoading(false);
     }

@@ -7,10 +7,11 @@ import Modal from '@/components/ui/Modal';
 interface Props {
     ordemId: string;
     produtoId: string;
+    tipoBom?: 'producao' | 'beneficiamento';
     onApplied: (roteiro: RoteiroListItem) => void;
 }
 
-export default function RoteiroSelector({ ordemId, produtoId, onApplied }: Props) {
+export default function RoteiroSelector({ ordemId, produtoId, tipoBom, onApplied }: Props) {
     const [isOpen, setIsOpen] = useState(false);
     const [roteiros, setRoteiros] = useState<RoteiroListItem[]>([]);
     const [loading, setLoading] = useState(false);
@@ -22,7 +23,7 @@ export default function RoteiroSelector({ ordemId, produtoId, onApplied }: Props
         setLoading(true);
         try {
             const targetProdutoId = filterByProduct ? produtoId : undefined;
-            const data = await listRoteiros(searchTerm, targetProdutoId, undefined, true);
+            const data = await listRoteiros(searchTerm, targetProdutoId, tipoBom, true);
             setRoteiros(data);
         } catch (e) {
             console.error(e);
@@ -51,7 +52,7 @@ export default function RoteiroSelector({ ordemId, produtoId, onApplied }: Props
             <button
                 onClick={() => setIsOpen(true)}
                 className="flex items-center gap-2 text-sm font-medium text-blue-600 hover:text-blue-800 hover:bg-blue-50 px-3 py-2 rounded-lg transition-colors"
-                disabled={!ordemId}
+                disabled={!produtoId}
             >
                 <FileText size={16} /> Selecionar Roteiro
             </button>
