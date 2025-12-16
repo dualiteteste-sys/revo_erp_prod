@@ -118,6 +118,39 @@ export default function PcpDashboardPage() {
   const [batchRows, setBatchRows] = useState<any[]>([]);
   const [batchPreviewed, setBatchPreviewed] = useState(false);
 
+  const loadData = useCallback(async () => {
+    setLoading(true);
+    try {
+      const [cargaData, ganttData, kpisData, atpData, paretoData, leadTimeData] = await Promise.all([
+        listPcpCargaCapacidade(startDate, endDate),
+        listPcpGantt(startDate, endDate),
+        listPcpKpis(30),
+        listPcpAtpCtp(endDate),
+        listPcpParetoRefugos(startDate, endDate),
+        listPcpOrdensLeadTime(startDate, endDate)
+      ]);
+      setCarga(cargaData);
+      setGantt(ganttData);
+      setKpis(kpisData);
+      setAtpCtp(atpData);
+      setPareto(paretoData);
+      setLeadTimes(leadTimeData);
+      setSelectedProdutoId(prev => {
+        if (prev && atpData.some(item => item.produto_id === prev)) {
+          return prev;
+        }
+        return atpData[0]?.produto_id || null;
+      });
+      if (atpData.length === 0) {
+        setEstoqueProjetado([]);
+      }
+    } catch (error: any) {
+      addToast(error.message || 'Não foi possível carregar PCP.', 'error');
+    } finally {
+      setLoading(false);
+    }
+  }, [addToast, endDate, startDate]);
+
   const openGanttForCt = useCallback((ctId: string) => {
     setGanttCtFilter(ctId);
     setGanttStatusFilter('all');
@@ -363,43 +396,9 @@ export default function PcpDashboardPage() {
       .finally(() => setApsLoading(false));
   }, [apsModal.open, apsSelectedRunId]);
 
-  const loadData = async () => {
-    setLoading(true);
-    try {
-      const [cargaData, ganttData, kpisData, atpData, paretoData, leadTimeData] = await Promise.all([
-        listPcpCargaCapacidade(startDate, endDate),
-        listPcpGantt(startDate, endDate),
-        listPcpKpis(30),
-        listPcpAtpCtp(endDate),
-        listPcpParetoRefugos(startDate, endDate),
-        listPcpOrdensLeadTime(startDate, endDate)
-      ]);
-      setCarga(cargaData);
-      setGantt(ganttData);
-      setKpis(kpisData);
-      setAtpCtp(atpData);
-      setPareto(paretoData);
-      setLeadTimes(leadTimeData);
-      setSelectedProdutoId(prev => {
-        if (prev && atpData.some(item => item.produto_id === prev)) {
-          return prev;
-        }
-        return atpData[0]?.produto_id || null;
-      });
-      if (atpData.length === 0) {
-        setEstoqueProjetado([]);
-      }
-    } catch (error: any) {
-      addToast(error.message || 'Não foi possível carregar PCP.', 'error');
-    } finally {
-      setLoading(false);
-    }
-  };
-
   useEffect(() => {
     loadData();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [loadData]);
 
   useEffect(() => {
     if (!selectedProdutoId) {
