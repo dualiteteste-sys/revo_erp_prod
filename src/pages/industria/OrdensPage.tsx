@@ -8,7 +8,7 @@ import OrdensTable from '@/components/industria/ordens/OrdensTable';
 import OrdemFormPanel from '@/components/industria/ordens/OrdemFormPanel';
 import IndustriaKanbanBoard from '@/components/industria/kanban/IndustriaKanbanBoard';
 import Select from '@/components/ui/forms/Select';
-import { useSearchParams } from 'react-router-dom';
+import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 
 export default function OrdensPage() {
   const [viewMode, setViewMode] = useState<'list' | 'kanban'>('list');
@@ -21,6 +21,9 @@ export default function OrdensPage() {
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [searchParams, setSearchParams] = useSearchParams();
+  const location = useLocation();
+  const navigate = useNavigate();
+  const [initialPrefill, setInitialPrefill] = useState<React.ComponentProps<typeof OrdemFormPanel>['initialPrefill']>();
 
   const tipoOrdem = (searchParams.get('tipo') === 'beneficiamento' ? 'beneficiamento' : 'industrializacao') as
     | 'industrializacao'
@@ -29,12 +32,17 @@ export default function OrdensPage() {
   // Deep-link: /app/industria/ordens?tipo=beneficiamento&new=1
   useEffect(() => {
     if (searchParams.get('new') !== '1') return;
+    const statePrefill = (location.state as any)?.prefill as React.ComponentProps<typeof OrdemFormPanel>['initialPrefill'] | undefined;
+    setInitialPrefill(statePrefill);
     setSelectedId(null);
     setIsFormOpen(true);
     const next = new URLSearchParams(searchParams);
     next.delete('new');
-    setSearchParams(next, { replace: true });
-  }, [searchParams, setSearchParams]);
+    navigate(
+      { pathname: location.pathname, search: next.toString() ? `?${next.toString()}` : '' },
+      { replace: true, state: null }
+    );
+  }, [searchParams, location.pathname, location.state, navigate]);
 
   const fetchOrders = async () => {
     if (viewMode === 'kanban') return; // Kanban fetches its own data
@@ -66,6 +74,7 @@ export default function OrdensPage() {
   const handleClose = () => {
     setIsFormOpen(false);
     setSelectedId(null);
+    setInitialPrefill(undefined);
   };
 
   const handleSuccess = () => {
@@ -171,7 +180,13 @@ export default function OrdensPage() {
         title={selectedId ? 'Editar Ordem' : (tipoOrdem === 'beneficiamento' ? 'Nova Ordem de Beneficiamento' : 'Nova Ordem de Industrialização')}
         size="6xl"
       >
-        <OrdemFormPanel ordemId={selectedId} initialTipoOrdem={tipoOrdem} onSaveSuccess={handleSuccess} onClose={handleClose} />
+        <OrdemFormPanel
+          ordemId={selectedId}
+          initialTipoOrdem={tipoOrdem}
+          initialPrefill={selectedId ? undefined : initialPrefill}
+          onSaveSuccess={handleSuccess}
+          onClose={handleClose}
+        />
       </Modal>
     </div>
   );

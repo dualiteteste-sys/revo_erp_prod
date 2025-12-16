@@ -13,17 +13,30 @@ import OrdemFormItems from './OrdemFormItems';
 import OrdemEntregas from './OrdemEntregas';
 import BomSelector from './BomSelector';
 import { formatOrderNumber } from '@/lib/utils';
-import { ensureMaterialCliente } from '@/services/industriaMateriais';
+import { ensureMaterialClienteV2 } from '@/services/industriaMateriais';
 import type { MaterialClienteListItem } from '@/services/industriaMateriais';
 
 interface Props {
   ordemId: string | null;
   initialTipoOrdem?: 'industrializacao' | 'beneficiamento';
+  initialPrefill?: {
+    clienteId?: string | null;
+    clienteNome?: string | null;
+    clienteDoc?: string | null;
+    produtoId?: string | null;
+    produtoNome?: string | null;
+    quantidade?: number | null;
+    unidade?: string | null;
+    documentoRef?: string | null;
+    materialClienteNome?: string | null;
+    materialClienteCodigo?: string | null;
+    materialClienteUnidade?: string | null;
+  };
   onSaveSuccess: () => void;
   onClose: () => void;
 }
 
-export default function OrdemFormPanel({ ordemId, initialTipoOrdem, onSaveSuccess, onClose }: Props) {
+export default function OrdemFormPanel({ ordemId, initialTipoOrdem, initialPrefill, onSaveSuccess, onClose }: Props) {
   const { addToast } = useToast();
   const [loading, setLoading] = useState(!!ordemId);
   const [isSaving, setIsSaving] = useState(false);
@@ -45,6 +58,51 @@ export default function OrdemFormPanel({ ordemId, initialTipoOrdem, onSaveSucces
     if (!initialTipoOrdem) return;
     setFormData(prev => ({ ...prev, tipo_ordem: initialTipoOrdem }));
   }, [initialTipoOrdem, ordemId]);
+
+  useEffect(() => {
+    if (ordemId) return;
+    if (!initialPrefill) return;
+
+    setFormData(prev => {
+      const next: Partial<OrdemIndustriaDetails> = { ...prev };
+
+      if (initialPrefill.clienteId && !next.cliente_id) {
+        next.cliente_id = initialPrefill.clienteId;
+      }
+      if (initialPrefill.clienteNome && !next.cliente_nome) {
+        next.cliente_nome = initialPrefill.clienteNome;
+      }
+      if (initialPrefill.produtoId && !next.produto_final_id) {
+        next.produto_final_id = initialPrefill.produtoId;
+      }
+      if (initialPrefill.produtoNome && !next.produto_nome) {
+        next.produto_nome = initialPrefill.produtoNome;
+      }
+      if (typeof initialPrefill.quantidade === 'number' && (!next.quantidade_planejada || next.quantidade_planejada <= 0)) {
+        next.quantidade_planejada = initialPrefill.quantidade;
+      }
+      if (initialPrefill.unidade && (!next.unidade || next.unidade === 'un')) {
+        next.unidade = initialPrefill.unidade;
+      }
+      if (initialPrefill.documentoRef && !next.documento_ref) {
+        next.documento_ref = initialPrefill.documentoRef;
+      }
+
+      if (initialTipoOrdem === 'beneficiamento' || next.tipo_ordem === 'beneficiamento') {
+        if (initialPrefill.materialClienteNome && !next.material_cliente_nome) {
+          next.material_cliente_nome = initialPrefill.materialClienteNome;
+        }
+        if (initialPrefill.materialClienteCodigo && !next.material_cliente_codigo) {
+          next.material_cliente_codigo = initialPrefill.materialClienteCodigo;
+        }
+        if (initialPrefill.materialClienteUnidade && !next.material_cliente_unidade) {
+          next.material_cliente_unidade = initialPrefill.materialClienteUnidade;
+        }
+      }
+
+      return next;
+    });
+  }, [initialPrefill, initialTipoOrdem, ordemId]);
 
   useEffect(() => {
     if (ordemId) {
@@ -110,11 +168,15 @@ export default function OrdemFormPanel({ ordemId, initialTipoOrdem, onSaveSucces
         );
 
         if (shouldCreate) {
-          materialClienteId = await ensureMaterialCliente(
+          materialClienteId = await ensureMaterialClienteV2(
             formData.cliente_id,
             formData.produto_final_id,
             formData.produto_nome || 'Material',
-            formData.unidade || 'un'
+            formData.material_cliente_unidade || formData.unidade || 'un',
+            {
+              codigoCliente: formData.material_cliente_codigo ?? null,
+              nomeCliente: formData.material_cliente_nome ?? null,
+            }
           );
           usaMaterialCliente = true;
 
@@ -343,6 +405,28 @@ export default function OrdemFormPanel({ ordemId, initialTipoOrdem, onSaveSucces
                 {formData.id ? (
                   <div className="p-3 bg-gray-100 border border-gray-300 rounded-lg text-gray-700">
                     {formData.produto_nome}
+                  </div>
+                ) : formData.produto_final_id && formData.produto_nome ? (
+                  <div className="flex items-center justify-between gap-3 p-3 bg-gray-50 border border-gray-200 rounded-lg">
+                    <div className="text-gray-800 font-medium truncate">{formData.produto_nome}</div>
+                    {!isLocked && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          handleHeaderChange('produto_final_id', null);
+                          handleHeaderChange('produto_nome', null);
+                          handleHeaderChange('usa_material_cliente', false);
+                          handleHeaderChange('material_cliente_id', null);
+                          handleHeaderChange('material_cliente_nome', null);
+                          handleHeaderChange('material_cliente_codigo', null);
+                          handleHeaderChange('material_cliente_unidade', null);
+                          setMaterialCliente(null);
+                        }}
+                        className="text-xs font-bold text-blue-700 hover:text-blue-900 hover:underline whitespace-nowrap"
+                      >
+                        Trocar
+                      </button>
+                    )}
                   </div>
                 ) : (
                   <ItemAutocomplete onSelect={handleProductSelect} clearOnSelect={false} />
