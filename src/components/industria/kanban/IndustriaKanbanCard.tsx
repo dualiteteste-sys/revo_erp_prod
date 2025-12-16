@@ -1,15 +1,16 @@
 import React from 'react';
 import { Draggable } from '@hello-pangea/dnd';
 import { OrdemIndustria } from '@/services/industria';
-import { User, Calendar, Package } from 'lucide-react';
+import { User, Calendar, Package, Pencil } from 'lucide-react';
 import { formatOrderNumber } from '@/lib/utils';
 
 interface Props {
   item: OrdemIndustria;
   index: number;
+  onOpenOrder?: (order: OrdemIndustria) => void;
 }
 
-const IndustriaKanbanCard: React.FC<Props> = ({ item, index }) => {
+const IndustriaKanbanCard: React.FC<Props> = ({ item, index, onOpenOrder }) => {
   return (
     <Draggable draggableId={item.id} index={index}>
       {(provided, snapshot) => (
@@ -21,9 +22,25 @@ const IndustriaKanbanCard: React.FC<Props> = ({ item, index }) => {
         >
           <div className="flex justify-between items-start mb-1">
             <span className="text-xs font-bold text-blue-600">{formatOrderNumber(item.numero)}</span>
-            <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium ${item.tipo_ordem === 'industrializacao' ? 'bg-gray-100 text-gray-600' : 'bg-purple-50 text-purple-600'}`}>
+            <div className="flex items-center gap-2">
+              <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium ${item.tipo_ordem === 'industrializacao' ? 'bg-gray-100 text-gray-600' : 'bg-purple-50 text-purple-600'}`}>
                 {item.tipo_ordem === 'industrializacao' ? 'IND' : 'BEN'}
-            </span>
+              </span>
+              {onOpenOrder && (
+                <button
+                  type="button"
+                  onMouseDown={(e) => e.stopPropagation()}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onOpenOrder(item);
+                  }}
+                  className="p-1 rounded-md text-gray-500 hover:text-blue-700 hover:bg-blue-50"
+                  title="Abrir ordem"
+                >
+                  <Pencil size={14} />
+                </button>
+              )}
+            </div>
           </div>
           
           <div className="mb-2">

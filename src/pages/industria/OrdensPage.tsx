@@ -24,6 +24,7 @@ export default function OrdensPage() {
   const location = useLocation();
   const navigate = useNavigate();
   const [initialPrefill, setInitialPrefill] = useState<React.ComponentProps<typeof OrdemFormPanel>['initialPrefill']>();
+  const [kanbanRefresh, setKanbanRefresh] = useState(0);
 
   const tipoOrdem = (searchParams.get('tipo') === 'beneficiamento' ? 'beneficiamento' : 'industrializacao') as
     | 'industrializacao'
@@ -71,6 +72,11 @@ export default function OrdensPage() {
     setIsFormOpen(true);
   };
 
+  const handleOpenFromKanban = (order: OrdemIndustria) => {
+    setSelectedId(order.id);
+    setIsFormOpen(true);
+  };
+
   const handleClose = () => {
     setIsFormOpen(false);
     setSelectedId(null);
@@ -79,8 +85,9 @@ export default function OrdensPage() {
 
   const handleSuccess = () => {
     if (viewMode === 'list') fetchOrders();
-    // If kanban, we might need to force refresh the board, but for now let's rely on user navigation or manual refresh
+    if (viewMode === 'kanban') setKanbanRefresh(k => k + 1);
     if (!selectedId) handleClose();
+    if (selectedId) handleClose();
   };
 
   return (
@@ -121,7 +128,7 @@ export default function OrdensPage() {
         </div>
       </div>
 
-      {viewMode === 'list' && (
+      {(
         <div className="mb-6 flex gap-4 flex-shrink-0">
             <div className="relative flex-grow max-w-md">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={20} />
@@ -145,16 +152,18 @@ export default function OrdensPage() {
               <option value="industrializacao">Industrialização</option>
               <option value="beneficiamento">Beneficiamento</option>
             </Select>
-            <Select
-            value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value)}
-            className="min-w-[200px]"
-            >
-            <option value="">Todos os Status</option>
-            <option value="planejada">Planejada</option>
-            <option value="em_producao">Em Produção</option>
-            <option value="concluida">Concluída</option>
-            </Select>
+            {viewMode === 'list' && (
+              <Select
+                value={statusFilter}
+                onChange={(e) => setStatusFilter(e.target.value)}
+                className="min-w-[200px]"
+              >
+                <option value="">Todos os Status</option>
+                <option value="planejada">Planejada</option>
+                <option value="em_producao">Em Produção</option>
+                <option value="concluida">Concluída</option>
+              </Select>
+            )}
         </div>
       )}
 
@@ -170,7 +179,12 @@ export default function OrdensPage() {
                 )}
             </div>
         ) : (
-            <IndustriaKanbanBoard />
+            <IndustriaKanbanBoard
+              tipoOrdem={tipoOrdem}
+              search={debouncedSearch}
+              refreshToken={kanbanRefresh}
+              onOpenOrder={handleOpenFromKanban}
+            />
         )}
       </div>
 

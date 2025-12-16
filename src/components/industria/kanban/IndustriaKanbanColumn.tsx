@@ -7,9 +7,10 @@ interface Props {
   columnId: string;
   title: string;
   items: OrdemIndustria[];
+  onOpenOrder?: (order: OrdemIndustria) => void;
 }
 
-const IndustriaKanbanColumn: React.FC<Props> = ({ columnId, title, items }) => {
+const IndustriaKanbanColumn: React.FC<Props> = ({ columnId, title, items, onOpenOrder }) => {
   return (
     <div className="flex flex-col w-72 bg-gray-100/80 rounded-xl flex-shrink-0 h-full border border-gray-200/50">
       <div className="p-3 border-b border-gray-200 flex justify-between items-center">
@@ -26,7 +27,7 @@ const IndustriaKanbanColumn: React.FC<Props> = ({ columnId, title, items }) => {
             className={`flex-1 p-2 overflow-y-auto scrollbar-styled transition-colors ${snapshot.isDraggingOver ? 'bg-blue-50/50' : ''}`}
           >
             {items.map((item, index) => (
-              <IndustriaKanbanCard key={item.id} item={item} index={index} />
+              <IndustriaKanbanCard key={item.id} item={item} index={index} onOpenOrder={onOpenOrder} />
             ))}
             {provided.placeholder}
           </div>
