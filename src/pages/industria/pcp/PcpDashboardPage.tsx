@@ -114,6 +114,9 @@ export default function PcpDashboardPage() {
   const [manualSeqDirty, setManualSeqDirty] = useState(false);
   const [manualSeqSaving, setManualSeqSaving] = useState(false);
   const [batchSequencing, setBatchSequencing] = useState(false);
+  const [batchModalOpen, setBatchModalOpen] = useState(false);
+  const [batchRows, setBatchRows] = useState<any[]>([]);
+  const [batchPreviewed, setBatchPreviewed] = useState(false);
 
   const openGanttForCt = useCallback((ctId: string) => {
     setGanttCtFilter(ctId);
@@ -218,25 +221,36 @@ export default function PcpDashboardPage() {
     }
   }, [addToast, apsModal.ctId, loadApsRuns, loadData, manualSeqRows]);
 
-  const handleBatchSequencing = useCallback(async () => {
-    if (!confirm('Sequenciar TODOS os Centros de Trabalho no período? Isso vai aplicar o APS para cada CT e gerar runs (com undo).')) return;
+  const runBatchSequencing = useCallback(async (apply: boolean) => {
     setBatchSequencing(true);
     try {
-      const rows = await pcpApsSequenciarTodosCts({ dataInicial: startDate, dataFinal: endDate, apply: true });
-      const total = (rows || []).reduce((acc, r) => acc + (r.total_operacoes || 0), 0);
-      const updated = (rows || []).reduce((acc, r) => acc + (r.updated_operacoes || 0), 0);
-      const unscheduled = (rows || []).reduce((acc, r) => acc + (r.unscheduled_operacoes || 0), 0);
-      addToast(
-        `APS em lote concluído: ${updated}/${total} operações atualizadas.${unscheduled > 0 ? ` ${unscheduled} sem agenda.` : ''}`,
-        unscheduled > 0 ? 'warning' : 'success'
-      );
-      await loadData();
+      const rows = await pcpApsSequenciarTodosCts({ dataInicial: startDate, dataFinal: endDate, apply });
+      setBatchRows(rows || []);
+      setBatchPreviewed(true);
+      if (apply) {
+        const total = (rows || []).reduce((acc, r) => acc + (r.total_operacoes || 0), 0);
+        const updated = (rows || []).reduce((acc, r) => acc + (r.updated_operacoes || 0), 0);
+        const unscheduled = (rows || []).reduce((acc, r) => acc + (r.unscheduled_operacoes || 0), 0);
+        addToast(
+          `APS em lote concluído: ${updated}/${total} operações atualizadas.${unscheduled > 0 ? ` ${unscheduled} sem agenda.` : ''}`,
+          unscheduled > 0 ? 'warning' : 'success'
+        );
+        await loadData();
+      } else {
+        addToast('Preview em lote gerado (nenhuma alteração aplicada).', 'success');
+      }
     } catch (e: any) {
-      addToast(e?.message || 'Falha ao sequenciar todos os CTs.', 'error');
+      addToast(e?.message || 'Falha no APS em lote.', 'error');
     } finally {
       setBatchSequencing(false);
     }
   }, [addToast, endDate, startDate]);
+
+  const openBatchModal = useCallback(() => {
+    setBatchModalOpen(true);
+    setBatchRows([]);
+    setBatchPreviewed(false);
+  }, []);
 
   const fetchPreview = useCallback(async (silent = false) => {
     if (!apsModal.ctId) return;
@@ -763,7 +777,7 @@ export default function PcpDashboardPage() {
           </button>
           <button
             className="inline-flex items-center gap-2 px-4 py-2 rounded-md bg-indigo-600 text-white hover:bg-indigo-500 disabled:opacity-50"
-            onClick={handleBatchSequencing}
+            onClick={openBatchModal}
             disabled={loading || batchSequencing}
             title="Aplica APS (sequenciamento) para todos os CTs no período"
           >
@@ -772,6 +786,88 @@ export default function PcpDashboardPage() {
           </button>
         </div>
       </header>
+
+      <Modal
+        isOpen={batchModalOpen}
+        onClose={() => setBatchModalOpen(false)}
+        title="APS • Sequenciar todos os CTs"
+        size="lg"
+      >
+        <div className="p-6 space-y-4">
+          <div className="bg-slate-50 border border-slate-100 rounded-lg p-4 text-sm text-gray-700 space-y-1">
+            <div>Período: <span className="font-semibold">{format(new Date(startDate), 'dd/MM')}</span> → <span className="font-semibold">{format(new Date(endDate), 'dd/MM')}</span></div>
+            <div className="text-xs text-gray-500">
+              Use Preview para estimar impacto. Aplicar cria runs por CT (undo disponível em cada CT via “Sequenciar”).
+            </div>
+          </div>
+
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={() => runBatchSequencing(false)}
+              disabled={batchSequencing}
+              className="px-4 py-2 rounded-lg border bg-white hover:bg-gray-50 text-sm font-semibold disabled:opacity-50"
+            >
+              {batchSequencing ? 'Processando…' : 'Preview'}
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                if (!confirm('Aplicar APS em lote? Isso vai atualizar datas previstas e gerar runs.')) return;
+                runBatchSequencing(true);
+              }}
+              disabled={batchSequencing || !batchPreviewed}
+              className="px-4 py-2 rounded-lg bg-indigo-600 text-white hover:bg-indigo-500 text-sm font-semibold disabled:opacity-50"
+              title={!batchPreviewed ? 'Gere um preview antes de aplicar.' : ''}
+            >
+              {batchSequencing ? 'Aplicando…' : 'Aplicar'}
+            </button>
+          </div>
+
+          <div className="bg-white border rounded-lg overflow-hidden">
+            <div className="border-b px-4 py-2 text-sm font-semibold text-gray-800 flex items-center justify-between">
+              <span>Resumo por CT</span>
+              {batchRows.length > 0 && (
+                <span className="text-xs text-gray-500">
+                  {batchRows.reduce((acc, r) => acc + (r.updated_operacoes || 0), 0)}/
+                  {batchRows.reduce((acc, r) => acc + (r.total_operacoes || 0), 0)} atualizadas
+                </span>
+              )}
+            </div>
+            <div className="overflow-x-auto">
+              <table className="min-w-full text-xs">
+                <thead className="bg-gray-50 text-gray-600">
+                  <tr>
+                    <th className="px-3 py-2 text-left">Centro</th>
+                    <th className="px-3 py-2 text-right">Atualizadas</th>
+                    <th className="px-3 py-2 text-right">Sem agenda</th>
+                    <th className="px-3 py-2 text-right">Freeze</th>
+                    <th className="px-3 py-2 text-left">Run</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {batchRows.map((r) => (
+                    <tr key={r.centro_id} className="border-t">
+                      <td className="px-3 py-2 text-gray-900 font-medium">{r.centro_nome}</td>
+                      <td className="px-3 py-2 text-right text-gray-700">{(r.updated_operacoes ?? 0)}/{(r.total_operacoes ?? 0)}</td>
+                      <td className="px-3 py-2 text-right text-gray-700">{r.unscheduled_operacoes ?? 0}</td>
+                      <td className="px-3 py-2 text-right text-gray-700">{r.freeze_dias ?? 0}d</td>
+                      <td className="px-3 py-2 text-gray-500">{r.run_id ? String(r.run_id).slice(0, 8) : '—'}</td>
+                    </tr>
+                  ))}
+                  {batchRows.length === 0 && (
+                    <tr>
+                      <td colSpan={5} className="px-3 py-6 text-sm text-gray-500">
+                        {batchSequencing ? 'Processando…' : 'Clique em Preview para carregar o resumo.'}
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </Modal>
 
       {pcpAlerts.length > 0 && (
         <section className="bg-white border rounded-lg shadow-sm">
