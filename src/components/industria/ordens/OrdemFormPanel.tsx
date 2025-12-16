@@ -8,10 +8,12 @@ import Select from '@/components/ui/forms/Select';
 import TextArea from '@/components/ui/forms/TextArea';
 import ClientAutocomplete from '@/components/common/ClientAutocomplete';
 import ItemAutocomplete from '@/components/os/ItemAutocomplete';
+import MaterialClienteAutocomplete from '@/components/industria/materiais/MaterialClienteAutocomplete';
 import OrdemFormItems from './OrdemFormItems';
 import OrdemEntregas from './OrdemEntregas';
 import BomSelector from './BomSelector';
 import { formatOrderNumber } from '@/lib/utils';
+import type { MaterialClienteListItem } from '@/services/industriaMateriais';
 
 interface Props {
   ordemId: string | null;
@@ -25,6 +27,7 @@ export default function OrdemFormPanel({ ordemId, initialTipoOrdem, onSaveSucces
   const [loading, setLoading] = useState(!!ordemId);
   const [isSaving, setIsSaving] = useState(false);
   const [activeTab, setActiveTab] = useState<'dados' | 'componentes' | 'entregas'>('dados');
+  const [materialCliente, setMaterialCliente] = useState<MaterialClienteListItem | null>(null);
 
   const [formData, setFormData] = useState<Partial<OrdemIndustriaDetails>>({
     status: 'rascunho',
@@ -56,6 +59,7 @@ export default function OrdemFormPanel({ ordemId, initialTipoOrdem, onSaveSucces
     try {
       const data = await getOrdemDetails(idToLoad);
       setFormData(data);
+      setMaterialCliente(null);
     } catch (e) {
       console.error(e);
       addToast('Erro ao carregar ordem.', 'error');
@@ -75,6 +79,10 @@ export default function OrdemFormPanel({ ordemId, initialTipoOrdem, onSaveSucces
   };
 
   const handleSaveHeader = async () => {
+    if (formData.tipo_ordem === 'beneficiamento' && !formData.cliente_id) {
+      addToast('Para beneficiamento, selecione o cliente.', 'error');
+      return;
+    }
     if (!formData.produto_final_id) {
       addToast('Selecione um produto final.', 'error');
       return;
@@ -171,13 +179,14 @@ export default function OrdemFormPanel({ ordemId, initialTipoOrdem, onSaveSucces
   // --- Entregas ---
   const handleAddEntrega = async (data: Partial<OrdemEntrega>) => {
     if (!formData.id) return;
+    const doc = data.documento_ref ?? data.documento_entrega;
     await manageEntrega(
       formData.id,
       null,
       data.data_entrega!,
       data.quantidade_entregue!,
       data.status_faturamento!,
-      data.documento_ref,
+      doc,
       data.observacoes,
       'upsert'
     );
@@ -206,7 +215,9 @@ export default function OrdemFormPanel({ ordemId, initialTipoOrdem, onSaveSucces
         <div className="flex items-center justify-between py-4 px-6 bg-gray-50 border-b border-gray-200">
           <div>
             <h2 className="text-xl font-bold text-gray-800">
-              {formData.numero ? `Ordem ${formatOrderNumber(formData.numero)}` : 'Nova Ordem de Produção'}
+              {formData.numero
+                ? `Ordem ${formatOrderNumber(formData.numero)}`
+                : (formData.tipo_ordem === 'beneficiamento' ? 'Nova Ordem de Beneficiamento' : 'Nova Ordem de Industrialização')}
             </h2>
             <p className="text-sm text-gray-500">{formData.tipo_ordem === 'industrializacao' ? 'Industrialização' : 'Beneficiamento'}</p>
           </div>
@@ -260,7 +271,9 @@ export default function OrdemFormPanel({ ordemId, initialTipoOrdem, onSaveSucces
                 </Select>
               </div>
               <div className="sm:col-span-4">
-                <label className="block text-sm font-medium text-gray-700 mb-1">Produto Final</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  {formData.tipo_ordem === 'beneficiamento' ? 'Produto/Serviço Interno' : 'Produto Final'}
+                </label>
                 {formData.id ? (
                   <div className="p-3 bg-gray-100 border border-gray-300 rounded-lg text-gray-700">
                     {formData.produto_nome}
@@ -289,17 +302,59 @@ export default function OrdemFormPanel({ ordemId, initialTipoOrdem, onSaveSucces
                 />
               </div>
               <div className="sm:col-span-3">
-                <label className="block text-sm font-medium text-gray-700 mb-1">Cliente (Opcional)</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Cliente{formData.tipo_ordem === 'beneficiamento' ? ' *' : ' (Opcional)'}
+                </label>
                 <ClientAutocomplete
                   value={formData.cliente_id || null}
                   initialName={formData.cliente_nome}
                   onChange={(id, name) => {
                     handleHeaderChange('cliente_id', id);
                     if (name) handleHeaderChange('cliente_nome', name);
+                    setMaterialCliente(null);
                   }}
                   disabled={isLocked}
                 />
               </div>
+
+              {formData.tipo_ordem === 'beneficiamento' && (
+                <div className="sm:col-span-6 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <label className="block text-sm font-medium text-gray-700">Material do Cliente (opcional)</label>
+                    <div className="flex items-center gap-2">
+                      <a
+                        href="/app/industria/materiais-cliente"
+                        className="text-xs font-medium text-blue-700 hover:text-blue-900 hover:underline"
+                      >
+                        Cadastrar material
+                      </a>
+                      <span className="text-gray-300">|</span>
+                      <a
+                        href="/app/nfe-input"
+                        className="text-xs font-medium text-blue-700 hover:text-blue-900 hover:underline"
+                      >
+                        Importar XML (NF-e)
+                      </a>
+                    </div>
+                  </div>
+                  <MaterialClienteAutocomplete
+                    clienteId={formData.cliente_id || null}
+                    value={materialCliente?.id || null}
+                    initialName={materialCliente?.nome_cliente || materialCliente?.produto_nome}
+                    disabled={isLocked || !formData.cliente_id}
+                    onChange={(m) => {
+                      setMaterialCliente(m);
+                      if (!m) return;
+                      handleHeaderChange('produto_final_id', m.produto_id);
+                      handleHeaderChange('produto_nome', m.produto_nome);
+                      if (m.unidade) handleHeaderChange('unidade', m.unidade);
+                    }}
+                  />
+                  <p className="text-xs text-gray-500">
+                    Dica: selecione o material do cliente para preencher automaticamente o produto interno.
+                  </p>
+                </div>
+              )}
             </Section>
 
             <Section title="Programação" description="Prazos e status.">
@@ -346,7 +401,7 @@ export default function OrdemFormPanel({ ordemId, initialTipoOrdem, onSaveSucces
                 <BomSelector
                   ordemId={formData.id}
                   produtoId={formData.produto_final_id}
-                  tipoOrdem="producao"
+                  tipoOrdem={formData.tipo_ordem === 'beneficiamento' ? 'beneficiamento' : 'producao'}
                   onApplied={() => loadDetails(formData.id)}
                 />
               </div>
@@ -370,7 +425,7 @@ export default function OrdemFormPanel({ ordemId, initialTipoOrdem, onSaveSucces
             readOnly={isLocked}
             maxQuantity={formData.quantidade_planejada || 0}
             currentTotal={totalEntregue}
-            showBillingStatus={false}
+            showBillingStatus={formData.tipo_ordem === 'beneficiamento'}
           />
         )}
       </div>
