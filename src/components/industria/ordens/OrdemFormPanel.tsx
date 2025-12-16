@@ -13,6 +13,7 @@ import OrdemFormItems from './OrdemFormItems';
 import OrdemEntregas from './OrdemEntregas';
 import BomSelector from './BomSelector';
 import { formatOrderNumber } from '@/lib/utils';
+import { ensureMaterialCliente } from '@/services/industriaMateriais';
 import type { MaterialClienteListItem } from '@/services/industriaMateriais';
 
 interface Props {
@@ -100,6 +101,35 @@ export default function OrdemFormPanel({ ordemId, initialTipoOrdem, onSaveSucces
 
     setIsSaving(true);
     try {
+      let materialClienteId = formData.material_cliente_id || null;
+      let usaMaterialCliente = !!formData.usa_material_cliente;
+
+      if (formData.tipo_ordem === 'beneficiamento' && formData.cliente_id && formData.produto_final_id && !materialClienteId) {
+        const shouldCreate = window.confirm(
+          'Nenhum "Material do Cliente" foi selecionado.\n\nDeseja criar automaticamente um vínculo usando o produto interno selecionado?'
+        );
+
+        if (shouldCreate) {
+          materialClienteId = await ensureMaterialCliente(
+            formData.cliente_id,
+            formData.produto_final_id,
+            formData.produto_nome || 'Material',
+            formData.unidade || 'un'
+          );
+          usaMaterialCliente = true;
+
+          setFormData(prev => ({
+            ...prev,
+            usa_material_cliente: true,
+            material_cliente_id: materialClienteId,
+            material_cliente_nome: prev.material_cliente_nome ?? prev.produto_nome ?? null,
+            material_cliente_unidade: prev.material_cliente_unidade ?? prev.unidade ?? null,
+          }));
+        } else {
+          usaMaterialCliente = false;
+        }
+      }
+
       const payload: OrdemPayload = {
         id: formData.id,
         tipo_ordem: formData.tipo_ordem,
@@ -107,8 +137,8 @@ export default function OrdemFormPanel({ ordemId, initialTipoOrdem, onSaveSucces
         quantidade_planejada: formData.quantidade_planejada,
         unidade: formData.unidade,
         cliente_id: formData.cliente_id,
-        usa_material_cliente: formData.usa_material_cliente,
-        material_cliente_id: formData.material_cliente_id,
+        usa_material_cliente: usaMaterialCliente,
+        material_cliente_id: materialClienteId,
         status: formData.status,
         prioridade: formData.prioridade,
         data_prevista_inicio: formData.data_prevista_inicio,
