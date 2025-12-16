@@ -773,3 +773,25 @@ export async function listPcpOrdensLeadTime(startDate?: string, endDate?: string
     p_data_final: endDate || null
   });
 }
+
+export type PcpReplanResult = {
+  moved: number;
+  remaining_overload_hours?: number;
+  peak_day?: string;
+  peak_capacity?: number;
+  peak_load?: number;
+  end_day?: string;
+  message?: string;
+};
+
+export async function pcpReplanejarCentroSobrecarga(
+  centroTrabalhoId: string,
+  dia: string,
+  dataFinal?: string,
+): Promise<PcpReplanResult> {
+  return callRpc<PcpReplanResult>('pcp_replanejar_ct_sobrecarga', {
+    p_centro_id: centroTrabalhoId,
+    p_dia: dia,
+    p_data_final: dataFinal || null,
+  });
+}
