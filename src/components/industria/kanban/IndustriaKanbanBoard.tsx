@@ -69,6 +69,35 @@ const IndustriaKanbanBoard: React.FC<Props> = ({ tipoOrdem, search, refreshToken
     }
   };
 
+  const updateItem = (id: string, patch: Partial<OrdemIndustria>) => {
+    setItems(prev => prev.map(i => (i.id === id ? { ...i, ...patch } : i)));
+  };
+
+  const handleQuickStatus = async (order: OrdemIndustria, newStatus: StatusOrdem) => {
+    if (order.status === newStatus) return;
+    updateItem(order.id, { status: newStatus });
+    try {
+      await updateOrdemStatus(order.id, newStatus, order.prioridade);
+      addToast(`Status atualizado para ${newStatus.replace(/_/g, ' ')}`, 'success');
+    } catch (e: any) {
+      addToast('Falha ao atualizar status.', 'error');
+      fetchData();
+    }
+  };
+
+  const handleQuickPriority = async (order: OrdemIndustria, delta: number) => {
+    const next = Math.max(0, (order.prioridade ?? 0) + delta);
+    if (next === order.prioridade) return;
+    updateItem(order.id, { prioridade: next });
+    try {
+      await updateOrdemStatus(order.id, order.status, next);
+      addToast('Prioridade atualizada.', 'success');
+    } catch (e: any) {
+      addToast('Falha ao atualizar prioridade.', 'error');
+      fetchData();
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-full">
@@ -91,6 +120,8 @@ const IndustriaKanbanBoard: React.FC<Props> = ({ tipoOrdem, search, refreshToken
             title={col.title} 
             items={getItemsForColumn(col.id)} 
             onOpenOrder={onOpenOrder}
+            onQuickStatus={handleQuickStatus}
+            onQuickPriority={handleQuickPriority}
           />
         ))}
       </div>
