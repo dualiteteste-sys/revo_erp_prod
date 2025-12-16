@@ -155,6 +155,10 @@ export async function updateOrdemStatus(id: string, status: StatusOrdem, priorid
   });
 }
 
+export async function cloneOrdem(id: string): Promise<OrdemIndustriaDetails> {
+  return callRpc<OrdemIndustriaDetails>('industria_clone_ordem', { p_source_id: id });
+}
+
 export async function replanejarOperacao(operacaoId: string, centroTrabalhoId: string, prioridade?: number) {
   await callRpc('industria_operacao_replanejar', {
     p_operacao_id: operacaoId,

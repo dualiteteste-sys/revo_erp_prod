@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { listOrdens, OrdemIndustria } from '@/services/industria';
+import { cloneOrdem, listOrdens, OrdemIndustria } from '@/services/industria';
 import { PlusCircle, Search, LayoutGrid, List } from 'lucide-react';
 import { Loader2 } from 'lucide-react';
 import { useDebounce } from '@/hooks/useDebounce';
@@ -70,6 +70,16 @@ export default function OrdensPage() {
   const handleEdit = (order: OrdemIndustria) => {
     setSelectedId(order.id);
     setIsFormOpen(true);
+  };
+
+  const handleClone = async (order: OrdemIndustria) => {
+    try {
+      const cloned = await cloneOrdem(order.id);
+      setSelectedId(cloned.id);
+      setIsFormOpen(true);
+    } catch (e) {
+      console.error(e);
+    }
   };
 
   const handleOpenFromKanban = (order: OrdemIndustria) => {
@@ -175,7 +185,7 @@ export default function OrdensPage() {
                     <Loader2 className="animate-spin text-blue-600 w-10 h-10" />
                 </div>
                 ) : (
-                <OrdensTable orders={orders} onEdit={handleEdit} />
+                <OrdensTable orders={orders} onEdit={handleEdit} onClone={handleClone} />
                 )}
             </div>
         ) : (
@@ -184,6 +194,7 @@ export default function OrdensPage() {
               search={debouncedSearch}
               refreshToken={kanbanRefresh}
               onOpenOrder={handleOpenFromKanban}
+              onCloneOrder={handleClone}
             />
         )}
       </div>

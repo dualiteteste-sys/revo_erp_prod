@@ -1,7 +1,7 @@
 import React from 'react';
 import { Draggable } from '@hello-pangea/dnd';
 import { OrdemIndustria, StatusOrdem } from '@/services/industria';
-import { User, Calendar, Package, Pencil, MoreVertical, ArrowUp, ArrowDown, CheckCircle2 } from 'lucide-react';
+import { User, Calendar, Package, Pencil, MoreVertical, ArrowUp, ArrowDown, CheckCircle2, Copy } from 'lucide-react';
 import { formatOrderNumber } from '@/lib/utils';
 import {
   DropdownMenu,
@@ -21,6 +21,7 @@ interface Props {
   onOpenOrder?: (order: OrdemIndustria) => void;
   onQuickStatus?: (order: OrdemIndustria, status: StatusOrdem) => void;
   onQuickPriority?: (order: OrdemIndustria, delta: number) => void;
+  onCloneOrder?: (order: OrdemIndustria) => void;
 }
 
 const STATUS_OPTIONS: { id: StatusOrdem; label: string }[] = [
@@ -32,7 +33,7 @@ const STATUS_OPTIONS: { id: StatusOrdem; label: string }[] = [
   { id: 'concluida', label: 'Concluída' },
 ];
 
-const IndustriaKanbanCard: React.FC<Props> = ({ item, index, onOpenOrder, onQuickStatus, onQuickPriority }) => {
+const IndustriaKanbanCard: React.FC<Props> = ({ item, index, onOpenOrder, onQuickStatus, onQuickPriority, onCloneOrder }) => {
   return (
     <Draggable draggableId={item.id} index={index}>
       {(provided, snapshot) => (
@@ -86,6 +87,17 @@ const IndustriaKanbanCard: React.FC<Props> = ({ item, index, onOpenOrder, onQuic
                       >
                         <Pencil className="mr-2 h-4 w-4" />
                         Abrir
+                      </DropdownMenuItem>
+                    )}
+                    {onCloneOrder && (
+                      <DropdownMenuItem
+                        onSelect={(e) => {
+                          e.preventDefault();
+                          onCloneOrder(item);
+                        }}
+                      >
+                        <Copy className="mr-2 h-4 w-4" />
+                        Duplicar
                       </DropdownMenuItem>
                     )}
                     <DropdownMenuSeparator />

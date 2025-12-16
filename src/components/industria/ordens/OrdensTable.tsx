@@ -1,11 +1,12 @@
 import React from 'react';
 import { OrdemIndustria } from '@/services/industria';
-import { Edit, Eye, Calendar, User, Package } from 'lucide-react';
+import { Copy, Edit, Eye, Calendar, User, Package } from 'lucide-react';
 import { formatOrderNumber } from '@/lib/utils';
 
 interface Props {
   orders: OrdemIndustria[];
   onEdit: (order: OrdemIndustria) => void;
+  onClone?: (order: OrdemIndustria) => void;
 }
 
 const statusColors: Record<string, string> = {
@@ -23,7 +24,7 @@ const formatStatus = (status: string) => {
   return status.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
 };
 
-export default function OrdensTable({ orders, onEdit }: Props) {
+export default function OrdensTable({ orders, onEdit, onClone }: Props) {
   return (
     <div className="overflow-x-auto">
       <table className="min-w-full divide-y divide-gray-200">
@@ -82,9 +83,20 @@ export default function OrdensTable({ orders, onEdit }: Props) {
                 </span>
               </td>
               <td className="px-6 py-4 text-right">
-                <button onClick={() => onEdit(order)} className="text-blue-600 hover:text-blue-800 p-2 hover:bg-blue-50 rounded-full transition-colors">
-                  {order.status === 'concluida' || order.status === 'cancelada' ? <Eye size={18} /> : <Edit size={18} />}
-                </button>
+                <div className="flex items-center justify-end gap-2">
+                  {onClone && (
+                    <button
+                      onClick={() => onClone(order)}
+                      className="text-gray-600 hover:text-gray-900 p-2 hover:bg-gray-100 rounded-full transition-colors"
+                      title="Duplicar"
+                    >
+                      <Copy size={18} />
+                    </button>
+                  )}
+                  <button onClick={() => onEdit(order)} className="text-blue-600 hover:text-blue-800 p-2 hover:bg-blue-50 rounded-full transition-colors" title="Abrir">
+                    {order.status === 'concluida' || order.status === 'cancelada' ? <Eye size={18} /> : <Edit size={18} />}
+                  </button>
+                </div>
               </td>
             </tr>
           ))}

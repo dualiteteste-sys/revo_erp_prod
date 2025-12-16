@@ -19,9 +19,10 @@ type Props = {
   search?: string;
   refreshToken?: number;
   onOpenOrder?: (order: OrdemIndustria) => void;
+  onCloneOrder?: (order: OrdemIndustria) => void;
 };
 
-const IndustriaKanbanBoard: React.FC<Props> = ({ tipoOrdem, search, refreshToken, onOpenOrder }) => {
+const IndustriaKanbanBoard: React.FC<Props> = ({ tipoOrdem, search, refreshToken, onOpenOrder, onCloneOrder }) => {
   const [items, setItems] = useState<OrdemIndustria[]>([]);
   const [loading, setLoading] = useState(true);
   const { addToast } = useToast();
@@ -122,6 +123,7 @@ const IndustriaKanbanBoard: React.FC<Props> = ({ tipoOrdem, search, refreshToken
             onOpenOrder={onOpenOrder}
             onQuickStatus={handleQuickStatus}
             onQuickPriority={handleQuickPriority}
+            onCloneOrder={onCloneOrder}
           />
         ))}
       </div>
