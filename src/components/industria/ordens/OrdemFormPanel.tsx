@@ -15,11 +15,12 @@ import { formatOrderNumber } from '@/lib/utils';
 
 interface Props {
   ordemId: string | null;
+  initialTipoOrdem?: 'industrializacao' | 'beneficiamento';
   onSaveSuccess: () => void;
   onClose: () => void;
 }
 
-export default function OrdemFormPanel({ ordemId, onSaveSuccess, onClose }: Props) {
+export default function OrdemFormPanel({ ordemId, initialTipoOrdem, onSaveSuccess, onClose }: Props) {
   const { addToast } = useToast();
   const [loading, setLoading] = useState(!!ordemId);
   const [isSaving, setIsSaving] = useState(false);
@@ -27,13 +28,19 @@ export default function OrdemFormPanel({ ordemId, onSaveSuccess, onClose }: Prop
 
   const [formData, setFormData] = useState<Partial<OrdemIndustriaDetails>>({
     status: 'rascunho',
-    tipo_ordem: 'industrializacao',
+    tipo_ordem: initialTipoOrdem || 'industrializacao',
     prioridade: 0,
     unidade: 'un',
     quantidade_planejada: 0,
     componentes: [],
     entregas: []
   });
+
+  useEffect(() => {
+    if (ordemId) return;
+    if (!initialTipoOrdem) return;
+    setFormData(prev => ({ ...prev, tipo_ordem: initialTipoOrdem }));
+  }, [initialTipoOrdem, ordemId]);
 
   useEffect(() => {
     if (ordemId) {

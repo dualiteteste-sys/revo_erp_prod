@@ -15,6 +15,22 @@ export async function getDashboardStats(): Promise<DashboardStats> {
 // Tipos comuns que podem ser reutilizados
 export type StatusOrdem = 'rascunho' | 'planejada' | 'em_programacao' | 'em_producao' | 'em_inspecao' | 'parcialmente_concluida' | 'concluida' | 'cancelada' | 'aguardando_material' | 'em_beneficiamento' | 'parcialmente_entregue';
 
+export type TipoOrdemIndustria = 'industrializacao' | 'beneficiamento';
+
+export type OrdemIndustria = {
+  id: string;
+  numero: number;
+  tipo_ordem: TipoOrdemIndustria;
+  produto_nome: string;
+  cliente_nome?: string | null;
+  quantidade_planejada: number;
+  unidade: string;
+  status: StatusOrdem;
+  prioridade: number;
+  data_prevista_entrega?: string | null;
+  total_entregue: number;
+};
+
 export type OrdemComponente = {
   id: string;
   ordem_id: string;
@@ -42,11 +58,95 @@ export type OrdemEntrega = {
   created_at: string;
 };
 
+export type OrdemIndustriaDetails = {
+  id: string;
+  empresa_id: string;
+  numero: number;
+  tipo_ordem: TipoOrdemIndustria;
+  produto_final_id: string;
+  produto_nome: string;
+  quantidade_planejada: number;
+  unidade: string;
+  cliente_id?: string | null;
+  cliente_nome?: string | null;
+  status: StatusOrdem;
+  prioridade: number;
+  data_prevista_inicio?: string | null;
+  data_prevista_fim?: string | null;
+  data_prevista_entrega?: string | null;
+  documento_ref?: string | null;
+  observacoes?: string | null;
+  created_at?: string | null;
+  updated_at?: string | null;
+  componentes?: OrdemComponente[];
+  entregas?: OrdemEntrega[];
+};
+
+export type OrdemPayload = Partial<Omit<OrdemIndustriaDetails, 'numero' | 'produto_nome' | 'cliente_nome' | 'componentes' | 'entregas'>>;
+
+export async function listOrdens(search?: string, tipo?: TipoOrdemIndustria, status?: string): Promise<OrdemIndustria[]> {
+  return callRpc<OrdemIndustria[]>('industria_list_ordens', {
+    p_search: search || null,
+    p_tipo: tipo || null,
+    p_status: status || null,
+    p_limit: 200,
+    p_offset: 0,
+  });
+}
+
+export async function getOrdemDetails(id: string): Promise<OrdemIndustriaDetails> {
+  return callRpc<OrdemIndustriaDetails>('industria_get_ordem_details', { p_id: id });
+}
+
+export async function saveOrdem(payload: OrdemPayload): Promise<OrdemIndustriaDetails> {
+  return callRpc<OrdemIndustriaDetails>('industria_upsert_ordem', { p_payload: payload });
+}
+
+export async function manageComponente(
+  ordemId: string,
+  componenteId: string | null,
+  produtoId: string,
+  qtdPlanejada: number,
+  unidade: string,
+  action: 'upsert' | 'delete' = 'upsert'
+): Promise<void> {
+  await callRpc('industria_manage_componente', {
+    p_ordem_id: ordemId,
+    p_componente_id: componenteId,
+    p_produto_id: produtoId,
+    p_quantidade_planejada: qtdPlanejada,
+    p_unidade: unidade,
+    p_action: action,
+  });
+}
+
+export async function manageEntrega(
+  ordemId: string,
+  entregaId: string | null,
+  dataEntrega: string,
+  qtdEntregue: number,
+  statusFaturamento: string,
+  documentoRef?: string,
+  observacoes?: string,
+  action: 'upsert' | 'delete' = 'upsert'
+): Promise<void> {
+  await callRpc('industria_manage_entrega', {
+    p_ordem_id: ordemId,
+    p_entrega_id: entregaId,
+    p_data_entrega: dataEntrega,
+    p_quantidade_entregue: qtdEntregue,
+    p_status_faturamento: statusFaturamento,
+    p_documento_ref: documentoRef || null,
+    p_observacoes: observacoes || null,
+    p_action: action,
+  });
+}
+
 export async function updateOrdemStatus(id: string, status: StatusOrdem, prioridade?: number) {
-  await callRpc('industria_operacao_update_status', {
+  await callRpc('industria_update_ordem_status', {
     p_id: id,
     p_status: status,
-    p_prioridade: prioridade ?? null,
+    p_prioridade: prioridade ?? 0,
   });
 }
 

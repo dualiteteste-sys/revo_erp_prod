@@ -52,6 +52,8 @@ export const menuConfig: { name: string; icon: React.ElementType; href: string; 
     children: [
       { name: 'Dashboard Produção', icon: PieChart, href: '/app/industria/dashboard' },
       { name: 'Ordens de Produção', icon: Hammer, href: '/app/industria/producao' },
+      { name: 'Ordens (Industrialização)', icon: Hammer, href: '/app/industria/ordens?tipo=industrializacao' },
+      { name: 'Ordens (Beneficiamento)', icon: Hammer, href: '/app/industria/ordens?tipo=beneficiamento' },
       { name: 'Materiais de Clientes', icon: Package, href: '/app/industria/materiais-cliente' },
       { name: 'Execução (Operações)', icon: PlayCircle, href: '/app/industria/execucao' },
       { name: 'Chão de Fábrica', icon: HardHat, href: '/app/industria/chao-de-fabrica' },

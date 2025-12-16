@@ -8,6 +8,7 @@ import OrdensTable from '@/components/industria/ordens/OrdensTable';
 import OrdemFormPanel from '@/components/industria/ordens/OrdemFormPanel';
 import IndustriaKanbanBoard from '@/components/industria/kanban/IndustriaKanbanBoard';
 import Select from '@/components/ui/forms/Select';
+import { useSearchParams } from 'react-router-dom';
 
 export default function OrdensPage() {
   const [viewMode, setViewMode] = useState<'list' | 'kanban'>('list');
@@ -19,12 +20,27 @@ export default function OrdensPage() {
 
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [searchParams, setSearchParams] = useSearchParams();
+
+  const tipoOrdem = (searchParams.get('tipo') === 'beneficiamento' ? 'beneficiamento' : 'industrializacao') as
+    | 'industrializacao'
+    | 'beneficiamento';
+
+  // Deep-link: /app/industria/ordens?tipo=beneficiamento&new=1
+  useEffect(() => {
+    if (searchParams.get('new') !== '1') return;
+    setSelectedId(null);
+    setIsFormOpen(true);
+    const next = new URLSearchParams(searchParams);
+    next.delete('new');
+    setSearchParams(next, { replace: true });
+  }, [searchParams, setSearchParams]);
 
   const fetchOrders = async () => {
     if (viewMode === 'kanban') return; // Kanban fetches its own data
     setLoading(true);
     try {
-      const data = await listOrdens(debouncedSearch, undefined, statusFilter || undefined);
+      const data = await listOrdens(debouncedSearch, tipoOrdem, statusFilter || undefined);
       setOrders(data);
     } catch (e) {
       console.error(e);
@@ -35,7 +51,7 @@ export default function OrdensPage() {
 
   useEffect(() => {
     fetchOrders();
-  }, [debouncedSearch, statusFilter, viewMode]);
+  }, [debouncedSearch, statusFilter, viewMode, tipoOrdem]);
 
   const handleNew = () => {
     setSelectedId(null);
@@ -62,8 +78,12 @@ export default function OrdensPage() {
     <div className="p-1 h-full flex flex-col">
       <div className="flex justify-between items-center mb-6 flex-shrink-0">
         <div>
-          <h1 className="text-3xl font-bold text-gray-800">Ordens de Produção</h1>
-          <p className="text-gray-600 text-sm mt-1">Gestão de chão de fábrica.</p>
+          <h1 className="text-3xl font-bold text-gray-800">
+            {tipoOrdem === 'beneficiamento' ? 'Ordens de Beneficiamento' : 'Ordens de Industrialização'}
+          </h1>
+          <p className="text-gray-600 text-sm mt-1">
+            {tipoOrdem === 'beneficiamento' ? 'Gestão de beneficiamento de materiais (cliente/terceiros).' : 'Gestão de ordens de industrialização.'}
+          </p>
         </div>
         <div className="flex items-center gap-3">
             <div className="bg-gray-100 p-1 rounded-lg flex">
@@ -105,6 +125,18 @@ export default function OrdensPage() {
             />
             </div>
             <Select
+              value={tipoOrdem}
+              onChange={(e) => {
+                const next = new URLSearchParams(searchParams);
+                next.set('tipo', e.target.value);
+                setSearchParams(next, { replace: true });
+              }}
+              className="min-w-[220px]"
+            >
+              <option value="industrializacao">Industrialização</option>
+              <option value="beneficiamento">Beneficiamento</option>
+            </Select>
+            <Select
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value)}
             className="min-w-[200px]"
@@ -133,8 +165,13 @@ export default function OrdensPage() {
         )}
       </div>
 
-      <Modal isOpen={isFormOpen} onClose={handleClose} title={selectedId ? 'Editar Ordem de Produção' : 'Nova Ordem de Produção'} size="6xl">
-        <OrdemFormPanel ordemId={selectedId} onSaveSuccess={handleSuccess} onClose={handleClose} />
+      <Modal
+        isOpen={isFormOpen}
+        onClose={handleClose}
+        title={selectedId ? 'Editar Ordem' : (tipoOrdem === 'beneficiamento' ? 'Nova Ordem de Beneficiamento' : 'Nova Ordem de Industrialização')}
+        size="6xl"
+      >
+        <OrdemFormPanel ordemId={selectedId} initialTipoOrdem={tipoOrdem} onSaveSuccess={handleSuccess} onClose={handleClose} />
       </Modal>
     </div>
   );
