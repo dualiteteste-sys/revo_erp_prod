@@ -3,6 +3,9 @@
 
 BEGIN;
 
+-- Ambientes hardenizados podem remover o schema public. Garantimos existência antes de criar objetos nele.
+CREATE SCHEMA IF NOT EXISTS public;
+
 -- 1. Create Audit Table
 CREATE TABLE IF NOT EXISTS public.audit_logs (
     id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
