@@ -14,6 +14,8 @@ import {
   pcpApsSequenciarCentro,
   pcpApsListRuns,
   pcpApsUndo,
+  pcpApsGetRunChanges,
+  pcpApsPreviewSequenciarCentro,
   pcpReplanejarCentroSobrecarga,
   PcpAtpCtp,
   PcpCargaCapacidade,
@@ -98,6 +100,9 @@ export default function PcpDashboardPage() {
   }>(null);
   const [apsRuns, setApsRuns] = useState<any[]>([]);
   const [apsLoading, setApsLoading] = useState(false);
+  const [apsPreviewRows, setApsPreviewRows] = useState<any[]>([]);
+  const [apsSelectedRunId, setApsSelectedRunId] = useState<string | null>(null);
+  const [apsRunChanges, setApsRunChanges] = useState<any[]>([]);
 
   const openGanttForCt = useCallback((ctId: string) => {
     setGanttCtFilter(ctId);
@@ -144,6 +149,9 @@ export default function PcpDashboardPage() {
     if (!apsModal.open || !apsModal.ctId) return;
     setApsPreview(null);
     setApsRuns([]);
+    setApsPreviewRows([]);
+    setApsSelectedRunId(null);
+    setApsRunChanges([]);
     loadApsRuns(apsModal.ctId);
   }, [apsModal.open, apsModal.ctId, loadApsRuns]);
 
@@ -151,16 +159,19 @@ export default function PcpDashboardPage() {
     if (!apsModal.ctId) return;
     setApsLoading(true);
     try {
-      const result = await pcpApsSequenciarCentro({
+      const rows = await pcpApsPreviewSequenciarCentro({
         centroTrabalhoId: apsModal.ctId,
         dataInicial: startDate,
         dataFinal: endDate,
-        apply: false,
+        limit: 200,
       });
+      setApsPreviewRows(rows || []);
+      const unscheduled = (rows || []).filter(r => r.scheduled === false).length;
+      const changed = (rows || []).filter(r => r.scheduled === true).length;
       setApsPreview({
-        total_operacoes: result.total_operacoes,
-        updated_operacoes: result.updated_operacoes,
-        unscheduled_operacoes: result.unscheduled_operacoes,
+        total_operacoes: rows.length,
+        updated_operacoes: changed,
+        unscheduled_operacoes: unscheduled,
       });
       addToast('Preview gerado (nenhuma alteração aplicada).', 'success');
     } catch (e: any) {
@@ -212,6 +223,16 @@ export default function PcpDashboardPage() {
       setApsLoading(false);
     }
   }, [addToast, apsModal.ctId, apsRuns, loadApsRuns]);
+
+  useEffect(() => {
+    if (!apsModal.open) return;
+    if (!apsSelectedRunId) return;
+    setApsLoading(true);
+    pcpApsGetRunChanges(apsSelectedRunId, 200)
+      .then((rows) => setApsRunChanges(rows || []))
+      .catch(() => setApsRunChanges([]))
+      .finally(() => setApsLoading(false));
+  }, [apsModal.open, apsSelectedRunId]);
 
   const loadData = async () => {
     setLoading(true);
@@ -1137,13 +1158,76 @@ export default function PcpDashboardPage() {
             </button>
           </div>
 
+          {apsPreviewRows.length > 0 && (
+            <div className="bg-white border rounded-lg overflow-hidden">
+              <div className="border-b px-4 py-2 text-sm font-semibold text-gray-800">Preview (mudanças)</div>
+              <div className="overflow-x-auto">
+                <table className="min-w-full text-xs">
+                  <thead className="bg-gray-50 text-gray-600">
+                    <tr>
+                      <th className="px-3 py-2 text-left">OP</th>
+                      <th className="px-3 py-2 text-left">Produto</th>
+                      <th className="px-3 py-2 text-left">Antes</th>
+                      <th className="px-3 py-2 text-left">Depois</th>
+                      <th className="px-3 py-2 text-left">Status</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {apsPreviewRows.slice(0, 120).map((r) => (
+                      <tr key={r.operacao_id} className="border-t">
+                        <td className="px-3 py-2 font-medium text-gray-900">#{r.ordem_numero}</td>
+                        <td className="px-3 py-2 text-gray-700">{r.produto_nome}</td>
+                        <td className="px-3 py-2 text-gray-700">
+                          {r.old_ini ? format(new Date(r.old_ini), 'dd/MM') : '—'}{r.old_fim && r.old_fim !== r.old_ini ? ` → ${format(new Date(r.old_fim), 'dd/MM')}` : ''}
+                        </td>
+                        <td className="px-3 py-2 text-gray-700">
+                          {r.new_ini ? format(new Date(r.new_ini), 'dd/MM') : '—'}{r.new_fim && r.new_fim !== r.new_ini ? ` → ${format(new Date(r.new_fim), 'dd/MM')}` : ''}
+                        </td>
+                        <td className="px-3 py-2">
+                          <span className={`px-2 py-0.5 rounded-full text-[11px] font-semibold ${r.scheduled ? 'bg-emerald-50 text-emerald-700' : 'bg-rose-50 text-rose-700'}`}>
+                            {r.scheduled ? 'OK' : 'Sem agenda'}
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+                    {apsPreviewRows.length > 120 && (
+                      <tr>
+                        <td colSpan={5} className="px-3 py-2 text-gray-500">Mostrando 120 de {apsPreviewRows.length} linhas.</td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
           <div className="bg-white border rounded-lg overflow-hidden">
             <div className="border-b px-4 py-2 text-sm font-semibold text-gray-800">Últimos runs</div>
             <div className="divide-y">
               {apsRuns.map((r) => (
                 <div key={r.id} className="px-4 py-2 text-sm text-gray-700 flex justify-between gap-3">
                   <div>
-                    <div className="font-semibold">{r.kind}</div>
+                    <div className="font-semibold flex items-center gap-2">
+                      {r.kind}
+                      <button
+                        type="button"
+                        className="text-xs font-semibold text-indigo-700 hover:underline"
+                        onClick={() => setApsSelectedRunId(r.id)}
+                      >
+                        Detalhes
+                      </button>
+                      <button
+                        type="button"
+                        className="text-xs font-semibold text-rose-700 hover:underline"
+                        onClick={() => pcpApsUndo(r.id).then((res) => {
+                          addToast(`Undo concluído: ${res.restored} revertidas, ${res.skipped} ignoradas.`, res.skipped > 0 ? 'warning' : 'success');
+                          loadData();
+                          if (apsModal.ctId) loadApsRuns(apsModal.ctId);
+                        }).catch((e: any) => addToast(e?.message || 'Falha ao desfazer.', 'error'))}
+                      >
+                        Desfazer
+                      </button>
+                    </div>
                     <div className="text-xs text-gray-500">{new Date(r.created_at).toLocaleString()}</div>
                   </div>
                   <div className="text-xs text-gray-600 text-right">
@@ -1157,6 +1241,49 @@ export default function PcpDashboardPage() {
               )}
             </div>
           </div>
+
+          {apsSelectedRunId && (
+            <div className="bg-white border rounded-lg overflow-hidden">
+              <div className="border-b px-4 py-2 text-sm font-semibold text-gray-800">
+                Detalhes do run {apsSelectedRunId.slice(0, 8)}
+              </div>
+              <div className="overflow-x-auto">
+                <table className="min-w-full text-xs">
+                  <thead className="bg-gray-50 text-gray-600">
+                    <tr>
+                      <th className="px-3 py-2 text-left">OP</th>
+                      <th className="px-3 py-2 text-left">Produto</th>
+                      <th className="px-3 py-2 text-left">Antes</th>
+                      <th className="px-3 py-2 text-left">Depois</th>
+                      <th className="px-3 py-2 text-left">Status</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {apsRunChanges.map((r) => (
+                      <tr key={r.operacao_id} className="border-t">
+                        <td className="px-3 py-2 font-medium text-gray-900">#{r.ordem_numero}</td>
+                        <td className="px-3 py-2 text-gray-700">{r.produto_nome}</td>
+                        <td className="px-3 py-2 text-gray-700">
+                          {r.old_ini ? format(new Date(r.old_ini), 'dd/MM') : '—'}{r.old_fim && r.old_fim !== r.old_ini ? ` → ${format(new Date(r.old_fim), 'dd/MM')}` : ''}
+                        </td>
+                        <td className="px-3 py-2 text-gray-700">
+                          {r.new_ini ? format(new Date(r.new_ini), 'dd/MM') : '—'}{r.new_fim && r.new_fim !== r.new_ini ? ` → ${format(new Date(r.new_fim), 'dd/MM')}` : ''}
+                        </td>
+                        <td className="px-3 py-2 text-gray-600">{r.status_operacao}</td>
+                      </tr>
+                    ))}
+                    {apsRunChanges.length === 0 && (
+                      <tr>
+                        <td colSpan={5} className="px-3 py-4 text-gray-500">
+                          {apsLoading ? 'Carregando...' : 'Sem mudanças registradas.'}
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
         </div>
       </Modal>
 
