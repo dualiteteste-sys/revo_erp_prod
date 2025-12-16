@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Loader2, Save } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Loader2, Save } from 'lucide-react';
 import { OrdemIndustriaDetails, OrdemPayload, saveOrdem, getOrdemDetails, manageComponente, manageEntrega, OrdemEntrega } from '@/services/industria';
 import { useToast } from '@/contexts/ToastProvider';
 import Section from '@/components/ui/forms/Section';
@@ -42,6 +42,8 @@ export default function OrdemFormPanel({ ordemId, initialTipoOrdem, initialPrefi
   const [isSaving, setIsSaving] = useState(false);
   const [activeTab, setActiveTab] = useState<'dados' | 'componentes' | 'entregas'>('dados');
   const [materialCliente, setMaterialCliente] = useState<MaterialClienteListItem | null>(null);
+  const [wizardStep, setWizardStep] = useState<0 | 1 | 2>(0);
+  const [autoOpenBomSelector, setAutoOpenBomSelector] = useState(false);
 
   const [formData, setFormData] = useState<Partial<OrdemIndustriaDetails>>({
     status: 'rascunho',
@@ -103,6 +105,20 @@ export default function OrdemFormPanel({ ordemId, initialTipoOrdem, initialPrefi
       return next;
     });
   }, [initialPrefill, initialTipoOrdem, ordemId]);
+
+  useEffect(() => {
+    if (ordemId) return;
+    if (formData.tipo_ordem !== 'beneficiamento') return;
+
+    const hasCliente = !!formData.cliente_id;
+    const hasProduto = !!formData.produto_final_id;
+    const hasQtd = !!formData.quantidade_planejada && formData.quantidade_planejada > 0;
+
+    if (!hasCliente) setWizardStep(0);
+    else if (!hasProduto || !hasQtd) setWizardStep(1);
+    else setWizardStep(2);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ordemId, formData.tipo_ordem]);
 
   useEffect(() => {
     if (ordemId) {
@@ -216,6 +232,7 @@ export default function OrdemFormPanel({ ordemId, initialTipoOrdem, initialPrefi
       if (!formData.id) {
         addToast('Ordem criada! Configure os componentes.', 'success');
         setActiveTab('componentes');
+        if (formData.tipo_ordem === 'beneficiamento') setAutoOpenBomSelector(true);
       } else {
         addToast('Ordem salva.', 'success');
       }
@@ -308,6 +325,13 @@ export default function OrdemFormPanel({ ordemId, initialTipoOrdem, initialPrefi
 
   const isLocked = formData.status === 'concluida' || formData.status === 'cancelada';
   const totalEntregue = formData.entregas?.reduce((acc, e) => acc + Number(e.quantidade_entregue), 0) || 0;
+  const isWizard = !ordemId && !formData.id && formData.tipo_ordem === 'beneficiamento';
+
+  const canGoNextWizardStep = () => {
+    if (wizardStep === 0) return !!formData.cliente_id;
+    if (wizardStep === 1) return !!formData.produto_final_id && !!formData.quantidade_planejada && formData.quantidade_planejada > 0;
+    return true;
+  };
 
   useEffect(() => {
     if (formData.tipo_ordem !== 'beneficiamento') {
@@ -391,6 +415,26 @@ export default function OrdemFormPanel({ ordemId, initialTipoOrdem, initialPrefi
       <div className="flex-grow p-6 overflow-y-auto scrollbar-styled">
         {activeTab === 'dados' && (
           <>
+            {isWizard && (
+              <div className="mb-6 p-4 rounded-xl border border-blue-100 bg-blue-50">
+                <div className="flex items-center justify-between gap-4">
+                  <div>
+                    <div className="text-xs font-bold uppercase tracking-[0.12em] text-blue-700">Wizard de Beneficiamento</div>
+                    <div className="text-sm text-blue-900">
+                      Passo {wizardStep + 1} de 3 • {wizardStep === 0 ? 'Cliente' : wizardStep === 1 ? 'Material e quantidade' : 'Revisão'}
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    {[0, 1, 2].map((i) => (
+                      <div
+                        key={i}
+                        className={`h-2.5 w-12 rounded-full ${i <= wizardStep ? 'bg-blue-600' : 'bg-blue-200'}`}
+                      />
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
             <Section title="Planejamento" description="O que será produzido e para quem.">
               <div className="sm:col-span-2">
                 <Select label="Tipo de Ordem" name="tipo_ordem" value={formData.tipo_ordem} onChange={e => handleHeaderChange('tipo_ordem', e.target.value)} disabled={!!formData.id}>
@@ -529,6 +573,7 @@ export default function OrdemFormPanel({ ordemId, initialTipoOrdem, initialPrefi
               )}
             </Section>
 
+            {(!isWizard || wizardStep === 2) && (
             <Section title="Programação" description="Prazos e status.">
               <div className="sm:col-span-2">
                 <Select label="Status" name="status" value={formData.status} onChange={e => handleHeaderChange('status', e.target.value)} disabled={isLocked}>
@@ -558,11 +603,14 @@ export default function OrdemFormPanel({ ordemId, initialTipoOrdem, initialPrefi
               <Input label="Fim Previsto" type="date" value={formData.data_prevista_fim || ''} onChange={e => handleHeaderChange('data_prevista_fim', e.target.value)} disabled={isLocked} className="sm:col-span-2" />
               <Input label="Entrega Prevista" type="date" value={formData.data_prevista_entrega || ''} onChange={e => handleHeaderChange('data_prevista_entrega', e.target.value)} disabled={isLocked} className="sm:col-span-2" />
             </Section>
+            )}
 
+            {(!isWizard || wizardStep === 2) && (
             <Section title="Outros" description="Detalhes adicionais.">
               <Input label="Ref. Documento" name="doc_ref" value={formData.documento_ref || ''} onChange={e => handleHeaderChange('documento_ref', e.target.value)} disabled={isLocked} className="sm:col-span-2" placeholder="Pedido, Lote..." />
               <TextArea label="Observações" name="obs" value={formData.observacoes || ''} onChange={e => handleHeaderChange('observacoes', e.target.value)} rows={3} disabled={isLocked} className="sm:col-span-6" />
             </Section>
+            )}
           </>
         )}
 
@@ -574,7 +622,11 @@ export default function OrdemFormPanel({ ordemId, initialTipoOrdem, initialPrefi
                   ordemId={formData.id}
                   produtoId={formData.produto_final_id}
                   tipoOrdem={formData.tipo_ordem === 'beneficiamento' ? 'beneficiamento' : 'producao'}
-                  onApplied={() => loadDetails(formData.id)}
+                  openOnMount={autoOpenBomSelector}
+                  onApplied={() => {
+                    setAutoOpenBomSelector(false);
+                    loadDetails(formData.id);
+                  }}
                 />
               </div>
             )}
@@ -607,7 +659,7 @@ export default function OrdemFormPanel({ ordemId, initialTipoOrdem, initialPrefi
           Fechar
         </button>
         <div className="flex gap-3">
-          {!isLocked && (
+          {!isLocked && !isWizard && (
             <button
               onClick={handleSaveHeader}
               disabled={isSaving}
@@ -616,6 +668,38 @@ export default function OrdemFormPanel({ ordemId, initialTipoOrdem, initialPrefi
               {isSaving ? <Loader2 className="animate-spin" size={20} /> : <Save size={20} />}
               Salvar
             </button>
+          )}
+          {!isLocked && isWizard && (
+            <>
+              {wizardStep > 0 && (
+                <button
+                  type="button"
+                  onClick={() => setWizardStep(s => (s > 0 ? ((s - 1) as 0 | 1 | 2) : s))}
+                  className="flex items-center gap-2 border border-gray-300 bg-white text-gray-800 font-bold py-2 px-4 rounded-lg hover:bg-gray-50"
+                >
+                  <ArrowLeft size={18} /> Voltar
+                </button>
+              )}
+              {wizardStep < 2 ? (
+                <button
+                  type="button"
+                  disabled={!canGoNextWizardStep()}
+                  onClick={() => setWizardStep(s => (s < 2 ? ((s + 1) as 0 | 1 | 2) : s))}
+                  className="flex items-center gap-2 bg-blue-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-blue-700 disabled:opacity-50"
+                >
+                  Próximo <ArrowRight size={18} />
+                </button>
+              ) : (
+                <button
+                  onClick={handleSaveHeader}
+                  disabled={isSaving}
+                  className="flex items-center gap-2 bg-blue-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-blue-700 disabled:opacity-50"
+                >
+                  {isSaving ? <Loader2 className="animate-spin" size={20} /> : <Save size={20} />}
+                  Salvar e continuar
+                </button>
+              )}
+            </>
           )}
         </div>
       </footer>

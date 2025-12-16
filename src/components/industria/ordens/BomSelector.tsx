@@ -8,10 +8,11 @@ interface Props {
   ordemId: string;
   produtoId: string;
   tipoOrdem: 'producao' | 'beneficiamento';
+  openOnMount?: boolean;
   onApplied: (bom: BomListItem) => void;
 }
 
-export default function BomSelector({ ordemId, produtoId, tipoOrdem, onApplied }: Props) {
+export default function BomSelector({ ordemId, produtoId, tipoOrdem, openOnMount, onApplied }: Props) {
   const [isOpen, setIsOpen] = useState(false);
   const [boms, setBoms] = useState<BomListItem[]>([]);
   const [loading, setLoading] = useState(false);
@@ -19,6 +20,12 @@ export default function BomSelector({ ordemId, produtoId, tipoOrdem, onApplied }
   const [searchTerm, setSearchTerm] = useState('');
   const [filterByProduct, setFilterByProduct] = useState(true);
   const { addToast } = useToast();
+
+  useEffect(() => {
+    if (!openOnMount) return;
+    if (!ordemId) return;
+    setIsOpen(true);
+  }, [openOnMount, ordemId]);
 
   const loadBoms = async () => {
     setLoading(true);
