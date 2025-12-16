@@ -18,6 +18,7 @@ import {
   pcpApsGetRunChanges,
   pcpApsPreviewSequenciarCentro,
   pcpApsResequenciarCentro,
+  pcpApsSequenciarTodosCts,
   pcpReplanejarCentroSobrecarga,
   setOperacaoApsLock,
   PcpAtpCtp,
@@ -112,6 +113,7 @@ export default function PcpDashboardPage() {
   const [manualSeqRows, setManualSeqRows] = useState<PcpGanttOperacao[]>([]);
   const [manualSeqDirty, setManualSeqDirty] = useState(false);
   const [manualSeqSaving, setManualSeqSaving] = useState(false);
+  const [batchSequencing, setBatchSequencing] = useState(false);
 
   const openGanttForCt = useCallback((ctId: string) => {
     setGanttCtFilter(ctId);
@@ -215,6 +217,26 @@ export default function PcpDashboardPage() {
       setManualSeqSaving(false);
     }
   }, [addToast, apsModal.ctId, loadApsRuns, loadData, manualSeqRows]);
+
+  const handleBatchSequencing = useCallback(async () => {
+    if (!confirm('Sequenciar TODOS os Centros de Trabalho no período? Isso vai aplicar o APS para cada CT e gerar runs (com undo).')) return;
+    setBatchSequencing(true);
+    try {
+      const rows = await pcpApsSequenciarTodosCts({ dataInicial: startDate, dataFinal: endDate, apply: true });
+      const total = (rows || []).reduce((acc, r) => acc + (r.total_operacoes || 0), 0);
+      const updated = (rows || []).reduce((acc, r) => acc + (r.updated_operacoes || 0), 0);
+      const unscheduled = (rows || []).reduce((acc, r) => acc + (r.unscheduled_operacoes || 0), 0);
+      addToast(
+        `APS em lote concluído: ${updated}/${total} operações atualizadas.${unscheduled > 0 ? ` ${unscheduled} sem agenda.` : ''}`,
+        unscheduled > 0 ? 'warning' : 'success'
+      );
+      await loadData();
+    } catch (e: any) {
+      addToast(e?.message || 'Falha ao sequenciar todos os CTs.', 'error');
+    } finally {
+      setBatchSequencing(false);
+    }
+  }, [addToast, endDate, startDate]);
 
   const fetchPreview = useCallback(async (silent = false) => {
     if (!apsModal.ctId) return;
@@ -738,6 +760,15 @@ export default function PcpDashboardPage() {
           >
             <RefreshCw size={16} className={loading ? 'animate-spin' : ''} />
             Atualizar
+          </button>
+          <button
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-md bg-indigo-600 text-white hover:bg-indigo-500 disabled:opacity-50"
+            onClick={handleBatchSequencing}
+            disabled={loading || batchSequencing}
+            title="Aplica APS (sequenciamento) para todos os CTs no período"
+          >
+            <Activity size={16} className={batchSequencing ? 'animate-spin' : ''} />
+            {batchSequencing ? 'APS em lote…' : 'APS: Sequenciar todos'}
           </button>
         </div>
       </header>

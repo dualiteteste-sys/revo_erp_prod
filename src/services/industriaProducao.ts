@@ -927,3 +927,25 @@ export async function pcpApsResequenciarCentro(centroTrabalhoId: string, operaca
     p_operacao_ids: operacaoIds,
   });
 }
+
+export type PcpApsBatchSequencingRow = {
+  centro_id: string;
+  centro_nome: string;
+  run_id: string | null;
+  freeze_dias: number;
+  total_operacoes: number;
+  updated_operacoes: number;
+  unscheduled_operacoes: number;
+};
+
+export async function pcpApsSequenciarTodosCts(params: {
+  dataInicial: string;
+  dataFinal: string;
+  apply?: boolean;
+}): Promise<PcpApsBatchSequencingRow[]> {
+  return callRpc<PcpApsBatchSequencingRow[]>('pcp_aps_sequenciar_todos_cts', {
+    p_data_inicial: params.dataInicial,
+    p_data_final: params.dataFinal,
+    p_apply: params.apply ?? true,
+  });
+}
