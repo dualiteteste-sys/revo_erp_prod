@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Activity, AlertTriangle, BarChart3, BellRing, Filter, LineChart, Loader2, PackageSearch, PieChart, RefreshCw, TrendingUp } from 'lucide-react';
+import { Activity, AlertTriangle, BarChart3, BellRing, Filter, GripVertical, LineChart, Loader2, PackageSearch, PieChart, RefreshCw, TrendingUp } from 'lucide-react';
+import { DragDropContext, Draggable, Droppable, DropResult } from '@hello-pangea/dnd';
 import { useToast } from '@/contexts/ToastProvider';
 import {
   EstoqueProjetadoPoint,
@@ -16,6 +17,8 @@ import {
   pcpApsUndo,
   pcpApsGetRunChanges,
   pcpApsPreviewSequenciarCentro,
+  pcpApsResequenciarCentro,
+  pcpApsSequenciarTodosCts,
   pcpReplanejarCentroSobrecarga,
   setOperacaoApsLock,
   PcpAtpCtp,
@@ -107,6 +110,10 @@ export default function PcpDashboardPage() {
   const [apsRunChanges, setApsRunChanges] = useState<any[]>([]);
   const [apsFreezeDias, setApsFreezeDias] = useState<number>(0);
   const [apsConfigLoading, setApsConfigLoading] = useState(false);
+  const [manualSeqRows, setManualSeqRows] = useState<PcpGanttOperacao[]>([]);
+  const [manualSeqDirty, setManualSeqDirty] = useState(false);
+  const [manualSeqSaving, setManualSeqSaving] = useState(false);
+  const [batchSequencing, setBatchSequencing] = useState(false);
 
   const openGanttForCt = useCallback((ctId: string) => {
     setGanttCtFilter(ctId);
@@ -158,6 +165,8 @@ export default function PcpDashboardPage() {
     setApsSelectedRunId(null);
     setApsRunChanges([]);
     setApsFreezeDias(0);
+    setManualSeqRows([]);
+    setManualSeqDirty(false);
     loadApsRuns(apsModal.ctId);
     setApsConfigLoading(true);
     getCentroApsConfig(apsModal.ctId)
@@ -165,6 +174,69 @@ export default function PcpDashboardPage() {
       .catch(() => setApsFreezeDias(0))
       .finally(() => setApsConfigLoading(false));
   }, [apsModal.open, apsModal.ctId, loadApsRuns]);
+
+  useEffect(() => {
+    if (!apsModal.open || !apsModal.ctId) return;
+    if (manualSeqDirty) return;
+    const rows = (gantt || [])
+      .filter((r) => r.centro_trabalho_id === apsModal.ctId)
+      .filter((r) => !['em_execucao', 'concluida', 'cancelada'].includes(String(r.status_operacao || '').toLowerCase()))
+      .sort((a, b) => (a.operacao_sequencia ?? 0) - (b.operacao_sequencia ?? 0));
+    setManualSeqRows(rows);
+  }, [apsModal.open, apsModal.ctId, gantt, manualSeqDirty]);
+
+  const handleDragManualSeq = useCallback((result: DropResult) => {
+    if (!result.destination) return;
+    const from = result.source.index;
+    const to = result.destination.index;
+    if (from === to) return;
+    setManualSeqRows((prev) => {
+      const next = [...prev];
+      const [moved] = next.splice(from, 1);
+      next.splice(to, 0, moved);
+      return next;
+    });
+    setManualSeqDirty(true);
+  }, []);
+
+  const handleSaveManualSeq = useCallback(async () => {
+    if (!apsModal.ctId) return;
+    if (manualSeqRows.length === 0) return;
+    if (!confirm('Salvar ordem manual deste CT? Isso vai atualizar o campo sequencia das operações (Undo disponível em Runs).')) return;
+    setManualSeqSaving(true);
+    try {
+      const result = await pcpApsResequenciarCentro(apsModal.ctId, manualSeqRows.map((r) => r.operacao_id));
+      addToast(`Ordem salva: ${result.updated}/${result.total} operações atualizadas.`, result.updated > 0 ? 'success' : 'warning');
+      setManualSeqDirty(false);
+      await loadData();
+      await loadApsRuns(apsModal.ctId);
+      if (result.run_id) setApsSelectedRunId(String(result.run_id));
+    } catch (e: any) {
+      addToast(e?.message || 'Falha ao salvar ordem manual.', 'error');
+    } finally {
+      setManualSeqSaving(false);
+    }
+  }, [addToast, apsModal.ctId, loadApsRuns, loadData, manualSeqRows]);
+
+  const handleBatchSequencing = useCallback(async () => {
+    if (!confirm('Sequenciar TODOS os Centros de Trabalho no período? Isso vai aplicar o APS para cada CT e gerar runs (com undo).')) return;
+    setBatchSequencing(true);
+    try {
+      const rows = await pcpApsSequenciarTodosCts({ dataInicial: startDate, dataFinal: endDate, apply: true });
+      const total = (rows || []).reduce((acc, r) => acc + (r.total_operacoes || 0), 0);
+      const updated = (rows || []).reduce((acc, r) => acc + (r.updated_operacoes || 0), 0);
+      const unscheduled = (rows || []).reduce((acc, r) => acc + (r.unscheduled_operacoes || 0), 0);
+      addToast(
+        `APS em lote concluído: ${updated}/${total} operações atualizadas.${unscheduled > 0 ? ` ${unscheduled} sem agenda.` : ''}`,
+        unscheduled > 0 ? 'warning' : 'success'
+      );
+      await loadData();
+    } catch (e: any) {
+      addToast(e?.message || 'Falha ao sequenciar todos os CTs.', 'error');
+    } finally {
+      setBatchSequencing(false);
+    }
+  }, [addToast, endDate, startDate]);
 
   const fetchPreview = useCallback(async (silent = false) => {
     if (!apsModal.ctId) return;
@@ -689,6 +761,15 @@ export default function PcpDashboardPage() {
             <RefreshCw size={16} className={loading ? 'animate-spin' : ''} />
             Atualizar
           </button>
+          <button
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-md bg-indigo-600 text-white hover:bg-indigo-500 disabled:opacity-50"
+            onClick={handleBatchSequencing}
+            disabled={loading || batchSequencing}
+            title="Aplica APS (sequenciamento) para todos os CTs no período"
+          >
+            <Activity size={16} className={batchSequencing ? 'animate-spin' : ''} />
+            {batchSequencing ? 'APS em lote…' : 'APS: Sequenciar todos'}
+          </button>
         </div>
       </header>
 
@@ -1204,6 +1285,84 @@ export default function PcpDashboardPage() {
             </button>
           </div>
 
+          <div className="bg-white border rounded-lg overflow-hidden">
+            <div className="border-b px-4 py-2 text-sm font-semibold text-gray-800 flex items-center justify-between gap-2">
+              <span>Sequência manual (drag-and-drop)</span>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  className="text-xs font-semibold text-gray-700 hover:underline disabled:opacity-50"
+                  disabled={manualSeqSaving || apsLoading}
+                  onClick={() => {
+                    setManualSeqDirty(false);
+                    if (apsModal.ctId) {
+                      const rows = (gantt || [])
+                        .filter((r) => r.centro_trabalho_id === apsModal.ctId)
+                        .filter((r) => !['em_execucao', 'concluida', 'cancelada'].includes(String(r.status_operacao || '').toLowerCase()))
+                        .sort((a, b) => (a.operacao_sequencia ?? 0) - (b.operacao_sequencia ?? 0));
+                      setManualSeqRows(rows);
+                    }
+                  }}
+                >
+                  Resetar
+                </button>
+                <button
+                  type="button"
+                  className="text-xs font-semibold text-indigo-700 hover:underline disabled:opacity-50"
+                  disabled={!manualSeqDirty || manualSeqSaving || apsLoading}
+                  onClick={handleSaveManualSeq}
+                >
+                  {manualSeqSaving ? 'Salvando…' : 'Salvar ordem'}
+                </button>
+              </div>
+            </div>
+            <div className="p-3">
+              {manualSeqRows.length === 0 ? (
+                <div className="text-sm text-gray-500">Nenhuma operação elegível encontrada para este CT no período.</div>
+              ) : (
+                <DragDropContext onDragEnd={handleDragManualSeq}>
+                  <Droppable droppableId="pcp-aps-manual-seq">
+                    {(provided) => (
+                      <div ref={provided.innerRef} {...provided.droppableProps} className="space-y-2">
+                        {manualSeqRows.slice(0, 80).map((r, index) => (
+                          <Draggable key={r.operacao_id} draggableId={r.operacao_id} index={index}>
+                            {(provided, snapshot) => (
+                              <div
+                                ref={provided.innerRef}
+                                {...provided.draggableProps}
+                                className={`flex items-center gap-3 rounded-lg border px-3 py-2 text-sm ${
+                                  snapshot.isDragging ? 'bg-indigo-50 border-indigo-200 shadow-sm' : 'bg-white'
+                                }`}
+                              >
+                                <div {...provided.dragHandleProps} className="text-gray-400 cursor-grab">
+                                  <GripVertical size={16} />
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                  <div className="flex items-center gap-2">
+                                    <span className="font-semibold text-gray-900">#{r.ordem_numero}</span>
+                                    <span className="text-gray-700 truncate">{r.produto_nome}</span>
+                                    <span className="text-[11px] text-gray-500">seq {r.operacao_sequencia}</span>
+                                  </div>
+                                  <div className="text-[11px] text-gray-500">
+                                    {r.data_inicio ? format(new Date(r.data_inicio), 'dd/MM') : '—'} → {r.data_fim ? format(new Date(r.data_fim), 'dd/MM') : '—'} • {r.status_operacao}
+                                  </div>
+                                </div>
+                              </div>
+                            )}
+                          </Draggable>
+                        ))}
+                        {provided.placeholder}
+                        {manualSeqRows.length > 80 && (
+                          <div className="text-xs text-gray-500 pt-2">Mostrando 80 de {manualSeqRows.length} operações.</div>
+                        )}
+                      </div>
+                    )}
+                  </Droppable>
+                </DragDropContext>
+              )}
+            </div>
+          </div>
+
           {apsPreviewRows.length > 0 && (
             <div className="bg-white border rounded-lg overflow-hidden">
               <div className="border-b px-4 py-2 text-sm font-semibold text-gray-800">Preview (mudanças)</div>
@@ -1300,8 +1459,10 @@ export default function PcpDashboardPage() {
                     <div className="text-xs text-gray-500">{new Date(r.created_at).toLocaleString()}</div>
                   </div>
                   <div className="text-xs text-gray-600 text-right">
-                    {r.summary?.updated_operacoes ?? 0}/{r.summary?.total_operacoes ?? 0} atualizadas
-                    {r.summary?.unscheduled_operacoes ? ` • ${r.summary.unscheduled_operacoes} sem agenda` : ''}
+                    {r.kind === 'manual_resequence'
+                      ? `${r.summary?.updated ?? 0}/${r.summary?.total ?? 0} reordenadas`
+                      : `${r.summary?.updated_operacoes ?? 0}/${r.summary?.total_operacoes ?? 0} atualizadas`}
+                    {r.kind !== 'manual_resequence' && r.summary?.unscheduled_operacoes ? ` • ${r.summary.unscheduled_operacoes} sem agenda` : ''}
                   </div>
                 </div>
               ))}
@@ -1322,6 +1483,7 @@ export default function PcpDashboardPage() {
                     <tr>
                       <th className="px-3 py-2 text-left">OP</th>
                       <th className="px-3 py-2 text-left">Produto</th>
+                      <th className="px-3 py-2 text-left">Seq</th>
                       <th className="px-3 py-2 text-left">Antes</th>
                       <th className="px-3 py-2 text-left">Depois</th>
                       <th className="px-3 py-2 text-left">Status</th>
@@ -1333,6 +1495,11 @@ export default function PcpDashboardPage() {
                       <tr key={r.operacao_id} className="border-t">
                         <td className="px-3 py-2 font-medium text-gray-900">#{r.ordem_numero}</td>
                         <td className="px-3 py-2 text-gray-700">{r.produto_nome}</td>
+                        <td className="px-3 py-2 text-gray-700">
+                          {typeof r.old_seq === 'number' || typeof r.new_seq === 'number'
+                            ? `${r.old_seq ?? '—'} → ${r.new_seq ?? '—'}`
+                            : '—'}
+                        </td>
                         <td className="px-3 py-2 text-gray-700">
                           {r.old_ini ? format(new Date(r.old_ini), 'dd/MM') : '—'}{r.old_fim && r.old_fim !== r.old_ini ? ` → ${format(new Date(r.old_fim), 'dd/MM')}` : ''}
                         </td>
@@ -1360,7 +1527,7 @@ export default function PcpDashboardPage() {
                     ))}
                     {apsRunChanges.length === 0 && (
                       <tr>
-                        <td colSpan={6} className="px-3 py-4 text-gray-500">
+                        <td colSpan={7} className="px-3 py-4 text-gray-500">
                           {apsLoading ? 'Carregando...' : 'Sem mudanças registradas.'}
                         </td>
                       </tr>
