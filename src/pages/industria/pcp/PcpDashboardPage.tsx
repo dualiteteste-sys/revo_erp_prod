@@ -119,6 +119,9 @@ export default function PcpDashboardPage() {
   const [batchModalOpen, setBatchModalOpen] = useState(false);
   const [batchRows, setBatchRows] = useState<PcpApsBatchSequencingRow[]>([]);
   const [batchPreviewed, setBatchPreviewed] = useState(false);
+  const [replanModalOpen, setReplanModalOpen] = useState(false);
+  const [replanApplying, setReplanApplying] = useState(false);
+  const [replanResults, setReplanResults] = useState<Record<string, any>>({});
 
   const loadData = useCallback(async () => {
     setLoading(true);
@@ -288,6 +291,11 @@ export default function PcpDashboardPage() {
     setBatchPreviewed(false);
   }, []);
 
+  const openReplanModal = useCallback(() => {
+    setReplanModalOpen(true);
+    setReplanResults({});
+  }, []);
+
   const openApsForCt = useCallback((ctId: string, ctNome?: string) => {
     setBatchModalOpen(false);
     setApsModal({ open: true, ctId, ctNome });
@@ -306,6 +314,57 @@ export default function PcpDashboardPage() {
       setBatchSequencing(false);
     }
   }, [addToast, loadData]);
+
+  const replanCandidates = useMemo(() => {
+    const rows = capacitySummary
+      .map((ct) => {
+        const sug = capacitySuggestions.get(ct.id);
+        if (!sug?.peakDay || (sug.overloadHours ?? 0) <= 0.01) return null;
+        return {
+          centro_id: ct.id,
+          centro_nome: ct.nome,
+          peak_day: sug.peakDay,
+          peak_ratio: sug.peakRatio,
+          overload_hours: sug.overloadHours,
+          suggested_day: sug.suggestedDay,
+          suggested_span_days: sug.suggestedSpanDays,
+          message: sug.message,
+        };
+      })
+      .filter(Boolean) as Array<{
+        centro_id: string;
+        centro_nome: string;
+        peak_day: string;
+        peak_ratio: number;
+        overload_hours: number;
+        suggested_day?: string;
+        suggested_span_days?: number;
+        message?: string;
+      }>;
+
+    return rows.sort((a, b) => (b.overload_hours || 0) - (a.overload_hours || 0));
+  }, [capacitySummary, capacitySuggestions]);
+
+  const applyReplanBatch = useCallback(async () => {
+    if (replanCandidates.length === 0) return;
+    if (!confirm(`Aplicar replanejamento automático para ${replanCandidates.length} CT(s) com sobrecarga no período?`)) return;
+    setReplanApplying(true);
+    setReplanResults({});
+    try {
+      for (const item of replanCandidates) {
+        try {
+          const res = await pcpReplanejarCentroSobrecarga(item.centro_id, item.peak_day, endDate);
+          setReplanResults((prev) => ({ ...prev, [item.centro_id]: res }));
+        } catch (e: any) {
+          setReplanResults((prev) => ({ ...prev, [item.centro_id]: { message: e?.message || 'Falha', moved: 0 } }));
+        }
+      }
+      addToast('Replanejamento em lote concluído.', 'success');
+      await loadData();
+    } finally {
+      setReplanApplying(false);
+    }
+  }, [addToast, endDate, loadData, replanCandidates]);
 
   const fetchPreview = useCallback(async (silent = false) => {
     if (!apsModal.ctId) return;
@@ -813,6 +872,15 @@ export default function PcpDashboardPage() {
             <Activity size={16} className={batchSequencing ? 'animate-spin' : ''} />
             {batchSequencing ? 'APS em lote…' : 'APS: Sequenciar todos'}
           </button>
+          <button
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-md border border-amber-200 bg-amber-50 text-amber-800 hover:bg-amber-100 disabled:opacity-50"
+            onClick={openReplanModal}
+            disabled={loading}
+            title="Sugere e aplica replanejamento (mover menor prioridade) nos CTs com sobrecarga"
+          >
+            <AlertTriangle size={16} />
+            Replan: sobrecarga
+          </button>
         </div>
       </header>
 
@@ -909,6 +977,109 @@ export default function PcpDashboardPage() {
                     <tr>
                       <td colSpan={6} className="px-3 py-6 text-sm text-gray-500">
                         {batchSequencing ? 'Processando…' : 'Clique em Preview para carregar o resumo.'}
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </Modal>
+
+      <Modal
+        isOpen={replanModalOpen}
+        onClose={() => setReplanModalOpen(false)}
+        title="PCP • Replanejamento por sobrecarga (lote)"
+        size="lg"
+      >
+        <div className="p-6 space-y-4">
+          <div className="bg-amber-50 border border-amber-100 rounded-lg p-4 text-sm text-amber-900 space-y-1">
+            <div>Período: <span className="font-semibold">{format(new Date(startDate), 'dd/MM')}</span> → <span className="font-semibold">{format(new Date(endDate), 'dd/MM')}</span></div>
+            <div className="text-xs text-amber-800">
+              Move operações de menor prioridade do dia de pico para dias com folga (respeita Freeze/Locked). Gera runs e permite Undo por CT.
+            </div>
+          </div>
+
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={applyReplanBatch}
+              disabled={replanApplying || replanCandidates.length === 0}
+              className="px-4 py-2 rounded-lg bg-amber-600 text-white hover:bg-amber-500 text-sm font-semibold disabled:opacity-50"
+            >
+              {replanApplying ? 'Aplicando…' : `Aplicar em lote (${replanCandidates.length})`}
+            </button>
+          </div>
+
+          <div className="bg-white border rounded-lg overflow-hidden">
+            <div className="border-b px-4 py-2 text-sm font-semibold text-gray-800">CTs com sobrecarga (preview)</div>
+            <div className="overflow-x-auto">
+              <table className="min-w-full text-xs">
+                <thead className="bg-gray-50 text-gray-600">
+                  <tr>
+                    <th className="px-3 py-2 text-left">Centro</th>
+                    <th className="px-3 py-2 text-right">Sobrecarga</th>
+                    <th className="px-3 py-2 text-left">Pico</th>
+                    <th className="px-3 py-2 text-left">Sugestão</th>
+                    <th className="px-3 py-2 text-left">Resultado</th>
+                    <th className="px-3 py-2 text-left">Ações</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {replanCandidates.map((r) => {
+                    const res = replanResults[r.centro_id];
+                    const runId = res?.run_id as string | undefined;
+                    const moved = Number(res?.moved ?? 0) || 0;
+                    const msg = res?.message as string | undefined;
+                    const freezeUntil = res?.freeze_until as string | undefined;
+                    return (
+                      <tr key={r.centro_id} className="border-t">
+                        <td className="px-3 py-2 text-gray-900 font-medium">{r.centro_nome}</td>
+                        <td className="px-3 py-2 text-right text-gray-700">{(r.overload_hours || 0).toFixed(1)}h</td>
+                        <td className="px-3 py-2 text-gray-700">{format(new Date(r.peak_day), 'dd/MM')}</td>
+                        <td className="px-3 py-2 text-gray-700">
+                          {r.suggested_day ? `${format(new Date(r.suggested_day), 'dd/MM')} (${r.suggested_span_days || 1}d)` : '—'}
+                          {r.message ? <div className="text-[11px] text-gray-500">{r.message}</div> : null}
+                        </td>
+                        <td className="px-3 py-2 text-gray-700">
+                          {res ? (
+                            <div className="space-y-0.5">
+                              <div>{moved > 0 ? `${moved} movida(s)` : (msg || 'Sem mudanças')}</div>
+                              {freezeUntil ? <div className="text-[11px] text-gray-500">Freeze até {format(new Date(freezeUntil), 'dd/MM')}</div> : null}
+                              {runId ? <div className="text-[11px] text-gray-500">Run {runId.slice(0, 8)}</div> : null}
+                            </div>
+                          ) : (
+                            <span className="text-gray-400">{replanApplying ? '...' : '—'}</span>
+                          )}
+                        </td>
+                        <td className="px-3 py-2">
+                          <div className="flex items-center gap-2">
+                            <button
+                              type="button"
+                              className="text-[11px] px-2 py-1 rounded-md border bg-white hover:bg-gray-50"
+                              onClick={() => openGanttForCt(r.centro_id)}
+                            >
+                              Ver Gantt
+                            </button>
+                            <button
+                              type="button"
+                              className="text-[11px] px-2 py-1 rounded-md border border-rose-200 bg-rose-50 text-rose-700 hover:bg-rose-100 disabled:opacity-50"
+                              disabled={!runId || replanApplying}
+                              onClick={() => runId && undoBatchRun(runId)}
+                              title={!runId ? 'Sem run (nada aplicado)' : 'Desfaz o run'}
+                            >
+                              Undo
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                  {replanCandidates.length === 0 && (
+                    <tr>
+                      <td colSpan={6} className="px-3 py-6 text-sm text-gray-500">
+                        Nenhum CT com sobrecarga no período selecionado.
                       </td>
                     </tr>
                   )}
