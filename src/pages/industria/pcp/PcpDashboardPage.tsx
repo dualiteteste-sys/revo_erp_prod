@@ -22,6 +22,7 @@ import {
   pcpReplanejarCentroSobrecarga,
   setOperacaoApsLock,
   PcpAtpCtp,
+  PcpApsBatchSequencingRow,
   PcpCargaCapacidade,
   PcpGanttOperacao,
   PcpKpis,
@@ -115,7 +116,7 @@ export default function PcpDashboardPage() {
   const [manualSeqSaving, setManualSeqSaving] = useState(false);
   const [batchSequencing, setBatchSequencing] = useState(false);
   const [batchModalOpen, setBatchModalOpen] = useState(false);
-  const [batchRows, setBatchRows] = useState<any[]>([]);
+  const [batchRows, setBatchRows] = useState<PcpApsBatchSequencingRow[]>([]);
   const [batchPreviewed, setBatchPreviewed] = useState(false);
 
   const loadData = useCallback(async () => {
@@ -277,13 +278,32 @@ export default function PcpDashboardPage() {
     } finally {
       setBatchSequencing(false);
     }
-  }, [addToast, endDate, startDate]);
+  }, [addToast, endDate, loadData, startDate]);
 
   const openBatchModal = useCallback(() => {
     setBatchModalOpen(true);
     setBatchRows([]);
     setBatchPreviewed(false);
   }, []);
+
+  const openApsForCt = useCallback((ctId: string, ctNome?: string) => {
+    setBatchModalOpen(false);
+    setApsModal({ open: true, ctId, ctNome });
+  }, []);
+
+  const undoBatchRun = useCallback(async (runId: string) => {
+    if (!confirm(`Desfazer o run ${runId.slice(0, 8)}?`)) return;
+    setBatchSequencing(true);
+    try {
+      const res = await pcpApsUndo(runId);
+      addToast(`Undo concluído: ${res.restored} revertidas, ${res.skipped} ignoradas.`, res.skipped > 0 ? 'warning' : 'success');
+      await loadData();
+    } catch (e: any) {
+      addToast(e?.message || 'Falha ao desfazer run.', 'error');
+    } finally {
+      setBatchSequencing(false);
+    }
+  }, [addToast, loadData]);
 
   const fetchPreview = useCallback(async (silent = false) => {
     if (!apsModal.ctId) return;
@@ -842,6 +862,7 @@ export default function PcpDashboardPage() {
                     <th className="px-3 py-2 text-right">Sem agenda</th>
                     <th className="px-3 py-2 text-right">Freeze</th>
                     <th className="px-3 py-2 text-left">Run</th>
+                    <th className="px-3 py-2 text-left">Ações</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -852,11 +873,31 @@ export default function PcpDashboardPage() {
                       <td className="px-3 py-2 text-right text-gray-700">{r.unscheduled_operacoes ?? 0}</td>
                       <td className="px-3 py-2 text-right text-gray-700">{r.freeze_dias ?? 0}d</td>
                       <td className="px-3 py-2 text-gray-500">{r.run_id ? String(r.run_id).slice(0, 8) : '—'}</td>
+                      <td className="px-3 py-2">
+                        <div className="flex items-center gap-2">
+                          <button
+                            type="button"
+                            className="text-[11px] px-2 py-1 rounded-md border bg-white hover:bg-gray-50"
+                            onClick={() => openApsForCt(r.centro_id, r.centro_nome)}
+                          >
+                            Abrir
+                          </button>
+                          <button
+                            type="button"
+                            className="text-[11px] px-2 py-1 rounded-md border border-rose-200 bg-rose-50 text-rose-700 hover:bg-rose-100 disabled:opacity-50"
+                            disabled={!r.run_id || batchSequencing}
+                            onClick={() => r.run_id && undoBatchRun(r.run_id)}
+                            title={!r.run_id ? 'Sem run (nenhuma alteração aplicada)' : 'Desfaz o run deste CT'}
+                          >
+                            Undo
+                          </button>
+                        </div>
+                      </td>
                     </tr>
                   ))}
                   {batchRows.length === 0 && (
                     <tr>
-                      <td colSpan={5} className="px-3 py-6 text-sm text-gray-500">
+                      <td colSpan={6} className="px-3 py-6 text-sm text-gray-500">
                         {batchSequencing ? 'Processando…' : 'Clique em Preview para carregar o resumo.'}
                       </td>
                     </tr>
