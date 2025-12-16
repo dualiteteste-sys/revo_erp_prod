@@ -76,6 +76,12 @@ export default function OrdemFormPanel({ ordemId, initialTipoOrdem, onSaveSucces
   const handleProductSelect = (item: any) => {
     handleHeaderChange('produto_final_id', item.id);
     handleHeaderChange('produto_nome', item.descricao);
+    handleHeaderChange('usa_material_cliente', false);
+    handleHeaderChange('material_cliente_id', null);
+    handleHeaderChange('material_cliente_nome', null);
+    handleHeaderChange('material_cliente_codigo', null);
+    handleHeaderChange('material_cliente_unidade', null);
+    setMaterialCliente(null);
   };
 
   const handleSaveHeader = async () => {
@@ -101,6 +107,8 @@ export default function OrdemFormPanel({ ordemId, initialTipoOrdem, onSaveSucces
         quantidade_planejada: formData.quantidade_planejada,
         unidade: formData.unidade,
         cliente_id: formData.cliente_id,
+        usa_material_cliente: formData.usa_material_cliente,
+        material_cliente_id: formData.material_cliente_id,
         status: formData.status,
         prioridade: formData.prioridade,
         data_prevista_inicio: formData.data_prevista_inicio,
@@ -209,6 +217,34 @@ export default function OrdemFormPanel({ ordemId, initialTipoOrdem, onSaveSucces
   const isLocked = formData.status === 'concluida' || formData.status === 'cancelada';
   const totalEntregue = formData.entregas?.reduce((acc, e) => acc + Number(e.quantidade_entregue), 0) || 0;
 
+  useEffect(() => {
+    if (formData.tipo_ordem !== 'beneficiamento') {
+      setMaterialCliente(null);
+      return;
+    }
+    if (!formData.material_cliente_id) {
+      setMaterialCliente(null);
+      return;
+    }
+    if (!formData.cliente_id) {
+      setMaterialCliente(null);
+      return;
+    }
+
+    setMaterialCliente({
+      id: formData.material_cliente_id,
+      cliente_id: formData.cliente_id,
+      cliente_nome: formData.cliente_nome || '',
+      produto_id: formData.produto_final_id!,
+      produto_nome: formData.produto_nome || '',
+      codigo_cliente: formData.material_cliente_codigo ?? null,
+      nome_cliente: formData.material_cliente_nome ?? null,
+      unidade: formData.material_cliente_unidade ?? null,
+      ativo: true,
+      total_count: 1,
+    });
+  }, [formData.tipo_ordem, formData.material_cliente_id, formData.cliente_id]);
+
   return (
     <div className="flex flex-col h-full">
       <div className="border-b border-white/20">
@@ -312,6 +348,11 @@ export default function OrdemFormPanel({ ordemId, initialTipoOrdem, onSaveSucces
                     handleHeaderChange('cliente_id', id);
                     if (name) handleHeaderChange('cliente_nome', name);
                     setMaterialCliente(null);
+                    handleHeaderChange('usa_material_cliente', false);
+                    handleHeaderChange('material_cliente_id', null);
+                    handleHeaderChange('material_cliente_nome', null);
+                    handleHeaderChange('material_cliente_codigo', null);
+                    handleHeaderChange('material_cliente_unidade', null);
                   }}
                   disabled={isLocked}
                 />
@@ -339,12 +380,29 @@ export default function OrdemFormPanel({ ordemId, initialTipoOrdem, onSaveSucces
                   </div>
                   <MaterialClienteAutocomplete
                     clienteId={formData.cliente_id || null}
-                    value={materialCliente?.id || null}
-                    initialName={materialCliente?.nome_cliente || materialCliente?.produto_nome}
+                    value={formData.material_cliente_id || materialCliente?.id || null}
+                    initialName={
+                      formData.material_cliente_nome ||
+                      formData.material_cliente_codigo ||
+                      materialCliente?.nome_cliente ||
+                      materialCliente?.produto_nome
+                    }
                     disabled={isLocked || !formData.cliente_id}
                     onChange={(m) => {
                       setMaterialCliente(m);
-                      if (!m) return;
+                      if (!m) {
+                        handleHeaderChange('usa_material_cliente', false);
+                        handleHeaderChange('material_cliente_id', null);
+                        handleHeaderChange('material_cliente_nome', null);
+                        handleHeaderChange('material_cliente_codigo', null);
+                        handleHeaderChange('material_cliente_unidade', null);
+                        return;
+                      }
+                      handleHeaderChange('usa_material_cliente', true);
+                      handleHeaderChange('material_cliente_id', m.id);
+                      handleHeaderChange('material_cliente_nome', m.nome_cliente);
+                      handleHeaderChange('material_cliente_codigo', m.codigo_cliente);
+                      handleHeaderChange('material_cliente_unidade', m.unidade);
                       handleHeaderChange('produto_final_id', m.produto_id);
                       handleHeaderChange('produto_nome', m.produto_nome);
                       if (m.unidade) handleHeaderChange('unidade', m.unidade);

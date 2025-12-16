@@ -65,6 +65,11 @@ export type OrdemIndustriaDetails = {
   tipo_ordem: TipoOrdemIndustria;
   produto_final_id: string;
   produto_nome: string;
+  usa_material_cliente?: boolean | null;
+  material_cliente_id?: string | null;
+  material_cliente_nome?: string | null;
+  material_cliente_codigo?: string | null;
+  material_cliente_unidade?: string | null;
   quantidade_planejada: number;
   unidade: string;
   cliente_id?: string | null;
