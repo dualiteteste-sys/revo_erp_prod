@@ -795,3 +795,27 @@ export async function pcpReplanejarCentroSobrecarga(
     p_data_final: dataFinal || null,
   });
 }
+
+export type PcpApsSequenciarResult = {
+  apply: boolean;
+  centro_id: string;
+  data_inicial: string;
+  data_final: string;
+  total_operacoes: number;
+  updated_operacoes: number;
+  unscheduled_operacoes: number;
+};
+
+export async function pcpApsSequenciarCentro(params: {
+  centroTrabalhoId: string;
+  dataInicial: string;
+  dataFinal: string;
+  apply?: boolean;
+}): Promise<PcpApsSequenciarResult> {
+  return callRpc<PcpApsSequenciarResult>('pcp_aps_sequenciar_ct', {
+    p_centro_id: params.centroTrabalhoId,
+    p_data_inicial: params.dataInicial,
+    p_data_final: params.dataFinal,
+    p_apply: params.apply ?? true,
+  });
+}

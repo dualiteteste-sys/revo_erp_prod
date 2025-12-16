@@ -11,6 +11,7 @@ import {
   listPcpKpis,
   listPcpOrdensLeadTime,
   listPcpParetoRefugos,
+  pcpApsSequenciarCentro,
   pcpReplanejarCentroSobrecarga,
   PcpAtpCtp,
   PcpCargaCapacidade,
@@ -80,6 +81,7 @@ export default function PcpDashboardPage() {
   const [ganttCtFilter, setGanttCtFilter] = useState<string>('all');
   const [ganttStatusFilter, setGanttStatusFilter] = useState<string>('all');
   const [applyingCtId, setApplyingCtId] = useState<string | null>(null);
+  const [sequencingCtId, setSequencingCtId] = useState<string | null>(null);
 
   const openGanttForCt = useCallback((ctId: string) => {
     setGanttCtFilter(ctId);
@@ -108,6 +110,29 @@ export default function PcpDashboardPage() {
       setApplyingCtId(null);
     }
   }, [addToast, endDate]);
+
+  const runSequencerForCt = useCallback(async (ctId: string) => {
+    if (!confirm('Executar sequenciamento automático (capacidade finita) para este centro? Isso vai recalcular as datas previstas das operações elegíveis no período selecionado.')) return;
+    setSequencingCtId(ctId);
+    try {
+      const result = await pcpApsSequenciarCentro({
+        centroTrabalhoId: ctId,
+        dataInicial: startDate,
+        dataFinal: endDate,
+        apply: true,
+      });
+      addToast(
+        `Sequenciamento aplicado: ${result.updated_operacoes}/${result.total_operacoes} operações atualizadas.${result.unscheduled_operacoes > 0 ? ` ${result.unscheduled_operacoes} sem agenda.` : ''}`,
+        result.unscheduled_operacoes > 0 ? 'warning' : 'success'
+      );
+      await loadData();
+      openGanttForCt(ctId);
+    } catch (e: any) {
+      addToast(e?.message || 'Falha ao sequenciar centro.', 'error');
+    } finally {
+      setSequencingCtId(null);
+    }
+  }, [addToast, endDate, startDate, openGanttForCt]);
 
   const loadData = async () => {
     setLoading(true);
@@ -751,6 +776,14 @@ export default function PcpDashboardPage() {
                               {applyingCtId === ct.id ? 'Aplicando…' : 'Aplicar'}
                             </button>
                           )}
+                          <button
+                            type="button"
+                            disabled={sequencingCtId === ct.id}
+                            onClick={() => runSequencerForCt(ct.id)}
+                            className="text-xs font-semibold text-indigo-700 hover:text-indigo-800 underline-offset-2 hover:underline disabled:opacity-50"
+                          >
+                            {sequencingCtId === ct.id ? 'Sequenciando…' : 'Sequenciar'}
+                          </button>
                           <button
                             type="button"
                             onClick={() => openGanttForCt(ct.id)}
