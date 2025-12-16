@@ -12,6 +12,8 @@ import {
   listPcpOrdensLeadTime,
   listPcpParetoRefugos,
   pcpApsSequenciarCentro,
+  pcpApsListRuns,
+  pcpApsUndo,
   pcpReplanejarCentroSobrecarga,
   PcpAtpCtp,
   PcpCargaCapacidade,
@@ -21,6 +23,7 @@ import {
   PcpParetoItem
 } from '@/services/industriaProducao';
 import { differenceInCalendarDays, format } from 'date-fns';
+import Modal from '@/components/ui/Modal';
 
 const fmtInput = (date: Date) => date.toISOString().slice(0, 10);
 
@@ -83,6 +86,19 @@ export default function PcpDashboardPage() {
   const [applyingCtId, setApplyingCtId] = useState<string | null>(null);
   const [sequencingCtId, setSequencingCtId] = useState<string | null>(null);
 
+  const [apsModal, setApsModal] = useState<{
+    open: boolean;
+    ctId?: string;
+    ctNome?: string;
+  }>({ open: false });
+  const [apsPreview, setApsPreview] = useState<null | {
+    total_operacoes: number;
+    updated_operacoes: number;
+    unscheduled_operacoes: number;
+  }>(null);
+  const [apsRuns, setApsRuns] = useState<any[]>([]);
+  const [apsLoading, setApsLoading] = useState(false);
+
   const openGanttForCt = useCallback((ctId: string) => {
     setGanttCtFilter(ctId);
     setGanttStatusFilter('all');
@@ -99,7 +115,7 @@ export default function PcpDashboardPage() {
       const remaining = result?.remaining_overload_hours ?? 0;
       addToast(
         moved > 0
-          ? `Replanejamento aplicado: ${moved} operação(ões) movida(s).${remaining > 0.1 ? ` Restante ~${remaining.toFixed(1)}h.` : ''}`
+          ? `Replanejamento aplicado: ${moved} operação(ões) movida(s).${remaining > 0.1 ? ` Restante ~${remaining.toFixed(1)}h.` : ''} (Undo disponível em Sequenciar)`
           : (result?.message || 'Nada para mover no período.'),
         moved > 0 ? 'success' : 'warning'
       );
@@ -112,11 +128,55 @@ export default function PcpDashboardPage() {
   }, [addToast, endDate]);
 
   const runSequencerForCt = useCallback(async (ctId: string) => {
-    if (!confirm('Executar sequenciamento automático (capacidade finita) para este centro? Isso vai recalcular as datas previstas das operações elegíveis no período selecionado.')) return;
-    setSequencingCtId(ctId);
+    setApsModal({ open: true, ctId, ctNome: capacitySummary.find(c => c.id === ctId)?.nome });
+  }, [addToast, endDate, startDate, openGanttForCt]);
+
+  const loadApsRuns = useCallback(async (ctId: string) => {
+    try {
+      const data = await pcpApsListRuns(ctId, 5);
+      setApsRuns(data || []);
+    } catch {
+      setApsRuns([]);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!apsModal.open || !apsModal.ctId) return;
+    setApsPreview(null);
+    setApsRuns([]);
+    loadApsRuns(apsModal.ctId);
+  }, [apsModal.open, apsModal.ctId, loadApsRuns]);
+
+  const handlePreview = useCallback(async () => {
+    if (!apsModal.ctId) return;
+    setApsLoading(true);
     try {
       const result = await pcpApsSequenciarCentro({
-        centroTrabalhoId: ctId,
+        centroTrabalhoId: apsModal.ctId,
+        dataInicial: startDate,
+        dataFinal: endDate,
+        apply: false,
+      });
+      setApsPreview({
+        total_operacoes: result.total_operacoes,
+        updated_operacoes: result.updated_operacoes,
+        unscheduled_operacoes: result.unscheduled_operacoes,
+      });
+      addToast('Preview gerado (nenhuma alteração aplicada).', 'success');
+    } catch (e: any) {
+      addToast(e?.message || 'Falha ao gerar preview.', 'error');
+    } finally {
+      setApsLoading(false);
+    }
+  }, [addToast, apsModal.ctId, endDate, startDate]);
+
+  const handleApplySequencing = useCallback(async () => {
+    if (!apsModal.ctId) return;
+    if (!confirm('Aplicar sequenciamento automático (capacidade finita)? Isso vai atualizar as datas previstas das operações elegíveis.')) return;
+    setSequencingCtId(apsModal.ctId);
+    try {
+      const result = await pcpApsSequenciarCentro({
+        centroTrabalhoId: apsModal.ctId,
         dataInicial: startDate,
         dataFinal: endDate,
         apply: true,
@@ -126,13 +186,32 @@ export default function PcpDashboardPage() {
         result.unscheduled_operacoes > 0 ? 'warning' : 'success'
       );
       await loadData();
-      openGanttForCt(ctId);
+      await loadApsRuns(apsModal.ctId);
+      openGanttForCt(apsModal.ctId);
     } catch (e: any) {
       addToast(e?.message || 'Falha ao sequenciar centro.', 'error');
     } finally {
       setSequencingCtId(null);
     }
-  }, [addToast, endDate, startDate, openGanttForCt]);
+  }, [addToast, apsModal.ctId, endDate, loadApsRuns, openGanttForCt, startDate]);
+
+  const handleUndoLast = useCallback(async () => {
+    if (!apsModal.ctId) return;
+    const last = apsRuns?.find((r) => r.kind === 'sequencing') || apsRuns?.[0];
+    if (!last?.id) return;
+    if (!confirm('Desfazer o último sequenciamento aplicado?')) return;
+    setApsLoading(true);
+    try {
+      const result = await pcpApsUndo(last.id);
+      addToast(`Undo concluído: ${result.restored} revertidas, ${result.skipped} ignoradas.`, result.skipped > 0 ? 'warning' : 'success');
+      await loadData();
+      await loadApsRuns(apsModal.ctId);
+    } catch (e: any) {
+      addToast(e?.message || 'Falha ao desfazer.', 'error');
+    } finally {
+      setApsLoading(false);
+    }
+  }, [addToast, apsModal.ctId, apsRuns, loadApsRuns]);
 
   const loadData = async () => {
     setLoading(true);
@@ -1005,6 +1084,81 @@ export default function PcpDashboardPage() {
           </div>
         )}
       </section>
+
+      <Modal
+        isOpen={apsModal.open}
+        onClose={() => setApsModal({ open: false })}
+        title={`APS • Sequenciamento ${apsModal.ctNome ? `— ${apsModal.ctNome}` : ''}`}
+        size="lg"
+      >
+        <div className="p-6 space-y-4">
+          <div className="bg-slate-50 border border-slate-100 rounded-lg p-4 text-sm text-gray-700 space-y-1">
+            <div>Período: <span className="font-semibold">{format(new Date(startDate), 'dd/MM')}</span> → <span className="font-semibold">{format(new Date(endDate), 'dd/MM')}</span></div>
+            <div className="text-xs text-gray-500">
+              Preview não altera nada. Aplicar cria um log e permite desfazer (undo) se as datas ainda não foram alteradas manualmente depois.
+            </div>
+          </div>
+
+          {apsPreview && (
+            <div className="bg-white border rounded-lg p-4 text-sm">
+              <div className="font-semibold text-gray-900">Preview</div>
+              <div className="text-gray-700 mt-1">
+                Atualizaria {apsPreview.updated_operacoes}/{apsPreview.total_operacoes} operações.
+                {apsPreview.unscheduled_operacoes > 0 ? ` ${apsPreview.unscheduled_operacoes} ficariam sem agenda.` : ''}
+              </div>
+            </div>
+          )}
+
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={handlePreview}
+              disabled={apsLoading || sequencingCtId !== null}
+              className="px-4 py-2 rounded-lg border bg-white hover:bg-gray-50 text-sm font-semibold disabled:opacity-50"
+            >
+              {apsLoading ? 'Processando…' : 'Preview'}
+            </button>
+            <button
+              type="button"
+              onClick={handleApplySequencing}
+              disabled={apsLoading || sequencingCtId !== null || !apsModal.ctId}
+              className="px-4 py-2 rounded-lg bg-indigo-600 text-white hover:bg-indigo-500 text-sm font-semibold disabled:opacity-50"
+            >
+              {sequencingCtId ? 'Sequenciando…' : 'Aplicar'}
+            </button>
+            <button
+              type="button"
+              onClick={handleUndoLast}
+              disabled={apsLoading || apsRuns.length === 0}
+              className="px-4 py-2 rounded-lg border border-rose-200 bg-rose-50 text-rose-700 hover:bg-rose-100 text-sm font-semibold disabled:opacity-50"
+              title="Desfaz o último run registrado (se possível)"
+            >
+              Desfazer último
+            </button>
+          </div>
+
+          <div className="bg-white border rounded-lg overflow-hidden">
+            <div className="border-b px-4 py-2 text-sm font-semibold text-gray-800">Últimos runs</div>
+            <div className="divide-y">
+              {apsRuns.map((r) => (
+                <div key={r.id} className="px-4 py-2 text-sm text-gray-700 flex justify-between gap-3">
+                  <div>
+                    <div className="font-semibold">{r.kind}</div>
+                    <div className="text-xs text-gray-500">{new Date(r.created_at).toLocaleString()}</div>
+                  </div>
+                  <div className="text-xs text-gray-600 text-right">
+                    {r.summary?.updated_operacoes ?? 0}/{r.summary?.total_operacoes ?? 0} atualizadas
+                    {r.summary?.unscheduled_operacoes ? ` • ${r.summary.unscheduled_operacoes} sem agenda` : ''}
+                  </div>
+                </div>
+              ))}
+              {apsRuns.length === 0 && (
+                <div className="px-4 py-6 text-sm text-gray-500">Nenhum run registrado para este centro.</div>
+              )}
+            </div>
+          </div>
+        </div>
+      </Modal>
 
       <section className="bg-white border rounded-lg shadow-sm">
         <div className="border-b px-4 py-3 flex items-center gap-2 text-gray-700 font-semibold">
