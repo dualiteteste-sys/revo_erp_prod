@@ -14,7 +14,10 @@ import {
   pcpApsSequenciarCentro,
   pcpApsListRuns,
   pcpApsUndo,
+  pcpApsGetRunChanges,
+  pcpApsPreviewSequenciarCentro,
   pcpReplanejarCentroSobrecarga,
+  setOperacaoApsLock,
   PcpAtpCtp,
   PcpCargaCapacidade,
   PcpGanttOperacao,
@@ -22,6 +25,7 @@ import {
   PcpOrdemLeadTime,
   PcpParetoItem
 } from '@/services/industriaProducao';
+import { getCentroApsConfig } from '@/services/industriaCentros';
 import { differenceInCalendarDays, format } from 'date-fns';
 import Modal from '@/components/ui/Modal';
 
@@ -98,6 +102,11 @@ export default function PcpDashboardPage() {
   }>(null);
   const [apsRuns, setApsRuns] = useState<any[]>([]);
   const [apsLoading, setApsLoading] = useState(false);
+  const [apsPreviewRows, setApsPreviewRows] = useState<any[]>([]);
+  const [apsSelectedRunId, setApsSelectedRunId] = useState<string | null>(null);
+  const [apsRunChanges, setApsRunChanges] = useState<any[]>([]);
+  const [apsFreezeDias, setApsFreezeDias] = useState<number>(0);
+  const [apsConfigLoading, setApsConfigLoading] = useState(false);
 
   const openGanttForCt = useCallback((ctId: string) => {
     setGanttCtFilter(ctId);
@@ -113,10 +122,11 @@ export default function PcpDashboardPage() {
       const result = await pcpReplanejarCentroSobrecarga(ctId, peakDay, endDate);
       const moved = result?.moved ?? 0;
       const remaining = result?.remaining_overload_hours ?? 0;
+      const freezeInfo = result?.freeze_until ? ` (Freeze até ${format(new Date(result.freeze_until), 'dd/MM')})` : '';
       addToast(
         moved > 0
           ? `Replanejamento aplicado: ${moved} operação(ões) movida(s).${remaining > 0.1 ? ` Restante ~${remaining.toFixed(1)}h.` : ''} (Undo disponível em Sequenciar)`
-          : (result?.message || 'Nada para mover no período.'),
+          : `${result?.message || 'Nada para mover no período.'}${freezeInfo}`,
         moved > 0 ? 'success' : 'warning'
       );
       await loadData();
@@ -144,31 +154,48 @@ export default function PcpDashboardPage() {
     if (!apsModal.open || !apsModal.ctId) return;
     setApsPreview(null);
     setApsRuns([]);
+    setApsPreviewRows([]);
+    setApsSelectedRunId(null);
+    setApsRunChanges([]);
+    setApsFreezeDias(0);
     loadApsRuns(apsModal.ctId);
+    setApsConfigLoading(true);
+    getCentroApsConfig(apsModal.ctId)
+      .then((cfg) => setApsFreezeDias(Number(cfg?.freeze_dias ?? 0) || 0))
+      .catch(() => setApsFreezeDias(0))
+      .finally(() => setApsConfigLoading(false));
   }, [apsModal.open, apsModal.ctId, loadApsRuns]);
 
-  const handlePreview = useCallback(async () => {
+  const fetchPreview = useCallback(async (silent = false) => {
     if (!apsModal.ctId) return;
+    const rows = await pcpApsPreviewSequenciarCentro({
+      centroTrabalhoId: apsModal.ctId,
+      dataInicial: startDate,
+      dataFinal: endDate,
+      limit: 200,
+    });
+    setApsPreviewRows(rows || []);
+    const unscheduled = (rows || []).filter(r => r.scheduled === false && !r.skip_reason).length;
+    const skipped = (rows || []).filter(r => !!r.skip_reason).length;
+    const changed = (rows || []).filter(r => r.scheduled === true).length;
+    setApsPreview({
+      total_operacoes: rows.length,
+      updated_operacoes: changed,
+      unscheduled_operacoes: unscheduled + skipped,
+    });
+    if (!silent) addToast('Preview gerado (nenhuma alteração aplicada).', 'success');
+  }, [addToast, apsModal.ctId, endDate, startDate]);
+
+  const handlePreview = useCallback(async () => {
     setApsLoading(true);
     try {
-      const result = await pcpApsSequenciarCentro({
-        centroTrabalhoId: apsModal.ctId,
-        dataInicial: startDate,
-        dataFinal: endDate,
-        apply: false,
-      });
-      setApsPreview({
-        total_operacoes: result.total_operacoes,
-        updated_operacoes: result.updated_operacoes,
-        unscheduled_operacoes: result.unscheduled_operacoes,
-      });
-      addToast('Preview gerado (nenhuma alteração aplicada).', 'success');
+      await fetchPreview(false);
     } catch (e: any) {
       addToast(e?.message || 'Falha ao gerar preview.', 'error');
     } finally {
       setApsLoading(false);
     }
-  }, [addToast, apsModal.ctId, endDate, startDate]);
+  }, [addToast, fetchPreview]);
 
   const handleApplySequencing = useCallback(async () => {
     if (!apsModal.ctId) return;
@@ -181,8 +208,9 @@ export default function PcpDashboardPage() {
         dataFinal: endDate,
         apply: true,
       });
+      if (typeof result.freeze_dias === 'number') setApsFreezeDias(result.freeze_dias);
       addToast(
-        `Sequenciamento aplicado: ${result.updated_operacoes}/${result.total_operacoes} operações atualizadas.${result.unscheduled_operacoes > 0 ? ` ${result.unscheduled_operacoes} sem agenda.` : ''}`,
+        `Sequenciamento aplicado: ${result.updated_operacoes}/${result.total_operacoes} operações atualizadas.${result.unscheduled_operacoes > 0 ? ` ${result.unscheduled_operacoes} sem agenda.` : ''}${typeof result.freeze_dias === 'number' && result.freeze_dias > 0 ? ` (Freeze: ${result.freeze_dias} dias)` : ''}`,
         result.unscheduled_operacoes > 0 ? 'warning' : 'success'
       );
       await loadData();
@@ -194,6 +222,32 @@ export default function PcpDashboardPage() {
       setSequencingCtId(null);
     }
   }, [addToast, apsModal.ctId, endDate, loadApsRuns, openGanttForCt, startDate]);
+
+  const handleToggleLockOperacao = useCallback(async (operacaoId: string, locked: boolean, currentReason?: string | null) => {
+    const nextLocked = !locked;
+    const promptResult = nextLocked ? prompt('Motivo do bloqueio (opcional):', currentReason || '') : null;
+    if (nextLocked && promptResult === null) return;
+    const reason = nextLocked ? (promptResult || '').trim() : null;
+    if (!nextLocked && !confirm('Desbloquear esta operação para o APS?')) return;
+
+    setApsLoading(true);
+    try {
+      await setOperacaoApsLock(operacaoId, nextLocked, reason || null);
+      addToast(nextLocked ? 'Operação bloqueada para APS.' : 'Operação desbloqueada.', 'success');
+      if (apsModal.ctId) {
+        await loadData();
+        await fetchPreview(true);
+        if (apsSelectedRunId) {
+          const rows = await pcpApsGetRunChanges(apsSelectedRunId, 200);
+          setApsRunChanges(rows || []);
+        }
+      }
+    } catch (e: any) {
+      addToast(e?.message || 'Falha ao atualizar bloqueio APS.', 'error');
+    } finally {
+      setApsLoading(false);
+    }
+  }, [addToast, apsModal.ctId, apsSelectedRunId, fetchPreview]);
 
   const handleUndoLast = useCallback(async () => {
     if (!apsModal.ctId) return;
@@ -212,6 +266,16 @@ export default function PcpDashboardPage() {
       setApsLoading(false);
     }
   }, [addToast, apsModal.ctId, apsRuns, loadApsRuns]);
+
+  useEffect(() => {
+    if (!apsModal.open) return;
+    if (!apsSelectedRunId) return;
+    setApsLoading(true);
+    pcpApsGetRunChanges(apsSelectedRunId, 200)
+      .then((rows) => setApsRunChanges(rows || []))
+      .catch(() => setApsRunChanges([]))
+      .finally(() => setApsLoading(false));
+  }, [apsModal.open, apsSelectedRunId]);
 
   const loadData = async () => {
     setLoading(true);
@@ -1094,6 +1158,9 @@ export default function PcpDashboardPage() {
         <div className="p-6 space-y-4">
           <div className="bg-slate-50 border border-slate-100 rounded-lg p-4 text-sm text-gray-700 space-y-1">
             <div>Período: <span className="font-semibold">{format(new Date(startDate), 'dd/MM')}</span> → <span className="font-semibold">{format(new Date(endDate), 'dd/MM')}</span></div>
+            <div className="text-xs text-gray-600">
+              Freeze: <span className="font-semibold">{apsConfigLoading ? '…' : `${apsFreezeDias} dia(s)`}</span> (APS não altera operações dentro do horizonte)
+            </div>
             <div className="text-xs text-gray-500">
               Preview não altera nada. Aplicar cria um log e permite desfazer (undo) se as datas ainda não foram alteradas manualmente depois.
             </div>
@@ -1137,13 +1204,99 @@ export default function PcpDashboardPage() {
             </button>
           </div>
 
+          {apsPreviewRows.length > 0 && (
+            <div className="bg-white border rounded-lg overflow-hidden">
+              <div className="border-b px-4 py-2 text-sm font-semibold text-gray-800">Preview (mudanças)</div>
+              <div className="overflow-x-auto">
+                <table className="min-w-full text-xs">
+                  <thead className="bg-gray-50 text-gray-600">
+                    <tr>
+                      <th className="px-3 py-2 text-left">OP</th>
+                      <th className="px-3 py-2 text-left">Produto</th>
+                      <th className="px-3 py-2 text-left">Antes</th>
+                      <th className="px-3 py-2 text-left">Depois</th>
+                      <th className="px-3 py-2 text-left">Status</th>
+                      <th className="px-3 py-2 text-left">APS</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {apsPreviewRows.slice(0, 120).map((r) => (
+                      <tr key={r.operacao_id} className="border-t">
+                        <td className="px-3 py-2 font-medium text-gray-900">#{r.ordem_numero}</td>
+                        <td className="px-3 py-2 text-gray-700">{r.produto_nome}</td>
+                        <td className="px-3 py-2 text-gray-700">
+                          {r.old_ini ? format(new Date(r.old_ini), 'dd/MM') : '—'}{r.old_fim && r.old_fim !== r.old_ini ? ` → ${format(new Date(r.old_fim), 'dd/MM')}` : ''}
+                        </td>
+                        <td className="px-3 py-2 text-gray-700">
+                          {r.new_ini ? format(new Date(r.new_ini), 'dd/MM') : '—'}{r.new_fim && r.new_fim !== r.new_ini ? ` → ${format(new Date(r.new_fim), 'dd/MM')}` : ''}
+                        </td>
+                        <td className="px-3 py-2">
+                          {r.skip_reason ? (
+                            <span className="px-2 py-0.5 rounded-full text-[11px] font-semibold bg-amber-50 text-amber-800">
+                              Ignorado ({r.skip_reason})
+                            </span>
+                          ) : (
+                            <span className={`px-2 py-0.5 rounded-full text-[11px] font-semibold ${r.scheduled ? 'bg-emerald-50 text-emerald-700' : 'bg-rose-50 text-rose-700'}`}>
+                              {r.scheduled ? 'OK' : 'Sem agenda'}
+                            </span>
+                          )}
+                        </td>
+                        <td className="px-3 py-2">
+                          <div className="flex items-center gap-2">
+                            <span className={`px-2 py-0.5 rounded-full text-[11px] font-semibold ${r.aps_locked ? 'bg-slate-100 text-slate-700' : 'bg-gray-50 text-gray-700'}`}>
+                              {r.aps_locked ? 'Locked' : 'Livre'}
+                            </span>
+                            <button
+                              type="button"
+                              className="text-[11px] px-2 py-1 rounded-md border bg-white hover:bg-gray-50 disabled:opacity-50"
+                              disabled={apsLoading}
+                              onClick={() => handleToggleLockOperacao(r.operacao_id, !!r.aps_locked, r.aps_lock_reason)}
+                              title={r.aps_lock_reason || ''}
+                            >
+                              {r.aps_locked ? 'Desbloquear' : 'Bloquear'}
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                    {apsPreviewRows.length > 120 && (
+                      <tr>
+                        <td colSpan={6} className="px-3 py-2 text-gray-500">Mostrando 120 de {apsPreviewRows.length} linhas.</td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
           <div className="bg-white border rounded-lg overflow-hidden">
             <div className="border-b px-4 py-2 text-sm font-semibold text-gray-800">Últimos runs</div>
             <div className="divide-y">
               {apsRuns.map((r) => (
                 <div key={r.id} className="px-4 py-2 text-sm text-gray-700 flex justify-between gap-3">
                   <div>
-                    <div className="font-semibold">{r.kind}</div>
+                    <div className="font-semibold flex items-center gap-2">
+                      {r.kind}
+                      <button
+                        type="button"
+                        className="text-xs font-semibold text-indigo-700 hover:underline"
+                        onClick={() => setApsSelectedRunId(r.id)}
+                      >
+                        Detalhes
+                      </button>
+                      <button
+                        type="button"
+                        className="text-xs font-semibold text-rose-700 hover:underline"
+                        onClick={() => pcpApsUndo(r.id).then((res) => {
+                          addToast(`Undo concluído: ${res.restored} revertidas, ${res.skipped} ignoradas.`, res.skipped > 0 ? 'warning' : 'success');
+                          loadData();
+                          if (apsModal.ctId) loadApsRuns(apsModal.ctId);
+                        }).catch((e: any) => addToast(e?.message || 'Falha ao desfazer.', 'error'))}
+                      >
+                        Desfazer
+                      </button>
+                    </div>
                     <div className="text-xs text-gray-500">{new Date(r.created_at).toLocaleString()}</div>
                   </div>
                   <div className="text-xs text-gray-600 text-right">
@@ -1157,6 +1310,66 @@ export default function PcpDashboardPage() {
               )}
             </div>
           </div>
+
+          {apsSelectedRunId && (
+            <div className="bg-white border rounded-lg overflow-hidden">
+              <div className="border-b px-4 py-2 text-sm font-semibold text-gray-800">
+                Detalhes do run {apsSelectedRunId.slice(0, 8)}
+              </div>
+              <div className="overflow-x-auto">
+                <table className="min-w-full text-xs">
+                  <thead className="bg-gray-50 text-gray-600">
+                    <tr>
+                      <th className="px-3 py-2 text-left">OP</th>
+                      <th className="px-3 py-2 text-left">Produto</th>
+                      <th className="px-3 py-2 text-left">Antes</th>
+                      <th className="px-3 py-2 text-left">Depois</th>
+                      <th className="px-3 py-2 text-left">Status</th>
+                      <th className="px-3 py-2 text-left">APS</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {apsRunChanges.map((r) => (
+                      <tr key={r.operacao_id} className="border-t">
+                        <td className="px-3 py-2 font-medium text-gray-900">#{r.ordem_numero}</td>
+                        <td className="px-3 py-2 text-gray-700">{r.produto_nome}</td>
+                        <td className="px-3 py-2 text-gray-700">
+                          {r.old_ini ? format(new Date(r.old_ini), 'dd/MM') : '—'}{r.old_fim && r.old_fim !== r.old_ini ? ` → ${format(new Date(r.old_fim), 'dd/MM')}` : ''}
+                        </td>
+                        <td className="px-3 py-2 text-gray-700">
+                          {r.new_ini ? format(new Date(r.new_ini), 'dd/MM') : '—'}{r.new_fim && r.new_fim !== r.new_ini ? ` → ${format(new Date(r.new_fim), 'dd/MM')}` : ''}
+                        </td>
+                        <td className="px-3 py-2 text-gray-600">{r.status_operacao}</td>
+                        <td className="px-3 py-2">
+                          <div className="flex items-center gap-2">
+                            <span className={`px-2 py-0.5 rounded-full text-[11px] font-semibold ${r.aps_locked ? 'bg-slate-100 text-slate-700' : 'bg-gray-50 text-gray-700'}`}>
+                              {r.aps_locked ? 'Locked' : 'Livre'}
+                            </span>
+                            <button
+                              type="button"
+                              className="text-[11px] px-2 py-1 rounded-md border bg-white hover:bg-gray-50 disabled:opacity-50"
+                              disabled={apsLoading}
+                              onClick={() => handleToggleLockOperacao(r.operacao_id, !!r.aps_locked, r.aps_lock_reason)}
+                              title={r.aps_lock_reason || ''}
+                            >
+                              {r.aps_locked ? 'Desbloquear' : 'Bloquear'}
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                    {apsRunChanges.length === 0 && (
+                      <tr>
+                        <td colSpan={6} className="px-3 py-4 text-gray-500">
+                          {apsLoading ? 'Carregando...' : 'Sem mudanças registradas.'}
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
         </div>
       </Modal>
 

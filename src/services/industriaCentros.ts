@@ -23,6 +23,10 @@ export type CentroCalendarioDia = {
   capacidade_horas: number;
 };
 
+export type CentroApsConfig = {
+  freeze_dias: number;
+};
+
 export async function listCentrosTrabalho(search?: string, ativo?: boolean): Promise<CentroTrabalho[]> {
   return callRpc<CentroTrabalho[]>('industria_centros_trabalho_list', {
     p_search: search || null,
@@ -47,6 +51,18 @@ export async function upsertCentroCalendarioSemanal(
   calendario: CentroCalendarioDia[],
 ): Promise<void> {
   await callRpc('industria_ct_calendario_upsert', { p_centro_id: centroTrabalhoId, p_payload: calendario });
+}
+
+export async function getCentroApsConfig(centroTrabalhoId: string): Promise<CentroApsConfig> {
+  const rows = await callRpc<CentroApsConfig[]>('industria_ct_aps_config_get', { p_centro_id: centroTrabalhoId });
+  return rows?.[0] ?? { freeze_dias: 0 };
+}
+
+export async function upsertCentroApsConfig(centroTrabalhoId: string, freezeDias: number): Promise<void> {
+  await callRpc('industria_ct_aps_config_upsert', {
+    p_centro_id: centroTrabalhoId,
+    p_freeze_dias: freezeDias,
+  });
 }
 
 export async function seedCentrosTrabalho(): Promise<CentroTrabalho[]> {

@@ -3,7 +3,9 @@ import { Loader2, Save } from 'lucide-react';
 import {
   CentroTrabalho,
   CentroTrabalhoPayload,
+  getCentroApsConfig,
   getCentroCalendarioSemanal,
+  upsertCentroApsConfig,
   upsertCentroCalendarioSemanal,
   saveCentroTrabalho
 } from '@/services/industriaCentros';
@@ -24,6 +26,7 @@ export default function CentroTrabalhoFormPanel({ centro, onSaveSuccess, onClose
   const { addToast } = useToast();
   const [isSaving, setIsSaving] = useState(false);
   const [calendarLoading, setCalendarLoading] = useState(false);
+  const [apsConfigLoading, setApsConfigLoading] = useState(false);
   const [formData, setFormData] = useState<CentroTrabalhoPayload>({
     ativo: true,
     tipo_uso: 'ambos'
@@ -31,6 +34,7 @@ export default function CentroTrabalhoFormPanel({ centro, onSaveSuccess, onClose
 
   const [calendarHours, setCalendarHours] = useState<number[]>(() => Array.from({ length: 7 }).map(() => 0));
   const [calendarDirty, setCalendarDirty] = useState(false);
+  const [freezeDias, setFreezeDias] = useState<number>(0);
 
   const DOW_LABELS = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
 
@@ -50,6 +54,7 @@ export default function CentroTrabalhoFormPanel({ centro, onSaveSuccess, onClose
       const base = Number(centro?.capacidade_horas_dia ?? formData.capacidade_horas_dia ?? 8) || 8;
       applyDefaultCalendar(base);
       setCalendarDirty(false);
+      setFreezeDias(0);
       return;
     }
 
@@ -73,6 +78,12 @@ export default function CentroTrabalhoFormPanel({ centro, onSaveSuccess, onClose
         addToast(e?.message || 'Não foi possível carregar o calendário do centro.', 'error');
       })
       .finally(() => setCalendarLoading(false));
+
+    setApsConfigLoading(true);
+    getCentroApsConfig(centro.id)
+      .then((cfg) => setFreezeDias(Number(cfg?.freeze_dias ?? 0) || 0))
+      .catch((e: any) => addToast(e?.message || 'Não foi possível carregar as configurações APS.', 'error'))
+      .finally(() => setApsConfigLoading(false));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [centro?.id]);
 
@@ -103,6 +114,7 @@ export default function CentroTrabalhoFormPanel({ centro, onSaveSuccess, onClose
           saved.id,
           calendarHours.map((capacidade_horas, dow) => ({ dow, capacidade_horas }))
         );
+        await upsertCentroApsConfig(saved.id, freezeDias);
       }
       addToast('Centro de trabalho salvo com sucesso!', 'success');
       onSaveSuccess();
@@ -274,6 +286,25 @@ export default function CentroTrabalhoFormPanel({ centro, onSaveSuccess, onClose
             />
           ))}
         </Section>
+
+        <Section
+          title="APS (horizonte congelado)"
+          description="Defina um período (em dias) em que o APS não deve mexer nas operações já previstas (ex.: curto prazo)."
+        >
+          <Input
+            label="Freeze (dias)"
+            name="freeze_dias"
+            type="number"
+            min={0}
+            max={30}
+            value={freezeDias}
+            onChange={(e) => setFreezeDias(Math.max(0, Math.min(30, Number(e.target.value) || 0)))}
+            className="sm:col-span-2"
+          />
+          <div className="sm:col-span-4 text-xs text-gray-500 flex items-center">
+            {apsConfigLoading ? 'Carregando configurações APS…' : 'Ex.: 3 = congela hoje + próximos 3 dias.'}
+          </div>
+        </Section>
       </div>
 
       <footer className="flex-shrink-0 p-4 flex justify-end items-center border-t border-white/20 bg-gray-50">
@@ -283,7 +314,7 @@ export default function CentroTrabalhoFormPanel({ centro, onSaveSuccess, onClose
           </button>
           <button
             onClick={handleSave}
-            disabled={isSaving || calendarLoading}
+            disabled={isSaving || calendarLoading || apsConfigLoading}
             className="flex items-center gap-2 bg-blue-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-blue-700 disabled:opacity-50"
           >
             {isSaving ? <Loader2 className="animate-spin" size={20} /> : <Save size={20} />}

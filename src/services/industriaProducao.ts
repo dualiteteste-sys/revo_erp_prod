@@ -782,6 +782,7 @@ export type PcpReplanResult = {
   peak_capacity?: number;
   peak_load?: number;
   end_day?: string;
+  freeze_until?: string;
   message?: string;
 };
 
@@ -803,6 +804,7 @@ export type PcpApsSequenciarResult = {
   centro_id: string;
   data_inicial: string;
   data_final: string;
+  freeze_dias?: number;
   total_operacoes: number;
   updated_operacoes: number;
   unscheduled_operacoes: number;
@@ -850,4 +852,63 @@ export type PcpApsUndoResult = {
 
 export async function pcpApsUndo(runId: string): Promise<PcpApsUndoResult> {
   return callRpc<PcpApsUndoResult>('pcp_aps_undo', { p_run_id: runId });
+}
+
+export type PcpApsRunChange = {
+  operacao_id: string;
+  ordem_id: string;
+  ordem_numero: number;
+  produto_nome: string;
+  centro_trabalho_id: string | null;
+  status_operacao: string;
+  old_ini: string | null;
+  old_fim: string | null;
+  new_ini: string | null;
+  new_fim: string | null;
+  aps_locked?: boolean;
+  aps_lock_reason?: string | null;
+};
+
+export async function pcpApsGetRunChanges(runId: string, limit = 200): Promise<PcpApsRunChange[]> {
+  return callRpc<PcpApsRunChange[]>('pcp_aps_run_changes_list', {
+    p_run_id: runId,
+    p_limit: limit,
+  });
+}
+
+export type PcpApsPreviewRow = {
+  operacao_id: string;
+  ordem_id: string;
+  ordem_numero: number;
+  produto_nome: string;
+  old_ini: string | null;
+  old_fim: string | null;
+  new_ini: string | null;
+  new_fim: string | null;
+  scheduled: boolean;
+  aps_locked?: boolean;
+  aps_lock_reason?: string | null;
+  skip_reason?: string | null;
+};
+
+export async function pcpApsPreviewSequenciarCentro(params: {
+  centroTrabalhoId: string;
+  dataInicial: string;
+  dataFinal: string;
+  limit?: number;
+}): Promise<PcpApsPreviewRow[]> {
+  return callRpc<PcpApsPreviewRow[]>('pcp_aps_preview_sequenciar_ct', {
+    p_centro_id: params.centroTrabalhoId,
+    p_data_inicial: params.dataInicial,
+    p_data_final: params.dataFinal,
+    p_limit: params.limit ?? 200,
+  });
+}
+
+export async function setOperacaoApsLock(operacaoId: string, locked: boolean, reason?: string): Promise<void> {
+  await callRpc('industria_operacao_aps_lock_set', {
+    p_operacao_id: operacaoId,
+    p_locked: locked,
+    p_reason: reason || null,
+  });
 }
