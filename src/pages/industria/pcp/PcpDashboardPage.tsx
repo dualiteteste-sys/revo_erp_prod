@@ -332,85 +332,6 @@ export default function PcpDashboardPage() {
     }
   }, [addToast, loadData]);
 
-  const replanCandidates = useMemo(() => {
-    const rows = capacitySummary
-      .map((ct) => {
-        const sug = capacitySuggestions.get(ct.id);
-        if (!sug?.peakDay || (sug.overloadHours ?? 0) <= 0.01) return null;
-        return {
-          centro_id: ct.id,
-          centro_nome: ct.nome,
-          peak_day: sug.peakDay,
-          peak_ratio: sug.peakRatio,
-          overload_hours: sug.overloadHours,
-          suggested_day: sug.suggestedDay,
-          suggested_span_days: sug.suggestedSpanDays,
-          message: sug.message,
-        };
-      })
-      .filter(Boolean) as Array<{
-        centro_id: string;
-        centro_nome: string;
-        peak_day: string;
-        peak_ratio: number;
-        overload_hours: number;
-        suggested_day?: string;
-        suggested_span_days?: number;
-        message?: string;
-      }>;
-
-    return rows.sort((a, b) => (b.overload_hours || 0) - (a.overload_hours || 0));
-  }, [capacitySummary, capacitySuggestions]);
-
-  const applyReplanBatch = useCallback(async () => {
-    if (replanCandidates.length === 0) return;
-    if (!confirm(`Aplicar replanejamento automático para ${replanCandidates.length} CT(s) com sobrecarga no período?`)) return;
-    setReplanApplying(true);
-    setReplanResults({});
-    try {
-      for (const item of replanCandidates) {
-        try {
-          const res = await pcpReplanejarCentroSobrecarga(item.centro_id, item.peak_day, endDate);
-          setReplanResults((prev) => ({ ...prev, [item.centro_id]: res }));
-        } catch (e: any) {
-          setReplanResults((prev) => ({ ...prev, [item.centro_id]: { message: e?.message || 'Falha', moved: 0 } }));
-        }
-      }
-      addToast('Replanejamento em lote concluído.', 'success');
-      await loadData();
-    } finally {
-      setReplanApplying(false);
-    }
-  }, [addToast, endDate, loadData, replanCandidates]);
-
-  const previewReplanForCt = useCallback(async (ctId: string, ctNome: string, peakDay: string) => {
-    setReplanPreviewingCtId(ctId);
-    try {
-      const rows = await pcpReplanCentroSobrecargaPreview(ctId, peakDay, endDate, 200);
-      const summary = rows.reduce((acc, row) => {
-        acc.total += 1;
-        if (row.can_move) acc.canMove += 1;
-        if (row.reason === 'locked') acc.locked += 1;
-        if (row.reason === 'no_slot') acc.noSlot += 1;
-        if (row.reason === 'zero_hours') acc.zeroHours += 1;
-        if (row.reason === 'no_overload') acc.noOverload += 1;
-        if (!acc.freezeUntil && row.freeze_until) acc.freezeUntil = row.freeze_until;
-        return acc;
-      }, { total: 0, canMove: 0, locked: 0, noSlot: 0, zeroHours: 0, noOverload: 0, freezeUntil: undefined as string | undefined });
-
-      setReplanPreview((prev) => ({ ...prev, [ctId]: { rows, summary } }));
-
-      addToast(
-        `Preview ${ctNome}: ${summary.canMove}/${summary.total} movíveis${summary.locked > 0 ? `, ${summary.locked} locked` : ''}${summary.noSlot > 0 ? `, ${summary.noSlot} sem slot` : ''}${summary.freezeUntil ? ` (Freeze até ${format(new Date(summary.freezeUntil), 'dd/MM')})` : ''}.`,
-        summary.canMove > 0 ? 'success' : 'warning'
-      );
-    } catch (e: any) {
-      addToast(e?.message || 'Falha ao gerar preview do replanejamento.', 'error');
-    } finally {
-      setReplanPreviewingCtId(null);
-    }
-  }, [addToast, endDate]);
-
   const fetchPreview = useCallback(async (silent = false) => {
     if (!apsModal.ctId) return;
     const rows = await pcpApsPreviewSequenciarCentro({
@@ -643,6 +564,85 @@ export default function PcpDashboardPage() {
     }
     return map;
   }, [capacitySummary]);
+
+  const replanCandidates = useMemo(() => {
+    const rows = capacitySummary
+      .map((ct) => {
+        const sug = capacitySuggestions.get(ct.id);
+        if (!sug?.peakDay || (sug.overloadHours ?? 0) <= 0.01) return null;
+        return {
+          centro_id: ct.id,
+          centro_nome: ct.nome,
+          peak_day: sug.peakDay,
+          peak_ratio: sug.peakRatio,
+          overload_hours: sug.overloadHours,
+          suggested_day: sug.suggestedDay,
+          suggested_span_days: sug.suggestedSpanDays,
+          message: sug.message,
+        };
+      })
+      .filter(Boolean) as Array<{
+        centro_id: string;
+        centro_nome: string;
+        peak_day: string;
+        peak_ratio: number;
+        overload_hours: number;
+        suggested_day?: string;
+        suggested_span_days?: number;
+        message?: string;
+      }>;
+
+    return rows.sort((a, b) => (b.overload_hours || 0) - (a.overload_hours || 0));
+  }, [capacitySummary, capacitySuggestions]);
+
+  const applyReplanBatch = useCallback(async () => {
+    if (replanCandidates.length === 0) return;
+    if (!confirm(`Aplicar replanejamento automático para ${replanCandidates.length} CT(s) com sobrecarga no período?`)) return;
+    setReplanApplying(true);
+    setReplanResults({});
+    try {
+      for (const item of replanCandidates) {
+        try {
+          const res = await pcpReplanejarCentroSobrecarga(item.centro_id, item.peak_day, endDate);
+          setReplanResults((prev) => ({ ...prev, [item.centro_id]: res }));
+        } catch (e: any) {
+          setReplanResults((prev) => ({ ...prev, [item.centro_id]: { message: e?.message || 'Falha', moved: 0 } }));
+        }
+      }
+      addToast('Replanejamento em lote concluído.', 'success');
+      await loadData();
+    } finally {
+      setReplanApplying(false);
+    }
+  }, [addToast, endDate, loadData, replanCandidates]);
+
+  const previewReplanForCt = useCallback(async (ctId: string, ctNome: string, peakDay: string) => {
+    setReplanPreviewingCtId(ctId);
+    try {
+      const rows = await pcpReplanCentroSobrecargaPreview(ctId, peakDay, endDate, 200);
+      const summary = rows.reduce((acc, row) => {
+        acc.total += 1;
+        if (row.can_move) acc.canMove += 1;
+        if (row.reason === 'locked') acc.locked += 1;
+        if (row.reason === 'no_slot') acc.noSlot += 1;
+        if (row.reason === 'zero_hours') acc.zeroHours += 1;
+        if (row.reason === 'no_overload') acc.noOverload += 1;
+        if (!acc.freezeUntil && row.freeze_until) acc.freezeUntil = row.freeze_until;
+        return acc;
+      }, { total: 0, canMove: 0, locked: 0, noSlot: 0, zeroHours: 0, noOverload: 0, freezeUntil: undefined as string | undefined });
+
+      setReplanPreview((prev) => ({ ...prev, [ctId]: { rows, summary } }));
+
+      addToast(
+        `Preview ${ctNome}: ${summary.canMove}/${summary.total} movíveis${summary.locked > 0 ? `, ${summary.locked} locked` : ''}${summary.noSlot > 0 ? `, ${summary.noSlot} sem slot` : ''}${summary.freezeUntil ? ` (Freeze até ${format(new Date(summary.freezeUntil), 'dd/MM')})` : ''}.`,
+        summary.canMove > 0 ? 'success' : 'warning'
+      );
+    } catch (e: any) {
+      addToast(e?.message || 'Falha ao gerar preview do replanejamento.', 'error');
+    } finally {
+      setReplanPreviewingCtId(null);
+    }
+  }, [addToast, endDate]);
 
   const weeklySeries = useMemo(() => {
     const dailyMap = new Map<string, { label: string; carga: number; capacidade: number }>();
