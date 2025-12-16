@@ -20,6 +20,7 @@ import {
   pcpApsResequenciarCentro,
   pcpApsSequenciarTodosCts,
   pcpReplanejarCentroSobrecarga,
+  pcpReplanCentroSobrecargaPreview,
   setOperacaoApsLock,
   PcpAtpCtp,
   PcpApsBatchSequencingRow,
@@ -27,7 +28,8 @@ import {
   PcpGanttOperacao,
   PcpKpis,
   PcpOrdemLeadTime,
-  PcpParetoItem
+  PcpParetoItem,
+  PcpReplanPreviewRow
 } from '@/services/industriaProducao';
 import { getCentroApsConfig } from '@/services/industriaCentros';
 import { differenceInCalendarDays, format } from 'date-fns';
@@ -122,6 +124,19 @@ export default function PcpDashboardPage() {
   const [replanModalOpen, setReplanModalOpen] = useState(false);
   const [replanApplying, setReplanApplying] = useState(false);
   const [replanResults, setReplanResults] = useState<Record<string, any>>({});
+  const [replanPreview, setReplanPreview] = useState<Record<string, {
+    rows: PcpReplanPreviewRow[];
+    summary: {
+      total: number;
+      canMove: number;
+      locked: number;
+      noSlot: number;
+      zeroHours: number;
+      noOverload: number;
+      freezeUntil?: string;
+    };
+  }>>({});
+  const [replanPreviewingCtId, setReplanPreviewingCtId] = useState<string | null>(null);
 
   const loadData = useCallback(async () => {
     setLoading(true);
@@ -294,6 +309,8 @@ export default function PcpDashboardPage() {
   const openReplanModal = useCallback(() => {
     setReplanModalOpen(true);
     setReplanResults({});
+    setReplanPreview({});
+    setReplanPreviewingCtId(null);
   }, []);
 
   const openApsForCt = useCallback((ctId: string, ctNome?: string) => {
@@ -365,6 +382,34 @@ export default function PcpDashboardPage() {
       setReplanApplying(false);
     }
   }, [addToast, endDate, loadData, replanCandidates]);
+
+  const previewReplanForCt = useCallback(async (ctId: string, ctNome: string, peakDay: string) => {
+    setReplanPreviewingCtId(ctId);
+    try {
+      const rows = await pcpReplanCentroSobrecargaPreview(ctId, peakDay, endDate, 200);
+      const summary = rows.reduce((acc, row) => {
+        acc.total += 1;
+        if (row.can_move) acc.canMove += 1;
+        if (row.reason === 'locked') acc.locked += 1;
+        if (row.reason === 'no_slot') acc.noSlot += 1;
+        if (row.reason === 'zero_hours') acc.zeroHours += 1;
+        if (row.reason === 'no_overload') acc.noOverload += 1;
+        if (!acc.freezeUntil && row.freeze_until) acc.freezeUntil = row.freeze_until;
+        return acc;
+      }, { total: 0, canMove: 0, locked: 0, noSlot: 0, zeroHours: 0, noOverload: 0, freezeUntil: undefined as string | undefined });
+
+      setReplanPreview((prev) => ({ ...prev, [ctId]: { rows, summary } }));
+
+      addToast(
+        `Preview ${ctNome}: ${summary.canMove}/${summary.total} movíveis${summary.locked > 0 ? `, ${summary.locked} locked` : ''}${summary.noSlot > 0 ? `, ${summary.noSlot} sem slot` : ''}${summary.freezeUntil ? ` (Freeze até ${format(new Date(summary.freezeUntil), 'dd/MM')})` : ''}.`,
+        summary.canMove > 0 ? 'success' : 'warning'
+      );
+    } catch (e: any) {
+      addToast(e?.message || 'Falha ao gerar preview do replanejamento.', 'error');
+    } finally {
+      setReplanPreviewingCtId(null);
+    }
+  }, [addToast, endDate]);
 
   const fetchPreview = useCallback(async (silent = false) => {
     if (!apsModal.ctId) return;
@@ -1022,6 +1067,7 @@ export default function PcpDashboardPage() {
                     <th className="px-3 py-2 text-right">Sobrecarga</th>
                     <th className="px-3 py-2 text-left">Pico</th>
                     <th className="px-3 py-2 text-left">Sugestão</th>
+                    <th className="px-3 py-2 text-left">Preview</th>
                     <th className="px-3 py-2 text-left">Resultado</th>
                     <th className="px-3 py-2 text-left">Ações</th>
                   </tr>
@@ -1029,10 +1075,12 @@ export default function PcpDashboardPage() {
                 <tbody>
                   {replanCandidates.map((r) => {
                     const res = replanResults[r.centro_id];
+                    const prev = replanPreview[r.centro_id]?.summary;
                     const runId = res?.run_id as string | undefined;
                     const moved = Number(res?.moved ?? 0) || 0;
                     const msg = res?.message as string | undefined;
                     const freezeUntil = res?.freeze_until as string | undefined;
+                    const previewLoading = replanPreviewingCtId === r.centro_id;
                     return (
                       <tr key={r.centro_id} className="border-t">
                         <td className="px-3 py-2 text-gray-900 font-medium">{r.centro_nome}</td>
@@ -1041,6 +1089,23 @@ export default function PcpDashboardPage() {
                         <td className="px-3 py-2 text-gray-700">
                           {r.suggested_day ? `${format(new Date(r.suggested_day), 'dd/MM')} (${r.suggested_span_days || 1}d)` : '—'}
                           {r.message ? <div className="text-[11px] text-gray-500">{r.message}</div> : null}
+                        </td>
+                        <td className="px-3 py-2 text-gray-700">
+                          {prev ? (
+                            <div className="space-y-0.5">
+                              <div>{prev.canMove}/{prev.total} movíveis</div>
+                              <div className="text-[11px] text-gray-500">
+                                {prev.locked > 0 ? `${prev.locked} locked` : null}
+                                {prev.locked > 0 && prev.noSlot > 0 ? ' • ' : null}
+                                {prev.noSlot > 0 ? `${prev.noSlot} sem slot` : null}
+                                {(prev.locked > 0 || prev.noSlot > 0) && prev.zeroHours > 0 ? ' • ' : null}
+                                {prev.zeroHours > 0 ? `${prev.zeroHours} 0h` : null}
+                              </div>
+                              {prev.freezeUntil ? <div className="text-[11px] text-gray-500">Freeze até {format(new Date(prev.freezeUntil), 'dd/MM')}</div> : null}
+                            </div>
+                          ) : (
+                            <span className="text-gray-400">{previewLoading ? 'Carregando…' : '—'}</span>
+                          )}
                         </td>
                         <td className="px-3 py-2 text-gray-700">
                           {res ? (
@@ -1055,6 +1120,15 @@ export default function PcpDashboardPage() {
                         </td>
                         <td className="px-3 py-2">
                           <div className="flex items-center gap-2">
+                            <button
+                              type="button"
+                              className="text-[11px] px-2 py-1 rounded-md border bg-white hover:bg-gray-50 disabled:opacity-50"
+                              onClick={() => previewReplanForCt(r.centro_id, r.centro_nome, r.peak_day)}
+                              disabled={replanApplying || previewLoading}
+                              title="Simula o que seria movido e por quê (sem aplicar)"
+                            >
+                              {previewLoading ? 'Preview…' : 'Preview'}
+                            </button>
                             <button
                               type="button"
                               className="text-[11px] px-2 py-1 rounded-md border bg-white hover:bg-gray-50"
@@ -1078,7 +1152,7 @@ export default function PcpDashboardPage() {
                   })}
                   {replanCandidates.length === 0 && (
                     <tr>
-                      <td colSpan={6} className="px-3 py-6 text-sm text-gray-500">
+                      <td colSpan={7} className="px-3 py-6 text-sm text-gray-500">
                         Nenhum CT com sobrecarga no período selecionado.
                       </td>
                     </tr>
