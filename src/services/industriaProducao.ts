@@ -773,3 +773,49 @@ export async function listPcpOrdensLeadTime(startDate?: string, endDate?: string
     p_data_final: endDate || null
   });
 }
+
+export type PcpReplanResult = {
+  moved: number;
+  remaining_overload_hours?: number;
+  peak_day?: string;
+  peak_capacity?: number;
+  peak_load?: number;
+  end_day?: string;
+  message?: string;
+};
+
+export async function pcpReplanejarCentroSobrecarga(
+  centroTrabalhoId: string,
+  dia: string,
+  dataFinal?: string,
+): Promise<PcpReplanResult> {
+  return callRpc<PcpReplanResult>('pcp_replanejar_ct_sobrecarga', {
+    p_centro_id: centroTrabalhoId,
+    p_dia: dia,
+    p_data_final: dataFinal || null,
+  });
+}
+
+export type PcpApsSequenciarResult = {
+  apply: boolean;
+  centro_id: string;
+  data_inicial: string;
+  data_final: string;
+  total_operacoes: number;
+  updated_operacoes: number;
+  unscheduled_operacoes: number;
+};
+
+export async function pcpApsSequenciarCentro(params: {
+  centroTrabalhoId: string;
+  dataInicial: string;
+  dataFinal: string;
+  apply?: boolean;
+}): Promise<PcpApsSequenciarResult> {
+  return callRpc<PcpApsSequenciarResult>('pcp_aps_sequenciar_ct', {
+    p_centro_id: params.centroTrabalhoId,
+    p_data_inicial: params.dataInicial,
+    p_data_final: params.dataFinal,
+    p_apply: params.apply ?? true,
+  });
+}

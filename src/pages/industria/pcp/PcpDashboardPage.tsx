@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Activity, AlertTriangle, BarChart3, BellRing, Filter, LineChart, Loader2, PackageSearch, PieChart, RefreshCw, TrendingUp } from 'lucide-react';
 import { useToast } from '@/contexts/ToastProvider';
@@ -11,6 +11,8 @@ import {
   listPcpKpis,
   listPcpOrdensLeadTime,
   listPcpParetoRefugos,
+  pcpApsSequenciarCentro,
+  pcpReplanejarCentroSobrecarga,
   PcpAtpCtp,
   PcpCargaCapacidade,
   PcpGanttOperacao,
@@ -49,10 +51,21 @@ interface PcpAlert {
   action?: () => void;
 }
 
+type CapacitySuggestion = {
+  peakDay?: string;
+  peakRatio: number;
+  overloadHours: number;
+  suggestedDay?: string;
+  suggestedSpanDays?: number;
+  suggestedFreeHours?: number;
+  message?: string;
+};
+
 
 export default function PcpDashboardPage() {
   const navigate = useNavigate();
   const { addToast } = useToast();
+  const ganttSectionRef = useRef<HTMLDivElement | null>(null);
   const [carga, setCarga] = useState<PcpCargaCapacidade[]>([]);
   const [gantt, setGantt] = useState<PcpGanttOperacao[]>([]);
   const [kpis, setKpis] = useState<PcpKpis | null>(null);
@@ -67,6 +80,59 @@ export default function PcpDashboardPage() {
   const [endDate, setEndDate] = useState(fmtInput(new Date(Date.now() + 7 * 24 * 3600 * 1000)));
   const [ganttCtFilter, setGanttCtFilter] = useState<string>('all');
   const [ganttStatusFilter, setGanttStatusFilter] = useState<string>('all');
+  const [applyingCtId, setApplyingCtId] = useState<string | null>(null);
+  const [sequencingCtId, setSequencingCtId] = useState<string | null>(null);
+
+  const openGanttForCt = useCallback((ctId: string) => {
+    setGanttCtFilter(ctId);
+    setGanttStatusFilter('all');
+    setTimeout(() => ganttSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 50);
+  }, []);
+
+  const applyReplanForCt = useCallback(async (ctId: string, peakDay?: string) => {
+    if (!peakDay) return;
+    if (!confirm('Aplicar replanejamento automático? Isso vai mover operações (menor prioridade) para dias com folga no período.')) return;
+    setApplyingCtId(ctId);
+    try {
+      const result = await pcpReplanejarCentroSobrecarga(ctId, peakDay, endDate);
+      const moved = result?.moved ?? 0;
+      const remaining = result?.remaining_overload_hours ?? 0;
+      addToast(
+        moved > 0
+          ? `Replanejamento aplicado: ${moved} operação(ões) movida(s).${remaining > 0.1 ? ` Restante ~${remaining.toFixed(1)}h.` : ''}`
+          : (result?.message || 'Nada para mover no período.'),
+        moved > 0 ? 'success' : 'warning'
+      );
+      await loadData();
+    } catch (e: any) {
+      addToast(e?.message || 'Falha ao aplicar replanejamento.', 'error');
+    } finally {
+      setApplyingCtId(null);
+    }
+  }, [addToast, endDate]);
+
+  const runSequencerForCt = useCallback(async (ctId: string) => {
+    if (!confirm('Executar sequenciamento automático (capacidade finita) para este centro? Isso vai recalcular as datas previstas das operações elegíveis no período selecionado.')) return;
+    setSequencingCtId(ctId);
+    try {
+      const result = await pcpApsSequenciarCentro({
+        centroTrabalhoId: ctId,
+        dataInicial: startDate,
+        dataFinal: endDate,
+        apply: true,
+      });
+      addToast(
+        `Sequenciamento aplicado: ${result.updated_operacoes}/${result.total_operacoes} operações atualizadas.${result.unscheduled_operacoes > 0 ? ` ${result.unscheduled_operacoes} sem agenda.` : ''}`,
+        result.unscheduled_operacoes > 0 ? 'warning' : 'success'
+      );
+      await loadData();
+      openGanttForCt(ctId);
+    } catch (e: any) {
+      addToast(e?.message || 'Falha ao sequenciar centro.', 'error');
+    } finally {
+      setSequencingCtId(null);
+    }
+  }, [addToast, endDate, startDate, openGanttForCt]);
 
   const loadData = async () => {
     setLoading(true);
@@ -163,6 +229,65 @@ export default function PcpDashboardPage() {
     if (capacitySummary.length === 0) return null;
     const maisCritico = capacitySummary.reduce((prev, curr) => (curr.ratio > prev.ratio ? curr : prev));
     return maisCritico.id;
+  }, [capacitySummary]);
+
+  const capacitySuggestions = useMemo(() => {
+    const map = new Map<string, CapacitySuggestion>();
+    for (const ct of capacitySummary) {
+      if (!ct.dias?.length) {
+        map.set(ct.id, { peakRatio: 0, overloadHours: 0, message: 'Sem dados no período.' });
+        continue;
+      }
+      const dias = [...ct.dias].sort((a, b) => new Date(a.dia).getTime() - new Date(b.dia).getTime());
+      const peak = dias.reduce(
+        (acc, dia) => {
+          const ratioDia = dia.capacidade_horas > 0 ? dia.carga_total_horas / dia.capacidade_horas : 0;
+          return ratioDia > acc.ratio ? { ratio: ratioDia, dia } : acc;
+        },
+        { ratio: 0, dia: dias[0] }
+      );
+
+      const overloadHours = Math.max(0, peak.dia.carga_total_horas - peak.dia.capacidade_horas);
+      if (overloadHours <= 0.01) {
+        map.set(ct.id, {
+          peakDay: peak.dia.dia,
+          peakRatio: peak.ratio,
+          overloadHours: 0,
+          message: 'Sem sobrecarga no período.',
+        });
+        continue;
+      }
+
+      const startIndex = dias.findIndex(d => d.dia === peak.dia.dia);
+      let cumulativeFree = 0;
+      let suggestedDay: string | undefined;
+      let suggestedSpanDays = 0;
+      let suggestedFreeHours: number | undefined;
+
+      for (let i = Math.max(0, startIndex + 1); i < dias.length; i++) {
+        const free = Math.max(0, dias[i].capacidade_horas - dias[i].carga_total_horas);
+        cumulativeFree += free;
+        suggestedSpanDays++;
+        if (cumulativeFree + 1e-6 >= overloadHours) {
+          suggestedDay = dias[i].dia;
+          suggestedFreeHours = free;
+          break;
+        }
+      }
+
+      map.set(ct.id, {
+        peakDay: peak.dia.dia,
+        peakRatio: peak.ratio,
+        overloadHours,
+        suggestedDay,
+        suggestedSpanDays: suggestedDay ? suggestedSpanDays : undefined,
+        suggestedFreeHours,
+        message: suggestedDay
+          ? `Mover ~${overloadHours.toFixed(1)}h após o pico (folga acumulada em ${suggestedSpanDays} dia(s)).`
+          : 'Sem folga suficiente no período selecionado.',
+      });
+    }
+    return map;
   }, [capacitySummary]);
 
   const weeklySeries = useMemo(() => {
@@ -289,21 +414,25 @@ export default function PcpDashboardPage() {
       return { ...ct, peakRatio: peak.ratio, peakDay: peak.dia };
     });
 
-    const overloaded = overloadInfos.filter(info => info.peakRatio > 1.02);
+    const overloaded = overloadInfos
+      .filter(info => info.peakRatio > 1.02)
+      .sort((a, b) => b.peakRatio - a.peakRatio);
     if (overloaded.length > 0) {
       const primary = overloaded[0];
+      const suggestion = capacitySuggestions.get(primary.id);
+      const suggestionText = suggestion?.suggestedDay
+        ? `Sugestão: buscar folga até ${format(new Date(suggestion.suggestedDay), 'dd/MM')}.`
+        : 'Sugestão: ampliar janela/redistribuir carga.';
       alerts.push({
         id: 'ct-overload',
         severity: 'critical',
         title: 'Capacidade excedida',
         description: `${primary.nome} está com ${Math.round(primary.peakRatio * 100)}% na data ${primary.peakDay ? format(new Date(primary.peakDay), 'dd/MM') : 'informada'}.`,
-        helper: overloaded.length > 1 ? `+ ${overloaded.length - 1} centros também acima da capacidade.` : 'Reavalie sequenciamento ou redistribua carga.',
-        actionLabel: 'Abrir Centros',
-        action: () =>
-          navigate({
-            pathname: '/app/industria/centros-trabalho',
-            search: `?focus=${encodeURIComponent(primary.nome)}`
-          })
+        helper: overloaded.length > 1
+          ? `${suggestionText} + ${overloaded.length - 1} centros também acima da capacidade.`
+          : suggestionText,
+        actionLabel: 'Ver no Gantt',
+        action: () => openGanttForCt(primary.id)
       });
     } else if (capacitySummary.length > 0 && capacitySummary[0].ratio > 0.85) {
       alerts.push({
@@ -355,7 +484,7 @@ export default function PcpDashboardPage() {
     }
 
     return alerts;
-  }, [capacitySummary, atpCtp, rupturas, selectedProdutoInfo, navigate]);
+  }, [capacitySummary, atpCtp, rupturas, selectedProdutoInfo, navigate, capacitySuggestions, openGanttForCt]);
 
   const kpiCards = useMemo(() => [
     {
@@ -591,6 +720,7 @@ export default function PcpDashboardPage() {
               const ratio = ct.ratio;
               const gargaloSevero = ratio > 1;
               const isPrincipal = principalGargaloId === ct.id;
+              const suggestion = capacitySuggestions.get(ct.id);
               return (
                 <div key={ct.id} className="border rounded-lg p-4 space-y-3">
                   <div className="flex items-center justify-between">
@@ -609,6 +739,62 @@ export default function PcpDashboardPage() {
                       </span>
                     )}
                   </div>
+                  {suggestion && (
+                    <div className="rounded-lg bg-slate-50 border border-slate-100 p-3 text-sm text-gray-700">
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <div>
+                          <span className="text-xs uppercase tracking-wide text-gray-500">Simulação</span>
+                          <div className="mt-1">
+                            <span className="font-semibold">
+                              Pico {suggestion.peakDay ? format(new Date(suggestion.peakDay), 'dd/MM') : '—'}
+                            </span>
+                            {suggestion.overloadHours > 0 && (
+                              <span className="ml-2 text-red-700 font-semibold">+{suggestion.overloadHours.toFixed(1)}h</span>
+                            )}
+                            {suggestion.overloadHours <= 0 && (
+                              <span className="ml-2 text-emerald-700 font-semibold">OK</span>
+                            )}
+                          </div>
+                          {suggestion.suggestedDay && suggestion.overloadHours > 0 && (
+                            <div className="text-xs text-gray-600 mt-1">
+                              Melhor folga até {format(new Date(suggestion.suggestedDay), 'dd/MM')}
+                              {typeof suggestion.suggestedSpanDays === 'number' ? ` (${suggestion.suggestedSpanDays} dia(s))` : ''}.
+                            </div>
+                          )}
+                          {suggestion.message && (
+                            <div className="text-xs text-gray-500 mt-1">{suggestion.message}</div>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-3">
+                          {suggestion.overloadHours > 0.01 && (
+                            <button
+                              type="button"
+                              disabled={applyingCtId === ct.id}
+                              onClick={() => applyReplanForCt(ct.id, suggestion.peakDay)}
+                              className="text-xs font-semibold text-blue-700 hover:text-blue-800 underline-offset-2 hover:underline disabled:opacity-50"
+                            >
+                              {applyingCtId === ct.id ? 'Aplicando…' : 'Aplicar'}
+                            </button>
+                          )}
+                          <button
+                            type="button"
+                            disabled={sequencingCtId === ct.id}
+                            onClick={() => runSequencerForCt(ct.id)}
+                            className="text-xs font-semibold text-indigo-700 hover:text-indigo-800 underline-offset-2 hover:underline disabled:opacity-50"
+                          >
+                            {sequencingCtId === ct.id ? 'Sequenciando…' : 'Sequenciar'}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => openGanttForCt(ct.id)}
+                            className="text-xs font-semibold text-emerald-700 hover:text-emerald-800 underline-offset-2 hover:underline"
+                          >
+                            Ver no Gantt
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  )}
                   <div className="grid gap-4 text-sm sm:grid-cols-2 lg:grid-cols-6">
                     <div>
                       <p className="text-gray-500">Capacidade total</p>
@@ -696,7 +882,7 @@ export default function PcpDashboardPage() {
         )}
       </section>
 
-      <section className="bg-white border rounded-lg shadow-sm">
+      <section ref={ganttSectionRef} className="bg-white border rounded-lg shadow-sm">
         <div className="border-b px-4 py-3 flex flex-col gap-2 text-gray-700 font-semibold md:flex-row md:items-center md:justify-between">
           <div className="flex items-center gap-2">
             <BarChart3 className="text-purple-600" size={18} /> Gantt simplificado
