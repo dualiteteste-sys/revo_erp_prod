@@ -782,6 +782,7 @@ export type PcpReplanResult = {
   peak_capacity?: number;
   peak_load?: number;
   end_day?: string;
+  freeze_until?: string;
   message?: string;
 };
 
@@ -803,6 +804,7 @@ export type PcpApsSequenciarResult = {
   centro_id: string;
   data_inicial: string;
   data_final: string;
+  freeze_dias?: number;
   total_operacoes: number;
   updated_operacoes: number;
   unscheduled_operacoes: number;
@@ -863,6 +865,8 @@ export type PcpApsRunChange = {
   old_fim: string | null;
   new_ini: string | null;
   new_fim: string | null;
+  aps_locked?: boolean;
+  aps_lock_reason?: string | null;
 };
 
 export async function pcpApsGetRunChanges(runId: string, limit = 200): Promise<PcpApsRunChange[]> {
@@ -882,6 +886,9 @@ export type PcpApsPreviewRow = {
   new_ini: string | null;
   new_fim: string | null;
   scheduled: boolean;
+  aps_locked?: boolean;
+  aps_lock_reason?: string | null;
+  skip_reason?: string | null;
 };
 
 export async function pcpApsPreviewSequenciarCentro(params: {
@@ -895,5 +902,13 @@ export async function pcpApsPreviewSequenciarCentro(params: {
     p_data_inicial: params.dataInicial,
     p_data_final: params.dataFinal,
     p_limit: params.limit ?? 200,
+  });
+}
+
+export async function setOperacaoApsLock(operacaoId: string, locked: boolean, reason?: string): Promise<void> {
+  await callRpc('industria_operacao_aps_lock_set', {
+    p_operacao_id: operacaoId,
+    p_locked: locked,
+    p_reason: reason || null,
   });
 }
