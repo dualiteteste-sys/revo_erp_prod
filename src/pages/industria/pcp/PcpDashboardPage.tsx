@@ -91,6 +91,7 @@ export default function PcpDashboardPage() {
   const [endDate, setEndDate] = useState(fmtInput(new Date(Date.now() + 7 * 24 * 3600 * 1000)));
   const [ganttCtFilter, setGanttCtFilter] = useState<string>('all');
   const [ganttStatusFilter, setGanttStatusFilter] = useState<string>('all');
+  const [ganttApsFilter, setGanttApsFilter] = useState<string>('all');
   const [applyingCtId, setApplyingCtId] = useState<string | null>(null);
   const [sequencingCtId, setSequencingCtId] = useState<string | null>(null);
 
@@ -155,6 +156,7 @@ export default function PcpDashboardPage() {
   const openGanttForCt = useCallback((ctId: string) => {
     setGanttCtFilter(ctId);
     setGanttStatusFilter('all');
+    setGanttApsFilter('all');
     setTimeout(() => ganttSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 50);
   }, []);
 
@@ -568,7 +570,15 @@ export default function PcpDashboardPage() {
     const filtered = gantt.filter(item => {
       const matchCt = ganttCtFilter === 'all' || item.centro_trabalho_id === ganttCtFilter;
       const matchStatus = ganttStatusFilter === 'all' || item.status_operacao === ganttStatusFilter;
-      return matchCt && matchStatus;
+      const isLocked = !!item.aps_locked;
+      const isFreeze = !!item.aps_in_freeze;
+      const matchAps =
+        ganttApsFilter === 'all'
+        || (ganttApsFilter === 'locked' && isLocked)
+        || (ganttApsFilter === 'freeze' && !isLocked && isFreeze)
+        || (ganttApsFilter === 'blocked' && (isLocked || isFreeze))
+        || (ganttApsFilter === 'eligible' && !isLocked && !isFreeze);
+      return matchCt && matchStatus && matchAps;
     });
 
     return filtered.map(item => {
@@ -1275,6 +1285,18 @@ export default function PcpDashboardPage() {
                 </option>
               ))}
             </select>
+            <select
+              value={ganttApsFilter}
+              onChange={(e) => setGanttApsFilter(e.target.value)}
+              className="border rounded-md px-2 py-1 text-xs"
+              title="Filtro APS (o que o sequenciador ignora)"
+            >
+              <option value="all">APS: todos</option>
+              <option value="eligible">APS: elegíveis</option>
+              <option value="blocked">APS: bloqueados</option>
+              <option value="freeze">APS: freeze</option>
+              <option value="locked">APS: locked</option>
+            </select>
           </div>
         </div>
         {loading && gantt.length === 0 ? (
@@ -1289,6 +1311,7 @@ export default function PcpDashboardPage() {
                   <th className="px-4 py-2 text-left">OP</th>
                   <th className="px-4 py-2 text-left">Produto</th>
                   <th className="px-4 py-2 text-left">CT / Seq</th>
+                  <th className="px-4 py-2 text-left">APS</th>
                   <th className="px-4 py-2 text-left">Status</th>
                   <th className="px-4 py-2 text-left w-2/5">Linha do tempo</th>
                 </tr>
@@ -1303,6 +1326,27 @@ export default function PcpDashboardPage() {
                       <span className="ml-1 text-xs text-gray-500">seq {item.operacao_sequencia}</span>
                       {item.permite_overlap && (
                         <span className="ml-2 text-[10px] bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full uppercase">Overlap</span>
+                      )}
+                    </td>
+                    <td className="px-4 py-2">
+                      {item.aps_locked ? (
+                        <span
+                          className="inline-flex px-2 py-0.5 rounded-full text-xs font-semibold bg-slate-100 text-slate-700"
+                          title={item.aps_lock_reason || 'Operação bloqueada manualmente para APS'}
+                        >
+                          Locked
+                        </span>
+                      ) : item.aps_in_freeze ? (
+                        <span
+                          className="inline-flex px-2 py-0.5 rounded-full text-xs font-semibold bg-amber-50 text-amber-800"
+                          title="Dentro do horizonte congelado (freeze) do CT"
+                        >
+                          Freeze
+                        </span>
+                      ) : (
+                        <span className="inline-flex px-2 py-0.5 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700" title="Elegível para APS">
+                          OK
+                        </span>
                       )}
                     </td>
                     <td className="px-4 py-2">
@@ -1357,7 +1401,7 @@ export default function PcpDashboardPage() {
                 ))}
                 {ganttRows.length === 0 && (
                   <tr>
-                    <td colSpan={5} className="text-center text-gray-500 py-6">Nenhuma OP encontrada no período selecionado.</td>
+                    <td colSpan={6} className="text-center text-gray-500 py-6">Nenhuma OP encontrada no período selecionado.</td>
                   </tr>
                 )}
               </tbody>

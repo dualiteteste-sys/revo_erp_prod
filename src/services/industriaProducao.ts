@@ -518,6 +518,9 @@ export interface PcpGanttOperacao {
   data_fim: string;
   quantidade_transferida: number;
   transfer_ratio: number;
+  aps_locked?: boolean;
+  aps_lock_reason?: string | null;
+  aps_in_freeze?: boolean;
 }
 
 export interface PcpKpis {
