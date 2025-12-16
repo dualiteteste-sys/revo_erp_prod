@@ -314,21 +314,6 @@ export default function PcpDashboardPage() {
     setBatchPreviewed(false);
   }, []);
 
-  const openReplanModal = useCallback(() => {
-    setReplanModalOpen(true);
-    setReplanResults({});
-    setReplanPreview({});
-    setReplanPreviewingCtId(null);
-    setReplanPreviewDetails({ open: false });
-    setReplanPreviewReasonFilter('all');
-    setReplanSelected(
-      replanCandidates.reduce((acc, r) => {
-        acc[r.centro_id] = true;
-        return acc;
-      }, {} as Record<string, boolean>)
-    );
-  }, [replanCandidates]);
-
   const openApsForCt = useCallback((ctId: string, ctNome?: string) => {
     setBatchModalOpen(false);
     setApsModal({ open: true, ctId, ctNome });
@@ -615,6 +600,21 @@ export default function PcpDashboardPage() {
     () => replanCandidates.filter((r) => replanSelected[r.centro_id] !== false),
     [replanCandidates, replanSelected]
   );
+
+  const openReplanModal = useCallback(() => {
+    setReplanModalOpen(true);
+    setReplanResults({});
+    setReplanPreview({});
+    setReplanPreviewingCtId(null);
+    setReplanPreviewDetails({ open: false });
+    setReplanPreviewReasonFilter('all');
+    setReplanSelected(
+      replanCandidates.reduce((acc, r) => {
+        acc[r.centro_id] = true;
+        return acc;
+      }, {} as Record<string, boolean>)
+    );
+  }, [replanCandidates]);
 
   const applyReplanBatch = useCallback(async () => {
     if (selectedReplanCandidates.length === 0) return;
