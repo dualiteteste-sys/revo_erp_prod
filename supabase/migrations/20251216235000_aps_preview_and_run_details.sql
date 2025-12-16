@@ -200,7 +200,7 @@ BEGIN
 
     -- Retorna apenas mudanças relevantes, mas inclui "não agendadas" quando houver
     IF v_start IS NULL OR v_end IS NULL THEN
-      RETURN NEXT (
+      RETURN QUERY SELECT
         rec.operacao_id,
         rec.ordem_id,
         rec.ordem_numero,
@@ -209,11 +209,10 @@ BEGIN
         rec.old_fim,
         NULL::date,
         NULL::date,
-        false
-      );
+        false;
     ELSE
       IF rec.old_ini IS DISTINCT FROM v_start OR rec.old_fim IS DISTINCT FROM v_end THEN
-        RETURN NEXT (
+        RETURN QUERY SELECT
           rec.operacao_id,
           rec.ordem_id,
           rec.ordem_numero,
@@ -222,8 +221,7 @@ BEGIN
           rec.old_fim,
           v_start,
           v_end,
-          true
-        );
+          true;
       END IF;
     END IF;
   END LOOP;
@@ -236,4 +234,3 @@ GRANT EXECUTE ON FUNCTION public.pcp_aps_run_changes_list(uuid, integer) TO auth
 GRANT EXECUTE ON FUNCTION public.pcp_aps_preview_sequenciar_ct(uuid, date, date, integer) TO authenticated, service_role;
 
 COMMIT;
-

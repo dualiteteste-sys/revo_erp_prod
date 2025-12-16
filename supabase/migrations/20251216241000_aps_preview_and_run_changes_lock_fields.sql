@@ -192,7 +192,7 @@ BEGIN
 
     IF rec.aps_locked THEN
       v_count := v_count + 1;
-      RETURN NEXT (
+      RETURN QUERY SELECT
         rec.operacao_id,
         rec.ordem_id,
         rec.ordem_numero,
@@ -204,14 +204,13 @@ BEGIN
         false,
         true,
         rec.aps_lock_reason,
-        'locked'
-      );
+        'locked';
       CONTINUE;
     END IF;
 
     IF rec.effective_day <= v_freeze_until THEN
       v_count := v_count + 1;
-      RETURN NEXT (
+      RETURN QUERY SELECT
         rec.operacao_id,
         rec.ordem_id,
         rec.ordem_numero,
@@ -223,8 +222,7 @@ BEGIN
         false,
         false,
         NULL::text,
-        'freeze'
-      );
+        'freeze';
       CONTINUE;
     END IF;
 
@@ -264,7 +262,7 @@ BEGIN
 
     IF v_start IS NULL OR v_end IS NULL THEN
       v_count := v_count + 1;
-      RETURN NEXT (
+      RETURN QUERY SELECT
         rec.operacao_id,
         rec.ordem_id,
         rec.ordem_numero,
@@ -276,12 +274,11 @@ BEGIN
         false,
         false,
         NULL::text,
-        NULL::text
-      );
+        NULL::text;
     ELSE
       IF rec.old_ini IS DISTINCT FROM v_start OR rec.old_fim IS DISTINCT FROM v_end THEN
         v_count := v_count + 1;
-        RETURN NEXT (
+        RETURN QUERY SELECT
           rec.operacao_id,
           rec.ordem_id,
           rec.ordem_numero,
@@ -293,8 +290,7 @@ BEGIN
           true,
           false,
           NULL::text,
-          NULL::text
-        );
+          NULL::text;
       END IF;
     END IF;
   END LOOP;
@@ -307,4 +303,3 @@ GRANT EXECUTE ON FUNCTION public.pcp_aps_run_changes_list(uuid, integer) TO auth
 GRANT EXECUTE ON FUNCTION public.pcp_aps_preview_sequenciar_ct(uuid, date, date, integer) TO authenticated, service_role;
 
 COMMIT;
-
