@@ -865,6 +865,8 @@ export type PcpApsRunChange = {
   old_fim: string | null;
   new_ini: string | null;
   new_fim: string | null;
+  old_seq?: number | null;
+  new_seq?: number | null;
   aps_locked?: boolean;
   aps_lock_reason?: string | null;
 };
@@ -910,5 +912,18 @@ export async function setOperacaoApsLock(operacaoId: string, locked: boolean, re
     p_operacao_id: operacaoId,
     p_locked: locked,
     p_reason: reason || null,
+  });
+}
+
+export type PcpApsManualResequenceResult = {
+  run_id?: string | null;
+  total: number;
+  updated: number;
+};
+
+export async function pcpApsResequenciarCentro(centroTrabalhoId: string, operacaoIds: string[]): Promise<PcpApsManualResequenceResult> {
+  return callRpc<PcpApsManualResequenceResult>('pcp_aps_resequenciar_ct', {
+    p_centro_id: centroTrabalhoId,
+    p_operacao_ids: operacaoIds,
   });
 }
