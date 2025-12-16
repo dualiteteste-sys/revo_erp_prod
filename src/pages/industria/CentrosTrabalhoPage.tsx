@@ -23,6 +23,16 @@ export default function CentrosTrabalhoPage() {
   const [pendingHighlightTerm, setPendingHighlightTerm] = useState<string | null>(null);
   const [highlightCentroId, setHighlightCentroId] = useState<string | null>(null);
 
+  // Deep-link: /app/industria/centros-trabalho?new=1
+  useEffect(() => {
+    if (searchParams.get('new') !== '1') return;
+    setSelectedCentro(null);
+    setIsFormOpen(true);
+    const next = new URLSearchParams(searchParams);
+    next.delete('new');
+    setSearchParams(next, { replace: true });
+  }, [searchParams, setSearchParams]);
+
   const fetchCentros = async () => {
     setLoading(true);
     try {

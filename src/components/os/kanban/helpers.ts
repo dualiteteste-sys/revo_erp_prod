@@ -70,26 +70,30 @@ export const getNewDateForColumn = (columnId: ColumnId): string | null => {
     switch (columnId) {
         case 'today':
             return today.toISOString().split('T')[0];
-        case 'tomorrow':
+        case 'tomorrow': {
             const tomorrow = new Date(today);
             tomorrow.setDate(today.getDate() + 1);
             return tomorrow.toISOString().split('T')[0];
-        case 'this_week':
+        }
+        case 'this_week': {
             const endOfWeek = new Date(today);
             endOfWeek.setDate(today.getDate() + (7 - today.getDay()));
             return endOfWeek.toISOString().split('T')[0];
-        case 'next_week':
+        }
+        case 'next_week': {
             const endOfNextWeek = new Date(today);
             endOfNextWeek.setDate(today.getDate() + 14 - today.getDay());
             return endOfNextWeek.toISOString().split('T')[0];
+        }
         case 'no_date':
             return null;
         case 'overdue':
              return today.toISOString().split('T')[0];
-        case 'future':
+        case 'future': {
             const futureDate = new Date(today);
             futureDate.setDate(today.getDate() + 15);
             return futureDate.toISOString().split('T')[0];
+        }
         default:
             return null;
     }

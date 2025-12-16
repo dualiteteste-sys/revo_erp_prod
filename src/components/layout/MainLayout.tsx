@@ -7,6 +7,7 @@ import { SubscriptionProvider } from '../../contexts/SubscriptionProvider';
 import SubscriptionGuard from './SubscriptionGuard';
 import { menuConfig } from '../../config/menuConfig';
 import { useAuth } from '../../contexts/AuthProvider';
+import CommandPalette from './CommandPalette';
 
 const findActiveItem = (pathname: string): string => {
   for (const group of menuConfig) {
@@ -24,10 +25,20 @@ const findActiveItem = (pathname: string): string => {
   return 'Dashboard'; // Fallback
 };
 
+const STORAGE_SIDEBAR_COLLAPSED = 'ui:sidebarCollapsed';
+
 const MainLayout: React.FC = () => {
   const { activeEmpresa, loading: authLoading } = useAuth();
   const [isSettingsPanelOpen, setIsSettingsPanelOpen] = useState(false);
-  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(() => {
+    try {
+      const raw = localStorage.getItem(STORAGE_SIDEBAR_COLLAPSED);
+      if (raw === null) return false;
+      return raw === 'true';
+    } catch {
+      return false;
+    }
+  });
   const [wasSidebarExpandedBeforeSettings, setWasSidebarExpandedBeforeSettings] = useState(false);
 
   // Settings Panel Control
@@ -42,6 +53,14 @@ const MainLayout: React.FC = () => {
   useEffect(() => {
     setActiveItem(findActiveItem(location.pathname));
   }, [location.pathname]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(STORAGE_SIDEBAR_COLLAPSED, String(isSidebarCollapsed));
+    } catch {
+      // ignore
+    }
+  }, [isSidebarCollapsed]);
 
   // Guard: Force Complete Profile
   useEffect(() => {
@@ -96,6 +115,7 @@ const MainLayout: React.FC = () => {
   return (
     <SubscriptionProvider>
       <div className="h-screen p-4 flex gap-4">
+        <CommandPalette />
         <Sidebar
           isCollapsed={isSidebarCollapsed}
           setIsCollapsed={setIsSidebarCollapsed}

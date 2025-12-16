@@ -8,6 +8,7 @@ import Select from '@/components/ui/forms/Select';
 import RoteirosTable from '@/components/industria/roteiros/RoteirosTable';
 import RoteiroFormPanel from '@/components/industria/roteiros/RoteiroFormPanel';
 import { useToast } from '@/contexts/ToastProvider';
+import { useSearchParams } from 'react-router-dom';
 
 export default function RoteirosPage() {
   const [roteiros, setRoteiros] = useState<RoteiroListItem[]>([]);
@@ -16,11 +17,23 @@ export default function RoteirosPage() {
   const [typeFilter, setTypeFilter] = useState('');
   const debouncedSearch = useDebounce(search, 500);
   const { addToast } = useToast();
+  const [searchParams, setSearchParams] = useSearchParams();
 
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [initialFormData, setInitialFormData] = useState<Partial<RoteiroDetails> | null>(null);
   const [isSeeding, setIsSeeding] = useState(false);
+
+  // Deep-link: /app/industria/roteiros?new=1
+  useEffect(() => {
+    if (searchParams.get('new') !== '1') return;
+    setSelectedId(null);
+    setInitialFormData(null);
+    setIsFormOpen(true);
+    const next = new URLSearchParams(searchParams);
+    next.delete('new');
+    setSearchParams(next, { replace: true });
+  }, [searchParams, setSearchParams]);
 
   const fetchRoteiros = async () => {
     setLoading(true);

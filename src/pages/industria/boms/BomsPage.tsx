@@ -8,6 +8,7 @@ import Select from '@/components/ui/forms/Select';
 import BomsTable from '@/components/industria/boms/BomsTable';
 import BomFormPanel from '@/components/industria/boms/BomFormPanel';
 import { useToast } from '@/contexts/ToastProvider';
+import { useSearchParams } from 'react-router-dom';
 
 export default function BomsPage() {
   const [boms, setBoms] = useState<BomListItem[]>([]);
@@ -16,11 +17,23 @@ export default function BomsPage() {
   const [typeFilter, setTypeFilter] = useState('');
   const debouncedSearch = useDebounce(search, 500);
   const { addToast } = useToast();
+  const [searchParams, setSearchParams] = useSearchParams();
 
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [initialFormData, setInitialFormData] = useState<Partial<BomDetails> | null>(null);
   const [isSeeding, setIsSeeding] = useState(false);
+
+  // Deep-link: /app/industria/boms?new=1
+  useEffect(() => {
+    if (searchParams.get('new') !== '1') return;
+    setSelectedId(null);
+    setInitialFormData(null);
+    setIsFormOpen(true);
+    const next = new URLSearchParams(searchParams);
+    next.delete('new');
+    setSearchParams(next, { replace: true });
+  }, [searchParams, setSearchParams]);
 
   const fetchBoms = async () => {
     setLoading(true);

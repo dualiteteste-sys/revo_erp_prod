@@ -13,7 +13,12 @@ const COLUMNS: { id: StatusProducao; title: string }[] = [
   { id: 'concluida', title: 'Concluída' },
 ];
 
-const ProducaoKanbanBoard: React.FC = () => {
+type Props = {
+  search?: string;
+  statusFilter?: string;
+};
+
+const ProducaoKanbanBoard: React.FC<Props> = ({ search, statusFilter }) => {
   const [items, setItems] = useState<OrdemProducao[]>([]);
   const [loading, setLoading] = useState(true);
   const { addToast } = useToast();
@@ -21,7 +26,7 @@ const ProducaoKanbanBoard: React.FC = () => {
   const fetchData = async () => {
     setLoading(true);
     try {
-      const data = await listOrdensProducao(undefined, undefined); 
+      const data = await listOrdensProducao(search, statusFilter || undefined);
       setItems(data);
     } catch (error: any) {
       addToast('Erro ao carregar o quadro.', 'error');
@@ -32,7 +37,8 @@ const ProducaoKanbanBoard: React.FC = () => {
 
   useEffect(() => {
     fetchData();
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [search, statusFilter]);
 
   const onDragEnd = async (result: DropResult) => {
     const { source, destination, draggableId } = result;

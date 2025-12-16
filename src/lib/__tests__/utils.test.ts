@@ -2,14 +2,15 @@ import { describe, it, expect } from 'vitest';
 import { cn, formatCurrency, classNames, formatOrderNumber } from '../utils';
 
 describe('src/lib/utils', () => {
-    describe('cn', () => {
-        it('merges class names correctly', () => {
-            expect(cn('p-4', 'bg-red-500')).toBe('p-4 bg-red-500');
-        });
-
-        it('handles conditional classes', () => {
-            expect(cn('p-4', false && 'bg-red-500', 'text-white')).toBe('p-4 text-white');
-        });
+	    describe('cn', () => {
+	        it('merges class names correctly', () => {
+	            expect(cn('p-4', 'bg-red-500')).toBe('p-4 bg-red-500');
+	        });
+	
+	        it('handles conditional classes', () => {
+	            const condition = false;
+	            expect(cn('p-4', condition && 'bg-red-500', 'text-white')).toBe('p-4 text-white');
+	        });
 
         it('merges tailwind classes (overrides)', () => {
             // tailwind-merge should resolve p-4 + p-8 -> p-8
