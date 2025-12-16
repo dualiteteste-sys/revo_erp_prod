@@ -124,6 +124,7 @@ export default function PcpDashboardPage() {
   const [replanModalOpen, setReplanModalOpen] = useState(false);
   const [replanApplying, setReplanApplying] = useState(false);
   const [replanResults, setReplanResults] = useState<Record<string, any>>({});
+  const [replanSelected, setReplanSelected] = useState<Record<string, boolean>>({});
   const [replanPreview, setReplanPreview] = useState<Record<string, {
     rows: PcpReplanPreviewRow[];
     summary: {
@@ -320,7 +321,13 @@ export default function PcpDashboardPage() {
     setReplanPreviewingCtId(null);
     setReplanPreviewDetails({ open: false });
     setReplanPreviewReasonFilter('all');
-  }, []);
+    setReplanSelected(
+      replanCandidates.reduce((acc, r) => {
+        acc[r.centro_id] = true;
+        return acc;
+      }, {} as Record<string, boolean>)
+    );
+  }, [replanCandidates]);
 
   const openApsForCt = useCallback((ctId: string, ctNome?: string) => {
     setBatchModalOpen(false);
@@ -604,13 +611,18 @@ export default function PcpDashboardPage() {
     return rows.sort((a, b) => (b.overload_hours || 0) - (a.overload_hours || 0));
   }, [capacitySummary, capacitySuggestions]);
 
+  const selectedReplanCandidates = useMemo(
+    () => replanCandidates.filter((r) => replanSelected[r.centro_id] !== false),
+    [replanCandidates, replanSelected]
+  );
+
   const applyReplanBatch = useCallback(async () => {
-    if (replanCandidates.length === 0) return;
-    if (!confirm(`Aplicar replanejamento automático para ${replanCandidates.length} CT(s) com sobrecarga no período?`)) return;
+    if (selectedReplanCandidates.length === 0) return;
+    if (!confirm(`Aplicar replanejamento automático para ${selectedReplanCandidates.length} CT(s) selecionado(s) com sobrecarga no período?`)) return;
     setReplanApplying(true);
     setReplanResults({});
     try {
-      for (const item of replanCandidates) {
+      for (const item of selectedReplanCandidates) {
         try {
           const res = await pcpReplanejarCentroSobrecarga(item.centro_id, item.peak_day, endDate);
           setReplanResults((prev) => ({ ...prev, [item.centro_id]: res }));
@@ -623,7 +635,7 @@ export default function PcpDashboardPage() {
     } finally {
       setReplanApplying(false);
     }
-  }, [addToast, endDate, loadData, replanCandidates]);
+  }, [addToast, endDate, loadData, selectedReplanCandidates]);
 
   const previewReplanForCt = useCallback(async (ctId: string, ctNome: string, peakDay: string) => {
     setReplanPreviewingCtId(ctId);
@@ -1089,10 +1101,10 @@ export default function PcpDashboardPage() {
             <button
               type="button"
               onClick={applyReplanBatch}
-              disabled={replanApplying || replanCandidates.length === 0}
+              disabled={replanApplying || selectedReplanCandidates.length === 0}
               className="px-4 py-2 rounded-lg bg-amber-600 text-white hover:bg-amber-500 text-sm font-semibold disabled:opacity-50"
             >
-              {replanApplying ? 'Aplicando…' : `Aplicar em lote (${replanCandidates.length})`}
+              {replanApplying ? 'Aplicando…' : `Aplicar selecionados (${selectedReplanCandidates.length}/${replanCandidates.length})`}
             </button>
           </div>
 
@@ -1102,6 +1114,22 @@ export default function PcpDashboardPage() {
               <table className="min-w-full text-xs">
                 <thead className="bg-gray-50 text-gray-600">
                   <tr>
+                    <th className="px-3 py-2 text-left w-[1%]">
+                      <input
+                        type="checkbox"
+                        checked={replanCandidates.length > 0 && replanCandidates.every((r) => replanSelected[r.centro_id] !== false)}
+                        onChange={(e) => {
+                          const checked = e.target.checked;
+                          setReplanSelected(
+                            replanCandidates.reduce((acc, r) => {
+                              acc[r.centro_id] = checked;
+                              return acc;
+                            }, {} as Record<string, boolean>)
+                          );
+                        }}
+                        title="Selecionar todos"
+                      />
+                    </th>
                     <th className="px-3 py-2 text-left">Centro</th>
                     <th className="px-3 py-2 text-right">Sobrecarga</th>
                     <th className="px-3 py-2 text-left">Pico</th>
@@ -1120,8 +1148,18 @@ export default function PcpDashboardPage() {
                     const msg = res?.message as string | undefined;
                     const freezeUntil = res?.freeze_until as string | undefined;
                     const previewLoading = replanPreviewingCtId === r.centro_id;
+                    const isSelected = replanSelected[r.centro_id] !== false;
                     return (
                       <tr key={r.centro_id} className="border-t">
+                        <td className="px-3 py-2">
+                          <input
+                            type="checkbox"
+                            checked={isSelected}
+                            onChange={(e) => setReplanSelected((prevSel) => ({ ...prevSel, [r.centro_id]: e.target.checked }))}
+                            disabled={replanApplying}
+                            title="Incluir este CT no lote"
+                          />
+                        </td>
                         <td className="px-3 py-2 text-gray-900 font-medium">{r.centro_nome}</td>
                         <td className="px-3 py-2 text-right text-gray-700">{(r.overload_hours || 0).toFixed(1)}h</td>
                         <td className="px-3 py-2 text-gray-700">{format(new Date(r.peak_day), 'dd/MM')}</td>
@@ -1200,7 +1238,7 @@ export default function PcpDashboardPage() {
                   })}
                   {replanCandidates.length === 0 && (
                     <tr>
-                      <td colSpan={7} className="px-3 py-6 text-sm text-gray-500">
+                      <td colSpan={8} className="px-3 py-6 text-sm text-gray-500">
                         Nenhum CT com sobrecarga no período selecionado.
                       </td>
                     </tr>
