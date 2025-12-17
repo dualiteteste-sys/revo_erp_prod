@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { listMateriaisCliente, MaterialClienteListItem, seedMateriaisCliente, deleteMaterialCliente } from '@/services/industriaMateriais';
-import { PlusCircle, Search, DatabaseBackup, Package } from 'lucide-react';
+import { PlusCircle, Search, DatabaseBackup, Package, FileUp } from 'lucide-react';
 import { Loader2 } from 'lucide-react';
 import { useDebounce } from '@/hooks/useDebounce';
 import Modal from '@/components/ui/Modal';
@@ -10,6 +10,7 @@ import MaterialFormPanel from '@/components/industria/materiais/MaterialFormPane
 import { useToast } from '@/contexts/ToastProvider';
 import ConfirmationModal from '@/components/ui/ConfirmationModal';
 import Pagination from '@/components/ui/Pagination';
+import ImportarXmlSuprimentosModal from '@/components/industria/materiais/ImportarXmlSuprimentosModal';
 
 export default function MateriaisClientePage() {
   const [materiais, setMateriais] = useState<MaterialClienteListItem[]>([]);
@@ -26,6 +27,7 @@ export default function MateriaisClientePage() {
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [isSeeding, setIsSeeding] = useState(false);
+  const [isImportOpen, setIsImportOpen] = useState(false);
   
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [itemToDelete, setItemToDelete] = useState<MaterialClienteListItem | null>(null);
@@ -114,6 +116,15 @@ export default function MateriaisClientePage() {
         </div>
         <div className="flex items-center gap-2">
             <button
+              onClick={() => setIsImportOpen(true)}
+              disabled={loading}
+              className="flex items-center gap-2 bg-white border border-gray-200 text-gray-800 font-semibold py-2 px-4 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50"
+              title="Importar itens de terceiros a partir de um XML de NF-e"
+            >
+              <FileUp size={20} />
+              Importar XML (NF-e)
+            </button>
+            <button
               onClick={handleSeed}
               disabled={isSeeding || loading}
               className="flex items-center gap-2 bg-gray-100 text-gray-700 font-semibold py-2 px-4 rounded-lg hover:bg-gray-200 transition-colors disabled:opacity-50"
@@ -180,6 +191,11 @@ export default function MateriaisClientePage() {
       <Modal isOpen={isFormOpen} onClose={handleClose} title={selectedId ? 'Editar Material' : 'Novo Material'} size="lg">
         <MaterialFormPanel materialId={selectedId} onSaveSuccess={handleSuccess} onClose={handleClose} />
       </Modal>
+
+      <ImportarXmlSuprimentosModal
+        isOpen={isImportOpen}
+        onClose={() => setIsImportOpen(false)}
+      />
 
       <ConfirmationModal
         isOpen={isDeleteModalOpen}

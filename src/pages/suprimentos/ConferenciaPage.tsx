@@ -79,7 +79,8 @@ export default function ConferenciaPage() {
                 loadData(id);
             }
         } catch (error) {
-            addToast('Erro ao finalizar recebimento.', 'error');
+            console.error(error);
+            addToast((error as any)?.message || 'Erro ao finalizar recebimento.', 'error');
         }
     };
 

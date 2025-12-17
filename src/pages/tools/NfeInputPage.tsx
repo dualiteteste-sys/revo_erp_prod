@@ -32,7 +32,11 @@ const InfoItem: React.FC<{ label: string; value?: string | null }> = ({ label, v
   ) : null
 );
 
-export default function NfeInputPage() {
+type NfeInputPageProps = {
+  embedded?: boolean;
+};
+
+export default function NfeInputPage({ embedded }: NfeInputPageProps) {
   const { addToast } = useToast();
   const navigate = useNavigate();
 
@@ -288,8 +292,12 @@ export default function NfeInputPage() {
   // Renderização
   return (
     <div className="p-1">
-      <h1 className="text-3xl font-bold text-gray-800 mb-2">Entrada de Beneficiamento (NF-e)</h1>
-      <p className="text-gray-600 mb-6">Importe o XML da nota fiscal para registrar a entrada de insumos de terceiros.</p>
+      {!embedded && (
+        <>
+          <h1 className="text-3xl font-bold text-gray-800 mb-2">Entrada de Beneficiamento (NF-e)</h1>
+          <p className="text-gray-600 mb-6">Importe o XML da nota fiscal para registrar a entrada de insumos de terceiros.</p>
+        </>
+      )}
 
       {/* Stepper */}
       <div className="flex items-center mb-8 text-sm font-medium text-gray-500">

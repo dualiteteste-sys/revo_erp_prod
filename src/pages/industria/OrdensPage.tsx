@@ -1,5 +1,6 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { cloneOrdem, listOrdens, OrdemIndustria } from '@/services/industria';
+import { listOrdensProducao, OrdemProducao } from '@/services/industriaProducao';
 import { PlusCircle, Search, LayoutGrid, List } from 'lucide-react';
 import { Loader2 } from 'lucide-react';
 import { useDebounce } from '@/hooks/useDebounce';
@@ -10,6 +11,8 @@ import IndustriaKanbanBoard from '@/components/industria/kanban/IndustriaKanbanB
 import Select from '@/components/ui/forms/Select';
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { useToast } from '@/contexts/ToastProvider';
+import ProducaoFormPanel from '@/components/industria/producao/ProducaoFormPanel';
+import ProducaoKanbanBoard from '@/components/industria/producao/ProducaoKanbanBoard';
 
 export default function OrdensPage() {
   const { addToast } = useToast();
@@ -33,10 +36,38 @@ export default function OrdensPage() {
     | 'industrializacao'
     | 'beneficiamento';
 
+  const statusOptions = useMemo(() => {
+    if (tipoOrdem === 'industrializacao') {
+      return [
+        { value: '', label: 'Todos os Status' },
+        { value: 'planejada', label: 'Planejada' },
+        { value: 'em_programacao', label: 'Em Programação' },
+        { value: 'em_producao', label: 'Em Produção' },
+        { value: 'em_inspecao', label: 'Em Inspeção' },
+        { value: 'concluida', label: 'Concluída' },
+        { value: 'cancelada', label: 'Cancelada' },
+      ];
+    }
+
+    return [
+      { value: '', label: 'Todos os Status' },
+      { value: 'rascunho', label: 'Rascunho' },
+      { value: 'planejada', label: 'Planejada' },
+      { value: 'em_programacao', label: 'Em Programação' },
+      { value: 'em_beneficiamento', label: 'Em Beneficiamento' },
+      { value: 'parcialmente_entregue', label: 'Parcialmente Entregue' },
+      { value: 'concluida', label: 'Concluída' },
+      { value: 'cancelada', label: 'Cancelada' },
+    ];
+  }, [tipoOrdem]);
+
   // Deep-link: /app/industria/ordens?tipo=beneficiamento&new=1
   useEffect(() => {
     if (searchParams.get('new') !== '1') return;
-    const statePrefill = (location.state as any)?.prefill as React.ComponentProps<typeof OrdemFormPanel>['initialPrefill'] | undefined;
+    const statePrefill =
+      tipoOrdem === 'beneficiamento'
+        ? ((location.state as any)?.prefill as React.ComponentProps<typeof OrdemFormPanel>['initialPrefill'] | undefined)
+        : undefined;
     setInitialPrefill(statePrefill);
     setSelectedId(null);
     setIsFormOpen(true);
@@ -52,8 +83,29 @@ export default function OrdensPage() {
     if (viewMode === 'kanban') return; // Kanban fetches its own data
     setLoading(true);
     try {
-      const data = await listOrdens(debouncedSearch, tipoOrdem, statusFilter || undefined);
-      setOrders(data);
+      if (tipoOrdem === 'industrializacao') {
+        const data = await listOrdensProducao(debouncedSearch, statusFilter || undefined);
+        setOrders(
+          data.map(
+            (o: OrdemProducao): OrdemIndustria => ({
+              id: o.id,
+              numero: o.numero,
+              tipo_ordem: 'industrializacao',
+              produto_nome: o.produto_nome,
+              cliente_nome: null,
+              quantidade_planejada: o.quantidade_planejada,
+              unidade: o.unidade,
+              status: o.status as any,
+              prioridade: o.prioridade,
+              data_prevista_entrega: o.data_prevista_entrega || null,
+              total_entregue: o.total_entregue,
+            })
+          )
+        );
+      } else {
+        const data = await listOrdens(debouncedSearch, tipoOrdem, statusFilter || undefined);
+        setOrders(data);
+      }
     } catch (e) {
       console.error(e);
       const message = (e as any)?.message || 'Erro ao carregar ordens.';
@@ -91,6 +143,7 @@ export default function OrdensPage() {
   };
 
   const handleClone = async (order: OrdemIndustria) => {
+    if (tipoOrdem === 'industrializacao') return;
     try {
       const cloned = await cloneOrdem(order.id);
       setSelectedId(cloned.id);
@@ -186,10 +239,11 @@ export default function OrdensPage() {
                 onChange={(e) => setStatusFilter(e.target.value)}
                 className="min-w-[200px]"
               >
-                <option value="">Todos os Status</option>
-                <option value="planejada">Planejada</option>
-                <option value="em_producao">Em Produção</option>
-                <option value="concluida">Concluída</option>
+                {statusOptions.map((o) => (
+                  <option key={o.value || 'all'} value={o.value}>
+                    {o.label}
+                  </option>
+                ))}
               </Select>
             )}
         </div>
@@ -203,17 +257,25 @@ export default function OrdensPage() {
                     <Loader2 className="animate-spin text-blue-600 w-10 h-10" />
                 </div>
                 ) : (
-                <OrdensTable orders={orders} onEdit={handleEdit} onClone={handleClone} />
+                <OrdensTable orders={orders} onEdit={handleEdit} onClone={tipoOrdem === 'beneficiamento' ? handleClone : undefined} />
                 )}
             </div>
         ) : (
-            <IndustriaKanbanBoard
-              tipoOrdem={tipoOrdem}
-              search={debouncedSearch}
-              refreshToken={kanbanRefresh}
-              onOpenOrder={handleOpenFromKanban}
-              onCloneOrder={handleClone}
-            />
+            tipoOrdem === 'industrializacao' ? (
+              <ProducaoKanbanBoard
+                search={debouncedSearch}
+                statusFilter={statusFilter}
+                onOpenOrder={(order: any) => handleOpenFromKanban({ ...(order as any), tipo_ordem: 'industrializacao' })}
+              />
+            ) : (
+              <IndustriaKanbanBoard
+                tipoOrdem={tipoOrdem}
+                search={debouncedSearch}
+                refreshToken={kanbanRefresh}
+                onOpenOrder={handleOpenFromKanban}
+                onCloneOrder={handleClone}
+              />
+            )
         )}
       </div>
 
@@ -223,13 +285,17 @@ export default function OrdensPage() {
         title={selectedId ? 'Editar Ordem' : (tipoOrdem === 'beneficiamento' ? 'Nova Ordem de Beneficiamento' : 'Nova Ordem de Industrialização')}
         size="6xl"
       >
-        <OrdemFormPanel
-          ordemId={selectedId}
-          initialTipoOrdem={tipoOrdem}
-          initialPrefill={selectedId ? undefined : initialPrefill}
-          onSaveSuccess={handleSuccess}
-          onClose={handleClose}
-        />
+        {tipoOrdem === 'industrializacao' ? (
+          <ProducaoFormPanel ordemId={selectedId} onSaveSuccess={handleSuccess} onClose={handleClose} />
+        ) : (
+          <OrdemFormPanel
+            ordemId={selectedId}
+            initialTipoOrdem={tipoOrdem}
+            initialPrefill={selectedId ? undefined : initialPrefill}
+            onSaveSuccess={handleSuccess}
+            onClose={handleClose}
+          />
+        )}
       </Modal>
     </div>
   );

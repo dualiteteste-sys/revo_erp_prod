@@ -16,9 +16,10 @@ const COLUMNS: { id: StatusProducao; title: string }[] = [
 type Props = {
   search?: string;
   statusFilter?: string;
+  onOpenOrder?: (order: OrdemProducao) => void;
 };
 
-const ProducaoKanbanBoard: React.FC<Props> = ({ search, statusFilter }) => {
+const ProducaoKanbanBoard: React.FC<Props> = ({ search, statusFilter, onOpenOrder }) => {
   const [items, setItems] = useState<OrdemProducao[]>([]);
   const [loading, setLoading] = useState(true);
   const { addToast } = useToast();
@@ -75,7 +76,10 @@ const ProducaoKanbanBoard: React.FC<Props> = ({ search, statusFilter }) => {
 
   const getItemsForColumn = (status: string) => {
     // Cast to any to reuse the generic card component which expects OrdemIndustria-like shape
-    return items.filter(i => i.status === status).sort((a, b) => a.prioridade - b.prioridade) as any[];
+    return items
+      .filter(i => i.status === status)
+      .sort((a, b) => a.prioridade - b.prioridade)
+      .map((i) => ({ ...i, tipo_ordem: 'industrializacao' })) as any[];
   };
 
   return (
@@ -86,7 +90,8 @@ const ProducaoKanbanBoard: React.FC<Props> = ({ search, statusFilter }) => {
             key={col.id} 
             columnId={col.id} 
             title={col.title} 
-            items={getItemsForColumn(col.id)} 
+            items={getItemsForColumn(col.id)}
+            onOpenOrder={onOpenOrder as any}
           />
         ))}
       </div>

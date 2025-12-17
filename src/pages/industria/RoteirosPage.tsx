@@ -18,6 +18,7 @@ export default function RoteirosPage() {
   const debouncedSearch = useDebounce(search, 500);
   const { addToast } = useToast();
   const [searchParams, setSearchParams] = useSearchParams();
+  const hasShownRpcHint = React.useRef(false);
 
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -42,6 +43,21 @@ export default function RoteirosPage() {
       setRoteiros(data);
     } catch (e) {
       console.error(e);
+      const message = (e as any)?.message || 'Erro ao carregar roteiros.';
+      if (
+        !hasShownRpcHint.current &&
+        typeof message === 'string' &&
+        message.includes('industria_roteiros_list') &&
+        message.includes('HTTP_404')
+      ) {
+        hasShownRpcHint.current = true;
+        addToast(
+          "RPC 'industria_roteiros_list' não encontrada. Verifique se as migrações de Roteiros foram aplicadas e recarregue o schema cache do Supabase (NOTIFY pgrst, 'reload schema').",
+          'error'
+        );
+      } else {
+        addToast(message, 'error');
+      }
     } finally {
       setLoading(false);
     }
@@ -133,7 +149,7 @@ export default function RoteirosPage() {
       <div className="flex justify-between items-center mb-6 flex-shrink-0">
         <div>
           <h1 className="text-3xl font-bold text-gray-800 flex items-center gap-2">
-            <Route className="text-blue-600" /> Roteiros de Produção
+            <Route className="text-blue-600" /> Roteiros
           </h1>
           <p className="text-gray-600 text-sm mt-1">Sequência de operações e centros de trabalho.</p>
         </div>

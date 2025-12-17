@@ -25,7 +25,7 @@ export default function RoteiroFormPanel({ roteiroId, initialData, onSaveSuccess
 
   const INITIAL_DATA: Partial<RoteiroDetails> = {
     tipo_bom: 'producao',
-    versao: 1,
+    versao: '1.0',
     ativo: true,
     padrao_para_producao: true,
     padrao_para_beneficiamento: false,
@@ -78,13 +78,14 @@ export default function RoteiroFormPanel({ roteiroId, initialData, onSaveSuccess
 
     setIsSaving(true);
     try {
+      const versao = String(formData.versao ?? '').trim() || '1.0';
       const payload: RoteiroPayload = {
         id: formData.id,
         produto_id: formData.produto_id,
         tipo_bom: formData.tipo_bom,
         codigo: formData.codigo,
         descricao: formData.descricao,
-        versao: formData.versao,
+        versao,
         ativo: formData.ativo,
         padrao_para_producao: formData.padrao_para_producao,
         padrao_para_beneficiamento: formData.padrao_para_beneficiamento,
@@ -168,9 +169,8 @@ export default function RoteiroFormPanel({ roteiroId, initialData, onSaveSuccess
             <Input
               label="Versão"
               name="versao"
-              type="number"
-              value={formData.versao || 1}
-              onChange={e => handleHeaderChange('versao', parseInt(e.target.value))}
+              value={(formData.versao as any) || '1.0'}
+              onChange={e => handleHeaderChange('versao', e.target.value)}
               className="sm:col-span-1"
             />
             <Input
