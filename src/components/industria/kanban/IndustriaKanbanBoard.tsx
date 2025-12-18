@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { DragDropContext, DropResult } from '@hello-pangea/dnd';
-import { listOrdens, updateOrdemStatus, OrdemIndustria, StatusOrdem, replanejarOperacao } from '@/services/industria';
+import { listOrdens, updateOrdemStatus, OrdemIndustria, StatusOrdem, TipoOrdemIndustria } from '@/services/industria';
 import { useToast } from '@/contexts/ToastProvider';
 import { Loader2 } from 'lucide-react';
 import IndustriaKanbanColumn from './IndustriaKanbanColumn';
@@ -14,7 +14,15 @@ const COLUMNS: { id: StatusOrdem; title: string }[] = [
   { id: 'concluida', title: 'Concluída' },
 ];
 
-const IndustriaKanbanBoard: React.FC = () => {
+type Props = {
+  tipoOrdem?: TipoOrdemIndustria;
+  search?: string;
+  refreshToken?: number;
+  onOpenOrder?: (order: OrdemIndustria) => void;
+  onCloneOrder?: (order: OrdemIndustria) => void;
+};
+
+const IndustriaKanbanBoard: React.FC<Props> = ({ tipoOrdem, search, refreshToken, onOpenOrder, onCloneOrder }) => {
   const [items, setItems] = useState<OrdemIndustria[]>([]);
   const [loading, setLoading] = useState(true);
   const { addToast } = useToast();
@@ -22,7 +30,7 @@ const IndustriaKanbanBoard: React.FC = () => {
   const fetchData = async () => {
     setLoading(true);
     try {
-      const data = await listOrdens(undefined, undefined, undefined, 1, 100); // Fetch more items for kanban
+      const data = await listOrdens(search, tipoOrdem, undefined);
       setItems(data);
     } catch (error: any) {
       addToast('Erro ao carregar o quadro.', 'error');
@@ -33,7 +41,8 @@ const IndustriaKanbanBoard: React.FC = () => {
 
   useEffect(() => {
     fetchData();
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tipoOrdem, search, refreshToken]);
 
   const onDragEnd = async (result: DropResult) => {
     const { source, destination, draggableId } = result;
@@ -61,6 +70,35 @@ const IndustriaKanbanBoard: React.FC = () => {
     }
   };
 
+  const updateItem = (id: string, patch: Partial<OrdemIndustria>) => {
+    setItems(prev => prev.map(i => (i.id === id ? { ...i, ...patch } : i)));
+  };
+
+  const handleQuickStatus = async (order: OrdemIndustria, newStatus: StatusOrdem) => {
+    if (order.status === newStatus) return;
+    updateItem(order.id, { status: newStatus });
+    try {
+      await updateOrdemStatus(order.id, newStatus, order.prioridade);
+      addToast(`Status atualizado para ${newStatus.replace(/_/g, ' ')}`, 'success');
+    } catch (e: any) {
+      addToast('Falha ao atualizar status.', 'error');
+      fetchData();
+    }
+  };
+
+  const handleQuickPriority = async (order: OrdemIndustria, delta: number) => {
+    const next = Math.max(0, (order.prioridade ?? 0) + delta);
+    if (next === order.prioridade) return;
+    updateItem(order.id, { prioridade: next });
+    try {
+      await updateOrdemStatus(order.id, order.status, next);
+      addToast('Prioridade atualizada.', 'success');
+    } catch (e: any) {
+      addToast('Falha ao atualizar prioridade.', 'error');
+      fetchData();
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-full">
@@ -82,6 +120,10 @@ const IndustriaKanbanBoard: React.FC = () => {
             columnId={col.id} 
             title={col.title} 
             items={getItemsForColumn(col.id)} 
+            onOpenOrder={onOpenOrder}
+            onQuickStatus={handleQuickStatus}
+            onQuickPriority={handleQuickPriority}
+            onCloneOrder={onCloneOrder}
           />
         ))}
       </div>

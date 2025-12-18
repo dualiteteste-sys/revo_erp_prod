@@ -1,15 +1,39 @@
 import React from 'react';
 import { Draggable } from '@hello-pangea/dnd';
-import { OrdemIndustria } from '@/services/industria';
-import { User, Calendar, Package } from 'lucide-react';
+import { OrdemIndustria, StatusOrdem } from '@/services/industria';
+import { User, Calendar, Package, Pencil, MoreVertical, ArrowUp, ArrowDown, CheckCircle2, Copy } from 'lucide-react';
 import { formatOrderNumber } from '@/lib/utils';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 
 interface Props {
   item: OrdemIndustria;
   index: number;
+  onOpenOrder?: (order: OrdemIndustria) => void;
+  onQuickStatus?: (order: OrdemIndustria, status: StatusOrdem) => void;
+  onQuickPriority?: (order: OrdemIndustria, delta: number) => void;
+  onCloneOrder?: (order: OrdemIndustria) => void;
 }
 
-const IndustriaKanbanCard: React.FC<Props> = ({ item, index }) => {
+const STATUS_OPTIONS: { id: StatusOrdem; label: string }[] = [
+  { id: 'planejada', label: 'Planejada' },
+  { id: 'em_programacao', label: 'Em Programação' },
+  { id: 'em_producao', label: 'Em Produção' },
+  { id: 'em_inspecao', label: 'Em Inspeção' },
+  { id: 'parcialmente_concluida', label: 'Parcialmente Concluída' },
+  { id: 'concluida', label: 'Concluída' },
+];
+
+const IndustriaKanbanCard: React.FC<Props> = ({ item, index, onOpenOrder, onQuickStatus, onQuickPriority, onCloneOrder }) => {
   return (
     <Draggable draggableId={item.id} index={index}>
       {(provided, snapshot) => (
@@ -21,9 +45,112 @@ const IndustriaKanbanCard: React.FC<Props> = ({ item, index }) => {
         >
           <div className="flex justify-between items-start mb-1">
             <span className="text-xs font-bold text-blue-600">{formatOrderNumber(item.numero)}</span>
-            <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium ${item.tipo_ordem === 'industrializacao' ? 'bg-gray-100 text-gray-600' : 'bg-purple-50 text-purple-600'}`}>
+            <div className="flex items-center gap-2">
+              <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium ${item.tipo_ordem === 'industrializacao' ? 'bg-gray-100 text-gray-600' : 'bg-purple-50 text-purple-600'}`}>
                 {item.tipo_ordem === 'industrializacao' ? 'IND' : 'BEN'}
-            </span>
+              </span>
+              {onOpenOrder && (
+                <button
+                  type="button"
+                  onMouseDown={(e) => e.stopPropagation()}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onOpenOrder(item);
+                  }}
+                  className="p-1 rounded-md text-gray-500 hover:text-blue-700 hover:bg-blue-50"
+                  title="Abrir ordem"
+                >
+                  <Pencil size={14} />
+                </button>
+              )}
+              {(onQuickStatus || onQuickPriority) && (
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <button
+                      type="button"
+                      onMouseDown={(e) => e.stopPropagation()}
+                      onClick={(e) => e.stopPropagation()}
+                      className="p-1 rounded-md text-gray-500 hover:text-gray-800 hover:bg-gray-100"
+                      title="Ações rápidas"
+                    >
+                      <MoreVertical size={14} />
+                    </button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" sideOffset={6}>
+                    <DropdownMenuLabel>Ordem</DropdownMenuLabel>
+                    {onOpenOrder && (
+                      <DropdownMenuItem
+                        onSelect={(e) => {
+                          e.preventDefault();
+                          onOpenOrder(item);
+                        }}
+                      >
+                        <Pencil className="mr-2 h-4 w-4" />
+                        Abrir
+                      </DropdownMenuItem>
+                    )}
+                    {onCloneOrder && (
+                      <DropdownMenuItem
+                        onSelect={(e) => {
+                          e.preventDefault();
+                          onCloneOrder(item);
+                        }}
+                      >
+                        <Copy className="mr-2 h-4 w-4" />
+                        Duplicar
+                      </DropdownMenuItem>
+                    )}
+                    <DropdownMenuSeparator />
+                    {onQuickPriority && (
+                      <>
+                        <DropdownMenuItem
+                          onSelect={(e) => {
+                            e.preventDefault();
+                            onQuickPriority(item, -1);
+                          }}
+                        >
+                          <ArrowUp className="mr-2 h-4 w-4" />
+                          Aumentar prioridade
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          onSelect={(e) => {
+                            e.preventDefault();
+                            onQuickPriority(item, +1);
+                          }}
+                        >
+                          <ArrowDown className="mr-2 h-4 w-4" />
+                          Reduzir prioridade
+                        </DropdownMenuItem>
+                        <DropdownMenuSeparator />
+                      </>
+                    )}
+                    {onQuickStatus && (
+                      <>
+                        <DropdownMenuSub>
+                          <DropdownMenuSubTrigger>
+                            <CheckCircle2 className="mr-2 h-4 w-4" />
+                            Mudar status
+                          </DropdownMenuSubTrigger>
+                          <DropdownMenuSubContent>
+                            {STATUS_OPTIONS.map((s) => (
+                              <DropdownMenuItem
+                                key={s.id}
+                                onSelect={(e) => {
+                                  e.preventDefault();
+                                  onQuickStatus(item, s.id);
+                                }}
+                              >
+                                {s.label}
+                              </DropdownMenuItem>
+                            ))}
+                          </DropdownMenuSubContent>
+                        </DropdownMenuSub>
+                      </>
+                    )}
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              )}
+            </div>
           </div>
           
           <div className="mb-2">

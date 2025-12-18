@@ -58,7 +58,8 @@ function flattenMenu(): PaletteItem[] {
 
 function getActionItems(): PaletteItem[] {
   return [
-    { id: 'action:new-op', group: 'Ações', label: 'Nova Ordem de Produção', href: '/app/industria/producao?new=1', Icon: PlusCircle },
+    { id: 'action:new-op', group: 'Ações', label: 'Nova Ordem (Industrialização)', href: '/app/industria/ordens?tipo=industrializacao&new=1', Icon: PlusCircle },
+    { id: 'action:new-ob', group: 'Ações', label: 'Nova Ordem (Beneficiamento)', href: '/app/industria/ordens?tipo=beneficiamento&new=1', Icon: PlusCircle },
     { id: 'action:new-bom', group: 'Ações', label: 'Nova Ficha Técnica / BOM', href: '/app/industria/boms?new=1', Icon: PlusCircle },
     { id: 'action:new-roteiro', group: 'Ações', label: 'Novo Roteiro', href: '/app/industria/roteiros?new=1', Icon: PlusCircle },
     { id: 'action:new-ct', group: 'Ações', label: 'Novo Centro de Trabalho', href: '/app/industria/centros-trabalho?new=1', Icon: PlusCircle },

@@ -11,7 +11,8 @@
     "tsc:dualite": "yarn tsc -p tsconfig.dualite.json",
     "preview": "vite preview",
     "test": "vitest",
-    "test:coverage": "vitest run --coverage"
+    "test:coverage": "vitest run --coverage",
+    "test:e2e": "playwright test"
   },
   "dependencies": {
     "@hello-pangea/dnd": "^16.6.0",

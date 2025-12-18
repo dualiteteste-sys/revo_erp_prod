@@ -153,6 +153,7 @@ END;
 $$;
 
 -- 5. RPC: Get Quality Motives
+DROP FUNCTION IF EXISTS public.qualidade_get_motivos();
 CREATE OR REPLACE FUNCTION public.qualidade_get_motivos()
 RETURNS TABLE (
     id uuid,

@@ -68,7 +68,7 @@ const QuickScanDialog: React.FC<QuickScanDialogProps> = ({
 
   return createPortal(
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur">
-      <div className="relative w-full max-w-xl rounded-3xl bg-slate-950/80 border border-slate-800 p-5 text-white shadow-2xl">
+      <div className="relative w-full min-w-[50vw] max-w-xl rounded-3xl bg-slate-950/80 border border-slate-800 p-5 text-white shadow-2xl">
         <button
           onClick={onClose}
           className="absolute right-4 top-4 text-slate-400 hover:text-white transition-colors"

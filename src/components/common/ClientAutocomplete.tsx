@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { searchClients, ClientHit } from '@/services/clients';
 import { useDebounce } from '@/hooks/useDebounce';
-import { Loader2, Plus } from 'lucide-react';
+import { Loader2 } from 'lucide-react';
 import Modal from '@/components/ui/Modal';
 import PartnerFormPanel from '@/components/partners/PartnerFormPanel';
 import { useToast } from '@/contexts/ToastProvider';
@@ -137,11 +137,11 @@ export default function ClientAutocomplete({ value, onChange, placeholder, disab
       <button
         type="button"
         onClick={() => setIsCreateModalOpen(true)}
-        className="flex-shrink-0 p-3 bg-blue-100 text-blue-600 rounded-lg hover:bg-blue-200 transition-colors"
-        title="Novo Cliente"
+        className="flex-shrink-0 px-4 py-3 bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200 transition-colors text-sm font-semibold whitespace-nowrap"
+        title="Criar um novo cadastro. Para cliente já cadastrado, digite no campo de busca ao lado."
         disabled={disabled}
       >
-        <Plus size={20} />
+        Criar Novo
       </button>
 
       <Modal

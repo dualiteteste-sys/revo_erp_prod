@@ -13,7 +13,7 @@ export type RoteiroListItem = {
   tipo_bom: TipoBom;
   codigo: string | null;
   descricao: string | null;
-  versao: number;
+  versao: string;
   ativo: boolean;
   padrao_para_producao: boolean;
   padrao_para_beneficiamento: boolean;
@@ -97,7 +97,7 @@ export async function seedRoteiros(): Promise<void> {
       tipo_bom: tipo,
       codigo: `ROT-${faker.string.numeric(4)}`,
       descricao: `Roteiro Padrão - ${faker.date.recent().getFullYear()}`,
-      versao: faker.number.int({ min: 1, max: 5 }),
+      versao: `${faker.number.int({ min: 1, max: 5 })}.0`,
       ativo: true,
       padrao_para_producao: tipo === 'producao',
       padrao_para_beneficiamento: tipo === 'beneficiamento',

@@ -62,8 +62,8 @@ const OrdemEntregas: React.FC<OrdemEntregasProps> = ({
       data_entrega: dataEntrega,
       quantidade_entregue: qtdNum,
       status_faturamento: statusFaturamento,
-      documento_ref: showBillingStatus ? undefined : docRef, // Produção usa doc_ref
-      documento_entrega: showBillingStatus ? docRef : undefined, // Beneficiamento usa doc_entrega
+      documento_ref: docRef,
+      documento_entrega: showBillingStatus ? docRef : undefined,
       observacoes: observacoes,
     };
 
@@ -233,7 +233,9 @@ const OrdemEntregas: React.FC<OrdemEntregasProps> = ({
                                         </td>
                                     )}
                                     <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-600">
-                                        {showBillingStatus ? entrega.documento_entrega || '-' : entrega.documento_ref || '-'}
+                                        {showBillingStatus
+                                          ? (entrega.documento_entrega || entrega.documento_ref || '-')
+                                          : (entrega.documento_ref || entrega.documento_entrega || '-')}
                                     </td>
                                     <td className="px-4 py-3 text-sm text-gray-500 truncate max-w-xs">
                                         {entrega.observacoes || '-'}

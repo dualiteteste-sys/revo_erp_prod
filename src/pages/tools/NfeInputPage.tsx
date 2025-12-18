@@ -15,6 +15,8 @@ import {
 } from '@/services/nfeInput';
 import { createRecebimentoFromXml, listRecebimentoItens, updateRecebimentoItemProduct } from '@/services/recebimento';
 import ItemAutocomplete from '@/components/os/ItemAutocomplete';
+import { getProductDetails } from '@/services/products';
+import { searchClients } from '@/services/partners';
 
 // Helper para acesso seguro a propriedades aninhadas
 const get = (obj: any, path: string, defaultValue: any = null) => {
@@ -30,7 +32,11 @@ const InfoItem: React.FC<{ label: string; value?: string | null }> = ({ label, v
   ) : null
 );
 
-export default function NfeInputPage() {
+type NfeInputPageProps = {
+  embedded?: boolean;
+};
+
+export default function NfeInputPage({ embedded }: NfeInputPageProps) {
   const { addToast } = useToast();
   const navigate = useNavigate();
 
@@ -44,6 +50,76 @@ export default function NfeInputPage() {
   const [importId, setImportId] = useState<string | null>(null);
   const [previewData, setPreviewData] = useState<PreviewResult | null>(null);
   const [manualMatches, setManualMatches] = useState<Record<string, { id: string, name: string }>>({}); // item_id -> { id, name }
+  const [creatingObItemId, setCreatingObItemId] = useState<string | null>(null);
+
+  const digitsOnly = (value?: string | null) => (value || '').replace(/\D/g, '');
+
+  const resolveClienteFromCnpj = async (cnpj?: string | null): Promise<{ id: string; nome: string; doc: string } | null> => {
+    const doc = digitsOnly(cnpj);
+    if (!doc) return null;
+
+    try {
+      const hits = await searchClients(doc, 5);
+      const exact = hits.find(h => digitsOnly(h.doc_unico) === doc) || hits[0];
+      if (!exact) return null;
+      return { id: exact.id, nome: exact.nome, doc: exact.doc_unico || doc };
+    } catch (e) {
+      console.warn('[NFE][CTA][resolveClienteFromCnpj] failed', e);
+      return null;
+    }
+  };
+
+  const handleCreateObFromItem = async (item: any) => {
+    if (!previewData) return;
+    const matchId: string | null = item.match_produto_id || manualMatches[item.item_id]?.id || null;
+    if (!matchId) {
+      addToast('Vincule o item a um produto antes de criar a OB.', 'warning');
+      return;
+    }
+
+    setCreatingObItemId(item.item_id);
+    try {
+      const produto = manualMatches[item.item_id]
+        ? { id: matchId, nome: manualMatches[item.item_id]?.name }
+        : await (async () => {
+          const details = await getProductDetails(matchId);
+          return { id: matchId, nome: details?.nome || 'Produto vinculado' };
+        })();
+
+      const clienteDoc = previewData.import?.emitente_cnpj || null;
+      const clienteNomeSugerido = previewData.import?.emitente_nome || null;
+      const clienteResolved = await resolveClienteFromCnpj(clienteDoc);
+
+      const numero = previewData.import?.numero || '';
+      const serie = previewData.import?.serie || '';
+      const chave = previewData.import?.chave_acesso || '';
+      const documentoRef = `NF-e ${numero}${serie ? `/${serie}` : ''}${chave ? ` — ${chave}` : ''}`.trim();
+
+      navigate('/app/industria/ordens?tipo=beneficiamento&new=1', {
+        state: {
+          prefill: {
+            clienteId: clienteResolved?.id || null,
+            clienteNome: clienteResolved?.nome || clienteNomeSugerido,
+            clienteDoc: clienteResolved?.doc || clienteDoc,
+            produtoId: produto.id,
+            produtoNome: produto.nome,
+            quantidade: typeof item.qcom === 'number' ? item.qcom : Number(item.qcom),
+            unidade: item.ucom || null,
+            documentoRef,
+            materialClienteNome: item.xprod || null,
+            materialClienteCodigo: item.cprod || null,
+            materialClienteUnidade: item.ucom || null,
+          },
+          source: { kind: 'nfe-beneficiamento', importId, itemId: item.item_id },
+        },
+      });
+    } catch (e: any) {
+      console.error(e);
+      addToast(e.message || 'Erro ao preparar a Ordem de Beneficiamento.', 'error');
+    } finally {
+      setCreatingObItemId(null);
+    }
+  };
 
   // Parsing do XML
   const onDrop = useCallback((acceptedFiles: File[]) => {
@@ -142,7 +218,9 @@ export default function NfeInputPage() {
       setPreviewData(preview);
 
       setStep('matching');
-      addToast('Nota registrada! Verifique os vínculos dos produtos.', 'success');
+      if (!embedded) {
+        addToast('Nota registrada! Verifique os vínculos dos produtos.', 'success');
+      }
     } catch (e: any) {
       console.error('[NFE_IMPORT_ERROR]', e);
 
@@ -216,8 +294,12 @@ export default function NfeInputPage() {
   // Renderização
   return (
     <div className="p-1">
-      <h1 className="text-3xl font-bold text-gray-800 mb-2">Entrada de Beneficiamento (NF-e)</h1>
-      <p className="text-gray-600 mb-6">Importe o XML da nota fiscal para registrar a entrada de insumos de terceiros.</p>
+      {!embedded && (
+        <>
+          <h1 className="text-3xl font-bold text-gray-800 mb-2">Entrada de Beneficiamento (NF-e)</h1>
+          <p className="text-gray-600 mb-6">Importe o XML da nota fiscal para registrar a entrada de insumos de terceiros.</p>
+        </>
+      )}
 
       {/* Stepper */}
       <div className="flex items-center mb-8 text-sm font-medium text-gray-500">
@@ -334,6 +416,7 @@ export default function NfeInputPage() {
                     <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">Qtd.</th>
                     <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Vínculo no Sistema</th>
                     <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">Status</th>
+                    <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">Ação</th>
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
@@ -398,6 +481,16 @@ export default function NfeInputPage() {
                               Pendente
                             </span>
                           )}
+                        </td>
+                        <td className="px-4 py-3 text-center">
+                          <button
+                            onClick={() => handleCreateObFromItem(item)}
+                            disabled={!isMatched || creatingObItemId === item.item_id}
+                            className="inline-flex items-center justify-center px-3 py-1.5 text-xs font-bold rounded-lg border border-blue-600 text-blue-700 hover:bg-blue-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                            title={isMatched ? 'Criar Ordem de Beneficiamento' : 'Vincule o produto para habilitar'}
+                          >
+                            {creatingObItemId === item.item_id ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Criar OB'}
+                          </button>
                         </td>
                       </tr>
                     );

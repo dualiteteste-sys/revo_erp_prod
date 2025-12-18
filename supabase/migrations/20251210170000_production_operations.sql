@@ -113,6 +113,7 @@ end;
 $function$;
 
 -- RPC: Registrar Evento (Start, Pause, Resume, Finish)
+DROP FUNCTION IF EXISTS public.industria_producao_registrar_evento(uuid, text);
 CREATE OR REPLACE FUNCTION public.industria_producao_registrar_evento(p_operacao_id uuid, p_tipo_evento text)
  RETURNS void
  LANGUAGE plpgsql

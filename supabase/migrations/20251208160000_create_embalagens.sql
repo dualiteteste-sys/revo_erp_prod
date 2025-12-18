@@ -1,5 +1,10 @@
 -- Create table for packaging types (Embalagens)
-CREATE TYPE public.tipo_embalagem_registry AS ENUM ('pacote_caixa', 'envelope', 'rolo_cilindro', 'outro');
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'tipo_embalagem_registry') THEN
+    CREATE TYPE public.tipo_embalagem_registry AS ENUM ('pacote_caixa', 'envelope', 'rolo_cilindro', 'outro');
+  END IF;
+END $$;
 
 CREATE TABLE IF NOT EXISTS public.embalagens (
     id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
@@ -26,6 +31,7 @@ ALTER TABLE public.embalagens ENABLE ROW LEVEL SECURITY;
 
 -- Policies
 -- 1. Read: Allow access to system defaults (empresa_id IS NULL) AND company-specific packaging
+DROP POLICY IF EXISTS "Enable read access for authenticated users" ON public.embalagens;
 CREATE POLICY "Enable read access for authenticated users" ON public.embalagens
     FOR SELECT
     TO authenticated
@@ -40,6 +46,7 @@ CREATE POLICY "Enable read access for authenticated users" ON public.embalagens
     );
 
 -- 2. Insert: Allow authenticated users to insert packaging for their own companies
+DROP POLICY IF EXISTS "Enable insert for authenticated users" ON public.embalagens;
 CREATE POLICY "Enable insert for authenticated users" ON public.embalagens
     FOR INSERT
     TO authenticated
@@ -52,6 +59,7 @@ CREATE POLICY "Enable insert for authenticated users" ON public.embalagens
     );
 
 -- 3. Update: Allow authenticated users to update packaging for their own companies
+DROP POLICY IF EXISTS "Enable update for authenticated users" ON public.embalagens;
 CREATE POLICY "Enable update for authenticated users" ON public.embalagens
     FOR UPDATE
     TO authenticated
@@ -71,6 +79,7 @@ CREATE POLICY "Enable update for authenticated users" ON public.embalagens
     );
 
 -- 4. Delete: Allow authenticated users to delete packaging for their own companies
+DROP POLICY IF EXISTS "Enable delete for authenticated users" ON public.embalagens;
 CREATE POLICY "Enable delete for authenticated users" ON public.embalagens
     FOR DELETE
     TO authenticated

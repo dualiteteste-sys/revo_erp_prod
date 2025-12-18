@@ -801,6 +801,20 @@ export async function pcpReplanejarCentroSobrecarga(
   });
 }
 
+export async function pcpReplanejarCentroSobrecargaApplySubset(
+  centroTrabalhoId: string,
+  dia: string,
+  operacaoIds: string[],
+  dataFinal?: string,
+): Promise<PcpReplanResult> {
+  return callRpc<PcpReplanResult>('pcp_replanejar_ct_sobrecarga_apply_subset', {
+    p_centro_id: centroTrabalhoId,
+    p_dia: dia,
+    p_operacao_ids: operacaoIds,
+    p_data_final: dataFinal || null,
+  });
+}
+
 export type PcpReplanPreviewRow = {
   operacao_id: string;
   ordem_id: string;

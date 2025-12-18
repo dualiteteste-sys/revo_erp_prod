@@ -50,6 +50,7 @@ CREATE POLICY "Acesso por empresa" ON public.industria_producao_apontamentos USI
 -- 2. RPCs
 
 -- RPC: Get Operacoes
+DROP FUNCTION IF EXISTS public.industria_producao_get_operacoes(uuid);
 CREATE OR REPLACE FUNCTION public.industria_producao_get_operacoes(p_ordem_id uuid)
 RETURNS TABLE (
     id uuid,

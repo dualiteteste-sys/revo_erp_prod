@@ -25,7 +25,7 @@ const DeleteProductModal: React.FC<DeleteProductModalProps> = ({ isOpen, onClose
             initial={{ scale: 0.95, y: 20 }}
             animate={{ scale: 1, y: 0 }}
             exit={{ scale: 0.95, y: 20 }}
-            className="bg-white rounded-2xl shadow-xl w-full max-w-md relative p-8"
+            className="bg-white rounded-2xl shadow-xl w-full min-w-[50vw] max-w-md relative p-8"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-start">

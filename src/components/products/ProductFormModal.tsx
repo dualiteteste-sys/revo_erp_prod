@@ -26,7 +26,7 @@ const ProductFormModal: React.FC<ProductFormModalProps> = ({ isOpen, onClose, on
             initial={{ scale: 0.95, y: 20 }}
             animate={{ scale: 1, y: 0 }}
             exit={{ scale: 0.95, y: 20 }}
-            className="bg-glass-200 border border-white/20 rounded-3xl shadow-2xl w-full max-w-2xl relative"
+            className="bg-glass-200 border border-white/20 rounded-3xl shadow-2xl w-full min-w-[50vw] max-w-2xl relative"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="p-8">

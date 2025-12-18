@@ -20,6 +20,7 @@ import {
   pcpApsResequenciarCentro,
   pcpApsSequenciarTodosCts,
   pcpReplanejarCentroSobrecarga,
+  pcpReplanejarCentroSobrecargaApplySubset,
   pcpReplanCentroSobrecargaPreview,
   setOperacaoApsLock,
   PcpAtpCtp,
@@ -145,6 +146,8 @@ export default function PcpDashboardPage() {
     peakDay?: string;
   }>({ open: false });
   const [replanPreviewReasonFilter, setReplanPreviewReasonFilter] = useState<string>('all');
+  const [replanPreviewSelectedOps, setReplanPreviewSelectedOps] = useState<Record<string, boolean>>({});
+  const [replanApplyingSubsetCtId, setReplanApplyingSubsetCtId] = useState<string | null>(null);
 
   const loadData = useCallback(async () => {
     setLoading(true);
@@ -608,6 +611,8 @@ export default function PcpDashboardPage() {
     setReplanPreviewingCtId(null);
     setReplanPreviewDetails({ open: false });
     setReplanPreviewReasonFilter('all');
+    setReplanPreviewSelectedOps({});
+    setReplanApplyingSubsetCtId(null);
     setReplanSelected(
       replanCandidates.reduce((acc, r) => {
         acc[r.centro_id] = true;
@@ -669,6 +674,12 @@ export default function PcpDashboardPage() {
     const existing = replanPreview[ctId]?.rows;
     if (existing?.length) {
       setReplanPreviewDetails({ open: true, ctId, ctNome, peakDay });
+      setReplanPreviewSelectedOps(
+        existing.reduce((acc, r) => {
+          if (r.can_move) acc[r.operacao_id] = true;
+          return acc;
+        }, {} as Record<string, boolean>)
+      );
       return;
     }
 
@@ -688,12 +699,57 @@ export default function PcpDashboardPage() {
 
       setReplanPreview((prev) => ({ ...prev, [ctId]: { rows, summary } }));
       setReplanPreviewDetails({ open: true, ctId, ctNome, peakDay });
+      setReplanPreviewSelectedOps(
+        rows.reduce((acc, r) => {
+          if (r.can_move) acc[r.operacao_id] = true;
+          return acc;
+        }, {} as Record<string, boolean>)
+      );
     } catch (e: any) {
       addToast(e?.message || 'Falha ao carregar detalhes do preview.', 'error');
     } finally {
       setReplanPreviewingCtId(null);
     }
   }, [addToast, endDate, replanPreview]);
+
+  const applyReplanSelectedOpsForCurrentCt = useCallback(async () => {
+    const ctId = replanPreviewDetails.ctId;
+    const ctNome = replanPreviewDetails.ctNome || 'CT';
+    const peakDay = replanPreviewDetails.peakDay;
+    if (!ctId || !peakDay) return;
+
+    const previewRows = replanPreview[ctId]?.rows || [];
+    const selectedIds = previewRows
+      .filter((r) => r.can_move && replanPreviewSelectedOps[r.operacao_id] === true)
+      .map((r) => r.operacao_id);
+
+    if (selectedIds.length === 0) {
+      addToast('Nenhuma operação movível selecionada.', 'warning');
+      return;
+    }
+
+    if (!confirm(`Aplicar replanejamento para ${selectedIds.length} operação(ões) selecionada(s) de ${ctNome}?`)) return;
+
+    setReplanApplyingSubsetCtId(ctId);
+    try {
+      const res = await pcpReplanejarCentroSobrecargaApplySubset(ctId, peakDay, selectedIds, endDate);
+      setReplanResults((prev) => ({ ...prev, [ctId]: res }));
+      const moved = Number(res?.moved ?? 0) || 0;
+      const remaining = Number(res?.remaining_overload_hours ?? 0) || 0;
+      addToast(
+        moved > 0
+          ? `Replanejamento aplicado: ${moved} operação(ões) movida(s).${remaining > 0.1 ? ` Restante ~${remaining.toFixed(1)}h.` : ''}`
+          : (res?.message || 'Nenhuma alteração aplicada.'),
+        moved > 0 ? 'success' : 'warning'
+      );
+      setReplanPreviewDetails({ open: false });
+      await loadData();
+    } catch (e: any) {
+      addToast(e?.message || 'Falha ao aplicar replanejamento (selecionadas).', 'error');
+    } finally {
+      setReplanApplyingSubsetCtId(null);
+    }
+  }, [addToast, endDate, loadData, replanPreview, replanPreviewDetails.ctId, replanPreviewDetails.ctNome, replanPreviewDetails.peakDay, replanPreviewSelectedOps]);
 
   const weeklySeries = useMemo(() => {
     const dailyMap = new Map<string, { label: string; carga: number; capacidade: number }>();
@@ -1262,6 +1318,9 @@ export default function PcpDashboardPage() {
             const peakDay = replanPreviewDetails.peakDay;
             const preview = ctId ? replanPreview[ctId] : undefined;
             const rows = preview?.rows || [];
+            const movableRows = rows.filter((r) => r.can_move);
+            const selectedMovableCount = movableRows.filter((r) => replanPreviewSelectedOps[r.operacao_id] === true).length;
+            const allMovableSelected = movableRows.length > 0 && movableRows.every((r) => replanPreviewSelectedOps[r.operacao_id] === true);
             const summary = preview?.summary;
             const filtered =
               replanPreviewReasonFilter === 'all'
@@ -1311,7 +1370,40 @@ export default function PcpDashboardPage() {
                     <option value="zero_hours">0h</option>
                     <option value="no_overload">Sem sobrecarga</option>
                   </select>
-                  <div className="ml-auto text-xs text-gray-500">
+                  <button
+                    type="button"
+                    className="ml-2 text-[11px] px-2 py-1 rounded-md border bg-white hover:bg-gray-50 disabled:opacity-50"
+                    disabled={!ctId || movableRows.length === 0}
+                    onClick={() => {
+                      setReplanPreviewSelectedOps(
+                        movableRows.reduce((acc, r) => {
+                          acc[r.operacao_id] = true;
+                          return acc;
+                        }, {} as Record<string, boolean>)
+                      );
+                    }}
+                    title="Seleciona todas as operações movíveis"
+                  >
+                    Selecionar movíveis
+                  </button>
+                  <button
+                    type="button"
+                    className="text-[11px] px-2 py-1 rounded-md border bg-white hover:bg-gray-50 disabled:opacity-50"
+                    disabled={!ctId || movableRows.length === 0}
+                    onClick={() => setReplanPreviewSelectedOps({})}
+                    title="Limpa a seleção"
+                  >
+                    Limpar
+                  </button>
+                  <button
+                    type="button"
+                    className="ml-auto px-3 py-1.5 rounded-md bg-amber-600 text-white hover:bg-amber-500 text-xs font-semibold disabled:opacity-50"
+                    disabled={!ctId || selectedMovableCount === 0 || replanApplying || (replanApplyingSubsetCtId === ctId)}
+                    onClick={applyReplanSelectedOpsForCurrentCt}
+                  >
+                    {replanApplyingSubsetCtId === ctId ? 'Aplicando…' : `Aplicar selecionadas (${selectedMovableCount})`}
+                  </button>
+                  <div className="text-xs text-gray-500">
                     {filtered.length}/{rows.length} operações
                   </div>
                 </div>
@@ -1321,6 +1413,27 @@ export default function PcpDashboardPage() {
                     <table className="min-w-full text-xs">
                       <thead className="bg-gray-50 text-gray-600">
                         <tr>
+                          <th className="px-3 py-2 text-left w-[1%]">
+                            <input
+                              type="checkbox"
+                              disabled={movableRows.length === 0}
+                              checked={allMovableSelected}
+                              onChange={(e) => {
+                                const checked = e.target.checked;
+                                if (!checked) {
+                                  setReplanPreviewSelectedOps({});
+                                  return;
+                                }
+                                setReplanPreviewSelectedOps(
+                                  movableRows.reduce((acc, r) => {
+                                    acc[r.operacao_id] = true;
+                                    return acc;
+                                  }, {} as Record<string, boolean>)
+                                );
+                              }}
+                              title="Selecionar todas as operações movíveis"
+                            />
+                          </th>
                           <th className="px-3 py-2 text-left">Ordem</th>
                           <th className="px-3 py-2 text-left">Produto</th>
                           <th className="px-3 py-2 text-right">Horas</th>
@@ -1342,6 +1455,17 @@ export default function PcpDashboardPage() {
                                   : 'bg-gray-50 text-gray-700 border-gray-200';
                           return (
                             <tr key={r.operacao_id} className="border-t">
+                              <td className="px-3 py-2">
+                                {r.can_move ? (
+                                  <input
+                                    type="checkbox"
+                                    checked={replanPreviewSelectedOps[r.operacao_id] === true}
+                                    onChange={(e) => setReplanPreviewSelectedOps((prevSel) => ({ ...prevSel, [r.operacao_id]: e.target.checked }))}
+                                    disabled={replanApplying || (replanApplyingSubsetCtId === ctId)}
+                                    title="Incluir na aplicação"
+                                  />
+                                ) : null}
+                              </td>
                               <td className="px-3 py-2 text-gray-900 font-medium">{r.ordem_numero ?? '—'}</td>
                               <td className="px-3 py-2 text-gray-700">{r.produto_nome || '—'}</td>
                               <td className="px-3 py-2 text-right text-gray-700">{formatHours(r.horas)}</td>
@@ -1357,7 +1481,7 @@ export default function PcpDashboardPage() {
                         })}
                         {filtered.length === 0 && (
                           <tr>
-                            <td colSpan={6} className="px-3 py-6 text-sm text-gray-500">
+                            <td colSpan={7} className="px-3 py-6 text-sm text-gray-500">
                               {rows.length === 0 ? 'Nenhuma operação retornada no preview.' : 'Nenhuma operação neste filtro.'}
                             </td>
                           </tr>

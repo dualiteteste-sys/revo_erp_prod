@@ -75,6 +75,18 @@ export async function deleteMaterialCliente(id: string): Promise<void> {
  * Se não existir, cria um automaticamente.
  */
 export async function ensureMaterialCliente(clienteId: string, produtoId: string, produtoNome: string, unidade: string): Promise<string> {
+  // Back-compat overload: if produtoNome/unidade represent the internal product, callers can pass
+  // a "customer name/code" via the optional 5th arg below.
+  return ensureMaterialClienteV2(clienteId, produtoId, produtoNome, unidade);
+}
+
+export async function ensureMaterialClienteV2(
+  clienteId: string,
+  produtoId: string,
+  produtoNome: string,
+  unidade: string,
+  opts?: { codigoCliente?: string | null; nomeCliente?: string | null }
+): Promise<string> {
   // 1. Tenta encontrar existente
   const { data } = await listMateriaisCliente(undefined, clienteId, true, 1, 100);
   const existing = data.find(m => m.produto_id === produtoId);
@@ -87,8 +99,8 @@ export async function ensureMaterialCliente(clienteId: string, produtoId: string
   const payload: MaterialClientePayload = {
     cliente_id: clienteId,
     produto_id: produtoId,
-    nome_cliente: produtoNome, // Usa o nome interno como padrão
-    codigo_cliente: null,      // Sem código específico por enquanto
+    nome_cliente: (opts?.nomeCliente ?? produtoNome) || produtoNome,
+    codigo_cliente: opts?.codigoCliente ?? null,
     unidade: unidade,
     ativo: true,
     observacoes: 'Gerado automaticamente via Ordem de Beneficiamento'
