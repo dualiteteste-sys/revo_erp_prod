@@ -72,8 +72,17 @@ CREATE INDEX IF NOT EXISTS idx_pessoas_nome ON public.pessoas(empresa_id, nome);
 CREATE INDEX IF NOT EXISTS idx_pessoas_doc ON public.pessoas(empresa_id, doc_unico);
 
 -- 5. Triggers
-CREATE TRIGGER handle_updated_at_pessoas
-BEFORE UPDATE ON public.pessoas
-FOR EACH ROW EXECUTE FUNCTION public.tg_set_updated_at();
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_trigger
+    WHERE tgname = 'handle_updated_at_pessoas'
+      AND tgrelid = 'public.pessoas'::regclass
+  ) THEN
+    CREATE TRIGGER handle_updated_at_pessoas
+      BEFORE UPDATE ON public.pessoas
+      FOR EACH ROW EXECUTE FUNCTION public.tg_set_updated_at();
+  END IF;
+END $$;
 
 COMMIT;

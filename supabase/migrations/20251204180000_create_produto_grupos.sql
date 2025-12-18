@@ -19,6 +19,7 @@ add column if not exists "grupo_id" uuid references "public"."produto_grupos" ("
 alter table "public"."produto_grupos" enable row level security;
 
 -- Policies for produto_grupos
+drop policy if exists "produto_grupos_select" on "public"."produto_grupos";
 create policy "produto_grupos_select"
 on "public"."produto_grupos"
 as permissive
@@ -26,6 +27,7 @@ for select
 to public
 using ((empresa_id = public.current_empresa_id()));
 
+drop policy if exists "produto_grupos_insert" on "public"."produto_grupos";
 create policy "produto_grupos_insert"
 on "public"."produto_grupos"
 as permissive
@@ -33,6 +35,7 @@ for insert
 to public
 with check ((empresa_id = public.current_empresa_id()));
 
+drop policy if exists "produto_grupos_update" on "public"."produto_grupos";
 create policy "produto_grupos_update"
 on "public"."produto_grupos"
 as permissive
@@ -41,6 +44,7 @@ to public
 using ((empresa_id = public.current_empresa_id()))
 with check ((empresa_id = public.current_empresa_id()));
 
+drop policy if exists "produto_grupos_delete" on "public"."produto_grupos";
 create policy "produto_grupos_delete"
 on "public"."produto_grupos"
 as permissive

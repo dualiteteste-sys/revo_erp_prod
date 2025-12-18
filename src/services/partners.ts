@@ -150,7 +150,27 @@ export async function deletePartner(id: string): Promise<void> {
     await callRpc('delete_partner', { p_id: id });
   } catch (error: any) {
     console.error('[SERVICE][DELETE_PARTNER]', error);
-    throw new Error(error.message || 'Erro ao excluir o registro.');
+    const msg = String(error?.message || '');
+
+    if (
+      /HTTP_409/i.test(msg) &&
+      (/recebimentos_cliente_fkey/i.test(msg) || /on table \"recebimentos\"/i.test(msg))
+    ) {
+      throw new Error(
+        'Não é possível excluir este cliente porque ele está vinculado a um ou mais recebimentos. ' +
+          'Para manter o histórico do sistema, a exclusão é bloqueada. ' +
+          'Sugestão: edite o cliente e marque como inativo.'
+      );
+    }
+
+    if (/HTTP_409/i.test(msg) && /violates foreign key constraint/i.test(msg)) {
+      throw new Error(
+        'Não é possível excluir este registro porque existem dados vinculados a ele. ' +
+          'Para manter o histórico do sistema, a exclusão é bloqueada.'
+      );
+    }
+
+    throw new Error(msg || 'Erro ao excluir o registro.');
   }
 }
 

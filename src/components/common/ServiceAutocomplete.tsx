@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { listServices, Service } from '@/services/services';
 import { useDebounce } from '@/hooks/useDebounce';
-import { Loader2, Search, Wrench, Plus } from 'lucide-react';
+import { Loader2, Search, Wrench } from 'lucide-react';
 import Modal from '@/components/ui/Modal';
 import ProductFormPanel from '@/components/products/ProductFormPanel';
 import { saveProduct } from '@/services/products';
@@ -150,11 +150,11 @@ export default function ServiceAutocomplete({
         {!disabled && (
           <button
             onClick={() => setIsCreateModalOpen(true)}
-            className="p-3 bg-blue-100 text-blue-600 rounded-lg hover:bg-blue-200 transition-colors flex-shrink-0"
-            title="Novo Serviço"
+            className="px-4 py-3 bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200 transition-colors flex-shrink-0 text-sm font-semibold whitespace-nowrap"
+            title="Criar um novo cadastro. Para cliente já cadastrado, digite no campo de busca ao lado."
             type="button"
           >
-            <Plus size={20} />
+            Criar Novo
           </button>
         )}
       </div>

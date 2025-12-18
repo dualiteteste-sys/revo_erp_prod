@@ -25,9 +25,18 @@ DROP POLICY IF EXISTS industria_mrp_parametros_policy ON public.industria_mrp_pa
 CREATE POLICY industria_mrp_parametros_policy ON public.industria_mrp_parametros
     USING (empresa_id = public.current_empresa_id());
 
-CREATE TRIGGER industria_mrp_parametros_updated_at
-BEFORE UPDATE ON public.industria_mrp_parametros
-FOR EACH ROW EXECUTE FUNCTION public.tg_set_updated_at();
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_trigger
+    WHERE tgname = 'industria_mrp_parametros_updated_at'
+      AND tgrelid = 'public.industria_mrp_parametros'::regclass
+  ) THEN
+    CREATE TRIGGER industria_mrp_parametros_updated_at
+      BEFORE UPDATE ON public.industria_mrp_parametros
+      FOR EACH ROW EXECUTE FUNCTION public.tg_set_updated_at();
+  END IF;
+END $$;
 
 -- 2) Demand snapshot table
 CREATE TABLE IF NOT EXISTS public.industria_mrp_demandas (
@@ -57,9 +66,18 @@ DROP POLICY IF EXISTS industria_mrp_demandas_policy ON public.industria_mrp_dema
 CREATE POLICY industria_mrp_demandas_policy ON public.industria_mrp_demandas
     USING (empresa_id = public.current_empresa_id());
 
-CREATE TRIGGER industria_mrp_demandas_updated_at
-BEFORE UPDATE ON public.industria_mrp_demandas
-FOR EACH ROW EXECUTE FUNCTION public.tg_set_updated_at();
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_trigger
+    WHERE tgname = 'industria_mrp_demandas_updated_at'
+      AND tgrelid = 'public.industria_mrp_demandas'::regclass
+  ) THEN
+    CREATE TRIGGER industria_mrp_demandas_updated_at
+      BEFORE UPDATE ON public.industria_mrp_demandas
+      FOR EACH ROW EXECUTE FUNCTION public.tg_set_updated_at();
+  END IF;
+END $$;
 
 CREATE INDEX IF NOT EXISTS idx_mrp_demandas_status ON public.industria_mrp_demandas(empresa_id, status);
 CREATE INDEX IF NOT EXISTS idx_mrp_demandas_produto ON public.industria_mrp_demandas(empresa_id, produto_id);
@@ -281,6 +299,7 @@ END;
 $$;
 
 -- 6) Demand listing
+DROP FUNCTION IF EXISTS public.mrp_list_demandas(text);
 CREATE OR REPLACE FUNCTION public.mrp_list_demandas(p_status text DEFAULT NULL)
 RETURNS TABLE (
     id uuid,

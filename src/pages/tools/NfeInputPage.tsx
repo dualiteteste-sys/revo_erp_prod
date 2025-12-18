@@ -218,7 +218,9 @@ export default function NfeInputPage({ embedded }: NfeInputPageProps) {
       setPreviewData(preview);
 
       setStep('matching');
-      addToast('Nota registrada! Verifique os vínculos dos produtos.', 'success');
+      if (!embedded) {
+        addToast('Nota registrada! Verifique os vínculos dos produtos.', 'success');
+      }
     } catch (e: any) {
       console.error('[NFE_IMPORT_ERROR]', e);
 

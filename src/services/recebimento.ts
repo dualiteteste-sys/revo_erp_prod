@@ -8,6 +8,8 @@ export type Recebimento = {
     empresa_id: string;
     fiscal_nfe_import_id: string;
     status: RecebimentoStatus;
+    classificacao?: 'estoque_proprio' | 'material_cliente' | null;
+    cliente_id?: string | null;
     data_recebimento: string;
     responsavel_id: string | null;
     observacao: string | null;
@@ -126,6 +128,62 @@ export async function conferirItem(itemId: string, quantidade: number): Promise<
 
 export async function finalizarRecebimento(id: string): Promise<{ status: string; message: string }> {
     return callRpc('finalizar_recebimento', { p_recebimento_id: id });
+}
+
+export type FinalizarRecebimentoResult = {
+    status: string;
+    message: string;
+    materiais_cliente_sync?: {
+        status?: string;
+        reason?: string;
+        error?: string;
+        upserted?: number;
+        cliente_id?: string;
+    };
+};
+
+export async function finalizarRecebimentoV2(id: string): Promise<FinalizarRecebimentoResult> {
+    return callRpc('finalizar_recebimento', { p_recebimento_id: id });
+}
+
+export async function setRecebimentoClassificacao(
+    recebimentoId: string,
+    classificacao: 'estoque_proprio' | 'material_cliente',
+    clienteId?: string | null
+): Promise<{ status: string; classificacao: string; cliente_id?: string | null }> {
+    return callRpc('recebimento_set_classificacao', {
+        p_recebimento_id: recebimentoId,
+        p_classificacao: classificacao,
+        p_cliente_id: clienteId ?? null,
+    });
+}
+
+export async function syncMateriaisClienteFromRecebimento(
+    recebimentoId: string
+): Promise<{ status: string; reason?: string; error?: string; upserted?: number; cliente_id?: string }> {
+    try {
+        return await callRpc('recebimento_sync_materiais_cliente', { p_recebimento_id: recebimentoId });
+    } catch (e: any) {
+        const msg = String(e?.message || '');
+        if (/no unique or exclusion constraint matching the ON CONFLICT specification/i.test(msg)) {
+            throw new Error(
+                'O banco de dados ainda não está com o índice necessário para sincronizar Materiais de Clientes. ' +
+                    'Atualize as migrations do Supabase e tente novamente.'
+            );
+        }
+        throw e;
+    }
+}
+
+export async function deleteRecebimento(recebimentoId: string, opts?: { force?: boolean }): Promise<void> {
+    await callRpc('recebimento_delete', { p_recebimento_id: recebimentoId, p_force: opts?.force ?? false });
+}
+
+export async function cancelarRecebimento(recebimentoId: string, motivo?: string | null): Promise<{ status: string }> {
+    return callRpc('recebimento_cancelar', {
+        p_recebimento_id: recebimentoId,
+        p_motivo: motivo ?? null,
+    });
 }
 
 export async function updateRecebimentoItemProduct(itemId: string, productId: string | null): Promise<void> {

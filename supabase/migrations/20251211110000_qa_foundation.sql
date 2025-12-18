@@ -37,16 +37,27 @@ CREATE TABLE IF NOT EXISTS public.industria_qualidade_motivos (
 
 ALTER TABLE public.industria_qualidade_motivos ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "Enable read access for all users" ON public.industria_qualidade_motivos;
 CREATE POLICY "Enable read access for all users" ON public.industria_qualidade_motivos
     FOR SELECT USING (empresa_id = public.current_empresa_id());
 
+DROP POLICY IF EXISTS "Enable all access for authenticated users" ON public.industria_qualidade_motivos;
 CREATE POLICY "Enable all access for authenticated users" ON public.industria_qualidade_motivos
     FOR ALL USING (empresa_id = public.current_empresa_id());
 
 -- Trigger for updated_at
-CREATE TRIGGER handle_updated_at_qualidade_motivos
-BEFORE UPDATE ON public.industria_qualidade_motivos
-FOR EACH ROW EXECUTE FUNCTION public.tg_set_updated_at();
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_trigger
+    WHERE tgname = 'handle_updated_at_qualidade_motivos'
+      AND tgrelid = 'public.industria_qualidade_motivos'::regclass
+  ) THEN
+    CREATE TRIGGER handle_updated_at_qualidade_motivos
+      BEFORE UPDATE ON public.industria_qualidade_motivos
+      FOR EACH ROW EXECUTE FUNCTION public.tg_set_updated_at();
+  END IF;
+END $$;
 
 
 -- 3. RPC: Get Motives

@@ -180,9 +180,11 @@ CREATE TABLE IF NOT EXISTS public.estoque_movimentos (
 
 ALTER TABLE public.estoque_movimentos ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "Enable read access for all users" ON public.estoque_movimentos;
 CREATE POLICY "Enable read access for all users" ON public.estoque_movimentos
     FOR SELECT USING (empresa_id = public.current_empresa_id());
 
+DROP POLICY IF EXISTS "Enable insert for authenticated users only" ON public.estoque_movimentos;
 CREATE POLICY "Enable insert for authenticated users only" ON public.estoque_movimentos
     FOR INSERT WITH CHECK (empresa_id = public.current_empresa_id());
 
@@ -211,6 +213,7 @@ CREATE TABLE IF NOT EXISTS public.industria_producao_ordens (
 );
 
 ALTER TABLE public.industria_producao_ordens ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Enable all access" ON public.industria_producao_ordens;
 CREATE POLICY "Enable all access" ON public.industria_producao_ordens USING (empresa_id = public.current_empresa_id());
 
 CREATE TABLE IF NOT EXISTS public.industria_producao_componentes (
@@ -226,6 +229,7 @@ CREATE TABLE IF NOT EXISTS public.industria_producao_componentes (
 );
 
 ALTER TABLE public.industria_producao_componentes ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Enable all access" ON public.industria_producao_componentes;
 CREATE POLICY "Enable all access" ON public.industria_producao_componentes USING (empresa_id = public.current_empresa_id());
 
 -- 5.1 Centros de Trabalho (Missing in baseline)
@@ -244,6 +248,7 @@ CREATE TABLE IF NOT EXISTS public.industria_centros_trabalho (
     capacidade_horas_dia numeric(15,4) DEFAULT 8
 );
 ALTER TABLE public.industria_centros_trabalho ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Enable all access" ON public.industria_centros_trabalho;
 CREATE POLICY "Enable all access" ON public.industria_centros_trabalho USING (empresa_id = public.current_empresa_id());
 
 -- 5.2 Roteiros de Produção (Missing in baseline)
@@ -260,6 +265,7 @@ CREATE TABLE IF NOT EXISTS public.industria_roteiros (
     updated_at timestamptz DEFAULT now()
 );
 ALTER TABLE public.industria_roteiros ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Enable all access" ON public.industria_roteiros;
 CREATE POLICY "Enable all access" ON public.industria_roteiros USING (empresa_id = public.current_empresa_id());
 
 -- 5.3 Etapas do Roteiro (Missing in baseline)
@@ -277,6 +283,7 @@ CREATE TABLE IF NOT EXISTS public.industria_roteiros_etapas (
     updated_at timestamptz DEFAULT now()
 );
 ALTER TABLE public.industria_roteiros_etapas ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Enable all access" ON public.industria_roteiros_etapas;
 CREATE POLICY "Enable all access" ON public.industria_roteiros_etapas USING (empresa_id = public.current_empresa_id());
 
 
@@ -295,15 +302,19 @@ CREATE TABLE IF NOT EXISTS public.industria_reservas (
 
 ALTER TABLE public.industria_reservas ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "Enable read access for all users" ON public.industria_reservas;
 CREATE POLICY "Enable read access for all users" ON public.industria_reservas
     FOR SELECT USING (empresa_id = public.current_empresa_id());
 
+DROP POLICY IF EXISTS "Enable insert for authenticated users only" ON public.industria_reservas;
 CREATE POLICY "Enable insert for authenticated users only" ON public.industria_reservas
     FOR INSERT WITH CHECK (empresa_id = public.current_empresa_id());
 
+DROP POLICY IF EXISTS "Enable update for authenticated users only" ON public.industria_reservas;
 CREATE POLICY "Enable update for authenticated users only" ON public.industria_reservas
     FOR UPDATE USING (empresa_id = public.current_empresa_id());
 
+DROP POLICY IF EXISTS "Enable delete for authenticated users only" ON public.industria_reservas;
 CREATE POLICY "Enable delete for authenticated users only" ON public.industria_reservas
     FOR DELETE USING (empresa_id = public.current_empresa_id());
 
@@ -312,10 +323,28 @@ CREATE POLICY "Enable delete for authenticated users only" ON public.industria_r
 -- ADD COLUMN IF NOT EXISTS quantidade_reservada numeric(15,4) DEFAULT 0;
 
 -- Trigger to update updated_at on new tables
-CREATE TRIGGER handle_updated_at_estoque_lotes 
-BEFORE UPDATE ON public.estoque_lotes 
-FOR EACH ROW EXECUTE FUNCTION public.tg_set_updated_at();
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_trigger
+    WHERE tgname = 'handle_updated_at_estoque_lotes'
+      AND tgrelid = 'public.estoque_lotes'::regclass
+  ) THEN
+    CREATE TRIGGER handle_updated_at_estoque_lotes
+      BEFORE UPDATE ON public.estoque_lotes
+      FOR EACH ROW EXECUTE FUNCTION public.tg_set_updated_at();
+  END IF;
+END $$;
 
-CREATE TRIGGER handle_updated_at_industria_reservas 
-BEFORE UPDATE ON public.industria_reservas 
-FOR EACH ROW EXECUTE FUNCTION public.tg_set_updated_at();
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_trigger
+    WHERE tgname = 'handle_updated_at_industria_reservas'
+      AND tgrelid = 'public.industria_reservas'::regclass
+  ) THEN
+    CREATE TRIGGER handle_updated_at_industria_reservas
+      BEFORE UPDATE ON public.industria_reservas
+      FOR EACH ROW EXECUTE FUNCTION public.tg_set_updated_at();
+  END IF;
+END $$;

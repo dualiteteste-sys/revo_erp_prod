@@ -48,7 +48,7 @@ const Modal: React.FC<ModalProps> = ({ isOpen, onClose, children, title, size = 
             animate={{ scale: 1, y: 0 }}
             exit={{ scale: 0.95, y: 20 }}
             transition={{ type: 'spring', stiffness: 300, damping: 30 }}
-            className={`w-full h-full max-h-[95vh] flex flex-col relative ${sizeClasses[size]}`}
+            className={`w-full min-w-[50vw] h-full max-h-[95vh] flex flex-col relative ${sizeClasses[size]}`}
             onClick={(e) => e.stopPropagation()}
           >
             <GlassCard className="h-full flex flex-col overflow-hidden">

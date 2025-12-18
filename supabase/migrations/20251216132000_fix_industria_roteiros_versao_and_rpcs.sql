@@ -47,6 +47,10 @@ begin
 end $$;
 
 -- 2) RPC: Listar roteiros (versao text)
+-- OBS: em alguns ambientes a função existe com OUT params diferentes; `create or replace`
+-- não permite mudar o return type, então fazemos DROP antes para manter idempotência.
+drop function if exists public.industria_roteiros_list(text, uuid, text, boolean);
+drop function if exists public.industria_roteiros_list(text, uuid, text, boolean, int, int);
 create or replace function public.industria_roteiros_list(
   p_search     text    default null,
   p_produto_id uuid    default null,
@@ -112,6 +116,7 @@ revoke all on function public.industria_roteiros_list from public;
 grant execute on function public.industria_roteiros_list to authenticated, service_role;
 
 -- 3) RPC: Upsert (versao text)
+drop function if exists public.industria_roteiros_upsert(jsonb);
 create or replace function public.industria_roteiros_upsert(
   p_payload jsonb
 )
@@ -223,4 +228,3 @@ grant execute on function public.industria_roteiros_upsert to authenticated, ser
 notify pgrst, 'reload schema';
 
 commit;
-

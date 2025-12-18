@@ -1,12 +1,23 @@
 import React, { useState, useEffect } from 'react';
-import { listRecebimentos, Recebimento } from '@/services/recebimento';
+import { cancelarRecebimento, deleteRecebimento, listRecebimentos, Recebimento } from '@/services/recebimento';
 import { useNavigate } from 'react-router-dom';
-import { Loader2, PackageCheck, AlertTriangle, CheckCircle, Clock, Plus, FileText } from 'lucide-react';
+import { Loader2, PackageCheck, AlertTriangle, CheckCircle, Clock, FileText, Trash2, RotateCcw } from 'lucide-react';
+import { useToast } from '@/contexts/ToastProvider';
+import ConfirmationModal from '@/components/ui/ConfirmationModal';
+import Modal from '@/components/ui/Modal';
 
 export default function RecebimentoListPage() {
     const [recebimentos, setRecebimentos] = useState<Recebimento[]>([]);
     const [loading, setLoading] = useState(true);
     const navigate = useNavigate();
+    const { addToast } = useToast();
+    const [isDeleteOpen, setIsDeleteOpen] = useState(false);
+    const [deleting, setDeleting] = useState(false);
+    const [toDelete, setToDelete] = useState<Recebimento | null>(null);
+    const [isCancelOpen, setIsCancelOpen] = useState(false);
+    const [canceling, setCanceling] = useState(false);
+    const [toCancel, setToCancel] = useState<Recebimento | null>(null);
+    const [cancelMotivo, setCancelMotivo] = useState('');
 
     useEffect(() => {
         loadData();
@@ -30,7 +41,57 @@ export default function RecebimentoListPage() {
             case 'em_conferencia': return <span className="bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded-full flex items-center gap-1"><PackageCheck size={12} /> Em Conferência</span>;
             case 'divergente': return <span className="bg-red-100 text-red-800 text-xs px-2 py-1 rounded-full flex items-center gap-1"><AlertTriangle size={12} /> Divergente</span>;
             case 'concluido': return <span className="bg-green-100 text-green-800 text-xs px-2 py-1 rounded-full flex items-center gap-1"><CheckCircle size={12} /> Concluído</span>;
+            case 'cancelado': return <span className="bg-orange-100 text-orange-800 text-xs px-2 py-1 rounded-full flex items-center gap-1"><AlertTriangle size={12} /> Cancelado</span>;
             default: return <span className="bg-gray-100 text-gray-800 text-xs px-2 py-1 rounded-full">{status}</span>;
+        }
+    };
+
+    const openDelete = (rec: Recebimento) => {
+        setToDelete(rec);
+        setIsDeleteOpen(true);
+    };
+
+    const openCancel = (rec: Recebimento) => {
+        setToCancel(rec);
+        setCancelMotivo('');
+        setIsCancelOpen(true);
+    };
+
+    const confirmDelete = async () => {
+        if (!toDelete) return;
+        if (toDelete.status === 'concluido') {
+            addToast('Recebimento concluído não pode ser excluído.', 'warning');
+            setIsDeleteOpen(false);
+            setToDelete(null);
+            return;
+        }
+        setDeleting(true);
+        try {
+            await deleteRecebimento(toDelete.id);
+            addToast('Recebimento excluído com sucesso.', 'success');
+            setIsDeleteOpen(false);
+            setToDelete(null);
+            loadData();
+        } catch (e: any) {
+            addToast(e.message || 'Erro ao excluir recebimento.', 'error');
+        } finally {
+            setDeleting(false);
+        }
+    };
+
+    const confirmCancel = async () => {
+        if (!toCancel) return;
+        setCanceling(true);
+        try {
+            await cancelarRecebimento(toCancel.id, cancelMotivo);
+            addToast('Recebimento cancelado (estorno aplicado).', 'success');
+            setIsCancelOpen(false);
+            setToCancel(null);
+            loadData();
+        } catch (e: any) {
+            addToast(e.message || 'Erro ao cancelar recebimento.', 'error');
+        } finally {
+            setCanceling(false);
         }
     };
 
@@ -100,12 +161,31 @@ export default function RecebimentoListPage() {
                                             {getStatusBadge(rec.status)}
                                         </td>
                                         <td className="px-6 py-4 text-right">
-                                            <button
-                                                onClick={() => navigate(`/app/suprimentos/recebimento/${rec.id}`)}
-                                                className="text-blue-600 hover:text-blue-800 font-medium text-sm hover:underline"
-                                            >
-                                                {rec.status === 'concluido' ? 'Visualizar' : 'Conferir'}
-                                            </button>
+                                            <div className="flex items-center justify-end gap-3">
+                                                <button
+                                                    onClick={() => navigate(`/app/suprimentos/recebimento/${rec.id}`)}
+                                                    className="text-blue-600 hover:text-blue-800 font-medium text-sm hover:underline"
+                                                >
+                                                    {rec.status === 'concluido' || rec.status === 'cancelado' ? 'Visualizar' : 'Conferir'}
+                                                </button>
+                                                {rec.status === 'concluido' ? (
+                                                    <button
+                                                        onClick={() => openCancel(rec)}
+                                                        className="text-gray-400 hover:text-orange-600 transition-colors flex items-center gap-1"
+                                                        title="Cancelar (estornar) recebimento"
+                                                    >
+                                                        <RotateCcw size={16} />
+                                                    </button>
+                                                ) : rec.status === 'cancelado' ? null : (
+                                                    <button
+                                                        onClick={() => openDelete(rec)}
+                                                        className="text-gray-400 hover:text-red-600 transition-colors"
+                                                        title="Excluir recebimento"
+                                                    >
+                                                        <Trash2 size={16} />
+                                                    </button>
+                                                )}
+                                            </div>
                                         </td>
                                     </tr>
                                 ))
@@ -114,6 +194,64 @@ export default function RecebimentoListPage() {
                     </table>
                 </div>
             </div>
+
+            <ConfirmationModal
+                isOpen={isDeleteOpen}
+                onClose={() => setIsDeleteOpen(false)}
+                onConfirm={confirmDelete}
+                title="Excluir recebimento"
+                description={
+                    toDelete?.status === 'concluido'
+                        ? 'Este recebimento está concluído e, por padrão, não pode ser excluído.'
+                        : `Tem certeza que deseja excluir o recebimento ${toDelete?.fiscal_nfe_imports?.numero ? `NF ${toDelete.fiscal_nfe_imports.numero}/${toDelete.fiscal_nfe_imports.serie}` : ''}?`
+                }
+                confirmText={toDelete?.status === 'concluido' ? 'Entendi' : 'Excluir'}
+                isLoading={deleting}
+                variant="danger"
+            />
+
+            <Modal
+                isOpen={isCancelOpen}
+                onClose={() => setIsCancelOpen(false)}
+                title="Cancelar recebimento (estorno)"
+                size="md"
+            >
+                <div className="p-6 space-y-4">
+                    <p className="text-sm text-gray-700">
+                        Este recebimento está <b>concluído</b>. Ao cancelar, o sistema gera <b>estornos</b> para reverter a entrada no estoque e
+                        marca o recebimento como <b>cancelado</b>.
+                    </p>
+
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Motivo (opcional)</label>
+                        <textarea
+                            value={cancelMotivo}
+                            onChange={(e) => setCancelMotivo(e.target.value)}
+                            rows={4}
+                            className="w-full rounded-lg border border-gray-200 bg-white/70 p-3 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            placeholder="Ex.: NF-e importada errada / fornecedor incorreto / quantidade incorreta..."
+                        />
+                    </div>
+
+                    <div className="flex justify-end gap-2 pt-2">
+                        <button
+                            onClick={() => setIsCancelOpen(false)}
+                            className="rounded-md border border-gray-300 bg-white py-2 px-4 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50"
+                            disabled={canceling}
+                        >
+                            Voltar
+                        </button>
+                        <button
+                            onClick={confirmCancel}
+                            disabled={canceling}
+                            className="flex items-center gap-2 bg-orange-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-orange-700 disabled:opacity-50"
+                        >
+                            {canceling ? <Loader2 className="animate-spin" size={18} /> : null}
+                            Cancelar recebimento
+                        </button>
+                    </div>
+                </div>
+            </Modal>
         </div>
     );
 }

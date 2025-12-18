@@ -11,11 +11,12 @@ import { Pessoa } from '../../services/partners';
 
 interface PartnerFormPanelProps {
   partner: PartnerDetails | null;
+  initialValues?: Partial<PartnerDetails>;
   onSaveSuccess: (savedPartner: PartnerDetails) => void;
   onClose: () => void;
 }
 
-const PartnerFormPanel: React.FC<PartnerFormPanelProps> = ({ partner, onSaveSuccess, onClose }) => {
+const PartnerFormPanel: React.FC<PartnerFormPanelProps> = ({ partner, initialValues, onSaveSuccess, onClose }) => {
   const { addToast } = useToast();
   const [isSaving, setIsSaving] = useState(false);
   const [formData, setFormData] = useState<Partial<PartnerDetails>>({});
@@ -28,9 +29,22 @@ const PartnerFormPanel: React.FC<PartnerFormPanelProps> = ({ partner, onSaveSucc
         contatos: partner.contatos || [],
       });
     } else {
-      setFormData({ tipo: 'cliente', tipo_pessoa: 'juridica', isento_ie: false, contribuinte_icms: '9', contato_tags: [], enderecos: [], contatos: [] });
+      const base: Partial<PartnerDetails> = {
+        tipo: 'cliente',
+        tipo_pessoa: 'juridica',
+        isento_ie: false,
+        contribuinte_icms: '9',
+        contato_tags: [],
+      };
+
+      const merged = { ...base, ...(initialValues || {}) } as Partial<PartnerDetails>;
+      setFormData({
+        ...merged,
+        enderecos: merged.enderecos || [],
+        contatos: merged.contatos || [],
+      });
     }
-  }, [partner]);
+  }, [partner, initialValues]);
 
   const handlePessoaChange = (field: keyof Pessoa, value: any) => {
     setFormData(prev => ({ ...prev, [field]: value }));

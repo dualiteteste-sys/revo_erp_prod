@@ -16,6 +16,7 @@ ALTER TABLE public.unidades_medida ENABLE ROW LEVEL SECURITY;
 
 -- Policies
 -- 1. Read: Allow access to system defaults (empresa_id IS NULL) AND company-specific units
+DROP POLICY IF EXISTS "Enable read access for authenticated users" ON public.unidades_medida;
 CREATE POLICY "Enable read access for authenticated users" ON public.unidades_medida
     FOR SELECT
     TO authenticated
@@ -26,6 +27,7 @@ CREATE POLICY "Enable read access for authenticated users" ON public.unidades_me
     );
 
 -- 2. Insert: Allow authenticated users to insert units for their own company
+DROP POLICY IF EXISTS "Enable insert for authenticated users" ON public.unidades_medida;
 CREATE POLICY "Enable insert for authenticated users" ON public.unidades_medida
     FOR INSERT
     TO authenticated
@@ -34,6 +36,7 @@ CREATE POLICY "Enable insert for authenticated users" ON public.unidades_medida
     );
 
 -- 3. Update: Allow authenticated users to update units for their own company
+DROP POLICY IF EXISTS "Enable update for authenticated users" ON public.unidades_medida;
 CREATE POLICY "Enable update for authenticated users" ON public.unidades_medida
     FOR UPDATE
     TO authenticated
@@ -45,6 +48,7 @@ CREATE POLICY "Enable update for authenticated users" ON public.unidades_medida
     );
 
 -- 4. Delete: Allow authenticated users to delete units for their own company
+DROP POLICY IF EXISTS "Enable delete for authenticated users" ON public.unidades_medida;
 CREATE POLICY "Enable delete for authenticated users" ON public.unidades_medida
     FOR DELETE
     TO authenticated
