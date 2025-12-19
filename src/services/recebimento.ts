@@ -115,7 +115,9 @@ export async function listRecebimentoItens(recebimentoId: string): Promise<Receb
     return data as RecebimentoItem[];
 }
 
-export async function createRecebimentoFromXml(importId: string): Promise<{ id: string; status: string }> {
+export type CreateRecebimentoFromXmlStatus = 'created' | 'exists' | 'reopened';
+
+export async function createRecebimentoFromXml(importId: string): Promise<{ id: string; status: CreateRecebimentoFromXmlStatus }> {
     return callRpc('create_recebimento_from_xml', { p_import_id: importId });
 }
 

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Loader2, Save, Play, ShieldAlert } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Loader2, Save, Play, ShieldAlert } from 'lucide-react';
 import {
   OrdemProducaoDetails,
   OrdemProducaoPayload,
@@ -30,9 +30,17 @@ interface Props {
   ordemId: string | null;
   onSaveSuccess: () => void;
   onClose: () => void;
+  allowTipoOrdemChange?: boolean;
+  onTipoOrdemChange?: (tipo: 'industrializacao' | 'beneficiamento') => void;
 }
 
-export default function ProducaoFormPanel({ ordemId, onSaveSuccess, onClose }: Props) {
+export default function ProducaoFormPanel({
+  ordemId,
+  onSaveSuccess,
+  onClose,
+  allowTipoOrdemChange,
+  onTipoOrdemChange,
+}: Props) {
   const { addToast } = useToast();
   const [loading, setLoading] = useState(!!ordemId);
   const [isSaving, setIsSaving] = useState(false);
@@ -40,6 +48,7 @@ export default function ProducaoFormPanel({ ordemId, onSaveSuccess, onClose }: P
   const [unidades, setUnidades] = useState<UnidadeMedida[]>([]);
   const [showClosureModal, setShowClosureModal] = useState(false);
   const [entregaBloqueada, setEntregaBloqueada] = useState<{ blocked: boolean; reason?: string } | null>(null);
+  const [wizardStep, setWizardStep] = useState<0 | 1 | 2>(0);
 
   const [formData, setFormData] = useState<Partial<OrdemProducaoDetails>>({
     status: 'rascunho',
@@ -134,6 +143,7 @@ export default function ProducaoFormPanel({ ordemId, onSaveSuccess, onClose }: P
       } else {
         addToast('Ordem salva.', 'success');
       }
+      onSaveSuccess();
       return saved.id;
     } catch (e: any) {
       addToast(e.message, 'error');
@@ -284,6 +294,12 @@ export default function ProducaoFormPanel({ ordemId, onSaveSuccess, onClose }: P
   if (loading) return <div className="flex justify-center p-8"><Loader2 className="animate-spin" /></div>;
 
   const isLocked = formData.status === 'concluida' || formData.status === 'cancelada';
+  const isWizard = !ordemId && !formData.id;
+
+  const canGoNextWizardStep = () => {
+    if (wizardStep === 0) return !!formData.produto_final_id && !!formData.quantidade_planejada && formData.quantidade_planejada > 0;
+    return true;
+  };
 
   return (
     <div className="flex flex-col h-full bg-white">
@@ -352,10 +368,56 @@ export default function ProducaoFormPanel({ ordemId, onSaveSuccess, onClose }: P
       <div className="flex-grow p-6 overflow-y-auto scrollbar-styled">
         {activeTab === 'dados' && (
           <>
+            {isWizard && (
+              <div className="mb-6 p-4 rounded-xl border border-blue-100 bg-blue-50">
+                <div className="flex items-center justify-between gap-4">
+                  <div>
+                    <div className="text-xs font-bold uppercase tracking-[0.12em] text-blue-700">Wizard de Industrialização</div>
+                    <div className="text-sm text-blue-900">
+                      Passo {wizardStep + 1} de 3 • {wizardStep === 0 ? 'Produto e quantidade' : wizardStep === 1 ? 'Programação e parâmetros' : 'Revisão'}
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    {[0, 1, 2].map((i) => (
+                      <div
+                        key={i}
+                        className={`h-2.5 w-12 rounded-full ${i <= wizardStep ? 'bg-blue-600' : 'bg-blue-200'}`}
+                      />
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
             <Section title="O que produzir?" description="Definição do produto e quantidades.">
               <div className="sm:col-span-2">
-                <Select label="Tipo de Ordem" name="tipo_ordem" value="industrializacao" disabled>
+                <Select
+                  label="Tipo de Ordem"
+                  name="tipo_ordem"
+                  value="industrializacao"
+                  disabled={!!formData.id || !allowTipoOrdemChange}
+                  onChange={(e) => {
+                    const nextTipo = e.target.value as 'industrializacao' | 'beneficiamento';
+                    if (nextTipo === 'industrializacao') return;
+                    if (!!formData.id || !allowTipoOrdemChange) return;
+
+                    const hasAnyData =
+                      !!formData.produto_final_id ||
+                      !!formData.quantidade_planejada ||
+                      !!formData.documento_ref ||
+                      !!formData.observacoes;
+
+                    if (hasAnyData) {
+                      const ok = window.confirm(
+                        'Trocar o tipo de ordem irá reiniciar os campos preenchidos nesta ordem.\n\nDeseja continuar?'
+                      );
+                      if (!ok) return;
+                    }
+
+                    onTipoOrdemChange?.(nextTipo);
+                  }}
+                >
                   <option value="industrializacao">Industrialização</option>
+                  <option value="beneficiamento">Beneficiamento</option>
                 </Select>
               </div>
               <div className="sm:col-span-4">
@@ -402,80 +464,83 @@ export default function ProducaoFormPanel({ ordemId, onSaveSuccess, onClose }: P
               </div>
             </Section>
 
-            <Section title="Programação" description="Prazos e status.">
-              <div className="sm:col-span-2">
-                <Select label="Status" name="status" value={formData.status} onChange={e => handleHeaderChange('status', e.target.value)} disabled={isLocked}>
-                  <option value="rascunho">Rascunho</option>
-                  <option value="planejada">Planejada</option>
-                  <option value="em_programacao">Em Programação</option>
-                  <option value="em_producao">Em Produção</option>
-                  <option value="em_inspecao">Em Inspeção</option>
-                  <option value="concluida">Concluída</option>
-                  <option value="cancelada">Cancelada</option>
-                </Select>
-              </div>
-              <div className="sm:col-span-2">
-                <Input
-                  label="Prioridade (0-100)"
-                  name="prioridade"
-                  type="number"
-                  value={formData.prioridade || 0}
-                  onChange={e => handleHeaderChange('prioridade', parseInt(e.target.value))}
-                  disabled={isLocked}
-                />
-              </div>
-              <div className="sm:col-span-2"></div>
+            {(!isWizard || wizardStep >= 1) && (
+              <>
+                <Section title="Programação" description="Prazos e status.">
+                  <div className="sm:col-span-2">
+                    <Select label="Status" name="status" value={formData.status} onChange={e => handleHeaderChange('status', e.target.value)} disabled={isLocked}>
+                      <option value="rascunho">Rascunho</option>
+                      <option value="planejada">Planejada</option>
+                      <option value="em_programacao">Em Programação</option>
+                      <option value="em_producao">Em Produção</option>
+                      <option value="em_inspecao">Em Inspeção</option>
+                      <option value="concluida">Concluída</option>
+                      <option value="cancelada">Cancelada</option>
+                    </Select>
+                  </div>
+                  <div className="sm:col-span-2">
+                    <Input
+                      label="Prioridade (0-100)"
+                      name="prioridade"
+                      type="number"
+                      value={formData.prioridade || 0}
+                      onChange={e => handleHeaderChange('prioridade', parseInt(e.target.value))}
+                      disabled={isLocked}
+                    />
+                  </div>
+                  <div className="sm:col-span-2"></div>
 
-              <Input label="Início Previsto" type="date" value={formData.data_prevista_inicio || ''} onChange={e => handleHeaderChange('data_prevista_inicio', e.target.value)} disabled={isLocked} className="sm:col-span-2" />
-              <Input label="Fim Previsto" type="date" value={formData.data_prevista_fim || ''} onChange={e => handleHeaderChange('data_prevista_fim', e.target.value)} disabled={isLocked} className="sm:col-span-2" />
-              <Input label="Entrega Prevista" type="date" value={formData.data_prevista_entrega || ''} onChange={e => handleHeaderChange('data_prevista_entrega', e.target.value)} disabled={isLocked} className="sm:col-span-2" />
-            </Section>
+                  <Input label="Início Previsto" type="date" value={formData.data_prevista_inicio || ''} onChange={e => handleHeaderChange('data_prevista_inicio', e.target.value)} disabled={isLocked} className="sm:col-span-2" />
+                  <Input label="Fim Previsto" type="date" value={formData.data_prevista_fim || ''} onChange={e => handleHeaderChange('data_prevista_fim', e.target.value)} disabled={isLocked} className="sm:col-span-2" />
+                  <Input label="Entrega Prevista" type="date" value={formData.data_prevista_entrega || ''} onChange={e => handleHeaderChange('data_prevista_entrega', e.target.value)} disabled={isLocked} className="sm:col-span-2" />
+                </Section>
 
-            <Section title="Parâmetros da OP" description="Configurações de produção.">
-              <div className="sm:col-span-2">
-                <Input
-                  label="Lote de Produção"
-                  name="lote"
-                  value={formData.lote_producao || ''}
-                  onChange={e => handleHeaderChange('lote_producao', e.target.value)}
-                  disabled={isLocked}
-                  placeholder="Ex: LOTE-2025-001"
-                />
-              </div>
-              <div className="sm:col-span-2">
-                <Select
-                  label="Reserva de Estoque"
-                  name="reserva"
-                  value={formData.reserva_modo || 'ao_liberar'}
-                  onChange={e => handleHeaderChange('reserva_modo', e.target.value)}
-                  disabled={isLocked}
-                >
-                  <option value="ao_liberar">Ao Liberar (Padrão)</option>
-                  <option value="ao_planejar">Ao Planejar</option>
-                  <option value="sem_reserva">Sem Reserva</option>
-                </Select>
-              </div>
-              <div className="sm:col-span-2">
-                <Input
-                  label="Tolerância Overrun (%)"
-                  name="overrun"
-                  type="number"
-                  min="0"
-                  max="10"
-                  value={formData.tolerancia_overrun_percent || 0}
-                  onChange={e => handleHeaderChange('tolerancia_overrun_percent', parseFloat(e.target.value))}
-                  disabled={isLocked}
-                />
-              </div>
+                <Section title="Parâmetros da OP" description="Configurações de produção.">
+                  <div className="sm:col-span-2">
+                    <Input
+                      label="Lote de Produção"
+                      name="lote"
+                      value={formData.lote_producao || ''}
+                      onChange={e => handleHeaderChange('lote_producao', e.target.value)}
+                      disabled={isLocked}
+                      placeholder="Ex: LOTE-2025-001"
+                    />
+                  </div>
+                  <div className="sm:col-span-2">
+                    <Select
+                      label="Reserva de Estoque"
+                      name="reserva"
+                      value={formData.reserva_modo || 'ao_liberar'}
+                      onChange={e => handleHeaderChange('reserva_modo', e.target.value)}
+                      disabled={isLocked}
+                    >
+                      <option value="ao_liberar">Ao Liberar (Padrão)</option>
+                      <option value="ao_planejar">Ao Planejar</option>
+                      <option value="sem_reserva">Sem Reserva</option>
+                    </Select>
+                  </div>
+                  <div className="sm:col-span-2">
+                    <Input
+                      label="Tolerância Overrun (%)"
+                      name="overrun"
+                      type="number"
+                      min="0"
+                      max="10"
+                      value={formData.tolerancia_overrun_percent || 0}
+                      onChange={e => handleHeaderChange('tolerancia_overrun_percent', parseFloat(e.target.value))}
+                      disabled={isLocked}
+                    />
+                  </div>
+                </Section>
+              </>
+            )}
 
-            </Section>
-
-
-
-            <Section title="Outros" description="Detalhes adicionais.">
-              <Input label="Ref. Documento" name="doc_ref" value={formData.documento_ref || ''} onChange={e => handleHeaderChange('documento_ref', e.target.value)} disabled={isLocked} className="sm:col-span-2" placeholder="Pedido, Lote..." />
-              <TextArea label="Observações" name="obs" value={formData.observacoes || ''} onChange={e => handleHeaderChange('observacoes', e.target.value)} rows={3} disabled={isLocked} className="sm:col-span-6" />
-            </Section>
+            {(!isWizard || wizardStep === 2) && (
+              <Section title="Outros" description="Detalhes adicionais.">
+                <Input label="Ref. Documento" name="doc_ref" value={formData.documento_ref || ''} onChange={e => handleHeaderChange('documento_ref', e.target.value)} disabled={isLocked} className="sm:col-span-2" placeholder="Pedido, Lote..." />
+                <TextArea label="Observações" name="obs" value={formData.observacoes || ''} onChange={e => handleHeaderChange('observacoes', e.target.value)} rows={3} disabled={isLocked} className="sm:col-span-6" />
+              </Section>
+            )}
           </>
         )
         }
@@ -613,14 +678,52 @@ export default function ProducaoFormPanel({ ordemId, onSaveSuccess, onClose }: P
             </button>
           )}
 
-          <button
-            onClick={handleSaveHeader}
-            disabled={isSaving || isLocked}
-            className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50"
-          >
-            <Save size={20} className="mr-2" />
-            Salvar
-          </button>
+          {!isLocked && !isWizard && (
+            <button
+              onClick={handleSaveHeader}
+              disabled={isSaving}
+              className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50"
+            >
+              <Save size={20} className="mr-2" />
+              Salvar
+            </button>
+          )}
+
+          {!isLocked && isWizard && (
+            <>
+              {wizardStep > 0 && (
+                <button
+                  type="button"
+                  onClick={() => setWizardStep(s => (s > 0 ? ((s - 1) as 0 | 1 | 2) : s))}
+                  className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                >
+                  <ArrowLeft size={18} className="mr-2" />
+                  Voltar
+                </button>
+              )}
+
+              {wizardStep < 2 ? (
+                <button
+                  type="button"
+                  disabled={!canGoNextWizardStep()}
+                  onClick={() => setWizardStep(s => (s < 2 ? ((s + 1) as 0 | 1 | 2) : s))}
+                  className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50"
+                >
+                  Próximo
+                  <ArrowRight size={18} className="ml-2" />
+                </button>
+              ) : (
+                <button
+                  onClick={handleSaveHeader}
+                  disabled={isSaving}
+                  className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50"
+                >
+                  <Save size={20} className="mr-2" />
+                  Salvar e continuar
+                </button>
+              )}
+            </>
+          )}
         </div>
       </div>
     </div >

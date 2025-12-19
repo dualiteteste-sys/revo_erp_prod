@@ -34,11 +34,21 @@ interface Props {
     materialClienteCodigo?: string | null;
     materialClienteUnidade?: string | null;
   };
+  allowTipoOrdemChange?: boolean;
+  onTipoOrdemChange?: (tipo: 'industrializacao' | 'beneficiamento') => void;
   onSaveSuccess: () => void;
   onClose: () => void;
 }
 
-export default function OrdemFormPanel({ ordemId, initialTipoOrdem, initialPrefill, onSaveSuccess, onClose }: Props) {
+export default function OrdemFormPanel({
+  ordemId,
+  initialTipoOrdem,
+  initialPrefill,
+  allowTipoOrdemChange,
+  onTipoOrdemChange,
+  onSaveSuccess,
+  onClose,
+}: Props) {
   const { addToast } = useToast();
   const navigate = useNavigate();
   const [loading, setLoading] = useState(!!ordemId);
@@ -242,6 +252,7 @@ export default function OrdemFormPanel({ ordemId, initialTipoOrdem, initialPrefi
       } else {
         addToast('Ordem salva.', 'success');
       }
+      onSaveSuccess();
       return saved.id;
     } catch (e: any) {
       addToast(e.message, 'error');
@@ -471,7 +482,36 @@ export default function OrdemFormPanel({ ordemId, initialTipoOrdem, initialPrefi
             )}
             <Section title="Planejamento" description="O que será produzido e para quem.">
               <div className="sm:col-span-2">
-                <Select label="Tipo de Ordem" name="tipo_ordem" value={formData.tipo_ordem} onChange={e => handleHeaderChange('tipo_ordem', e.target.value)} disabled={!!formData.id}>
+                <Select
+                  label="Tipo de Ordem"
+                  name="tipo_ordem"
+                  value={formData.tipo_ordem}
+                  onChange={e => {
+                    const nextTipo = e.target.value as 'industrializacao' | 'beneficiamento';
+                    if (nextTipo === formData.tipo_ordem) return;
+
+                    if (!allowTipoOrdemChange || formData.id || ordemId) return;
+
+                    const hasAnyData =
+                      !!formData.cliente_id ||
+                      !!formData.produto_final_id ||
+                      !!formData.quantidade_planejada ||
+                      !!formData.documento_ref ||
+                      !!formData.material_cliente_id ||
+                      !!formData.material_cliente_nome ||
+                      !!formData.material_cliente_codigo;
+
+                    if (hasAnyData) {
+                      const ok = window.confirm(
+                        'Trocar o tipo de ordem irá reiniciar os campos preenchidos nesta ordem.\n\nDeseja continuar?'
+                      );
+                      if (!ok) return;
+                    }
+
+                    onTipoOrdemChange?.(nextTipo);
+                  }}
+                  disabled={!!formData.id || !!ordemId || !allowTipoOrdemChange}
+                >
                   <option value="industrializacao">Industrialização</option>
                   <option value="beneficiamento">Beneficiamento</option>
                 </Select>

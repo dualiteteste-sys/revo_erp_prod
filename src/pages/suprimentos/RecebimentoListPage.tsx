@@ -163,7 +163,10 @@ export default function RecebimentoListPage() {
                                         <td className="px-6 py-4 text-right">
                                             <div className="flex items-center justify-end gap-3">
                                                 <button
-                                                    onClick={() => navigate(`/app/suprimentos/recebimento/${rec.id}`)}
+                                                    onClick={() => {
+                                                        const view = (rec.status === 'concluido' || rec.status === 'cancelado') ? '?view=details' : '';
+                                                        navigate(`/app/suprimentos/recebimento/${rec.id}${view}`);
+                                                    }}
                                                     className="text-blue-600 hover:text-blue-800 font-medium text-sm hover:underline"
                                                 >
                                                     {rec.status === 'concluido' || rec.status === 'cancelado' ? 'Visualizar' : 'Conferir'}

@@ -253,6 +253,9 @@ export default function MateriaisClientePage() {
       <ImportarXmlSuprimentosModal
         isOpen={isImportOpen}
         onClose={() => setIsImportOpen(false)}
+        onFinished={() => {
+          fetchMateriais();
+        }}
       />
 
       <Modal isOpen={isClassificarOpen} onClose={() => setIsClassificarOpen(false)} title="Classificar recebimento como Material do Cliente" size="md">
