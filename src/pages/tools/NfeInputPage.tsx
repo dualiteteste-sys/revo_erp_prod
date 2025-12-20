@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useDropzone } from 'react-dropzone';
 import { XMLParser } from 'fast-xml-parser';
@@ -13,10 +13,18 @@ import {
   PreviewResult,
   MatchItem
 } from '@/services/nfeInput';
-import { createRecebimentoFromXml, listRecebimentoItens, updateRecebimentoItemProduct } from '@/services/recebimento';
+import {
+  conferirItem,
+  createRecebimentoFromXml,
+  finalizarRecebimentoV2,
+  getRecebimento,
+  listRecebimentoItens,
+  setRecebimentoClassificacao,
+  updateRecebimentoItemProduct,
+} from '@/services/recebimento';
 import ItemAutocomplete from '@/components/os/ItemAutocomplete';
 import { getProductDetails } from '@/services/products';
-import { searchClients } from '@/services/partners';
+import { savePartner, searchClients } from '@/services/partners';
 
 // Helper para acesso seguro a propriedades aninhadas
 const get = (obj: any, path: string, defaultValue: any = null) => {
@@ -34,9 +42,11 @@ const InfoItem: React.FC<{ label: string; value?: string | null }> = ({ label, v
 
 type NfeInputPageProps = {
   embedded?: boolean;
+  onRecebimentoReady?: (params: { recebimentoId: string; status: 'created' | 'exists' | 'reopened' }) => void;
+  autoFinalizeMaterialCliente?: boolean;
 };
 
-export default function NfeInputPage({ embedded }: NfeInputPageProps) {
+export default function NfeInputPage({ embedded, onRecebimentoReady, autoFinalizeMaterialCliente }: NfeInputPageProps) {
   const { addToast } = useToast();
   const navigate = useNavigate();
 
@@ -45,14 +55,29 @@ export default function NfeInputPage({ embedded }: NfeInputPageProps) {
   const [nfeData, setNfeData] = useState<any | null>(null);
 
   // Estado do Processo
-  const [step, setStep] = useState<'upload' | 'review' | 'matching' | 'success'>('upload');
+  const [step, setStep] = useState<'upload' | 'review' | 'matching' | 'conferencia' | 'success'>('upload');
   const [loading, setLoading] = useState(false);
   const [importId, setImportId] = useState<string | null>(null);
+  const [recebimentoId, setRecebimentoId] = useState<string | null>(null);
   const [previewData, setPreviewData] = useState<PreviewResult | null>(null);
   const [manualMatches, setManualMatches] = useState<Record<string, { id: string, name: string }>>({}); // item_id -> { id, name }
   const [creatingObItemId, setCreatingObItemId] = useState<string | null>(null);
+  const [conferidas, setConferidas] = useState<Record<string, number>>({}); // item_id (fiscal) -> quantidade conferida
 
   const digitsOnly = (value?: string | null) => (value || '').replace(/\D/g, '');
+
+  useEffect(() => {
+    if (!previewData?.itens) return;
+    setConferidas((prev) => {
+      const next = { ...prev };
+      for (const it of previewData.itens) {
+        if (typeof next[it.item_id] !== 'number') {
+          next[it.item_id] = typeof it.qcom === 'number' ? it.qcom : Number(it.qcom);
+        }
+      }
+      return next;
+    });
+  }, [previewData]);
 
   const resolveClienteFromCnpj = async (cnpj?: string | null): Promise<{ id: string; nome: string; doc: string } | null> => {
     const doc = digitsOnly(cnpj);
@@ -66,6 +91,36 @@ export default function NfeInputPage({ embedded }: NfeInputPageProps) {
     } catch (e) {
       console.warn('[NFE][CTA][resolveClienteFromCnpj] failed', e);
       return null;
+    }
+  };
+
+  const ensureClienteFromNfe = async (): Promise<{ id: string; nome: string; doc: string } | null> => {
+    const doc = digitsOnly(previewData?.import?.emitente_cnpj || null);
+    const nome = (previewData?.import?.emitente_nome || '').trim() || 'Cliente (NF-e)';
+    if (!doc) return null;
+
+    const resolved = await resolveClienteFromCnpj(doc);
+    if (resolved) return resolved;
+
+    try {
+      const created = await savePartner({
+        pessoa: {
+          tipo: 'cliente',
+          tipo_pessoa: 'juridica',
+          nome,
+          fantasia: nome,
+          doc_unico: doc,
+        },
+        enderecos: [],
+        contatos: [],
+      });
+
+      return { id: created.id, nome: created.nome || nome, doc: created.doc_unico || doc };
+    } catch (e) {
+      // Se deu race/unique, tenta resolver novamente.
+      const retry = await resolveClienteFromCnpj(doc);
+      if (retry) return retry;
+      throw e;
     }
   };
 
@@ -247,44 +302,137 @@ export default function NfeInputPage({ embedded }: NfeInputPageProps) {
 
     setLoading(true);
     try {
-      // 1. Criar o Recebimento (Pré-Nota)
-      const { id: recebimentoId, status } = await createRecebimentoFromXml(importId);
-
-      if (status === 'exists') {
-        addToast('Já existe um recebimento para esta nota. Redirecionando...', 'info');
-        navigate(`/app/suprimentos/recebimento/${recebimentoId}`);
+      const missingQty = (previewData.itens || []).filter((it) => {
+        const qty = conferidas[it.item_id];
+        return typeof qty !== 'number' || Number.isNaN(qty);
+      });
+      if (missingQty.length > 0) {
+        addToast('Informe a quantidade conferida de todos os itens antes de concluir.', 'warning');
         return;
       }
 
+      // 1. Criar o Recebimento (Pré-Nota)
+      const { id: recebimentoId, status } = await createRecebimentoFromXml(importId);
+      setRecebimentoId(recebimentoId);
+
       // 2. Aplicar Matches Manuais (se houver)
-      const manualMatchKeys = Object.keys(manualMatches);
-      if (manualMatchKeys.length > 0) {
-        // Buscar itens criados para saber seus IDs
-        const itensCriados = await listRecebimentoItens(recebimentoId);
+      const itensCriados = await listRecebimentoItens(recebimentoId);
 
-        // Para cada match manual, encontrar o item correspondente e atualizar
-        const updatePromises = manualMatchKeys.map(async (fiscalItemId) => {
-          const match = manualMatches[fiscalItemId];
-          // Encontrar o item do recebimento que aponta para este item fiscal
-          const itemRecebimento = itensCriados.find(i => i.fiscal_nfe_item_id === fiscalItemId);
-
-          if (itemRecebimento) {
-            await updateRecebimentoItemProduct(itemRecebimento.id, match.id);
-          }
-        });
-
-        await Promise.all(updatePromises);
+      const matchByFiscalItemId: Record<string, string> = {};
+      for (const it of previewData.itens || []) {
+        const manual = manualMatches[it.item_id]?.id || null;
+        const auto = it.match_produto_id || null;
+        const resolved = manual || auto;
+        if (resolved) matchByFiscalItemId[it.item_id] = resolved;
       }
 
-      addToast('Recebimento criado com sucesso! Iniciando conferência...', 'success');
-      navigate(`/app/suprimentos/recebimento/${recebimentoId}`);
+      const missingMatches = (previewData.itens || []).filter((it) => !matchByFiscalItemId[it.item_id]);
+      if (missingMatches.length > 0) {
+        addToast('Há itens sem vínculo de produto. Vincule todos na etapa “Vínculos” antes de concluir.', 'warning');
+        return;
+      }
+
+      await Promise.all(
+        itensCriados.map(async (itemRecebimento) => {
+          const desiredProductId = matchByFiscalItemId[itemRecebimento.fiscal_nfe_item_id];
+          if (desiredProductId && itemRecebimento.produto_id !== desiredProductId) {
+            await updateRecebimentoItemProduct(itemRecebimento.id, desiredProductId);
+          }
+        })
+      );
+
+      const itensAtualizados = await listRecebimentoItens(recebimentoId);
+      const missingAfterUpdate = itensAtualizados.filter((it) => !it.produto_id);
+      if (missingAfterUpdate.length > 0) {
+        addToast('Ainda existem itens sem vínculo de produto. Verifique os vínculos e tente novamente.', 'warning');
+        return;
+      }
+
+      // Conferência: usa as quantidades informadas pelo usuário (ou default do XML)
+      await Promise.all(
+        itensAtualizados.map(async (item) => {
+          const fiscalItemId = item.fiscal_nfe_item_id;
+          const qty = conferidas[fiscalItemId];
+          await conferirItem(item.id, qty);
+        })
+      );
+
+      if (embedded && autoFinalizeMaterialCliente) {
+        const rec = await getRecebimento(recebimentoId);
+        if (rec.status === 'concluido') {
+          addToast('Recebimento já estava concluído.', 'info');
+          onRecebimentoReady?.({ recebimentoId, status });
+          setStep('success');
+          return;
+        }
+
+        const cliente = await ensureClienteFromNfe();
+        if (!cliente?.id) {
+          addToast('Não foi possível determinar/criar o cliente (emitente) do XML.', 'error');
+          return;
+        }
+
+        await setRecebimentoClassificacao(recebimentoId, 'material_cliente', cliente.id);
+        try {
+          const result = await finalizarRecebimentoV2(recebimentoId);
+
+          if (result?.status !== 'concluido') {
+            addToast(result?.message || 'Não foi possível concluir o recebimento automaticamente.', 'warning');
+            return;
+          }
+
+          addToast('Recebimento concluído e Materiais de Clientes sincronizados.', 'success');
+          onRecebimentoReady?.({ recebimentoId, status });
+          setStep('success');
+          return;
+        } catch (e: any) {
+          const msg = String(e?.message || '');
+          if (/sem mapeamento de produto/i.test(msg) || /Utilize preview e envie p_matches/i.test(msg)) {
+            addToast('Há itens sem vínculo de produto. Vincule todos na etapa “Vínculos” e tente novamente.', 'warning');
+            return;
+          }
+          throw e;
+        }
+      }
+
+      if (embedded) {
+        addToast(status === 'exists' ? 'Recebimento já existe para esta nota.' : 'Recebimento criado com sucesso!', 'success');
+        onRecebimentoReady?.({ recebimentoId, status });
+        setStep('success');
+        return;
+      }
+
+      addToast(status === 'exists' ? 'Recebimento já existe para esta nota.' : 'Recebimento criado com sucesso!', 'success');
+      setStep('success');
 
     } catch (e: any) {
       console.error(e);
-      addToast(e.message || 'Erro ao criar recebimento.', 'error');
+      const msg = String(e?.message || '');
+      if (/Informe a quantidade conferida/i.test(msg)) {
+        addToast(msg, 'warning');
+      } else {
+        addToast(msg || 'Erro ao criar recebimento.', 'error');
+      }
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleGoToConferencia = () => {
+    if (!previewData) return;
+    const matchByFiscalItemId: Record<string, string> = {};
+    for (const it of previewData.itens || []) {
+      const manual = manualMatches[it.item_id]?.id || null;
+      const auto = it.match_produto_id || null;
+      const resolved = manual || auto;
+      if (resolved) matchByFiscalItemId[it.item_id] = resolved;
+    }
+    const missingMatches = (previewData.itens || []).filter((it) => !matchByFiscalItemId[it.item_id]);
+    if (missingMatches.length > 0) {
+      addToast('Vincule todos os itens a um produto para continuar para a conferência.', 'warning');
+      return;
+    }
+    setStep('conferencia');
   };
 
   const handleMatchSelect = (itemId: string, product: any) => {
@@ -318,8 +466,13 @@ export default function NfeInputPage({ embedded }: NfeInputPageProps) {
           Vínculos
         </div>
         <div className="w-8 h-px bg-gray-300 mx-2" />
+        <div className={`flex items-center gap-2 ${step === 'conferencia' ? 'text-blue-600' : ''}`}>
+          <span className={`w-6 h-6 rounded-full flex items-center justify-center border ${step === 'conferencia' ? 'border-blue-600 bg-blue-50' : 'border-gray-300'}`}>4</span>
+          Conferência
+        </div>
+        <div className="w-8 h-px bg-gray-300 mx-2" />
         <div className={`flex items-center gap-2 ${step === 'success' ? 'text-green-600' : ''}`}>
-          <span className={`w-6 h-6 rounded-full flex items-center justify-center border ${step === 'success' ? 'border-green-600 bg-green-50' : 'border-gray-300'}`}>4</span>
+          <span className={`w-6 h-6 rounded-full flex items-center justify-center border ${step === 'success' ? 'border-green-600 bg-green-50' : 'border-gray-300'}`}>5</span>
           Conclusão
         </div>
       </div>
@@ -414,7 +567,7 @@ export default function NfeInputPage({ embedded }: NfeInputPageProps) {
                   <tr>
                     <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Item (XML)</th>
                     <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">Qtd.</th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Vínculo no Sistema</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase w-[40rem]">Vínculo no Sistema</th>
                     <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">Status</th>
                     <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">Ação</th>
                   </tr>
@@ -431,7 +584,7 @@ export default function NfeInputPage({ embedded }: NfeInputPageProps) {
                         <td className="px-4 py-3 text-center text-sm text-gray-700">
                           {item.qcom} <span className="text-xs text-gray-500">{item.ucom}</span>
                         </td>
-                        <td className="px-4 py-3">
+                        <td className="px-4 py-3 w-[40rem]">
                           {item.match_produto_id || manualMatches[item.item_id] ? (
                             <div className="flex items-center gap-2 text-sm text-green-700">
                               <CheckCircle size={16} />
@@ -461,7 +614,7 @@ export default function NfeInputPage({ embedded }: NfeInputPageProps) {
                               )}
                             </div>
                           ) : (
-                            <div className="w-full max-w-xs">
+                            <div className="w-full max-w-[40rem]">
                               <ItemAutocomplete
                                 onSelect={(prod) => handleMatchSelect(item.item_id, prod)}
                                 placeholder="Buscar produto para vincular..."
@@ -501,12 +654,115 @@ export default function NfeInputPage({ embedded }: NfeInputPageProps) {
 
             <div className="flex justify-end gap-3 pt-4 border-t">
               <button
+                onClick={() => setStep('review')}
+                disabled={loading}
+                className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+              >
+                Voltar
+              </button>
+              <button
+                onClick={handleGoToConferencia}
+                disabled={loading}
+                className="flex items-center gap-2 bg-blue-600 text-white font-bold py-2 px-6 rounded-lg hover:bg-blue-700 disabled:opacity-50"
+              >
+                <ArrowRight />
+                Conferir Quantidades
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* STEP 4: CONFERÊNCIA */}
+        {step === 'conferencia' && previewData && (
+          <div className="space-y-6">
+            <div className="flex justify-between items-center">
+              <h3 className="text-lg font-bold text-gray-800">Conferência de Quantidades</h3>
+              <span className="text-sm text-gray-500">
+                {previewData.itens.length} itens
+              </span>
+            </div>
+
+            <div className="overflow-x-auto border rounded-lg">
+              <table className="min-w-full divide-y divide-gray-200">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Item (XML)</th>
+                    <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">Qtd. XML</th>
+                    <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">Qtd. Conferida</th>
+                    <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">Status</th>
+                  </tr>
+                </thead>
+                <tbody className="bg-white divide-y divide-gray-200">
+                  {previewData.itens.map((item) => {
+                    const qty = conferidas[item.item_id];
+                    const qtyNumber = typeof qty === 'number' && !Number.isNaN(qty) ? qty : NaN;
+                    const tol = 1e-6;
+                    const ok = typeof qtyNumber === 'number' && !Number.isNaN(qtyNumber) && Math.abs(qtyNumber - item.qcom) <= tol;
+                    const diverge = typeof qtyNumber === 'number' && !Number.isNaN(qtyNumber) && Math.abs(qtyNumber - item.qcom) > tol;
+                    return (
+                      <tr key={item.item_id} className={diverge ? 'bg-yellow-50/40' : ''}>
+                        <td className="px-4 py-3">
+                          <p className="text-sm font-medium text-gray-900">{item.xprod}</p>
+                          <p className="text-xs text-gray-500">Cód: {item.cprod} | EAN: {item.ean || '-'}</p>
+                        </td>
+                        <td className="px-4 py-3 text-center text-sm text-gray-700">
+                          {item.qcom} <span className="text-xs text-gray-500">{item.ucom}</span>
+                        </td>
+                        <td className="px-4 py-3 text-center">
+                          <input
+                            type="number"
+                            step="0.0001"
+                            inputMode="decimal"
+                            value={Number.isFinite(conferidas[item.item_id]) ? conferidas[item.item_id] : ''}
+                            onChange={(e) => {
+                              const raw = e.target.value;
+                              const next = raw === '' ? NaN : Number(raw);
+                              setConferidas((prev) => ({ ...prev, [item.item_id]: next }));
+                            }}
+                            className="w-32 rounded-md border border-gray-300 px-2 py-1 text-sm text-gray-800 shadow-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-500"
+                            aria-label={`Quantidade conferida do item ${item.n_item}`}
+                            title="Quantidade conferida"
+                          />
+                        </td>
+                        <td className="px-4 py-3 text-center">
+                          {ok ? (
+                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                              Ok
+                            </span>
+                          ) : diverge ? (
+                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
+                              Divergente
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-700">
+                              Pendente
+                            </span>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+
+            <div className="flex justify-end gap-3 pt-4 border-t">
+              <button
+                onClick={() => setStep('matching')}
+                disabled={loading}
+                className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+              >
+                Voltar para Vínculos
+              </button>
+              <button
                 onClick={handleProcess}
                 disabled={loading}
                 className="flex items-center gap-2 bg-green-600 text-white font-bold py-2 px-6 rounded-lg hover:bg-green-700 disabled:opacity-50"
               >
                 {loading ? <Loader2 className="animate-spin" /> : <Save />}
-                Criar Recebimento e Conferir
+                {embedded
+                  ? (autoFinalizeMaterialCliente ? 'Concluir e Sincronizar' : 'Criar Recebimento')
+                  : 'Salvar Conferência e Criar Recebimento'}
               </button>
             </div>
           </div>
@@ -520,7 +776,11 @@ export default function NfeInputPage({ embedded }: NfeInputPageProps) {
             </div>
             <h2 className="text-2xl font-bold text-gray-800 mb-2">Importação Concluída!</h2>
             <p className="text-gray-600 mb-8 max-w-md">
-              A entrada de beneficiamento foi registrada e o estoque foi atualizado com sucesso.
+              {embedded
+                ? (autoFinalizeMaterialCliente
+                    ? 'O recebimento foi concluído e os Materiais de Clientes foram sincronizados.'
+                    : 'O recebimento foi criado. Você pode continuar e concluir o recebimento quando desejar.')
+                : 'O recebimento foi criado e a conferência foi registrada. Ele também está disponível em Suprimentos → Recebimentos.'}
             </p>
             <div className="flex gap-4">
               <button
@@ -529,12 +789,24 @@ export default function NfeInputPage({ embedded }: NfeInputPageProps) {
               >
                 Importar Outra Nota
               </button>
-              <a
-                href="/app/suprimentos/estoque"
-                className="px-6 py-2 bg-blue-600 text-white font-bold rounded-lg hover:bg-blue-700"
-              >
-                Ver Estoque
-              </a>
+              {!embedded && (
+                <>
+                  <button
+                    onClick={() => navigate('/app/suprimentos/recebimentos')}
+                    className="px-6 py-2 bg-blue-600 text-white font-bold rounded-lg hover:bg-blue-700"
+                  >
+                    Voltar para Recebimentos
+                  </button>
+                  {recebimentoId && (
+                    <button
+                      onClick={() => navigate(`/app/suprimentos/recebimento/${recebimentoId}?view=details`)}
+                      className="px-6 py-2 bg-white border border-gray-300 text-gray-700 font-semibold rounded-lg hover:bg-gray-50"
+                    >
+                      Ver Detalhes
+                    </button>
+                  )}
+                </>
+              )}
             </div>
           </div>
         )}

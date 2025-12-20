@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { ArrowLeft, ArrowRight, Loader2, Save } from 'lucide-react';
-import { OrdemIndustriaDetails, OrdemPayload, saveOrdem, getOrdemDetails, manageComponente, manageEntrega, OrdemEntrega, gerarExecucaoOrdem } from '@/services/industria';
+import { ArrowLeft, ArrowRight, CheckCircle2, Loader2, Save, TriangleAlert, XCircle } from 'lucide-react';
+import { OrdemIndustriaDetails, OrdemPayload, saveOrdem, getOrdemDetails, manageComponente, manageEntrega, OrdemEntrega, gerarExecucaoOrdem, cloneOrdem } from '@/services/industria';
 import { useToast } from '@/contexts/ToastProvider';
 import Section from '@/components/ui/forms/Section';
 import Input from '@/components/ui/forms/Input';
@@ -17,6 +17,7 @@ import { formatOrderNumber } from '@/lib/utils';
 import { ensureMaterialClienteV2 } from '@/services/industriaMateriais';
 import type { MaterialClienteListItem } from '@/services/industriaMateriais';
 import { useNavigate } from 'react-router-dom';
+import Modal from '@/components/ui/Modal';
 
 interface Props {
   ordemId: string | null;
@@ -34,11 +35,23 @@ interface Props {
     materialClienteCodigo?: string | null;
     materialClienteUnidade?: string | null;
   };
+  allowTipoOrdemChange?: boolean;
+  onTipoOrdemChange?: (tipo: 'industrializacao' | 'beneficiamento') => void;
   onSaveSuccess: () => void;
+  onOpenOrder?: (ordemId: string) => void;
   onClose: () => void;
 }
 
-export default function OrdemFormPanel({ ordemId, initialTipoOrdem, initialPrefill, onSaveSuccess, onClose }: Props) {
+export default function OrdemFormPanel({
+  ordemId,
+  initialTipoOrdem,
+  initialPrefill,
+  allowTipoOrdemChange,
+  onTipoOrdemChange,
+  onSaveSuccess,
+  onOpenOrder,
+  onClose,
+}: Props) {
   const { addToast } = useToast();
   const navigate = useNavigate();
   const [loading, setLoading] = useState(!!ordemId);
@@ -48,6 +61,7 @@ export default function OrdemFormPanel({ ordemId, initialTipoOrdem, initialPrefi
   const [materialCliente, setMaterialCliente] = useState<MaterialClienteListItem | null>(null);
   const [wizardStep, setWizardStep] = useState<0 | 1 | 2>(0);
   const [autoOpenBomSelector, setAutoOpenBomSelector] = useState(false);
+  const [showGerarExecucaoModal, setShowGerarExecucaoModal] = useState(false);
 
   const [formData, setFormData] = useState<Partial<OrdemIndustriaDetails>>({
     status: 'rascunho',
@@ -242,6 +256,7 @@ export default function OrdemFormPanel({ ordemId, initialTipoOrdem, initialPrefi
       } else {
         addToast('Ordem salva.', 'success');
       }
+      onSaveSuccess();
       return saved.id;
     } catch (e: any) {
       addToast(e.message, 'error');
@@ -332,6 +347,40 @@ export default function OrdemFormPanel({ ordemId, initialTipoOrdem, initialPrefi
   const isLocked = formData.status === 'concluida' || formData.status === 'cancelada';
   const totalEntregue = formData.entregas?.reduce((acc, e) => acc + Number(e.quantidade_entregue), 0) || 0;
   const isWizard = !ordemId && !formData.id && formData.tipo_ordem === 'beneficiamento';
+  const isExecucaoGerada = !!formData.execucao_ordem_id;
+  const isHeaderLocked = isLocked || isExecucaoGerada;
+  const componentesCount = Array.isArray(formData.componentes) ? formData.componentes.length : 0;
+  const checklistExecucao = [
+    {
+      label: formData.tipo_ordem === 'beneficiamento' ? 'Cliente selecionado' : 'Cliente (opcional)',
+      status: formData.tipo_ordem === 'beneficiamento'
+        ? (formData.cliente_id ? 'ok' : 'error')
+        : (formData.cliente_id ? 'ok' : 'warn'),
+      details: formData.cliente_nome || (formData.tipo_ordem === 'beneficiamento' ? 'Selecione o cliente para prosseguir.' : 'Opcional para Industrialização.'),
+    },
+    {
+      label: 'Produto e quantidade definidos',
+      status: formData.produto_final_id && (formData.quantidade_planejada || 0) > 0 ? 'ok' : 'error',
+      details: !formData.produto_final_id
+        ? 'Selecione o produto.'
+        : (formData.quantidade_planejada || 0) <= 0
+          ? 'A quantidade deve ser maior que zero.'
+          : undefined,
+    },
+    {
+      label: 'Roteiro',
+      status: formData.roteiro_aplicado_id ? 'ok' : 'warn',
+      details: formData.roteiro_aplicado_id
+        ? (formData.roteiro_aplicado_desc || 'Selecionado')
+        : 'Nenhum roteiro selecionado: será usado o roteiro padrão do produto (se existir).',
+    },
+    {
+      label: 'Componentes/BOM',
+      status: componentesCount > 0 ? 'ok' : 'warn',
+      details: componentesCount > 0 ? `${componentesCount} item(ns) em componentes.` : 'Sem componentes definidos (pode ser ajustado depois).',
+    },
+  ] as const;
+  const hasChecklistError = checklistExecucao.some(i => i.status === 'error');
 
   const canGoNextWizardStep = () => {
     if (wizardStep === 0) return !!formData.cliente_id;
@@ -392,6 +441,19 @@ export default function OrdemFormPanel({ ordemId, initialTipoOrdem, initialPrefi
       addToast(e?.message || 'Não foi possível gerar operações.', 'error');
     } finally {
       setIsGeneratingExecucao(false);
+    }
+  };
+
+  const handleCriarRevisao = async () => {
+    if (!formData.id) return;
+    if (!window.confirm('Criar uma revisão desta ordem? Uma nova ordem em rascunho será criada para você ajustar e liberar novamente.')) return;
+    try {
+      const cloned = await cloneOrdem(formData.id);
+      addToast('Revisão criada.', 'success');
+      onSaveSuccess();
+      onOpenOrder?.(cloned.id);
+    } catch (e: any) {
+      addToast(e?.message || 'Não foi possível criar a revisão.', 'error');
     }
   };
 
@@ -471,7 +533,36 @@ export default function OrdemFormPanel({ ordemId, initialTipoOrdem, initialPrefi
             )}
             <Section title="Planejamento" description="O que será produzido e para quem.">
               <div className="sm:col-span-2">
-                <Select label="Tipo de Ordem" name="tipo_ordem" value={formData.tipo_ordem} onChange={e => handleHeaderChange('tipo_ordem', e.target.value)} disabled={!!formData.id}>
+                <Select
+                  label="Tipo de Ordem"
+                  name="tipo_ordem"
+                  value={formData.tipo_ordem}
+                  onChange={e => {
+                    const nextTipo = e.target.value as 'industrializacao' | 'beneficiamento';
+                    if (nextTipo === formData.tipo_ordem) return;
+
+                    if (!allowTipoOrdemChange || formData.id || ordemId) return;
+
+                    const hasAnyData =
+                      !!formData.cliente_id ||
+                      !!formData.produto_final_id ||
+                      !!formData.quantidade_planejada ||
+                      !!formData.documento_ref ||
+                      !!formData.material_cliente_id ||
+                      !!formData.material_cliente_nome ||
+                      !!formData.material_cliente_codigo;
+
+                    if (hasAnyData) {
+                      const ok = window.confirm(
+                        'Trocar o tipo de ordem irá reiniciar os campos preenchidos nesta ordem.\n\nDeseja continuar?'
+                      );
+                      if (!ok) return;
+                    }
+
+                    onTipoOrdemChange?.(nextTipo);
+                  }}
+                  disabled={!!formData.id || !!ordemId || !allowTipoOrdemChange}
+                >
                   <option value="industrializacao">Industrialização</option>
                   <option value="beneficiamento">Beneficiamento</option>
                 </Select>
@@ -487,7 +578,7 @@ export default function OrdemFormPanel({ ordemId, initialTipoOrdem, initialPrefi
                 ) : formData.produto_final_id && formData.produto_nome ? (
                   <div className="flex items-center justify-between gap-3 p-3 bg-gray-50 border border-gray-200 rounded-lg">
                     <div className="text-gray-800 font-medium truncate">{formData.produto_nome}</div>
-                    {!isLocked && (
+                    {!isHeaderLocked && (
                       <button
                         type="button"
                         onClick={() => {
@@ -517,7 +608,7 @@ export default function OrdemFormPanel({ ordemId, initialTipoOrdem, initialPrefi
                   type="number"
                   value={formData.quantidade_planejada || ''}
                   onChange={e => handleHeaderChange('quantidade_planejada', parseFloat(e.target.value))}
-                  disabled={isLocked}
+                  disabled={isHeaderLocked}
                 />
               </div>
               <div className="sm:col-span-1">
@@ -526,7 +617,7 @@ export default function OrdemFormPanel({ ordemId, initialTipoOrdem, initialPrefi
                   name="unidade"
                   value={formData.unidade || ''}
                   onChange={e => handleHeaderChange('unidade', e.target.value)}
-                  disabled={isLocked}
+                  disabled={isHeaderLocked}
                 />
               </div>
               <div className="sm:col-span-3">
@@ -546,7 +637,7 @@ export default function OrdemFormPanel({ ordemId, initialTipoOrdem, initialPrefi
                     handleHeaderChange('material_cliente_codigo', null);
                     handleHeaderChange('material_cliente_unidade', null);
                   }}
-                  disabled={isLocked}
+                  disabled={isHeaderLocked}
                 />
               </div>
 
@@ -627,6 +718,7 @@ export default function OrdemFormPanel({ ordemId, initialTipoOrdem, initialPrefi
                         ordemId={formData.id || 'new'}
                         produtoId={formData.produto_final_id || ''}
                         tipoBom={formData.tipo_ordem === 'beneficiamento' ? 'beneficiamento' : 'producao'}
+                        disabled={isLocked || isExecucaoGerada}
                         onApplied={(roteiro) => {
                           handleHeaderChange('roteiro_aplicado_id', roteiro.id);
                           const label = `${roteiro.codigo || 'Sem código'} (v${roteiro.versao})${roteiro.descricao ? ` - ${roteiro.descricao}` : ''}`;
@@ -703,6 +795,7 @@ export default function OrdemFormPanel({ ordemId, initialTipoOrdem, initialPrefi
                   produtoId={formData.produto_final_id}
                   tipoOrdem={formData.tipo_ordem === 'beneficiamento' ? 'beneficiamento' : 'producao'}
                   openOnMount={autoOpenBomSelector}
+                  disabled={isExecucaoGerada}
                   onApplied={() => {
                     setAutoOpenBomSelector(false);
                     loadDetails(formData.id);
@@ -739,10 +832,21 @@ export default function OrdemFormPanel({ ordemId, initialTipoOrdem, initialPrefi
           Fechar
         </button>
         <div className="flex gap-3">
+          {formData.id && isHeaderLocked && (
+            <button
+              type="button"
+              onClick={handleCriarRevisao}
+              className="flex items-center gap-2 border border-amber-200 bg-amber-50 text-amber-900 font-bold py-2 px-4 rounded-lg hover:bg-amber-100"
+              title="Cria uma nova ordem em rascunho para ajustar após a execução já ter sido gerada."
+            >
+              <Save size={18} />
+              Criar revisão
+            </button>
+          )}
           {!isLocked && formData.id && !formData.execucao_ordem_id && (
             <button
               type="button"
-              onClick={handleGerarExecucao}
+              onClick={() => setShowGerarExecucaoModal(true)}
               disabled={isGeneratingExecucao}
               className="flex items-center gap-2 border border-blue-200 bg-blue-50 text-blue-800 font-bold py-2 px-4 rounded-lg hover:bg-blue-100 disabled:opacity-50"
               title="Gera operações e abre Execução"
@@ -806,6 +910,73 @@ export default function OrdemFormPanel({ ordemId, initialTipoOrdem, initialPrefi
           )}
         </div>
       </footer>
+
+      <Modal
+        isOpen={showGerarExecucaoModal}
+        onClose={() => setShowGerarExecucaoModal(false)}
+        title="Gerar Execução (Checklist)"
+        size="lg"
+      >
+        <div className="p-6 space-y-4">
+          <div className="rounded-lg border border-gray-200 bg-white p-4">
+            <div className="text-sm font-semibold text-gray-800">Resumo</div>
+            <div className="mt-2 text-sm text-gray-700">
+              <div><span className="font-medium">Ordem:</span> {formData.numero ? formatOrderNumber(formData.numero) : 'Nova (será salva)'} • {formData.tipo_ordem === 'beneficiamento' ? 'Beneficiamento' : 'Industrialização'}</div>
+              <div><span className="font-medium">Cliente:</span> {formData.cliente_nome || '—'}</div>
+              <div><span className="font-medium">Produto:</span> {formData.produto_nome || '—'}</div>
+              <div><span className="font-medium">Quantidade:</span> {formData.quantidade_planejada || 0} {formData.unidade || ''}</div>
+              <div><span className="font-medium">Roteiro:</span> {formData.roteiro_aplicado_desc || 'Padrão do produto (se existir)'}</div>
+            </div>
+          </div>
+
+          <div className="rounded-lg border border-blue-100 bg-blue-50 p-4 text-sm text-blue-900">
+            Ao gerar a Execução, o sistema criará a ordem de produção correspondente, gerará as operações e travará o cabeçalho/roteiro desta ordem.
+          </div>
+
+          <div className="rounded-lg border border-gray-200 bg-white p-4">
+            <div className="text-sm font-semibold text-gray-800">Checklist</div>
+            <div className="mt-3 space-y-2">
+              {checklistExecucao.map((item) => (
+                <div key={item.label} className="flex items-start gap-3">
+                  {item.status === 'ok' ? (
+                    <CheckCircle2 className="text-green-600 mt-0.5" size={18} />
+                  ) : item.status === 'warn' ? (
+                    <TriangleAlert className="text-amber-600 mt-0.5" size={18} />
+                  ) : (
+                    <XCircle className="text-rose-600 mt-0.5" size={18} />
+                  )}
+                  <div className="flex-1">
+                    <div className="text-sm font-medium text-gray-900">{item.label}</div>
+                    {item.details && <div className="text-xs text-gray-600">{item.details}</div>}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="flex justify-end gap-3">
+            <button
+              type="button"
+              onClick={() => setShowGerarExecucaoModal(false)}
+              className="rounded-md border border-gray-300 bg-white py-2 px-4 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50"
+            >
+              Voltar
+            </button>
+            <button
+              type="button"
+              disabled={isGeneratingExecucao || hasChecklistError || isLocked}
+              onClick={async () => {
+                setShowGerarExecucaoModal(false);
+                await handleGerarExecucao();
+              }}
+              className="flex items-center gap-2 bg-blue-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-blue-700 disabled:opacity-50"
+            >
+              {isGeneratingExecucao ? <Loader2 className="animate-spin" size={20} /> : <ArrowRight size={18} />}
+              Gerar e abrir Execução
+            </button>
+          </div>
+        </div>
+      </Modal>
     </div>
   );
 }

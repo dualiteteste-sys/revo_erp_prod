@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Loader2, Save, Play, ShieldAlert } from 'lucide-react';
+import { ArrowLeft, ArrowRight, CheckCircle2, Loader2, Play, Save, ShieldAlert, TriangleAlert, XCircle } from 'lucide-react';
 import {
   OrdemProducaoDetails,
   OrdemProducaoPayload,
@@ -10,6 +10,7 @@ import {
   gerarOperacoes,
   registrarEntrega,
   deleteOrdemProducao,
+  cloneOrdemProducao,
   fecharOrdemProducao
 } from '@/services/industriaProducao';
 import { useToast } from '@/contexts/ToastProvider';
@@ -25,14 +26,25 @@ import RoteiroSelector from '../ordens/RoteiroSelector';
 import OperacoesGrid from './OperacoesGrid';
 import { formatOrderNumber } from '@/lib/utils';
 import { listUnidades, UnidadeMedida } from '@/services/unidades';
+import Modal from '@/components/ui/Modal';
 
 interface Props {
   ordemId: string | null;
   onSaveSuccess: () => void;
   onClose: () => void;
+  allowTipoOrdemChange?: boolean;
+  onTipoOrdemChange?: (tipo: 'industrializacao' | 'beneficiamento') => void;
+  onOpenOrder?: (ordemId: string) => void;
 }
 
-export default function ProducaoFormPanel({ ordemId, onSaveSuccess, onClose }: Props) {
+export default function ProducaoFormPanel({
+  ordemId,
+  onSaveSuccess,
+  onClose,
+  allowTipoOrdemChange,
+  onTipoOrdemChange,
+  onOpenOrder,
+}: Props) {
   const { addToast } = useToast();
   const [loading, setLoading] = useState(!!ordemId);
   const [isSaving, setIsSaving] = useState(false);
@@ -40,6 +52,8 @@ export default function ProducaoFormPanel({ ordemId, onSaveSuccess, onClose }: P
   const [unidades, setUnidades] = useState<UnidadeMedida[]>([]);
   const [showClosureModal, setShowClosureModal] = useState(false);
   const [entregaBloqueada, setEntregaBloqueada] = useState<{ blocked: boolean; reason?: string } | null>(null);
+  const [wizardStep, setWizardStep] = useState<0 | 1 | 2>(0);
+  const [showLiberarModal, setShowLiberarModal] = useState(false);
 
   const [formData, setFormData] = useState<Partial<OrdemProducaoDetails>>({
     status: 'rascunho',
@@ -134,6 +148,7 @@ export default function ProducaoFormPanel({ ordemId, onSaveSuccess, onClose }: P
       } else {
         addToast('Ordem salva.', 'success');
       }
+      onSaveSuccess();
       return saved.id;
     } catch (e: any) {
       addToast(e.message, 'error');
@@ -257,14 +272,12 @@ export default function ProducaoFormPanel({ ordemId, onSaveSuccess, onClose }: P
     }
   };
 
-  const handleLiberar = async () => {
+  const doLiberar = async () => {
     if (!formData.id) return;
     if (!formData.roteiro_aplicado_id) {
       addToast('A ordem precisa ter um roteiro aplicado para ser liberada.', 'error');
       return;
     }
-
-    if (!confirm('Deseja liberar a ordem? Isso irá gerar as operações de produção.')) return;
 
     try {
       setIsSaving(true);
@@ -281,11 +294,61 @@ export default function ProducaoFormPanel({ ordemId, onSaveSuccess, onClose }: P
     }
   };
 
+  const handleCriarRevisao = async () => {
+    if (!formData.id) return;
+    if (!window.confirm('Criar uma revisão desta OP? Uma nova OP em rascunho será criada para você ajustar e liberar novamente.')) return;
+    setIsSaving(true);
+    try {
+      const cloned = await cloneOrdemProducao(formData.id);
+      addToast('Revisão criada.', 'success');
+      onSaveSuccess();
+      onOpenOrder?.(cloned.id);
+    } catch (e: any) {
+      addToast(e?.message || 'Não foi possível criar a revisão.', 'error');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
   if (loading) return <div className="flex justify-center p-8"><Loader2 className="animate-spin" /></div>;
 
   const isLocked = formData.status === 'concluida' || formData.status === 'cancelada';
+  const isWizard = !ordemId && !formData.id;
+  const isReleased = formData.status === 'em_producao' || formData.status === 'em_inspecao';
+  const hasOperacoes = Array.isArray((formData as any).operacoes) && (formData as any).operacoes.length > 0;
+  const isCoreHeaderLocked = isLocked || isReleased || (formData.status as any) === 'parcialmente_concluida' || hasOperacoes;
+  const canLiberar = !!formData.id && !isLocked && (formData.status === 'rascunho' || formData.status === 'planejada') && !!formData.roteiro_aplicado_id;
+  const componentesCount = Array.isArray(formData.componentes) ? formData.componentes.length : 0;
+  const checklist = [
+    {
+      label: 'Produto e quantidade definidos',
+      status: formData.produto_final_id && (formData.quantidade_planejada || 0) > 0 ? 'ok' : 'error',
+      details: !formData.produto_final_id
+        ? 'Selecione o produto final.'
+        : (formData.quantidade_planejada || 0) <= 0
+          ? 'A quantidade deve ser maior que zero.'
+          : undefined,
+    },
+    {
+      label: 'Roteiro aplicado',
+      status: formData.roteiro_aplicado_id ? 'ok' : 'error',
+      details: formData.roteiro_aplicado_id ? formData.roteiro_aplicado_desc || undefined : 'Selecione um roteiro para liberar.',
+    },
+    {
+      label: 'BOM / Insumos',
+      status: componentesCount > 0 ? 'ok' : 'warn',
+      details: componentesCount > 0 ? `${componentesCount} item(ns) em insumos/componentes.` : 'Sem insumos definidos (você pode definir depois, mas é recomendável).',
+    },
+  ] as const;
+  const hasChecklistError = checklist.some(i => i.status === 'error');
+
+  const canGoNextWizardStep = () => {
+    if (wizardStep === 0) return !!formData.produto_final_id && !!formData.quantidade_planejada && formData.quantidade_planejada > 0;
+    return true;
+  };
 
   return (
+    <>
     <div className="flex flex-col h-full bg-white">
       <div className="border-b border-gray-200">
         <div className="flex items-center justify-between py-4 px-6 bg-gray-50 border-b border-gray-200">
@@ -352,10 +415,56 @@ export default function ProducaoFormPanel({ ordemId, onSaveSuccess, onClose }: P
       <div className="flex-grow p-6 overflow-y-auto scrollbar-styled">
         {activeTab === 'dados' && (
           <>
+            {isWizard && (
+              <div className="mb-6 p-4 rounded-xl border border-blue-100 bg-blue-50">
+                <div className="flex items-center justify-between gap-4">
+                  <div>
+                    <div className="text-xs font-bold uppercase tracking-[0.12em] text-blue-700">Wizard de Industrialização</div>
+                    <div className="text-sm text-blue-900">
+                      Passo {wizardStep + 1} de 3 • {wizardStep === 0 ? 'Produto e quantidade' : wizardStep === 1 ? 'Programação e parâmetros' : 'Revisão'}
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    {[0, 1, 2].map((i) => (
+                      <div
+                        key={i}
+                        className={`h-2.5 w-12 rounded-full ${i <= wizardStep ? 'bg-blue-600' : 'bg-blue-200'}`}
+                      />
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
             <Section title="O que produzir?" description="Definição do produto e quantidades.">
               <div className="sm:col-span-2">
-                <Select label="Tipo de Ordem" name="tipo_ordem" value="industrializacao" disabled>
+                <Select
+                  label="Tipo de Ordem"
+                  name="tipo_ordem"
+                  value="industrializacao"
+                  disabled={!!formData.id || !allowTipoOrdemChange}
+                  onChange={(e) => {
+                    const nextTipo = e.target.value as 'industrializacao' | 'beneficiamento';
+                    if (nextTipo === 'industrializacao') return;
+                    if (!!formData.id || !allowTipoOrdemChange) return;
+
+                    const hasAnyData =
+                      !!formData.produto_final_id ||
+                      !!formData.quantidade_planejada ||
+                      !!formData.documento_ref ||
+                      !!formData.observacoes;
+
+                    if (hasAnyData) {
+                      const ok = window.confirm(
+                        'Trocar o tipo de ordem irá reiniciar os campos preenchidos nesta ordem.\n\nDeseja continuar?'
+                      );
+                      if (!ok) return;
+                    }
+
+                    onTipoOrdemChange?.(nextTipo);
+                  }}
+                >
                   <option value="industrializacao">Industrialização</option>
+                  <option value="beneficiamento">Beneficiamento</option>
                 </Select>
               </div>
               <div className="sm:col-span-4">
@@ -375,7 +484,7 @@ export default function ProducaoFormPanel({ ordemId, onSaveSuccess, onClose }: P
                   type="number"
                   value={formData.quantidade_planejada || ''}
                   onChange={e => handleHeaderChange('quantidade_planejada', parseFloat(e.target.value))}
-                  disabled={isLocked}
+                  disabled={isCoreHeaderLocked}
                 />
               </div>
               <div className="sm:col-span-1">
@@ -384,7 +493,7 @@ export default function ProducaoFormPanel({ ordemId, onSaveSuccess, onClose }: P
                   name="unidade"
                   value={formData.unidade || ''}
                   onChange={e => handleHeaderChange('unidade', e.target.value)}
-                  disabled={isLocked}
+                  disabled={isCoreHeaderLocked}
                 >
                   <option value="">Selecione...</option>
                   {unidades.map(u => (
@@ -402,80 +511,83 @@ export default function ProducaoFormPanel({ ordemId, onSaveSuccess, onClose }: P
               </div>
             </Section>
 
-            <Section title="Programação" description="Prazos e status.">
-              <div className="sm:col-span-2">
-                <Select label="Status" name="status" value={formData.status} onChange={e => handleHeaderChange('status', e.target.value)} disabled={isLocked}>
-                  <option value="rascunho">Rascunho</option>
-                  <option value="planejada">Planejada</option>
-                  <option value="em_programacao">Em Programação</option>
-                  <option value="em_producao">Em Produção</option>
-                  <option value="em_inspecao">Em Inspeção</option>
-                  <option value="concluida">Concluída</option>
-                  <option value="cancelada">Cancelada</option>
-                </Select>
-              </div>
-              <div className="sm:col-span-2">
-                <Input
-                  label="Prioridade (0-100)"
-                  name="prioridade"
-                  type="number"
-                  value={formData.prioridade || 0}
-                  onChange={e => handleHeaderChange('prioridade', parseInt(e.target.value))}
-                  disabled={isLocked}
-                />
-              </div>
-              <div className="sm:col-span-2"></div>
+            {(!isWizard || wizardStep >= 1) && (
+              <>
+                <Section title="Programação" description="Prazos e status.">
+                  <div className="sm:col-span-2">
+                    <Select label="Status" name="status" value={formData.status} onChange={e => handleHeaderChange('status', e.target.value)} disabled={isLocked}>
+                      <option value="rascunho">Rascunho</option>
+                      <option value="planejada">Planejada</option>
+                      <option value="em_programacao">Em Programação</option>
+                      <option value="em_producao">Em Produção</option>
+                      <option value="em_inspecao">Em Inspeção</option>
+                      <option value="concluida">Concluída</option>
+                      <option value="cancelada">Cancelada</option>
+                    </Select>
+                  </div>
+                  <div className="sm:col-span-2">
+                    <Input
+                      label="Prioridade (0-100)"
+                      name="prioridade"
+                      type="number"
+                      value={formData.prioridade || 0}
+                      onChange={e => handleHeaderChange('prioridade', parseInt(e.target.value))}
+                      disabled={isLocked}
+                    />
+                  </div>
+                  <div className="sm:col-span-2"></div>
 
-              <Input label="Início Previsto" type="date" value={formData.data_prevista_inicio || ''} onChange={e => handleHeaderChange('data_prevista_inicio', e.target.value)} disabled={isLocked} className="sm:col-span-2" />
-              <Input label="Fim Previsto" type="date" value={formData.data_prevista_fim || ''} onChange={e => handleHeaderChange('data_prevista_fim', e.target.value)} disabled={isLocked} className="sm:col-span-2" />
-              <Input label="Entrega Prevista" type="date" value={formData.data_prevista_entrega || ''} onChange={e => handleHeaderChange('data_prevista_entrega', e.target.value)} disabled={isLocked} className="sm:col-span-2" />
-            </Section>
+                  <Input label="Início Previsto" type="date" value={formData.data_prevista_inicio || ''} onChange={e => handleHeaderChange('data_prevista_inicio', e.target.value)} disabled={isLocked} className="sm:col-span-2" />
+                  <Input label="Fim Previsto" type="date" value={formData.data_prevista_fim || ''} onChange={e => handleHeaderChange('data_prevista_fim', e.target.value)} disabled={isLocked} className="sm:col-span-2" />
+                  <Input label="Entrega Prevista" type="date" value={formData.data_prevista_entrega || ''} onChange={e => handleHeaderChange('data_prevista_entrega', e.target.value)} disabled={isLocked} className="sm:col-span-2" />
+                </Section>
 
-            <Section title="Parâmetros da OP" description="Configurações de produção.">
-              <div className="sm:col-span-2">
-                <Input
-                  label="Lote de Produção"
-                  name="lote"
-                  value={formData.lote_producao || ''}
-                  onChange={e => handleHeaderChange('lote_producao', e.target.value)}
-                  disabled={isLocked}
-                  placeholder="Ex: LOTE-2025-001"
-                />
-              </div>
-              <div className="sm:col-span-2">
-                <Select
-                  label="Reserva de Estoque"
-                  name="reserva"
-                  value={formData.reserva_modo || 'ao_liberar'}
-                  onChange={e => handleHeaderChange('reserva_modo', e.target.value)}
-                  disabled={isLocked}
-                >
-                  <option value="ao_liberar">Ao Liberar (Padrão)</option>
-                  <option value="ao_planejar">Ao Planejar</option>
-                  <option value="sem_reserva">Sem Reserva</option>
-                </Select>
-              </div>
-              <div className="sm:col-span-2">
-                <Input
-                  label="Tolerância Overrun (%)"
-                  name="overrun"
-                  type="number"
-                  min="0"
-                  max="10"
-                  value={formData.tolerancia_overrun_percent || 0}
-                  onChange={e => handleHeaderChange('tolerancia_overrun_percent', parseFloat(e.target.value))}
-                  disabled={isLocked}
-                />
-              </div>
+                <Section title="Parâmetros da OP" description="Configurações de produção.">
+                  <div className="sm:col-span-2">
+                    <Input
+                      label="Lote de Produção"
+                      name="lote"
+                      value={formData.lote_producao || ''}
+                      onChange={e => handleHeaderChange('lote_producao', e.target.value)}
+                      disabled={isLocked}
+                      placeholder="Ex: LOTE-2025-001"
+                    />
+                  </div>
+                  <div className="sm:col-span-2">
+                    <Select
+                      label="Reserva de Estoque"
+                      name="reserva"
+                      value={formData.reserva_modo || 'ao_liberar'}
+                      onChange={e => handleHeaderChange('reserva_modo', e.target.value)}
+                      disabled={isLocked}
+                    >
+                      <option value="ao_liberar">Ao Liberar (Padrão)</option>
+                      <option value="ao_planejar">Ao Planejar</option>
+                      <option value="sem_reserva">Sem Reserva</option>
+                    </Select>
+                  </div>
+                  <div className="sm:col-span-2">
+                    <Input
+                      label="Tolerância Overrun (%)"
+                      name="overrun"
+                      type="number"
+                      min="0"
+                      max="10"
+                      value={formData.tolerancia_overrun_percent || 0}
+                      onChange={e => handleHeaderChange('tolerancia_overrun_percent', parseFloat(e.target.value))}
+                      disabled={isLocked}
+                    />
+                  </div>
+                </Section>
+              </>
+            )}
 
-            </Section>
-
-
-
-            <Section title="Outros" description="Detalhes adicionais.">
-              <Input label="Ref. Documento" name="doc_ref" value={formData.documento_ref || ''} onChange={e => handleHeaderChange('documento_ref', e.target.value)} disabled={isLocked} className="sm:col-span-2" placeholder="Pedido, Lote..." />
-              <TextArea label="Observações" name="obs" value={formData.observacoes || ''} onChange={e => handleHeaderChange('observacoes', e.target.value)} rows={3} disabled={isLocked} className="sm:col-span-6" />
-            </Section>
+            {(!isWizard || wizardStep === 2) && (
+              <Section title="Outros" description="Detalhes adicionais.">
+                <Input label="Ref. Documento" name="doc_ref" value={formData.documento_ref || ''} onChange={e => handleHeaderChange('documento_ref', e.target.value)} disabled={isLocked} className="sm:col-span-2" placeholder="Pedido, Lote..." />
+                <TextArea label="Observações" name="obs" value={formData.observacoes || ''} onChange={e => handleHeaderChange('observacoes', e.target.value)} rows={3} disabled={isLocked} className="sm:col-span-6" />
+              </Section>
+            )}
           </>
         )
         }
@@ -494,6 +606,7 @@ export default function ProducaoFormPanel({ ordemId, onSaveSuccess, onClose }: P
                     <RoteiroSelector
                       ordemId={formData.id}
                       produtoId={formData.produto_final_id}
+                      disabled={isReleased || isLocked}
                       onApplied={handleRoteiroApplied}
                     />
                   </div>
@@ -508,6 +621,7 @@ export default function ProducaoFormPanel({ ordemId, onSaveSuccess, onClose }: P
                       ordemId={formData.id}
                       produtoId={formData.produto_final_id}
                       tipoOrdem="producao"
+                      disabled={isReleased || isLocked}
                       onApplied={handleBomApplied}
                     />
                   </div>
@@ -559,7 +673,7 @@ export default function ProducaoFormPanel({ ordemId, onSaveSuccess, onClose }: P
       </div >
 
       <div className="flex justify-between p-4 border-t bg-gray-50 rounded-b-lg">
-        {formData.id && !isLocked ? (
+        {formData.id && !isLocked && formData.status === 'rascunho' ? (
           <button
             onClick={async () => {
               if (confirm('Tem certeza que deseja excluir esta Ordem de Produção? Esta ação não pode ser desfeita.')) {
@@ -592,10 +706,23 @@ export default function ProducaoFormPanel({ ordemId, onSaveSuccess, onClose }: P
             Fechar
           </button>
 
+          {formData.id && isCoreHeaderLocked && (
+            <button
+              type="button"
+              onClick={handleCriarRevisao}
+              disabled={isSaving}
+              className="inline-flex items-center px-4 py-2 border border-amber-200 rounded-md shadow-sm text-sm font-medium text-amber-900 bg-amber-50 hover:bg-amber-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-amber-500 disabled:opacity-50"
+              title="Cria uma nova OP em rascunho para ajustar após a liberação."
+            >
+              <Save size={20} className="mr-2" />
+              Criar revisão
+            </button>
+          )}
+
           {formData.id && (formData.status === 'rascunho' || formData.status === 'planejada') && (
             <button
-              onClick={handleLiberar}
-              disabled={isSaving || !formData.roteiro_aplicado_id}
+              onClick={() => setShowLiberarModal(true)}
+              disabled={isSaving || !canLiberar}
               className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 disabled:opacity-50"
             >
               <Play size={20} className="mr-2" />
@@ -613,17 +740,122 @@ export default function ProducaoFormPanel({ ordemId, onSaveSuccess, onClose }: P
             </button>
           )}
 
-          <button
-            onClick={handleSaveHeader}
-            disabled={isSaving || isLocked}
-            className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50"
-          >
-            <Save size={20} className="mr-2" />
-            Salvar
-          </button>
+          {!isLocked && !isWizard && (
+            <button
+              onClick={handleSaveHeader}
+              disabled={isSaving}
+              className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50"
+            >
+              <Save size={20} className="mr-2" />
+              Salvar
+            </button>
+          )}
+
+          {!isLocked && isWizard && (
+            <>
+              {wizardStep > 0 && (
+                <button
+                  type="button"
+                  onClick={() => setWizardStep(s => (s > 0 ? ((s - 1) as 0 | 1 | 2) : s))}
+                  className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                >
+                  <ArrowLeft size={18} className="mr-2" />
+                  Voltar
+                </button>
+              )}
+
+              {wizardStep < 2 ? (
+                <button
+                  type="button"
+                  disabled={!canGoNextWizardStep()}
+                  onClick={() => setWizardStep(s => (s < 2 ? ((s + 1) as 0 | 1 | 2) : s))}
+                  className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50"
+                >
+                  Próximo
+                  <ArrowRight size={18} className="ml-2" />
+                </button>
+              ) : (
+                <button
+                  onClick={handleSaveHeader}
+                  disabled={isSaving}
+                  className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50"
+                >
+                  <Save size={20} className="mr-2" />
+                  Salvar e continuar
+                </button>
+              )}
+            </>
+          )}
         </div>
       </div>
     </div >
+
+    <Modal
+      isOpen={showLiberarModal}
+      onClose={() => setShowLiberarModal(false)}
+      title="Liberar OP (Checklist)"
+      size="lg"
+    >
+      <div className="p-6 space-y-4">
+        <div className="rounded-lg border border-gray-200 bg-white p-4">
+          <div className="text-sm font-semibold text-gray-800">Resumo</div>
+          <div className="mt-2 text-sm text-gray-700">
+            <div><span className="font-medium">Produto:</span> {formData.produto_nome || '—'}</div>
+            <div><span className="font-medium">Quantidade:</span> {formData.quantidade_planejada || 0} {formData.unidade || ''}</div>
+            <div><span className="font-medium">Roteiro:</span> {formData.roteiro_aplicado_desc || '—'}</div>
+            <div><span className="font-medium">BOM:</span> {formData.bom_aplicado_desc || (componentesCount > 0 ? 'Componentes manuais' : '—')}</div>
+          </div>
+        </div>
+
+        <div className="rounded-lg border border-blue-100 bg-blue-50 p-4 text-sm text-blue-900">
+          Ao liberar, o sistema irá gerar as operações e travar os campos críticos do cabeçalho (produto/quantidade/unidade) e o roteiro/BOM desta OP.
+        </div>
+
+        <div className="rounded-lg border border-gray-200 bg-white p-4">
+          <div className="text-sm font-semibold text-gray-800">Checklist</div>
+          <div className="mt-3 space-y-2">
+            {checklist.map((item) => (
+              <div key={item.label} className="flex items-start gap-3">
+                {item.status === 'ok' ? (
+                  <CheckCircle2 className="text-green-600 mt-0.5" size={18} />
+                ) : item.status === 'warn' ? (
+                  <TriangleAlert className="text-amber-600 mt-0.5" size={18} />
+                ) : (
+                  <XCircle className="text-rose-600 mt-0.5" size={18} />
+                )}
+                <div className="flex-1">
+                  <div className="text-sm font-medium text-gray-900">{item.label}</div>
+                  {item.details && <div className="text-xs text-gray-600">{item.details}</div>}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div className="flex justify-end gap-3">
+          <button
+            type="button"
+            onClick={() => setShowLiberarModal(false)}
+            className="rounded-md border border-gray-300 bg-white py-2 px-4 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50"
+          >
+            Voltar
+          </button>
+          <button
+            type="button"
+            disabled={isSaving || hasChecklistError || !canLiberar}
+            onClick={async () => {
+              setShowLiberarModal(false);
+              await doLiberar();
+            }}
+            className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-green-600 hover:bg-green-700 disabled:opacity-50"
+          >
+            <Play size={18} className="mr-2" />
+            Liberar e gerar operações
+          </button>
+        </div>
+      </div>
+    </Modal>
+    </>
   );
 }
   const checkEntregaBlocked = (ordem: OrdemProducaoDetails | null): { blocked: boolean; reason?: string } => {

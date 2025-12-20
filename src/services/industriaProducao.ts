@@ -313,6 +313,10 @@ export async function deleteOrdemProducao(ordemId: string): Promise<void> {
   await callRpc('industria_producao_ordens_delete', { p_id: ordemId });
 }
 
+export async function cloneOrdemProducao(ordemId: string): Promise<OrdemProducaoDetails> {
+  return callRpc<OrdemProducaoDetails>('industria_producao_clone_ordem', { p_source_id: ordemId });
+}
+
 
 // --- Quality Management Types ---
 

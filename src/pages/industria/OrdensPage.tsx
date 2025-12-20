@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { cloneOrdem, listOrdens, OrdemIndustria } from '@/services/industria';
+import { cloneOrdemProducao } from '@/services/industriaProducao';
 import { listOrdensProducao, OrdemProducao } from '@/services/industriaProducao';
 import { PlusCircle, Search, LayoutGrid, List } from 'lucide-react';
 import { Loader2 } from 'lucide-react';
@@ -30,6 +31,7 @@ export default function OrdensPage() {
   const location = useLocation();
   const navigate = useNavigate();
   const [initialPrefill, setInitialPrefill] = useState<React.ComponentProps<typeof OrdemFormPanel>['initialPrefill']>();
+  const [draftTipoOrdem, setDraftTipoOrdem] = useState<'industrializacao' | 'beneficiamento'>('industrializacao');
   const [kanbanRefresh, setKanbanRefresh] = useState(0);
 
   const tipoOrdem = (searchParams.get('tipo') === 'beneficiamento' ? 'beneficiamento' : 'industrializacao') as
@@ -69,6 +71,7 @@ export default function OrdensPage() {
         ? ((location.state as any)?.prefill as React.ComponentProps<typeof OrdemFormPanel>['initialPrefill'] | undefined)
         : undefined;
     setInitialPrefill(statePrefill);
+    setDraftTipoOrdem(tipoOrdem);
     setSelectedId(null);
     setIsFormOpen(true);
     const next = new URLSearchParams(searchParams);
@@ -133,6 +136,7 @@ export default function OrdensPage() {
   }, [debouncedSearch, statusFilter, viewMode, tipoOrdem]);
 
   const handleNew = () => {
+    setDraftTipoOrdem(tipoOrdem);
     setSelectedId(null);
     setIsFormOpen(true);
   };
@@ -143,9 +147,10 @@ export default function OrdensPage() {
   };
 
   const handleClone = async (order: OrdemIndustria) => {
-    if (tipoOrdem === 'industrializacao') return;
     try {
-      const cloned = await cloneOrdem(order.id);
+      const cloned = tipoOrdem === 'industrializacao'
+        ? await cloneOrdemProducao(order.id)
+        : await cloneOrdem(order.id);
       setSelectedId(cloned.id);
       setIsFormOpen(true);
     } catch (e) {
@@ -167,8 +172,16 @@ export default function OrdensPage() {
   const handleSuccess = () => {
     if (viewMode === 'list') fetchOrders();
     if (viewMode === 'kanban') setKanbanRefresh(k => k + 1);
-    if (!selectedId) handleClose();
-    if (selectedId) handleClose();
+  };
+
+  const handleDraftTipoChange = (nextTipo: 'industrializacao' | 'beneficiamento') => {
+    if (selectedId) return; // só para novas ordens
+    const next = new URLSearchParams(searchParams);
+    next.set('tipo', nextTipo);
+    setStatusFilter('');
+    setSearchParams(next, { replace: true });
+    setInitialPrefill(undefined);
+    setDraftTipoOrdem(nextTipo);
   };
 
   return (
@@ -257,7 +270,7 @@ export default function OrdensPage() {
                     <Loader2 className="animate-spin text-blue-600 w-10 h-10" />
                 </div>
                 ) : (
-                <OrdensTable orders={orders} onEdit={handleEdit} onClone={tipoOrdem === 'beneficiamento' ? handleClone : undefined} />
+                <OrdensTable orders={orders} onEdit={handleEdit} onClone={handleClone} />
                 )}
             </div>
         ) : (
@@ -266,6 +279,7 @@ export default function OrdensPage() {
                 search={debouncedSearch}
                 statusFilter={statusFilter}
                 onOpenOrder={(order: any) => handleOpenFromKanban({ ...(order as any), tipo_ordem: 'industrializacao' })}
+                onCloneOrder={(order: any) => handleClone({ ...(order as any), tipo_ordem: 'industrializacao' })}
               />
             ) : (
               <IndustriaKanbanBoard
@@ -282,18 +296,34 @@ export default function OrdensPage() {
       <Modal
         isOpen={isFormOpen}
         onClose={handleClose}
-        title={selectedId ? 'Editar Ordem' : (tipoOrdem === 'beneficiamento' ? 'Nova Ordem de Beneficiamento' : 'Nova Ordem de Industrialização')}
+        title={
+          selectedId
+            ? 'Editar Ordem'
+            : ((selectedId ? tipoOrdem : draftTipoOrdem) === 'beneficiamento'
+              ? 'Nova Ordem de Beneficiamento'
+              : 'Nova Ordem de Industrialização')
+        }
         size="6xl"
       >
-        {tipoOrdem === 'industrializacao' ? (
-          <ProducaoFormPanel ordemId={selectedId} onSaveSuccess={handleSuccess} onClose={handleClose} />
+        {(selectedId ? tipoOrdem : draftTipoOrdem) === 'industrializacao' ? (
+          <ProducaoFormPanel
+            ordemId={selectedId}
+            onSaveSuccess={handleSuccess}
+            onClose={handleClose}
+            allowTipoOrdemChange={!selectedId}
+            onTipoOrdemChange={handleDraftTipoChange}
+            onOpenOrder={(id) => setSelectedId(id)}
+          />
         ) : (
           <OrdemFormPanel
             ordemId={selectedId}
-            initialTipoOrdem={tipoOrdem}
+            initialTipoOrdem={selectedId ? tipoOrdem : draftTipoOrdem}
             initialPrefill={selectedId ? undefined : initialPrefill}
+            allowTipoOrdemChange={!selectedId && !initialPrefill}
+            onTipoOrdemChange={handleDraftTipoChange}
             onSaveSuccess={handleSuccess}
             onClose={handleClose}
+            onOpenOrder={(id) => setSelectedId(id)}
           />
         )}
       </Modal>

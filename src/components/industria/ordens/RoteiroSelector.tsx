@@ -8,10 +8,11 @@ interface Props {
     ordemId: string;
     produtoId: string;
     tipoBom?: 'producao' | 'beneficiamento';
+    disabled?: boolean;
     onApplied: (roteiro: RoteiroListItem) => void;
 }
 
-export default function RoteiroSelector({ ordemId, produtoId, tipoBom, onApplied }: Props) {
+export default function RoteiroSelector({ ordemId, produtoId, tipoBom, disabled, onApplied }: Props) {
     const [isOpen, setIsOpen] = useState(false);
     const [roteiros, setRoteiros] = useState<RoteiroListItem[]>([]);
     const [loading, setLoading] = useState(false);
@@ -51,8 +52,10 @@ export default function RoteiroSelector({ ordemId, produtoId, tipoBom, onApplied
         <>
             <button
                 onClick={() => setIsOpen(true)}
-                className="flex items-center gap-2 text-sm font-medium text-blue-600 hover:text-blue-800 hover:bg-blue-50 px-3 py-2 rounded-lg transition-colors"
-                disabled={!produtoId}
+                className={`flex items-center gap-2 text-sm font-medium px-3 py-2 rounded-lg transition-colors ${
+                    disabled ? 'text-gray-400 cursor-not-allowed' : 'text-blue-600 hover:text-blue-800 hover:bg-blue-50'
+                }`}
+                disabled={!produtoId || !!disabled}
             >
                 <FileText size={16} /> Selecionar Roteiro
             </button>

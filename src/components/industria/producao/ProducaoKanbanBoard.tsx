@@ -17,9 +17,10 @@ type Props = {
   search?: string;
   statusFilter?: string;
   onOpenOrder?: (order: OrdemProducao) => void;
+  onCloneOrder?: (order: OrdemProducao) => void;
 };
 
-const ProducaoKanbanBoard: React.FC<Props> = ({ search, statusFilter, onOpenOrder }) => {
+const ProducaoKanbanBoard: React.FC<Props> = ({ search, statusFilter, onOpenOrder, onCloneOrder }) => {
   const [items, setItems] = useState<OrdemProducao[]>([]);
   const [loading, setLoading] = useState(true);
   const { addToast } = useToast();
@@ -92,6 +93,7 @@ const ProducaoKanbanBoard: React.FC<Props> = ({ search, statusFilter, onOpenOrde
             title={col.title} 
             items={getItemsForColumn(col.id)}
             onOpenOrder={onOpenOrder as any}
+            onCloneOrder={onCloneOrder as any}
           />
         ))}
       </div>

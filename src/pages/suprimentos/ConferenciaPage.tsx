@@ -1,5 +1,5 @@
 import React, { useMemo, useRef, useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useLocation, useParams, useNavigate } from 'react-router-dom';
 import { getRecebimento, listRecebimentoItens, conferirItem, finalizarRecebimentoV2, setRecebimentoClassificacao, syncMateriaisClienteFromRecebimento, updateRecebimentoItemProduct, Recebimento, RecebimentoItem } from '@/services/recebimento';
 import { Loader2, ArrowLeft, CheckCircle, AlertTriangle, Save, Layers, RefreshCw } from 'lucide-react';
 import { useToast } from '@/contexts/ToastProvider';
@@ -12,6 +12,7 @@ import PartnerFormPanel from '@/components/partners/PartnerFormPanel';
 export default function ConferenciaPage() {
     const { id } = useParams<{ id: string }>();
     const navigate = useNavigate();
+    const location = useLocation();
     const { addToast } = useToast();
 
     const [recebimento, setRecebimento] = useState<Recebimento | null>(null);
@@ -28,6 +29,7 @@ export default function ConferenciaPage() {
     const [resolvendoSugestao, setResolvendoSugestao] = useState(false);
     const [isCreateClienteOpen, setIsCreateClienteOpen] = useState(false);
     const [syncingMateriaisCliente, setSyncingMateriaisCliente] = useState(false);
+    const [showItens, setShowItens] = useState(true);
 
     const digitsOnly = (value?: string | null) => (value || '').replace(/\D/g, '');
 
@@ -54,6 +56,14 @@ export default function ConferenciaPage() {
     useEffect(() => {
         if (id) loadData(id);
     }, [id]);
+
+    const detailsViewParam = useMemo(() => new URLSearchParams(location.search).get('view') === 'details', [location.search]);
+
+    useEffect(() => {
+        if (detailsViewParam && recebimento?.status === 'concluido') {
+            setShowItens(false);
+        }
+    }, [detailsViewParam, recebimento?.status]);
 
     const loadData = async (recId: string) => {
         setLoading(true);
@@ -98,6 +108,10 @@ export default function ConferenciaPage() {
     const handleFinalizar = async () => {
         if (!id) return;
         if (finalizing) return;
+        if (recebimento?.status === 'cancelado') {
+            addToast('Recebimento cancelado não pode ser finalizado.', 'warning');
+            return;
+        }
 
         // Verifica se há pendências
         const pendentes = itens.filter(i => i.quantidade_conferida === 0);
@@ -281,6 +295,9 @@ export default function ConferenciaPage() {
     if (!recebimento) return <div className="p-12 text-center">Recebimento não encontrado.</div>;
 
     const isConcluido = recebimento.status === 'concluido';
+    const isCancelado = recebimento.status === 'cancelado';
+    const isLocked = isConcluido || isCancelado;
+    const isDetailsView = (isConcluido || isCancelado) && detailsViewParam;
 
     return (
         <div className="p-6 max-w-7xl mx-auto">
@@ -289,13 +306,15 @@ export default function ConferenciaPage() {
                     <ArrowLeft size={20} />
                 </button>
                 <div>
-                    <h1 className="text-2xl font-bold text-gray-800">Conferência de Recebimento</h1>
+                    <h1 className="text-2xl font-bold text-gray-800">
+                        {isConcluido ? 'Detalhes do Recebimento' : 'Conferência de Recebimento'}
+                    </h1>
                     <p className="text-gray-600">
                         Nota: {recebimento.fiscal_nfe_imports?.numero} - {recebimento.fiscal_nfe_imports?.emitente_nome}
                     </p>
                 </div>
                 <div className="ml-auto">
-                    {!isConcluido && (
+                    {!isLocked && (
                         <button
                             onClick={handleFinalizar}
                             disabled={finalizing}
@@ -305,9 +324,9 @@ export default function ConferenciaPage() {
                             Finalizar Recebimento
                         </button>
                     )}
-                    {isConcluido && (
+                    {isLocked && (
                         <div className="flex items-center gap-2">
-                            {recebimento?.classificacao === 'material_cliente' && (
+                            {isConcluido && recebimento?.classificacao === 'material_cliente' && (
                                 <button
                                     type="button"
                                     onClick={handleResyncMateriaisCliente}
@@ -321,109 +340,144 @@ export default function ConferenciaPage() {
                                     Sincronizar Materiais
                                 </button>
                             )}
-                            <span className="bg-green-100 text-green-800 px-4 py-2 rounded-lg font-bold flex items-center gap-2">
-                                <CheckCircle size={20} />
-                                Recebimento Concluído
-                            </span>
+                            <button
+                                type="button"
+                                onClick={() => setShowItens(v => !v)}
+                                className="bg-gray-100 text-gray-800 px-4 py-2 rounded-lg font-bold hover:bg-gray-200"
+                                title={showItens ? 'Ocultar itens do recebimento' : 'Mostrar itens do recebimento'}
+                            >
+                                {showItens ? 'Ocultar Itens' : 'Mostrar Itens'}
+                            </button>
+                            {isConcluido ? (
+                                <span className="bg-green-100 text-green-800 px-4 py-2 rounded-lg font-bold flex items-center gap-2">
+                                    <CheckCircle size={20} />
+                                    Recebimento Concluído
+                                </span>
+                            ) : (
+                                <span className="bg-orange-100 text-orange-800 px-4 py-2 rounded-lg font-bold flex items-center gap-2">
+                                    <AlertTriangle size={20} />
+                                    Recebimento Cancelado
+                                </span>
+                            )}
                         </div>
                     )}
                 </div>
             </div>
 
-            <div className="bg-white rounded-xl shadow overflow-hidden">
-                <table className="min-w-full divide-y divide-gray-200">
-                    <thead className="bg-gray-50">
-                        <tr>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Produto (XML)</th>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Produto (Sistema)</th>
-                            <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Qtd. Nota</th>
-                            <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Qtd. Conferida</th>
-                            <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase">Status</th>
-                            <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase">Ações</th>
-                        </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-200">
-                        {itens.map(item => (
-                            <tr key={item.id} className={item.status === 'divergente' && item.quantidade_conferida > 0 ? 'bg-red-50' : ''}>
-                                <td className="px-6 py-4">
-                                    <div className="font-medium text-gray-900">{item.fiscal_nfe_import_items?.xprod}</div>
-                                    <div className="text-xs text-gray-500">Cód: {item.fiscal_nfe_import_items?.cprod}</div>
-                                </td>
-                                <td className="px-6 py-4">
-                                    {item.produtos ? (
-                                        <>
-                                            <div className="text-gray-900">{item.produtos.nome}</div>
-                                            <div className="text-xs text-gray-500">{item.produtos.sku}</div>
-                                        </>
-                                    ) : (
-                                        <div className="w-full max-w-xs">
-                                            <ItemAutocomplete
-                                                onSelect={async (prod) => {
-                                                    try {
-                                                        await updateRecebimentoItemProduct(item.id, prod.id);
-                                                        // Update local state
-                                                        setItens(prev => prev.map(i =>
-                                                            i.id === item.id
-                                                                ? { ...i, produto_id: prod.id, produtos: { nome: prod.descricao, sku: prod.sku || null, unidade: prod.unidade || 'UN' } }
-                                                                : i
-                                                        ));
-                                                        addToast('Produto vinculado com sucesso!', 'success');
-                                                    } catch (e) {
-                                                        addToast('Erro ao vincular produto.', 'error');
-                                                    }
-                                                }}
-                                                placeholder="Vincular produto..."
-                                                onlySales={false}
-                                                type="product"
-                                                disabled={isConcluido}
-                                            />
-                                        </div>
-                                    )}
-                                </td>
-                                <td className="px-6 py-4 text-right font-medium text-gray-700">
-                                    {item.quantidade_xml}
-                                </td>
-                                <td className="px-6 py-4 text-right">
-                                    {isConcluido ? (
-                                        <span className="font-bold">{item.quantidade_conferida}</span>
-                                    ) : (
-                                        <input
-                                            type="number"
-                                            className="w-24 p-2 border rounded text-right focus:ring-2 focus:ring-blue-500"
-                                            defaultValue={item.quantidade_conferida}
-                                            onBlur={(e) => {
-                                                const promise = handleConferencia(item.id, Number(e.target.value));
-                                                lastSavePromiseRef.current = promise;
-                                            }}
-                                        />
-                                    )}
-                                </td>
-                                <td className="px-6 py-4 text-center">
-                                    {item.status === 'ok' && <CheckCircle className="mx-auto text-green-500" size={20} />}
-                                    {item.status === 'divergente' && item.quantidade_conferida > 0 && <AlertTriangle className="mx-auto text-red-500" size={20} />}
-                                    {item.status === 'pendente' && <span className="text-gray-400">-</span>}
-                                    {saving === item.id && <Loader2 className="mx-auto animate-spin text-blue-500" size={20} />}
-                                </td>
-                                <td className="px-6 py-4 text-center">
-                                    <button
-                                        onClick={() => handleGerarOP(item)}
-                                        disabled={!isConcluido}
-                                        className={`p-2 rounded-lg transition-colors flex items-center gap-1 mx-auto text-xs font-medium ${
-                                            isConcluido 
-                                            ? 'text-purple-600 hover:text-purple-800 hover:bg-purple-50' 
-                                            : 'text-gray-400 cursor-not-allowed'
-                                        }`}
-                                        title={isConcluido ? "Gerar Ordem de Produção" : "Finalize a conferência para gerar a ordem"}
-                                    >
-                                        <Layers size={16} />
-                                        Gerar OP
-                                    </button>
-                                </td>
+            {isDetailsView && (
+                isConcluido ? (
+                    <div className="mb-6 rounded-xl border border-green-200 bg-green-50 p-4 text-green-900">
+                        <div className="font-semibold">Recebimento concluído</div>
+                        <div className="text-sm text-green-800">
+                            A conferência já foi realizada no fluxo anterior. Aqui você pode apenas consultar os detalhes.
+                        </div>
+                    </div>
+                ) : (
+                    <div className="mb-6 rounded-xl border border-orange-200 bg-orange-50 p-4 text-orange-900">
+                        <div className="font-semibold">Recebimento cancelado</div>
+                        <div className="text-sm text-orange-800">
+                            Este recebimento foi cancelado (estornado). Não é possível editar ou finalizar.
+                        </div>
+                    </div>
+                )
+            )}
+
+            {showItens && (
+                <div className="bg-white rounded-xl shadow overflow-hidden">
+                    <table className="min-w-full divide-y divide-gray-200">
+                        <thead className="bg-gray-50">
+                            <tr>
+                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Produto (XML)</th>
+                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Produto (Sistema)</th>
+                                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Qtd. Nota</th>
+                                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Qtd. Conferida</th>
+                                <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase">Status</th>
+                                <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase">Ações</th>
                             </tr>
-                        ))}
-                    </tbody>
-                </table>
-            </div>
+                        </thead>
+                        <tbody className="divide-y divide-gray-200">
+                            {itens.map(item => (
+                                <tr key={item.id} className={item.status === 'divergente' && item.quantidade_conferida > 0 ? 'bg-red-50' : ''}>
+                                    <td className="px-6 py-4">
+                                        <div className="font-medium text-gray-900">{item.fiscal_nfe_import_items?.xprod}</div>
+                                        <div className="text-xs text-gray-500">Cód: {item.fiscal_nfe_import_items?.cprod}</div>
+                                    </td>
+                                    <td className="px-6 py-4">
+                                        {item.produtos ? (
+                                            <>
+                                                <div className="text-gray-900">{item.produtos.nome}</div>
+                                                <div className="text-xs text-gray-500">{item.produtos.sku}</div>
+                                            </>
+                                        ) : (
+                                            <div className="w-full max-w-xs">
+                                                <ItemAutocomplete
+                                                    onSelect={async (prod) => {
+                                                        try {
+                                                            await updateRecebimentoItemProduct(item.id, prod.id);
+                                                            // Update local state
+                                                            setItens(prev => prev.map(i =>
+                                                                i.id === item.id
+                                                                    ? { ...i, produto_id: prod.id, produtos: { nome: prod.descricao, sku: prod.sku || null, unidade: prod.unidade || 'UN' } }
+                                                                    : i
+                                                            ));
+                                                            addToast('Produto vinculado com sucesso!', 'success');
+                                                        } catch (e) {
+                                                            addToast('Erro ao vincular produto.', 'error');
+                                                        }
+                                                    }}
+                                                    placeholder="Vincular produto..."
+                                                    onlySales={false}
+                                                    type="product"
+                                                    disabled={isLocked}
+                                                />
+                                            </div>
+                                        )}
+                                    </td>
+                                    <td className="px-6 py-4 text-right font-medium text-gray-700">
+                                        {item.quantidade_xml}
+                                    </td>
+                                    <td className="px-6 py-4 text-right">
+                                        {isLocked ? (
+                                            <span className="font-bold">{item.quantidade_conferida}</span>
+                                        ) : (
+                                            <input
+                                                type="number"
+                                                className="w-24 p-2 border rounded text-right focus:ring-2 focus:ring-blue-500"
+                                                defaultValue={item.quantidade_conferida}
+                                                onBlur={(e) => {
+                                                    const promise = handleConferencia(item.id, Number(e.target.value));
+                                                    lastSavePromiseRef.current = promise;
+                                                }}
+                                            />
+                                        )}
+                                    </td>
+                                    <td className="px-6 py-4 text-center">
+                                        {item.status === 'ok' && <CheckCircle className="mx-auto text-green-500" size={20} />}
+                                        {item.status === 'divergente' && item.quantidade_conferida > 0 && <AlertTriangle className="mx-auto text-red-500" size={20} />}
+                                        {item.status === 'pendente' && <span className="text-gray-400">-</span>}
+                                        {saving === item.id && <Loader2 className="mx-auto animate-spin text-blue-500" size={20} />}
+                                    </td>
+                                    <td className="px-6 py-4 text-center">
+                                        <button
+                                            onClick={() => handleGerarOP(item)}
+                                            disabled={!isConcluido}
+                                            className={`p-2 rounded-lg transition-colors flex items-center gap-1 mx-auto text-xs font-medium ${
+                                                isConcluido 
+                                                ? 'text-purple-600 hover:text-purple-800 hover:bg-purple-50' 
+                                                : 'text-gray-400 cursor-not-allowed'
+                                            }`}
+                                            title={isConcluido ? "Gerar Ordem de Produção" : "Finalize a conferência para gerar a ordem"}
+                                        >
+                                            <Layers size={16} />
+                                            Gerar OP
+                                        </button>
+                                    </td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                </div>
+            )}
 
             <Modal
                 isOpen={isClassificacaoOpen}
