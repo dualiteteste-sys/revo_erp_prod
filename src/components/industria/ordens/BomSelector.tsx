@@ -3,6 +3,7 @@ import { listBoms, BomListItem, aplicarBomProducao, aplicarBomBeneficiamento } f
 import { Loader2, FileCog } from 'lucide-react';
 import { useToast } from '@/contexts/ToastProvider';
 import Modal from '@/components/ui/Modal';
+import { logger } from '@/lib/logger';
 
 interface Props {
   ordemId: string;
@@ -38,7 +39,8 @@ export default function BomSelector({ ordemId, produtoId, tipoOrdem, openOnMount
       const data = await listBoms(searchTerm, targetProdutoId, tipoOrdem, true);
       setBoms(data);
     } catch (e) {
-      console.error(e);
+      logger.error('[Indústria][OP] Falha ao listar BOMs (selector)', e, { produtoId, tipoOrdem, searchTerm, filterByProduct });
+      addToast((e as any)?.message || 'Erro ao listar fichas técnicas (BOM).', 'error');
     } finally {
       setLoading(false);
     }

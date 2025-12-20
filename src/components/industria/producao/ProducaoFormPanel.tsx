@@ -27,6 +27,7 @@ import OperacoesGrid from './OperacoesGrid';
 import { formatOrderNumber } from '@/lib/utils';
 import { listUnidades, UnidadeMedida } from '@/services/unidades';
 import Modal from '@/components/ui/Modal';
+import { logger } from '@/lib/logger';
 
 interface Props {
   ordemId: string | null;
@@ -69,7 +70,12 @@ export default function ProducaoFormPanel({
   });
 
   useEffect(() => {
-    listUnidades().then(setUnidades).catch(console.error);
+    listUnidades()
+      .then(setUnidades)
+      .catch((e: any) => {
+        logger.error('[Indústria][OP] Falha ao carregar unidades', e);
+        addToast(e?.message || 'Erro ao carregar unidades.', 'error');
+      });
   }, []);
 
   useEffect(() => {
@@ -88,7 +94,7 @@ export default function ProducaoFormPanel({
       const bloqueio = checkEntregaBlocked(data);
       setEntregaBloqueada(bloqueio);
     } catch (e) {
-      console.error(e);
+      logger.error('[Indústria][OP] Falha ao carregar ordem', e, { ordemId: idToLoad });
       addToast('Erro ao carregar ordem.', 'error');
       if (ordemId) onClose();
     } finally {
@@ -251,7 +257,7 @@ export default function ProducaoFormPanel({
       });
       await loadDetails(formData.id);
     } catch (e: any) {
-      console.error(e);
+      logger.error('[Indústria][OP] Falha ao salvar referência de BOM no cabeçalho', e, { ordemId: formData.id, bomId: bom?.id });
       addToast('BOM aplicada, mas erro ao salvar referência no cabeçalho.', 'warning');
       await loadDetails(formData.id);
     }

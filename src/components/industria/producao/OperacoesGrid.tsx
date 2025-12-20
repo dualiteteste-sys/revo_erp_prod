@@ -14,6 +14,7 @@ import DecimalInput from '../../ui/forms/DecimalInput';
 import OperacaoQaModal from './OperacaoQaModal';
 import RegistrarInspecaoModal from './RegistrarInspecaoModal';
 import OperacaoDocsModal from './OperacaoDocsModal';
+import { logger } from '@/lib/logger';
 
 interface Props {
     ordemId: string;
@@ -54,7 +55,7 @@ export default function OperacoesGrid({ ordemId }: Props) {
                 }
             }
         } catch (e: any) {
-            console.error(e);
+            logger.error('[Indústria][Produção] Falha ao carregar operações', e, { ordemId });
             addToast('Erro ao carregar operações', 'error');
         } finally {
             setLoading(false);

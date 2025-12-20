@@ -3,6 +3,7 @@
 // Evita 401 por headers manuais e padroniza erros/logs.
 
 import { supabase } from "@/lib/supabaseClient"; // mantenha seu caminho atual
+import { logger } from "@/lib/logger";
 
 type RpcArgs = Record<string, any>;
 
@@ -24,7 +25,7 @@ export async function callRpc<T = unknown>(fn: string, args: RpcArgs = {}): Prom
     const msg = error.message || "RPC_ERROR";
     const details = (error as any).details ?? null;
 
-    console.error("[RPC][ERROR]", fn, `HTTP_${status}`, msg, { message: msg, details });
+    logger.error("[RPC][ERROR]", error, { fn, status, message: msg, details });
 
     if (/Invalid API key/i.test(msg)) {
       throw new RpcError(

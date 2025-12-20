@@ -3,6 +3,7 @@ import { listRoteiros, RoteiroListItem } from '@/services/industriaRoteiros';
 import { Loader2, FileText } from 'lucide-react';
 import { useToast } from '@/contexts/ToastProvider';
 import Modal from '@/components/ui/Modal';
+import { logger } from '@/lib/logger';
 
 interface Props {
     ordemId: string;
@@ -27,7 +28,7 @@ export default function RoteiroSelector({ ordemId, produtoId, tipoBom, disabled,
             const data = await listRoteiros(searchTerm, targetProdutoId, tipoBom, true);
             setRoteiros(data);
         } catch (e) {
-            console.error(e);
+            logger.error('[Indústria][OP] Falha ao listar roteiros (selector)', e, { produtoId, tipoBom, searchTerm, filterByProduct });
             addToast('Erro ao listar roteiros.', 'error');
         } finally {
             setLoading(false);

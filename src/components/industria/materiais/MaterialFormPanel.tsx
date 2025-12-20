@@ -11,6 +11,7 @@ import ItemAutocomplete from '@/components/os/ItemAutocomplete';
 import Select from '@/components/ui/forms/Select';
 import { OsItemSearchResult } from '@/services/os';
 import { listUnidades, UnidadeMedida } from '@/services/unidades';
+import { logger } from '@/lib/logger';
 
 interface Props {
   materialId: string | null;
@@ -31,7 +32,12 @@ export default function MaterialFormPanel({ materialId, onSaveSuccess, onClose }
   const [unidades, setUnidades] = useState<UnidadeMedida[]>([]);
 
   useEffect(() => {
-    listUnidades().then(setUnidades).catch(console.error);
+    listUnidades()
+      .then(setUnidades)
+      .catch((e: any) => {
+        logger.error('[Indústria][Materiais do Cliente] Falha ao carregar unidades', e);
+        addToast(e?.message || 'Erro ao carregar unidades.', 'error');
+      });
     if (materialId) {
       loadDetails();
     }
@@ -42,7 +48,7 @@ export default function MaterialFormPanel({ materialId, onSaveSuccess, onClose }
       const data = await getMaterialClienteDetails(materialId!);
       setFormData(data);
     } catch (e) {
-      console.error(e);
+      logger.error('[Indústria][Materiais do Cliente] Falha ao carregar material', e, { materialId });
       addToast('Erro ao carregar material.', 'error');
       onClose();
     } finally {

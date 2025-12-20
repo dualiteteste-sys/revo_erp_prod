@@ -17,6 +17,7 @@ import {
 import { useToast } from '@/contexts/ToastProvider';
 import PlanoCaracteristicaModal from './PlanoCaracteristicaModal';
 import { getRoteiroDetails, listRoteiros, RoteiroEtapa, RoteiroListItem } from '@/services/industriaRoteiros';
+import { logger } from '@/lib/logger';
 
 interface Props {
   isOpen: boolean;
@@ -130,7 +131,8 @@ export default function PlanoInspecaoFormModal({ isOpen, onClose, planoId, onSav
         setEtapas([]);
       }
     } catch (error) {
-      console.error('[PlanosInspecao] Erro ao listar roteiros', error);
+      logger.error('[Indústria][QA] Erro ao listar roteiros (Plano de Inspeção)', error, { produtoId });
+      addToast('Erro ao listar roteiros do produto.', 'error');
       setRoteiros([]);
     }
   };
@@ -143,7 +145,8 @@ export default function PlanoInspecaoFormModal({ isOpen, onClose, planoId, onSav
         setForm(prev => ({ ...prev, roteiro_etapa_id: '' }));
       }
     } catch (error) {
-      console.error('[PlanosInspecao] Erro ao carregar etapas', error);
+      logger.error('[Indústria][QA] Erro ao carregar etapas (Plano de Inspeção)', error, { roteiroId });
+      addToast('Erro ao carregar etapas do roteiro.', 'error');
       setEtapas([]);
     }
   };

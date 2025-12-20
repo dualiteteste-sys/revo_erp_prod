@@ -15,6 +15,7 @@ import AndonGrid from '@/components/industria/chao/AndonGrid';
 import { useChaoDeFabricaRealtime } from '@/hooks/useChaoDeFabricaRealtime';
 import { useMemo } from 'react';
 import { createOperacaoDocSignedUrl, listOperacaoDocs, OperacaoDoc } from '@/services/industriaOperacaoDocs';
+import { logger } from '@/lib/logger';
 
 export default function ChaoDeFabricaPage() {
   const { addToast } = useToast();
@@ -105,10 +106,15 @@ export default function ChaoDeFabricaPage() {
   }, [addToast, processAlerts]);
 
   useEffect(() => {
-    listCentrosTrabalho(undefined, true).then(data => {
-        setCentros(data);
-        if (data.length > 0) setSelectedCentroId(data[0].id);
-    });
+    listCentrosTrabalho(undefined, true)
+      .then(data => {
+          setCentros(data);
+          if (data.length > 0) setSelectedCentroId(data[0].id);
+      })
+      .catch((e: any) => {
+        logger.error('[Indústria][Chão] Falha ao carregar centros de trabalho', e);
+        addToast(e?.message || 'Erro ao carregar centros de trabalho.', 'error');
+      });
 
     fetchOverview();
   }, [fetchOverview]);
@@ -139,7 +145,8 @@ export default function ChaoDeFabricaPage() {
         setSelectedOp(data[0] || null);
       }
     } catch (e) {
-      console.error(e);
+      logger.error('[Indústria][Chão] Falha ao carregar fila do centro', e, { selectedCentroId });
+      addToast((e as any)?.message || 'Falha ao carregar fila do centro.', 'error');
     } finally {
       isFetchingFila.current = false;
       if (withLoader) setLoading(false);

@@ -4,6 +4,7 @@ import { AlertCircle, CheckCircle, Factory, RefreshCw } from 'lucide-react';
 import GlassCard from '@/components/ui/GlassCard';
 import ReactECharts from 'echarts-for-react';
 import { motion } from 'framer-motion';
+import { logger } from '@/lib/logger';
 
 export default function IndustriaDashboardPage() {
   const [stats, setStats] = useState<DashboardStats | null>(null);
@@ -19,7 +20,7 @@ export default function IndustriaDashboardPage() {
       if (!data) throw new Error("Dados não recebidos do servidor.");
       setStats(data);
     } catch (err: any) {
-      console.error("Erro ao carregar dashboard:", err);
+      logger.error('[Indústria][Dashboard] Erro ao carregar dashboard', err);
       // Tratamento de erro amigável
       setError(err.message || "Não foi possível carregar os dados do dashboard.");
     } finally {

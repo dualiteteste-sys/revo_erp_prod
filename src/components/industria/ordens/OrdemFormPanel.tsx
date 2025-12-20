@@ -18,6 +18,7 @@ import { ensureMaterialClienteV2 } from '@/services/industriaMateriais';
 import type { MaterialClienteListItem } from '@/services/industriaMateriais';
 import { useNavigate } from 'react-router-dom';
 import Modal from '@/components/ui/Modal';
+import { logger } from '@/lib/logger';
 
 interface Props {
   ordemId: string | null;
@@ -154,7 +155,7 @@ export default function OrdemFormPanel({
       setFormData(data);
       setMaterialCliente(null);
     } catch (e) {
-      console.error(e);
+      logger.error('[Indústria][OP/OB] Falha ao carregar ordem', e, { ordemId: idToLoad });
       addToast('Erro ao carregar ordem.', 'error');
       if (ordemId) onClose();
     } finally {

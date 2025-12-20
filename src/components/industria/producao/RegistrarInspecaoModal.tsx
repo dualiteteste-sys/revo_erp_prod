@@ -12,6 +12,7 @@ import {
     registrarInspecao
 } from '@/services/industriaProducao';
 import { useToast } from '@/contexts/ToastProvider';
+import { logger } from '@/lib/logger';
 
 interface Props {
     operacao: OrdemOperacao | null;
@@ -63,7 +64,12 @@ export default function RegistrarInspecaoModal({ operacao, tipo, isOpen, onClose
             motivo_refugo_id: '',
             observacoes: ''
         });
-        getMotivosRefugo().then(setMotivos).catch(console.error);
+        getMotivosRefugo()
+          .then(setMotivos)
+          .catch((e: any) => {
+            logger.error('[Indústria][QA] Falha ao carregar motivos de refugo', e, { operacaoId: operacao.id });
+            addToast(e?.message || 'Erro ao carregar motivos de refugo.', 'error');
+          });
     }, [isOpen, operacao]);
 
     const handleChange = (field: keyof FormState, value: any) => {

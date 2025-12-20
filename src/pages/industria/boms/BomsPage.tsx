@@ -9,6 +9,7 @@ import BomsTable from '@/components/industria/boms/BomsTable';
 import BomFormPanel from '@/components/industria/boms/BomFormPanel';
 import { useToast } from '@/contexts/ToastProvider';
 import { useSearchParams } from 'react-router-dom';
+import { logger } from '@/lib/logger';
 
 export default function BomsPage() {
   const [boms, setBoms] = useState<BomListItem[]>([]);
@@ -41,7 +42,8 @@ export default function BomsPage() {
       const data = await listBoms(debouncedSearch, undefined, typeFilter as any || undefined);
       setBoms(data);
     } catch (e) {
-      console.error(e);
+      logger.error('[Indústria][BOMs] Falha ao carregar BOMs', e, { q: debouncedSearch, typeFilter });
+      addToast((e as any)?.message || 'Erro ao carregar BOMs.', 'error');
     } finally {
       setLoading(false);
     }

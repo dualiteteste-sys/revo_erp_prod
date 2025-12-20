@@ -9,6 +9,7 @@ import RoteirosTable from '@/components/industria/roteiros/RoteirosTable';
 import RoteiroFormPanel from '@/components/industria/roteiros/RoteiroFormPanel';
 import { useToast } from '@/contexts/ToastProvider';
 import { useSearchParams } from 'react-router-dom';
+import { logger } from '@/lib/logger';
 
 export default function RoteirosPage() {
   const [roteiros, setRoteiros] = useState<RoteiroListItem[]>([]);
@@ -42,7 +43,7 @@ export default function RoteirosPage() {
       const data = await listRoteiros(debouncedSearch, undefined, typeFilter as any || undefined);
       setRoteiros(data);
     } catch (e) {
-      console.error(e);
+      logger.error('[Indústria][Roteiros] Falha ao carregar roteiros', e, { q: debouncedSearch, typeFilter });
       const message = (e as any)?.message || 'Erro ao carregar roteiros.';
       if (
         !hasShownRpcHint.current &&

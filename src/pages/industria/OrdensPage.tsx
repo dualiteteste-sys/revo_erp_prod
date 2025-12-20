@@ -14,6 +14,7 @@ import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { useToast } from '@/contexts/ToastProvider';
 import ProducaoFormPanel from '@/components/industria/producao/ProducaoFormPanel';
 import ProducaoKanbanBoard from '@/components/industria/producao/ProducaoKanbanBoard';
+import { logger } from '@/lib/logger';
 
 export default function OrdensPage() {
   const { addToast } = useToast();
@@ -110,7 +111,7 @@ export default function OrdensPage() {
         setOrders(data);
       }
     } catch (e) {
-      console.error(e);
+      logger.error('[Indústria][Ordens] Falha ao carregar ordens', e, { tipoOrdem, statusFilter, q: debouncedSearch });
       const message = (e as any)?.message || 'Erro ao carregar ordens.';
       if (
         !hasShownRpcHint.current &&
@@ -154,7 +155,8 @@ export default function OrdensPage() {
       setSelectedId(cloned.id);
       setIsFormOpen(true);
     } catch (e) {
-      console.error(e);
+      logger.error('[Indústria][Ordens] Falha ao criar revisão (clone)', e, { tipoOrdem, ordemId: order.id });
+      addToast((e as any)?.message || 'Falha ao criar revisão desta ordem.', 'error');
     }
   };
 

@@ -15,6 +15,7 @@ import { useToast } from '../../../contexts/ToastProvider';
 import DecimalInput from '../../ui/forms/DecimalInput';
 import NovoMotivoModal from '../qualidade/NovoMotivoModal';
 import { Plus, Trash2, AlertTriangle } from 'lucide-react';
+import { logger } from '@/lib/logger';
 
 interface Props {
     isOpen: boolean;
@@ -44,7 +45,10 @@ export default function ApontamentoModal({ isOpen, onClose, operacao, onSuccess 
     const loadMotivos = () => {
         getMotivosRefugo()
             .then(setMotivosRefugo)
-            .catch(err => console.error('Erro ao carregar motivos:', err));
+            .catch((err) => {
+                logger.error('[Indústria][Produção] Falha ao carregar motivos de refugo', err, { operacaoId: operacao.id });
+                addToast('Erro ao carregar motivos de refugo.', 'error');
+            });
     };
 
     const loadApontamentos = async () => {
@@ -52,8 +56,9 @@ export default function ApontamentoModal({ isOpen, onClose, operacao, onSuccess 
         try {
             const data = await listApontamentos(operacao.id);
             setApontamentos(data);
-        } catch (err) {
-            console.error(err);
+        } catch (err: any) {
+            logger.error('[Indústria][Produção] Falha ao carregar apontamentos', err, { operacaoId: operacao.id });
+            addToast(err?.message || 'Erro ao carregar apontamentos.', 'error');
         } finally {
             setApontamentosLoading(false);
         }

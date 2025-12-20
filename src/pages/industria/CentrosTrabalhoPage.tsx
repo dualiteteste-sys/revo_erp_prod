@@ -8,6 +8,7 @@ import CentrosTrabalhoTable from '@/components/industria/centros-trabalho/Centro
 import CentroTrabalhoFormPanel from '@/components/industria/centros-trabalho/CentroTrabalhoFormPanel';
 import { useToast } from '@/contexts/ToastProvider';
 import { useSearchParams } from 'react-router-dom';
+import { logger } from '@/lib/logger';
 
 export default function CentrosTrabalhoPage() {
   const [centros, setCentros] = useState<CentroTrabalho[]>([]);
@@ -39,7 +40,8 @@ export default function CentrosTrabalhoPage() {
       const data = await listCentrosTrabalho(debouncedSearch);
       setCentros(data);
     } catch (e) {
-      console.error(e);
+      logger.error('[Indústria][CT] Falha ao carregar centros de trabalho', e, { q: debouncedSearch });
+      addToast((e as any)?.message || 'Erro ao carregar centros de trabalho.', 'error');
     } finally {
       setLoading(false);
     }

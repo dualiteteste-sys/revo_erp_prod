@@ -14,6 +14,7 @@ import ImportarXmlSuprimentosModal from '@/components/industria/materiais/Import
 import { listRecebimentos, setRecebimentoClassificacao, Recebimento } from '@/services/recebimento';
 import ClientAutocomplete from '@/components/common/ClientAutocomplete';
 import { useNavigate } from 'react-router-dom';
+import { logger } from '@/lib/logger';
 
 export default function MateriaisClientePage() {
   const [materiais, setMateriais] = useState<MaterialClienteListItem[]>([]);
@@ -51,7 +52,8 @@ export default function MateriaisClientePage() {
       setMateriais(data);
       setTotalCount(count);
     } catch (e) {
-      console.error(e);
+      logger.error('[Indústria][Materiais do Cliente] Falha ao carregar materiais', e, { q: debouncedSearch, activeFilter, page, pageSize });
+      addToast((e as any)?.message || 'Erro ao carregar materiais.', 'error');
     } finally {
       setLoading(false);
     }
@@ -103,7 +105,7 @@ export default function MateriaisClientePage() {
       setRecebimentosPendentes(pendentes);
       if (pendentes.length === 1) setRecebimentoSelecionadoId(pendentes[0].id);
     } catch (e: any) {
-      console.error(e);
+      logger.error('[Indústria][Materiais do Cliente] Falha ao carregar recebimentos pendentes', e);
       addToast(e.message || 'Erro ao carregar recebimentos.', 'error');
     } finally {
       setLoadingRecebimentos(false);
@@ -126,7 +128,7 @@ export default function MateriaisClientePage() {
       setIsClassificarOpen(false);
       navigate(`/app/suprimentos/recebimento/${recebimentoSelecionadoId}`);
     } catch (e: any) {
-      console.error(e);
+      logger.error('[Indústria][Materiais do Cliente] Falha ao classificar recebimento', e, { recebimentoSelecionadoId, clienteSelecionadoId });
       addToast(e.message || 'Erro ao classificar recebimento.', 'error');
     } finally {
       setClassificando(false);

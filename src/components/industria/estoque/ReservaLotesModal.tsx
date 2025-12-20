@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { getLotesDisponiveis, reservarEstoque, EstoqueLote } from '@/services/industriaProducao';
 import { useToast } from '@/contexts/ToastProvider';
 import { Loader2 } from 'lucide-react';
+import { logger } from '@/lib/logger';
 
 interface ReservaLotesModalProps {
     isOpen: boolean;
@@ -45,7 +46,7 @@ const ReservaLotesModal: React.FC<ReservaLotesModalProps> = ({
             const data = await getLotesDisponiveis(produtoId);
             setLotes(data);
         } catch (error) {
-            console.error('Erro ao carregar lotes:', error);
+            logger.error('[Indústria][Estoque] Falha ao carregar lotes disponíveis', error, { produtoId });
             addToast('Erro ao carregar lotes disponíveis.', 'error');
         } finally {
             setLoading(false);
@@ -110,7 +111,7 @@ const ReservaLotesModal: React.FC<ReservaLotesModalProps> = ({
             onSuccess();
             onClose();
         } catch (error: any) {
-            console.error(error);
+            logger.error('[Indústria][Estoque] Falha ao reservar lotes', error, { ordemId, componenteId, produtoId });
             addToast('Erro ao realizar reservas: ' + (error.message || 'Erro desconhecido'), 'error');
         } finally {
             setSubmitting(false);
