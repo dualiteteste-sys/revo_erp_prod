@@ -19,7 +19,6 @@ import {
   pcpApsPreviewSequenciarCentro,
   pcpApsResequenciarCentro,
   pcpApsSequenciarTodosCts,
-  pcpReplanejarCentroSobrecarga,
   pcpReplanejarCentroSobrecargaApplySubset,
   pcpReplanCentroSobrecargaPreview,
   setOperacaoApsLock,
@@ -32,7 +31,7 @@ import {
   PcpParetoItem,
   PcpReplanPreviewRow
 } from '@/services/industriaProducao';
-import { getCentroApsConfig } from '@/services/industriaCentros';
+import { getCentroApsConfig, upsertCentroApsConfig } from '@/services/industriaCentros';
 import { differenceInCalendarDays, format } from 'date-fns';
 import Modal from '@/components/ui/Modal';
 
@@ -95,7 +94,6 @@ export default function PcpDashboardPage() {
   const [ganttCtFilter, setGanttCtFilter] = useState<string>('all');
   const [ganttStatusFilter, setGanttStatusFilter] = useState<string>('all');
   const [ganttApsFilter, setGanttApsFilter] = useState<string>('all');
-  const [applyingCtId, setApplyingCtId] = useState<string | null>(null);
   const [sequencingCtId, setSequencingCtId] = useState<string | null>(null);
 
   const [apsModal, setApsModal] = useState<{
@@ -115,6 +113,8 @@ export default function PcpDashboardPage() {
   const [apsRunChanges, setApsRunChanges] = useState<any[]>([]);
   const [apsFreezeDias, setApsFreezeDias] = useState<number>(0);
   const [apsConfigLoading, setApsConfigLoading] = useState(false);
+  const [apsFreezeDraft, setApsFreezeDraft] = useState<string>('0');
+  const [apsConfigSaving, setApsConfigSaving] = useState(false);
   const [manualSeqRows, setManualSeqRows] = useState<PcpGanttOperacao[]>([]);
   const [manualSeqDirty, setManualSeqDirty] = useState(false);
   const [manualSeqSaving, setManualSeqSaving] = useState(false);
@@ -123,9 +123,7 @@ export default function PcpDashboardPage() {
   const [batchRows, setBatchRows] = useState<PcpApsBatchSequencingRow[]>([]);
   const [batchPreviewed, setBatchPreviewed] = useState(false);
   const [replanModalOpen, setReplanModalOpen] = useState(false);
-  const [replanApplying, setReplanApplying] = useState(false);
   const [replanResults, setReplanResults] = useState<Record<string, any>>({});
-  const [replanSelected, setReplanSelected] = useState<Record<string, boolean>>({});
   const [replanPreview, setReplanPreview] = useState<Record<string, {
     rows: PcpReplanPreviewRow[];
     summary: {
@@ -189,29 +187,6 @@ export default function PcpDashboardPage() {
     setTimeout(() => ganttSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 50);
   }, []);
 
-  const applyReplanForCt = useCallback(async (ctId: string, peakDay?: string) => {
-    if (!peakDay) return;
-    if (!confirm('Aplicar replanejamento automático? Isso vai mover operações (menor prioridade) para dias com folga no período.')) return;
-    setApplyingCtId(ctId);
-    try {
-      const result = await pcpReplanejarCentroSobrecarga(ctId, peakDay, endDate);
-      const moved = result?.moved ?? 0;
-      const remaining = result?.remaining_overload_hours ?? 0;
-      const freezeInfo = result?.freeze_until ? ` (Freeze até ${format(new Date(result.freeze_until), 'dd/MM')})` : '';
-      addToast(
-        moved > 0
-          ? `Replanejamento aplicado: ${moved} operação(ões) movida(s).${remaining > 0.1 ? ` Restante ~${remaining.toFixed(1)}h.` : ''} (Undo disponível em Sequenciar)`
-          : `${result?.message || 'Nada para mover no período.'}${freezeInfo}`,
-        moved > 0 ? 'success' : 'warning'
-      );
-      await loadData();
-    } catch (e: any) {
-      addToast(e?.message || 'Falha ao aplicar replanejamento.', 'error');
-    } finally {
-      setApplyingCtId(null);
-    }
-  }, [addToast, endDate]);
-
   const runSequencerForCt = useCallback(async (ctId: string) => {
     setApsModal({ open: true, ctId, ctNome: capacitySummary.find(c => c.id === ctId)?.nome });
   }, [addToast, endDate, startDate, openGanttForCt]);
@@ -233,13 +208,22 @@ export default function PcpDashboardPage() {
     setApsSelectedRunId(null);
     setApsRunChanges([]);
     setApsFreezeDias(0);
+    setApsFreezeDraft('0');
+    setApsConfigSaving(false);
     setManualSeqRows([]);
     setManualSeqDirty(false);
     loadApsRuns(apsModal.ctId);
     setApsConfigLoading(true);
     getCentroApsConfig(apsModal.ctId)
-      .then((cfg) => setApsFreezeDias(Number(cfg?.freeze_dias ?? 0) || 0))
-      .catch(() => setApsFreezeDias(0))
+      .then((cfg) => {
+        const freezeDias = Number(cfg?.freeze_dias ?? 0) || 0;
+        setApsFreezeDias(freezeDias);
+        setApsFreezeDraft(String(freezeDias));
+      })
+      .catch(() => {
+        setApsFreezeDias(0);
+        setApsFreezeDraft('0');
+      })
       .finally(() => setApsConfigLoading(false));
   }, [apsModal.open, apsModal.ctId, loadApsRuns]);
 
@@ -369,6 +353,10 @@ export default function PcpDashboardPage() {
 
   const handleApplySequencing = useCallback(async () => {
     if (!apsModal.ctId) return;
+    if (!apsPreview) {
+      addToast('Gere o Preview antes de aplicar o APS.', 'warning');
+      return;
+    }
     if (!confirm('Aplicar sequenciamento automático (capacidade finita)? Isso vai atualizar as datas previstas das operações elegíveis.')) return;
     setSequencingCtId(apsModal.ctId);
     try {
@@ -391,7 +379,7 @@ export default function PcpDashboardPage() {
     } finally {
       setSequencingCtId(null);
     }
-  }, [addToast, apsModal.ctId, endDate, loadApsRuns, openGanttForCt, startDate]);
+  }, [addToast, apsModal.ctId, apsPreview, endDate, loadApsRuns, openGanttForCt, startDate]);
 
   const handleToggleLockOperacao = useCallback(async (operacaoId: string, locked: boolean, currentReason?: string | null) => {
     const nextLocked = !locked;
@@ -599,11 +587,6 @@ export default function PcpDashboardPage() {
     return rows.sort((a, b) => (b.overload_hours || 0) - (a.overload_hours || 0));
   }, [capacitySummary, capacitySuggestions]);
 
-  const selectedReplanCandidates = useMemo(
-    () => replanCandidates.filter((r) => replanSelected[r.centro_id] !== false),
-    [replanCandidates, replanSelected]
-  );
-
   const openReplanModal = useCallback(() => {
     setReplanModalOpen(true);
     setReplanResults({});
@@ -613,34 +596,7 @@ export default function PcpDashboardPage() {
     setReplanPreviewReasonFilter('all');
     setReplanPreviewSelectedOps({});
     setReplanApplyingSubsetCtId(null);
-    setReplanSelected(
-      replanCandidates.reduce((acc, r) => {
-        acc[r.centro_id] = true;
-        return acc;
-      }, {} as Record<string, boolean>)
-    );
-  }, [replanCandidates]);
-
-  const applyReplanBatch = useCallback(async () => {
-    if (selectedReplanCandidates.length === 0) return;
-    if (!confirm(`Aplicar replanejamento automático para ${selectedReplanCandidates.length} CT(s) selecionado(s) com sobrecarga no período?`)) return;
-    setReplanApplying(true);
-    setReplanResults({});
-    try {
-      for (const item of selectedReplanCandidates) {
-        try {
-          const res = await pcpReplanejarCentroSobrecarga(item.centro_id, item.peak_day, endDate);
-          setReplanResults((prev) => ({ ...prev, [item.centro_id]: res }));
-        } catch (e: any) {
-          setReplanResults((prev) => ({ ...prev, [item.centro_id]: { message: e?.message || 'Falha', moved: 0 } }));
-        }
-      }
-      addToast('Replanejamento em lote concluído.', 'success');
-      await loadData();
-    } finally {
-      setReplanApplying(false);
-    }
-  }, [addToast, endDate, loadData, selectedReplanCandidates]);
+  }, []);
 
   const previewReplanForCt = useCallback(async (ctId: string, ctNome: string, peakDay: string) => {
     setReplanPreviewingCtId(ctId);
@@ -711,6 +667,13 @@ export default function PcpDashboardPage() {
       setReplanPreviewingCtId(null);
     }
   }, [addToast, endDate, replanPreview]);
+
+  const openReplanFromCapacityCard = useCallback((ctId: string, ctNome: string, peakDay: string) => {
+    openReplanModal();
+    setTimeout(() => {
+      openReplanPreviewDetailsForCt(ctId, ctNome, peakDay);
+    }, 0);
+  }, [openReplanModal, openReplanPreviewDetailsForCt]);
 
   const applyReplanSelectedOpsForCurrentCt = useCallback(async () => {
     const ctId = replanPreviewDetails.ctId;
@@ -1149,19 +1112,8 @@ export default function PcpDashboardPage() {
           <div className="bg-amber-50 border border-amber-100 rounded-lg p-4 text-sm text-amber-900 space-y-1">
             <div>Período: <span className="font-semibold">{format(new Date(startDate), 'dd/MM')}</span> → <span className="font-semibold">{format(new Date(endDate), 'dd/MM')}</span></div>
             <div className="text-xs text-amber-800">
-              Move operações de menor prioridade do dia de pico para dias com folga (respeita Freeze/Locked). Gera runs e permite Undo por CT.
+              Preview obrigatório: revise em “Detalhes” e aplique somente as operações desejadas (respeita Freeze/Locked). Gera runs e permite Undo por CT.
             </div>
-          </div>
-
-          <div className="flex flex-wrap gap-2">
-            <button
-              type="button"
-              onClick={applyReplanBatch}
-              disabled={replanApplying || selectedReplanCandidates.length === 0}
-              className="px-4 py-2 rounded-lg bg-amber-600 text-white hover:bg-amber-500 text-sm font-semibold disabled:opacity-50"
-            >
-              {replanApplying ? 'Aplicando…' : `Aplicar selecionados (${selectedReplanCandidates.length}/${replanCandidates.length})`}
-            </button>
           </div>
 
           <div className="bg-white border rounded-lg overflow-hidden">
@@ -1170,22 +1122,6 @@ export default function PcpDashboardPage() {
               <table className="min-w-full text-xs">
                 <thead className="bg-gray-50 text-gray-600">
                   <tr>
-                    <th className="px-3 py-2 text-left w-[1%]">
-                      <input
-                        type="checkbox"
-                        checked={replanCandidates.length > 0 && replanCandidates.every((r) => replanSelected[r.centro_id] !== false)}
-                        onChange={(e) => {
-                          const checked = e.target.checked;
-                          setReplanSelected(
-                            replanCandidates.reduce((acc, r) => {
-                              acc[r.centro_id] = checked;
-                              return acc;
-                            }, {} as Record<string, boolean>)
-                          );
-                        }}
-                        title="Selecionar todos"
-                      />
-                    </th>
                     <th className="px-3 py-2 text-left">Centro</th>
                     <th className="px-3 py-2 text-right">Sobrecarga</th>
                     <th className="px-3 py-2 text-left">Pico</th>
@@ -1204,18 +1140,8 @@ export default function PcpDashboardPage() {
                     const msg = res?.message as string | undefined;
                     const freezeUntil = res?.freeze_until as string | undefined;
                     const previewLoading = replanPreviewingCtId === r.centro_id;
-                    const isSelected = replanSelected[r.centro_id] !== false;
                     return (
                       <tr key={r.centro_id} className="border-t">
-                        <td className="px-3 py-2">
-                          <input
-                            type="checkbox"
-                            checked={isSelected}
-                            onChange={(e) => setReplanSelected((prevSel) => ({ ...prevSel, [r.centro_id]: e.target.checked }))}
-                            disabled={replanApplying}
-                            title="Incluir este CT no lote"
-                          />
-                        </td>
                         <td className="px-3 py-2 text-gray-900 font-medium">{r.centro_nome}</td>
                         <td className="px-3 py-2 text-right text-gray-700">{(r.overload_hours || 0).toFixed(1)}h</td>
                         <td className="px-3 py-2 text-gray-700">{format(new Date(r.peak_day), 'dd/MM')}</td>
@@ -1248,7 +1174,7 @@ export default function PcpDashboardPage() {
                               {runId ? <div className="text-[11px] text-gray-500">Run {runId.slice(0, 8)}</div> : null}
                             </div>
                           ) : (
-                            <span className="text-gray-400">{replanApplying ? '...' : '—'}</span>
+                            <span className="text-gray-400">—</span>
                           )}
                         </td>
                         <td className="px-3 py-2">
@@ -1257,7 +1183,7 @@ export default function PcpDashboardPage() {
                               type="button"
                               className="text-[11px] px-2 py-1 rounded-md border bg-white hover:bg-gray-50 disabled:opacity-50"
                               onClick={() => previewReplanForCt(r.centro_id, r.centro_nome, r.peak_day)}
-                              disabled={replanApplying || previewLoading}
+                              disabled={previewLoading || replanApplyingSubsetCtId !== null}
                               title="Simula o que seria movido e por quê (sem aplicar)"
                             >
                               {previewLoading ? 'Preview…' : 'Preview'}
@@ -1266,7 +1192,7 @@ export default function PcpDashboardPage() {
                               type="button"
                               className="text-[11px] px-2 py-1 rounded-md border bg-white hover:bg-gray-50 disabled:opacity-50"
                               onClick={() => openReplanPreviewDetailsForCt(r.centro_id, r.centro_nome, r.peak_day)}
-                              disabled={replanApplying || previewLoading}
+                              disabled={previewLoading || replanApplyingSubsetCtId !== null}
                               title="Ver operações do preview (motivos, old→new)"
                             >
                               Detalhes
@@ -1281,7 +1207,7 @@ export default function PcpDashboardPage() {
                             <button
                               type="button"
                               className="text-[11px] px-2 py-1 rounded-md border border-rose-200 bg-rose-50 text-rose-700 hover:bg-rose-100 disabled:opacity-50"
-                              disabled={!runId || replanApplying}
+                              disabled={!runId || replanApplyingSubsetCtId !== null}
                               onClick={() => runId && undoBatchRun(runId)}
                               title={!runId ? 'Sem run (nada aplicado)' : 'Desfaz o run'}
                             >
@@ -1294,7 +1220,7 @@ export default function PcpDashboardPage() {
                   })}
                   {replanCandidates.length === 0 && (
                     <tr>
-                      <td colSpan={8} className="px-3 py-6 text-sm text-gray-500">
+                      <td colSpan={7} className="px-3 py-6 text-sm text-gray-500">
                         Nenhum CT com sobrecarga no período selecionado.
                       </td>
                     </tr>
@@ -1398,7 +1324,7 @@ export default function PcpDashboardPage() {
                   <button
                     type="button"
                     className="ml-auto px-3 py-1.5 rounded-md bg-amber-600 text-white hover:bg-amber-500 text-xs font-semibold disabled:opacity-50"
-                    disabled={!ctId || selectedMovableCount === 0 || replanApplying || (replanApplyingSubsetCtId === ctId)}
+                    disabled={!ctId || selectedMovableCount === 0 || replanApplyingSubsetCtId !== null}
                     onClick={applyReplanSelectedOpsForCurrentCt}
                   >
                     {replanApplyingSubsetCtId === ctId ? 'Aplicando…' : `Aplicar selecionadas (${selectedMovableCount})`}
@@ -1461,7 +1387,7 @@ export default function PcpDashboardPage() {
                                     type="checkbox"
                                     checked={replanPreviewSelectedOps[r.operacao_id] === true}
                                     onChange={(e) => setReplanPreviewSelectedOps((prevSel) => ({ ...prevSel, [r.operacao_id]: e.target.checked }))}
-                                    disabled={replanApplying || (replanApplyingSubsetCtId === ctId)}
+                                    disabled={replanApplyingSubsetCtId !== null}
                                     title="Incluir na aplicação"
                                   />
                                 ) : null}
@@ -1716,11 +1642,11 @@ export default function PcpDashboardPage() {
                           {suggestion.overloadHours > 0.01 && (
                             <button
                               type="button"
-                              disabled={applyingCtId === ct.id}
-                              onClick={() => applyReplanForCt(ct.id, suggestion.peakDay)}
+                              disabled={!suggestion.peakDay || replanPreviewingCtId === ct.id || replanApplyingSubsetCtId !== null}
+                              onClick={() => suggestion.peakDay && openReplanFromCapacityCard(ct.id, ct.nome, suggestion.peakDay)}
                               className="text-xs font-semibold text-blue-700 hover:text-blue-800 underline-offset-2 hover:underline disabled:opacity-50"
                             >
-                              {applyingCtId === ct.id ? 'Aplicando…' : 'Aplicar'}
+                              {replanPreviewingCtId === ct.id ? 'Abrindo…' : 'Replanejar'}
                             </button>
                           )}
                           <button
@@ -1996,8 +1922,49 @@ export default function PcpDashboardPage() {
         <div className="p-6 space-y-4">
           <div className="bg-slate-50 border border-slate-100 rounded-lg p-4 text-sm text-gray-700 space-y-1">
             <div>Período: <span className="font-semibold">{format(new Date(startDate), 'dd/MM')}</span> → <span className="font-semibold">{format(new Date(endDate), 'dd/MM')}</span></div>
-            <div className="text-xs text-gray-600">
-              Freeze: <span className="font-semibold">{apsConfigLoading ? '…' : `${apsFreezeDias} dia(s)`}</span> (APS não altera operações dentro do horizonte)
+            <div className="flex flex-wrap items-center gap-2 text-xs text-gray-600">
+              <span>
+                Freeze atual:{' '}
+                <span className="font-semibold">{apsConfigLoading ? '…' : `${apsFreezeDias} dia(s)`}</span>
+              </span>
+              <span className="text-gray-400">•</span>
+              <span>Editar:</span>
+              <input
+                type="number"
+                min={0}
+                max={365}
+                step={1}
+                value={apsFreezeDraft}
+                onChange={(e) => setApsFreezeDraft(e.target.value)}
+                disabled={apsConfigLoading || apsConfigSaving || !apsModal.ctId}
+                className="w-20 border rounded-md px-2 py-1 text-xs bg-white"
+                title="Horizon (dias) congelado: APS não altera operações dentro deste período"
+              />
+              <button
+                type="button"
+                className="text-[11px] px-2 py-1 rounded-md border bg-white hover:bg-gray-50 disabled:opacity-50"
+                disabled={apsConfigLoading || apsConfigSaving || !apsModal.ctId || String(apsFreezeDias) === String(apsFreezeDraft)}
+                onClick={async () => {
+                  if (!apsModal.ctId) return;
+                  const freezeDias = Math.max(0, Math.min(365, Math.floor(Number(apsFreezeDraft) || 0)));
+                  setApsConfigSaving(true);
+                  try {
+                    await upsertCentroApsConfig(apsModal.ctId, freezeDias);
+                    setApsFreezeDias(freezeDias);
+                    setApsFreezeDraft(String(freezeDias));
+                    addToast('Freeze atualizado com sucesso.', 'success');
+                    await fetchPreview(true);
+                  } catch (e: any) {
+                    addToast(e?.message || 'Falha ao atualizar Freeze.', 'error');
+                  } finally {
+                    setApsConfigSaving(false);
+                  }
+                }}
+                title="Salva o Freeze do CT e atualiza o preview"
+              >
+                {apsConfigSaving ? 'Salvando…' : 'Salvar'}
+              </button>
+              <span className="text-gray-500">(APS ignora operações no horizonte)</span>
             </div>
             <div className="text-xs text-gray-500">
               Preview não altera nada. Aplicar cria um log e permite desfazer (undo) se as datas ainda não foram alteradas manualmente depois.
@@ -2026,8 +1993,9 @@ export default function PcpDashboardPage() {
             <button
               type="button"
               onClick={handleApplySequencing}
-              disabled={apsLoading || sequencingCtId !== null || !apsModal.ctId}
+              disabled={apsLoading || sequencingCtId !== null || !apsModal.ctId || !apsPreview}
               className="px-4 py-2 rounded-lg bg-indigo-600 text-white hover:bg-indigo-500 text-sm font-semibold disabled:opacity-50"
+              title={!apsPreview ? 'Gere o Preview antes de aplicar' : undefined}
             >
               {sequencingCtId ? 'Sequenciando…' : 'Aplicar'}
             </button>
