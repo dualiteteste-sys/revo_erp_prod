@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useRef, useState, useEffect } from 'react';
 import { ArrowLeft, ArrowRight, CheckCircle2, Loader2, Save, TriangleAlert, XCircle } from 'lucide-react';
 import { OrdemIndustriaDetails, OrdemPayload, saveOrdem, getOrdemDetails, manageComponente, manageEntrega, OrdemEntrega, gerarExecucaoOrdem, cloneOrdem } from '@/services/industria';
 import { useToast } from '@/contexts/ToastProvider';
@@ -60,6 +60,9 @@ export default function OrdemFormPanel({
   const [isSaving, setIsSaving] = useState(false);
   const [isGeneratingExecucao, setIsGeneratingExecucao] = useState(false);
   const [activeTab, setActiveTab] = useState<'dados' | 'componentes' | 'entregas' | 'historico'>('dados');
+  const [highlightComponenteId, setHighlightComponenteId] = useState<string | null>(null);
+  const [highlightEntregaId, setHighlightEntregaId] = useState<string | null>(null);
+  const highlightTimerRef = useRef<number | null>(null);
   const [materialCliente, setMaterialCliente] = useState<MaterialClienteListItem | null>(null);
   const [wizardStep, setWizardStep] = useState<0 | 1 | 2>(0);
   const [autoOpenBomSelector, setAutoOpenBomSelector] = useState(false);
@@ -822,6 +825,7 @@ export default function OrdemFormPanel({
               onUpdateItem={handleUpdateComponente}
               isAddingItem={false}
               readOnly={isLocked}
+              highlightItemId={highlightComponenteId}
             />
           </>
         )}
@@ -835,6 +839,7 @@ export default function OrdemFormPanel({
             maxQuantity={formData.quantidade_planejada || 0}
             currentTotal={totalEntregue}
             showBillingStatus={formData.tipo_ordem === 'beneficiamento'}
+            highlightEntregaId={highlightEntregaId}
           />
         )}
 
@@ -848,10 +853,32 @@ export default function OrdemFormPanel({
                 'industria_ordens_entregas',
               ]}
               onNavigate={(row) => {
-                if (row.table_name === 'industria_ordens') setActiveTab('dados');
-                else if (row.table_name === 'industria_ordens_componentes') setActiveTab('componentes');
-                else if (row.table_name === 'industria_ordens_entregas') setActiveTab('entregas');
+                if (highlightTimerRef.current) window.clearTimeout(highlightTimerRef.current);
+                setHighlightComponenteId(null);
+                setHighlightEntregaId(null);
+
+                const targetId =
+                  row.record_id ||
+                  (typeof row.new_data?.id === 'string' ? (row.new_data.id as string) : null) ||
+                  (typeof row.old_data?.id === 'string' ? (row.old_data.id as string) : null);
+
+                const tableName = row.table_name || '';
+
+                if (tableName === 'industria_ordens') setActiveTab('dados');
+                else if (tableName === 'industria_ordens_componentes' || tableName.includes('componentes')) {
+                  setActiveTab('componentes');
+                  if (targetId) setHighlightComponenteId(targetId);
+                }
+                else if (tableName === 'industria_ordens_entregas' || tableName.includes('entregas')) {
+                  setActiveTab('entregas');
+                  if (targetId) setHighlightEntregaId(targetId);
+                }
                 else setActiveTab('dados');
+
+                highlightTimerRef.current = window.setTimeout(() => {
+                  setHighlightComponenteId(null);
+                  setHighlightEntregaId(null);
+                }, 4500);
               }}
             />
           ) : (

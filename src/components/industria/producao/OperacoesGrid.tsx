@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
     OrdemOperacao,
     getOperacoes,
@@ -18,12 +18,14 @@ import { logger } from '@/lib/logger';
 
 interface Props {
     ordemId: string;
+    highlightOperacaoId?: string | null;
 }
 
-export default function OperacoesGrid({ ordemId }: Props) {
+export default function OperacoesGrid({ ordemId, highlightOperacaoId }: Props) {
     const [operacoes, setOperacoes] = useState<OrdemOperacao[]>([]);
     const [loading, setLoading] = useState(true);
     const { addToast } = useToast();
+    const tableRef = useRef<HTMLDivElement | null>(null);
 
     // Controle de modal de apontamento
     const [selectedOp, setSelectedOp] = useState<OrdemOperacao | null>(null);
@@ -65,6 +67,13 @@ export default function OperacoesGrid({ ordemId }: Props) {
     useEffect(() => {
         loadData();
     }, [ordemId]);
+
+    useEffect(() => {
+        if (!highlightOperacaoId) return;
+        const el = tableRef.current?.querySelector(`[data-operacao-id="${highlightOperacaoId}"]`) as HTMLElement | null;
+        if (!el) return;
+        el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }, [highlightOperacaoId, operacoes.length]);
 
     const handleEvento = async (op: OrdemOperacao, evento: 'iniciar' | 'pausar' | 'retomar' | 'concluir') => {
         if (evento === 'concluir') {
@@ -154,7 +163,7 @@ export default function OperacoesGrid({ ordemId }: Props) {
 
     return (
         <div className="space-y-4">
-            <div className="overflow-x-auto">
+            <div ref={tableRef} className="overflow-x-auto">
                 <table className="min-w-full divide-y divide-gray-200">
                     <thead className="bg-gray-50">
                         <tr>
@@ -180,7 +189,11 @@ export default function OperacoesGrid({ ordemId }: Props) {
                             const podeTransferir = op.permite_overlap && disponivelTransferencia > 0 && op.status !== 'concluida' && ipLiberado;
 
                             return (
-                                <tr key={op.id}>
+                                <tr
+                                    key={op.id}
+                                    data-operacao-id={op.id}
+                                    className={highlightOperacaoId === op.id ? 'bg-yellow-50 ring-2 ring-yellow-300 ring-inset' : undefined}
+                                >
                                     <td className="px-3 py-2 whitespace-nowrap text-sm text-gray-900">{op.sequencia}</td>
                                     <td className="px-3 py-2 whitespace-nowrap text-sm text-gray-900">
                                         {op.centro_trabalho_nome}

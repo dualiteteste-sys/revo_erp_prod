@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { OrdemEntrega } from '@/services/industria';
 import { Trash2, Plus, AlertCircle, Calendar, Package } from 'lucide-react';
 import Section from '@/components/ui/forms/Section';
@@ -13,7 +13,9 @@ interface OrdemEntregasProps {
   onRemoveEntrega: (entregaId: string) => void;
   readOnly?: boolean;
   maxQuantity: number;
+  currentTotal?: number;
   showBillingStatus?: boolean;
+  highlightEntregaId?: string | null;
 }
 
 const OrdemEntregas: React.FC<OrdemEntregasProps> = ({ 
@@ -22,7 +24,8 @@ const OrdemEntregas: React.FC<OrdemEntregasProps> = ({
   onRemoveEntrega, 
   readOnly, 
   maxQuantity, 
-  showBillingStatus = false 
+  showBillingStatus = false,
+  highlightEntregaId
 }) => {
   // Estado local para o formulário de nova entrega
   const [dataEntrega, setDataEntrega] = useState(new Date().toISOString().split('T')[0]);
@@ -38,6 +41,14 @@ const OrdemEntregas: React.FC<OrdemEntregasProps> = ({
   }, [entregas]);
 
   const saldoRestante = Math.max(0, maxQuantity - totalEntregue);
+  const tableRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    if (!highlightEntregaId) return;
+    const el = tableRef.current?.querySelector(`[data-entrega-id="${highlightEntregaId}"]`) as HTMLElement | null;
+    if (!el) return;
+    el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }, [highlightEntregaId, entregas.length]);
 
   const validateAndAdd = () => {
     setError(null);
@@ -187,7 +198,7 @@ const OrdemEntregas: React.FC<OrdemEntregasProps> = ({
             )}
 
             {/* Tabela de Entregas */}
-            <div className="border border-gray-200 rounded-xl overflow-hidden bg-white shadow-sm">
+            <div ref={tableRef} className="border border-gray-200 rounded-xl overflow-hidden bg-white shadow-sm">
                 <table className="min-w-full divide-y divide-gray-200">
                     <thead className="bg-gray-50">
                         <tr>
@@ -209,7 +220,8 @@ const OrdemEntregas: React.FC<OrdemEntregasProps> = ({
                                     animate={{ opacity: 1, backgroundColor: "#ffffff" }}
                                     exit={{ opacity: 0, backgroundColor: "#fef2f2" }}
                                     transition={{ duration: 0.3 }}
-                                    className="hover:bg-gray-50"
+                                    data-entrega-id={entrega.id}
+                                    className={`hover:bg-gray-50 ${highlightEntregaId === entrega.id ? 'bg-yellow-50 ring-2 ring-yellow-300 ring-inset' : ''}`}
                                 >
                                     <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
                                         <div className="flex items-center gap-2">

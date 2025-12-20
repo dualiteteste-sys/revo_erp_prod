@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { ArrowLeft, ArrowRight, CheckCircle2, Loader2, Play, Save, ShieldAlert, TriangleAlert, XCircle } from 'lucide-react';
 import {
   OrdemProducaoDetails,
@@ -51,6 +51,10 @@ export default function ProducaoFormPanel({
   const [loading, setLoading] = useState(!!ordemId);
   const [isSaving, setIsSaving] = useState(false);
   const [activeTab, setActiveTab] = useState<'dados' | 'componentes' | 'entregas' | 'operacoes' | 'historico'>('dados');
+  const [highlightComponenteId, setHighlightComponenteId] = useState<string | null>(null);
+  const [highlightEntregaId, setHighlightEntregaId] = useState<string | null>(null);
+  const [highlightOperacaoId, setHighlightOperacaoId] = useState<string | null>(null);
+  const highlightTimerRef = useRef<number | null>(null);
   const [unidades, setUnidades] = useState<UnidadeMedida[]>([]);
   const [showClosureModal, setShowClosureModal] = useState(false);
   const [entregaBloqueada, setEntregaBloqueada] = useState<{ blocked: boolean; reason?: string } | null>(null);
@@ -653,6 +657,7 @@ export default function ProducaoFormPanel({
                 onRefresh={() => loadDetails(formData.id)}
                 isAddingItem={false}
                 readOnly={isLocked}
+                highlightItemId={highlightComponenteId}
               />
             </>
           )
@@ -660,7 +665,7 @@ export default function ProducaoFormPanel({
 
         {
           activeTab === 'operacoes' && formData.id && (
-            <OperacoesGrid ordemId={formData.id} />
+            <OperacoesGrid ordemId={formData.id} highlightOperacaoId={highlightOperacaoId} />
           )
         }
 
@@ -683,6 +688,7 @@ export default function ProducaoFormPanel({
                 readOnly={isLocked || entregaBloqueada?.blocked}
                 maxQuantity={formData.quantidade_planejada || 0}
                 showBillingStatus={false}
+                highlightEntregaId={highlightEntregaId}
               />
             </div>
           )
@@ -699,11 +705,38 @@ export default function ProducaoFormPanel({
                 'industria_producao_operacoes',
               ]}
               onNavigate={(row) => {
-                if (row.table_name === 'industria_producao_ordens') setActiveTab('dados');
-                else if (row.table_name === 'industria_producao_componentes') setActiveTab('componentes');
-                else if (row.table_name === 'industria_producao_entregas') setActiveTab('entregas');
-                else if (row.table_name === 'industria_producao_operacoes') setActiveTab('operacoes');
+                if (highlightTimerRef.current) window.clearTimeout(highlightTimerRef.current);
+                setHighlightComponenteId(null);
+                setHighlightEntregaId(null);
+                setHighlightOperacaoId(null);
+
+                const targetId =
+                  row.record_id ||
+                  (typeof row.new_data?.id === 'string' ? (row.new_data.id as string) : null) ||
+                  (typeof row.old_data?.id === 'string' ? (row.old_data.id as string) : null);
+
+                const tableName = row.table_name || '';
+
+                if (tableName === 'industria_producao_ordens') setActiveTab('dados');
+                else if (tableName === 'industria_producao_componentes' || tableName.includes('componentes')) {
+                  setActiveTab('componentes');
+                  if (targetId) setHighlightComponenteId(targetId);
+                }
+                else if (tableName === 'industria_producao_entregas' || tableName.includes('entregas')) {
+                  setActiveTab('entregas');
+                  if (targetId) setHighlightEntregaId(targetId);
+                }
+                else if (tableName === 'industria_producao_operacoes' || tableName.includes('operacoes')) {
+                  setActiveTab('operacoes');
+                  if (targetId) setHighlightOperacaoId(targetId);
+                }
                 else setActiveTab('dados');
+
+                highlightTimerRef.current = window.setTimeout(() => {
+                  setHighlightComponenteId(null);
+                  setHighlightEntregaId(null);
+                  setHighlightOperacaoId(null);
+                }, 4500);
               }}
             />
           ) : (
