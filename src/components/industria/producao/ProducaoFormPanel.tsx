@@ -10,6 +10,7 @@ import {
   gerarOperacoes,
   registrarEntrega,
   deleteOrdemProducao,
+  cloneOrdemProducao,
   fecharOrdemProducao
 } from '@/services/industriaProducao';
 import { useToast } from '@/contexts/ToastProvider';
@@ -33,6 +34,7 @@ interface Props {
   onClose: () => void;
   allowTipoOrdemChange?: boolean;
   onTipoOrdemChange?: (tipo: 'industrializacao' | 'beneficiamento') => void;
+  onOpenOrder?: (ordemId: string) => void;
 }
 
 export default function ProducaoFormPanel({
@@ -41,6 +43,7 @@ export default function ProducaoFormPanel({
   onClose,
   allowTipoOrdemChange,
   onTipoOrdemChange,
+  onOpenOrder,
 }: Props) {
   const { addToast } = useToast();
   const [loading, setLoading] = useState(!!ordemId);
@@ -286,6 +289,22 @@ export default function ProducaoFormPanel({
       setActiveTab('operacoes');
     } catch (e: any) {
       addToast(e.message, 'error');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleCriarRevisao = async () => {
+    if (!formData.id) return;
+    if (!window.confirm('Criar uma revisão desta OP? Uma nova OP em rascunho será criada para você ajustar e liberar novamente.')) return;
+    setIsSaving(true);
+    try {
+      const cloned = await cloneOrdemProducao(formData.id);
+      addToast('Revisão criada.', 'success');
+      onSaveSuccess();
+      onOpenOrder?.(cloned.id);
+    } catch (e: any) {
+      addToast(e?.message || 'Não foi possível criar a revisão.', 'error');
     } finally {
       setIsSaving(false);
     }
@@ -686,6 +705,19 @@ export default function ProducaoFormPanel({
           >
             Fechar
           </button>
+
+          {formData.id && isCoreHeaderLocked && (
+            <button
+              type="button"
+              onClick={handleCriarRevisao}
+              disabled={isSaving}
+              className="inline-flex items-center px-4 py-2 border border-amber-200 rounded-md shadow-sm text-sm font-medium text-amber-900 bg-amber-50 hover:bg-amber-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-amber-500 disabled:opacity-50"
+              title="Cria uma nova OP em rascunho para ajustar após a liberação."
+            >
+              <Save size={20} className="mr-2" />
+              Criar revisão
+            </button>
+          )}
 
           {formData.id && (formData.status === 'rascunho' || formData.status === 'planejada') && (
             <button

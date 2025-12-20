@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { ArrowLeft, ArrowRight, CheckCircle2, Loader2, Save, TriangleAlert, XCircle } from 'lucide-react';
-import { OrdemIndustriaDetails, OrdemPayload, saveOrdem, getOrdemDetails, manageComponente, manageEntrega, OrdemEntrega, gerarExecucaoOrdem } from '@/services/industria';
+import { OrdemIndustriaDetails, OrdemPayload, saveOrdem, getOrdemDetails, manageComponente, manageEntrega, OrdemEntrega, gerarExecucaoOrdem, cloneOrdem } from '@/services/industria';
 import { useToast } from '@/contexts/ToastProvider';
 import Section from '@/components/ui/forms/Section';
 import Input from '@/components/ui/forms/Input';
@@ -38,6 +38,7 @@ interface Props {
   allowTipoOrdemChange?: boolean;
   onTipoOrdemChange?: (tipo: 'industrializacao' | 'beneficiamento') => void;
   onSaveSuccess: () => void;
+  onOpenOrder?: (ordemId: string) => void;
   onClose: () => void;
 }
 
@@ -48,6 +49,7 @@ export default function OrdemFormPanel({
   allowTipoOrdemChange,
   onTipoOrdemChange,
   onSaveSuccess,
+  onOpenOrder,
   onClose,
 }: Props) {
   const { addToast } = useToast();
@@ -442,6 +444,19 @@ export default function OrdemFormPanel({
     }
   };
 
+  const handleCriarRevisao = async () => {
+    if (!formData.id) return;
+    if (!window.confirm('Criar uma revisão desta ordem? Uma nova ordem em rascunho será criada para você ajustar e liberar novamente.')) return;
+    try {
+      const cloned = await cloneOrdem(formData.id);
+      addToast('Revisão criada.', 'success');
+      onSaveSuccess();
+      onOpenOrder?.(cloned.id);
+    } catch (e: any) {
+      addToast(e?.message || 'Não foi possível criar a revisão.', 'error');
+    }
+  };
+
   return (
     <div className="flex flex-col h-full">
       <div className="border-b border-white/20">
@@ -817,6 +832,17 @@ export default function OrdemFormPanel({
           Fechar
         </button>
         <div className="flex gap-3">
+          {formData.id && isHeaderLocked && (
+            <button
+              type="button"
+              onClick={handleCriarRevisao}
+              className="flex items-center gap-2 border border-amber-200 bg-amber-50 text-amber-900 font-bold py-2 px-4 rounded-lg hover:bg-amber-100"
+              title="Cria uma nova ordem em rascunho para ajustar após a execução já ter sido gerada."
+            >
+              <Save size={18} />
+              Criar revisão
+            </button>
+          )}
           {!isLocked && formData.id && !formData.execucao_ordem_id && (
             <button
               type="button"

@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { cloneOrdem, listOrdens, OrdemIndustria } from '@/services/industria';
+import { cloneOrdemProducao } from '@/services/industriaProducao';
 import { listOrdensProducao, OrdemProducao } from '@/services/industriaProducao';
 import { PlusCircle, Search, LayoutGrid, List } from 'lucide-react';
 import { Loader2 } from 'lucide-react';
@@ -146,9 +147,10 @@ export default function OrdensPage() {
   };
 
   const handleClone = async (order: OrdemIndustria) => {
-    if (tipoOrdem === 'industrializacao') return;
     try {
-      const cloned = await cloneOrdem(order.id);
+      const cloned = tipoOrdem === 'industrializacao'
+        ? await cloneOrdemProducao(order.id)
+        : await cloneOrdem(order.id);
       setSelectedId(cloned.id);
       setIsFormOpen(true);
     } catch (e) {
@@ -268,7 +270,7 @@ export default function OrdensPage() {
                     <Loader2 className="animate-spin text-blue-600 w-10 h-10" />
                 </div>
                 ) : (
-                <OrdensTable orders={orders} onEdit={handleEdit} onClone={tipoOrdem === 'beneficiamento' ? handleClone : undefined} />
+                <OrdensTable orders={orders} onEdit={handleEdit} onClone={handleClone} />
                 )}
             </div>
         ) : (
@@ -277,6 +279,7 @@ export default function OrdensPage() {
                 search={debouncedSearch}
                 statusFilter={statusFilter}
                 onOpenOrder={(order: any) => handleOpenFromKanban({ ...(order as any), tipo_ordem: 'industrializacao' })}
+                onCloneOrder={(order: any) => handleClone({ ...(order as any), tipo_ordem: 'industrializacao' })}
               />
             ) : (
               <IndustriaKanbanBoard
@@ -309,6 +312,7 @@ export default function OrdensPage() {
             onClose={handleClose}
             allowTipoOrdemChange={!selectedId}
             onTipoOrdemChange={handleDraftTipoChange}
+            onOpenOrder={(id) => setSelectedId(id)}
           />
         ) : (
           <OrdemFormPanel
@@ -319,6 +323,7 @@ export default function OrdensPage() {
             onTipoOrdemChange={handleDraftTipoChange}
             onSaveSuccess={handleSuccess}
             onClose={handleClose}
+            onOpenOrder={(id) => setSelectedId(id)}
           />
         )}
       </Modal>
