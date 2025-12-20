@@ -624,7 +624,7 @@ export default function ProducaoFormPanel({
       </div >
 
       <div className="flex justify-between p-4 border-t bg-gray-50 rounded-b-lg">
-        {formData.id && !isLocked ? (
+        {formData.id && !isLocked && formData.status === 'rascunho' ? (
           <button
             onClick={async () => {
               if (confirm('Tem certeza que deseja excluir esta Ordem de Produção? Esta ação não pode ser desfeita.')) {
