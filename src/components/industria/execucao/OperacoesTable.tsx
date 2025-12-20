@@ -1,11 +1,15 @@
 import React from 'react';
 import { Operacao } from '@/services/industriaExecucao';
-import { Package, User, Calendar, Clock } from 'lucide-react';
+import { Package, User, Calendar, Clock, FileText, PauseCircle, PlayCircle, CheckCircle2 } from 'lucide-react';
 import { formatOrderNumber } from '@/lib/utils';
 
 interface Props {
   operacoes: Operacao[];
   onUpdateStatus: (op: Operacao, newStatus: string) => void;
+  onOpenDocs?: (op: Operacao) => void;
+  onStart?: (op: Operacao) => void;
+  onPause?: (op: Operacao) => void;
+  onConclude?: (op: Operacao) => void;
 }
 
 const statusColors: Record<string, string> = {
@@ -18,7 +22,17 @@ const statusColors: Record<string, string> = {
   cancelada: 'bg-red-100 text-red-800',
 };
 
-export default function OperacoesTable({ operacoes, onUpdateStatus }: Props) {
+const STATUS_OPTIONS: Array<{ value: Operacao['status']; label: string }> = [
+  { value: 'planejada', label: 'Planejada' },
+  { value: 'liberada', label: 'Liberada' },
+  { value: 'em_execucao', label: 'Em execução' },
+  { value: 'em_espera', label: 'Em espera' },
+  { value: 'em_inspecao', label: 'Em inspeção' },
+  { value: 'concluida', label: 'Concluída' },
+  { value: 'cancelada', label: 'Cancelada' },
+];
+
+export default function OperacoesTable({ operacoes, onUpdateStatus, onOpenDocs, onStart, onPause, onConclude }: Props) {
   return (
     <div className="overflow-x-auto">
       <table className="min-w-full divide-y divide-gray-200">
@@ -30,6 +44,7 @@ export default function OperacoesTable({ operacoes, onUpdateStatus }: Props) {
             <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
             <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Previsão</th>
             <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase">%</th>
+            <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Ações</th>
           </tr>
         </thead>
         <tbody className="bg-white divide-y divide-gray-200">
@@ -54,9 +69,24 @@ export default function OperacoesTable({ operacoes, onUpdateStatus }: Props) {
                 {op.centro_trabalho_nome}
               </td>
               <td className="px-6 py-4">
-                <span className={`px-2 py-1 rounded-full text-xs font-semibold uppercase ${statusColors[op.status] || 'bg-gray-100'}`}>
-                  {op.status.replace(/_/g, ' ')}
-                </span>
+                <div className="flex items-center gap-2">
+                  <span className={`px-2 py-1 rounded-full text-xs font-semibold uppercase ${statusColors[op.status] || 'bg-gray-100'}`}>
+                    {op.status.replace(/_/g, ' ')}
+                  </span>
+                  <select
+                    value={op.status}
+                    onChange={(e) => onUpdateStatus(op, e.target.value)}
+                    className="text-xs border rounded-md px-2 py-1 bg-white"
+                    title="Alterar status manualmente"
+                    disabled={op.status === 'concluida' || op.status === 'cancelada'}
+                  >
+                    {STATUS_OPTIONS.map((opt) => (
+                      <option key={opt.value} value={opt.value}>
+                        {opt.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
               </td>
               <td className="px-6 py-4 text-sm text-gray-500">
                 <div className="flex flex-col">
@@ -72,11 +102,55 @@ export default function OperacoesTable({ operacoes, onUpdateStatus }: Props) {
                 </div>
                 <span className="text-xs text-gray-500 mt-1">{op.percentual_concluido}%</span>
               </td>
+              <td className="px-6 py-4 text-right">
+                <div className="inline-flex items-center gap-2">
+                  <button
+                    type="button"
+                    className="text-xs px-2 py-1 rounded-md border bg-white hover:bg-gray-50 disabled:opacity-50 inline-flex items-center gap-1"
+                    onClick={() => onOpenDocs?.(op)}
+                    disabled={!onOpenDocs}
+                    title="Instruções / documentos"
+                  >
+                    <FileText size={14} />
+                    Docs
+                  </button>
+                  <button
+                    type="button"
+                    className="text-xs px-2 py-1 rounded-md border bg-white hover:bg-gray-50 disabled:opacity-50 inline-flex items-center gap-1"
+                    onClick={() => onStart?.(op)}
+                    disabled={!onStart || op.status === 'em_execucao' || op.status === 'concluida' || op.status === 'cancelada'}
+                    title="Iniciar execução"
+                  >
+                    <PlayCircle size={14} />
+                    Iniciar
+                  </button>
+                  <button
+                    type="button"
+                    className="text-xs px-2 py-1 rounded-md border bg-white hover:bg-gray-50 disabled:opacity-50 inline-flex items-center gap-1"
+                    onClick={() => onPause?.(op)}
+                    disabled={!onPause || op.status !== 'em_execucao'}
+                    title="Pausar"
+                  >
+                    <PauseCircle size={14} />
+                    Pausar
+                  </button>
+                  <button
+                    type="button"
+                    className="text-xs px-2 py-1 rounded-md border border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 disabled:opacity-50 inline-flex items-center gap-1"
+                    onClick={() => onConclude?.(op)}
+                    disabled={!onConclude || op.status === 'concluida' || op.status === 'cancelada'}
+                    title="Concluir"
+                  >
+                    <CheckCircle2 size={14} />
+                    Concluir
+                  </button>
+                </div>
+              </td>
             </tr>
           ))}
           {operacoes.length === 0 && (
             <tr>
-              <td colSpan={6} className="px-6 py-12 text-center text-gray-500">Nenhuma operação encontrada.</td>
+              <td colSpan={7} className="px-6 py-12 text-center text-gray-500">Nenhuma operação encontrada.</td>
             </tr>
           )}
         </tbody>

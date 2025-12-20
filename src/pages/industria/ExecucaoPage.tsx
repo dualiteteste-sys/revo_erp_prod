@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { listOperacoes, Operacao } from '@/services/industriaExecucao';
+import { apontarExecucao, listOperacoes, Operacao, updateOperacaoStatus } from '@/services/industriaExecucao';
 import { listCentrosTrabalho, CentroTrabalho } from '@/services/industriaCentros';
 import { Search, LayoutGrid, List, PlayCircle } from 'lucide-react';
 import { Loader2 } from 'lucide-react';
@@ -10,6 +10,8 @@ import Select from '@/components/ui/forms/Select';
 import OperacoesTable from '@/components/industria/execucao/OperacoesTable';
 import OperacoesKanbanBoard from '@/components/industria/execucao/OperacoesKanbanBoard';
 import { useSearchParams } from 'react-router-dom';
+import OperacaoDocsModal from '@/components/industria/producao/OperacaoDocsModal';
+import ApontamentoExecucaoModal from '@/components/industria/execucao/ApontamentoExecucaoModal';
 
 export default function ExecucaoPage() {
   const { addToast } = useToast();
@@ -24,6 +26,13 @@ export default function ExecucaoPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   
   const debouncedSearch = useDebounce(search, 500);
+
+  const [docsOpId, setDocsOpId] = useState<string | null>(null);
+  const [apontamentoState, setApontamentoState] = useState<{
+    open: boolean;
+    action: 'pausar' | 'concluir';
+    operacao: Operacao | null;
+  }>({ open: false, action: 'pausar', operacao: null });
 
   useEffect(() => {
     listCentrosTrabalho(undefined, true)
@@ -75,6 +84,28 @@ export default function ExecucaoPage() {
   useEffect(() => {
     fetchOperacoes();
   }, [debouncedSearch, statusFilter, centroFilter, viewMode]);
+
+  const handleUpdateStatus = async (op: Operacao, newStatus: string) => {
+    if (op.status === newStatus) return;
+    try {
+      await updateOperacaoStatus(op.id, newStatus as any, op.prioridade, op.centro_trabalho_id);
+      addToast('Status atualizado.', 'success');
+      await fetchOperacoes();
+    } catch (e: any) {
+      addToast(e?.message || 'Falha ao atualizar status.', 'error');
+      await fetchOperacoes();
+    }
+  };
+
+  const handleStart = async (op: Operacao) => {
+    try {
+      await apontarExecucao(op.id, 'iniciar');
+      addToast('Operação iniciada.', 'success');
+      await fetchOperacoes();
+    } catch (e: any) {
+      addToast(e?.message || 'Falha ao iniciar.', 'error');
+    }
+  };
 
   return (
     <div className="p-1 h-full flex flex-col">
@@ -145,13 +176,34 @@ export default function ExecucaoPage() {
                     <Loader2 className="animate-spin text-blue-600 w-10 h-10" />
                 </div>
                 ) : (
-                <OperacoesTable operacoes={operacoes} onUpdateStatus={() => {}} />
+                <OperacoesTable
+                  operacoes={operacoes}
+                  onUpdateStatus={handleUpdateStatus}
+                  onOpenDocs={(op) => setDocsOpId(op.id)}
+                  onStart={handleStart}
+                  onPause={(op) => setApontamentoState({ open: true, action: 'pausar', operacao: op })}
+                  onConclude={(op) => setApontamentoState({ open: true, action: 'concluir', operacao: op })}
+                />
                 )}
             </div>
         ) : (
             <OperacoesKanbanBoard centroId={centroFilter} status={statusFilter} search={debouncedSearch} />
         )}
       </div>
+
+      <OperacaoDocsModal
+        operacaoId={docsOpId || ''}
+        open={!!docsOpId}
+        onClose={() => setDocsOpId(null)}
+      />
+
+      <ApontamentoExecucaoModal
+        open={apontamentoState.open}
+        action={apontamentoState.action}
+        operacao={apontamentoState.operacao}
+        onClose={() => setApontamentoState((p) => ({ ...p, open: false }))}
+        onSuccess={fetchOperacoes}
+      />
     </div>
   );
 }
