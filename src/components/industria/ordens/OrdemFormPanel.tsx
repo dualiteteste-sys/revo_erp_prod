@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { ArrowLeft, ArrowRight, Loader2, Save } from 'lucide-react';
+import { ArrowLeft, ArrowRight, CheckCircle2, Loader2, Save, TriangleAlert, XCircle } from 'lucide-react';
 import { OrdemIndustriaDetails, OrdemPayload, saveOrdem, getOrdemDetails, manageComponente, manageEntrega, OrdemEntrega, gerarExecucaoOrdem } from '@/services/industria';
 import { useToast } from '@/contexts/ToastProvider';
 import Section from '@/components/ui/forms/Section';
@@ -17,6 +17,7 @@ import { formatOrderNumber } from '@/lib/utils';
 import { ensureMaterialClienteV2 } from '@/services/industriaMateriais';
 import type { MaterialClienteListItem } from '@/services/industriaMateriais';
 import { useNavigate } from 'react-router-dom';
+import Modal from '@/components/ui/Modal';
 
 interface Props {
   ordemId: string | null;
@@ -58,6 +59,7 @@ export default function OrdemFormPanel({
   const [materialCliente, setMaterialCliente] = useState<MaterialClienteListItem | null>(null);
   const [wizardStep, setWizardStep] = useState<0 | 1 | 2>(0);
   const [autoOpenBomSelector, setAutoOpenBomSelector] = useState(false);
+  const [showGerarExecucaoModal, setShowGerarExecucaoModal] = useState(false);
 
   const [formData, setFormData] = useState<Partial<OrdemIndustriaDetails>>({
     status: 'rascunho',
@@ -345,6 +347,38 @@ export default function OrdemFormPanel({
   const isWizard = !ordemId && !formData.id && formData.tipo_ordem === 'beneficiamento';
   const isExecucaoGerada = !!formData.execucao_ordem_id;
   const isHeaderLocked = isLocked || isExecucaoGerada;
+  const componentesCount = Array.isArray(formData.componentes) ? formData.componentes.length : 0;
+  const checklistExecucao = [
+    {
+      label: formData.tipo_ordem === 'beneficiamento' ? 'Cliente selecionado' : 'Cliente (opcional)',
+      status: formData.tipo_ordem === 'beneficiamento'
+        ? (formData.cliente_id ? 'ok' : 'error')
+        : (formData.cliente_id ? 'ok' : 'warn'),
+      details: formData.cliente_nome || (formData.tipo_ordem === 'beneficiamento' ? 'Selecione o cliente para prosseguir.' : 'Opcional para Industrialização.'),
+    },
+    {
+      label: 'Produto e quantidade definidos',
+      status: formData.produto_final_id && (formData.quantidade_planejada || 0) > 0 ? 'ok' : 'error',
+      details: !formData.produto_final_id
+        ? 'Selecione o produto.'
+        : (formData.quantidade_planejada || 0) <= 0
+          ? 'A quantidade deve ser maior que zero.'
+          : undefined,
+    },
+    {
+      label: 'Roteiro',
+      status: formData.roteiro_aplicado_id ? 'ok' : 'warn',
+      details: formData.roteiro_aplicado_id
+        ? (formData.roteiro_aplicado_desc || 'Selecionado')
+        : 'Nenhum roteiro selecionado: será usado o roteiro padrão do produto (se existir).',
+    },
+    {
+      label: 'Componentes/BOM',
+      status: componentesCount > 0 ? 'ok' : 'warn',
+      details: componentesCount > 0 ? `${componentesCount} item(ns) em componentes.` : 'Sem componentes definidos (pode ser ajustado depois).',
+    },
+  ] as const;
+  const hasChecklistError = checklistExecucao.some(i => i.status === 'error');
 
   const canGoNextWizardStep = () => {
     if (wizardStep === 0) return !!formData.cliente_id;
@@ -786,7 +820,7 @@ export default function OrdemFormPanel({
           {!isLocked && formData.id && !formData.execucao_ordem_id && (
             <button
               type="button"
-              onClick={handleGerarExecucao}
+              onClick={() => setShowGerarExecucaoModal(true)}
               disabled={isGeneratingExecucao}
               className="flex items-center gap-2 border border-blue-200 bg-blue-50 text-blue-800 font-bold py-2 px-4 rounded-lg hover:bg-blue-100 disabled:opacity-50"
               title="Gera operações e abre Execução"
@@ -850,6 +884,73 @@ export default function OrdemFormPanel({
           )}
         </div>
       </footer>
+
+      <Modal
+        isOpen={showGerarExecucaoModal}
+        onClose={() => setShowGerarExecucaoModal(false)}
+        title="Gerar Execução (Checklist)"
+        size="lg"
+      >
+        <div className="p-6 space-y-4">
+          <div className="rounded-lg border border-gray-200 bg-white p-4">
+            <div className="text-sm font-semibold text-gray-800">Resumo</div>
+            <div className="mt-2 text-sm text-gray-700">
+              <div><span className="font-medium">Ordem:</span> {formData.numero ? formatOrderNumber(formData.numero) : 'Nova (será salva)'} • {formData.tipo_ordem === 'beneficiamento' ? 'Beneficiamento' : 'Industrialização'}</div>
+              <div><span className="font-medium">Cliente:</span> {formData.cliente_nome || '—'}</div>
+              <div><span className="font-medium">Produto:</span> {formData.produto_nome || '—'}</div>
+              <div><span className="font-medium">Quantidade:</span> {formData.quantidade_planejada || 0} {formData.unidade || ''}</div>
+              <div><span className="font-medium">Roteiro:</span> {formData.roteiro_aplicado_desc || 'Padrão do produto (se existir)'}</div>
+            </div>
+          </div>
+
+          <div className="rounded-lg border border-blue-100 bg-blue-50 p-4 text-sm text-blue-900">
+            Ao gerar a Execução, o sistema criará a ordem de produção correspondente, gerará as operações e travará o cabeçalho/roteiro desta ordem.
+          </div>
+
+          <div className="rounded-lg border border-gray-200 bg-white p-4">
+            <div className="text-sm font-semibold text-gray-800">Checklist</div>
+            <div className="mt-3 space-y-2">
+              {checklistExecucao.map((item) => (
+                <div key={item.label} className="flex items-start gap-3">
+                  {item.status === 'ok' ? (
+                    <CheckCircle2 className="text-green-600 mt-0.5" size={18} />
+                  ) : item.status === 'warn' ? (
+                    <TriangleAlert className="text-amber-600 mt-0.5" size={18} />
+                  ) : (
+                    <XCircle className="text-rose-600 mt-0.5" size={18} />
+                  )}
+                  <div className="flex-1">
+                    <div className="text-sm font-medium text-gray-900">{item.label}</div>
+                    {item.details && <div className="text-xs text-gray-600">{item.details}</div>}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="flex justify-end gap-3">
+            <button
+              type="button"
+              onClick={() => setShowGerarExecucaoModal(false)}
+              className="rounded-md border border-gray-300 bg-white py-2 px-4 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50"
+            >
+              Voltar
+            </button>
+            <button
+              type="button"
+              disabled={isGeneratingExecucao || hasChecklistError || isLocked}
+              onClick={async () => {
+                setShowGerarExecucaoModal(false);
+                await handleGerarExecucao();
+              }}
+              className="flex items-center gap-2 bg-blue-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-blue-700 disabled:opacity-50"
+            >
+              {isGeneratingExecucao ? <Loader2 className="animate-spin" size={20} /> : <ArrowRight size={18} />}
+              Gerar e abrir Execução
+            </button>
+          </div>
+        </div>
+      </Modal>
     </div>
   );
 }

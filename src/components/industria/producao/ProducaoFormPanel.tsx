@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { ArrowLeft, ArrowRight, Loader2, Save, Play, ShieldAlert } from 'lucide-react';
+import { ArrowLeft, ArrowRight, CheckCircle2, Loader2, Play, Save, ShieldAlert, TriangleAlert, XCircle } from 'lucide-react';
 import {
   OrdemProducaoDetails,
   OrdemProducaoPayload,
@@ -25,6 +25,7 @@ import RoteiroSelector from '../ordens/RoteiroSelector';
 import OperacoesGrid from './OperacoesGrid';
 import { formatOrderNumber } from '@/lib/utils';
 import { listUnidades, UnidadeMedida } from '@/services/unidades';
+import Modal from '@/components/ui/Modal';
 
 interface Props {
   ordemId: string | null;
@@ -49,6 +50,7 @@ export default function ProducaoFormPanel({
   const [showClosureModal, setShowClosureModal] = useState(false);
   const [entregaBloqueada, setEntregaBloqueada] = useState<{ blocked: boolean; reason?: string } | null>(null);
   const [wizardStep, setWizardStep] = useState<0 | 1 | 2>(0);
+  const [showLiberarModal, setShowLiberarModal] = useState(false);
 
   const [formData, setFormData] = useState<Partial<OrdemProducaoDetails>>({
     status: 'rascunho',
@@ -267,14 +269,12 @@ export default function ProducaoFormPanel({
     }
   };
 
-  const handleLiberar = async () => {
+  const doLiberar = async () => {
     if (!formData.id) return;
     if (!formData.roteiro_aplicado_id) {
       addToast('A ordem precisa ter um roteiro aplicado para ser liberada.', 'error');
       return;
     }
-
-    if (!confirm('Deseja liberar a ordem? Isso irá gerar as operações de produção.')) return;
 
     try {
       setIsSaving(true);
@@ -298,6 +298,30 @@ export default function ProducaoFormPanel({
   const isReleased = formData.status === 'em_producao' || formData.status === 'em_inspecao';
   const hasOperacoes = Array.isArray((formData as any).operacoes) && (formData as any).operacoes.length > 0;
   const isCoreHeaderLocked = isLocked || isReleased || (formData.status as any) === 'parcialmente_concluida' || hasOperacoes;
+  const canLiberar = !!formData.id && !isLocked && (formData.status === 'rascunho' || formData.status === 'planejada') && !!formData.roteiro_aplicado_id;
+  const componentesCount = Array.isArray(formData.componentes) ? formData.componentes.length : 0;
+  const checklist = [
+    {
+      label: 'Produto e quantidade definidos',
+      status: formData.produto_final_id && (formData.quantidade_planejada || 0) > 0 ? 'ok' : 'error',
+      details: !formData.produto_final_id
+        ? 'Selecione o produto final.'
+        : (formData.quantidade_planejada || 0) <= 0
+          ? 'A quantidade deve ser maior que zero.'
+          : undefined,
+    },
+    {
+      label: 'Roteiro aplicado',
+      status: formData.roteiro_aplicado_id ? 'ok' : 'error',
+      details: formData.roteiro_aplicado_id ? formData.roteiro_aplicado_desc || undefined : 'Selecione um roteiro para liberar.',
+    },
+    {
+      label: 'BOM / Insumos',
+      status: componentesCount > 0 ? 'ok' : 'warn',
+      details: componentesCount > 0 ? `${componentesCount} item(ns) em insumos/componentes.` : 'Sem insumos definidos (você pode definir depois, mas é recomendável).',
+    },
+  ] as const;
+  const hasChecklistError = checklist.some(i => i.status === 'error');
 
   const canGoNextWizardStep = () => {
     if (wizardStep === 0) return !!formData.produto_final_id && !!formData.quantidade_planejada && formData.quantidade_planejada > 0;
@@ -305,6 +329,7 @@ export default function ProducaoFormPanel({
   };
 
   return (
+    <>
     <div className="flex flex-col h-full bg-white">
       <div className="border-b border-gray-200">
         <div className="flex items-center justify-between py-4 px-6 bg-gray-50 border-b border-gray-200">
@@ -664,8 +689,8 @@ export default function ProducaoFormPanel({
 
           {formData.id && (formData.status === 'rascunho' || formData.status === 'planejada') && (
             <button
-              onClick={handleLiberar}
-              disabled={isSaving || !formData.roteiro_aplicado_id}
+              onClick={() => setShowLiberarModal(true)}
+              disabled={isSaving || !canLiberar}
               className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 disabled:opacity-50"
             >
               <Play size={20} className="mr-2" />
@@ -732,6 +757,73 @@ export default function ProducaoFormPanel({
         </div>
       </div>
     </div >
+
+    <Modal
+      isOpen={showLiberarModal}
+      onClose={() => setShowLiberarModal(false)}
+      title="Liberar OP (Checklist)"
+      size="lg"
+    >
+      <div className="p-6 space-y-4">
+        <div className="rounded-lg border border-gray-200 bg-white p-4">
+          <div className="text-sm font-semibold text-gray-800">Resumo</div>
+          <div className="mt-2 text-sm text-gray-700">
+            <div><span className="font-medium">Produto:</span> {formData.produto_nome || '—'}</div>
+            <div><span className="font-medium">Quantidade:</span> {formData.quantidade_planejada || 0} {formData.unidade || ''}</div>
+            <div><span className="font-medium">Roteiro:</span> {formData.roteiro_aplicado_desc || '—'}</div>
+            <div><span className="font-medium">BOM:</span> {formData.bom_aplicado_desc || (componentesCount > 0 ? 'Componentes manuais' : '—')}</div>
+          </div>
+        </div>
+
+        <div className="rounded-lg border border-blue-100 bg-blue-50 p-4 text-sm text-blue-900">
+          Ao liberar, o sistema irá gerar as operações e travar os campos críticos do cabeçalho (produto/quantidade/unidade) e o roteiro/BOM desta OP.
+        </div>
+
+        <div className="rounded-lg border border-gray-200 bg-white p-4">
+          <div className="text-sm font-semibold text-gray-800">Checklist</div>
+          <div className="mt-3 space-y-2">
+            {checklist.map((item) => (
+              <div key={item.label} className="flex items-start gap-3">
+                {item.status === 'ok' ? (
+                  <CheckCircle2 className="text-green-600 mt-0.5" size={18} />
+                ) : item.status === 'warn' ? (
+                  <TriangleAlert className="text-amber-600 mt-0.5" size={18} />
+                ) : (
+                  <XCircle className="text-rose-600 mt-0.5" size={18} />
+                )}
+                <div className="flex-1">
+                  <div className="text-sm font-medium text-gray-900">{item.label}</div>
+                  {item.details && <div className="text-xs text-gray-600">{item.details}</div>}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div className="flex justify-end gap-3">
+          <button
+            type="button"
+            onClick={() => setShowLiberarModal(false)}
+            className="rounded-md border border-gray-300 bg-white py-2 px-4 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50"
+          >
+            Voltar
+          </button>
+          <button
+            type="button"
+            disabled={isSaving || hasChecklistError || !canLiberar}
+            onClick={async () => {
+              setShowLiberarModal(false);
+              await doLiberar();
+            }}
+            className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-green-600 hover:bg-green-700 disabled:opacity-50"
+          >
+            <Play size={18} className="mr-2" />
+            Liberar e gerar operações
+          </button>
+        </div>
+      </div>
+    </Modal>
+    </>
   );
 }
   const checkEntregaBlocked = (ordem: OrdemProducaoDetails | null): { blocked: boolean; reason?: string } => {
