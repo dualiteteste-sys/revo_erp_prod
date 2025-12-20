@@ -295,6 +295,7 @@ export default function ProducaoFormPanel({
 
   const isLocked = formData.status === 'concluida' || formData.status === 'cancelada';
   const isWizard = !ordemId && !formData.id;
+  const isReleased = formData.status === 'em_producao' || formData.status === 'em_inspecao';
 
   const canGoNextWizardStep = () => {
     if (wizardStep === 0) return !!formData.produto_final_id && !!formData.quantidade_planejada && formData.quantidade_planejada > 0;
@@ -559,6 +560,7 @@ export default function ProducaoFormPanel({
                     <RoteiroSelector
                       ordemId={formData.id}
                       produtoId={formData.produto_final_id}
+                      disabled={isReleased || isLocked}
                       onApplied={handleRoteiroApplied}
                     />
                   </div>
@@ -573,6 +575,7 @@ export default function ProducaoFormPanel({
                       ordemId={formData.id}
                       produtoId={formData.produto_final_id}
                       tipoOrdem="producao"
+                      disabled={isReleased || isLocked}
                       onApplied={handleBomApplied}
                     />
                   </div>

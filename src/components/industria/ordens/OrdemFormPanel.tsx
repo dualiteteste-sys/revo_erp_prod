@@ -343,6 +343,7 @@ export default function OrdemFormPanel({
   const isLocked = formData.status === 'concluida' || formData.status === 'cancelada';
   const totalEntregue = formData.entregas?.reduce((acc, e) => acc + Number(e.quantidade_entregue), 0) || 0;
   const isWizard = !ordemId && !formData.id && formData.tipo_ordem === 'beneficiamento';
+  const isExecucaoGerada = !!formData.execucao_ordem_id;
 
   const canGoNextWizardStep = () => {
     if (wizardStep === 0) return !!formData.cliente_id;
@@ -667,6 +668,7 @@ export default function OrdemFormPanel({
                         ordemId={formData.id || 'new'}
                         produtoId={formData.produto_final_id || ''}
                         tipoBom={formData.tipo_ordem === 'beneficiamento' ? 'beneficiamento' : 'producao'}
+                        disabled={isLocked || isExecucaoGerada}
                         onApplied={(roteiro) => {
                           handleHeaderChange('roteiro_aplicado_id', roteiro.id);
                           const label = `${roteiro.codigo || 'Sem código'} (v${roteiro.versao})${roteiro.descricao ? ` - ${roteiro.descricao}` : ''}`;
@@ -743,6 +745,7 @@ export default function OrdemFormPanel({
                   produtoId={formData.produto_final_id}
                   tipoOrdem={formData.tipo_ordem === 'beneficiamento' ? 'beneficiamento' : 'producao'}
                   openOnMount={autoOpenBomSelector}
+                  disabled={isExecucaoGerada}
                   onApplied={() => {
                     setAutoOpenBomSelector(false);
                     loadDetails(formData.id);

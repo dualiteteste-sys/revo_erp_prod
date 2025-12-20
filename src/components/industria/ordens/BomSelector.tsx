@@ -9,10 +9,11 @@ interface Props {
   produtoId: string;
   tipoOrdem: 'producao' | 'beneficiamento';
   openOnMount?: boolean;
+  disabled?: boolean;
   onApplied: (bom: BomListItem) => void;
 }
 
-export default function BomSelector({ ordemId, produtoId, tipoOrdem, openOnMount, onApplied }: Props) {
+export default function BomSelector({ ordemId, produtoId, tipoOrdem, openOnMount, disabled, onApplied }: Props) {
   const [isOpen, setIsOpen] = useState(false);
   const [boms, setBoms] = useState<BomListItem[]>([]);
   const [loading, setLoading] = useState(false);
@@ -76,8 +77,10 @@ export default function BomSelector({ ordemId, produtoId, tipoOrdem, openOnMount
     <>
       <button
         onClick={() => setIsOpen(true)}
-        className="flex items-center gap-2 text-sm font-medium text-blue-600 hover:text-blue-800 hover:bg-blue-50 px-3 py-2 rounded-lg transition-colors"
-        disabled={!ordemId}
+        className={`flex items-center gap-2 text-sm font-medium px-3 py-2 rounded-lg transition-colors ${
+          disabled ? 'text-gray-400 cursor-not-allowed' : 'text-blue-600 hover:text-blue-800 hover:bg-blue-50'
+        }`}
+        disabled={!ordemId || !!disabled}
       >
         <FileCog size={16} /> Aplicar BOM
       </button>
