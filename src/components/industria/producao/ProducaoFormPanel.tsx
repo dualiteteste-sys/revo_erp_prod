@@ -296,6 +296,8 @@ export default function ProducaoFormPanel({
   const isLocked = formData.status === 'concluida' || formData.status === 'cancelada';
   const isWizard = !ordemId && !formData.id;
   const isReleased = formData.status === 'em_producao' || formData.status === 'em_inspecao';
+  const hasOperacoes = Array.isArray((formData as any).operacoes) && (formData as any).operacoes.length > 0;
+  const isCoreHeaderLocked = isLocked || isReleased || (formData.status as any) === 'parcialmente_concluida' || hasOperacoes;
 
   const canGoNextWizardStep = () => {
     if (wizardStep === 0) return !!formData.produto_final_id && !!formData.quantidade_planejada && formData.quantidade_planejada > 0;
@@ -438,7 +440,7 @@ export default function ProducaoFormPanel({
                   type="number"
                   value={formData.quantidade_planejada || ''}
                   onChange={e => handleHeaderChange('quantidade_planejada', parseFloat(e.target.value))}
-                  disabled={isLocked}
+                  disabled={isCoreHeaderLocked}
                 />
               </div>
               <div className="sm:col-span-1">
@@ -447,7 +449,7 @@ export default function ProducaoFormPanel({
                   name="unidade"
                   value={formData.unidade || ''}
                   onChange={e => handleHeaderChange('unidade', e.target.value)}
-                  disabled={isLocked}
+                  disabled={isCoreHeaderLocked}
                 >
                   <option value="">Selecione...</option>
                   {unidades.map(u => (

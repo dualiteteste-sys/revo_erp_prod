@@ -344,6 +344,7 @@ export default function OrdemFormPanel({
   const totalEntregue = formData.entregas?.reduce((acc, e) => acc + Number(e.quantidade_entregue), 0) || 0;
   const isWizard = !ordemId && !formData.id && formData.tipo_ordem === 'beneficiamento';
   const isExecucaoGerada = !!formData.execucao_ordem_id;
+  const isHeaderLocked = isLocked || isExecucaoGerada;
 
   const canGoNextWizardStep = () => {
     if (wizardStep === 0) return !!formData.cliente_id;
@@ -528,7 +529,7 @@ export default function OrdemFormPanel({
                 ) : formData.produto_final_id && formData.produto_nome ? (
                   <div className="flex items-center justify-between gap-3 p-3 bg-gray-50 border border-gray-200 rounded-lg">
                     <div className="text-gray-800 font-medium truncate">{formData.produto_nome}</div>
-                    {!isLocked && (
+                    {!isHeaderLocked && (
                       <button
                         type="button"
                         onClick={() => {
@@ -558,7 +559,7 @@ export default function OrdemFormPanel({
                   type="number"
                   value={formData.quantidade_planejada || ''}
                   onChange={e => handleHeaderChange('quantidade_planejada', parseFloat(e.target.value))}
-                  disabled={isLocked}
+                  disabled={isHeaderLocked}
                 />
               </div>
               <div className="sm:col-span-1">
@@ -567,7 +568,7 @@ export default function OrdemFormPanel({
                   name="unidade"
                   value={formData.unidade || ''}
                   onChange={e => handleHeaderChange('unidade', e.target.value)}
-                  disabled={isLocked}
+                  disabled={isHeaderLocked}
                 />
               </div>
               <div className="sm:col-span-3">
@@ -587,7 +588,7 @@ export default function OrdemFormPanel({
                     handleHeaderChange('material_cliente_codigo', null);
                     handleHeaderChange('material_cliente_unidade', null);
                   }}
-                  disabled={isLocked}
+                  disabled={isHeaderLocked}
                 />
               </div>
 
