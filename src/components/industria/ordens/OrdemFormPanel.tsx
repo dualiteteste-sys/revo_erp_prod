@@ -20,6 +20,7 @@ import { useNavigate } from 'react-router-dom';
 import Modal from '@/components/ui/Modal';
 import { logger } from '@/lib/logger';
 import IndustriaAuditTrailPanel from '@/components/industria/audit/IndustriaAuditTrailPanel';
+import { roleAtLeast, useEmpresaRole } from '@/hooks/useEmpresaRole';
 
 interface Props {
   ordemId: string | null;
@@ -56,6 +57,9 @@ export default function OrdemFormPanel({
 }: Props) {
   const { addToast } = useToast();
   const navigate = useNavigate();
+  const { data: empresaRole } = useEmpresaRole();
+  const canEdit = roleAtLeast(empresaRole, 'member');
+  const canAdmin = roleAtLeast(empresaRole, 'admin');
   const [loading, setLoading] = useState(!!ordemId);
   const [isSaving, setIsSaving] = useState(false);
   const [isGeneratingExecucao, setIsGeneratingExecucao] = useState(false);
@@ -183,17 +187,25 @@ export default function OrdemFormPanel({
   };
 
   const handleSaveHeader = async () => {
+    if (!canEdit) {
+      addToast('Você não tem permissão para editar esta ordem.', 'error');
+      return null;
+    }
+    if (formData.status === 'concluida' || formData.status === 'cancelada') {
+      addToast('Esta ordem está bloqueada para edição.', 'error');
+      return null;
+    }
     if (formData.tipo_ordem === 'beneficiamento' && !formData.cliente_id) {
       addToast('Para beneficiamento, selecione o cliente.', 'error');
-      return;
+      return null;
     }
     if (!formData.produto_final_id) {
       addToast('Selecione um produto final.', 'error');
-      return;
+      return null;
     }
     if (!formData.quantidade_planejada || formData.quantidade_planejada <= 0) {
       addToast('A quantidade planejada deve ser maior que zero.', 'error');
-      return;
+      return null;
     }
 
     setIsSaving(true);
@@ -273,6 +285,10 @@ export default function OrdemFormPanel({
 
   // --- Componentes ---
   const handleAddComponente = async (item: any) => {
+    if (!canEdit) {
+      addToast('Você não tem permissão para editar esta ordem.', 'error');
+      return;
+    }
     let currentId = formData.id;
     if (!currentId) {
       currentId = await handleSaveHeader();
@@ -289,6 +305,10 @@ export default function OrdemFormPanel({
   };
 
   const handleRemoveComponente = async (itemId: string) => {
+    if (!canEdit) {
+      addToast('Você não tem permissão para editar esta ordem.', 'error');
+      return;
+    }
     try {
       await manageComponente(formData.id!, itemId, '', 0, '', 'delete');
       await loadDetails(formData.id);
@@ -299,6 +319,10 @@ export default function OrdemFormPanel({
   };
 
   const handleUpdateComponente = async (itemId: string, field: string, value: any) => {
+    if (!canEdit) {
+      addToast('Você não tem permissão para editar esta ordem.', 'error');
+      return;
+    }
     const item = formData.componentes?.find(c => c.id === itemId);
     if (!item) return;
 
@@ -321,6 +345,10 @@ export default function OrdemFormPanel({
 
   // --- Entregas ---
   const handleAddEntrega = async (data: Partial<OrdemEntrega>) => {
+    if (!canEdit) {
+      addToast('Você não tem permissão para editar esta ordem.', 'error');
+      return;
+    }
     if (!formData.id) return;
     const doc = data.documento_ref ?? data.documento_entrega;
     await manageEntrega(
@@ -338,6 +366,10 @@ export default function OrdemFormPanel({
   };
 
   const handleRemoveEntrega = async (entregaId: string) => {
+    if (!canEdit) {
+      addToast('Você não tem permissão para editar esta ordem.', 'error');
+      return;
+    }
     try {
       await manageEntrega(formData.id!, entregaId, '', 0, 'nao_faturado', undefined, undefined, 'delete');
       await loadDetails(formData.id);
@@ -350,10 +382,12 @@ export default function OrdemFormPanel({
   if (loading) return <div className="flex justify-center p-8"><Loader2 className="animate-spin" /></div>;
 
   const isLocked = formData.status === 'concluida' || formData.status === 'cancelada';
+  const isRoleReadOnly = !canEdit;
+  const isLockedEffective = isLocked || isRoleReadOnly;
   const totalEntregue = formData.entregas?.reduce((acc, e) => acc + Number(e.quantidade_entregue), 0) || 0;
   const isWizard = !ordemId && !formData.id && formData.tipo_ordem === 'beneficiamento';
   const isExecucaoGerada = !!formData.execucao_ordem_id;
-  const isHeaderLocked = isLocked || isExecucaoGerada;
+  const isHeaderLocked = isLockedEffective || isExecucaoGerada;
   const componentesCount = Array.isArray(formData.componentes) ? formData.componentes.length : 0;
   const checklistExecucao = [
     {
@@ -429,7 +463,11 @@ export default function OrdemFormPanel({
   };
 
   const handleGerarExecucao = async () => {
-    if (isLocked) return;
+    if (!canEdit) {
+      addToast('Você não tem permissão para gerar operações.', 'error');
+      return;
+    }
+    if (isLockedEffective) return;
     setIsGeneratingExecucao(true);
     try {
       let currentId = formData.id;
@@ -685,7 +723,7 @@ export default function OrdemFormPanel({
                       materialCliente?.nome_cliente ||
                       materialCliente?.produto_nome
                     }
-                    disabled={isLocked || !formData.cliente_id}
+                    disabled={isLockedEffective || !formData.cliente_id}
                     onChange={(m) => {
                       setMaterialCliente(m);
                       if (!m) {
@@ -733,7 +771,7 @@ export default function OrdemFormPanel({
                         ordemId={formData.id || 'new'}
                         produtoId={formData.produto_final_id || ''}
                         tipoBom={formData.tipo_ordem === 'beneficiamento' ? 'beneficiamento' : 'producao'}
-                        disabled={isLocked || isExecucaoGerada}
+                        disabled={isLockedEffective || isExecucaoGerada}
                         onApplied={(roteiro) => {
                           handleHeaderChange('roteiro_aplicado_id', roteiro.id);
                           const label = `${roteiro.codigo || 'Sem código'} (v${roteiro.versao})${roteiro.descricao ? ` - ${roteiro.descricao}` : ''}`;
@@ -763,7 +801,7 @@ export default function OrdemFormPanel({
             {(!isWizard || wizardStep === 2) && (
             <Section title="Programação" description="Prazos e status.">
               <div className="sm:col-span-2">
-                <Select label="Status" name="status" value={formData.status} onChange={e => handleHeaderChange('status', e.target.value)} disabled={isLocked}>
+                <Select label="Status" name="status" value={formData.status} onChange={e => handleHeaderChange('status', e.target.value)} disabled={isLockedEffective}>
                   <option value="rascunho">Rascunho</option>
                   <option value="planejada">Planejada</option>
                   <option value="em_programacao">Em Programação</option>
@@ -781,21 +819,21 @@ export default function OrdemFormPanel({
                   type="number"
                   value={formData.prioridade || 0}
                   onChange={e => handleHeaderChange('prioridade', parseInt(e.target.value))}
-                  disabled={isLocked}
+                  disabled={isLockedEffective}
                 />
               </div>
               <div className="sm:col-span-2"></div>
 
-              <Input label="Início Previsto" type="date" value={formData.data_prevista_inicio || ''} onChange={e => handleHeaderChange('data_prevista_inicio', e.target.value)} disabled={isLocked} className="sm:col-span-2" />
-              <Input label="Fim Previsto" type="date" value={formData.data_prevista_fim || ''} onChange={e => handleHeaderChange('data_prevista_fim', e.target.value)} disabled={isLocked} className="sm:col-span-2" />
-              <Input label="Entrega Prevista" type="date" value={formData.data_prevista_entrega || ''} onChange={e => handleHeaderChange('data_prevista_entrega', e.target.value)} disabled={isLocked} className="sm:col-span-2" />
+              <Input label="Início Previsto" type="date" value={formData.data_prevista_inicio || ''} onChange={e => handleHeaderChange('data_prevista_inicio', e.target.value)} disabled={isLockedEffective} className="sm:col-span-2" />
+              <Input label="Fim Previsto" type="date" value={formData.data_prevista_fim || ''} onChange={e => handleHeaderChange('data_prevista_fim', e.target.value)} disabled={isLockedEffective} className="sm:col-span-2" />
+              <Input label="Entrega Prevista" type="date" value={formData.data_prevista_entrega || ''} onChange={e => handleHeaderChange('data_prevista_entrega', e.target.value)} disabled={isLockedEffective} className="sm:col-span-2" />
             </Section>
             )}
 
             {(!isWizard || wizardStep === 2) && (
             <Section title="Outros" description="Detalhes adicionais.">
-              <Input label="Ref. Documento" name="doc_ref" value={formData.documento_ref || ''} onChange={e => handleHeaderChange('documento_ref', e.target.value)} disabled={isLocked} className="sm:col-span-2" placeholder="Pedido, Lote..." />
-              <TextArea label="Observações" name="obs" value={formData.observacoes || ''} onChange={e => handleHeaderChange('observacoes', e.target.value)} rows={3} disabled={isLocked} className="sm:col-span-6" />
+              <Input label="Ref. Documento" name="doc_ref" value={formData.documento_ref || ''} onChange={e => handleHeaderChange('documento_ref', e.target.value)} disabled={isLockedEffective} className="sm:col-span-2" placeholder="Pedido, Lote..." />
+              <TextArea label="Observações" name="obs" value={formData.observacoes || ''} onChange={e => handleHeaderChange('observacoes', e.target.value)} rows={3} disabled={isLockedEffective} className="sm:col-span-6" />
             </Section>
             )}
           </>
@@ -803,14 +841,14 @@ export default function OrdemFormPanel({
 
         {activeTab === 'componentes' && (
           <>
-            {!isLocked && formData.id && formData.produto_final_id && (
+            {!isLockedEffective && formData.id && formData.produto_final_id && (
               <div className="mb-4 flex justify-end">
                 <BomSelector
                   ordemId={formData.id}
                   produtoId={formData.produto_final_id}
                   tipoOrdem={formData.tipo_ordem === 'beneficiamento' ? 'beneficiamento' : 'producao'}
                   openOnMount={autoOpenBomSelector}
-                  disabled={isExecucaoGerada}
+                  disabled={isExecucaoGerada || isLockedEffective}
                   onApplied={() => {
                     setAutoOpenBomSelector(false);
                     loadDetails(formData.id);
@@ -824,7 +862,7 @@ export default function OrdemFormPanel({
               onRemoveItem={handleRemoveComponente}
               onUpdateItem={handleUpdateComponente}
               isAddingItem={false}
-              readOnly={isLocked}
+              readOnly={isLockedEffective}
               highlightItemId={highlightComponenteId}
             />
           </>
@@ -835,7 +873,7 @@ export default function OrdemFormPanel({
             entregas={formData.entregas || []}
             onAddEntrega={handleAddEntrega}
             onRemoveEntrega={handleRemoveEntrega}
-            readOnly={isLocked}
+            readOnly={isLockedEffective}
             maxQuantity={formData.quantidade_planejada || 0}
             currentTotal={totalEntregue}
             showBillingStatus={formData.tipo_ordem === 'beneficiamento'}
@@ -892,7 +930,7 @@ export default function OrdemFormPanel({
           Fechar
         </button>
         <div className="flex gap-3">
-          {formData.id && isHeaderLocked && (
+          {formData.id && isHeaderLocked && canEdit && (
             <button
               type="button"
               onClick={handleCriarRevisao}
@@ -903,7 +941,7 @@ export default function OrdemFormPanel({
               Criar revisão
             </button>
           )}
-          {!isLocked && formData.id && !formData.execucao_ordem_id && (
+          {!isLockedEffective && formData.id && !formData.execucao_ordem_id && (
             <button
               type="button"
               onClick={() => setShowGerarExecucaoModal(true)}
@@ -915,7 +953,7 @@ export default function OrdemFormPanel({
               Gerar operações
             </button>
           )}
-          {!isLocked && formData.execucao_ordem_id && (
+          {formData.execucao_ordem_id && (
             <button
               type="button"
               onClick={() => handleGoToExecucao(formData.execucao_ordem_numero ? String(formData.execucao_ordem_numero) : undefined)}
@@ -926,7 +964,7 @@ export default function OrdemFormPanel({
               Abrir Execução
             </button>
           )}
-          {!isLocked && !isWizard && (
+          {!isLockedEffective && canEdit && !isWizard && (
             <button
               onClick={handleSaveHeader}
               disabled={isSaving}
@@ -936,7 +974,7 @@ export default function OrdemFormPanel({
               Salvar
             </button>
           )}
-          {!isLocked && isWizard && (
+          {!isLockedEffective && canEdit && isWizard && (
             <>
               {wizardStep > 0 && (
                 <button
@@ -1024,7 +1062,7 @@ export default function OrdemFormPanel({
             </button>
             <button
               type="button"
-              disabled={isGeneratingExecucao || hasChecklistError || isLocked}
+              disabled={isGeneratingExecucao || hasChecklistError || isLockedEffective || !canEdit}
               onClick={async () => {
                 setShowGerarExecucaoModal(false);
                 await handleGerarExecucao();

@@ -15,9 +15,12 @@ import { useToast } from '@/contexts/ToastProvider';
 import ProducaoFormPanel from '@/components/industria/producao/ProducaoFormPanel';
 import ProducaoKanbanBoard from '@/components/industria/producao/ProducaoKanbanBoard';
 import { logger } from '@/lib/logger';
+import { roleAtLeast, useEmpresaRole } from '@/hooks/useEmpresaRole';
 
 export default function OrdensPage() {
   const { addToast } = useToast();
+  const { data: empresaRole } = useEmpresaRole();
+  const canCreate = roleAtLeast(empresaRole, 'member');
   const [viewMode, setViewMode] = useState<'list' | 'kanban'>('list');
   const [orders, setOrders] = useState<OrdemIndustria[]>([]);
   const [loading, setLoading] = useState(true);
@@ -67,6 +70,16 @@ export default function OrdensPage() {
   // Deep-link: /app/industria/ordens?tipo=beneficiamento&new=1
   useEffect(() => {
     if (searchParams.get('new') !== '1') return;
+    if (!canCreate) {
+      addToast('Você não tem permissão para criar novas ordens.', 'error');
+      const next = new URLSearchParams(searchParams);
+      next.delete('new');
+      navigate(
+        { pathname: location.pathname, search: next.toString() ? `?${next.toString()}` : '' },
+        { replace: true, state: null }
+      );
+      return;
+    }
     const statePrefill =
       tipoOrdem === 'beneficiamento'
         ? ((location.state as any)?.prefill as React.ComponentProps<typeof OrdemFormPanel>['initialPrefill'] | undefined)
@@ -81,7 +94,7 @@ export default function OrdensPage() {
       { pathname: location.pathname, search: next.toString() ? `?${next.toString()}` : '' },
       { replace: true, state: null }
     );
-  }, [searchParams, location.pathname, location.state, navigate]);
+  }, [searchParams, location.pathname, location.state, navigate, canCreate]);
 
   const fetchOrders = async () => {
     if (viewMode === 'kanban') return; // Kanban fetches its own data
@@ -137,7 +150,12 @@ export default function OrdensPage() {
   }, [debouncedSearch, statusFilter, viewMode, tipoOrdem]);
 
   const handleNew = () => {
+    if (!canCreate) {
+      addToast('Você não tem permissão para criar novas ordens.', 'error');
+      return;
+    }
     setDraftTipoOrdem(tipoOrdem);
+    setInitialPrefill(undefined);
     setSelectedId(null);
     setIsFormOpen(true);
   };
@@ -148,6 +166,10 @@ export default function OrdensPage() {
   };
 
   const handleClone = async (order: OrdemIndustria) => {
+    if (!canCreate) {
+      addToast('Você não tem permissão para criar novas ordens.', 'error');
+      return;
+    }
     try {
       const cloned = tipoOrdem === 'industrializacao'
         ? await cloneOrdemProducao(order.id)
@@ -216,7 +238,9 @@ export default function OrdensPage() {
             </div>
             <button
             onClick={handleNew}
-            className="flex items-center gap-2 bg-blue-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-blue-700 transition-colors"
+            disabled={!canCreate}
+            title={!canCreate ? 'Sem permissão para criar novas ordens' : undefined}
+            className="flex items-center gap-2 bg-blue-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
             <PlusCircle size={20} />
             Nova Ordem
@@ -305,7 +329,7 @@ export default function OrdensPage() {
               ? 'Nova Ordem de Beneficiamento'
               : 'Nova Ordem de Industrialização')
         }
-        size="6xl"
+        size="90pct"
       >
         {(selectedId ? tipoOrdem : draftTipoOrdem) === 'industrializacao' ? (
           <ProducaoFormPanel

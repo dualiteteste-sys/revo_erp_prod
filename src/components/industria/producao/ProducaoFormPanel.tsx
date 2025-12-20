@@ -29,6 +29,7 @@ import { listUnidades, UnidadeMedida } from '@/services/unidades';
 import Modal from '@/components/ui/Modal';
 import { logger } from '@/lib/logger';
 import IndustriaAuditTrailPanel from '@/components/industria/audit/IndustriaAuditTrailPanel';
+import { roleAtLeast, useEmpresaRole } from '@/hooks/useEmpresaRole';
 
 interface Props {
   ordemId: string | null;
@@ -48,6 +49,11 @@ export default function ProducaoFormPanel({
   onOpenOrder,
 }: Props) {
   const { addToast } = useToast();
+  const { data: empresaRole } = useEmpresaRole();
+  const canEdit = roleAtLeast(empresaRole, 'member');
+  const canAdmin = roleAtLeast(empresaRole, 'admin');
+  const canOperate = canEdit;
+  const canConfigureQa = canAdmin;
   const [loading, setLoading] = useState(!!ordemId);
   const [isSaving, setIsSaving] = useState(false);
   const [activeTab, setActiveTab] = useState<'dados' | 'componentes' | 'entregas' | 'operacoes' | 'historico'>('dados');
@@ -117,13 +123,21 @@ export default function ProducaoFormPanel({
   };
 
   const handleSaveHeader = async () => {
+    if (!canEdit) {
+      addToast('Você não tem permissão para editar esta ordem.', 'error');
+      return null;
+    }
+    if (formData.status === 'concluida' || formData.status === 'cancelada') {
+      addToast('Esta ordem está bloqueada para edição.', 'error');
+      return null;
+    }
     if (!formData.produto_final_id) {
       addToast('Selecione um produto final.', 'error');
-      return;
+      return null;
     }
     if (!formData.quantidade_planejada || formData.quantidade_planejada <= 0) {
       addToast('A quantidade planejada deve ser maior que zero.', 'error');
-      return;
+      return null;
     }
 
     setIsSaving(true);
@@ -324,11 +338,13 @@ export default function ProducaoFormPanel({
   if (loading) return <div className="flex justify-center p-8"><Loader2 className="animate-spin" /></div>;
 
   const isLocked = formData.status === 'concluida' || formData.status === 'cancelada';
+  const isRoleReadOnly = !canEdit;
+  const isLockedEffective = isLocked || isRoleReadOnly;
   const isWizard = !ordemId && !formData.id;
   const isReleased = formData.status === 'em_producao' || formData.status === 'em_inspecao';
   const hasOperacoes = Array.isArray((formData as any).operacoes) && (formData as any).operacoes.length > 0;
-  const isCoreHeaderLocked = isLocked || isReleased || (formData.status as any) === 'parcialmente_concluida' || hasOperacoes;
-  const canLiberar = !!formData.id && !isLocked && (formData.status === 'rascunho' || formData.status === 'planejada') && !!formData.roteiro_aplicado_id;
+  const isCoreHeaderLocked = isLockedEffective || isReleased || (formData.status as any) === 'parcialmente_concluida' || hasOperacoes;
+  const canLiberar = canEdit && !!formData.id && !isLockedEffective && (formData.status === 'rascunho' || formData.status === 'planejada') && !!formData.roteiro_aplicado_id;
   const componentesCount = Array.isArray(formData.componentes) ? formData.componentes.length : 0;
   const checklist = [
     {
@@ -523,7 +539,7 @@ export default function ProducaoFormPanel({
                 </Select>
               </div>
               <div className="sm:col-span-2">
-                <Select label="Origem" name="origem" value={formData.origem_ordem} onChange={e => handleHeaderChange('origem_ordem', e.target.value)} disabled={isLocked}>
+                <Select label="Origem" name="origem" value={formData.origem_ordem} onChange={e => handleHeaderChange('origem_ordem', e.target.value)} disabled={isLockedEffective}>
                   <option value="manual">Manual</option>
                   <option value="venda">Venda</option>
                   <option value="reposicao">Reposição</option>
@@ -536,7 +552,7 @@ export default function ProducaoFormPanel({
               <>
                 <Section title="Programação" description="Prazos e status.">
                   <div className="sm:col-span-2">
-                    <Select label="Status" name="status" value={formData.status} onChange={e => handleHeaderChange('status', e.target.value)} disabled={isLocked}>
+                    <Select label="Status" name="status" value={formData.status} onChange={e => handleHeaderChange('status', e.target.value)} disabled={isLockedEffective}>
                       <option value="rascunho">Rascunho</option>
                       <option value="planejada">Planejada</option>
                       <option value="em_programacao">Em Programação</option>
@@ -553,14 +569,14 @@ export default function ProducaoFormPanel({
                       type="number"
                       value={formData.prioridade || 0}
                       onChange={e => handleHeaderChange('prioridade', parseInt(e.target.value))}
-                      disabled={isLocked}
+                      disabled={isLockedEffective}
                     />
                   </div>
                   <div className="sm:col-span-2"></div>
 
-                  <Input label="Início Previsto" type="date" value={formData.data_prevista_inicio || ''} onChange={e => handleHeaderChange('data_prevista_inicio', e.target.value)} disabled={isLocked} className="sm:col-span-2" />
-                  <Input label="Fim Previsto" type="date" value={formData.data_prevista_fim || ''} onChange={e => handleHeaderChange('data_prevista_fim', e.target.value)} disabled={isLocked} className="sm:col-span-2" />
-                  <Input label="Entrega Prevista" type="date" value={formData.data_prevista_entrega || ''} onChange={e => handleHeaderChange('data_prevista_entrega', e.target.value)} disabled={isLocked} className="sm:col-span-2" />
+                  <Input label="Início Previsto" type="date" value={formData.data_prevista_inicio || ''} onChange={e => handleHeaderChange('data_prevista_inicio', e.target.value)} disabled={isLockedEffective} className="sm:col-span-2" />
+                  <Input label="Fim Previsto" type="date" value={formData.data_prevista_fim || ''} onChange={e => handleHeaderChange('data_prevista_fim', e.target.value)} disabled={isLockedEffective} className="sm:col-span-2" />
+                  <Input label="Entrega Prevista" type="date" value={formData.data_prevista_entrega || ''} onChange={e => handleHeaderChange('data_prevista_entrega', e.target.value)} disabled={isLockedEffective} className="sm:col-span-2" />
                 </Section>
 
                 <Section title="Parâmetros da OP" description="Configurações de produção.">
@@ -570,7 +586,7 @@ export default function ProducaoFormPanel({
                       name="lote"
                       value={formData.lote_producao || ''}
                       onChange={e => handleHeaderChange('lote_producao', e.target.value)}
-                      disabled={isLocked}
+                      disabled={isLockedEffective}
                       placeholder="Ex: LOTE-2025-001"
                     />
                   </div>
@@ -580,7 +596,7 @@ export default function ProducaoFormPanel({
                       name="reserva"
                       value={formData.reserva_modo || 'ao_liberar'}
                       onChange={e => handleHeaderChange('reserva_modo', e.target.value)}
-                      disabled={isLocked}
+                      disabled={isLockedEffective}
                     >
                       <option value="ao_liberar">Ao Liberar (Padrão)</option>
                       <option value="ao_planejar">Ao Planejar</option>
@@ -596,7 +612,7 @@ export default function ProducaoFormPanel({
                       max="10"
                       value={formData.tolerancia_overrun_percent || 0}
                       onChange={e => handleHeaderChange('tolerancia_overrun_percent', parseFloat(e.target.value))}
-                      disabled={isLocked}
+                      disabled={isLockedEffective}
                     />
                   </div>
                 </Section>
@@ -605,8 +621,8 @@ export default function ProducaoFormPanel({
 
             {(!isWizard || wizardStep === 2) && (
               <Section title="Outros" description="Detalhes adicionais.">
-                <Input label="Ref. Documento" name="doc_ref" value={formData.documento_ref || ''} onChange={e => handleHeaderChange('documento_ref', e.target.value)} disabled={isLocked} className="sm:col-span-2" placeholder="Pedido, Lote..." />
-                <TextArea label="Observações" name="obs" value={formData.observacoes || ''} onChange={e => handleHeaderChange('observacoes', e.target.value)} rows={3} disabled={isLocked} className="sm:col-span-6" />
+                <Input label="Ref. Documento" name="doc_ref" value={formData.documento_ref || ''} onChange={e => handleHeaderChange('documento_ref', e.target.value)} disabled={isLockedEffective} className="sm:col-span-2" placeholder="Pedido, Lote..." />
+                <TextArea label="Observações" name="obs" value={formData.observacoes || ''} onChange={e => handleHeaderChange('observacoes', e.target.value)} rows={3} disabled={isLockedEffective} className="sm:col-span-6" />
               </Section>
             )}
           </>
@@ -616,7 +632,7 @@ export default function ProducaoFormPanel({
         {
           activeTab === 'componentes' && (
             <>
-              {!isLocked && formData.id && formData.produto_final_id && (
+              {!isLockedEffective && formData.id && formData.produto_final_id && (
                 <div className="mb-4 grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="flex justify-between items-center bg-blue-50 p-3 rounded-lg border border-blue-100">
                     <p className="text-sm text-blue-800">
@@ -627,7 +643,7 @@ export default function ProducaoFormPanel({
                     <RoteiroSelector
                       ordemId={formData.id}
                       produtoId={formData.produto_final_id}
-                      disabled={isReleased || isLocked}
+                      disabled={isReleased || isLockedEffective}
                       onApplied={handleRoteiroApplied}
                     />
                   </div>
@@ -642,7 +658,7 @@ export default function ProducaoFormPanel({
                       ordemId={formData.id}
                       produtoId={formData.produto_final_id}
                       tipoOrdem="producao"
-                      disabled={isReleased || isLocked}
+                      disabled={isReleased || isLockedEffective}
                       onApplied={handleBomApplied}
                     />
                   </div>
@@ -656,7 +672,7 @@ export default function ProducaoFormPanel({
                 onUpdateItem={handleUpdateComponente}
                 onRefresh={() => loadDetails(formData.id)}
                 isAddingItem={false}
-                readOnly={isLocked}
+                readOnly={isLockedEffective}
                 highlightItemId={highlightComponenteId}
               />
             </>
@@ -665,7 +681,12 @@ export default function ProducaoFormPanel({
 
         {
           activeTab === 'operacoes' && formData.id && (
-            <OperacoesGrid ordemId={formData.id} highlightOperacaoId={highlightOperacaoId} />
+            <OperacoesGrid
+              ordemId={formData.id}
+              highlightOperacaoId={highlightOperacaoId}
+              canOperate={canOperate && !isLockedEffective}
+              canConfigureQa={canConfigureQa && !isLockedEffective}
+            />
           )
         }
 
@@ -685,7 +706,7 @@ export default function ProducaoFormPanel({
                 entregas={formData.entregas || []}
                 onAddEntrega={handleAddEntrega}
                 onRemoveEntrega={handleRemoveEntrega}
-                readOnly={isLocked || entregaBloqueada?.blocked}
+                readOnly={isLockedEffective || entregaBloqueada?.blocked}
                 maxQuantity={formData.quantidade_planejada || 0}
                 showBillingStatus={false}
                 highlightEntregaId={highlightEntregaId}
@@ -746,7 +767,7 @@ export default function ProducaoFormPanel({
       </div >
 
       <div className="flex justify-between p-4 border-t bg-gray-50 rounded-b-lg">
-        {formData.id && !isLocked && formData.status === 'rascunho' ? (
+        {formData.id && !isLockedEffective && canAdmin && formData.status === 'rascunho' ? (
           <button
             onClick={async () => {
               if (confirm('Tem certeza que deseja excluir esta Ordem de Produção? Esta ação não pode ser desfeita.')) {
@@ -806,14 +827,14 @@ export default function ProducaoFormPanel({
           {formData.id && (formData.status === 'em_producao' || (formData.status as any) === 'parcialmente_concluida') && (
             <button
               onClick={() => setShowClosureModal(true)}
-              disabled={isSaving}
+              disabled={isSaving || !canAdmin}
               className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 disabled:opacity-50"
             >
               Encerrar Ordem (Backflush)
             </button>
           )}
 
-          {!isLocked && !isWizard && (
+          {!isLockedEffective && canEdit && !isWizard && (
             <button
               onClick={handleSaveHeader}
               disabled={isSaving}
@@ -824,7 +845,7 @@ export default function ProducaoFormPanel({
             </button>
           )}
 
-          {!isLocked && isWizard && (
+          {!isLockedEffective && canEdit && isWizard && (
             <>
               {wizardStep > 0 && (
                 <button

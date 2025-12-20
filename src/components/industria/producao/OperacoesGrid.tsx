@@ -19,13 +19,20 @@ import { logger } from '@/lib/logger';
 interface Props {
     ordemId: string;
     highlightOperacaoId?: string | null;
+    canOperate?: boolean;
+    canConfigureQa?: boolean;
 }
 
-export default function OperacoesGrid({ ordemId, highlightOperacaoId }: Props) {
+export default function OperacoesGrid({ ordemId, highlightOperacaoId, canOperate = true, canConfigureQa = true }: Props) {
     const [operacoes, setOperacoes] = useState<OrdemOperacao[]>([]);
     const [loading, setLoading] = useState(true);
     const { addToast } = useToast();
     const tableRef = useRef<HTMLDivElement | null>(null);
+    const btnSm = "h-8 px-3 text-xs";
+    const btnPrimary = "bg-blue-600 text-white hover:bg-blue-700";
+    const btnSecondary = "bg-gray-100 text-gray-800 hover:bg-gray-200";
+    const btnSuccess = "bg-green-600 text-white hover:bg-green-700";
+    const btnOutlineBlue = "border border-blue-200 text-blue-700 hover:bg-blue-50";
 
     // Controle de modal de apontamento
     const [selectedOp, setSelectedOp] = useState<OrdemOperacao | null>(null);
@@ -76,6 +83,10 @@ export default function OperacoesGrid({ ordemId, highlightOperacaoId }: Props) {
     }, [highlightOperacaoId, operacoes.length]);
 
     const handleEvento = async (op: OrdemOperacao, evento: 'iniciar' | 'pausar' | 'retomar' | 'concluir') => {
+        if (!canOperate) {
+            addToast('Você não tem permissão para executar ações nesta operação.', 'error');
+            return;
+        }
         if (evento === 'concluir') {
             if (!confirm(`Confirma a conclusão da etapa ${op.sequencia}?`)) return;
         }
@@ -115,12 +126,20 @@ export default function OperacoesGrid({ ordemId, highlightOperacaoId }: Props) {
     };
 
     const openTransferModal = (op: OrdemOperacao) => {
+        if (!canOperate) {
+            addToast('Você não tem permissão para transferir.', 'error');
+            return;
+        }
         const disponivel = Math.max(op.quantidade_produzida - (op.quantidade_transferida || 0), 0);
         setTransferOp(op);
         setTransferQty(disponivel);
     };
 
     const openQaModal = (op: OrdemOperacao) => {
+        if (!canConfigureQa) {
+            addToast('Você não tem permissão para configurar QA.', 'error');
+            return;
+        }
         setQaOp(op);
     };
 
@@ -224,61 +243,102 @@ export default function OperacoesGrid({ ordemId, highlightOperacaoId }: Props) {
                                         {op.require_if && op.if_status !== 'aprovada' && (
                                             <p className="text-xs text-amber-600">IF necessária para concluir.</p>
                                         )}
-                                        <Button size="xs" variant="ghost" className="text-blue-600" onClick={() => openQaModal(op)}>
-                                            Configurar QA
-                                        </Button>
-                                        <Button size="xs" variant="ghost" className="text-blue-600" onClick={() => openDocsModal(op)}>
-                                            Instruções / Docs
-                                        </Button>
+                                        <div className="flex flex-col gap-2 pt-1">
+                                            <Button
+                                                size="sm"
+                                                className={`${btnSm} ${btnPrimary}`}
+                                                onClick={() => openQaModal(op)}
+                                                disabled={!canConfigureQa}
+                                                title={!canConfigureQa ? 'Sem permissão para configurar QA' : 'Configurar QA'}
+                                            >
+                                                Configurar QA
+                                            </Button>
+                                            <Button
+                                                size="sm"
+                                                className={`${btnSm} ${btnPrimary}`}
+                                                onClick={() => openDocsModal(op)}
+                                            >
+                                                Instruções / Docs
+                                            </Button>
+                                        </div>
                                     </td>
-                                    <td className="px-3 py-2 whitespace-nowrap text-sm text-center space-x-2">
+                                    <td className="px-3 py-2 text-sm">
                                         {/* Botões de Ação */}
-                                        {(op.status === 'na_fila' || op.status === 'pendente' || op.status === 'pausada') && (
-                                            <Button
-                                                size="xs"
-                                                variant={op.status === 'pausada' ? 'secondary' : 'success'}
-                                                onClick={() => handleEvento(op, op.status === 'pausada' ? 'retomar' : 'iniciar')}
-                                            >
-                                                <Play className="w-3 h-3 mr-1" />
-                                                {op.status === 'pausada' ? 'Retomar' : 'Iniciar'}
-                                            </Button>
-                                        )}
-
-                                        {op.status === 'em_execucao' && (
-                                            <>
-                                                <Button size="xs" variant="secondary" onClick={() => handleEvento(op, 'pausar')}>
-                                                    <Pause className="w-3 h-3 mr-1" />
-                                                    Pausar
-                                                </Button>
-                                                <Button size="xs" onClick={() => { setSelectedOp(op); setIsApontamentoOpen(true); }}>
-                                                    <ClipboardList className="w-3 h-3 mr-1" />
-                                                    Apontar
-                                                </Button>
+                                        <div className="flex flex-wrap justify-center gap-2 min-w-[240px]">
+                                            {(op.status === 'na_fila' || op.status === 'pendente' || op.status === 'pausada') && (
                                                 <Button
-                                                    size="xs"
-                                                    variant="outline"
-                                                    disabled={!ifLiberado}
-                                                    title={ifLiberado ? 'Concluir operação' : 'IF pendente: realize a inspeção final'}
-                                                    onClick={() => ifLiberado && handleEvento(op, 'concluir')}
+                                                    size="sm"
+                                                    className={`${btnSm} ${btnPrimary}`}
+                                                    onClick={() => handleEvento(op, op.status === 'pausada' ? 'retomar' : 'iniciar')}
+                                                    disabled={!canOperate}
+                                                    title={!canOperate ? 'Sem permissão para operar' : undefined}
                                                 >
-                                                    <CheckCircle className="w-3 h-3 mr-1" />
-                                                    Concluir
+                                                    <Play className="w-3 h-3 mr-1" />
+                                                    {op.status === 'pausada' ? 'Retomar' : 'Iniciar'}
                                                 </Button>
-                                            </>
-                                        )}
+                                            )}
 
-                                        {op.permite_overlap && disponivelTransferencia > 0 && op.status !== 'concluida' && (
-                                            <Button
-                                                size="xs"
-                                                variant="ghost"
-                                                className={`${podeTransferir ? 'text-blue-600 hover:text-blue-800' : 'text-gray-400 cursor-not-allowed'}`}
-                                                title={podeTransferir ? `Transferir ${disponivelTransferencia}` : 'IP pendente: realize a inspeção para liberar'}
-                                                disabled={!podeTransferir}
-                                                onClick={() => podeTransferir && openTransferModal(op)}
-                                            >
-                                                <ArrowRight className="w-3 h-3" />
-                                            </Button>
-                                        )}
+                                            {op.status === 'em_execucao' && (
+                                                <>
+                                                    <Button
+                                                        size="sm"
+                                                        className={`${btnSm} ${btnSecondary}`}
+                                                        onClick={() => handleEvento(op, 'pausar')}
+                                                        disabled={!canOperate}
+                                                        title={!canOperate ? 'Sem permissão para operar' : undefined}
+                                                    >
+                                                        <Pause className="w-3 h-3 mr-1" />
+                                                        Pausar
+                                                    </Button>
+                                                    <Button
+                                                        size="sm"
+                                                        className={`${btnSm} ${btnPrimary}`}
+                                                        disabled={!canOperate}
+                                                        title={!canOperate ? 'Sem permissão para operar' : undefined}
+                                                        onClick={() => {
+                                                            if (!canOperate) return;
+                                                            setSelectedOp(op);
+                                                            setIsApontamentoOpen(true);
+                                                        }}
+                                                    >
+                                                        <ClipboardList className="w-3 h-3 mr-1" />
+                                                        Apontar
+                                                    </Button>
+                                                    <Button
+                                                        size="sm"
+                                                        className={`${btnSm} ${btnSuccess}`}
+                                                        disabled={!ifLiberado || !canOperate}
+                                                        title={
+                                                            !canOperate
+                                                                ? 'Sem permissão para operar'
+                                                                : (ifLiberado ? 'Concluir operação' : 'IF pendente: realize a inspeção final')
+                                                        }
+                                                        onClick={() => ifLiberado && handleEvento(op, 'concluir')}
+                                                    >
+                                                        <CheckCircle className="w-3 h-3 mr-1" />
+                                                        Concluir
+                                                    </Button>
+                                                </>
+                                            )}
+
+                                            {op.permite_overlap && disponivelTransferencia > 0 && op.status !== 'concluida' && (
+                                                <Button
+                                                    size="sm"
+                                                    variant="outline"
+                                                    className={`${btnSm} ${btnOutlineBlue} ${!podeTransferir ? 'cursor-not-allowed opacity-60' : ''}`}
+                                                    title={
+                                                        !canOperate
+                                                            ? 'Sem permissão para operar'
+                                                            : (podeTransferir ? `Transferir ${disponivelTransferencia}` : 'IP pendente: realize a inspeção para liberar')
+                                                    }
+                                                    disabled={!podeTransferir || !canOperate}
+                                                    onClick={() => podeTransferir && openTransferModal(op)}
+                                                >
+                                                    <ArrowRight className="w-3 h-3 mr-1" />
+                                                    Transferir
+                                                </Button>
+                                            )}
+                                        </div>
                                     </td>
                                 </tr>
                             );
@@ -353,10 +413,20 @@ export default function OperacoesGrid({ ordemId, highlightOperacaoId }: Props) {
                         </div>
 
                         <div className="flex justify-end space-x-2">
-                            <Button variant="ghost" onClick={() => { if (!transferLoading) { setTransferOp(null); setTransferQty(0); } }} disabled={transferLoading}>
+                            <Button
+                                size="sm"
+                                className={`${btnSm} ${btnSecondary}`}
+                                onClick={() => { if (!transferLoading) { setTransferOp(null); setTransferQty(0); } }}
+                                disabled={transferLoading}
+                            >
                                 Cancelar
                             </Button>
-                            <Button onClick={handleTransferConfirm} disabled={transferLoading}>
+                            <Button
+                                size="sm"
+                                className={`${btnSm} ${btnPrimary}`}
+                                onClick={handleTransferConfirm}
+                                disabled={transferLoading}
+                            >
                                 {transferLoading ? 'Transferindo...' : 'Confirmar Transferência'}
                             </Button>
                         </div>
