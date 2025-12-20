@@ -19,6 +19,7 @@ import type { MaterialClienteListItem } from '@/services/industriaMateriais';
 import { useNavigate } from 'react-router-dom';
 import Modal from '@/components/ui/Modal';
 import { logger } from '@/lib/logger';
+import IndustriaAuditTrailPanel from '@/components/industria/audit/IndustriaAuditTrailPanel';
 
 interface Props {
   ordemId: string | null;
@@ -58,7 +59,7 @@ export default function OrdemFormPanel({
   const [loading, setLoading] = useState(!!ordemId);
   const [isSaving, setIsSaving] = useState(false);
   const [isGeneratingExecucao, setIsGeneratingExecucao] = useState(false);
-  const [activeTab, setActiveTab] = useState<'dados' | 'componentes' | 'entregas'>('dados');
+  const [activeTab, setActiveTab] = useState<'dados' | 'componentes' | 'entregas' | 'historico'>('dados');
   const [materialCliente, setMaterialCliente] = useState<MaterialClienteListItem | null>(null);
   const [wizardStep, setWizardStep] = useState<0 | 1 | 2>(0);
   const [autoOpenBomSelector, setAutoOpenBomSelector] = useState(false);
@@ -506,6 +507,16 @@ export default function OrdemFormPanel({
           >
             Entregas ({formData.entregas?.length || 0})
           </button>
+          <button
+            onClick={() => setActiveTab('historico')}
+            className={`whitespace-nowrap py-2 px-3 border-b-2 font-medium text-sm transition-colors ${activeTab === 'historico'
+              ? 'border-blue-500 text-blue-600'
+              : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+              }`}
+            disabled={!formData.id}
+          >
+            Histórico
+          </button>
         </nav>
       </div>
 
@@ -825,6 +836,27 @@ export default function OrdemFormPanel({
             currentTotal={totalEntregue}
             showBillingStatus={formData.tipo_ordem === 'beneficiamento'}
           />
+        )}
+
+        {activeTab === 'historico' && (
+          formData.id ? (
+            <IndustriaAuditTrailPanel
+              ordemId={formData.id}
+              tables={[
+                'industria_ordens',
+                'industria_ordens_componentes',
+                'industria_ordens_entregas',
+              ]}
+              onNavigate={(row) => {
+                if (row.table_name === 'industria_ordens') setActiveTab('dados');
+                else if (row.table_name === 'industria_ordens_componentes') setActiveTab('componentes');
+                else if (row.table_name === 'industria_ordens_entregas') setActiveTab('entregas');
+                else setActiveTab('dados');
+              }}
+            />
+          ) : (
+            <div className="text-sm text-gray-500">Salve a ordem para visualizar o histórico.</div>
+          )
         )}
       </div>
 

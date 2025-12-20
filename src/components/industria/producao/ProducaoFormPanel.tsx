@@ -28,6 +28,7 @@ import { formatOrderNumber } from '@/lib/utils';
 import { listUnidades, UnidadeMedida } from '@/services/unidades';
 import Modal from '@/components/ui/Modal';
 import { logger } from '@/lib/logger';
+import IndustriaAuditTrailPanel from '@/components/industria/audit/IndustriaAuditTrailPanel';
 
 interface Props {
   ordemId: string | null;
@@ -49,7 +50,7 @@ export default function ProducaoFormPanel({
   const { addToast } = useToast();
   const [loading, setLoading] = useState(!!ordemId);
   const [isSaving, setIsSaving] = useState(false);
-  const [activeTab, setActiveTab] = useState<'dados' | 'componentes' | 'entregas' | 'operacoes'>('dados');
+  const [activeTab, setActiveTab] = useState<'dados' | 'componentes' | 'entregas' | 'operacoes' | 'historico'>('dados');
   const [unidades, setUnidades] = useState<UnidadeMedida[]>([]);
   const [showClosureModal, setShowClosureModal] = useState(false);
   const [entregaBloqueada, setEntregaBloqueada] = useState<{ blocked: boolean; reason?: string } | null>(null);
@@ -415,6 +416,16 @@ export default function ProducaoFormPanel({
               </span>
             )}
           </button>
+          <button
+            onClick={() => setActiveTab('historico')}
+            className={`whitespace-nowrap py-2 px-3 border-b-2 font-medium text-sm transition-colors ${activeTab === 'historico'
+              ? 'border-blue-500 text-blue-600'
+              : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+              } `}
+            disabled={!formData.id}
+          >
+            Histórico
+          </button>
         </nav>
       </div>
 
@@ -676,6 +687,29 @@ export default function ProducaoFormPanel({
             </div>
           )
         }
+
+        {activeTab === 'historico' && (
+          formData.id ? (
+            <IndustriaAuditTrailPanel
+              ordemId={formData.id}
+              tables={[
+                'industria_producao_ordens',
+                'industria_producao_componentes',
+                'industria_producao_entregas',
+                'industria_producao_operacoes',
+              ]}
+              onNavigate={(row) => {
+                if (row.table_name === 'industria_producao_ordens') setActiveTab('dados');
+                else if (row.table_name === 'industria_producao_componentes') setActiveTab('componentes');
+                else if (row.table_name === 'industria_producao_entregas') setActiveTab('entregas');
+                else if (row.table_name === 'industria_producao_operacoes') setActiveTab('operacoes');
+                else setActiveTab('dados');
+              }}
+            />
+          ) : (
+            <div className="text-sm text-gray-500">Salve a ordem para visualizar o histórico.</div>
+          )
+        )}
       </div >
 
       <div className="flex justify-between p-4 border-t bg-gray-50 rounded-b-lg">
