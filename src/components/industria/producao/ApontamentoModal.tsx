@@ -15,6 +15,8 @@ import { useToast } from '../../../contexts/ToastProvider';
 import DecimalInput from '../../ui/forms/DecimalInput';
 import NovoMotivoModal from '../qualidade/NovoMotivoModal';
 import { Plus, Trash2, AlertTriangle } from 'lucide-react';
+import { logger } from '@/lib/logger';
+import { useConfirm } from '@/contexts/ConfirmProvider';
 
 interface Props {
     isOpen: boolean;
@@ -25,6 +27,7 @@ interface Props {
 
 export default function ApontamentoModal({ isOpen, onClose, operacao, onSuccess }: Props) {
     const { addToast } = useToast();
+    const { confirm } = useConfirm();
     const [loading, setLoading] = useState(false);
     const [qtdBoa, setQtdBoa] = useState(0);
     const [qtdRefugo, setQtdRefugo] = useState(0);
@@ -44,7 +47,10 @@ export default function ApontamentoModal({ isOpen, onClose, operacao, onSuccess 
     const loadMotivos = () => {
         getMotivosRefugo()
             .then(setMotivosRefugo)
-            .catch(err => console.error('Erro ao carregar motivos:', err));
+            .catch((err) => {
+                logger.error('[Indústria][Produção] Falha ao carregar motivos de refugo', err, { operacaoId: operacao.id });
+                addToast('Erro ao carregar motivos de refugo.', 'error');
+            });
     };
 
     const loadApontamentos = async () => {
@@ -52,8 +58,9 @@ export default function ApontamentoModal({ isOpen, onClose, operacao, onSuccess 
         try {
             const data = await listApontamentos(operacao.id);
             setApontamentos(data);
-        } catch (err) {
-            console.error(err);
+        } catch (err: any) {
+            logger.error('[Indústria][Produção] Falha ao carregar apontamentos', err, { operacaoId: operacao.id });
+            addToast(err?.message || 'Erro ao carregar apontamentos.', 'error');
         } finally {
             setApontamentosLoading(false);
         }
@@ -114,7 +121,14 @@ export default function ApontamentoModal({ isOpen, onClose, operacao, onSuccess 
     };
 
     const handleDeleteApontamento = async (id: string) => {
-        if (!confirm('Excluir este apontamento?')) return;
+        const ok = await confirm({
+            title: 'Excluir apontamento',
+            description: 'Tem certeza que deseja excluir este apontamento? Esta ação não pode ser desfeita.',
+            confirmText: 'Excluir',
+            cancelText: 'Cancelar',
+            variant: 'danger',
+        });
+        if (!ok) return;
         try {
             await deleteApontamento(id);
             addToast('Apontamento removido.', 'success');

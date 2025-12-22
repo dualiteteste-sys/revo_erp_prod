@@ -3,6 +3,8 @@ import { listBoms, BomListItem, aplicarBomProducao, aplicarBomBeneficiamento } f
 import { Loader2, FileCog } from 'lucide-react';
 import { useToast } from '@/contexts/ToastProvider';
 import Modal from '@/components/ui/Modal';
+import { logger } from '@/lib/logger';
+import { useConfirm } from '@/contexts/ConfirmProvider';
 
 interface Props {
   ordemId: string;
@@ -11,57 +13,85 @@ interface Props {
   openOnMount?: boolean;
   disabled?: boolean;
   onApplied: (bom: BomListItem) => void;
+  onEnsureOrder?: () => Promise<string | null>;
 }
 
-export default function BomSelector({ ordemId, produtoId, tipoOrdem, openOnMount, disabled, onApplied }: Props) {
+export default function BomSelector({ ordemId, produtoId, tipoOrdem, openOnMount, disabled, onApplied, onEnsureOrder }: Props) {
+  const [resolvedOrdemId, setResolvedOrdemId] = useState(ordemId);
   const [isOpen, setIsOpen] = useState(false);
   const [boms, setBoms] = useState<BomListItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [applying, setApplying] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterByProduct, setFilterByProduct] = useState(true);
+  const [filterByTipo, setFilterByTipo] = useState(false);
   const { addToast } = useToast();
+  const { confirm } = useConfirm();
+
+  useEffect(() => {
+    setResolvedOrdemId(ordemId);
+  }, [ordemId]);
 
   useEffect(() => {
     if (!openOnMount) return;
-    if (!ordemId) return;
+    if (!resolvedOrdemId) return;
     setIsOpen(true);
-  }, [openOnMount, ordemId]);
+  }, [openOnMount, resolvedOrdemId]);
+
+  const ensureOrderBeforeOpen = async () => {
+    if (resolvedOrdemId) return resolvedOrdemId;
+    if (!onEnsureOrder) return null;
+    const id = await onEnsureOrder();
+    if (id) setResolvedOrdemId(id);
+    return id;
+  };
 
   const loadBoms = async () => {
     setLoading(true);
     try {
       // Se filterByProduct for true, usa o produtoId recebido via prop.
       // Caso contrário, passa undefined para listar BOMs de qualquer produto.
-      const targetProdutoId = filterByProduct ? produtoId : undefined;
-
-      const data = await listBoms(searchTerm, targetProdutoId, tipoOrdem, true);
+      const targetProdutoId = filterByProduct && produtoId ? produtoId : undefined;
+      const targetTipo = filterByTipo ? tipoOrdem : undefined;
+      const data = await listBoms(searchTerm, targetProdutoId, targetTipo, true);
       setBoms(data);
     } catch (e) {
-      console.error(e);
+      logger.error('[Indústria][OP] Falha ao listar BOMs (selector)', e, { produtoId, tipoOrdem, searchTerm, filterByProduct });
+      addToast((e as any)?.message || 'Erro ao listar fichas técnicas (BOM).', 'error');
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    if (isOpen) {
-      loadBoms();
-    }
-  }, [isOpen, filterByProduct, searchTerm]); // Recarrega ao mudar filtros
+    if (isOpen) loadBoms();
+  }, [isOpen, filterByProduct, filterByTipo, searchTerm]); // Recarrega ao mudar filtros
 
   const handleApply = async (bomId: string, mode: 'substituir' | 'adicionar') => {
-    if (!confirm(`Tem certeza que deseja aplicar esta BOM? ${mode === 'substituir' ? 'Isso substituirá os componentes atuais.' : ''}`)) return;
+    const ok = await confirm({
+      title: 'Aplicar BOM',
+      description:
+        mode === 'substituir'
+          ? 'Tem certeza que deseja aplicar esta BOM? Isso substituirá os componentes atuais.'
+          : 'Tem certeza que deseja aplicar esta BOM? Os componentes atuais serão mantidos.',
+      confirmText: 'Aplicar',
+      cancelText: 'Cancelar',
+      variant: 'primary',
+    });
+    if (!ok) return;
 
     const selectedBom = boms.find(b => b.id === bomId);
     if (!selectedBom) return;
 
+    const currentId = resolvedOrdemId || (await ensureOrderBeforeOpen());
+    if (!currentId) return;
+
     setApplying(bomId);
     try {
       if (tipoOrdem === 'producao') {
-        await aplicarBomProducao(bomId, ordemId, mode);
+        await aplicarBomProducao(bomId, currentId, mode);
       } else {
-        await aplicarBomBeneficiamento(bomId, ordemId, mode);
+        await aplicarBomBeneficiamento(bomId, currentId, mode);
       }
       addToast('BOM aplicada com sucesso!', 'success');
       setIsOpen(false);
@@ -76,11 +106,15 @@ export default function BomSelector({ ordemId, produtoId, tipoOrdem, openOnMount
   return (
     <>
       <button
-        onClick={() => setIsOpen(true)}
+        onClick={async () => {
+          const ok = await ensureOrderBeforeOpen();
+          if (!ok) return;
+          setIsOpen(true);
+        }}
         className={`flex items-center gap-2 text-sm font-medium px-3 py-2 rounded-lg transition-colors ${
           disabled ? 'text-gray-400 cursor-not-allowed' : 'text-blue-600 hover:text-blue-800 hover:bg-blue-50'
         }`}
-        disabled={!ordemId || !!disabled}
+        disabled={!!disabled || !produtoId}
       >
         <FileCog size={16} /> Aplicar BOM
       </button>
@@ -107,6 +141,18 @@ export default function BomSelector({ ordemId, produtoId, tipoOrdem, openOnMount
                 Filtrar pelo produto/serviço selecionado na ordem
               </label>
             </div>
+            <div className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                id="filterByTipo"
+                checked={filterByTipo}
+                onChange={(e) => setFilterByTipo(e.target.checked)}
+                className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+              />
+              <label htmlFor="filterByTipo" className="text-sm text-gray-700">
+                Filtrar por tipo de uso (Produção/Beneficiamento)
+              </label>
+            </div>
           </div>
 
           {loading ? (
@@ -123,6 +169,9 @@ export default function BomSelector({ ordemId, produtoId, tipoOrdem, openOnMount
                   <div>
                     <div className="flex items-center gap-2">
                       <h4 className="font-bold text-gray-800">{bom.codigo || 'Sem código'} (v{bom.versao})</h4>
+                      <span className="text-xs bg-blue-100 text-blue-800 px-2 py-0.5 rounded-full">
+                        {bom.tipo_bom === 'beneficiamento' ? 'Beneficiamento' : 'Produção'}
+                      </span>
                       {bom.padrao_para_producao && <span className="text-xs bg-green-100 text-green-800 px-2 py-0.5 rounded-full">Padrão</span>}
                     </div>
                     <p className="text-sm text-gray-600">{bom.descricao}</p>

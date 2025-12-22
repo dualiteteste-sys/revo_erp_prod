@@ -4,6 +4,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { MemoryRouter } from 'react-router-dom';
 import { AuthProvider } from '../contexts/AuthProvider';
 import { ToastProvider } from '../contexts/ToastProvider';
+import { ConfirmProvider } from '../contexts/ConfirmProvider';
 import { SupabaseProvider } from '../providers/SupabaseProvider';
 
 const createTestQueryClient = () => new QueryClient({
@@ -60,11 +61,13 @@ export function renderWithProviders(
             <QueryClientProvider client={queryClient}>
                 <SupabaseProvider>
                     <ToastProvider>
-                        <AuthProvider>
-                            <MemoryRouter initialEntries={[route]}>
-                                {children}
-                            </MemoryRouter>
-                        </AuthProvider>
+                        <ConfirmProvider>
+                            <AuthProvider>
+                                <MemoryRouter initialEntries={[route]}>
+                                    {children}
+                                </MemoryRouter>
+                            </AuthProvider>
+                        </ConfirmProvider>
                     </ToastProvider>
                 </SupabaseProvider>
             </QueryClientProvider>

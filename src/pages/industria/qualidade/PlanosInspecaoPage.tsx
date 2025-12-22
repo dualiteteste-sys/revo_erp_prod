@@ -9,9 +9,12 @@ import {
 } from '@/services/industriaProducao';
 import PlanosInspecaoTable from '@/components/industria/qualidade/PlanosInspecaoTable';
 import PlanoInspecaoFormModal from '@/components/industria/qualidade/PlanoInspecaoFormModal';
+import { useConfirm } from '@/contexts/ConfirmProvider';
+import { Button } from '@/components/ui/button';
 
 export default function PlanosInspecaoPage() {
   const { addToast } = useToast();
+  const { confirm } = useConfirm();
   const [planos, setPlanos] = useState<PlanoInspecao[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -47,7 +50,14 @@ export default function PlanosInspecaoPage() {
   };
 
   const handleDelete = async (id: string) => {
-    if (!confirm('Deseja realmente excluir este plano? Esta ação não pode ser desfeita.')) return;
+    const ok = await confirm({
+      title: 'Excluir plano de inspeção',
+      description: 'Deseja realmente excluir este plano? Esta ação não pode ser desfeita.',
+      confirmText: 'Excluir',
+      cancelText: 'Cancelar',
+      variant: 'danger',
+    });
+    if (!ok) return;
     try {
       await deletePlanoInspecao(id);
       addToast('Plano removido com sucesso!', 'success');
@@ -66,19 +76,13 @@ export default function PlanosInspecaoPage() {
             Configure IP/IF vinculadas aos produtos e etapas para garantir liberação da próxima fase somente após a aprovação.
           </p>
         </div>
-        <div className="flex gap-2">
-          <button
-            onClick={loadPlanos}
-            className="flex items-center gap-2 px-4 py-2 border border-gray-200 rounded-lg text-sm text-gray-600 hover:bg-gray-50"
-          >
+        <div className="flex gap-2 flex-wrap">
+          <Button onClick={loadPlanos} variant="outline" className="gap-2">
             <RefreshCcw size={16} /> Atualizar
-          </button>
-          <button
-            onClick={handleNew}
-            className="flex items-center gap-2 px-4 py-2 rounded-lg bg-blue-600 text-white text-sm hover:bg-blue-700"
-          >
+          </Button>
+          <Button onClick={handleNew} className="gap-2">
             <PlusCircle size={18} /> Novo Plano
-          </button>
+          </Button>
         </div>
       </div>
 

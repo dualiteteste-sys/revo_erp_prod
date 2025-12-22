@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Loader2, Trash2 } from "lucide-react";
 import { deletePendingInvitation } from "@/services/users";
+import { useToast } from "@/contexts/ToastProvider";
 
 type Props = {
   userId: string;
@@ -10,6 +11,7 @@ type Props = {
 
 export default function RemoveInviteButton({ userId, status, onRemoved }: Props) {
   const [loading, setLoading] = useState(false);
+  const { addToast } = useToast();
 
   const onClick = async () => {
     if (loading || status !== "PENDING") return;
@@ -24,7 +26,7 @@ export default function RemoveInviteButton({ userId, status, onRemoved }: Props)
       }
     } catch (err: any) {
       console.error("[RPC][DELETE_INVITE] error", err);
-      alert(err?.message ?? "Falha ao remover convite. Veja o console para detalhes.");
+      addToast(err?.message ?? "Falha ao remover convite.", "error");
     } finally {
       setLoading(false);
     }

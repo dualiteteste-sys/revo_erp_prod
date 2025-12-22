@@ -11,6 +11,7 @@ import Toggle from '@/components/ui/forms/Toggle';
 import ItemAutocomplete from '@/components/os/ItemAutocomplete';
 import DecimalInput from '@/components/ui/forms/DecimalInput';
 import { motion, AnimatePresence } from 'framer-motion';
+import { logger } from '@/lib/logger';
 // ... existing imports
 
 // Inside the component return
@@ -41,7 +42,12 @@ export default function BomFormPanel({ bomId, initialData, onSaveSuccess, onClos
 
   useEffect(() => {
     // Fetch units
-    listUnidades().then(setUnidades).catch(console.error);
+    listUnidades()
+      .then(setUnidades)
+      .catch((e: any) => {
+        logger.error('[Indústria][BOM] Falha ao carregar unidades', e);
+        addToast(e?.message || 'Erro ao carregar unidades.', 'error');
+      });
 
     if (bomId) {
       loadDetails();
@@ -50,7 +56,6 @@ export default function BomFormPanel({ bomId, initialData, onSaveSuccess, onClos
         ...initialData,
         componentes: initialData.componentes || []
       });
-      console.log('Dados iniciais carregados (Clonagem):', initialData);
       setLoading(false);
 
       // If cloning, we might want to ensure components tab is accessible if there are components
@@ -79,7 +84,7 @@ export default function BomFormPanel({ bomId, initialData, onSaveSuccess, onClos
       const data = await getBomDetails(targetId);
       setFormData(data);
     } catch (e) {
-      console.error(e);
+      logger.error('[Indústria][BOM] Falha ao carregar BOM', e, { bomId: targetId });
       addToast('Erro ao carregar BOM.', 'error');
       onClose();
     } finally {

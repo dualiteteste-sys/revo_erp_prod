@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useContasCorrentes, useMovimentacoes, useExtratos } from '@/hooks/useTesouraria';
 import { useToast } from '@/contexts/ToastProvider';
+import { useConfirm } from '@/contexts/ConfirmProvider';
 import { PlusCircle, Search, Landmark, ArrowRightLeft, Calendar, UploadCloud, FileSpreadsheet } from 'lucide-react';
 import { Loader2 } from 'lucide-react';
 import Modal from '@/components/ui/Modal';
@@ -19,6 +20,7 @@ import Toggle from '@/components/ui/forms/Toggle';
 export default function TesourariaPage() {
   const [activeTab, setActiveTab] = useState<'contas' | 'movimentos' | 'conciliacao'>('contas');
   const { addToast } = useToast();
+  const { confirm } = useConfirm();
 
   // --- Contas State ---
   const {
@@ -131,7 +133,14 @@ export default function TesourariaPage() {
   };
 
   const handleUnconciliate = async (item: ExtratoItem) => {
-    if (!confirm('Desfazer a conciliação deste lançamento?')) return;
+    const ok = await confirm({
+      title: 'Desfazer conciliação',
+      description: 'Desfazer a conciliação deste lançamento?',
+      confirmText: 'Desfazer',
+      cancelText: 'Cancelar',
+      variant: 'danger',
+    });
+    if (!ok) return;
     try {
         await desconciliarExtrato(item.id);
         addToast('Conciliação desfeita.', 'success');

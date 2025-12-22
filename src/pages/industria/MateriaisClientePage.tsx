@@ -14,6 +14,8 @@ import ImportarXmlSuprimentosModal from '@/components/industria/materiais/Import
 import { listRecebimentos, setRecebimentoClassificacao, Recebimento } from '@/services/recebimento';
 import ClientAutocomplete from '@/components/common/ClientAutocomplete';
 import { useNavigate } from 'react-router-dom';
+import { logger } from '@/lib/logger';
+import { Button } from '@/components/ui/button';
 
 export default function MateriaisClientePage() {
   const [materiais, setMateriais] = useState<MaterialClienteListItem[]>([]);
@@ -51,7 +53,8 @@ export default function MateriaisClientePage() {
       setMateriais(data);
       setTotalCount(count);
     } catch (e) {
-      console.error(e);
+      logger.error('[Indústria][Materiais do Cliente] Falha ao carregar materiais', e, { q: debouncedSearch, activeFilter, page, pageSize });
+      addToast((e as any)?.message || 'Erro ao carregar materiais.', 'error');
     } finally {
       setLoading(false);
     }
@@ -103,7 +106,7 @@ export default function MateriaisClientePage() {
       setRecebimentosPendentes(pendentes);
       if (pendentes.length === 1) setRecebimentoSelecionadoId(pendentes[0].id);
     } catch (e: any) {
-      console.error(e);
+      logger.error('[Indústria][Materiais do Cliente] Falha ao carregar recebimentos pendentes', e);
       addToast(e.message || 'Erro ao carregar recebimentos.', 'error');
     } finally {
       setLoadingRecebimentos(false);
@@ -126,7 +129,7 @@ export default function MateriaisClientePage() {
       setIsClassificarOpen(false);
       navigate(`/app/suprimentos/recebimento/${recebimentoSelecionadoId}`);
     } catch (e: any) {
-      console.error(e);
+      logger.error('[Indústria][Materiais do Cliente] Falha ao classificar recebimento', e, { recebimentoSelecionadoId, clienteSelecionadoId });
       addToast(e.message || 'Erro ao classificar recebimento.', 'error');
     } finally {
       setClassificando(false);
@@ -163,40 +166,35 @@ export default function MateriaisClientePage() {
           </h1>
           <p className="text-gray-600 text-sm mt-1">Cadastro de itens de terceiros para beneficiamento.</p>
         </div>
-        <div className="flex items-center gap-2">
-            <button
-              onClick={() => setIsImportOpen(true)}
-              disabled={loading}
-              className="flex items-center gap-2 bg-white border border-gray-200 text-gray-800 font-semibold py-2 px-4 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50"
-              title="Importar itens de terceiros a partir de um XML de NF-e"
-            >
-              <FileUp size={20} />
-              Importar XML (NF-e)
-            </button>
-            <button
-              onClick={openClassificar}
-              disabled={loading}
-              className="flex items-center gap-2 bg-white border border-gray-200 text-gray-800 font-semibold py-2 px-4 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50"
-              title="Marcar um recebimento como Material do Cliente (terceiros) antes de concluir"
-            >
-              <FileUp size={20} />
-              Classificar Recebimento
-            </button>
-            <button
-              onClick={handleSeed}
-              disabled={isSeeding || loading}
-              className="flex items-center gap-2 bg-gray-100 text-gray-700 font-semibold py-2 px-4 rounded-lg hover:bg-gray-200 transition-colors disabled:opacity-50"
-            >
-              {isSeeding ? <Loader2 className="animate-spin" size={20} /> : <DatabaseBackup size={20} />}
-              Popular Dados
-            </button>
-            <button
-              onClick={handleNew}
-              className="flex items-center gap-2 bg-blue-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-blue-700 transition-colors"
-            >
-              <PlusCircle size={20} />
-              Novo Material
-            </button>
+        <div className="flex items-center gap-2 flex-wrap">
+          <Button
+            onClick={() => setIsImportOpen(true)}
+            disabled={loading}
+            variant="outline"
+            className="gap-2"
+            title="Importar itens de terceiros a partir de um XML de NF-e"
+          >
+            <FileUp size={18} />
+            Importar XML (NF-e)
+          </Button>
+          <Button
+            onClick={openClassificar}
+            disabled={loading}
+            variant="outline"
+            className="gap-2"
+            title="Marcar um recebimento como Material do Cliente (terceiros) antes de concluir"
+          >
+            <FileUp size={18} />
+            Classificar Recebimento
+          </Button>
+          <Button onClick={handleSeed} disabled={isSeeding || loading} variant="secondary" className="gap-2">
+            {isSeeding ? <Loader2 className="animate-spin" size={18} /> : <DatabaseBackup size={18} />}
+            Popular Dados
+          </Button>
+          <Button onClick={handleNew} className="gap-2">
+            <PlusCircle size={18} />
+            Novo Material
+          </Button>
         </div>
       </div>
 

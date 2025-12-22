@@ -1,7 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useRef, useState, useEffect } from 'react';
 import { ArrowLeft, ArrowRight, CheckCircle2, Loader2, Save, TriangleAlert, XCircle } from 'lucide-react';
 import { OrdemIndustriaDetails, OrdemPayload, saveOrdem, getOrdemDetails, manageComponente, manageEntrega, OrdemEntrega, gerarExecucaoOrdem, cloneOrdem } from '@/services/industria';
 import { useToast } from '@/contexts/ToastProvider';
+import { useConfirm } from '@/contexts/ConfirmProvider';
 import Section from '@/components/ui/forms/Section';
 import Input from '@/components/ui/forms/Input';
 import Select from '@/components/ui/forms/Select';
@@ -18,6 +19,10 @@ import { ensureMaterialClienteV2 } from '@/services/industriaMateriais';
 import type { MaterialClienteListItem } from '@/services/industriaMateriais';
 import { useNavigate } from 'react-router-dom';
 import Modal from '@/components/ui/Modal';
+import { logger } from '@/lib/logger';
+import IndustriaAuditTrailPanel from '@/components/industria/audit/IndustriaAuditTrailPanel';
+import { roleAtLeast, useEmpresaRole } from '@/hooks/useEmpresaRole';
+import ImportarXmlSuprimentosModal from '@/components/industria/materiais/ImportarXmlSuprimentosModal';
 
 interface Props {
   ordemId: string | null;
@@ -53,14 +58,23 @@ export default function OrdemFormPanel({
   onClose,
 }: Props) {
   const { addToast } = useToast();
+  const { confirm } = useConfirm();
   const navigate = useNavigate();
+  const empresaRoleQuery = useEmpresaRole();
+  const empresaRole = empresaRoleQuery.data;
+  // Enquanto o role não carregou, não travar o formulário (evita "race condition" de empresa/role).
+  const canEdit = empresaRoleQuery.isFetched ? roleAtLeast(empresaRole, 'member') : true;
+  const canAdmin = empresaRoleQuery.isFetched ? roleAtLeast(empresaRole, 'admin') : false;
   const [loading, setLoading] = useState(!!ordemId);
   const [isSaving, setIsSaving] = useState(false);
   const [isGeneratingExecucao, setIsGeneratingExecucao] = useState(false);
-  const [activeTab, setActiveTab] = useState<'dados' | 'componentes' | 'entregas'>('dados');
-  const [materialCliente, setMaterialCliente] = useState<MaterialClienteListItem | null>(null);
+  const [activeTab, setActiveTab] = useState<'dados' | 'componentes' | 'entregas' | 'historico'>('dados');
+  const [highlightComponenteId, setHighlightComponenteId] = useState<string | null>(null);
+  const [highlightEntregaId, setHighlightEntregaId] = useState<string | null>(null);
+  const [materialRefreshToken, setMaterialRefreshToken] = useState<number>(0);
+  const [showImportXmlModal, setShowImportXmlModal] = useState(false);
+  const highlightTimerRef = useRef<number | null>(null);
   const [wizardStep, setWizardStep] = useState<0 | 1 | 2>(0);
-  const [autoOpenBomSelector, setAutoOpenBomSelector] = useState(false);
   const [showGerarExecucaoModal, setShowGerarExecucaoModal] = useState(false);
 
   const [formData, setFormData] = useState<Partial<OrdemIndustriaDetails>>({
@@ -125,20 +139,6 @@ export default function OrdemFormPanel({
   }, [initialPrefill, initialTipoOrdem, ordemId]);
 
   useEffect(() => {
-    if (ordemId) return;
-    if (formData.tipo_ordem !== 'beneficiamento') return;
-
-    const hasCliente = !!formData.cliente_id;
-    const hasProduto = !!formData.produto_final_id;
-    const hasQtd = !!formData.quantidade_planejada && formData.quantidade_planejada > 0;
-
-    if (!hasCliente) setWizardStep(0);
-    else if (!hasProduto || !hasQtd) setWizardStep(1);
-    else setWizardStep(2);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ordemId, formData.tipo_ordem]);
-
-  useEffect(() => {
     if (ordemId) {
       loadDetails();
     }
@@ -152,9 +152,8 @@ export default function OrdemFormPanel({
     try {
       const data = await getOrdemDetails(idToLoad);
       setFormData(data);
-      setMaterialCliente(null);
     } catch (e) {
-      console.error(e);
+      logger.error('[Indústria][OP/OB] Falha ao carregar ordem', e, { ordemId: idToLoad });
       addToast('Erro ao carregar ordem.', 'error');
       if (ordemId) onClose();
     } finally {
@@ -178,17 +177,25 @@ export default function OrdemFormPanel({
   };
 
   const handleSaveHeader = async () => {
+    if (!canEdit) {
+      addToast('Você não tem permissão para editar esta ordem.', 'error');
+      return null;
+    }
+    if (formData.status === 'concluida' || formData.status === 'cancelada') {
+      addToast('Esta ordem está bloqueada para edição.', 'error');
+      return null;
+    }
     if (formData.tipo_ordem === 'beneficiamento' && !formData.cliente_id) {
       addToast('Para beneficiamento, selecione o cliente.', 'error');
-      return;
+      return null;
     }
     if (!formData.produto_final_id) {
       addToast('Selecione um produto final.', 'error');
-      return;
+      return null;
     }
     if (!formData.quantidade_planejada || formData.quantidade_planejada <= 0) {
       addToast('A quantidade planejada deve ser maior que zero.', 'error');
-      return;
+      return null;
     }
 
     setIsSaving(true);
@@ -196,12 +203,13 @@ export default function OrdemFormPanel({
       let materialClienteId = formData.material_cliente_id || null;
       let usaMaterialCliente = !!formData.usa_material_cliente;
 
-      if (formData.tipo_ordem === 'beneficiamento' && formData.cliente_id && formData.produto_final_id && !materialClienteId) {
-        const shouldCreate = window.confirm(
-          'Nenhum "Material do Cliente" foi selecionado.\n\nDeseja criar automaticamente um vínculo usando o produto interno selecionado?'
-        );
-
-        if (shouldCreate) {
+      if (formData.tipo_ordem === 'beneficiamento') {
+        if (!formData.cliente_id) {
+          addToast('Beneficiamento: selecione o cliente antes de salvar.', 'error');
+          setIsSaving(false);
+          return null;
+        }
+        if (formData.cliente_id && formData.produto_final_id && !materialClienteId) {
           materialClienteId = await ensureMaterialClienteV2(
             formData.cliente_id,
             formData.produto_final_id,
@@ -221,8 +229,6 @@ export default function OrdemFormPanel({
             material_cliente_nome: prev.material_cliente_nome ?? prev.produto_nome ?? null,
             material_cliente_unidade: prev.material_cliente_unidade ?? prev.unidade ?? null,
           }));
-        } else {
-          usaMaterialCliente = false;
         }
       }
 
@@ -244,6 +250,9 @@ export default function OrdemFormPanel({
         observacoes: formData.observacoes,
         roteiro_aplicado_id: formData.roteiro_aplicado_id,
         roteiro_aplicado_desc: formData.roteiro_aplicado_desc,
+        qtde_caixas: formData.qtde_caixas,
+        numero_nf: formData.numero_nf,
+        pedido_numero: formData.pedido_numero,
       };
 
       const saved = await saveOrdem(payload);
@@ -252,7 +261,7 @@ export default function OrdemFormPanel({
       if (!formData.id) {
         addToast('Ordem criada! Configure os componentes.', 'success');
         setActiveTab('componentes');
-        if (formData.tipo_ordem === 'beneficiamento') setAutoOpenBomSelector(true);
+        // Para beneficiamento, mantém o fluxo igual ao de produção (BOM/roteiro só na aba dedicada).
       } else {
         addToast('Ordem salva.', 'success');
       }
@@ -266,8 +275,36 @@ export default function OrdemFormPanel({
     }
   };
 
+  const ensureOrderSaved = async (): Promise<string | null> => {
+    if (formData.id) return formData.id;
+    const createdId = await handleSaveHeader();
+    return createdId || null;
+  };
+
+  const materialClienteValue: MaterialClienteListItem | null = formData.tipo_ordem === 'beneficiamento' &&
+    formData.material_cliente_id &&
+    formData.cliente_id &&
+    formData.produto_final_id
+    ? {
+        id: formData.material_cliente_id,
+        cliente_id: formData.cliente_id,
+        cliente_nome: formData.cliente_nome || '',
+        produto_id: formData.produto_final_id!,
+        produto_nome: formData.produto_nome || '',
+        codigo_cliente: formData.material_cliente_codigo ?? null,
+        nome_cliente: formData.material_cliente_nome ?? null,
+        unidade: formData.material_cliente_unidade ?? null,
+        ativo: true,
+        total_count: 1,
+      }
+    : null;
+
   // --- Componentes ---
   const handleAddComponente = async (item: any) => {
+    if (!canEdit) {
+      addToast('Você não tem permissão para editar esta ordem.', 'error');
+      return;
+    }
     let currentId = formData.id;
     if (!currentId) {
       currentId = await handleSaveHeader();
@@ -284,6 +321,10 @@ export default function OrdemFormPanel({
   };
 
   const handleRemoveComponente = async (itemId: string) => {
+    if (!canEdit) {
+      addToast('Você não tem permissão para editar esta ordem.', 'error');
+      return;
+    }
     try {
       await manageComponente(formData.id!, itemId, '', 0, '', 'delete');
       await loadDetails(formData.id);
@@ -294,6 +335,10 @@ export default function OrdemFormPanel({
   };
 
   const handleUpdateComponente = async (itemId: string, field: string, value: any) => {
+    if (!canEdit) {
+      addToast('Você não tem permissão para editar esta ordem.', 'error');
+      return;
+    }
     const item = formData.componentes?.find(c => c.id === itemId);
     if (!item) return;
 
@@ -316,6 +361,10 @@ export default function OrdemFormPanel({
 
   // --- Entregas ---
   const handleAddEntrega = async (data: Partial<OrdemEntrega>) => {
+    if (!canEdit) {
+      addToast('Você não tem permissão para editar esta ordem.', 'error');
+      return;
+    }
     if (!formData.id) return;
     const doc = data.documento_ref ?? data.documento_entrega;
     await manageEntrega(
@@ -333,6 +382,10 @@ export default function OrdemFormPanel({
   };
 
   const handleRemoveEntrega = async (entregaId: string) => {
+    if (!canEdit) {
+      addToast('Você não tem permissão para editar esta ordem.', 'error');
+      return;
+    }
     try {
       await manageEntrega(formData.id!, entregaId, '', 0, 'nao_faturado', undefined, undefined, 'delete');
       await loadDetails(formData.id);
@@ -345,10 +398,12 @@ export default function OrdemFormPanel({
   if (loading) return <div className="flex justify-center p-8"><Loader2 className="animate-spin" /></div>;
 
   const isLocked = formData.status === 'concluida' || formData.status === 'cancelada';
+  const isRoleReadOnly = !canEdit;
+  const isLockedEffective = isLocked || isRoleReadOnly;
   const totalEntregue = formData.entregas?.reduce((acc, e) => acc + Number(e.quantidade_entregue), 0) || 0;
-  const isWizard = !ordemId && !formData.id && formData.tipo_ordem === 'beneficiamento';
+  const isWizard = !ordemId && !formData.id;
   const isExecucaoGerada = !!formData.execucao_ordem_id;
-  const isHeaderLocked = isLocked || isExecucaoGerada;
+  const isHeaderLocked = isLockedEffective || isExecucaoGerada;
   const componentesCount = Array.isArray(formData.componentes) ? formData.componentes.length : 0;
   const checklistExecucao = [
     {
@@ -383,38 +438,13 @@ export default function OrdemFormPanel({
   const hasChecklistError = checklistExecucao.some(i => i.status === 'error');
 
   const canGoNextWizardStep = () => {
-    if (wizardStep === 0) return !!formData.cliente_id;
-    if (wizardStep === 1) return !!formData.produto_final_id && !!formData.quantidade_planejada && formData.quantidade_planejada > 0;
+    if (wizardStep === 0) {
+      const hasProduto = !!formData.produto_final_id && !!formData.quantidade_planejada && formData.quantidade_planejada > 0;
+      const hasCliente = formData.tipo_ordem === 'beneficiamento' ? !!formData.cliente_id : true;
+      return hasProduto && hasCliente;
+    }
     return true;
   };
-
-  useEffect(() => {
-    if (formData.tipo_ordem !== 'beneficiamento') {
-      setMaterialCliente(null);
-      return;
-    }
-    if (!formData.material_cliente_id) {
-      setMaterialCliente(null);
-      return;
-    }
-    if (!formData.cliente_id) {
-      setMaterialCliente(null);
-      return;
-    }
-
-    setMaterialCliente({
-      id: formData.material_cliente_id,
-      cliente_id: formData.cliente_id,
-      cliente_nome: formData.cliente_nome || '',
-      produto_id: formData.produto_final_id!,
-      produto_nome: formData.produto_nome || '',
-      codigo_cliente: formData.material_cliente_codigo ?? null,
-      nome_cliente: formData.material_cliente_nome ?? null,
-      unidade: formData.material_cliente_unidade ?? null,
-      ativo: true,
-      total_count: 1,
-    });
-  }, [formData.tipo_ordem, formData.material_cliente_id, formData.cliente_id]);
 
   const handleGoToExecucao = (q?: string) => {
     const next = new URLSearchParams();
@@ -424,7 +454,11 @@ export default function OrdemFormPanel({
   };
 
   const handleGerarExecucao = async () => {
-    if (isLocked) return;
+    if (!canEdit) {
+      addToast('Você não tem permissão para gerar operações.', 'error');
+      return;
+    }
+    if (isLockedEffective) return;
     setIsGeneratingExecucao(true);
     try {
       let currentId = formData.id;
@@ -446,7 +480,14 @@ export default function OrdemFormPanel({
 
   const handleCriarRevisao = async () => {
     if (!formData.id) return;
-    if (!window.confirm('Criar uma revisão desta ordem? Uma nova ordem em rascunho será criada para você ajustar e liberar novamente.')) return;
+    const ok = await confirm({
+      title: 'Criar revisão',
+      description: 'Criar uma revisão desta ordem? Uma nova ordem em rascunho será criada para você ajustar e liberar novamente.',
+      confirmText: 'Criar revisão',
+      cancelText: 'Cancelar',
+      variant: 'primary',
+    });
+    if (!ok) return;
     try {
       const cloned = await cloneOrdem(formData.id);
       addToast('Revisão criada.', 'success');
@@ -493,7 +534,7 @@ export default function OrdemFormPanel({
               }`}
             disabled={!formData.id}
           >
-            Insumos / Componentes
+            Roteiro e Insumos (BOM)
           </button>
           <button
             onClick={() => setActiveTab('entregas')}
@@ -505,6 +546,16 @@ export default function OrdemFormPanel({
           >
             Entregas ({formData.entregas?.length || 0})
           </button>
+          <button
+            onClick={() => setActiveTab('historico')}
+            className={`whitespace-nowrap py-2 px-3 border-b-2 font-medium text-sm transition-colors ${activeTab === 'historico'
+              ? 'border-blue-500 text-blue-600'
+              : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+              }`}
+            disabled={!formData.id}
+          >
+            Histórico
+          </button>
         </nav>
       </div>
 
@@ -515,9 +566,11 @@ export default function OrdemFormPanel({
               <div className="mb-6 p-4 rounded-xl border border-blue-100 bg-blue-50">
                 <div className="flex items-center justify-between gap-4">
                   <div>
-                    <div className="text-xs font-bold uppercase tracking-[0.12em] text-blue-700">Wizard de Beneficiamento</div>
+                    <div className="text-xs font-bold uppercase tracking-[0.12em] text-blue-700">
+                      Wizard de {formData.tipo_ordem === 'beneficiamento' ? 'Beneficiamento' : 'Industrialização'}
+                    </div>
                     <div className="text-sm text-blue-900">
-                      Passo {wizardStep + 1} de 3 • {wizardStep === 0 ? 'Cliente' : wizardStep === 1 ? 'Material e quantidade' : 'Revisão'}
+                      Passo {wizardStep + 1} de 3 • {wizardStep === 0 ? 'Produto e quantidade' : wizardStep === 1 ? 'Programação' : 'Revisão'}
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
@@ -537,7 +590,7 @@ export default function OrdemFormPanel({
                   label="Tipo de Ordem"
                   name="tipo_ordem"
                   value={formData.tipo_ordem}
-                  onChange={e => {
+                  onChange={async (e) => {
                     const nextTipo = e.target.value as 'industrializacao' | 'beneficiamento';
                     if (nextTipo === formData.tipo_ordem) return;
 
@@ -553,9 +606,13 @@ export default function OrdemFormPanel({
                       !!formData.material_cliente_codigo;
 
                     if (hasAnyData) {
-                      const ok = window.confirm(
-                        'Trocar o tipo de ordem irá reiniciar os campos preenchidos nesta ordem.\n\nDeseja continuar?'
-                      );
+                      const ok = await confirm({
+                        title: 'Trocar tipo de ordem',
+                        description: 'Trocar o tipo de ordem irá reiniciar os campos preenchidos nesta ordem. Deseja continuar?',
+                        confirmText: 'Trocar e reiniciar',
+                        cancelText: 'Cancelar',
+                        variant: 'danger',
+                      });
                       if (!ok) return;
                     }
 
@@ -630,7 +687,6 @@ export default function OrdemFormPanel({
                   onChange={(id, name) => {
                     handleHeaderChange('cliente_id', id);
                     if (name) handleHeaderChange('cliente_nome', name);
-                    setMaterialCliente(null);
                     handleHeaderChange('usa_material_cliente', false);
                     handleHeaderChange('material_cliente_id', null);
                     handleHeaderChange('material_cliente_nome', null);
@@ -644,7 +700,7 @@ export default function OrdemFormPanel({
               {formData.tipo_ordem === 'beneficiamento' && (
                 <div className="sm:col-span-6 space-y-2">
                   <div className="flex items-center justify-between">
-                    <label className="block text-sm font-medium text-gray-700">Material do Cliente (opcional)</label>
+                    <label className="block text-sm font-medium text-gray-700">Material do Cliente</label>
                     <div className="flex items-center gap-2">
                       <a
                         href="/app/industria/materiais-cliente"
@@ -653,26 +709,27 @@ export default function OrdemFormPanel({
                         Cadastrar material
                       </a>
                       <span className="text-gray-300">|</span>
-                      <a
-                        href="/app/nfe-input"
+                      <button
+                        type="button"
+                        onClick={() => setShowImportXmlModal(true)}
                         className="text-xs font-medium text-blue-700 hover:text-blue-900 hover:underline"
                       >
                         Importar XML (NF-e)
-                      </a>
+                      </button>
                     </div>
                   </div>
                   <MaterialClienteAutocomplete
+                    key={materialRefreshToken}
                     clienteId={formData.cliente_id || null}
-                    value={formData.material_cliente_id || materialCliente?.id || null}
+                    value={materialClienteValue?.id || null}
                     initialName={
                       formData.material_cliente_nome ||
                       formData.material_cliente_codigo ||
-                      materialCliente?.nome_cliente ||
-                      materialCliente?.produto_nome
+                      materialClienteValue?.nome_cliente ||
+                      materialClienteValue?.produto_nome
                     }
-                    disabled={isLocked || !formData.cliente_id}
+                    disabled={isLockedEffective || !formData.cliente_id}
                     onChange={(m) => {
-                      setMaterialCliente(m);
                       if (!m) {
                         handleHeaderChange('usa_material_cliente', false);
                         handleHeaderChange('material_cliente_id', null);
@@ -698,57 +755,10 @@ export default function OrdemFormPanel({
               )}
             </Section>
 
-            {(!isWizard || wizardStep === 2) && (
-              <Section
-                title="Processo"
-                description="Selecione o roteiro para gerar as operações de Execução (Chão/Tela do Operador)."
-              >
-                <div className="sm:col-span-6 flex flex-col gap-2">
-                  <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-gray-200 bg-white px-3 py-2">
-                    <div className="min-w-[220px]">
-                      <div className="text-xs font-semibold text-gray-500">Roteiro aplicado</div>
-                      <div className="text-sm font-medium text-gray-800">
-                        {formData.roteiro_aplicado_desc
-                          ? formData.roteiro_aplicado_desc
-                          : 'Nenhum selecionado (usará o padrão do produto, se existir)'}
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <RoteiroSelector
-                        ordemId={formData.id || 'new'}
-                        produtoId={formData.produto_final_id || ''}
-                        tipoBom={formData.tipo_ordem === 'beneficiamento' ? 'beneficiamento' : 'producao'}
-                        disabled={isLocked || isExecucaoGerada}
-                        onApplied={(roteiro) => {
-                          handleHeaderChange('roteiro_aplicado_id', roteiro.id);
-                          const label = `${roteiro.codigo || 'Sem código'} (v${roteiro.versao})${roteiro.descricao ? ` - ${roteiro.descricao}` : ''}`;
-                          handleHeaderChange('roteiro_aplicado_desc', label);
-                        }}
-                      />
-                      {formData.execucao_ordem_id && (
-                        <button
-                          type="button"
-                          onClick={() => handleGoToExecucao(formData.execucao_ordem_numero ? String(formData.execucao_ordem_numero) : undefined)}
-                          className="text-sm font-medium text-gray-700 hover:text-gray-900 hover:bg-gray-50 px-3 py-2 rounded-lg transition-colors border border-gray-200"
-                        >
-                          Ir para Execução
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                  {!!formData.execucao_ordem_id && (
-                    <div className="text-xs text-gray-500">
-                      Execução gerada{formData.execucao_ordem_numero ? ` (OP ${formatOrderNumber(formData.execucao_ordem_numero)})` : ''}.
-                    </div>
-                  )}
-                </div>
-              </Section>
-            )}
-
-            {(!isWizard || wizardStep === 2) && (
+            {(!isWizard || wizardStep >= 1) && (
             <Section title="Programação" description="Prazos e status.">
               <div className="sm:col-span-2">
-                <Select label="Status" name="status" value={formData.status} onChange={e => handleHeaderChange('status', e.target.value)} disabled={isLocked}>
+                <Select label="Status" name="status" value={formData.status} onChange={e => handleHeaderChange('status', e.target.value)} disabled={isLockedEffective}>
                   <option value="rascunho">Rascunho</option>
                   <option value="planejada">Planejada</option>
                   <option value="em_programacao">Em Programação</option>
@@ -766,21 +776,53 @@ export default function OrdemFormPanel({
                   type="number"
                   value={formData.prioridade || 0}
                   onChange={e => handleHeaderChange('prioridade', parseInt(e.target.value))}
-                  disabled={isLocked}
+                  disabled={isLockedEffective}
                 />
               </div>
               <div className="sm:col-span-2"></div>
 
-              <Input label="Início Previsto" type="date" value={formData.data_prevista_inicio || ''} onChange={e => handleHeaderChange('data_prevista_inicio', e.target.value)} disabled={isLocked} className="sm:col-span-2" />
-              <Input label="Fim Previsto" type="date" value={formData.data_prevista_fim || ''} onChange={e => handleHeaderChange('data_prevista_fim', e.target.value)} disabled={isLocked} className="sm:col-span-2" />
-              <Input label="Entrega Prevista" type="date" value={formData.data_prevista_entrega || ''} onChange={e => handleHeaderChange('data_prevista_entrega', e.target.value)} disabled={isLocked} className="sm:col-span-2" />
+              <Input label="Início Previsto" type="date" value={formData.data_prevista_inicio || ''} onChange={e => handleHeaderChange('data_prevista_inicio', e.target.value)} disabled={isLockedEffective} className="sm:col-span-2" />
+              <Input label="Fim Previsto" type="date" value={formData.data_prevista_fim || ''} onChange={e => handleHeaderChange('data_prevista_fim', e.target.value)} disabled={isLockedEffective} className="sm:col-span-2" />
+              <Input label="Entrega Prevista" type="date" value={formData.data_prevista_entrega || ''} onChange={e => handleHeaderChange('data_prevista_entrega', e.target.value)} disabled={isLockedEffective} className="sm:col-span-2" />
             </Section>
             )}
 
             {(!isWizard || wizardStep === 2) && (
             <Section title="Outros" description="Detalhes adicionais.">
-              <Input label="Ref. Documento" name="doc_ref" value={formData.documento_ref || ''} onChange={e => handleHeaderChange('documento_ref', e.target.value)} disabled={isLocked} className="sm:col-span-2" placeholder="Pedido, Lote..." />
-              <TextArea label="Observações" name="obs" value={formData.observacoes || ''} onChange={e => handleHeaderChange('observacoes', e.target.value)} rows={3} disabled={isLocked} className="sm:col-span-6" />
+              {formData.tipo_ordem === 'beneficiamento' && (
+                <>
+                  <Input
+                    label="Qtde. de Caixas"
+                    name="qtde_caixas"
+                    type="number"
+                    value={formData.qtde_caixas ?? ''}
+                    onChange={e => handleHeaderChange('qtde_caixas', e.target.value === '' ? null : Number(e.target.value))}
+                    disabled={isLockedEffective}
+                    className="sm:col-span-2"
+                    placeholder="Ex: 10"
+                  />
+                  <Input
+                    label="Número da NF (cliente)"
+                    name="numero_nf"
+                    value={formData.numero_nf || ''}
+                    onChange={e => handleHeaderChange('numero_nf', e.target.value)}
+                    disabled={isLockedEffective}
+                    className="sm:col-span-2"
+                    placeholder="Ex: 12345"
+                  />
+                  <Input
+                    label="Número do Pedido"
+                    name="pedido_numero"
+                    value={formData.pedido_numero || ''}
+                    onChange={e => handleHeaderChange('pedido_numero', e.target.value)}
+                    disabled={isLockedEffective}
+                    className="sm:col-span-2"
+                    placeholder="Pedido do cliente"
+                  />
+                </>
+              )}
+              <Input label="Ref. Documento" name="doc_ref" value={formData.documento_ref || ''} onChange={e => handleHeaderChange('documento_ref', e.target.value)} disabled={isLockedEffective} className="sm:col-span-2" placeholder="Pedido, Lote..." />
+              <TextArea label="Observações" name="obs" value={formData.observacoes || ''} onChange={e => handleHeaderChange('observacoes', e.target.value)} rows={3} disabled={isLockedEffective} className="sm:col-span-6" />
             </Section>
             )}
           </>
@@ -788,19 +830,46 @@ export default function OrdemFormPanel({
 
         {activeTab === 'componentes' && (
           <>
-            {!isLocked && formData.id && formData.produto_final_id && (
-              <div className="mb-4 flex justify-end">
-                <BomSelector
-                  ordemId={formData.id}
-                  produtoId={formData.produto_final_id}
-                  tipoOrdem={formData.tipo_ordem === 'beneficiamento' ? 'beneficiamento' : 'producao'}
-                  openOnMount={autoOpenBomSelector}
-                  disabled={isExecucaoGerada}
-                  onApplied={() => {
-                    setAutoOpenBomSelector(false);
-                    loadDetails(formData.id);
-                  }}
-                />
+            {!isLockedEffective && formData.produto_final_id && (
+              <div className="mb-4 grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="flex justify-between items-center bg-blue-50 p-3 rounded-lg border border-blue-100">
+                  <p className="text-sm text-blue-800">
+                    {formData.roteiro_aplicado_desc
+                      ? <>Roteiro: <strong>{formData.roteiro_aplicado_desc}</strong></>
+                      : 'Nenhum roteiro aplicado.'}
+                  </p>
+                  <RoteiroSelector
+                    ordemId={formData.id || 'new'}
+                    produtoId={formData.produto_final_id}
+                    tipoBom={formData.tipo_ordem === 'beneficiamento' ? 'beneficiamento' : 'producao'}
+                    disabled={isExecucaoGerada || isLockedEffective}
+                    onApplied={(roteiro) => {
+                      handleHeaderChange('roteiro_aplicado_id', roteiro.id);
+                      const label = `${roteiro.codigo || 'Sem código'} (v${roteiro.versao})${roteiro.descricao ? ` - ${roteiro.descricao}` : ''}`;
+                      handleHeaderChange('roteiro_aplicado_desc', label);
+                    }}
+                  />
+                </div>
+
+                <div className="flex justify-between items-center bg-blue-50 p-3 rounded-lg border border-blue-100">
+                  <p className="text-sm text-blue-800">
+                    {formData.bom_aplicado_desc
+                      ? <>BOM: <strong>{formData.bom_aplicado_desc}</strong></>
+                      : 'Nenhuma BOM aplicada.'}
+                  </p>
+                  <BomSelector
+                    ordemId={formData.id || ''}
+                    produtoId={formData.produto_final_id}
+                    tipoOrdem={formData.tipo_ordem === 'beneficiamento' ? 'beneficiamento' : 'producao'}
+                    openOnMount={false}
+                    disabled={isExecucaoGerada || isLockedEffective}
+                    onEnsureOrder={ensureOrderSaved}
+                    onApplied={(bom) => {
+                      handleHeaderChange('bom_aplicado_desc', bom.codigo ? `${bom.codigo} (v${bom.versao})` : bom.descricao || 'Ficha técnica aplicada');
+                      loadDetails(formData.id);
+                    }}
+                  />
+                </div>
               </div>
             )}
             <OrdemFormItems
@@ -809,7 +878,8 @@ export default function OrdemFormPanel({
               onRemoveItem={handleRemoveComponente}
               onUpdateItem={handleUpdateComponente}
               isAddingItem={false}
-              readOnly={isLocked}
+              readOnly={isLockedEffective}
+              highlightItemId={highlightComponenteId}
             />
           </>
         )}
@@ -819,11 +889,55 @@ export default function OrdemFormPanel({
             entregas={formData.entregas || []}
             onAddEntrega={handleAddEntrega}
             onRemoveEntrega={handleRemoveEntrega}
-            readOnly={isLocked}
+            readOnly={isLockedEffective}
             maxQuantity={formData.quantidade_planejada || 0}
             currentTotal={totalEntregue}
             showBillingStatus={formData.tipo_ordem === 'beneficiamento'}
+            highlightEntregaId={highlightEntregaId}
           />
+        )}
+
+        {activeTab === 'historico' && (
+          formData.id ? (
+            <IndustriaAuditTrailPanel
+              ordemId={formData.id}
+              tables={[
+                'industria_ordens',
+                'industria_ordens_componentes',
+                'industria_ordens_entregas',
+              ]}
+              onNavigate={(row) => {
+                if (highlightTimerRef.current) window.clearTimeout(highlightTimerRef.current);
+                setHighlightComponenteId(null);
+                setHighlightEntregaId(null);
+
+                const targetId =
+                  row.record_id ||
+                  (typeof row.new_data?.id === 'string' ? (row.new_data.id as string) : null) ||
+                  (typeof row.old_data?.id === 'string' ? (row.old_data.id as string) : null);
+
+                const tableName = row.table_name || '';
+
+                if (tableName === 'industria_ordens') setActiveTab('dados');
+                else if (tableName === 'industria_ordens_componentes' || tableName.includes('componentes')) {
+                  setActiveTab('componentes');
+                  if (targetId) setHighlightComponenteId(targetId);
+                }
+                else if (tableName === 'industria_ordens_entregas' || tableName.includes('entregas')) {
+                  setActiveTab('entregas');
+                  if (targetId) setHighlightEntregaId(targetId);
+                }
+                else setActiveTab('dados');
+
+                highlightTimerRef.current = window.setTimeout(() => {
+                  setHighlightComponenteId(null);
+                  setHighlightEntregaId(null);
+                }, 4500);
+              }}
+            />
+          ) : (
+            <div className="text-sm text-gray-500">Salve a ordem para visualizar o histórico.</div>
+          )
         )}
       </div>
 
@@ -832,7 +946,7 @@ export default function OrdemFormPanel({
           Fechar
         </button>
         <div className="flex gap-3">
-          {formData.id && isHeaderLocked && (
+          {formData.id && isHeaderLocked && canEdit && (
             <button
               type="button"
               onClick={handleCriarRevisao}
@@ -843,7 +957,7 @@ export default function OrdemFormPanel({
               Criar revisão
             </button>
           )}
-          {!isLocked && formData.id && !formData.execucao_ordem_id && (
+          {!isLockedEffective && formData.id && !formData.execucao_ordem_id && (
             <button
               type="button"
               onClick={() => setShowGerarExecucaoModal(true)}
@@ -855,7 +969,7 @@ export default function OrdemFormPanel({
               Gerar operações
             </button>
           )}
-          {!isLocked && formData.execucao_ordem_id && (
+          {formData.execucao_ordem_id && (
             <button
               type="button"
               onClick={() => handleGoToExecucao(formData.execucao_ordem_numero ? String(formData.execucao_ordem_numero) : undefined)}
@@ -866,7 +980,7 @@ export default function OrdemFormPanel({
               Abrir Execução
             </button>
           )}
-          {!isLocked && !isWizard && (
+          {!isLockedEffective && canEdit && !isWizard && (
             <button
               onClick={handleSaveHeader}
               disabled={isSaving}
@@ -876,7 +990,7 @@ export default function OrdemFormPanel({
               Salvar
             </button>
           )}
-          {!isLocked && isWizard && (
+          {!isLockedEffective && canEdit && isWizard && (
             <>
               {wizardStep > 0 && (
                 <button
@@ -964,7 +1078,7 @@ export default function OrdemFormPanel({
             </button>
             <button
               type="button"
-              disabled={isGeneratingExecucao || hasChecklistError || isLocked}
+              disabled={isGeneratingExecucao || hasChecklistError || isLockedEffective || !canEdit}
               onClick={async () => {
                 setShowGerarExecucaoModal(false);
                 await handleGerarExecucao();
@@ -977,6 +1091,14 @@ export default function OrdemFormPanel({
           </div>
         </div>
       </Modal>
+      <ImportarXmlSuprimentosModal
+        isOpen={showImportXmlModal}
+        onClose={() => setShowImportXmlModal(false)}
+        onFinished={() => {
+          setShowImportXmlModal(false);
+          setMaterialRefreshToken(Date.now());
+        }}
+      />
     </div>
   );
 }

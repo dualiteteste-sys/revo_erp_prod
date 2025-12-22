@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Loader2, Save, Trash2 } from 'lucide-react';
 import { CrmOportunidade, OportunidadePayload, saveOportunidade, deleteOportunidade, getCrmKanbanData } from '@/services/crm';
 import { useToast } from '@/contexts/ToastProvider';
+import { useConfirm } from '@/contexts/ConfirmProvider';
 import Section from '@/components/ui/forms/Section';
 import Input from '@/components/ui/forms/Input';
 import Select from '@/components/ui/forms/Select';
@@ -19,6 +20,7 @@ interface Props {
 
 export default function DealFormPanel({ deal, funilId, etapaId, onSaveSuccess, onClose }: Props) {
   const { addToast } = useToast();
+  const { confirm } = useConfirm();
   const [isSaving, setIsSaving] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [currentFunilId, setCurrentFunilId] = useState(funilId);
@@ -80,7 +82,15 @@ export default function DealFormPanel({ deal, funilId, etapaId, onSaveSuccess, o
   };
 
   const handleDelete = async () => {
-    if (!deal?.id || !confirm('Tem certeza que deseja excluir esta oportunidade?')) return;
+    if (!deal?.id) return;
+    const ok = await confirm({
+      title: 'Excluir oportunidade',
+      description: 'Tem certeza que deseja excluir esta oportunidade? Esta ação não pode ser desfeita.',
+      confirmText: 'Excluir',
+      cancelText: 'Cancelar',
+      variant: 'danger',
+    });
+    if (!ok) return;
     setIsDeleting(true);
     try {
         await deleteOportunidade(deal.id);

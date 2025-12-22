@@ -3,6 +3,7 @@ import { listRoteiros, RoteiroListItem } from '@/services/industriaRoteiros';
 import { Loader2, FileText } from 'lucide-react';
 import { useToast } from '@/contexts/ToastProvider';
 import Modal from '@/components/ui/Modal';
+import { logger } from '@/lib/logger';
 
 interface Props {
     ordemId: string;
@@ -18,16 +19,18 @@ export default function RoteiroSelector({ ordemId, produtoId, tipoBom, disabled,
     const [loading, setLoading] = useState(false);
     const [searchTerm, setSearchTerm] = useState('');
     const [filterByProduct, setFilterByProduct] = useState(true);
+    const [filterByTipo, setFilterByTipo] = useState(false);
     const { addToast } = useToast();
 
     const loadRoteiros = async () => {
         setLoading(true);
         try {
-            const targetProdutoId = filterByProduct ? produtoId : undefined;
-            const data = await listRoteiros(searchTerm, targetProdutoId, tipoBom, true);
+            const targetProdutoId = filterByProduct && produtoId ? produtoId : undefined;
+            const targetTipo = filterByTipo ? tipoBom : undefined;
+            const data = await listRoteiros(searchTerm, targetProdutoId, targetTipo, true);
             setRoteiros(data);
         } catch (e) {
-            console.error(e);
+            logger.error('[Indústria][OP] Falha ao listar roteiros (selector)', e, { produtoId, tipoBom, searchTerm, filterByProduct });
             addToast('Erro ao listar roteiros.', 'error');
         } finally {
             setLoading(false);
@@ -38,7 +41,7 @@ export default function RoteiroSelector({ ordemId, produtoId, tipoBom, disabled,
         if (isOpen) {
             loadRoteiros();
         }
-    }, [isOpen, filterByProduct, searchTerm]);
+  }, [isOpen, filterByProduct, filterByTipo, searchTerm]);
 
     const handleApply = (roteiro: RoteiroListItem) => {
         // No confirmation needed inside selector, parent (ProducaoFormPanel) usually handles "Apply" logic via saving header.
@@ -82,6 +85,18 @@ export default function RoteiroSelector({ ordemId, produtoId, tipoBom, disabled,
                                 Filtrar pelo produto da ordem
                             </label>
                         </div>
+                        <div className="flex items-center gap-2">
+                            <input
+                                type="checkbox"
+                                id="filterByTipoRot"
+                                checked={filterByTipo}
+                                onChange={(e) => setFilterByTipo(e.target.checked)}
+                                className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                            />
+                            <label htmlFor="filterByTipoRot" className="text-sm text-gray-700">
+                                Filtrar por tipo de uso (Produção/Beneficiamento)
+                            </label>
+                        </div>
                     </div>
 
                     {loading ? (
@@ -98,6 +113,9 @@ export default function RoteiroSelector({ ordemId, produtoId, tipoBom, disabled,
                                     <div>
                                         <div className="flex items-center gap-2">
                                             <h4 className="font-bold text-gray-800">{rot.codigo || 'Sem Código'} (v{rot.versao})</h4>
+                                            <span className="text-xs bg-blue-100 text-blue-800 px-2 py-0.5 rounded-full">
+                                              {rot.tipo_bom === 'beneficiamento' ? 'Beneficiamento' : 'Produção'}
+                                            </span>
                                             {rot.padrao_para_producao && <span className="text-xs bg-green-100 text-green-800 px-2 py-0.5 rounded-full">Padrão</span>}
                                         </div>
                                         <p className="text-sm text-gray-600">{rot.descricao}</p>

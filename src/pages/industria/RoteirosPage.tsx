@@ -9,6 +9,9 @@ import RoteirosTable from '@/components/industria/roteiros/RoteirosTable';
 import RoteiroFormPanel from '@/components/industria/roteiros/RoteiroFormPanel';
 import { useToast } from '@/contexts/ToastProvider';
 import { useSearchParams } from 'react-router-dom';
+import { logger } from '@/lib/logger';
+import { Button } from '@/components/ui/button';
+import { useConfirm } from '@/contexts/ConfirmProvider';
 
 export default function RoteirosPage() {
   const [roteiros, setRoteiros] = useState<RoteiroListItem[]>([]);
@@ -19,6 +22,7 @@ export default function RoteirosPage() {
   const { addToast } = useToast();
   const [searchParams, setSearchParams] = useSearchParams();
   const hasShownRpcHint = React.useRef(false);
+  const { confirm } = useConfirm();
 
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -42,7 +46,7 @@ export default function RoteirosPage() {
       const data = await listRoteiros(debouncedSearch, undefined, typeFilter as any || undefined);
       setRoteiros(data);
     } catch (e) {
-      console.error(e);
+      logger.error('[Indústria][Roteiros] Falha ao carregar roteiros', e, { q: debouncedSearch, typeFilter });
       const message = (e as any)?.message || 'Erro ao carregar roteiros.';
       if (
         !hasShownRpcHint.current &&
@@ -109,7 +113,14 @@ export default function RoteirosPage() {
   };
 
   const handleDelete = async (roteiro: RoteiroListItem) => {
-    if (!confirm(`Tem certeza que deseja excluir o roteiro "${roteiro.descricao}"?`)) return;
+    const ok = await confirm({
+      title: 'Excluir roteiro',
+      description: `Tem certeza que deseja excluir o roteiro "${roteiro.descricao}"? Esta ação não pode ser desfeita.`,
+      confirmText: 'Excluir',
+      cancelText: 'Cancelar',
+      variant: 'danger',
+    });
+    if (!ok) return;
 
     try {
       await deleteRoteiro(roteiro.id);
@@ -153,22 +164,15 @@ export default function RoteirosPage() {
           </h1>
           <p className="text-gray-600 text-sm mt-1">Sequência de operações e centros de trabalho.</p>
         </div>
-        <div className="flex items-center gap-2">
-          <button
-            onClick={handleSeed}
-            disabled={isSeeding || loading}
-            className="flex items-center gap-2 bg-gray-100 text-gray-700 font-semibold py-2 px-4 rounded-lg hover:bg-gray-200 transition-colors disabled:opacity-50"
-          >
-            {isSeeding ? <Loader2 className="animate-spin" size={20} /> : <DatabaseBackup size={20} />}
+        <div className="flex items-center gap-2 flex-wrap">
+          <Button onClick={handleSeed} disabled={isSeeding || loading} variant="secondary" className="gap-2">
+            {isSeeding ? <Loader2 className="animate-spin" size={18} /> : <DatabaseBackup size={18} />}
             Popular Dados
-          </button>
-          <button
-            onClick={handleNew}
-            className="flex items-center gap-2 bg-blue-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-blue-700 transition-colors"
-          >
-            <PlusCircle size={20} />
+          </Button>
+          <Button onClick={handleNew} className="gap-2">
+            <PlusCircle size={18} />
             Novo Roteiro
-          </button>
+          </Button>
         </div>
       </div>
 

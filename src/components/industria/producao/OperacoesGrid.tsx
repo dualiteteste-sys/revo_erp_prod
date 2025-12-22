@@ -1,12 +1,13 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
     OrdemOperacao,
     getOperacoes,
     registrarEventoOperacao,
-    transferirLoteOperacao
+    transferirLoteOperacao,
+    resetOperacaoProducao
 } from '../../../services/industriaProducao';
 import { Button } from '../../ui/button';
-import { Loader2, Play, Pause, CheckCircle, ArrowRight, ClipboardList, ShieldAlert } from 'lucide-react';
+import { Loader2, Play, Pause, CheckCircle, ArrowRight, ClipboardList, ShieldAlert, MoreHorizontal, Trash2, RotateCcw } from 'lucide-react';
 import { useToast } from '../../../contexts/ToastProvider';
 import ApontamentoModal from './ApontamentoModal';
 import Modal from '../../ui/Modal';
@@ -14,15 +15,28 @@ import DecimalInput from '../../ui/forms/DecimalInput';
 import OperacaoQaModal from './OperacaoQaModal';
 import RegistrarInspecaoModal from './RegistrarInspecaoModal';
 import OperacaoDocsModal from './OperacaoDocsModal';
+import { logger } from '@/lib/logger';
+import { useConfirm } from '@/contexts/ConfirmProvider';
 
 interface Props {
     ordemId: string;
+    highlightOperacaoId?: string | null;
+    canOperate?: boolean;
+    canConfigureQa?: boolean;
+    canReset?: boolean;
 }
 
-export default function OperacoesGrid({ ordemId }: Props) {
+export default function OperacoesGrid({ ordemId, highlightOperacaoId, canOperate = true, canConfigureQa = true, canReset = false }: Props) {
     const [operacoes, setOperacoes] = useState<OrdemOperacao[]>([]);
     const [loading, setLoading] = useState(true);
     const { addToast } = useToast();
+    const { confirm } = useConfirm();
+    const tableRef = useRef<HTMLDivElement | null>(null);
+    const btnSm = "h-8 px-3 text-xs";
+    const btnPrimary = "bg-blue-600 text-white hover:bg-blue-700";
+    const btnSecondary = "bg-gray-100 text-gray-800 hover:bg-gray-200";
+    const btnSuccess = "bg-green-600 text-white hover:bg-green-700";
+    const btnOutlineBlue = "border border-blue-200 text-blue-700 hover:bg-blue-50";
 
     // Controle de modal de apontamento
     const [selectedOp, setSelectedOp] = useState<OrdemOperacao | null>(null);
@@ -35,6 +49,7 @@ export default function OperacoesGrid({ ordemId }: Props) {
     const [inspectionOp, setInspectionOp] = useState<OrdemOperacao | null>(null);
     const [qaRefreshToken, setQaRefreshToken] = useState(0);
     const [docsOp, setDocsOp] = useState<OrdemOperacao | null>(null);
+    const [menuOpId, setMenuOpId] = useState<string | null>(null);
 
     const loadData = async () => {
         setLoading(true);
@@ -54,7 +69,7 @@ export default function OperacoesGrid({ ordemId }: Props) {
                 }
             }
         } catch (e: any) {
-            console.error(e);
+            logger.error('[Indústria][Produção] Falha ao carregar operações', e, { ordemId });
             addToast('Erro ao carregar operações', 'error');
         } finally {
             setLoading(false);
@@ -65,9 +80,27 @@ export default function OperacoesGrid({ ordemId }: Props) {
         loadData();
     }, [ordemId]);
 
+    useEffect(() => {
+        if (!highlightOperacaoId) return;
+        const el = tableRef.current?.querySelector(`[data-operacao-id="${highlightOperacaoId}"]`) as HTMLElement | null;
+        if (!el) return;
+        el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }, [highlightOperacaoId, operacoes.length]);
+
     const handleEvento = async (op: OrdemOperacao, evento: 'iniciar' | 'pausar' | 'retomar' | 'concluir') => {
+        if (!canOperate) {
+            addToast('Você não tem permissão para executar ações nesta operação.', 'error');
+            return;
+        }
         if (evento === 'concluir') {
-            if (!confirm(`Confirma a conclusão da etapa ${op.sequencia}?`)) return;
+            const ok = await confirm({
+                title: 'Concluir etapa',
+                description: `Confirma a conclusão da etapa ${op.sequencia}?`,
+                confirmText: 'Concluir',
+                cancelText: 'Cancelar',
+                variant: 'primary',
+            });
+            if (!ok) return;
         }
 
         try {
@@ -105,12 +138,20 @@ export default function OperacoesGrid({ ordemId }: Props) {
     };
 
     const openTransferModal = (op: OrdemOperacao) => {
+        if (!canOperate) {
+            addToast('Você não tem permissão para transferir.', 'error');
+            return;
+        }
         const disponivel = Math.max(op.quantidade_produzida - (op.quantidade_transferida || 0), 0);
         setTransferOp(op);
         setTransferQty(disponivel);
     };
 
     const openQaModal = (op: OrdemOperacao) => {
+        if (!canConfigureQa) {
+            addToast('Você não tem permissão para configurar QA.', 'error');
+            return;
+        }
         setQaOp(op);
     };
 
@@ -153,7 +194,7 @@ export default function OperacoesGrid({ ordemId }: Props) {
 
     return (
         <div className="space-y-4">
-            <div className="overflow-x-auto">
+            <div ref={tableRef} className="overflow-x-auto">
                 <table className="min-w-full divide-y divide-gray-200">
                     <thead className="bg-gray-50">
                         <tr>
@@ -167,6 +208,7 @@ export default function OperacoesGrid({ ordemId }: Props) {
                             <th className="px-3 py-2 text-right text-xs font-medium text-gray-500 uppercase">A transferir</th>
                             <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">QA</th>
                             <th className="px-3 py-2 text-center text-xs font-medium text-gray-500 uppercase">Ações</th>
+                            {canReset && <th className="px-3 py-2 text-center text-xs font-medium text-gray-500 uppercase">⋯</th>}
                         </tr>
                     </thead>
                     <tbody className="bg-white divide-y divide-gray-200">
@@ -179,7 +221,11 @@ export default function OperacoesGrid({ ordemId }: Props) {
                             const podeTransferir = op.permite_overlap && disponivelTransferencia > 0 && op.status !== 'concluida' && ipLiberado;
 
                             return (
-                                <tr key={op.id}>
+                                <tr
+                                    key={op.id}
+                                    data-operacao-id={op.id}
+                                    className={highlightOperacaoId === op.id ? 'bg-yellow-50 ring-2 ring-yellow-300 ring-inset' : undefined}
+                                >
                                     <td className="px-3 py-2 whitespace-nowrap text-sm text-gray-900">{op.sequencia}</td>
                                     <td className="px-3 py-2 whitespace-nowrap text-sm text-gray-900">
                                         {op.centro_trabalho_nome}
@@ -210,62 +256,170 @@ export default function OperacoesGrid({ ordemId }: Props) {
                                         {op.require_if && op.if_status !== 'aprovada' && (
                                             <p className="text-xs text-amber-600">IF necessária para concluir.</p>
                                         )}
-                                        <Button size="xs" variant="ghost" className="text-blue-600" onClick={() => openQaModal(op)}>
-                                            Configurar QA
-                                        </Button>
-                                        <Button size="xs" variant="ghost" className="text-blue-600" onClick={() => openDocsModal(op)}>
-                                            Instruções / Docs
-                                        </Button>
+                                        <div className="flex flex-col gap-2 pt-1">
+                                            <Button
+                                                size="sm"
+                                                className={`${btnSm} ${btnPrimary}`}
+                                                onClick={() => openQaModal(op)}
+                                                disabled={!canConfigureQa}
+                                                title={!canConfigureQa ? 'Sem permissão para configurar QA' : 'Configurar QA'}
+                                            >
+                                                Configurar QA
+                                            </Button>
+                                            <Button
+                                                size="sm"
+                                                className={`${btnSm} ${btnPrimary}`}
+                                                onClick={() => openDocsModal(op)}
+                                            >
+                                                Instruções / Docs
+                                            </Button>
+                                        </div>
                                     </td>
-                                    <td className="px-3 py-2 whitespace-nowrap text-sm text-center space-x-2">
+                                    <td className="px-3 py-2 text-sm">
                                         {/* Botões de Ação */}
-                                        {(op.status === 'na_fila' || op.status === 'pendente' || op.status === 'pausada') && (
-                                            <Button
-                                                size="xs"
-                                                variant={op.status === 'pausada' ? 'secondary' : 'success'}
-                                                onClick={() => handleEvento(op, op.status === 'pausada' ? 'retomar' : 'iniciar')}
-                                            >
-                                                <Play className="w-3 h-3 mr-1" />
-                                                {op.status === 'pausada' ? 'Retomar' : 'Iniciar'}
-                                            </Button>
-                                        )}
-
-                                        {op.status === 'em_execucao' && (
-                                            <>
-                                                <Button size="xs" variant="secondary" onClick={() => handleEvento(op, 'pausar')}>
-                                                    <Pause className="w-3 h-3 mr-1" />
-                                                    Pausar
-                                                </Button>
-                                                <Button size="xs" onClick={() => { setSelectedOp(op); setIsApontamentoOpen(true); }}>
-                                                    <ClipboardList className="w-3 h-3 mr-1" />
-                                                    Apontar
-                                                </Button>
+                                        <div className="flex flex-wrap justify-center gap-2 min-w-[240px]">
+                                            {(op.status === 'na_fila' || op.status === 'pendente' || op.status === 'pausada') && (
                                                 <Button
-                                                    size="xs"
-                                                    variant="outline"
-                                                    disabled={!ifLiberado}
-                                                    title={ifLiberado ? 'Concluir operação' : 'IF pendente: realize a inspeção final'}
-                                                    onClick={() => ifLiberado && handleEvento(op, 'concluir')}
+                                                    size="sm"
+                                                    className={`${btnSm} ${btnPrimary}`}
+                                                    onClick={() => handleEvento(op, op.status === 'pausada' ? 'retomar' : 'iniciar')}
+                                                    disabled={!canOperate}
+                                                    title={!canOperate ? 'Sem permissão para operar' : undefined}
                                                 >
-                                                    <CheckCircle className="w-3 h-3 mr-1" />
-                                                    Concluir
+                                                    <Play className="w-3 h-3 mr-1" />
+                                                    {op.status === 'pausada' ? 'Retomar' : 'Iniciar'}
                                                 </Button>
-                                            </>
-                                        )}
+                                            )}
 
-                                        {op.permite_overlap && disponivelTransferencia > 0 && op.status !== 'concluida' && (
-                                            <Button
-                                                size="xs"
-                                                variant="ghost"
-                                                className={`${podeTransferir ? 'text-blue-600 hover:text-blue-800' : 'text-gray-400 cursor-not-allowed'}`}
-                                                title={podeTransferir ? `Transferir ${disponivelTransferencia}` : 'IP pendente: realize a inspeção para liberar'}
-                                                disabled={!podeTransferir}
-                                                onClick={() => podeTransferir && openTransferModal(op)}
-                                            >
-                                                <ArrowRight className="w-3 h-3" />
-                                            </Button>
-                                        )}
+                                            {op.status === 'em_execucao' && (
+                                                <>
+                                                    <Button
+                                                        size="sm"
+                                                        className={`${btnSm} ${btnSecondary}`}
+                                                        onClick={() => handleEvento(op, 'pausar')}
+                                                        disabled={!canOperate}
+                                                        title={!canOperate ? 'Sem permissão para operar' : undefined}
+                                                    >
+                                                        <Pause className="w-3 h-3 mr-1" />
+                                                        Pausar
+                                                    </Button>
+                                                    <Button
+                                                        size="sm"
+                                                        className={`${btnSm} ${btnPrimary}`}
+                                                        disabled={!canOperate}
+                                                        title={!canOperate ? 'Sem permissão para operar' : undefined}
+                                                        onClick={() => {
+                                                            if (!canOperate) return;
+                                                            setSelectedOp(op);
+                                                            setIsApontamentoOpen(true);
+                                                        }}
+                                                    >
+                                                        <ClipboardList className="w-3 h-3 mr-1" />
+                                                        Apontar
+                                                    </Button>
+                                                    <Button
+                                                        size="sm"
+                                                        className={`${btnSm} ${btnSuccess}`}
+                                                        disabled={!ifLiberado || !canOperate}
+                                                        title={
+                                                            !canOperate
+                                                                ? 'Sem permissão para operar'
+                                                                : (ifLiberado ? 'Concluir operação' : 'IF pendente: realize a inspeção final')
+                                                        }
+                                                        onClick={() => ifLiberado && handleEvento(op, 'concluir')}
+                                                    >
+                                                        <CheckCircle className="w-3 h-3 mr-1" />
+                                                        Concluir
+                                                    </Button>
+                                                </>
+                                            )}
+
+                                            {op.permite_overlap && disponivelTransferencia > 0 && op.status !== 'concluida' && (
+                                                <Button
+                                                    size="sm"
+                                                    variant="outline"
+                                                    className={`${btnSm} ${btnOutlineBlue} ${!podeTransferir ? 'cursor-not-allowed opacity-60' : ''}`}
+                                                    title={
+                                                        !canOperate
+                                                            ? 'Sem permissão para operar'
+                                                            : (podeTransferir ? `Transferir ${disponivelTransferencia}` : 'IP pendente: realize a inspeção para liberar')
+                                                    }
+                                                    disabled={!podeTransferir || !canOperate}
+                                                    onClick={() => podeTransferir && openTransferModal(op)}
+                                                >
+                                                    <ArrowRight className="w-3 h-3 mr-1" />
+                                                    Transferir
+                                                </Button>
+                                            )}
+                                        </div>
                                     </td>
+                                    {canReset && (
+                                      <td className="px-3 py-2 text-sm text-center relative">
+                                        <div className="inline-flex relative">
+                                          <Button
+                                            size="sm"
+                                            variant="outline"
+                                            className={`${btnSm} ${btnSecondary}`}
+                                            onClick={() => setMenuOpId(menuOpId === op.id ? null : op.id)}
+                                            title="Opções"
+                                          >
+                                            <MoreHorizontal className="w-4 h-4" />
+                                          </Button>
+                                          {menuOpId === op.id && (
+                                            <div className="absolute right-0 top-9 z-20 w-64 rounded-md border border-gray-200 bg-white shadow-lg">
+                                              <div className="py-1 text-sm text-gray-800">
+                                                <button
+                                                  className="w-full flex items-center gap-2 px-3 py-2 text-left hover:bg-gray-100"
+                                                  onClick={async () => {
+                                                    setMenuOpId(null);
+                                                    const ok = await confirm({
+                                                      title: 'Excluir Operação',
+                                                      description: 'Remove esta operação (sem apontamentos). Use quando foi gerada por engano.',
+                                                      confirmText: 'Excluir',
+                                                      cancelText: 'Cancelar',
+                                                      variant: 'warning',
+                                                    });
+                                                    if (!ok) return;
+                                                    try {
+                                                      await resetOperacaoProducao(op.id, false);
+                                                      addToast('Operação excluída.', 'success');
+                                                      loadData();
+                                                    } catch (e: any) {
+                                                      addToast(String(e?.message || 'Erro ao excluir operação.'), 'error');
+                                                    }
+                                                  }}
+                                                >
+                                                  <RotateCcw className="w-4 h-4 text-amber-600" /> Excluir Operação
+                                                </button>
+                                                <button
+                                                  className="w-full flex items-center gap-2 px-3 py-2 text-left hover:bg-gray-100 text-red-700"
+                                                  onClick={async () => {
+                                                    setMenuOpId(null);
+                                                    const ok = await confirm({
+                                                      title: 'Forçar reset (remove apontamentos)',
+                                                      description: 'Remove apontamentos/QA desta operação e apaga a operação. Use apenas se foi gerada por engano.',
+                                                      confirmText: 'Remover e resetar',
+                                                      cancelText: 'Cancelar',
+                                                      variant: 'danger',
+                                                    });
+                                                    if (!ok) return;
+                                                    try {
+                                                      await resetOperacaoProducao(op.id, true);
+                                                      addToast('Operação e apontamentos removidos.', 'success');
+                                                      loadData();
+                                                    } catch (e: any) {
+                                                      addToast(String(e?.message || 'Erro ao forçar reset.'), 'error');
+                                                    }
+                                                  }}
+                                                >
+                                                  <Trash2 className="w-4 h-4" /> Remover apontamentos e resetar
+                                                </button>
+                                              </div>
+                                            </div>
+                                          )}
+                                        </div>
+                                      </td>
+                                    )}
                                 </tr>
                             );
                         })}
@@ -339,10 +493,20 @@ export default function OperacoesGrid({ ordemId }: Props) {
                         </div>
 
                         <div className="flex justify-end space-x-2">
-                            <Button variant="ghost" onClick={() => { if (!transferLoading) { setTransferOp(null); setTransferQty(0); } }} disabled={transferLoading}>
+                            <Button
+                                size="sm"
+                                className={`${btnSm} ${btnSecondary}`}
+                                onClick={() => { if (!transferLoading) { setTransferOp(null); setTransferQty(0); } }}
+                                disabled={transferLoading}
+                            >
                                 Cancelar
                             </Button>
-                            <Button onClick={handleTransferConfirm} disabled={transferLoading}>
+                            <Button
+                                size="sm"
+                                className={`${btnSm} ${btnPrimary}`}
+                                onClick={handleTransferConfirm}
+                                disabled={transferLoading}
+                            >
                                 {transferLoading ? 'Transferindo...' : 'Confirmar Transferência'}
                             </Button>
                         </div>

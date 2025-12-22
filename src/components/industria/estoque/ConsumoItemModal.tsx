@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { getLotesDisponiveis, consumirEstoque, EstoqueLote } from '@/services/industriaProducao';
 import { useToast } from '@/contexts/ToastProvider';
 import { Loader2 } from 'lucide-react';
+import { logger } from '@/lib/logger';
 
 interface ConsumoItemModalProps {
     isOpen: boolean;
@@ -68,7 +69,7 @@ const ConsumoItemModal: React.FC<ConsumoItemModalProps> = ({
             onSuccess();
             onClose();
         } catch (error: any) {
-            console.error(error);
+            logger.error('[Indústria][Estoque] Falha ao consumir lote', error, { ordemId, componenteId, produtoId, lote: selectedLote });
             addToast('Erro ao consumir: ' + (error.message || 'Erro desconhecido'), 'error');
         } finally {
             setSubmitting(false);

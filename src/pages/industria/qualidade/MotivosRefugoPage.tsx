@@ -6,12 +6,15 @@ import Modal from '@/components/ui/Modal';
 import Input from '@/components/ui/forms/Input';
 import Select from '@/components/ui/forms/Select';
 import { QualidadeMotivo } from '@/services/industriaProducao';
+import { useConfirm } from '@/contexts/ConfirmProvider';
+import { Button } from '@/components/ui/button';
 
 export default function MotivosRefugoPage() {
     const [motivos, setMotivos] = useState<QualidadeMotivo[]>([]);
     const [loading, setLoading] = useState(true);
     const [isModalOpen, setIsModalOpen] = useState(false);
     const { addToast } = useToast();
+    const { confirm } = useConfirm();
 
     // Form State
     const [formData, setFormData] = useState({
@@ -67,7 +70,14 @@ export default function MotivosRefugoPage() {
     };
 
     const handleDelete = async (id: string) => {
-        if (!confirm('Excluir este motivo?')) return;
+        const ok = await confirm({
+            title: 'Excluir motivo',
+            description: 'Excluir este motivo? Esta ação não pode ser desfeita.',
+            confirmText: 'Excluir',
+            cancelText: 'Cancelar',
+            variant: 'danger',
+        });
+        if (!ok) return;
         try {
             await callRpc('qualidade_excluir_motivo', { p_id: id });
             addToast('Motivo excluído.', 'success');
@@ -84,13 +94,10 @@ export default function MotivosRefugoPage() {
                     <h1 className="text-2xl font-bold text-gray-800">Motivos de Qualidade</h1>
                     <p className="text-gray-500 mt-1">Gerencie os motivos de refugo, bloqueio e devolução.</p>
                 </div>
-                <button
-                    onClick={() => setIsModalOpen(true)}
-                    className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 shadow-sm transition-all"
-                >
-                    <Plus size={20} />
+                <Button onClick={() => setIsModalOpen(true)} className="gap-2">
+                    <Plus size={18} />
                     Novo Motivo
-                </button>
+                </Button>
             </div>
 
             <div className="bg-white rounded shadow overflow-hidden">

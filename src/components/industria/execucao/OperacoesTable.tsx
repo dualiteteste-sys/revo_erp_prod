@@ -1,11 +1,15 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Operacao } from '@/services/industriaExecucao';
-import { Package, User, Calendar, Clock } from 'lucide-react';
+import { Package, User, Calendar, Clock, FileText, PauseCircle, PlayCircle, CheckCircle2, MoreHorizontal } from 'lucide-react';
 import { formatOrderNumber } from '@/lib/utils';
 
 interface Props {
   operacoes: Operacao[];
   onUpdateStatus: (op: Operacao, newStatus: string) => void;
+  onOpenDocs?: (op: Operacao) => void;
+  onStart?: (op: Operacao) => void;
+  onPause?: (op: Operacao) => void;
+  onConclude?: (op: Operacao) => void;
 }
 
 const statusColors: Record<string, string> = {
@@ -18,7 +22,19 @@ const statusColors: Record<string, string> = {
   cancelada: 'bg-red-100 text-red-800',
 };
 
-export default function OperacoesTable({ operacoes, onUpdateStatus }: Props) {
+const STATUS_OPTIONS: Array<{ value: Operacao['status']; label: string }> = [
+  { value: 'planejada', label: 'Planejada' },
+  { value: 'liberada', label: 'Liberada' },
+  { value: 'em_execucao', label: 'Em execução' },
+  { value: 'em_espera', label: 'Em espera' },
+  { value: 'em_inspecao', label: 'Em inspeção' },
+  { value: 'concluida', label: 'Concluída' },
+  { value: 'cancelada', label: 'Cancelada' },
+];
+
+export default function OperacoesTable({ operacoes, onUpdateStatus, onOpenDocs, onStart, onPause, onConclude }: Props) {
+  const [menuId, setMenuId] = useState<string | null>(null);
+
   return (
     <div className="overflow-x-auto">
       <table className="min-w-full divide-y divide-gray-200">
@@ -30,6 +46,7 @@ export default function OperacoesTable({ operacoes, onUpdateStatus }: Props) {
             <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
             <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Previsão</th>
             <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase">%</th>
+            <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Ações</th>
           </tr>
         </thead>
         <tbody className="bg-white divide-y divide-gray-200">
@@ -54,9 +71,24 @@ export default function OperacoesTable({ operacoes, onUpdateStatus }: Props) {
                 {op.centro_trabalho_nome}
               </td>
               <td className="px-6 py-4">
-                <span className={`px-2 py-1 rounded-full text-xs font-semibold uppercase ${statusColors[op.status] || 'bg-gray-100'}`}>
-                  {op.status.replace(/_/g, ' ')}
-                </span>
+                <div className="flex items-center gap-2">
+                  <span className={`px-2 py-1 rounded-full text-xs font-semibold uppercase ${statusColors[op.status] || 'bg-gray-100'}`}>
+                    {op.status.replace(/_/g, ' ')}
+                  </span>
+                  <select
+                    value={op.status}
+                    onChange={(e) => onUpdateStatus(op, e.target.value)}
+                    className="text-xs border rounded-md px-2 py-1 bg-white"
+                    title="Alterar status manualmente"
+                    disabled={op.status === 'concluida' || op.status === 'cancelada'}
+                  >
+                    {STATUS_OPTIONS.map((opt) => (
+                      <option key={opt.value} value={opt.value}>
+                        {opt.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
               </td>
               <td className="px-6 py-4 text-sm text-gray-500">
                 <div className="flex flex-col">
@@ -72,11 +104,78 @@ export default function OperacoesTable({ operacoes, onUpdateStatus }: Props) {
                 </div>
                 <span className="text-xs text-gray-500 mt-1">{op.percentual_concluido}%</span>
               </td>
+              <td className="px-6 py-4 text-right">
+                <div className="relative inline-flex">
+                  <button
+                    type="button"
+                    className="p-2 rounded-full hover:bg-gray-100 text-gray-700"
+                    onClick={() => setMenuId(menuId === op.id ? null : op.id)}
+                    title="Mais ações"
+                  >
+                    <MoreHorizontal size={18} />
+                  </button>
+                  {menuId === op.id && (
+                    <div className="absolute right-0 mt-2 w-52 rounded-md bg-white shadow-lg border border-gray-200 z-10 text-sm">
+                      {onOpenDocs && (
+                        <button
+                          className="w-full flex items-center gap-2 px-3 py-2 text-left hover:bg-gray-100"
+                          onClick={() => {
+                            setMenuId(null);
+                            onOpenDocs(op);
+                          }}
+                          disabled={!onOpenDocs}
+                        >
+                          <FileText size={14} /> Instruções / Docs
+                        </button>
+                      )}
+                      {onStart && (
+                        <button
+                          className="w-full flex items-center gap-2 px-3 py-2 text-left hover:bg-gray-100 disabled:opacity-50"
+                          onClick={() => {
+                            if (!onStart || op.status === 'em_execucao' || op.status === 'concluida' || op.status === 'cancelada') return;
+                            setMenuId(null);
+                            onStart(op);
+                          }}
+                          disabled={op.status === 'em_execucao' || op.status === 'concluida' || op.status === 'cancelada'}
+                        >
+                          <PlayCircle size={14} /> Iniciar
+                        </button>
+                      )}
+                      {onPause && (
+                        <button
+                          className="w-full flex items-center gap-2 px-3 py-2 text-left hover:bg-gray-100 disabled:opacity-50"
+                          onClick={() => {
+                            if (!onPause || op.status !== 'em_execucao') return;
+                            setMenuId(null);
+                            onPause(op);
+                          }}
+                          disabled={op.status !== 'em_execucao'}
+                        >
+                          <PauseCircle size={14} /> Pausar
+                        </button>
+                      )}
+                      {onConclude && (
+                        <button
+                          className="w-full flex items-center gap-2 px-3 py-2 text-left hover:bg-gray-100 disabled:opacity-50"
+                          onClick={() => {
+                            if (!onConclude || op.status === 'concluida' || op.status === 'cancelada') return;
+                            setMenuId(null);
+                            onConclude(op);
+                          }}
+                          disabled={op.status === 'concluida' || op.status === 'cancelada'}
+                        >
+                          <CheckCircle2 size={14} /> Concluir
+                        </button>
+                      )}
+                    </div>
+                  )}
+                </div>
+              </td>
             </tr>
           ))}
           {operacoes.length === 0 && (
             <tr>
-              <td colSpan={6} className="px-6 py-12 text-center text-gray-500">Nenhuma operação encontrada.</td>
+              <td colSpan={7} className="px-6 py-12 text-center text-gray-500">Nenhuma operação encontrada.</td>
             </tr>
           )}
         </tbody>

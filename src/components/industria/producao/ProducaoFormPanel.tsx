@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { ArrowLeft, ArrowRight, CheckCircle2, Loader2, Play, Save, ShieldAlert, TriangleAlert, XCircle } from 'lucide-react';
 import {
   OrdemProducaoDetails,
@@ -11,9 +11,11 @@ import {
   registrarEntrega,
   deleteOrdemProducao,
   cloneOrdemProducao,
-  fecharOrdemProducao
+  fecharOrdemProducao,
+  resetOrdemProducao
 } from '@/services/industriaProducao';
 import { useToast } from '@/contexts/ToastProvider';
+import { useConfirm } from '@/contexts/ConfirmProvider';
 import Section from '@/components/ui/forms/Section';
 import Input from '@/components/ui/forms/Input';
 import Select from '@/components/ui/forms/Select';
@@ -27,6 +29,9 @@ import OperacoesGrid from './OperacoesGrid';
 import { formatOrderNumber } from '@/lib/utils';
 import { listUnidades, UnidadeMedida } from '@/services/unidades';
 import Modal from '@/components/ui/Modal';
+import { logger } from '@/lib/logger';
+import IndustriaAuditTrailPanel from '@/components/industria/audit/IndustriaAuditTrailPanel';
+import { roleAtLeast, useEmpresaRole } from '@/hooks/useEmpresaRole';
 
 interface Props {
   ordemId: string | null;
@@ -46,14 +51,27 @@ export default function ProducaoFormPanel({
   onOpenOrder,
 }: Props) {
   const { addToast } = useToast();
+  const { confirm } = useConfirm();
+  const empresaRoleQuery = useEmpresaRole();
+  const empresaRole = empresaRoleQuery.data;
+  // Enquanto o role não carregou, não travar o formulário (evita "race condition" de empresa/role).
+  const canEdit = empresaRoleQuery.isFetched ? roleAtLeast(empresaRole, 'member') : true;
+  const canAdmin = empresaRoleQuery.isFetched ? roleAtLeast(empresaRole, 'admin') : false;
+  const canOperate = canEdit;
+  const canConfigureQa = canAdmin;
   const [loading, setLoading] = useState(!!ordemId);
   const [isSaving, setIsSaving] = useState(false);
-  const [activeTab, setActiveTab] = useState<'dados' | 'componentes' | 'entregas' | 'operacoes'>('dados');
+  const [activeTab, setActiveTab] = useState<'dados' | 'componentes' | 'entregas' | 'operacoes' | 'historico'>('dados');
+  const [highlightComponenteId, setHighlightComponenteId] = useState<string | null>(null);
+  const [highlightEntregaId, setHighlightEntregaId] = useState<string | null>(null);
+  const [highlightOperacaoId, setHighlightOperacaoId] = useState<string | null>(null);
+  const highlightTimerRef = useRef<number | null>(null);
   const [unidades, setUnidades] = useState<UnidadeMedida[]>([]);
   const [showClosureModal, setShowClosureModal] = useState(false);
   const [entregaBloqueada, setEntregaBloqueada] = useState<{ blocked: boolean; reason?: string } | null>(null);
   const [wizardStep, setWizardStep] = useState<0 | 1 | 2>(0);
   const [showLiberarModal, setShowLiberarModal] = useState(false);
+  const [isResetting, setIsResetting] = useState(false);
 
   const [formData, setFormData] = useState<Partial<OrdemProducaoDetails>>({
     status: 'rascunho',
@@ -69,7 +87,12 @@ export default function ProducaoFormPanel({
   });
 
   useEffect(() => {
-    listUnidades().then(setUnidades).catch(console.error);
+    listUnidades()
+      .then(setUnidades)
+      .catch((e: any) => {
+        logger.error('[Indústria][OP] Falha ao carregar unidades', e);
+        addToast(e?.message || 'Erro ao carregar unidades.', 'error');
+      });
   }, []);
 
   useEffect(() => {
@@ -84,11 +107,16 @@ export default function ProducaoFormPanel({
 
     try {
       const data = await getOrdemProducaoDetails(idToLoad);
+      if (!data) {
+        addToast('Ordem não encontrada (talvez tenha sido excluída).', 'error');
+        if (ordemId) onClose();
+        return;
+      }
       setFormData(data);
       const bloqueio = checkEntregaBlocked(data);
       setEntregaBloqueada(bloqueio);
     } catch (e) {
-      console.error(e);
+      logger.error('[Indústria][OP] Falha ao carregar ordem', e, { ordemId: idToLoad });
       addToast('Erro ao carregar ordem.', 'error');
       if (ordemId) onClose();
     } finally {
@@ -106,13 +134,21 @@ export default function ProducaoFormPanel({
   };
 
   const handleSaveHeader = async () => {
+    if (!canEdit) {
+      addToast('Você não tem permissão para editar esta ordem.', 'error');
+      return null;
+    }
+    if (formData.status === 'concluida' || formData.status === 'cancelada') {
+      addToast('Esta ordem está bloqueada para edição.', 'error');
+      return null;
+    }
     if (!formData.produto_final_id) {
       addToast('Selecione um produto final.', 'error');
-      return;
+      return null;
     }
     if (!formData.quantidade_planejada || formData.quantidade_planejada <= 0) {
       addToast('A quantidade planejada deve ser maior que zero.', 'error');
-      return;
+      return null;
     }
 
     setIsSaving(true);
@@ -251,7 +287,7 @@ export default function ProducaoFormPanel({
       });
       await loadDetails(formData.id);
     } catch (e: any) {
-      console.error(e);
+      logger.error('[Indústria][OP] Falha ao salvar referência de BOM no cabeçalho', e, { ordemId: formData.id, bomId: bom?.id });
       addToast('BOM aplicada, mas erro ao salvar referência no cabeçalho.', 'warning');
       await loadDetails(formData.id);
     }
@@ -296,7 +332,14 @@ export default function ProducaoFormPanel({
 
   const handleCriarRevisao = async () => {
     if (!formData.id) return;
-    if (!window.confirm('Criar uma revisão desta OP? Uma nova OP em rascunho será criada para você ajustar e liberar novamente.')) return;
+    const ok = await confirm({
+      title: 'Criar revisão',
+      description: 'Criar uma revisão desta OP? Uma nova OP em rascunho será criada para você ajustar e liberar novamente.',
+      confirmText: 'Criar revisão',
+      cancelText: 'Cancelar',
+      variant: 'primary',
+    });
+    if (!ok) return;
     setIsSaving(true);
     try {
       const cloned = await cloneOrdemProducao(formData.id);
@@ -313,11 +356,13 @@ export default function ProducaoFormPanel({
   if (loading) return <div className="flex justify-center p-8"><Loader2 className="animate-spin" /></div>;
 
   const isLocked = formData.status === 'concluida' || formData.status === 'cancelada';
+  const isRoleReadOnly = !canEdit;
+  const isLockedEffective = isLocked || isRoleReadOnly;
   const isWizard = !ordemId && !formData.id;
   const isReleased = formData.status === 'em_producao' || formData.status === 'em_inspecao';
   const hasOperacoes = Array.isArray((formData as any).operacoes) && (formData as any).operacoes.length > 0;
-  const isCoreHeaderLocked = isLocked || isReleased || (formData.status as any) === 'parcialmente_concluida' || hasOperacoes;
-  const canLiberar = !!formData.id && !isLocked && (formData.status === 'rascunho' || formData.status === 'planejada') && !!formData.roteiro_aplicado_id;
+  const isCoreHeaderLocked = isLockedEffective || isReleased || (formData.status as any) === 'parcialmente_concluida' || hasOperacoes;
+  const canLiberar = canEdit && !!formData.id && !isLockedEffective && (formData.status === 'rascunho' || formData.status === 'planejada') && !!formData.roteiro_aplicado_id;
   const componentesCount = Array.isArray(formData.componentes) ? formData.componentes.length : 0;
   const checklist = [
     {
@@ -409,6 +454,16 @@ export default function ProducaoFormPanel({
               </span>
             )}
           </button>
+          <button
+            onClick={() => setActiveTab('historico')}
+            className={`whitespace-nowrap py-2 px-3 border-b-2 font-medium text-sm transition-colors ${activeTab === 'historico'
+              ? 'border-blue-500 text-blue-600'
+              : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+              } `}
+            disabled={!formData.id}
+          >
+            Histórico
+          </button>
         </nav>
       </div>
 
@@ -442,7 +497,7 @@ export default function ProducaoFormPanel({
                   name="tipo_ordem"
                   value="industrializacao"
                   disabled={!!formData.id || !allowTipoOrdemChange}
-                  onChange={(e) => {
+                  onChange={async (e) => {
                     const nextTipo = e.target.value as 'industrializacao' | 'beneficiamento';
                     if (nextTipo === 'industrializacao') return;
                     if (!!formData.id || !allowTipoOrdemChange) return;
@@ -454,9 +509,13 @@ export default function ProducaoFormPanel({
                       !!formData.observacoes;
 
                     if (hasAnyData) {
-                      const ok = window.confirm(
-                        'Trocar o tipo de ordem irá reiniciar os campos preenchidos nesta ordem.\n\nDeseja continuar?'
-                      );
+                      const ok = await confirm({
+                        title: 'Trocar tipo de ordem',
+                        description: 'Trocar o tipo de ordem irá reiniciar os campos preenchidos nesta ordem. Deseja continuar?',
+                        confirmText: 'Trocar e reiniciar',
+                        cancelText: 'Cancelar',
+                        variant: 'danger',
+                      });
                       if (!ok) return;
                     }
 
@@ -502,7 +561,7 @@ export default function ProducaoFormPanel({
                 </Select>
               </div>
               <div className="sm:col-span-2">
-                <Select label="Origem" name="origem" value={formData.origem_ordem} onChange={e => handleHeaderChange('origem_ordem', e.target.value)} disabled={isLocked}>
+                <Select label="Origem" name="origem" value={formData.origem_ordem} onChange={e => handleHeaderChange('origem_ordem', e.target.value)} disabled={isLockedEffective}>
                   <option value="manual">Manual</option>
                   <option value="venda">Venda</option>
                   <option value="reposicao">Reposição</option>
@@ -515,7 +574,7 @@ export default function ProducaoFormPanel({
               <>
                 <Section title="Programação" description="Prazos e status.">
                   <div className="sm:col-span-2">
-                    <Select label="Status" name="status" value={formData.status} onChange={e => handleHeaderChange('status', e.target.value)} disabled={isLocked}>
+                    <Select label="Status" name="status" value={formData.status} onChange={e => handleHeaderChange('status', e.target.value)} disabled={isLockedEffective}>
                       <option value="rascunho">Rascunho</option>
                       <option value="planejada">Planejada</option>
                       <option value="em_programacao">Em Programação</option>
@@ -532,14 +591,14 @@ export default function ProducaoFormPanel({
                       type="number"
                       value={formData.prioridade || 0}
                       onChange={e => handleHeaderChange('prioridade', parseInt(e.target.value))}
-                      disabled={isLocked}
+                      disabled={isLockedEffective}
                     />
                   </div>
                   <div className="sm:col-span-2"></div>
 
-                  <Input label="Início Previsto" type="date" value={formData.data_prevista_inicio || ''} onChange={e => handleHeaderChange('data_prevista_inicio', e.target.value)} disabled={isLocked} className="sm:col-span-2" />
-                  <Input label="Fim Previsto" type="date" value={formData.data_prevista_fim || ''} onChange={e => handleHeaderChange('data_prevista_fim', e.target.value)} disabled={isLocked} className="sm:col-span-2" />
-                  <Input label="Entrega Prevista" type="date" value={formData.data_prevista_entrega || ''} onChange={e => handleHeaderChange('data_prevista_entrega', e.target.value)} disabled={isLocked} className="sm:col-span-2" />
+                  <Input label="Início Previsto" type="date" value={formData.data_prevista_inicio || ''} onChange={e => handleHeaderChange('data_prevista_inicio', e.target.value)} disabled={isLockedEffective} className="sm:col-span-2" />
+                  <Input label="Fim Previsto" type="date" value={formData.data_prevista_fim || ''} onChange={e => handleHeaderChange('data_prevista_fim', e.target.value)} disabled={isLockedEffective} className="sm:col-span-2" />
+                  <Input label="Entrega Prevista" type="date" value={formData.data_prevista_entrega || ''} onChange={e => handleHeaderChange('data_prevista_entrega', e.target.value)} disabled={isLockedEffective} className="sm:col-span-2" />
                 </Section>
 
                 <Section title="Parâmetros da OP" description="Configurações de produção.">
@@ -549,7 +608,7 @@ export default function ProducaoFormPanel({
                       name="lote"
                       value={formData.lote_producao || ''}
                       onChange={e => handleHeaderChange('lote_producao', e.target.value)}
-                      disabled={isLocked}
+                      disabled={isLockedEffective}
                       placeholder="Ex: LOTE-2025-001"
                     />
                   </div>
@@ -559,7 +618,7 @@ export default function ProducaoFormPanel({
                       name="reserva"
                       value={formData.reserva_modo || 'ao_liberar'}
                       onChange={e => handleHeaderChange('reserva_modo', e.target.value)}
-                      disabled={isLocked}
+                      disabled={isLockedEffective}
                     >
                       <option value="ao_liberar">Ao Liberar (Padrão)</option>
                       <option value="ao_planejar">Ao Planejar</option>
@@ -575,7 +634,7 @@ export default function ProducaoFormPanel({
                       max="10"
                       value={formData.tolerancia_overrun_percent || 0}
                       onChange={e => handleHeaderChange('tolerancia_overrun_percent', parseFloat(e.target.value))}
-                      disabled={isLocked}
+                      disabled={isLockedEffective}
                     />
                   </div>
                 </Section>
@@ -584,8 +643,8 @@ export default function ProducaoFormPanel({
 
             {(!isWizard || wizardStep === 2) && (
               <Section title="Outros" description="Detalhes adicionais.">
-                <Input label="Ref. Documento" name="doc_ref" value={formData.documento_ref || ''} onChange={e => handleHeaderChange('documento_ref', e.target.value)} disabled={isLocked} className="sm:col-span-2" placeholder="Pedido, Lote..." />
-                <TextArea label="Observações" name="obs" value={formData.observacoes || ''} onChange={e => handleHeaderChange('observacoes', e.target.value)} rows={3} disabled={isLocked} className="sm:col-span-6" />
+                <Input label="Ref. Documento" name="doc_ref" value={formData.documento_ref || ''} onChange={e => handleHeaderChange('documento_ref', e.target.value)} disabled={isLockedEffective} className="sm:col-span-2" placeholder="Pedido, Lote..." />
+                <TextArea label="Observações" name="obs" value={formData.observacoes || ''} onChange={e => handleHeaderChange('observacoes', e.target.value)} rows={3} disabled={isLockedEffective} className="sm:col-span-6" />
               </Section>
             )}
           </>
@@ -595,7 +654,7 @@ export default function ProducaoFormPanel({
         {
           activeTab === 'componentes' && (
             <>
-              {!isLocked && formData.id && formData.produto_final_id && (
+              {!isLockedEffective && formData.id && formData.produto_final_id && (
                 <div className="mb-4 grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="flex justify-between items-center bg-blue-50 p-3 rounded-lg border border-blue-100">
                     <p className="text-sm text-blue-800">
@@ -606,7 +665,7 @@ export default function ProducaoFormPanel({
                     <RoteiroSelector
                       ordemId={formData.id}
                       produtoId={formData.produto_final_id}
-                      disabled={isReleased || isLocked}
+                      disabled={isReleased || isLockedEffective}
                       onApplied={handleRoteiroApplied}
                     />
                   </div>
@@ -621,7 +680,7 @@ export default function ProducaoFormPanel({
                       ordemId={formData.id}
                       produtoId={formData.produto_final_id}
                       tipoOrdem="producao"
-                      disabled={isReleased || isLocked}
+                      disabled={isReleased || isLockedEffective}
                       onApplied={handleBomApplied}
                     />
                   </div>
@@ -635,7 +694,8 @@ export default function ProducaoFormPanel({
                 onUpdateItem={handleUpdateComponente}
                 onRefresh={() => loadDetails(formData.id)}
                 isAddingItem={false}
-                readOnly={isLocked}
+                readOnly={isLockedEffective}
+                highlightItemId={highlightComponenteId}
               />
             </>
           )
@@ -643,7 +703,13 @@ export default function ProducaoFormPanel({
 
         {
           activeTab === 'operacoes' && formData.id && (
-            <OperacoesGrid ordemId={formData.id} />
+            <OperacoesGrid
+              ordemId={formData.id}
+              highlightOperacaoId={highlightOperacaoId}
+              canOperate={canOperate && !isLockedEffective}
+              canConfigureQa={canConfigureQa && !isLockedEffective}
+              canReset={canAdmin && !isLockedEffective}
+            />
           )
         }
 
@@ -663,31 +729,116 @@ export default function ProducaoFormPanel({
                 entregas={formData.entregas || []}
                 onAddEntrega={handleAddEntrega}
                 onRemoveEntrega={handleRemoveEntrega}
-                readOnly={isLocked || entregaBloqueada?.blocked}
+                readOnly={isLockedEffective || entregaBloqueada?.blocked}
                 maxQuantity={formData.quantidade_planejada || 0}
                 showBillingStatus={false}
+                highlightEntregaId={highlightEntregaId}
               />
             </div>
           )
         }
+
+        {activeTab === 'historico' && (
+          formData.id ? (
+            <IndustriaAuditTrailPanel
+              ordemId={formData.id}
+              tables={[
+                'industria_producao_ordens',
+                'industria_producao_componentes',
+                'industria_producao_entregas',
+                'industria_producao_operacoes',
+              ]}
+              onNavigate={(row) => {
+                if (highlightTimerRef.current) window.clearTimeout(highlightTimerRef.current);
+                setHighlightComponenteId(null);
+                setHighlightEntregaId(null);
+                setHighlightOperacaoId(null);
+
+                const targetId =
+                  row.record_id ||
+                  (typeof row.new_data?.id === 'string' ? (row.new_data.id as string) : null) ||
+                  (typeof row.old_data?.id === 'string' ? (row.old_data.id as string) : null);
+
+                const tableName = row.table_name || '';
+
+                if (tableName === 'industria_producao_ordens') setActiveTab('dados');
+                else if (tableName === 'industria_producao_componentes' || tableName.includes('componentes')) {
+                  setActiveTab('componentes');
+                  if (targetId) setHighlightComponenteId(targetId);
+                }
+                else if (tableName === 'industria_producao_entregas' || tableName.includes('entregas')) {
+                  setActiveTab('entregas');
+                  if (targetId) setHighlightEntregaId(targetId);
+                }
+                else if (tableName === 'industria_producao_operacoes' || tableName.includes('operacoes')) {
+                  setActiveTab('operacoes');
+                  if (targetId) setHighlightOperacaoId(targetId);
+                }
+                else setActiveTab('dados');
+
+                highlightTimerRef.current = window.setTimeout(() => {
+                  setHighlightComponenteId(null);
+                  setHighlightEntregaId(null);
+                  setHighlightOperacaoId(null);
+                }, 4500);
+              }}
+            />
+          ) : (
+            <div className="text-sm text-gray-500">Salve a ordem para visualizar o histórico.</div>
+          )
+        )}
       </div >
 
       <div className="flex justify-between p-4 border-t bg-gray-50 rounded-b-lg">
-        {formData.id && !isLocked && formData.status === 'rascunho' ? (
+        {formData.id && !isLockedEffective && canAdmin && formData.status === 'rascunho' ? (
           <button
             onClick={async () => {
-              if (confirm('Tem certeza que deseja excluir esta Ordem de Produção? Esta ação não pode ser desfeita.')) {
-                setIsSaving(true);
-                try {
-                  await deleteOrdemProducao(formData.id!);
-                  addToast('Ordem excluída com sucesso!', 'success');
-                  onClose();
-                  if (onSaveSuccess) onSaveSuccess();
-                } catch (e: any) {
-                  addToast('Erro ao excluir ordem: ' + e.message, 'error');
-                } finally {
-                  setIsSaving(false);
+              const ok = await confirm({
+                title: 'Excluir OP',
+                description: 'Tem certeza que deseja excluir esta Ordem de Produção? Esta ação não pode ser desfeita.',
+                confirmText: 'Excluir',
+                cancelText: 'Cancelar',
+                variant: 'danger',
+              });
+              if (!ok) return;
+
+              setIsSaving(true);
+              try {
+                await deleteOrdemProducao(formData.id!);
+                const stillThere = await getOrdemProducaoDetails(formData.id!);
+                if (stillThere) {
+                  throw new Error(
+                    'O sistema confirmou a exclusão, mas a ordem ainda existe. Verifique permissões/empresa ativa e tente novamente.'
+                  );
                 }
+                addToast('Ordem excluída com sucesso!', 'success');
+                onClose();
+                if (onSaveSuccess) onSaveSuccess();
+              } catch (e: any) {
+                const raw = String(e?.message || '');
+                const msg = raw.toLowerCase();
+
+                if (msg.includes('sem permissão') || msg.includes('permission denied') || msg.includes('42501')) {
+                  addToast(
+                    'Sem permissão para excluir esta OP. Confirme se você está como admin/owner na empresa ativa.',
+                    'error'
+                  );
+                } else if (msg.includes('somente ordens em rascunho')) {
+                  addToast('Só é possível excluir OP em rascunho. Para ordens já liberadas, cancele a OP.', 'error');
+                } else if (msg.includes('já possui operações')) {
+                  addToast('Não é possível excluir: a OP já possui operações geradas.', 'error');
+                } else if (msg.includes('já possui entregas')) {
+                  addToast('Não é possível excluir: a OP já possui entregas registradas.', 'error');
+                } else if (msg.includes('violates foreign key constraint') || msg.includes('violates')) {
+                  addToast(
+                    'Não foi possível excluir porque existem registros vinculados (ex.: inspeções/qualidade).',
+                    'error'
+                  );
+                } else {
+                  addToast('Erro ao excluir ordem: ' + raw, 'error');
+                }
+              } finally {
+                setIsSaving(false);
               }
             }}
             disabled={isSaving}
@@ -698,6 +849,41 @@ export default function ProducaoFormPanel({
         ) : <div></div>}
 
         <div className="flex space-x-2">
+          {formData.id && canAdmin && ['rascunho', 'planejada', 'em_programacao'].includes(formData.status as string) && (
+            <button
+              type="button"
+              onClick={async () => {
+                const ok = await confirm({
+                  title: 'Reverter OP (remover operações)',
+                  description:
+                    'Use apenas se as operações foram geradas por engano. Remove operações/reservas e retorna a OP para Rascunho. Não pode haver entregas ou apontamentos.',
+                  confirmText: 'Reverter',
+                  cancelText: 'Cancelar',
+                  variant: 'warning',
+                });
+                if (!ok || !formData.id) return;
+
+                setIsResetting(true);
+                try {
+                  await resetOrdemProducao(formData.id);
+                  await loadDetails(formData.id);
+                  addToast('OP revertida: operações removidas e status em rascunho.', 'success');
+                  if (onSaveSuccess) onSaveSuccess();
+                  setActiveTab('dados');
+                } catch (e: any) {
+                  const msg = String(e?.message || '');
+                  addToast('Erro ao reverter OP: ' + msg, 'error');
+                } finally {
+                  setIsResetting(false);
+                }
+              }}
+              disabled={isSaving || isResetting}
+              className="inline-flex items-center px-4 py-2 border border-amber-300 rounded-md shadow-sm text-sm font-medium text-amber-900 bg-amber-50 hover:bg-amber-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-amber-500 disabled:opacity-50"
+            >
+              Reverter OP
+            </button>
+          )}
+
           <button
             onClick={onClose}
             disabled={isSaving}
@@ -733,14 +919,14 @@ export default function ProducaoFormPanel({
           {formData.id && (formData.status === 'em_producao' || (formData.status as any) === 'parcialmente_concluida') && (
             <button
               onClick={() => setShowClosureModal(true)}
-              disabled={isSaving}
+              disabled={isSaving || !canAdmin}
               className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 disabled:opacity-50"
             >
               Encerrar Ordem (Backflush)
             </button>
           )}
 
-          {!isLocked && !isWizard && (
+          {!isLockedEffective && canEdit && !isWizard && (
             <button
               onClick={handleSaveHeader}
               disabled={isSaving}
@@ -751,7 +937,7 @@ export default function ProducaoFormPanel({
             </button>
           )}
 
-          {!isLocked && isWizard && (
+          {!isLockedEffective && canEdit && isWizard && (
             <>
               {wizardStep > 0 && (
                 <button

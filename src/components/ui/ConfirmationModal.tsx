@@ -11,7 +11,7 @@ interface ConfirmationModalProps {
   confirmText?: string;
   cancelText?: string;
   isLoading: boolean;
-  variant?: 'danger' | 'primary';
+  variant?: 'danger' | 'primary' | 'warning';
 }
 
 const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
@@ -25,9 +25,10 @@ const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
   isLoading,
   variant = 'primary',
 }) => {
-  const confirmButtonClasses = {
+  const confirmButtonClasses: Record<NonNullable<typeof variant>, string> = {
     danger: 'bg-red-600 hover:bg-red-500',
     primary: 'bg-blue-600 hover:bg-blue-500',
+    warning: 'bg-amber-500 hover:bg-amber-600 text-white',
   };
 
   return (

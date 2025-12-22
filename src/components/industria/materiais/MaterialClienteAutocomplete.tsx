@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { listMateriaisCliente, MaterialClienteListItem } from '@/services/industriaMateriais';
 import { useDebounce } from '@/hooks/useDebounce';
 import { Loader2, Search, Package } from 'lucide-react';
+import { logger } from '@/lib/logger';
 
 type Props = {
   clienteId?: string | null;
@@ -71,7 +72,7 @@ export default function MaterialClienteAutocomplete({
         setResults(data);
         if (data.length > 0) setOpen(true);
       } catch (e) {
-        console.error('Error searching materials', e);
+        logger.error('[Indústria][Materiais do Cliente] Falha ao buscar materiais (autocomplete)', e, { query, clienteId });
       } finally {
         setLoading(false);
       }

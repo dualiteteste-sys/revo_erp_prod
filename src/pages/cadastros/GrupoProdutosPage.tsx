@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Plus, Pencil, Trash2, Search, FolderTree } from 'lucide-react';
 import { useToast } from '../../contexts/ToastProvider';
+import { useConfirm } from '../../contexts/ConfirmProvider';
 import { listProdutoGrupos, upsertProdutoGrupo, deleteProdutoGrupo, ProdutoGrupo, ProdutoGrupoPayload } from '../../services/produtoGrupos';
 import Modal from '../../components/ui/Modal';
 import GrupoProdutoForm from '../../components/cadastros/GrupoProdutoForm';
@@ -8,6 +9,7 @@ import { Button } from '../../components/ui/button';
 
 const GrupoProdutosPage: React.FC = () => {
     const { addToast } = useToast();
+    const { confirm } = useConfirm();
     const [grupos, setGrupos] = useState<ProdutoGrupo[]>([]);
     const [loading, setLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState('');
@@ -56,7 +58,14 @@ const GrupoProdutosPage: React.FC = () => {
     };
 
     const handleDelete = async (id: string) => {
-        if (!window.confirm('Tem certeza que deseja excluir este grupo?')) return;
+        const ok = await confirm({
+            title: 'Excluir grupo',
+            description: 'Tem certeza que deseja excluir este grupo? Esta ação não pode ser desfeita.',
+            confirmText: 'Excluir',
+            cancelText: 'Cancelar',
+            variant: 'danger',
+        });
+        if (!ok) return;
 
         try {
             await deleteProdutoGrupo(id);

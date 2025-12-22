@@ -3,14 +3,23 @@ import { Trash2, Building, AlertTriangle, Loader2 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthProvider';
 import { leaveCompany } from '@/services/company';
 import { useToast } from '@/contexts/ToastProvider';
+import { useConfirm } from '@/contexts/ConfirmProvider';
 
 const DataManagementContent: React.FC = () => {
   const { empresas, refreshEmpresas, activeEmpresa } = useAuth();
   const { addToast } = useToast();
+  const { confirm } = useConfirm();
   const [loadingId, setLoadingId] = useState<string | null>(null);
 
   const handleLeaveCompany = async (empresaId: string, nome: string) => {
-    if (!confirm(`Tem certeza que deseja sair da empresa "${nome}"?`)) return;
+    const ok = await confirm({
+      title: 'Sair da empresa',
+      description: `Tem certeza que deseja sair da empresa "${nome}"?`,
+      confirmText: 'Sair',
+      cancelText: 'Cancelar',
+      variant: 'danger',
+    });
+    if (!ok) return;
 
     setLoadingId(empresaId);
     try {

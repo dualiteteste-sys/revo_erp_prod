@@ -5,6 +5,7 @@ import { useToast } from '@/contexts/ToastProvider';
 import { Loader2, Plus, Pencil, Trash2, RefreshCw, KeyRound, ShieldCheck, Printer, IdCard } from 'lucide-react';
 import Modal from '@/components/ui/Modal';
 import Input from '@/components/ui/forms/Input';
+import { Button } from '@/components/ui/button';
 import QRCode from 'react-qr-code';
 import { useAuth } from '@/contexts/AuthProvider';
 import { useSupabase } from '@/providers/SupabaseProvider';
@@ -193,29 +194,26 @@ export default function OperadoresPage() {
           </h1>
           <p className="text-sm text-gray-500">Gerencie PIN/QR e centros permitidos.</p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-2 flex-wrap items-center">
           <input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Buscar por nome ou e-mail"
             className="border rounded-lg px-3 py-2 text-sm"
           />
-          <button
-            onClick={loadData}
-            className="inline-flex items-center gap-2 px-3 py-2 border rounded-lg text-sm hover:bg-gray-50"
-          >
+          <Button onClick={loadData} variant="outline" className="gap-2" disabled={loading}>
             <RefreshCw size={16} className={loading ? 'animate-spin' : ''} />
             Atualizar
-          </button>
-          <button
+          </Button>
+          <Button
             onClick={() => {
               setForm({ nome: '', email: '', pin: randomPin(), centros_trabalho_ids: [], ativo: true });
               setModalOpen(true);
             }}
-            className="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-blue-600 text-white text-sm hover:bg-blue-500"
+            className="gap-2"
           >
             <Plus size={16} /> Novo operador
-          </button>
+          </Button>
         </div>
       </div>
 

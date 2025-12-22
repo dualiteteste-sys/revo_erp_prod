@@ -4,6 +4,8 @@ import Modal from '@/components/ui/Modal';
 import UnidadeFormPanel from '@/components/cadastros/UnidadeFormPanel';
 import { listUnidades, deleteUnidade, UnidadeMedida } from '@/services/unidades';
 import { useToast } from '@/contexts/ToastProvider';
+import { useConfirm } from '@/contexts/ConfirmProvider';
+import { Button } from '@/components/ui/button';
 
 export default function UnidadesPage() {
     const [unidades, setUnidades] = useState<UnidadeMedida[]>([]);
@@ -11,6 +13,7 @@ export default function UnidadesPage() {
     const [isFormOpen, setIsFormOpen] = useState(false);
     const [selectedUnidade, setSelectedUnidade] = useState<UnidadeMedida | null>(null);
     const { addToast } = useToast();
+    const { confirm } = useConfirm();
 
     const loadUnidades = async () => {
         setLoading(true);
@@ -44,7 +47,14 @@ export default function UnidadesPage() {
             addToast('Não é possível excluir unidades padrão do sistema.', 'error');
             return;
         }
-        if (!confirm(`Tem certeza que deseja excluir a unidade ${u.sigla}?`)) return;
+        const ok = await confirm({
+            title: 'Excluir unidade',
+            description: `Tem certeza que deseja excluir a unidade ${u.sigla}?`,
+            confirmText: 'Excluir',
+            cancelText: 'Cancelar',
+            variant: 'danger',
+        });
+        if (!ok) return;
 
         try {
             await deleteUnidade(u.id);
@@ -70,13 +80,10 @@ export default function UnidadesPage() {
                     </h1>
                     <p className="text-gray-600 mt-1">Gerencie as unidades de medida disponíveis no sistema.</p>
                 </div>
-                <button
-                    onClick={handleNew}
-                    className="flex items-center gap-2 bg-blue-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-blue-700 transition-colors"
-                >
-                    <PlusCircle size={20} />
+                <Button onClick={handleNew} className="gap-2">
+                    <PlusCircle size={18} />
                     Nova Unidade
-                </button>
+                </Button>
             </div>
 
             <div className="bg-white rounded-lg shadow overflow-hidden flex-grow">

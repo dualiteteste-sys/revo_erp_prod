@@ -11,6 +11,8 @@ import ProducaoFormPanel from '@/components/industria/producao/ProducaoFormPanel
 import ProducaoKanbanBoard from '@/components/industria/producao/ProducaoKanbanBoard';
 import { useToast } from '@/contexts/ToastProvider';
 import { useSearchParams } from 'react-router-dom';
+import { Button } from '@/components/ui/button';
+import { useConfirm } from '@/contexts/ConfirmProvider';
 
 export default function ProducaoPage() {
   const [viewMode, setViewMode] = useLocalStorageState<'list' | 'kanban'>('industria:producao:viewMode', 'list');
@@ -21,10 +23,12 @@ export default function ProducaoPage() {
   const debouncedSearch = useDebounce(search, 500);
   const { addToast } = useToast();
   const [searchParams, setSearchParams] = useSearchParams();
+  const { confirm } = useConfirm();
 
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [isSeeding, setIsSeeding] = useState(false);
+  const [kanbanRefresh, setKanbanRefresh] = useState(0);
 
   // Deep-link: /app/industria/producao?new=1
   useEffect(() => {
@@ -90,6 +94,7 @@ export default function ProducaoPage() {
 
   const handleSuccess = () => {
     if (viewMode === 'list') fetchOrders();
+    if (viewMode === 'kanban') setKanbanRefresh(k => k + 1);
     if (!selectedId) handleClose();
   };
 
@@ -107,7 +112,14 @@ export default function ProducaoPage() {
   };
 
   const handleDelete = async (id: string) => {
-    if (!confirm('Tem certeza que deseja excluir esta Ordem de Produção?')) return;
+    const ok = await confirm({
+      title: 'Excluir Ordem de Produção',
+      description: 'Tem certeza que deseja excluir esta Ordem de Produção? Esta ação não pode ser desfeita.',
+      confirmText: 'Excluir',
+      cancelText: 'Cancelar',
+      variant: 'danger',
+    });
+    if (!ok) return;
     try {
       await deleteOrdemProducao(id);
       addToast('Ordem excluída com sucesso!', 'success');
@@ -126,7 +138,7 @@ export default function ProducaoPage() {
           </h1>
           <p className="text-gray-600 text-sm mt-1">Transformação de insumos em produtos acabados.</p>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2 flex-wrap">
           <div className="bg-gray-100 p-1 rounded-lg flex">
             <button
               onClick={() => setViewMode('list')}
@@ -143,21 +155,14 @@ export default function ProducaoPage() {
               <LayoutGrid size={20} />
             </button>
           </div>
-          <button
-            onClick={handleSeed}
-            disabled={isSeeding || loading}
-            className="flex items-center gap-2 bg-gray-100 text-gray-700 font-semibold py-2 px-4 rounded-lg hover:bg-gray-200 transition-colors disabled:opacity-50"
-          >
-            {isSeeding ? <Loader2 className="animate-spin" size={20} /> : <DatabaseBackup size={20} />}
+          <Button onClick={handleSeed} disabled={isSeeding || loading} variant="secondary" className="gap-2">
+            {isSeeding ? <Loader2 className="animate-spin" size={18} /> : <DatabaseBackup size={18} />}
             Popular Dados
-          </button>
-          <button
-            onClick={handleNew}
-            className="flex items-center gap-2 bg-blue-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-blue-700 transition-colors"
-          >
-            <PlusCircle size={20} />
+          </Button>
+          <Button onClick={handleNew} className="gap-2">
+            <PlusCircle size={18} />
             Nova OP
-          </button>
+          </Button>
         </div>
       </div>
 
@@ -199,7 +204,7 @@ export default function ProducaoPage() {
             )}
           </div>
         ) : (
-          <ProducaoKanbanBoard search={debouncedSearch} statusFilter={statusFilter} />
+          <ProducaoKanbanBoard search={debouncedSearch} statusFilter={statusFilter} refreshToken={kanbanRefresh} />
         )}
       </div>
 

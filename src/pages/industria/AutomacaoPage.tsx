@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { listAutomacaoRegras, upsertAutomacaoRegra } from '@/services/industriaAutomacao';
 import { useToast } from '@/contexts/ToastProvider';
 import { Loader2, Bot } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 
 type FormState = {
   auto_avancar: boolean;
@@ -73,14 +74,10 @@ export default function AutomacaoPage() {
           </h1>
           <p className="text-sm text-gray-500">Regras para auto-avanço e alertas de exceção.</p>
         </div>
-        <button
-          onClick={save}
-          disabled={saving}
-          className="px-5 py-2 rounded-xl bg-blue-600 text-white font-semibold hover:bg-blue-500 disabled:opacity-50 flex items-center gap-2"
-        >
+        <Button onClick={save} disabled={saving} className="gap-2">
           {saving && <Loader2 className="w-4 h-4 animate-spin" />}
           Salvar
-        </button>
+        </Button>
       </div>
 
       <div className="bg-white border rounded-2xl shadow-sm p-6 space-y-6">
@@ -131,4 +128,3 @@ export default function AutomacaoPage() {
     </div>
   );
 }
-

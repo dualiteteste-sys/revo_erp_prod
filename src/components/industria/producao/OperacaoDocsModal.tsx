@@ -7,6 +7,7 @@ import { useAuth } from '@/contexts/AuthProvider';
 import { createOperacaoDocSignedUrl, deleteOperacaoDoc, listOperacaoDocs, uploadOperacaoDoc, OperacaoDoc } from '@/services/industriaOperacaoDocs';
 import { Button } from '@/components/ui/button';
 import { Loader2, Paperclip, Download, Trash2 } from 'lucide-react';
+import { useConfirm } from '@/contexts/ConfirmProvider';
 
 export default function OperacaoDocsModal({
   operacaoId,
@@ -19,6 +20,7 @@ export default function OperacaoDocsModal({
 }) {
   const { addToast } = useToast();
   const { activeEmpresaId } = useAuth();
+  const { confirm } = useConfirm();
   const [loading, setLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [docs, setDocs] = useState<OperacaoDoc[]>([]);
@@ -80,7 +82,14 @@ export default function OperacaoDocsModal({
   };
 
   const handleDeleteDoc = async (doc: OperacaoDoc) => {
-    if (!confirm(`Excluir "${doc.titulo}" v${doc.versao}?`)) return;
+    const ok = await confirm({
+      title: 'Excluir documento',
+      description: `Excluir "${doc.titulo}" v${doc.versao}?`,
+      confirmText: 'Excluir',
+      cancelText: 'Cancelar',
+      variant: 'danger',
+    });
+    if (!ok) return;
     try {
       await deleteOperacaoDoc({ id: doc.id, arquivoPath: doc.arquivo_path });
       addToast('Documento excluído.', 'success');

@@ -9,6 +9,7 @@ import TextArea from '@/components/ui/forms/TextArea';
 import Toggle from '@/components/ui/forms/Toggle';
 import ItemAutocomplete from '@/components/os/ItemAutocomplete';
 import RoteiroEtapasGrid from './RoteiroEtapasGrid';
+import { logger } from '@/lib/logger';
 
 interface Props {
   roteiroId: string | null;
@@ -53,7 +54,7 @@ export default function RoteiroFormPanel({ roteiroId, initialData, onSaveSuccess
         throw new Error('Roteiro não encontrado');
       }
     } catch (e) {
-      console.error(e);
+      logger.error('[Indústria][Roteiro] Falha ao carregar roteiro', e, { roteiroId });
       addToast('Erro ao carregar roteiro.', 'error');
       onClose();
     } finally {

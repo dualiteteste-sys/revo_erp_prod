@@ -7,6 +7,8 @@ import { motion, AnimatePresence } from 'framer-motion';
 
 import Modal from '@/components/ui/Modal';
 import CentroTrabalhoFormPanel from '@/components/industria/centros-trabalho/CentroTrabalhoFormPanel';
+import { Button } from '@/components/ui/button';
+import { useConfirm } from '@/contexts/ConfirmProvider';
 
 interface Props {
   roteiroId: string;
@@ -20,6 +22,7 @@ import DecimalInput from '@/components/ui/forms/DecimalInput';
 
 export default function RoteiroEtapasGrid({ roteiroId, etapas, onUpdate, readOnly }: Props) {
   const { addToast } = useToast();
+  const { confirm } = useConfirm();
   const [centros, setCentros] = useState<CentroTrabalho[]>([]);
   const [localEtapas, setLocalEtapas] = useState<RoteiroEtapa[]>(etapas);
   const [isAdding, setIsAdding] = useState(false);
@@ -63,7 +66,14 @@ export default function RoteiroEtapasGrid({ roteiroId, etapas, onUpdate, readOnl
   };
 
   const handleRemove = async (id: string) => {
-    if (!confirm('Remover esta etapa?')) return;
+    const ok = await confirm({
+      title: 'Remover etapa',
+      description: 'Remover esta etapa do roteiro?',
+      confirmText: 'Remover',
+      cancelText: 'Cancelar',
+      variant: 'danger',
+    });
+    if (!ok) return;
     try {
       await manageRoteiroEtapa(roteiroId, id, {}, 'delete');
       addToast('Etapa removida.', 'success');
@@ -111,12 +121,9 @@ export default function RoteiroEtapasGrid({ roteiroId, etapas, onUpdate, readOnl
       <div className="flex justify-between items-center">
         <h3 className="text-lg font-semibold text-gray-800">Etapas do Processo</h3>
         {!readOnly && (
-          <button
-            onClick={() => setIsAdding(!isAdding)}
-            className="flex items-center gap-2 text-sm font-medium text-blue-600 hover:bg-blue-50 px-3 py-2 rounded-lg transition-colors"
-          >
+          <Button onClick={() => setIsAdding(!isAdding)} variant="outline" className="gap-2">
             <Plus size={16} /> Adicionar Etapa
-          </button>
+          </Button>
         )}
       </div>
 

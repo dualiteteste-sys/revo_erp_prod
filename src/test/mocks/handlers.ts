@@ -55,6 +55,10 @@ export const handlers = [
             });
         }
 
+        if (functionName === 'current_empresa_role') {
+            return HttpResponse.json('owner');
+        }
+
         // Default fallback for unhandled RPCs
         return HttpResponse.json({ error: `Unhandled RPC: ${functionName}` }, { status: 500 });
     }),
@@ -71,6 +75,7 @@ export const handlers = [
         console.log('[MSW] GET empresa_usuarios', request.url);
         return HttpResponse.json([
             {
+                role: 'owner',
                 empresa: {
                     id: 'empresa-1',
                     razao_social: 'Empresa Teste',
