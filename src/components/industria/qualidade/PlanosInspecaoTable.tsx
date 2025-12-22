@@ -22,7 +22,7 @@ export default function PlanosInspecaoTable({ planos, onEdit, onDelete }: Props)
   }
 
   return (
-    <div className="overflow-x-auto border rounded-lg">
+    <div className="overflow-x-auto overflow-y-visible border rounded-lg">
       <table className="min-w-full divide-y divide-gray-200">
         <thead className="bg-gray-50">
           <tr>
