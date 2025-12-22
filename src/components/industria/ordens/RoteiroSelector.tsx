@@ -19,7 +19,7 @@ export default function RoteiroSelector({ ordemId, produtoId, tipoBom, disabled,
     const [loading, setLoading] = useState(false);
     const [searchTerm, setSearchTerm] = useState('');
     const [filterByProduct, setFilterByProduct] = useState(true);
-    const [filterByTipo, setFilterByTipo] = useState(true);
+    const [filterByTipo, setFilterByTipo] = useState(false);
     const { addToast } = useToast();
 
     const loadRoteiros = async () => {
@@ -113,6 +113,9 @@ export default function RoteiroSelector({ ordemId, produtoId, tipoBom, disabled,
                                     <div>
                                         <div className="flex items-center gap-2">
                                             <h4 className="font-bold text-gray-800">{rot.codigo || 'Sem Código'} (v{rot.versao})</h4>
+                                            <span className="text-xs bg-blue-100 text-blue-800 px-2 py-0.5 rounded-full">
+                                              {rot.tipo_bom === 'beneficiamento' ? 'Beneficiamento' : 'Produção'}
+                                            </span>
                                             {rot.padrao_para_producao && <span className="text-xs bg-green-100 text-green-800 px-2 py-0.5 rounded-full">Padrão</span>}
                                         </div>
                                         <p className="text-sm text-gray-600">{rot.descricao}</p>

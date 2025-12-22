@@ -24,7 +24,7 @@ export default function BomSelector({ ordemId, produtoId, tipoOrdem, openOnMount
   const [applying, setApplying] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterByProduct, setFilterByProduct] = useState(true);
-  const [filterByTipo, setFilterByTipo] = useState(true);
+  const [filterByTipo, setFilterByTipo] = useState(false);
   const { addToast } = useToast();
   const { confirm } = useConfirm();
 
@@ -169,6 +169,9 @@ export default function BomSelector({ ordemId, produtoId, tipoOrdem, openOnMount
                   <div>
                     <div className="flex items-center gap-2">
                       <h4 className="font-bold text-gray-800">{bom.codigo || 'Sem código'} (v{bom.versao})</h4>
+                      <span className="text-xs bg-blue-100 text-blue-800 px-2 py-0.5 rounded-full">
+                        {bom.tipo_bom === 'beneficiamento' ? 'Beneficiamento' : 'Produção'}
+                      </span>
                       {bom.padrao_para_producao && <span className="text-xs bg-green-100 text-green-800 px-2 py-0.5 rounded-full">Padrão</span>}
                     </div>
                     <p className="text-sm text-gray-600">{bom.descricao}</p>
