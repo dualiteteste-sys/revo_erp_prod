@@ -29,6 +29,10 @@ export type OrdemIndustria = {
   prioridade: number;
   data_prevista_entrega?: string | null;
   total_entregue: number;
+  created_at?: string | null;
+  qtde_caixas?: number | null;
+  numero_nf?: string | null;
+  pedido_numero?: string | null;
 };
 
 export type OrdemComponente = {
@@ -85,6 +89,9 @@ export type OrdemIndustriaDetails = {
   data_prevista_fim?: string | null;
   data_prevista_entrega?: string | null;
   documento_ref?: string | null;
+  numero_nf?: string | null;
+  pedido_numero?: string | null;
+  qtde_caixas?: number | null;
   observacoes?: string | null;
   created_at?: string | null;
   updated_at?: string | null;

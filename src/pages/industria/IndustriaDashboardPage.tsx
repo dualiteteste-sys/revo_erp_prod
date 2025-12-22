@@ -100,6 +100,46 @@ export default function IndustriaDashboardPage() {
     ]
   };
 
+  const benefStatusData = beneficiamentoStatus.map(s => ({
+    value: Number(s.total),
+    name: s.status.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())
+  }));
+
+  const benefStatusChartOption = {
+    title: { text: 'Beneficiamento por Status', left: 'center', textStyle: { fontSize: 14, color: '#4b5563' } },
+    tooltip: { trigger: 'item' },
+    legend: { bottom: '0%' },
+    series: [
+      {
+        name: 'Status',
+        type: 'pie',
+        radius: ['40%', '70%'],
+        center: ['50%', '45%'],
+        itemStyle: { borderRadius: 5, borderColor: '#fff', borderWidth: 2 },
+        data: benefStatusData.length > 0 ? benefStatusData : [{ value: 0, name: 'Sem dados' }]
+      }
+    ]
+  };
+
+  const benefPipelineChartOption = {
+    title: { text: 'Pipeline de Beneficiamento', left: 'center', textStyle: { fontSize: 14, color: '#4b5563' } },
+    tooltip: { trigger: 'axis' },
+    xAxis: {
+      type: 'category',
+      data: beneficiamentoStatus.map(s => s.status.replace(/_/g, ' ')),
+      axisLabel: { rotate: 20 }
+    },
+    yAxis: { type: 'value' },
+    series: [
+      {
+        data: beneficiamentoStatus.map(s => Number(s.total)),
+        type: 'bar',
+        itemStyle: { color: '#06b6d4', borderRadius: [4, 4, 0, 0] },
+        label: { show: true, position: 'top' }
+      }
+    ]
+  };
+
   // KPI Calculations (Safe)
   const concluidasProd = producaoStatus.find(s => s.status === 'concluida')?.total ?? 0;
   const emProducao = producaoStatus.find(s => s.status === 'em_producao')?.total ?? 0;
@@ -146,7 +186,21 @@ export default function IndustriaDashboardPage() {
   const benefChartOption = {
     title: { text: 'Saldo por Cliente (Beneficiamento)', left: 'center', textStyle: { fontSize: 14, color: '#4b5563' } },
     tooltip: { trigger: 'axis' },
-    xAxis: { type: 'category', data: benefSaldoPorCliente.map(i => i.cliente), axisLabel: { rotate: 20 } },
+    grid: { left: '6%', right: '4%', bottom: 50, containLabel: true },
+    xAxis: {
+      type: 'category',
+      data: benefSaldoPorCliente.map(i => i.cliente),
+      axisLabel: {
+        interval: 0,
+        rotate: 0,
+        fontSize: 11,
+        margin: 14,
+        formatter: (value: string) => {
+          const chunks = value.match(/.{1,18}/g);
+          return chunks ? chunks.join('\n') : value;
+        },
+      },
+    },
     yAxis: { type: 'value' },
     series: [
       {
@@ -296,7 +350,7 @@ export default function IndustriaDashboardPage() {
           </div>
         </div>
 
-        <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+        <div className="flex flex-col gap-4">
           <div className="overflow-x-auto border border-gray-100 rounded-xl">
             <table className="min-w-full text-sm">
               <thead className="bg-gray-50">
@@ -315,10 +369,10 @@ export default function IndustriaDashboardPage() {
               <tbody className="divide-y divide-gray-100">
                 {benefEmAndamento.map((o) => {
                   const saldo = Math.max((o.quantidade_planejada ?? 0) - (o.total_entregue ?? 0), 0);
-                  const qtdeCaixas = (o as any)?.qtde_caixas ?? '—';
-                  const nfNumero = o.documento_ref || '—';
-                  const pedidoNumero = (o as any)?.pedido_numero || '—';
-                  const dataEntrada = (o as any)?.created_at || o.data_prevista_inicio || '';
+                  const qtdeCaixas = o.qtde_caixas ?? '—';
+                  const nfNumero = o.numero_nf || o.documento_ref || '—';
+                  const pedidoNumero = o.pedido_numero || '—';
+                  const dataEntrada = o.created_at || o.data_prevista_inicio || '';
                   return (
                     <tr key={o.id} className="hover:bg-gray-50">
                       <td className="px-3 py-2 text-gray-800">{o.quantidade_planejada ?? '—'}</td>
@@ -346,8 +400,16 @@ export default function IndustriaDashboardPage() {
             </table>
           </div>
 
-          <div className="border border-gray-100 rounded-xl p-3 min-h-[320px]">
-            <ReactECharts option={benefChartOption} style={{ height: '100%', width: '100%' }} />
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            <div className="border border-gray-100 rounded-xl p-3 min-h-[320px]">
+              <ReactECharts option={benefStatusChartOption} style={{ height: 300, width: '100%' }} />
+            </div>
+            <div className="border border-gray-100 rounded-xl p-3 min-h-[320px]">
+              <ReactECharts option={benefPipelineChartOption} style={{ height: 300, width: '100%' }} />
+            </div>
+            <div className="border border-gray-100 rounded-xl p-3 min-h-[320px] lg:col-span-2">
+              <ReactECharts option={benefChartOption} style={{ height: 340, width: '100%' }} />
+            </div>
           </div>
         </div>
       </GlassCard>

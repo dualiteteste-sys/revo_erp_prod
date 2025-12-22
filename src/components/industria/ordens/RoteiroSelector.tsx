@@ -19,13 +19,15 @@ export default function RoteiroSelector({ ordemId, produtoId, tipoBom, disabled,
     const [loading, setLoading] = useState(false);
     const [searchTerm, setSearchTerm] = useState('');
     const [filterByProduct, setFilterByProduct] = useState(true);
+    const [filterByTipo, setFilterByTipo] = useState(true);
     const { addToast } = useToast();
 
     const loadRoteiros = async () => {
         setLoading(true);
         try {
-            const targetProdutoId = filterByProduct ? produtoId : undefined;
-            const data = await listRoteiros(searchTerm, targetProdutoId, tipoBom, true);
+            const targetProdutoId = filterByProduct && produtoId ? produtoId : undefined;
+            const targetTipo = filterByTipo ? tipoBom : undefined;
+            const data = await listRoteiros(searchTerm, targetProdutoId, targetTipo, true);
             setRoteiros(data);
         } catch (e) {
             logger.error('[Indústria][OP] Falha ao listar roteiros (selector)', e, { produtoId, tipoBom, searchTerm, filterByProduct });
@@ -39,7 +41,7 @@ export default function RoteiroSelector({ ordemId, produtoId, tipoBom, disabled,
         if (isOpen) {
             loadRoteiros();
         }
-    }, [isOpen, filterByProduct, searchTerm]);
+  }, [isOpen, filterByProduct, filterByTipo, searchTerm]);
 
     const handleApply = (roteiro: RoteiroListItem) => {
         // No confirmation needed inside selector, parent (ProducaoFormPanel) usually handles "Apply" logic via saving header.
@@ -81,6 +83,18 @@ export default function RoteiroSelector({ ordemId, produtoId, tipoBom, disabled,
                             />
                             <label htmlFor="filterByProductRot" className="text-sm text-gray-700">
                                 Filtrar pelo produto da ordem
+                            </label>
+                        </div>
+                        <div className="flex items-center gap-2">
+                            <input
+                                type="checkbox"
+                                id="filterByTipoRot"
+                                checked={filterByTipo}
+                                onChange={(e) => setFilterByTipo(e.target.checked)}
+                                className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                            />
+                            <label htmlFor="filterByTipoRot" className="text-sm text-gray-700">
+                                Filtrar por tipo de uso (Produção/Beneficiamento)
                             </label>
                         </div>
                     </div>
