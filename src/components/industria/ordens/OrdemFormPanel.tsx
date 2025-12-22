@@ -2,6 +2,7 @@ import React, { useRef, useState, useEffect } from 'react';
 import { ArrowLeft, ArrowRight, CheckCircle2, Loader2, Save, TriangleAlert, XCircle } from 'lucide-react';
 import { OrdemIndustriaDetails, OrdemPayload, saveOrdem, getOrdemDetails, manageComponente, manageEntrega, OrdemEntrega, gerarExecucaoOrdem, cloneOrdem } from '@/services/industria';
 import { useToast } from '@/contexts/ToastProvider';
+import { useConfirm } from '@/contexts/ConfirmProvider';
 import Section from '@/components/ui/forms/Section';
 import Input from '@/components/ui/forms/Input';
 import Select from '@/components/ui/forms/Select';
@@ -56,10 +57,13 @@ export default function OrdemFormPanel({
   onClose,
 }: Props) {
   const { addToast } = useToast();
+  const { confirm } = useConfirm();
   const navigate = useNavigate();
-  const { data: empresaRole } = useEmpresaRole();
-  const canEdit = roleAtLeast(empresaRole, 'member');
-  const canAdmin = roleAtLeast(empresaRole, 'admin');
+  const empresaRoleQuery = useEmpresaRole();
+  const empresaRole = empresaRoleQuery.data;
+  // Enquanto o role não carregou, não travar o formulário (evita "race condition" de empresa/role).
+  const canEdit = empresaRoleQuery.isFetched ? roleAtLeast(empresaRole, 'member') : true;
+  const canAdmin = empresaRoleQuery.isFetched ? roleAtLeast(empresaRole, 'admin') : false;
   const [loading, setLoading] = useState(!!ordemId);
   const [isSaving, setIsSaving] = useState(false);
   const [isGeneratingExecucao, setIsGeneratingExecucao] = useState(false);
@@ -214,9 +218,14 @@ export default function OrdemFormPanel({
       let usaMaterialCliente = !!formData.usa_material_cliente;
 
       if (formData.tipo_ordem === 'beneficiamento' && formData.cliente_id && formData.produto_final_id && !materialClienteId) {
-        const shouldCreate = window.confirm(
-          'Nenhum "Material do Cliente" foi selecionado.\n\nDeseja criar automaticamente um vínculo usando o produto interno selecionado?'
-        );
+        const shouldCreate = await confirm({
+          title: 'Criar Material do Cliente automaticamente?',
+          description:
+            'Nenhum "Material do Cliente" foi selecionado. Deseja criar automaticamente um vínculo usando o produto interno selecionado?',
+          confirmText: 'Criar automaticamente',
+          cancelText: 'Agora não',
+          variant: 'primary',
+        });
 
         if (shouldCreate) {
           materialClienteId = await ensureMaterialClienteV2(
@@ -489,7 +498,14 @@ export default function OrdemFormPanel({
 
   const handleCriarRevisao = async () => {
     if (!formData.id) return;
-    if (!window.confirm('Criar uma revisão desta ordem? Uma nova ordem em rascunho será criada para você ajustar e liberar novamente.')) return;
+    const ok = await confirm({
+      title: 'Criar revisão',
+      description: 'Criar uma revisão desta ordem? Uma nova ordem em rascunho será criada para você ajustar e liberar novamente.',
+      confirmText: 'Criar revisão',
+      cancelText: 'Cancelar',
+      variant: 'primary',
+    });
+    if (!ok) return;
     try {
       const cloned = await cloneOrdem(formData.id);
       addToast('Revisão criada.', 'success');
@@ -590,7 +606,7 @@ export default function OrdemFormPanel({
                   label="Tipo de Ordem"
                   name="tipo_ordem"
                   value={formData.tipo_ordem}
-                  onChange={e => {
+                  onChange={async (e) => {
                     const nextTipo = e.target.value as 'industrializacao' | 'beneficiamento';
                     if (nextTipo === formData.tipo_ordem) return;
 
@@ -606,9 +622,13 @@ export default function OrdemFormPanel({
                       !!formData.material_cliente_codigo;
 
                     if (hasAnyData) {
-                      const ok = window.confirm(
-                        'Trocar o tipo de ordem irá reiniciar os campos preenchidos nesta ordem.\n\nDeseja continuar?'
-                      );
+                      const ok = await confirm({
+                        title: 'Trocar tipo de ordem',
+                        description: 'Trocar o tipo de ordem irá reiniciar os campos preenchidos nesta ordem. Deseja continuar?',
+                        confirmText: 'Trocar e reiniciar',
+                        cancelText: 'Cancelar',
+                        variant: 'danger',
+                      });
                       if (!ok) return;
                     }
 

@@ -3,10 +3,11 @@ import {
     OrdemOperacao,
     getOperacoes,
     registrarEventoOperacao,
-    transferirLoteOperacao
+    transferirLoteOperacao,
+    resetOperacaoProducao
 } from '../../../services/industriaProducao';
 import { Button } from '../../ui/button';
-import { Loader2, Play, Pause, CheckCircle, ArrowRight, ClipboardList, ShieldAlert } from 'lucide-react';
+import { Loader2, Play, Pause, CheckCircle, ArrowRight, ClipboardList, ShieldAlert, MoreHorizontal, Trash2, RotateCcw } from 'lucide-react';
 import { useToast } from '../../../contexts/ToastProvider';
 import ApontamentoModal from './ApontamentoModal';
 import Modal from '../../ui/Modal';
@@ -15,18 +16,21 @@ import OperacaoQaModal from './OperacaoQaModal';
 import RegistrarInspecaoModal from './RegistrarInspecaoModal';
 import OperacaoDocsModal from './OperacaoDocsModal';
 import { logger } from '@/lib/logger';
+import { useConfirm } from '@/contexts/ConfirmProvider';
 
 interface Props {
     ordemId: string;
     highlightOperacaoId?: string | null;
     canOperate?: boolean;
     canConfigureQa?: boolean;
+    canReset?: boolean;
 }
 
-export default function OperacoesGrid({ ordemId, highlightOperacaoId, canOperate = true, canConfigureQa = true }: Props) {
+export default function OperacoesGrid({ ordemId, highlightOperacaoId, canOperate = true, canConfigureQa = true, canReset = false }: Props) {
     const [operacoes, setOperacoes] = useState<OrdemOperacao[]>([]);
     const [loading, setLoading] = useState(true);
     const { addToast } = useToast();
+    const { confirm } = useConfirm();
     const tableRef = useRef<HTMLDivElement | null>(null);
     const btnSm = "h-8 px-3 text-xs";
     const btnPrimary = "bg-blue-600 text-white hover:bg-blue-700";
@@ -45,6 +49,7 @@ export default function OperacoesGrid({ ordemId, highlightOperacaoId, canOperate
     const [inspectionOp, setInspectionOp] = useState<OrdemOperacao | null>(null);
     const [qaRefreshToken, setQaRefreshToken] = useState(0);
     const [docsOp, setDocsOp] = useState<OrdemOperacao | null>(null);
+    const [menuOpId, setMenuOpId] = useState<string | null>(null);
 
     const loadData = async () => {
         setLoading(true);
@@ -88,7 +93,14 @@ export default function OperacoesGrid({ ordemId, highlightOperacaoId, canOperate
             return;
         }
         if (evento === 'concluir') {
-            if (!confirm(`Confirma a conclusão da etapa ${op.sequencia}?`)) return;
+            const ok = await confirm({
+                title: 'Concluir etapa',
+                description: `Confirma a conclusão da etapa ${op.sequencia}?`,
+                confirmText: 'Concluir',
+                cancelText: 'Cancelar',
+                variant: 'primary',
+            });
+            if (!ok) return;
         }
 
         try {
@@ -196,6 +208,7 @@ export default function OperacoesGrid({ ordemId, highlightOperacaoId, canOperate
                             <th className="px-3 py-2 text-right text-xs font-medium text-gray-500 uppercase">A transferir</th>
                             <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">QA</th>
                             <th className="px-3 py-2 text-center text-xs font-medium text-gray-500 uppercase">Ações</th>
+                            {canReset && <th className="px-3 py-2 text-center text-xs font-medium text-gray-500 uppercase">⋯</th>}
                         </tr>
                     </thead>
                     <tbody className="bg-white divide-y divide-gray-200">
@@ -340,6 +353,73 @@ export default function OperacoesGrid({ ordemId, highlightOperacaoId, canOperate
                                             )}
                                         </div>
                                     </td>
+                                    {canReset && (
+                                      <td className="px-3 py-2 text-sm text-center relative">
+                                        <div className="inline-flex relative">
+                                          <Button
+                                            size="sm"
+                                            variant="outline"
+                                            className={`${btnSm} ${btnSecondary}`}
+                                            onClick={() => setMenuOpId(menuOpId === op.id ? null : op.id)}
+                                            title="Opções"
+                                          >
+                                            <MoreHorizontal className="w-4 h-4" />
+                                          </Button>
+                                          {menuOpId === op.id && (
+                                            <div className="absolute right-0 top-9 z-20 w-64 rounded-md border border-gray-200 bg-white shadow-lg">
+                                              <div className="py-1 text-sm text-gray-800">
+                                                <button
+                                                  className="w-full flex items-center gap-2 px-3 py-2 text-left hover:bg-gray-100"
+                                                  onClick={async () => {
+                                                    setMenuOpId(null);
+                                                    const ok = await confirm({
+                                                      title: 'Excluir Operação',
+                                                      description: 'Remove esta operação (sem apontamentos). Use quando foi gerada por engano.',
+                                                      confirmText: 'Excluir',
+                                                      cancelText: 'Cancelar',
+                                                      variant: 'warning',
+                                                    });
+                                                    if (!ok) return;
+                                                    try {
+                                                      await resetOperacaoProducao(op.id, false);
+                                                      addToast('Operação excluída.', 'success');
+                                                      loadData();
+                                                    } catch (e: any) {
+                                                      addToast(String(e?.message || 'Erro ao excluir operação.'), 'error');
+                                                    }
+                                                  }}
+                                                >
+                                                  <RotateCcw className="w-4 h-4 text-amber-600" /> Excluir Operação
+                                                </button>
+                                                <button
+                                                  className="w-full flex items-center gap-2 px-3 py-2 text-left hover:bg-gray-100 text-red-700"
+                                                  onClick={async () => {
+                                                    setMenuOpId(null);
+                                                    const ok = await confirm({
+                                                      title: 'Forçar reset (remove apontamentos)',
+                                                      description: 'Remove apontamentos/QA desta operação e apaga a operação. Use apenas se foi gerada por engano.',
+                                                      confirmText: 'Remover e resetar',
+                                                      cancelText: 'Cancelar',
+                                                      variant: 'danger',
+                                                    });
+                                                    if (!ok) return;
+                                                    try {
+                                                      await resetOperacaoProducao(op.id, true);
+                                                      addToast('Operação e apontamentos removidos.', 'success');
+                                                      loadData();
+                                                    } catch (e: any) {
+                                                      addToast(String(e?.message || 'Erro ao forçar reset.'), 'error');
+                                                    }
+                                                  }}
+                                                >
+                                                  <Trash2 className="w-4 h-4" /> Remover apontamentos e resetar
+                                                </button>
+                                              </div>
+                                            </div>
+                                          )}
+                                        </div>
+                                      </td>
+                                    )}
                                 </tr>
                             );
                         })}

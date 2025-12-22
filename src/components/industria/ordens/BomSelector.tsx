@@ -4,6 +4,7 @@ import { Loader2, FileCog } from 'lucide-react';
 import { useToast } from '@/contexts/ToastProvider';
 import Modal from '@/components/ui/Modal';
 import { logger } from '@/lib/logger';
+import { useConfirm } from '@/contexts/ConfirmProvider';
 
 interface Props {
   ordemId: string;
@@ -22,6 +23,7 @@ export default function BomSelector({ ordemId, produtoId, tipoOrdem, openOnMount
   const [searchTerm, setSearchTerm] = useState('');
   const [filterByProduct, setFilterByProduct] = useState(true);
   const { addToast } = useToast();
+  const { confirm } = useConfirm();
 
   useEffect(() => {
     if (!openOnMount) return;
@@ -53,7 +55,17 @@ export default function BomSelector({ ordemId, produtoId, tipoOrdem, openOnMount
   }, [isOpen, filterByProduct, searchTerm]); // Recarrega ao mudar filtros
 
   const handleApply = async (bomId: string, mode: 'substituir' | 'adicionar') => {
-    if (!confirm(`Tem certeza que deseja aplicar esta BOM? ${mode === 'substituir' ? 'Isso substituirá os componentes atuais.' : ''}`)) return;
+    const ok = await confirm({
+      title: 'Aplicar BOM',
+      description:
+        mode === 'substituir'
+          ? 'Tem certeza que deseja aplicar esta BOM? Isso substituirá os componentes atuais.'
+          : 'Tem certeza que deseja aplicar esta BOM? Os componentes atuais serão mantidos.',
+      confirmText: 'Aplicar',
+      cancelText: 'Cancelar',
+      variant: 'primary',
+    });
+    if (!ok) return;
 
     const selectedBom = boms.find(b => b.id === bomId);
     if (!selectedBom) return;

@@ -2,6 +2,7 @@
 import React from "react";
 import { RefreshCw } from "lucide-react";
 import { resendInvite } from "@/services/users";
+import { useToast } from "@/contexts/ToastProvider";
 
 type Props = {
   userId?: string | null;
@@ -11,6 +12,7 @@ type Props = {
 
 export default function ResendInviteButton({ userId, email, className }: Props) {
   const [loading, setLoading] = React.useState(false);
+  const { addToast } = useToast();
 
   const onClick = async () => {
     if (loading) return;
@@ -22,7 +24,7 @@ export default function ResendInviteButton({ userId, email, className }: Props) 
         null;
 
       if (!payload) {
-        alert("Não foi possível identificar o destinatário do convite.");
+        addToast("Não foi possível identificar o destinatário do convite.", "error");
         return;
       }
 
@@ -36,18 +38,18 @@ export default function ResendInviteButton({ userId, email, className }: Props) 
       if (action === "generated_link" && link) {
         try {
           await navigator.clipboard.writeText(link);
-          alert("Convite reenviado via link. A URL foi copiada para sua área de transferência.");
+          addToast("Convite reenviado via link. A URL foi copiada para sua área de transferência.", "success");
         } catch {
-          alert(`Convite reenviado via link.\nCopie e envie ao usuário:\n\n${link}`);
+          addToast(`Convite reenviado via link. Copie e envie ao usuário: ${link}`, "info");
         }
       } else if (action === "invited") {
-        alert("Convite reenviado por e-mail com sucesso.");
+        addToast("Convite reenviado por e-mail com sucesso.", "success");
       } else {
-        alert("A solicitação foi processada.");
+        addToast("A solicitação foi processada.", "success");
       }
     } catch (err: any) {
       console.error("[RESEND] exception", err);
-      alert(err?.message || "Falha ao reenviar convite.");
+      addToast(err?.message || "Falha ao reenviar convite.", "error");
     } finally {
       setLoading(false);
     }

@@ -19,8 +19,10 @@ import { roleAtLeast, useEmpresaRole } from '@/hooks/useEmpresaRole';
 
 export default function OrdensPage() {
   const { addToast } = useToast();
-  const { data: empresaRole } = useEmpresaRole();
+  const empresaRoleQuery = useEmpresaRole();
+  const empresaRole = empresaRoleQuery.data;
   const canCreate = roleAtLeast(empresaRole, 'member');
+  const canCreateEffective = empresaRoleQuery.isFetched ? canCreate : true;
   const [viewMode, setViewMode] = useState<'list' | 'kanban'>('list');
   const [orders, setOrders] = useState<OrdemIndustria[]>([]);
   const [loading, setLoading] = useState(true);
@@ -70,16 +72,9 @@ export default function OrdensPage() {
   // Deep-link: /app/industria/ordens?tipo=beneficiamento&new=1
   useEffect(() => {
     if (searchParams.get('new') !== '1') return;
-    if (!canCreate) {
-      addToast('Você não tem permissão para criar novas ordens.', 'error');
-      const next = new URLSearchParams(searchParams);
-      next.delete('new');
-      navigate(
-        { pathname: location.pathname, search: next.toString() ? `?${next.toString()}` : '' },
-        { replace: true, state: null }
-      );
-      return;
-    }
+
+    // Abre o modal imediatamente; se o role ainda não carregou, validamos assim que resolver.
+    // Isso evita que o deep-link falhe por "race condition" do carregamento de empresa/role.
     const statePrefill =
       tipoOrdem === 'beneficiamento'
         ? ((location.state as any)?.prefill as React.ComponentProps<typeof OrdemFormPanel>['initialPrefill'] | undefined)
@@ -94,7 +89,17 @@ export default function OrdensPage() {
       { pathname: location.pathname, search: next.toString() ? `?${next.toString()}` : '' },
       { replace: true, state: null }
     );
-  }, [searchParams, location.pathname, location.state, navigate, canCreate]);
+  }, [searchParams, location.pathname, location.state, navigate, tipoOrdem]);
+
+  // Se o usuário não tem permissão para criar, bloqueia a criação assim que o role estiver disponível.
+  useEffect(() => {
+    if (!isFormOpen) return;
+    if (selectedId) return; // edição/visualização
+    if (!empresaRoleQuery.isFetched) return;
+    if (canCreate) return;
+    addToast('Você não tem permissão para criar novas ordens.', 'error');
+    handleClose();
+  }, [isFormOpen, selectedId, empresaRoleQuery.isFetched, canCreate, addToast]);
 
   const fetchOrders = async () => {
     if (viewMode === 'kanban') return; // Kanban fetches its own data
@@ -150,7 +155,7 @@ export default function OrdensPage() {
   }, [debouncedSearch, statusFilter, viewMode, tipoOrdem]);
 
   const handleNew = () => {
-    if (!canCreate) {
+    if (empresaRoleQuery.isFetched && !canCreate) {
       addToast('Você não tem permissão para criar novas ordens.', 'error');
       return;
     }
@@ -166,7 +171,7 @@ export default function OrdensPage() {
   };
 
   const handleClone = async (order: OrdemIndustria) => {
-    if (!canCreate) {
+    if (empresaRoleQuery.isFetched && !canCreate) {
       addToast('Você não tem permissão para criar novas ordens.', 'error');
       return;
     }
@@ -238,8 +243,14 @@ export default function OrdensPage() {
             </div>
             <button
             onClick={handleNew}
-            disabled={!canCreate}
-            title={!canCreate ? 'Sem permissão para criar novas ordens' : undefined}
+            disabled={!canCreateEffective}
+            title={
+              !empresaRoleQuery.isFetched
+                ? 'Carregando permissões...'
+                : !canCreate
+                  ? 'Sem permissão para criar novas ordens'
+                  : undefined
+            }
             className="flex items-center gap-2 bg-blue-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
             <PlusCircle size={20} />
@@ -296,7 +307,7 @@ export default function OrdensPage() {
                     <Loader2 className="animate-spin text-blue-600 w-10 h-10" />
                 </div>
                 ) : (
-                <OrdensTable orders={orders} onEdit={handleEdit} onClone={handleClone} />
+                <OrdensTable orders={orders} onEdit={handleEdit} onClone={handleClone} onChanged={handleSuccess} />
                 )}
             </div>
         ) : (
@@ -304,6 +315,7 @@ export default function OrdensPage() {
               <ProducaoKanbanBoard
                 search={debouncedSearch}
                 statusFilter={statusFilter}
+                refreshToken={kanbanRefresh}
                 onOpenOrder={(order: any) => handleOpenFromKanban({ ...(order as any), tipo_ordem: 'industrializacao' })}
                 onCloneOrder={(order: any) => handleClone({ ...(order as any), tipo_ordem: 'industrializacao' })}
               />

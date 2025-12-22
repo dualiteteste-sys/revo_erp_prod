@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Loader2, Save, CheckCircle, Trash2, AlertTriangle } from 'lucide-react';
 import { VendaDetails, VendaPayload, saveVenda, manageVendaItem, getVendaDetails, aprovarVenda } from '@/services/vendas';
 import { useToast } from '@/contexts/ToastProvider';
+import { useConfirm } from '@/contexts/ConfirmProvider';
 import Section from '@/components/ui/forms/Section';
 import Input from '@/components/ui/forms/Input';
 import Select from '@/components/ui/forms/Select';
@@ -18,6 +19,7 @@ interface Props {
 
 export default function PedidoVendaFormPanel({ vendaId, onSaveSuccess, onClose }: Props) {
   const { addToast } = useToast();
+  const { confirm } = useConfirm();
   const [loading, setLoading] = useState(!!vendaId);
   const [isSaving, setIsSaving] = useState(false);
   const [formData, setFormData] = useState<Partial<VendaDetails>>({
@@ -149,7 +151,14 @@ export default function PedidoVendaFormPanel({ vendaId, onSaveSuccess, onClose }
   };
 
   const handleAprovar = async () => {
-    if (!confirm('Confirmar aprovação do pedido?')) return;
+    const ok = await confirm({
+      title: 'Aprovar pedido',
+      description: 'Confirmar aprovação do pedido?',
+      confirmText: 'Aprovar',
+      cancelText: 'Cancelar',
+      variant: 'primary',
+    });
+    if (!ok) return;
     setIsSaving(true);
     try {
       await aprovarVenda(formData.id!);

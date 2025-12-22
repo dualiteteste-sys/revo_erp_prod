@@ -34,6 +34,7 @@ import {
 import { getCentroApsConfig, upsertCentroApsConfig } from '@/services/industriaCentros';
 import { differenceInCalendarDays, format } from 'date-fns';
 import Modal from '@/components/ui/Modal';
+import { useConfirm } from '@/contexts/ConfirmProvider';
 
 const fmtInput = (date: Date) => date.toISOString().slice(0, 10);
 
@@ -78,6 +79,7 @@ type CapacitySuggestion = {
 export default function PcpDashboardPage() {
   const navigate = useNavigate();
   const { addToast } = useToast();
+  const { confirm } = useConfirm();
   const ganttSectionRef = useRef<HTMLDivElement | null>(null);
   const [carga, setCarga] = useState<PcpCargaCapacidade[]>([]);
   const [gantt, setGantt] = useState<PcpGanttOperacao[]>([]);
@@ -254,7 +256,14 @@ export default function PcpDashboardPage() {
   const handleSaveManualSeq = useCallback(async () => {
     if (!apsModal.ctId) return;
     if (manualSeqRows.length === 0) return;
-    if (!confirm('Salvar ordem manual deste CT? Isso vai atualizar o campo sequencia das operações (Undo disponível em Runs).')) return;
+    const ok = await confirm({
+      title: 'Salvar ordem manual',
+      description: 'Salvar ordem manual deste CT? Isso vai atualizar o campo sequência das operações (Undo disponível em Runs).',
+      confirmText: 'Salvar',
+      cancelText: 'Cancelar',
+      variant: 'primary',
+    });
+    if (!ok) return;
     setManualSeqSaving(true);
     try {
       const result = await pcpApsResequenciarCentro(apsModal.ctId, manualSeqRows.map((r) => r.operacao_id));
@@ -268,7 +277,7 @@ export default function PcpDashboardPage() {
     } finally {
       setManualSeqSaving(false);
     }
-  }, [addToast, apsModal.ctId, loadApsRuns, loadData, manualSeqRows]);
+  }, [addToast, apsModal.ctId, confirm, loadApsRuns, loadData, manualSeqRows]);
 
   const runBatchSequencing = useCallback(async (apply: boolean) => {
     setBatchSequencing(true);
@@ -307,7 +316,14 @@ export default function PcpDashboardPage() {
   }, []);
 
   const undoBatchRun = useCallback(async (runId: string) => {
-    if (!confirm(`Desfazer o run ${runId.slice(0, 8)}?`)) return;
+    const ok = await confirm({
+      title: 'Desfazer run',
+      description: `Desfazer o run ${runId.slice(0, 8)}?`,
+      confirmText: 'Desfazer',
+      cancelText: 'Cancelar',
+      variant: 'danger',
+    });
+    if (!ok) return;
     setBatchSequencing(true);
     try {
       const res = await pcpApsUndo(runId);
@@ -318,7 +334,7 @@ export default function PcpDashboardPage() {
     } finally {
       setBatchSequencing(false);
     }
-  }, [addToast, loadData]);
+  }, [addToast, confirm, loadData]);
 
   const fetchPreview = useCallback(async (silent = false) => {
     if (!apsModal.ctId) return;
@@ -357,7 +373,14 @@ export default function PcpDashboardPage() {
       addToast('Gere o Preview antes de aplicar o APS.', 'warning');
       return;
     }
-    if (!confirm('Aplicar sequenciamento automático (capacidade finita)? Isso vai atualizar as datas previstas das operações elegíveis.')) return;
+    const ok = await confirm({
+      title: 'Aplicar APS',
+      description: 'Aplicar sequenciamento automático (capacidade finita)? Isso vai atualizar as datas previstas das operações elegíveis.',
+      confirmText: 'Aplicar',
+      cancelText: 'Cancelar',
+      variant: 'primary',
+    });
+    if (!ok) return;
     setSequencingCtId(apsModal.ctId);
     try {
       const result = await pcpApsSequenciarCentro({
@@ -379,14 +402,23 @@ export default function PcpDashboardPage() {
     } finally {
       setSequencingCtId(null);
     }
-  }, [addToast, apsModal.ctId, apsPreview, endDate, loadApsRuns, openGanttForCt, startDate]);
+  }, [addToast, apsModal.ctId, apsPreview, confirm, endDate, loadApsRuns, openGanttForCt, startDate]);
 
   const handleToggleLockOperacao = useCallback(async (operacaoId: string, locked: boolean, currentReason?: string | null) => {
     const nextLocked = !locked;
     const promptResult = nextLocked ? prompt('Motivo do bloqueio (opcional):', currentReason || '') : null;
     if (nextLocked && promptResult === null) return;
     const reason = nextLocked ? (promptResult || '').trim() : null;
-    if (!nextLocked && !confirm('Desbloquear esta operação para o APS?')) return;
+    if (!nextLocked) {
+      const ok = await confirm({
+        title: 'Desbloquear operação',
+        description: 'Desbloquear esta operação para o APS?',
+        confirmText: 'Desbloquear',
+        cancelText: 'Cancelar',
+        variant: 'primary',
+      });
+      if (!ok) return;
+    }
 
     setApsLoading(true);
     try {
@@ -405,13 +437,20 @@ export default function PcpDashboardPage() {
     } finally {
       setApsLoading(false);
     }
-  }, [addToast, apsModal.ctId, apsSelectedRunId, fetchPreview]);
+  }, [addToast, apsModal.ctId, apsSelectedRunId, confirm, fetchPreview]);
 
   const handleUndoLast = useCallback(async () => {
     if (!apsModal.ctId) return;
     const last = apsRuns?.find((r) => r.kind === 'sequencing') || apsRuns?.[0];
     if (!last?.id) return;
-    if (!confirm('Desfazer o último sequenciamento aplicado?')) return;
+    const ok = await confirm({
+      title: 'Desfazer último APS',
+      description: 'Desfazer o último sequenciamento aplicado?',
+      confirmText: 'Desfazer',
+      cancelText: 'Cancelar',
+      variant: 'danger',
+    });
+    if (!ok) return;
     setApsLoading(true);
     try {
       const result = await pcpApsUndo(last.id);
@@ -423,7 +462,7 @@ export default function PcpDashboardPage() {
     } finally {
       setApsLoading(false);
     }
-  }, [addToast, apsModal.ctId, apsRuns, loadApsRuns]);
+  }, [addToast, apsModal.ctId, apsRuns, confirm, loadApsRuns, loadData]);
 
   useEffect(() => {
     if (!apsModal.open) return;
@@ -691,7 +730,14 @@ export default function PcpDashboardPage() {
       return;
     }
 
-    if (!confirm(`Aplicar replanejamento para ${selectedIds.length} operação(ões) selecionada(s) de ${ctNome}?`)) return;
+    const ok = await confirm({
+      title: 'Aplicar replanejamento',
+      description: `Aplicar replanejamento para ${selectedIds.length} operação(ões) selecionada(s) de ${ctNome}?`,
+      confirmText: 'Aplicar',
+      cancelText: 'Cancelar',
+      variant: 'primary',
+    });
+    if (!ok) return;
 
     setReplanApplyingSubsetCtId(ctId);
     try {
@@ -712,7 +758,7 @@ export default function PcpDashboardPage() {
     } finally {
       setReplanApplyingSubsetCtId(null);
     }
-  }, [addToast, endDate, loadData, replanPreview, replanPreviewDetails.ctId, replanPreviewDetails.ctNome, replanPreviewDetails.peakDay, replanPreviewSelectedOps]);
+  }, [addToast, confirm, endDate, loadData, replanPreview, replanPreviewDetails.ctId, replanPreviewDetails.ctNome, replanPreviewDetails.peakDay, replanPreviewSelectedOps]);
 
   const weeklySeries = useMemo(() => {
     const dailyMap = new Map<string, { label: string; carga: number; capacidade: number }>();
@@ -1025,8 +1071,17 @@ export default function PcpDashboardPage() {
             <button
               type="button"
               onClick={() => {
-                if (!confirm('Aplicar APS em lote? Isso vai atualizar datas previstas e gerar runs.')) return;
-                runBatchSequencing(true);
+                (async () => {
+                  const ok = await confirm({
+                    title: 'Aplicar APS em lote',
+                    description: 'Aplicar APS em lote? Isso vai atualizar datas previstas e gerar runs.',
+                    confirmText: 'Aplicar',
+                    cancelText: 'Cancelar',
+                    variant: 'primary',
+                  });
+                  if (!ok) return;
+                  runBatchSequencing(true);
+                })();
               }}
               disabled={batchSequencing || !batchPreviewed}
               className="px-4 py-2 rounded-lg bg-indigo-600 text-white hover:bg-indigo-500 text-sm font-semibold disabled:opacity-50"

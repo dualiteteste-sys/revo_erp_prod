@@ -1,4 +1,4 @@
-import { test, expect, type Page } from '@playwright/test';
+import { test, expect, type Page } from './fixtures';
 
 async function mockAuthAndEmpresa(page: Page) {
   // Auth: login
@@ -43,9 +43,20 @@ async function mockAuthAndEmpresa(page: Page) {
 
   // Empresas do usuário
   await page.route('**/rest/v1/empresa_usuarios*', async (route) => {
+    const url = new URL(route.request().url());
+    const select = url.searchParams.get('select') || '';
+
+    // useEmpresaRole() faz `.select('role')...maybeSingle()` e espera OBJETO.
+    if (select === 'role' || select.includes('role')) {
+      await route.fulfill({ json: { role: 'member' } });
+      return;
+    }
+
+    // useEmpresas() lista empresas do usuário e espera ARRAY.
     await route.fulfill({
       json: [
         {
+          role: 'member',
           empresa: {
             id: 'empresa-1',
             nome_razao_social: 'Empresa Teste E2E',
@@ -427,11 +438,13 @@ test('Beneficiamento: criar OB e gerar operações na Execução', async ({ page
   const bomHeading = page.getByRole('heading', { name: 'Selecionar Ficha Técnica (BOM)' });
   await expect(bomHeading).toBeVisible();
   await page.getByRole('button', { name: 'Substituir' }).click();
+  await page.getByRole('button', { name: 'Aplicar', exact: true }).click();
   await expect(bomHeading).toBeHidden();
   await expect(page.getByText('Parafuso bruto (cliente)')).toBeVisible();
 
   // 3) Gerar operações e ir para Execução
   await page.getByRole('button', { name: 'Gerar operações' }).click();
+  await page.getByRole('button', { name: 'Gerar e abrir Execução' }).click();
   await expect(page).toHaveURL(/\/app\/industria\/execucao/);
 
   // 4) Validar que operações aparecem (tipo + produto + cliente)

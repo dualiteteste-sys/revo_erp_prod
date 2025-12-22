@@ -29,23 +29,32 @@ export function useEmpresaRole() {
     queryFn: async (): Promise<EmpresaRole | null> => {
       if (!activeEmpresaId || !userId) return null;
 
-      const { data, error } = await supabase
+      // Fonte preferencial: vínculo + join em roles (legado), evita depender do schema cache de RPC.
+      const { data: row, error: rowError } = await supabase
         .from('empresa_usuarios')
-        .select('role')
+        .select('role, roles:roles(slug)')
         .eq('empresa_id', activeEmpresaId)
         .eq('user_id', userId)
         .maybeSingle();
 
-      if (error) {
-        logger.warn('[RBAC] Falha ao carregar role da empresa', error, { activeEmpresaId, userId });
+      if (rowError) {
+        logger.warn('[RBAC] Falha ao carregar role da empresa', rowError, { activeEmpresaId, userId });
         return null;
       }
 
-      const role = (data as any)?.role as string | null | undefined;
-      const normalized = (role || '').toLowerCase() as EmpresaRole;
-      if (!normalized || !(normalized in precedence)) return null;
-      return normalized;
+      const roleText = (row as any)?.role as string | null | undefined;
+      const roleSlug = (row as any)?.roles?.slug as string | null | undefined;
+
+      const normalizedText = (roleText || '').toLowerCase() as EmpresaRole;
+      const normalizedSlug = (roleSlug || '').toLowerCase() as EmpresaRole;
+
+      const fromText = normalizedText in precedence ? normalizedText : null;
+      const fromSlug = normalizedSlug in precedence ? normalizedSlug : null;
+
+      if (!fromText && !fromSlug) return null;
+      if (!fromText) return fromSlug;
+      if (!fromSlug) return fromText;
+      return precedence[fromSlug] > precedence[fromText] ? fromSlug : fromText;
     },
   });
 }
-

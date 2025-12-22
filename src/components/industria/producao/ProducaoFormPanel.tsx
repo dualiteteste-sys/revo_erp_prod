@@ -11,9 +11,11 @@ import {
   registrarEntrega,
   deleteOrdemProducao,
   cloneOrdemProducao,
-  fecharOrdemProducao
+  fecharOrdemProducao,
+  resetOrdemProducao
 } from '@/services/industriaProducao';
 import { useToast } from '@/contexts/ToastProvider';
+import { useConfirm } from '@/contexts/ConfirmProvider';
 import Section from '@/components/ui/forms/Section';
 import Input from '@/components/ui/forms/Input';
 import Select from '@/components/ui/forms/Select';
@@ -49,9 +51,12 @@ export default function ProducaoFormPanel({
   onOpenOrder,
 }: Props) {
   const { addToast } = useToast();
-  const { data: empresaRole } = useEmpresaRole();
-  const canEdit = roleAtLeast(empresaRole, 'member');
-  const canAdmin = roleAtLeast(empresaRole, 'admin');
+  const { confirm } = useConfirm();
+  const empresaRoleQuery = useEmpresaRole();
+  const empresaRole = empresaRoleQuery.data;
+  // Enquanto o role não carregou, não travar o formulário (evita "race condition" de empresa/role).
+  const canEdit = empresaRoleQuery.isFetched ? roleAtLeast(empresaRole, 'member') : true;
+  const canAdmin = empresaRoleQuery.isFetched ? roleAtLeast(empresaRole, 'admin') : false;
   const canOperate = canEdit;
   const canConfigureQa = canAdmin;
   const [loading, setLoading] = useState(!!ordemId);
@@ -66,6 +71,7 @@ export default function ProducaoFormPanel({
   const [entregaBloqueada, setEntregaBloqueada] = useState<{ blocked: boolean; reason?: string } | null>(null);
   const [wizardStep, setWizardStep] = useState<0 | 1 | 2>(0);
   const [showLiberarModal, setShowLiberarModal] = useState(false);
+  const [isResetting, setIsResetting] = useState(false);
 
   const [formData, setFormData] = useState<Partial<OrdemProducaoDetails>>({
     status: 'rascunho',
@@ -101,6 +107,11 @@ export default function ProducaoFormPanel({
 
     try {
       const data = await getOrdemProducaoDetails(idToLoad);
+      if (!data) {
+        addToast('Ordem não encontrada (talvez tenha sido excluída).', 'error');
+        if (ordemId) onClose();
+        return;
+      }
       setFormData(data);
       const bloqueio = checkEntregaBlocked(data);
       setEntregaBloqueada(bloqueio);
@@ -321,7 +332,14 @@ export default function ProducaoFormPanel({
 
   const handleCriarRevisao = async () => {
     if (!formData.id) return;
-    if (!window.confirm('Criar uma revisão desta OP? Uma nova OP em rascunho será criada para você ajustar e liberar novamente.')) return;
+    const ok = await confirm({
+      title: 'Criar revisão',
+      description: 'Criar uma revisão desta OP? Uma nova OP em rascunho será criada para você ajustar e liberar novamente.',
+      confirmText: 'Criar revisão',
+      cancelText: 'Cancelar',
+      variant: 'primary',
+    });
+    if (!ok) return;
     setIsSaving(true);
     try {
       const cloned = await cloneOrdemProducao(formData.id);
@@ -479,7 +497,7 @@ export default function ProducaoFormPanel({
                   name="tipo_ordem"
                   value="industrializacao"
                   disabled={!!formData.id || !allowTipoOrdemChange}
-                  onChange={(e) => {
+                  onChange={async (e) => {
                     const nextTipo = e.target.value as 'industrializacao' | 'beneficiamento';
                     if (nextTipo === 'industrializacao') return;
                     if (!!formData.id || !allowTipoOrdemChange) return;
@@ -491,9 +509,13 @@ export default function ProducaoFormPanel({
                       !!formData.observacoes;
 
                     if (hasAnyData) {
-                      const ok = window.confirm(
-                        'Trocar o tipo de ordem irá reiniciar os campos preenchidos nesta ordem.\n\nDeseja continuar?'
-                      );
+                      const ok = await confirm({
+                        title: 'Trocar tipo de ordem',
+                        description: 'Trocar o tipo de ordem irá reiniciar os campos preenchidos nesta ordem. Deseja continuar?',
+                        confirmText: 'Trocar e reiniciar',
+                        cancelText: 'Cancelar',
+                        variant: 'danger',
+                      });
                       if (!ok) return;
                     }
 
@@ -686,6 +708,7 @@ export default function ProducaoFormPanel({
               highlightOperacaoId={highlightOperacaoId}
               canOperate={canOperate && !isLockedEffective}
               canConfigureQa={canConfigureQa && !isLockedEffective}
+              canReset={canAdmin && !isLockedEffective}
             />
           )
         }
@@ -770,18 +793,52 @@ export default function ProducaoFormPanel({
         {formData.id && !isLockedEffective && canAdmin && formData.status === 'rascunho' ? (
           <button
             onClick={async () => {
-              if (confirm('Tem certeza que deseja excluir esta Ordem de Produção? Esta ação não pode ser desfeita.')) {
-                setIsSaving(true);
-                try {
-                  await deleteOrdemProducao(formData.id!);
-                  addToast('Ordem excluída com sucesso!', 'success');
-                  onClose();
-                  if (onSaveSuccess) onSaveSuccess();
-                } catch (e: any) {
-                  addToast('Erro ao excluir ordem: ' + e.message, 'error');
-                } finally {
-                  setIsSaving(false);
+              const ok = await confirm({
+                title: 'Excluir OP',
+                description: 'Tem certeza que deseja excluir esta Ordem de Produção? Esta ação não pode ser desfeita.',
+                confirmText: 'Excluir',
+                cancelText: 'Cancelar',
+                variant: 'danger',
+              });
+              if (!ok) return;
+
+              setIsSaving(true);
+              try {
+                await deleteOrdemProducao(formData.id!);
+                const stillThere = await getOrdemProducaoDetails(formData.id!);
+                if (stillThere) {
+                  throw new Error(
+                    'O sistema confirmou a exclusão, mas a ordem ainda existe. Verifique permissões/empresa ativa e tente novamente.'
+                  );
                 }
+                addToast('Ordem excluída com sucesso!', 'success');
+                onClose();
+                if (onSaveSuccess) onSaveSuccess();
+              } catch (e: any) {
+                const raw = String(e?.message || '');
+                const msg = raw.toLowerCase();
+
+                if (msg.includes('sem permissão') || msg.includes('permission denied') || msg.includes('42501')) {
+                  addToast(
+                    'Sem permissão para excluir esta OP. Confirme se você está como admin/owner na empresa ativa.',
+                    'error'
+                  );
+                } else if (msg.includes('somente ordens em rascunho')) {
+                  addToast('Só é possível excluir OP em rascunho. Para ordens já liberadas, cancele a OP.', 'error');
+                } else if (msg.includes('já possui operações')) {
+                  addToast('Não é possível excluir: a OP já possui operações geradas.', 'error');
+                } else if (msg.includes('já possui entregas')) {
+                  addToast('Não é possível excluir: a OP já possui entregas registradas.', 'error');
+                } else if (msg.includes('violates foreign key constraint') || msg.includes('violates')) {
+                  addToast(
+                    'Não foi possível excluir porque existem registros vinculados (ex.: inspeções/qualidade).',
+                    'error'
+                  );
+                } else {
+                  addToast('Erro ao excluir ordem: ' + raw, 'error');
+                }
+              } finally {
+                setIsSaving(false);
               }
             }}
             disabled={isSaving}
@@ -792,6 +849,41 @@ export default function ProducaoFormPanel({
         ) : <div></div>}
 
         <div className="flex space-x-2">
+          {formData.id && canAdmin && ['rascunho', 'planejada', 'em_programacao'].includes(formData.status as string) && (
+            <button
+              type="button"
+              onClick={async () => {
+                const ok = await confirm({
+                  title: 'Reverter OP (remover operações)',
+                  description:
+                    'Use apenas se as operações foram geradas por engano. Remove operações/reservas e retorna a OP para Rascunho. Não pode haver entregas ou apontamentos.',
+                  confirmText: 'Reverter',
+                  cancelText: 'Cancelar',
+                  variant: 'warning',
+                });
+                if (!ok || !formData.id) return;
+
+                setIsResetting(true);
+                try {
+                  await resetOrdemProducao(formData.id);
+                  await loadDetails(formData.id);
+                  addToast('OP revertida: operações removidas e status em rascunho.', 'success');
+                  if (onSaveSuccess) onSaveSuccess();
+                  setActiveTab('dados');
+                } catch (e: any) {
+                  const msg = String(e?.message || '');
+                  addToast('Erro ao reverter OP: ' + msg, 'error');
+                } finally {
+                  setIsResetting(false);
+                }
+              }}
+              disabled={isSaving || isResetting}
+              className="inline-flex items-center px-4 py-2 border border-amber-300 rounded-md shadow-sm text-sm font-medium text-amber-900 bg-amber-50 hover:bg-amber-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-amber-500 disabled:opacity-50"
+            >
+              Reverter OP
+            </button>
+          )}
+
           <button
             onClick={onClose}
             disabled={isSaving}

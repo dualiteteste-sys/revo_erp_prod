@@ -16,11 +16,12 @@ const COLUMNS: { id: StatusProducao; title: string }[] = [
 type Props = {
   search?: string;
   statusFilter?: string;
+  refreshToken?: number;
   onOpenOrder?: (order: OrdemProducao) => void;
   onCloneOrder?: (order: OrdemProducao) => void;
 };
 
-const ProducaoKanbanBoard: React.FC<Props> = ({ search, statusFilter, onOpenOrder, onCloneOrder }) => {
+const ProducaoKanbanBoard: React.FC<Props> = ({ search, statusFilter, refreshToken, onOpenOrder, onCloneOrder }) => {
   const [items, setItems] = useState<OrdemProducao[]>([]);
   const [loading, setLoading] = useState(true);
   const { addToast } = useToast();
@@ -40,7 +41,7 @@ const ProducaoKanbanBoard: React.FC<Props> = ({ search, statusFilter, onOpenOrde
   useEffect(() => {
     fetchData();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [search, statusFilter]);
+  }, [search, statusFilter, refreshToken]);
 
   const onDragEnd = async (result: DropResult) => {
     const { source, destination, draggableId } = result;

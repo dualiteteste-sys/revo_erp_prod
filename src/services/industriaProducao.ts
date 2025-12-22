@@ -56,8 +56,8 @@ export async function listOrdensProducao(search?: string, status?: string): Prom
   });
 }
 
-export async function getOrdemProducaoDetails(id: string): Promise<OrdemProducaoDetails> {
-  return callRpc<OrdemProducaoDetails>('industria_producao_get_ordem_details', { p_id: id });
+export async function getOrdemProducaoDetails(id: string): Promise<OrdemProducaoDetails | null> {
+  return callRpc<OrdemProducaoDetails | null>('industria_producao_get_ordem_details', { p_id: id });
 }
 
 export async function saveOrdemProducao(payload: OrdemProducaoPayload): Promise<OrdemProducaoDetails> {
@@ -311,6 +311,14 @@ export async function fecharOrdemProducao(ordemId: string): Promise<void> {
 
 export async function deleteOrdemProducao(ordemId: string): Promise<void> {
   await callRpc('industria_producao_ordens_delete', { p_id: ordemId });
+}
+
+export async function resetOrdemProducao(ordemId: string): Promise<void> {
+  await callRpc('industria_producao_reset_ordem', { p_id: ordemId });
+}
+
+export async function resetOperacaoProducao(operacaoId: string, force = false): Promise<void> {
+  await callRpc('industria_producao_reset_operacao', { p_operacao_id: operacaoId, p_force: force });
 }
 
 export async function cloneOrdemProducao(ordemId: string): Promise<OrdemProducaoDetails> {

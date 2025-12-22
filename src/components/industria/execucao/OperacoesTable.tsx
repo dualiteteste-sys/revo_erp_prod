@@ -1,6 +1,6 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Operacao } from '@/services/industriaExecucao';
-import { Package, User, Calendar, Clock, FileText, PauseCircle, PlayCircle, CheckCircle2 } from 'lucide-react';
+import { Package, User, Calendar, Clock, FileText, PauseCircle, PlayCircle, CheckCircle2, MoreHorizontal } from 'lucide-react';
 import { formatOrderNumber } from '@/lib/utils';
 
 interface Props {
@@ -33,6 +33,8 @@ const STATUS_OPTIONS: Array<{ value: Operacao['status']; label: string }> = [
 ];
 
 export default function OperacoesTable({ operacoes, onUpdateStatus, onOpenDocs, onStart, onPause, onConclude }: Props) {
+  const [menuId, setMenuId] = useState<string | null>(null);
+
   return (
     <div className="overflow-x-auto">
       <table className="min-w-full divide-y divide-gray-200">
@@ -103,47 +105,70 @@ export default function OperacoesTable({ operacoes, onUpdateStatus, onOpenDocs, 
                 <span className="text-xs text-gray-500 mt-1">{op.percentual_concluido}%</span>
               </td>
               <td className="px-6 py-4 text-right">
-                <div className="inline-flex items-center gap-2">
+                <div className="relative inline-flex">
                   <button
                     type="button"
-                    className="text-xs px-2 py-1 rounded-md border bg-white hover:bg-gray-50 disabled:opacity-50 inline-flex items-center gap-1"
-                    onClick={() => onOpenDocs?.(op)}
-                    disabled={!onOpenDocs}
-                    title="Instruções / documentos"
+                    className="p-2 rounded-full hover:bg-gray-100 text-gray-700"
+                    onClick={() => setMenuId(menuId === op.id ? null : op.id)}
+                    title="Mais ações"
                   >
-                    <FileText size={14} />
-                    Docs
+                    <MoreHorizontal size={18} />
                   </button>
-                  <button
-                    type="button"
-                    className="text-xs px-2 py-1 rounded-md border bg-white hover:bg-gray-50 disabled:opacity-50 inline-flex items-center gap-1"
-                    onClick={() => onStart?.(op)}
-                    disabled={!onStart || op.status === 'em_execucao' || op.status === 'concluida' || op.status === 'cancelada'}
-                    title="Iniciar execução"
-                  >
-                    <PlayCircle size={14} />
-                    Iniciar
-                  </button>
-                  <button
-                    type="button"
-                    className="text-xs px-2 py-1 rounded-md border bg-white hover:bg-gray-50 disabled:opacity-50 inline-flex items-center gap-1"
-                    onClick={() => onPause?.(op)}
-                    disabled={!onPause || op.status !== 'em_execucao'}
-                    title="Pausar"
-                  >
-                    <PauseCircle size={14} />
-                    Pausar
-                  </button>
-                  <button
-                    type="button"
-                    className="text-xs px-2 py-1 rounded-md border border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 disabled:opacity-50 inline-flex items-center gap-1"
-                    onClick={() => onConclude?.(op)}
-                    disabled={!onConclude || op.status === 'concluida' || op.status === 'cancelada'}
-                    title="Concluir"
-                  >
-                    <CheckCircle2 size={14} />
-                    Concluir
-                  </button>
+                  {menuId === op.id && (
+                    <div className="absolute right-0 mt-2 w-52 rounded-md bg-white shadow-lg border border-gray-200 z-10 text-sm">
+                      {onOpenDocs && (
+                        <button
+                          className="w-full flex items-center gap-2 px-3 py-2 text-left hover:bg-gray-100"
+                          onClick={() => {
+                            setMenuId(null);
+                            onOpenDocs(op);
+                          }}
+                          disabled={!onOpenDocs}
+                        >
+                          <FileText size={14} /> Instruções / Docs
+                        </button>
+                      )}
+                      {onStart && (
+                        <button
+                          className="w-full flex items-center gap-2 px-3 py-2 text-left hover:bg-gray-100 disabled:opacity-50"
+                          onClick={() => {
+                            if (!onStart || op.status === 'em_execucao' || op.status === 'concluida' || op.status === 'cancelada') return;
+                            setMenuId(null);
+                            onStart(op);
+                          }}
+                          disabled={op.status === 'em_execucao' || op.status === 'concluida' || op.status === 'cancelada'}
+                        >
+                          <PlayCircle size={14} /> Iniciar
+                        </button>
+                      )}
+                      {onPause && (
+                        <button
+                          className="w-full flex items-center gap-2 px-3 py-2 text-left hover:bg-gray-100 disabled:opacity-50"
+                          onClick={() => {
+                            if (!onPause || op.status !== 'em_execucao') return;
+                            setMenuId(null);
+                            onPause(op);
+                          }}
+                          disabled={op.status !== 'em_execucao'}
+                        >
+                          <PauseCircle size={14} /> Pausar
+                        </button>
+                      )}
+                      {onConclude && (
+                        <button
+                          className="w-full flex items-center gap-2 px-3 py-2 text-left hover:bg-gray-100 disabled:opacity-50"
+                          onClick={() => {
+                            if (!onConclude || op.status === 'concluida' || op.status === 'cancelada') return;
+                            setMenuId(null);
+                            onConclude(op);
+                          }}
+                          disabled={op.status === 'concluida' || op.status === 'cancelada'}
+                        >
+                          <CheckCircle2 size={14} /> Concluir
+                        </button>
+                      )}
+                    </div>
+                  )}
                 </div>
               </td>
             </tr>

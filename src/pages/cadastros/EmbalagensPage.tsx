@@ -7,6 +7,7 @@ import { Embalagem, listEmbalagens, deleteEmbalagem } from '../../services/embal
 import EmbalagemFormPanel from '../../components/cadastros/EmbalagemFormPanel';
 import { useToast } from '../../contexts/ToastProvider';
 import { tipo_embalagem } from '../../types/database.types';
+import { useConfirm } from '@/contexts/ConfirmProvider';
 
 const EmbalagensPage: React.FC = () => {
     const [embalagens, setEmbalagens] = useState<Embalagem[]>([]);
@@ -15,6 +16,7 @@ const EmbalagensPage: React.FC = () => {
     const [isFormOpen, setIsFormOpen] = useState(false);
     const [selectedEmbalagem, setSelectedEmbalagem] = useState<Embalagem | null>(null);
     const { addToast } = useToast();
+    const { confirm } = useConfirm();
 
     const fetchEmbalagens = async () => {
         setIsLoading(true);
@@ -52,7 +54,14 @@ const EmbalagensPage: React.FC = () => {
             addToast('Embalagens padrão do sistema não podem ser excluídas.', 'error');
             return;
         }
-        if (!confirm('Tem certeza que deseja excluir esta embalagem?')) return;
+        const ok = await confirm({
+            title: 'Excluir embalagem',
+            description: 'Tem certeza que deseja excluir esta embalagem?',
+            confirmText: 'Excluir',
+            cancelText: 'Cancelar',
+            variant: 'danger',
+        });
+        if (!ok) return;
         try {
             await deleteEmbalagem(id);
             addToast('Embalagem excluída com sucesso!', 'success');

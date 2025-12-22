@@ -9,6 +9,7 @@ import { SupabaseProvider } from "./providers/SupabaseProvider";
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { GlobalErrorBoundary } from "./components/error/GlobalErrorBoundary";
 import * as Sentry from "@sentry/react";
+import { ConfirmProvider } from "./contexts/ConfirmProvider";
 
 Sentry.init({
   dsn: import.meta.env.VITE_SENTRY_DSN,
@@ -33,9 +34,11 @@ ReactDOM.createRoot(root).render(
       <QueryClientProvider client={queryClient}>
         <SupabaseProvider>
           <ToastProvider>
-            <AuthProvider>
-              <RouterProvider router={router} />
-            </AuthProvider>
+            <ConfirmProvider>
+              <AuthProvider>
+                <RouterProvider router={router} />
+              </AuthProvider>
+            </ConfirmProvider>
           </ToastProvider>
         </SupabaseProvider>
       </QueryClientProvider>

@@ -15,6 +15,7 @@ import {
   upsertPlanoInspecao
 } from '@/services/industriaProducao';
 import { useToast } from '@/contexts/ToastProvider';
+import { useConfirm } from '@/contexts/ConfirmProvider';
 import PlanoCaracteristicaModal from './PlanoCaracteristicaModal';
 import { getRoteiroDetails, listRoteiros, RoteiroEtapa, RoteiroListItem } from '@/services/industriaRoteiros';
 import { logger } from '@/lib/logger';
@@ -53,6 +54,7 @@ const defaultForm: PlanoFormState = {
 
 export default function PlanoInspecaoFormModal({ isOpen, onClose, planoId, onSaved }: Props) {
   const { addToast } = useToast();
+  const { confirm } = useConfirm();
   const [form, setForm] = useState<PlanoFormState>(defaultForm);
   const [produtoSelecionado, setProdutoSelecionado] = useState<{ id: string; nome: string } | null>(null);
   const [roteiros, setRoteiros] = useState<RoteiroListItem[]>([]);
@@ -205,7 +207,14 @@ export default function PlanoInspecaoFormModal({ isOpen, onClose, planoId, onSav
   };
 
   const handleDeleteCaracteristica = async (caracteristicaId: string) => {
-    if (!confirm('Remover esta característica?')) return;
+    const ok = await confirm({
+      title: 'Remover característica',
+      description: 'Remover esta característica do plano?',
+      confirmText: 'Remover',
+      cancelText: 'Cancelar',
+      variant: 'danger',
+    });
+    if (!ok) return;
     try {
       await deletePlanoCaracteristica(caracteristicaId);
       addToast('Característica removida.', 'success');

@@ -1,12 +1,16 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { OrdemIndustria } from '@/services/industria';
-import { Copy, Edit, Eye, Calendar, User, Package } from 'lucide-react';
+import { Copy, Edit, Eye, Calendar, User, Package, MoreHorizontal, Trash2 } from 'lucide-react';
 import { formatOrderNumber } from '@/lib/utils';
+import { useToast } from '@/contexts/ToastProvider';
+import { useConfirm } from '@/contexts/ConfirmProvider';
+import { deleteOrdemProducao } from '@/services/industriaProducao';
 
 interface Props {
   orders: OrdemIndustria[];
   onEdit: (order: OrdemIndustria) => void;
   onClone?: (order: OrdemIndustria) => void;
+  onChanged?: () => void; // refresh callback após delete/clone/etc
 }
 
 const statusColors: Record<string, string> = {
@@ -24,7 +28,52 @@ const formatStatus = (status: string) => {
   return status.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
 };
 
-export default function OrdensTable({ orders, onEdit, onClone }: Props) {
+export default function OrdensTable({ orders, onEdit, onClone, onChanged }: Props) {
+  const { addToast } = useToast();
+  const { confirm } = useConfirm();
+  const [menuId, setMenuId] = useState<string | null>(null);
+
+  const handleClone = async (order: OrdemIndustria) => {
+    setMenuId(null);
+    onClone?.(order);
+  };
+
+  const handleDelete = async (order: OrdemIndustria) => {
+    setMenuId(null);
+
+    // Só suportamos delete direto para OP (industrializacao). Outros tipos usam fluxo próprio.
+    if (order.tipo_ordem !== 'industrializacao') {
+      addToast('Exclusão rápida disponível apenas para OP de industrialização.', 'info');
+      return;
+    }
+
+    const ok = await confirm({
+      title: 'Excluir OP',
+      description: 'Excluirá esta OP se estiver em rascunho e sem operações/apontamentos/entregas.',
+      confirmText: 'Excluir',
+      cancelText: 'Cancelar',
+      variant: 'warning',
+    });
+    if (!ok) return;
+
+    try {
+      await deleteOrdemProducao(order.id);
+      addToast('OP excluída com sucesso.', 'success');
+      onChanged?.();
+    } catch (e: any) {
+      const msg = String(e?.message || '');
+      if (msg.toLowerCase().includes('já possui operações')) {
+        addToast('Não é possível excluir: há operações. Remova as operações/apontamentos antes.', 'error');
+      } else if (msg.toLowerCase().includes('entregas')) {
+        addToast('Não é possível excluir: há entregas. Remova entregas antes.', 'error');
+      } else if (msg.toLowerCase().includes('rascunho')) {
+        addToast('Só é possível excluir OP em rascunho.', 'error');
+      } else {
+        addToast('Erro ao excluir OP: ' + msg, 'error');
+      }
+    }
+  };
+
   return (
     <div className="overflow-x-auto">
       <table className="min-w-full divide-y divide-gray-200">
@@ -84,18 +133,42 @@ export default function OrdensTable({ orders, onEdit, onClone }: Props) {
               </td>
               <td className="px-6 py-4 text-right">
                 <div className="flex items-center justify-end gap-2">
-                  {onClone && (
-                    <button
-                      onClick={() => onClone(order)}
-                      className="text-gray-600 hover:text-gray-900 p-2 hover:bg-gray-100 rounded-full transition-colors"
-                      title="Duplicar"
-                    >
-                      <Copy size={18} />
-                    </button>
-                  )}
-                  <button onClick={() => onEdit(order)} className="text-blue-600 hover:text-blue-800 p-2 hover:bg-blue-50 rounded-full transition-colors" title="Abrir">
+                  <button
+                    onClick={() => onEdit(order)}
+                    className="text-blue-600 hover:text-blue-800 p-2 hover:bg-blue-50 rounded-full transition-colors"
+                    title={order.status === 'concluida' || order.status === 'cancelada' ? 'Visualizar' : 'Abrir'}
+                  >
                     {order.status === 'concluida' || order.status === 'cancelada' ? <Eye size={18} /> : <Edit size={18} />}
                   </button>
+                  {(onClone || order.tipo_ordem === 'industrializacao') && (
+                    <div className="relative">
+                      <button
+                        onClick={() => setMenuId(menuId === order.id ? null : order.id)}
+                        className="text-gray-600 hover:text-gray-900 p-2 hover:bg-gray-100 rounded-full transition-colors"
+                        title="Mais ações"
+                      >
+                        <MoreHorizontal size={18} />
+                      </button>
+                      {menuId === order.id && (
+                        <div className="absolute right-0 mt-2 w-48 rounded-md bg-white shadow-lg border border-gray-200 z-10">
+                          <button
+                            className="flex items-center gap-2 w-full px-3 py-2 text-sm text-gray-800 hover:bg-gray-100"
+                            onClick={() => handleClone(order)}
+                          >
+                            <Copy size={16} /> Clonar OP
+                          </button>
+                          {order.tipo_ordem === 'industrializacao' && (
+                            <button
+                              className="flex items-center gap-2 w-full px-3 py-2 text-sm text-red-700 hover:bg-gray-100"
+                              onClick={() => handleDelete(order)}
+                            >
+                              <Trash2 size={16} /> Excluir OP
+                            </button>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
               </td>
             </tr>

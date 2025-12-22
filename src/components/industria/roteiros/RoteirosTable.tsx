@@ -1,6 +1,6 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { RoteiroListItem } from '@/services/industriaRoteiros';
-import { Edit, CheckCircle, XCircle, Package, Copy, Trash2 } from 'lucide-react';
+import { Edit, CheckCircle, XCircle, Package, Copy, Trash2, MoreHorizontal } from 'lucide-react';
 
 interface Props {
   roteiros: RoteiroListItem[];
@@ -10,6 +10,8 @@ interface Props {
 }
 
 export default function RoteirosTable({ roteiros, onEdit, onClone, onDelete }: Props) {
+  const [menuId, setMenuId] = useState<string | null>(null);
+
   return (
     <div className="overflow-x-auto">
       <table className="min-w-full divide-y divide-gray-200">
@@ -59,13 +61,6 @@ export default function RoteirosTable({ roteiros, onEdit, onClone, onDelete }: P
               <td className="px-6 py-4 text-right">
                 <div className="flex justify-end gap-2">
                   <button
-                    onClick={() => onClone(roteiro)}
-                    className="text-gray-500 hover:text-gray-700 p-2 hover:bg-gray-100 rounded-full transition-colors"
-                    title="Clonar"
-                  >
-                    <Copy size={18} />
-                  </button>
-                  <button
                     onClick={() => onEdit(roteiro)}
                     className="text-blue-600 hover:text-blue-800 p-2 hover:bg-blue-50 rounded-full transition-colors"
                   >
@@ -78,6 +73,28 @@ export default function RoteirosTable({ roteiros, onEdit, onClone, onDelete }: P
                   >
                     <Trash2 size={18} />
                   </button>
+                  <div className="relative">
+                    <button
+                      onClick={() => setMenuId(menuId === roteiro.id ? null : roteiro.id)}
+                      className="text-gray-600 hover:text-gray-900 p-2 hover:bg-gray-100 rounded-full transition-colors"
+                      title="Mais ações"
+                    >
+                      <MoreHorizontal size={18} />
+                    </button>
+                    {menuId === roteiro.id && (
+                      <div className="absolute right-0 mt-2 w-44 rounded-md bg-white shadow-lg border border-gray-200 z-10">
+                        <button
+                          className="flex items-center gap-2 w-full px-3 py-2 text-sm text-gray-800 hover:bg-gray-100"
+                          onClick={() => {
+                            setMenuId(null);
+                            onClone(roteiro);
+                          }}
+                        >
+                          <Copy size={16} /> Clonar
+                        </button>
+                      </div>
+                    )}
+                  </div>
                 </div>
               </td>
             </tr>

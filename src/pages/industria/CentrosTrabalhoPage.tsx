@@ -9,6 +9,8 @@ import CentroTrabalhoFormPanel from '@/components/industria/centros-trabalho/Cen
 import { useToast } from '@/contexts/ToastProvider';
 import { useSearchParams } from 'react-router-dom';
 import { logger } from '@/lib/logger';
+import { Button } from '@/components/ui/button';
+import { useConfirm } from '@/contexts/ConfirmProvider';
 
 export default function CentrosTrabalhoPage() {
   const [centros, setCentros] = useState<CentroTrabalho[]>([]);
@@ -16,6 +18,7 @@ export default function CentrosTrabalhoPage() {
   const [search, setSearch] = useState('');
   const debouncedSearch = useDebounce(search, 500);
   const { addToast } = useToast();
+  const { confirm } = useConfirm();
 
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [selectedCentro, setSelectedCentro] = useState<CentroTrabalho | null>(null);
@@ -93,7 +96,14 @@ export default function CentrosTrabalhoPage() {
   };
 
   const handleDelete = async (centro: CentroTrabalho) => {
-    if (!confirm(`Tem certeza que deseja excluir "${centro.nome}"?`)) return;
+    const ok = await confirm({
+      title: 'Excluir Centro de Trabalho',
+      description: `Tem certeza que deseja excluir "${centro.nome}"? Esta ação não pode ser desfeita.`,
+      confirmText: 'Excluir',
+      cancelText: 'Cancelar',
+      variant: 'danger',
+    });
+    if (!ok) return;
 
     try {
       await deleteCentroTrabalho(centro.id);
@@ -136,22 +146,15 @@ export default function CentrosTrabalhoPage() {
           </h1>
           <p className="text-gray-600 text-sm mt-1">Locais onde as operações são executadas.</p>
         </div>
-        <div className="flex items-center gap-2">
-          <button
-            onClick={handleSeed}
-            disabled={isSeeding || loading}
-            className="flex items-center gap-2 bg-gray-100 text-gray-700 font-semibold py-2 px-4 rounded-lg hover:bg-gray-200 transition-colors disabled:opacity-50"
-          >
-            {isSeeding ? <Loader2 className="animate-spin" size={20} /> : <DatabaseBackup size={20} />}
+        <div className="flex items-center gap-2 flex-wrap">
+          <Button onClick={handleSeed} disabled={isSeeding || loading} variant="secondary" className="gap-2">
+            {isSeeding ? <Loader2 className="animate-spin" size={18} /> : <DatabaseBackup size={18} />}
             Popular Dados
-          </button>
-          <button
-            onClick={handleNew}
-            className="flex items-center gap-2 bg-blue-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-blue-700 transition-colors"
-          >
-            <PlusCircle size={20} />
+          </Button>
+          <Button onClick={handleNew} className="gap-2">
+            <PlusCircle size={18} />
             Novo Centro
-          </button>
+          </Button>
         </div>
       </div>
 

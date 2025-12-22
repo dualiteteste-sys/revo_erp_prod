@@ -3,6 +3,7 @@ import { useLocation, useParams, useNavigate } from 'react-router-dom';
 import { getRecebimento, listRecebimentoItens, conferirItem, finalizarRecebimentoV2, setRecebimentoClassificacao, syncMateriaisClienteFromRecebimento, updateRecebimentoItemProduct, Recebimento, RecebimentoItem } from '@/services/recebimento';
 import { Loader2, ArrowLeft, CheckCircle, AlertTriangle, Save, Layers, RefreshCw } from 'lucide-react';
 import { useToast } from '@/contexts/ToastProvider';
+import { useConfirm } from '@/contexts/ConfirmProvider';
 import ItemAutocomplete from '@/components/os/ItemAutocomplete';
 import ClientAutocomplete from '@/components/common/ClientAutocomplete';
 import Modal from '@/components/ui/Modal';
@@ -14,6 +15,7 @@ export default function ConferenciaPage() {
     const navigate = useNavigate();
     const location = useLocation();
     const { addToast } = useToast();
+    const { confirm } = useConfirm();
 
     const [recebimento, setRecebimento] = useState<Recebimento | null>(null);
     const [itens, setItens] = useState<RecebimentoItem[]>([]);
@@ -116,7 +118,14 @@ export default function ConferenciaPage() {
         // Verifica se há pendências
         const pendentes = itens.filter(i => i.quantidade_conferida === 0);
         if (pendentes.length > 0) {
-            if (!confirm(`Existem ${pendentes.length} itens com quantidade zero. Deseja continuar mesmo assim?`)) return;
+            const ok = await confirm({
+                title: 'Finalizar recebimento',
+                description: `Existem ${pendentes.length} itens com quantidade zero. Deseja continuar mesmo assim?`,
+                confirmText: 'Continuar',
+                cancelText: 'Cancelar',
+                variant: 'primary',
+            });
+            if (!ok) return;
         }
 
         setFinalizing(true);

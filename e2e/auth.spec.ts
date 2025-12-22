@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from './fixtures';
 
 test('should allow user to log in and view products', async ({ page }) => {
     // Log console messages
@@ -63,19 +63,30 @@ test('should allow user to log in and view products', async ({ page }) => {
 
     // Mock Empresa Usuarios
     await page.route('**/rest/v1/empresa_usuarios*', async route => {
+        const url = new URL(route.request().url());
+        const select = url.searchParams.get('select') || '';
+
+        // useEmpresaRole() faz `.select('role')...maybeSingle()` e espera OBJETO.
+        if (select === 'role' || select.includes('role')) {
+          await route.fulfill({ json: { role: 'member' } });
+          return;
+        }
+
+        // useEmpresas() lista empresas do usuário e espera ARRAY.
         await route.fulfill({
-            json: [
-                {
-                    empresa: {
-                        id: 'empresa-1',
-                        nome_razao_social: 'Empresa Teste E2E',
-                        nome_fantasia: 'Fantasia E2E',
-                        cnpj: '00000000000191',
-                        endereco_logradouro: 'Rua Teste',
-                        telefone: '11999999999'
-                    }
-                }
-            ]
+          json: [
+            {
+              role: 'member',
+              empresa: {
+                id: 'empresa-1',
+                nome_razao_social: 'Empresa Teste E2E',
+                nome_fantasia: 'Fantasia E2E',
+                cnpj: '00000000000191',
+                endereco_logradouro: 'Rua Teste',
+                telefone: '11999999999',
+              },
+            },
+          ],
         });
     });
 

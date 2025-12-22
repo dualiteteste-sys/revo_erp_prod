@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Loader2, Save, Plus, Trash2, Package, CheckCircle } from 'lucide-react';
 import { CompraDetails, CompraPayload, saveCompra, manageCompraItem, getCompraDetails, receberCompra } from '@/services/compras';
 import { useToast } from '@/contexts/ToastProvider';
+import { useConfirm } from '@/contexts/ConfirmProvider';
 import Section from '@/components/ui/forms/Section';
 import Input from '@/components/ui/forms/Input';
 import Select from '@/components/ui/forms/Select';
@@ -18,6 +19,7 @@ interface Props {
 
 export default function CompraFormPanel({ compraId, onSaveSuccess, onClose }: Props) {
   const { addToast } = useToast();
+  const { confirm } = useConfirm();
   const [loading, setLoading] = useState(!!compraId);
   const [isSaving, setIsSaving] = useState(false);
   const [formData, setFormData] = useState<Partial<CompraDetails>>({
@@ -138,7 +140,14 @@ export default function CompraFormPanel({ compraId, onSaveSuccess, onClose }: Pr
   };
 
   const handleReceber = async () => {
-    if (!confirm('Confirmar recebimento? Isso irá lançar a entrada dos produtos no estoque.')) return;
+    const ok = await confirm({
+      title: 'Confirmar recebimento',
+      description: 'Confirmar recebimento? Isso irá lançar a entrada dos produtos no estoque.',
+      confirmText: 'Confirmar',
+      cancelText: 'Cancelar',
+      variant: 'primary',
+    });
+    if (!ok) return;
     setIsSaving(true);
     try {
       await receberCompra(formData.id!);
