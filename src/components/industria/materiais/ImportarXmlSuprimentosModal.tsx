@@ -10,7 +10,13 @@ type Props = {
 
 export default function ImportarXmlSuprimentosModal({ isOpen, onClose, onFinished }: Props) {
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title="Importar XML (NF-e)" size="90pct">
+    <Modal
+      isOpen={isOpen}
+      onClose={onClose}
+      title="Importar XML (NF-e)"
+      size="90pct"
+      containerClassName="h-[80vh] max-h-[80vh]"
+    >
       <div className="p-4">
         <NfeInputPage
           embedded
