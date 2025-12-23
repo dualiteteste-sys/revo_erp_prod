@@ -6,17 +6,17 @@
 BEGIN;
 
 -- 1) Ajustar colunas tipo_bom (roteiros e BOMs) para aceitar 'ambos'
-ALTER TABLE public.industria_roteiros
+ALTER TABLE IF EXISTS public.industria_roteiros
   ADD COLUMN IF NOT EXISTS tipo_bom text;
 
-ALTER TABLE public.industria_roteiros
+ALTER TABLE IF EXISTS public.industria_roteiros
   ALTER COLUMN tipo_bom TYPE text,
   ALTER COLUMN tipo_bom DROP DEFAULT;
 
-ALTER TABLE public.industria_boms
+ALTER TABLE IF EXISTS public.industria_boms
   ADD COLUMN IF NOT EXISTS tipo_bom text;
 
-ALTER TABLE public.industria_boms
+ALTER TABLE IF EXISTS public.industria_boms
   ALTER COLUMN tipo_bom TYPE text,
   ALTER COLUMN tipo_bom DROP DEFAULT;
 
