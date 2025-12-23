@@ -166,6 +166,7 @@ export default function RoteiroEtapasGrid({ roteiroId, etapas, onUpdate, readOnl
               type="number"
               value={newEtapa.tempo_setup_min || 0}
               onChange={e => setNewEtapa({ ...newEtapa, tempo_setup_min: parseInt(e.target.value) })}
+              onFocus={(e) => e.currentTarget.select()}
               className="w-full p-2 rounded border border-gray-300"
               min="0"
               step="1"
@@ -257,6 +258,7 @@ export default function RoteiroEtapasGrid({ roteiroId, etapas, onUpdate, readOnl
                       value={etapa.tempo_setup_min || 0}
                       onChange={e => handleLocalUpdate(etapa.id, 'tempo_setup_min', parseInt(e.target.value))}
                       onBlur={() => handlePersist(etapa.id)}
+                      onFocus={(e) => e.currentTarget.select()}
                       disabled={readOnly}
                       className="w-full p-1 text-right border border-gray-300 rounded"
                     />
