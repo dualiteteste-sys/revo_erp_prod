@@ -15,7 +15,7 @@ import OrdemEntregas from './OrdemEntregas';
 import BomSelector from './BomSelector';
 import RoteiroSelector from './RoteiroSelector';
 import { formatOrderNumber } from '@/lib/utils';
-import type { MaterialClienteListItem } from '@/services/industriaMateriais';
+import { listMateriaisCliente, type MaterialClienteListItem } from '@/services/industriaMateriais';
 import { useNavigate } from 'react-router-dom';
 import Modal from '@/components/ui/Modal';
 import { logger } from '@/lib/logger';
@@ -172,7 +172,6 @@ export default function OrdemFormPanel({
     handleHeaderChange('material_cliente_nome', null);
     handleHeaderChange('material_cliente_codigo', null);
     handleHeaderChange('material_cliente_unidade', null);
-    setMaterialCliente(null);
   };
 
 	  const handleSaveHeader = async () => {
@@ -646,7 +645,6 @@ export default function OrdemFormPanel({
                           handleHeaderChange('material_cliente_nome', null);
                           handleHeaderChange('material_cliente_codigo', null);
                           handleHeaderChange('material_cliente_unidade', null);
-                          setMaterialCliente(null);
                         }}
                         className="text-xs font-bold text-blue-700 hover:text-blue-900 hover:underline whitespace-nowrap"
                       >
@@ -1094,9 +1092,48 @@ export default function OrdemFormPanel({
       <ImportarXmlSuprimentosModal
         isOpen={showImportXmlModal}
         onClose={() => setShowImportXmlModal(false)}
-        onFinished={() => {
+        onFinished={({ recebimentoId }) => {
           setShowImportXmlModal(false);
           setMaterialRefreshToken(Date.now());
+
+          void (async () => {
+            if (formData.tipo_ordem !== 'beneficiamento') return;
+            if (!formData.cliente_id) {
+              addToast('Selecione o cliente antes de importar o XML.', 'warning');
+              return;
+            }
+
+            try {
+              const { data } = await listMateriaisCliente(undefined, formData.cliente_id, true, 1, 20);
+              if (!data || data.length === 0) {
+                addToast('Importação concluída, mas nenhum Material do Cliente foi encontrado para este cliente.', 'warning');
+                return;
+              }
+
+              const alreadySelected = !!formData.material_cliente_id;
+              const byProduto = formData.produto_final_id ? data.find(m => m.produto_id === formData.produto_final_id) : null;
+              const shouldAutoSelect = !alreadySelected && (data.length === 1 || !!byProduto);
+              if (!shouldAutoSelect) {
+                addToast('Importação concluída. Atualizamos a lista de Materiais do Cliente.', 'success');
+                return;
+              }
+
+              const m = byProduto ?? data[0];
+              handleHeaderChange('usa_material_cliente', true);
+              handleHeaderChange('material_cliente_id', m.id);
+              handleHeaderChange('material_cliente_nome', m.nome_cliente);
+              handleHeaderChange('material_cliente_codigo', m.codigo_cliente);
+              handleHeaderChange('material_cliente_unidade', m.unidade);
+              handleHeaderChange('produto_final_id', m.produto_id);
+              handleHeaderChange('produto_nome', m.produto_nome);
+              if (m.unidade) handleHeaderChange('unidade', m.unidade);
+
+              addToast(`Material do cliente atualizado via XML (rec.: ${recebimentoId}).`, 'success');
+            } catch (e) {
+              logger.error('[Indústria][OB] Falha ao atualizar materiais após importação de XML', e, { recebimentoId });
+              addToast('Importação concluída, mas não foi possível atualizar automaticamente o Material do Cliente.', 'warning');
+            }
+          })();
         }}
       />
     </div>
