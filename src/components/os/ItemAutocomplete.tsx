@@ -213,6 +213,7 @@ export default function ItemAutocomplete({ onSelect, disabled, onlySales = true,
         onClose={() => setIsCreateModalOpen(false)}
         title="Novo Produto"
         size="4xl"
+        containerClassName="h-[80vh] max-h-[80vh]"
       >
         <ProductFormPanel
           product={null}
