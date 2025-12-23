@@ -31,10 +31,32 @@ BEGIN
   END LOOP;
 END $$;
 
-ALTER TABLE public.industria_roteiros
-  ADD CONSTRAINT industria_roteiros_tipo_bom_check CHECK (tipo_bom in ('producao', 'beneficiamento', 'ambos'));
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1
+    FROM information_schema.columns
+    WHERE table_schema = 'public'
+      AND table_name = 'industria_roteiros'
+      AND column_name = 'tipo_bom'
+  ) THEN
+    EXECUTE $$ALTER TABLE public.industria_roteiros
+      ADD CONSTRAINT industria_roteiros_tipo_bom_check CHECK (tipo_bom in ('producao', 'beneficiamento', 'ambos'))$$;
+  END IF;
+END $$;
 
-ALTER TABLE public.industria_boms
-  ADD CONSTRAINT industria_boms_tipo_bom_check CHECK (tipo_bom in ('producao', 'beneficiamento', 'ambos'));
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1
+    FROM information_schema.columns
+    WHERE table_schema = 'public'
+      AND table_name = 'industria_boms'
+      AND column_name = 'tipo_bom'
+  ) THEN
+    EXECUTE $$ALTER TABLE public.industria_boms
+      ADD CONSTRAINT industria_boms_tipo_bom_check CHECK (tipo_bom in ('producao', 'beneficiamento', 'ambos'))$$;
+  END IF;
+END $$;
 
 COMMIT;

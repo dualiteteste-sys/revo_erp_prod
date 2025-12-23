@@ -17,13 +17,16 @@ test.describe('Roteiro/BOM: tipo "Ambos"', () => {
     await expect(page.getByRole('button', { name: 'Novo Roteiro' })).toBeVisible();
     await page.getByRole('button', { name: 'Novo Roteiro' }).click();
     await expect(page.getByLabel('Utilizar em')).toBeVisible();
-    await expect(page.getByRole('option', { name: 'Ambos' })).toBeVisible();
-    await page.getByRole('button', { name: 'Fechar' }).click();
+    await page.getByLabel('Utilizar em').selectOption('ambos');
+    await expect(page.getByLabel('Utilizar em')).toHaveValue('ambos');
+    await page.getByRole('button', { name: 'Cancelar' }).click();
 
     await page.goto('/app/industria/boms');
     await expect(page.getByRole('button', { name: 'Nova Ficha Técnica' })).toBeVisible();
     await page.getByRole('button', { name: 'Nova Ficha Técnica' }).click();
     await expect(page.getByLabel('Utilizar em')).toBeVisible();
-    await expect(page.getByRole('option', { name: 'Ambos' })).toBeVisible();
+    await page.getByLabel('Utilizar em').selectOption('ambos');
+    await expect(page.getByLabel('Utilizar em')).toHaveValue('ambos');
+    await page.getByRole('button', { name: 'Cancelar' }).click();
   });
 });
