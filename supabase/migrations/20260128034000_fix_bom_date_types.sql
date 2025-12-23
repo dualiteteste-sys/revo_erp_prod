@@ -6,6 +6,10 @@ BEGIN;
 DROP FUNCTION IF EXISTS public.industria_bom_list(text, uuid, text, boolean, int, int);
 DROP FUNCTION IF EXISTS public.industria_bom_upsert(jsonb);
 
+DO $$
+BEGIN
+  IF to_regclass('public.industria_boms') IS NOT NULL THEN
+    EXECUTE $sql$
 CREATE OR REPLACE FUNCTION public.industria_bom_list(
   p_search text default null,
   p_produto_id uuid default null,
@@ -67,7 +71,14 @@ BEGIN
   LIMIT p_limit OFFSET p_offset;
 END;
 $$;
+    $sql$;
+  END IF;
+END $$;
 
+DO $$
+BEGIN
+  IF to_regclass('public.industria_boms') IS NOT NULL THEN
+    EXECUTE $sql$
 CREATE OR REPLACE FUNCTION public.industria_bom_upsert(p_payload jsonb)
 RETURNS jsonb
 LANGUAGE plpgsql
@@ -150,9 +161,19 @@ BEGIN
   RETURN v_result;
 END;
 $$;
+    $sql$;
+  END IF;
+END $$;
 
-REVOKE ALL ON FUNCTION public.industria_bom_list FROM public;
-GRANT EXECUTE ON FUNCTION public.industria_bom_list TO authenticated, service_role;
-GRANT EXECUTE ON FUNCTION public.industria_bom_upsert TO authenticated, service_role;
+DO $$
+BEGIN
+  IF to_regprocedure('public.industria_bom_list(text, uuid, text, boolean, int, int)') IS NOT NULL THEN
+    EXECUTE 'REVOKE ALL ON FUNCTION public.industria_bom_list(text, uuid, text, boolean, int, int) FROM public';
+    EXECUTE 'GRANT EXECUTE ON FUNCTION public.industria_bom_list(text, uuid, text, boolean, int, int) TO authenticated, service_role';
+  END IF;
+  IF to_regprocedure('public.industria_bom_upsert(jsonb)') IS NOT NULL THEN
+    EXECUTE 'GRANT EXECUTE ON FUNCTION public.industria_bom_upsert(jsonb) TO authenticated, service_role';
+  END IF;
+END $$;
 
 COMMIT;

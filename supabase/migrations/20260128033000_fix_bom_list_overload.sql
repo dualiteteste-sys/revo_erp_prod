@@ -7,6 +7,10 @@ BEGIN;
 DROP FUNCTION IF EXISTS public.industria_bom_list(text, uuid, text, boolean);
 DROP FUNCTION IF EXISTS public.industria_bom_list(text, uuid, text, boolean, int, int);
 
+DO $$
+BEGIN
+  IF to_regclass('public.industria_boms') IS NOT NULL THEN
+    EXECUTE $sql$
 CREATE OR REPLACE FUNCTION public.industria_bom_list(
   p_search text default null,
   p_produto_id uuid default null,
@@ -68,8 +72,16 @@ BEGIN
   LIMIT p_limit OFFSET p_offset;
 END;
 $$;
+    $sql$;
+  END IF;
+END $$;
 
-REVOKE ALL ON FUNCTION public.industria_bom_list FROM public;
-GRANT EXECUTE ON FUNCTION public.industria_bom_list TO authenticated, service_role;
+DO $$
+BEGIN
+  IF to_regprocedure('public.industria_bom_list(text, uuid, text, boolean, int, int)') IS NOT NULL THEN
+    EXECUTE 'REVOKE ALL ON FUNCTION public.industria_bom_list(text, uuid, text, boolean, int, int) FROM public';
+    EXECUTE 'GRANT EXECUTE ON FUNCTION public.industria_bom_list(text, uuid, text, boolean, int, int) TO authenticated, service_role';
+  END IF;
+END $$;
 
 COMMIT;

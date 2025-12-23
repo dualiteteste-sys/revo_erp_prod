@@ -6,25 +6,33 @@
 BEGIN;
 
 -- 1) Ajustar constraints de tipo_bom (roteiros e BOMs) para aceitar 'ambos'
-ALTER TABLE public.industria_roteiros
-  ADD COLUMN IF NOT EXISTS tipo_bom text;
+DO $$
+BEGIN
+  IF to_regclass('public.industria_roteiros') IS NOT NULL THEN
+    EXECUTE 'ALTER TABLE public.industria_roteiros ADD COLUMN IF NOT EXISTS tipo_bom text';
+    EXECUTE 'ALTER TABLE public.industria_roteiros ALTER COLUMN tipo_bom TYPE text';
+    EXECUTE 'ALTER TABLE public.industria_roteiros ALTER COLUMN tipo_bom DROP DEFAULT';
+  END IF;
+END $$;
 
-ALTER TABLE public.industria_roteiros
-  ALTER COLUMN tipo_bom TYPE text,
-  ALTER COLUMN tipo_bom DROP DEFAULT;
-
-ALTER TABLE public.industria_boms
-  ADD COLUMN IF NOT EXISTS tipo_bom text;
-
-ALTER TABLE public.industria_boms
-  ALTER COLUMN tipo_bom TYPE text,
-  ALTER COLUMN tipo_bom DROP DEFAULT;
+DO $$
+BEGIN
+  IF to_regclass('public.industria_boms') IS NOT NULL THEN
+    EXECUTE 'ALTER TABLE public.industria_boms ADD COLUMN IF NOT EXISTS tipo_bom text';
+    EXECUTE 'ALTER TABLE public.industria_boms ALTER COLUMN tipo_bom TYPE text';
+    EXECUTE 'ALTER TABLE public.industria_boms ALTER COLUMN tipo_bom DROP DEFAULT';
+  END IF;
+END $$;
 
 -- 2) Atualizar funções de ROTEIROS para aceitar 'ambos'
 -- Drop/recreate com novo check
 DROP FUNCTION IF EXISTS public.industria_roteiros_list(text, uuid, text, boolean);
 DROP FUNCTION IF EXISTS public.industria_roteiros_upsert(jsonb);
 
+DO $$
+BEGIN
+  IF to_regclass('public.industria_roteiros') IS NOT NULL THEN
+    EXECUTE $sql$
 CREATE OR REPLACE FUNCTION public.industria_roteiros_list(
   p_search    text default null,
   p_produto_id uuid default null,
@@ -76,7 +84,14 @@ BEGIN
     AND (p_ativo IS NULL OR r.ativo = p_ativo);
 END;
 $$;
+    $sql$;
+  END IF;
+END $$;
 
+DO $$
+BEGIN
+  IF to_regclass('public.industria_roteiros') IS NOT NULL THEN
+    EXECUTE $sql$
 CREATE OR REPLACE FUNCTION public.industria_roteiros_upsert(p_payload jsonb)
 RETURNS jsonb
 LANGUAGE plpgsql
@@ -154,14 +169,28 @@ BEGIN
   RETURN v_result;
 END;
 $$;
+    $sql$;
+  END IF;
+END $$;
 
-GRANT EXECUTE ON FUNCTION public.industria_roteiros_list(text, uuid, text, boolean) TO authenticated, service_role;
-GRANT EXECUTE ON FUNCTION public.industria_roteiros_upsert(jsonb) TO authenticated, service_role;
+DO $$
+BEGIN
+  IF to_regprocedure('public.industria_roteiros_list(text, uuid, text, boolean)') IS NOT NULL THEN
+    EXECUTE 'GRANT EXECUTE ON FUNCTION public.industria_roteiros_list(text, uuid, text, boolean) TO authenticated, service_role';
+  END IF;
+  IF to_regprocedure('public.industria_roteiros_upsert(jsonb)') IS NOT NULL THEN
+    EXECUTE 'GRANT EXECUTE ON FUNCTION public.industria_roteiros_upsert(jsonb) TO authenticated, service_role';
+  END IF;
+END $$;
 
 -- 3) Ajustar funções de BOM para aceitar 'ambos'
 DROP FUNCTION IF EXISTS public.industria_bom_list(text, uuid, text, boolean);
 DROP FUNCTION IF EXISTS public.industria_bom_upsert(jsonb);
 
+DO $$
+BEGIN
+  IF to_regclass('public.industria_boms') IS NOT NULL THEN
+    EXECUTE $sql$
 CREATE OR REPLACE FUNCTION public.industria_bom_list(
   p_search text default null,
   p_produto_id uuid default null,
@@ -215,7 +244,14 @@ BEGIN
     AND (p_ativo IS NULL OR b.ativo = p_ativo);
 END;
 $$;
+    $sql$;
+  END IF;
+END $$;
 
+DO $$
+BEGIN
+  IF to_regclass('public.industria_boms') IS NOT NULL THEN
+    EXECUTE $sql$
 CREATE OR REPLACE FUNCTION public.industria_bom_upsert(p_payload jsonb)
 RETURNS jsonb
 LANGUAGE plpgsql
@@ -298,8 +334,18 @@ BEGIN
   RETURN v_result;
 END;
 $$;
+    $sql$;
+  END IF;
+END $$;
 
-GRANT EXECUTE ON FUNCTION public.industria_bom_list(text, uuid, text, boolean) TO authenticated, service_role;
-GRANT EXECUTE ON FUNCTION public.industria_bom_upsert(jsonb) TO authenticated, service_role;
+DO $$
+BEGIN
+  IF to_regprocedure('public.industria_bom_list(text, uuid, text, boolean)') IS NOT NULL THEN
+    EXECUTE 'GRANT EXECUTE ON FUNCTION public.industria_bom_list(text, uuid, text, boolean) TO authenticated, service_role';
+  END IF;
+  IF to_regprocedure('public.industria_bom_upsert(jsonb)') IS NOT NULL THEN
+    EXECUTE 'GRANT EXECUTE ON FUNCTION public.industria_bom_upsert(jsonb) TO authenticated, service_role';
+  END IF;
+END $$;
 
 COMMIT;
