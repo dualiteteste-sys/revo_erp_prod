@@ -15,7 +15,6 @@ import OrdemEntregas from './OrdemEntregas';
 import BomSelector from './BomSelector';
 import RoteiroSelector from './RoteiroSelector';
 import { formatOrderNumber } from '@/lib/utils';
-import { ensureMaterialClienteV2 } from '@/services/industriaMateriais';
 import type { MaterialClienteListItem } from '@/services/industriaMateriais';
 import { useNavigate } from 'react-router-dom';
 import Modal from '@/components/ui/Modal';
@@ -176,61 +175,50 @@ export default function OrdemFormPanel({
     setMaterialCliente(null);
   };
 
-  const handleSaveHeader = async () => {
-    if (!canEdit) {
-      addToast('Você não tem permissão para editar esta ordem.', 'error');
-      return null;
-    }
-    if (formData.status === 'concluida' || formData.status === 'cancelada') {
-      addToast('Esta ordem está bloqueada para edição.', 'error');
-      return null;
-    }
-    if (formData.tipo_ordem === 'beneficiamento' && !formData.cliente_id) {
-      addToast('Para beneficiamento, selecione o cliente.', 'error');
-      return null;
-    }
-    if (!formData.produto_final_id) {
-      addToast('Selecione um produto final.', 'error');
-      return null;
-    }
-    if (!formData.quantidade_planejada || formData.quantidade_planejada <= 0) {
+	  const handleSaveHeader = async () => {
+	    if (!canEdit) {
+	      addToast('Você não tem permissão para editar esta ordem.', 'error');
+	      return null;
+	    }
+	    if (formData.status === 'concluida' || formData.status === 'cancelada') {
+	      addToast('Esta ordem está bloqueada para edição.', 'error');
+	      return null;
+	    }
+	    if (formData.tipo_ordem === 'beneficiamento' && !formData.cliente_id) {
+	      addToast('Para beneficiamento, selecione o cliente.', 'error');
+	      return null;
+	    }
+	    if (formData.tipo_ordem === 'beneficiamento' && !formData.material_cliente_id) {
+	      addToast('Para beneficiamento, selecione o Material do Cliente (ou importe o XML / cadastre o material).', 'error');
+	      return null;
+	    }
+	    if (!formData.produto_final_id) {
+	      addToast('Selecione um produto final.', 'error');
+	      return null;
+	    }
+	    if (!formData.quantidade_planejada || formData.quantidade_planejada <= 0) {
       addToast('A quantidade planejada deve ser maior que zero.', 'error');
       return null;
     }
 
-    setIsSaving(true);
-    try {
-      let materialClienteId = formData.material_cliente_id || null;
-      let usaMaterialCliente = !!formData.usa_material_cliente;
+	    setIsSaving(true);
+	    try {
+	      let materialClienteId = formData.material_cliente_id || null;
+	      let usaMaterialCliente = !!formData.usa_material_cliente;
 
-      if (formData.tipo_ordem === 'beneficiamento') {
-        if (!formData.cliente_id) {
-          addToast('Beneficiamento: selecione o cliente antes de salvar.', 'error');
-          setIsSaving(false);
-          return null;
-        }
-        if (formData.cliente_id && formData.produto_final_id && !materialClienteId) {
-          materialClienteId = await ensureMaterialClienteV2(
-            formData.cliente_id,
-            formData.produto_final_id,
-            formData.produto_nome || 'Material',
-            formData.material_cliente_unidade || formData.unidade || 'un',
-            {
-              codigoCliente: formData.material_cliente_codigo ?? null,
-              nomeCliente: formData.material_cliente_nome ?? null,
-            }
-          );
-          usaMaterialCliente = true;
-
-          setFormData(prev => ({
-            ...prev,
-            usa_material_cliente: true,
-            material_cliente_id: materialClienteId,
-            material_cliente_nome: prev.material_cliente_nome ?? prev.produto_nome ?? null,
-            material_cliente_unidade: prev.material_cliente_unidade ?? prev.unidade ?? null,
-          }));
-        }
-      }
+	      if (formData.tipo_ordem === 'beneficiamento') {
+	        if (!formData.cliente_id) {
+	          addToast('Beneficiamento: selecione o cliente antes de salvar.', 'error');
+	          setIsSaving(false);
+	          return null;
+	        }
+	        if (!materialClienteId) {
+	          addToast('Beneficiamento: selecione o Material do Cliente antes de salvar.', 'error');
+	          setIsSaving(false);
+	          return null;
+	        }
+	        usaMaterialCliente = true;
+	      }
 
       const payload: OrdemPayload = {
         id: formData.id,
@@ -405,19 +393,30 @@ export default function OrdemFormPanel({
   const isExecucaoGerada = !!formData.execucao_ordem_id;
   const isHeaderLocked = isLockedEffective || isExecucaoGerada;
   const componentesCount = Array.isArray(formData.componentes) ? formData.componentes.length : 0;
-  const checklistExecucao = [
-    {
-      label: formData.tipo_ordem === 'beneficiamento' ? 'Cliente selecionado' : 'Cliente (opcional)',
-      status: formData.tipo_ordem === 'beneficiamento'
-        ? (formData.cliente_id ? 'ok' : 'error')
-        : (formData.cliente_id ? 'ok' : 'warn'),
-      details: formData.cliente_nome || (formData.tipo_ordem === 'beneficiamento' ? 'Selecione o cliente para prosseguir.' : 'Opcional para Industrialização.'),
-    },
-    {
-      label: 'Produto e quantidade definidos',
-      status: formData.produto_final_id && (formData.quantidade_planejada || 0) > 0 ? 'ok' : 'error',
-      details: !formData.produto_final_id
-        ? 'Selecione o produto.'
+	  const checklistExecucao = [
+	    {
+	      label: formData.tipo_ordem === 'beneficiamento' ? 'Cliente selecionado' : 'Cliente (opcional)',
+	      status: formData.tipo_ordem === 'beneficiamento'
+	        ? (formData.cliente_id ? 'ok' : 'error')
+	        : (formData.cliente_id ? 'ok' : 'warn'),
+	      details: formData.cliente_nome || (formData.tipo_ordem === 'beneficiamento' ? 'Selecione o cliente para prosseguir.' : 'Opcional para Industrialização.'),
+	    },
+	    ...(formData.tipo_ordem === 'beneficiamento'
+	      ? ([
+	          {
+	            label: 'Material do cliente selecionado',
+	            status: formData.material_cliente_id ? 'ok' : 'error',
+	            details: formData.material_cliente_id
+	              ? (formData.material_cliente_codigo || formData.material_cliente_nome || 'Selecionado')
+	              : 'Selecione o material do cliente (ou importe o XML / cadastre o material).',
+	          },
+	        ] as const)
+	      : []),
+	    {
+	      label: 'Produto e quantidade definidos',
+	      status: formData.produto_final_id && (formData.quantidade_planejada || 0) > 0 ? 'ok' : 'error',
+	      details: !formData.produto_final_id
+	        ? 'Selecione o produto.'
         : (formData.quantidade_planejada || 0) <= 0
           ? 'A quantidade deve ser maior que zero.'
           : undefined,
@@ -437,14 +436,15 @@ export default function OrdemFormPanel({
   ] as const;
   const hasChecklistError = checklistExecucao.some(i => i.status === 'error');
 
-  const canGoNextWizardStep = () => {
-    if (wizardStep === 0) {
-      const hasProduto = !!formData.produto_final_id && !!formData.quantidade_planejada && formData.quantidade_planejada > 0;
-      const hasCliente = formData.tipo_ordem === 'beneficiamento' ? !!formData.cliente_id : true;
-      return hasProduto && hasCliente;
-    }
-    return true;
-  };
+	  const canGoNextWizardStep = () => {
+	    if (wizardStep === 0) {
+	      const hasProduto = !!formData.produto_final_id && !!formData.quantidade_planejada && formData.quantidade_planejada > 0;
+	      const hasCliente = formData.tipo_ordem === 'beneficiamento' ? !!formData.cliente_id : true;
+	      const hasMaterialCliente = formData.tipo_ordem === 'beneficiamento' ? !!formData.material_cliente_id : true;
+	      return hasProduto && hasCliente && hasMaterialCliente;
+	    }
+	    return true;
+	  };
 
   const handleGoToExecucao = (q?: string) => {
     const next = new URLSearchParams();

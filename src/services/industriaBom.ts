@@ -2,7 +2,7 @@ import { callRpc } from '@/lib/api';
 import { faker } from '@faker-js/faker';
 import { getProducts } from './products';
 
-export type BomType = 'producao' | 'beneficiamento';
+export type BomType = 'producao' | 'beneficiamento' | 'ambos';
 
 export type BomListItem = {
   id: string;
@@ -140,7 +140,7 @@ export async function seedBoms(): Promise<void> {
     const potentialChildren = products.filter(p => p.id !== parent.id);
     if (potentialChildren.length === 0) continue;
 
-    const tipo = faker.helpers.arrayElement(['producao', 'beneficiamento']) as BomType;
+    const tipo = faker.helpers.arrayElement(['producao', 'beneficiamento', 'ambos']) as BomType;
 
     const payload: BomPayload = {
       produto_final_id: parent.id,
@@ -149,8 +149,8 @@ export async function seedBoms(): Promise<void> {
       descricao: `Ficha Técnica v${faker.number.int({ min: 1, max: 9 })}`,
       versao: faker.number.int({ min: 1, max: 10 }),
       ativo: true,
-      padrao_para_producao: tipo === 'producao',
-      padrao_para_beneficiamento: tipo === 'beneficiamento',
+      padrao_para_producao: tipo === 'producao' || tipo === 'ambos',
+      padrao_para_beneficiamento: tipo === 'beneficiamento' || tipo === 'ambos',
       data_inicio_vigencia: new Date().toISOString(),
       observacoes: faker.lorem.sentence(),
     };

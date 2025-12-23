@@ -30,7 +30,7 @@ export default function RoteiroEtapasGrid({ roteiroId, etapas, onUpdate, readOnl
   const [newEtapa, setNewEtapa] = useState<Partial<RoteiroEtapa>>({
     sequencia: (etapas.length + 1) * 10,
     tipo_operacao: 'producao',
-    tempo_setup_min: 0,
+    tempo_setup_min: null,
     tempo_ciclo_min_por_unidade: 0,
     permitir_overlap: false
   });
@@ -49,13 +49,22 @@ export default function RoteiroEtapasGrid({ roteiroId, etapas, onUpdate, readOnl
       return;
     }
     try {
-      await manageRoteiroEtapa(roteiroId, null, newEtapa, 'upsert');
+      await manageRoteiroEtapa(
+        roteiroId,
+        null,
+        {
+          ...newEtapa,
+          tempo_setup_min: Number(newEtapa.tempo_setup_min ?? 0),
+          tempo_ciclo_min_por_unidade: Number(newEtapa.tempo_ciclo_min_por_unidade ?? 0),
+        },
+        'upsert'
+      );
       addToast('Etapa adicionada.', 'success');
       setIsAdding(false);
       setNewEtapa({
         sequencia: (etapas.length + 2) * 10,
         tipo_operacao: 'producao',
-        tempo_setup_min: 0,
+        tempo_setup_min: null,
         tempo_ciclo_min_por_unidade: 0,
         permitir_overlap: false
       });
@@ -94,7 +103,16 @@ export default function RoteiroEtapasGrid({ roteiroId, etapas, onUpdate, readOnl
     if (!etapa) return;
 
     try {
-      await manageRoteiroEtapa(roteiroId, etapa.id, etapa, 'upsert');
+      await manageRoteiroEtapa(
+        roteiroId,
+        etapa.id,
+        {
+          ...etapa,
+          tempo_setup_min: Number((etapa as any).tempo_setup_min ?? 0),
+          tempo_ciclo_min_por_unidade: Number((etapa as any).tempo_ciclo_min_por_unidade ?? 0),
+        },
+        'upsert'
+      );
       // No need to toast on every field save
     } catch (e: any) {
       addToast(e.message, 'error');
@@ -163,13 +181,20 @@ export default function RoteiroEtapasGrid({ roteiroId, etapas, onUpdate, readOnl
           <div className="md:col-span-2">
             <label className="block text-xs font-medium text-gray-700">Setup (min)</label>
             <input
-              type="number"
-              value={newEtapa.tempo_setup_min || 0}
-              onChange={e => setNewEtapa({ ...newEtapa, tempo_setup_min: parseInt(e.target.value) })}
-              onFocus={(e) => e.currentTarget.select()}
+              type="text"
+              inputMode="numeric"
+              value={newEtapa.tempo_setup_min == null ? '' : String(newEtapa.tempo_setup_min)}
+              onChange={(e) => {
+                const raw = e.target.value;
+                if (raw === '') {
+                  setNewEtapa({ ...newEtapa, tempo_setup_min: null });
+                  return;
+                }
+                const next = Number.parseInt(raw, 10);
+                setNewEtapa({ ...newEtapa, tempo_setup_min: Number.isFinite(next) ? next : 0 });
+              }}
               className="w-full p-2 rounded border border-gray-300"
-              min="0"
-              step="1"
+              placeholder="0"
             />
           </div>
           <div className="md:col-span-4 grid grid-cols-2 gap-2">
@@ -254,13 +279,22 @@ export default function RoteiroEtapasGrid({ roteiroId, etapas, onUpdate, readOnl
                   <td className="px-4 py-2 text-sm capitalize">{etapa.tipo_operacao}</td>
                   <td className="px-4 py-2">
                     <input
-                      type="number"
-                      value={etapa.tempo_setup_min || 0}
-                      onChange={e => handleLocalUpdate(etapa.id, 'tempo_setup_min', parseInt(e.target.value))}
+                      type="text"
+                      inputMode="numeric"
+                      value={(etapa as any).tempo_setup_min == null ? '' : String((etapa as any).tempo_setup_min)}
+                      onChange={(e) => {
+                        const raw = e.target.value;
+                        if (raw === '') {
+                          handleLocalUpdate(etapa.id, 'tempo_setup_min', null as any);
+                          return;
+                        }
+                        const next = Number.parseInt(raw, 10);
+                        handleLocalUpdate(etapa.id, 'tempo_setup_min', Number.isFinite(next) ? next : 0);
+                      }}
                       onBlur={() => handlePersist(etapa.id)}
-                      onFocus={(e) => e.currentTarget.select()}
                       disabled={readOnly}
                       className="w-full p-1 text-right border border-gray-300 rounded"
+                      placeholder="0"
                     />
                   </td>
                   <td className="px-4 py-2">
