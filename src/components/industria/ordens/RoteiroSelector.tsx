@@ -63,7 +63,7 @@ export default function RoteiroSelector({ ordemId, produtoId, tipoBom, disabled,
                 <FileText size={16} /> Selecionar Roteiro
             </button>
 
-            <Modal isOpen={isOpen} onClose={() => setIsOpen(false)} title="Selecionar Roteiro de Produção" size="lg">
+            <Modal isOpen={isOpen} onClose={() => setIsOpen(false)} title="Selecionar Roteiro" size="lg">
                 <div className="p-6">
                     <div className="mb-4 space-y-3">
                         <input
@@ -94,7 +94,7 @@ export default function RoteiroSelector({ ordemId, produtoId, tipoBom, disabled,
                                 className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
                             />
                             <label htmlFor="filterByTipoRot" className="text-sm text-gray-700">
-                                Filtrar por tipo de uso (Produção/Beneficiamento)
+                                Filtrar por tipo de uso (Produção/Beneficiamento/Ambos)
                             </label>
                         </div>
                     </div>

@@ -65,6 +65,21 @@ export default function NfeInputPage({ embedded, onRecebimentoReady, autoFinaliz
   const [conferidas, setConferidas] = useState<Record<string, number>>({}); // item_id (fiscal) -> quantidade conferida
 
   const digitsOnly = (value?: string | null) => (value || '').replace(/\D/g, '');
+  const formatQty = (value?: number | string | null) => {
+    const num = typeof value === 'number' ? value : Number(value);
+    if (!Number.isFinite(num)) return '-';
+    return new Intl.NumberFormat('pt-BR', { maximumFractionDigits: 4 }).format(num);
+  };
+  const parseQtyInput = (raw: string) => {
+    const trimmed = raw.trim();
+    if (!trimmed) return NaN;
+    let normalized = trimmed;
+    if (normalized.includes(',')) {
+      normalized = normalized.replace(/\./g, '').replace(',', '.');
+    }
+    const parsed = Number(normalized);
+    return Number.isFinite(parsed) ? parsed : NaN;
+  };
 
   useEffect(() => {
     if (!previewData?.itens) return;
@@ -582,7 +597,7 @@ export default function NfeInputPage({ embedded, onRecebimentoReady, autoFinaliz
                           <p className="text-xs text-gray-500">Cód: {item.cprod} | EAN: {item.ean || '-'}</p>
                         </td>
                         <td className="px-4 py-3 text-center text-sm text-gray-700">
-                          {item.qcom} <span className="text-xs text-gray-500">{item.ucom}</span>
+                          {formatQty(item.qcom)} <span className="text-xs text-gray-500">{item.ucom}</span>
                         </td>
                         <td className="px-4 py-3 w-[40rem]">
                           {item.match_produto_id || manualMatches[item.item_id] ? (
@@ -706,17 +721,16 @@ export default function NfeInputPage({ embedded, onRecebimentoReady, autoFinaliz
                           <p className="text-xs text-gray-500">Cód: {item.cprod} | EAN: {item.ean || '-'}</p>
                         </td>
                         <td className="px-4 py-3 text-center text-sm text-gray-700">
-                          {item.qcom} <span className="text-xs text-gray-500">{item.ucom}</span>
+                          {formatQty(item.qcom)} <span className="text-xs text-gray-500">{item.ucom}</span>
                         </td>
                         <td className="px-4 py-3 text-center">
                           <input
-                            type="number"
-                            step="0.0001"
+                            type="text"
                             inputMode="decimal"
-                            value={Number.isFinite(conferidas[item.item_id]) ? conferidas[item.item_id] : ''}
+                            value={Number.isFinite(conferidas[item.item_id]) ? formatQty(conferidas[item.item_id]) : ''}
                             onChange={(e) => {
                               const raw = e.target.value;
-                              const next = raw === '' ? NaN : Number(raw);
+                              const next = parseQtyInput(raw);
                               setConferidas((prev) => ({ ...prev, [item.item_id]: next }));
                             }}
                             className="w-32 rounded-md border border-gray-300 px-2 py-1 text-sm text-gray-800 shadow-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-500"

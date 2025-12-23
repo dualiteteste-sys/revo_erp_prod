@@ -155,9 +155,10 @@ export default function RoteiroFormPanel({ roteiroId, initialData, onSaveSuccess
               )}
             </div>
             <div className="sm:col-span-2">
-              <Select label="Tipo" name="tipo_bom" value={formData?.tipo_bom} onChange={e => handleHeaderChange('tipo_bom', e.target.value)} disabled={!!formData?.id}>
+              <Select label="Utilizar em" name="tipo_bom" value={formData?.tipo_bom} onChange={e => handleHeaderChange('tipo_bom', e.target.value)} disabled={!!formData?.id}>
                 <option value="producao">Produção</option>
                 <option value="beneficiamento">Beneficiamento</option>
+                <option value="ambos">Ambos</option>
               </Select>
             </div>
             <Input
@@ -189,7 +190,7 @@ export default function RoteiroFormPanel({ roteiroId, initialData, onSaveSuccess
                 checked={formData.ativo !== false}
                 onChange={checked => handleHeaderChange('ativo', checked)}
               />
-              {formData.tipo_bom === 'producao' && (
+              {(formData.tipo_bom === 'producao' || formData.tipo_bom === 'ambos') && (
                 <Toggle
                   label="Padrão para Produção"
                   name="padrao_prod"
@@ -197,7 +198,7 @@ export default function RoteiroFormPanel({ roteiroId, initialData, onSaveSuccess
                   onChange={checked => handleHeaderChange('padrao_para_producao', checked)}
                 />
               )}
-              {formData.tipo_bom === 'beneficiamento' && (
+              {(formData.tipo_bom === 'beneficiamento' || formData.tipo_bom === 'ambos') && (
                 <Toggle
                   label="Padrão para Beneficiamento"
                   name="padrao_benef"

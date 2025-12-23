@@ -150,7 +150,7 @@ export default function BomSelector({ ordemId, produtoId, tipoOrdem, openOnMount
                 className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
               />
               <label htmlFor="filterByTipo" className="text-sm text-gray-700">
-                Filtrar por tipo de uso (Produção/Beneficiamento)
+                Filtrar por tipo de uso (Produção/Beneficiamento/Ambos)
               </label>
             </div>
           </div>

@@ -24,6 +24,11 @@ export function useEmpresas(userId: string | null) {
                 .order("created_at", { ascending: false });
 
             if (error) {
+                const message = String((error as any)?.message || '');
+                if (message.toLowerCase().includes('failed to fetch')) {
+                    logger.warn('[QUERY][empresas] list error (network)', { error });
+                    return [] as Empresa[];
+                }
                 logger.error('[QUERY][empresas] list error', error);
                 throw error;
             }

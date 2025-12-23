@@ -21,6 +21,8 @@ BEGIN
 END $$;
 
 -- Restaurar permissões padrão (ajuste conforme necessário para seu ambiente Supabase)
+CREATE SCHEMA IF NOT EXISTS public;
+
 GRANT USAGE ON SCHEMA public TO postgres;
 GRANT USAGE ON SCHEMA public TO anon;
 GRANT USAGE ON SCHEMA public TO authenticated;

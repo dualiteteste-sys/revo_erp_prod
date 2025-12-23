@@ -2,6 +2,7 @@ import { createContext, useContext, useEffect, useState, ReactNode, useCallback 
 import { useSupabase } from '@/providers/SupabaseProvider';
 import { useAuth } from './AuthProvider';
 import { Database } from '../types/database.types';
+import { logger } from '@/lib/logger';
 
 type Subscription = Database['public']['Tables']['subscriptions']['Row'];
 type Plan = Database['public']['Tables']['plans']['Row'];
@@ -56,7 +57,7 @@ export const SubscriptionProvider = ({ children }: { children: ReactNode }) => {
       }
 
     } catch (error) {
-      console.error('Erro ao buscar assinatura:', error);
+      logger.warn('Falha ao buscar assinatura', { error });
       setSubscription(null);
     } finally {
       setLoadingSubscription(false);

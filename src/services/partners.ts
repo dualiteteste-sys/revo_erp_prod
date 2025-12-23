@@ -66,6 +66,7 @@ export async function savePartner(payload: PartnerPayload): Promise<PartnerDetai
       doc_unico: payload.pessoa.doc_unico?.replace(/\D/g, '') || null,
       telefone: payload.pessoa.telefone?.replace(/\D/g, '') || null,
       celular: payload.pessoa.celular?.replace(/\D/g, '') || null,
+      contribuinte_icms: payload.pessoa.contribuinte_icms ?? '9',
       limite_credito: payload.pessoa.limite_credito,
       condicao_pagamento: payload.pessoa.condicao_pagamento,
       informacoes_bancarias: payload.pessoa.informacoes_bancarias,

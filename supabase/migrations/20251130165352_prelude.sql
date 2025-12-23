@@ -1,4 +1,12 @@
 -- prelude mínimo para rodar baseline no VERIFY
+DO $$
+BEGIN
+  IF to_regclass('supabase_migrations.schema_migrations') IS NOT NULL THEN
+    DELETE FROM supabase_migrations.schema_migrations
+    WHERE version = '20251130165352';
+  END IF;
+END $$;
+
 create schema if not exists audit;
 
 -- Stub para current_empresa_id caso seja necessário por defaults
