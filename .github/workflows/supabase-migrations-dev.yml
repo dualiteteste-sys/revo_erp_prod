@@ -9,6 +9,10 @@ on:
       - dev
   workflow_dispatch:
 
+concurrency:
+  group: verify-migrations-dev
+  cancel-in-progress: false
+
 jobs:
   verify-migrations:
     name: Verify migrations on clean database
