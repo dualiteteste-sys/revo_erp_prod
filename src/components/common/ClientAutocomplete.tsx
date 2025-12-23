@@ -50,7 +50,9 @@ export default function ClientAutocomplete({ value, onChange, placeholder, disab
         setHits([]);
         return;
       }
-      if (value && query === initialName) {
+      // Se já existe um valor selecionado, não deve continuar pesquisando;
+      // o valor será limpo quando o usuário digitar novamente (handleInputChange).
+      if (value) {
         return;
       }
 
