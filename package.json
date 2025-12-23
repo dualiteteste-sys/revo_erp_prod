@@ -12,7 +12,8 @@
     "preview": "vite preview",
     "test": "vitest",
     "test:coverage": "vitest run --coverage",
-    "test:e2e": "playwright test"
+    "test:e2e": "playwright test",
+    "verify:migrations": "supabase start && echo \"y\" | supabase db push --local --include-all && supabase stop"
   },
   "dependencies": {
     "@hello-pangea/dnd": "^16.6.0",
