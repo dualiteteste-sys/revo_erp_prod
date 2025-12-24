@@ -1,4 +1,5 @@
 import { useHasPermission } from './useHasPermission';
+import { roleAtLeast, useEmpresaRole } from './useEmpresaRole';
 
 // List of modules based on the seeded permissions in the database
 export type PermissionModule = 
@@ -19,6 +20,9 @@ export type PermissionAction = 'view' | 'create' | 'update' | 'delete' | 'manage
  * Note: During initial loading, it will return `false`, which may cause a brief flicker in the UI.
  */
 export function useCan(module: PermissionModule, action: PermissionAction): boolean {
+  const empresaRoleQuery = useEmpresaRole();
+  if (empresaRoleQuery.isFetched && roleAtLeast(empresaRoleQuery.data, 'admin')) return true;
+
   const { data: hasPermission, isLoading } = useHasPermission(module, action);
 
   // During the loading phase, we assume no permission to be on the safe side.
