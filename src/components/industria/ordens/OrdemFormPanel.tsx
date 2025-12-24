@@ -38,6 +38,10 @@ interface Props {
     materialClienteNome?: string | null;
     materialClienteCodigo?: string | null;
     materialClienteUnidade?: string | null;
+    origemNfeImportId?: string | null;
+    origemNfeItemId?: string | null;
+    origemQtdXml?: number | null;
+    origemUnidadeXml?: string | null;
   };
   allowTipoOrdemChange?: boolean;
   onTipoOrdemChange?: (tipo: 'industrializacao' | 'beneficiamento') => void;
@@ -119,6 +123,25 @@ export default function OrdemFormPanel({
       }
       if (initialPrefill.documentoRef && !next.documento_ref) {
         next.documento_ref = initialPrefill.documentoRef;
+      }
+
+      if (initialPrefill.origemNfeImportId && !next.origem_fiscal_nfe_import_id) {
+        next.origem_fiscal_nfe_import_id = initialPrefill.origemNfeImportId;
+      }
+      if (initialPrefill.origemNfeItemId && !next.origem_fiscal_nfe_item_id) {
+        next.origem_fiscal_nfe_item_id = initialPrefill.origemNfeItemId;
+      }
+      if (typeof initialPrefill.origemQtdXml === 'number' && next.origem_qtd_xml == null) {
+        next.origem_qtd_xml = initialPrefill.origemQtdXml;
+        if (!next.quantidade_planejada || next.quantidade_planejada <= 0) {
+          next.quantidade_planejada = initialPrefill.origemQtdXml;
+        }
+      }
+      if (initialPrefill.origemUnidadeXml && !next.origem_unidade_xml) {
+        next.origem_unidade_xml = initialPrefill.origemUnidadeXml;
+        if (!next.unidade || next.unidade === 'un') {
+          next.unidade = initialPrefill.origemUnidadeXml;
+        }
       }
 
       if (initialTipoOrdem === 'beneficiamento' || next.tipo_ordem === 'beneficiamento') {
@@ -240,6 +263,10 @@ export default function OrdemFormPanel({
         qtde_caixas: formData.qtde_caixas,
         numero_nf: formData.numero_nf,
         pedido_numero: formData.pedido_numero,
+        origem_fiscal_nfe_import_id: formData.origem_fiscal_nfe_import_id,
+        origem_fiscal_nfe_item_id: formData.origem_fiscal_nfe_item_id,
+        origem_qtd_xml: formData.origem_qtd_xml,
+        origem_unidade_xml: formData.origem_unidade_xml,
       };
 
       const saved = await saveOrdem(payload);
@@ -391,6 +418,7 @@ export default function OrdemFormPanel({
   const isWizard = !ordemId && !formData.id;
   const isExecucaoGerada = !!formData.execucao_ordem_id;
   const isHeaderLocked = isLockedEffective || isExecucaoGerada;
+  const hasOrigemNfe = !!formData.origem_fiscal_nfe_item_id;
   const componentesCount = Array.isArray(formData.componentes) ? formData.componentes.length : 0;
 	  const checklistExecucao = [
 	    {
@@ -450,6 +478,30 @@ export default function OrdemFormPanel({
     next.set('view', 'list');
     if (q) next.set('q', q);
     navigate(`/app/industria/execucao?${next.toString()}`);
+  };
+
+  const handleDesvincularOrigemNfe = async () => {
+    if (!canAdmin) {
+      addToast('Você não tem permissão para desvincular a origem da NF-e.', 'error');
+      return;
+    }
+    if (!hasOrigemNfe) return;
+    if (isHeaderLocked) return;
+    const ok = await confirm({
+      title: 'Usar quantidade manual',
+      description:
+        'Esta ordem foi criada a partir de uma NF-e. Ao desvincular, você poderá alterar produto/unidade/quantidade manualmente e o rastreio do item da NF será removido desta ordem. Deseja continuar?',
+      confirmText: 'Desvincular',
+      cancelText: 'Cancelar',
+      variant: 'danger',
+    });
+    if (!ok) return;
+
+    handleHeaderChange('origem_fiscal_nfe_import_id', null);
+    handleHeaderChange('origem_fiscal_nfe_item_id', null);
+    handleHeaderChange('origem_qtd_xml', null);
+    handleHeaderChange('origem_unidade_xml', null);
+    addToast('Origem da NF-e desvinculada. Agora você pode editar manualmente.', 'success');
   };
 
   const handleGerarExecucao = async () => {
@@ -634,7 +686,7 @@ export default function OrdemFormPanel({
                 ) : formData.produto_final_id && formData.produto_nome ? (
                   <div className="flex items-center justify-between gap-3 p-3 bg-gray-50 border border-gray-200 rounded-lg">
                     <div className="text-gray-800 font-medium truncate">{formData.produto_nome}</div>
-                    {!isHeaderLocked && (
+                    {!isHeaderLocked && !hasOrigemNfe && (
                       <button
                         type="button"
                         onClick={() => {
@@ -658,13 +710,39 @@ export default function OrdemFormPanel({
               </div>
               <div className="sm:col-span-2">
                 <Input
-                  label="Quantidade Planejada"
+                  label={
+                    <div className="flex items-center justify-between gap-3">
+                      <span>Quantidade Planejada</span>
+                      {hasOrigemNfe && (
+                        <div className="flex items-center gap-3">
+                          <span className="text-[11px] px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 border border-slate-200">
+                            NF-e
+                          </span>
+                          {canAdmin && !isHeaderLocked && (
+                            <button
+                              type="button"
+                              onClick={handleDesvincularOrigemNfe}
+                              className="text-[11px] font-semibold text-rose-700 hover:text-rose-900 hover:underline whitespace-nowrap"
+                              title="Desvincula a origem da NF-e para permitir edição manual."
+                            >
+                              Usar quantidade manual
+                            </button>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  }
                   name="qtd"
                   type="number"
                   value={formData.quantidade_planejada || ''}
                   onChange={e => handleHeaderChange('quantidade_planejada', parseFloat(e.target.value))}
-                  disabled={isHeaderLocked}
+                  disabled={isHeaderLocked || hasOrigemNfe}
                 />
+                {hasOrigemNfe && (
+                  <div className="mt-1 text-xs text-gray-500">
+                    Definida pelo XML: {formData.origem_qtd_xml ?? '—'} {formData.origem_unidade_xml || formData.unidade || ''}
+                  </div>
+                )}
               </div>
               <div className="sm:col-span-1">
                 <Input
@@ -672,7 +750,7 @@ export default function OrdemFormPanel({
                   name="unidade"
                   value={formData.unidade || ''}
                   onChange={e => handleHeaderChange('unidade', e.target.value)}
-                  disabled={isHeaderLocked}
+                  disabled={isHeaderLocked || hasOrigemNfe}
                 />
               </div>
               <div className="sm:col-span-3">

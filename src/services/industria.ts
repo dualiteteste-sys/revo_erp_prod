@@ -92,6 +92,11 @@ export type OrdemIndustriaDetails = {
   numero_nf?: string | null;
   pedido_numero?: string | null;
   qtde_caixas?: number | null;
+  // Origem fiscal (NF-e / XML)
+  origem_fiscal_nfe_import_id?: string | null;
+  origem_fiscal_nfe_item_id?: string | null;
+  origem_qtd_xml?: number | null;
+  origem_unidade_xml?: string | null;
   observacoes?: string | null;
   created_at?: string | null;
   updated_at?: string | null;
