@@ -401,7 +401,7 @@ export default function OrdemFormPanel({
       return;
     }
     try {
-      await manageEntrega(formData.id!, entregaId, '', 0, 'nao_faturado', undefined, undefined, 'delete');
+      await manageEntrega(formData.id!, entregaId, null, null, null, undefined, undefined, 'delete');
       await loadDetails(formData.id);
       addToast('Entrega removida.', 'success');
     } catch (e: any) {

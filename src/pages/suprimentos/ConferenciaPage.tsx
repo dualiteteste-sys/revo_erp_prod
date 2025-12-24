@@ -477,7 +477,7 @@ export default function ConferenciaPage() {
                                 <button
                                     type="button"
                                     onClick={handleOpenGerarOb}
-                                    className="bg-purple-600 text-white px-4 py-2 rounded-lg font-bold flex items-center gap-2 hover:bg-purple-700"
+                                    className="bg-blue-600 text-white px-4 py-2 rounded-lg font-bold flex items-center gap-2 hover:bg-blue-700"
                                     title="Gerar Ordem(s) de Beneficiamento a partir deste recebimento"
                                 >
                                     <Hammer size={18} />
@@ -607,7 +607,7 @@ export default function ConferenciaPage() {
                                             disabled={!isConcluido}
                                             className={`p-2 rounded-lg transition-colors flex items-center gap-1 mx-auto text-xs font-medium ${
                                                 isConcluido 
-                                                ? 'text-purple-600 hover:text-purple-800 hover:bg-purple-50' 
+                                                ? 'text-blue-600 hover:text-blue-800 hover:bg-blue-50' 
                                                 : 'text-gray-400 cursor-not-allowed'
                                             }`}
                                             title={
@@ -712,7 +712,7 @@ export default function ConferenciaPage() {
                         <button
                             type="button"
                             onClick={handleGerarObConfirm}
-                            className="flex items-center gap-2 bg-purple-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-purple-700 disabled:opacity-50"
+                            className="flex items-center gap-2 bg-blue-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-blue-700 disabled:opacity-50"
                             disabled={gerarObLoading}
                         >
                             {gerarObLoading ? <Loader2 className="animate-spin" size={18} /> : <Hammer size={18} />}

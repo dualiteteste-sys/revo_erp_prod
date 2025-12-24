@@ -145,9 +145,9 @@ export async function manageComponente(
 export async function manageEntrega(
   ordemId: string,
   entregaId: string | null,
-  dataEntrega: string,
-  qtdEntregue: number,
-  statusFaturamento: string,
+  dataEntrega?: string | null,
+  qtdEntregue?: number | null,
+  statusFaturamento?: string | null,
   documentoRef?: string,
   observacoes?: string,
   action: 'upsert' | 'delete' = 'upsert'
@@ -155,9 +155,10 @@ export async function manageEntrega(
   await callRpc('industria_manage_entrega', {
     p_ordem_id: ordemId,
     p_entrega_id: entregaId,
-    p_data_entrega: dataEntrega,
-    p_quantidade_entregue: qtdEntregue,
-    p_status_faturamento: statusFaturamento,
+    // Para delete, esses campos são ignorados no servidor. Usar null evita erro de cast ('' -> date).
+    p_data_entrega: action === 'delete' ? null : (dataEntrega ?? null),
+    p_quantidade_entregue: action === 'delete' ? null : (qtdEntregue ?? null),
+    p_status_faturamento: action === 'delete' ? null : (statusFaturamento ?? null),
     p_documento_ref: documentoRef || null,
     p_observacoes: observacoes || null,
     p_action: action,
@@ -174,6 +175,10 @@ export async function updateOrdemStatus(id: string, status: StatusOrdem, priorid
 
 export async function cloneOrdem(id: string): Promise<OrdemIndustriaDetails> {
   return callRpc<OrdemIndustriaDetails>('industria_clone_ordem', { p_source_id: id });
+}
+
+export async function deleteOrdemBeneficiamento(id: string): Promise<void> {
+  await callRpc('industria_delete_ordem', { p_id: id });
 }
 
 export async function replanejarOperacao(operacaoId: string, centroTrabalhoId: string, prioridade?: number) {
