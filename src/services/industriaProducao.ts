@@ -89,17 +89,18 @@ export async function manageComponenteProducao(
 export async function manageEntregaProducao(
   ordemId: string,
   entregaId: string | null,
-  dataEntrega: string,
-  qtdEntregue: number,
+  dataEntrega: string | null,
+  qtdEntregue: number | null,
   docRef?: string,
   obs?: string,
   action: 'upsert' | 'delete' = 'upsert'
 ): Promise<void> {
+  const isDelete = action === 'delete';
   await callRpc('industria_producao_manage_entrega', {
     p_ordem_id: ordemId,
     p_entrega_id: entregaId,
-    p_data_entrega: dataEntrega,
-    p_quantidade_entregue: qtdEntregue,
+    p_data_entrega: isDelete ? null : dataEntrega,
+    p_quantidade_entregue: isDelete ? null : qtdEntregue,
     p_documento_ref: docRef || null,
     p_observacoes: obs || null,
     p_action: action,
