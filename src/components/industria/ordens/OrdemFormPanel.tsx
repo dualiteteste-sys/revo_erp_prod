@@ -933,16 +933,17 @@ export default function OrdemFormPanel({
                       ? <>BOM: <strong>{formData.bom_aplicado_desc}</strong></>
                       : 'Nenhuma BOM aplicada.'}
                   </p>
-                  <BomSelector
+                    <BomSelector
                     ordemId={formData.id || ''}
                     produtoId={formData.produto_final_id}
                     tipoOrdem={formData.tipo_ordem === 'beneficiamento' ? 'beneficiamento' : 'producao'}
                     openOnMount={false}
                     disabled={isExecucaoGerada || isLockedEffective}
                     onEnsureOrder={ensureOrderSaved}
-                    onApplied={(bom) => {
+                    onApplied={(bom, appliedOrdemId) => {
+                      handleHeaderChange('bom_aplicado_id', bom.id);
                       handleHeaderChange('bom_aplicado_desc', bom.codigo ? `${bom.codigo} (v${bom.versao})` : bom.descricao || 'Ficha técnica aplicada');
-                      loadDetails(formData.id);
+                      loadDetails(appliedOrdemId);
                     }}
                   />
                 </div>

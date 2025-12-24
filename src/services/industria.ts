@@ -69,6 +69,8 @@ export type OrdemIndustriaDetails = {
   tipo_ordem: TipoOrdemIndustria;
   produto_final_id: string;
   produto_nome: string;
+  bom_aplicado_id?: string | null;
+  bom_aplicado_desc?: string | null;
   roteiro_aplicado_id?: string | null;
   roteiro_aplicado_desc?: string | null;
   execucao_ordem_id?: string | null;
