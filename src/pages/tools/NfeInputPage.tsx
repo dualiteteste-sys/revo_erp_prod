@@ -280,6 +280,7 @@ export default function NfeInputPage({ embedded, onRecebimentoReady, autoFinaliz
         data_emissao: get(infNFe, 'ide.dhEmi'),
         total_produtos: parseFloat(get(infNFe, 'total.ICMSTot.vProd')),
         total_nf: parseFloat(get(infNFe, 'total.ICMSTot.vNF')),
+        pedido_numero: get(infNFe, 'compra.xPed') || null,
         items: itemsPayload,
         origem_upload: 'xml'
       };

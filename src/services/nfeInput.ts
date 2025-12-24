@@ -5,6 +5,7 @@ export type NfeImportPayload = {
   origem_upload?: 'xml' | 'danfe';
   numero?: string;
   serie?: string;
+  pedido_numero?: string | null;
   emitente_cnpj?: string;
   emitente_nome?: string;
   destinat_cnpj?: string;
