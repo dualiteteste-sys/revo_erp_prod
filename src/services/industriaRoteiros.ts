@@ -3,7 +3,7 @@ import { faker } from '@faker-js/faker';
 import { getProducts } from './products';
 import { listCentrosTrabalho } from './industriaCentros';
 
-export type TipoBom = 'producao' | 'beneficiamento';
+export type TipoBom = 'producao' | 'beneficiamento' | 'ambos';
 export type TipoOperacao = 'setup' | 'producao' | 'inspecao' | 'embalagem' | 'outro';
 
 export type RoteiroListItem = {
@@ -90,7 +90,7 @@ export async function seedRoteiros(): Promise<void> {
   // 2. Generate 5 Roteiros
   for (let i = 0; i < 5; i++) {
     const product = faker.helpers.arrayElement(products);
-    const tipo = faker.helpers.arrayElement(['producao', 'beneficiamento']) as TipoBom;
+    const tipo = faker.helpers.arrayElement(['producao', 'beneficiamento', 'ambos']) as TipoBom;
 
     const payload: RoteiroPayload = {
       produto_id: product.id,
@@ -99,8 +99,8 @@ export async function seedRoteiros(): Promise<void> {
       descricao: `Roteiro Padrão - ${faker.date.recent().getFullYear()}`,
       versao: `${faker.number.int({ min: 1, max: 5 })}.0`,
       ativo: true,
-      padrao_para_producao: tipo === 'producao',
-      padrao_para_beneficiamento: tipo === 'beneficiamento',
+      padrao_para_producao: tipo === 'producao' || tipo === 'ambos',
+      padrao_para_beneficiamento: tipo === 'beneficiamento' || tipo === 'ambos',
       observacoes: faker.lorem.sentence(),
     };
 

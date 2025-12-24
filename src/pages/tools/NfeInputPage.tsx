@@ -179,6 +179,10 @@ export default function NfeInputPage({ embedded, onRecebimentoReady, autoFinaliz
             materialClienteNome: item.xprod || null,
             materialClienteCodigo: item.cprod || null,
             materialClienteUnidade: item.ucom || null,
+            origemNfeImportId: importId,
+            origemNfeItemId: item.item_id,
+            origemQtdXml: typeof item.qcom === 'number' ? item.qcom : Number(item.qcom),
+            origemUnidadeXml: item.ucom || null,
           },
           source: { kind: 'nfe-beneficiamento', importId, itemId: item.item_id },
         },
@@ -276,6 +280,7 @@ export default function NfeInputPage({ embedded, onRecebimentoReady, autoFinaliz
         data_emissao: get(infNFe, 'ide.dhEmi'),
         total_produtos: parseFloat(get(infNFe, 'total.ICMSTot.vProd')),
         total_nf: parseFloat(get(infNFe, 'total.ICMSTot.vNF')),
+        pedido_numero: get(infNFe, 'compra.xPed') || null,
         items: itemsPayload,
         origem_upload: 'xml'
       };

@@ -5,10 +5,16 @@ import { useToast } from '@/contexts/ToastProvider';
 import Modal from '@/components/ui/Modal';
 import { logger } from '@/lib/logger';
 
+const labelTipoRoteiro = (tipo?: string | null) => {
+  if (tipo === 'beneficiamento') return { label: 'Beneficiamento', className: 'bg-purple-100 text-purple-800' };
+  if (tipo === 'ambos') return { label: 'Ambos', className: 'bg-slate-100 text-slate-800' };
+  return { label: 'Produção', className: 'bg-blue-100 text-blue-800' };
+};
+
 interface Props {
-    ordemId: string;
-    produtoId: string;
-    tipoBom?: 'producao' | 'beneficiamento';
+  ordemId: string;
+  produtoId: string;
+  tipoBom?: 'producao' | 'beneficiamento' | 'ambos';
     disabled?: boolean;
     onApplied: (roteiro: RoteiroListItem) => void;
 }
@@ -113,11 +119,16 @@ export default function RoteiroSelector({ ordemId, produtoId, tipoBom, disabled,
                                     <div>
                                         <div className="flex items-center gap-2">
                                             <h4 className="font-bold text-gray-800">{rot.codigo || 'Sem Código'} (v{rot.versao})</h4>
-                                            <span className="text-xs bg-blue-100 text-blue-800 px-2 py-0.5 rounded-full">
-                                              {rot.tipo_bom === 'beneficiamento' ? 'Beneficiamento' : 'Produção'}
-                                            </span>
-                                            {rot.padrao_para_producao && <span className="text-xs bg-green-100 text-green-800 px-2 py-0.5 rounded-full">Padrão</span>}
-                                        </div>
+                                              {(() => {
+                                                const meta = labelTipoRoteiro(rot.tipo_bom);
+                                                return (
+                                                  <span className={`text-xs px-2 py-0.5 rounded-full ${meta.className}`}>
+                                                    {meta.label}
+                                                  </span>
+                                                );
+                                              })()}
+                                              {rot.padrao_para_producao && <span className="text-xs bg-green-100 text-green-800 px-2 py-0.5 rounded-full">Padrão</span>}
+                                            </div>
                                         <p className="text-sm text-gray-600">{rot.descricao}</p>
                                         <p className="text-xs text-gray-500 mt-1">Produto: {rot.produto_nome}</p>
                                     </div>

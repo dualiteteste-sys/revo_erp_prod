@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Loader2, PlusCircle, RefreshCcw } from 'lucide-react';
+import { Loader2, PlusCircle, RefreshCcw, ClipboardCheck } from 'lucide-react';
 import { useDebounce } from '@/hooks/useDebounce';
 import { useToast } from '@/contexts/ToastProvider';
 import {
@@ -11,6 +11,8 @@ import PlanosInspecaoTable from '@/components/industria/qualidade/PlanosInspecao
 import PlanoInspecaoFormModal from '@/components/industria/qualidade/PlanoInspecaoFormModal';
 import { useConfirm } from '@/contexts/ConfirmProvider';
 import { Button } from '@/components/ui/button';
+import PageHeader from '@/components/ui/PageHeader';
+import SearchField from '@/components/ui/forms/SearchField';
 
 export default function PlanosInspecaoPage() {
   const { addToast } = useToast();
@@ -68,38 +70,29 @@ export default function PlanosInspecaoPage() {
   };
 
   return (
-    <div className="p-6 space-y-6">
-      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-800">Planos de Inspeção</h1>
-          <p className="text-sm text-gray-500">
-            Configure IP/IF vinculadas aos produtos e etapas para garantir liberação da próxima fase somente após a aprovação.
-          </p>
-        </div>
-        <div className="flex gap-2 flex-wrap">
-          <Button onClick={loadPlanos} variant="outline" className="gap-2">
-            <RefreshCcw size={16} /> Atualizar
-          </Button>
-          <Button onClick={handleNew} className="gap-2">
-            <PlusCircle size={18} /> Novo Plano
-          </Button>
-        </div>
-      </div>
+    <div className="p-1 space-y-6">
+      <PageHeader
+        title="Planos de Inspeção"
+        description="Configure IP/IF vinculadas aos produtos e etapas para liberar a próxima fase somente após aprovação."
+        icon={<ClipboardCheck className="w-5 h-5" />}
+        actions={
+          <>
+            <Button onClick={loadPlanos} variant="outline" className="gap-2">
+              <RefreshCcw size={16} /> Atualizar
+            </Button>
+            <Button onClick={handleNew} className="gap-2">
+              <PlusCircle size={18} /> Novo Plano
+            </Button>
+          </>
+        }
+      />
 
-      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-        <div className="relative w-full md:w-96">
-          <input
-            className="w-full rounded-lg border border-gray-300 bg-white py-2.5 pl-10 pr-3 text-sm shadow-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-500"
-            placeholder="Buscar por nome, produto ou etapa..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-          />
-          <svg className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2">
-            <circle cx="8" cy="8" r="6" />
-            <line x1="12.5" y1="12.5" x2="16" y2="16" />
-          </svg>
-        </div>
-      </div>
+      <SearchField
+        placeholder="Buscar por nome, produto ou etapa..."
+        value={search}
+        onChange={(e) => setSearch(e.target.value)}
+        className="max-w-md"
+      />
 
       {loading ? (
         <div className="flex items-center justify-center py-16 text-blue-600 gap-2">

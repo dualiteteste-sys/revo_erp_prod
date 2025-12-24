@@ -267,7 +267,7 @@ export default function ProducaoFormPanel({
 
   const handleRemoveEntrega = async (entregaId: string) => {
     try {
-      await manageEntregaProducao(formData.id!, entregaId, '', 0, undefined, undefined, 'delete');
+      await manageEntregaProducao(formData.id!, entregaId, null, null, undefined, undefined, 'delete');
       await loadDetails(formData.id);
       addToast('Entrega removida.', 'success');
     } catch (e: any) {

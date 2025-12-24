@@ -57,6 +57,7 @@ const LotesQualidadePage = lazyImport(() => import("../pages/industria/qualidade
 const MateriaisClientePage = lazyImport(() => import("../pages/industria/MateriaisClientePage"));
 const MrpDemandasPage = lazyImport(() => import("../pages/industria/mrp/MrpDemandasPage"));
 const PcpDashboardPage = lazyImport(() => import("../pages/industria/pcp/PcpDashboardPage"));
+const StatusBeneficiamentosPage = lazyImport(() => import("../pages/industria/StatusBeneficiamentosPage"));
 
 // Suprimentos Pages
 const EstoquePage = lazyImport(() => import("../pages/suprimentos/EstoquePage"));
@@ -101,6 +102,7 @@ export const appRoutes: RouteObject[] = [
             { path: "industria/qualidade/planos", element: <Suspense fallback={<PageLoader />}><PlanosInspecaoPage /></Suspense> },
             { path: "industria/qualidade/lotes", element: <Suspense fallback={<PageLoader />}><LotesQualidadePage /></Suspense> },
             { path: "industria/dashboard", element: <Suspense fallback={<PageLoader />}><IndustriaDashboardPage /></Suspense> },
+            { path: "industria/status-beneficiamentos", element: <Suspense fallback={<PageLoader />}><StatusBeneficiamentosPage /></Suspense> },
             { path: "industria/producao", element: <Suspense fallback={<PageLoader />}><ProducaoPage /></Suspense> },
             { path: "industria/ordens", element: <Suspense fallback={<PageLoader />}><OrdensPage /></Suspense> },
             { path: "industria/mrp", element: <Suspense fallback={<PageLoader />}><MrpDemandasPage /></Suspense> },

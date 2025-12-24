@@ -217,6 +217,7 @@ test('Beneficiamento: criar OB e gerar operações na Execução', async ({ page
   await page.route('**/rest/v1/rpc/industria_upsert_ordem', async (route) => {
     const body = route.request().postDataJSON?.() as any;
     const roteiroId = body?.p_payload?.roteiro_aplicado_id ?? null;
+    const materialClienteId = body?.p_payload?.material_cliente_id ?? 'mat-cli-1';
     await route.fulfill({
       json: {
         id: 'ord-1',
@@ -236,11 +237,11 @@ test('Beneficiamento: criar OB e gerar operações na Execução', async ({ page
         data_prevista_entrega: null,
         documento_ref: null,
         observacoes: null,
-        usa_material_cliente: false,
-        material_cliente_id: null,
-        material_cliente_nome: null,
-        material_cliente_codigo: null,
-        material_cliente_unidade: null,
+        usa_material_cliente: true,
+        material_cliente_id: materialClienteId,
+        material_cliente_nome: 'Parafuso do Cliente M6 (bruto)',
+        material_cliente_codigo: 'CLI-PARAF-001',
+        material_cliente_unidade: 'un',
         roteiro_aplicado_id: roteiroId,
         roteiro_aplicado_desc: roteiroId ? 'ROT-PARAF-PR (v1) - Ponta + Rosca' : null,
         execucao_ordem_id: null,
@@ -287,11 +288,11 @@ test('Beneficiamento: criar OB e gerar operações na Execução', async ({ page
         data_prevista_entrega: null,
         documento_ref: null,
         observacoes: null,
-        usa_material_cliente: false,
-        material_cliente_id: null,
-        material_cliente_nome: null,
-        material_cliente_codigo: null,
-        material_cliente_unidade: null,
+        usa_material_cliente: true,
+        material_cliente_id: 'mat-cli-1',
+        material_cliente_nome: 'Parafuso do Cliente M6 (bruto)',
+        material_cliente_codigo: 'CLI-PARAF-001',
+        material_cliente_unidade: 'un',
         roteiro_aplicado_id: 'rot-1',
         roteiro_aplicado_desc: 'ROT-PARAF-PR (v1) - Ponta + Rosca',
         execucao_ordem_id: execucaoGerada ? 'prod-ord-1' : null,
@@ -404,10 +405,9 @@ test('Beneficiamento: criar OB e gerar operações na Execução', async ({ page
   // 2.1) Cliente
   const clienteInput = page.getByPlaceholder('Nome/CPF/CNPJ...');
   await clienteInput.fill('Cl');
-  await page.getByText('Cliente E2E').first().click();
-
-  // Wizard: vai para o passo de Material/Qtd
-  await page.getByRole('button', { name: 'Próximo' }).click();
+  const clienteHit = page.getByText('Cliente E2E').first();
+  await expect(clienteHit).toBeVisible();
+  await clienteHit.click();
 
   // 2.2) Produto/Serviço interno (Parafuso)
   const itemInput = page.getByPlaceholder('Buscar produto ou serviço...');
@@ -422,19 +422,23 @@ test('Beneficiamento: criar OB e gerar operações na Execução', async ({ page
   // 2.3) Quantidade
   await page.getByLabel('Quantidade Planejada').fill('5');
 
-  // Wizard: vai para o passo de Revisão (Processo)
+  // Wizard: vai para o passo de Programação
   await page.getByRole('button', { name: 'Próximo' }).click();
 
-  // Seleciona roteiro (ponta + rosca)
+  // Wizard: vai para o passo de Revisão
+  await page.getByRole('button', { name: 'Próximo' }).click();
+
+  // 2.4) Salvar (Wizard) e abrir aba de componentes
+  await page.getByRole('button', { name: 'Salvar e continuar' }).click();
+
+  // 2.5) Selecionar roteiro (aba Componentes)
   await page.getByRole('button', { name: 'Selecionar Roteiro' }).click();
-  await expect(page.getByRole('heading', { name: 'Selecionar Roteiro de Produção' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Selecionar Roteiro' })).toBeVisible();
   await page.getByText('ROT-PARAF-PR').first().click();
   await expect(page.getByText('ROT-PARAF-PR (v1) - Ponta + Rosca')).toBeVisible();
 
-  // 2.4) Salvar (Wizard)
-  await page.getByRole('button', { name: 'Salvar e continuar' }).click();
-
-  // 2.5) BOM auto-abre; aplica FT
+  // 2.6) Aplicar BOM (aba Componentes)
+  await page.getByRole('button', { name: 'Aplicar BOM' }).click();
   const bomHeading = page.getByRole('heading', { name: 'Selecionar Ficha Técnica (BOM)' });
   await expect(bomHeading).toBeVisible();
   await page.getByRole('button', { name: 'Substituir' }).click();

@@ -5,6 +5,7 @@ import { formatOrderNumber } from '@/lib/utils';
 import { useToast } from '@/contexts/ToastProvider';
 import { useConfirm } from '@/contexts/ConfirmProvider';
 import { deleteOrdemProducao } from '@/services/industriaProducao';
+import { deleteOrdemBeneficiamento } from '@/services/industria';
 
 interface Props {
   orders: OrdemIndustria[];
@@ -41,15 +42,14 @@ export default function OrdensTable({ orders, onEdit, onClone, onChanged }: Prop
   const handleDelete = async (order: OrdemIndustria) => {
     setMenuId(null);
 
-    // Só suportamos delete direto para OP (industrializacao). Outros tipos usam fluxo próprio.
-    if (order.tipo_ordem !== 'industrializacao') {
-      addToast('Exclusão rápida disponível apenas para OP de industrialização.', 'info');
-      return;
-    }
+    const isOb = order.tipo_ordem === 'beneficiamento';
+    const isOp = order.tipo_ordem === 'industrializacao';
 
     const ok = await confirm({
-      title: 'Excluir OP',
-      description: 'Excluirá esta OP se estiver em rascunho e sem operações/apontamentos/entregas.',
+      title: isOb ? 'Excluir OB' : 'Excluir OP',
+      description: isOb
+        ? 'Excluirá esta OB se estiver em rascunho e sem operações (execução) / entregas.'
+        : 'Excluirá esta OP se estiver em rascunho e sem operações/apontamentos/entregas.',
       confirmText: 'Excluir',
       cancelText: 'Cancelar',
       variant: 'warning',
@@ -57,8 +57,16 @@ export default function OrdensTable({ orders, onEdit, onClone, onChanged }: Prop
     if (!ok) return;
 
     try {
-      await deleteOrdemProducao(order.id);
-      addToast('OP excluída com sucesso.', 'success');
+      if (isOp) {
+        await deleteOrdemProducao(order.id);
+      } else if (isOb) {
+        await deleteOrdemBeneficiamento(order.id);
+      } else {
+        addToast('Tipo de ordem não suportado para exclusão.', 'error');
+        return;
+      }
+
+      addToast(`${isOb ? 'OB' : 'OP'} excluída com sucesso.`, 'success');
       onChanged?.();
     } catch (e: any) {
       const msg = String(e?.message || '');
@@ -67,9 +75,9 @@ export default function OrdensTable({ orders, onEdit, onClone, onChanged }: Prop
       } else if (msg.toLowerCase().includes('entregas')) {
         addToast('Não é possível excluir: há entregas. Remova entregas antes.', 'error');
       } else if (msg.toLowerCase().includes('rascunho')) {
-        addToast('Só é possível excluir OP em rascunho.', 'error');
+        addToast(`Só é possível excluir ${isOb ? 'OB' : 'OP'} em rascunho.`, 'error');
       } else {
-        addToast('Erro ao excluir OP: ' + msg, 'error');
+        addToast(`Erro ao excluir ${isOb ? 'OB' : 'OP'}: ${msg}`, 'error');
       }
     }
   };
@@ -140,7 +148,7 @@ export default function OrdensTable({ orders, onEdit, onClone, onChanged }: Prop
                   >
                     {order.status === 'concluida' || order.status === 'cancelada' ? <Eye size={18} /> : <Edit size={18} />}
                   </button>
-                  {(onClone || order.tipo_ordem === 'industrializacao') && (
+                  {(onClone || order.tipo_ordem === 'industrializacao' || order.tipo_ordem === 'beneficiamento') && (
                     <div className="relative">
                       <button
                         onClick={() => setMenuId(menuId === order.id ? null : order.id)}
@@ -157,12 +165,12 @@ export default function OrdensTable({ orders, onEdit, onClone, onChanged }: Prop
                           >
                             <Copy size={16} /> Clonar OP
                           </button>
-                          {order.tipo_ordem === 'industrializacao' && (
+                          {(order.tipo_ordem === 'industrializacao' || order.tipo_ordem === 'beneficiamento') && (
                             <button
                               className="flex items-center gap-2 w-full px-3 py-2 text-sm text-red-700 hover:bg-gray-100"
                               onClick={() => handleDelete(order)}
                             >
-                              <Trash2 size={16} /> Excluir OP
+                              <Trash2 size={16} /> Excluir {order.tipo_ordem === 'beneficiamento' ? 'OB' : 'OP'}
                             </button>
                           )}
                         </div>

@@ -1,7 +1,7 @@
 import React, { useMemo, useRef, useState, useEffect } from 'react';
 import { useLocation, useParams, useNavigate } from 'react-router-dom';
 import { getRecebimento, listRecebimentoItens, conferirItem, finalizarRecebimentoV2, setRecebimentoClassificacao, syncMateriaisClienteFromRecebimento, updateRecebimentoItemProduct, Recebimento, RecebimentoItem } from '@/services/recebimento';
-import { Loader2, ArrowLeft, CheckCircle, AlertTriangle, Save, Layers, RefreshCw } from 'lucide-react';
+import { Loader2, ArrowLeft, CheckCircle, AlertTriangle, Save, Layers, RefreshCw, Hammer } from 'lucide-react';
 import { useToast } from '@/contexts/ToastProvider';
 import { useConfirm } from '@/contexts/ConfirmProvider';
 import ItemAutocomplete from '@/components/os/ItemAutocomplete';
@@ -9,6 +9,8 @@ import ClientAutocomplete from '@/components/common/ClientAutocomplete';
 import Modal from '@/components/ui/Modal';
 import { searchClients } from '@/services/clients';
 import PartnerFormPanel from '@/components/partners/PartnerFormPanel';
+import { saveOrdem } from '@/services/industria';
+import { ensureMaterialClienteV2 } from '@/services/industriaMateriais';
 
 export default function ConferenciaPage() {
     const { id } = useParams<{ id: string }>();
@@ -32,6 +34,10 @@ export default function ConferenciaPage() {
     const [isCreateClienteOpen, setIsCreateClienteOpen] = useState(false);
     const [syncingMateriaisCliente, setSyncingMateriaisCliente] = useState(false);
     const [showItens, setShowItens] = useState(true);
+    const [isGerarObOpen, setIsGerarObOpen] = useState(false);
+    const [gerarObPedido, setGerarObPedido] = useState('');
+    const [gerarObSelecionados, setGerarObSelecionados] = useState<Record<string, boolean>>({});
+    const [gerarObLoading, setGerarObLoading] = useState(false);
 
     const digitsOnly = (value?: string | null) => (value || '').replace(/\D/g, '');
 
@@ -278,6 +284,14 @@ export default function ConferenciaPage() {
             return;
         }
 
+        if (recebimento.classificacao === 'material_cliente') {
+            // Estado da arte: gera Beneficiamento (OB) no próprio fluxo de Recebimento.
+            setGerarObSelecionados({ [item.id]: true });
+            setGerarObPedido(recebimento.fiscal_nfe_imports?.pedido_numero || '');
+            setIsGerarObOpen(true);
+            return;
+        }
+
         addToast('Redirecionando para criar uma Ordem de Produção.', 'info');
 
         navigate('/app/industria/producao', {
@@ -298,6 +312,116 @@ export default function ConferenciaPage() {
                 }
             }
         });
+    };
+
+    const handleOpenGerarOb = () => {
+        if (!recebimento) return;
+        const pre: Record<string, boolean> = {};
+        for (const it of itens) {
+            if (it.produto_id) pre[it.id] = true;
+        }
+        setGerarObSelecionados(pre);
+        setGerarObPedido(recebimento.fiscal_nfe_imports?.pedido_numero || '');
+        setIsGerarObOpen(true);
+    };
+
+    const buildDocumentoRef = (rec: Recebimento) => {
+        const numero = rec.fiscal_nfe_imports?.numero || '';
+        const serie = rec.fiscal_nfe_imports?.serie || '';
+        const chave = rec.fiscal_nfe_imports?.chave_acesso || '';
+        const documentoRef = `NF-e ${numero}${serie ? `/${serie}` : ''}${chave ? ` — ${chave}` : ''}`.trim();
+        return documentoRef || null;
+    };
+
+    const handleGerarObConfirm = async () => {
+        if (!recebimento) return;
+        if (recebimento.status !== 'concluido') {
+            addToast('Finalize o recebimento antes de gerar a OB.', 'warning');
+            return;
+        }
+        if (recebimento.classificacao !== 'material_cliente') {
+            addToast('Este recebimento não está classificado como Material do Cliente.', 'warning');
+            return;
+        }
+        if (!recebimento.cliente_id) {
+            addToast('Defina o cliente (dono do material) na classificação do recebimento.', 'warning');
+            return;
+        }
+
+        const selected = itens.filter(it => gerarObSelecionados[it.id]);
+        const invalid = selected.filter(it => !it.produto_id);
+        if (invalid.length > 0) {
+            addToast('Há itens sem produto vinculado. Vincule todos antes de gerar a OB.', 'warning');
+            return;
+        }
+
+        const ok = await confirm({
+            title: 'Gerar Ordens de Beneficiamento',
+            description: `Gerar ${selected.length} ordem(ns) a partir deste recebimento?`,
+            confirmText: 'Gerar OB',
+            cancelText: 'Cancelar',
+            variant: 'primary',
+        });
+        if (!ok) return;
+
+        setGerarObLoading(true);
+        try {
+            const documentoRef = buildDocumentoRef(recebimento);
+            const numeroNf = recebimento.fiscal_nfe_imports?.numero || null;
+            const pedido = gerarObPedido.trim() || null;
+
+            const createdIds: string[] = [];
+            for (const it of selected) {
+                const produtoId = it.produto_id!;
+                const qty = (it.quantidade_conferida && it.quantidade_conferida > 0) ? it.quantidade_conferida : it.quantidade_xml;
+                const unidadeXml = it.fiscal_nfe_import_items?.ucom || null;
+                const unidade = (unidadeXml || it.produtos?.unidade || 'UN').toString();
+
+                const materialClienteId = await ensureMaterialClienteV2(
+                    recebimento.cliente_id,
+                    produtoId,
+                    it.produtos?.nome || 'Material',
+                    unidade,
+                    {
+                        codigoCliente: it.fiscal_nfe_import_items?.cprod || null,
+                        nomeCliente: it.fiscal_nfe_import_items?.xprod || null,
+                    }
+                );
+
+                const saved = await saveOrdem({
+                    tipo_ordem: 'beneficiamento',
+                    status: 'rascunho',
+                    cliente_id: recebimento.cliente_id,
+                    produto_final_id: produtoId,
+                    quantidade_planejada: qty,
+                    unidade,
+                    usa_material_cliente: true,
+                    material_cliente_id: materialClienteId,
+                    documento_ref: documentoRef,
+                    numero_nf: numeroNf,
+                    pedido_numero: pedido,
+                    origem_fiscal_nfe_import_id: recebimento.fiscal_nfe_import_id,
+                    origem_fiscal_nfe_item_id: it.fiscal_nfe_item_id,
+                    origem_qtd_xml: qty,
+                    origem_unidade_xml: unidadeXml || unidade,
+                });
+
+                createdIds.push(saved.id);
+            }
+
+            addToast(`OB(s) gerada(s): ${createdIds.length}.`, 'success');
+            setIsGerarObOpen(false);
+            navigate('/app/industria/ordens?tipo=beneficiamento');
+        } catch (e: any) {
+            const msg = String(e?.message || '');
+            if (/duplicate key value violates unique constraint/i.test(msg) || /ux_industria_ordens_origem_item/i.test(msg)) {
+                addToast('Já existe uma Ordem de Beneficiamento para algum item selecionado desta NF-e.', 'warning');
+            } else {
+                addToast(msg || 'Erro ao gerar Ordens de Beneficiamento.', 'error');
+            }
+        } finally {
+            setGerarObLoading(false);
+        }
     };
 
     if (loading) return <div className="flex justify-center p-12"><Loader2 className="animate-spin text-blue-600" /></div>;
@@ -347,6 +471,17 @@ export default function ConferenciaPage() {
                                 >
                                     {syncingMateriaisCliente ? <Loader2 className="animate-spin" size={18} /> : <RefreshCw size={18} />}
                                     Sincronizar Materiais
+                                </button>
+                            )}
+                            {isConcluido && recebimento?.classificacao === 'material_cliente' && (
+                                <button
+                                    type="button"
+                                    onClick={handleOpenGerarOb}
+                                    className="bg-blue-600 text-white px-4 py-2 rounded-lg font-bold flex items-center gap-2 hover:bg-blue-700"
+                                    title="Gerar Ordem(s) de Beneficiamento a partir deste recebimento"
+                                >
+                                    <Hammer size={18} />
+                                    Gerar OB(s)
                                 </button>
                             )}
                             <button
@@ -472,13 +607,19 @@ export default function ConferenciaPage() {
                                             disabled={!isConcluido}
                                             className={`p-2 rounded-lg transition-colors flex items-center gap-1 mx-auto text-xs font-medium ${
                                                 isConcluido 
-                                                ? 'text-purple-600 hover:text-purple-800 hover:bg-purple-50' 
+                                                ? 'text-blue-600 hover:text-blue-800 hover:bg-blue-50' 
                                                 : 'text-gray-400 cursor-not-allowed'
                                             }`}
-                                            title={isConcluido ? "Gerar Ordem de Produção" : "Finalize a conferência para gerar a ordem"}
+                                            title={
+                                                !isConcluido
+                                                    ? 'Finalize a conferência para gerar a ordem'
+                                                    : (recebimento?.classificacao === 'material_cliente'
+                                                        ? 'Gerar Ordem de Beneficiamento'
+                                                        : 'Gerar Ordem de Produção')
+                                            }
                                         >
                                             <Layers size={16} />
-                                            Gerar OP
+                                            {recebimento?.classificacao === 'material_cliente' ? 'Gerar OB' : 'Gerar OP'}
                                         </button>
                                     </td>
                                 </tr>
@@ -487,6 +628,99 @@ export default function ConferenciaPage() {
                     </table>
                 </div>
             )}
+
+            <Modal
+                isOpen={isGerarObOpen}
+                onClose={() => setIsGerarObOpen(false)}
+                title="Gerar Ordens de Beneficiamento"
+                size="4xl"
+            >
+                <div className="p-6 space-y-5">
+                    <div className="rounded-xl border border-gray-200 bg-white p-4">
+                        <div className="text-sm font-semibold text-gray-800">Origem</div>
+                        <div className="mt-2 text-sm text-gray-700">
+                            <div><span className="font-medium">NF:</span> {recebimento?.fiscal_nfe_imports?.numero || '—'} / {recebimento?.fiscal_nfe_imports?.serie || '—'}</div>
+                            <div><span className="font-medium">Emitente:</span> {recebimento?.fiscal_nfe_imports?.emitente_nome || '—'}</div>
+                            <div className="mt-3">
+                                <label className="block text-sm font-medium text-gray-700 mb-1">Pedido do cliente (opcional)</label>
+                                <input
+                                    value={gerarObPedido}
+                                    onChange={(e) => setGerarObPedido(e.target.value)}
+                                    className="w-full p-3 bg-white/80 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition shadow-sm"
+                                    placeholder="Ex.: 12345"
+                                />
+                                <div className="mt-1 text-xs text-gray-500">
+                                    Dica: se o XML trouxer o pedido, ele será sugerido automaticamente aqui.
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="rounded-xl border border-gray-200 bg-white overflow-hidden">
+                        <div className="px-4 py-3 bg-gray-50 text-xs font-semibold text-gray-600 uppercase">Itens</div>
+                        <div className="max-h-[55vh] overflow-auto">
+                            <table className="min-w-full divide-y divide-gray-200">
+                                <thead className="bg-white sticky top-0">
+                                    <tr>
+                                        <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Gerar</th>
+                                        <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Produto (XML)</th>
+                                        <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Produto (Sistema)</th>
+                                        <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500 uppercase">Qtd (conf.)</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-gray-200 bg-white">
+                                    {itens.map((it) => {
+                                        const qty = (it.quantidade_conferida && it.quantidade_conferida > 0) ? it.quantidade_conferida : it.quantidade_xml;
+                                        const disabled = !it.produto_id;
+                                        return (
+                                            <tr key={it.id} className={disabled ? 'bg-gray-50' : ''}>
+                                                <td className="px-4 py-3">
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={!!gerarObSelecionados[it.id]}
+                                                        onChange={(e) => setGerarObSelecionados(prev => ({ ...prev, [it.id]: e.target.checked }))}
+                                                        disabled={disabled}
+                                                    />
+                                                </td>
+                                                <td className="px-4 py-3 text-sm text-gray-800">
+                                                    <div className="font-medium">{it.fiscal_nfe_import_items?.xprod || '—'}</div>
+                                                    <div className="text-xs text-gray-500">Cód: {it.fiscal_nfe_import_items?.cprod || '—'}</div>
+                                                </td>
+                                                <td className="px-4 py-3 text-sm text-gray-800">
+                                                    {it.produtos?.nome || <span className="text-gray-400">Vincule um produto</span>}
+                                                </td>
+                                                <td className="px-4 py-3 text-right text-sm font-semibold text-gray-800">
+                                                    {qty} <span className="text-xs text-gray-500">{it.fiscal_nfe_import_items?.ucom || it.produtos?.unidade || ''}</span>
+                                                </td>
+                                            </tr>
+                                        );
+                                    })}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <div className="flex justify-end gap-3">
+                        <button
+                            type="button"
+                            onClick={() => setIsGerarObOpen(false)}
+                            className="rounded-md border border-gray-300 bg-white py-2 px-4 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50"
+                            disabled={gerarObLoading}
+                        >
+                            Cancelar
+                        </button>
+                        <button
+                            type="button"
+                            onClick={handleGerarObConfirm}
+                            className="flex items-center gap-2 bg-blue-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-blue-700 disabled:opacity-50"
+                            disabled={gerarObLoading}
+                        >
+                            {gerarObLoading ? <Loader2 className="animate-spin" size={18} /> : <Hammer size={18} />}
+                            Gerar OB(s)
+                        </button>
+                    </div>
+                </div>
+            </Modal>
 
             <Modal
                 isOpen={isClassificacaoOpen}

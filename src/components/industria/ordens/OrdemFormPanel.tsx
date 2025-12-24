@@ -15,8 +15,7 @@ import OrdemEntregas from './OrdemEntregas';
 import BomSelector from './BomSelector';
 import RoteiroSelector from './RoteiroSelector';
 import { formatOrderNumber } from '@/lib/utils';
-import { ensureMaterialClienteV2 } from '@/services/industriaMateriais';
-import type { MaterialClienteListItem } from '@/services/industriaMateriais';
+import { listMateriaisCliente, type MaterialClienteListItem } from '@/services/industriaMateriais';
 import { useNavigate } from 'react-router-dom';
 import Modal from '@/components/ui/Modal';
 import { logger } from '@/lib/logger';
@@ -39,6 +38,10 @@ interface Props {
     materialClienteNome?: string | null;
     materialClienteCodigo?: string | null;
     materialClienteUnidade?: string | null;
+    origemNfeImportId?: string | null;
+    origemNfeItemId?: string | null;
+    origemQtdXml?: number | null;
+    origemUnidadeXml?: string | null;
   };
   allowTipoOrdemChange?: boolean;
   onTipoOrdemChange?: (tipo: 'industrializacao' | 'beneficiamento') => void;
@@ -122,6 +125,25 @@ export default function OrdemFormPanel({
         next.documento_ref = initialPrefill.documentoRef;
       }
 
+      if (initialPrefill.origemNfeImportId && !next.origem_fiscal_nfe_import_id) {
+        next.origem_fiscal_nfe_import_id = initialPrefill.origemNfeImportId;
+      }
+      if (initialPrefill.origemNfeItemId && !next.origem_fiscal_nfe_item_id) {
+        next.origem_fiscal_nfe_item_id = initialPrefill.origemNfeItemId;
+      }
+      if (typeof initialPrefill.origemQtdXml === 'number' && next.origem_qtd_xml == null) {
+        next.origem_qtd_xml = initialPrefill.origemQtdXml;
+        if (!next.quantidade_planejada || next.quantidade_planejada <= 0) {
+          next.quantidade_planejada = initialPrefill.origemQtdXml;
+        }
+      }
+      if (initialPrefill.origemUnidadeXml && !next.origem_unidade_xml) {
+        next.origem_unidade_xml = initialPrefill.origemUnidadeXml;
+        if (!next.unidade || next.unidade === 'un') {
+          next.unidade = initialPrefill.origemUnidadeXml;
+        }
+      }
+
       if (initialTipoOrdem === 'beneficiamento' || next.tipo_ordem === 'beneficiamento') {
         if (initialPrefill.materialClienteNome && !next.material_cliente_nome) {
           next.material_cliente_nome = initialPrefill.materialClienteNome;
@@ -173,64 +195,52 @@ export default function OrdemFormPanel({
     handleHeaderChange('material_cliente_nome', null);
     handleHeaderChange('material_cliente_codigo', null);
     handleHeaderChange('material_cliente_unidade', null);
-    setMaterialCliente(null);
   };
 
-  const handleSaveHeader = async () => {
-    if (!canEdit) {
-      addToast('Você não tem permissão para editar esta ordem.', 'error');
-      return null;
-    }
-    if (formData.status === 'concluida' || formData.status === 'cancelada') {
-      addToast('Esta ordem está bloqueada para edição.', 'error');
-      return null;
-    }
-    if (formData.tipo_ordem === 'beneficiamento' && !formData.cliente_id) {
-      addToast('Para beneficiamento, selecione o cliente.', 'error');
-      return null;
-    }
-    if (!formData.produto_final_id) {
-      addToast('Selecione um produto final.', 'error');
-      return null;
-    }
-    if (!formData.quantidade_planejada || formData.quantidade_planejada <= 0) {
+	  const handleSaveHeader = async () => {
+	    if (!canEdit) {
+	      addToast('Você não tem permissão para editar esta ordem.', 'error');
+	      return null;
+	    }
+	    if (formData.status === 'concluida' || formData.status === 'cancelada') {
+	      addToast('Esta ordem está bloqueada para edição.', 'error');
+	      return null;
+	    }
+	    if (formData.tipo_ordem === 'beneficiamento' && !formData.cliente_id) {
+	      addToast('Para beneficiamento, selecione o cliente.', 'error');
+	      return null;
+	    }
+	    if (formData.tipo_ordem === 'beneficiamento' && !formData.material_cliente_id) {
+	      addToast('Para beneficiamento, selecione o Material do Cliente (ou importe o XML / cadastre o material).', 'error');
+	      return null;
+	    }
+	    if (!formData.produto_final_id) {
+	      addToast('Selecione um produto final.', 'error');
+	      return null;
+	    }
+	    if (!formData.quantidade_planejada || formData.quantidade_planejada <= 0) {
       addToast('A quantidade planejada deve ser maior que zero.', 'error');
       return null;
     }
 
-    setIsSaving(true);
-    try {
-      let materialClienteId = formData.material_cliente_id || null;
-      let usaMaterialCliente = !!formData.usa_material_cliente;
+	    setIsSaving(true);
+	    try {
+	      let materialClienteId = formData.material_cliente_id || null;
+	      let usaMaterialCliente = !!formData.usa_material_cliente;
 
-      if (formData.tipo_ordem === 'beneficiamento') {
-        if (!formData.cliente_id) {
-          addToast('Beneficiamento: selecione o cliente antes de salvar.', 'error');
-          setIsSaving(false);
-          return null;
-        }
-        if (formData.cliente_id && formData.produto_final_id && !materialClienteId) {
-          materialClienteId = await ensureMaterialClienteV2(
-            formData.cliente_id,
-            formData.produto_final_id,
-            formData.produto_nome || 'Material',
-            formData.material_cliente_unidade || formData.unidade || 'un',
-            {
-              codigoCliente: formData.material_cliente_codigo ?? null,
-              nomeCliente: formData.material_cliente_nome ?? null,
-            }
-          );
-          usaMaterialCliente = true;
-
-          setFormData(prev => ({
-            ...prev,
-            usa_material_cliente: true,
-            material_cliente_id: materialClienteId,
-            material_cliente_nome: prev.material_cliente_nome ?? prev.produto_nome ?? null,
-            material_cliente_unidade: prev.material_cliente_unidade ?? prev.unidade ?? null,
-          }));
-        }
-      }
+	      if (formData.tipo_ordem === 'beneficiamento') {
+	        if (!formData.cliente_id) {
+	          addToast('Beneficiamento: selecione o cliente antes de salvar.', 'error');
+	          setIsSaving(false);
+	          return null;
+	        }
+	        if (!materialClienteId) {
+	          addToast('Beneficiamento: selecione o Material do Cliente antes de salvar.', 'error');
+	          setIsSaving(false);
+	          return null;
+	        }
+	        usaMaterialCliente = true;
+	      }
 
       const payload: OrdemPayload = {
         id: formData.id,
@@ -253,6 +263,10 @@ export default function OrdemFormPanel({
         qtde_caixas: formData.qtde_caixas,
         numero_nf: formData.numero_nf,
         pedido_numero: formData.pedido_numero,
+        origem_fiscal_nfe_import_id: formData.origem_fiscal_nfe_import_id,
+        origem_fiscal_nfe_item_id: formData.origem_fiscal_nfe_item_id,
+        origem_qtd_xml: formData.origem_qtd_xml,
+        origem_unidade_xml: formData.origem_unidade_xml,
       };
 
       const saved = await saveOrdem(payload);
@@ -387,7 +401,7 @@ export default function OrdemFormPanel({
       return;
     }
     try {
-      await manageEntrega(formData.id!, entregaId, '', 0, 'nao_faturado', undefined, undefined, 'delete');
+      await manageEntrega(formData.id!, entregaId, null, null, null, undefined, undefined, 'delete');
       await loadDetails(formData.id);
       addToast('Entrega removida.', 'success');
     } catch (e: any) {
@@ -404,20 +418,32 @@ export default function OrdemFormPanel({
   const isWizard = !ordemId && !formData.id;
   const isExecucaoGerada = !!formData.execucao_ordem_id;
   const isHeaderLocked = isLockedEffective || isExecucaoGerada;
+  const hasOrigemNfe = !!formData.origem_fiscal_nfe_item_id;
   const componentesCount = Array.isArray(formData.componentes) ? formData.componentes.length : 0;
-  const checklistExecucao = [
-    {
-      label: formData.tipo_ordem === 'beneficiamento' ? 'Cliente selecionado' : 'Cliente (opcional)',
-      status: formData.tipo_ordem === 'beneficiamento'
-        ? (formData.cliente_id ? 'ok' : 'error')
-        : (formData.cliente_id ? 'ok' : 'warn'),
-      details: formData.cliente_nome || (formData.tipo_ordem === 'beneficiamento' ? 'Selecione o cliente para prosseguir.' : 'Opcional para Industrialização.'),
-    },
-    {
-      label: 'Produto e quantidade definidos',
-      status: formData.produto_final_id && (formData.quantidade_planejada || 0) > 0 ? 'ok' : 'error',
-      details: !formData.produto_final_id
-        ? 'Selecione o produto.'
+	  const checklistExecucao = [
+	    {
+	      label: formData.tipo_ordem === 'beneficiamento' ? 'Cliente selecionado' : 'Cliente (opcional)',
+	      status: formData.tipo_ordem === 'beneficiamento'
+	        ? (formData.cliente_id ? 'ok' : 'error')
+	        : (formData.cliente_id ? 'ok' : 'warn'),
+	      details: formData.cliente_nome || (formData.tipo_ordem === 'beneficiamento' ? 'Selecione o cliente para prosseguir.' : 'Opcional para Industrialização.'),
+	    },
+	    ...(formData.tipo_ordem === 'beneficiamento'
+	      ? ([
+	          {
+	            label: 'Material do cliente selecionado',
+	            status: formData.material_cliente_id ? 'ok' : 'error',
+	            details: formData.material_cliente_id
+	              ? (formData.material_cliente_codigo || formData.material_cliente_nome || 'Selecionado')
+	              : 'Selecione o material do cliente (ou importe o XML / cadastre o material).',
+	          },
+	        ] as const)
+	      : []),
+	    {
+	      label: 'Produto e quantidade definidos',
+	      status: formData.produto_final_id && (formData.quantidade_planejada || 0) > 0 ? 'ok' : 'error',
+	      details: !formData.produto_final_id
+	        ? 'Selecione o produto.'
         : (formData.quantidade_planejada || 0) <= 0
           ? 'A quantidade deve ser maior que zero.'
           : undefined,
@@ -437,20 +463,45 @@ export default function OrdemFormPanel({
   ] as const;
   const hasChecklistError = checklistExecucao.some(i => i.status === 'error');
 
-  const canGoNextWizardStep = () => {
-    if (wizardStep === 0) {
-      const hasProduto = !!formData.produto_final_id && !!formData.quantidade_planejada && formData.quantidade_planejada > 0;
-      const hasCliente = formData.tipo_ordem === 'beneficiamento' ? !!formData.cliente_id : true;
-      return hasProduto && hasCliente;
-    }
-    return true;
-  };
+	  const canGoNextWizardStep = () => {
+	    if (wizardStep === 0) {
+	      const hasProduto = !!formData.produto_final_id && !!formData.quantidade_planejada && formData.quantidade_planejada > 0;
+	      const hasCliente = formData.tipo_ordem === 'beneficiamento' ? !!formData.cliente_id : true;
+	      const hasMaterialCliente = formData.tipo_ordem === 'beneficiamento' ? !!formData.material_cliente_id : true;
+	      return hasProduto && hasCliente && hasMaterialCliente;
+	    }
+	    return true;
+	  };
 
   const handleGoToExecucao = (q?: string) => {
     const next = new URLSearchParams();
     next.set('view', 'list');
     if (q) next.set('q', q);
     navigate(`/app/industria/execucao?${next.toString()}`);
+  };
+
+  const handleDesvincularOrigemNfe = async () => {
+    if (!canAdmin) {
+      addToast('Você não tem permissão para desvincular a origem da NF-e.', 'error');
+      return;
+    }
+    if (!hasOrigemNfe) return;
+    if (isHeaderLocked) return;
+    const ok = await confirm({
+      title: 'Usar quantidade manual',
+      description:
+        'Esta ordem foi criada a partir de uma NF-e. Ao desvincular, você poderá alterar produto/unidade/quantidade manualmente e o rastreio do item da NF será removido desta ordem. Deseja continuar?',
+      confirmText: 'Desvincular',
+      cancelText: 'Cancelar',
+      variant: 'danger',
+    });
+    if (!ok) return;
+
+    handleHeaderChange('origem_fiscal_nfe_import_id', null);
+    handleHeaderChange('origem_fiscal_nfe_item_id', null);
+    handleHeaderChange('origem_qtd_xml', null);
+    handleHeaderChange('origem_unidade_xml', null);
+    addToast('Origem da NF-e desvinculada. Agora você pode editar manualmente.', 'success');
   };
 
   const handleGerarExecucao = async () => {
@@ -635,7 +686,7 @@ export default function OrdemFormPanel({
                 ) : formData.produto_final_id && formData.produto_nome ? (
                   <div className="flex items-center justify-between gap-3 p-3 bg-gray-50 border border-gray-200 rounded-lg">
                     <div className="text-gray-800 font-medium truncate">{formData.produto_nome}</div>
-                    {!isHeaderLocked && (
+                    {!isHeaderLocked && !hasOrigemNfe && (
                       <button
                         type="button"
                         onClick={() => {
@@ -646,7 +697,6 @@ export default function OrdemFormPanel({
                           handleHeaderChange('material_cliente_nome', null);
                           handleHeaderChange('material_cliente_codigo', null);
                           handleHeaderChange('material_cliente_unidade', null);
-                          setMaterialCliente(null);
                         }}
                         className="text-xs font-bold text-blue-700 hover:text-blue-900 hover:underline whitespace-nowrap"
                       >
@@ -660,13 +710,39 @@ export default function OrdemFormPanel({
               </div>
               <div className="sm:col-span-2">
                 <Input
-                  label="Quantidade Planejada"
+                  label={
+                    <div className="flex items-center justify-between gap-3">
+                      <span>Quantidade Planejada</span>
+                      {hasOrigemNfe && (
+                        <div className="flex items-center gap-3">
+                          <span className="text-[11px] px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 border border-slate-200">
+                            NF-e
+                          </span>
+                          {canAdmin && !isHeaderLocked && (
+                            <button
+                              type="button"
+                              onClick={handleDesvincularOrigemNfe}
+                              className="text-[11px] font-semibold text-rose-700 hover:text-rose-900 hover:underline whitespace-nowrap"
+                              title="Desvincula a origem da NF-e para permitir edição manual."
+                            >
+                              Usar quantidade manual
+                            </button>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  }
                   name="qtd"
                   type="number"
                   value={formData.quantidade_planejada || ''}
                   onChange={e => handleHeaderChange('quantidade_planejada', parseFloat(e.target.value))}
-                  disabled={isHeaderLocked}
+                  disabled={isHeaderLocked || hasOrigemNfe}
                 />
+                {hasOrigemNfe && (
+                  <div className="mt-1 text-xs text-gray-500">
+                    Definida pelo XML: {formData.origem_qtd_xml ?? '—'} {formData.origem_unidade_xml || formData.unidade || ''}
+                  </div>
+                )}
               </div>
               <div className="sm:col-span-1">
                 <Input
@@ -674,7 +750,7 @@ export default function OrdemFormPanel({
                   name="unidade"
                   value={formData.unidade || ''}
                   onChange={e => handleHeaderChange('unidade', e.target.value)}
-                  disabled={isHeaderLocked}
+                  disabled={isHeaderLocked || hasOrigemNfe}
                 />
               </div>
               <div className="sm:col-span-3">
@@ -1094,9 +1170,48 @@ export default function OrdemFormPanel({
       <ImportarXmlSuprimentosModal
         isOpen={showImportXmlModal}
         onClose={() => setShowImportXmlModal(false)}
-        onFinished={() => {
+        onFinished={({ recebimentoId }) => {
           setShowImportXmlModal(false);
           setMaterialRefreshToken(Date.now());
+
+          void (async () => {
+            if (formData.tipo_ordem !== 'beneficiamento') return;
+            if (!formData.cliente_id) {
+              addToast('Selecione o cliente antes de importar o XML.', 'warning');
+              return;
+            }
+
+            try {
+              const { data } = await listMateriaisCliente(undefined, formData.cliente_id, true, 1, 20);
+              if (!data || data.length === 0) {
+                addToast('Importação concluída, mas nenhum Material do Cliente foi encontrado para este cliente.', 'warning');
+                return;
+              }
+
+              const alreadySelected = !!formData.material_cliente_id;
+              const byProduto = formData.produto_final_id ? data.find(m => m.produto_id === formData.produto_final_id) : null;
+              const shouldAutoSelect = !alreadySelected && (data.length === 1 || !!byProduto);
+              if (!shouldAutoSelect) {
+                addToast('Importação concluída. Atualizamos a lista de Materiais do Cliente.', 'success');
+                return;
+              }
+
+              const m = byProduto ?? data[0];
+              handleHeaderChange('usa_material_cliente', true);
+              handleHeaderChange('material_cliente_id', m.id);
+              handleHeaderChange('material_cliente_nome', m.nome_cliente);
+              handleHeaderChange('material_cliente_codigo', m.codigo_cliente);
+              handleHeaderChange('material_cliente_unidade', m.unidade);
+              handleHeaderChange('produto_final_id', m.produto_id);
+              handleHeaderChange('produto_nome', m.produto_nome);
+              if (m.unidade) handleHeaderChange('unidade', m.unidade);
+
+              addToast(`Material do cliente atualizado via XML (rec.: ${recebimentoId}).`, 'success');
+            } catch (e) {
+              logger.error('[Indústria][OB] Falha ao atualizar materiais após importação de XML', e, { recebimentoId });
+              addToast('Importação concluída, mas não foi possível atualizar automaticamente o Material do Cliente.', 'warning');
+            }
+          })();
         }}
       />
     </div>

@@ -7,8 +7,10 @@ import ReactECharts from 'echarts-for-react';
 import { motion } from 'framer-motion';
 import { logger } from '@/lib/logger';
 import { formatOrderNumber } from '@/lib/utils';
+import { useNavigate } from 'react-router-dom';
 
 export default function IndustriaDashboardPage() {
+  const navigate = useNavigate();
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -173,6 +175,8 @@ export default function IndustriaDashboardPage() {
     [benefOrders]
   );
 
+  const benefTop = useMemo(() => benefEmAndamento.slice(0, 8), [benefEmAndamento]);
+
   const benefSaldoPorCliente = useMemo(() => {
     const map: Record<string, number> = {};
     benefEmAndamento.forEach(o => {
@@ -328,8 +332,18 @@ export default function IndustriaDashboardPage() {
               Itens pendentes por cliente com saldo e documentos de entrada.
             </p>
           </div>
-          <div className="text-xs text-gray-500">
-            {benefLoading ? 'Atualizando...' : benefError ? benefError : `${benefEmAndamento.length} ordens`}
+          <div className="flex items-center gap-3">
+            <div className="text-xs text-gray-500">
+              {benefLoading ? 'Atualizando...' : benefError ? benefError : `${benefEmAndamento.length} ordens`}
+            </div>
+            <Button
+              variant="outline"
+              className="h-9"
+              onClick={() => navigate('/app/industria/status-beneficiamentos')}
+              title="Abrir a visão completa (com filtros e exportação)"
+            >
+              Ver tabela completa
+            </Button>
           </div>
         </div>
 
@@ -367,7 +381,7 @@ export default function IndustriaDashboardPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
-                {benefEmAndamento.map((o) => {
+                {benefTop.map((o) => {
                   const saldo = Math.max((o.quantidade_planejada ?? 0) - (o.total_entregue ?? 0), 0);
                   const qtdeCaixas = o.qtde_caixas ?? '—';
                   const nfNumero = o.numero_nf || o.documento_ref || '—';
@@ -393,6 +407,13 @@ export default function IndustriaDashboardPage() {
                   <tr>
                     <td colSpan={9} className="px-3 py-6 text-center text-gray-500 text-sm">
                       Nenhuma ordem de beneficiamento em andamento.
+                    </td>
+                  </tr>
+                )}
+                {benefEmAndamento.length > benefTop.length && (
+                  <tr>
+                    <td colSpan={9} className="px-3 py-3 text-center text-gray-500 text-xs bg-gray-50">
+                      Mostrando {benefTop.length} de {benefEmAndamento.length} ordens. Use “Ver tabela completa” para filtros e exportação.
                     </td>
                   </tr>
                 )}

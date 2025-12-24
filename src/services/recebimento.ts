@@ -23,6 +23,7 @@ export type Recebimento = {
         numero: string;
         serie: string;
         total_nf: number;
+        pedido_numero?: string | null;
     };
 };
 
@@ -44,6 +45,7 @@ export type RecebimentoItem = {
         xprod: string;
         cprod: string;
         ean: string;
+        ucom?: string | null;
     };
 };
 
@@ -58,7 +60,8 @@ export async function listRecebimentos(status?: RecebimentoStatus): Promise<Rece
         emitente_cnpj,
         numero,
         serie,
-        total_nf
+        total_nf,
+        pedido_numero
       )
     `)
         .order('created_at', { ascending: false });
@@ -83,7 +86,8 @@ export async function getRecebimento(id: string): Promise<Recebimento> {
         emitente_cnpj,
         numero,
         serie,
-        total_nf
+        total_nf,
+        pedido_numero
       )
     `)
         .eq('id', id)
@@ -106,7 +110,8 @@ export async function listRecebimentoItens(recebimentoId: string): Promise<Receb
       fiscal_nfe_import_items (
         xprod,
         cprod,
-        ean
+        ean,
+        ucom
       )
     `)
         .eq('recebimento_id', recebimentoId);

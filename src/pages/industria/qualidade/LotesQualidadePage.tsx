@@ -12,6 +12,8 @@ import Modal from '@/components/ui/Modal';
 import { Button } from '@/components/ui/button';
 import TextArea from '@/components/ui/forms/TextArea';
 import Select from '@/components/ui/forms/Select';
+import PageHeader from '@/components/ui/PageHeader';
+import SearchField from '@/components/ui/forms/SearchField';
 
 const statusLabels: Record<StatusQualidade, string> = {
   aprovado: 'Aprovado',
@@ -120,43 +122,33 @@ export default function LotesQualidadePage() {
   };
 
   return (
-    <div className="p-6 space-y-6">
-      <header className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
-            <ShieldCheck className="text-blue-600" /> Lotes & Bloqueios
-          </h1>
-          <p className="text-sm text-gray-500">
-            Controle os lotes bloqueados por qualidade e libere consumo/entrega apenas quando aprovados.
-          </p>
-        </div>
-        <div className="flex gap-2">
-          <input
-            type="text"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Buscar produto ou lote..."
-            className="border rounded-md px-3 py-2 text-sm w-64"
-          />
-          <Select
-            value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value as any)}
-          >
-            <option value="todos">Todos</option>
-            <option value="aprovado">Aprovados</option>
-            <option value="em_analise">Em análise</option>
-            <option value="bloqueado">Bloqueados</option>
-            <option value="reprovado">Reprovados</option>
-          </Select>
-          <button
-            className="inline-flex items-center gap-2 px-3 py-2 border rounded-md text-sm text-gray-600 hover:bg-gray-50"
-            onClick={loadLotes}
-          >
-            <RefreshCw size={16} />
-            Atualizar
-          </button>
-        </div>
-      </header>
+    <div className="p-1 space-y-6">
+      <PageHeader
+        title="Lotes & Bloqueios"
+        description="Controle lotes bloqueados por qualidade e libere consumo/entrega apenas quando aprovados."
+        icon={<ShieldCheck className="w-5 h-5" />}
+        actions={
+          <Button onClick={loadLotes} variant="outline" className="gap-2">
+            <RefreshCw size={16} /> Atualizar
+          </Button>
+        }
+      />
+
+      <div className="flex gap-4 flex-wrap items-end">
+        <SearchField
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder="Buscar produto ou lote..."
+          className="max-w-md flex-grow"
+        />
+        <Select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value as any)} className="min-w-[220px]">
+          <option value="todos">Todos</option>
+          <option value="aprovado">Aprovados</option>
+          <option value="em_analise">Em análise</option>
+          <option value="bloqueado">Bloqueados</option>
+          <option value="reprovado">Reprovados</option>
+        </Select>
+      </div>
 
       <section className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         {(Object.keys(resumo.totals) as StatusQualidade[]).map(status => (
@@ -226,13 +218,10 @@ export default function LotesQualidadePage() {
                     <td className="px-4 py-3">
                       {renderUltimaInspecao(lote)}
                     </td>
-                    <td className="px-4 py-3 text-center">
-                      <button
-                        className="text-blue-600 hover:underline text-sm"
-                        onClick={() => openModal(lote)}
-                      >
+                  <td className="px-4 py-3 text-center">
+                      <Button variant="link" className="h-auto p-0" onClick={() => openModal(lote)}>
                         Alterar status
-                      </button>
+                      </Button>
                     </td>
                   </tr>
                 ))}
