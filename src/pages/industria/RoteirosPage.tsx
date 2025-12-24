@@ -195,6 +195,7 @@ export default function RoteirosPage() {
           <option value="">Todos os Tipos</option>
           <option value="producao">Produção</option>
           <option value="beneficiamento">Beneficiamento</option>
+          <option value="ambos">Ambos</option>
         </Select>
       </div>
 

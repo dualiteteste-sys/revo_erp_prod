@@ -9,6 +9,12 @@ interface Props {
   onDelete?: (bom: BomListItem) => void;
 }
 
+const tipoMeta = (tipo?: string | null) => {
+  if (tipo === 'beneficiamento') return { label: 'Beneficiamento', className: 'bg-purple-100 text-purple-800' };
+  if (tipo === 'ambos') return { label: 'Ambos', className: 'bg-slate-100 text-slate-800' };
+  return { label: 'Produção', className: 'bg-blue-100 text-blue-800' };
+};
+
 export default function BomsTable({ boms, onEdit, onClone, onDelete }: Props) {
   const [menuId, setMenuId] = useState<string | null>(null);
 
@@ -38,9 +44,14 @@ export default function BomsTable({ boms, onEdit, onClone, onDelete }: Props) {
                 {bom.codigo || '-'} <span className="text-xs text-gray-400 ml-1">v{bom.versao}</span>
               </td>
               <td className="px-6 py-4">
-                <span className={`px-2 py-1 rounded-full text-xs font-semibold uppercase ${bom.tipo_bom === 'producao' ? 'bg-blue-100 text-blue-800' : 'bg-purple-100 text-purple-800'}`}>
-                  {bom.tipo_bom}
-                </span>
+                {(() => {
+                  const meta = tipoMeta(bom.tipo_bom);
+                  return (
+                    <span className={`px-2 py-1 rounded-full text-xs font-semibold uppercase ${meta.className}`}>
+                      {meta.label}
+                    </span>
+                  );
+                })()}
               </td>
               <td className="px-6 py-4 text-center">
                 {(bom.padrao_para_producao || bom.padrao_para_beneficiamento) && (
