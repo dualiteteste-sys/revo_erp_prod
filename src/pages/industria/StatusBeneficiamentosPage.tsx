@@ -8,7 +8,7 @@ import { useDebounce } from '@/hooks/useDebounce';
 import { formatOrderNumber } from '@/lib/utils';
 import { useNavigate } from 'react-router-dom';
 
-type SortKey = 'saldo' | 'numero' | 'cliente' | 'produto' | 'entrada';
+type SortKey = 'saldo' | 'numero' | 'cliente' | 'produto';
 type SortDir = 'asc' | 'desc';
 
 const statusOptions: { value: '' | StatusOrdem; label: string }[] = [
@@ -27,11 +27,11 @@ function computeSaldo(o: OrdemIndustria) {
   return Math.max((o.quantidade_planejada ?? 0) - (o.total_entregue ?? 0), 0);
 }
 
-function formatDatePtBr(value?: string | null) {
-  if (!value) return '—';
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return '—';
-  return date.toLocaleDateString('pt-BR');
+function formatQtyPtBr(value: any) {
+  if (value === null || value === undefined || value === '') return '—';
+  const n = Number(value);
+  if (!Number.isFinite(n)) return '—';
+  return new Intl.NumberFormat('pt-BR', { maximumFractionDigits: 4 }).format(n);
 }
 
 function exportCsv(filename: string, rows: Record<string, any>[]) {
@@ -99,7 +99,6 @@ export default function StatusBeneficiamentosPage() {
       if (sortKey === 'numero') return (a.numero - b.numero) * dir;
       if (sortKey === 'cliente') return (String(a.cliente_nome || '')).localeCompare(String(b.cliente_nome || ''), 'pt-BR') * dir;
       if (sortKey === 'produto') return (String(a.produto_nome || '')).localeCompare(String(b.produto_nome || ''), 'pt-BR') * dir;
-      if (sortKey === 'entrada') return (String(a.created_at || '')).localeCompare(String(b.created_at || ''), 'pt-BR') * dir;
       return 0;
     });
     return copy;
@@ -128,15 +127,15 @@ export default function StatusBeneficiamentosPage() {
     exportCsv(
       `status-beneficiamentos-${new Date().toISOString().slice(0, 10)}.csv`,
       sorted.map(o => ({
-        'Itens em produção': o.quantidade_planejada ?? 0,
+        Item: o.produto_nome || '',
         'Qtde. Caixas': o.qtde_caixas ?? '',
-        OP: formatOrderNumber(o.numero),
+        OB: formatOrderNumber(o.numero),
         Cliente: o.cliente_nome || '',
-        'Qtde. NF Cliente': o.total_entregue ?? 0,
+        'Qtde. NF Cliente': o.quantidade_planejada ?? 0,
         NF: o.numero_nf || '',
         Pedido: o.pedido_numero || '',
-        'Data de entrada': formatDatePtBr(o.created_at),
-        'Saldo (A entregar)': computeSaldo(o),
+        'Qtde. Entregue': o.total_entregue ?? 0,
+        'Saldo a Entregar': computeSaldo(o),
         Status: o.status || '',
       }))
     );
@@ -218,15 +217,15 @@ export default function StatusBeneficiamentosPage() {
           <table className="min-w-full text-sm">
             <thead className="bg-gray-50 sticky top-0 z-10">
               <tr>
-                <Th>Itens em produção</Th>
+                <Th onClick={() => toggleSort('produto')} active={sortKey === 'produto'} dir={sortDir}>Item</Th>
                 <Th>Qtde. Caixas</Th>
-                <Th onClick={() => toggleSort('numero')} active={sortKey === 'numero'} dir={sortDir}>OP</Th>
+                <Th onClick={() => toggleSort('numero')} active={sortKey === 'numero'} dir={sortDir}>OB</Th>
                 <Th onClick={() => toggleSort('cliente')} active={sortKey === 'cliente'} dir={sortDir}>Cliente</Th>
                 <Th className="text-right">Qtde. NF Cliente</Th>
                 <Th>NF</Th>
                 <Th>Pedido</Th>
-                <Th onClick={() => toggleSort('entrada')} active={sortKey === 'entrada'} dir={sortDir}>Data de entrada</Th>
-                <Th onClick={() => toggleSort('saldo')} active={sortKey === 'saldo'} dir={sortDir} className="text-right">Saldo (A entregar)</Th>
+                <Th className="text-right">Qtde. Entregue</Th>
+                <Th onClick={() => toggleSort('saldo')} active={sortKey === 'saldo'} dir={sortDir} className="text-right">Saldo a Entregar</Th>
                 <Th>Status</Th>
                 <Th className="text-right">Ação</Th>
               </tr>
@@ -252,15 +251,15 @@ export default function StatusBeneficiamentosPage() {
                 const saldo = computeSaldo(o);
                 return (
                   <tr key={o.id} className="hover:bg-gray-50">
-                    <td className="px-4 py-3 text-gray-800">{o.quantidade_planejada ?? '—'}</td>
-                    <td className="px-4 py-3 text-gray-700">{o.qtde_caixas ?? '—'}</td>
+                    <td className="px-4 py-3 text-gray-800">{o.produto_nome || '—'}</td>
+                    <td className="px-4 py-3 text-gray-700">{formatQtyPtBr(o.qtde_caixas)}</td>
                     <td className="px-4 py-3 font-semibold text-gray-900">{formatOrderNumber(o.numero)}</td>
                     <td className="px-4 py-3 text-gray-800">{o.cliente_nome || '—'}</td>
-                    <td className="px-4 py-3 text-right text-gray-800">{o.total_entregue ?? 0}</td>
+                    <td className="px-4 py-3 text-right text-gray-800">{formatQtyPtBr(o.quantidade_planejada)}</td>
                     <td className="px-4 py-3 text-gray-700">{o.numero_nf || '—'}</td>
                     <td className="px-4 py-3 text-gray-700">{o.pedido_numero || '—'}</td>
-                    <td className="px-4 py-3 text-gray-700">{formatDatePtBr(o.created_at)}</td>
-                    <td className="px-4 py-3 text-right font-semibold text-gray-900">{saldo}</td>
+                    <td className="px-4 py-3 text-right text-gray-800">{formatQtyPtBr(o.total_entregue)}</td>
+                    <td className="px-4 py-3 text-right font-semibold text-gray-900">{formatQtyPtBr(saldo)}</td>
                     <td className="px-4 py-3">
                       <StatusBadge status={o.status} />
                     </td>
