@@ -1,6 +1,6 @@
 import { defineConfig, devices } from '@playwright/test';
 
-const baseURL = process.env.PLAYWRIGHT_BASE_URL || 'http://localhost:5173';
+const baseURL = process.env.PLAYWRIGHT_BASE_URL || 'http://127.0.0.1:5173';
 const shouldUseWebServer = !process.env.PLAYWRIGHT_BASE_URL;
 
 export default defineConfig({
@@ -34,7 +34,7 @@ export default defineConfig({
     /* Run your local dev server before starting the tests */
     webServer: shouldUseWebServer
       ? {
-          command: 'npm run dev',
+          command: 'yarn dev --host 127.0.0.1 --port 5173',
           url: baseURL,
           reuseExistingServer: !process.env.CI,
           timeout: 120 * 1000,

@@ -248,6 +248,7 @@ export interface Database {
           empresa_id: string
           user_id: string
           role: string
+          role_id: string | null
           created_at: string
           is_principal?: boolean | null
         }
@@ -255,6 +256,7 @@ export interface Database {
           empresa_id: string
           user_id: string
           role?: string
+          role_id?: string | null
           created_at?: string
           is_principal?: boolean | null
         }
@@ -262,6 +264,7 @@ export interface Database {
           empresa_id?: string
           user_id?: string
           role?: string
+          role_id?: string | null
           created_at?: string
           is_principal?: boolean | null
         }
@@ -915,6 +918,104 @@ export interface Database {
           codigo_externo?: string | null
           contribuinte_icms?: Database["public"]["Enums"]["contribuinte_icms_enum"]
           contato_tags?: string[] | null
+        }
+      }
+      permissions: {
+        Row: {
+          id: string
+          module: string
+          action: string
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          module: string
+          action: string
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          module?: string
+          action?: string
+          created_at?: string
+          updated_at?: string
+        }
+      }
+      role_permissions: {
+        Row: {
+          role_id: string
+          permission_id: string
+          allow: boolean
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          role_id: string
+          permission_id: string
+          allow?: boolean
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          role_id?: string
+          permission_id?: string
+          allow?: boolean
+          created_at?: string
+          updated_at?: string
+        }
+      }
+      roles: {
+        Row: {
+          id: string
+          slug: string
+          name: string
+          precedence: number
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          slug: string
+          name: string
+          precedence?: number
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          slug?: string
+          name?: string
+          precedence?: number
+          created_at?: string
+          updated_at?: string
+        }
+      }
+      user_permission_overrides: {
+        Row: {
+          empresa_id: string
+          user_id: string
+          permission_id: string
+          allow: boolean
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          empresa_id: string
+          user_id: string
+          permission_id: string
+          allow: boolean
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          empresa_id?: string
+          user_id?: string
+          permission_id?: string
+          allow?: boolean
+          created_at?: string
+          updated_at?: string
         }
       }
       user_active_empresa: {

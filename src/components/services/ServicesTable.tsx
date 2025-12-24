@@ -2,6 +2,8 @@
 import React from 'react';
 import { Edit, Trash2, Copy, ArrowUpDown } from 'lucide-react';
 import { Service } from '@/services/services';
+import { Button } from '@/components/ui/button';
+import { formatCurrency } from '@/lib/utils';
 
 type Props = {
   services: Service[];
@@ -52,7 +54,7 @@ export default function ServicesTable({ services, onEdit, onDelete, onClone, sor
             <tr key={s.id}>
               <td className="px-6 py-4 text-sm text-gray-900">{s.descricao}</td>
               <td className="px-6 py-4 text-sm text-gray-500">{s.codigo || '—'}</td>
-              <td className="px-6 py-4 text-sm text-gray-500">{s.preco_venda ? new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Number(s.preco_venda)) : '—'}</td>
+              <td className="px-6 py-4 text-sm text-gray-500">{s.preco_venda ? formatCurrency(Math.round(Number(s.preco_venda) * 100)) : '—'}</td>
               <td className="px-6 py-4 text-sm text-gray-500">{s.unidade ?? '—'}</td>
               <td className="px-6 py-4 text-sm">
                 <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${s.status === 'ativo' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'}`}>
@@ -61,15 +63,39 @@ export default function ServicesTable({ services, onEdit, onDelete, onClone, sor
               </td>
               <td className="px-6 py-4">
                 <div className="flex items-center justify-end gap-3">
-                  <button onClick={() => onClone(s)} className="text-blue-600 hover:text-blue-900" title="Clonar">
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => onClone(s)}
+                    title="Clonar"
+                    aria-label="Clonar"
+                    className="text-blue-600 hover:text-blue-900"
+                  >
                     <Copy size={18} />
-                  </button>
-                  <button onClick={() => onEdit(s)} className="text-indigo-600 hover:text-indigo-900" title="Editar">
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => onEdit(s)}
+                    title="Editar"
+                    aria-label="Editar"
+                    className="text-indigo-600 hover:text-indigo-900"
+                  >
                     <Edit size={18} />
-                  </button>
-                  <button onClick={() => onDelete(s)} className="text-red-600 hover:text-red-900" title="Remover">
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => onDelete(s)}
+                    title="Remover"
+                    aria-label="Remover"
+                    className="text-red-600 hover:text-red-900"
+                  >
                     <Trash2 size={18} />
-                  </button>
+                  </Button>
                 </div>
               </td>
             </tr>
