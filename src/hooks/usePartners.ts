@@ -17,6 +17,7 @@ export const usePartners = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const debouncedSearchTerm = useDebounce(searchTerm, 500);
   const [filterType, setFilterType] = useState<string | null>(null);
+  const [statusFilter, setStatusFilter] = useState<partnersService.PartnerStatusFilter>('active');
   const [page, setPage] = useState(1);
   const [pageSize] = useState(15);
   const [sortBy, setSortBy] = useState<{ column: keyof partnersService.PartnerListItem; ascending: boolean }>({
@@ -30,6 +31,7 @@ export const usePartners = () => {
     pageSize,
     searchTerm: debouncedSearchTerm,
     filterType,
+    statusFilter,
     sortBy,
   };
 
@@ -53,10 +55,12 @@ export const usePartners = () => {
     pageSize,
     searchTerm,
     filterType,
+    statusFilter,
     sortBy,
     setPage,
     setSearchTerm,
     setFilterType,
+    setStatusFilter,
     setSortBy,
     refresh: refetch,
   };

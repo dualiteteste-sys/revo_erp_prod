@@ -400,7 +400,7 @@ const OperadorPage: React.FC = () => {
                     key={op.nome}
                     type="button"
                     onClick={() => applyRecentOperator(op)}
-                    className="px-3 py-2 rounded-xl bg-slate-900 border border-slate-700 hover:border-blue-500 text-sm"
+                    className="px-3 py-2 rounded-xl bg-blue-600/20 border border-blue-500/30 hover:bg-blue-600/30 hover:border-blue-400 text-sm text-blue-100"
                   >
                     {op.nome}
                   </button>
@@ -437,7 +437,7 @@ const OperadorPage: React.FC = () => {
             <button
               type="button"
               onClick={() => setScannerContext('login')}
-              className="flex-1 rounded-2xl border border-slate-800 bg-slate-900/60 py-3 flex items-center justify-center gap-2 text-sm text-slate-300 hover:bg-slate-900"
+              className="flex-1 rounded-2xl border border-blue-500/30 bg-blue-600/20 py-3 flex items-center justify-center gap-2 text-sm text-blue-100 hover:bg-blue-600/30 hover:border-blue-400"
             >
               <QrCode size={18} />
               Ler QR do crachá

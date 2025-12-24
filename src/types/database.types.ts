@@ -866,12 +866,18 @@ export interface Database {
           doc_unico: string | null
           email: string | null
           telefone: string | null
+          celular: string | null
+          site: string | null
           inscr_estadual: string | null
           isento_ie: boolean | null
           inscr_municipal: string | null
           observacoes: string | null
+          limite_credito: number | null
+          condicao_pagamento: string | null
+          informacoes_bancarias: string | null
           created_at: string
           updated_at: string
+          deleted_at: string | null
           pessoa_search: any
           tipo_pessoa: Database["public"]["Enums"]["tipo_pessoa_enum"]
           fantasia: string | null
@@ -887,12 +893,18 @@ export interface Database {
           doc_unico?: string | null
           email?: string | null
           telefone?: string | null
+          celular?: string | null
+          site?: string | null
           inscr_estadual?: string | null
           isento_ie?: boolean | null
           inscr_municipal?: string | null
           observacoes?: string | null
+          limite_credito?: number | null
+          condicao_pagamento?: string | null
+          informacoes_bancarias?: string | null
           created_at?: string
           updated_at?: string
+          deleted_at?: string | null
           tipo_pessoa?: Database["public"]["Enums"]["tipo_pessoa_enum"]
           fantasia?: string | null
           codigo_externo?: string | null
@@ -907,12 +919,18 @@ export interface Database {
           doc_unico?: string | null
           email?: string | null
           telefone?: string | null
+          celular?: string | null
+          site?: string | null
           inscr_estadual?: string | null
           isento_ie?: boolean | null
           inscr_municipal?: string | null
           observacoes?: string | null
+          limite_credito?: number | null
+          condicao_pagamento?: string | null
+          informacoes_bancarias?: string | null
           created_at?: string
           updated_at?: string
+          deleted_at?: string | null
           tipo_pessoa?: Database["public"]["Enums"]["tipo_pessoa_enum"]
           fantasia?: string | null
           codigo_externo?: string | null

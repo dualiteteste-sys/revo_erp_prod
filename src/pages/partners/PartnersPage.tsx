@@ -24,10 +24,12 @@ const PartnersPage: React.FC = () => {
     pageSize,
     searchTerm,
     filterType,
+    statusFilter,
     sortBy,
     setPage,
     setSearchTerm,
     setFilterType,
+    setStatusFilter,
     setSortBy,
     refresh,
   } = usePartners();
@@ -95,13 +97,23 @@ const PartnersPage: React.FC = () => {
     setIsDeleting(true);
     try {
       await partnersService.deletePartner(partnerToDelete.id);
-      addToast('Registro excluído com sucesso!', 'success');
+      addToast('Registro inativado com sucesso!', 'success');
       refresh();
       handleCloseDeleteModal();
     } catch (e: any) {
       addToast(e.message || 'Erro ao excluir.', 'error');
     } finally {
       setIsDeleting(false);
+    }
+  };
+
+  const handleRestore = async (partner: partnersService.PartnerListItem) => {
+    try {
+      await partnersService.restorePartner(partner.id);
+      addToast('Registro reativado com sucesso!', 'success');
+      refresh();
+    } catch (e: any) {
+      addToast(e.message || 'Erro ao reativar.', 'error');
     }
   };
 
@@ -195,6 +207,15 @@ const PartnersPage: React.FC = () => {
           <option value="fornecedor">Fornecedor</option>
           <option value="ambos">Ambos</option>
         </Select>
+        <Select
+          value={statusFilter || 'active'}
+          onChange={(e) => setStatusFilter((e.target.value as any) || 'active')}
+          className="min-w-[220px]"
+        >
+          <option value="active">Apenas ativos</option>
+          <option value="inactive">Apenas inativos</option>
+          <option value="all">Ativos e inativos</option>
+        </Select>
       </div>
 
       <div className="bg-white rounded-lg shadow overflow-hidden">
@@ -216,7 +237,14 @@ const PartnersPage: React.FC = () => {
             </Button>
           </div>
         ) : (
-          <PartnersTable partners={partners} onEdit={handleOpenForm} onDelete={handleOpenDeleteModal} sortBy={sortBy} onSort={handleSort} />
+          <PartnersTable
+            partners={partners}
+            onEdit={handleOpenForm}
+            onDelete={handleOpenDeleteModal}
+            onRestore={handleRestore}
+            sortBy={sortBy}
+            onSort={handleSort}
+          />
         )}
       </div>
 
@@ -243,9 +271,9 @@ const PartnersPage: React.FC = () => {
         isOpen={isDeleteModalOpen}
         onClose={handleCloseDeleteModal}
         onConfirm={handleDelete}
-        title="Confirmar Exclusão"
-        description={`Tem certeza que deseja excluir "${partnerToDelete?.nome}"? Esta ação não pode ser desfeita.`}
-        confirmText="Sim, Excluir"
+        title="Confirmar Inativação"
+        description={`Tem certeza que deseja inativar "${partnerToDelete?.nome}"? Você pode reativar depois, se necessário.`}
+        confirmText="Sim, Inativar"
         isLoading={isDeleting}
         variant="danger"
       />
