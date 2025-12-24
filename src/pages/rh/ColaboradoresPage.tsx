@@ -1,12 +1,15 @@
 import React, { useState, useEffect } from 'react';
 import { listColaboradores, Colaborador, getColaboradorDetails, ColaboradorDetails, seedColaboradores } from '@/services/rh';
-import { PlusCircle, Search, User, Briefcase, Edit, Phone, Mail, DatabaseBackup } from 'lucide-react';
+import { PlusCircle, Briefcase, Edit, DatabaseBackup, Users } from 'lucide-react';
 import GlassCard from '@/components/ui/GlassCard';
 import Modal from '@/components/ui/Modal';
 import ColaboradorFormPanel from '@/components/rh/ColaboradorFormPanel';
 import { Loader2 } from 'lucide-react';
 import { useDebounce } from '@/hooks/useDebounce';
 import { useToast } from '@/contexts/ToastProvider';
+import { Button } from '@/components/ui/button';
+import PageHeader from '@/components/ui/PageHeader';
+import SearchField from '@/components/ui/forms/SearchField';
 
 export default function ColaboradoresPage() {
   const [colaboradores, setColaboradores] = useState<Colaborador[]>([]);
@@ -26,7 +29,7 @@ export default function ColaboradoresPage() {
       const data = await listColaboradores(debouncedSearch);
       setColaboradores(data);
     } catch (error) {
-      console.error(error);
+      addToast((error as any)?.message || 'Erro ao carregar colaboradores.', 'error');
     } finally {
       setLoading(false);
     }
@@ -44,7 +47,7 @@ export default function ColaboradoresPage() {
       const details = await getColaboradorDetails(id);
       setSelectedColaborador(details);
     } catch (error) {
-      console.error(error);
+      addToast((error as any)?.message || 'Erro ao carregar colaborador.', 'error');
       setIsFormOpen(false);
     } finally {
       setLoadingDetails(false);
@@ -75,41 +78,31 @@ export default function ColaboradoresPage() {
   };
 
   return (
-    <div className="p-1">
-      <div className="flex justify-between items-center mb-6">
-        <div>
-          <h1 className="text-3xl font-bold text-gray-800">Colaboradores</h1>
-          <p className="text-gray-600 text-sm mt-1">Gestão de pessoas e avaliações de competência.</p>
-        </div>
-        <div className="flex items-center gap-2">
-            <button
-              onClick={handleSeed}
-              disabled={isSeeding || loading}
-              className="flex items-center gap-2 bg-gray-100 text-gray-700 font-semibold py-2 px-4 rounded-lg hover:bg-gray-200 transition-colors disabled:opacity-50"
-            >
-              {isSeeding ? <Loader2 className="animate-spin" size={20} /> : <DatabaseBackup size={20} />}
+    <div className="p-1 space-y-6">
+      <PageHeader
+        title="Colaboradores"
+        description="Gestão de pessoas, cargos e avaliações de competência."
+        icon={<Users className="w-5 h-5" />}
+        actions={
+          <>
+            <Button onClick={handleSeed} disabled={isSeeding || loading} variant="outline" className="gap-2">
+              {isSeeding ? <Loader2 className="animate-spin" size={16} /> : <DatabaseBackup size={16} />}
               Popular Dados
-            </button>
-            <button
-              onClick={handleNew}
-              className="flex items-center gap-2 bg-blue-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-blue-700 transition-colors"
-            >
-              <PlusCircle size={20} />
+            </Button>
+            <Button onClick={handleNew} className="gap-2">
+              <PlusCircle size={18} />
               Novo Colaborador
-            </button>
-        </div>
-      </div>
+            </Button>
+          </>
+        }
+      />
 
-      <div className="mb-6 relative max-w-md">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={20} />
-        <input
-          type="text"
-          placeholder="Buscar por nome ou e-mail..."
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          className="w-full p-3 pl-10 border border-gray-300 rounded-xl shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-        />
-      </div>
+      <SearchField
+        placeholder="Buscar por nome ou e-mail..."
+        value={search}
+        onChange={(e) => setSearch(e.target.value)}
+        className="max-w-md"
+      />
 
       {loading ? (
         <div className="flex justify-center h-64 items-center">
@@ -161,8 +154,10 @@ export default function ColaboradoresPage() {
             </GlassCard>
           ))}
           {colaboradores.length === 0 && (
-            <div className="col-span-full text-center py-12 text-gray-500">
-              Nenhum colaborador encontrado.
+            <div className="col-span-full">
+              <div className="text-center py-12 text-gray-500 bg-white border border-gray-100 rounded-2xl">
+                Nenhum colaborador encontrado.
+              </div>
             </div>
           )}
         </div>

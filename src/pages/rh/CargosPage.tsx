@@ -1,12 +1,15 @@
 import React, { useState, useEffect } from 'react';
 import { listCargos, Cargo, getCargoDetails, CargoDetails, seedCargos } from '@/services/rh';
-import { PlusCircle, Search, Briefcase, Edit, Users, DatabaseBackup } from 'lucide-react';
+import { PlusCircle, Briefcase, Edit, Users, DatabaseBackup } from 'lucide-react';
 import GlassCard from '@/components/ui/GlassCard';
 import Modal from '@/components/ui/Modal';
 import CargoFormPanel from '@/components/rh/CargoFormPanel';
 import { Loader2 } from 'lucide-react';
 import { useDebounce } from '@/hooks/useDebounce';
 import { useToast } from '@/contexts/ToastProvider';
+import { Button } from '@/components/ui/button';
+import PageHeader from '@/components/ui/PageHeader';
+import SearchField from '@/components/ui/forms/SearchField';
 
 export default function CargosPage() {
   const [cargos, setCargos] = useState<Cargo[]>([]);
@@ -26,7 +29,7 @@ export default function CargosPage() {
       const data = await listCargos(debouncedSearch);
       setCargos(data);
     } catch (error) {
-      console.error(error);
+      addToast((error as any)?.message || 'Erro ao carregar cargos.', 'error');
     } finally {
       setLoading(false);
     }
@@ -44,7 +47,7 @@ export default function CargosPage() {
       const details = await getCargoDetails(id);
       setSelectedCargo(details);
     } catch (error) {
-      console.error(error);
+      addToast((error as any)?.message || 'Erro ao carregar cargo.', 'error');
       setIsFormOpen(false);
     } finally {
       setLoadingDetails(false);
@@ -75,41 +78,31 @@ export default function CargosPage() {
   };
 
   return (
-    <div className="p-1">
-      <div className="flex justify-between items-center mb-6">
-        <div>
-          <h1 className="text-3xl font-bold text-gray-800">Cargos e Funções</h1>
-          <p className="text-gray-600 text-sm mt-1">Gestão de responsabilidades e autoridades (ISO 9001)</p>
-        </div>
-        <div className="flex items-center gap-2">
-            <button
-              onClick={handleSeed}
-              disabled={isSeeding || loading}
-              className="flex items-center gap-2 bg-gray-100 text-gray-700 font-semibold py-2 px-4 rounded-lg hover:bg-gray-200 transition-colors disabled:opacity-50"
-            >
-              {isSeeding ? <Loader2 className="animate-spin" size={20} /> : <DatabaseBackup size={20} />}
+    <div className="p-1 space-y-6">
+      <PageHeader
+        title="Cargos e Funções"
+        description="Gestão de responsabilidades e autoridades (ISO 9001)."
+        icon={<Briefcase className="w-5 h-5" />}
+        actions={
+          <>
+            <Button onClick={handleSeed} disabled={isSeeding || loading} variant="outline" className="gap-2">
+              {isSeeding ? <Loader2 className="animate-spin" size={16} /> : <DatabaseBackup size={16} />}
               Popular Dados
-            </button>
-            <button
-              onClick={handleNew}
-              className="flex items-center gap-2 bg-blue-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-blue-700 transition-colors"
-            >
-              <PlusCircle size={20} />
+            </Button>
+            <Button onClick={handleNew} className="gap-2">
+              <PlusCircle size={18} />
               Novo Cargo
-            </button>
-        </div>
-      </div>
+            </Button>
+          </>
+        }
+      />
 
-      <div className="mb-6 relative max-w-md">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={20} />
-        <input
-          type="text"
-          placeholder="Buscar cargos..."
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          className="w-full p-3 pl-10 border border-gray-300 rounded-xl shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-        />
-      </div>
+      <SearchField
+        placeholder="Buscar cargos..."
+        value={search}
+        onChange={(e) => setSearch(e.target.value)}
+        className="max-w-md"
+      />
 
       {loading ? (
         <div className="flex justify-center h-64 items-center">
@@ -148,8 +141,10 @@ export default function CargosPage() {
             </GlassCard>
           ))}
           {cargos.length === 0 && (
-            <div className="col-span-full text-center py-12 text-gray-500">
-              Nenhum cargo encontrado.
+            <div className="col-span-full">
+              <div className="text-center py-12 text-gray-500 bg-white border border-gray-100 rounded-2xl">
+                Nenhum cargo encontrado.
+              </div>
             </div>
           )}
         </div>

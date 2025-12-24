@@ -1,10 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { getCompetencyMatrix, MatrixRow, listCargos, Cargo } from '@/services/rh';
-import { Loader2, Filter, AlertCircle, TrendingUp, TrendingDown, Minus } from 'lucide-react';
+import { Loader2, Filter, AlertCircle, TrendingUp, TrendingDown, Minus, Grid } from 'lucide-react';
 import GlassCard from '@/components/ui/GlassCard';
 import Select from '@/components/ui/forms/Select';
+import PageHeader from '@/components/ui/PageHeader';
+import { useToast } from '@/contexts/ToastProvider';
 
 export default function MatrizCompetenciasPage() {
+  const { addToast } = useToast();
   const [matrixData, setMatrixData] = useState<MatrixRow[]>([]);
   const [cargos, setCargos] = useState<Cargo[]>([]);
   const [selectedCargo, setSelectedCargo] = useState<string>('');
@@ -16,11 +19,11 @@ export default function MatrizCompetenciasPage() {
         const data = await listCargos(undefined, true); // Only active cargos
         setCargos(data);
       } catch (e) {
-        console.error(e);
+        addToast((e as any)?.message || 'Erro ao carregar cargos.', 'error');
       }
     };
     loadFilters();
-  }, []);
+  }, [addToast]);
 
   useEffect(() => {
     const fetchMatrix = async () => {
@@ -29,13 +32,13 @@ export default function MatrizCompetenciasPage() {
         const data = await getCompetencyMatrix(selectedCargo || undefined);
         setMatrixData(data);
       } catch (error) {
-        console.error(error);
+        addToast((error as any)?.message || 'Erro ao carregar matriz de competências.', 'error');
       } finally {
         setLoading(false);
       }
     };
     fetchMatrix();
-  }, [selectedCargo]);
+  }, [selectedCargo, addToast]);
 
   // Extract all unique competencies to build columns
   const allCompetencies = React.useMemo(() => {
@@ -91,27 +94,27 @@ export default function MatrizCompetenciasPage() {
   };
 
   return (
-    <div className="p-1 h-full flex flex-col">
-      <div className="flex flex-wrap justify-between items-center mb-6 gap-4">
-        <div>
-          <h1 className="text-3xl font-bold text-gray-800">Matriz de Competências</h1>
-          <p className="text-gray-600 text-sm mt-1">Análise de GAPs e conformidade ISO 9001.</p>
-        </div>
-        
-        <div className="flex items-center gap-2 bg-white p-2 rounded-xl shadow-sm border border-gray-200">
-          <Filter className="text-gray-400 ml-2" size={20} />
-          <select 
-            value={selectedCargo} 
-            onChange={(e) => setSelectedCargo(e.target.value)}
-            className="bg-transparent border-none focus:ring-0 text-sm text-gray-700 min-w-[200px]"
-          >
-            <option value="">Todos os Cargos</option>
-            {cargos.map(c => (
-              <option key={c.id} value={c.id}>{c.nome}</option>
-            ))}
-          </select>
-        </div>
-      </div>
+    <div className="p-1 h-full flex flex-col gap-6">
+      <PageHeader
+        title="Matriz de Competências"
+        description="Análise de GAPs e conformidade ISO 9001."
+        icon={<Grid className="w-5 h-5" />}
+        actions={
+          <div className="flex items-center gap-2">
+            <Filter className="text-gray-400" size={18} />
+            <Select
+              value={selectedCargo}
+              onChange={(e) => setSelectedCargo(e.target.value)}
+              className="min-w-[240px]"
+            >
+              <option value="">Todos os Cargos</option>
+              {cargos.map(c => (
+                <option key={c.id} value={c.id}>{c.nome}</option>
+              ))}
+            </Select>
+          </div>
+        }
+      />
 
       {loading ? (
         <div className="flex-grow flex justify-center items-center">

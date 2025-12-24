@@ -5,6 +5,9 @@ import GlassCard from '@/components/ui/GlassCard';
 import ReactECharts from 'echarts-for-react';
 import { motion } from 'framer-motion';
 import { useToast } from '@/contexts/ToastProvider';
+import PageHeader from '@/components/ui/PageHeader';
+import { Button } from '@/components/ui/button';
+import { RefreshCw } from 'lucide-react';
 
 export default function RHDashboard() {
   const [stats, setStats] = useState<RHDashboardStats | null>(null);
@@ -18,7 +21,7 @@ export default function RHDashboard() {
       const data = await getDashboardStats();
       setStats(data);
     } catch (error) {
-      console.error(error);
+      addToast((error as any)?.message || 'Erro ao carregar dashboard RH.', 'error');
     } finally {
       setLoading(false);
     }
@@ -73,17 +76,20 @@ export default function RHDashboard() {
     );
   }
 
+  const topGaps = stats.top_gaps ?? [];
+  const statusTreinamentos = stats.status_treinamentos ?? [];
+
   const gapsChartOption = {
     title: { text: 'Top 5 Gaps de Competência', left: 'center', textStyle: { fontSize: 14 } },
     tooltip: { trigger: 'axis' },
     grid: { left: '3%', right: '4%', bottom: '3%', containLabel: true },
     xAxis: { type: 'value' },
-    yAxis: { type: 'category', data: stats.top_gaps.map(g => g.nome).reverse() },
+    yAxis: { type: 'category', data: topGaps.map(g => g.nome).reverse() },
     series: [
       {
         name: 'Gaps',
         type: 'bar',
-        data: stats.top_gaps.map(g => g.total_gaps).reverse(),
+        data: topGaps.map(g => g.total_gaps).reverse(),
         itemStyle: { color: '#ef4444', borderRadius: [0, 4, 4, 0] }
       }
     ]
@@ -98,7 +104,7 @@ export default function RHDashboard() {
         type: 'pie',
         radius: ['40%', '70%'],
         itemStyle: { borderRadius: 5, borderColor: '#fff', borderWidth: 2 },
-        data: stats.status_treinamentos.map(s => ({
+        data: (statusTreinamentos.length > 0 ? statusTreinamentos : [{ status: 'sem_dados', total: 0 }]).map(s => ({
           value: s.total,
           name: s.status.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())
         }))
@@ -108,12 +114,16 @@ export default function RHDashboard() {
 
   return (
     <div className="p-1 space-y-6">
-      <div className="flex justify-between items-center">
-        <div>
-          <h1 className="text-3xl font-bold text-gray-800">Dashboard RH & Qualidade</h1>
-          <p className="text-gray-600 text-sm mt-1">Visão geral de competências e desenvolvimento.</p>
-        </div>
-      </div>
+      <PageHeader
+        title="Dashboard RH & Qualidade"
+        description="Visão geral de competências, desenvolvimento e indicadores."
+        actions={
+          <Button onClick={fetchStats} variant="outline" className="gap-2">
+            <RefreshCw size={16} />
+            Atualizar
+          </Button>
+        }
+      />
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         <KPICard 

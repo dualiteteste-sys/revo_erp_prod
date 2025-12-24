@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Trash2, Save, X } from 'lucide-react';
+import { Plus, Trash2, Save, ClipboardCheck, Loader2 } from 'lucide-react';
 import { useToast } from '@/contexts/ToastProvider';
 import { callRpc } from '@/lib/api';
 import Modal from '@/components/ui/Modal';
@@ -8,6 +8,7 @@ import Select from '@/components/ui/forms/Select';
 import { QualidadeMotivo } from '@/services/industriaProducao';
 import { useConfirm } from '@/contexts/ConfirmProvider';
 import { Button } from '@/components/ui/button';
+import PageHeader from '@/components/ui/PageHeader';
 
 export default function MotivosRefugoPage() {
     const [motivos, setMotivos] = useState<QualidadeMotivo[]>([]);
@@ -42,18 +43,6 @@ export default function MotivosRefugoPage() {
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         try {
-            // Direct insert via supabase client would be easier if exposed, but let's assume we need an RPC or direct table access
-            // Since I haven't made an Upsert RPC, let's use the table directly if RLS allows (Policy was "Enable all access for authenticated users")
-            // We'll use the supabase check here (mocked as callRpc for now, but really should use supabase client)
-
-            // WAIT: I should use the supabase client directly as I set "FOR ALL" policy.
-            // But adhering to the 'callRpc' pattern... I'll check if I can use a generic insert.
-            // Let's assume there's a `qualidade_adicionar_motivo` we can create, OR use `supabase.from().insert()`.
-            // I'll assume standard direct access for "Master Data" is fine given the policy.
-
-            // Since I don't have the supabase client imported here directly, I'll fallback to creating a small RPC in the previous migration file or just use `callRpc` to a generic 'insert_record'? No.
-
-            // Let's add the RPC to the migration file I just created! It's safer.
             await callRpc('qualidade_adicionar_motivo', {
                 p_codigo: formData.codigo,
                 p_descricao: formData.descricao,
@@ -88,17 +77,18 @@ export default function MotivosRefugoPage() {
     };
 
     return (
-        <div className="p-6">
-            <div className="flex justify-between items-center mb-6">
-                <div>
-                    <h1 className="text-2xl font-bold text-gray-800">Motivos de Qualidade</h1>
-                    <p className="text-gray-500 mt-1">Gerencie os motivos de refugo, bloqueio e devolução.</p>
-                </div>
+        <div className="p-1 space-y-6">
+            <PageHeader
+              title="Motivos de Qualidade"
+              description="Gerencie os motivos de refugo, bloqueio e devolução."
+              icon={<ClipboardCheck className="w-5 h-5" />}
+              actions={
                 <Button onClick={() => setIsModalOpen(true)} className="gap-2">
-                    <Plus size={18} />
-                    Novo Motivo
+                  <Plus size={18} />
+                  Novo Motivo
                 </Button>
-            </div>
+              }
+            />
 
             <div className="bg-white rounded shadow overflow-hidden">
                 <table className="min-w-full divide-y divide-gray-200">
@@ -111,6 +101,15 @@ export default function MotivosRefugoPage() {
                         </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-200 bg-white">
+                        {loading && (
+                            <tr>
+                                <td colSpan={4} className="py-10 text-center text-gray-500">
+                                    <span className="inline-flex items-center gap-2">
+                                        <Loader2 className="animate-spin" size={18} /> Carregando...
+                                    </span>
+                                </td>
+                            </tr>
+                        )}
                         {motivos.map((m) => (
                             <tr key={m.id} className="hover:bg-gray-50 transition-colors">
                                 <td className="px-6 py-4 font-mono text-sm text-gray-700 font-medium">{m.codigo}</td>
@@ -135,10 +134,12 @@ export default function MotivosRefugoPage() {
                         ))}
                         {motivos.length === 0 && !loading && (
                             <tr>
-                                <td colSpan={4} className="text-center py-12 text-gray-400 flex flex-col items-center justify-center gap-2">
-                                    <Trash2 size={48} className="opacity-20 mb-2" />
-                                    <p>Nenhum motivo cadastrado.</p>
-                                    <p className="text-sm">Clique em "Novo Motivo" para começar.</p>
+                                <td colSpan={4} className="py-12">
+                                    <div className="text-center text-gray-500 flex flex-col items-center justify-center gap-2">
+                                        <Trash2 size={44} className="opacity-20 mb-1" />
+                                        <p className="font-semibold text-gray-700">Nenhum motivo cadastrado.</p>
+                                        <p className="text-sm text-gray-500">Clique em “Novo Motivo” para começar.</p>
+                                    </div>
                                 </td>
                             </tr>
                         )}
@@ -171,10 +172,13 @@ export default function MotivosRefugoPage() {
                         <option value="bloqueio">Bloqueio</option>
                         <option value="devolucao">Devolução</option>
                     </Select>
-                    <div className="flex justify-end pt-4">
-                        <button type="submit" className="bg-green-600 text-white px-6 py-2.5 rounded hover:bg-green-700 flex gap-2 items-center shadow-sm">
+                    <div className="flex justify-end gap-2 pt-4 border-t border-gray-100">
+                        <Button type="button" variant="ghost" onClick={() => setIsModalOpen(false)}>
+                            Cancelar
+                        </Button>
+                        <Button type="submit" className="gap-2">
                             <Save size={18} /> Salvar
-                        </button>
+                        </Button>
                     </div>
                 </form>
             </Modal>
