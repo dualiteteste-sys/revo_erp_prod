@@ -51,6 +51,7 @@ export const menuConfig: { name: string; icon: React.ElementType; href: string; 
     gradient: 'from-zinc-500 to-neutral-600',
     children: [
       { name: 'Dashboard Produção', icon: PieChart, href: '/app/industria/dashboard' },
+      { name: 'Status de Beneficiamentos', icon: ClipboardList, href: '/app/industria/status-beneficiamentos' },
       { name: 'Materiais de Clientes', icon: Package, href: '/app/industria/materiais-cliente' },
       { name: 'Centros de Trabalho', icon: Settings, href: '/app/industria/centros-trabalho' },
       { name: 'Fichas Técnicas / BOM', icon: FileCog, href: '/app/industria/boms' },

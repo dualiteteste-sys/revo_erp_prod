@@ -91,6 +91,22 @@ export default function OrdensPage() {
     );
   }, [searchParams, location.pathname, location.state, navigate, tipoOrdem]);
 
+  // Deep-link: /app/industria/ordens?tipo=beneficiamento&open=<ordemId>
+  useEffect(() => {
+    const openId = searchParams.get('open');
+    if (!openId) return;
+    setInitialPrefill(undefined);
+    setDraftTipoOrdem(tipoOrdem);
+    setSelectedId(openId);
+    setIsFormOpen(true);
+    const next = new URLSearchParams(searchParams);
+    next.delete('open');
+    navigate(
+      { pathname: location.pathname, search: next.toString() ? `?${next.toString()}` : '' },
+      { replace: true, state: null }
+    );
+  }, [searchParams, location.pathname, navigate, tipoOrdem]);
+
   // Se o usuário não tem permissão para criar, bloqueia a criação assim que o role estiver disponível.
   useEffect(() => {
     if (!isFormOpen) return;
