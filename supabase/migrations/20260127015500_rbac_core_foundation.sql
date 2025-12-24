@@ -191,6 +191,120 @@ where eu.role_id is null
   and upper(eu.role) = r.slug;
 
 -- 8) Functions
+-- NOTE: These helpers are required by RLS policies in this migration.
+-- They are also recreated/adjusted by later migrations, but must exist here
+-- so a clean database can apply the full chain without failures.
+
+create or replace function public.normalize_empresa_role(p_role text)
+returns text
+language sql
+immutable
+as $$
+  select case lower(coalesce(p_role, ''))
+    when 'owner' then 'owner'
+    when 'dono' then 'owner'
+    when 'admin' then 'admin'
+    when 'administrador' then 'admin'
+    when 'member' then 'member'
+    when 'membro' then 'member'
+    when 'ops' then 'member'
+    when 'operador' then 'member'
+    when 'readonly' then 'viewer'
+    when 'read_only' then 'viewer'
+    when 'viewer' then 'viewer'
+    when 'leitura' then 'viewer'
+    else null
+  end;
+$$;
+
+create or replace function public.empresa_role_rank(p_role text)
+returns int
+language sql
+immutable
+as $$
+  select case public.normalize_empresa_role(p_role)
+    when 'viewer' then 1
+    when 'member' then 2
+    when 'admin' then 3
+    when 'owner' then 4
+    else 0
+  end;
+$$;
+
+create or replace function public.current_jwt_role()
+returns text
+language sql
+stable
+as $$
+  select coalesce(
+    nullif(auth.role(), ''),
+    nullif(current_setting('request.jwt.claim.role', true), ''),
+    nullif(current_setting('request.jwt.claims', true), ''),
+    ''
+  );
+$$;
+
+create or replace function public.is_service_role()
+returns boolean
+language sql
+stable
+as $$
+  select public.current_jwt_role() = 'service_role';
+$$;
+
+create or replace function public.current_empresa_role()
+returns text
+language plpgsql
+stable
+security definer
+set search_path = pg_catalog, public
+as $$
+declare
+  v_uid uuid := auth.uid();
+  v_emp uuid := public.current_empresa_id();
+  v_role_text text;
+  v_role_slug text;
+  v_norm_text text;
+  v_norm_slug text;
+begin
+  if public.is_service_role() then
+    return 'owner';
+  end if;
+
+  if v_uid is null or v_emp is null then
+    return null;
+  end if;
+
+  select eu.role, r.slug
+    into v_role_text, v_role_slug
+    from public.empresa_usuarios eu
+    left join public.roles r on r.id = eu.role_id
+   where eu.empresa_id = v_emp
+     and eu.user_id = v_uid
+   limit 1;
+
+  v_norm_text := public.normalize_empresa_role(v_role_text);
+  v_norm_slug := public.normalize_empresa_role(lower(v_role_slug));
+
+  if public.empresa_role_rank(v_norm_slug) > public.empresa_role_rank(v_norm_text) then
+    return v_norm_slug;
+  end if;
+  return v_norm_text;
+end;
+$$;
+
+revoke all on function public.normalize_empresa_role(text) from public, anon;
+revoke all on function public.empresa_role_rank(text) from public, anon;
+revoke all on function public.current_jwt_role() from public, anon;
+revoke all on function public.is_service_role() from public, anon;
+revoke all on function public.current_empresa_role() from public, anon;
+
+grant execute on function public.normalize_empresa_role(text) to authenticated, service_role, postgres;
+grant execute on function public.empresa_role_rank(text) to authenticated, service_role, postgres;
+grant execute on function public.current_jwt_role() to authenticated, service_role, postgres;
+grant execute on function public.is_service_role() to authenticated, service_role, postgres;
+grant execute on function public.current_empresa_role() to authenticated, service_role, postgres;
+
 create or replace function public.current_role_id()
 returns uuid
 language sql
