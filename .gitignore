@@ -123,3 +123,7 @@ dist
 dist-ssr
 .DS_Store
 .DS_Store
+
+# Playwright
+playwright-report/
+test-results/

@@ -5,6 +5,7 @@ import SubscriptionPage from '../../pages/billing/SubscriptionPage';
 import DataManagementContent from './data-management/DataManagementContent';
 import RolesPage from '@/pages/settings/roles/RolesPage';
 import UsersPage from '@/pages/settings/general/UsersPage';
+import NfeEmissaoSettings from '@/components/settings/fiscal/NfeEmissaoSettings';
 
 interface SettingsContentProps {
   activeItem: string;
@@ -21,6 +22,8 @@ const SettingsContent: React.FC<SettingsContentProps> = ({ activeItem }) => {
         return <RolesPage />;
       case 'Minha Assinatura':
         return <SubscriptionPage />;
+      case 'NF-e (Emissão)':
+        return <NfeEmissaoSettings />;
       case 'Limpeza de Dados':
         return <DataManagementContent />;
       default:
