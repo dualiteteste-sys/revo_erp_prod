@@ -1,4 +1,5 @@
 import { callRpc } from '@/lib/api';
+import { logger } from '@/lib/logger';
 import { Database } from '@/types/database.types';
 
 export type PartnerListItem = {
@@ -58,7 +59,7 @@ export type PartnerDetails = Pessoa & {
 export type ClientHit = { id: string; label: string; nome: string; doc_unico: string | null };
 
 export async function savePartner(payload: PartnerPayload): Promise<PartnerDetails> {
-  console.log('[SERVICE][SAVE_PARTNER]', payload);
+  logger.debug('[SERVICE][SAVE_PARTNER]', { payload });
   try {
     // Explicitly build the pessoa object to ensure all fields are present
     const pessoaPayload: PartnerPessoa = {
@@ -82,7 +83,7 @@ export async function savePartner(payload: PartnerPayload): Promise<PartnerDetai
     const data = await callRpc<PartnerDetails>('create_update_partner', { p_payload: cleanedPayload });
     return data;
   } catch (error: any) {
-    console.error('[SERVICE][SAVE_PARTNER][ERROR]', error);
+    logger.error('[SERVICE][SAVE_PARTNER][ERROR]', error, { payload });
     if (error.message && (
       error.message.includes('ux_pessoas_empresa_id_doc_unico') ||
       error.message.includes('idx_pessoas_empresa_id_doc_unico_not_null')
@@ -124,7 +125,7 @@ export async function getPartners(options: {
 
     return { data: data ?? [], count: Number(count) };
   } catch (error) {
-    console.error('[SERVICE][GET_PARTNERS]', error);
+    logger.error('[SERVICE][GET_PARTNERS]', error, { options });
     throw new Error('Não foi possível listar os registros.');
   }
 }
@@ -141,7 +142,7 @@ export async function getPartnerDetails(id: string): Promise<PartnerDetails | nu
     }
     return data || null;
   } catch (error) {
-    console.error('[SERVICE][GET_PARTNER_DETAILS]', error);
+    logger.error('[SERVICE][GET_PARTNER_DETAILS]', error, { id });
     throw new Error('Erro ao buscar detalhes do registro.');
   }
 }
@@ -150,7 +151,7 @@ export async function deletePartner(id: string): Promise<void> {
   try {
     await callRpc('delete_partner', { p_id: id });
   } catch (error: any) {
-    console.error('[SERVICE][DELETE_PARTNER]', error);
+    logger.error('[SERVICE][DELETE_PARTNER]', error, { id });
     const msg = String(error?.message || '');
 
     if (
@@ -176,7 +177,7 @@ export async function deletePartner(id: string): Promise<void> {
 }
 
 export async function seedDefaultPartners(): Promise<Pessoa[]> {
-  console.log('[RPC] seed_partners_for_current_user');
+  logger.debug('[RPC] seed_partners_for_current_user');
   return callRpc<Pessoa[]>('seed_partners_for_current_user');
 }
 

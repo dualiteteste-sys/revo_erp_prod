@@ -2,6 +2,8 @@ import React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { PartnerListItem } from '../../services/partners';
 import { Edit, Trash2, ArrowUpDown } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { documentMask } from '@/lib/masks';
 
 interface PartnersTableProps {
   partners: PartnerListItem[];
@@ -73,11 +75,31 @@ const PartnersTable: React.FC<PartnersTableProps> = ({ partners, onEdit, onDelet
                     {tipoLabels[partner.tipo]}
                   </span>
                 </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{partner.doc_unico || '-'}</td>
+                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{partner.doc_unico ? documentMask(partner.doc_unico) : '-'}</td>
                 <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                   <div className="flex items-center justify-end gap-4">
-                    <button onClick={() => onEdit(partner)} className="text-indigo-600 hover:text-indigo-900"><Edit size={18} /></button>
-                    <button onClick={() => onDelete(partner)} className="text-red-600 hover:text-red-900"><Trash2 size={18} /></button>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => onEdit(partner)}
+                      title="Editar"
+                      aria-label="Editar"
+                      className="text-indigo-600 hover:text-indigo-900"
+                    >
+                      <Edit size={18} />
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => onDelete(partner)}
+                      title="Excluir"
+                      aria-label="Excluir"
+                      className="text-red-600 hover:text-red-900"
+                    >
+                      <Trash2 size={18} />
+                    </Button>
                   </div>
                 </td>
               </motion.tr>
