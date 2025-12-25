@@ -3,6 +3,7 @@ import { RouteObject, Navigate } from "react-router-dom";
 import MainLayout from '../components/layout/MainLayout';
 import ProtectedRoute from '../components/layout/ProtectedRoute';
 import OnboardingGuard from "../components/auth/OnboardingGuard";
+import RequirePermission from "../components/auth/RequirePermission";
 import PageLoader from "../components/ui/PageLoader";
 import { lazyImport } from "../utils/lazyImport";
 import PlanGuard from "../components/layout/PlanGuard";
@@ -152,13 +153,62 @@ export const appRoutes: RouteObject[] = [
             { path: "fiscal/nfe/configuracoes", element: <Suspense fallback={<PageLoader />}><NfeSettingsPage /></Suspense> },
 
             // Financeiro
-            { path: "financeiro/tesouraria", element: <Suspense fallback={<PageLoader />}><TesourariaPage /></Suspense> },
-            { path: "financeiro/contas-a-receber", element: <Suspense fallback={<PageLoader />}><ContasAReceberPage /></Suspense> },
-            { path: "financeiro/contas-a-pagar", element: <Suspense fallback={<PageLoader />}><ContasPagarPage /></Suspense> },
-            { path: "financeiro/centros-de-custo", element: <Suspense fallback={<PageLoader />}><CentrosDeCustoPage /></Suspense> },
-            { path: "financeiro/cobrancas", element: <Suspense fallback={<PageLoader />}><CobrancasBancariasPage /></Suspense> },
-            { path: "financeiro/extrato", element: <Suspense fallback={<PageLoader />}><ExtratoPage /></Suspense> },
-            { path: "financeiro/relatorios", element: <Suspense fallback={<PageLoader />}><RelatoriosFinanceiroPage /></Suspense> },
+            {
+              path: "financeiro/tesouraria",
+              element: (
+                <RequirePermission permission={{ domain: "tesouraria", action: "view" }}>
+                  <Suspense fallback={<PageLoader />}><TesourariaPage /></Suspense>
+                </RequirePermission>
+              ),
+            },
+            {
+              path: "financeiro/contas-a-receber",
+              element: (
+                <RequirePermission permission={{ domain: "contas_a_receber", action: "view" }}>
+                  <Suspense fallback={<PageLoader />}><ContasAReceberPage /></Suspense>
+                </RequirePermission>
+              ),
+            },
+            {
+              path: "financeiro/contas-a-pagar",
+              element: (
+                <RequirePermission permission={{ domain: "contas_a_pagar", action: "view" }}>
+                  <Suspense fallback={<PageLoader />}><ContasPagarPage /></Suspense>
+                </RequirePermission>
+              ),
+            },
+            {
+              path: "financeiro/centros-de-custo",
+              element: (
+                <RequirePermission permission={{ domain: "centros_de_custo", action: "view" }}>
+                  <Suspense fallback={<PageLoader />}><CentrosDeCustoPage /></Suspense>
+                </RequirePermission>
+              ),
+            },
+            {
+              path: "financeiro/cobrancas",
+              element: (
+                <RequirePermission permission={{ domain: "tesouraria", action: "view" }}>
+                  <Suspense fallback={<PageLoader />}><CobrancasBancariasPage /></Suspense>
+                </RequirePermission>
+              ),
+            },
+            {
+              path: "financeiro/extrato",
+              element: (
+                <RequirePermission permission={{ domain: "tesouraria", action: "view" }}>
+                  <Suspense fallback={<PageLoader />}><ExtratoPage /></Suspense>
+                </RequirePermission>
+              ),
+            },
+            {
+              path: "financeiro/relatorios",
+              element: (
+                <RequirePermission permission={{ domain: "relatorios_financeiro", action: "view" }}>
+                  <Suspense fallback={<PageLoader />}><RelatoriosFinanceiroPage /></Suspense>
+                </RequirePermission>
+              ),
+            },
 
             // RH
             { path: "rh/dashboard", element: <Suspense fallback={<PageLoader />}><RHDashboard /></Suspense> },
