@@ -32,6 +32,10 @@ const XmlTesterPage = lazyImport(() => import('../pages/tools/XmlTesterPage'));
 const LogsPage = lazyImport(() => import("../pages/dev/LogsPage"));
 const SupabaseDemoPage = lazyImport(() => import("../pages/tools/SupabaseDemoPage"));
 
+// Fiscal Pages
+const NfeEmissoesPage = lazyImport(() => import("../pages/fiscal/NfeEmissoesPage"));
+const NfeSettingsPage = lazyImport(() => import("../pages/fiscal/NfeSettingsPage"));
+
 // RH Pages
 const CargosPage = lazyImport(() => import("../pages/rh/CargosPage"));
 const CompetenciasPage = lazyImport(() => import("../pages/rh/CompetenciasPage"));
@@ -135,6 +139,10 @@ export const appRoutes: RouteObject[] = [
             { path: "suprimentos/recebimentos", element: <Suspense fallback={<PageLoader />}><RecebimentoListPage /></Suspense> },
             { path: "suprimentos/recebimento-manual", element: <Suspense fallback={<PageLoader />}><RecebimentoManualPage /></Suspense> },
             { path: "suprimentos/recebimento/:id", element: <Suspense fallback={<PageLoader />}><ConferenciaPage /></Suspense> },
+
+            // Fiscal (NF-e)
+            { path: "fiscal/nfe", element: <Suspense fallback={<PageLoader />}><NfeEmissoesPage /></Suspense> },
+            { path: "fiscal/nfe/configuracoes", element: <Suspense fallback={<PageLoader />}><NfeSettingsPage /></Suspense> },
 
             // Financeiro
             { path: "financeiro/tesouraria", element: <Suspense fallback={<PageLoader />}><TesourariaPage /></Suspense> },

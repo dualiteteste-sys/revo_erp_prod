@@ -94,13 +94,23 @@ export const menuConfig: { name: string; icon: React.ElementType; href: string; 
       { name: 'Metas de Vendas', icon: Target, href: '/app/vendas/metas' },
       { name: 'Propostas Comerciais', icon: FileSignature, href: '#' },
       { name: 'PDV', icon: Store, href: '#' },
-      { name: 'Notas Fiscais', icon: Receipt, href: '#' },
+      { name: 'Notas Fiscais (NF-e)', icon: Receipt, href: '/app/fiscal/nfe' },
       { name: 'Expedição', icon: Truck, href: '#' },
       { name: 'Comissões', icon: Percent, href: '#' },
       { name: 'Painel de Automações', icon: Bot, href: '#' },
       { name: 'Devolução de Venda', icon: Undo2, href: '#' },
       { name: 'Relatórios', icon: BarChart2, href: '#' },
     ]
+  },
+  {
+    name: 'Fiscal',
+    icon: Receipt,
+    href: '#',
+    gradient: 'from-sky-500 to-sky-600',
+    children: [
+      { name: 'NF-e (Rascunhos)', icon: Receipt, href: '/app/fiscal/nfe' },
+      { name: 'Configurações NF-e', icon: Settings, href: '/app/fiscal/nfe/configuracoes' },
+    ],
   },
   {
     name: 'Serviços',
