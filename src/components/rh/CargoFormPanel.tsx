@@ -8,6 +8,7 @@ import TextArea from '@/components/ui/forms/TextArea';
 import Select from '@/components/ui/forms/Select';
 import Toggle from '@/components/ui/forms/Toggle';
 import { motion, AnimatePresence } from 'framer-motion';
+import { Button } from '@/components/ui/button';
 
 interface CargoFormPanelProps {
   cargo: CargoDetails | null;
@@ -171,12 +172,9 @@ const CargoFormPanel: React.FC<CargoFormPanelProps> = ({ cargo, onSaveSuccess, o
                 <option key={c.id} value={c.id}>{c.nome} ({c.tipo})</option>
               ))}
             </Select>
-            <button 
-              onClick={handleAddCompetencia}
-              className="bg-blue-600 text-white p-3 rounded-lg hover:bg-blue-700 transition-colors mb-[1px]"
-            >
+            <Button onClick={handleAddCompetencia} size="icon" className="mb-[1px]">
               <Plus size={20} />
-            </button>
+            </Button>
           </div>
 
           <div className="sm:col-span-6 space-y-3">
@@ -237,11 +235,13 @@ const CargoFormPanel: React.FC<CargoFormPanelProps> = ({ cargo, onSaveSuccess, o
 
       <footer className="flex-shrink-0 p-4 flex justify-end items-center border-t border-white/20">
         <div className="flex gap-3">
-          <button type="button" onClick={onClose} className="rounded-md border border-gray-300 bg-white py-2 px-4 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50">Cancelar</button>
-          <button onClick={handleSave} disabled={isSaving} className="flex items-center gap-2 bg-blue-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50">
+          <Button type="button" onClick={onClose} variant="outline">
+            Cancelar
+          </Button>
+          <Button onClick={handleSave} disabled={isSaving} className="gap-2">
             {isSaving ? <Loader2 className="animate-spin" size={20} /> : <Save size={20} />}
             Salvar Cargo
-          </button>
+          </Button>
         </div>
       </footer>
     </div>

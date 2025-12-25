@@ -18,6 +18,7 @@ import Select from '@/components/ui/forms/Select';
 import { useNumericField } from '@/hooks/useNumericField';
 import { motion, AnimatePresence } from 'framer-motion';
 import ParticipanteModal from './ParticipanteModal';
+import { Button } from '@/components/ui/button';
 
 interface TreinamentoFormPanelProps {
   treinamento: TreinamentoDetails | null;
@@ -50,7 +51,7 @@ const TreinamentoFormPanel: React.FC<TreinamentoFormPanelProps> = ({ treinamento
 
     const loadColaboradores = async () => {
       try {
-        const data = await listColaboradores(undefined, undefined); // List all active
+        const data = await listColaboradores(undefined, undefined, true);
         setColaboradores(data);
       } catch (e) {
         console.error(e);
@@ -239,7 +240,7 @@ const TreinamentoFormPanel: React.FC<TreinamentoFormPanelProps> = ({ treinamento
               className="sm:col-span-6" 
               placeholder="Qual gap de competência ou necessidade este treinamento visa atender?"
             />
-             <TextArea 
+            <TextArea 
               label="Descrição / Conteúdo" 
               name="descricao" 
               value={formData.descricao || ''} 
@@ -266,13 +267,9 @@ const TreinamentoFormPanel: React.FC<TreinamentoFormPanelProps> = ({ treinamento
                   ))}
                 </select>
               </div>
-              <button 
-                onClick={handleAddParticipante}
-                disabled={!selectedColaboradorId}
-                className="bg-blue-600 text-white px-4 py-2.5 rounded-lg hover:bg-blue-700 transition-colors disabled:bg-blue-300 flex items-center gap-2"
-              >
+              <Button onClick={handleAddParticipante} disabled={!selectedColaboradorId} className="gap-2">
                 <UserPlus size={18} /> Adicionar
-              </button>
+              </Button>
             </div>
 
             <div className="space-y-3">
@@ -336,11 +333,13 @@ const TreinamentoFormPanel: React.FC<TreinamentoFormPanelProps> = ({ treinamento
 
       <footer className="flex-shrink-0 p-4 flex justify-end items-center border-t border-white/20">
         <div className="flex gap-3">
-          <button type="button" onClick={onClose} className="rounded-md border border-gray-300 bg-white py-2 px-4 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50">Cancelar</button>
-          <button onClick={handleSave} disabled={isSaving} className="flex items-center gap-2 bg-blue-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50">
+          <Button type="button" onClick={onClose} variant="outline">
+            Cancelar
+          </Button>
+          <Button onClick={handleSave} disabled={isSaving} className="gap-2">
             {isSaving ? <Loader2 className="animate-spin" size={20} /> : <Save size={20} />}
             Salvar
-          </button>
+          </Button>
         </div>
       </footer>
 

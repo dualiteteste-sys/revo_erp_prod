@@ -18,6 +18,7 @@ import Input from '@/components/ui/forms/Input';
 import Select from '@/components/ui/forms/Select';
 import Toggle from '@/components/ui/forms/Toggle';
 import { motion } from 'framer-motion';
+import { Button } from '@/components/ui/button';
 
 interface ColaboradorFormPanelProps {
   colaborador: ColaboradorDetails | null;
@@ -41,7 +42,7 @@ const ColaboradorFormPanel: React.FC<ColaboradorFormPanelProps> = ({ colaborador
 
   useEffect(() => {
     const loadData = async () => {
-      const [cargosData, compData] = await Promise.all([listCargos(), listCompetencias()]);
+      const [cargosData, compData] = await Promise.all([listCargos(undefined, true), listCompetencias()]);
       setCargos(cargosData);
       setAllCompetencias(compData);
     };
@@ -193,25 +194,31 @@ const ColaboradorFormPanel: React.FC<ColaboradorFormPanelProps> = ({ colaborador
     <div className="flex flex-col h-full">
       <div className="border-b border-gray-200 px-6">
         <nav className="-mb-px flex space-x-6">
-          <button
+          <Button
             onClick={() => setActiveTab('dados')}
+            type="button"
+            variant="ghost"
             className={`py-4 px-1 border-b-2 font-medium text-sm ${activeTab === 'dados' ? 'border-blue-500 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'}`}
           >
             Dados Pessoais
-          </button>
-          <button
+          </Button>
+          <Button
             onClick={() => setActiveTab('competencias')}
+            type="button"
+            variant="ghost"
             className={`py-4 px-1 border-b-2 font-medium text-sm ${activeTab === 'competencias' ? 'border-blue-500 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'}`}
           >
             Competências & Avaliação
-          </button>
-          <button
+          </Button>
+          <Button
             onClick={() => setActiveTab('treinamentos')}
+            type="button"
+            variant="ghost"
             className={`py-4 px-1 border-b-2 font-medium text-sm ${activeTab === 'treinamentos' ? 'border-blue-500 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'}`}
             disabled={!colaborador?.id}
           >
             Treinamentos {!colaborador?.id ? '(salve primeiro)' : ''}
-          </button>
+          </Button>
         </nav>
       </div>
 
@@ -432,11 +439,13 @@ const ColaboradorFormPanel: React.FC<ColaboradorFormPanelProps> = ({ colaborador
 
       <footer className="flex-shrink-0 p-4 flex justify-end items-center border-t border-white/20">
         <div className="flex gap-3">
-          <button type="button" onClick={onClose} className="rounded-md border border-gray-300 bg-white py-2 px-4 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50">Cancelar</button>
-          <button onClick={handleSave} disabled={isSaving} className="flex items-center gap-2 bg-blue-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50">
+          <Button type="button" onClick={onClose} variant="outline">
+            Cancelar
+          </Button>
+          <Button onClick={handleSave} disabled={isSaving} className="gap-2">
             {isSaving ? <Loader2 className="animate-spin" size={20} /> : <Save size={20} />}
             Salvar
-          </button>
+          </Button>
         </div>
       </footer>
     </div>

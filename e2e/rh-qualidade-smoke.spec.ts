@@ -214,6 +214,20 @@ test('RH & Qualidade: navegação e render sem erros de console', async ({ page 
       ],
     });
   });
+  await page.route('**/rest/v1/rpc/rh_list_competencias_v2', async (route) => {
+    await route.fulfill({
+      json: [
+        {
+          id: 'comp-1',
+          nome: 'Leitura e Interpretação',
+          descricao: 'Interpretação de desenho',
+          tipo: 'tecnica',
+          critico_sgq: true,
+          ativo: true,
+        },
+      ],
+    });
+  });
 
   // RH: matriz
   await page.route('**/rest/v1/rpc/rh_get_competency_matrix', async (route) => {

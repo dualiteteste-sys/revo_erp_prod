@@ -190,7 +190,14 @@ export async function seedCargos(): Promise<void> {
 
 // Competências
 export async function listCompetencias(search?: string): Promise<Competencia[]> {
-  return callRpc<Competencia[]>('rh_list_competencias', { p_search: search || null });
+  try {
+    return await callRpc<Competencia[]>('rh_list_competencias_v2', {
+      p_search: search || null,
+      p_ativo_only: false,
+    });
+  } catch {
+    return callRpc<Competencia[]>('rh_list_competencias', { p_search: search || null });
+  }
 }
 
 export async function saveCompetencia(payload: CompetenciaPayload): Promise<Competencia> {
@@ -212,11 +219,11 @@ export async function seedCompetencias(): Promise<void> {
 }
 
 // Colaboradores
-export async function listColaboradores(search?: string, cargoId?: string): Promise<Colaborador[]> {
+export async function listColaboradores(search?: string, cargoId?: string, ativoOnly: boolean = false): Promise<Colaborador[]> {
   return callRpc<Colaborador[]>('rh_list_colaboradores', { 
     p_search: search || null, 
     p_cargo_id: cargoId || null,
-    p_ativo_only: false 
+    p_ativo_only: ativoOnly
   });
 }
 
