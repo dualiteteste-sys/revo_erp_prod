@@ -27,6 +27,7 @@ const TesourariaPage = lazyImport(() => import("../pages/financeiro/TesourariaPa
 const CobrancasBancariasPage = lazyImport(() => import("../pages/financeiro/CobrancasBancariasPage"));
 const ExtratoPage = lazyImport(() => import("../pages/financeiro/ExtratoPage"));
 const RelatoriosFinanceiroPage = lazyImport(() => import("../pages/financeiro/RelatoriosFinanceiroPage"));
+const RelatoriosHubPage = lazyImport(() => import("../pages/relatorios/RelatoriosHubPage"));
 const CepSearchPage = lazyImport(() => import("../pages/tools/CepSearchPage"));
 const CnpjSearchPage = lazyImport(() => import("../pages/tools/CnpjSearchPage"));
 const NfeInputPage = lazyImport(() => import("../pages/tools/NfeInputPage"));
@@ -129,6 +130,9 @@ export const appRoutes: RouteObject[] = [
             { path: "vendas/metas", element: <Suspense fallback={<PageLoader />}><SalesGoalsPage /></Suspense> },
             { path: "vendas/pedidos", element: <Suspense fallback={<PageLoader />}><PedidosVendasPage /></Suspense> },
             { path: "vendas/crm", element: <Suspense fallback={<PageLoader />}><CrmPage /></Suspense> },
+
+            // Relatórios (Central)
+            { path: "relatorios", element: <Suspense fallback={<PageLoader />}><RelatoriosHubPage /></Suspense> },
 
             // Serviços (Módulo)
             { path: "ordens-de-servico", element: <PlanGuard feature="servicos"><Suspense fallback={<PageLoader />}><OSPage /></Suspense></PlanGuard> },

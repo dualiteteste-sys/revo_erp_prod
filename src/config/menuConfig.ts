@@ -41,7 +41,7 @@ export const menuConfig: { name: string; icon: React.ElementType; href: string; 
       { name: 'Serviços', icon: Wrench, href: '/app/services' },
       { name: 'Vendedores', icon: UserSquare, href: '#' },
       { name: 'Embalagens', icon: Box, href: '/app/cadastros/embalagens' },
-      { name: 'Relatórios', icon: BarChart2, href: '#' },
+      { name: 'Relatórios', icon: BarChart2, href: '/app/relatorios' },
     ],
   },
   {
