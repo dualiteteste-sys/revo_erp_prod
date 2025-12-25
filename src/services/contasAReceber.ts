@@ -91,6 +91,23 @@ export async function saveContaAReceber(payload: ContaAReceberPayload): Promise<
     }
 }
 
+export async function receberContaAReceber(params: {
+  id: string;
+  dataPagamento?: string;
+  valorPago?: number;
+}): Promise<ContaAReceber> {
+  try {
+    return await callRpc<ContaAReceber>('financeiro_conta_a_receber_receber', {
+      p_id: params.id,
+      p_data_pagamento: params.dataPagamento ?? null,
+      p_valor_pago: params.valorPago ?? null,
+    });
+  } catch (error: any) {
+    console.error('[SERVICE][RECEBER_CONTA_A_RECEBER]', error);
+    throw new Error(error.message || 'Erro ao registrar recebimento.');
+  }
+}
+
 export async function deleteContaAReceber(id: string): Promise<void> {
     try {
         await callRpc('delete_conta_a_receber', { p_id: id });

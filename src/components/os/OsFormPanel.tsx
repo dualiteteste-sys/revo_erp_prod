@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { FileText, Loader2, Save, Paperclip, Plus, Trash2 } from 'lucide-react';
+import { CheckCircle2, FileText, Loader2, Save, Paperclip, Plus, Trash2 } from 'lucide-react';
 import { OrdemServicoDetails, saveOs, deleteOsItem, getOsDetails, OsItemSearchResult, addOsItem } from '@/services/os';
 import { getPartnerDetails } from '@/services/partners';
 import { useToast } from '@/contexts/ToastProvider';
@@ -13,9 +13,10 @@ import { useNumericField } from '@/hooks/useNumericField';
 import ClientAutocomplete from '../common/ClientAutocomplete';
 import { Button } from '@/components/ui/button';
 import OsAuditTrailPanel from '@/components/os/OsAuditTrailPanel';
-import { createContaAReceberFromOs, getContaAReceberFromOs } from '@/services/contasAReceber';
+import { createContaAReceberFromOs, getContaAReceberDetails, getContaAReceberFromOs, receberContaAReceber, type ContaAReceber } from '@/services/contasAReceber';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { useNavigate } from 'react-router-dom';
+import { useConfirm } from '@/contexts/ConfirmProvider';
 
 interface OsFormPanelProps {
   os: OrdemServicoDetails | null;
@@ -33,15 +34,18 @@ const statusOptions: { value: Database['public']['Enums']['status_os']; label: s
 const OsFormPanel: React.FC<OsFormPanelProps> = ({ os, onSaveSuccess, onClose }) => {
   const { addToast } = useToast();
   const navigate = useNavigate();
+  const { confirm } = useConfirm();
   const [isSaving, setIsSaving] = useState(false);
   const [isAddingItem, setIsAddingItem] = useState(false);
   const [formData, setFormData] = useState<Partial<OrdemServicoDetails>>({});
   const [clientName, setClientName] = useState('');
   const [novoAnexo, setNovoAnexo] = useState('');
   const [contaReceberId, setContaReceberId] = useState<string | null>(null);
+  const [contaReceber, setContaReceber] = useState<ContaAReceber | null>(null);
   const [isContaDialogOpen, setIsContaDialogOpen] = useState(false);
   const [contaVencimento, setContaVencimento] = useState<string>('');
   const [isCreatingConta, setIsCreatingConta] = useState(false);
+  const [isReceivingConta, setIsReceivingConta] = useState(false);
 
   const descontoProps = useNumericField(formData.desconto_valor, (value) => handleFormChange('desconto_valor', value));
   const custoEstimadoProps = useNumericField((formData as any).custo_estimado, (value) => handleFormChange('custo_estimado' as any, value));
@@ -76,6 +80,15 @@ const OsFormPanel: React.FC<OsFormPanelProps> = ({ os, onSaveSuccess, onClose })
     void (async () => {
       const id = await getContaAReceberFromOs(osId);
       setContaReceberId(id);
+      setContaReceber(null);
+      if (id) {
+        try {
+          const details = await getContaAReceberDetails(id);
+          setContaReceber(details);
+        } catch {
+          setContaReceber(null);
+        }
+      }
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [formData.id]);
@@ -116,6 +129,55 @@ const OsFormPanel: React.FC<OsFormPanelProps> = ({ os, onSaveSuccess, onClose })
     if (!contaReceberId) return;
     navigate(`/app/financeiro/contas-a-receber?contaId=${encodeURIComponent(contaReceberId)}`);
   };
+
+  const handleReceberContaAgora = async () => {
+    if (!contaReceberId || !contaReceber) return;
+    if (contaReceber.status === 'pago' || contaReceber.status === 'cancelado') {
+      handleOpenConta();
+      return;
+    }
+
+    const ok = await confirm({
+      title: 'Registrar recebimento',
+      description: `Deseja marcar esta conta como paga hoje? Valor: ${new Intl.NumberFormat('pt-BR', {
+        style: 'currency',
+        currency: 'BRL',
+      }).format(contaReceber.valor || 0)}.`,
+      confirmText: 'Registrar recebimento',
+      cancelText: 'Cancelar',
+      variant: 'default',
+    });
+    if (!ok) return;
+
+    setIsReceivingConta(true);
+    try {
+      const today = new Date().toISOString().slice(0, 10);
+      const updated = await receberContaAReceber({
+        id: contaReceberId,
+        dataPagamento: today,
+        valorPago: Number(contaReceber.valor || 0),
+      });
+      setContaReceber(updated);
+      addToast('Recebimento registrado com sucesso!', 'success');
+      navigate(`/app/financeiro/contas-a-receber?contaId=${encodeURIComponent(contaReceberId)}`);
+    } catch (e: any) {
+      addToast(e?.message || 'Erro ao registrar recebimento.', 'error');
+    } finally {
+      setIsReceivingConta(false);
+    }
+  };
+
+  const contaStatusBadge = useMemo(() => {
+    if (!contaReceber) return null;
+    const map: Record<string, { label: string; color: string }> = {
+      pendente: { label: 'Pendente', color: 'bg-yellow-100 text-yellow-800' },
+      pago: { label: 'Pago', color: 'bg-green-100 text-green-800' },
+      vencido: { label: 'Vencido', color: 'bg-red-100 text-red-800' },
+      cancelado: { label: 'Cancelado', color: 'bg-gray-100 text-gray-800' },
+    };
+    const cfg = map[contaReceber.status] || { label: contaReceber.status, color: 'bg-gray-100 text-gray-800' };
+    return <span className={`px-2 py-1 rounded-full text-xs font-semibold ${cfg.color}`}>{cfg.label}</span>;
+  }, [contaReceber]);
 
   const refreshOsData = async (osId: string) => {
     try {
@@ -266,15 +328,24 @@ const OsFormPanel: React.FC<OsFormPanelProps> = ({ os, onSaveSuccess, onClose })
 
           {canGenerateConta ? (
             <div className="sm:col-span-6 flex flex-wrap items-center justify-between gap-2 mt-2">
-              <div className="text-xs text-gray-500">
-                Gere uma conta a receber vinculada à OS concluída (evita duplicidade).
+              <div className="flex items-center gap-2 text-xs text-gray-500">
+                <span>Conta a receber vinculada à OS concluída.</span>
+                {contaStatusBadge}
               </div>
               <div className="flex gap-2">
                 {contaReceberId ? (
-                  <Button type="button" variant="outline" onClick={handleOpenConta} className="gap-2">
-                    <FileText size={18} />
-                    Abrir Conta a Receber
-                  </Button>
+                  <>
+                    {contaReceber && contaReceber.status !== 'pago' && contaReceber.status !== 'cancelado' ? (
+                      <Button type="button" onClick={handleReceberContaAgora} disabled={isReceivingConta} className="gap-2">
+                        {isReceivingConta ? <Loader2 className="animate-spin" size={18} /> : <CheckCircle2 size={18} />}
+                        Registrar Recebimento
+                      </Button>
+                    ) : null}
+                    <Button type="button" variant="outline" onClick={handleOpenConta} className="gap-2">
+                      <FileText size={18} />
+                      Abrir Conta
+                    </Button>
+                  </>
                 ) : (
                   <Button type="button" onClick={handleOpenContaDialog} className="gap-2">
                     <FileText size={18} />

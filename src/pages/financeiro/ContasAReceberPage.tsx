@@ -12,6 +12,7 @@ import ContasAReceberSummary from '@/components/financeiro/contas-a-receber/Cont
 import Select from '@/components/ui/forms/Select';
 import { Button } from '@/components/ui/button';
 import { useSearchParams } from 'react-router-dom';
+import { useConfirm } from '@/contexts/ConfirmProvider';
 
 const ContasAReceberPage: React.FC = () => {
   const {
@@ -32,6 +33,7 @@ const ContasAReceberPage: React.FC = () => {
     refresh,
   } = useContasAReceber();
   const { addToast } = useToast();
+  const { confirm } = useConfirm();
 
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [selectedConta, setSelectedConta] = useState<contasAReceberService.ContaAReceber | null>(null);
@@ -121,6 +123,31 @@ const ContasAReceberPage: React.FC = () => {
     }
   };
 
+  const handleReceive = async (conta: contasAReceberService.ContaAReceber) => {
+    if (!conta?.id) return;
+    const ok = await confirm({
+      title: 'Registrar recebimento',
+      description: `Deseja marcar a conta "${conta.descricao}" como paga hoje?`,
+      confirmText: 'Registrar recebimento',
+      cancelText: 'Cancelar',
+      variant: 'default',
+    });
+    if (!ok) return;
+
+    try {
+      const today = new Date().toISOString().slice(0, 10);
+      await contasAReceberService.receberContaAReceber({
+        id: conta.id,
+        dataPagamento: today,
+        valorPago: Number(conta.valor || 0),
+      });
+      addToast('Recebimento registrado com sucesso!', 'success');
+      refresh();
+    } catch (e: any) {
+      addToast(e?.message || 'Erro ao registrar recebimento.', 'error');
+    }
+  };
+
   const handleSort = (column: string) => {
     setSortBy(prev => ({
       column,
@@ -202,7 +229,14 @@ const ContasAReceberPage: React.FC = () => {
             {searchTerm && <p className="text-sm">Tente ajustar sua busca.</p>}
           </div>
         ) : (
-          <ContasAReceberTable contas={contas} onEdit={handleOpenForm} onDelete={handleOpenDeleteModal} sortBy={sortBy} onSort={handleSort} />
+          <ContasAReceberTable
+            contas={contas}
+            onEdit={handleOpenForm}
+            onReceive={handleReceive}
+            onDelete={handleOpenDeleteModal}
+            sortBy={sortBy}
+            onSort={handleSort}
+          />
         )}
       </div>
 
