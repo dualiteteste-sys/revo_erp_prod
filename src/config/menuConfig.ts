@@ -62,6 +62,7 @@ export const menuConfig: { name: string; icon: React.ElementType; href: string; 
       { name: 'Tela do Operador', icon: MonitorUp, href: '/app/industria/operador' },
       { name: 'Chão de Fábrica', icon: HardHat, href: '/app/industria/chao-de-fabrica' },
       { name: 'PCP e Capacidade', icon: BarChart3, href: '/app/industria/pcp' },
+      { name: 'Relatórios', icon: BarChart2, href: '/app/industria/relatorios' },
       { name: 'Planejamento (MRP)', icon: BarChart2, href: '/app/industria/mrp' },
       { name: 'Motivos da Qualidade', icon: ClipboardCheck, href: '/app/industria/qualidade/motivos' },
       { name: 'Planos de Inspeção', icon: ClipboardList, href: '/app/industria/qualidade/planos' },

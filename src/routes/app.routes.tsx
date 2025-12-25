@@ -67,6 +67,7 @@ const MateriaisClientePage = lazyImport(() => import("../pages/industria/Materia
 const MrpDemandasPage = lazyImport(() => import("../pages/industria/mrp/MrpDemandasPage"));
 const PcpDashboardPage = lazyImport(() => import("../pages/industria/pcp/PcpDashboardPage"));
 const StatusBeneficiamentosPage = lazyImport(() => import("../pages/industria/StatusBeneficiamentosPage"));
+const RelatoriosIndustriaPage = lazyImport(() => import("../pages/industria/RelatoriosIndustriaPage"));
 
 // Suprimentos Pages
 const EstoquePage = lazyImport(() => import("../pages/suprimentos/EstoquePage"));
@@ -116,6 +117,7 @@ export const appRoutes: RouteObject[] = [
             { path: "industria/ordens", element: <PlanGuard feature="industria"><Suspense fallback={<PageLoader />}><OrdensPage /></Suspense></PlanGuard> },
             { path: "industria/mrp", element: <PlanGuard feature="industria"><Suspense fallback={<PageLoader />}><MrpDemandasPage /></Suspense></PlanGuard> },
             { path: "industria/pcp", element: <PlanGuard feature="industria"><Suspense fallback={<PageLoader />}><PcpDashboardPage /></Suspense></PlanGuard> },
+            { path: "industria/relatorios", element: <PlanGuard feature="industria"><Suspense fallback={<PageLoader />}><RelatoriosIndustriaPage /></Suspense></PlanGuard> },
             { path: "industria/boms", element: <PlanGuard feature="industria"><Suspense fallback={<PageLoader />}><BomsPage /></Suspense></PlanGuard> },
             { path: "industria/roteiros", element: <PlanGuard feature="industria"><Suspense fallback={<PageLoader />}><RoteirosPage /></Suspense></PlanGuard> },
             { path: "industria/centros-trabalho", element: <PlanGuard feature="industria"><Suspense fallback={<PageLoader />}><CentrosTrabalhoPage /></Suspense></PlanGuard> },
