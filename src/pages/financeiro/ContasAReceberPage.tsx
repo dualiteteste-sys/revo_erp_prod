@@ -132,7 +132,7 @@ const ContasAReceberPage: React.FC = () => {
     if (!conta?.id) return;
     const ok = await confirm({
       title: 'Registrar recebimento',
-      description: `Deseja marcar a conta "${conta.descricao}" como paga hoje?`,
+      description: `Deseja marcar a conta "${conta.descricao}" como recebida hoje?`,
       confirmText: 'Registrar recebimento',
       cancelText: 'Cancelar',
       variant: 'default',
