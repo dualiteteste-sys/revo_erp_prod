@@ -211,12 +211,54 @@ export const appRoutes: RouteObject[] = [
             },
 
             // RH
-            { path: "rh/dashboard", element: <Suspense fallback={<PageLoader />}><RHDashboard /></Suspense> },
-            { path: "rh/cargos", element: <Suspense fallback={<PageLoader />}><CargosPage /></Suspense> },
-            { path: "rh/competencias", element: <Suspense fallback={<PageLoader />}><CompetenciasPage /></Suspense> },
-            { path: "rh/colaboradores", element: <Suspense fallback={<PageLoader />}><ColaboradoresPage /></Suspense> },
-            { path: "rh/matriz", element: <Suspense fallback={<PageLoader />}><MatrizCompetenciasPage /></Suspense> },
-            { path: "rh/treinamentos", element: <Suspense fallback={<PageLoader />}><TreinamentosPage /></Suspense> },
+            {
+              path: "rh/dashboard",
+              element: (
+                <RequirePermission permission={{ domain: "rh", action: "view" }}>
+                  <Suspense fallback={<PageLoader />}><RHDashboard /></Suspense>
+                </RequirePermission>
+              ),
+            },
+            {
+              path: "rh/cargos",
+              element: (
+                <RequirePermission permission={{ domain: "rh", action: "view" }}>
+                  <Suspense fallback={<PageLoader />}><CargosPage /></Suspense>
+                </RequirePermission>
+              ),
+            },
+            {
+              path: "rh/competencias",
+              element: (
+                <RequirePermission permission={{ domain: "rh", action: "view" }}>
+                  <Suspense fallback={<PageLoader />}><CompetenciasPage /></Suspense>
+                </RequirePermission>
+              ),
+            },
+            {
+              path: "rh/colaboradores",
+              element: (
+                <RequirePermission permission={{ domain: "rh", action: "view" }}>
+                  <Suspense fallback={<PageLoader />}><ColaboradoresPage /></Suspense>
+                </RequirePermission>
+              ),
+            },
+            {
+              path: "rh/matriz",
+              element: (
+                <RequirePermission permission={{ domain: "rh", action: "view" }}>
+                  <Suspense fallback={<PageLoader />}><MatrizCompetenciasPage /></Suspense>
+                </RequirePermission>
+              ),
+            },
+            {
+              path: "rh/treinamentos",
+              element: (
+                <RequirePermission permission={{ domain: "rh", action: "view" }}>
+                  <Suspense fallback={<PageLoader />}><TreinamentosPage /></Suspense>
+                </RequirePermission>
+              ),
+            },
 
             // Ferramentas
             { path: "cep-search", element: <Suspense fallback={<PageLoader />}><CepSearchPage /></Suspense> },

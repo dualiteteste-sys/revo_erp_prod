@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Loader2, Save, AlertCircle, TrendingUp, TrendingDown, Minus, PlusCircle, GraduationCap } from 'lucide-react';
+import { Loader2, Save, AlertCircle, TrendingUp, TrendingDown, Minus, PlusCircle, GraduationCap, Paperclip, Download, Trash2, CalendarPlus } from 'lucide-react';
 import {
   ColaboradorDetails,
   ColaboradorPayload,
@@ -11,8 +11,13 @@ import {
   getCargoDetails,
   listTreinamentosPorColaborador,
   ColaboradorTreinamento,
+  listAfastamentos,
+  addAfastamento,
+  encerrarAfastamento,
+  type ColaboradorAfastamento,
 } from '@/services/rh';
 import { useToast } from '@/contexts/ToastProvider';
+import { useAuth } from '@/contexts/AuthProvider';
 import Section from '@/components/ui/forms/Section';
 import Input from '@/components/ui/forms/Input';
 import Select from '@/components/ui/forms/Select';
@@ -20,6 +25,8 @@ import Toggle from '@/components/ui/forms/Toggle';
 import { motion } from 'framer-motion';
 import { Button } from '@/components/ui/button';
 import { listAuditLogsForTables, type AuditLogRow } from '@/services/auditLogs';
+import { useConfirm } from '@/contexts/ConfirmProvider';
+import { createRhDocSignedUrl, deleteRhDoc, listRhDocs, uploadRhDoc, type RhDoc } from '@/services/rhDocs';
 
 interface ColaboradorFormPanelProps {
   colaborador: ColaboradorDetails | null;
@@ -29,11 +36,13 @@ interface ColaboradorFormPanelProps {
 
 const ColaboradorFormPanel: React.FC<ColaboradorFormPanelProps> = ({ colaborador, onSaveSuccess, onClose }) => {
   const { addToast } = useToast();
+  const { activeEmpresaId } = useAuth();
+  const { confirm } = useConfirm();
   const [isSaving, setIsSaving] = useState(false);
   const [formData, setFormData] = useState<ColaboradorPayload>({});
   const [cargos, setCargos] = useState<Cargo[]>([]);
   const [allCompetencias, setAllCompetencias] = useState<Competencia[]>([]);
-  const [activeTab, setActiveTab] = useState<'dados' | 'competencias' | 'treinamentos' | 'historico'>('dados');
+  const [activeTab, setActiveTab] = useState<'dados' | 'competencias' | 'afastamentos' | 'anexos' | 'treinamentos' | 'historico'>('dados');
 
   const [mappedCargoId, setMappedCargoId] = useState<string | null>(null);
   const [extraCompetenciaId, setExtraCompetenciaId] = useState<string>('');
@@ -42,6 +51,21 @@ const ColaboradorFormPanel: React.FC<ColaboradorFormPanelProps> = ({ colaborador
   const [loadingTreinamentos, setLoadingTreinamentos] = useState(false);
   const [auditRows, setAuditRows] = useState<AuditLogRow[]>([]);
   const [loadingAudit, setLoadingAudit] = useState(false);
+
+  const [afastamentos, setAfastamentos] = useState<ColaboradorAfastamento[]>([]);
+  const [loadingAfastamentos, setLoadingAfastamentos] = useState(false);
+  const [novoAfastTipo, setNovoAfastTipo] = useState<ColaboradorAfastamento['tipo']>('outros');
+  const [novoAfastMotivo, setNovoAfastMotivo] = useState<string>('');
+  const [novoAfastInicio, setNovoAfastInicio] = useState<string>('');
+  const [novoAfastFim, setNovoAfastFim] = useState<string>('');
+  const [savingAfastamento, setSavingAfastamento] = useState(false);
+
+  const [docs, setDocs] = useState<RhDoc[]>([]);
+  const [loadingDocs, setLoadingDocs] = useState(false);
+  const [uploadingDoc, setUploadingDoc] = useState(false);
+  const [docTitulo, setDocTitulo] = useState('');
+  const [docDescricao, setDocDescricao] = useState('');
+  const [docFile, setDocFile] = useState<File | null>(null);
 
   useEffect(() => {
     const loadData = async () => {
@@ -97,6 +121,46 @@ const ColaboradorFormPanel: React.FC<ColaboradorFormPanelProps> = ({ colaborador
       }
     };
     fetchAudit();
+  }, [activeTab, colaborador?.id, addToast]);
+
+  useEffect(() => {
+    const fetchAfastamentos = async () => {
+      if (activeTab !== 'afastamentos') return;
+      if (!colaborador?.id) {
+        setAfastamentos([]);
+        return;
+      }
+      setLoadingAfastamentos(true);
+      try {
+        const data = await listAfastamentos(colaborador.id);
+        setAfastamentos(data);
+      } catch (e: any) {
+        addToast(e?.message || 'Erro ao carregar afastamentos.', 'error');
+      } finally {
+        setLoadingAfastamentos(false);
+      }
+    };
+    fetchAfastamentos();
+  }, [activeTab, colaborador?.id, addToast]);
+
+  useEffect(() => {
+    const fetchDocs = async () => {
+      if (activeTab !== 'anexos') return;
+      if (!colaborador?.id) {
+        setDocs([]);
+        return;
+      }
+      setLoadingDocs(true);
+      try {
+        const data = await listRhDocs('colaborador', colaborador.id, false);
+        setDocs(data);
+      } catch (e: any) {
+        addToast(e?.message || 'Erro ao carregar anexos.', 'error');
+      } finally {
+        setLoadingDocs(false);
+      }
+    };
+    fetchDocs();
   }, [activeTab, colaborador?.id, addToast]);
 
   useEffect(() => {
@@ -207,6 +271,113 @@ const ColaboradorFormPanel: React.FC<ColaboradorFormPanelProps> = ({ colaborador
     }
   };
 
+  const handleAddAfastamento = async () => {
+    if (!colaborador?.id) return;
+    setSavingAfastamento(true);
+    try {
+      await addAfastamento({
+        colaboradorId: colaborador.id,
+        tipo: novoAfastTipo,
+        motivo: novoAfastMotivo || null,
+        dataInicio: novoAfastInicio || null,
+        dataFim: novoAfastFim || null,
+      });
+      addToast('Afastamento registrado.', 'success');
+      setNovoAfastTipo('outros');
+      setNovoAfastMotivo('');
+      setNovoAfastInicio('');
+      setNovoAfastFim('');
+      const data = await listAfastamentos(colaborador.id);
+      setAfastamentos(data);
+    } catch (e: any) {
+      addToast(e?.message || 'Erro ao registrar afastamento.', 'error');
+    } finally {
+      setSavingAfastamento(false);
+    }
+  };
+
+  const handleEncerrarAfastamento = async (afast: ColaboradorAfastamento) => {
+    const ok = await confirm({
+      title: 'Encerrar afastamento',
+      description: `Encerrar afastamento (${afast.tipo.replace(/_/g, ' ')}) de ${new Date(afast.data_inicio).toLocaleDateString('pt-BR')}?`,
+      confirmText: 'Encerrar',
+      cancelText: 'Cancelar',
+      variant: 'default',
+    });
+    if (!ok) return;
+    try {
+      await encerrarAfastamento(afast.id, new Date().toISOString().slice(0, 10));
+      addToast('Afastamento encerrado.', 'success');
+      if (colaborador?.id) {
+        const data = await listAfastamentos(colaborador.id);
+        setAfastamentos(data);
+      }
+    } catch (e: any) {
+      addToast(e?.message || 'Erro ao encerrar afastamento.', 'error');
+    }
+  };
+
+  const loadDocs = async () => {
+    if (!colaborador?.id) return;
+    const data = await listRhDocs('colaborador', colaborador.id, false);
+    setDocs(data);
+  };
+
+  const handleUploadDoc = async () => {
+    if (!colaborador?.id || !activeEmpresaId || !docFile) return;
+    if (!docTitulo.trim()) {
+      addToast('Informe o título do anexo.', 'warning');
+      return;
+    }
+    setUploadingDoc(true);
+    try {
+      await uploadRhDoc({
+        empresaId: activeEmpresaId,
+        entityType: 'colaborador',
+        entityId: colaborador.id,
+        titulo: docTitulo.trim(),
+        descricao: docDescricao.trim() || null,
+        file: docFile,
+      });
+      addToast('Anexo enviado.', 'success');
+      setDocTitulo('');
+      setDocDescricao('');
+      setDocFile(null);
+      await loadDocs();
+    } catch (e: any) {
+      addToast(e?.message || 'Erro ao enviar anexo.', 'error');
+    } finally {
+      setUploadingDoc(false);
+    }
+  };
+
+  const handleOpenDoc = async (doc: RhDoc) => {
+    try {
+      const url = await createRhDocSignedUrl(doc.arquivo_path);
+      window.open(url, '_blank', 'noopener,noreferrer');
+    } catch (e: any) {
+      addToast(e?.message || 'Erro ao abrir anexo.', 'error');
+    }
+  };
+
+  const handleDeleteDoc = async (doc: RhDoc) => {
+    const ok = await confirm({
+      title: 'Excluir anexo',
+      description: `Excluir "${doc.titulo}" v${doc.versao}?`,
+      confirmText: 'Excluir',
+      cancelText: 'Cancelar',
+      variant: 'danger',
+    });
+    if (!ok) return;
+    try {
+      await deleteRhDoc({ id: doc.id, arquivoPath: doc.arquivo_path });
+      addToast('Anexo excluído.', 'success');
+      await loadDocs();
+    } catch (e: any) {
+      addToast(e?.message || 'Erro ao excluir anexo.', 'error');
+    }
+  };
+
   const renderGapIndicator = (gap: number, required: number) => {
     if (required === 0) return <span className="text-gray-400 text-xs">N/A</span>;
     if (gap >= 0) return <span className="flex items-center text-green-600 text-xs font-bold"><TrendingUp size={14} className="mr-1" /> Adequado</span>;
@@ -267,6 +438,24 @@ const ColaboradorFormPanel: React.FC<ColaboradorFormPanelProps> = ({ colaborador
             Competências & Avaliação
           </Button>
           <Button
+            onClick={() => setActiveTab('afastamentos')}
+            type="button"
+            variant="ghost"
+            className={`py-4 px-1 border-b-2 font-medium text-sm ${activeTab === 'afastamentos' ? 'border-blue-500 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'}`}
+            disabled={!colaborador?.id}
+          >
+            Afastamentos {!colaborador?.id ? '(salve primeiro)' : ''}
+          </Button>
+          <Button
+            onClick={() => setActiveTab('anexos')}
+            type="button"
+            variant="ghost"
+            className={`py-4 px-1 border-b-2 font-medium text-sm ${activeTab === 'anexos' ? 'border-blue-500 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'}`}
+            disabled={!colaborador?.id}
+          >
+            Anexos {!colaborador?.id ? '(salve primeiro)' : ''}
+          </Button>
+          <Button
             onClick={() => setActiveTab('treinamentos')}
             type="button"
             variant="ghost"
@@ -321,6 +510,20 @@ const ColaboradorFormPanel: React.FC<ColaboradorFormPanelProps> = ({ colaborador
               onChange={e => handleFormChange('documento', e.target.value)} 
               className="sm:col-span-3" 
             />
+            <Input
+              label="Telefone (opcional)"
+              name="telefone"
+              value={(formData as any).telefone || ''}
+              onChange={(e) => handleFormChange('telefone', e.target.value)}
+              className="sm:col-span-3"
+            />
+            <Input
+              label="Matrícula (opcional)"
+              name="matricula"
+              value={(formData as any).matricula || ''}
+              onChange={(e) => handleFormChange('matricula', e.target.value)}
+              className="sm:col-span-3"
+            />
             <Select 
               label="Cargo" 
               name="cargo_id" 
@@ -342,7 +545,201 @@ const ColaboradorFormPanel: React.FC<ColaboradorFormPanelProps> = ({ colaborador
               onChange={e => handleFormChange('data_admissao', e.target.value)} 
               className="sm:col-span-3" 
             />
+            <Select
+              label="Status (RH)"
+              name="status"
+              value={(formData as any).status || 'ativo'}
+              onChange={(e) => handleFormChange('status', e.target.value)}
+              className="sm:col-span-3"
+            >
+              <option value="ativo">Ativo</option>
+              <option value="afastado">Afastado</option>
+              <option value="ferias">Férias</option>
+              <option value="licenca">Licença</option>
+              <option value="desligado">Desligado</option>
+            </Select>
+            <Input
+              label="Observações (opcional)"
+              name="observacoes"
+              value={(formData as any).observacoes || ''}
+              onChange={(e) => handleFormChange('observacoes', e.target.value)}
+              className="sm:col-span-6"
+            />
           </Section>
+        )}
+
+        {activeTab === 'afastamentos' && (
+          <div className="space-y-6">
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 flex items-start gap-3">
+              <CalendarPlus className="text-blue-600 mt-0.5" size={20} />
+              <div>
+                <h4 className="font-semibold text-blue-800">Afastamentos</h4>
+                <p className="text-sm text-blue-700">Registre períodos de afastamento e mantenha o status do colaborador atualizado.</p>
+              </div>
+            </div>
+
+            <div className="bg-gray-50 border border-gray-200 rounded-2xl p-4 space-y-3">
+              <div className="grid grid-cols-1 md:grid-cols-12 gap-3 items-end">
+                <div className="md:col-span-3">
+                  <Select label="Tipo" name="tipo_afast" value={novoAfastTipo} onChange={(e) => setNovoAfastTipo(e.target.value as any)}>
+                    <option value="outros">Outros</option>
+                    <option value="ferias">Férias</option>
+                    <option value="licenca">Licença</option>
+                    <option value="atestado">Atestado</option>
+                  </Select>
+                </div>
+                <div className="md:col-span-3">
+                  <Input label="Início" name="afast_inicio" type="date" value={novoAfastInicio} onChange={(e) => setNovoAfastInicio(e.target.value)} />
+                </div>
+                <div className="md:col-span-3">
+                  <Input label="Fim (opcional)" name="afast_fim" type="date" value={novoAfastFim} onChange={(e) => setNovoAfastFim(e.target.value)} />
+                </div>
+                <div className="md:col-span-3 flex justify-end">
+                  <Button onClick={handleAddAfastamento} disabled={savingAfastamento} className="gap-2">
+                    {savingAfastamento ? <Loader2 className="animate-spin" size={16} /> : <PlusCircle size={18} />}
+                    Registrar
+                  </Button>
+                </div>
+                <div className="md:col-span-12">
+                  <Input label="Motivo (opcional)" name="afast_motivo" value={novoAfastMotivo} onChange={(e) => setNovoAfastMotivo(e.target.value)} />
+                </div>
+              </div>
+            </div>
+
+            <div className="border rounded-2xl overflow-hidden bg-white">
+              <table className="min-w-full text-sm">
+                <thead className="bg-gray-50 text-gray-600">
+                  <tr>
+                    <th className="px-4 py-2 text-left">Tipo</th>
+                    <th className="px-4 py-2 text-left">Período</th>
+                    <th className="px-4 py-2 text-left">Motivo</th>
+                    <th className="px-4 py-2 text-right">Ações</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {loadingAfastamentos && (
+                    <tr>
+                      <td colSpan={4} className="px-4 py-8 text-center text-gray-500">
+                        <Loader2 className="inline-block w-4 h-4 animate-spin mr-2" />
+                        Carregando...
+                      </td>
+                    </tr>
+                  )}
+                  {!loadingAfastamentos && afastamentos.length === 0 && (
+                    <tr>
+                      <td colSpan={4} className="px-4 py-8 text-center text-gray-500">Nenhum afastamento registrado.</td>
+                    </tr>
+                  )}
+                  {!loadingAfastamentos &&
+                    afastamentos.map((a) => {
+                      const aberto = !a.data_fim;
+                      return (
+                        <tr key={a.id} className="border-t">
+                          <td className="px-4 py-2 font-semibold text-gray-900">{a.tipo}</td>
+                          <td className="px-4 py-2 text-gray-700">
+                            {new Date(a.data_inicio).toLocaleDateString('pt-BR')} {a.data_fim ? `→ ${new Date(a.data_fim).toLocaleDateString('pt-BR')}` : '→ (em aberto)'}
+                          </td>
+                          <td className="px-4 py-2 text-gray-600">{a.motivo || '—'}</td>
+                          <td className="px-4 py-2 text-right">
+                            {aberto ? (
+                              <Button variant="outline" size="sm" onClick={() => handleEncerrarAfastamento(a)}>
+                                Encerrar
+                              </Button>
+                            ) : (
+                              <span className="text-xs text-gray-500">Encerrado</span>
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
+        {activeTab === 'anexos' && (
+          <div className="space-y-6">
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 flex items-start gap-3">
+              <Paperclip className="text-blue-600 mt-0.5" size={20} />
+              <div>
+                <h4 className="font-semibold text-blue-800">Anexos do colaborador</h4>
+                <p className="text-sm text-blue-700">Anexe documentos (contrato, certificados, atestados, etc.).</p>
+              </div>
+            </div>
+
+            <div className="bg-gray-50 border border-gray-200 rounded-2xl p-4 space-y-3">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <Input label="Título do anexo" value={docTitulo} onChange={(e) => setDocTitulo(e.target.value)} placeholder="Ex: Contrato, RG, Certificado NR-12" />
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Arquivo</label>
+                  <input type="file" onChange={(e) => setDocFile(e.target.files?.[0] || null)} className="w-full text-sm" />
+                  <p className="text-xs text-gray-500 mt-1">O arquivo será armazenado por empresa (acesso controlado).</p>
+                </div>
+              </div>
+              <Input label="Descrição (opcional)" value={docDescricao} onChange={(e) => setDocDescricao(e.target.value)} />
+              <div className="flex justify-end">
+                <Button onClick={handleUploadDoc} disabled={!activeEmpresaId || !docFile || uploadingDoc} className="gap-2">
+                  {uploadingDoc ? <Loader2 className="animate-spin" size={16} /> : <Paperclip size={16} />}
+                  Enviar
+                </Button>
+              </div>
+            </div>
+
+            <div className="border rounded-2xl overflow-hidden bg-white">
+              <table className="min-w-full text-sm">
+                <thead className="bg-gray-50 text-gray-600">
+                  <tr>
+                    <th className="px-4 py-2 text-left">Título</th>
+                    <th className="px-4 py-2 text-left">Versão</th>
+                    <th className="px-4 py-2 text-left">Criado</th>
+                    <th className="px-4 py-2 text-right">Ações</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {loadingDocs && (
+                    <tr>
+                      <td colSpan={4} className="px-4 py-8 text-center text-gray-500">
+                        <Loader2 className="inline-block w-4 h-4 animate-spin mr-2" />
+                        Carregando...
+                      </td>
+                    </tr>
+                  )}
+                  {!loadingDocs && docs.length === 0 && (
+                    <tr>
+                      <td colSpan={4} className="px-4 py-8 text-center text-gray-500">Nenhum anexo enviado.</td>
+                    </tr>
+                  )}
+                  {!loadingDocs &&
+                    docs.map((d) => (
+                      <tr key={d.id} className="border-t">
+                        <td className="px-4 py-2">
+                          <div className="font-semibold text-gray-900">{d.titulo}</div>
+                          {d.descricao && <div className="text-xs text-gray-500">{d.descricao}</div>}
+                        </td>
+                        <td className="px-4 py-2">v{d.versao}</td>
+                        <td className="px-4 py-2 text-gray-600">{new Date(d.created_at).toLocaleString('pt-BR')}</td>
+                        <td className="px-4 py-2 text-right">
+                          <Button variant="ghost" size="sm" onClick={() => handleOpenDoc(d)}>
+                            <Download className="w-4 h-4 mr-2" />
+                            Abrir
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleDeleteDoc(d)}
+                            className="text-rose-600 hover:text-rose-700"
+                          >
+                            <Trash2 className="w-4 h-4 mr-2" />
+                            Excluir
+                          </Button>
+                        </td>
+                      </tr>
+                    ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
         )}
 
         {activeTab === 'competencias' && (

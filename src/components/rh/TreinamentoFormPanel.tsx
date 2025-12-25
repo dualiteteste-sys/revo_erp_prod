@@ -218,6 +218,21 @@ const TreinamentoFormPanel: React.FC<TreinamentoFormPanelProps> = ({ treinamento
               onChange={e => handleFormChange('carga_horaria_horas', parseFloat(e.target.value))} 
               className="sm:col-span-2" 
             />
+
+            <Input
+              label="Validade do certificado (meses)"
+              name="validade_meses"
+              type="number"
+              min="0"
+              step="1"
+              value={formData.validade_meses ?? ''}
+              onChange={(e) => {
+                const v = e.target.value === '' ? null : Number(e.target.value);
+                handleFormChange('validade_meses', Number.isFinite(v as number) ? v : null);
+              }}
+              className="sm:col-span-2"
+              helperText="Ao marcar um participante como Concluído, o sistema calcula a validade e a data sugerida de reciclagem."
+            />
             <Input 
               label="Custo Estimado (R$)" 
               name="custo_estimado" 
@@ -300,6 +315,22 @@ const TreinamentoFormPanel: React.FC<TreinamentoFormPanelProps> = ({ treinamento
                     <div className="flex items-center gap-2">
                         {part.eficacia_avaliada && <CheckCircle size={18} className="text-green-500" title="Eficácia Avaliada" />}
                         {part.nota_final !== null && <span className="text-sm font-bold text-gray-700">Nota: {part.nota_final}</span>}
+                    </div>
+
+                    <div className="min-w-[220px] text-sm text-gray-600">
+                      {part.validade_ate ? (
+                        <div>
+                          <span className="font-medium">Validade:</span>{' '}
+                          {new Date(part.validade_ate).toLocaleDateString('pt-BR')}
+                        </div>
+                      ) : (
+                        <div className="text-gray-400">Validade: —</div>
+                      )}
+                      {part.proxima_reciclagem ? (
+                        <div className="text-xs text-gray-500">
+                          Reciclagem sugerida: {new Date(part.proxima_reciclagem).toLocaleDateString('pt-BR')}
+                        </div>
+                      ) : null}
                     </div>
 
                     <div className="flex items-center gap-2">
