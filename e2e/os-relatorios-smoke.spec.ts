@@ -148,6 +148,25 @@ test('Serviços: relatórios abrem sem erros de console', async ({ page }) => {
     });
   });
 
+  await page.route('**/rest/v1/rpc/os_relatorios_list', async (route) => {
+    await route.fulfill({
+      json: [
+        {
+          id: 'os-1',
+          numero: 10,
+          descricao: 'OS Relatório E2E',
+          status: 'concluida',
+          data_ref: '2026-01-10',
+          cliente_nome: 'Cliente A',
+          total_geral: 1000,
+          custo_real: 400,
+          margem: 600,
+          total_count: 1,
+        },
+      ],
+    });
+  });
+
   await page.goto('/auth/login');
   await page.getByPlaceholder('seu@email.com').fill('test@example.com');
   await page.getByLabel('Senha').fill('password123');
@@ -157,5 +176,6 @@ test('Serviços: relatórios abrem sem erros de console', async ({ page }) => {
   await page.goto('/app/servicos/relatorios');
   await expect(page.getByRole('heading', { name: 'Relatórios de Serviços' })).toBeVisible();
   await expect(page.getByText('Top clientes (por faturamento no período)')).toBeVisible();
+  await expect(page.getByText('Lista detalhada')).toBeVisible();
+  await expect(page.getByText('#10')).toBeVisible();
 });
-
