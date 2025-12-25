@@ -13,6 +13,7 @@ import Select from '@/components/ui/forms/Select';
 import DatePicker from '@/components/ui/DatePicker';
 import ErrorAlert from '@/components/ui/ErrorAlert';
 import { Button } from '@/components/ui/button';
+import { useConfirm } from '@/contexts/ConfirmProvider';
 
 const ContasPagarPage: React.FC = () => {
   const {
@@ -37,6 +38,7 @@ const ContasPagarPage: React.FC = () => {
     refresh,
   } = useContasPagar();
   const { addToast } = useToast();
+  const { confirm } = useConfirm();
 
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [selectedConta, setSelectedConta] = useState<financeiroService.ContaPagar | null>(null);
@@ -98,6 +100,32 @@ const ContasPagarPage: React.FC = () => {
       addToast(e.message || 'Erro ao excluir.', 'error');
     } finally {
       setIsDeleting(false);
+    }
+  };
+
+  const handlePay = async (conta: financeiroService.ContaPagar) => {
+    if (!conta?.id) return;
+    const ok = await confirm({
+      title: 'Registrar pagamento',
+      description: `Deseja marcar a conta "${conta.descricao}" como paga hoje?`,
+      confirmText: 'Registrar pagamento',
+      cancelText: 'Cancelar',
+      variant: 'default',
+    });
+    if (!ok) return;
+
+    try {
+      const today = new Date().toISOString().slice(0, 10);
+      const total = (Number(conta.valor_total || 0) + Number(conta.multa || 0) + Number(conta.juros || 0) - Number(conta.desconto || 0));
+      await financeiroService.pagarContaPagar({
+        id: conta.id,
+        dataPagamento: today,
+        valorPago: total,
+      });
+      addToast('Pagamento registrado com sucesso!', 'success');
+      refresh();
+    } catch (e: any) {
+      addToast(e?.message || 'Erro ao registrar pagamento.', 'error');
     }
   };
 
@@ -222,7 +250,14 @@ const ContasPagarPage: React.FC = () => {
                 {searchTerm && <p className="text-sm">Tente ajustar sua busca.</p>}
               </div>
             ) : (
-              <ContasPagarTable contas={contas} onEdit={handleOpenForm} onDelete={handleOpenDeleteModal} sortBy={sortBy} onSort={handleSort} />
+              <ContasPagarTable
+                contas={contas}
+                onEdit={handleOpenForm}
+                onPay={handlePay}
+                onDelete={handleOpenDeleteModal}
+                sortBy={sortBy}
+                onSort={handleSort}
+              />
             )}
           </div>
 

@@ -1,11 +1,13 @@
 import React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ContaPagar } from '@/services/financeiro';
-import { Edit, Trash2, ArrowUpDown } from 'lucide-react';
+import { CheckCircle2, Edit, Trash2, ArrowUpDown } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 
 interface ContasPagarTableProps {
   contas: ContaPagar[];
   onEdit: (conta: ContaPagar) => void;
+  onPay?: (conta: ContaPagar) => void;
   onDelete: (conta: ContaPagar) => void;
   sortBy: { column: string; ascending: boolean };
   onSort: (column: string) => void;
@@ -40,7 +42,7 @@ const SortableHeader: React.FC<{
   );
 };
 
-const ContasPagarTable: React.FC<ContasPagarTableProps> = ({ contas, onEdit, onDelete, sortBy, onSort }) => {
+const ContasPagarTable: React.FC<ContasPagarTableProps> = ({ contas, onEdit, onPay, onDelete, sortBy, onSort }) => {
   return (
     <div className="overflow-x-auto">
       <table className="min-w-full divide-y divide-gray-200">
@@ -79,8 +81,41 @@ const ContasPagarTable: React.FC<ContasPagarTableProps> = ({ contas, onEdit, onD
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                   <div className="flex items-center justify-end gap-4">
-                    <button onClick={() => onEdit(conta)} className="text-indigo-600 hover:text-indigo-900"><Edit size={18} /></button>
-                    <button onClick={() => onDelete(conta)} className="text-red-600 hover:text-red-900"><Trash2 size={18} /></button>
+                    {onPay && (conta.status === 'aberta' || conta.status === 'parcial') ? (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => onPay(conta)}
+                        title="Registrar pagamento"
+                        aria-label="Registrar pagamento"
+                        className="text-emerald-600 hover:text-emerald-900"
+                      >
+                        <CheckCircle2 size={18} />
+                      </Button>
+                    ) : null}
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => onEdit(conta)}
+                      title="Editar"
+                      aria-label="Editar"
+                      className="text-indigo-600 hover:text-indigo-900"
+                    >
+                      <Edit size={18} />
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => onDelete(conta)}
+                      title="Excluir"
+                      aria-label="Excluir"
+                      className="text-red-600 hover:text-red-900"
+                    >
+                      <Trash2 size={18} />
+                    </Button>
                   </div>
                 </td>
               </motion.tr>
