@@ -11,6 +11,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import UsersFilters from '@/features/users/components/UsersFilters';
 import Pagination from '@/components/ui/Pagination';
 import { UsersTableSkeleton } from '@/features/users/components/UsersTableSkeleton';
+import { useEmpresaFeatures } from '@/hooks/useEmpresaFeatures';
 
 const PAGE_SIZE = 10;
 
@@ -18,12 +19,15 @@ export default function UsersPage() {
   const [filters, setFilters] = useState<Filters>({ q: '', role: [], status: [] });
   const [page, setPage] = useState(1);
   const { users, count, isLoading, isError, error, refetch } = useUsers(filters, page, PAGE_SIZE);
+  const empresaFeatures = useEmpresaFeatures();
 
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [selectedUser, setSelectedUser] = useState<EmpresaUser | null>(null);
   const [isInviteOpen, setIsInviteOpen] = useState(false);
 
   const canManage = useCan('usuarios', 'manage');
+  const maxUsers = empresaFeatures.max_users;
+  const reachedLimit = !empresaFeatures.loading && typeof maxUsers === 'number' && maxUsers > 0 && count >= maxUsers;
 
   const handleFilterChange = (patch: Partial<Filters>) => {
     setPage(1); // Reset page on filter change
@@ -42,14 +46,36 @@ export default function UsersPage() {
   return (
     <div>
       <div className="flex justify-between items-center mb-6">
-        <h1 className="text-2xl font-bold text-gray-800">Usuários</h1>
+        <div>
+          <h1 className="text-2xl font-bold text-gray-800">Usuários</h1>
+          {!empresaFeatures.loading && (
+            <div className="mt-1 text-xs text-gray-500">
+              Limite do plano: <span className="font-semibold text-gray-700">{count}</span> /{' '}
+              <span className="font-semibold text-gray-700">{maxUsers}</span>
+            </div>
+          )}
+        </div>
         {canManage && (
-          <Button onClick={() => setIsInviteOpen(true)}>
+          <Button
+            onClick={() => setIsInviteOpen(true)}
+            disabled={reachedLimit}
+            title={
+              reachedLimit
+                ? 'Limite de usuários atingido. Ajuste o limite em Configurações → Minha Assinatura.'
+                : 'Convidar novo usuário'
+            }
+          >
             <UserPlus className="mr-2 h-4 w-4" />
             Convidar Usuário
           </Button>
         )}
       </div>
+
+      {reachedLimit && (
+        <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+          Limite de usuários atingido para esta empresa. Ajuste o limite em <span className="font-semibold">Configurações → Minha Assinatura</span>.
+        </div>
+      )}
 
       <UsersFilters filters={filters} onFilterChange={handleFilterChange} />
 
