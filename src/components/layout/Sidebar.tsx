@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useMemo, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import GlassCard from '../ui/GlassCard';
 import { menuConfig, MenuItem } from '../../config/menuConfig';
@@ -8,6 +8,8 @@ import SidebarSwitch from '../sidebar/SidebarSwitch';
 import CompanySwitcher from '../sidebar/CompanySwitcher';
 import { useAuth } from '../../contexts/AuthProvider';
 import RevoLogo from '../landing/RevoLogo';
+import { useEmpresaFeatures } from '@/hooks/useEmpresaFeatures';
+import { filterMenuByFeatures } from '@/utils/menu/filterMenuByFeatures';
 
 const sidebarVariants = {
   expanded: { width: 320, transition: { type: 'spring', stiffness: 300, damping: 30 } },
@@ -35,9 +37,15 @@ const Sidebar: React.FC<SidebarProps> = ({
   const [isHoveringSubmenu, setIsHoveringSubmenu] = useState(false);
   const timerRef = useRef<number | null>(null);
   const { signOut } = useAuth();
+  const { industria_enabled, servicos_enabled, loading: loadingFeatures } = useEmpresaFeatures();
+
+  const visibleMenu = useMemo(() => {
+    if (loadingFeatures) return menuConfig;
+    return filterMenuByFeatures(menuConfig, { industria_enabled, servicos_enabled });
+  }, [industria_enabled, servicos_enabled, loadingFeatures]);
 
   const findParentGroup = (itemName: string) => {
-    const parent = menuConfig.find(group => group.children?.some(child => child.name === itemName));
+    const parent = visibleMenu.find(group => group.children?.some(child => child.name === itemName));
     return parent ? parent.name : null;
   };
 
@@ -136,7 +144,7 @@ const Sidebar: React.FC<SidebarProps> = ({
                 exit={{ opacity: 0 }}
                 className="space-y-4 pt-4 flex flex-col items-center"
               >
-                {menuConfig.map((item) => (
+                {visibleMenu.map((item) => (
                   <li 
                     key={item.name} 
                     className="relative" 
@@ -161,7 +169,7 @@ const Sidebar: React.FC<SidebarProps> = ({
                 exit={{ opacity: 0 }}
                 className="space-y-2"
               >
-                {menuConfig.map((item) => (
+                {visibleMenu.map((item) => (
                   <SidebarGroup
                     key={item.name}
                     item={item}

@@ -8,6 +8,7 @@ import { useSupabase } from '@/providers/SupabaseProvider';
 import { Database } from '../../../types/database.types';
 
 type EmpresaAddon = Database['public']['Tables']['empresa_addons']['Row'];
+type PlanoMvp = 'ambos' | 'servicos' | 'industria';
 
 interface SubscriptionSettingsProps {
   onSwitchToPlans: () => void;
@@ -74,6 +75,10 @@ const SubscriptionSettings: React.FC<SubscriptionSettingsProps> = ({ onSwitchToP
   const [isPortalLoading, setIsPortalLoading] = useState(false);
   const [addons, setAddons] = useState<EmpresaAddon[]>([]);
   const [loadingAddons, setLoadingAddons] = useState(true);
+  const [loadingEntitlements, setLoadingEntitlements] = useState(true);
+  const [savingEntitlements, setSavingEntitlements] = useState(false);
+  const [planoMvp, setPlanoMvp] = useState<PlanoMvp>('ambos');
+  const [maxUsers, setMaxUsers] = useState<number>(999);
 
   const fetchAddons = useCallback(async () => {
     if (!activeEmpresa?.id) return;
@@ -91,9 +96,35 @@ const SubscriptionSettings: React.FC<SubscriptionSettingsProps> = ({ onSwitchToP
     setLoadingAddons(false);
   }, [activeEmpresa, addToast, supabase]);
 
+  const fetchEntitlements = useCallback(async () => {
+    const empresaId = activeEmpresa?.id;
+    if (!empresaId) return;
+    setLoadingEntitlements(true);
+
+    try {
+      const { data, error } = await (supabase as any)
+        .from('empresa_entitlements')
+        .select('plano_mvp, max_users')
+        .eq('empresa_id', empresaId)
+        .maybeSingle();
+
+      if (error) throw error;
+
+      setPlanoMvp((data?.plano_mvp ?? 'ambos') as PlanoMvp);
+      setMaxUsers(typeof data?.max_users === 'number' ? data.max_users : 999);
+    } catch (error: any) {
+      addToast('Não foi possível carregar o Plano MVP (usando padrão).', 'warning');
+      setPlanoMvp('ambos');
+      setMaxUsers(999);
+    } finally {
+      setLoadingEntitlements(false);
+    }
+  }, [activeEmpresa?.id, addToast, supabase]);
+
   useEffect(() => {
     fetchAddons();
-  }, [fetchAddons]);
+    fetchEntitlements();
+  }, [fetchAddons, fetchEntitlements]);
 
   const handleManageBilling = async () => {
     if (!activeEmpresa) {
@@ -224,6 +255,95 @@ const SubscriptionSettings: React.FC<SubscriptionSettingsProps> = ({ onSwitchToP
     )
   }
 
+  const handleSaveEntitlements = async () => {
+    const empresaId = activeEmpresa?.id;
+    if (!empresaId) {
+      addToast('Nenhuma empresa ativa selecionada.', 'error');
+      return;
+    }
+
+    const nextMaxUsers = Number.isFinite(maxUsers) ? Math.max(1, Math.trunc(maxUsers)) : 999;
+
+    setSavingEntitlements(true);
+    try {
+      const { error } = await (supabase as any)
+        .from('empresa_entitlements')
+        .upsert(
+          {
+            empresa_id: empresaId,
+            plano_mvp: planoMvp,
+            max_users: nextMaxUsers,
+          },
+          { onConflict: 'empresa_id' }
+        );
+
+      if (error) throw error;
+      addToast('Plano MVP salvo com sucesso.', 'success');
+      await fetchEntitlements();
+      window.dispatchEvent(new Event('empresa-features-refresh'));
+    } catch (error: any) {
+      addToast(error?.message || 'Erro ao salvar Plano MVP.', 'error');
+    } finally {
+      setSavingEntitlements(false);
+    }
+  };
+
+  const renderEntitlements = () => (
+    <div className="bg-white/80 rounded-2xl p-6 md:p-8 border border-gray-200 shadow-sm">
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <h2 className="text-xl font-bold text-gray-800">Plano MVP e Limites</h2>
+          <p className="text-sm text-gray-500 mt-1">
+            Use esta configuração para simular os 2 planos iniciais (Serviços / Indústria) e limites de usuários.
+          </p>
+        </div>
+        <button
+          onClick={handleSaveEntitlements}
+          disabled={savingEntitlements || loadingEntitlements}
+          className="bg-blue-600 text-white font-bold py-2 px-5 rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50"
+        >
+          {savingEntitlements ? 'Salvando…' : 'Salvar'}
+        </button>
+      </div>
+
+      <div className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div>
+          <label className="block text-sm font-semibold text-gray-700 mb-2">Plano MVP</label>
+          <select
+            value={planoMvp}
+            onChange={(e) => setPlanoMvp(e.target.value as PlanoMvp)}
+            disabled={loadingEntitlements}
+            className="w-full bg-white border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+          >
+            <option value="ambos">Ambos (sem bloqueios)</option>
+            <option value="servicos">Serviços (Essencial)</option>
+            <option value="industria">Indústria (Essencial)</option>
+          </select>
+          <p className="text-xs text-gray-500 mt-2">
+            Esta configuração afeta menus e rotas (guards) e serve como base para a política de planos/limites.
+          </p>
+        </div>
+
+        <div>
+          <label className="block text-sm font-semibold text-gray-700 mb-2">Limite de usuários</label>
+          <input
+            type="number"
+            min={1}
+            step={1}
+            value={Number.isFinite(maxUsers) ? String(maxUsers) : ''}
+            onChange={(e) => setMaxUsers(Number(e.target.value))}
+            disabled={loadingEntitlements}
+            className="w-full bg-white border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            placeholder="Ex.: 3"
+          />
+          <p className="text-xs text-gray-500 mt-2">
+            O banco bloqueia novos vínculos em <span className="font-semibold">empresa_usuarios</span> quando o limite é atingido.
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+
   return (
     <div className="space-y-8">
       <div className="flex justify-between items-center">
@@ -239,6 +359,7 @@ const SubscriptionSettings: React.FC<SubscriptionSettingsProps> = ({ onSwitchToP
       </div>
       {renderMainSubscription()}
       {renderAddons()}
+      {renderEntitlements()}
     </div>
   );
 };

@@ -1,7 +1,7 @@
 import { test as base, expect, type ConsoleMessage } from '@playwright/test';
 
 export const test = base.extend({
-  page: async ({ page }, use) => {
+  page: async ({ page }, run) => {
     const consoleErrors: string[] = [];
 
     const onConsole = (msg: ConsoleMessage) => {
@@ -18,7 +18,7 @@ export const test = base.extend({
     page.on('console', onConsole);
     page.on('pageerror', onPageError);
 
-    await use(page);
+    await run(page);
 
     page.off('console', onConsole);
     page.off('pageerror', onPageError);
@@ -30,4 +30,3 @@ export const test = base.extend({
 });
 
 export { expect };
-

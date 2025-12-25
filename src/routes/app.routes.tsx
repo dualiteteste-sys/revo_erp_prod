@@ -5,6 +5,7 @@ import ProtectedRoute from '../components/layout/ProtectedRoute';
 import OnboardingGuard from "../components/auth/OnboardingGuard";
 import PageLoader from "../components/ui/PageLoader";
 import { lazyImport } from "../utils/lazyImport";
+import PlanGuard from "../components/layout/PlanGuard";
 
 // App Pages (Lazy Loaded)
 const Dashboard = lazyImport(() => import('../pages/Dashboard'));
@@ -92,30 +93,30 @@ export const appRoutes: RouteObject[] = [
             { path: "products", element: <Suspense fallback={<PageLoader />}><ProductsPage /></Suspense> },
             { path: "partners", element: <Suspense fallback={<PageLoader />}><PartnersPage /></Suspense> },
             { path: "carriers", element: <Suspense fallback={<PageLoader />}><CarriersPage /></Suspense> },
-            { path: "services", element: <Suspense fallback={<PageLoader />}><ServicesPage /></Suspense> },
+            { path: "services", element: <PlanGuard feature="servicos"><Suspense fallback={<PageLoader />}><ServicesPage /></Suspense></PlanGuard> },
             { path: "cadastros/grupos-produtos", element: <Suspense fallback={<PageLoader />}><GrupoProdutosPage /></Suspense> },
             { path: "cadastros/unidades-medida", element: <Suspense fallback={<PageLoader />}><UnidadesPage /></Suspense> },
             { path: "cadastros/embalagens", element: <Suspense fallback={<PageLoader />}><EmbalagensPage /></Suspense> },
 
             // Indústria
-            { path: "industria/qualidade/motivos", element: <Suspense fallback={<PageLoader />}><MotivosRefugoPage /></Suspense> },
-            { path: "industria/qualidade/planos", element: <Suspense fallback={<PageLoader />}><PlanosInspecaoPage /></Suspense> },
-            { path: "industria/qualidade/lotes", element: <Suspense fallback={<PageLoader />}><LotesQualidadePage /></Suspense> },
-            { path: "industria/dashboard", element: <Suspense fallback={<PageLoader />}><IndustriaDashboardPage /></Suspense> },
-            { path: "industria/status-beneficiamentos", element: <Suspense fallback={<PageLoader />}><StatusBeneficiamentosPage /></Suspense> },
-            { path: "industria/producao", element: <Suspense fallback={<PageLoader />}><ProducaoPage /></Suspense> },
-            { path: "industria/ordens", element: <Suspense fallback={<PageLoader />}><OrdensPage /></Suspense> },
-            { path: "industria/mrp", element: <Suspense fallback={<PageLoader />}><MrpDemandasPage /></Suspense> },
-            { path: "industria/pcp", element: <Suspense fallback={<PageLoader />}><PcpDashboardPage /></Suspense> },
-            { path: "industria/boms", element: <Suspense fallback={<PageLoader />}><BomsPage /></Suspense> },
-            { path: "industria/roteiros", element: <Suspense fallback={<PageLoader />}><RoteirosPage /></Suspense> },
-            { path: "industria/centros-trabalho", element: <Suspense fallback={<PageLoader />}><CentrosTrabalhoPage /></Suspense> },
-            { path: "industria/execucao", element: <Suspense fallback={<PageLoader />}><ExecucaoPage /></Suspense> },
-            { path: "industria/chao-de-fabrica", element: <Suspense fallback={<PageLoader />}><ChaoDeFabricaPage /></Suspense> },
-            { path: "industria/operador", element: <Suspense fallback={<PageLoader />}><OperadorPage /></Suspense> },
-            { path: "industria/operadores", element: <Suspense fallback={<PageLoader />}><OperadoresPage /></Suspense> },
-            { path: "industria/automacao", element: <Suspense fallback={<PageLoader />}><AutomacaoPage /></Suspense> },
-            { path: "industria/materiais-cliente", element: <Suspense fallback={<PageLoader />}><MateriaisClientePage /></Suspense> },
+            { path: "industria/qualidade/motivos", element: <PlanGuard feature="industria"><Suspense fallback={<PageLoader />}><MotivosRefugoPage /></Suspense></PlanGuard> },
+            { path: "industria/qualidade/planos", element: <PlanGuard feature="industria"><Suspense fallback={<PageLoader />}><PlanosInspecaoPage /></Suspense></PlanGuard> },
+            { path: "industria/qualidade/lotes", element: <PlanGuard feature="industria"><Suspense fallback={<PageLoader />}><LotesQualidadePage /></Suspense></PlanGuard> },
+            { path: "industria/dashboard", element: <PlanGuard feature="industria"><Suspense fallback={<PageLoader />}><IndustriaDashboardPage /></Suspense></PlanGuard> },
+            { path: "industria/status-beneficiamentos", element: <PlanGuard feature="industria"><Suspense fallback={<PageLoader />}><StatusBeneficiamentosPage /></Suspense></PlanGuard> },
+            { path: "industria/producao", element: <PlanGuard feature="industria"><Suspense fallback={<PageLoader />}><ProducaoPage /></Suspense></PlanGuard> },
+            { path: "industria/ordens", element: <PlanGuard feature="industria"><Suspense fallback={<PageLoader />}><OrdensPage /></Suspense></PlanGuard> },
+            { path: "industria/mrp", element: <PlanGuard feature="industria"><Suspense fallback={<PageLoader />}><MrpDemandasPage /></Suspense></PlanGuard> },
+            { path: "industria/pcp", element: <PlanGuard feature="industria"><Suspense fallback={<PageLoader />}><PcpDashboardPage /></Suspense></PlanGuard> },
+            { path: "industria/boms", element: <PlanGuard feature="industria"><Suspense fallback={<PageLoader />}><BomsPage /></Suspense></PlanGuard> },
+            { path: "industria/roteiros", element: <PlanGuard feature="industria"><Suspense fallback={<PageLoader />}><RoteirosPage /></Suspense></PlanGuard> },
+            { path: "industria/centros-trabalho", element: <PlanGuard feature="industria"><Suspense fallback={<PageLoader />}><CentrosTrabalhoPage /></Suspense></PlanGuard> },
+            { path: "industria/execucao", element: <PlanGuard feature="industria"><Suspense fallback={<PageLoader />}><ExecucaoPage /></Suspense></PlanGuard> },
+            { path: "industria/chao-de-fabrica", element: <PlanGuard feature="industria"><Suspense fallback={<PageLoader />}><ChaoDeFabricaPage /></Suspense></PlanGuard> },
+            { path: "industria/operador", element: <PlanGuard feature="industria"><Suspense fallback={<PageLoader />}><OperadorPage /></Suspense></PlanGuard> },
+            { path: "industria/operadores", element: <PlanGuard feature="industria"><Suspense fallback={<PageLoader />}><OperadoresPage /></Suspense></PlanGuard> },
+            { path: "industria/automacao", element: <PlanGuard feature="industria"><Suspense fallback={<PageLoader />}><AutomacaoPage /></Suspense></PlanGuard> },
+            { path: "industria/materiais-cliente", element: <PlanGuard feature="industria"><Suspense fallback={<PageLoader />}><MateriaisClientePage /></Suspense></PlanGuard> },
 
             // Vendas
             { path: "sales-dashboard", element: <Suspense fallback={<PageLoader />}><SalesDashboard /></Suspense> },
@@ -124,7 +125,7 @@ export const appRoutes: RouteObject[] = [
             { path: "vendas/crm", element: <Suspense fallback={<PageLoader />}><CrmPage /></Suspense> },
 
             // Serviços (Módulo)
-            { path: "ordens-de-servico", element: <Suspense fallback={<PageLoader />}><OSPage /></Suspense> },
+            { path: "ordens-de-servico", element: <PlanGuard feature="servicos"><Suspense fallback={<PageLoader />}><OSPage /></Suspense></PlanGuard> },
 
             // Suprimentos
             { path: "suprimentos/estoque", element: <Suspense fallback={<PageLoader />}><EstoquePage /></Suspense> },
