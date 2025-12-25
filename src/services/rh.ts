@@ -65,6 +65,19 @@ export type ColaboradorDetails = Colaborador & {
   competencias: ColaboradorCompetencia[];
 };
 
+export type ColaboradorTreinamento = {
+  treinamento_id: string;
+  treinamento_nome: string;
+  treinamento_status: string;
+  treinamento_tipo: string;
+  data_inicio: string | null;
+  data_fim: string | null;
+  participante_status: string;
+  nota_final: number | null;
+  eficacia_avaliada: boolean;
+  parecer_eficacia: string | null;
+};
+
 export type MatrixCompetencia = {
   id: string;
   nome: string;
@@ -213,6 +226,12 @@ export async function getColaboradorDetails(id: string): Promise<ColaboradorDeta
 
 export async function saveColaborador(payload: ColaboradorPayload): Promise<ColaboradorDetails> {
   return callRpc<ColaboradorDetails>('rh_upsert_colaborador', { p_payload: payload });
+}
+
+export async function listTreinamentosPorColaborador(colaboradorId: string): Promise<ColaboradorTreinamento[]> {
+  return callRpc<ColaboradorTreinamento[]>('rh_list_treinamentos_por_colaborador', {
+    p_colaborador_id: colaboradorId,
+  });
 }
 
 export async function seedColaboradores(): Promise<void> {

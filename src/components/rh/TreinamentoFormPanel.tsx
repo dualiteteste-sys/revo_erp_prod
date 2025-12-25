@@ -1,6 +1,15 @@
 import React, { useState, useEffect } from 'react';
 import { Loader2, Save, Plus, Trash2, UserPlus, CheckCircle, XCircle, Edit } from 'lucide-react';
-import { TreinamentoDetails, TreinamentoPayload, saveTreinamento, listColaboradores, Colaborador, manageParticipante, TreinamentoParticipante } from '@/services/rh';
+import {
+  TreinamentoDetails,
+  TreinamentoPayload,
+  saveTreinamento,
+  listColaboradores,
+  Colaborador,
+  manageParticipante,
+  TreinamentoParticipante,
+  getTreinamentoDetails,
+} from '@/services/rh';
 import { useToast } from '@/contexts/ToastProvider';
 import Section from '@/components/ui/forms/Section';
 import Input from '@/components/ui/forms/Input';
@@ -12,11 +21,11 @@ import ParticipanteModal from './ParticipanteModal';
 
 interface TreinamentoFormPanelProps {
   treinamento: TreinamentoDetails | null;
-  onSaveSuccess: () => void;
+  onSaved: (treinamento: TreinamentoDetails) => void;
   onClose: () => void;
 }
 
-const TreinamentoFormPanel: React.FC<TreinamentoFormPanelProps> = ({ treinamento, onSaveSuccess, onClose }) => {
+const TreinamentoFormPanel: React.FC<TreinamentoFormPanelProps> = ({ treinamento, onSaved, onClose }) => {
   const { addToast } = useToast();
   const [isSaving, setIsSaving] = useState(false);
   const [formData, setFormData] = useState<TreinamentoPayload>({});
@@ -65,11 +74,8 @@ const TreinamentoFormPanel: React.FC<TreinamentoFormPanelProps> = ({ treinamento
       const saved = await saveTreinamento(formData);
       setFormData(saved); // Update with ID if created
       addToast('Treinamento salvo com sucesso!', 'success');
-      if (!treinamento) {
-        onSaveSuccess(); 
-      } else {
-        onSaveSuccess();
-      }
+      onSaved(saved);
+      setActiveTab('participantes');
     } catch (error: any) {
       addToast(error.message, 'error');
     } finally {
@@ -87,7 +93,7 @@ const TreinamentoFormPanel: React.FC<TreinamentoFormPanelProps> = ({ treinamento
     try {
       await manageParticipante(formData.id, selectedColaboradorId, 'add');
       addToast('Participante adicionado.', 'success');
-      const updated = await saveTreinamento(formData);
+      const updated = await getTreinamentoDetails(formData.id);
       setFormData(updated);
       setSelectedColaboradorId('');
     } catch (e: any) {
@@ -100,7 +106,7 @@ const TreinamentoFormPanel: React.FC<TreinamentoFormPanelProps> = ({ treinamento
     try {
       await manageParticipante(formData.id, colaboradorId, 'remove');
       addToast('Participante removido.', 'success');
-      const updated = await saveTreinamento(formData);
+      const updated = await getTreinamentoDetails(formData.id);
       setFormData(updated);
     } catch (e: any) {
       addToast(e.message, 'error');
@@ -112,7 +118,7 @@ const TreinamentoFormPanel: React.FC<TreinamentoFormPanelProps> = ({ treinamento
     try {
       await manageParticipante(formData.id, colaboradorId, 'update', data);
       addToast('Participante atualizado.', 'success');
-      const updated = await saveTreinamento(formData);
+      const updated = await getTreinamentoDetails(formData.id);
       setFormData(updated);
     } catch (e: any) {
       addToast(e.message, 'error');

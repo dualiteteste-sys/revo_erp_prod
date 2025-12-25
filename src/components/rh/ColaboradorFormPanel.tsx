@@ -1,6 +1,17 @@
 import React, { useState, useEffect } from 'react';
-import { Loader2, Save, AlertCircle, TrendingUp, TrendingDown, Minus } from 'lucide-react';
-import { ColaboradorDetails, ColaboradorPayload, saveColaborador, Cargo, listCargos, Competencia, listCompetencias } from '@/services/rh';
+import { Loader2, Save, AlertCircle, TrendingUp, TrendingDown, Minus, PlusCircle, GraduationCap } from 'lucide-react';
+import {
+  ColaboradorDetails,
+  ColaboradorPayload,
+  saveColaborador,
+  Cargo,
+  listCargos,
+  Competencia,
+  listCompetencias,
+  getCargoDetails,
+  listTreinamentosPorColaborador,
+  ColaboradorTreinamento,
+} from '@/services/rh';
 import { useToast } from '@/contexts/ToastProvider';
 import Section from '@/components/ui/forms/Section';
 import Input from '@/components/ui/forms/Input';
@@ -20,7 +31,13 @@ const ColaboradorFormPanel: React.FC<ColaboradorFormPanelProps> = ({ colaborador
   const [formData, setFormData] = useState<ColaboradorPayload>({});
   const [cargos, setCargos] = useState<Cargo[]>([]);
   const [allCompetencias, setAllCompetencias] = useState<Competencia[]>([]);
-  const [activeTab, setActiveTab] = useState<'dados' | 'competencias'>('dados');
+  const [activeTab, setActiveTab] = useState<'dados' | 'competencias' | 'treinamentos'>('dados');
+
+  const [mappedCargoId, setMappedCargoId] = useState<string | null>(null);
+  const [extraCompetenciaId, setExtraCompetenciaId] = useState<string>('');
+
+  const [treinamentos, setTreinamentos] = useState<ColaboradorTreinamento[]>([]);
+  const [loadingTreinamentos, setLoadingTreinamentos] = useState(false);
 
   useEffect(() => {
     const loadData = async () => {
@@ -35,7 +52,69 @@ const ColaboradorFormPanel: React.FC<ColaboradorFormPanelProps> = ({ colaborador
     } else {
       setFormData({ ativo: true, competencias: [] });
     }
+    setMappedCargoId(null);
+    setExtraCompetenciaId('');
   }, [colaborador]);
+
+  useEffect(() => {
+    const fetchTreinamentos = async () => {
+      if (!colaborador?.id) {
+        setTreinamentos([]);
+        return;
+      }
+      setLoadingTreinamentos(true);
+      try {
+        const data = await listTreinamentosPorColaborador(colaborador.id);
+        setTreinamentos(data);
+      } catch (e: any) {
+        addToast(e?.message || 'Erro ao carregar treinamentos do colaborador.', 'error');
+      } finally {
+        setLoadingTreinamentos(false);
+      }
+    };
+    fetchTreinamentos();
+  }, [colaborador?.id, addToast]);
+
+  useEffect(() => {
+    const hydrateCompetenciasFromCargo = async () => {
+      const cargoId = (formData.cargo_id || '') as string;
+      if (!cargoId) return;
+      if (mappedCargoId === cargoId) return;
+
+      try {
+        const cargo = await getCargoDetails(cargoId);
+        const current = formData.competencias || [];
+        const currentById = new Map(current.map((c: any) => [c.competencia_id, c]));
+
+        const requiredIds = new Set(cargo.competencias.map((c) => c.competencia_id));
+        const required = cargo.competencias.map((req) => {
+          const existing = currentById.get(req.competencia_id);
+          const nivelAtual = existing?.nivel_atual ?? 0;
+          const nivelRequerido = req.nivel_requerido ?? 0;
+          return {
+            competencia_id: req.competencia_id,
+            nome: req.nome,
+            tipo: req.tipo,
+            nivel_requerido: nivelRequerido,
+            nivel_atual: nivelAtual,
+            gap: nivelAtual - nivelRequerido,
+            obrigatorio: !!req.obrigatorio,
+            data_avaliacao: existing?.data_avaliacao ?? null,
+            origem: existing?.origem ?? null,
+          };
+        });
+
+        const extras = current.filter((c: any) => !requiredIds.has(c.competencia_id));
+        setFormData((prev) => ({ ...prev, competencias: [...required, ...extras] }));
+        setMappedCargoId(cargoId);
+      } catch (e) {
+        setMappedCargoId(cargoId);
+      }
+    };
+
+    hydrateCompetenciasFromCargo();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [formData.cargo_id]);
 
   const handleFormChange = (field: keyof ColaboradorPayload, value: any) => {
     setFormData(prev => ({ ...prev, [field]: value }));
@@ -48,18 +127,25 @@ const ColaboradorFormPanel: React.FC<ColaboradorFormPanelProps> = ({ colaborador
     let newComps = [...currentComps];
     
     if (existingIndex >= 0) {
-      newComps[existingIndex] = { ...newComps[existingIndex], [field]: value };
+      const prev = newComps[existingIndex] as any;
+      const next: any = { ...prev, [field]: value };
+      if (field === 'nivel_atual') {
+        next.data_avaliacao = new Date().toISOString();
+      }
+      next.gap = (next.nivel_atual ?? 0) - (next.nivel_requerido ?? 0);
+      newComps[existingIndex] = next;
     } else {
       // Se não existe na lista (ex: adicionando uma competência extra não requerida)
       const compInfo = allCompetencias.find(c => c.id === compId);
       if (compInfo) {
+        const nivelAtual = field === 'nivel_atual' ? value : 0;
         newComps.push({
           competencia_id: compId,
           nome: compInfo.nome,
           tipo: compInfo.tipo,
           nivel_requerido: 0,
-          nivel_atual: field === 'nivel_atual' ? value : 0,
-          gap: 0,
+          nivel_atual: nivelAtual,
+          gap: nivelAtual,
           obrigatorio: false,
           data_avaliacao: new Date().toISOString(),
           origem: null
@@ -67,6 +153,12 @@ const ColaboradorFormPanel: React.FC<ColaboradorFormPanelProps> = ({ colaborador
       }
     }
     setFormData(prev => ({ ...prev, competencias: newComps }));
+  };
+
+  const handleAddExtraCompetencia = () => {
+    if (!extraCompetenciaId) return;
+    handleCompetenciaChange(extraCompetenciaId, 'nivel_atual', 0);
+    setExtraCompetenciaId('');
   };
 
   const handleSave = async () => {
@@ -112,6 +204,13 @@ const ColaboradorFormPanel: React.FC<ColaboradorFormPanelProps> = ({ colaborador
             className={`py-4 px-1 border-b-2 font-medium text-sm ${activeTab === 'competencias' ? 'border-blue-500 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'}`}
           >
             Competências & Avaliação
+          </button>
+          <button
+            onClick={() => setActiveTab('treinamentos')}
+            className={`py-4 px-1 border-b-2 font-medium text-sm ${activeTab === 'treinamentos' ? 'border-blue-500 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'}`}
+            disabled={!colaborador?.id}
+          >
+            Treinamentos {!colaborador?.id ? '(salve primeiro)' : ''}
           </button>
         </nav>
       </div>
@@ -187,13 +286,43 @@ const ColaboradorFormPanel: React.FC<ColaboradorFormPanelProps> = ({ colaborador
               </div>
             </div>
 
+            <div className="bg-white border border-gray-200 rounded-lg p-4 flex flex-wrap items-end gap-3">
+              <Select
+                label="Adicionar competência extra (opcional)"
+                name="extra_competencia"
+                value={extraCompetenciaId}
+                onChange={(e) => setExtraCompetenciaId(e.target.value)}
+                className="min-w-[260px] flex-1"
+              >
+                <option value="">Selecione...</option>
+                {allCompetencias
+                  .filter((c) => !(formData.competencias || []).some((cc) => cc.competencia_id === c.id))
+                  .map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.nome} ({c.tipo})
+                    </option>
+                  ))}
+              </Select>
+              <button
+                type="button"
+                onClick={handleAddExtraCompetencia}
+                disabled={!extraCompetenciaId}
+                className="flex items-center gap-2 bg-blue-600 text-white font-semibold py-2 px-3 rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50"
+              >
+                <PlusCircle size={18} />
+                Adicionar
+              </button>
+            </div>
+
             <div className="space-y-4">
-              {formData.competencias?.map((comp) => (
+              {formData.competencias?.map((comp: any) => {
+                const gapNow = (comp.nivel_atual ?? 0) - (comp.nivel_requerido ?? 0);
+                return (
                 <motion.div 
                   key={comp.competencia_id}
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
-                  className={`border rounded-lg p-4 ${comp.gap < 0 ? 'bg-red-50 border-red-200' : 'bg-white border-gray-200'}`}
+                  className={`border rounded-lg p-4 ${comp.nivel_requerido > 0 && gapNow < 0 ? 'bg-red-50 border-red-200' : 'bg-white border-gray-200'}`}
                 >
                   <div className="flex flex-wrap justify-between items-center gap-4 mb-3">
                     <div>
@@ -233,7 +362,7 @@ const ColaboradorFormPanel: React.FC<ColaboradorFormPanelProps> = ({ colaborador
                     </div>
                   </div>
                 </motion.div>
-              ))}
+              )})}
 
               {(!formData.competencias || formData.competencias.length === 0) && (
                 <div className="text-center py-12 text-gray-500">
@@ -243,6 +372,60 @@ const ColaboradorFormPanel: React.FC<ColaboradorFormPanelProps> = ({ colaborador
                 </div>
               )}
             </div>
+          </div>
+        )}
+
+        {activeTab === 'treinamentos' && (
+          <div className="space-y-6">
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 flex items-start gap-3">
+              <GraduationCap className="text-blue-600 mt-0.5" size={20} />
+              <div>
+                <h4 className="font-semibold text-blue-800">Histórico de Treinamentos</h4>
+                <p className="text-sm text-blue-700">
+                  Acompanhe inscrições, conclusão e eficácia por colaborador.
+                </p>
+              </div>
+            </div>
+
+            {loadingTreinamentos ? (
+              <div className="flex justify-center items-center h-40">
+                <Loader2 className="animate-spin text-blue-600 w-8 h-8" />
+              </div>
+            ) : treinamentos.length === 0 ? (
+              <div className="text-center py-12 text-gray-500">
+                <Minus className="mx-auto h-8 w-8 mb-2 text-gray-300" />
+                <p>Nenhum treinamento encontrado para este colaborador.</p>
+              </div>
+            ) : (
+              <div className="overflow-hidden border border-gray-200 rounded-lg bg-white">
+                <table className="min-w-full text-sm">
+                  <thead className="bg-gray-50 text-gray-600">
+                    <tr>
+                      <th className="text-left p-3">Treinamento</th>
+                      <th className="text-left p-3">Status</th>
+                      <th className="text-left p-3">Participação</th>
+                      <th className="text-left p-3">Data</th>
+                      <th className="text-left p-3">Eficácia</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100">
+                    {treinamentos.map((t) => (
+                      <tr key={t.treinamento_id} className="hover:bg-gray-50">
+                        <td className="p-3 font-medium text-gray-800">{t.treinamento_nome}</td>
+                        <td className="p-3 text-gray-600 capitalize">{t.treinamento_status?.replace(/_/g, ' ')}</td>
+                        <td className="p-3 text-gray-600 capitalize">{t.participante_status?.replace(/_/g, ' ')}</td>
+                        <td className="p-3 text-gray-600">
+                          {t.data_inicio ? new Date(t.data_inicio).toLocaleDateString('pt-BR') : '—'}
+                        </td>
+                        <td className="p-3 text-gray-600">
+                          {t.eficacia_avaliada ? 'Avaliada' : 'Pendente'}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </div>
         )}
       </div>

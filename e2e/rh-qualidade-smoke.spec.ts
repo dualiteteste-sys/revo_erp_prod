@@ -118,7 +118,7 @@ test('RH & Qualidade: navegação e render sem erros de console', async ({ page 
   await mockAuthAndEmpresa(page);
 
   // RH: dashboard
-  await page.route('**/rest/v1/rpc/rh_get_dashboard_stats', async (route) => {
+  await page.route('**/rest/v1/rpc/get_rh_dashboard_stats', async (route) => {
     await route.fulfill({
       json: {
         total_colaboradores: 2,

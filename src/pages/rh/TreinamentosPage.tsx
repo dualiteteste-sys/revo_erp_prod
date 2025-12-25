@@ -61,8 +61,8 @@ export default function TreinamentosPage() {
     setIsFormOpen(true);
   };
 
-  const handleSaveSuccess = () => {
-    setIsFormOpen(false);
+  const handleSaved = (saved: TreinamentoDetails) => {
+    setSelectedTreinamento(saved);
     fetchTreinamentos();
   };
 
@@ -185,7 +185,7 @@ export default function TreinamentosPage() {
             <Loader2 className="animate-spin text-blue-600 w-8 h-8" />
           </div>
         ) : (
-          <TreinamentoFormPanel treinamento={selectedTreinamento} onSaveSuccess={handleSaveSuccess} onClose={() => setIsFormOpen(false)} />
+          <TreinamentoFormPanel treinamento={selectedTreinamento} onSaved={handleSaved} onClose={() => setIsFormOpen(false)} />
         )}
       </Modal>
     </div>
