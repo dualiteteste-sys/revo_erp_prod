@@ -3,7 +3,7 @@ import { BadgeCheck, Lock, Save } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthProvider';
 import { useToast } from '@/contexts/ToastProvider';
 import { useSupabase } from '@/providers/SupabaseProvider';
-import { useFeatureFlags } from '@/hooks/useFeatureFlags';
+import { useEmpresaFeatures } from '@/hooks/useEmpresaFeatures';
 
 type AmbienteNfe = 'homologacao' | 'producao';
 
@@ -23,15 +23,16 @@ const NfeEmissaoSettings: React.FC = () => {
   const supabase = useSupabase();
   const { activeEmpresa } = useAuth();
   const { addToast } = useToast();
-  const flags = useFeatureFlags();
+  const features = useEmpresaFeatures();
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [savingFeatureFlag, setSavingFeatureFlag] = useState(false);
   const [initial, setInitial] = useState<NfeConfigForm>(DEFAULT_FORM);
   const [form, setForm] = useState<NfeConfigForm>(DEFAULT_FORM);
 
   const isDirty = useMemo(() => JSON.stringify(initial) !== JSON.stringify(form), [initial, form]);
-  const nfeEnabled = !!flags.nfe_emissao_enabled;
+  const nfeEnabled = !!features.nfe_emissao_enabled;
 
   useEffect(() => {
     const load = async () => {
@@ -63,6 +64,31 @@ const NfeEmissaoSettings: React.FC = () => {
 
     load();
   }, [activeEmpresa?.id, addToast, supabase]);
+
+  const handleToggleNfeEnabled = async (next: boolean) => {
+    if (!activeEmpresa?.id) return;
+    setSavingFeatureFlag(true);
+    try {
+      const { error } = await supabase
+        .from('empresa_feature_flags')
+        .upsert(
+          {
+            empresa_id: activeEmpresa.id,
+            nfe_emissao_enabled: next,
+          },
+          { onConflict: 'empresa_id' }
+        );
+
+      if (error) throw error;
+      addToast(next ? 'Emissão de NF-e habilitada.' : 'Emissão de NF-e desativada.', 'success');
+      window.dispatchEvent(new Event('empresa-features-refresh'));
+      await features.refetch();
+    } catch (err: any) {
+      addToast(err?.message || 'Falha ao atualizar o status de emissão.', 'error');
+    } finally {
+      setSavingFeatureFlag(false);
+    }
+  };
 
   const handleSave = async () => {
     if (!activeEmpresa?.id) return;
@@ -118,6 +144,40 @@ const NfeEmissaoSettings: React.FC = () => {
       </div>
 
       <div className="mt-6 rounded-2xl border border-gray-200 bg-white/70 p-5">
+        <div className="mb-6 rounded-xl border border-gray-200 bg-white/80 p-4">
+          <div className="flex flex-wrap items-center justify-between gap-4">
+            <div>
+              <div className="text-sm font-semibold text-gray-800">Ativação da emissão</div>
+              <div className="text-xs text-gray-500 mt-1">
+                Controle de feature-flag: deixe desativado até decidir assinar/usar a emissão em produção.
+              </div>
+            </div>
+
+            <label className="inline-flex items-center gap-3 select-none">
+              <span className="text-sm text-gray-700">{nfeEnabled ? 'Habilitado' : 'Desativado'}</span>
+              <button
+                type="button"
+                onClick={() => void handleToggleNfeEnabled(!nfeEnabled)}
+                disabled={savingFeatureFlag || features.loading}
+                className={[
+                  'relative inline-flex h-7 w-12 items-center rounded-full transition-colors',
+                  nfeEnabled ? 'bg-blue-600' : 'bg-gray-300',
+                  (savingFeatureFlag || features.loading) ? 'opacity-60 cursor-not-allowed' : 'cursor-pointer',
+                ].join(' ')}
+                aria-pressed={nfeEnabled}
+                aria-label="Alternar emissão de NF-e"
+              >
+                <span
+                  className={[
+                    'inline-block h-5 w-5 transform rounded-full bg-white shadow transition-transform',
+                    nfeEnabled ? 'translate-x-6' : 'translate-x-1',
+                  ].join(' ')}
+                />
+              </button>
+            </label>
+          </div>
+        </div>
+
         <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Provedor</label>
@@ -205,4 +265,3 @@ const NfeEmissaoSettings: React.FC = () => {
 };
 
 export default NfeEmissaoSettings;
-

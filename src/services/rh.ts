@@ -65,6 +65,19 @@ export type ColaboradorDetails = Colaborador & {
   competencias: ColaboradorCompetencia[];
 };
 
+export type ColaboradorTreinamento = {
+  treinamento_id: string;
+  treinamento_nome: string;
+  treinamento_status: string;
+  treinamento_tipo: string;
+  data_inicio: string | null;
+  data_fim: string | null;
+  participante_status: string;
+  nota_final: number | null;
+  eficacia_avaliada: boolean;
+  parecer_eficacia: string | null;
+};
+
 export type MatrixCompetencia = {
   id: string;
   nome: string;
@@ -143,6 +156,14 @@ export type TreinamentoPayload = Partial<Omit<TreinamentoDetails, 'participantes
 
 // --- Services ---
 
+export async function setCargoAtivo(id: string, ativo: boolean): Promise<void> {
+  return callRpc('rh_set_cargo_ativo', { p_id: id, p_ativo: ativo });
+}
+
+export async function setColaboradorAtivo(id: string, ativo: boolean): Promise<void> {
+  return callRpc('rh_set_colaborador_ativo', { p_id: id, p_ativo: ativo });
+}
+
 // Cargos
 export async function listCargos(search?: string, ativoOnly?: boolean): Promise<Cargo[]> {
   return callRpc<Cargo[]>('rh_list_cargos', { 
@@ -177,7 +198,14 @@ export async function seedCargos(): Promise<void> {
 
 // Competências
 export async function listCompetencias(search?: string): Promise<Competencia[]> {
-  return callRpc<Competencia[]>('rh_list_competencias', { p_search: search || null });
+  try {
+    return await callRpc<Competencia[]>('rh_list_competencias_v2', {
+      p_search: search || null,
+      p_ativo_only: false,
+    });
+  } catch {
+    return callRpc<Competencia[]>('rh_list_competencias', { p_search: search || null });
+  }
 }
 
 export async function saveCompetencia(payload: CompetenciaPayload): Promise<Competencia> {
@@ -199,11 +227,11 @@ export async function seedCompetencias(): Promise<void> {
 }
 
 // Colaboradores
-export async function listColaboradores(search?: string, cargoId?: string): Promise<Colaborador[]> {
+export async function listColaboradores(search?: string, cargoId?: string, ativoOnly: boolean = false): Promise<Colaborador[]> {
   return callRpc<Colaborador[]>('rh_list_colaboradores', { 
     p_search: search || null, 
     p_cargo_id: cargoId || null,
-    p_ativo_only: false 
+    p_ativo_only: ativoOnly
   });
 }
 
@@ -213,6 +241,12 @@ export async function getColaboradorDetails(id: string): Promise<ColaboradorDeta
 
 export async function saveColaborador(payload: ColaboradorPayload): Promise<ColaboradorDetails> {
   return callRpc<ColaboradorDetails>('rh_upsert_colaborador', { p_payload: payload });
+}
+
+export async function listTreinamentosPorColaborador(colaboradorId: string): Promise<ColaboradorTreinamento[]> {
+  return callRpc<ColaboradorTreinamento[]>('rh_list_treinamentos_por_colaborador', {
+    p_colaborador_id: colaboradorId,
+  });
 }
 
 export async function seedColaboradores(): Promise<void> {

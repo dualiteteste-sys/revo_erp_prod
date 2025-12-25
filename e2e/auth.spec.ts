@@ -90,6 +90,26 @@ test('should allow user to log in and view products', async ({ page }) => {
         });
     });
 
+    // Mock RBAC fallback (useEmpresaRole)
+    await page.route('**/rest/v1/rpc/current_empresa_role', async (route) => {
+      await route.fulfill({ json: 'member' });
+    });
+
+    // Mock empresa_features (menus/guards)
+    await page.route('**/rest/v1/empresa_features*', async (route) => {
+      await route.fulfill({
+        json: {
+          empresa_id: 'empresa-1',
+          revo_send_enabled: false,
+          nfe_emissao_enabled: false,
+          plano_mvp: 'ambos',
+          max_users: 999,
+          servicos_enabled: true,
+          industria_enabled: true,
+        },
+      });
+    });
+
     // Mock Products List RPC
     await page.route('**/rest/v1/rpc/produtos_list_for_current_user', async route => {
         await route.fulfill({

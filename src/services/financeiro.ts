@@ -92,6 +92,19 @@ export async function saveContaPagar(payload: ContaPagarPayload): Promise<ContaP
     }
 }
 
+export async function pagarContaPagar(params: { id: string; dataPagamento?: string; valorPago?: number }): Promise<ContaPagar> {
+  try {
+    return await callRpc<ContaPagar>('financeiro_conta_pagar_pagar', {
+      p_id: params.id,
+      p_data_pagamento: params.dataPagamento ?? null,
+      p_valor_pago: params.valorPago ?? null,
+    });
+  } catch (error: any) {
+    console.error('[SERVICE][PAGAR_CONTA_PAGAR]', error);
+    throw new Error(error.message || 'Erro ao registrar pagamento.');
+  }
+}
+
 export async function deleteContaPagar(id: string): Promise<void> {
     try {
         await callRpc('financeiro_contas_pagar_delete', { p_id: id });

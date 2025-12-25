@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useContasAReceber } from '@/hooks/useContasAReceber';
 import { useToast } from '@/contexts/ToastProvider';
 import * as contasAReceberService from '@/services/contasAReceber';
@@ -10,6 +10,9 @@ import ContasAReceberTable from '@/components/financeiro/contas-a-receber/Contas
 import ContasAReceberFormPanel from '@/components/financeiro/contas-a-receber/ContasAReceberFormPanel';
 import ContasAReceberSummary from '@/components/financeiro/contas-a-receber/ContasAReceberSummary';
 import Select from '@/components/ui/forms/Select';
+import { Button } from '@/components/ui/button';
+import { useSearchParams } from 'react-router-dom';
+import { useConfirm } from '@/contexts/ConfirmProvider';
 
 const ContasAReceberPage: React.FC = () => {
   const {
@@ -30,6 +33,7 @@ const ContasAReceberPage: React.FC = () => {
     refresh,
   } = useContasAReceber();
   const { addToast } = useToast();
+  const { confirm } = useConfirm();
 
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [selectedConta, setSelectedConta] = useState<contasAReceberService.ContaAReceber | null>(null);
@@ -38,6 +42,31 @@ const ContasAReceberPage: React.FC = () => {
   const [isDeleting, setIsDeleting] = useState(false);
   const [isFetchingDetails, setIsFetchingDetails] = useState(false);
   const [isSeeding, setIsSeeding] = useState(false);
+  const [searchParams, setSearchParams] = useSearchParams();
+
+  useEffect(() => {
+    const contaId = searchParams.get('contaId');
+    if (!contaId) return;
+
+    void (async () => {
+      setIsFetchingDetails(true);
+      setIsFormOpen(true);
+      setSelectedConta(null);
+      try {
+        const details = await contasAReceberService.getContaAReceberDetails(contaId);
+        setSelectedConta(details);
+      } catch (e: any) {
+        addToast(e?.message || 'Erro ao abrir a conta a receber.', 'error');
+        setIsFormOpen(false);
+      } finally {
+        setIsFetchingDetails(false);
+        const next = new URLSearchParams(searchParams);
+        next.delete('contaId');
+        setSearchParams(next, { replace: true });
+      }
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const handleOpenForm = async (conta: contasAReceberService.ContaAReceber | null = null) => {
     if (conta?.id) {
@@ -94,6 +123,31 @@ const ContasAReceberPage: React.FC = () => {
     }
   };
 
+  const handleReceive = async (conta: contasAReceberService.ContaAReceber) => {
+    if (!conta?.id) return;
+    const ok = await confirm({
+      title: 'Registrar recebimento',
+      description: `Deseja marcar a conta "${conta.descricao}" como paga hoje?`,
+      confirmText: 'Registrar recebimento',
+      cancelText: 'Cancelar',
+      variant: 'default',
+    });
+    if (!ok) return;
+
+    try {
+      const today = new Date().toISOString().slice(0, 10);
+      await contasAReceberService.receberContaAReceber({
+        id: conta.id,
+        dataPagamento: today,
+        valorPago: Number(conta.valor || 0),
+      });
+      addToast('Recebimento registrado com sucesso!', 'success');
+      refresh();
+    } catch (e: any) {
+      addToast(e?.message || 'Erro ao registrar recebimento.', 'error');
+    }
+  };
+
   const handleSort = (column: string) => {
     setSortBy(prev => ({
       column,
@@ -119,21 +173,19 @@ const ContasAReceberPage: React.FC = () => {
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-3xl font-bold text-gray-800">Contas a Receber</h1>
         <div className="flex items-center gap-2">
-            <button
+            <Button
+              variant="secondary"
               onClick={handleSeed}
               disabled={isSeeding || loading}
-              className="flex items-center gap-2 bg-gray-100 text-gray-700 font-semibold py-2 px-4 rounded-lg hover:bg-gray-200 transition-colors disabled:opacity-50"
+              className="gap-2"
             >
-              {isSeeding ? <Loader2 className="animate-spin" size={20} /> : <DatabaseBackup size={20} />}
+              {isSeeding ? <Loader2 className="animate-spin" size={18} /> : <DatabaseBackup size={18} />}
               Popular Dados
-            </button>
-            <button
-              onClick={() => handleOpenForm()}
-              className="flex items-center gap-2 bg-blue-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-blue-700 transition-colors"
-            >
-              <PlusCircle size={20} />
+            </Button>
+            <Button onClick={() => handleOpenForm()} className="gap-2">
+              <PlusCircle size={18} />
               Nova Conta
-            </button>
+            </Button>
         </div>
       </div>
 
@@ -177,7 +229,14 @@ const ContasAReceberPage: React.FC = () => {
             {searchTerm && <p className="text-sm">Tente ajustar sua busca.</p>}
           </div>
         ) : (
-          <ContasAReceberTable contas={contas} onEdit={handleOpenForm} onDelete={handleOpenDeleteModal} sortBy={sortBy} onSort={handleSort} />
+          <ContasAReceberTable
+            contas={contas}
+            onEdit={handleOpenForm}
+            onReceive={handleReceive}
+            onDelete={handleOpenDeleteModal}
+            sortBy={sortBy}
+            onSort={handleSort}
+          />
         )}
       </div>
 

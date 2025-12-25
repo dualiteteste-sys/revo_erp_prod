@@ -9,20 +9,20 @@ import { menuConfig } from '../../config/menuConfig';
 import { useAuth } from '../../contexts/AuthProvider';
 import CommandPalette from './CommandPalette';
 
-const findActiveItem = (pathname: string): string => {
+const findActiveHref = (pathname: string): string => {
   for (const group of menuConfig) {
     if (group.children) {
       for (const child of group.children) {
         if (pathname.startsWith(child.href)) {
-          return child.name;
+          return child.href;
         }
       }
     }
     if (pathname.startsWith(group.href)) {
-      return group.name;
+      return group.href;
     }
   }
-  return 'Dashboard'; // Fallback
+  return '/app/dashboard'; // Fallback
 };
 
 const STORAGE_SIDEBAR_COLLAPSED = 'ui:sidebarCollapsed';
@@ -48,10 +48,10 @@ const MainLayout: React.FC = () => {
 
   const location = useLocation();
   const navigate = useNavigate();
-  const [activeItem, setActiveItem] = useState(() => findActiveItem(location.pathname));
+  const [activeItem, setActiveItem] = useState(() => findActiveHref(location.pathname));
 
   useEffect(() => {
-    setActiveItem(findActiveItem(location.pathname));
+    setActiveItem(findActiveHref(location.pathname));
   }, [location.pathname]);
 
   useEffect(() => {
@@ -104,12 +104,9 @@ const MainLayout: React.FC = () => {
     setIsSidebarCollapsed(!wasSidebarExpandedBeforeSettings);
   };
 
-  const handleSetActiveItem = (name: string) => {
-    const item = menuConfig.flatMap(g => g.children || g).find(i => i.name === name);
-    if (item && item.href && item.href !== '#') {
-      navigate(item.href);
-    }
-    setActiveItem(name);
+  const handleSetActiveItem = (href: string) => {
+    if (href && href !== '#') navigate(href);
+    setActiveItem(href);
   };
 
   return (

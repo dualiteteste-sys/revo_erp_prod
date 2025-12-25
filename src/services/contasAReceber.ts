@@ -15,6 +15,28 @@ export type ContasAReceberSummary = {
     total_vencido: number;
 };
 
+export async function getContaAReceberFromOs(osId: string): Promise<string | null> {
+  try {
+    const result = await callRpc<string | null>('financeiro_conta_a_receber_from_os_get', { p_os_id: osId });
+    return result || null;
+  } catch (error: any) {
+    console.error('[SERVICE][GET_CONTA_A_RECEBER_FROM_OS]', error);
+    return null;
+  }
+}
+
+export async function createContaAReceberFromOs(params: { osId: string; dataVencimento?: string | null }): Promise<ContaAReceber> {
+  try {
+    return await callRpc<ContaAReceber>('financeiro_conta_a_receber_from_os_create', {
+      p_os_id: params.osId,
+      p_data_vencimento: params.dataVencimento ?? null,
+    });
+  } catch (error: any) {
+    console.error('[SERVICE][CREATE_CONTA_A_RECEBER_FROM_OS]', error);
+    throw new Error(error.message || 'Erro ao gerar conta a receber a partir da OS.');
+  }
+}
+
 export async function listContasAReceber(options: {
     page: number;
     pageSize: number;
@@ -67,6 +89,23 @@ export async function saveContaAReceber(payload: ContaAReceberPayload): Promise<
         console.error('[SERVICE][SAVE_CONTA_A_RECEBER]', error);
         throw new Error(error.message || 'Erro ao salvar a conta.');
     }
+}
+
+export async function receberContaAReceber(params: {
+  id: string;
+  dataPagamento?: string;
+  valorPago?: number;
+}): Promise<ContaAReceber> {
+  try {
+    return await callRpc<ContaAReceber>('financeiro_conta_a_receber_receber', {
+      p_id: params.id,
+      p_data_pagamento: params.dataPagamento ?? null,
+      p_valor_pago: params.valorPago ?? null,
+    });
+  } catch (error: any) {
+    console.error('[SERVICE][RECEBER_CONTA_A_RECEBER]', error);
+    throw new Error(error.message || 'Erro ao registrar recebimento.');
+  }
 }
 
 export async function deleteContaAReceber(id: string): Promise<void> {

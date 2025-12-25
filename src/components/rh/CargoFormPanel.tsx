@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Loader2, Save, Plus, Trash2, AlertTriangle } from 'lucide-react';
 import { CargoDetails, CargoPayload, Competencia, listCompetencias, saveCargo } from '@/services/rh';
 import { useToast } from '@/contexts/ToastProvider';
@@ -8,6 +8,8 @@ import TextArea from '@/components/ui/forms/TextArea';
 import Select from '@/components/ui/forms/Select';
 import Toggle from '@/components/ui/forms/Toggle';
 import { motion, AnimatePresence } from 'framer-motion';
+import { Button } from '@/components/ui/button';
+import { listAuditLogsForTables, type AuditLogRow } from '@/services/auditLogs';
 
 interface CargoFormPanelProps {
   cargo: CargoDetails | null;
@@ -21,6 +23,9 @@ const CargoFormPanel: React.FC<CargoFormPanelProps> = ({ cargo, onSaveSuccess, o
   const [formData, setFormData] = useState<CargoPayload>({});
   const [availableCompetencias, setAvailableCompetencias] = useState<Competencia[]>([]);
   const [selectedCompId, setSelectedCompId] = useState<string>('');
+  const [activeTab, setActiveTab] = useState<'dados' | 'competencias' | 'historico'>('dados');
+  const [auditRows, setAuditRows] = useState<AuditLogRow[]>([]);
+  const [loadingAudit, setLoadingAudit] = useState(false);
 
   useEffect(() => {
     const loadCompetencias = async () => {
@@ -38,7 +43,28 @@ const CargoFormPanel: React.FC<CargoFormPanelProps> = ({ cargo, onSaveSuccess, o
     } else {
       setFormData({ ativo: true, competencias: [] });
     }
+    setActiveTab('dados');
   }, [cargo]);
+
+  useEffect(() => {
+    const fetchAudit = async () => {
+      if (activeTab !== 'historico') return;
+      if (!cargo?.id) {
+        setAuditRows([]);
+        return;
+      }
+      setLoadingAudit(true);
+      try {
+        const data = await listAuditLogsForTables(['rh_cargos', 'rh_cargo_competencias'], 300);
+        setAuditRows(data.filter((r) => r.record_id === cargo.id));
+      } catch (e: any) {
+        addToast(e?.message || 'Erro ao carregar histórico.', 'error');
+      } finally {
+        setLoadingAudit(false);
+      }
+    };
+    fetchAudit();
+  }, [activeTab, cargo?.id, addToast]);
 
   const handleFormChange = (field: keyof CargoPayload, value: any) => {
     setFormData(prev => ({ ...prev, [field]: value }));
@@ -102,9 +128,72 @@ const CargoFormPanel: React.FC<CargoFormPanelProps> = ({ cargo, onSaveSuccess, o
     }
   };
 
+  const labelOperation = (op: AuditLogRow['operation']) => {
+    if (op === 'INSERT') return 'Criado';
+    if (op === 'UPDATE') return 'Atualizado';
+    if (op === 'DELETE') return 'Excluído';
+    return op;
+  };
+
+  const formatChangedFields = (row: AuditLogRow) => {
+    if (row.operation !== 'UPDATE') return '';
+    const oldData = row.old_data || {};
+    const newData = row.new_data || {};
+    const keys = Array.from(
+      new Set([...Object.keys(oldData || {}), ...Object.keys(newData || {})].filter((k) => k !== 'updated_at' && k !== 'created_at'))
+    );
+    const changed = keys.filter((k) => JSON.stringify((oldData as any)[k]) !== JSON.stringify((newData as any)[k]));
+    if (changed.length === 0) return '';
+    const labels: Record<string, string> = {
+      nome: 'Nome',
+      setor: 'Setor',
+      descricao: 'Descrição',
+      responsabilidades: 'Responsabilidades',
+      autoridades: 'Autoridades',
+      ativo: 'Status',
+      nivel_requerido: 'Nível requerido',
+      obrigatorio: 'Obrigatório',
+    };
+    return changed
+      .slice(0, 4)
+      .map((k) => labels[k] || k)
+      .join(', ');
+  };
+
   return (
     <div className="flex flex-col h-full">
+      <div className="border-b border-gray-200 px-6">
+        <nav className="-mb-px flex space-x-6">
+          <Button
+            onClick={() => setActiveTab('dados')}
+            type="button"
+            variant="ghost"
+            className={`py-4 px-1 border-b-2 font-medium text-sm ${activeTab === 'dados' ? 'border-blue-500 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'}`}
+          >
+            Dados
+          </Button>
+          <Button
+            onClick={() => setActiveTab('competencias')}
+            type="button"
+            variant="ghost"
+            className={`py-4 px-1 border-b-2 font-medium text-sm ${activeTab === 'competencias' ? 'border-blue-500 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'}`}
+          >
+            Competências
+          </Button>
+          <Button
+            onClick={() => setActiveTab('historico')}
+            type="button"
+            variant="ghost"
+            className={`py-4 px-1 border-b-2 font-medium text-sm ${activeTab === 'historico' ? 'border-blue-500 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'}`}
+            disabled={!cargo?.id}
+          >
+            Histórico {!cargo?.id ? '(salve primeiro)' : ''}
+          </Button>
+        </nav>
+      </div>
+
       <div className="flex-grow p-6 overflow-y-auto scrollbar-styled">
+        {activeTab === 'dados' && (
         <Section title="Dados do Cargo" description="Informações básicas e responsabilidades.">
           <Input 
             label="Nome do Cargo" 
@@ -156,7 +245,9 @@ const CargoFormPanel: React.FC<CargoFormPanelProps> = ({ cargo, onSaveSuccess, o
             placeholder="O que este cargo tem autonomia para decidir ou aprovar?"
           />
         </Section>
+        )}
 
+        {activeTab === 'competencias' && (
         <Section title="Competências Requeridas" description="Defina os requisitos de competência (ISO 9001: 7.2).">
           <div className="sm:col-span-6 bg-blue-50 p-4 rounded-lg mb-4 flex gap-2 items-end">
             <Select 
@@ -171,12 +262,9 @@ const CargoFormPanel: React.FC<CargoFormPanelProps> = ({ cargo, onSaveSuccess, o
                 <option key={c.id} value={c.id}>{c.nome} ({c.tipo})</option>
               ))}
             </Select>
-            <button 
-              onClick={handleAddCompetencia}
-              className="bg-blue-600 text-white p-3 rounded-lg hover:bg-blue-700 transition-colors mb-[1px]"
-            >
+            <Button onClick={handleAddCompetencia} size="icon" className="mb-[1px]">
               <Plus size={20} />
-            </button>
+            </Button>
           </div>
 
           <div className="sm:col-span-6 space-y-3">
@@ -233,15 +321,74 @@ const CargoFormPanel: React.FC<CargoFormPanelProps> = ({ cargo, onSaveSuccess, o
             )}
           </div>
         </Section>
+        )}
+
+        {activeTab === 'historico' && (
+          <div className="space-y-4">
+            <div className="bg-white border border-gray-200 rounded-lg p-4">
+              <div className="text-sm text-gray-600">
+                Alterações registradas em <span className="font-medium">Cargo</span> e <span className="font-medium">Competências requeridas</span>.
+              </div>
+            </div>
+
+            {loadingAudit ? (
+              <div className="flex justify-center items-center h-40">
+                <Loader2 className="animate-spin text-blue-600 w-8 h-8" />
+              </div>
+            ) : auditRows.length === 0 ? (
+              <div className="text-center py-12 text-gray-500">
+                <AlertTriangle className="mx-auto h-8 w-8 mb-2 text-gray-300" />
+                <p>Nenhuma alteração registrada para este cargo.</p>
+              </div>
+            ) : (
+              <div className="overflow-hidden border border-gray-200 rounded-lg bg-white">
+                <table className="min-w-full text-sm">
+                  <thead className="bg-gray-50 text-gray-600">
+                    <tr>
+                      <th className="text-left p-3">Quando</th>
+                      <th className="text-left p-3">Ação</th>
+                      <th className="text-left p-3">Tabela</th>
+                      <th className="text-left p-3">Detalhes</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100">
+                    {auditRows.map((r) => (
+                      <tr key={r.id} className="hover:bg-gray-50">
+                        <td className="p-3 text-gray-600">{new Date(r.changed_at).toLocaleString('pt-BR')}</td>
+                        <td className="p-3">
+                          <span
+                            className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
+                              r.operation === 'INSERT'
+                                ? 'bg-green-100 text-green-800'
+                                : r.operation === 'UPDATE'
+                                  ? 'bg-blue-100 text-blue-800'
+                                  : 'bg-gray-100 text-gray-800'
+                            }`}
+                          >
+                            {labelOperation(r.operation)}
+                          </span>
+                        </td>
+                        <td className="p-3 text-gray-600">{r.table_name}</td>
+                        <td className="p-3 text-gray-600">{formatChangedFields(r) || '—'}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       <footer className="flex-shrink-0 p-4 flex justify-end items-center border-t border-white/20">
         <div className="flex gap-3">
-          <button type="button" onClick={onClose} className="rounded-md border border-gray-300 bg-white py-2 px-4 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50">Cancelar</button>
-          <button onClick={handleSave} disabled={isSaving} className="flex items-center gap-2 bg-blue-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50">
+          <Button type="button" onClick={onClose} variant="outline">
+            Cancelar
+          </Button>
+          <Button onClick={handleSave} disabled={isSaving} className="gap-2">
             {isSaving ? <Loader2 className="animate-spin" size={20} /> : <Save size={20} />}
             Salvar Cargo
-          </button>
+          </Button>
         </div>
       </footer>
     </div>

@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { Loader2, Save } from 'lucide-react';
+import React, { useEffect, useMemo, useState } from 'react';
+import { CheckCircle2, FileText, Loader2, Save, Paperclip, Plus, Trash2 } from 'lucide-react';
 import { OrdemServicoDetails, saveOs, deleteOsItem, getOsDetails, OsItemSearchResult, addOsItem } from '@/services/os';
 import { getPartnerDetails } from '@/services/partners';
 import { useToast } from '@/contexts/ToastProvider';
@@ -11,6 +11,12 @@ import { Database } from '@/types/database.types';
 import OsFormItems from './OsFormItems';
 import { useNumericField } from '@/hooks/useNumericField';
 import ClientAutocomplete from '../common/ClientAutocomplete';
+import { Button } from '@/components/ui/button';
+import OsAuditTrailPanel from '@/components/os/OsAuditTrailPanel';
+import { createContaAReceberFromOs, getContaAReceberDetails, getContaAReceberFromOs, receberContaAReceber, type ContaAReceber } from '@/services/contasAReceber';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { useNavigate } from 'react-router-dom';
+import { useConfirm } from '@/contexts/ConfirmProvider';
 
 interface OsFormPanelProps {
   os: OrdemServicoDetails | null;
@@ -27,16 +33,30 @@ const statusOptions: { value: Database['public']['Enums']['status_os']; label: s
 
 const OsFormPanel: React.FC<OsFormPanelProps> = ({ os, onSaveSuccess, onClose }) => {
   const { addToast } = useToast();
+  const navigate = useNavigate();
+  const { confirm } = useConfirm();
   const [isSaving, setIsSaving] = useState(false);
   const [isAddingItem, setIsAddingItem] = useState(false);
   const [formData, setFormData] = useState<Partial<OrdemServicoDetails>>({});
   const [clientName, setClientName] = useState('');
+  const [novoAnexo, setNovoAnexo] = useState('');
+  const [contaReceberId, setContaReceberId] = useState<string | null>(null);
+  const [contaReceber, setContaReceber] = useState<ContaAReceber | null>(null);
+  const [isContaDialogOpen, setIsContaDialogOpen] = useState(false);
+  const [contaVencimento, setContaVencimento] = useState<string>('');
+  const [isCreatingConta, setIsCreatingConta] = useState(false);
+  const [isReceivingConta, setIsReceivingConta] = useState(false);
 
   const descontoProps = useNumericField(formData.desconto_valor, (value) => handleFormChange('desconto_valor', value));
+  const custoEstimadoProps = useNumericField((formData as any).custo_estimado, (value) => handleFormChange('custo_estimado' as any, value));
+  const custoRealProps = useNumericField((formData as any).custo_real, (value) => handleFormChange('custo_real' as any, value));
 
   useEffect(() => {
     if (os) {
       setFormData(os);
+      setNovoAnexo('');
+      setContaReceberId(null);
+      setContaVencimento('');
       if (os.cliente_id) {
         getPartnerDetails(os.cliente_id).then(partner => {
           if (partner) setClientName(partner.nome);
@@ -47,8 +67,117 @@ const OsFormPanel: React.FC<OsFormPanelProps> = ({ os, onSaveSuccess, onClose })
     } else {
       setFormData({ status: 'orcamento', desconto_valor: 0, total_itens: 0, total_geral: 0, itens: [] });
       setClientName('');
+      setNovoAnexo('');
+      setContaReceberId(null);
+      setContaVencimento('');
     }
   }, [os]);
+
+  useEffect(() => {
+    const osId = formData.id ? String(formData.id) : null;
+    if (!osId) return;
+
+    void (async () => {
+      const id = await getContaAReceberFromOs(osId);
+      setContaReceberId(id);
+      setContaReceber(null);
+      if (id) {
+        try {
+          const details = await getContaAReceberDetails(id);
+          setContaReceber(details);
+        } catch {
+          setContaReceber(null);
+        }
+      }
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [formData.id]);
+
+  const statusOs = (formData.status as any) as Database['public']['Enums']['status_os'] | undefined;
+  const canGenerateConta = !!formData.id && statusOs === 'concluida';
+
+  const defaultVencimento = useMemo(() => {
+    const d = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+    return d.toISOString().slice(0, 10);
+  }, []);
+
+  const handleOpenContaDialog = () => {
+    setContaVencimento(contaVencimento || defaultVencimento);
+    setIsContaDialogOpen(true);
+  };
+
+  const handleCreateConta = async () => {
+    if (!formData.id) return;
+    setIsCreatingConta(true);
+    try {
+      const conta = await createContaAReceberFromOs({
+        osId: String(formData.id),
+        dataVencimento: contaVencimento || null,
+      });
+      setContaReceberId(conta.id);
+      addToast('Conta a receber gerada com sucesso!', 'success');
+      setIsContaDialogOpen(false);
+      navigate(`/app/financeiro/contas-a-receber?contaId=${encodeURIComponent(conta.id)}`);
+    } catch (e: any) {
+      addToast(e?.message || 'Erro ao gerar conta a receber.', 'error');
+    } finally {
+      setIsCreatingConta(false);
+    }
+  };
+
+  const handleOpenConta = () => {
+    if (!contaReceberId) return;
+    navigate(`/app/financeiro/contas-a-receber?contaId=${encodeURIComponent(contaReceberId)}`);
+  };
+
+  const handleReceberContaAgora = async () => {
+    if (!contaReceberId || !contaReceber) return;
+    if (contaReceber.status === 'pago' || contaReceber.status === 'cancelado') {
+      handleOpenConta();
+      return;
+    }
+
+    const ok = await confirm({
+      title: 'Registrar recebimento',
+      description: `Deseja marcar esta conta como paga hoje? Valor: ${new Intl.NumberFormat('pt-BR', {
+        style: 'currency',
+        currency: 'BRL',
+      }).format(contaReceber.valor || 0)}.`,
+      confirmText: 'Registrar recebimento',
+      cancelText: 'Cancelar',
+      variant: 'default',
+    });
+    if (!ok) return;
+
+    setIsReceivingConta(true);
+    try {
+      const today = new Date().toISOString().slice(0, 10);
+      const updated = await receberContaAReceber({
+        id: contaReceberId,
+        dataPagamento: today,
+        valorPago: Number(contaReceber.valor || 0),
+      });
+      setContaReceber(updated);
+      addToast('Recebimento registrado com sucesso!', 'success');
+      navigate(`/app/financeiro/contas-a-receber?contaId=${encodeURIComponent(contaReceberId)}`);
+    } catch (e: any) {
+      addToast(e?.message || 'Erro ao registrar recebimento.', 'error');
+    } finally {
+      setIsReceivingConta(false);
+    }
+  };
+
+  const contaStatusBadge = useMemo(() => {
+    if (!contaReceber) return null;
+    const map: Record<string, { label: string; color: string }> = {
+      pendente: { label: 'Pendente', color: 'bg-yellow-100 text-yellow-800' },
+      pago: { label: 'Pago', color: 'bg-green-100 text-green-800' },
+      vencido: { label: 'Vencido', color: 'bg-red-100 text-red-800' },
+      cancelado: { label: 'Cancelado', color: 'bg-gray-100 text-gray-800' },
+    };
+    const cfg = map[contaReceber.status] || { label: contaReceber.status, color: 'bg-gray-100 text-gray-800' };
+    return <span className={`px-2 py-1 rounded-full text-xs font-semibold ${cfg.color}`}>{cfg.label}</span>;
+  }, [contaReceber]);
 
   const refreshOsData = async (osId: string) => {
     try {
@@ -61,6 +190,23 @@ const OsFormPanel: React.FC<OsFormPanelProps> = ({ os, onSaveSuccess, onClose })
 
   const handleFormChange = (field: keyof OrdemServicoDetails, value: any) => {
     setFormData(prev => ({ ...prev, [field]: value }));
+  };
+
+  const anexos = (formData.anexos || []) as string[];
+
+  const handleAddAnexo = () => {
+    const value = novoAnexo.trim();
+    if (!value) return;
+    if (anexos.includes(value)) {
+      addToast('Este anexo já foi adicionado.', 'warning');
+      return;
+    }
+    handleFormChange('anexos' as any, [...anexos, value]);
+    setNovoAnexo('');
+  };
+
+  const handleRemoveAnexo = (value: string) => {
+    handleFormChange('anexos' as any, anexos.filter((a) => a !== value));
   };
 
   const handleRemoveItem = async (itemId: string) => {
@@ -162,6 +308,11 @@ const OsFormPanel: React.FC<OsFormPanelProps> = ({ os, onSaveSuccess, onClose })
         
         <OsFormItems items={formData.itens || []} onRemoveItem={handleRemoveItem} onAddItem={handleAddItem} isAddingItem={isAddingItem} />
 
+        <Section title="Custos" description="Controle básico de custos para cálculo de margem e relatórios.">
+          <Input label="Custo Estimado (R$)" name="custo_estimado" {...custoEstimadoProps} className="sm:col-span-3" />
+          <Input label="Custo Real (R$)" name="custo_real" {...custoRealProps} className="sm:col-span-3" />
+        </Section>
+
         <Section title="Financeiro" description="Valores e condições de pagamento">
           <div className="sm:col-span-2">
             <label className="block text-sm font-medium text-gray-700 mb-1">Total dos Itens</label>
@@ -174,6 +325,36 @@ const OsFormPanel: React.FC<OsFormPanelProps> = ({ os, onSaveSuccess, onClose })
           </div>
           <Input label="Forma de Recebimento" name="forma_recebimento" value={formData.forma_recebimento || ''} onChange={e => handleFormChange('forma_recebimento', e.target.value)} className="sm:col-span-3" />
           <Input label="Condição de Pagamento" name="condicao_pagamento" value={formData.condicao_pagamento || ''} onChange={e => handleFormChange('condicao_pagamento', e.target.value)} className="sm:col-span-3" />
+
+          {canGenerateConta ? (
+            <div className="sm:col-span-6 flex flex-wrap items-center justify-between gap-2 mt-2">
+              <div className="flex items-center gap-2 text-xs text-gray-500">
+                <span>Conta a receber vinculada à OS concluída.</span>
+                {contaStatusBadge}
+              </div>
+              <div className="flex gap-2">
+                {contaReceberId ? (
+                  <>
+                    {contaReceber && contaReceber.status !== 'pago' && contaReceber.status !== 'cancelado' ? (
+                      <Button type="button" onClick={handleReceberContaAgora} disabled={isReceivingConta} className="gap-2">
+                        {isReceivingConta ? <Loader2 className="animate-spin" size={18} /> : <CheckCircle2 size={18} />}
+                        Registrar Recebimento
+                      </Button>
+                    ) : null}
+                    <Button type="button" variant="outline" onClick={handleOpenConta} className="gap-2">
+                      <FileText size={18} />
+                      Abrir Conta
+                    </Button>
+                  </>
+                ) : (
+                  <Button type="button" onClick={handleOpenContaDialog} className="gap-2">
+                    <FileText size={18} />
+                    Gerar Conta a Receber
+                  </Button>
+                )}
+              </div>
+            </div>
+          ) : null}
         </Section>
 
         <Section title="Observações" description="Detalhes adicionais e anotações internas">
@@ -181,17 +362,94 @@ const OsFormPanel: React.FC<OsFormPanelProps> = ({ os, onSaveSuccess, onClose })
             <TextArea label="Observações Internas" name="observacoes_internas" value={formData.observacoes_internas || ''} onChange={e => handleFormChange('observacoes_internas', e.target.value)} rows={3} className="sm:col-span-3" />
         </Section>
 
+        <Section title="Anexos" description="Links/arquivos relacionados (fotos, PDFs, comprovantes).">
+          <div className="sm:col-span-6 flex gap-2 items-end">
+            <Input
+              label="Adicionar anexo (URL ou caminho)"
+              name="novo_anexo"
+              value={novoAnexo}
+              onChange={(e) => setNovoAnexo(e.target.value)}
+              className="flex-1"
+              startAdornment={<Paperclip size={18} />}
+            />
+            <Button type="button" onClick={handleAddAnexo} className="gap-2">
+              <Plus size={18} />
+              Adicionar
+            </Button>
+          </div>
+          <div className="sm:col-span-6 space-y-2">
+            {anexos.length === 0 ? (
+              <div className="text-sm text-gray-500 py-3">Nenhum anexo adicionado.</div>
+            ) : (
+              anexos.map((a) => (
+                <div key={a} className="flex items-center justify-between gap-3 bg-gray-50 border border-gray-200 rounded-lg px-3 py-2">
+                  <a
+                    href={a}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="text-sm text-blue-700 hover:underline truncate"
+                    title={a}
+                  >
+                    {a}
+                  </a>
+                  <Button type="button" variant="ghost" size="icon" className="text-rose-600 hover:text-rose-700" onClick={() => handleRemoveAnexo(a)}>
+                    <Trash2 size={18} />
+                  </Button>
+                </div>
+              ))
+            )}
+          </div>
+        </Section>
+
+        {formData.id ? (
+          <div className="mt-6">
+            <OsAuditTrailPanel osId={String(formData.id)} />
+          </div>
+        ) : null}
       </div>
 
       <footer className="flex-shrink-0 p-4 flex justify-end items-center border-t border-white/20">
         <div className="flex gap-3">
-          <button type="button" onClick={onClose} className="rounded-md border border-gray-300 bg-white py-2 px-4 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50">Cancelar</button>
-          <button onClick={handleSave} disabled={isSaving} className="flex items-center gap-2 bg-blue-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50">
+          <Button type="button" onClick={onClose} variant="outline">
+            Cancelar
+          </Button>
+          <Button onClick={handleSave} disabled={isSaving} className="gap-2">
             {isSaving ? <Loader2 className="animate-spin" size={20} /> : <Save size={20} />}
             Salvar O.S.
-          </button>
+          </Button>
         </div>
       </footer>
+
+      <Dialog open={isContaDialogOpen} onOpenChange={setIsContaDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Gerar Conta a Receber</DialogTitle>
+            <DialogDescription>
+              Cria uma conta a receber vinculada a esta OS. Se já existir uma conta vinculada, o sistema retorna a existente.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="mt-2">
+            <Input
+              label="Data de vencimento"
+              name="conta_vencimento"
+              type="date"
+              value={contaVencimento}
+              onChange={(e) => setContaVencimento(e.target.value)}
+            />
+          </div>
+
+          <div className="mt-6 flex justify-end gap-2">
+            <Button type="button" variant="outline" onClick={() => setIsContaDialogOpen(false)}>
+              Cancelar
+            </Button>
+            <Button type="button" onClick={handleCreateConta} disabled={isCreatingConta} className="gap-2">
+              {isCreatingConta ? <Loader2 className="animate-spin" size={18} /> : <FileText size={18} />}
+              Gerar
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

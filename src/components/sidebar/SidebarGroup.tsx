@@ -8,7 +8,7 @@ import { useAuth } from '../../contexts/AuthProvider';
 interface SidebarGroupProps {
   item: MenuItem;
   activeItem: string;
-  setActiveItem: (name: string) => void;
+  setActiveItem: (href: string) => void;
   isOpen: boolean;
   setOpenGroup: (name: string | null) => void;
   onOpenSettings: () => void;
@@ -16,8 +16,8 @@ interface SidebarGroupProps {
 
 const SidebarGroup: React.FC<SidebarGroupProps> = ({ item, activeItem, setActiveItem, isOpen, setOpenGroup, onOpenSettings }) => {
   const { signOut } = useAuth();
-  const isGroupActive = item.children?.some(child => child.name === activeItem) ?? false;
-  const isDirectlyActive = activeItem === item.name && !item.children;
+  const isGroupActive = item.children?.some(child => child.href === activeItem) ?? false;
+  const isDirectlyActive = activeItem === item.href && !item.children;
 
   const handleGroupClick = () => {
     if (item.name === 'Configurações') {
@@ -32,7 +32,7 @@ const SidebarGroup: React.FC<SidebarGroupProps> = ({ item, activeItem, setActive
     if (item.children) {
       setOpenGroup(item.name);
     } else {
-      setActiveItem(item.name);
+      if (item.href && item.href !== '#') setActiveItem(item.href);
       setOpenGroup(null);
     }
   };
@@ -71,8 +71,8 @@ const SidebarGroup: React.FC<SidebarGroupProps> = ({ item, activeItem, setActive
                 <SidebarItem
                   key={child.name}
                   item={child}
-                  isActive={activeItem === child.name}
-                  onClick={() => setActiveItem(child.name)}
+                  isActive={activeItem === child.href}
+                  onClick={(href) => setActiveItem(href)}
                 />
               ))}
             </ul>

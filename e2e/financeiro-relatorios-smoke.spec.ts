@@ -1,0 +1,163 @@
+import { test, expect, type Page } from './fixtures';
+
+async function mockAuthAndEmpresa(page: Page) {
+  await page.route('**/auth/v1/token?grant_type=password', async (route) => {
+    await route.fulfill({
+      json: {
+        access_token: 'fake-access-token',
+        token_type: 'bearer',
+        expires_in: 3600,
+        refresh_token: 'fake-refresh-token',
+        user: {
+          id: 'user-123',
+          aud: 'authenticated',
+          role: 'authenticated',
+          email: 'test@example.com',
+        },
+      },
+    });
+  });
+
+  await page.route('**/auth/v1/user', async (route) => {
+    await route.fulfill({
+      json: {
+        id: 'user-123',
+        aud: 'authenticated',
+        role: 'authenticated',
+        email: 'test@example.com',
+        email_confirmed_at: new Date().toISOString(),
+        app_metadata: { provider: 'email', providers: ['email'] },
+        user_metadata: {},
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      },
+    });
+  });
+
+  await page.route('**/rest/v1/user_active_empresa*', async (route) => {
+    await route.fulfill({ json: { empresa_id: 'empresa-1' } });
+  });
+
+  await page.route('**/rest/v1/empresa_usuarios*', async (route) => {
+    const url = new URL(route.request().url());
+    const select = url.searchParams.get('select') || '';
+
+    if (select === 'role' || select.includes('role')) {
+      await route.fulfill({ json: { role: 'member' } });
+      return;
+    }
+
+    await route.fulfill({
+      json: [
+        {
+          role: 'member',
+          empresa: {
+            id: 'empresa-1',
+            nome_razao_social: 'Empresa Teste E2E',
+            nome_fantasia: 'Fantasia E2E',
+            cnpj: '00000000000191',
+            endereco_logradouro: 'Rua Teste',
+            telefone: '11999999999',
+          },
+        },
+      ],
+    });
+  });
+
+  await page.route('**/rest/v1/subscriptions*', async (route) => {
+    await route.fulfill({
+      json: {
+        id: 'sub_123',
+        empresa_id: 'empresa-1',
+        status: 'active',
+        current_period_end: new Date(Date.now() + 86400000).toISOString(),
+        stripe_price_id: 'price_123',
+      },
+    });
+  });
+
+  await page.route('**/rest/v1/plans*', async (route) => {
+    await route.fulfill({
+      json: {
+        id: 'plan_123',
+        name: 'Pro',
+        stripe_price_id: 'price_123',
+      },
+    });
+  });
+
+  await page.route('**/rest/v1/rpc/current_empresa_role', async (route) => {
+    await route.fulfill({ json: 'member' });
+  });
+
+  await page.route('**/rest/v1/empresa_features*', async (route) => {
+    await route.fulfill({
+      json: {
+        empresa_id: 'empresa-1',
+        revo_send_enabled: false,
+        nfe_emissao_enabled: false,
+        plano_mvp: 'ambos',
+        max_users: 999,
+        servicos_enabled: true,
+        industria_enabled: true,
+      },
+    });
+  });
+}
+
+test('Financeiro: relatórios abrem sem erros de console', async ({ page }) => {
+  await page.route('**/rest/v1/**', async (route) => {
+    if (route.request().method() === 'OPTIONS') {
+      await route.fulfill({ status: 204, body: '' });
+      return;
+    }
+    await route.fulfill({ json: [] });
+  });
+
+  await mockAuthAndEmpresa(page);
+
+  await page.route('**/rest/v1/rpc/financeiro_relatorios_resumo', async (route) => {
+    await route.fulfill({
+      json: {
+        periodo: { inicio: '2026-01-01', fim: '2026-01-31' },
+        receber: {
+          total_pendente: 12500.5,
+          total_vencido: 2500,
+          total_cancelado: 0,
+          total_pago: 3200,
+          qtd_pendente: 6,
+          qtd_vencido: 2,
+          qtd_pago: 3,
+        },
+        pagar: {
+          total_aberta: 8400,
+          total_parcial: 1200,
+          total_cancelada: 0,
+          total_paga: 4100,
+          total_vencida: 900,
+          qtd_aberta: 4,
+          qtd_parcial: 1,
+          qtd_paga: 2,
+        },
+        caixa: { contas_ativas: 2, saldo_total: 15890.25 },
+        series: [
+          { mes: '2025-10', entradas: 1000, saidas: 900, receber_pago: 800, pagar_pago: 650 },
+          { mes: '2025-11', entradas: 1300, saidas: 1200, receber_pago: 900, pagar_pago: 720 },
+          { mes: '2025-12', entradas: 900, saidas: 700, receber_pago: 600, pagar_pago: 450 },
+          { mes: '2026-01', entradas: 1400, saidas: 1100, receber_pago: 1100, pagar_pago: 780 },
+        ],
+      },
+    });
+  });
+
+  await page.goto('/auth/login');
+  await page.getByPlaceholder('seu@email.com').fill('test@example.com');
+  await page.getByLabel('Senha').fill('password123');
+  await page.getByRole('button', { name: 'Entrar' }).click();
+  await expect(page).toHaveURL(/\/app\//);
+
+  await page.goto('/app/financeiro/relatorios');
+  await expect(page.getByRole('heading', { name: 'Relatórios do Financeiro' })).toBeVisible();
+  await expect(page.getByText('Saldo total (Caixa)')).toBeVisible();
+});
+

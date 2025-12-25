@@ -89,6 +89,24 @@ async function mockAuthAndEmpresaOwner(page: Page) {
     });
   });
 
+  await page.route('**/rest/v1/rpc/current_empresa_role', async (route) => {
+    await route.fulfill({ json: 'owner' });
+  });
+
+  await page.route('**/rest/v1/empresa_features*', async (route) => {
+    await route.fulfill({
+      json: {
+        empresa_id: 'empresa-1',
+        revo_send_enabled: false,
+        nfe_emissao_enabled: false,
+        plano_mvp: 'ambos',
+        max_users: 999,
+        servicos_enabled: true,
+        industria_enabled: true,
+      },
+    });
+  });
+
   // Se algum trecho ainda tentar validar permissão via RPC, forçamos erro — owner deve passar pelo bypass.
   await page.route('**/rest/v1/rpc/has_permission_for_current_user', async (route) => {
     await route.fulfill({ status: 500, json: { message: 'should-not-be-called-for-owner' } });

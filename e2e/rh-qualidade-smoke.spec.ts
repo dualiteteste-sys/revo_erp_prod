@@ -85,6 +85,24 @@ async function mockAuthAndEmpresa(page: Page) {
       },
     });
   });
+
+  await page.route('**/rest/v1/rpc/current_empresa_role', async (route) => {
+    await route.fulfill({ json: 'member' });
+  });
+
+  await page.route('**/rest/v1/empresa_features*', async (route) => {
+    await route.fulfill({
+      json: {
+        empresa_id: 'empresa-1',
+        revo_send_enabled: false,
+        nfe_emissao_enabled: false,
+        plano_mvp: 'ambos',
+        max_users: 999,
+        servicos_enabled: true,
+        industria_enabled: true,
+      },
+    });
+  });
 }
 
 test('RH & Qualidade: navegação e render sem erros de console', async ({ page }) => {
@@ -100,7 +118,7 @@ test('RH & Qualidade: navegação e render sem erros de console', async ({ page 
   await mockAuthAndEmpresa(page);
 
   // RH: dashboard
-  await page.route('**/rest/v1/rpc/rh_get_dashboard_stats', async (route) => {
+  await page.route('**/rest/v1/rpc/get_rh_dashboard_stats', async (route) => {
     await route.fulfill({
       json: {
         total_colaboradores: 2,
@@ -183,6 +201,20 @@ test('RH & Qualidade: navegação e render sem erros de console', async ({ page 
 
   // RH: competências
   await page.route('**/rest/v1/rpc/rh_list_competencias', async (route) => {
+    await route.fulfill({
+      json: [
+        {
+          id: 'comp-1',
+          nome: 'Leitura e Interpretação',
+          descricao: 'Interpretação de desenho',
+          tipo: 'tecnica',
+          critico_sgq: true,
+          ativo: true,
+        },
+      ],
+    });
+  });
+  await page.route('**/rest/v1/rpc/rh_list_competencias_v2', async (route) => {
     await route.fulfill({
       json: [
         {
@@ -350,4 +382,3 @@ test('RH & Qualidade: navegação e render sem erros de console', async ({ page 
   await expect(page.getByText('Lotes & Bloqueios')).toBeVisible();
   await expect(page.getByText('L001')).toBeVisible();
 });
-

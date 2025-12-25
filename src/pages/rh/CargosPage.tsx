@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
-import { listCargos, Cargo, getCargoDetails, CargoDetails, seedCargos } from '@/services/rh';
-import { PlusCircle, Briefcase, Edit, Users, DatabaseBackup } from 'lucide-react';
+import React, { useMemo, useState, useEffect } from 'react';
+import { listCargos, setCargoAtivo, Cargo, getCargoDetails, CargoDetails, seedCargos } from '@/services/rh';
+import { Briefcase, DatabaseBackup, LayoutGrid, List, PlusCircle } from 'lucide-react';
 import GlassCard from '@/components/ui/GlassCard';
 import Modal from '@/components/ui/Modal';
 import CargoFormPanel from '@/components/rh/CargoFormPanel';
@@ -10,6 +10,8 @@ import { useToast } from '@/contexts/ToastProvider';
 import { Button } from '@/components/ui/button';
 import PageHeader from '@/components/ui/PageHeader';
 import SearchField from '@/components/ui/forms/SearchField';
+import { useConfirm } from '@/contexts/ConfirmProvider';
+import CargosTable from '@/components/rh/CargosTable';
 
 export default function CargosPage() {
   const [cargos, setCargos] = useState<Cargo[]>([]);
@@ -17,16 +19,26 @@ export default function CargosPage() {
   const [search, setSearch] = useState('');
   const debouncedSearch = useDebounce(search, 500);
   const { addToast } = useToast();
+  const { confirm } = useConfirm();
   
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [selectedCargo, setSelectedCargo] = useState<CargoDetails | null>(null);
   const [loadingDetails, setLoadingDetails] = useState(false);
   const [isSeeding, setIsSeeding] = useState(false);
+  const [viewMode, setViewMode] = useState<'cards' | 'table'>('table');
+  const [statusFilter, setStatusFilter] = useState<'todos' | 'ativos' | 'inativos'>('ativos');
+
+  const cargosFiltered = useMemo(() => {
+    if (statusFilter === 'inativos') return cargos.filter((c) => !c.ativo);
+    if (statusFilter === 'ativos') return cargos.filter((c) => c.ativo);
+    return cargos;
+  }, [cargos, statusFilter]);
 
   const fetchCargos = async () => {
     setLoading(true);
     try {
-      const data = await listCargos(debouncedSearch);
+      const ativoOnly = statusFilter === 'ativos';
+      const data = await listCargos(debouncedSearch, ativoOnly);
       setCargos(data);
     } catch (error) {
       addToast((error as any)?.message || 'Erro ao carregar cargos.', 'error');
@@ -37,7 +49,7 @@ export default function CargosPage() {
 
   useEffect(() => {
     fetchCargos();
-  }, [debouncedSearch]);
+  }, [debouncedSearch, statusFilter]);
 
   const handleEdit = async (id: string) => {
     setLoadingDetails(true);
@@ -64,6 +76,47 @@ export default function CargosPage() {
     fetchCargos();
   };
 
+  const handleToggleAtivo = async (cargo: Cargo) => {
+    const nextAtivo = !cargo.ativo;
+    const ok = await confirm({
+      title: nextAtivo ? 'Reativar cargo' : 'Inativar cargo',
+      description: nextAtivo
+        ? `Deseja reativar o cargo "${cargo.nome}"?`
+        : `Deseja inativar o cargo "${cargo.nome}"? Ele ficará indisponível para novos colaboradores.`,
+      confirmText: nextAtivo ? 'Reativar' : 'Inativar',
+      cancelText: 'Cancelar',
+      variant: nextAtivo ? 'default' : 'danger',
+    });
+    if (!ok) return;
+
+    try {
+      await setCargoAtivo(cargo.id, nextAtivo);
+      addToast(nextAtivo ? 'Cargo reativado com sucesso!' : 'Cargo inativado com sucesso!', 'success');
+      fetchCargos();
+    } catch (e: any) {
+      addToast(e?.message || 'Erro ao alterar status do cargo.', 'error');
+    }
+  };
+
+  const sortState = useState<{ column: keyof Cargo; ascending: boolean }>({ column: 'nome', ascending: true });
+  const [sortBy, setSortBy] = sortState;
+  const onSort = (column: keyof Cargo) => {
+    setSortBy((prev) => ({ column, ascending: prev.column === column ? !prev.ascending : true }));
+  };
+
+  const cargosSorted = useMemo(() => {
+    const data = [...cargosFiltered];
+    const { column, ascending } = sortBy;
+    data.sort((a, b) => {
+      const av = (a[column] ?? '') as any;
+      const bv = (b[column] ?? '') as any;
+      if (typeof av === 'string' && typeof bv === 'string') return ascending ? av.localeCompare(bv) : bv.localeCompare(av);
+      if (typeof av === 'boolean' && typeof bv === 'boolean') return ascending ? Number(av) - Number(bv) : Number(bv) - Number(av);
+      return ascending ? String(av).localeCompare(String(bv)) : String(bv).localeCompare(String(av));
+    });
+    return data;
+  }, [cargosFiltered, sortBy]);
+
   const handleSeed = async () => {
     setIsSeeding(true);
     try {
@@ -89,6 +142,26 @@ export default function CargosPage() {
               {isSeeding ? <Loader2 className="animate-spin" size={16} /> : <DatabaseBackup size={16} />}
               Popular Dados
             </Button>
+            <div className="flex items-center gap-2">
+              <Button
+                type="button"
+                variant={viewMode === 'table' ? 'default' : 'outline'}
+                className="gap-2"
+                onClick={() => setViewMode('table')}
+              >
+                <List size={16} />
+                Tabela
+              </Button>
+              <Button
+                type="button"
+                variant={viewMode === 'cards' ? 'default' : 'outline'}
+                className="gap-2"
+                onClick={() => setViewMode('cards')}
+              >
+                <LayoutGrid size={16} />
+                Cards
+              </Button>
+            </div>
             <Button onClick={handleNew} className="gap-2">
               <PlusCircle size={18} />
               Novo Cargo
@@ -97,57 +170,112 @@ export default function CargosPage() {
         }
       />
 
-      <SearchField
-        placeholder="Buscar cargos..."
-        value={search}
-        onChange={(e) => setSearch(e.target.value)}
-        className="max-w-md"
-      />
+      <div className="grid grid-cols-1 md:grid-cols-12 gap-3 items-end">
+        <div className="md:col-span-9">
+          <SearchField
+            placeholder="Buscar cargos..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="w-full"
+          />
+        </div>
+        <div className="md:col-span-3 flex gap-2">
+          <Button
+            type="button"
+            variant={statusFilter === 'ativos' ? 'default' : 'outline'}
+            onClick={() => setStatusFilter('ativos')}
+            className="flex-1"
+          >
+            Ativos
+          </Button>
+          <Button
+            type="button"
+            variant={statusFilter === 'inativos' ? 'default' : 'outline'}
+            onClick={() => setStatusFilter('inativos')}
+            className="flex-1"
+          >
+            Inativos
+          </Button>
+          <Button
+            type="button"
+            variant={statusFilter === 'todos' ? 'default' : 'outline'}
+            onClick={() => setStatusFilter('todos')}
+            className="flex-1"
+          >
+            Todos
+          </Button>
+        </div>
+      </div>
 
       {loading ? (
         <div className="flex justify-center h-64 items-center">
           <Loader2 className="animate-spin text-blue-600 w-10 h-10" />
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {cargos.map(cargo => (
-            <GlassCard key={cargo.id} className="p-6 flex flex-col justify-between hover:shadow-xl transition-shadow cursor-pointer border-l-4 border-l-blue-500" onClick={() => handleEdit(cargo.id)}>
-              <div>
-                <div className="flex justify-between items-start mb-2">
-                  <h3 className="text-lg font-bold text-gray-800">{cargo.nome}</h3>
-                  <span className={`px-2 py-1 rounded-full text-xs font-semibold ${cargo.ativo ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-600'}`}>
-                    {cargo.ativo ? 'Ativo' : 'Inativo'}
-                  </span>
+        <>
+          {viewMode === 'table' ? (
+            <div className="bg-white rounded-lg shadow overflow-hidden">
+              <CargosTable cargos={cargosSorted} onEdit={(c) => handleEdit(c.id)} onToggleAtivo={handleToggleAtivo} sortBy={sortBy} onSort={onSort} />
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {cargosSorted.map((cargo) => (
+                <GlassCard
+                  key={cargo.id}
+                  className={`p-6 flex flex-col justify-between hover:shadow-xl transition-shadow cursor-pointer border-l-4 ${
+                    cargo.ativo ? 'border-l-blue-500' : 'border-l-gray-300'
+                  }`}
+                  onClick={() => handleEdit(cargo.id)}
+                >
+                  <div>
+                    <div className="flex justify-between items-start mb-2">
+                      <h3 className="text-lg font-bold text-gray-800">{cargo.nome}</h3>
+                      <span
+                        className={`px-2 py-1 rounded-full text-xs font-semibold ${
+                          cargo.ativo ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-600'
+                        }`}
+                      >
+                        {cargo.ativo ? 'Ativo' : 'Inativo'}
+                      </span>
+                    </div>
+                    <p className="text-sm text-gray-500 mb-4">{cargo.setor || 'Sem setor definido'}</p>
+                    <p className="text-sm text-gray-600 line-clamp-3 mb-4">{cargo.descricao || 'Sem descrição.'}</p>
+                  </div>
+
+                  <div className="flex items-center justify-between pt-4 border-t border-gray-100 text-sm text-gray-500">
+                    <div className="flex items-center gap-2">
+                      <span title="Colaboradores neste cargo">
+                        <span className="font-semibold text-blue-600">{cargo.total_colaboradores || 0}</span> colabs
+                      </span>
+                      <span className="text-gray-300">•</span>
+                      <span title="Competências requeridas">
+                        <span className="font-semibold text-blue-600">{cargo.total_competencias || 0}</span> req.
+                      </span>
+                    </div>
+                    <button
+                      type="button"
+                      className="text-blue-600 hover:text-blue-800 font-medium"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        handleToggleAtivo(cargo);
+                      }}
+                    >
+                      {cargo.ativo ? 'Inativar' : 'Reativar'}
+                    </button>
+                  </div>
+                </GlassCard>
+              ))}
+              {cargosSorted.length === 0 && (
+                <div className="col-span-full">
+                  <div className="text-center py-12 text-gray-500 bg-white border border-gray-100 rounded-2xl">
+                    Nenhum cargo encontrado.
+                  </div>
                 </div>
-                <p className="text-sm text-gray-500 mb-4">{cargo.setor || 'Sem setor definido'}</p>
-                <p className="text-sm text-gray-600 line-clamp-3 mb-4">
-                  {cargo.descricao || 'Sem descrição.'}
-                </p>
-              </div>
-              
-              <div className="flex items-center justify-between pt-4 border-t border-gray-100 text-sm text-gray-500">
-                <div className="flex items-center gap-1" title="Colaboradores neste cargo">
-                  <Users size={16} />
-                  <span>{cargo.total_colaboradores || 0}</span>
-                </div>
-                <div className="flex items-center gap-1" title="Competências requeridas">
-                  <Briefcase size={16} />
-                  <span>{cargo.total_competencias || 0} req.</span>
-                </div>
-                <button className="text-blue-600 hover:text-blue-800 font-medium flex items-center gap-1">
-                  <Edit size={14} /> Editar
-                </button>
-              </div>
-            </GlassCard>
-          ))}
-          {cargos.length === 0 && (
-            <div className="col-span-full">
-              <div className="text-center py-12 text-gray-500 bg-white border border-gray-100 rounded-2xl">
-                Nenhum cargo encontrado.
-              </div>
+              )}
             </div>
           )}
-        </div>
+        </>
       )}
 
       <Modal isOpen={isFormOpen} onClose={() => setIsFormOpen(false)} title={selectedCargo ? 'Editar Cargo' : 'Novo Cargo'}>

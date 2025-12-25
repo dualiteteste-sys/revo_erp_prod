@@ -41,7 +41,7 @@ export const menuConfig: { name: string; icon: React.ElementType; href: string; 
       { name: 'Serviços', icon: Wrench, href: '/app/services' },
       { name: 'Vendedores', icon: UserSquare, href: '#' },
       { name: 'Embalagens', icon: Box, href: '/app/cadastros/embalagens' },
-      { name: 'Relatórios', icon: BarChart2, href: '#' },
+      { name: 'Relatórios', icon: BarChart2, href: '/app/relatorios' },
     ],
   },
   {
@@ -94,13 +94,23 @@ export const menuConfig: { name: string; icon: React.ElementType; href: string; 
       { name: 'Metas de Vendas', icon: Target, href: '/app/vendas/metas' },
       { name: 'Propostas Comerciais', icon: FileSignature, href: '#' },
       { name: 'PDV', icon: Store, href: '#' },
-      { name: 'Notas Fiscais', icon: Receipt, href: '#' },
+      { name: 'Notas Fiscais (NF-e)', icon: Receipt, href: '/app/fiscal/nfe' },
       { name: 'Expedição', icon: Truck, href: '#' },
       { name: 'Comissões', icon: Percent, href: '#' },
       { name: 'Painel de Automações', icon: Bot, href: '#' },
       { name: 'Devolução de Venda', icon: Undo2, href: '#' },
       { name: 'Relatórios', icon: BarChart2, href: '#' },
     ]
+  },
+  {
+    name: 'Fiscal',
+    icon: Receipt,
+    href: '#',
+    gradient: 'from-sky-500 to-sky-600',
+    children: [
+      { name: 'NF-e (Rascunhos)', icon: Receipt, href: '/app/fiscal/nfe' },
+      { name: 'Configurações NF-e', icon: Settings, href: '/app/fiscal/nfe/configuracoes' },
+    ],
   },
   {
     name: 'Serviços',
@@ -112,7 +122,7 @@ export const menuConfig: { name: string; icon: React.ElementType; href: string; 
       { name: 'Contratos', icon: FileText, href: '#' },
       { name: 'Notas de Serviço', icon: Receipt, href: '#' },
       { name: 'Cobranças', icon: Banknote, href: '#' },
-      { name: 'Relatórios', icon: BarChart2, href: '#' },
+      { name: 'Relatórios', icon: BarChart2, href: '/app/servicos/relatorios' },
     ]
   },
   {
@@ -127,7 +137,7 @@ export const menuConfig: { name: string; icon: React.ElementType; href: string; 
       { name: 'Centro de Custos', icon: Landmark, href: '/app/financeiro/centros-de-custo' },
       { name: 'Cobranças Bancárias', icon: Banknote, href: '/app/financeiro/cobrancas' },
       { name: 'Extrato Bancário', icon: FileSpreadsheet, href: '/app/financeiro/extrato' },
-      { name: 'Relatórios', icon: BarChart2, href: '#' },
+      { name: 'Relatórios', icon: BarChart2, href: '/app/financeiro/relatorios' },
     ]
   },
   {

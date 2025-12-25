@@ -85,6 +85,24 @@ async function mockAuthAndEmpresa(page: Page) {
       },
     });
   });
+
+  await page.route('**/rest/v1/rpc/current_empresa_role', async (route) => {
+    await route.fulfill({ json: 'member' });
+  });
+
+  await page.route('**/rest/v1/empresa_features*', async (route) => {
+    await route.fulfill({
+      json: {
+        empresa_id: 'empresa-1',
+        revo_send_enabled: false,
+        nfe_emissao_enabled: false,
+        plano_mvp: 'ambos',
+        max_users: 999,
+        servicos_enabled: true,
+        industria_enabled: true,
+      },
+    });
+  });
 }
 
 test('Cadastro de Clientes/Fornecedores: listar e criar sem erros de console', async ({ page }) => {
@@ -99,12 +117,12 @@ test('Cadastro de Clientes/Fornecedores: listar e criar sem erros de console', a
 
   await mockAuthAndEmpresa(page);
 
-  // Partners list/count
-  await page.route('**/rest/v1/rpc/count_partners', async (route) => {
+  // Partners list/count (v2)
+  await page.route('**/rest/v1/rpc/count_partners_v2', async (route) => {
     await route.fulfill({ json: 1 });
   });
 
-  await page.route('**/rest/v1/rpc/list_partners', async (route) => {
+  await page.route('**/rest/v1/rpc/list_partners_v2', async (route) => {
     await route.fulfill({
       json: [
         {

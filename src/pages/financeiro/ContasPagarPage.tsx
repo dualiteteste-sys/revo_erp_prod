@@ -12,6 +12,8 @@ import ContasPagarSummary from '@/components/financeiro/contas-pagar/ContasPagar
 import Select from '@/components/ui/forms/Select';
 import DatePicker from '@/components/ui/DatePicker';
 import ErrorAlert from '@/components/ui/ErrorAlert';
+import { Button } from '@/components/ui/button';
+import { useConfirm } from '@/contexts/ConfirmProvider';
 
 const ContasPagarPage: React.FC = () => {
   const {
@@ -36,6 +38,7 @@ const ContasPagarPage: React.FC = () => {
     refresh,
   } = useContasPagar();
   const { addToast } = useToast();
+  const { confirm } = useConfirm();
 
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [selectedConta, setSelectedConta] = useState<financeiroService.ContaPagar | null>(null);
@@ -100,6 +103,32 @@ const ContasPagarPage: React.FC = () => {
     }
   };
 
+  const handlePay = async (conta: financeiroService.ContaPagar) => {
+    if (!conta?.id) return;
+    const ok = await confirm({
+      title: 'Registrar pagamento',
+      description: `Deseja marcar a conta "${conta.descricao}" como paga hoje?`,
+      confirmText: 'Registrar pagamento',
+      cancelText: 'Cancelar',
+      variant: 'default',
+    });
+    if (!ok) return;
+
+    try {
+      const today = new Date().toISOString().slice(0, 10);
+      const total = (Number(conta.valor_total || 0) + Number(conta.multa || 0) + Number(conta.juros || 0) - Number(conta.desconto || 0));
+      await financeiroService.pagarContaPagar({
+        id: conta.id,
+        dataPagamento: today,
+        valorPago: total,
+      });
+      addToast('Pagamento registrado com sucesso!', 'success');
+      refresh();
+    } catch (e: any) {
+      addToast(e?.message || 'Erro ao registrar pagamento.', 'error');
+    }
+  };
+
   const handleSort = (column: string) => {
     setSortBy(prev => ({
       column,
@@ -130,21 +159,19 @@ const ContasPagarPage: React.FC = () => {
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-3xl font-bold text-gray-800">Contas a Pagar</h1>
         <div className="flex items-center gap-2">
-            <button
+            <Button
+              variant="secondary"
               onClick={handleSeed}
               disabled={isSeeding || loading}
-              className="flex items-center gap-2 bg-gray-100 text-gray-700 font-semibold py-2 px-4 rounded-lg hover:bg-gray-200 transition-colors disabled:opacity-50"
+              className="gap-2"
             >
-              {isSeeding ? <Loader2 className="animate-spin" size={20} /> : <DatabaseBackup size={20} />}
+              {isSeeding ? <Loader2 className="animate-spin" size={18} /> : <DatabaseBackup size={18} />}
               Popular Dados
-            </button>
-            <button
-              onClick={() => handleOpenForm()}
-              className="flex items-center gap-2 bg-blue-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-blue-700 transition-colors"
-            >
-              <PlusCircle size={20} />
+            </Button>
+            <Button onClick={() => handleOpenForm()} className="gap-2">
+              <PlusCircle size={18} />
               Nova Conta
-            </button>
+            </Button>
         </div>
       </div>
 
@@ -223,7 +250,14 @@ const ContasPagarPage: React.FC = () => {
                 {searchTerm && <p className="text-sm">Tente ajustar sua busca.</p>}
               </div>
             ) : (
-              <ContasPagarTable contas={contas} onEdit={handleOpenForm} onDelete={handleOpenDeleteModal} sortBy={sortBy} onSort={handleSort} />
+              <ContasPagarTable
+                contas={contas}
+                onEdit={handleOpenForm}
+                onPay={handlePay}
+                onDelete={handleOpenDeleteModal}
+                sortBy={sortBy}
+                onSort={handleSort}
+              />
             )}
           </div>
 

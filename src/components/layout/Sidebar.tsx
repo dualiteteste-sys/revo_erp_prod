@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useMemo, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import GlassCard from '../ui/GlassCard';
 import { menuConfig, MenuItem } from '../../config/menuConfig';
@@ -8,6 +8,8 @@ import SidebarSwitch from '../sidebar/SidebarSwitch';
 import CompanySwitcher from '../sidebar/CompanySwitcher';
 import { useAuth } from '../../contexts/AuthProvider';
 import RevoLogo from '../landing/RevoLogo';
+import { useEmpresaFeatures } from '@/hooks/useEmpresaFeatures';
+import { filterMenuByFeatures } from '@/utils/menu/filterMenuByFeatures';
 
 const sidebarVariants = {
   expanded: { width: 320, transition: { type: 'spring', stiffness: 300, damping: 30 } },
@@ -19,8 +21,8 @@ interface SidebarProps {
   setIsCollapsed: (isCollapsed: boolean) => void;
   onOpenSettings: () => void;
   onOpenCreateCompanyModal: () => void;
-  activeItem: string;
-  setActiveItem: (name: string) => void;
+  activeItem: string; // href ativo
+  setActiveItem: (href: string) => void;
 }
 
 const Sidebar: React.FC<SidebarProps> = ({ 
@@ -35,23 +37,33 @@ const Sidebar: React.FC<SidebarProps> = ({
   const [isHoveringSubmenu, setIsHoveringSubmenu] = useState(false);
   const timerRef = useRef<number | null>(null);
   const { signOut } = useAuth();
+  const { industria_enabled, servicos_enabled, loading: loadingFeatures } = useEmpresaFeatures();
 
-  const findParentGroup = (itemName: string) => {
-    const parent = menuConfig.find(group => group.children?.some(child => child.name === itemName));
+  const visibleMenu = useMemo(() => {
+    if (loadingFeatures) return menuConfig;
+    return filterMenuByFeatures(menuConfig, { industria_enabled, servicos_enabled });
+  }, [industria_enabled, servicos_enabled, loadingFeatures]);
+
+  const findParentGroup = (href: string) => {
+    const parent = visibleMenu.find(group => group.children?.some(child => child.href === href));
     return parent ? parent.name : null;
   };
 
   const [openGroup, setOpenGroup] = useState<string | null>(() => findParentGroup(activeItem));
 
-  const handleSetActiveItem = (itemName: string) => {
-    setActiveItem(itemName);
-    const parentName = findParentGroup(itemName);
-    setOpenGroup(parentName);
+  const handleSetActiveItem = (href: string) => {
+    setActiveItem(href);
+    setOpenGroup(findParentGroup(href));
   };
 
   const handleSetOpenGroup = (groupName: string | null) => {
     setOpenGroup(currentOpenGroup => (currentOpenGroup === groupName ? null : groupName));
   };
+
+  React.useEffect(() => {
+    setOpenGroup(findParentGroup(activeItem));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeItem]);
   
   const handleMouseEnterItem = (e: React.MouseEvent, item: MenuItem) => {
     if (timerRef.current) {
@@ -103,7 +115,7 @@ const Sidebar: React.FC<SidebarProps> = ({
       return;
     }
     if (!item.children) {
-      setActiveItem(item.name);
+      if (item.href && item.href !== '#') setActiveItem(item.href);
       setActiveSubmenu(null);
     }
   };
@@ -136,7 +148,7 @@ const Sidebar: React.FC<SidebarProps> = ({
                 exit={{ opacity: 0 }}
                 className="space-y-4 pt-4 flex flex-col items-center"
               >
-                {menuConfig.map((item) => (
+                {visibleMenu.map((item) => (
                   <li 
                     key={item.name} 
                     className="relative" 
@@ -161,7 +173,7 @@ const Sidebar: React.FC<SidebarProps> = ({
                 exit={{ opacity: 0 }}
                 className="space-y-2"
               >
-                {menuConfig.map((item) => (
+                {visibleMenu.map((item) => (
                   <SidebarGroup
                     key={item.name}
                     item={item}

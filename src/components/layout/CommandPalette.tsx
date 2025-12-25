@@ -2,6 +2,8 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { menuConfig } from '@/config/menuConfig';
 import { PlusCircle } from 'lucide-react';
+import { useEmpresaFeatures } from '@/hooks/useEmpresaFeatures';
+import { filterMenuByFeatures } from '@/utils/menu/filterMenuByFeatures';
 import {
   CommandDialog,
   CommandEmpty,
@@ -25,10 +27,10 @@ type RecentEntry = Pick<PaletteItem, 'id' | 'group' | 'label' | 'href'>;
 const STORAGE_KEY = 'ui:commandPaletteRecents';
 const MAX_RECENTS = 8;
 
-function flattenMenu(): PaletteItem[] {
+function flattenMenu(menu = menuConfig): PaletteItem[] {
   const items: PaletteItem[] = [];
 
-  for (const group of menuConfig) {
+  for (const group of menu) {
     if (group.children?.length) {
       for (const child of group.children) {
         if (!child.href || child.href === '#') continue;
@@ -56,7 +58,8 @@ function flattenMenu(): PaletteItem[] {
   return items;
 }
 
-function getActionItems(): PaletteItem[] {
+function getActionItems({ industriaEnabled }: { industriaEnabled: boolean }): PaletteItem[] {
+  if (!industriaEnabled) return [];
   return [
     { id: 'action:new-op', group: 'Ações', label: 'Nova Ordem (Industrialização)', href: '/app/industria/ordens?tipo=industrializacao&new=1', Icon: PlusCircle },
     { id: 'action:new-ob', group: 'Ações', label: 'Nova Ordem (Beneficiamento)', href: '/app/industria/ordens?tipo=beneficiamento&new=1', Icon: PlusCircle },
@@ -97,8 +100,17 @@ export default function CommandPalette() {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
   const [recents, setRecents] = useState<RecentEntry[]>(() => readRecents());
+  const { industria_enabled, servicos_enabled, loading } = useEmpresaFeatures();
 
-  const allItems = useMemo(() => [...getActionItems(), ...flattenMenu()], []);
+  const filteredMenu = useMemo(() => {
+    if (loading) return menuConfig;
+    return filterMenuByFeatures(menuConfig, { industria_enabled, servicos_enabled });
+  }, [industria_enabled, servicos_enabled, loading]);
+
+  const allItems = useMemo(
+    () => [...getActionItems({ industriaEnabled: industria_enabled }), ...flattenMenu(filteredMenu)],
+    [filteredMenu, industria_enabled]
+  );
 
   const groupedItems = useMemo(() => {
     const map = new Map<string, PaletteItem[]>();

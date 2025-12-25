@@ -1,9 +1,9 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { DragDropContext, DropResult } from '@hello-pangea/dnd';
 import { useOs } from '@/hooks/useOs';
 import { useToast } from '@/contexts/ToastProvider';
 import * as osService from '@/services/os';
-import { Loader2, PlusCircle, Search, ClipboardCheck, LayoutGrid } from 'lucide-react';
+import { Loader2, PlusCircle, ClipboardCheck, LayoutGrid } from 'lucide-react';
 import Pagination from '@/components/ui/Pagination';
 import ConfirmationModal from '@/components/ui/ConfirmationModal';
 import Modal from '@/components/ui/Modal';
@@ -12,6 +12,12 @@ import OsFormPanel from '@/components/os/OsFormPanel';
 import Select from '@/components/ui/forms/Select';
 import OsKanbanModal from '@/components/os/kanban/OsKanbanModal';
 import { Database } from '@/types/database.types';
+import PageHeader from '@/components/ui/PageHeader';
+import SearchField from '@/components/ui/forms/SearchField';
+import { Button } from '@/components/ui/button';
+import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useConfirm } from '@/contexts/ConfirmProvider';
+import { setStatus as setOsStatus } from '@/services/osStatus';
 
 const OSPage: React.FC = () => {
   const {
@@ -32,6 +38,8 @@ const OSPage: React.FC = () => {
     reorderOs,
   } = useOs();
   const { addToast } = useToast();
+  const { confirm } = useConfirm();
+  const navigate = useNavigate();
 
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [selectedOs, setSelectedOs] = useState<osService.OrdemServicoDetails | null>(null);
@@ -40,6 +48,31 @@ const OSPage: React.FC = () => {
   const [isDeleting, setIsDeleting] = useState(false);
   const [isFetchingDetails, setIsFetchingDetails] = useState(false);
   const [isKanbanModalOpen, setIsKanbanModalOpen] = useState(false);
+  const [searchParams, setSearchParams] = useSearchParams();
+
+  useEffect(() => {
+    const osId = searchParams.get('osId');
+    if (!osId) return;
+
+    void (async () => {
+      setIsFetchingDetails(true);
+      setIsFormOpen(true);
+      setSelectedOs(null);
+      try {
+        const details = await osService.getOsDetails(osId);
+        setSelectedOs(details);
+      } catch (e: any) {
+        addToast(e?.message || 'Erro ao abrir a O.S.', 'error');
+        setIsFormOpen(false);
+      } finally {
+        setIsFetchingDetails(false);
+        const next = new URLSearchParams(searchParams);
+        next.delete('osId');
+        setSearchParams(next, { replace: true });
+      }
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const handleOpenForm = async (os: osService.OrdemServico | null = null) => {
     if (os?.id) {
@@ -96,6 +129,38 @@ const OSPage: React.FC = () => {
     }
   };
 
+  const handleSetStatus = async (os: osService.OrdemServico, next: Database['public']['Enums']['status_os']) => {
+    const labelMap: Record<Database['public']['Enums']['status_os'], string> = {
+      orcamento: 'Orçamento',
+      aberta: 'Aberta',
+      concluida: 'Concluída',
+      cancelada: 'Cancelada',
+    };
+
+    const shouldConfirm = next === 'concluida' || next === 'cancelada';
+    if (shouldConfirm) {
+      const ok = await confirm({
+        title: next === 'concluida' ? 'Concluir O.S.' : 'Cancelar O.S.',
+        description:
+          next === 'concluida'
+            ? `Deseja concluir a O.S. nº ${os.numero}?`
+            : `Deseja cancelar a O.S. nº ${os.numero}?`,
+        confirmText: next === 'concluida' ? 'Concluir' : 'Cancelar',
+        cancelText: 'Voltar',
+        variant: next === 'cancelada' ? 'danger' : 'default',
+      });
+      if (!ok) return;
+    }
+
+    try {
+      await setOsStatus(os.id, next);
+      addToast(`Status atualizado para “${labelMap[next]}”.`, 'success');
+      refresh();
+    } catch (e: any) {
+      addToast(e?.message || 'Falha ao atualizar status.', 'error');
+    }
+  };
+
   const handleSort = (column: keyof osService.OrdemServico) => {
     setSortBy(prev => ({
       column,
@@ -119,37 +184,34 @@ const OSPage: React.FC = () => {
 
   return (
     <div className="p-1">
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-3xl font-bold text-gray-800">Ordens de Serviço</h1>
-        <div className="flex items-center gap-4">
-          <button
-            onClick={() => setIsKanbanModalOpen(true)}
-            className="flex items-center gap-2 bg-white border border-gray-300 text-gray-700 font-semibold py-2 px-4 rounded-lg hover:bg-gray-100 transition-colors"
-          >
-            <LayoutGrid size={20} />
-            Agenda
-          </button>
-          <button
-            onClick={() => handleOpenForm()}
-            className="flex items-center gap-2 bg-blue-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-blue-700 transition-colors"
-          >
-            <PlusCircle size={20} />
-            Nova O.S.
-          </button>
-        </div>
-      </div>
+      <PageHeader
+        title="Ordens de Serviço"
+        description="Orçamento, execução e agenda de serviços."
+        icon={<ClipboardCheck className="w-5 h-5" />}
+        actions={
+          <>
+            <Button onClick={() => navigate('/app/servicos/relatorios')} variant="outline" className="gap-2">
+              Relatórios
+            </Button>
+            <Button onClick={() => setIsKanbanModalOpen(true)} variant="outline" className="gap-2">
+              <LayoutGrid size={18} />
+              Agenda
+            </Button>
+            <Button onClick={() => handleOpenForm()} className="gap-2">
+              <PlusCircle size={18} />
+              Nova O.S.
+            </Button>
+          </>
+        }
+      />
 
-      <div className="mb-4 flex gap-4">
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={20} />
-          <input
-            type="text"
-            placeholder="Buscar por cliente ou descrição..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full max-w-xs p-3 pl-10 border border-gray-300 rounded-lg"
-          />
-        </div>
+      <div className="mb-4 mt-6 flex gap-4 flex-wrap items-end">
+        <SearchField
+          placeholder="Buscar por cliente ou descrição..."
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+          className="w-full max-w-sm"
+        />
         <Select
           value={filterStatus || ''}
           onChange={(e) => setFilterStatus(e.target.value as Database['public']['Enums']['status_os'] || null)}
@@ -178,7 +240,15 @@ const OSPage: React.FC = () => {
           </div>
         ) : (
           <DragDropContext onDragEnd={onDragEnd}>
-            <OsTable serviceOrders={serviceOrders} onEdit={handleOpenForm} onDelete={handleOpenDeleteModal} sortBy={sortBy} onSort={handleSort} />
+            <OsTable
+              serviceOrders={serviceOrders}
+              onEdit={handleOpenForm}
+              onDelete={handleOpenDeleteModal}
+              onOpenAgenda={() => setIsKanbanModalOpen(true)}
+              onSetStatus={handleSetStatus}
+              sortBy={sortBy}
+              onSort={handleSort}
+            />
           </DragDropContext>
         )}
       </div>

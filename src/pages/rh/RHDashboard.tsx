@@ -64,14 +64,10 @@ export default function RHDashboard() {
         <p className="text-gray-600 max-w-md mb-8">
           Parece que você ainda não cadastrou nenhum dado. Que tal popular o sistema com dados de exemplo para ver os indicadores em ação?
         </p>
-        <button
-          onClick={handleSeed}
-          disabled={seeding}
-          className="flex items-center gap-2 bg-blue-600 text-white font-bold py-3 px-6 rounded-xl hover:bg-blue-700 transition-colors disabled:opacity-50"
-        >
+        <Button onClick={handleSeed} disabled={seeding} className="gap-2">
           {seeding ? <Loader2 className="animate-spin" /> : <DatabaseBackup />}
           Popular com Dados de Exemplo
-        </button>
+        </Button>
       </div>
     );
   }

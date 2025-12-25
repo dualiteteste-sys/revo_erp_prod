@@ -1,12 +1,25 @@
 import React, { useState, useEffect } from 'react';
-import { Loader2, Save, AlertCircle, TrendingUp, TrendingDown, Minus } from 'lucide-react';
-import { ColaboradorDetails, ColaboradorPayload, saveColaborador, Cargo, listCargos, Competencia, listCompetencias } from '@/services/rh';
+import { Loader2, Save, AlertCircle, TrendingUp, TrendingDown, Minus, PlusCircle, GraduationCap } from 'lucide-react';
+import {
+  ColaboradorDetails,
+  ColaboradorPayload,
+  saveColaborador,
+  Cargo,
+  listCargos,
+  Competencia,
+  listCompetencias,
+  getCargoDetails,
+  listTreinamentosPorColaborador,
+  ColaboradorTreinamento,
+} from '@/services/rh';
 import { useToast } from '@/contexts/ToastProvider';
 import Section from '@/components/ui/forms/Section';
 import Input from '@/components/ui/forms/Input';
 import Select from '@/components/ui/forms/Select';
 import Toggle from '@/components/ui/forms/Toggle';
 import { motion } from 'framer-motion';
+import { Button } from '@/components/ui/button';
+import { listAuditLogsForTables, type AuditLogRow } from '@/services/auditLogs';
 
 interface ColaboradorFormPanelProps {
   colaborador: ColaboradorDetails | null;
@@ -20,11 +33,19 @@ const ColaboradorFormPanel: React.FC<ColaboradorFormPanelProps> = ({ colaborador
   const [formData, setFormData] = useState<ColaboradorPayload>({});
   const [cargos, setCargos] = useState<Cargo[]>([]);
   const [allCompetencias, setAllCompetencias] = useState<Competencia[]>([]);
-  const [activeTab, setActiveTab] = useState<'dados' | 'competencias'>('dados');
+  const [activeTab, setActiveTab] = useState<'dados' | 'competencias' | 'treinamentos' | 'historico'>('dados');
+
+  const [mappedCargoId, setMappedCargoId] = useState<string | null>(null);
+  const [extraCompetenciaId, setExtraCompetenciaId] = useState<string>('');
+
+  const [treinamentos, setTreinamentos] = useState<ColaboradorTreinamento[]>([]);
+  const [loadingTreinamentos, setLoadingTreinamentos] = useState(false);
+  const [auditRows, setAuditRows] = useState<AuditLogRow[]>([]);
+  const [loadingAudit, setLoadingAudit] = useState(false);
 
   useEffect(() => {
     const loadData = async () => {
-      const [cargosData, compData] = await Promise.all([listCargos(), listCompetencias()]);
+      const [cargosData, compData] = await Promise.all([listCargos(undefined, true), listCompetencias()]);
       setCargos(cargosData);
       setAllCompetencias(compData);
     };
@@ -35,7 +56,89 @@ const ColaboradorFormPanel: React.FC<ColaboradorFormPanelProps> = ({ colaborador
     } else {
       setFormData({ ativo: true, competencias: [] });
     }
+    setMappedCargoId(null);
+    setExtraCompetenciaId('');
   }, [colaborador]);
+
+  useEffect(() => {
+    const fetchTreinamentos = async () => {
+      if (!colaborador?.id) {
+        setTreinamentos([]);
+        return;
+      }
+      setLoadingTreinamentos(true);
+      try {
+        const data = await listTreinamentosPorColaborador(colaborador.id);
+        setTreinamentos(data);
+      } catch (e: any) {
+        addToast(e?.message || 'Erro ao carregar treinamentos do colaborador.', 'error');
+      } finally {
+        setLoadingTreinamentos(false);
+      }
+    };
+    fetchTreinamentos();
+  }, [colaborador?.id, addToast]);
+
+  useEffect(() => {
+    const fetchAudit = async () => {
+      if (activeTab !== 'historico') return;
+      if (!colaborador?.id) {
+        setAuditRows([]);
+        return;
+      }
+      setLoadingAudit(true);
+      try {
+        const data = await listAuditLogsForTables(['rh_colaboradores', 'rh_colaborador_competencias'], 300);
+        setAuditRows(data.filter((r) => r.record_id === colaborador.id));
+      } catch (e: any) {
+        addToast(e?.message || 'Erro ao carregar histórico.', 'error');
+      } finally {
+        setLoadingAudit(false);
+      }
+    };
+    fetchAudit();
+  }, [activeTab, colaborador?.id, addToast]);
+
+  useEffect(() => {
+    const hydrateCompetenciasFromCargo = async () => {
+      const cargoId = (formData.cargo_id || '') as string;
+      if (!cargoId) return;
+      if (mappedCargoId === cargoId) return;
+
+      try {
+        const cargo = await getCargoDetails(cargoId);
+        const current = formData.competencias || [];
+        const currentById = new Map(current.map((c: any) => [c.competencia_id, c]));
+
+        const requiredIds = new Set(cargo.competencias.map((c) => c.competencia_id));
+        const required = cargo.competencias.map((req) => {
+          const existing = currentById.get(req.competencia_id);
+          const nivelAtual = existing?.nivel_atual ?? 0;
+          const nivelRequerido = req.nivel_requerido ?? 0;
+          return {
+            competencia_id: req.competencia_id,
+            nome: req.nome,
+            tipo: req.tipo,
+            nivel_requerido: nivelRequerido,
+            nivel_atual: nivelAtual,
+            gap: nivelAtual - nivelRequerido,
+            obrigatorio: !!req.obrigatorio,
+            data_avaliacao: existing?.data_avaliacao ?? null,
+            origem: existing?.origem ?? null,
+          };
+        });
+
+        const extras = current.filter((c: any) => !requiredIds.has(c.competencia_id));
+        setFormData((prev) => ({ ...prev, competencias: [...required, ...extras] }));
+        setMappedCargoId(cargoId);
+      } catch (e) {
+        setMappedCargoId(cargoId);
+      }
+    };
+
+    hydrateCompetenciasFromCargo();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [formData.cargo_id]);
 
   const handleFormChange = (field: keyof ColaboradorPayload, value: any) => {
     setFormData(prev => ({ ...prev, [field]: value }));
@@ -48,18 +151,25 @@ const ColaboradorFormPanel: React.FC<ColaboradorFormPanelProps> = ({ colaborador
     let newComps = [...currentComps];
     
     if (existingIndex >= 0) {
-      newComps[existingIndex] = { ...newComps[existingIndex], [field]: value };
+      const prev = newComps[existingIndex] as any;
+      const next: any = { ...prev, [field]: value };
+      if (field === 'nivel_atual') {
+        next.data_avaliacao = new Date().toISOString();
+      }
+      next.gap = (next.nivel_atual ?? 0) - (next.nivel_requerido ?? 0);
+      newComps[existingIndex] = next;
     } else {
       // Se não existe na lista (ex: adicionando uma competência extra não requerida)
       const compInfo = allCompetencias.find(c => c.id === compId);
       if (compInfo) {
+        const nivelAtual = field === 'nivel_atual' ? value : 0;
         newComps.push({
           competencia_id: compId,
           nome: compInfo.nome,
           tipo: compInfo.tipo,
           nivel_requerido: 0,
-          nivel_atual: field === 'nivel_atual' ? value : 0,
-          gap: 0,
+          nivel_atual: nivelAtual,
+          gap: nivelAtual,
           obrigatorio: false,
           data_avaliacao: new Date().toISOString(),
           origem: null
@@ -67,6 +177,12 @@ const ColaboradorFormPanel: React.FC<ColaboradorFormPanelProps> = ({ colaborador
       }
     }
     setFormData(prev => ({ ...prev, competencias: newComps }));
+  };
+
+  const handleAddExtraCompetencia = () => {
+    if (!extraCompetenciaId) return;
+    handleCompetenciaChange(extraCompetenciaId, 'nivel_atual', 0);
+    setExtraCompetenciaId('');
   };
 
   const handleSave = async () => {
@@ -97,22 +213,77 @@ const ColaboradorFormPanel: React.FC<ColaboradorFormPanelProps> = ({ colaborador
     return <span className="flex items-center text-red-600 text-xs font-bold"><TrendingDown size={14} className="mr-1" /> Gap: {gap}</span>;
   };
 
+  const labelOperation = (op: AuditLogRow['operation']) => {
+    if (op === 'INSERT') return 'Criado';
+    if (op === 'UPDATE') return 'Atualizado';
+    if (op === 'DELETE') return 'Excluído';
+    return op;
+  };
+
+  const formatChangedFields = (row: AuditLogRow) => {
+    if (row.operation !== 'UPDATE') return '';
+    const oldData = row.old_data || {};
+    const newData = row.new_data || {};
+    const keys = Array.from(
+      new Set([...Object.keys(oldData || {}), ...Object.keys(newData || {})].filter((k) => k !== 'updated_at' && k !== 'created_at'))
+    );
+    const changed = keys.filter((k) => JSON.stringify((oldData as any)[k]) !== JSON.stringify((newData as any)[k]));
+    if (changed.length === 0) return '';
+    const labels: Record<string, string> = {
+      nome: 'Nome',
+      email: 'E-mail',
+      documento: 'Documento',
+      data_admissao: 'Data de admissão',
+      cargo_id: 'Cargo',
+      ativo: 'Status',
+      nivel_atual: 'Nível avaliado',
+      data_avaliacao: 'Data da avaliação',
+      origem: 'Origem',
+    };
+    return changed
+      .slice(0, 4)
+      .map((k) => labels[k] || k)
+      .join(', ');
+  };
+
   return (
     <div className="flex flex-col h-full">
       <div className="border-b border-gray-200 px-6">
         <nav className="-mb-px flex space-x-6">
-          <button
+          <Button
             onClick={() => setActiveTab('dados')}
+            type="button"
+            variant="ghost"
             className={`py-4 px-1 border-b-2 font-medium text-sm ${activeTab === 'dados' ? 'border-blue-500 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'}`}
           >
             Dados Pessoais
-          </button>
-          <button
+          </Button>
+          <Button
             onClick={() => setActiveTab('competencias')}
+            type="button"
+            variant="ghost"
             className={`py-4 px-1 border-b-2 font-medium text-sm ${activeTab === 'competencias' ? 'border-blue-500 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'}`}
           >
             Competências & Avaliação
-          </button>
+          </Button>
+          <Button
+            onClick={() => setActiveTab('treinamentos')}
+            type="button"
+            variant="ghost"
+            className={`py-4 px-1 border-b-2 font-medium text-sm ${activeTab === 'treinamentos' ? 'border-blue-500 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'}`}
+            disabled={!colaborador?.id}
+          >
+            Treinamentos {!colaborador?.id ? '(salve primeiro)' : ''}
+          </Button>
+          <Button
+            onClick={() => setActiveTab('historico')}
+            type="button"
+            variant="ghost"
+            className={`py-4 px-1 border-b-2 font-medium text-sm ${activeTab === 'historico' ? 'border-blue-500 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'}`}
+            disabled={!colaborador?.id}
+          >
+            Histórico {!colaborador?.id ? '(salve primeiro)' : ''}
+          </Button>
         </nav>
       </div>
 
@@ -187,13 +358,43 @@ const ColaboradorFormPanel: React.FC<ColaboradorFormPanelProps> = ({ colaborador
               </div>
             </div>
 
+            <div className="bg-white border border-gray-200 rounded-lg p-4 flex flex-wrap items-end gap-3">
+              <Select
+                label="Adicionar competência extra (opcional)"
+                name="extra_competencia"
+                value={extraCompetenciaId}
+                onChange={(e) => setExtraCompetenciaId(e.target.value)}
+                className="min-w-[260px] flex-1"
+              >
+                <option value="">Selecione...</option>
+                {allCompetencias
+                  .filter((c) => !(formData.competencias || []).some((cc) => cc.competencia_id === c.id))
+                  .map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.nome} ({c.tipo})
+                    </option>
+                  ))}
+              </Select>
+              <button
+                type="button"
+                onClick={handleAddExtraCompetencia}
+                disabled={!extraCompetenciaId}
+                className="flex items-center gap-2 bg-blue-600 text-white font-semibold py-2 px-3 rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50"
+              >
+                <PlusCircle size={18} />
+                Adicionar
+              </button>
+            </div>
+
             <div className="space-y-4">
-              {formData.competencias?.map((comp) => (
+              {formData.competencias?.map((comp: any) => {
+                const gapNow = (comp.nivel_atual ?? 0) - (comp.nivel_requerido ?? 0);
+                return (
                 <motion.div 
                   key={comp.competencia_id}
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
-                  className={`border rounded-lg p-4 ${comp.gap < 0 ? 'bg-red-50 border-red-200' : 'bg-white border-gray-200'}`}
+                  className={`border rounded-lg p-4 ${comp.nivel_requerido > 0 && gapNow < 0 ? 'bg-red-50 border-red-200' : 'bg-white border-gray-200'}`}
                 >
                   <div className="flex flex-wrap justify-between items-center gap-4 mb-3">
                     <div>
@@ -233,7 +434,7 @@ const ColaboradorFormPanel: React.FC<ColaboradorFormPanelProps> = ({ colaborador
                     </div>
                   </div>
                 </motion.div>
-              ))}
+              )})}
 
               {(!formData.competencias || formData.competencias.length === 0) && (
                 <div className="text-center py-12 text-gray-500">
@@ -245,15 +446,129 @@ const ColaboradorFormPanel: React.FC<ColaboradorFormPanelProps> = ({ colaborador
             </div>
           </div>
         )}
+
+        {activeTab === 'treinamentos' && (
+          <div className="space-y-6">
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 flex items-start gap-3">
+              <GraduationCap className="text-blue-600 mt-0.5" size={20} />
+              <div>
+                <h4 className="font-semibold text-blue-800">Histórico de Treinamentos</h4>
+                <p className="text-sm text-blue-700">
+                  Acompanhe inscrições, conclusão e eficácia por colaborador.
+                </p>
+              </div>
+            </div>
+
+            {loadingTreinamentos ? (
+              <div className="flex justify-center items-center h-40">
+                <Loader2 className="animate-spin text-blue-600 w-8 h-8" />
+              </div>
+            ) : treinamentos.length === 0 ? (
+              <div className="text-center py-12 text-gray-500">
+                <Minus className="mx-auto h-8 w-8 mb-2 text-gray-300" />
+                <p>Nenhum treinamento encontrado para este colaborador.</p>
+              </div>
+            ) : (
+              <div className="overflow-hidden border border-gray-200 rounded-lg bg-white">
+                <table className="min-w-full text-sm">
+                  <thead className="bg-gray-50 text-gray-600">
+                    <tr>
+                      <th className="text-left p-3">Treinamento</th>
+                      <th className="text-left p-3">Status</th>
+                      <th className="text-left p-3">Participação</th>
+                      <th className="text-left p-3">Data</th>
+                      <th className="text-left p-3">Eficácia</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100">
+                    {treinamentos.map((t) => (
+                      <tr key={t.treinamento_id} className="hover:bg-gray-50">
+                        <td className="p-3 font-medium text-gray-800">{t.treinamento_nome}</td>
+                        <td className="p-3 text-gray-600 capitalize">{t.treinamento_status?.replace(/_/g, ' ')}</td>
+                        <td className="p-3 text-gray-600 capitalize">{t.participante_status?.replace(/_/g, ' ')}</td>
+                        <td className="p-3 text-gray-600">
+                          {t.data_inicio ? new Date(t.data_inicio).toLocaleDateString('pt-BR') : '—'}
+                        </td>
+                        <td className="p-3 text-gray-600">
+                          {t.eficacia_avaliada ? 'Avaliada' : 'Pendente'}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        )}
+
+        {activeTab === 'historico' && (
+          <div className="space-y-4">
+            <div className="bg-white border border-gray-200 rounded-lg p-4">
+              <div className="text-sm text-gray-600">
+                Alterações registradas em <span className="font-medium">Colaborador</span> e <span className="font-medium">Competências avaliadas</span>.
+              </div>
+            </div>
+
+            {loadingAudit ? (
+              <div className="flex justify-center items-center h-40">
+                <Loader2 className="animate-spin text-blue-600 w-8 h-8" />
+              </div>
+            ) : auditRows.length === 0 ? (
+              <div className="text-center py-12 text-gray-500">
+                <Minus className="mx-auto h-8 w-8 mb-2 text-gray-300" />
+                <p>Nenhuma alteração registrada para este colaborador.</p>
+              </div>
+            ) : (
+              <div className="overflow-hidden border border-gray-200 rounded-lg bg-white">
+                <table className="min-w-full text-sm">
+                  <thead className="bg-gray-50 text-gray-600">
+                    <tr>
+                      <th className="text-left p-3">Quando</th>
+                      <th className="text-left p-3">Ação</th>
+                      <th className="text-left p-3">Tabela</th>
+                      <th className="text-left p-3">Detalhes</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100">
+                    {auditRows.map((r) => (
+                      <tr key={r.id} className="hover:bg-gray-50">
+                        <td className="p-3 text-gray-600">
+                          {new Date(r.changed_at).toLocaleString('pt-BR')}
+                        </td>
+                        <td className="p-3">
+                          <span
+                            className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
+                              r.operation === 'INSERT'
+                                ? 'bg-green-100 text-green-800'
+                                : r.operation === 'UPDATE'
+                                  ? 'bg-blue-100 text-blue-800'
+                                  : 'bg-gray-100 text-gray-800'
+                            }`}
+                          >
+                            {labelOperation(r.operation)}
+                          </span>
+                        </td>
+                        <td className="p-3 text-gray-600">{r.table_name}</td>
+                        <td className="p-3 text-gray-600">{formatChangedFields(r) || '—'}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       <footer className="flex-shrink-0 p-4 flex justify-end items-center border-t border-white/20">
         <div className="flex gap-3">
-          <button type="button" onClick={onClose} className="rounded-md border border-gray-300 bg-white py-2 px-4 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50">Cancelar</button>
-          <button onClick={handleSave} disabled={isSaving} className="flex items-center gap-2 bg-blue-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50">
+          <Button type="button" onClick={onClose} variant="outline">
+            Cancelar
+          </Button>
+          <Button onClick={handleSave} disabled={isSaving} className="gap-2">
             {isSaving ? <Loader2 className="animate-spin" size={20} /> : <Save size={20} />}
             Salvar
-          </button>
+          </Button>
         </div>
       </footer>
     </div>

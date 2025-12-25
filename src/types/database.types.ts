@@ -184,6 +184,29 @@ export interface Database {
           updated_at?: string
         }
       }
+      empresa_entitlements: {
+        Row: {
+          empresa_id: string
+          plano_mvp: string
+          max_users: number
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          empresa_id: string
+          plano_mvp?: string
+          max_users?: number
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          empresa_id?: string
+          plano_mvp?: string
+          max_users?: number
+          created_at?: string
+          updated_at?: string
+        }
+      }
       empresas: {
         Row: {
           id: string
@@ -1094,6 +1117,11 @@ export interface Database {
         Row: {
           empresa_id: string | null
           revo_send_enabled: boolean | null
+          nfe_emissao_enabled: boolean | null
+          plano_mvp: string | null
+          max_users: number | null
+          servicos_enabled: boolean | null
+          industria_enabled: boolean | null
         }
       }
       produtos_compat_view: {

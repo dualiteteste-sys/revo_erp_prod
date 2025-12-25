@@ -16,6 +16,7 @@ import { ContaCorrente, Movimentacao, ExtratoItem, deleteContaCorrente, deleteMo
 import ConfirmationModal from '@/components/ui/ConfirmationModal';
 import DatePicker from '@/components/ui/DatePicker';
 import Toggle from '@/components/ui/forms/Toggle';
+import { Button } from '@/components/ui/button';
 
 export default function TesourariaPage() {
   const [activeTab, setActiveTab] = useState<'contas' | 'movimentos' | 'conciliacao'>('contas');
@@ -196,12 +197,9 @@ export default function TesourariaPage() {
                         className="w-full p-3 pl-10 border border-gray-300 rounded-xl shadow-sm focus:ring-2 focus:ring-blue-500"
                     />
                 </div>
-                <button
-                    onClick={handleNewConta}
-                    className="flex items-center gap-2 bg-blue-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-blue-700 transition-colors"
-                >
-                    <PlusCircle size={20} /> Nova Conta
-                </button>
+                <Button onClick={handleNewConta} className="gap-2">
+                  <PlusCircle size={18} /> Nova Conta
+                </Button>
             </div>
 
             <div className="bg-white rounded-lg shadow overflow-hidden">
@@ -240,13 +238,13 @@ export default function TesourariaPage() {
                     <DatePicker label="Até" value={movEndDate} onChange={setMovEndDate} className="w-40" />
                 </div>
 
-                <button
-                    onClick={handleNewMov}
-                    disabled={!selectedContaId}
-                    className="flex items-center gap-2 bg-blue-600 text-white font-bold py-2.5 px-4 rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed ml-auto"
+                <Button
+                  onClick={handleNewMov}
+                  disabled={!selectedContaId}
+                  className="gap-2 ml-auto"
                 >
-                    <ArrowRightLeft size={20} /> Registrar Movimento
-                </button>
+                  <ArrowRightLeft size={18} /> Registrar Movimento
+                </Button>
             </div>
 
             <div className="bg-white rounded-lg shadow overflow-hidden flex-grow">
@@ -294,13 +292,13 @@ export default function TesourariaPage() {
                     />
                 </div>
 
-                <button
-                    onClick={() => setIsImportModalOpen(true)}
-                    disabled={!selectedContaId}
-                    className="flex items-center gap-2 bg-purple-600 text-white font-bold py-2.5 px-4 rounded-lg hover:bg-purple-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed ml-auto"
+                <Button
+                  onClick={() => setIsImportModalOpen(true)}
+                  disabled={!selectedContaId}
+                  className="gap-2 ml-auto"
                 >
-                    <UploadCloud size={20} /> Importar Extrato
-                </button>
+                  <UploadCloud size={18} /> Importar Extrato
+                </Button>
             </div>
 
             <div className="bg-white rounded-lg shadow overflow-hidden flex-grow">
@@ -345,6 +343,7 @@ export default function TesourariaPage() {
         onClose={() => setIsImportModalOpen(false)} 
         onImport={handleImport}
         contaCorrenteId={selectedContaId!}
+        onImported={() => { refreshExtrato(); refreshMov(); refreshContas(); }}
       />
 
       <ConciliacaoDrawer 
