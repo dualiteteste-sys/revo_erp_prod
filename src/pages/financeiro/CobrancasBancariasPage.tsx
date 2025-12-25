@@ -11,6 +11,7 @@ import CobrancaFormPanel from '@/components/financeiro/cobrancas/CobrancaFormPan
 import CobrancasSummary from '@/components/financeiro/cobrancas/CobrancasSummary';
 import Select from '@/components/ui/forms/Select';
 import DatePicker from '@/components/ui/DatePicker';
+import { Button } from '@/components/ui/button';
 
 export default function CobrancasBancariasPage() {
   const {
@@ -109,21 +110,14 @@ export default function CobrancasBancariasPage() {
             <p className="text-gray-600 text-sm mt-1">Gestão de boletos, Pix e links de pagamento.</p>
         </div>
         <div className="flex items-center gap-2">
-            <button
-              onClick={handleSeed}
-              disabled={isSeeding || loading}
-              className="flex items-center gap-2 bg-gray-100 text-gray-700 font-semibold py-2 px-4 rounded-lg hover:bg-gray-200 transition-colors disabled:opacity-50"
-            >
-              {isSeeding ? <Loader2 className="animate-spin" size={20} /> : <DatabaseBackup size={20} />}
-              Popular Dados
-            </button>
-            <button
-              onClick={() => handleOpenForm()}
-              className="flex items-center gap-2 bg-blue-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-blue-700 transition-colors"
-            >
-              <PlusCircle size={20} />
-              Nova Cobrança
-            </button>
+          <Button onClick={handleSeed} disabled={isSeeding || loading} variant="outline" className="gap-2">
+            {isSeeding ? <Loader2 className="animate-spin" size={20} /> : <DatabaseBackup size={20} />}
+            Popular Dados
+          </Button>
+          <Button onClick={() => handleOpenForm()} className="gap-2">
+            <PlusCircle size={20} />
+            Nova Cobrança
+          </Button>
         </div>
       </div>
 
@@ -169,13 +163,15 @@ export default function CobrancasBancariasPage() {
                 className="w-[160px]"
             />
             {(startVenc || endVenc) && (
-                <button 
-                    onClick={clearDateFilters}
-                    className="p-2 text-gray-500 hover:text-red-500 hover:bg-red-50 rounded-full transition-colors"
-                    title="Limpar datas"
-                >
-                    <X size={18} />
-                </button>
+              <Button
+                onClick={clearDateFilters}
+                variant="ghost"
+                size="icon"
+                title="Limpar datas"
+                className="text-muted-foreground hover:text-destructive"
+              >
+                <X size={18} />
+              </Button>
             )}
         </div>
       </div>

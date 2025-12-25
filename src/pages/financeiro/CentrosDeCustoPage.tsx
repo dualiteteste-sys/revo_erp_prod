@@ -9,6 +9,7 @@ import Modal from '@/components/ui/Modal';
 import CentrosDeCustoTable from '@/components/financeiro/centros-de-custo/CentrosDeCustoTable';
 import CentrosDeCustoFormPanel from '@/components/financeiro/centros-de-custo/CentrosDeCustoFormPanel';
 import Select from '@/components/ui/forms/Select';
+import { Button } from '@/components/ui/button';
 
 const CentrosDeCustoPage: React.FC = () => {
   const {
@@ -117,21 +118,14 @@ const CentrosDeCustoPage: React.FC = () => {
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-3xl font-bold text-gray-800">Centro de Custos</h1>
         <div className="flex items-center gap-2">
-            <button
-              onClick={handleSeed}
-              disabled={isSeeding || loading}
-              className="flex items-center gap-2 bg-gray-100 text-gray-700 font-semibold py-2 px-4 rounded-lg hover:bg-gray-200 transition-colors disabled:opacity-50"
-            >
-              {isSeeding ? <Loader2 className="animate-spin" size={20} /> : <DatabaseBackup size={20} />}
-              Popular Dados
-            </button>
-            <button
-              onClick={() => handleOpenForm()}
-              className="flex items-center gap-2 bg-blue-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-blue-700 transition-colors"
-            >
-              <PlusCircle size={20} />
-              Novo Centro de Custo
-            </button>
+          <Button onClick={handleSeed} disabled={isSeeding || loading} variant="outline" className="gap-2">
+            {isSeeding ? <Loader2 className="animate-spin" size={20} /> : <DatabaseBackup size={20} />}
+            Popular Dados
+          </Button>
+          <Button onClick={() => handleOpenForm()} className="gap-2">
+            <PlusCircle size={20} />
+            Novo Centro de Custo
+          </Button>
         </div>
       </div>
 
