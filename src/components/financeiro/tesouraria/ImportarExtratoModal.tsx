@@ -4,15 +4,17 @@ import TextArea from '@/components/ui/forms/TextArea';
 import { Loader2, UploadCloud, DatabaseBackup } from 'lucide-react';
 import { ImportarExtratoPayload, seedExtratos } from '@/services/treasury';
 import { useToast } from '@/contexts/ToastProvider';
+import { Button } from '@/components/ui/button';
 
 interface Props {
   isOpen: boolean;
   onClose: () => void;
   onImport: (itens: ImportarExtratoPayload[]) => Promise<void>;
   contaCorrenteId: string;
+  onImported?: () => void;
 }
 
-export default function ImportarExtratoModal({ isOpen, onClose, onImport, contaCorrenteId }: Props) {
+export default function ImportarExtratoModal({ isOpen, onClose, onImport, contaCorrenteId, onImported }: Props) {
   const { addToast } = useToast();
   const [csvText, setCsvText] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
@@ -23,9 +25,8 @@ export default function ImportarExtratoModal({ isOpen, onClose, onImport, contaC
     try {
         await seedExtratos(contaCorrenteId);
         addToast('Dados de exemplo importados com sucesso!', 'success');
+        onImported?.();
         onClose();
-        // Force refresh on parent via callback if needed, but import usually triggers refresh
-        window.location.reload(); // Simple reload to refresh everything or pass a refresh callback
     } catch (e: any) {
         addToast(e.message, 'error');
     } finally {
@@ -77,6 +78,7 @@ export default function ImportarExtratoModal({ isOpen, onClose, onImport, contaC
         await onImport(itens);
         addToast(`${itens.length} lançamentos importados.`, 'success');
         setCsvText('');
+        onImported?.();
         onClose();
     } catch (e: any) {
         addToast('Erro ao importar: ' + e.message, 'error');
@@ -106,27 +108,22 @@ export default function ImportarExtratoModal({ isOpen, onClose, onImport, contaC
         />
 
         <div className="flex justify-between items-center pt-4 border-t border-gray-100">
-            <button 
-                onClick={handleSeed} 
-                disabled={isSeeding || isProcessing}
-                className="text-gray-600 hover:text-blue-600 text-sm flex items-center gap-2 disabled:opacity-50"
+            <Button
+              variant="secondary"
+              onClick={handleSeed}
+              disabled={isSeeding || isProcessing}
+              className="gap-2"
             >
-                {isSeeding ? <Loader2 className="animate-spin" size={16} /> : <DatabaseBackup size={16} />}
-                Gerar dados de teste
-            </button>
+              {isSeeding ? <Loader2 className="animate-spin" size={16} /> : <DatabaseBackup size={16} />}
+              Gerar dados de teste
+            </Button>
 
             <div className="flex gap-3">
-                <button onClick={onClose} className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50">
-                    Cancelar
-                </button>
-                <button 
-                    onClick={handleImport} 
-                    disabled={isProcessing}
-                    className="flex items-center gap-2 bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 disabled:opacity-50"
-                >
-                    {isProcessing ? <Loader2 className="animate-spin" size={18} /> : <UploadCloud size={18} />}
-                    Importar
-                </button>
+                <Button variant="outline" onClick={onClose}>Cancelar</Button>
+                <Button onClick={handleImport} disabled={isProcessing} className="gap-2">
+                  {isProcessing ? <Loader2 className="animate-spin" size={18} /> : <UploadCloud size={18} />}
+                  Importar
+                </Button>
             </div>
         </div>
       </div>
