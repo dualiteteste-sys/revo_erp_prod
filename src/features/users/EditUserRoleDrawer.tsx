@@ -7,6 +7,8 @@ import { useToast } from '@/contexts/ToastProvider';
 import { Loader2 } from 'lucide-react';
 import { updateUserRole, deactivateUser, reactivateUser } from '@/services/users';
 import DangerZoneUser from './DangerZoneUser';
+import { useCan } from '@/hooks/useCan';
+import UserPermissionOverrides from './components/UserPermissionOverrides';
 
 type Props = {
   open: boolean;
@@ -27,6 +29,7 @@ export function EditUserRoleDrawer({ open, user, onClose, onUpdate }: Props) {
   const [role, setRole] = useState<UserRole>('READONLY');
   const [loading, setLoading] = useState(false);
   const { addToast } = useToast();
+  const canManageUsers = useCan('usuarios', 'manage');
 
   useEffect(() => {
     if (user) setRole(user.role);
@@ -92,7 +95,12 @@ export function EditUserRoleDrawer({ open, user, onClose, onUpdate }: Props) {
         </div>
         
         <div className="space-y-2">
-          <Select label="Papel do Usuário" value={role} onChange={e => setRole(e.target.value as UserRole)} disabled={isOwner}>
+          <Select
+            label="Papel do Usuário"
+            value={role}
+            onChange={e => setRole(e.target.value as UserRole)}
+            disabled={isOwner || !canManageUsers}
+          >
             {roleOptions.map(opt => (
               <option key={opt.value} value={opt.value} disabled={opt.value === 'OWNER'}>
                 {opt.label}
@@ -100,15 +108,25 @@ export function EditUserRoleDrawer({ open, user, onClose, onUpdate }: Props) {
             ))}
           </Select>
           {isOwner && <p className="text-xs text-orange-600">O papel de Proprietário não pode ser alterado.</p>}
+          {!canManageUsers && (
+            <p className="text-xs text-gray-500">Você não tem permissão para gerenciar usuários.</p>
+          )}
         </div>
 
         <div className="flex justify-end gap-2">
           <Button variant="outline" onClick={onClose}>Cancelar</Button>
-          <Button onClick={handleSave} disabled={loading || role === user.role || isOwner}>
+          <Button onClick={handleSave} disabled={loading || role === user.role || isOwner || !canManageUsers}>
             {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
             Salvar Alterações
           </Button>
         </div>
+
+        {canManageUsers && (
+          <div className="pt-6 border-t border-gray-200">
+            <h3 className="text-base font-semibold text-gray-800 mb-3">Permissões específicas</h3>
+            <UserPermissionOverrides userId={user.user_id} />
+          </div>
+        )}
 
         <DangerZoneUser
           user={user}
