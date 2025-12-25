@@ -21,8 +21,8 @@ interface SidebarProps {
   setIsCollapsed: (isCollapsed: boolean) => void;
   onOpenSettings: () => void;
   onOpenCreateCompanyModal: () => void;
-  activeItem: string;
-  setActiveItem: (name: string) => void;
+  activeItem: string; // href ativo
+  setActiveItem: (href: string) => void;
 }
 
 const Sidebar: React.FC<SidebarProps> = ({ 
@@ -44,22 +44,26 @@ const Sidebar: React.FC<SidebarProps> = ({
     return filterMenuByFeatures(menuConfig, { industria_enabled, servicos_enabled });
   }, [industria_enabled, servicos_enabled, loadingFeatures]);
 
-  const findParentGroup = (itemName: string) => {
-    const parent = visibleMenu.find(group => group.children?.some(child => child.name === itemName));
+  const findParentGroup = (href: string) => {
+    const parent = visibleMenu.find(group => group.children?.some(child => child.href === href));
     return parent ? parent.name : null;
   };
 
   const [openGroup, setOpenGroup] = useState<string | null>(() => findParentGroup(activeItem));
 
-  const handleSetActiveItem = (itemName: string) => {
-    setActiveItem(itemName);
-    const parentName = findParentGroup(itemName);
-    setOpenGroup(parentName);
+  const handleSetActiveItem = (href: string) => {
+    setActiveItem(href);
+    setOpenGroup(findParentGroup(href));
   };
 
   const handleSetOpenGroup = (groupName: string | null) => {
     setOpenGroup(currentOpenGroup => (currentOpenGroup === groupName ? null : groupName));
   };
+
+  React.useEffect(() => {
+    setOpenGroup(findParentGroup(activeItem));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeItem]);
   
   const handleMouseEnterItem = (e: React.MouseEvent, item: MenuItem) => {
     if (timerRef.current) {
@@ -111,7 +115,7 @@ const Sidebar: React.FC<SidebarProps> = ({
       return;
     }
     if (!item.children) {
-      setActiveItem(item.name);
+      if (item.href && item.href !== '#') setActiveItem(item.href);
       setActiveSubmenu(null);
     }
   };

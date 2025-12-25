@@ -175,7 +175,12 @@ test('Serviços: relatórios abrem sem erros de console', async ({ page }) => {
   await page.getByRole('button', { name: 'Entrar' }).click();
   await expect(page).toHaveURL(/\/app\//);
 
-  await page.goto('/app/servicos/relatorios');
+  // Navegação via menu (evita regressão: itens com nomes repetidos, ex. "Relatórios").
+  await page.goto('/app/dashboard');
+  await page.getByRole('button', { name: 'Serviços' }).click();
+  await page.getByRole('link', { name: 'Relatórios' }).click();
+  await expect(page).toHaveURL(/\/app\/servicos\/relatorios/);
+
   await expect(page.getByRole('heading', { name: 'Relatórios de Serviços' })).toBeVisible();
   await expect(page.getByText('Top clientes (por faturamento no período)')).toBeVisible();
   await expect(page.getByText('Lista detalhada')).toBeVisible();

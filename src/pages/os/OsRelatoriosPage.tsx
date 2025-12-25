@@ -11,6 +11,7 @@ import { getOsRelatoriosResumo, listOsRelatorios, type OsRelatoriosListRow, type
 import Pagination from '@/components/ui/Pagination';
 import SearchField from '@/components/ui/forms/SearchField';
 import { useNavigate } from 'react-router-dom';
+import ClientAutocomplete from '@/components/common/ClientAutocomplete';
 
 function formatBRL(value: number) {
   return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value || 0);
@@ -43,6 +44,7 @@ export default function OsRelatoriosPage() {
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<string[] | null>(null);
   const [clienteId, setClienteId] = useState<string | null>(null);
+  const [clienteNome, setClienteNome] = useState<string>('');
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -175,6 +177,7 @@ export default function OsRelatoriosPage() {
         if (!s) return;
         setPage(1);
         setClienteId(null);
+        setClienteNome('');
         setStatusFilter([s]);
       },
     };
@@ -236,6 +239,19 @@ export default function OsRelatoriosPage() {
               }}
               className="w-full max-w-sm"
             />
+            <div className="w-full sm:w-[360px]">
+              <label className="block text-sm font-medium text-gray-700 mb-1">Cliente</label>
+              <ClientAutocomplete
+                value={clienteId}
+                initialName={clienteNome}
+                onChange={(id, name) => {
+                  setPage(1);
+                  setClienteId(id);
+                  setClienteNome(name || '');
+                }}
+                placeholder="Filtrar por cliente..."
+              />
+            </div>
             <div className="flex flex-wrap gap-2">
               {(['orcamento', 'aberta', 'concluida', 'cancelada'] as const).map((s) => {
                 const active = (statusFilter ?? []).includes(s);
@@ -283,6 +299,7 @@ export default function OsRelatoriosPage() {
                 onClick={() => {
                   setPage(1);
                   setClienteId(null);
+                  setClienteNome('');
                   setStatusFilter(null);
                   setSearch('');
                 }}

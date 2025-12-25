@@ -4,7 +4,7 @@ import { MenuItem } from '../../config/menuConfig';
 interface SidebarItemProps {
   item: MenuItem;
   isActive: boolean;
-  onClick: () => void;
+  onClick: (href: string) => void;
 }
 
 const SidebarItem: React.FC<SidebarItemProps> = ({ item, isActive, onClick }) => {
@@ -15,7 +15,7 @@ const SidebarItem: React.FC<SidebarItemProps> = ({ item, isActive, onClick }) =>
         href={item.href}
         onClick={(e) => {
           e.preventDefault();
-          onClick();
+          if (item.href && item.href !== '#') onClick(item.href);
         }}
         className={`flex items-center gap-3 px-4 py-2 rounded-lg text-sm transition-colors duration-200 ${
           isActive

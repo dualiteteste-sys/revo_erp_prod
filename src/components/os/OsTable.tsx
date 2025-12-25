@@ -1,14 +1,23 @@
 import React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { OrdemServico } from '@/services/os';
-import { Edit, Trash2, ArrowUpDown, GripVertical } from 'lucide-react';
+import { Edit, Trash2, ArrowUpDown, GripVertical, MoreHorizontal, CalendarClock, Paperclip, CheckCircle2, XCircle, ClipboardCheck, ArrowUpRight } from 'lucide-react';
 import { Database } from '@/types/database.types';
 import { Droppable, Draggable } from '@hello-pangea/dnd';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 
 interface OsTableProps {
   serviceOrders: OrdemServico[];
   onEdit: (os: OrdemServico) => void;
   onDelete: (os: OrdemServico) => void;
+  onOpenAgenda: () => void;
+  onSetStatus: (os: OrdemServico, next: Database['public']['Enums']['status_os']) => void;
   sortBy: { column: keyof OrdemServico; ascending: boolean };
   onSort: (column: keyof OrdemServico) => void;
 }
@@ -45,7 +54,10 @@ const SortableHeader: React.FC<{
   );
 };
 
-const OsTable: React.FC<OsTableProps> = ({ serviceOrders, onEdit, onDelete, sortBy, onSort }) => {
+const OsTable: React.FC<OsTableProps> = ({ serviceOrders, onEdit, onDelete, onOpenAgenda, onSetStatus, sortBy, onSort }) => {
+  const formatDate = (value?: string | null) => (value ? new Date(value).toLocaleDateString('pt-BR') : '—');
+  const formatTime = (value?: string | null) => (value ? String(value).slice(0, 5) : '');
+
   return (
     <div className="overflow-x-auto">
       <table className="min-w-full divide-y divide-gray-200">
@@ -55,7 +67,7 @@ const OsTable: React.FC<OsTableProps> = ({ serviceOrders, onEdit, onDelete, sort
             <SortableHeader column="numero" label="Nº" sortBy={sortBy} onSort={onSort} />
             <SortableHeader column="cliente_nome" label="Cliente / Descrição" sortBy={sortBy} onSort={onSort} />
             <SortableHeader column="status" label="Status" sortBy={sortBy} onSort={onSort} />
-            <SortableHeader column="data_inicio" label="Data Início" sortBy={sortBy} onSort={onSort} />
+            <SortableHeader column="data_prevista" label="Agendamento" sortBy={sortBy} onSort={onSort} />
             <SortableHeader column="total_geral" label="Total" sortBy={sortBy} onSort={onSort} />
             <th scope="col" className="relative px-6 py-3"><span className="sr-only">Ações</span></th>
           </tr>
@@ -89,18 +101,69 @@ const OsTable: React.FC<OsTableProps> = ({ serviceOrders, onEdit, onDelete, sort
                                             <p className="text-sm text-gray-500 break-words">
                                                 {os.descricao || '-'}
                                             </p>
+                                            {Array.isArray((os as any).anexos) && (os as any).anexos.length ? (
+                                              <div className="mt-1 flex items-center gap-1 text-xs text-gray-500">
+                                                <Paperclip size={14} />
+                                                <span>{(os as any).anexos.length} anexo(s)</span>
+                                              </div>
+                                            ) : null}
                                         </td>
                                         <td className="px-6 py-4 whitespace-nowrap">
                                         <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${statusConfig[os.status].color}`}>
                                             {statusConfig[os.status].label}
                                         </span>
                                         </td>
-                                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{os.data_inicio ? new Date(os.data_inicio).toLocaleDateString('pt-BR') : '-'}</td>
+                                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
+                                          <div className="flex items-center gap-2">
+                                            <div className="p-1.5 rounded-md bg-blue-50 text-blue-700">
+                                              <CalendarClock size={16} />
+                                            </div>
+                                            <div className="leading-tight">
+                                              <div className="font-medium text-gray-800">{formatDate((os as any).data_prevista || (os as any).data_inicio)}</div>
+                                              <div className="text-xs text-gray-500">{formatTime((os as any).hora) || '—'}</div>
+                                            </div>
+                                          </div>
+                                        </td>
                                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 font-semibold">{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(os.total_geral)}</td>
                                         <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                                         <div className="flex items-center justify-end gap-4">
-                                            <button onClick={() => onEdit(os)} className="text-indigo-600 hover:text-indigo-900"><Edit size={18} /></button>
-                                            <button onClick={() => onDelete(os)} className="text-red-600 hover:text-red-900"><Trash2 size={18} /></button>
+                                            <DropdownMenu>
+                                              <DropdownMenuTrigger asChild>
+                                                <button className="text-slate-600 hover:text-slate-800" title="Mais ações">
+                                                  <MoreHorizontal size={18} />
+                                                </button>
+                                              </DropdownMenuTrigger>
+                                              <DropdownMenuContent align="end" sideOffset={6} className="w-56">
+                                                <DropdownMenuItem onClick={() => onEdit(os)} className="gap-2">
+                                                  <ArrowUpRight size={16} />
+                                                  Abrir
+                                                </DropdownMenuItem>
+                                                <DropdownMenuItem onClick={() => onOpenAgenda()} className="gap-2">
+                                                  <CalendarClock size={16} />
+                                                  Abrir Agenda
+                                                </DropdownMenuItem>
+                                                <DropdownMenuSeparator />
+                                                <DropdownMenuItem onClick={() => onSetStatus(os, 'orcamento')} className="gap-2">
+                                                  <ClipboardCheck size={16} />
+                                                  Marcar como Orçamento
+                                                </DropdownMenuItem>
+                                                <DropdownMenuItem onClick={() => onSetStatus(os, 'aberta')} className="gap-2">
+                                                  <ClipboardCheck size={16} />
+                                                  Marcar como Aberta
+                                                </DropdownMenuItem>
+                                                <DropdownMenuItem onClick={() => onSetStatus(os, 'concluida')} className="gap-2">
+                                                  <CheckCircle2 size={16} />
+                                                  Concluir
+                                                </DropdownMenuItem>
+                                                <DropdownMenuItem onClick={() => onSetStatus(os, 'cancelada')} className="gap-2">
+                                                  <XCircle size={16} />
+                                                  Cancelar
+                                                </DropdownMenuItem>
+                                              </DropdownMenuContent>
+                                            </DropdownMenu>
+
+                                            <button onClick={() => onEdit(os)} className="text-indigo-600 hover:text-indigo-900" title="Editar"><Edit size={18} /></button>
+                                            <button onClick={() => onDelete(os)} className="text-red-600 hover:text-red-900" title="Excluir"><Trash2 size={18} /></button>
                                         </div>
                                         </td>
                                     </motion.tr>

@@ -15,7 +15,9 @@ import { Database } from '@/types/database.types';
 import PageHeader from '@/components/ui/PageHeader';
 import SearchField from '@/components/ui/forms/SearchField';
 import { Button } from '@/components/ui/button';
-import { useSearchParams } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useConfirm } from '@/contexts/ConfirmProvider';
+import { setStatus as setOsStatus } from '@/services/osStatus';
 
 const OSPage: React.FC = () => {
   const {
@@ -36,6 +38,8 @@ const OSPage: React.FC = () => {
     reorderOs,
   } = useOs();
   const { addToast } = useToast();
+  const { confirm } = useConfirm();
+  const navigate = useNavigate();
 
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [selectedOs, setSelectedOs] = useState<osService.OrdemServicoDetails | null>(null);
@@ -125,6 +129,38 @@ const OSPage: React.FC = () => {
     }
   };
 
+  const handleSetStatus = async (os: osService.OrdemServico, next: Database['public']['Enums']['status_os']) => {
+    const labelMap: Record<Database['public']['Enums']['status_os'], string> = {
+      orcamento: 'Orçamento',
+      aberta: 'Aberta',
+      concluida: 'Concluída',
+      cancelada: 'Cancelada',
+    };
+
+    const shouldConfirm = next === 'concluida' || next === 'cancelada';
+    if (shouldConfirm) {
+      const ok = await confirm({
+        title: next === 'concluida' ? 'Concluir O.S.' : 'Cancelar O.S.',
+        description:
+          next === 'concluida'
+            ? `Deseja concluir a O.S. nº ${os.numero}?`
+            : `Deseja cancelar a O.S. nº ${os.numero}?`,
+        confirmText: next === 'concluida' ? 'Concluir' : 'Cancelar',
+        cancelText: 'Voltar',
+        variant: next === 'cancelada' ? 'danger' : 'default',
+      });
+      if (!ok) return;
+    }
+
+    try {
+      await setOsStatus(os.id, next);
+      addToast(`Status atualizado para “${labelMap[next]}”.`, 'success');
+      refresh();
+    } catch (e: any) {
+      addToast(e?.message || 'Falha ao atualizar status.', 'error');
+    }
+  };
+
   const handleSort = (column: keyof osService.OrdemServico) => {
     setSortBy(prev => ({
       column,
@@ -154,6 +190,9 @@ const OSPage: React.FC = () => {
         icon={<ClipboardCheck className="w-5 h-5" />}
         actions={
           <>
+            <Button onClick={() => navigate('/app/servicos/relatorios')} variant="outline" className="gap-2">
+              Relatórios
+            </Button>
             <Button onClick={() => setIsKanbanModalOpen(true)} variant="outline" className="gap-2">
               <LayoutGrid size={18} />
               Agenda
@@ -201,7 +240,15 @@ const OSPage: React.FC = () => {
           </div>
         ) : (
           <DragDropContext onDragEnd={onDragEnd}>
-            <OsTable serviceOrders={serviceOrders} onEdit={handleOpenForm} onDelete={handleOpenDeleteModal} sortBy={sortBy} onSort={handleSort} />
+            <OsTable
+              serviceOrders={serviceOrders}
+              onEdit={handleOpenForm}
+              onDelete={handleOpenDeleteModal}
+              onOpenAgenda={() => setIsKanbanModalOpen(true)}
+              onSetStatus={handleSetStatus}
+              sortBy={sortBy}
+              onSort={handleSort}
+            />
           </DragDropContext>
         )}
       </div>
