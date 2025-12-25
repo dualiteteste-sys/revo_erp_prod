@@ -137,7 +137,7 @@ export const menuConfig: { name: string; icon: React.ElementType; href: string; 
       { name: 'Centro de Custos', icon: Landmark, href: '/app/financeiro/centros-de-custo' },
       { name: 'Cobranças Bancárias', icon: Banknote, href: '/app/financeiro/cobrancas' },
       { name: 'Extrato Bancário', icon: FileSpreadsheet, href: '/app/financeiro/extrato' },
-      { name: 'Relatórios', icon: BarChart2, href: '#' },
+      { name: 'Relatórios', icon: BarChart2, href: '/app/financeiro/relatorios' },
     ]
   },
   {

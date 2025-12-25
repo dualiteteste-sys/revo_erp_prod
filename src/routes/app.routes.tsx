@@ -25,6 +25,7 @@ const CentrosDeCustoPage = lazyImport(() => import("../pages/financeiro/CentrosD
 const TesourariaPage = lazyImport(() => import("../pages/financeiro/TesourariaPage"));
 const CobrancasBancariasPage = lazyImport(() => import("../pages/financeiro/CobrancasBancariasPage"));
 const ExtratoPage = lazyImport(() => import("../pages/financeiro/ExtratoPage"));
+const RelatoriosFinanceiroPage = lazyImport(() => import("../pages/financeiro/RelatoriosFinanceiroPage"));
 const CepSearchPage = lazyImport(() => import("../pages/tools/CepSearchPage"));
 const CnpjSearchPage = lazyImport(() => import("../pages/tools/CnpjSearchPage"));
 const NfeInputPage = lazyImport(() => import("../pages/tools/NfeInputPage"));
@@ -151,6 +152,7 @@ export const appRoutes: RouteObject[] = [
             { path: "financeiro/centros-de-custo", element: <Suspense fallback={<PageLoader />}><CentrosDeCustoPage /></Suspense> },
             { path: "financeiro/cobrancas", element: <Suspense fallback={<PageLoader />}><CobrancasBancariasPage /></Suspense> },
             { path: "financeiro/extrato", element: <Suspense fallback={<PageLoader />}><ExtratoPage /></Suspense> },
+            { path: "financeiro/relatorios", element: <Suspense fallback={<PageLoader />}><RelatoriosFinanceiroPage /></Suspense> },
 
             // RH
             { path: "rh/dashboard", element: <Suspense fallback={<PageLoader />}><RHDashboard /></Suspense> },
