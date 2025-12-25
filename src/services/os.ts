@@ -21,6 +21,8 @@ export type OrdemServico = {
   condicao_pagamento: string | null;
   observacoes: string | null;
   observacoes_internas: string | null;
+  anexos?: string[] | null;
+  marcadores?: string[] | null;
   created_at: string;
   updated_at: string;
   ordem: number | null;
@@ -176,9 +178,32 @@ export async function seedDefaultOs(): Promise<OrdemServico[]> {
 // --- Kanban Functions ---
 
 export async function listKanbanOs(): Promise<KanbanOs[]> {
-  return callRpc<KanbanOs[]>('list_kanban_os');
+  return listKanbanOsV2({});
 }
 
 export async function updateOsDataPrevista(osId: string, newDate: string | null): Promise<void> {
   return callRpc('update_os_data_prevista', { p_os_id: osId, p_new_date: newDate });
+}
+
+export async function listKanbanOsV2(params: {
+  search?: string | null;
+  status?: status_os[] | null;
+}): Promise<KanbanOs[]> {
+  try {
+    return await callRpc<KanbanOs[]>('list_kanban_os_v2', {
+      p_search: params.search ?? null,
+      p_status: params.status ?? null,
+    });
+  } catch {
+    // Fallback para legado
+    return callRpc<KanbanOs[]>('list_kanban_os', {});
+  }
+}
+
+export async function setOsStatus(osId: string, next: status_os, extra?: Record<string, unknown> | null): Promise<void> {
+  await callRpc('os_set_status_for_current_user', {
+    p_id: osId,
+    p_next: next,
+    p_extra: extra ?? null,
+  });
 }

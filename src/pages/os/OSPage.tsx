@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { DragDropContext, DropResult } from '@hello-pangea/dnd';
 import { useOs } from '@/hooks/useOs';
 import { useToast } from '@/contexts/ToastProvider';
@@ -15,6 +15,7 @@ import { Database } from '@/types/database.types';
 import PageHeader from '@/components/ui/PageHeader';
 import SearchField from '@/components/ui/forms/SearchField';
 import { Button } from '@/components/ui/button';
+import { useSearchParams } from 'react-router-dom';
 
 const OSPage: React.FC = () => {
   const {
@@ -43,6 +44,31 @@ const OSPage: React.FC = () => {
   const [isDeleting, setIsDeleting] = useState(false);
   const [isFetchingDetails, setIsFetchingDetails] = useState(false);
   const [isKanbanModalOpen, setIsKanbanModalOpen] = useState(false);
+  const [searchParams, setSearchParams] = useSearchParams();
+
+  useEffect(() => {
+    const osId = searchParams.get('osId');
+    if (!osId) return;
+
+    void (async () => {
+      setIsFetchingDetails(true);
+      setIsFormOpen(true);
+      setSelectedOs(null);
+      try {
+        const details = await osService.getOsDetails(osId);
+        setSelectedOs(details);
+      } catch (e: any) {
+        addToast(e?.message || 'Erro ao abrir a O.S.', 'error');
+        setIsFormOpen(false);
+      } finally {
+        setIsFetchingDetails(false);
+        const next = new URLSearchParams(searchParams);
+        next.delete('osId');
+        setSearchParams(next, { replace: true });
+      }
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const handleOpenForm = async (os: osService.OrdemServico | null = null) => {
     if (os?.id) {

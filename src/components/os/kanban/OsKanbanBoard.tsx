@@ -1,10 +1,20 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { DragDropContext, DropResult } from '@hello-pangea/dnd';
-import { listKanbanOs, updateOsDataPrevista, KanbanOs } from '@/services/os';
+import { listKanbanOsV2, setOsStatus, updateOsDataPrevista, KanbanOs, type status_os } from '@/services/os';
 import { useToast } from '@/contexts/ToastProvider';
-import { Loader2 } from 'lucide-react';
+import { Loader2, RefreshCw, Filter } from 'lucide-react';
 import OsKanbanColumn from './OsKanbanColumn';
 import { groupOsByDate, getNewDateForColumn, ColumnId } from './helpers';
+import SearchField from '@/components/ui/forms/SearchField';
+import { Button } from '@/components/ui/button';
+import {
+  DropdownMenu,
+  DropdownMenuCheckboxItem,
+  DropdownMenuContent,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 
 export type KanbanColumn = {
   id: ColumnId;
@@ -14,15 +24,26 @@ export type KanbanColumn = {
 
 export type KanbanColumns = Record<ColumnId, KanbanColumn>;
 
-const OsKanbanBoard: React.FC = () => {
+const DEFAULT_STATUS: status_os[] = ['orcamento', 'aberta'];
+
+const STATUS_LABEL: Record<status_os, string> = {
+  orcamento: 'Orçamento',
+  aberta: 'Aberta',
+  concluida: 'Concluída',
+  cancelada: 'Cancelada',
+};
+
+const OsKanbanBoard: React.FC<{ onOpenOs?: (osId: string) => void }> = ({ onOpenOs }) => {
   const [columns, setColumns] = useState<KanbanColumns | null>(null);
   const [loading, setLoading] = useState(true);
   const { addToast } = useToast();
+  const [search, setSearch] = useState('');
+  const [status, setStatus] = useState<status_os[]>(DEFAULT_STATUS);
 
   const fetchData = useCallback(async () => {
     setLoading(true);
     try {
-      const data = await listKanbanOs();
+      const data = await listKanbanOsV2({ search: search || null, status });
       const groupedData = groupOsByDate(data);
       setColumns(groupedData);
     } catch (error: any) {
@@ -30,7 +51,7 @@ const OsKanbanBoard: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  }, [addToast]);
+  }, [addToast, search, status]);
 
   useEffect(() => {
     fetchData();
@@ -87,10 +108,69 @@ const OsKanbanBoard: React.FC = () => {
 
   return (
     <DragDropContext onDragEnd={onDragEnd}>
-      <div className="flex gap-4 h-full overflow-x-auto p-1">
+      <div className="flex flex-col gap-3 h-full">
+        <div className="flex flex-wrap gap-3 items-end justify-between">
+          <div className="flex flex-wrap gap-3 items-end">
+            <SearchField
+              placeholder="Buscar por nº, cliente ou descrição..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="w-full max-w-sm"
+            />
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" className="gap-2">
+                  <Filter size={16} />
+                  Status
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start" className="w-64">
+                <DropdownMenuLabel>Mostrar no Kanban</DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                {(['orcamento', 'aberta', 'concluida', 'cancelada'] as status_os[]).map((s) => (
+                  <DropdownMenuCheckboxItem
+                    key={s}
+                    checked={status.includes(s)}
+                    onCheckedChange={(checked) => {
+                      setStatus((prev) => {
+                        const next = new Set(prev);
+                        if (checked) next.add(s);
+                        else next.delete(s);
+                        const arr = Array.from(next);
+                        return arr.length ? arr : DEFAULT_STATUS;
+                      });
+                    }}
+                  >
+                    {STATUS_LABEL[s]}
+                  </DropdownMenuCheckboxItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
+          <Button onClick={fetchData} variant="outline" className="gap-2">
+            <RefreshCw size={16} />
+            Atualizar
+          </Button>
+        </div>
+
+        <div className="flex gap-4 flex-1 overflow-x-auto p-1">
         {columns && Object.values(columns).map(col => (
-          <OsKanbanColumn key={col.id} column={col} />
+          <OsKanbanColumn
+            key={col.id}
+            column={col}
+            onOpenOs={onOpenOs}
+            onSetStatus={async (osId, next) => {
+              try {
+                await setOsStatus(osId, next);
+                addToast(`Status atualizado para "${STATUS_LABEL[next]}".`, 'success');
+                await fetchData();
+              } catch (e: any) {
+                addToast(e?.message || 'Falha ao atualizar status.', 'error');
+              }
+            }}
+          />
         ))}
+        </div>
       </div>
     </DragDropContext>
   );

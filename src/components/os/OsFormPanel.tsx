@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Loader2, Save } from 'lucide-react';
+import { Loader2, Save, Paperclip, Plus, Trash2 } from 'lucide-react';
 import { OrdemServicoDetails, saveOs, deleteOsItem, getOsDetails, OsItemSearchResult, addOsItem } from '@/services/os';
 import { getPartnerDetails } from '@/services/partners';
 import { useToast } from '@/contexts/ToastProvider';
@@ -12,6 +12,7 @@ import OsFormItems from './OsFormItems';
 import { useNumericField } from '@/hooks/useNumericField';
 import ClientAutocomplete from '../common/ClientAutocomplete';
 import { Button } from '@/components/ui/button';
+import OsAuditTrailPanel from '@/components/os/OsAuditTrailPanel';
 
 interface OsFormPanelProps {
   os: OrdemServicoDetails | null;
@@ -32,12 +33,14 @@ const OsFormPanel: React.FC<OsFormPanelProps> = ({ os, onSaveSuccess, onClose })
   const [isAddingItem, setIsAddingItem] = useState(false);
   const [formData, setFormData] = useState<Partial<OrdemServicoDetails>>({});
   const [clientName, setClientName] = useState('');
+  const [novoAnexo, setNovoAnexo] = useState('');
 
   const descontoProps = useNumericField(formData.desconto_valor, (value) => handleFormChange('desconto_valor', value));
 
   useEffect(() => {
     if (os) {
       setFormData(os);
+      setNovoAnexo('');
       if (os.cliente_id) {
         getPartnerDetails(os.cliente_id).then(partner => {
           if (partner) setClientName(partner.nome);
@@ -48,6 +51,7 @@ const OsFormPanel: React.FC<OsFormPanelProps> = ({ os, onSaveSuccess, onClose })
     } else {
       setFormData({ status: 'orcamento', desconto_valor: 0, total_itens: 0, total_geral: 0, itens: [] });
       setClientName('');
+      setNovoAnexo('');
     }
   }, [os]);
 
@@ -62,6 +66,23 @@ const OsFormPanel: React.FC<OsFormPanelProps> = ({ os, onSaveSuccess, onClose })
 
   const handleFormChange = (field: keyof OrdemServicoDetails, value: any) => {
     setFormData(prev => ({ ...prev, [field]: value }));
+  };
+
+  const anexos = (formData.anexos || []) as string[];
+
+  const handleAddAnexo = () => {
+    const value = novoAnexo.trim();
+    if (!value) return;
+    if (anexos.includes(value)) {
+      addToast('Este anexo já foi adicionado.', 'warning');
+      return;
+    }
+    handleFormChange('anexos' as any, [...anexos, value]);
+    setNovoAnexo('');
+  };
+
+  const handleRemoveAnexo = (value: string) => {
+    handleFormChange('anexos' as any, anexos.filter((a) => a !== value));
   };
 
   const handleRemoveItem = async (itemId: string) => {
@@ -182,6 +203,50 @@ const OsFormPanel: React.FC<OsFormPanelProps> = ({ os, onSaveSuccess, onClose })
             <TextArea label="Observações Internas" name="observacoes_internas" value={formData.observacoes_internas || ''} onChange={e => handleFormChange('observacoes_internas', e.target.value)} rows={3} className="sm:col-span-3" />
         </Section>
 
+        <Section title="Anexos" description="Links/arquivos relacionados (fotos, PDFs, comprovantes).">
+          <div className="sm:col-span-6 flex gap-2 items-end">
+            <Input
+              label="Adicionar anexo (URL ou caminho)"
+              name="novo_anexo"
+              value={novoAnexo}
+              onChange={(e) => setNovoAnexo(e.target.value)}
+              className="flex-1"
+              startAdornment={<Paperclip size={18} />}
+            />
+            <Button type="button" onClick={handleAddAnexo} className="gap-2">
+              <Plus size={18} />
+              Adicionar
+            </Button>
+          </div>
+          <div className="sm:col-span-6 space-y-2">
+            {anexos.length === 0 ? (
+              <div className="text-sm text-gray-500 py-3">Nenhum anexo adicionado.</div>
+            ) : (
+              anexos.map((a) => (
+                <div key={a} className="flex items-center justify-between gap-3 bg-gray-50 border border-gray-200 rounded-lg px-3 py-2">
+                  <a
+                    href={a}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="text-sm text-blue-700 hover:underline truncate"
+                    title={a}
+                  >
+                    {a}
+                  </a>
+                  <Button type="button" variant="ghost" size="icon" className="text-rose-600 hover:text-rose-700" onClick={() => handleRemoveAnexo(a)}>
+                    <Trash2 size={18} />
+                  </Button>
+                </div>
+              ))
+            )}
+          </div>
+        </Section>
+
+        {formData.id ? (
+          <div className="mt-6">
+            <OsAuditTrailPanel osId={String(formData.id)} />
+          </div>
+        ) : null}
       </div>
 
       <footer className="flex-shrink-0 p-4 flex justify-end items-center border-t border-white/20">

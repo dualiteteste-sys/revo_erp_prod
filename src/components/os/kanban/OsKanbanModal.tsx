@@ -1,6 +1,7 @@
 import React from 'react';
 import Modal from '@/components/ui/Modal';
 import OsKanbanBoard from './OsKanbanBoard';
+import { useNavigate } from 'react-router-dom';
 
 interface OsKanbanModalProps {
   isOpen: boolean;
@@ -8,10 +9,17 @@ interface OsKanbanModalProps {
 }
 
 const OsKanbanModal: React.FC<OsKanbanModalProps> = ({ isOpen, onClose }) => {
+  const navigate = useNavigate();
+
   return (
     <Modal isOpen={isOpen} onClose={onClose} title="Agenda de Ordens de Serviço" size="7xl">
       <div className="p-4 h-full">
-        <OsKanbanBoard />
+        <OsKanbanBoard
+          onOpenOs={(osId) => {
+            onClose();
+            navigate(`/app/ordens-de-servico?osId=${encodeURIComponent(osId)}`);
+          }}
+        />
       </div>
     </Modal>
   );

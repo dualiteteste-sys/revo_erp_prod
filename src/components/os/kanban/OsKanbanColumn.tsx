@@ -2,12 +2,15 @@ import React from 'react';
 import { Droppable } from '@hello-pangea/dnd';
 import OsKanbanCard from './OsKanbanCard';
 import { KanbanColumn } from './OsKanbanBoard';
+import type { status_os } from '@/services/os';
 
 interface OsKanbanColumnProps {
   column: KanbanColumn;
+  onOpenOs?: (osId: string) => void;
+  onSetStatus?: (osId: string, next: status_os) => void | Promise<void>;
 }
 
-const OsKanbanColumn: React.FC<OsKanbanColumnProps> = ({ column }) => {
+const OsKanbanColumn: React.FC<OsKanbanColumnProps> = ({ column, onOpenOs, onSetStatus }) => {
   return (
     <div className="flex flex-col w-80 bg-gray-100/80 rounded-2xl flex-shrink-0 h-full">
       <div className="p-4 border-b border-gray-200">
@@ -21,7 +24,7 @@ const OsKanbanColumn: React.FC<OsKanbanColumnProps> = ({ column }) => {
             className={`flex-1 p-2 overflow-y-auto scrollbar-styled transition-colors ${snapshot.isDraggingOver ? 'bg-blue-50' : ''}`}
           >
             {column.items.map((item, index) => (
-              <OsKanbanCard key={item.id} item={item} index={index} />
+              <OsKanbanCard key={item.id} item={item} index={index} onOpenOs={onOpenOs} onSetStatus={onSetStatus} />
             ))}
             {provided.placeholder}
           </div>
