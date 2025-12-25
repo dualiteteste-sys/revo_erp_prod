@@ -156,6 +156,14 @@ export type TreinamentoPayload = Partial<Omit<TreinamentoDetails, 'participantes
 
 // --- Services ---
 
+export async function setCargoAtivo(id: string, ativo: boolean): Promise<void> {
+  return callRpc('rh_set_cargo_ativo', { p_id: id, p_ativo: ativo });
+}
+
+export async function setColaboradorAtivo(id: string, ativo: boolean): Promise<void> {
+  return callRpc('rh_set_colaborador_ativo', { p_id: id, p_ativo: ativo });
+}
+
 // Cargos
 export async function listCargos(search?: string, ativoOnly?: boolean): Promise<Cargo[]> {
   return callRpc<Cargo[]>('rh_list_cargos', { 

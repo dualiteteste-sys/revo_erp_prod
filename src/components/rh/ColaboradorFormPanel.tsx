@@ -19,6 +19,7 @@ import Select from '@/components/ui/forms/Select';
 import Toggle from '@/components/ui/forms/Toggle';
 import { motion } from 'framer-motion';
 import { Button } from '@/components/ui/button';
+import { listAuditLogsForTables, type AuditLogRow } from '@/services/auditLogs';
 
 interface ColaboradorFormPanelProps {
   colaborador: ColaboradorDetails | null;
@@ -32,13 +33,15 @@ const ColaboradorFormPanel: React.FC<ColaboradorFormPanelProps> = ({ colaborador
   const [formData, setFormData] = useState<ColaboradorPayload>({});
   const [cargos, setCargos] = useState<Cargo[]>([]);
   const [allCompetencias, setAllCompetencias] = useState<Competencia[]>([]);
-  const [activeTab, setActiveTab] = useState<'dados' | 'competencias' | 'treinamentos'>('dados');
+  const [activeTab, setActiveTab] = useState<'dados' | 'competencias' | 'treinamentos' | 'historico'>('dados');
 
   const [mappedCargoId, setMappedCargoId] = useState<string | null>(null);
   const [extraCompetenciaId, setExtraCompetenciaId] = useState<string>('');
 
   const [treinamentos, setTreinamentos] = useState<ColaboradorTreinamento[]>([]);
   const [loadingTreinamentos, setLoadingTreinamentos] = useState(false);
+  const [auditRows, setAuditRows] = useState<AuditLogRow[]>([]);
+  const [loadingAudit, setLoadingAudit] = useState(false);
 
   useEffect(() => {
     const loadData = async () => {
@@ -75,6 +78,26 @@ const ColaboradorFormPanel: React.FC<ColaboradorFormPanelProps> = ({ colaborador
     };
     fetchTreinamentos();
   }, [colaborador?.id, addToast]);
+
+  useEffect(() => {
+    const fetchAudit = async () => {
+      if (activeTab !== 'historico') return;
+      if (!colaborador?.id) {
+        setAuditRows([]);
+        return;
+      }
+      setLoadingAudit(true);
+      try {
+        const data = await listAuditLogsForTables(['rh_colaboradores', 'rh_colaborador_competencias'], 300);
+        setAuditRows(data.filter((r) => r.record_id === colaborador.id));
+      } catch (e: any) {
+        addToast(e?.message || 'Erro ao carregar histórico.', 'error');
+      } finally {
+        setLoadingAudit(false);
+      }
+    };
+    fetchAudit();
+  }, [activeTab, colaborador?.id, addToast]);
 
   useEffect(() => {
     const hydrateCompetenciasFromCargo = async () => {
@@ -190,6 +213,39 @@ const ColaboradorFormPanel: React.FC<ColaboradorFormPanelProps> = ({ colaborador
     return <span className="flex items-center text-red-600 text-xs font-bold"><TrendingDown size={14} className="mr-1" /> Gap: {gap}</span>;
   };
 
+  const labelOperation = (op: AuditLogRow['operation']) => {
+    if (op === 'INSERT') return 'Criado';
+    if (op === 'UPDATE') return 'Atualizado';
+    if (op === 'DELETE') return 'Excluído';
+    return op;
+  };
+
+  const formatChangedFields = (row: AuditLogRow) => {
+    if (row.operation !== 'UPDATE') return '';
+    const oldData = row.old_data || {};
+    const newData = row.new_data || {};
+    const keys = Array.from(
+      new Set([...Object.keys(oldData || {}), ...Object.keys(newData || {})].filter((k) => k !== 'updated_at' && k !== 'created_at'))
+    );
+    const changed = keys.filter((k) => JSON.stringify((oldData as any)[k]) !== JSON.stringify((newData as any)[k]));
+    if (changed.length === 0) return '';
+    const labels: Record<string, string> = {
+      nome: 'Nome',
+      email: 'E-mail',
+      documento: 'Documento',
+      data_admissao: 'Data de admissão',
+      cargo_id: 'Cargo',
+      ativo: 'Status',
+      nivel_atual: 'Nível avaliado',
+      data_avaliacao: 'Data da avaliação',
+      origem: 'Origem',
+    };
+    return changed
+      .slice(0, 4)
+      .map((k) => labels[k] || k)
+      .join(', ');
+  };
+
   return (
     <div className="flex flex-col h-full">
       <div className="border-b border-gray-200 px-6">
@@ -218,6 +274,15 @@ const ColaboradorFormPanel: React.FC<ColaboradorFormPanelProps> = ({ colaborador
             disabled={!colaborador?.id}
           >
             Treinamentos {!colaborador?.id ? '(salve primeiro)' : ''}
+          </Button>
+          <Button
+            onClick={() => setActiveTab('historico')}
+            type="button"
+            variant="ghost"
+            className={`py-4 px-1 border-b-2 font-medium text-sm ${activeTab === 'historico' ? 'border-blue-500 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'}`}
+            disabled={!colaborador?.id}
+          >
+            Histórico {!colaborador?.id ? '(salve primeiro)' : ''}
           </Button>
         </nav>
       </div>
@@ -427,6 +492,64 @@ const ColaboradorFormPanel: React.FC<ColaboradorFormPanelProps> = ({ colaborador
                         <td className="p-3 text-gray-600">
                           {t.eficacia_avaliada ? 'Avaliada' : 'Pendente'}
                         </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        )}
+
+        {activeTab === 'historico' && (
+          <div className="space-y-4">
+            <div className="bg-white border border-gray-200 rounded-lg p-4">
+              <div className="text-sm text-gray-600">
+                Alterações registradas em <span className="font-medium">Colaborador</span> e <span className="font-medium">Competências avaliadas</span>.
+              </div>
+            </div>
+
+            {loadingAudit ? (
+              <div className="flex justify-center items-center h-40">
+                <Loader2 className="animate-spin text-blue-600 w-8 h-8" />
+              </div>
+            ) : auditRows.length === 0 ? (
+              <div className="text-center py-12 text-gray-500">
+                <Minus className="mx-auto h-8 w-8 mb-2 text-gray-300" />
+                <p>Nenhuma alteração registrada para este colaborador.</p>
+              </div>
+            ) : (
+              <div className="overflow-hidden border border-gray-200 rounded-lg bg-white">
+                <table className="min-w-full text-sm">
+                  <thead className="bg-gray-50 text-gray-600">
+                    <tr>
+                      <th className="text-left p-3">Quando</th>
+                      <th className="text-left p-3">Ação</th>
+                      <th className="text-left p-3">Tabela</th>
+                      <th className="text-left p-3">Detalhes</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100">
+                    {auditRows.map((r) => (
+                      <tr key={r.id} className="hover:bg-gray-50">
+                        <td className="p-3 text-gray-600">
+                          {new Date(r.changed_at).toLocaleString('pt-BR')}
+                        </td>
+                        <td className="p-3">
+                          <span
+                            className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
+                              r.operation === 'INSERT'
+                                ? 'bg-green-100 text-green-800'
+                                : r.operation === 'UPDATE'
+                                  ? 'bg-blue-100 text-blue-800'
+                                  : 'bg-gray-100 text-gray-800'
+                            }`}
+                          >
+                            {labelOperation(r.operation)}
+                          </span>
+                        </td>
+                        <td className="p-3 text-gray-600">{r.table_name}</td>
+                        <td className="p-3 text-gray-600">{formatChangedFields(r) || '—'}</td>
                       </tr>
                     ))}
                   </tbody>
