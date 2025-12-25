@@ -36,6 +36,8 @@ const OsFormPanel: React.FC<OsFormPanelProps> = ({ os, onSaveSuccess, onClose })
   const [novoAnexo, setNovoAnexo] = useState('');
 
   const descontoProps = useNumericField(formData.desconto_valor, (value) => handleFormChange('desconto_valor', value));
+  const custoEstimadoProps = useNumericField((formData as any).custo_estimado, (value) => handleFormChange('custo_estimado' as any, value));
+  const custoRealProps = useNumericField((formData as any).custo_real, (value) => handleFormChange('custo_real' as any, value));
 
   useEffect(() => {
     if (os) {
@@ -183,6 +185,11 @@ const OsFormPanel: React.FC<OsFormPanelProps> = ({ os, onSaveSuccess, onClose })
         </Section>
         
         <OsFormItems items={formData.itens || []} onRemoveItem={handleRemoveItem} onAddItem={handleAddItem} isAddingItem={isAddingItem} />
+
+        <Section title="Custos" description="Controle básico de custos para cálculo de margem e relatórios.">
+          <Input label="Custo Estimado (R$)" name="custo_estimado" {...custoEstimadoProps} className="sm:col-span-3" />
+          <Input label="Custo Real (R$)" name="custo_real" {...custoRealProps} className="sm:col-span-3" />
+        </Section>
 
         <Section title="Financeiro" description="Valores e condições de pagamento">
           <div className="sm:col-span-2">

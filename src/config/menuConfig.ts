@@ -122,7 +122,7 @@ export const menuConfig: { name: string; icon: React.ElementType; href: string; 
       { name: 'Contratos', icon: FileText, href: '#' },
       { name: 'Notas de Serviço', icon: Receipt, href: '#' },
       { name: 'Cobranças', icon: Banknote, href: '#' },
-      { name: 'Relatórios', icon: BarChart2, href: '#' },
+      { name: 'Relatórios', icon: BarChart2, href: '/app/servicos/relatorios' },
     ]
   },
   {

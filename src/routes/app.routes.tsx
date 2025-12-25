@@ -19,6 +19,7 @@ const EmbalagensPage = lazyImport(() => import("../pages/cadastros/EmbalagensPag
 const SalesDashboard = lazyImport(() => import("../pages/SalesDashboard"));
 const SalesGoalsPage = lazyImport(() => import("../pages/sales/SalesGoalsPage"));
 const OSPage = lazyImport(() => import("../pages/os/OSPage"));
+const OsRelatoriosPage = lazyImport(() => import("../pages/os/OsRelatoriosPage"));
 const ContasAReceberPage = lazyImport(() => import("../pages/financeiro/ContasAReceberPage"));
 const ContasPagarPage = lazyImport(() => import("../pages/financeiro/ContasPagarPage"));
 const CentrosDeCustoPage = lazyImport(() => import("../pages/financeiro/CentrosDeCustoPage"));
@@ -131,6 +132,7 @@ export const appRoutes: RouteObject[] = [
 
             // Serviços (Módulo)
             { path: "ordens-de-servico", element: <PlanGuard feature="servicos"><Suspense fallback={<PageLoader />}><OSPage /></Suspense></PlanGuard> },
+            { path: "servicos/relatorios", element: <PlanGuard feature="servicos"><Suspense fallback={<PageLoader />}><OsRelatoriosPage /></Suspense></PlanGuard> },
 
             // Suprimentos
             { path: "suprimentos/estoque", element: <Suspense fallback={<PageLoader />}><EstoquePage /></Suspense> },

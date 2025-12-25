@@ -17,6 +17,8 @@ export type OrdemServico = {
   total_itens: number;
   desconto_valor: number;
   total_geral: number;
+  custo_estimado?: number | null;
+  custo_real?: number | null;
   forma_recebimento: string | null;
   condicao_pagamento: string | null;
   observacoes: string | null;
