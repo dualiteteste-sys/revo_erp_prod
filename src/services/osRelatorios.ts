@@ -20,6 +20,7 @@ export type OsRelatoriosFaturamentoMensal = {
   faturamento: number;
   custo_real: number;
   margem: number;
+  recebido?: number;
 };
 
 export type OsRelatoriosResumo = {
@@ -33,6 +34,8 @@ export type OsRelatoriosResumo = {
     faturamento: number;
     custo_real: number;
     margem: number;
+    recebido?: number;
+    a_receber?: number;
   };
   por_status: OsRelatoriosPorStatus[];
   top_clientes: OsRelatoriosTopCliente[];

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useContasAReceber } from '@/hooks/useContasAReceber';
 import { useToast } from '@/contexts/ToastProvider';
 import * as contasAReceberService from '@/services/contasAReceber';
@@ -11,6 +11,7 @@ import ContasAReceberFormPanel from '@/components/financeiro/contas-a-receber/Co
 import ContasAReceberSummary from '@/components/financeiro/contas-a-receber/ContasAReceberSummary';
 import Select from '@/components/ui/forms/Select';
 import { Button } from '@/components/ui/button';
+import { useSearchParams } from 'react-router-dom';
 
 const ContasAReceberPage: React.FC = () => {
   const {
@@ -39,6 +40,31 @@ const ContasAReceberPage: React.FC = () => {
   const [isDeleting, setIsDeleting] = useState(false);
   const [isFetchingDetails, setIsFetchingDetails] = useState(false);
   const [isSeeding, setIsSeeding] = useState(false);
+  const [searchParams, setSearchParams] = useSearchParams();
+
+  useEffect(() => {
+    const contaId = searchParams.get('contaId');
+    if (!contaId) return;
+
+    void (async () => {
+      setIsFetchingDetails(true);
+      setIsFormOpen(true);
+      setSelectedConta(null);
+      try {
+        const details = await contasAReceberService.getContaAReceberDetails(contaId);
+        setSelectedConta(details);
+      } catch (e: any) {
+        addToast(e?.message || 'Erro ao abrir a conta a receber.', 'error');
+        setIsFormOpen(false);
+      } finally {
+        setIsFetchingDetails(false);
+        const next = new URLSearchParams(searchParams);
+        next.delete('contaId');
+        setSearchParams(next, { replace: true });
+      }
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const handleOpenForm = async (conta: contasAReceberService.ContaAReceber | null = null) => {
     if (conta?.id) {

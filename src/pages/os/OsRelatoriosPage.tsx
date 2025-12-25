@@ -117,6 +117,7 @@ export default function OsRelatoriosPage() {
         { name: 'Faturamento', type: 'line', smooth: true, data: mensal.map((m) => m.faturamento), itemStyle: { color: '#10b981' } },
         { name: 'Custo', type: 'line', smooth: true, data: mensal.map((m) => m.custo_real), itemStyle: { color: '#f97316' } },
         { name: 'Margem', type: 'line', smooth: true, data: mensal.map((m) => m.margem), itemStyle: { color: '#3b82f6' } },
+        { name: 'Recebido', type: 'line', smooth: true, data: mensal.map((m) => (m as any).recebido ?? 0), itemStyle: { color: '#8b5cf6' } },
       ],
     };
   }, [mensal]);
@@ -307,7 +308,9 @@ export default function OsRelatoriosPage() {
                 <div>
                   <div className="text-xs text-gray-500">Faturamento (OS concluídas)</div>
                   <div className="text-2xl font-bold text-gray-900">{formatBRL(data.kpis.faturamento)}</div>
-                  <div className="text-xs text-gray-500 mt-1">Margem: {formatBRL(data.kpis.margem)}</div>
+                  <div className="text-xs text-gray-500 mt-1">
+                    Margem: {formatBRL(data.kpis.margem)} • Recebido: {formatBRL((data.kpis as any).recebido ?? 0)}
+                  </div>
                 </div>
                 <div className="p-2 rounded-lg bg-emerald-50 text-emerald-700">
                   <TrendingUp size={20} />

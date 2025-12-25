@@ -129,6 +129,8 @@ test('Serviços: relatórios abrem sem erros de console', async ({ page }) => {
           faturamento: 12500.5,
           custo_real: 6400,
           margem: 6100.5,
+          recebido: 3200,
+          a_receber: 9300.5,
         },
         por_status: [
           { status: 'orcamento', qtd: 4, total: 1000, custo: 0 },
@@ -141,8 +143,8 @@ test('Serviços: relatórios abrem sem erros de console', async ({ page }) => {
           { cliente_id: 'cli-2', cliente_nome: 'Cliente B', qtd: 1, faturamento: 3500.5, custo: 1900 },
         ],
         faturamento_mensal: [
-          { mes: '2025-12', faturamento: 2000, custo_real: 900, margem: 1100 },
-          { mes: '2026-01', faturamento: 10500.5, custo_real: 5500, margem: 5000.5 },
+          { mes: '2025-12', faturamento: 2000, custo_real: 900, margem: 1100, recebido: 500 },
+          { mes: '2026-01', faturamento: 10500.5, custo_real: 5500, margem: 5000.5, recebido: 2700 },
         ],
       },
     });

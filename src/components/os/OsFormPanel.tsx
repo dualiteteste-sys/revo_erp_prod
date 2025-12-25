@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { Loader2, Save, Paperclip, Plus, Trash2 } from 'lucide-react';
+import React, { useEffect, useMemo, useState } from 'react';
+import { FileText, Loader2, Save, Paperclip, Plus, Trash2 } from 'lucide-react';
 import { OrdemServicoDetails, saveOs, deleteOsItem, getOsDetails, OsItemSearchResult, addOsItem } from '@/services/os';
 import { getPartnerDetails } from '@/services/partners';
 import { useToast } from '@/contexts/ToastProvider';
@@ -13,6 +13,9 @@ import { useNumericField } from '@/hooks/useNumericField';
 import ClientAutocomplete from '../common/ClientAutocomplete';
 import { Button } from '@/components/ui/button';
 import OsAuditTrailPanel from '@/components/os/OsAuditTrailPanel';
+import { createContaAReceberFromOs, getContaAReceberFromOs } from '@/services/contasAReceber';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { useNavigate } from 'react-router-dom';
 
 interface OsFormPanelProps {
   os: OrdemServicoDetails | null;
@@ -29,11 +32,16 @@ const statusOptions: { value: Database['public']['Enums']['status_os']; label: s
 
 const OsFormPanel: React.FC<OsFormPanelProps> = ({ os, onSaveSuccess, onClose }) => {
   const { addToast } = useToast();
+  const navigate = useNavigate();
   const [isSaving, setIsSaving] = useState(false);
   const [isAddingItem, setIsAddingItem] = useState(false);
   const [formData, setFormData] = useState<Partial<OrdemServicoDetails>>({});
   const [clientName, setClientName] = useState('');
   const [novoAnexo, setNovoAnexo] = useState('');
+  const [contaReceberId, setContaReceberId] = useState<string | null>(null);
+  const [isContaDialogOpen, setIsContaDialogOpen] = useState(false);
+  const [contaVencimento, setContaVencimento] = useState<string>('');
+  const [isCreatingConta, setIsCreatingConta] = useState(false);
 
   const descontoProps = useNumericField(formData.desconto_valor, (value) => handleFormChange('desconto_valor', value));
   const custoEstimadoProps = useNumericField((formData as any).custo_estimado, (value) => handleFormChange('custo_estimado' as any, value));
@@ -43,6 +51,8 @@ const OsFormPanel: React.FC<OsFormPanelProps> = ({ os, onSaveSuccess, onClose })
     if (os) {
       setFormData(os);
       setNovoAnexo('');
+      setContaReceberId(null);
+      setContaVencimento('');
       if (os.cliente_id) {
         getPartnerDetails(os.cliente_id).then(partner => {
           if (partner) setClientName(partner.nome);
@@ -54,8 +64,58 @@ const OsFormPanel: React.FC<OsFormPanelProps> = ({ os, onSaveSuccess, onClose })
       setFormData({ status: 'orcamento', desconto_valor: 0, total_itens: 0, total_geral: 0, itens: [] });
       setClientName('');
       setNovoAnexo('');
+      setContaReceberId(null);
+      setContaVencimento('');
     }
   }, [os]);
+
+  useEffect(() => {
+    const osId = formData.id ? String(formData.id) : null;
+    if (!osId) return;
+
+    void (async () => {
+      const id = await getContaAReceberFromOs(osId);
+      setContaReceberId(id);
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [formData.id]);
+
+  const statusOs = (formData.status as any) as Database['public']['Enums']['status_os'] | undefined;
+  const canGenerateConta = !!formData.id && statusOs === 'concluida';
+
+  const defaultVencimento = useMemo(() => {
+    const d = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+    return d.toISOString().slice(0, 10);
+  }, []);
+
+  const handleOpenContaDialog = () => {
+    setContaVencimento(contaVencimento || defaultVencimento);
+    setIsContaDialogOpen(true);
+  };
+
+  const handleCreateConta = async () => {
+    if (!formData.id) return;
+    setIsCreatingConta(true);
+    try {
+      const conta = await createContaAReceberFromOs({
+        osId: String(formData.id),
+        dataVencimento: contaVencimento || null,
+      });
+      setContaReceberId(conta.id);
+      addToast('Conta a receber gerada com sucesso!', 'success');
+      setIsContaDialogOpen(false);
+      navigate(`/app/financeiro/contas-a-receber?contaId=${encodeURIComponent(conta.id)}`);
+    } catch (e: any) {
+      addToast(e?.message || 'Erro ao gerar conta a receber.', 'error');
+    } finally {
+      setIsCreatingConta(false);
+    }
+  };
+
+  const handleOpenConta = () => {
+    if (!contaReceberId) return;
+    navigate(`/app/financeiro/contas-a-receber?contaId=${encodeURIComponent(contaReceberId)}`);
+  };
 
   const refreshOsData = async (osId: string) => {
     try {
@@ -203,6 +263,27 @@ const OsFormPanel: React.FC<OsFormPanelProps> = ({ os, onSaveSuccess, onClose })
           </div>
           <Input label="Forma de Recebimento" name="forma_recebimento" value={formData.forma_recebimento || ''} onChange={e => handleFormChange('forma_recebimento', e.target.value)} className="sm:col-span-3" />
           <Input label="Condição de Pagamento" name="condicao_pagamento" value={formData.condicao_pagamento || ''} onChange={e => handleFormChange('condicao_pagamento', e.target.value)} className="sm:col-span-3" />
+
+          {canGenerateConta ? (
+            <div className="sm:col-span-6 flex flex-wrap items-center justify-between gap-2 mt-2">
+              <div className="text-xs text-gray-500">
+                Gere uma conta a receber vinculada à OS concluída (evita duplicidade).
+              </div>
+              <div className="flex gap-2">
+                {contaReceberId ? (
+                  <Button type="button" variant="outline" onClick={handleOpenConta} className="gap-2">
+                    <FileText size={18} />
+                    Abrir Conta a Receber
+                  </Button>
+                ) : (
+                  <Button type="button" onClick={handleOpenContaDialog} className="gap-2">
+                    <FileText size={18} />
+                    Gerar Conta a Receber
+                  </Button>
+                )}
+              </div>
+            </div>
+          ) : null}
         </Section>
 
         <Section title="Observações" description="Detalhes adicionais e anotações internas">
@@ -267,6 +348,37 @@ const OsFormPanel: React.FC<OsFormPanelProps> = ({ os, onSaveSuccess, onClose })
           </Button>
         </div>
       </footer>
+
+      <Dialog open={isContaDialogOpen} onOpenChange={setIsContaDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Gerar Conta a Receber</DialogTitle>
+            <DialogDescription>
+              Cria uma conta a receber vinculada a esta OS. Se já existir uma conta vinculada, o sistema retorna a existente.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="mt-2">
+            <Input
+              label="Data de vencimento"
+              name="conta_vencimento"
+              type="date"
+              value={contaVencimento}
+              onChange={(e) => setContaVencimento(e.target.value)}
+            />
+          </div>
+
+          <div className="mt-6 flex justify-end gap-2">
+            <Button type="button" variant="outline" onClick={() => setIsContaDialogOpen(false)}>
+              Cancelar
+            </Button>
+            <Button type="button" onClick={handleCreateConta} disabled={isCreatingConta} className="gap-2">
+              {isCreatingConta ? <Loader2 className="animate-spin" size={18} /> : <FileText size={18} />}
+              Gerar
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
