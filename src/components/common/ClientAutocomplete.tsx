@@ -5,6 +5,7 @@ import { Loader2 } from 'lucide-react';
 import Modal from '@/components/ui/Modal';
 import PartnerFormPanel from '@/components/partners/PartnerFormPanel';
 import { useToast } from '@/contexts/ToastProvider';
+import { logger } from '@/lib/logger';
 
 type Props = {
   value: string | null;
@@ -62,7 +63,8 @@ export default function ClientAutocomplete({ value, onChange, placeholder, disab
         setHits(res);
         setOpen(true);
       } catch (e) {
-        console.error('[RPC][ERROR] search_clients_for_current_user', e);
+        const msg = e instanceof Error ? e.message : String(e);
+        logger.warn('[RPC][ERROR] search_clients_for_current_user', { error: msg });
       } finally {
         setLoading(false);
       }

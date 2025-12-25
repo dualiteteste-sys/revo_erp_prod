@@ -4,7 +4,7 @@ import { Loader2, Lock } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
 interface FeatureGuardProps {
-  feature: 'revo_send_enabled';
+  feature: 'revo_send_enabled' | 'nfe_emissao_enabled';
   children: React.ReactNode;
 }
 
@@ -46,6 +46,7 @@ const FeatureGuard: React.FC<FeatureGuardProps> = ({ feature, children }) => {
 
   const featureNameMap = {
     revo_send_enabled: 'REVO Send',
+    nfe_emissao_enabled: 'Emissão de NF-e',
   };
 
   if (flags[feature]) {

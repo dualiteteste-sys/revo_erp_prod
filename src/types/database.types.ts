@@ -248,6 +248,7 @@ export interface Database {
           empresa_id: string
           user_id: string
           role: string
+          role_id: string | null
           created_at: string
           is_principal?: boolean | null
         }
@@ -255,6 +256,7 @@ export interface Database {
           empresa_id: string
           user_id: string
           role?: string
+          role_id?: string | null
           created_at?: string
           is_principal?: boolean | null
         }
@@ -262,6 +264,7 @@ export interface Database {
           empresa_id?: string
           user_id?: string
           role?: string
+          role_id?: string | null
           created_at?: string
           is_principal?: boolean | null
         }
@@ -863,12 +866,18 @@ export interface Database {
           doc_unico: string | null
           email: string | null
           telefone: string | null
+          celular: string | null
+          site: string | null
           inscr_estadual: string | null
           isento_ie: boolean | null
           inscr_municipal: string | null
           observacoes: string | null
+          limite_credito: number | null
+          condicao_pagamento: string | null
+          informacoes_bancarias: string | null
           created_at: string
           updated_at: string
+          deleted_at: string | null
           pessoa_search: any
           tipo_pessoa: Database["public"]["Enums"]["tipo_pessoa_enum"]
           fantasia: string | null
@@ -884,12 +893,18 @@ export interface Database {
           doc_unico?: string | null
           email?: string | null
           telefone?: string | null
+          celular?: string | null
+          site?: string | null
           inscr_estadual?: string | null
           isento_ie?: boolean | null
           inscr_municipal?: string | null
           observacoes?: string | null
+          limite_credito?: number | null
+          condicao_pagamento?: string | null
+          informacoes_bancarias?: string | null
           created_at?: string
           updated_at?: string
+          deleted_at?: string | null
           tipo_pessoa?: Database["public"]["Enums"]["tipo_pessoa_enum"]
           fantasia?: string | null
           codigo_externo?: string | null
@@ -904,17 +919,121 @@ export interface Database {
           doc_unico?: string | null
           email?: string | null
           telefone?: string | null
+          celular?: string | null
+          site?: string | null
           inscr_estadual?: string | null
           isento_ie?: boolean | null
           inscr_municipal?: string | null
           observacoes?: string | null
+          limite_credito?: number | null
+          condicao_pagamento?: string | null
+          informacoes_bancarias?: string | null
           created_at?: string
           updated_at?: string
+          deleted_at?: string | null
           tipo_pessoa?: Database["public"]["Enums"]["tipo_pessoa_enum"]
           fantasia?: string | null
           codigo_externo?: string | null
           contribuinte_icms?: Database["public"]["Enums"]["contribuinte_icms_enum"]
           contato_tags?: string[] | null
+        }
+      }
+      permissions: {
+        Row: {
+          id: string
+          module: string
+          action: string
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          module: string
+          action: string
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          module?: string
+          action?: string
+          created_at?: string
+          updated_at?: string
+        }
+      }
+      role_permissions: {
+        Row: {
+          role_id: string
+          permission_id: string
+          allow: boolean
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          role_id: string
+          permission_id: string
+          allow?: boolean
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          role_id?: string
+          permission_id?: string
+          allow?: boolean
+          created_at?: string
+          updated_at?: string
+        }
+      }
+      roles: {
+        Row: {
+          id: string
+          slug: string
+          name: string
+          precedence: number
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          slug: string
+          name: string
+          precedence?: number
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          slug?: string
+          name?: string
+          precedence?: number
+          created_at?: string
+          updated_at?: string
+        }
+      }
+      user_permission_overrides: {
+        Row: {
+          empresa_id: string
+          user_id: string
+          permission_id: string
+          allow: boolean
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          empresa_id: string
+          user_id: string
+          permission_id: string
+          allow: boolean
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          empresa_id?: string
+          user_id?: string
+          permission_id?: string
+          allow?: boolean
+          created_at?: string
+          updated_at?: string
         }
       }
       user_active_empresa: {

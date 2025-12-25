@@ -277,6 +277,8 @@ test('Beneficiamento: criar OB e gerar operações na Execução', async ({ page
         tipo_ordem: 'beneficiamento',
         produto_final_id: 'prod-1',
         produto_nome: 'Parafuso M6',
+        bom_aplicado_id: bomAplicada ? 'bom-1' : null,
+        bom_aplicado_desc: bomAplicada ? 'FT-PARAF-M6 (v1)' : null,
         quantidade_planejada: 5,
         unidade: 'un',
         cliente_id: 'cli-1',
@@ -444,6 +446,7 @@ test('Beneficiamento: criar OB e gerar operações na Execução', async ({ page
   await page.getByRole('button', { name: 'Substituir' }).click();
   await page.getByRole('button', { name: 'Aplicar', exact: true }).click();
   await expect(bomHeading).toBeHidden();
+  await expect(page.getByText('FT-PARAF-M6 (v1)')).toBeVisible();
   await expect(page.getByText('Parafuso bruto (cliente)')).toBeVisible();
 
   // 3) Gerar operações e ir para Execução

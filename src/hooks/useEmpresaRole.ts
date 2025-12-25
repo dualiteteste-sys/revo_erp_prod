@@ -37,24 +37,41 @@ export function useEmpresaRole() {
         .eq('user_id', userId)
         .maybeSingle();
 
+      const normalize = (value: unknown): EmpresaRole | null => {
+        const normalized = (String(value || '').toLowerCase() || '') as EmpresaRole;
+        return normalized in precedence ? normalized : null;
+      };
+
+      const roleText = normalize((row as any)?.role);
+      const roleSlug = normalize((row as any)?.roles?.slug);
+
+      const pickBest = (a: EmpresaRole | null, b: EmpresaRole | null) => {
+        if (!a && !b) return null;
+        if (!a) return b;
+        if (!b) return a;
+        return precedence[b] > precedence[a] ? b : a;
+      };
+
+      // Fallback: RPC current_empresa_role() (útil quando o schema/cache de join está inconsistênte).
+      // Isso ajuda a evitar situações onde um usuário "owner/admin" fica bloqueado por erro transitório de schema.
+      const tryRpcFallback = async (): Promise<EmpresaRole | null> => {
+        const { data, error: rpcError } = await supabase.rpc('current_empresa_role');
+        if (rpcError) {
+          logger.warn('[RBAC] Falha ao carregar role via RPC current_empresa_role()', rpcError, { activeEmpresaId, userId });
+          return null;
+        }
+        return normalize(data);
+      };
+
       if (rowError) {
-        logger.warn('[RBAC] Falha ao carregar role da empresa', rowError, { activeEmpresaId, userId });
-        return null;
+        logger.warn('[RBAC] Falha ao carregar role da empresa (join)', rowError, { activeEmpresaId, userId });
+        return await tryRpcFallback();
       }
 
-      const roleText = (row as any)?.role as string | null | undefined;
-      const roleSlug = (row as any)?.roles?.slug as string | null | undefined;
+      const bestFromJoin = pickBest(roleText, roleSlug);
+      if (bestFromJoin) return bestFromJoin;
 
-      const normalizedText = (roleText || '').toLowerCase() as EmpresaRole;
-      const normalizedSlug = (roleSlug || '').toLowerCase() as EmpresaRole;
-
-      const fromText = normalizedText in precedence ? normalizedText : null;
-      const fromSlug = normalizedSlug in precedence ? normalizedSlug : null;
-
-      if (!fromText && !fromSlug) return null;
-      if (!fromText) return fromSlug;
-      if (!fromSlug) return fromText;
-      return precedence[fromSlug] > precedence[fromText] ? fromSlug : fromText;
+      return await tryRpcFallback();
     },
   });
 }

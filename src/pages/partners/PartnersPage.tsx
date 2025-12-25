@@ -1,8 +1,8 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { usePartners } from '../../hooks/usePartners';
 import { useToast } from '../../contexts/ToastProvider';
 import * as partnersService from '../../services/partners';
-import { Loader2, PlusCircle, Search, Users2, DatabaseBackup } from 'lucide-react';
+import { Loader2, Search, Users2, DatabaseBackup, UsersRound, Plus } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
 import Pagination from '../../components/ui/Pagination';
 import ConfirmationModal from '../../components/ui/ConfirmationModal';
@@ -10,6 +10,9 @@ import Modal from '../../components/ui/Modal';
 import PartnersTable from '../../components/partners/PartnersTable';
 import PartnerFormPanel from '../../components/partners/PartnerFormPanel';
 import Select from '@/components/ui/forms/Select';
+import PageHeader from '@/components/ui/PageHeader';
+import { Button } from '@/components/ui/button';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 
 const PartnersPage: React.FC = () => {
   const {
@@ -21,10 +24,12 @@ const PartnersPage: React.FC = () => {
     pageSize,
     searchTerm,
     filterType,
+    statusFilter,
     sortBy,
     setPage,
     setSearchTerm,
     setFilterType,
+    setStatusFilter,
     setSortBy,
     refresh,
   } = usePartners();
@@ -32,13 +37,18 @@ const PartnersPage: React.FC = () => {
 
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [selectedPartner, setSelectedPartner] = useState<partnersService.PartnerDetails | null>(null);
+  const [initialFormValues, setInitialFormValues] = useState<Partial<partnersService.PartnerDetails> | undefined>(undefined);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [partnerToDelete, setPartnerToDelete] = useState<partnersService.PartnerListItem | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
   const [isFetchingDetails, setIsFetchingDetails] = useState(false);
   const [isSeeding, setIsSeeding] = useState(false);
 
-  const handleOpenForm = async (partner: partnersService.PartnerListItem | null = null) => {
+  const handleOpenForm = async (
+    partner: partnersService.PartnerListItem | null = null,
+    initialValues?: Partial<partnersService.PartnerDetails>
+  ) => {
+    setInitialFormValues(initialValues);
     if (partner?.id) {
       setIsFetchingDetails(true);
       setIsFormOpen(true);
@@ -61,6 +71,7 @@ const PartnersPage: React.FC = () => {
   const handleCloseForm = () => {
     setIsFormOpen(false);
     setSelectedPartner(null);
+    setInitialFormValues(undefined);
   };
 
   const queryClient = useQueryClient();
@@ -86,13 +97,23 @@ const PartnersPage: React.FC = () => {
     setIsDeleting(true);
     try {
       await partnersService.deletePartner(partnerToDelete.id);
-      addToast('Registro excluído com sucesso!', 'success');
+      addToast('Registro inativado com sucesso!', 'success');
       refresh();
       handleCloseDeleteModal();
     } catch (e: any) {
       addToast(e.message || 'Erro ao excluir.', 'error');
     } finally {
       setIsDeleting(false);
+    }
+  };
+
+  const handleRestore = async (partner: partnersService.PartnerListItem) => {
+    try {
+      await partnersService.restorePartner(partner.id);
+      addToast('Registro reativado com sucesso!', 'success');
+      refresh();
+    } catch (e: any) {
+      addToast(e.message || 'Erro ao reativar.', 'error');
     }
   };
 
@@ -116,27 +137,53 @@ const PartnersPage: React.FC = () => {
     }
   };
 
+  const headerActions = useMemo(() => {
+    return (
+      <>
+        <Button onClick={handleSeedPartners} disabled={isSeeding || loading} variant="secondary">
+          {isSeeding ? <Loader2 className="animate-spin" size={18} /> : <DatabaseBackup size={18} />}
+          <span className="ml-2">Popular dados</span>
+        </Button>
+
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button>
+              <Plus size={18} />
+              <span className="ml-2">Novo</span>
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <DropdownMenuItem onClick={() => handleOpenForm(null, { tipo: 'cliente' })}>
+              Novo cliente
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => handleOpenForm(null, { tipo: 'fornecedor' })}>
+              Novo fornecedor
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => handleOpenForm(null, { tipo: 'ambos' })}>
+              Cliente e fornecedor
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </>
+    );
+  }, [handleSeedPartners, handleOpenForm, isSeeding, loading]);
+
+  const formTitle = useMemo(() => {
+    if (selectedPartner) return 'Editar Cliente/Fornecedor';
+    if (initialFormValues?.tipo === 'fornecedor') return 'Novo Fornecedor';
+    if (initialFormValues?.tipo === 'ambos') return 'Novo Cliente/Fornecedor';
+    return 'Novo Cliente';
+  }, [initialFormValues?.tipo, selectedPartner]);
+
   return (
     <div className="p-1">
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-3xl font-bold text-gray-800">Clientes e Fornecedores</h1>
-        <div className="flex items-center gap-2">
-          <button
-            onClick={handleSeedPartners}
-            disabled={isSeeding || loading}
-            className="flex items-center gap-2 bg-gray-100 text-gray-700 font-semibold py-2 px-4 rounded-lg hover:bg-gray-200 transition-colors disabled:opacity-50"
-          >
-            {isSeeding ? <Loader2 className="animate-spin" size={20} /> : <DatabaseBackup size={20} />}
-            Popular Dados
-          </button>
-          <button
-            onClick={() => handleOpenForm()}
-            className="flex items-center gap-2 bg-blue-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-blue-700 transition-colors"
-          >
-            <PlusCircle size={20} />
-            Novo Cliente/Fornecedor
-          </button>
-        </div>
+      <div className="mb-6">
+        <PageHeader
+          title="Clientes e Fornecedores"
+          description="Cadastre e gerencie clientes, fornecedores e perfis que são ambos."
+          icon={<UsersRound size={20} />}
+          actions={headerActions}
+        />
       </div>
 
       <div className="mb-4 flex gap-4">
@@ -160,6 +207,15 @@ const PartnersPage: React.FC = () => {
           <option value="fornecedor">Fornecedor</option>
           <option value="ambos">Ambos</option>
         </Select>
+        <Select
+          value={statusFilter || 'active'}
+          onChange={(e) => setStatusFilter((e.target.value as any) || 'active')}
+          className="min-w-[220px]"
+        >
+          <option value="active">Apenas ativos</option>
+          <option value="inactive">Apenas inativos</option>
+          <option value="all">Ativos e inativos</option>
+        </Select>
       </div>
 
       <div className="bg-white rounded-lg shadow overflow-hidden">
@@ -175,17 +231,20 @@ const PartnersPage: React.FC = () => {
             <p className="font-semibold text-lg">Nenhum cliente ou fornecedor encontrado.</p>
             <p className="text-sm mb-4">Comece cadastrando um novo parceiro ou popule com dados de exemplo.</p>
             {searchTerm && <p className="text-sm">Tente ajustar sua busca.</p>}
-            <button
-              onClick={handleSeedPartners}
-              disabled={isSeeding}
-              className="mt-4 flex items-center gap-2 bg-blue-100 text-blue-700 font-bold py-2 px-4 rounded-lg hover:bg-blue-200 transition-colors disabled:opacity-50"
-            >
-              {isSeeding ? <Loader2 className="animate-spin" size={20} /> : <DatabaseBackup size={20} />}
-              Popular com 10 parceiros padrão
-            </button>
+            <Button onClick={handleSeedPartners} disabled={isSeeding} variant="secondary" className="mt-4">
+              {isSeeding ? <Loader2 className="animate-spin" size={18} /> : <DatabaseBackup size={18} />}
+              <span className="ml-2">Popular com dados de exemplo</span>
+            </Button>
           </div>
         ) : (
-          <PartnersTable partners={partners} onEdit={handleOpenForm} onDelete={handleOpenDeleteModal} sortBy={sortBy} onSort={handleSort} />
+          <PartnersTable
+            partners={partners}
+            onEdit={handleOpenForm}
+            onDelete={handleOpenDeleteModal}
+            onRestore={handleRestore}
+            sortBy={sortBy}
+            onSort={handleSort}
+          />
         )}
       </div>
 
@@ -193,13 +252,18 @@ const PartnersPage: React.FC = () => {
         <Pagination currentPage={page} totalCount={count} pageSize={pageSize} onPageChange={setPage} />
       )}
 
-      <Modal isOpen={isFormOpen} onClose={handleCloseForm} title={selectedPartner ? 'Editar Cliente/Fornecedor' : 'Novo Cliente/Fornecedor'}>
+      <Modal isOpen={isFormOpen} onClose={handleCloseForm} title={formTitle}>
         {isFetchingDetails ? (
           <div className="flex items-center justify-center h-full min-h-[500px]">
             <Loader2 className="animate-spin text-blue-600" size={48} />
           </div>
         ) : (
-          <PartnerFormPanel partner={selectedPartner} onSaveSuccess={handleSaveSuccess} onClose={handleCloseForm} />
+          <PartnerFormPanel
+            partner={selectedPartner}
+            initialValues={initialFormValues}
+            onSaveSuccess={handleSaveSuccess}
+            onClose={handleCloseForm}
+          />
         )}
       </Modal>
 
@@ -207,9 +271,9 @@ const PartnersPage: React.FC = () => {
         isOpen={isDeleteModalOpen}
         onClose={handleCloseDeleteModal}
         onConfirm={handleDelete}
-        title="Confirmar Exclusão"
-        description={`Tem certeza que deseja excluir "${partnerToDelete?.nome}"? Esta ação não pode ser desfeita.`}
-        confirmText="Sim, Excluir"
+        title="Confirmar Inativação"
+        description={`Tem certeza que deseja inativar "${partnerToDelete?.nome}"? Você pode reativar depois, se necessário.`}
+        confirmText="Sim, Inativar"
         isLoading={isDeleting}
         variant="danger"
       />

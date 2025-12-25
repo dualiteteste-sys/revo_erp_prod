@@ -1,4 +1,5 @@
 import { callRpc } from '@/lib/api';
+import { logger } from '@/lib/logger';
 import { Database } from '@/types/database.types';
 
 export type PartnerListItem = {
@@ -6,6 +7,9 @@ export type PartnerListItem = {
   nome: string;
   tipo: Database['public']['Enums']['pessoa_tipo'];
   doc_unico: string | null;
+  email: string | null;
+  telefone: string | null;
+  deleted_at: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -17,9 +21,12 @@ export type Pessoa = Database['public']['Tables']['pessoas']['Row'] & {
   limite_credito?: number | null;
   condicao_pagamento?: string | null;
   informacoes_bancarias?: string | null;
+  deleted_at?: string | null;
 };
 
 export type PartnerPessoa = Partial<Pessoa>;
+
+export type PartnerStatusFilter = 'active' | 'inactive' | 'all';
 
 // New types based on OpenAPI spec
 export type EnderecoPayload = {
@@ -58,7 +65,7 @@ export type PartnerDetails = Pessoa & {
 export type ClientHit = { id: string; label: string; nome: string; doc_unico: string | null };
 
 export async function savePartner(payload: PartnerPayload): Promise<PartnerDetails> {
-  console.log('[SERVICE][SAVE_PARTNER]', payload);
+  logger.debug('[SERVICE][SAVE_PARTNER]', { payload });
   try {
     // Explicitly build the pessoa object to ensure all fields are present
     const pessoaPayload: PartnerPessoa = {
@@ -82,7 +89,7 @@ export async function savePartner(payload: PartnerPayload): Promise<PartnerDetai
     const data = await callRpc<PartnerDetails>('create_update_partner', { p_payload: cleanedPayload });
     return data;
   } catch (error: any) {
-    console.error('[SERVICE][SAVE_PARTNER][ERROR]', error);
+    logger.error('[SERVICE][SAVE_PARTNER][ERROR]', error, { payload });
     if (error.message && (
       error.message.includes('ux_pessoas_empresa_id_doc_unico') ||
       error.message.includes('idx_pessoas_empresa_id_doc_unico_not_null')
@@ -98,33 +105,58 @@ export async function getPartners(options: {
   pageSize: number;
   searchTerm: string;
   filterType: string | null;
+  statusFilter?: PartnerStatusFilter;
   sortBy: { column: keyof PartnerListItem; ascending: boolean };
 }): Promise<{ data: PartnerListItem[]; count: number }> {
-  const { page, pageSize, searchTerm, filterType, sortBy } = options;
+  const { page, pageSize, searchTerm, filterType, statusFilter = 'active', sortBy } = options;
   const offset = (page - 1) * pageSize;
   const orderString = `${sortBy.column} ${sortBy.ascending ? 'asc' : 'desc'}`;
 
   try {
-    const count = await callRpc<number>('count_partners', {
-      p_q: searchTerm || null,
-      p_tipo: (filterType as Database['public']['Enums']['pessoa_tipo']) || null,
-    });
+    const orderByAllowed: Array<keyof PartnerListItem> = ['nome', 'created_at', 'updated_at', 'doc_unico'];
+    const v2OrderBy: keyof PartnerListItem = orderByAllowed.includes(sortBy.column) ? sortBy.column : 'nome';
+    const v2OrderDir = sortBy.ascending ? 'asc' : 'desc';
 
-    if (Number(count) === 0) {
-      return { data: [], count: 0 };
+    try {
+      const countV2 = await callRpc<number>('count_partners_v2', {
+        p_search: searchTerm || null,
+        p_tipo: (filterType as Database['public']['Enums']['pessoa_tipo']) || null,
+        p_status: statusFilter,
+      });
+
+      if (Number(countV2) === 0) return { data: [], count: 0 };
+
+      const dataV2 = await callRpc<PartnerListItem[]>('list_partners_v2', {
+        p_search: searchTerm || null,
+        p_tipo: (filterType as Database['public']['Enums']['pessoa_tipo']) || null,
+        p_status: statusFilter,
+        p_limit: pageSize,
+        p_offset: offset,
+        p_order_by: v2OrderBy,
+        p_order_dir: v2OrderDir,
+      });
+
+      return { data: dataV2 ?? [], count: Number(countV2) };
+    } catch (errorV2) {
+      const countLegacy = await callRpc<number>('count_partners', {
+        p_q: searchTerm || null,
+        p_tipo: (filterType as Database['public']['Enums']['pessoa_tipo']) || null,
+      });
+
+      if (Number(countLegacy) === 0) return { data: [], count: 0 };
+
+      const dataLegacy = await callRpc<PartnerListItem[]>('list_partners', {
+        p_limit: pageSize,
+        p_offset: offset,
+        p_q: searchTerm || null,
+        p_tipo: (filterType as Database['public']['Enums']['pessoa_tipo']) || null,
+        p_order: orderString,
+      });
+
+      return { data: dataLegacy ?? [], count: Number(countLegacy) };
     }
-
-    const data = await callRpc<PartnerListItem[]>('list_partners', {
-      p_limit: pageSize,
-      p_offset: offset,
-      p_q: searchTerm || null,
-      p_tipo: (filterType as Database['public']['Enums']['pessoa_tipo']) || null,
-      p_order: orderString,
-    });
-
-    return { data: data ?? [], count: Number(count) };
   } catch (error) {
-    console.error('[SERVICE][GET_PARTNERS]', error);
+    logger.error('[SERVICE][GET_PARTNERS]', error, { options });
     throw new Error('Não foi possível listar os registros.');
   }
 }
@@ -141,7 +173,7 @@ export async function getPartnerDetails(id: string): Promise<PartnerDetails | nu
     }
     return data || null;
   } catch (error) {
-    console.error('[SERVICE][GET_PARTNER_DETAILS]', error);
+    logger.error('[SERVICE][GET_PARTNER_DETAILS]', error, { id });
     throw new Error('Erro ao buscar detalhes do registro.');
   }
 }
@@ -150,19 +182,8 @@ export async function deletePartner(id: string): Promise<void> {
   try {
     await callRpc('delete_partner', { p_id: id });
   } catch (error: any) {
-    console.error('[SERVICE][DELETE_PARTNER]', error);
+    logger.error('[SERVICE][DELETE_PARTNER]', error, { id });
     const msg = String(error?.message || '');
-
-    if (
-      /HTTP_409/i.test(msg) &&
-      (/recebimentos_cliente_fkey/i.test(msg) || /on table \"recebimentos\"/i.test(msg))
-    ) {
-      throw new Error(
-        'Não é possível excluir este cliente porque ele está vinculado a um ou mais recebimentos. ' +
-          'Para manter o histórico do sistema, a exclusão é bloqueada. ' +
-          'Sugestão: edite o cliente e marque como inativo.'
-      );
-    }
 
     if (/HTTP_409/i.test(msg) && /violates foreign key constraint/i.test(msg)) {
       throw new Error(
@@ -175,8 +196,18 @@ export async function deletePartner(id: string): Promise<void> {
   }
 }
 
+export async function restorePartner(id: string): Promise<void> {
+  try {
+    await callRpc('restore_partner', { p_id: id });
+  } catch (error: any) {
+    logger.error('[SERVICE][RESTORE_PARTNER]', error, { id });
+    const msg = String(error?.message || '');
+    throw new Error(msg || 'Erro ao reativar o registro.');
+  }
+}
+
 export async function seedDefaultPartners(): Promise<Pessoa[]> {
-  console.log('[RPC] seed_partners_for_current_user');
+  logger.debug('[RPC] seed_partners_for_current_user');
   return callRpc<Pessoa[]>('seed_partners_for_current_user');
 }
 

@@ -86,6 +86,15 @@ export const handlers = [
         ]);
     }),
 
+    http.get(`${supabaseUrl}/rest/v1/empresa_features`, ({ request }) => {
+        console.log('[MSW] GET empresa_features', request.url);
+        return HttpResponse.json({
+            empresa_id: 'empresa-1',
+            revo_send_enabled: false,
+            nfe_emissao_enabled: false,
+        });
+    }),
+
     // Auth endpoints
     http.post(`${supabaseUrl}/auth/v1/token`, ({ request }) => {
         console.log('[MSW] POST token', request.url);

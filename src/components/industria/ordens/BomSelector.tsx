@@ -18,7 +18,7 @@ interface Props {
   tipoOrdem: 'producao' | 'beneficiamento';
   openOnMount?: boolean;
   disabled?: boolean;
-  onApplied: (bom: BomListItem) => void;
+  onApplied: (bom: BomListItem, ordemId: string) => void;
   onEnsureOrder?: () => Promise<string | null>;
 }
 
@@ -101,7 +101,7 @@ export default function BomSelector({ ordemId, produtoId, tipoOrdem, openOnMount
       }
       addToast('BOM aplicada com sucesso!', 'success');
       setIsOpen(false);
-      onApplied(selectedBom);
+      onApplied(selectedBom, currentId);
     } catch (e: any) {
       addToast(e.message, 'error');
     } finally {

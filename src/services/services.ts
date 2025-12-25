@@ -23,22 +23,48 @@ export type ListServicesParams = {
   offset?: number;
   limit?: number;
   search?: string | null;
+  status?: Service['status'] | null;
   orderBy?: string | null;   // ex: 'descricao'
   orderDir?: 'asc' | 'desc' | null;
 };
 
 /** Lista serviços paginados do tenant atual */
 export async function listServices(params: ListServicesParams = {}): Promise<Service[]> {
-  const { offset = 0, limit = 25, search = null, orderBy = null, orderDir = 'asc' } = params;
+  const { offset = 0, limit = 25, search = null, status = null, orderBy = null, orderDir = 'asc' } = params;
 
-  // Os nomes aqui devem bater com a assinatura da RPC no banco
-  return callRpc<Service[]>('list_services_for_current_user', {
-    p_offset: offset,
-    p_limit: limit,
-    p_search: search && search.trim() ? search : null,
-    p_order_by: orderBy,
-    p_order_dir: orderDir,
-  });
+  // Preferir v2 (com filtro e contagem real). Fallback para legado se a função não existir.
+  try {
+    return await callRpc<Service[]>('list_services_for_current_user_v2', {
+      p_offset: offset,
+      p_limit: limit,
+      p_search: search && search.trim() ? search : null,
+      p_status: status || null,
+      p_order_by: orderBy,
+      p_order_dir: orderDir,
+    });
+  } catch {
+    return callRpc<Service[]>('list_services_for_current_user', {
+      p_offset: offset,
+      p_limit: limit,
+      p_search: search && search.trim() ? search : null,
+      p_order_by: orderBy,
+      p_order_dir: orderDir,
+    });
+  }
+}
+
+export async function countServices(params: Pick<ListServicesParams, 'search' | 'status'> = {}): Promise<number> {
+  const { search = null, status = null } = params;
+  try {
+    const count = await callRpc<number>('count_services_for_current_user', {
+      p_search: search && search.trim() ? search : null,
+      p_status: status || null,
+    });
+    return Number(count) || 0;
+  } catch {
+    // Sem RPC de contagem: o frontend pode estimar.
+    return -1;
+  }
 }
 
 /** Busca um serviço por ID (escopo da empresa atual) */

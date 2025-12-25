@@ -1,4 +1,4 @@
-import { Building, Users, UserCog, CreditCard, Trash2, ShieldCheck } from 'lucide-react';
+import { Building, Users, UserCog, CreditCard, Trash2, ShieldCheck, Receipt } from 'lucide-react';
 
 export interface SettingsTab {
   name: string;
@@ -46,7 +46,9 @@ export const settingsMenuConfig: SettingsTab[] = [
   },
   {
     name: 'Notas Fiscais',
-    menu: [],
+    menu: [
+      { name: 'NF-e (Emissão)', icon: Receipt },
+    ],
   },
   {
     name: 'Financeiro',

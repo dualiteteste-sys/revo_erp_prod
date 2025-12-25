@@ -12,6 +12,7 @@ export const useServices = () => {
 
   const [searchTerm, setSearchTerm] = useState('');
   const debouncedSearchTerm = useDebounce(searchTerm, 500);
+  const [statusFilter, setStatusFilter] = useState<'ativo' | 'inativo' | null>(null);
 
   const [page, setPage] = useState(1);
   const [pageSize] = useState(15);
@@ -30,17 +31,23 @@ export const useServices = () => {
     setLoading(true);
     setError(null);
     try {
+      const total = await servicesService.countServices({ search: debouncedSearchTerm, status: statusFilter });
       const data = await servicesService.listServices({
         offset: (page - 1) * pageSize,
         limit: pageSize,
         search: debouncedSearchTerm,
+        status: statusFilter,
         orderBy: sortBy.column,
         orderDir: sortBy.ascending ? 'asc' : 'desc',
       });
       setServices(data);
-      // A RPC de listagem não retorna contagem, então fazemos uma estimativa
-      const newCount = data.length < pageSize ? (page - 1) * pageSize + data.length : (page * pageSize) + 1;
-      setCount(newCount);
+      // Se a contagem não estiver disponível, volta para estimativa.
+      if (total >= 0) {
+        setCount(total);
+      } else {
+        const newCount = data.length < pageSize ? (page - 1) * pageSize + data.length : (page * pageSize) + 1;
+        setCount(newCount);
+      }
     } catch (e: any) {
       setError(e.message);
       setServices([]);
@@ -48,7 +55,7 @@ export const useServices = () => {
     } finally {
       setLoading(false);
     }
-  }, [page, pageSize, debouncedSearchTerm, sortBy, activeEmpresa]);
+  }, [page, pageSize, debouncedSearchTerm, sortBy, activeEmpresa, statusFilter]);
 
   useEffect(() => {
     fetchServices();
@@ -66,9 +73,11 @@ export const useServices = () => {
     page,
     pageSize,
     searchTerm,
+    statusFilter,
     sortBy,
     setPage,
     setSearchTerm,
+    setStatusFilter,
     setSortBy,
     refresh,
   };

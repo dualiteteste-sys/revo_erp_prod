@@ -8,6 +8,7 @@ import AddressSection from './form-sections/AddressSection';
 import AdditionalContactsSection from './form-sections/AdditionalContactsSection';
 import FinancialSection from './form-sections/FinancialSection';
 import { Pessoa } from '../../services/partners';
+import { Button } from '@/components/ui/button';
 
 interface PartnerFormPanelProps {
   partner: PartnerDetails | null;
@@ -16,10 +17,13 @@ interface PartnerFormPanelProps {
   onClose: () => void;
 }
 
+type PartnerFormTab = 'identificacao' | 'endereco' | 'contato' | 'financeiro' | 'contatos';
+
 const PartnerFormPanel: React.FC<PartnerFormPanelProps> = ({ partner, initialValues, onSaveSuccess, onClose }) => {
   const { addToast } = useToast();
   const [isSaving, setIsSaving] = useState(false);
   const [formData, setFormData] = useState<Partial<PartnerDetails>>({});
+  const [activeTab, setActiveTab] = useState<PartnerFormTab>('identificacao');
 
   useEffect(() => {
     if (partner) {
@@ -44,6 +48,7 @@ const PartnerFormPanel: React.FC<PartnerFormPanelProps> = ({ partner, initialVal
         contatos: merged.contatos || [],
       });
     }
+    setActiveTab('identificacao');
   }, [partner, initialValues]);
 
   const handlePessoaChange = (field: keyof Pessoa, value: any) => {
@@ -100,37 +105,71 @@ const PartnerFormPanel: React.FC<PartnerFormPanelProps> = ({ partner, initialVal
 
   return (
     <div className="flex flex-col h-full">
+      <div className="flex-shrink-0 px-6 pt-6">
+        <div className="flex flex-wrap gap-2">
+          <Button
+            type="button"
+            variant={activeTab === 'identificacao' ? 'default' : 'secondary'}
+            onClick={() => setActiveTab('identificacao')}
+          >
+            Identificação
+          </Button>
+          <Button
+            type="button"
+            variant={activeTab === 'endereco' ? 'default' : 'secondary'}
+            onClick={() => setActiveTab('endereco')}
+          >
+            Endereço
+          </Button>
+          <Button
+            type="button"
+            variant={activeTab === 'contato' ? 'default' : 'secondary'}
+            onClick={() => setActiveTab('contato')}
+          >
+            Contato
+          </Button>
+          <Button
+            type="button"
+            variant={activeTab === 'financeiro' ? 'default' : 'secondary'}
+            onClick={() => setActiveTab('financeiro')}
+          >
+            Financeiro
+          </Button>
+          <Button
+            type="button"
+            variant={activeTab === 'contatos' ? 'default' : 'secondary'}
+            onClick={() => setActiveTab('contatos')}
+          >
+            Contatos adicionais
+          </Button>
+        </div>
+      </div>
+
       <div className="flex-grow p-6 overflow-y-auto scrollbar-styled">
-        <IdentificationSection
-          data={formData}
-          onChange={handlePessoaChange}
-          onCnpjDataFetched={handleCnpjDataFetched}
-        />
-        <AddressSection
-          enderecos={formData.enderecos || []}
-          onEnderecosChange={handleEnderecosChange}
-        />
-        <ContactSection
-          data={formData}
-          onPessoaChange={handlePessoaChange}
-        />
-        <FinancialSection
-          data={formData}
-          onChange={handlePessoaChange}
-        />
-        <AdditionalContactsSection
-          contatos={formData.contatos || []}
-          onContatosChange={handleContatosChange}
-        />
+        {activeTab === 'identificacao' ? (
+          <IdentificationSection data={formData} onChange={handlePessoaChange} onCnpjDataFetched={handleCnpjDataFetched} />
+        ) : null}
+        {activeTab === 'endereco' ? (
+          <AddressSection enderecos={formData.enderecos || []} onEnderecosChange={handleEnderecosChange} />
+        ) : null}
+        {activeTab === 'contato' ? (
+          <ContactSection data={formData} onPessoaChange={handlePessoaChange} />
+        ) : null}
+        {activeTab === 'financeiro' ? (
+          <FinancialSection data={formData} onChange={handlePessoaChange} />
+        ) : null}
+        {activeTab === 'contatos' ? (
+          <AdditionalContactsSection contatos={formData.contatos || []} onContatosChange={handleContatosChange} />
+        ) : null}
       </div>
 
       <footer className="flex-shrink-0 p-4 flex justify-end items-center border-t border-white/20">
         <div className="flex gap-3">
-          <button type="button" onClick={onClose} className="rounded-md border border-gray-300 bg-white py-2 px-4 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50">Cancelar</button>
-          <button onClick={handleSave} disabled={isSaving} className="flex items-center gap-2 bg-blue-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50">
-            {isSaving ? <Loader2 className="animate-spin" size={20} /> : <Save size={20} />}
-            Salvar
-          </button>
+          <Button type="button" variant="outline" onClick={onClose}>Cancelar</Button>
+          <Button type="button" onClick={handleSave} disabled={isSaving}>
+            {isSaving ? <Loader2 className="animate-spin" size={18} /> : <Save size={18} />}
+            <span className="ml-2">Salvar</span>
+          </Button>
         </div>
       </footer>
     </div>
