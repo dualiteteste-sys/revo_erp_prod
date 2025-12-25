@@ -12,7 +12,7 @@ import MovimentacaoFormPanel from '@/components/financeiro/tesouraria/Movimentac
 import ExtratosTable from '@/components/financeiro/tesouraria/ExtratosTable';
 import ImportarExtratoModal from '@/components/financeiro/tesouraria/ImportarExtratoModal';
 import ConciliacaoDrawer from '@/components/financeiro/tesouraria/ConciliacaoDrawer';
-import { ContaCorrente, Movimentacao, ExtratoItem, deleteContaCorrente, deleteMovimentacao, importarExtrato, conciliarExtrato, desconciliarExtrato } from '@/services/treasury';
+import { ContaCorrente, Movimentacao, ExtratoItem, deleteContaCorrente, deleteMovimentacao, importarExtrato, conciliarExtrato, desconciliarExtrato, setContaCorrentePadrao } from '@/services/treasury';
 import ConfirmationModal from '@/components/ui/ConfirmationModal';
 import DatePicker from '@/components/ui/DatePicker';
 import Toggle from '@/components/ui/forms/Toggle';
@@ -83,6 +83,26 @@ export default function TesourariaPage() {
       setContaToDelete(null);
     } catch (e: any) {
       addToast(e.message, 'error');
+    }
+  };
+
+  const handleSetPadrao = async (conta: ContaCorrente, para: 'pagamentos' | 'recebimentos') => {
+    const label = para === 'pagamentos' ? 'Pagamentos' : 'Recebimentos';
+    const ok = await confirm({
+      title: `Definir padrão para ${label}`,
+      description: `Deseja definir "${conta.nome}" como conta padrão para ${label.toLowerCase()}?`,
+      confirmText: 'Definir como padrão',
+      cancelText: 'Cancelar',
+      variant: 'default',
+    });
+    if (!ok) return;
+
+    try {
+      await setContaCorrentePadrao({ id: conta.id, para });
+      addToast(`Conta padrão de ${label.toLowerCase()} atualizada.`, 'success');
+      refreshContas();
+    } catch (e: any) {
+      addToast(e?.message || 'Erro ao definir padrão.', 'error');
     }
   };
 
@@ -210,6 +230,7 @@ export default function TesourariaPage() {
                         contas={contas} 
                         onEdit={handleEditConta} 
                         onDelete={setContaToDelete} 
+                        onSetPadrao={handleSetPadrao}
                     />
                 )}
             </div>

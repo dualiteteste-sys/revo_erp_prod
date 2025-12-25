@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { BarChart3, CalendarDays, Loader2, RefreshCw, TrendingDown, TrendingUp, Wallet } from 'lucide-react';
+import { BarChart3, CalendarDays, FileText, Loader2, RefreshCw, TrendingDown, TrendingUp, Wallet } from 'lucide-react';
 import ReactECharts from 'echarts-for-react';
 
 import PageHeader from '@/components/ui/PageHeader';
@@ -8,6 +8,7 @@ import Input from '@/components/ui/forms/Input';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/contexts/ToastProvider';
 import { getFinanceiroRelatoriosResumo, type FinanceiroRelatoriosResumo } from '@/services/financeiroRelatorios';
+import { useNavigate } from 'react-router-dom';
 
 function formatBRL(value: number) {
   return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value || 0);
@@ -21,6 +22,7 @@ function toDateOrNull(value: string): Date | null {
 
 export default function RelatoriosFinanceiroPage() {
   const { addToast } = useToast();
+  const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [startDate, setStartDate] = useState<string>('');
   const [endDate, setEndDate] = useState<string>('');
@@ -111,10 +113,28 @@ export default function RelatoriosFinanceiroPage() {
         description="Visão consolidada de caixa, contas a receber e a pagar."
         icon={<BarChart3 className="w-5 h-5" />}
         actions={
-          <Button onClick={fetchData} variant="outline" className="gap-2">
-            <RefreshCw size={16} />
-            Atualizar
-          </Button>
+          <div className="flex flex-wrap gap-2">
+            <Button onClick={() => navigate('/app/financeiro/tesouraria')} variant="outline" className="gap-2">
+              <Wallet size={16} />
+              Tesouraria
+            </Button>
+            <Button onClick={() => navigate('/app/financeiro/contas-a-receber')} variant="outline" className="gap-2">
+              <TrendingUp size={16} />
+              Contas a Receber
+            </Button>
+            <Button onClick={() => navigate('/app/financeiro/contas-a-pagar')} variant="outline" className="gap-2">
+              <TrendingDown size={16} />
+              Contas a Pagar
+            </Button>
+            <Button onClick={() => navigate('/app/servicos/relatorios')} variant="outline" className="gap-2">
+              <FileText size={16} />
+              Relatórios de Serviços
+            </Button>
+            <Button onClick={fetchData} variant="outline" className="gap-2">
+              <RefreshCw size={16} />
+              Atualizar
+            </Button>
+          </div>
         }
       />
 
@@ -151,7 +171,7 @@ export default function RelatoriosFinanceiroPage() {
       ) : (
         <>
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-            <GlassCard className="p-5">
+            <GlassCard className="p-5 cursor-pointer" onClick={() => navigate('/app/financeiro/tesouraria')}>
               <div className="flex items-start justify-between gap-3">
                 <div>
                   <div className="text-xs text-gray-500">Saldo total (Caixa)</div>
@@ -164,7 +184,7 @@ export default function RelatoriosFinanceiroPage() {
               </div>
             </GlassCard>
 
-            <GlassCard className="p-5">
+            <GlassCard className="p-5 cursor-pointer" onClick={() => navigate('/app/financeiro/contas-a-receber')}>
               <div className="flex items-start justify-between gap-3">
                 <div>
                   <div className="text-xs text-gray-500">A Receber (pendente)</div>
@@ -179,7 +199,7 @@ export default function RelatoriosFinanceiroPage() {
               </div>
             </GlassCard>
 
-            <GlassCard className="p-5">
+            <GlassCard className="p-5 cursor-pointer" onClick={() => navigate('/app/financeiro/contas-a-pagar')}>
               <div className="flex items-start justify-between gap-3">
                 <div>
                   <div className="text-xs text-gray-500">A Pagar (aberta)</div>
@@ -211,4 +231,3 @@ export default function RelatoriosFinanceiroPage() {
     </div>
   );
 }
-

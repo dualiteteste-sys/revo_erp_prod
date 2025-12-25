@@ -1,11 +1,13 @@
 import React from 'react';
 import { ContaCorrente } from '@/services/treasury';
-import { Edit, Trash2, Wallet, Landmark, CreditCard } from 'lucide-react';
+import { Edit, Trash2, Wallet, Landmark, CreditCard, ArrowDownToLine, ArrowUpFromLine } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 
 interface Props {
   contas: ContaCorrente[];
   onEdit: (conta: ContaCorrente) => void;
   onDelete: (conta: ContaCorrente) => void;
+  onSetPadrao: (conta: ContaCorrente, para: 'pagamentos' | 'recebimentos') => void;
 }
 
 const getIcon = (tipo: string) => {
@@ -24,6 +26,7 @@ export default function ContasCorrentesTable({ contas, onEdit, onDelete }: Props
           <tr>
             <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Nome / Banco</th>
             <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Agência / Conta</th>
+            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Padrões</th>
             <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Saldo Atual</th>
             <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase">Status</th>
             <th className="px-6 py-3"></th>
@@ -51,6 +54,46 @@ export default function ContasCorrentesTable({ contas, onEdit, onDelete }: Props
                     </>
                 )}
               </td>
+              <td className="px-6 py-4">
+                <div className="flex flex-wrap items-center gap-2">
+                  {conta.padrao_para_recebimentos ? (
+                    <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700">
+                      <ArrowDownToLine size={14} />
+                      Recebimentos
+                    </span>
+                  ) : (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="gap-1"
+                      onClick={() => onSetPadrao(conta, 'recebimentos')}
+                      title="Definir como padrão para recebimentos"
+                    >
+                      <ArrowDownToLine size={14} />
+                      Padrão receb.
+                    </Button>
+                  )}
+                  {conta.padrao_para_pagamentos ? (
+                    <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-semibold bg-orange-50 text-orange-700">
+                      <ArrowUpFromLine size={14} />
+                      Pagamentos
+                    </span>
+                  ) : (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="gap-1"
+                      onClick={() => onSetPadrao(conta, 'pagamentos')}
+                      title="Definir como padrão para pagamentos"
+                    >
+                      <ArrowUpFromLine size={14} />
+                      Padrão pag.
+                    </Button>
+                  )}
+                </div>
+              </td>
               <td className="px-6 py-4 text-right">
                 <span className={`font-semibold ${conta.saldo_atual && conta.saldo_atual < 0 ? 'text-red-600' : 'text-green-600'}`}>
                   {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: conta.moeda }).format(conta.saldo_atual || 0)}
@@ -75,7 +118,7 @@ export default function ContasCorrentesTable({ contas, onEdit, onDelete }: Props
           ))}
           {contas.length === 0 && (
             <tr>
-              <td colSpan={5} className="px-6 py-12 text-center text-gray-500">Nenhuma conta cadastrada.</td>
+              <td colSpan={6} className="px-6 py-12 text-center text-gray-500">Nenhuma conta cadastrada.</td>
             </tr>
           )}
         </tbody>

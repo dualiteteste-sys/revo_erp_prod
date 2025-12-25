@@ -42,26 +42,32 @@ export async function listContasAReceber(options: {
     pageSize: number;
     searchTerm: string;
     status: string | null;
+    startDate?: Date | null;
+    endDate?: Date | null;
     sortBy: { column: string; ascending: boolean };
 }): Promise<{ data: ContaAReceber[]; count: number }> {
-    const { page, pageSize, searchTerm, status, sortBy } = options;
+    const { page, pageSize, searchTerm, status, sortBy, startDate, endDate } = options;
     const offset = (page - 1) * pageSize;
     
     try {
-        const count = await callRpc<number>('count_contas_a_receber', {
+        const count = await callRpc<number>('count_contas_a_receber_v2', {
             p_q: searchTerm || null,
             p_status: status as any || null,
+            p_start_date: startDate ? startDate.toISOString().split('T')[0] : null,
+            p_end_date: endDate ? endDate.toISOString().split('T')[0] : null,
         });
 
         if (Number(count) === 0) {
             return { data: [], count: 0 };
         }
 
-        const data = await callRpc<ContaAReceber[]>('list_contas_a_receber', {
+        const data = await callRpc<ContaAReceber[]>('list_contas_a_receber_v2', {
             p_limit: pageSize,
             p_offset: offset,
             p_q: searchTerm || null,
             p_status: status as any || null,
+            p_start_date: startDate ? startDate.toISOString().split('T')[0] : null,
+            p_end_date: endDate ? endDate.toISOString().split('T')[0] : null,
             p_order_by: sortBy.column,
             p_order_dir: sortBy.ascending ? 'asc' : 'desc',
         });
@@ -117,9 +123,12 @@ export async function deleteContaAReceber(id: string): Promise<void> {
     }
 }
 
-export async function getContasAReceberSummary(): Promise<ContasAReceberSummary> {
+export async function getContasAReceberSummary(startDate?: Date | null, endDate?: Date | null): Promise<ContasAReceberSummary> {
     try {
-        const result = await callRpc<ContasAReceberSummary[]>('get_contas_a_receber_summary', {});
+        const result = await callRpc<ContasAReceberSummary[]>('get_contas_a_receber_summary_v2', {
+          p_start_date: startDate ? startDate.toISOString().split('T')[0] : null,
+          p_end_date: endDate ? endDate.toISOString().split('T')[0] : null,
+        });
         return result[0] || { total_pendente: 0, total_pago_mes: 0, total_vencido: 0 };
     } catch (error) {
         console.error('[SERVICE][GET_CONTAS_A_RECEBER_SUMMARY]', error);

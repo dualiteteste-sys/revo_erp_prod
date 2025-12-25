@@ -19,6 +19,8 @@ export const useContasAReceber = () => {
     const debouncedSearchTerm = useDebounce(searchTerm, 500);
 
     const [filterStatus, setFilterStatus] = useState<string | null>(null);
+    const [filterStartDate, setFilterStartDate] = useState<Date | null>(null);
+    const [filterEndDate, setFilterEndDate] = useState<Date | null>(null);
     const [page, setPage] = useState(1);
     const [pageSize] = useState(15);
 
@@ -42,9 +44,11 @@ export const useContasAReceber = () => {
                     pageSize,
                     searchTerm: debouncedSearchTerm,
                     status: filterStatus,
+                    startDate: filterStartDate,
+                    endDate: filterEndDate,
                     sortBy,
                 }),
-                contasAReceberService.getContasAReceberSummary(),
+                contasAReceberService.getContasAReceberSummary(filterStartDate, filterEndDate),
             ]);
             setContas(data);
             setCount(count);
@@ -56,7 +60,7 @@ export const useContasAReceber = () => {
         } finally {
             setLoading(false);
         }
-    }, [page, pageSize, debouncedSearchTerm, filterStatus, sortBy, activeEmpresa]);
+    }, [page, pageSize, debouncedSearchTerm, filterStatus, filterStartDate, filterEndDate, sortBy, activeEmpresa]);
 
     useEffect(() => {
         fetchContas();
@@ -76,10 +80,14 @@ export const useContasAReceber = () => {
         pageSize,
         searchTerm,
         filterStatus,
+        filterStartDate,
+        filterEndDate,
         sortBy,
         setPage,
         setSearchTerm,
         setFilterStatus,
+        setFilterStartDate,
+        setFilterEndDate,
         setSortBy,
         refresh,
     };
