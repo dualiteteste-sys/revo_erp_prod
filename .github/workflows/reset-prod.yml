@@ -1,0 +1,69 @@
+name: Reset PROD (Destrutivo)
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: "Digite RESETAR-PROD para confirmar o reset destrutivo do schema public"
+        required: true
+        type: string
+
+jobs:
+  reset-prod:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    environment:
+      name: production
+
+    env:
+      SUPABASE_DB_URL_PROD: ${{ secrets.SUPABASE_DB_URL_PROD }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Safety check
+        run: |
+          set -euo pipefail
+          if [[ "${{ inputs.confirm }}" != "RESETAR-PROD" ]]; then
+            echo "::error::Confirmação inválida. Digite RESETAR-PROD para prosseguir."
+            exit 1
+          fi
+          if [[ -z "${SUPABASE_DB_URL_PROD:-}" ]]; then
+            echo "::error::SUPABASE_DB_URL_PROD não está configurado nos secrets."
+            exit 1
+          fi
+
+      - name: Install PostgreSQL client (psql)
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y postgresql-client
+
+      - name: Install Supabase CLI
+        uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Reset schema public on PROD (DESTRUCTIVE)
+        run: |
+          set -euo pipefail
+          psql "$SUPABASE_DB_URL_PROD" -v ON_ERROR_STOP=1 -X -f scripts/reset_prod.sql
+
+      - name: Apply all migrations to PROD
+        run: |
+          set -euo pipefail
+          echo "y" | supabase db push --include-all --db-url "$SUPABASE_DB_URL_PROD"
+
+      - name: Snapshot current schema (public) from PROD
+        run: |
+          set -euo pipefail
+          psql "$SUPABASE_DB_URL_PROD" -v ON_ERROR_STOP=1 -X -qAt -f scripts/public_schema_snapshot.sql > prod_public_schema.txt
+
+      - name: Upload PROD schema snapshot (debug)
+        uses: actions/upload-artifact@v4
+        with:
+          name: prod_public_schema_after_reset
+          path: prod_public_schema.txt
+          retention-days: 7
+
