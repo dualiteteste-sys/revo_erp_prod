@@ -65,10 +65,36 @@ jobs:
           set -euo pipefail
           supabase stop
 
+  release-gate:
+    name: Release Gate (Unit + E2E)
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Enable Corepack (Yarn)
+        run: corepack enable
+
+      - name: Install dependencies
+        run: yarn install --immutable
+
+      - name: Install Playwright (Chromium)
+        run: npx playwright install --with-deps chromium
+
+      - name: Release check (CI)
+        env:
+          CI: true
+        run: yarn release:check:ci
+
   deploy-prod:
     name: Deploy to Production
     runs-on: ubuntu-latest
-    needs: verify-migrations
+    needs: [verify-migrations, release-gate]
     if: github.ref == 'refs/heads/main'
     environment:
       name: production

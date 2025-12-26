@@ -20,10 +20,12 @@ supabase migration up --db-url "$SUPABASE_DB_URL"
 ## 2. Testar e gerar artefatos
 
 ```bash
-npm ci
-npm run lint
-npm run test
-npm run build
+# Release Gate local (unit + E2E + verify migrations)
+yarn release:check
+
+# Build
+yarn lint
+yarn build
 ```
 
 Somente avance se todos os testes passarem.
