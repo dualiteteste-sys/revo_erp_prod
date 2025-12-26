@@ -10,6 +10,7 @@ import { useToast } from '@/contexts/ToastProvider';
 import { Button } from '@/components/ui/button';
 import PageHeader from '@/components/ui/PageHeader';
 import SearchField from '@/components/ui/forms/SearchField';
+import { useHasPermission } from '@/hooks/useHasPermission';
 
 export default function CompetenciasPage() {
   const [competencias, setCompetencias] = useState<Competencia[]>([]);
@@ -17,7 +18,14 @@ export default function CompetenciasPage() {
   const [search, setSearch] = useState('');
   const debouncedSearch = useDebounce(search, 500);
   const { addToast } = useToast();
-  
+
+  const permCreate = useHasPermission('rh', 'create');
+  const permUpdate = useHasPermission('rh', 'update');
+  const permManage = useHasPermission('rh', 'manage');
+  const permsLoading = permCreate.isLoading || permUpdate.isLoading || permManage.isLoading;
+  const canCreate = permCreate.data;
+  const canManage = permManage.data;
+
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [selectedCompetencia, setSelectedCompetencia] = useState<Competencia | null>(null);
   const [isSeeding, setIsSeeding] = useState(false);
@@ -44,6 +52,10 @@ export default function CompetenciasPage() {
   };
 
   const handleNew = () => {
+    if (!permsLoading && !canCreate) {
+      addToast('Você não tem permissão para criar competências.', 'warning');
+      return;
+    }
     setSelectedCompetencia(null);
     setIsFormOpen(true);
   };
@@ -54,6 +66,10 @@ export default function CompetenciasPage() {
   };
 
   const handleSeed = async () => {
+    if (!permsLoading && !canManage) {
+      addToast('Você não tem permissão para popular dados de exemplo.', 'warning');
+      return;
+    }
     setIsSeeding(true);
     try {
       await seedCompetencias();
@@ -74,11 +90,22 @@ export default function CompetenciasPage() {
         icon={<BookOpen className="w-5 h-5" />}
         actions={
           <>
-            <Button onClick={handleSeed} disabled={isSeeding || loading} variant="outline" className="gap-2">
+            <Button
+              onClick={handleSeed}
+              disabled={isSeeding || loading || permsLoading || !canManage}
+              title={!canManage ? 'Sem permissão para popular dados' : undefined}
+              variant="outline"
+              className="gap-2"
+            >
               {isSeeding ? <Loader2 className="animate-spin" size={16} /> : <DatabaseBackup size={16} />}
               Popular Dados
             </Button>
-            <Button onClick={handleNew} className="gap-2">
+            <Button
+              onClick={handleNew}
+              disabled={permsLoading || !canCreate}
+              title={!canCreate ? 'Sem permissão para criar competências' : undefined}
+              className="gap-2"
+            >
               <PlusCircle size={18} />
               Nova Competência
             </Button>

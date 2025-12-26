@@ -27,6 +27,7 @@ import { Button } from '@/components/ui/button';
 import { listAuditLogsForTables, type AuditLogRow } from '@/services/auditLogs';
 import { useConfirm } from '@/contexts/ConfirmProvider';
 import { createRhDocSignedUrl, deleteRhDoc, listRhDocs, uploadRhDoc, type RhDoc } from '@/services/rhDocs';
+import { useHasPermission } from '@/hooks/useHasPermission';
 
 interface ColaboradorFormPanelProps {
   colaborador: ColaboradorDetails | null;
@@ -66,6 +67,17 @@ const ColaboradorFormPanel: React.FC<ColaboradorFormPanelProps> = ({ colaborador
   const [docTitulo, setDocTitulo] = useState('');
   const [docDescricao, setDocDescricao] = useState('');
   const [docFile, setDocFile] = useState<File | null>(null);
+
+  const permCreate = useHasPermission('rh', 'create');
+  const permUpdate = useHasPermission('rh', 'update');
+  const permDelete = useHasPermission('rh', 'delete');
+  const permsLoading = permCreate.isLoading || permUpdate.isLoading || permDelete.isLoading;
+  const isEditing = !!colaborador?.id;
+  const canSave = isEditing ? permUpdate.data : permCreate.data;
+  const readOnly = !permsLoading && !canSave;
+  const canUpdate = !permsLoading && permUpdate.data;
+  const canUploadDoc = !permsLoading && permCreate.data;
+  const canDeleteDoc = !permsLoading && permDelete.data;
 
   useEffect(() => {
     const loadData = async () => {
@@ -205,10 +217,12 @@ const ColaboradorFormPanel: React.FC<ColaboradorFormPanelProps> = ({ colaborador
   }, [formData.cargo_id]);
 
   const handleFormChange = (field: keyof ColaboradorPayload, value: any) => {
+    if (readOnly) return;
     setFormData(prev => ({ ...prev, [field]: value }));
   };
 
   const handleCompetenciaChange = (compId: string, field: string, value: any) => {
+    if (readOnly) return;
     const currentComps = formData.competencias || [];
     const existingIndex = currentComps.findIndex(c => c.competencia_id === compId);
     
@@ -244,12 +258,17 @@ const ColaboradorFormPanel: React.FC<ColaboradorFormPanelProps> = ({ colaborador
   };
 
   const handleAddExtraCompetencia = () => {
+    if (readOnly) return;
     if (!extraCompetenciaId) return;
     handleCompetenciaChange(extraCompetenciaId, 'nivel_atual', 0);
     setExtraCompetenciaId('');
   };
 
   const handleSave = async () => {
+    if (readOnly) {
+      addToast('Você não tem permissão para salvar colaboradores.', 'warning');
+      return;
+    }
     if (!formData.nome) {
       addToast('O nome é obrigatório.', 'error');
       return;
@@ -272,6 +291,10 @@ const ColaboradorFormPanel: React.FC<ColaboradorFormPanelProps> = ({ colaborador
   };
 
   const handleAddAfastamento = async () => {
+    if (!canUpdate) {
+      addToast('Você não tem permissão para registrar afastamentos.', 'warning');
+      return;
+    }
     if (!colaborador?.id) return;
     setSavingAfastamento(true);
     try {
@@ -297,6 +320,10 @@ const ColaboradorFormPanel: React.FC<ColaboradorFormPanelProps> = ({ colaborador
   };
 
   const handleEncerrarAfastamento = async (afast: ColaboradorAfastamento) => {
+    if (!canUpdate) {
+      addToast('Você não tem permissão para encerrar afastamentos.', 'warning');
+      return;
+    }
     const ok = await confirm({
       title: 'Encerrar afastamento',
       description: `Encerrar afastamento (${afast.tipo.replace(/_/g, ' ')}) de ${new Date(afast.data_inicio).toLocaleDateString('pt-BR')}?`,
@@ -324,6 +351,10 @@ const ColaboradorFormPanel: React.FC<ColaboradorFormPanelProps> = ({ colaborador
   };
 
   const handleUploadDoc = async () => {
+    if (!canUploadDoc) {
+      addToast('Você não tem permissão para enviar anexos.', 'warning');
+      return;
+    }
     if (!colaborador?.id || !activeEmpresaId || !docFile) return;
     if (!docTitulo.trim()) {
       addToast('Informe o título do anexo.', 'warning');
@@ -361,6 +392,10 @@ const ColaboradorFormPanel: React.FC<ColaboradorFormPanelProps> = ({ colaborador
   };
 
   const handleDeleteDoc = async (doc: RhDoc) => {
+    if (!canDeleteDoc) {
+      addToast('Você não tem permissão para excluir anexos.', 'warning');
+      return;
+    }
     const ok = await confirm({
       title: 'Excluir anexo',
       description: `Excluir "${doc.titulo}" v${doc.versao}?`,
@@ -477,6 +512,11 @@ const ColaboradorFormPanel: React.FC<ColaboradorFormPanelProps> = ({ colaborador
       </div>
 
       <div className="flex-grow p-6 overflow-y-auto scrollbar-styled">
+        {readOnly && (
+          <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
+            Você está em modo somente leitura. Solicite permissão para criar/editar colaboradores.
+          </div>
+        )}
         {activeTab === 'dados' && (
           <Section title="Identificação" description="Dados cadastrais do colaborador.">
             <Input 
@@ -486,6 +526,7 @@ const ColaboradorFormPanel: React.FC<ColaboradorFormPanelProps> = ({ colaborador
               onChange={e => handleFormChange('nome', e.target.value)} 
               required 
               className="sm:col-span-4" 
+              disabled={readOnly}
             />
             <div className="sm:col-span-2">
               <Toggle 
@@ -493,6 +534,7 @@ const ColaboradorFormPanel: React.FC<ColaboradorFormPanelProps> = ({ colaborador
                 name="ativo" 
                 checked={formData.ativo !== false} 
                 onChange={checked => handleFormChange('ativo', checked)} 
+                disabled={readOnly}
               />
             </div>
             <Input 
@@ -502,6 +544,7 @@ const ColaboradorFormPanel: React.FC<ColaboradorFormPanelProps> = ({ colaborador
               value={formData.email || ''} 
               onChange={e => handleFormChange('email', e.target.value)} 
               className="sm:col-span-3" 
+              disabled={readOnly}
             />
             <Input 
               label="CPF / Documento" 
@@ -509,6 +552,7 @@ const ColaboradorFormPanel: React.FC<ColaboradorFormPanelProps> = ({ colaborador
               value={formData.documento || ''} 
               onChange={e => handleFormChange('documento', e.target.value)} 
               className="sm:col-span-3" 
+              disabled={readOnly}
             />
             <Input
               label="Telefone (opcional)"
@@ -516,6 +560,7 @@ const ColaboradorFormPanel: React.FC<ColaboradorFormPanelProps> = ({ colaborador
               value={(formData as any).telefone || ''}
               onChange={(e) => handleFormChange('telefone', e.target.value)}
               className="sm:col-span-3"
+              disabled={readOnly}
             />
             <Input
               label="Matrícula (opcional)"
@@ -523,6 +568,7 @@ const ColaboradorFormPanel: React.FC<ColaboradorFormPanelProps> = ({ colaborador
               value={(formData as any).matricula || ''}
               onChange={(e) => handleFormChange('matricula', e.target.value)}
               className="sm:col-span-3"
+              disabled={readOnly}
             />
             <Select 
               label="Cargo" 
@@ -531,6 +577,7 @@ const ColaboradorFormPanel: React.FC<ColaboradorFormPanelProps> = ({ colaborador
               onChange={e => handleFormChange('cargo_id', e.target.value)}
               required
               className="sm:col-span-3"
+              disabled={readOnly}
             >
               <option value="">Selecione...</option>
               {cargos.map(c => (
@@ -544,6 +591,7 @@ const ColaboradorFormPanel: React.FC<ColaboradorFormPanelProps> = ({ colaborador
               value={formData.data_admissao || ''} 
               onChange={e => handleFormChange('data_admissao', e.target.value)} 
               className="sm:col-span-3" 
+              disabled={readOnly}
             />
             <Select
               label="Status (RH)"
@@ -551,6 +599,7 @@ const ColaboradorFormPanel: React.FC<ColaboradorFormPanelProps> = ({ colaborador
               value={(formData as any).status || 'ativo'}
               onChange={(e) => handleFormChange('status', e.target.value)}
               className="sm:col-span-3"
+              disabled={readOnly}
             >
               <option value="ativo">Ativo</option>
               <option value="afastado">Afastado</option>
@@ -564,6 +613,7 @@ const ColaboradorFormPanel: React.FC<ColaboradorFormPanelProps> = ({ colaborador
               value={(formData as any).observacoes || ''}
               onChange={(e) => handleFormChange('observacoes', e.target.value)}
               className="sm:col-span-6"
+              disabled={readOnly}
             />
           </Section>
         )}
@@ -581,7 +631,13 @@ const ColaboradorFormPanel: React.FC<ColaboradorFormPanelProps> = ({ colaborador
             <div className="bg-gray-50 border border-gray-200 rounded-2xl p-4 space-y-3">
               <div className="grid grid-cols-1 md:grid-cols-12 gap-3 items-end">
                 <div className="md:col-span-3">
-                  <Select label="Tipo" name="tipo_afast" value={novoAfastTipo} onChange={(e) => setNovoAfastTipo(e.target.value as any)}>
+                  <Select
+                    label="Tipo"
+                    name="tipo_afast"
+                    value={novoAfastTipo}
+                    onChange={(e) => setNovoAfastTipo(e.target.value as any)}
+                    disabled={!canUpdate}
+                  >
                     <option value="outros">Outros</option>
                     <option value="ferias">Férias</option>
                     <option value="licenca">Licença</option>
@@ -589,19 +645,39 @@ const ColaboradorFormPanel: React.FC<ColaboradorFormPanelProps> = ({ colaborador
                   </Select>
                 </div>
                 <div className="md:col-span-3">
-                  <Input label="Início" name="afast_inicio" type="date" value={novoAfastInicio} onChange={(e) => setNovoAfastInicio(e.target.value)} />
+                  <Input
+                    label="Início"
+                    name="afast_inicio"
+                    type="date"
+                    value={novoAfastInicio}
+                    onChange={(e) => setNovoAfastInicio(e.target.value)}
+                    disabled={!canUpdate}
+                  />
                 </div>
                 <div className="md:col-span-3">
-                  <Input label="Fim (opcional)" name="afast_fim" type="date" value={novoAfastFim} onChange={(e) => setNovoAfastFim(e.target.value)} />
+                  <Input
+                    label="Fim (opcional)"
+                    name="afast_fim"
+                    type="date"
+                    value={novoAfastFim}
+                    onChange={(e) => setNovoAfastFim(e.target.value)}
+                    disabled={!canUpdate}
+                  />
                 </div>
                 <div className="md:col-span-3 flex justify-end">
-                  <Button onClick={handleAddAfastamento} disabled={savingAfastamento} className="gap-2">
+                  <Button onClick={handleAddAfastamento} disabled={savingAfastamento || !canUpdate} className="gap-2">
                     {savingAfastamento ? <Loader2 className="animate-spin" size={16} /> : <PlusCircle size={18} />}
                     Registrar
                   </Button>
                 </div>
                 <div className="md:col-span-12">
-                  <Input label="Motivo (opcional)" name="afast_motivo" value={novoAfastMotivo} onChange={(e) => setNovoAfastMotivo(e.target.value)} />
+                  <Input
+                    label="Motivo (opcional)"
+                    name="afast_motivo"
+                    value={novoAfastMotivo}
+                    onChange={(e) => setNovoAfastMotivo(e.target.value)}
+                    disabled={!canUpdate}
+                  />
                 </div>
               </div>
             </div>
@@ -642,7 +718,7 @@ const ColaboradorFormPanel: React.FC<ColaboradorFormPanelProps> = ({ colaborador
                           <td className="px-4 py-2 text-gray-600">{a.motivo || '—'}</td>
                           <td className="px-4 py-2 text-right">
                             {aberto ? (
-                              <Button variant="outline" size="sm" onClick={() => handleEncerrarAfastamento(a)}>
+                              <Button variant="outline" size="sm" onClick={() => handleEncerrarAfastamento(a)} disabled={!canUpdate}>
                                 Encerrar
                               </Button>
                             ) : (
@@ -670,16 +746,27 @@ const ColaboradorFormPanel: React.FC<ColaboradorFormPanelProps> = ({ colaborador
 
             <div className="bg-gray-50 border border-gray-200 rounded-2xl p-4 space-y-3">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <Input label="Título do anexo" value={docTitulo} onChange={(e) => setDocTitulo(e.target.value)} placeholder="Ex: Contrato, RG, Certificado NR-12" />
+                <Input
+                  label="Título do anexo"
+                  value={docTitulo}
+                  onChange={(e) => setDocTitulo(e.target.value)}
+                  placeholder="Ex: Contrato, RG, Certificado NR-12"
+                  disabled={!canUploadDoc}
+                />
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Arquivo</label>
-                  <input type="file" onChange={(e) => setDocFile(e.target.files?.[0] || null)} className="w-full text-sm" />
+                  <input
+                    type="file"
+                    onChange={(e) => setDocFile(e.target.files?.[0] || null)}
+                    className="w-full text-sm"
+                    disabled={!canUploadDoc}
+                  />
                   <p className="text-xs text-gray-500 mt-1">O arquivo será armazenado por empresa (acesso controlado).</p>
                 </div>
               </div>
-              <Input label="Descrição (opcional)" value={docDescricao} onChange={(e) => setDocDescricao(e.target.value)} />
+              <Input label="Descrição (opcional)" value={docDescricao} onChange={(e) => setDocDescricao(e.target.value)} disabled={!canUploadDoc} />
               <div className="flex justify-end">
-                <Button onClick={handleUploadDoc} disabled={!activeEmpresaId || !docFile || uploadingDoc} className="gap-2">
+                <Button onClick={handleUploadDoc} disabled={!activeEmpresaId || !docFile || uploadingDoc || !canUploadDoc} className="gap-2">
                   {uploadingDoc ? <Loader2 className="animate-spin" size={16} /> : <Paperclip size={16} />}
                   Enviar
                 </Button>
@@ -729,6 +816,7 @@ const ColaboradorFormPanel: React.FC<ColaboradorFormPanelProps> = ({ colaborador
                             size="sm"
                             onClick={() => handleDeleteDoc(d)}
                             className="text-rose-600 hover:text-rose-700"
+                            disabled={!canDeleteDoc}
                           >
                             <Trash2 className="w-4 h-4 mr-2" />
                             Excluir
@@ -762,6 +850,7 @@ const ColaboradorFormPanel: React.FC<ColaboradorFormPanelProps> = ({ colaborador
                 value={extraCompetenciaId}
                 onChange={(e) => setExtraCompetenciaId(e.target.value)}
                 className="min-w-[260px] flex-1"
+                disabled={readOnly}
               >
                 <option value="">Selecione...</option>
                 {allCompetencias
@@ -775,7 +864,7 @@ const ColaboradorFormPanel: React.FC<ColaboradorFormPanelProps> = ({ colaborador
               <button
                 type="button"
                 onClick={handleAddExtraCompetencia}
-                disabled={!extraCompetenciaId}
+                disabled={!extraCompetenciaId || readOnly}
                 className="flex items-center gap-2 bg-blue-600 text-white font-semibold py-2 px-3 rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50"
               >
                 <PlusCircle size={18} />
@@ -818,6 +907,7 @@ const ColaboradorFormPanel: React.FC<ColaboradorFormPanelProps> = ({ colaborador
                         value={comp.nivel_atual} 
                         onChange={e => handleCompetenciaChange(comp.competencia_id, 'nivel_atual', parseInt(e.target.value))}
                         className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-blue-600"
+                        disabled={readOnly}
                       />
                       <div className="flex justify-between text-xs text-gray-400 px-1 mt-1">
                         <span>0</span><span>1</span><span>2</span><span>3</span><span>4</span><span>5</span>
@@ -962,7 +1052,7 @@ const ColaboradorFormPanel: React.FC<ColaboradorFormPanelProps> = ({ colaborador
           <Button type="button" onClick={onClose} variant="outline">
             Cancelar
           </Button>
-          <Button onClick={handleSave} disabled={isSaving} className="gap-2">
+          <Button onClick={handleSave} disabled={isSaving || permsLoading || !canSave} className="gap-2">
             {isSaving ? <Loader2 className="animate-spin" size={20} /> : <Save size={20} />}
             Salvar
           </Button>

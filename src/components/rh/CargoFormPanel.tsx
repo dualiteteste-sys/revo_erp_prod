@@ -10,6 +10,7 @@ import Toggle from '@/components/ui/forms/Toggle';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Button } from '@/components/ui/button';
 import { listAuditLogsForTables, type AuditLogRow } from '@/services/auditLogs';
+import { useHasPermission } from '@/hooks/useHasPermission';
 
 interface CargoFormPanelProps {
   cargo: CargoDetails | null;
@@ -26,6 +27,13 @@ const CargoFormPanel: React.FC<CargoFormPanelProps> = ({ cargo, onSaveSuccess, o
   const [activeTab, setActiveTab] = useState<'dados' | 'competencias' | 'historico'>('dados');
   const [auditRows, setAuditRows] = useState<AuditLogRow[]>([]);
   const [loadingAudit, setLoadingAudit] = useState(false);
+
+  const permCreate = useHasPermission('rh', 'create');
+  const permUpdate = useHasPermission('rh', 'update');
+  const permsLoading = permCreate.isLoading || permUpdate.isLoading;
+  const isEditing = !!cargo?.id;
+  const canSave = isEditing ? permUpdate.data : permCreate.data;
+  const readOnly = !permsLoading && !canSave;
 
   useEffect(() => {
     const loadCompetencias = async () => {
@@ -71,6 +79,10 @@ const CargoFormPanel: React.FC<CargoFormPanelProps> = ({ cargo, onSaveSuccess, o
   };
 
   const handleAddCompetencia = () => {
+    if (readOnly) {
+      addToast('Você não tem permissão para editar competências do cargo.', 'warning');
+      return;
+    }
     if (!selectedCompId) return;
     const comp = availableCompetencias.find(c => c.id === selectedCompId);
     if (!comp) return;
@@ -98,6 +110,10 @@ const CargoFormPanel: React.FC<CargoFormPanelProps> = ({ cargo, onSaveSuccess, o
   };
 
   const handleRemoveCompetencia = (compId: string) => {
+    if (readOnly) {
+      addToast('Você não tem permissão para editar competências do cargo.', 'warning');
+      return;
+    }
     setFormData(prev => ({
       ...prev,
       competencias: prev.competencias?.filter(c => c.competencia_id !== compId)
@@ -105,12 +121,17 @@ const CargoFormPanel: React.FC<CargoFormPanelProps> = ({ cargo, onSaveSuccess, o
   };
 
   const handleUpdateCompetencia = (index: number, field: string, value: any) => {
+    if (readOnly) return;
     const newComps = [...(formData.competencias || [])];
     newComps[index] = { ...newComps[index], [field]: value };
     setFormData(prev => ({ ...prev, competencias: newComps }));
   };
 
   const handleSave = async () => {
+    if (readOnly) {
+      addToast('Você não tem permissão para salvar cargos.', 'warning');
+      return;
+    }
     if (!formData.nome) {
       addToast('O nome do cargo é obrigatório.', 'error');
       return;
@@ -193,6 +214,11 @@ const CargoFormPanel: React.FC<CargoFormPanelProps> = ({ cargo, onSaveSuccess, o
       </div>
 
       <div className="flex-grow p-6 overflow-y-auto scrollbar-styled">
+        {readOnly && (
+          <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
+            Você está em modo somente leitura. Solicite permissão para criar/editar cargos.
+          </div>
+        )}
         {activeTab === 'dados' && (
         <Section title="Dados do Cargo" description="Informações básicas e responsabilidades.">
           <Input 
@@ -202,6 +228,7 @@ const CargoFormPanel: React.FC<CargoFormPanelProps> = ({ cargo, onSaveSuccess, o
             onChange={e => handleFormChange('nome', e.target.value)} 
             required 
             className="sm:col-span-4" 
+            disabled={readOnly}
           />
           <Input 
             label="Setor / Departamento" 
@@ -209,6 +236,7 @@ const CargoFormPanel: React.FC<CargoFormPanelProps> = ({ cargo, onSaveSuccess, o
             value={formData.setor || ''} 
             onChange={e => handleFormChange('setor', e.target.value)} 
             className="sm:col-span-2" 
+            disabled={readOnly}
           />
           <div className="sm:col-span-6">
             <Toggle 
@@ -216,6 +244,7 @@ const CargoFormPanel: React.FC<CargoFormPanelProps> = ({ cargo, onSaveSuccess, o
               name="ativo" 
               checked={formData.ativo !== false} 
               onChange={checked => handleFormChange('ativo', checked)} 
+              disabled={readOnly}
             />
           </div>
           <TextArea 
@@ -225,6 +254,7 @@ const CargoFormPanel: React.FC<CargoFormPanelProps> = ({ cargo, onSaveSuccess, o
             onChange={e => handleFormChange('descricao', e.target.value)} 
             rows={3} 
             className="sm:col-span-6" 
+            disabled={readOnly}
           />
           <TextArea 
             label="Responsabilidades Principais (ISO 9001: 5.3)" 
@@ -234,6 +264,7 @@ const CargoFormPanel: React.FC<CargoFormPanelProps> = ({ cargo, onSaveSuccess, o
             rows={4} 
             className="sm:col-span-6" 
             placeholder="Liste as principais responsabilidades e deveres..."
+            disabled={readOnly}
           />
           <TextArea 
             label="Autoridades (ISO 9001: 5.3)" 
@@ -243,6 +274,7 @@ const CargoFormPanel: React.FC<CargoFormPanelProps> = ({ cargo, onSaveSuccess, o
             rows={3} 
             className="sm:col-span-6" 
             placeholder="O que este cargo tem autonomia para decidir ou aprovar?"
+            disabled={readOnly}
           />
         </Section>
         )}
@@ -256,13 +288,14 @@ const CargoFormPanel: React.FC<CargoFormPanelProps> = ({ cargo, onSaveSuccess, o
               value={selectedCompId} 
               onChange={e => setSelectedCompId(e.target.value)}
               className="flex-grow"
+              disabled={readOnly}
             >
               <option value="">Selecione...</option>
               {availableCompetencias.map(c => (
                 <option key={c.id} value={c.id}>{c.nome} ({c.tipo})</option>
               ))}
             </Select>
-            <Button onClick={handleAddCompetencia} size="icon" className="mb-[1px]">
+            <Button onClick={handleAddCompetencia} size="icon" className="mb-[1px]" disabled={readOnly || !selectedCompId}>
               <Plus size={20} />
             </Button>
           </div>
@@ -291,6 +324,7 @@ const CargoFormPanel: React.FC<CargoFormPanelProps> = ({ cargo, onSaveSuccess, o
                       value={comp.nivel_requerido} 
                       onChange={e => handleUpdateCompetencia(index, 'nivel_requerido', parseInt(e.target.value))}
                       className="w-16 p-1 border rounded text-center"
+                      disabled={readOnly}
                     />
                   </div>
 
@@ -300,6 +334,7 @@ const CargoFormPanel: React.FC<CargoFormPanelProps> = ({ cargo, onSaveSuccess, o
                       checked={comp.obrigatorio} 
                       onChange={e => handleUpdateCompetencia(index, 'obrigatorio', e.target.checked)}
                       className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                      disabled={readOnly}
                     />
                     <label className="text-sm text-gray-700">Obrigatório</label>
                   </div>
@@ -307,6 +342,7 @@ const CargoFormPanel: React.FC<CargoFormPanelProps> = ({ cargo, onSaveSuccess, o
                   <button 
                     onClick={() => handleRemoveCompetencia(comp.competencia_id)}
                     className="text-red-500 hover:text-red-700 p-2 hover:bg-red-50 rounded-full"
+                    disabled={readOnly}
                   >
                     <Trash2 size={18} />
                   </button>
@@ -385,7 +421,7 @@ const CargoFormPanel: React.FC<CargoFormPanelProps> = ({ cargo, onSaveSuccess, o
           <Button type="button" onClick={onClose} variant="outline">
             Cancelar
           </Button>
-          <Button onClick={handleSave} disabled={isSaving} className="gap-2">
+          <Button onClick={handleSave} disabled={isSaving || permsLoading || !canSave} className="gap-2">
             {isSaving ? <Loader2 className="animate-spin" size={20} /> : <Save size={20} />}
             Salvar Cargo
           </Button>

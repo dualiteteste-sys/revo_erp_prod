@@ -12,6 +12,7 @@ import PageHeader from '@/components/ui/PageHeader';
 import SearchField from '@/components/ui/forms/SearchField';
 import { useConfirm } from '@/contexts/ConfirmProvider';
 import CargosTable from '@/components/rh/CargosTable';
+import { useHasPermission } from '@/hooks/useHasPermission';
 
 export default function CargosPage() {
   const [cargos, setCargos] = useState<Cargo[]>([]);
@@ -27,6 +28,14 @@ export default function CargosPage() {
   const [isSeeding, setIsSeeding] = useState(false);
   const [viewMode, setViewMode] = useState<'cards' | 'table'>('table');
   const [statusFilter, setStatusFilter] = useState<'todos' | 'ativos' | 'inativos'>('ativos');
+
+  const permCreate = useHasPermission('rh', 'create');
+  const permUpdate = useHasPermission('rh', 'update');
+  const permManage = useHasPermission('rh', 'manage');
+  const permsLoading = permCreate.isLoading || permUpdate.isLoading || permManage.isLoading;
+  const canCreate = permCreate.data;
+  const canUpdate = permUpdate.data;
+  const canManage = permManage.data;
 
   const cargosFiltered = useMemo(() => {
     if (statusFilter === 'inativos') return cargos.filter((c) => !c.ativo);
@@ -67,6 +76,10 @@ export default function CargosPage() {
   };
 
   const handleNew = () => {
+    if (!permsLoading && !canCreate) {
+      addToast('Você não tem permissão para criar cargos.', 'warning');
+      return;
+    }
     setSelectedCargo(null);
     setIsFormOpen(true);
   };
@@ -77,6 +90,10 @@ export default function CargosPage() {
   };
 
   const handleToggleAtivo = async (cargo: Cargo) => {
+    if (!permsLoading && !canUpdate) {
+      addToast('Você não tem permissão para alterar o status de cargos.', 'warning');
+      return;
+    }
     const nextAtivo = !cargo.ativo;
     const ok = await confirm({
       title: nextAtivo ? 'Reativar cargo' : 'Inativar cargo',
@@ -118,6 +135,10 @@ export default function CargosPage() {
   }, [cargosFiltered, sortBy]);
 
   const handleSeed = async () => {
+    if (!permsLoading && !canManage) {
+      addToast('Você não tem permissão para popular dados de exemplo.', 'warning');
+      return;
+    }
     setIsSeeding(true);
     try {
       await seedCargos();
@@ -138,7 +159,13 @@ export default function CargosPage() {
         icon={<Briefcase className="w-5 h-5" />}
         actions={
           <>
-            <Button onClick={handleSeed} disabled={isSeeding || loading} variant="outline" className="gap-2">
+            <Button
+              onClick={handleSeed}
+              disabled={isSeeding || loading || permsLoading || !canManage}
+              title={!canManage ? 'Sem permissão para popular dados' : undefined}
+              variant="outline"
+              className="gap-2"
+            >
               {isSeeding ? <Loader2 className="animate-spin" size={16} /> : <DatabaseBackup size={16} />}
               Popular Dados
             </Button>
@@ -162,7 +189,12 @@ export default function CargosPage() {
                 Cards
               </Button>
             </div>
-            <Button onClick={handleNew} className="gap-2">
+            <Button
+              onClick={handleNew}
+              disabled={permsLoading || !canCreate}
+              title={!canCreate ? 'Sem permissão para criar cargos' : undefined}
+              className="gap-2"
+            >
               <PlusCircle size={18} />
               Novo Cargo
             </Button>
@@ -215,7 +247,15 @@ export default function CargosPage() {
         <>
           {viewMode === 'table' ? (
             <div className="bg-white rounded-lg shadow overflow-hidden">
-              <CargosTable cargos={cargosSorted} onEdit={(c) => handleEdit(c.id)} onToggleAtivo={handleToggleAtivo} sortBy={sortBy} onSort={onSort} />
+              <CargosTable
+                cargos={cargosSorted}
+                onEdit={(c) => handleEdit(c.id)}
+                onToggleAtivo={handleToggleAtivo}
+                sortBy={sortBy}
+                onSort={onSort}
+                canEdit={permsLoading ? false : true}
+                canToggleAtivo={permsLoading ? false : canUpdate}
+              />
             </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -254,12 +294,14 @@ export default function CargosPage() {
                     </div>
                     <button
                       type="button"
-                      className="text-blue-600 hover:text-blue-800 font-medium"
+                      className="text-blue-600 hover:text-blue-800 font-medium disabled:opacity-50 disabled:cursor-not-allowed"
                       onClick={(e) => {
                         e.preventDefault();
                         e.stopPropagation();
                         handleToggleAtivo(cargo);
                       }}
+                      disabled={permsLoading || !canUpdate}
+                      title={!canUpdate ? 'Sem permissão para alterar status' : undefined}
                     >
                       {cargo.ativo ? 'Inativar' : 'Reativar'}
                     </button>

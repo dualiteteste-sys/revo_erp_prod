@@ -8,6 +8,7 @@ export type PermissionModule =
   | 'centros_de_custo' 
   | 'produtos' 
   | 'servicos' 
+  | 'rh'
   | 'logs';
 
 export type PermissionAction = 'view' | 'create' | 'update' | 'delete' | 'manage';
