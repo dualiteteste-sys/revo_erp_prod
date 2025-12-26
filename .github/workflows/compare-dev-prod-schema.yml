@@ -1,0 +1,76 @@
+name: Compare DEV vs PROD schema (public)
+
+on:
+  workflow_dispatch:
+
+jobs:
+  compare:
+    name: Compare public schema (DEV ↔ PROD)
+    runs-on: ubuntu-latest
+
+    env:
+      SUPABASE_DB_URL_DEV: ${{ secrets.SUPABASE_DB_URL_DEV }}
+      SUPABASE_DB_URL_PROD: ${{ secrets.SUPABASE_DB_URL_PROD }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install PostgreSQL client (psql)
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y postgresql-client
+
+      - name: Validate secrets
+        run: |
+          set -euo pipefail
+          if [[ -z "${SUPABASE_DB_URL_DEV:-}" ]]; then
+            echo "::error::Missing secret SUPABASE_DB_URL_DEV"
+            exit 1
+          fi
+          if [[ -z "${SUPABASE_DB_URL_PROD:-}" ]]; then
+            echo "::error::Missing secret SUPABASE_DB_URL_PROD"
+            exit 1
+          fi
+
+      - name: Snapshot public schema from DEV
+        run: |
+          set -euo pipefail
+          psql "$SUPABASE_DB_URL_DEV" -v ON_ERROR_STOP=1 -X -qAt -f scripts/public_schema_snapshot.sql > dev_public_schema.txt
+
+      - name: Snapshot public schema from PROD
+        run: |
+          set -euo pipefail
+          psql "$SUPABASE_DB_URL_PROD" -v ON_ERROR_STOP=1 -X -qAt -f scripts/public_schema_snapshot.sql > prod_public_schema.txt
+
+      - name: Diff DEV vs PROD (public)
+        id: diff
+        run: |
+          set -euo pipefail
+          diff -u dev_public_schema.txt prod_public_schema.txt > dev_vs_prod_public_schema.diff || true
+          if [[ -s dev_vs_prod_public_schema.diff ]]; then
+            echo "has_diff=true" >> "$GITHUB_OUTPUT"
+            echo "::error::DEV e PROD estão com drift no schema public (veja o artifact dev_vs_prod_public_schema.diff)."
+            echo "Diff lines: $(wc -l < dev_vs_prod_public_schema.diff)" >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "has_diff=false" >> "$GITHUB_OUTPUT"
+            echo "DEV e PROD estão alinhados (schema public)." >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Upload schema snapshots + diff (debug)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: dev_prod_public_schema
+          path: |
+            dev_public_schema.txt
+            prod_public_schema.txt
+            dev_vs_prod_public_schema.diff
+          retention-days: 7
+
+      - name: Fail if drift detected
+        if: steps.diff.outputs.has_diff == 'true'
+        run: |
+          exit 1
+
