@@ -9,6 +9,7 @@ import { Loader2, RefreshCw, History } from 'lucide-react';
 const TABLE_LABEL: Record<string, string> = {
   ordem_servicos: 'Ordem de Serviço',
   ordem_servico_itens: 'Itens da O.S.',
+  os_docs: 'Anexos (O.S.)',
 };
 
 function labelOperation(op: AuditLogRow['operation']) {
@@ -25,8 +26,14 @@ function labelOperation(op: AuditLogRow['operation']) {
 }
 
 function getRelatedOsId(row: AuditLogRow) {
-  const oldId = (row.old_data as any)?.ordem_servico_id ?? (row.old_data as any)?.ordem_id;
-  const newId = (row.new_data as any)?.ordem_servico_id ?? (row.new_data as any)?.ordem_id;
+  const oldId =
+    (row.old_data as any)?.ordem_servico_id ??
+    (row.old_data as any)?.ordem_id ??
+    (row.old_data as any)?.os_id;
+  const newId =
+    (row.new_data as any)?.ordem_servico_id ??
+    (row.new_data as any)?.ordem_id ??
+    (row.new_data as any)?.os_id;
   return String(newId ?? oldId ?? '');
 }
 
@@ -62,7 +69,7 @@ export default function OsAuditTrailPanel({ osId, limit = 200 }: { osId: string;
   const load = async () => {
     setLoading(true);
     try {
-      const data = await listAuditLogsForTables(['ordem_servicos', 'ordem_servico_itens'], limit);
+      const data = await listAuditLogsForTables(['ordem_servicos', 'ordem_servico_itens', 'os_docs'], limit);
       setRows(data);
     } catch (e: any) {
       addToast(e?.message || 'Erro ao carregar histórico.', 'error');
@@ -145,4 +152,3 @@ export default function OsAuditTrailPanel({ osId, limit = 200 }: { osId: string;
     </GlassCard>
   );
 }
-

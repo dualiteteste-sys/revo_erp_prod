@@ -17,6 +17,8 @@ import { createContaAReceberFromOs, getContaAReceberDetails, getContaAReceberFro
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { useNavigate } from 'react-router-dom';
 import { useConfirm } from '@/contexts/ConfirmProvider';
+import { useAuth } from '@/contexts/AuthProvider';
+import { createOsDocSignedUrl, deleteOsDoc, listOsDocs, uploadOsDoc, type OsDoc } from '@/services/osDocs';
 
 interface OsFormPanelProps {
   os: OrdemServicoDetails | null;
@@ -35,11 +37,18 @@ const OsFormPanel: React.FC<OsFormPanelProps> = ({ os, onSaveSuccess, onClose })
   const { addToast } = useToast();
   const navigate = useNavigate();
   const { confirm } = useConfirm();
+  const { activeEmpresaId } = useAuth();
   const [isSaving, setIsSaving] = useState(false);
   const [isAddingItem, setIsAddingItem] = useState(false);
   const [formData, setFormData] = useState<Partial<OrdemServicoDetails>>({});
   const [clientName, setClientName] = useState('');
   const [novoAnexo, setNovoAnexo] = useState('');
+  const [docs, setDocs] = useState<OsDoc[]>([]);
+  const [isDocsLoading, setIsDocsLoading] = useState(false);
+  const [isUploadingDoc, setIsUploadingDoc] = useState(false);
+  const [docFile, setDocFile] = useState<File | null>(null);
+  const [docTitulo, setDocTitulo] = useState('');
+  const [docDescricao, setDocDescricao] = useState('');
   const [contaReceberId, setContaReceberId] = useState<string | null>(null);
   const [contaReceber, setContaReceber] = useState<ContaAReceber | null>(null);
   const [isContaDialogOpen, setIsContaDialogOpen] = useState(false);
@@ -55,6 +64,10 @@ const OsFormPanel: React.FC<OsFormPanelProps> = ({ os, onSaveSuccess, onClose })
     if (os) {
       setFormData(os);
       setNovoAnexo('');
+      setDocs([]);
+      setDocFile(null);
+      setDocTitulo('');
+      setDocDescricao('');
       setContaReceberId(null);
       setContaVencimento('');
       if (os.cliente_id) {
@@ -68,10 +81,33 @@ const OsFormPanel: React.FC<OsFormPanelProps> = ({ os, onSaveSuccess, onClose })
       setFormData({ status: 'orcamento', desconto_valor: 0, total_itens: 0, total_geral: 0, itens: [] });
       setClientName('');
       setNovoAnexo('');
+      setDocs([]);
+      setDocFile(null);
+      setDocTitulo('');
+      setDocDescricao('');
       setContaReceberId(null);
       setContaVencimento('');
     }
   }, [os]);
+
+  const loadDocs = async (osId: string) => {
+    setIsDocsLoading(true);
+    try {
+      const data = await listOsDocs(osId);
+      setDocs(data ?? []);
+    } catch (e: any) {
+      addToast(e?.message || 'Erro ao carregar anexos.', 'error');
+    } finally {
+      setIsDocsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    const osId = formData.id ? String(formData.id) : null;
+    if (!osId) return;
+    void loadDocs(osId);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [formData.id]);
 
   useEffect(() => {
     const osId = formData.id ? String(formData.id) : null;
@@ -219,6 +255,75 @@ const OsFormPanel: React.FC<OsFormPanelProps> = ({ os, onSaveSuccess, onClose })
     }
   };
 
+  const handleUploadDoc = async () => {
+    const osId = formData.id ? String(formData.id) : null;
+    if (!osId) {
+      addToast('Salve a O.S. antes de anexar arquivos.', 'warning');
+      return;
+    }
+    if (!activeEmpresaId) {
+      addToast('Nenhuma empresa ativa encontrada.', 'error');
+      return;
+    }
+    if (!docFile) {
+      addToast('Selecione um arquivo para enviar.', 'warning');
+      return;
+    }
+
+    const title = (docTitulo || docFile.name).trim();
+    setIsUploadingDoc(true);
+    try {
+      await uploadOsDoc({
+        empresaId: activeEmpresaId,
+        osId,
+        titulo: title,
+        descricao: docDescricao.trim() ? docDescricao.trim() : null,
+        file: docFile,
+      });
+      addToast('Anexo enviado com sucesso!', 'success');
+      setDocFile(null);
+      setDocTitulo('');
+      setDocDescricao('');
+      await loadDocs(osId);
+    } catch (e: any) {
+      addToast(e?.message || 'Erro ao enviar anexo.', 'error');
+    } finally {
+      setIsUploadingDoc(false);
+    }
+  };
+
+  const handleOpenDoc = async (arquivoPath: string) => {
+    try {
+      const url = await createOsDocSignedUrl(arquivoPath, 3600);
+      window.open(url, '_blank', 'noopener,noreferrer');
+    } catch (e: any) {
+      addToast(e?.message || 'Erro ao abrir anexo.', 'error');
+    }
+  };
+
+  const handleDeleteDoc = async (doc: OsDoc) => {
+    const ok = await confirm({
+      title: 'Excluir anexo',
+      description: `Deseja excluir o anexo “${doc.titulo}”?`,
+      confirmText: 'Excluir',
+      cancelText: 'Cancelar',
+      variant: 'danger',
+    });
+    if (!ok) return;
+
+    setIsUploadingDoc(true);
+    try {
+      await deleteOsDoc({ id: doc.id, arquivoPath: doc.arquivo_path });
+      addToast('Anexo excluído.', 'success');
+      const osId = formData.id ? String(formData.id) : null;
+      if (osId) await loadDocs(osId);
+    } catch (e: any) {
+      addToast(e?.message || 'Erro ao excluir anexo.', 'error');
+    } finally {
+      setIsUploadingDoc(false);
+    }
+  };
+
   const handleAddItem = async (item: OsItemSearchResult) => {
     setIsAddingItem(true);
     try {
@@ -360,6 +465,80 @@ const OsFormPanel: React.FC<OsFormPanelProps> = ({ os, onSaveSuccess, onClose })
         <Section title="Observações" description="Detalhes adicionais e anotações internas">
             <TextArea label="Observações" name="observacoes" value={formData.observacoes || ''} onChange={e => handleFormChange('observacoes', e.target.value)} rows={3} className="sm:col-span-3" />
             <TextArea label="Observações Internas" name="observacoes_internas" value={formData.observacoes_internas || ''} onChange={e => handleFormChange('observacoes_internas', e.target.value)} rows={3} className="sm:col-span-3" />
+        </Section>
+
+        <Section title="Arquivos" description="Anexos enviados para o sistema (PDFs, fotos, comprovantes).">
+          <Input
+            label="Título (opcional)"
+            name="doc_titulo"
+            value={docTitulo}
+            onChange={(e) => setDocTitulo(e.target.value)}
+            placeholder="Ex.: Foto do equipamento, Laudo, etc."
+            className="sm:col-span-3"
+          />
+          <Input
+            label="Descrição (opcional)"
+            name="doc_descricao"
+            value={docDescricao}
+            onChange={(e) => setDocDescricao(e.target.value)}
+            placeholder="Detalhe rápido do anexo"
+            className="sm:col-span-3"
+          />
+          <div className="sm:col-span-6 flex flex-wrap gap-2 items-end">
+            <div className="flex-1 min-w-[260px]">
+              <label className="block text-sm font-medium text-gray-700 mb-1">Arquivo</label>
+              <input
+                aria-label="Arquivo"
+                type="file"
+                className="block w-full text-sm file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 border border-gray-200 rounded-lg px-3 py-2 bg-white"
+                onChange={(e) => setDocFile(e.target.files?.[0] ?? null)}
+              />
+              {docFile ? (
+                <div className="text-xs text-gray-500 mt-1 truncate" title={docFile.name}>
+                  Selecionado: {docFile.name}
+                </div>
+              ) : null}
+            </div>
+            <Button type="button" onClick={handleUploadDoc} disabled={isUploadingDoc} className="gap-2">
+              {isUploadingDoc ? <Loader2 className="animate-spin" size={18} /> : <Plus size={18} />}
+              Enviar
+            </Button>
+          </div>
+
+          <div className="sm:col-span-6">
+            {isDocsLoading ? (
+              <div className="py-6 flex items-center justify-center text-sm text-gray-500">
+                <Loader2 className="animate-spin mr-2" size={18} />
+                Carregando anexos…
+              </div>
+            ) : docs.length === 0 ? (
+              <div className="text-sm text-gray-500 py-3">Nenhum arquivo anexado.</div>
+            ) : (
+              <div className="space-y-2">
+                {docs.map((d) => (
+                  <div key={d.id} className="flex flex-wrap items-center justify-between gap-3 bg-gray-50 border border-gray-200 rounded-lg px-3 py-2">
+                    <div className="min-w-0">
+                      <div className="text-sm font-medium text-gray-900 truncate" title={d.titulo}>{d.titulo}</div>
+                      <div className="text-xs text-gray-500">
+                        {new Date(d.created_at).toLocaleString('pt-BR')}
+                        {typeof d.tamanho_bytes === 'number' ? ` • ${(d.tamanho_bytes / 1024 / 1024).toFixed(2)} MB` : ''}
+                      </div>
+                      {d.descricao ? <div className="text-xs text-gray-600 mt-1">{d.descricao}</div> : null}
+                    </div>
+                    <div className="flex gap-2">
+                      <Button type="button" variant="outline" className="gap-2" onClick={() => handleOpenDoc(d.arquivo_path)}>
+                        <FileText size={16} />
+                        Abrir
+                      </Button>
+                      <Button type="button" variant="ghost" size="icon" className="text-rose-600 hover:text-rose-700" onClick={() => handleDeleteDoc(d)}>
+                        <Trash2 size={18} />
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
         </Section>
 
         <Section title="Anexos" description="Links/arquivos relacionados (fotos, PDFs, comprovantes).">
