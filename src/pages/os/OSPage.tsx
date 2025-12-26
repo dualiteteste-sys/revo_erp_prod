@@ -17,7 +17,6 @@ import SearchField from '@/components/ui/forms/SearchField';
 import { Button } from '@/components/ui/button';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useConfirm } from '@/contexts/ConfirmProvider';
-import { setStatus as setOsStatus } from '@/services/osStatus';
 
 const OSPage: React.FC = () => {
   const {
@@ -153,7 +152,7 @@ const OSPage: React.FC = () => {
     }
 
     try {
-      await setOsStatus(os.id, next);
+      await osService.setOsStatus(os.id, next);
       addToast(`Status atualizado para “${labelMap[next]}”.`, 'success');
       refresh();
     } catch (e: any) {

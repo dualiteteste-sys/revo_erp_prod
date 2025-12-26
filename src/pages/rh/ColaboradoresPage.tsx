@@ -22,6 +22,7 @@ import SearchField from '@/components/ui/forms/SearchField';
 import Select from '@/components/ui/forms/Select';
 import { useConfirm } from '@/contexts/ConfirmProvider';
 import ColaboradoresTable from '@/components/rh/ColaboradoresTable';
+import { useHasPermission } from '@/hooks/useHasPermission';
 
 export default function ColaboradoresPage() {
   const [colaboradores, setColaboradores] = useState<Colaborador[]>([]);
@@ -39,6 +40,14 @@ export default function ColaboradoresPage() {
   const [statusFilter, setStatusFilter] = useState<'todos' | 'ativos' | 'inativos'>('ativos');
   const [cargoFilter, setCargoFilter] = useState<string>('');
   const [cargos, setCargos] = useState<Cargo[]>([]);
+
+  const permCreate = useHasPermission('rh', 'create');
+  const permUpdate = useHasPermission('rh', 'update');
+  const permManage = useHasPermission('rh', 'manage');
+  const permsLoading = permCreate.isLoading || permUpdate.isLoading || permManage.isLoading;
+  const canCreate = permCreate.data;
+  const canUpdate = permUpdate.data;
+  const canManage = permManage.data;
 
   const colaboradoresFiltered = useMemo(() => {
     if (statusFilter === 'inativos') return colaboradores.filter((c) => !c.ativo);
@@ -91,6 +100,10 @@ export default function ColaboradoresPage() {
   };
 
   const handleNew = () => {
+    if (!permsLoading && !canCreate) {
+      addToast('Você não tem permissão para criar colaboradores.', 'warning');
+      return;
+    }
     setSelectedColaborador(null);
     setIsFormOpen(true);
   };
@@ -101,6 +114,10 @@ export default function ColaboradoresPage() {
   };
 
   const handleToggleAtivo = async (colab: Colaborador) => {
+    if (!permsLoading && !canUpdate) {
+      addToast('Você não tem permissão para alterar o status de colaboradores.', 'warning');
+      return;
+    }
     const nextAtivo = !colab.ativo;
     const ok = await confirm({
       title: nextAtivo ? 'Reativar colaborador' : 'Inativar colaborador',
@@ -143,6 +160,10 @@ export default function ColaboradoresPage() {
   };
 
   const handleSeed = async () => {
+    if (!permsLoading && !canManage) {
+      addToast('Você não tem permissão para popular dados de exemplo.', 'warning');
+      return;
+    }
     setIsSeeding(true);
     try {
       await seedColaboradores();
@@ -163,7 +184,13 @@ export default function ColaboradoresPage() {
         icon={<Users className="w-5 h-5" />}
         actions={
           <>
-            <Button onClick={handleSeed} disabled={isSeeding || loading} variant="outline" className="gap-2">
+            <Button
+              onClick={handleSeed}
+              disabled={isSeeding || loading || permsLoading || !canManage}
+              title={!canManage ? 'Sem permissão para popular dados' : undefined}
+              variant="outline"
+              className="gap-2"
+            >
               {isSeeding ? <Loader2 className="animate-spin" size={16} /> : <DatabaseBackup size={16} />}
               Popular Dados
             </Button>
@@ -187,7 +214,12 @@ export default function ColaboradoresPage() {
                 Cards
               </Button>
             </div>
-            <Button onClick={handleNew} className="gap-2">
+            <Button
+              onClick={handleNew}
+              disabled={permsLoading || !canCreate}
+              title={!canCreate ? 'Sem permissão para criar colaboradores' : undefined}
+              className="gap-2"
+            >
               <PlusCircle size={18} />
               Novo Colaborador
             </Button>
@@ -261,6 +293,8 @@ export default function ColaboradoresPage() {
                 onToggleAtivo={handleToggleAtivo}
                 sortBy={sortBy}
                 onSort={onSort}
+                canEdit={!permsLoading}
+                canToggleAtivo={!permsLoading && canUpdate}
               />
             </div>
           ) : (
@@ -314,12 +348,14 @@ export default function ColaboradoresPage() {
                     </div>
                     <button
                       type="button"
-                      className="text-blue-600 hover:text-blue-800 font-medium"
+                      className="text-blue-600 hover:text-blue-800 font-medium disabled:opacity-50 disabled:cursor-not-allowed"
                       onClick={(e) => {
                         e.preventDefault();
                         e.stopPropagation();
                         handleToggleAtivo(colab);
                       }}
+                      disabled={permsLoading || !canUpdate}
+                      title={!canUpdate ? 'Sem permissão para alterar status' : undefined}
                     >
                       {colab.ativo ? 'Inativar' : 'Reativar'}
                     </button>

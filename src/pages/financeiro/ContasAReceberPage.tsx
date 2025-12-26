@@ -2,17 +2,18 @@ import React, { useEffect, useState } from 'react';
 import { useContasAReceber } from '@/hooks/useContasAReceber';
 import { useToast } from '@/contexts/ToastProvider';
 import * as contasAReceberService from '@/services/contasAReceber';
-import { Loader2, PlusCircle, Search, TrendingUp, DatabaseBackup } from 'lucide-react';
+import { Loader2, PlusCircle, Search, TrendingUp, DatabaseBackup, X } from 'lucide-react';
 import Pagination from '@/components/ui/Pagination';
 import ConfirmationModal from '@/components/ui/ConfirmationModal';
 import Modal from '@/components/ui/Modal';
 import ContasAReceberTable from '@/components/financeiro/contas-a-receber/ContasAReceberTable';
 import ContasAReceberFormPanel from '@/components/financeiro/contas-a-receber/ContasAReceberFormPanel';
 import ContasAReceberSummary from '@/components/financeiro/contas-a-receber/ContasAReceberSummary';
+import BaixaRapidaModal from '@/components/financeiro/common/BaixaRapidaModal';
 import Select from '@/components/ui/forms/Select';
 import { Button } from '@/components/ui/button';
 import { useSearchParams } from 'react-router-dom';
-import { useConfirm } from '@/contexts/ConfirmProvider';
+import DatePicker from '@/components/ui/DatePicker';
 
 const ContasAReceberPage: React.FC = () => {
   const {
@@ -25,15 +26,18 @@ const ContasAReceberPage: React.FC = () => {
     pageSize,
     searchTerm,
     filterStatus,
+    filterStartDate,
+    filterEndDate,
     sortBy,
     setPage,
     setSearchTerm,
     setFilterStatus,
+    setFilterStartDate,
+    setFilterEndDate,
     setSortBy,
     refresh,
   } = useContasAReceber();
   const { addToast } = useToast();
-  const { confirm } = useConfirm();
 
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [selectedConta, setSelectedConta] = useState<contasAReceberService.ContaAReceber | null>(null);
@@ -43,6 +47,8 @@ const ContasAReceberPage: React.FC = () => {
   const [isFetchingDetails, setIsFetchingDetails] = useState(false);
   const [isSeeding, setIsSeeding] = useState(false);
   const [searchParams, setSearchParams] = useSearchParams();
+  const [isBaixaOpen, setIsBaixaOpen] = useState(false);
+  const [contaToReceive, setContaToReceive] = useState<contasAReceberService.ContaAReceber | null>(null);
 
   useEffect(() => {
     const contaId = searchParams.get('contaId');
@@ -125,27 +131,13 @@ const ContasAReceberPage: React.FC = () => {
 
   const handleReceive = async (conta: contasAReceberService.ContaAReceber) => {
     if (!conta?.id) return;
-    const ok = await confirm({
-      title: 'Registrar recebimento',
-      description: `Deseja marcar a conta "${conta.descricao}" como paga hoje?`,
-      confirmText: 'Registrar recebimento',
-      cancelText: 'Cancelar',
-      variant: 'default',
-    });
-    if (!ok) return;
+    setContaToReceive(conta);
+    setIsBaixaOpen(true);
+  };
 
-    try {
-      const today = new Date().toISOString().slice(0, 10);
-      await contasAReceberService.receberContaAReceber({
-        id: conta.id,
-        dataPagamento: today,
-        valorPago: Number(conta.valor || 0),
-      });
-      addToast('Recebimento registrado com sucesso!', 'success');
-      refresh();
-    } catch (e: any) {
-      addToast(e?.message || 'Erro ao registrar recebimento.', 'error');
-    }
+  const handleCloseBaixa = () => {
+    setIsBaixaOpen(false);
+    setContaToReceive(null);
   };
 
   const handleSort = (column: string) => {
@@ -153,6 +145,11 @@ const ContasAReceberPage: React.FC = () => {
       column,
       ascending: prev.column === column ? !prev.ascending : true,
     }));
+  };
+
+  const clearDateFilters = () => {
+    setFilterStartDate(null);
+    setFilterEndDate(null);
   };
 
   const handleSeed = async () => {
@@ -191,8 +188,8 @@ const ContasAReceberPage: React.FC = () => {
 
       <ContasAReceberSummary summary={summary} />
 
-      <div className="mt-6 mb-4 flex gap-4">
-        <div className="relative">
+      <div className="mt-6 mb-4 flex flex-wrap gap-4 items-end">
+        <div className="relative flex-grow max-w-xs">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={20} />
           <input
             type="text"
@@ -213,6 +210,31 @@ const ContasAReceberPage: React.FC = () => {
           <option value="vencido">Vencido</option>
           <option value="cancelado">Cancelado</option>
         </Select>
+
+        <div className="flex items-center gap-2">
+          <DatePicker
+            label=""
+            value={filterStartDate}
+            onChange={setFilterStartDate}
+            className="w-[160px]"
+          />
+          <span className="text-gray-500">até</span>
+          <DatePicker
+            label=""
+            value={filterEndDate}
+            onChange={setFilterEndDate}
+            className="w-[160px]"
+          />
+          {(filterStartDate || filterEndDate) && (
+            <button
+              onClick={clearDateFilters}
+              className="p-2 text-gray-500 hover:text-red-500 hover:bg-red-50 rounded-full transition-colors"
+              title="Limpar datas"
+            >
+              <X size={18} />
+            </button>
+          )}
+        </div>
       </div>
 
       <div className="bg-white rounded-lg shadow overflow-hidden">
@@ -253,6 +275,35 @@ const ContasAReceberPage: React.FC = () => {
           <ContasAReceberFormPanel conta={selectedConta} onSaveSuccess={handleSaveSuccess} onClose={handleCloseForm} />
         )}
       </Modal>
+
+      <BaixaRapidaModal
+        isOpen={isBaixaOpen}
+        onClose={handleCloseBaixa}
+        title="Registrar recebimento"
+        description={
+          contaToReceive?.descricao
+            ? `Confirmar recebimento da conta "${contaToReceive.descricao}".`
+            : 'Confirmar recebimento.'
+        }
+        defaultValor={Number(contaToReceive?.valor || 0)}
+        confirmLabel="Registrar recebimento"
+        onConfirm={async ({ contaCorrenteId, dataISO, valor }) => {
+          if (!contaToReceive?.id) return;
+          try {
+            await contasAReceberService.receberContaAReceber({
+              id: contaToReceive.id,
+              dataPagamento: dataISO,
+              valorPago: valor,
+              contaCorrenteId,
+            });
+            addToast('Recebimento registrado com sucesso!', 'success');
+            refresh();
+          } catch (e: any) {
+            addToast(e?.message || 'Erro ao registrar recebimento.', 'error');
+            throw e;
+          }
+        }}
+      />
 
       <ConfirmationModal
         isOpen={isDeleteModalOpen}

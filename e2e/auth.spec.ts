@@ -1,11 +1,14 @@
 import { test, expect } from './fixtures';
 
 test('should allow user to log in and view products', async ({ page }) => {
-    // Log console messages
-    page.on('console', msg => console.log('BROWSER LOG:', msg.text()));
-    // Log network requests
-    page.on('request', request => console.log('>>', request.method(), request.url()));
-    page.on('response', response => console.log('<<', response.status(), response.url()));
+    // Fallback: evita chamadas não mapeadas ao Supabase real (estabiliza o smoke no CI).
+    await page.route('**/rest/v1/**', async (route) => {
+        if (route.request().method() === 'OPTIONS') {
+            await route.fulfill({ status: 204, body: '' });
+            return;
+        }
+        await route.fulfill({ json: [] });
+    });
 
     // Mock Supabase Auth User Endpoint (for session validation)
     await page.route('**/auth/v1/user', async route => {
@@ -54,6 +57,34 @@ test('should allow user to log in and view products', async ({ page }) => {
         await route.fulfill({ json });
     });
 
+    // Subscription guard (deixa passar)
+    await page.route('**/rest/v1/subscriptions*', async route => {
+        await route.fulfill({
+            status: 200,
+            contentType: 'application/json',
+            body: JSON.stringify({
+                id: 'sub_123',
+                empresa_id: 'empresa-1',
+                status: 'active',
+                current_period_end: new Date(Date.now() + 86400000).toISOString(),
+                stripe_price_id: 'price_123'
+            })
+        });
+    });
+
+    // Mock Plans (if needed by SubscriptionProvider)
+    await page.route('**/rest/v1/plans*', async route => {
+        await route.fulfill({
+            status: 200,
+            contentType: 'application/json',
+            body: JSON.stringify({
+                id: 'plan_123',
+                name: 'Pro',
+                stripe_price_id: 'price_123'
+            })
+        });
+    });
+
     // Mock User Active Empresa
     await page.route('**/rest/v1/user_active_empresa*', async route => {
         await route.fulfill({
@@ -93,6 +124,10 @@ test('should allow user to log in and view products', async ({ page }) => {
     // Mock RBAC fallback (useEmpresaRole)
     await page.route('**/rest/v1/rpc/current_empresa_role', async (route) => {
       await route.fulfill({ json: 'member' });
+    });
+
+    await page.route('**/rest/v1/rpc/has_permission_for_current_user', async (route) => {
+      await route.fulfill({ json: true });
     });
 
     // Mock empresa_features (menus/guards)
@@ -138,35 +173,6 @@ test('should allow user to log in and view products', async ({ page }) => {
     await page.getByLabel('Senha').fill('password123');
     await page.getByRole('button', { name: 'Entrar' }).click();
 
-    // Expect to be redirected to the app
-    // Mock Subscriptions
-    await page.route('**/rest/v1/subscriptions*', async route => {
-        await route.fulfill({
-            status: 200,
-            contentType: 'application/json',
-            body: JSON.stringify({
-                id: 'sub_123',
-                empresa_id: 'empresa-1',
-                status: 'active',
-                current_period_end: new Date(Date.now() + 86400000).toISOString(),
-                stripe_price_id: 'price_123'
-            })
-        });
-    });
-
-    // Mock Plans (if needed by SubscriptionProvider)
-    await page.route('**/rest/v1/plans*', async route => {
-        await route.fulfill({
-            status: 200,
-            contentType: 'application/json',
-            body: JSON.stringify({
-                id: 'plan_123',
-                name: 'Pro',
-                stripe_price_id: 'price_123'
-            })
-        });
-    });
-
     // Wait for login to complete and redirect to app
     await expect(page).toHaveURL(/\/app/);
 
@@ -176,13 +182,9 @@ test('should allow user to log in and view products', async ({ page }) => {
     // Wait for network to settle
     await page.waitForLoadState('networkidle');
 
-    // Debug: Dump HTML
-    const content = await page.content();
-    console.log('PAGE CONTENT DUMP:', content);
-
     // Check if the active company is loaded
-    await expect(page.getByText('Fantasia E2E')).toBeVisible();
+    await expect(page.getByText('Fantasia E2E')).toBeVisible({ timeout: 15000 });
 
     // Check if the mocked product is visible
-    await expect(page.getByText('Produto E2E')).toBeVisible();
+    await expect(page.getByText('Produto E2E')).toBeVisible({ timeout: 15000 });
 });

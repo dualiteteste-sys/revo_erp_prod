@@ -3,6 +3,7 @@ import { RouteObject, Navigate } from "react-router-dom";
 import MainLayout from '../components/layout/MainLayout';
 import ProtectedRoute from '../components/layout/ProtectedRoute';
 import OnboardingGuard from "../components/auth/OnboardingGuard";
+import RequirePermission from "../components/auth/RequirePermission";
 import PageLoader from "../components/ui/PageLoader";
 import { lazyImport } from "../utils/lazyImport";
 import PlanGuard from "../components/layout/PlanGuard";
@@ -66,6 +67,7 @@ const MateriaisClientePage = lazyImport(() => import("../pages/industria/Materia
 const MrpDemandasPage = lazyImport(() => import("../pages/industria/mrp/MrpDemandasPage"));
 const PcpDashboardPage = lazyImport(() => import("../pages/industria/pcp/PcpDashboardPage"));
 const StatusBeneficiamentosPage = lazyImport(() => import("../pages/industria/StatusBeneficiamentosPage"));
+const RelatoriosIndustriaPage = lazyImport(() => import("../pages/industria/RelatoriosIndustriaPage"));
 
 // Suprimentos Pages
 const EstoquePage = lazyImport(() => import("../pages/suprimentos/EstoquePage"));
@@ -115,6 +117,7 @@ export const appRoutes: RouteObject[] = [
             { path: "industria/ordens", element: <PlanGuard feature="industria"><Suspense fallback={<PageLoader />}><OrdensPage /></Suspense></PlanGuard> },
             { path: "industria/mrp", element: <PlanGuard feature="industria"><Suspense fallback={<PageLoader />}><MrpDemandasPage /></Suspense></PlanGuard> },
             { path: "industria/pcp", element: <PlanGuard feature="industria"><Suspense fallback={<PageLoader />}><PcpDashboardPage /></Suspense></PlanGuard> },
+            { path: "industria/relatorios", element: <PlanGuard feature="industria"><Suspense fallback={<PageLoader />}><RelatoriosIndustriaPage /></Suspense></PlanGuard> },
             { path: "industria/boms", element: <PlanGuard feature="industria"><Suspense fallback={<PageLoader />}><BomsPage /></Suspense></PlanGuard> },
             { path: "industria/roteiros", element: <PlanGuard feature="industria"><Suspense fallback={<PageLoader />}><RoteirosPage /></Suspense></PlanGuard> },
             { path: "industria/centros-trabalho", element: <PlanGuard feature="industria"><Suspense fallback={<PageLoader />}><CentrosTrabalhoPage /></Suspense></PlanGuard> },
@@ -135,8 +138,26 @@ export const appRoutes: RouteObject[] = [
             { path: "relatorios", element: <Suspense fallback={<PageLoader />}><RelatoriosHubPage /></Suspense> },
 
             // Serviços (Módulo)
-            { path: "ordens-de-servico", element: <PlanGuard feature="servicos"><Suspense fallback={<PageLoader />}><OSPage /></Suspense></PlanGuard> },
-            { path: "servicos/relatorios", element: <PlanGuard feature="servicos"><Suspense fallback={<PageLoader />}><OsRelatoriosPage /></Suspense></PlanGuard> },
+            {
+              path: "ordens-de-servico",
+              element: (
+                <PlanGuard feature="servicos">
+                  <RequirePermission permission={{ domain: "os", action: "view" }}>
+                    <Suspense fallback={<PageLoader />}><OSPage /></Suspense>
+                  </RequirePermission>
+                </PlanGuard>
+              ),
+            },
+            {
+              path: "servicos/relatorios",
+              element: (
+                <PlanGuard feature="servicos">
+                  <RequirePermission permission={{ domain: "relatorios_servicos", action: "view" }}>
+                    <Suspense fallback={<PageLoader />}><OsRelatoriosPage /></Suspense>
+                  </RequirePermission>
+                </PlanGuard>
+              ),
+            },
 
             // Suprimentos
             { path: "suprimentos/estoque", element: <Suspense fallback={<PageLoader />}><EstoquePage /></Suspense> },
@@ -152,21 +173,112 @@ export const appRoutes: RouteObject[] = [
             { path: "fiscal/nfe/configuracoes", element: <Suspense fallback={<PageLoader />}><NfeSettingsPage /></Suspense> },
 
             // Financeiro
-            { path: "financeiro/tesouraria", element: <Suspense fallback={<PageLoader />}><TesourariaPage /></Suspense> },
-            { path: "financeiro/contas-a-receber", element: <Suspense fallback={<PageLoader />}><ContasAReceberPage /></Suspense> },
-            { path: "financeiro/contas-a-pagar", element: <Suspense fallback={<PageLoader />}><ContasPagarPage /></Suspense> },
-            { path: "financeiro/centros-de-custo", element: <Suspense fallback={<PageLoader />}><CentrosDeCustoPage /></Suspense> },
-            { path: "financeiro/cobrancas", element: <Suspense fallback={<PageLoader />}><CobrancasBancariasPage /></Suspense> },
-            { path: "financeiro/extrato", element: <Suspense fallback={<PageLoader />}><ExtratoPage /></Suspense> },
-            { path: "financeiro/relatorios", element: <Suspense fallback={<PageLoader />}><RelatoriosFinanceiroPage /></Suspense> },
+            {
+              path: "financeiro/tesouraria",
+              element: (
+                <RequirePermission permission={{ domain: "tesouraria", action: "view" }}>
+                  <Suspense fallback={<PageLoader />}><TesourariaPage /></Suspense>
+                </RequirePermission>
+              ),
+            },
+            {
+              path: "financeiro/contas-a-receber",
+              element: (
+                <RequirePermission permission={{ domain: "contas_a_receber", action: "view" }}>
+                  <Suspense fallback={<PageLoader />}><ContasAReceberPage /></Suspense>
+                </RequirePermission>
+              ),
+            },
+            {
+              path: "financeiro/contas-a-pagar",
+              element: (
+                <RequirePermission permission={{ domain: "contas_a_pagar", action: "view" }}>
+                  <Suspense fallback={<PageLoader />}><ContasPagarPage /></Suspense>
+                </RequirePermission>
+              ),
+            },
+            {
+              path: "financeiro/centros-de-custo",
+              element: (
+                <RequirePermission permission={{ domain: "centros_de_custo", action: "view" }}>
+                  <Suspense fallback={<PageLoader />}><CentrosDeCustoPage /></Suspense>
+                </RequirePermission>
+              ),
+            },
+            {
+              path: "financeiro/cobrancas",
+              element: (
+                <RequirePermission permission={{ domain: "tesouraria", action: "view" }}>
+                  <Suspense fallback={<PageLoader />}><CobrancasBancariasPage /></Suspense>
+                </RequirePermission>
+              ),
+            },
+            {
+              path: "financeiro/extrato",
+              element: (
+                <RequirePermission permission={{ domain: "tesouraria", action: "view" }}>
+                  <Suspense fallback={<PageLoader />}><ExtratoPage /></Suspense>
+                </RequirePermission>
+              ),
+            },
+            {
+              path: "financeiro/relatorios",
+              element: (
+                <RequirePermission permission={{ domain: "relatorios_financeiro", action: "view" }}>
+                  <Suspense fallback={<PageLoader />}><RelatoriosFinanceiroPage /></Suspense>
+                </RequirePermission>
+              ),
+            },
 
             // RH
-            { path: "rh/dashboard", element: <Suspense fallback={<PageLoader />}><RHDashboard /></Suspense> },
-            { path: "rh/cargos", element: <Suspense fallback={<PageLoader />}><CargosPage /></Suspense> },
-            { path: "rh/competencias", element: <Suspense fallback={<PageLoader />}><CompetenciasPage /></Suspense> },
-            { path: "rh/colaboradores", element: <Suspense fallback={<PageLoader />}><ColaboradoresPage /></Suspense> },
-            { path: "rh/matriz", element: <Suspense fallback={<PageLoader />}><MatrizCompetenciasPage /></Suspense> },
-            { path: "rh/treinamentos", element: <Suspense fallback={<PageLoader />}><TreinamentosPage /></Suspense> },
+            {
+              path: "rh/dashboard",
+              element: (
+                <RequirePermission permission={{ domain: "rh", action: "view" }}>
+                  <Suspense fallback={<PageLoader />}><RHDashboard /></Suspense>
+                </RequirePermission>
+              ),
+            },
+            {
+              path: "rh/cargos",
+              element: (
+                <RequirePermission permission={{ domain: "rh", action: "view" }}>
+                  <Suspense fallback={<PageLoader />}><CargosPage /></Suspense>
+                </RequirePermission>
+              ),
+            },
+            {
+              path: "rh/competencias",
+              element: (
+                <RequirePermission permission={{ domain: "rh", action: "view" }}>
+                  <Suspense fallback={<PageLoader />}><CompetenciasPage /></Suspense>
+                </RequirePermission>
+              ),
+            },
+            {
+              path: "rh/colaboradores",
+              element: (
+                <RequirePermission permission={{ domain: "rh", action: "view" }}>
+                  <Suspense fallback={<PageLoader />}><ColaboradoresPage /></Suspense>
+                </RequirePermission>
+              ),
+            },
+            {
+              path: "rh/matriz",
+              element: (
+                <RequirePermission permission={{ domain: "rh", action: "view" }}>
+                  <Suspense fallback={<PageLoader />}><MatrizCompetenciasPage /></Suspense>
+                </RequirePermission>
+              ),
+            },
+            {
+              path: "rh/treinamentos",
+              element: (
+                <RequirePermission permission={{ domain: "rh", action: "view" }}>
+                  <Suspense fallback={<PageLoader />}><TreinamentosPage /></Suspense>
+                </RequirePermission>
+              ),
+            },
 
             // Ferramentas
             { path: "cep-search", element: <Suspense fallback={<PageLoader />}><CepSearchPage /></Suspense> },

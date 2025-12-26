@@ -37,12 +37,12 @@ const Sidebar: React.FC<SidebarProps> = ({
   const [isHoveringSubmenu, setIsHoveringSubmenu] = useState(false);
   const timerRef = useRef<number | null>(null);
   const { signOut } = useAuth();
-  const { industria_enabled, servicos_enabled, loading: loadingFeatures } = useEmpresaFeatures();
+  const { industria_enabled, servicos_enabled, loading: loadingFeatures, error: featuresError } = useEmpresaFeatures();
 
   const visibleMenu = useMemo(() => {
-    if (loadingFeatures) return menuConfig;
+    if (loadingFeatures || featuresError) return menuConfig;
     return filterMenuByFeatures(menuConfig, { industria_enabled, servicos_enabled });
-  }, [industria_enabled, servicos_enabled, loadingFeatures]);
+  }, [industria_enabled, servicos_enabled, loadingFeatures, featuresError]);
 
   const findParentGroup = (href: string) => {
     const parent = visibleMenu.find(group => group.children?.some(child => child.href === href));

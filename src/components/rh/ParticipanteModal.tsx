@@ -75,6 +75,25 @@ const ParticipanteModal: React.FC<ParticipanteModalProps> = ({ isOpen, onClose, 
           placeholder="https://drive.google.com/..."
         />
 
+        {(participante.validade_ate || participante.proxima_reciclagem) && (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <Input
+              label="Validade (calculada)"
+              name="validade_ate"
+              value={participante.validade_ate ? new Date(participante.validade_ate).toLocaleDateString('pt-BR') : '—'}
+              onChange={() => {}}
+              disabled
+            />
+            <Input
+              label="Reciclagem sugerida"
+              name="proxima_reciclagem"
+              value={participante.proxima_reciclagem ? new Date(participante.proxima_reciclagem).toLocaleDateString('pt-BR') : '—'}
+              onChange={() => {}}
+              disabled
+            />
+          </div>
+        )}
+
         <div className="border-t pt-4 mt-4">
           <h4 className="font-semibold text-gray-800 mb-2">Avaliação de Eficácia (ISO 9001)</h4>
           <div className="mb-4">

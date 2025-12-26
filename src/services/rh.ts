@@ -42,10 +42,18 @@ export type Colaborador = {
   nome: string;
   email: string | null;
   documento: string | null;
+  telefone?: string | null;
+  matricula?: string | null;
   data_admissao: string | null;
   cargo_id: string | null;
   cargo_nome: string | null;
   ativo: boolean;
+  status?: 'ativo' | 'afastado' | 'ferias' | 'licenca' | 'desligado';
+  afastado_desde?: string | null;
+  afastado_ate?: string | null;
+  afastamento_motivo?: string | null;
+  data_demissao?: string | null;
+  observacoes?: string | null;
   total_competencias_avaliadas?: number;
 };
 
@@ -76,6 +84,8 @@ export type ColaboradorTreinamento = {
   nota_final: number | null;
   eficacia_avaliada: boolean;
   parecer_eficacia: string | null;
+  validade_ate?: string | null;
+  proxima_reciclagem?: string | null;
 };
 
 export type MatrixCompetencia = {
@@ -117,6 +127,8 @@ export type TreinamentoParticipante = {
   certificado_url: string | null;
   eficacia_avaliada: boolean;
   parecer_eficacia?: string | null;
+  validade_ate?: string | null;
+  proxima_reciclagem?: string | null;
 };
 
 export type TreinamentoDetails = {
@@ -129,6 +141,7 @@ export type TreinamentoDetails = {
   data_inicio: string | null;
   data_fim: string | null;
   carga_horaria_horas: number | null;
+  validade_meses?: number | null;
   instrutor: string | null;
   localizacao: string | null;
   custo_estimado: number | null;
@@ -331,6 +344,39 @@ export async function manageParticipante(
     p_parecer_eficacia: data?.parecer_eficacia || null,
     p_eficacia_avaliada: data?.eficacia_avaliada || false,
   });
+}
+
+// Afastamentos (básico)
+export type ColaboradorAfastamento = {
+  id: string;
+  tipo: 'ferias' | 'licenca' | 'atestado' | 'outros';
+  motivo: string | null;
+  data_inicio: string;
+  data_fim: string | null;
+};
+
+export async function listAfastamentos(colaboradorId: string): Promise<ColaboradorAfastamento[]> {
+  return callRpc<ColaboradorAfastamento[]>('rh_list_afastamentos', { p_colaborador_id: colaboradorId });
+}
+
+export async function addAfastamento(params: {
+  colaboradorId: string;
+  tipo: ColaboradorAfastamento['tipo'];
+  motivo?: string | null;
+  dataInicio?: string | null;
+  dataFim?: string | null;
+}): Promise<string> {
+  return callRpc<string>('rh_add_afastamento', {
+    p_colaborador_id: params.colaboradorId,
+    p_tipo: params.tipo,
+    p_motivo: params.motivo ?? null,
+    p_data_inicio: params.dataInicio ?? null,
+    p_data_fim: params.dataFim ?? null,
+  });
+}
+
+export async function encerrarAfastamento(afastamentoId: string, dataFim?: string | null): Promise<void> {
+  return callRpc('rh_encerrar_afastamento', { p_afastamento_id: afastamentoId, p_data_fim: dataFim ?? null });
 }
 
 // Dashboard

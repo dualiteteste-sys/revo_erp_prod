@@ -92,13 +92,31 @@ export async function saveContaPagar(payload: ContaPagarPayload): Promise<ContaP
     }
 }
 
-export async function pagarContaPagar(params: { id: string; dataPagamento?: string; valorPago?: number }): Promise<ContaPagar> {
+export async function pagarContaPagar(params: {
+  id: string;
+  dataPagamento?: string;
+  valorPago?: number;
+  contaCorrenteId?: string | null;
+}): Promise<ContaPagar> {
   try {
-    return await callRpc<ContaPagar>('financeiro_conta_pagar_pagar', {
-      p_id: params.id,
-      p_data_pagamento: params.dataPagamento ?? null,
-      p_valor_pago: params.valorPago ?? null,
-    });
+    try {
+      return await callRpc<ContaPagar>('financeiro_conta_pagar_pagar_v2', {
+        p_id: params.id,
+        p_data_pagamento: params.dataPagamento ?? null,
+        p_valor_pago: params.valorPago ?? null,
+        p_conta_corrente_id: params.contaCorrenteId ?? null,
+      });
+    } catch (e: any) {
+      const msg = String(e?.message || '');
+      if (!msg.includes('Could not find the function') && !msg.includes('PGRST202')) {
+        throw e;
+      }
+      return await callRpc<ContaPagar>('financeiro_conta_pagar_pagar', {
+        p_id: params.id,
+        p_data_pagamento: params.dataPagamento ?? null,
+        p_valor_pago: params.valorPago ?? null,
+      });
+    }
   } catch (error: any) {
     console.error('[SERVICE][PAGAR_CONTA_PAGAR]', error);
     throw new Error(error.message || 'Erro ao registrar pagamento.');

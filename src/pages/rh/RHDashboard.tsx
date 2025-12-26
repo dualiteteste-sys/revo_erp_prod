@@ -8,12 +8,16 @@ import { useToast } from '@/contexts/ToastProvider';
 import PageHeader from '@/components/ui/PageHeader';
 import { Button } from '@/components/ui/button';
 import { RefreshCw } from 'lucide-react';
+import { useHasPermission } from '@/hooks/useHasPermission';
 
 export default function RHDashboard() {
   const [stats, setStats] = useState<RHDashboardStats | null>(null);
   const [loading, setLoading] = useState(true);
   const [seeding, setSeeding] = useState(false);
   const { addToast } = useToast();
+
+  const permManage = useHasPermission('rh', 'manage');
+  const canManage = !permManage.isLoading && permManage.data;
 
   const fetchStats = async () => {
     setLoading(true);
@@ -32,6 +36,10 @@ export default function RHDashboard() {
   }, []);
 
   const handleSeed = async () => {
+    if (!canManage) {
+      addToast('Você não tem permissão para popular dados de exemplo.', 'warning');
+      return;
+    }
     setSeeding(true);
     try {
       await seedRhData();
@@ -64,7 +72,7 @@ export default function RHDashboard() {
         <p className="text-gray-600 max-w-md mb-8">
           Parece que você ainda não cadastrou nenhum dado. Que tal popular o sistema com dados de exemplo para ver os indicadores em ação?
         </p>
-        <Button onClick={handleSeed} disabled={seeding} className="gap-2">
+        <Button onClick={handleSeed} disabled={seeding || permManage.isLoading || !canManage} className="gap-2">
           {seeding ? <Loader2 className="animate-spin" /> : <DatabaseBackup />}
           Popular com Dados de Exemplo
         </Button>

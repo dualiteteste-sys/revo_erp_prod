@@ -119,6 +119,18 @@ export async function saveContaCorrente(payload: ContaCorrentePayload): Promise<
   return callRpc<ContaCorrente>('financeiro_contas_correntes_upsert', { p_payload: payload });
 }
 
+export async function setContaCorrentePadrao(params: {
+  id: string;
+  para: 'pagamentos' | 'recebimentos';
+  value?: boolean;
+}): Promise<ContaCorrente> {
+  return callRpc<ContaCorrente>('financeiro_contas_correntes_set_padrao', {
+    p_id: params.id,
+    p_para: params.para,
+    p_value: params.value ?? true,
+  });
+}
+
 export async function deleteContaCorrente(id: string): Promise<void> {
   return callRpc('financeiro_contas_correntes_delete', { p_id: id });
 }

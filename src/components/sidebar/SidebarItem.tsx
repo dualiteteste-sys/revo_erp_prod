@@ -11,21 +11,18 @@ const SidebarItem: React.FC<SidebarItemProps> = ({ item, isActive, onClick }) =>
   const Icon = item.icon;
   return (
     <li>
-      <a
-        href={item.href}
-        onClick={(e) => {
-          e.preventDefault();
+      <button
+        type="button"
+        onClick={() => {
           if (item.href && item.href !== '#') onClick(item.href);
         }}
-        className={`flex items-center gap-3 px-4 py-2 rounded-lg text-sm transition-colors duration-200 ${
-          isActive
-            ? 'bg-blue-600 text-white font-medium'
-            : 'text-gray-600 hover:bg-blue-500/20'
+        className={`w-full flex items-center gap-3 px-4 py-2 rounded-lg text-sm transition-colors duration-200 text-left ${
+          isActive ? 'bg-blue-600 text-white font-medium' : 'text-gray-600 hover:bg-blue-500/20'
         }`}
       >
         <Icon size={18} />
         <span>{item.name}</span>
-      </a>
+      </button>
     </li>
   );
 };

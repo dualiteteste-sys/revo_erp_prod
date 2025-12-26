@@ -12,6 +12,8 @@ interface ColaboradoresTableProps {
   onToggleAtivo: (colaborador: Colaborador) => void;
   sortBy: SortState;
   onSort: (column: keyof Colaborador) => void;
+  canEdit?: boolean;
+  canToggleAtivo?: boolean;
 }
 
 const SortableHeader: React.FC<{
@@ -36,7 +38,15 @@ const SortableHeader: React.FC<{
   );
 };
 
-export default function ColaboradoresTable({ colaboradores, onEdit, onToggleAtivo, sortBy, onSort }: ColaboradoresTableProps) {
+export default function ColaboradoresTable({
+  colaboradores,
+  onEdit,
+  onToggleAtivo,
+  sortBy,
+  onSort,
+  canEdit = true,
+  canToggleAtivo = true,
+}: ColaboradoresTableProps) {
   return (
     <div className="overflow-x-auto">
       <table className="min-w-full divide-y divide-gray-200">
@@ -82,9 +92,10 @@ export default function ColaboradoresTable({ colaboradores, onEdit, onToggleAtiv
                       variant="ghost"
                       size="icon"
                       onClick={() => onEdit(c)}
-                      title="Editar"
+                      title={canEdit ? 'Editar' : 'Sem permissão para editar'}
                       aria-label="Editar"
                       className="text-indigo-600 hover:text-indigo-900"
+                      disabled={!canEdit}
                     >
                       <SquarePen size={18} />
                     </Button>
@@ -93,9 +104,16 @@ export default function ColaboradoresTable({ colaboradores, onEdit, onToggleAtiv
                       variant="ghost"
                       size="icon"
                       onClick={() => onToggleAtivo(c)}
-                      title={c.ativo ? 'Inativar' : 'Reativar'}
+                      title={
+                        !canToggleAtivo
+                          ? 'Sem permissão para alterar status'
+                          : c.ativo
+                            ? 'Inativar'
+                            : 'Reativar'
+                      }
                       aria-label={c.ativo ? 'Inativar' : 'Reativar'}
                       className={c.ativo ? 'text-red-600 hover:text-red-900' : 'text-blue-600 hover:text-blue-900'}
+                      disabled={!canToggleAtivo}
                     >
                       {c.ativo ? <Trash2 size={18} /> : <RotateCcw size={18} />}
                     </Button>
@@ -112,4 +130,3 @@ export default function ColaboradoresTable({ colaboradores, onEdit, onToggleAtiv
     </div>
   );
 }
-
