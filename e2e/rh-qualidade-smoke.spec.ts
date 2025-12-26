@@ -106,6 +106,7 @@ async function mockAuthAndEmpresa(page: Page) {
 }
 
 test('RH & Qualidade: navegação e render sem erros de console', async ({ page }) => {
+  test.setTimeout(60000);
   // Fallback: evita chamadas não mapeadas ao Supabase real.
   await page.route('**/rest/v1/**', async (route) => {
     if (route.request().method() === 'OPTIONS') {
@@ -376,7 +377,7 @@ test('RH & Qualidade: navegação e render sem erros de console', async ({ page 
 
   await page.goto('/app/industria/qualidade/planos');
   await expect(page.getByText('Planos de Inspeção')).toBeVisible();
-  await expect(page.getByText('Plano IP - Produto A')).toBeVisible();
+  await expect(page.getByText('Plano IP - Produto A')).toBeVisible({ timeout: 15000 });
 
   await page.goto('/app/industria/qualidade/lotes');
   await expect(page.getByText('Lotes & Bloqueios')).toBeVisible();

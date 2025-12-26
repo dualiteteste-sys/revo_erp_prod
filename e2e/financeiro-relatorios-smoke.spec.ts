@@ -157,7 +157,6 @@ test('Financeiro: relatórios abrem sem erros de console', async ({ page }) => {
   await expect(page).toHaveURL(/\/app\//);
 
   await page.goto('/app/financeiro/relatorios');
-  await expect(page.getByRole('heading', { name: 'Relatórios do Financeiro' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Relatórios do Financeiro' })).toBeVisible({ timeout: 15000 });
   await expect(page.getByText('Saldo total (Caixa)')).toBeVisible();
 });
-

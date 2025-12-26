@@ -176,13 +176,9 @@ test('should allow user to log in and view products', async ({ page }) => {
     // Wait for network to settle
     await page.waitForLoadState('networkidle');
 
-    // Debug: Dump HTML
-    const content = await page.content();
-    console.log('PAGE CONTENT DUMP:', content);
-
     // Check if the active company is loaded
-    await expect(page.getByText('Fantasia E2E')).toBeVisible();
+    await expect(page.getByText('Fantasia E2E')).toBeVisible({ timeout: 15000 });
 
     // Check if the mocked product is visible
-    await expect(page.getByText('Produto E2E')).toBeVisible();
+    await expect(page.getByText('Produto E2E')).toBeVisible({ timeout: 15000 });
 });

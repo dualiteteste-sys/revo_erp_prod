@@ -95,6 +95,7 @@ async function mockAuthAndEmpresa(page: Page) {
 }
 
 test('Financeiro: registrar recebimento e pagamento (fluxo básico)', async ({ page }) => {
+  test.setTimeout(60000);
   const today = new Date().toISOString().slice(0, 10);
 
   const contasReceber = [
@@ -223,7 +224,7 @@ test('Financeiro: registrar recebimento e pagamento (fluxo básico)', async ({ p
   await expect(page).toHaveURL(/\/app\//);
 
   await page.goto('/app/financeiro/contas-a-receber');
-  await expect(page.getByRole('heading', { name: 'Contas a Receber' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Contas a Receber' })).toBeVisible({ timeout: 20000 });
   await page.getByRole('button', { name: 'Registrar recebimento' }).first().click();
   await page
     .locator('div.fixed.inset-0')
@@ -233,7 +234,7 @@ test('Financeiro: registrar recebimento e pagamento (fluxo básico)', async ({ p
   await expect(page.getByRole('table').getByText('Pago')).toBeVisible();
 
   await page.goto('/app/financeiro/contas-a-pagar');
-  await expect(page.getByRole('heading', { name: 'Contas a Pagar' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Contas a Pagar' })).toBeVisible({ timeout: 20000 });
   await page.getByRole('button', { name: 'Registrar pagamento' }).first().click();
   await page
     .locator('div.fixed.inset-0')

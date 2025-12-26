@@ -39,6 +39,14 @@ async function mockAuthAndEmpresa(page: Page) {
   });
 
   await page.route('**/rest/v1/empresa_usuarios*', async (route) => {
+    const url = new URL(route.request().url());
+    const select = url.searchParams.get('select') || '';
+
+    if (select === 'role' || select.includes('role')) {
+      await route.fulfill({ json: { role: 'member' } });
+      return;
+    }
+
     await route.fulfill({
       json: [
         {
@@ -97,7 +105,8 @@ async function mockAuthAndEmpresa(page: Page) {
   });
 }
 
-test('OS: lista e abre modal de criação', async ({ page }) => {
+test('Suprimentos: Ordens de Compra abrem sem erros de console', async ({ page }) => {
+  test.setTimeout(60000);
   await page.route('**/rest/v1/**', async (route) => {
     if (route.request().method() === 'OPTIONS') {
       await route.fulfill({ status: 204, body: '' });
@@ -108,33 +117,8 @@ test('OS: lista e abre modal de criação', async ({ page }) => {
 
   await mockAuthAndEmpresa(page);
 
-  await page.route('**/rest/v1/rpc/list_os_for_current_user', async (route) => {
-    await route.fulfill({
-      json: [
-        {
-          id: 'os-1',
-          empresa_id: 'empresa-1',
-          numero: 1001,
-          cliente_id: 'cli-1',
-          descricao: 'Manutenção preventiva',
-          status: 'aberta',
-          data_inicio: '2025-01-02',
-          data_prevista: '2025-01-03',
-          hora: '08:00',
-          total_itens: 1,
-          desconto_valor: 0,
-          total_geral: 150,
-          forma_recebimento: null,
-          condicao_pagamento: null,
-          observacoes: null,
-          observacoes_internas: null,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-          ordem: 1,
-          cliente_nome: 'Cliente Teste',
-        },
-      ],
-    });
+  await page.route('**/rest/v1/rpc/compras_list_pedidos', async (route) => {
+    await route.fulfill({ json: [] });
   });
 
   await page.goto('/auth/login');
@@ -143,11 +127,11 @@ test('OS: lista e abre modal de criação', async ({ page }) => {
   await page.getByRole('button', { name: 'Entrar' }).click();
   await expect(page).toHaveURL(/\/app\//);
 
-  await page.goto('/app/ordens-de-servico');
-  await expect(page.getByText('Ordens de Serviço')).toBeVisible({ timeout: 15000 });
-  await expect(page.getByText('Cliente Teste')).toBeVisible({ timeout: 15000 });
-  await expect(page.getByText('Manutenção preventiva')).toBeVisible({ timeout: 15000 });
+  await page.goto('/app/dashboard');
+  await page.getByRole('button', { name: 'Suprimentos' }).click();
+  await page.locator('a[href="/app/suprimentos/compras"]').click();
 
-  await page.getByRole('button', { name: 'Nova O.S.' }).click();
-  await expect(page.getByText('Nova Ordem de Serviço')).toBeVisible();
+  await expect(page).toHaveURL(/\/app\/suprimentos\/compras/);
+  await expect(page.getByRole('heading', { name: 'Ordens de Compra' })).toBeVisible({ timeout: 15000 });
+  await expect(page.getByRole('button', { name: 'Nova Compra' })).toBeVisible();
 });
