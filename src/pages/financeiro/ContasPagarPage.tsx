@@ -9,11 +9,11 @@ import Modal from '@/components/ui/Modal';
 import ContasPagarTable from '@/components/financeiro/contas-pagar/ContasPagarTable';
 import ContasPagarFormPanel from '@/components/financeiro/contas-pagar/ContasPagarFormPanel';
 import ContasPagarSummary from '@/components/financeiro/contas-pagar/ContasPagarSummary';
+import BaixaRapidaModal from '@/components/financeiro/common/BaixaRapidaModal';
 import Select from '@/components/ui/forms/Select';
 import DatePicker from '@/components/ui/DatePicker';
 import ErrorAlert from '@/components/ui/ErrorAlert';
 import { Button } from '@/components/ui/button';
-import { useConfirm } from '@/contexts/ConfirmProvider';
 
 const ContasPagarPage: React.FC = () => {
   const {
@@ -38,7 +38,6 @@ const ContasPagarPage: React.FC = () => {
     refresh,
   } = useContasPagar();
   const { addToast } = useToast();
-  const { confirm } = useConfirm();
 
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [selectedConta, setSelectedConta] = useState<financeiroService.ContaPagar | null>(null);
@@ -47,6 +46,8 @@ const ContasPagarPage: React.FC = () => {
   const [isDeleting, setIsDeleting] = useState(false);
   const [isFetchingDetails, setIsFetchingDetails] = useState(false);
   const [isSeeding, setIsSeeding] = useState(false);
+  const [isBaixaOpen, setIsBaixaOpen] = useState(false);
+  const [contaToPay, setContaToPay] = useState<financeiroService.ContaPagar | null>(null);
 
   const handleOpenForm = async (conta: financeiroService.ContaPagar | null = null) => {
     if (conta?.id) {
@@ -105,28 +106,13 @@ const ContasPagarPage: React.FC = () => {
 
   const handlePay = async (conta: financeiroService.ContaPagar) => {
     if (!conta?.id) return;
-    const ok = await confirm({
-      title: 'Registrar pagamento',
-      description: `Deseja marcar a conta "${conta.descricao}" como paga hoje?`,
-      confirmText: 'Registrar pagamento',
-      cancelText: 'Cancelar',
-      variant: 'default',
-    });
-    if (!ok) return;
+    setContaToPay(conta);
+    setIsBaixaOpen(true);
+  };
 
-    try {
-      const today = new Date().toISOString().slice(0, 10);
-      const total = (Number(conta.valor_total || 0) + Number(conta.multa || 0) + Number(conta.juros || 0) - Number(conta.desconto || 0));
-      await financeiroService.pagarContaPagar({
-        id: conta.id,
-        dataPagamento: today,
-        valorPago: total,
-      });
-      addToast('Pagamento registrado com sucesso!', 'success');
-      refresh();
-    } catch (e: any) {
-      addToast(e?.message || 'Erro ao registrar pagamento.', 'error');
-    }
+  const handleCloseBaixa = () => {
+    setIsBaixaOpen(false);
+    setContaToPay(null);
   };
 
   const handleSort = (column: string) => {
@@ -276,6 +262,40 @@ const ContasPagarPage: React.FC = () => {
           <ContasPagarFormPanel conta={selectedConta} onSaveSuccess={handleSaveSuccess} onClose={handleCloseForm} />
         )}
       </Modal>
+
+      <BaixaRapidaModal
+        isOpen={isBaixaOpen}
+        onClose={handleCloseBaixa}
+        title="Registrar pagamento"
+        description={
+          contaToPay?.descricao
+            ? `Confirmar pagamento da conta "${contaToPay.descricao}".`
+            : 'Confirmar pagamento.'
+        }
+        defaultValor={
+          Number(contaToPay?.valor_total || 0) +
+          Number(contaToPay?.multa || 0) +
+          Number(contaToPay?.juros || 0) -
+          Number(contaToPay?.desconto || 0)
+        }
+        confirmLabel="Registrar pagamento"
+        onConfirm={async ({ contaCorrenteId, dataISO, valor }) => {
+          if (!contaToPay?.id) return;
+          try {
+            await financeiroService.pagarContaPagar({
+              id: contaToPay.id,
+              dataPagamento: dataISO,
+              valorPago: valor,
+              contaCorrenteId,
+            });
+            addToast('Pagamento registrado com sucesso!', 'success');
+            refresh();
+          } catch (e: any) {
+            addToast(e?.message || 'Erro ao registrar pagamento.', 'error');
+            throw e;
+          }
+        }}
+      />
 
       <ConfirmationModal
         isOpen={isDeleteModalOpen}

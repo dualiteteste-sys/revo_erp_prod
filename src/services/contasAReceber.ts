@@ -101,13 +101,27 @@ export async function receberContaAReceber(params: {
   id: string;
   dataPagamento?: string;
   valorPago?: number;
+  contaCorrenteId?: string | null;
 }): Promise<ContaAReceber> {
   try {
-    return await callRpc<ContaAReceber>('financeiro_conta_a_receber_receber', {
-      p_id: params.id,
-      p_data_pagamento: params.dataPagamento ?? null,
-      p_valor_pago: params.valorPago ?? null,
-    });
+    try {
+      return await callRpc<ContaAReceber>('financeiro_conta_a_receber_receber_v2', {
+        p_id: params.id,
+        p_data_pagamento: params.dataPagamento ?? null,
+        p_valor_pago: params.valorPago ?? null,
+        p_conta_corrente_id: params.contaCorrenteId ?? null,
+      });
+    } catch (e: any) {
+      const msg = String(e?.message || '');
+      if (!msg.includes('Could not find the function') && !msg.includes('PGRST202')) {
+        throw e;
+      }
+      return await callRpc<ContaAReceber>('financeiro_conta_a_receber_receber', {
+        p_id: params.id,
+        p_data_pagamento: params.dataPagamento ?? null,
+        p_valor_pago: params.valorPago ?? null,
+      });
+    }
   } catch (error: any) {
     console.error('[SERVICE][RECEBER_CONTA_A_RECEBER]', error);
     throw new Error(error.message || 'Erro ao registrar recebimento.');

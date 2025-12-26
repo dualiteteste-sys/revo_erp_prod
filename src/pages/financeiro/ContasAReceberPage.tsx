@@ -9,10 +9,10 @@ import Modal from '@/components/ui/Modal';
 import ContasAReceberTable from '@/components/financeiro/contas-a-receber/ContasAReceberTable';
 import ContasAReceberFormPanel from '@/components/financeiro/contas-a-receber/ContasAReceberFormPanel';
 import ContasAReceberSummary from '@/components/financeiro/contas-a-receber/ContasAReceberSummary';
+import BaixaRapidaModal from '@/components/financeiro/common/BaixaRapidaModal';
 import Select from '@/components/ui/forms/Select';
 import { Button } from '@/components/ui/button';
 import { useSearchParams } from 'react-router-dom';
-import { useConfirm } from '@/contexts/ConfirmProvider';
 import DatePicker from '@/components/ui/DatePicker';
 
 const ContasAReceberPage: React.FC = () => {
@@ -38,7 +38,6 @@ const ContasAReceberPage: React.FC = () => {
     refresh,
   } = useContasAReceber();
   const { addToast } = useToast();
-  const { confirm } = useConfirm();
 
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [selectedConta, setSelectedConta] = useState<contasAReceberService.ContaAReceber | null>(null);
@@ -48,6 +47,8 @@ const ContasAReceberPage: React.FC = () => {
   const [isFetchingDetails, setIsFetchingDetails] = useState(false);
   const [isSeeding, setIsSeeding] = useState(false);
   const [searchParams, setSearchParams] = useSearchParams();
+  const [isBaixaOpen, setIsBaixaOpen] = useState(false);
+  const [contaToReceive, setContaToReceive] = useState<contasAReceberService.ContaAReceber | null>(null);
 
   useEffect(() => {
     const contaId = searchParams.get('contaId');
@@ -130,27 +131,13 @@ const ContasAReceberPage: React.FC = () => {
 
   const handleReceive = async (conta: contasAReceberService.ContaAReceber) => {
     if (!conta?.id) return;
-    const ok = await confirm({
-      title: 'Registrar recebimento',
-      description: `Deseja marcar a conta "${conta.descricao}" como recebida hoje?`,
-      confirmText: 'Registrar recebimento',
-      cancelText: 'Cancelar',
-      variant: 'default',
-    });
-    if (!ok) return;
+    setContaToReceive(conta);
+    setIsBaixaOpen(true);
+  };
 
-    try {
-      const today = new Date().toISOString().slice(0, 10);
-      await contasAReceberService.receberContaAReceber({
-        id: conta.id,
-        dataPagamento: today,
-        valorPago: Number(conta.valor || 0),
-      });
-      addToast('Recebimento registrado com sucesso!', 'success');
-      refresh();
-    } catch (e: any) {
-      addToast(e?.message || 'Erro ao registrar recebimento.', 'error');
-    }
+  const handleCloseBaixa = () => {
+    setIsBaixaOpen(false);
+    setContaToReceive(null);
   };
 
   const handleSort = (column: string) => {
@@ -288,6 +275,35 @@ const ContasAReceberPage: React.FC = () => {
           <ContasAReceberFormPanel conta={selectedConta} onSaveSuccess={handleSaveSuccess} onClose={handleCloseForm} />
         )}
       </Modal>
+
+      <BaixaRapidaModal
+        isOpen={isBaixaOpen}
+        onClose={handleCloseBaixa}
+        title="Registrar recebimento"
+        description={
+          contaToReceive?.descricao
+            ? `Confirmar recebimento da conta "${contaToReceive.descricao}".`
+            : 'Confirmar recebimento.'
+        }
+        defaultValor={Number(contaToReceive?.valor || 0)}
+        confirmLabel="Registrar recebimento"
+        onConfirm={async ({ contaCorrenteId, dataISO, valor }) => {
+          if (!contaToReceive?.id) return;
+          try {
+            await contasAReceberService.receberContaAReceber({
+              id: contaToReceive.id,
+              dataPagamento: dataISO,
+              valorPago: valor,
+              contaCorrenteId,
+            });
+            addToast('Recebimento registrado com sucesso!', 'success');
+            refresh();
+          } catch (e: any) {
+            addToast(e?.message || 'Erro ao registrar recebimento.', 'error');
+            throw e;
+          }
+        }}
+      />
 
       <ConfirmationModal
         isOpen={isDeleteModalOpen}

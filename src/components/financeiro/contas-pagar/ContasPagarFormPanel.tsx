@@ -18,8 +18,6 @@ interface ContasPagarFormPanelProps {
 
 const statusOptions = [
   { value: 'aberta', label: 'Aberta' },
-  { value: 'parcial', label: 'Parcialmente Paga' },
-  { value: 'paga', label: 'Paga' },
   { value: 'cancelada', label: 'Cancelada' },
 ];
 
@@ -28,6 +26,7 @@ const ContasPagarFormPanel: React.FC<ContasPagarFormPanelProps> = ({ conta, onSa
   const [isSaving, setIsSaving] = useState(false);
   const [formData, setFormData] = useState<Partial<ContaPagarPayload>>({});
   const [fornecedorName, setFornecedorName] = useState('');
+  const isPagoOuParcial = formData.status === 'paga' || formData.status === 'parcial';
 
   const valorTotalProps = useNumericField(formData.valor_total, (value) => handleFormChange('valor_total', value));
   const valorPagoProps = useNumericField(formData.valor_pago, (value) => handleFormChange('valor_pago', value));
@@ -113,14 +112,26 @@ const ContasPagarFormPanel: React.FC<ContasPagarFormPanelProps> = ({ conta, onSa
           <Input label="Data de Emissão" name="data_emissao" type="date" value={formData.data_emissao?.split('T')[0] || ''} onChange={e => handleFormChange('data_emissao', e.target.value)} className="sm:col-span-2" />
           <Input label="Data de Vencimento" name="data_vencimento" type="date" value={formData.data_vencimento?.split('T')[0] || ''} onChange={e => handleFormChange('data_vencimento', e.target.value)} required className="sm:col-span-2" />
           
-          <Select label="Status" name="status" value={formData.status || 'aberta'} onChange={e => handleFormChange('status', e.target.value as any)} className="sm:col-span-2">
+          <Select
+            label="Status"
+            name="status"
+            value={formData.status || 'aberta'}
+            onChange={e => handleFormChange('status', e.target.value as any)}
+            className="sm:col-span-2"
+            disabled={isPagoOuParcial}
+          >
+            {formData.status === 'paga' ? <option value="paga">Paga (registrado)</option> : null}
+            {formData.status === 'parcial' ? <option value="parcial">Parcial (registrado)</option> : null}
             {statusOptions.map(opt => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
           </Select>
         </Section>
 
         <Section title="Detalhes do Pagamento" description="Informações sobre o pagamento, juros e descontos.">
-          <Input label="Data de Pagamento" name="data_pagamento" type="date" value={formData.data_pagamento?.split('T')[0] || ''} onChange={e => handleFormChange('data_pagamento', e.target.value)} className="sm:col-span-2" />
-          <Input label="Valor Pago (R$)" name="valor_pago" {...valorPagoProps} className="sm:col-span-2" />
+          <div className="sm:col-span-6 text-sm text-gray-600">
+            Para registrar pagamento (e manter a Tesouraria/caixa consistente), use a ação <span className="font-medium">Registrar pagamento</span> na listagem.
+          </div>
+          <Input label="Data de Pagamento" name="data_pagamento" type="date" value={formData.data_pagamento?.split('T')[0] || ''} disabled className="sm:col-span-2" />
+          <Input label="Valor Pago (R$)" name="valor_pago" {...valorPagoProps} disabled className="sm:col-span-2" />
           <div className="sm:col-span-2"></div>
 
           <Input label="Multa (R$)" name="multa" {...multaProps} className="sm:col-span-2" />

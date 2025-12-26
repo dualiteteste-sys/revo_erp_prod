@@ -18,7 +18,6 @@ interface ContasAReceberFormPanelProps {
 
 const statusOptions = [
   { value: 'pendente', label: 'Pendente' },
-  { value: 'pago', label: 'Pago' },
   { value: 'vencido', label: 'Vencido' },
   { value: 'cancelado', label: 'Cancelado' },
 ];
@@ -28,6 +27,7 @@ const ContasAReceberFormPanel: React.FC<ContasAReceberFormPanelProps> = ({ conta
   const [isSaving, setIsSaving] = useState(false);
   const [formData, setFormData] = useState<Partial<ContaAReceber>>({});
   const [clienteName, setClienteName] = useState('');
+  const isPago = formData.status === 'pago';
 
   const valorProps = useNumericField(formData.valor, (value) => handleFormChange('valor', value));
 
@@ -88,13 +88,24 @@ const ContasAReceberFormPanel: React.FC<ContasAReceberFormPanelProps> = ({ conta
           </div>
           <Input label="Valor (R$)" name="valor" {...valorProps} required className="sm:col-span-3" />
           <Input label="Data de Vencimento" name="data_vencimento" type="date" value={formData.data_vencimento?.split('T')[0] || ''} onChange={e => handleFormChange('data_vencimento', e.target.value)} required className="sm:col-span-3" />
-          <Select label="Status" name="status" value={formData.status || 'pendente'} onChange={e => handleFormChange('status', e.target.value as any)} className="sm:col-span-3">
+          <Select
+            label="Status"
+            name="status"
+            value={formData.status || 'pendente'}
+            onChange={e => handleFormChange('status', e.target.value as any)}
+            className="sm:col-span-3"
+            disabled={isPago}
+          >
+            {isPago ? <option value="pago">Pago (registrado)</option> : null}
             {statusOptions.map(opt => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
           </Select>
         </Section>
         <Section title="Detalhes do Recebimento" description="Informações sobre o recebimento da conta.">
-          <Input label="Data de Recebimento" name="data_pagamento" type="date" value={formData.data_pagamento?.split('T')[0] || ''} onChange={e => handleFormChange('data_pagamento', e.target.value)} className="sm:col-span-3" />
-          <Input label="Valor Recebido" name="valor_pago" type="number" step="0.01" value={formData.valor_pago || ''} onChange={e => handleFormChange('valor_pago', parseFloat(e.target.value))} className="sm:col-span-3" />
+          <div className="sm:col-span-6 text-sm text-gray-600">
+            Para registrar recebimento (e manter a Tesouraria/caixa consistente), use a ação <span className="font-medium">Registrar recebimento</span> na listagem.
+          </div>
+          <Input label="Data de Recebimento" name="data_pagamento" type="date" value={formData.data_pagamento?.split('T')[0] || ''} disabled className="sm:col-span-3" />
+          <Input label="Valor Recebido" name="valor_pago" type="number" step="0.01" value={formData.valor_pago || ''} disabled className="sm:col-span-3" />
           <TextArea label="Observações" name="observacoes" value={formData.observacoes || ''} onChange={e => handleFormChange('observacoes', e.target.value)} rows={3} className="sm:col-span-6" />
         </Section>
       </div>
