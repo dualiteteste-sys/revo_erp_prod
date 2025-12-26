@@ -138,8 +138,26 @@ export const appRoutes: RouteObject[] = [
             { path: "relatorios", element: <Suspense fallback={<PageLoader />}><RelatoriosHubPage /></Suspense> },
 
             // Serviços (Módulo)
-            { path: "ordens-de-servico", element: <PlanGuard feature="servicos"><Suspense fallback={<PageLoader />}><OSPage /></Suspense></PlanGuard> },
-            { path: "servicos/relatorios", element: <PlanGuard feature="servicos"><Suspense fallback={<PageLoader />}><OsRelatoriosPage /></Suspense></PlanGuard> },
+            {
+              path: "ordens-de-servico",
+              element: (
+                <PlanGuard feature="servicos">
+                  <RequirePermission permission={{ domain: "os", action: "view" }}>
+                    <Suspense fallback={<PageLoader />}><OSPage /></Suspense>
+                  </RequirePermission>
+                </PlanGuard>
+              ),
+            },
+            {
+              path: "servicos/relatorios",
+              element: (
+                <PlanGuard feature="servicos">
+                  <RequirePermission permission={{ domain: "relatorios_servicos", action: "view" }}>
+                    <Suspense fallback={<PageLoader />}><OsRelatoriosPage /></Suspense>
+                  </RequirePermission>
+                </PlanGuard>
+              ),
+            },
 
             // Suprimentos
             { path: "suprimentos/estoque", element: <Suspense fallback={<PageLoader />}><EstoquePage /></Suspense> },

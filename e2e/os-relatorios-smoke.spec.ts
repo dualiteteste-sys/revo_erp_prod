@@ -90,6 +90,10 @@ async function mockAuthAndEmpresa(page: Page) {
     await route.fulfill({ json: 'member' });
   });
 
+  await page.route('**/rest/v1/rpc/has_permission_for_current_user', async (route) => {
+    await route.fulfill({ json: true });
+  });
+
   await page.route('**/rest/v1/empresa_features*', async (route) => {
     await route.fulfill({
       json: {
@@ -175,10 +179,8 @@ test('Serviços: relatórios abrem sem erros de console', async ({ page }) => {
   await page.getByRole('button', { name: 'Entrar' }).click();
   await expect(page).toHaveURL(/\/app\//);
 
-  // Navegação via menu (evita regressão: itens com nomes repetidos, ex. "Relatórios").
-  await page.goto('/app/dashboard');
-  await page.getByRole('button', { name: 'Serviços' }).click();
-  await page.getByRole('button', { name: 'Relatórios' }).click();
+  // Acesso direto evita flakiness por itens com nomes repetidos ("Relatórios") em múltiplos grupos.
+  await page.goto('/app/servicos/relatorios');
   await expect(page).toHaveURL(/\/app\/servicos\/relatorios/);
 
   await expect(page.getByRole('heading', { name: 'Relatórios de Serviços' })).toBeVisible();

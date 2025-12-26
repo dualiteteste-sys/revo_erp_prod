@@ -82,6 +82,10 @@ async function mockAuthAndEmpresa(page: Page) {
     await route.fulfill({ json: 'member' });
   });
 
+  await page.route('**/rest/v1/rpc/has_permission_for_current_user', async (route) => {
+    await route.fulfill({ json: true });
+  });
+
   await page.route('**/rest/v1/empresa_features*', async (route) => {
     await route.fulfill({
       json: {
