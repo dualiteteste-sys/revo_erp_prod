@@ -202,10 +202,14 @@ export async function listKanbanOsV2(params: {
   }
 }
 
-export async function setOsStatus(osId: string, next: status_os, extra?: Record<string, unknown> | null): Promise<void> {
+export async function setOsStatus(
+  osId: string,
+  next: status_os,
+  opts?: { force?: boolean } | null
+): Promise<void> {
   await callRpc('os_set_status_for_current_user', {
-    p_id: osId,
+    p_os_id: osId,
     p_next: next,
-    p_extra: extra ?? null,
+    p_opts: opts ?? {},
   });
 }

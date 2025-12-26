@@ -137,6 +137,21 @@ test('OS: lista e abre modal de criação', async ({ page }) => {
     });
   });
 
+  await page.route('**/rest/v1/rpc/os_set_status_for_current_user', async (route) => {
+    const body = (await route.request().postDataJSON()) as any;
+    expect(body).toMatchObject({ p_os_id: 'os-1', p_next: 'concluida' });
+    await route.fulfill({
+      json: {
+        id: 'os-1',
+        empresa_id: 'empresa-1',
+        numero: 1001,
+        cliente_id: 'cli-1',
+        descricao: 'Manutenção preventiva',
+        status: 'concluida',
+      },
+    });
+  });
+
   await page.goto('/auth/login');
   await page.getByPlaceholder('seu@email.com').fill('test@example.com');
   await page.getByLabel('Senha').fill('password123');
@@ -147,6 +162,11 @@ test('OS: lista e abre modal de criação', async ({ page }) => {
   await expect(page.getByText('Ordens de Serviço')).toBeVisible({ timeout: 15000 });
   await expect(page.getByText('Cliente Teste')).toBeVisible({ timeout: 15000 });
   await expect(page.getByText('Manutenção preventiva')).toBeVisible({ timeout: 15000 });
+
+  await page.getByTitle('Mais ações').click();
+  await page.getByRole('menuitem', { name: 'Concluir' }).click();
+  await page.getByRole('button', { name: 'Concluir' }).click();
+  await expect(page.getByText('Status atualizado para “Concluída”.')).toBeVisible();
 
   await page.getByRole('button', { name: 'Nova O.S.' }).click();
   await expect(page.getByText('Nova Ordem de Serviço')).toBeVisible();
