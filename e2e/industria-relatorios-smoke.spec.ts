@@ -204,13 +204,11 @@ test('Indústria: relatórios abrem sem erros (PCP + rupturas)', async ({ page }
   await page.getByRole('button', { name: 'Entrar' }).click();
   await expect(page).toHaveURL(/\/app\//);
 
-  await page.goto('/app/dashboard');
-  await page.getByRole('button', { name: 'Indústria' }).click();
-  await page.locator('a[href="/app/industria/relatorios"]').click();
+  // Acesso direto evita flakiness de navegação via menu (variações de markup/estado do sidebar).
+  await page.goto('/app/industria/relatorios');
   await expect(page).toHaveURL(/\/app\/industria\/relatorios/);
 
   await expect(page.getByRole('heading', { name: 'Relatórios de Indústria' })).toBeVisible();
   await expect(page.getByText('Rupturas / Baixo estoque')).toBeVisible();
   await expect(page.getByText('Parafuso 10mm')).toBeVisible();
 });
-

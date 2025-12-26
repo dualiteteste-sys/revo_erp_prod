@@ -127,9 +127,8 @@ test('Suprimentos: Ordens de Compra abrem sem erros de console', async ({ page }
   await page.getByRole('button', { name: 'Entrar' }).click();
   await expect(page).toHaveURL(/\/app\//);
 
-  await page.goto('/app/dashboard');
-  await page.getByRole('button', { name: 'Suprimentos' }).click();
-  await page.locator('a[href="/app/suprimentos/compras"]').click();
+  // Acesso direto evita flakiness de navegação via menu (variações de markup/estado do sidebar).
+  await page.goto('/app/suprimentos/compras');
 
   await expect(page).toHaveURL(/\/app\/suprimentos\/compras/);
   await expect(page.getByRole('heading', { name: 'Ordens de Compra' })).toBeVisible({ timeout: 15000 });

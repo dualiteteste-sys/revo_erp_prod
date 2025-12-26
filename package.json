@@ -13,6 +13,9 @@
     "test": "vitest",
     "test:coverage": "vitest run --coverage",
     "test:e2e": "playwright test --workers=1",
+    "test:e2e:gate:servicos": "playwright test --workers=1 e2e/auth.spec.ts e2e/partners-smoke.spec.ts e2e/rh-qualidade-smoke.spec.ts e2e/financeiro-flows.spec.ts e2e/financeiro-relatorios-smoke.spec.ts e2e/services-smoke.spec.ts e2e/os-smoke.spec.ts e2e/os-docs-smoke.spec.ts e2e/os-relatorios-smoke.spec.ts e2e/fiscal-nfe-smoke.spec.ts",
+    "test:e2e:gate:industria": "playwright test --workers=1 e2e/auth.spec.ts e2e/partners-smoke.spec.ts e2e/rh-qualidade-smoke.spec.ts e2e/financeiro-flows.spec.ts e2e/financeiro-relatorios-smoke.spec.ts e2e/beneficiamento-flow.spec.ts e2e/suprimentos-estoque-smoke.spec.ts e2e/compras-smoke.spec.ts e2e/industria-relatorios-smoke.spec.ts e2e/fiscal-nfe-smoke.spec.ts",
+    "test:e2e:gate:all": "playwright test --workers=1 e2e/auth.spec.ts e2e/partners-smoke.spec.ts e2e/rh-qualidade-smoke.spec.ts e2e/financeiro-flows.spec.ts e2e/financeiro-relatorios-smoke.spec.ts e2e/services-smoke.spec.ts e2e/os-smoke.spec.ts e2e/os-docs-smoke.spec.ts e2e/os-relatorios-smoke.spec.ts e2e/beneficiamento-flow.spec.ts e2e/suprimentos-estoque-smoke.spec.ts e2e/compras-smoke.spec.ts e2e/industria-relatorios-smoke.spec.ts e2e/fiscal-nfe-smoke.spec.ts",
     "verify:migrations": "supabase start -x logflare && echo \"y\" | supabase db push --local --include-all && supabase stop"
   },
   "dependencies": {
