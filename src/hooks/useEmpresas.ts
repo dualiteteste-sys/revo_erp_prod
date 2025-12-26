@@ -5,12 +5,6 @@ import { Database } from '@/types/database.types';
 
 type Empresa = Database['public']['Tables']['empresas']['Row'];
 
-async function hasValidSession(): Promise<boolean> {
-    const { data, error } = await supabase.auth.getSession();
-    if (error) return false;
-    return !!data.session?.access_token;
-}
-
 export const EMPRESAS_KEYS = {
     all: ['empresas'] as const,
     list: () => [...EMPRESAS_KEYS.all, 'list'] as const,
@@ -22,7 +16,6 @@ export function useEmpresas(userId: string | null) {
         queryKey: EMPRESAS_KEYS.list(),
         queryFn: async () => {
             if (!userId) return [];
-            if (!(await hasValidSession())) return [];
 
             logger.debug('[QUERY][empresas] fetching list');
             const { data, error } = await supabase
@@ -54,7 +47,6 @@ export function useActiveEmpresaId(userId: string | null) {
         queryKey: EMPRESAS_KEYS.active(),
         queryFn: async () => {
             if (!userId) return null;
-            if (!(await hasValidSession())) return null;
 
             logger.debug('[QUERY][active_empresa] fetching');
             const { data, error } = await supabase
@@ -83,9 +75,6 @@ export function useBootstrapEmpresa() {
     return useMutation({
         mutationFn: async () => {
             logger.info("[MUTATION][bootstrap] start");
-            if (!(await hasValidSession())) {
-                throw new Error('Sem sessão. Faça login para continuar.');
-            }
             // @ts-ignore - RPC types mismatch
             const { data, error } = await supabase.rpc("secure_bootstrap_empresa_for_current_user", {
                 p_razao_social: "Empresa sem Nome",
@@ -112,9 +101,6 @@ export function useSetActiveEmpresa() {
     return useMutation({
         mutationFn: async (empresaId: string) => {
             logger.info("[MUTATION][set_active] start", { empresaId });
-            if (!(await hasValidSession())) {
-                throw new Error('Sem sessão. Faça login para continuar.');
-            }
             // @ts-ignore - RPC types mismatch
             const { error } = await supabase.rpc('set_active_empresa_for_current_user', {
                 p_empresa_id: empresaId

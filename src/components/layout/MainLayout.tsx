@@ -45,6 +45,7 @@ const MainLayout: React.FC = () => {
   const [settingsCanClose, setSettingsCanClose] = useState(true);
   const [settingsInitialTab, setSettingsInitialTab] = useState('Geral');
   const [settingsInitialItem, setSettingsInitialItem] = useState('Empresa');
+  const forcedSettingsOpenRef = React.useRef(false);
 
   const location = useLocation();
   const navigate = useNavigate();
@@ -80,6 +81,8 @@ const MainLayout: React.FC = () => {
     if (isProfileIncomplete || activeEmpresa.nome_razao_social === 'Empresa sem Nome') {
       if (!isSettingsPanelOpen) {
         console.log('[MainLayout] Forcing Settings Open');
+        forcedSettingsOpenRef.current = true;
+        setWasSidebarExpandedBeforeSettings(!isSidebarCollapsed);
         setSettingsCanClose(false);
         setSettingsInitialTab('Geral');
         setSettingsInitialItem('Empresa');
@@ -87,9 +90,15 @@ const MainLayout: React.FC = () => {
         setIsSidebarCollapsed(true);
       }
     } else {
-      setSettingsCanClose(true);
+      // Libera fechamento e, se foi aberto automaticamente, fecha para o usuário seguir usando o sistema
+      if (!settingsCanClose) setSettingsCanClose(true);
+      if (isSettingsPanelOpen && forcedSettingsOpenRef.current) {
+        forcedSettingsOpenRef.current = false;
+        setIsSettingsPanelOpen(false);
+        setIsSidebarCollapsed(!wasSidebarExpandedBeforeSettings);
+      }
     }
-  }, [activeEmpresa, authLoading, isSettingsPanelOpen]);
+  }, [activeEmpresa, authLoading, isSettingsPanelOpen, isSidebarCollapsed, settingsCanClose, wasSidebarExpandedBeforeSettings]);
 
   const handleOpenSettings = () => {
     setWasSidebarExpandedBeforeSettings(!isSidebarCollapsed);
