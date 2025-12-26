@@ -76,7 +76,7 @@ const ColaboradorFormPanel: React.FC<ColaboradorFormPanelProps> = ({ colaborador
   const canSave = isEditing ? permUpdate.data : permCreate.data;
   const readOnly = !permsLoading && !canSave;
   const canUpdate = !permsLoading && permUpdate.data;
-  const canUploadDoc = !permsLoading && permCreate.data;
+  const canUploadDoc = !permsLoading && permUpdate.data;
   const canDeleteDoc = !permsLoading && permDelete.data;
 
   useEffect(() => {
@@ -965,6 +965,8 @@ const ColaboradorFormPanel: React.FC<ColaboradorFormPanelProps> = ({ colaborador
                       <th className="text-left p-3">Participação</th>
                       <th className="text-left p-3">Data</th>
                       <th className="text-left p-3">Eficácia</th>
+                      <th className="text-left p-3">Validade</th>
+                      <th className="text-left p-3">Reciclagem</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-100">
@@ -978,6 +980,32 @@ const ColaboradorFormPanel: React.FC<ColaboradorFormPanelProps> = ({ colaborador
                         </td>
                         <td className="p-3 text-gray-600">
                           {t.eficacia_avaliada ? 'Avaliada' : 'Pendente'}
+                        </td>
+                        <td className="p-3 text-gray-600">
+                          {t.validade_ate ? new Date(t.validade_ate).toLocaleDateString('pt-BR') : '—'}
+                        </td>
+                        <td className="p-3 text-gray-600">
+                          {t.proxima_reciclagem ? (
+                            (() => {
+                              const dt = new Date(t.proxima_reciclagem);
+                              const today = new Date();
+                              const diffDays = Math.ceil((dt.getTime() - today.getTime()) / 86400000);
+                              const urgent = diffDays <= 0;
+                              const soon = diffDays > 0 && diffDays <= 30;
+                              const cls = urgent
+                                ? 'bg-red-100 text-red-800'
+                                : soon
+                                  ? 'bg-amber-100 text-amber-800'
+                                  : 'bg-gray-100 text-gray-800';
+                              return (
+                                <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${cls}`}>
+                                  {dt.toLocaleDateString('pt-BR')}
+                                </span>
+                              );
+                            })()
+                          ) : (
+                            '—'
+                          )}
                         </td>
                       </tr>
                     ))}

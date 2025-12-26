@@ -90,6 +90,10 @@ async function mockAuthAndEmpresa(page: Page) {
     await route.fulfill({ json: 'member' });
   });
 
+  await page.route('**/rest/v1/rpc/has_permission_for_current_user', async (route) => {
+    await route.fulfill({ json: true });
+  });
+
   await page.route('**/rest/v1/empresa_features*', async (route) => {
     await route.fulfill({
       json: {
@@ -294,6 +298,10 @@ test('RH & Qualidade: navegação e render sem erros de console', async ({ page 
     });
   });
 
+  await page.route('**/rest/v1/rpc/rh_docs_list', async (route) => {
+    await route.fulfill({ json: [] });
+  });
+
   // Qualidade: motivos
   await page.route('**/rest/v1/rpc/qualidade_get_motivos', async (route) => {
     await route.fulfill({
@@ -370,6 +378,12 @@ test('RH & Qualidade: navegação e render sem erros de console', async ({ page 
   await page.goto('/app/rh/treinamentos');
   await expect(page.getByText('Treinamentos e Desenvolvimento')).toBeVisible();
   await expect(page.getByText('Integração')).toBeVisible();
+  await page.getByText('Integração').click();
+  await expect(page.getByRole('heading', { name: 'Editar Treinamento' })).toBeVisible();
+  await page.getByRole('button', { name: 'Anexos' }).click();
+  await expect(page.getByText('Anexos do treinamento')).toBeVisible();
+  await page.getByRole('button', { name: 'Histórico' }).click();
+  await expect(page.getByText('Alterações registradas em')).toBeVisible();
 
   await page.goto('/app/industria/qualidade/motivos');
   await expect(page.getByText('Motivos de Qualidade')).toBeVisible();

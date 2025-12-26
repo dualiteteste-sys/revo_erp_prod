@@ -84,6 +84,8 @@ export type ColaboradorTreinamento = {
   nota_final: number | null;
   eficacia_avaliada: boolean;
   parecer_eficacia: string | null;
+  validade_ate?: string | null;
+  proxima_reciclagem?: string | null;
 };
 
 export type MatrixCompetencia = {
