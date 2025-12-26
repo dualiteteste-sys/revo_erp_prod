@@ -100,12 +100,12 @@ export default function CommandPalette() {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
   const [recents, setRecents] = useState<RecentEntry[]>(() => readRecents());
-  const { industria_enabled, servicos_enabled, loading } = useEmpresaFeatures();
+  const { industria_enabled, servicos_enabled, loading, error: featuresError } = useEmpresaFeatures();
 
   const filteredMenu = useMemo(() => {
-    if (loading) return menuConfig;
+    if (loading || featuresError) return menuConfig;
     return filterMenuByFeatures(menuConfig, { industria_enabled, servicos_enabled });
-  }, [industria_enabled, servicos_enabled, loading]);
+  }, [industria_enabled, servicos_enabled, loading, featuresError]);
 
   const allItems = useMemo(
     () => [...getActionItems({ industriaEnabled: industria_enabled }), ...flattenMenu(filteredMenu)],

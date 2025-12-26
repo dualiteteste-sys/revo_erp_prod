@@ -13,6 +13,7 @@ export interface EmpresaFeatures {
   servicos_enabled: boolean;
   industria_enabled: boolean;
   loading: boolean;
+  error: unknown | null;
   refetch: () => Promise<void>;
 }
 
@@ -21,8 +22,9 @@ const DEFAULT_FEATURES: Omit<EmpresaFeatures, 'loading' | 'refetch'> = {
   nfe_emissao_enabled: false,
   plano_mvp: 'ambos',
   max_users: 999,
-  servicos_enabled: true,
-  industria_enabled: true,
+  servicos_enabled: false,
+  industria_enabled: false,
+  error: null,
 };
 
 export function useEmpresaFeatures(): EmpresaFeatures {
@@ -58,10 +60,18 @@ export function useEmpresaFeatures(): EmpresaFeatures {
         max_users: typeof data?.max_users === 'number' ? data.max_users : 999,
         servicos_enabled: data?.servicos_enabled ?? true,
         industria_enabled: data?.industria_enabled ?? true,
+        error: null,
       });
     } catch (error) {
-      logger.warn('[EmpresaFeatures] Falha ao buscar empresa_features; liberando acesso por segurança', { error });
-      setFeatures(DEFAULT_FEATURES);
+      logger.warn('[EmpresaFeatures] Falha ao buscar empresa_features; bloqueando acesso até validar plano/limites', {
+        error,
+      });
+      setFeatures((prev) => ({
+        ...prev,
+        servicos_enabled: false,
+        industria_enabled: false,
+        error,
+      }));
     } finally {
       setLoading(false);
     }
@@ -82,6 +92,7 @@ export function useEmpresaFeatures(): EmpresaFeatures {
   return {
     ...features,
     loading,
+    error: features.error,
     refetch: fetch,
   };
 }

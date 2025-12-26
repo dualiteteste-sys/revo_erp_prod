@@ -178,7 +178,7 @@ test('Serviços: relatórios abrem sem erros de console', async ({ page }) => {
   // Navegação via menu (evita regressão: itens com nomes repetidos, ex. "Relatórios").
   await page.goto('/app/dashboard');
   await page.getByRole('button', { name: 'Serviços' }).click();
-  await page.getByRole('link', { name: 'Relatórios' }).click();
+  await page.getByRole('button', { name: 'Relatórios' }).click();
   await expect(page).toHaveURL(/\/app\/servicos\/relatorios/);
 
   await expect(page.getByRole('heading', { name: 'Relatórios de Serviços' })).toBeVisible();
