@@ -7,7 +7,7 @@ import { useSupabase } from '@/providers/SupabaseProvider';
 import { useAuth } from '@/contexts/AuthProvider';
 import { useToast } from '@/contexts/ToastProvider';
 import { useEmpresaFeatures } from '@/hooks/useEmpresaFeatures';
-import { Loader2, Receipt, Save, ShieldCheck } from 'lucide-react';
+import { Loader2, Receipt, Save, ShieldCheck, Upload, FileKey, Trash2 } from 'lucide-react';
 import { roleAtLeast, useEmpresaRole } from '@/hooks/useEmpresaRole';
 
 type AmbienteNfe = 'homologacao' | 'producao';
@@ -19,6 +19,36 @@ type NfeConfig = {
   ambiente: AmbienteNfe;
   webhook_secret_hint: string | null;
   observacoes: string | null;
+};
+
+type NfeEmitente = {
+  empresa_id: string;
+  razao_social: string;
+  nome_fantasia: string | null;
+  cnpj: string;
+  ie: string | null;
+  im: string | null;
+  cnae: string | null;
+  crt: number | null;
+  endereco_logradouro: string | null;
+  endereco_numero: string | null;
+  endereco_complemento: string | null;
+  endereco_bairro: string | null;
+  endereco_municipio: string | null;
+  endereco_municipio_codigo: string | null;
+  endereco_uf: string | null;
+  endereco_cep: string | null;
+  telefone: string | null;
+  email: string | null;
+  certificado_storage_path: string | null;
+};
+
+type NfeNumeracao = {
+  id?: string;
+  empresa_id: string;
+  serie: number;
+  proximo_numero: number;
+  ativo: boolean;
 };
 
 export default function NfeSettingsPage() {
@@ -34,17 +64,30 @@ export default function NfeSettingsPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [savingFlag, setSavingFlag] = useState(false);
+  const [savingEmitente, setSavingEmitente] = useState(false);
+  const [savingNumeracao, setSavingNumeracao] = useState(false);
+  const [uploadingCert, setUploadingCert] = useState(false);
+  const [deletingCert, setDeletingCert] = useState(false);
 
   const [nfeEnabled, setNfeEnabled] = useState(false);
   const [config, setConfig] = useState<NfeConfig | null>(null);
+  const [emitente, setEmitente] = useState<NfeEmitente | null>(null);
+  const [numeracao, setNumeracao] = useState<NfeNumeracao | null>(null);
 
   const canShow = useMemo(() => !!empresaId, [empresaId]);
+
+  const digitsOnly = (v: string | null | undefined) => (v || '').toString().replace(/\D/g, '');
 
   const fetchData = useCallback(async () => {
     if (!empresaId) return;
     setLoading(true);
     try {
-      const [{ data: flagRow, error: flagError }, { data: cfgRow, error: cfgError }] = await Promise.all([
+      const [
+        { data: flagRow, error: flagError },
+        { data: cfgRow, error: cfgError },
+        { data: emitRow, error: emitErr },
+        { data: numRow, error: numErr },
+      ] = await Promise.all([
         supabase.from('empresa_feature_flags').select('nfe_emissao_enabled').eq('empresa_id', empresaId).maybeSingle(),
         supabase
           .from('fiscal_nfe_emissao_configs')
@@ -52,10 +95,25 @@ export default function NfeSettingsPage() {
           .eq('empresa_id', empresaId)
           .eq('provider_slug', 'NFE_IO')
           .maybeSingle(),
+        supabase
+          .from('fiscal_nfe_emitente')
+          .select(
+            'empresa_id,razao_social,nome_fantasia,cnpj,ie,im,cnae,crt,endereco_logradouro,endereco_numero,endereco_complemento,endereco_bairro,endereco_municipio,endereco_municipio_codigo,endereco_uf,endereco_cep,telefone,email,certificado_storage_path'
+          )
+          .eq('empresa_id', empresaId)
+          .maybeSingle(),
+        supabase
+          .from('fiscal_nfe_numeracao')
+          .select('id,empresa_id,serie,proximo_numero,ativo')
+          .eq('empresa_id', empresaId)
+          .eq('serie', 1)
+          .maybeSingle(),
       ]);
 
       if (flagError) throw flagError;
       if (cfgError) throw cfgError;
+      if (emitErr) throw emitErr;
+      if (numErr) throw numErr;
 
       setNfeEnabled(!!flagRow?.nfe_emissao_enabled);
       setConfig(
@@ -74,6 +132,69 @@ export default function NfeSettingsPage() {
               ambiente: 'homologacao',
               webhook_secret_hint: null,
               observacoes: null,
+            }
+      );
+
+      setEmitente(
+        emitRow
+          ? {
+              empresa_id: emitRow.empresa_id,
+              razao_social: (emitRow.razao_social ?? '').toString(),
+              nome_fantasia: emitRow.nome_fantasia ?? null,
+              cnpj: (emitRow.cnpj ?? '').toString(),
+              ie: emitRow.ie ?? null,
+              im: emitRow.im ?? null,
+              cnae: emitRow.cnae ?? null,
+              crt: typeof emitRow.crt === 'number' ? emitRow.crt : null,
+              endereco_logradouro: emitRow.endereco_logradouro ?? null,
+              endereco_numero: emitRow.endereco_numero ?? null,
+              endereco_complemento: emitRow.endereco_complemento ?? null,
+              endereco_bairro: emitRow.endereco_bairro ?? null,
+              endereco_municipio: emitRow.endereco_municipio ?? null,
+              endereco_municipio_codigo: emitRow.endereco_municipio_codigo ?? null,
+              endereco_uf: emitRow.endereco_uf ?? null,
+              endereco_cep: emitRow.endereco_cep ?? null,
+              telefone: emitRow.telefone ?? null,
+              email: emitRow.email ?? null,
+              certificado_storage_path: emitRow.certificado_storage_path ?? null,
+            }
+          : {
+              empresa_id: empresaId,
+              razao_social: '',
+              nome_fantasia: null,
+              cnpj: '',
+              ie: null,
+              im: null,
+              cnae: null,
+              crt: 1,
+              endereco_logradouro: null,
+              endereco_numero: null,
+              endereco_complemento: null,
+              endereco_bairro: null,
+              endereco_municipio: null,
+              endereco_municipio_codigo: null,
+              endereco_uf: null,
+              endereco_cep: null,
+              telefone: null,
+              email: null,
+              certificado_storage_path: null,
+            }
+      );
+
+      setNumeracao(
+        numRow
+          ? {
+              id: numRow.id,
+              empresa_id: numRow.empresa_id,
+              serie: Number(numRow.serie ?? 1) || 1,
+              proximo_numero: Number(numRow.proximo_numero ?? 1) || 1,
+              ativo: numRow.ativo ?? true,
+            }
+          : {
+              empresa_id: empresaId,
+              serie: 1,
+              proximo_numero: 1,
+              ativo: true,
             }
       );
     } catch (e: any) {
@@ -139,6 +260,132 @@ export default function NfeSettingsPage() {
     }
   };
 
+  const handleSaveEmitente = async () => {
+    if (!empresaId || !emitente) return;
+    if (!canAdmin) {
+      addToast('Sem permissão para salvar emitente. Apenas admin/owner.', 'error');
+      return;
+    }
+
+    const cnpj = digitsOnly(emitente.cnpj);
+    if (cnpj.length !== 14) {
+      addToast('CNPJ inválido (precisa ter 14 dígitos).', 'error');
+      return;
+    }
+    if (!emitente.razao_social.trim()) {
+      addToast('Razão social é obrigatória.', 'error');
+      return;
+    }
+
+    setSavingEmitente(true);
+    try {
+      const payload = {
+        ...emitente,
+        empresa_id: empresaId,
+        cnpj,
+        endereco_cep: digitsOnly(emitente.endereco_cep || '') || null,
+        endereco_municipio_codigo: digitsOnly(emitente.endereco_municipio_codigo || '') || null,
+      };
+      const { error } = await supabase.from('fiscal_nfe_emitente').upsert(payload, { onConflict: 'empresa_id' });
+      if (error) throw error;
+      addToast('Emitente salvo.', 'success');
+      await fetchData();
+    } catch (e: any) {
+      addToast(e?.message || 'Erro ao salvar emitente.', 'error');
+    } finally {
+      setSavingEmitente(false);
+    }
+  };
+
+  const handleSaveNumeracao = async () => {
+    if (!empresaId || !numeracao) return;
+    if (!canAdmin) {
+      addToast('Sem permissão para salvar numeração. Apenas admin/owner.', 'error');
+      return;
+    }
+    const serie = Math.max(1, Math.trunc(Number(numeracao.serie) || 1));
+    const proximo_numero = Math.max(1, Math.trunc(Number(numeracao.proximo_numero) || 1));
+
+    setSavingNumeracao(true);
+    try {
+      const payload = {
+        id: numeracao.id,
+        empresa_id: empresaId,
+        serie,
+        proximo_numero,
+        ativo: !!numeracao.ativo,
+      };
+      const { error } = await supabase
+        .from('fiscal_nfe_numeracao')
+        .upsert(payload, { onConflict: 'empresa_id,serie' });
+      if (error) throw error;
+      addToast('Numeração salva.', 'success');
+      await fetchData();
+    } catch (e: any) {
+      addToast(e?.message || 'Erro ao salvar numeração.', 'error');
+    } finally {
+      setSavingNumeracao(false);
+    }
+  };
+
+  const handleUploadCert = async (file: File) => {
+    if (!empresaId) return;
+    if (!canAdmin) {
+      addToast('Sem permissão para enviar certificado. Apenas admin/owner.', 'error');
+      return;
+    }
+    if (!file) return;
+
+    const nameSafe = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
+    const objectName = `${empresaId}/${Date.now()}_${nameSafe}`;
+
+    setUploadingCert(true);
+    try {
+      const { error } = await supabase.storage.from('nfe_certificados').upload(objectName, file, {
+        upsert: false,
+        contentType: file.type || 'application/octet-stream',
+      });
+      if (error) throw error;
+
+      // salva referência no emitente
+      const { error: upErr } = await supabase
+        .from('fiscal_nfe_emitente')
+        .upsert({ empresa_id: empresaId, certificado_storage_path: objectName }, { onConflict: 'empresa_id' });
+      if (upErr) throw upErr;
+
+      addToast('Certificado enviado (A1).', 'success');
+      await fetchData();
+    } catch (e: any) {
+      addToast(e?.message || 'Erro ao enviar certificado.', 'error');
+    } finally {
+      setUploadingCert(false);
+    }
+  };
+
+  const handleDeleteCert = async () => {
+    if (!empresaId || !emitente?.certificado_storage_path) return;
+    if (!canAdmin) {
+      addToast('Sem permissão para remover certificado. Apenas admin/owner.', 'error');
+      return;
+    }
+    setDeletingCert(true);
+    try {
+      const path = emitente.certificado_storage_path;
+      const { error: rmErr } = await supabase.storage.from('nfe_certificados').remove([path]);
+      if (rmErr) throw rmErr;
+      const { error: upErr } = await supabase
+        .from('fiscal_nfe_emitente')
+        .upsert({ empresa_id: empresaId, certificado_storage_path: null }, { onConflict: 'empresa_id' });
+      if (upErr) throw upErr;
+      addToast('Certificado removido.', 'success');
+      await fetchData();
+    } catch (e: any) {
+      addToast(e?.message || 'Erro ao remover certificado.', 'error');
+    } finally {
+      setDeletingCert(false);
+    }
+  };
+
   if (!canShow) {
     return (
       <div className="p-6">
@@ -165,6 +412,177 @@ export default function NfeSettingsPage() {
         </div>
       ) : (
         <div className="space-y-6">
+          <GlassCard className="p-6">
+            <div className="flex items-start justify-between gap-6">
+              <div>
+                <div className="flex items-center gap-2">
+                  <FileKey size={18} className="text-slate-700" />
+                  <h2 className="text-lg font-bold text-slate-900">Emitente (Empresa)</h2>
+                </div>
+                <p className="text-sm text-slate-600 mt-1">
+                  Preencha os dados fiscais do emitente. O certificado A1 fica em Storage privado (sem senha no banco).
+                </p>
+              </div>
+              <Button onClick={handleSaveEmitente} disabled={savingEmitente || !emitente || !canAdmin}>
+                {savingEmitente ? <Loader2 className="animate-spin" size={18} /> : <Save size={18} />}
+                <span className="ml-2">Salvar</span>
+              </Button>
+            </div>
+
+            <div className="mt-6 grid grid-cols-1 md:grid-cols-3 gap-6">
+              <div className="md:col-span-2">
+                <label className="block text-sm font-semibold text-slate-700 mb-2">Razão social</label>
+                <input
+                  value={emitente?.razao_social ?? ''}
+                  onChange={(e) => setEmitente((prev) => (prev ? { ...prev, razao_social: e.target.value } : prev))}
+                  disabled={!canAdmin}
+                  className="w-full p-3 border border-gray-300 rounded-xl shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  placeholder="Ex.: Minha Empresa LTDA"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-semibold text-slate-700 mb-2">Nome fantasia</label>
+                <input
+                  value={emitente?.nome_fantasia ?? ''}
+                  onChange={(e) => setEmitente((prev) => (prev ? { ...prev, nome_fantasia: e.target.value || null } : prev))}
+                  disabled={!canAdmin}
+                  className="w-full p-3 border border-gray-300 rounded-xl shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  placeholder="Ex.: Minha Marca"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-semibold text-slate-700 mb-2">CNPJ</label>
+                <input
+                  value={emitente?.cnpj ?? ''}
+                  onChange={(e) => setEmitente((prev) => (prev ? { ...prev, cnpj: e.target.value } : prev))}
+                  disabled={!canAdmin}
+                  className="w-full p-3 border border-gray-300 rounded-xl shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  placeholder="Somente números"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-semibold text-slate-700 mb-2">IE</label>
+                <input
+                  value={emitente?.ie ?? ''}
+                  onChange={(e) => setEmitente((prev) => (prev ? { ...prev, ie: e.target.value || null } : prev))}
+                  disabled={!canAdmin}
+                  className="w-full p-3 border border-gray-300 rounded-xl shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-semibold text-slate-700 mb-2">CRT</label>
+                <Select
+                  value={String(emitente?.crt ?? 1)}
+                  onChange={(e) => setEmitente((prev) => (prev ? { ...prev, crt: Number(e.target.value) || 1 } : prev))}
+                  disabled={!canAdmin}
+                  className="min-w-[220px]"
+                >
+                  <option value="1">1 — Simples Nacional</option>
+                  <option value="2">2 — Simples (excesso sublimite)</option>
+                  <option value="3">3 — Regime Normal</option>
+                </Select>
+              </div>
+
+              <div className="md:col-span-3">
+                <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+                  <div className="flex items-start justify-between gap-4">
+                    <div>
+                      <div className="text-sm font-semibold text-slate-800">Certificado A1 (PFX/P12)</div>
+                      <div className="text-xs text-slate-600 mt-1">
+                        {emitente?.certificado_storage_path ? (
+                          <span className="font-mono">{emitente.certificado_storage_path}</span>
+                        ) : (
+                          <span>Nenhum certificado enviado.</span>
+                        )}
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <label className={`inline-flex items-center gap-2 px-3 py-2 rounded-lg font-semibold border transition-colors ${!canAdmin || uploadingCert ? 'opacity-60 cursor-not-allowed' : 'cursor-pointer hover:bg-white'}`}>
+                        <Upload size={16} />
+                        <span>{uploadingCert ? 'Enviando…' : 'Enviar'}</span>
+                        <input
+                          type="file"
+                          accept=".pfx,.p12,application/x-pkcs12"
+                          disabled={!canAdmin || uploadingCert}
+                          onChange={(e) => {
+                            const file = e.target.files?.[0];
+                            if (file) void handleUploadCert(file);
+                            e.currentTarget.value = '';
+                          }}
+                          className="hidden"
+                        />
+                      </label>
+                      <Button
+                        variant="secondary"
+                        onClick={() => void handleDeleteCert()}
+                        disabled={!canAdmin || deletingCert || !emitente?.certificado_storage_path}
+                        title="Remover certificado"
+                      >
+                        {deletingCert ? <Loader2 className="animate-spin" size={18} /> : <Trash2 size={18} />}
+                        <span className="ml-2">Remover</span>
+                      </Button>
+                    </div>
+                  </div>
+                  <div className="mt-3 text-xs text-slate-600">
+                    A senha do certificado <span className="font-semibold">não</span> é salva no banco. Ela será usada somente na etapa de emissão (NFE-05).
+                  </div>
+                </div>
+              </div>
+            </div>
+          </GlassCard>
+
+          <GlassCard className="p-6">
+            <div className="flex items-start justify-between gap-6">
+              <div>
+                <h2 className="text-lg font-bold text-slate-900">Numeração (NF-e)</h2>
+                <p className="text-sm text-slate-600 mt-1">Configure série e o próximo número a emitir (MVP: série 1).</p>
+              </div>
+              <Button onClick={handleSaveNumeracao} disabled={savingNumeracao || !numeracao || !canAdmin}>
+                {savingNumeracao ? <Loader2 className="animate-spin" size={18} /> : <Save size={18} />}
+                <span className="ml-2">Salvar</span>
+              </Button>
+            </div>
+            <div className="mt-6 grid grid-cols-1 md:grid-cols-3 gap-6">
+              <div>
+                <label className="block text-sm font-semibold text-slate-700 mb-2">Série</label>
+                <input
+                  type="number"
+                  min={1}
+                  step={1}
+                  value={String(numeracao?.serie ?? 1)}
+                  onChange={(e) => setNumeracao((prev) => (prev ? { ...prev, serie: Number(e.target.value) || 1 } : prev))}
+                  disabled={!canAdmin}
+                  className="w-full p-3 border border-gray-300 rounded-xl shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-semibold text-slate-700 mb-2">Próximo número</label>
+                <input
+                  type="number"
+                  min={1}
+                  step={1}
+                  value={String(numeracao?.proximo_numero ?? 1)}
+                  onChange={(e) => setNumeracao((prev) => (prev ? { ...prev, proximo_numero: Number(e.target.value) || 1 } : prev))}
+                  disabled={!canAdmin}
+                  className="w-full p-3 border border-gray-300 rounded-xl shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                />
+              </div>
+              <div className="flex items-center gap-3">
+                <label className="flex items-center gap-2 select-none text-sm font-semibold text-slate-700">
+                  <input
+                    type="checkbox"
+                    checked={!!numeracao?.ativo}
+                    onChange={(e) => setNumeracao((prev) => (prev ? { ...prev, ativo: e.target.checked } : prev))}
+                    disabled={!canAdmin}
+                    className="h-5 w-5 accent-blue-600"
+                  />
+                  Ativo
+                </label>
+              </div>
+            </div>
+          </GlassCard>
+
           <GlassCard className="p-6">
             <div className="flex items-start justify-between gap-6">
               <div>
