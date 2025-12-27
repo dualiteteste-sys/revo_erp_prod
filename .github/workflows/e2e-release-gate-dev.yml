@@ -11,9 +11,10 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  e2e-release-gate:
+  unit-tests:
+    name: Unit tests
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
 
@@ -21,6 +22,7 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 20
+          cache: yarn
 
       - name: Enable Corepack (Yarn)
         run: corepack enable
@@ -28,15 +30,49 @@ jobs:
       - name: Install dependencies
         run: yarn install --immutable
 
-      - name: Install Playwright (Chromium)
-        run: npx playwright install --with-deps chromium
-
       - name: Unit tests
         env:
           CI: true
         run: yarn test --run
 
+  e2e-release-gate:
+    name: E2E gate (all) [shard ${{ matrix.shard }}/${{ matrix.total }}]
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    needs: [unit-tests]
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2]
+        total: [2]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: yarn
+
+      - name: Enable Corepack (Yarn)
+        run: corepack enable
+
+      - name: Install dependencies
+        run: yarn install --immutable
+
+      - name: Cache Playwright browsers
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-playwright-${{ hashFiles('yarn.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-playwright-
+
+      - name: Install Playwright (Chromium)
+        run: npx playwright install --with-deps chromium
+
       - name: E2E gate (all)
         env:
           CI: true
-        run: yarn test:e2e:gate:all
+        run: yarn test:e2e:gate:all -- --shard=${{ matrix.shard }}/${{ matrix.total }}
