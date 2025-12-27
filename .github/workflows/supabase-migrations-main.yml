@@ -151,6 +151,11 @@ jobs:
           echo "y" | supabase db push --include-all --db-url "$SUPABASE_DB_URL_PROD"
           echo "[PROD] Migrations applied successfully."
 
+      - name: Reload PostgREST schema cache (PROD)
+        run: |
+          set -euo pipefail
+          psql "$SUPABASE_DB_URL_PROD" -v ON_ERROR_STOP=1 -X -qAt -c "notify pgrst, 'reload schema';"
+
       - name: Download expected schema artifact
         uses: actions/download-artifact@v4
         with:

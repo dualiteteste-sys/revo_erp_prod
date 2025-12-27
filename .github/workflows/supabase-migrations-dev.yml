@@ -87,6 +87,14 @@ jobs:
           echo "y" | supabase db push --include-all --db-url "$SUPABASE_DB_URL_DEV"
           echo "[DEV] Migrations applied successfully."
 
+      - name: Reload PostgREST schema cache (DEV)
+        if: github.event_name == 'workflow_dispatch'
+        env:
+          SUPABASE_DB_URL_DEV: ${{ secrets.SUPABASE_DB_URL_DEV }}
+        run: |
+          set -euo pipefail
+          psql "$SUPABASE_DB_URL_DEV" -v ON_ERROR_STOP=1 -X -qAt -c "notify pgrst, 'reload schema';"
+
       - name: Snapshot current schema (public) from DEV (remote)
         if: github.event_name == 'workflow_dispatch'
         env:
