@@ -38,7 +38,14 @@ export function useEmpresaRole() {
         .maybeSingle();
 
       const normalize = (value: unknown): EmpresaRole | null => {
-        const normalized = (String(value || '').toLowerCase() || '') as EmpresaRole;
+        const raw = (String(value || '').toLowerCase() || '').trim();
+        const mapped =
+          raw === 'finance' || raw === 'financeiro' || raw === 'ops' || raw === 'operador'
+            ? 'member'
+            : raw === 'readonly' || raw === 'read_only' || raw === 'read-only'
+              ? 'viewer'
+              : raw;
+        const normalized = mapped as EmpresaRole;
         return normalized in precedence ? normalized : null;
       };
 
