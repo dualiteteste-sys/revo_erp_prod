@@ -6,6 +6,10 @@ on:
   pull_request:
     branches: [dev]
 
+concurrency:
+  group: e2e-release-gate-dev-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   e2e-release-gate:
     runs-on: ubuntu-latest
