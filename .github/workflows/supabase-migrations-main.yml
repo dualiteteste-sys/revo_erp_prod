@@ -119,8 +119,6 @@ jobs:
     runs-on: ubuntu-latest
     needs: [verify-migrations, release-gate]
     if: github.ref == 'refs/heads/main'
-    environment:
-      name: production
     
     env:
       SUPABASE_DB_URL_PROD: ${{ secrets.SUPABASE_DB_URL_PROD }}

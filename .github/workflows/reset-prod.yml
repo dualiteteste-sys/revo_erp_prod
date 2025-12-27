@@ -12,8 +12,6 @@ jobs:
   reset-prod:
     runs-on: ubuntu-latest
     timeout-minutes: 25
-    environment:
-      name: production
 
     env:
       SUPABASE_DB_URL_PROD: ${{ secrets.SUPABASE_DB_URL_PROD }}
