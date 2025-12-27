@@ -14,7 +14,7 @@ Legenda:
 ## 1) Configurações Comerciais (Planos/Limites + RBAC)
 - [x] CFG-01 Tela Configurações → Plano/Limites por empresa (módulos habilitados + limites)
 - [ ] (parcial) CFG-02 Enforcement em 3 camadas: Menu + Rotas + RPC/DB *(Menu/Rotas/DB ok; falta padronizar “check de plano” em RPCs SECURITY DEFINER críticas)*
-- [ ] CFG-03 Gestão de permissões por usuário (Super Admin sempre full; perfis Member/Viewer)
+- [x] CFG-03 Gestão de permissões por usuário (Super Admin sempre full; perfis Member/Viewer)
 - [x] CFG-04 Feature flags por empresa (incluindo NF‑e) com fallback seguro e auditoria
 
 ## 2) NF‑e Ativa (MVP real SP/PR, regime “Ambos”)
