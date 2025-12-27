@@ -8,7 +8,7 @@ import { useSupabase } from '@/providers/SupabaseProvider';
 import { useAuth } from '@/contexts/AuthProvider';
 import { useToast } from '@/contexts/ToastProvider';
 import { useEmpresaFeatures } from '@/hooks/useEmpresaFeatures';
-import { Loader2, Plus, Receipt, Search, Settings, Send } from 'lucide-react';
+import { Copy, Eye, Loader2, Plus, Receipt, Search, Settings, Send } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import ClientAutocomplete from '@/components/common/ClientAutocomplete';
 import ProductAutocomplete from '@/components/common/ProductAutocomplete';
@@ -86,6 +86,11 @@ export default function NfeEmissoesPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [rows, setRows] = useState<NfeEmissao[]>([]);
+  const [previewOpen, setPreviewOpen] = useState(false);
+  const [previewLoading, setPreviewLoading] = useState(false);
+  const [previewErrors, setPreviewErrors] = useState<string[]>([]);
+  const [previewWarnings, setPreviewWarnings] = useState<string[]>([]);
+  const [previewXml, setPreviewXml] = useState<string>('');
 
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
@@ -240,6 +245,107 @@ export default function NfeEmissoesPage() {
     setEditing(null);
   };
 
+  const persistDraft = async (): Promise<string> => {
+    if (!empresaId) throw new Error('Selecione uma empresa ativa.');
+    if (!items.length) throw new Error('Adicione ao menos 1 item ao rascunho.');
+
+    const frete = totalsDraft.frete;
+    if (formFrete.trim() && (!Number.isFinite(frete) || frete < 0)) {
+      throw new Error('Frete inválido.');
+    }
+
+    const payloadJson = {
+      version: 1,
+      ambiente: formAmbiente,
+      natureza_operacao: formNaturezaOperacao?.trim() || null,
+      destinatario_pessoa_id: formDestinatarioId ?? null,
+      totais: {
+        total_produtos: totalsDraft.total_produtos,
+        total_descontos: totalsDraft.total_descontos,
+        total_frete: frete,
+        total_impostos: 0,
+        total_nfe: totalsDraft.total_nfe,
+      },
+      itens: items.map((it) => ({
+        produto_id: it.produto_id,
+        descricao: it.produto_nome,
+        unidade: it.unidade,
+        quantidade: it.quantidade,
+        valor_unitario: it.valor_unitario,
+        valor_desconto: it.valor_desconto,
+        ncm: it.ncm || null,
+        cfop: it.cfop || null,
+        cst: it.cst || null,
+        csosn: it.csosn || null,
+      })),
+    };
+
+    let emissaoId = editing?.id ?? null;
+    if (emissaoId) {
+      const { error } = await supabase
+        .from('fiscal_nfe_emissoes')
+        .update({
+          destinatario_pessoa_id: formDestinatarioId ?? null,
+          ambiente: formAmbiente,
+          natureza_operacao: formNaturezaOperacao?.trim() || null,
+          total_frete: frete,
+          payload: payloadJson,
+        })
+        .eq('id', emissaoId)
+        .eq('empresa_id', empresaId);
+      if (error) throw error;
+    } else {
+      const { data, error } = await supabase
+        .from('fiscal_nfe_emissoes')
+        .insert({
+          empresa_id: empresaId,
+          provider_slug: 'NFE_IO',
+          ambiente: formAmbiente,
+          status: 'rascunho',
+          destinatario_pessoa_id: formDestinatarioId ?? null,
+          natureza_operacao: formNaturezaOperacao?.trim() || null,
+          total_frete: frete,
+          payload: payloadJson,
+        })
+        .select('id')
+        .single();
+      if (error) throw error;
+      emissaoId = data?.id ?? null;
+    }
+
+    if (!emissaoId) throw new Error('Falha ao persistir rascunho (sem id).');
+
+    const { error: delErr } = await supabase
+      .from('fiscal_nfe_emissao_itens')
+      .delete()
+      .eq('empresa_id', empresaId)
+      .eq('emissao_id', emissaoId);
+    if (delErr) throw delErr;
+
+    const rowsToInsert = items.map((it, idx) => ({
+      empresa_id: empresaId,
+      emissao_id: emissaoId,
+      produto_id: it.produto_id,
+      ordem: idx + 1,
+      descricao: it.produto_nome,
+      unidade: it.unidade,
+      ncm: it.ncm || null,
+      cfop: it.cfop || null,
+      cst: it.cst || null,
+      csosn: it.csosn || null,
+      quantidade: it.quantidade,
+      valor_unitario: it.valor_unitario,
+      valor_desconto: it.valor_desconto,
+      valor_total: Math.max(0, it.quantidade * it.valor_unitario - (it.valor_desconto || 0)),
+    }));
+
+    const { error: insErr } = await supabase.from('fiscal_nfe_emissao_itens').insert(rowsToInsert);
+    if (insErr) throw insErr;
+
+    await supabase.rpc('fiscal_nfe_recalc_totais', { p_emissao_id: emissaoId });
+    return emissaoId;
+  };
+
   const totalsDraft = useMemo(() => {
     const frete = formFrete.trim() ? Number(String(formFrete).replace(',', '.')) : 0;
     const total_produtos = items.reduce((acc, it) => acc + it.quantidade * it.valor_unitario, 0);
@@ -314,93 +420,7 @@ export default function NfeEmissoesPage() {
 
     setSaving(true);
     try {
-      const payloadJson = {
-        version: 1,
-        ambiente: formAmbiente,
-        natureza_operacao: formNaturezaOperacao?.trim() || null,
-        destinatario_pessoa_id: formDestinatarioId ?? null,
-        totais: {
-          total_produtos: totalsDraft.total_produtos,
-          total_descontos: totalsDraft.total_descontos,
-          total_frete: frete,
-          total_impostos: 0,
-          total_nfe: totalsDraft.total_nfe,
-        },
-        itens: items.map((it) => ({
-          produto_id: it.produto_id,
-          descricao: it.produto_nome,
-          unidade: it.unidade,
-          quantidade: it.quantidade,
-          valor_unitario: it.valor_unitario,
-          valor_desconto: it.valor_desconto,
-          ncm: it.ncm || null,
-          cfop: it.cfop || null,
-          cst: it.cst || null,
-          csosn: it.csosn || null,
-        })),
-      };
-
-      let emissaoId = editing?.id ?? null;
-      if (emissaoId) {
-        const { error } = await supabase
-          .from('fiscal_nfe_emissoes')
-          .update({
-            destinatario_pessoa_id: formDestinatarioId ?? null,
-            ambiente: formAmbiente,
-            natureza_operacao: formNaturezaOperacao?.trim() || null,
-            total_frete: frete,
-            payload: payloadJson,
-          })
-          .eq('id', emissaoId)
-          .eq('empresa_id', empresaId);
-        if (error) throw error;
-      } else {
-        const { data, error } = await supabase.from('fiscal_nfe_emissoes').insert({
-          empresa_id: empresaId,
-          provider_slug: 'NFE_IO',
-          ambiente: formAmbiente,
-          status: 'rascunho',
-          destinatario_pessoa_id: formDestinatarioId ?? null,
-          natureza_operacao: formNaturezaOperacao?.trim() || null,
-          total_frete: frete,
-          payload: payloadJson,
-        }).select('id').single();
-        if (error) throw error;
-        emissaoId = data?.id ?? null;
-      }
-
-      if (!emissaoId) throw new Error('Falha ao persistir rascunho (sem id).');
-
-      // Atualiza itens (simples e idempotente)
-      const { error: delErr } = await supabase
-        .from('fiscal_nfe_emissao_itens')
-        .delete()
-        .eq('empresa_id', empresaId)
-        .eq('emissao_id', emissaoId);
-      if (delErr) throw delErr;
-
-      const rowsToInsert = items.map((it, idx) => ({
-        empresa_id: empresaId,
-        emissao_id: emissaoId,
-        produto_id: it.produto_id,
-        ordem: idx + 1,
-        descricao: it.produto_nome,
-        unidade: it.unidade,
-        quantidade: it.quantidade,
-        valor_unitario: it.valor_unitario,
-        valor_desconto: it.valor_desconto,
-        valor_total: Math.max(0, it.quantidade * it.valor_unitario - (it.valor_desconto || 0)),
-        ncm: it.ncm || null,
-        cfop: it.cfop || null,
-        cst: it.cst || null,
-        csosn: it.csosn || null,
-      }));
-
-      const { error: insErr } = await supabase.from('fiscal_nfe_emissao_itens').insert(rowsToInsert);
-      if (insErr) throw insErr;
-
-      // Recalcula totais no cabeçalho (e mantém valor_total)
-      await supabase.rpc('fiscal_nfe_recalc_totais', { p_emissao_id: emissaoId });
+      await persistDraft();
 
       addToast(editing?.id ? 'Rascunho atualizado.' : 'Rascunho criado.', 'success');
 
@@ -410,6 +430,42 @@ export default function NfeEmissoesPage() {
       addToast(e?.message || 'Erro ao salvar rascunho.', 'error');
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handlePreviewXml = async () => {
+    if (!empresaId) return;
+
+    setPreviewOpen(true);
+    setPreviewLoading(true);
+    setPreviewErrors([]);
+    setPreviewWarnings([]);
+    setPreviewXml('');
+
+    try {
+      const emissaoId = await persistDraft();
+      const { data, error } = await supabase.rpc('fiscal_nfe_preview_xml', { p_emissao_id: emissaoId });
+      if (error) throw error;
+
+      const row = Array.isArray(data) ? data[0] : data;
+      const ok = !!row?.ok;
+      const errs = (row?.errors || []) as string[];
+      const warns = (row?.warnings || []) as string[];
+      setPreviewErrors(errs);
+      setPreviewWarnings(warns);
+      setPreviewXml((row?.xml || '').toString());
+
+      if (!ok) {
+        addToast('Preview não gerado: corrija os erros e tente novamente.', 'error');
+      } else {
+        addToast('Preview gerado (XML).', 'success');
+      }
+    } catch (e: any) {
+      setPreviewErrors([e?.message || 'Erro ao gerar preview.']);
+      addToast(e?.message || 'Erro ao gerar preview.', 'error');
+    } finally {
+      setPreviewLoading(false);
+      await fetchList();
     }
   };
 
@@ -805,11 +861,72 @@ export default function NfeEmissoesPage() {
             <Button variant="secondary" onClick={closeModal} disabled={saving}>
               Cancelar
             </Button>
+            <Button variant="secondary" onClick={handlePreviewXml} disabled={saving}>
+              <Eye size={18} />
+              <span className="ml-2">Preview XML</span>
+            </Button>
             <Button onClick={handleSave} disabled={saving}>
               {saving ? <Loader2 className="animate-spin" size={18} /> : null}
               <span className="ml-2">Salvar</span>
             </Button>
           </div>
+        </div>
+      </Modal>
+
+      <Modal isOpen={previewOpen} onClose={() => setPreviewOpen(false)} title="Preview XML (NFE-04)" size="80pct">
+        <div className="p-6 space-y-4">
+          {previewLoading ? (
+            <div className="h-40 flex items-center justify-center">
+              <Loader2 className="animate-spin text-blue-600" size={28} />
+            </div>
+          ) : (
+            <>
+              {previewErrors.length > 0 ? (
+                <GlassCard className="p-4 border border-rose-200 bg-rose-50/60">
+                  <div className="text-sm font-semibold text-rose-900">Erros</div>
+                  <ul className="mt-2 text-sm text-rose-900 list-disc pl-5 space-y-1">
+                    {previewErrors.map((e, idx) => (
+                      <li key={idx}>{e}</li>
+                    ))}
+                  </ul>
+                </GlassCard>
+              ) : null}
+
+              {previewWarnings.length > 0 ? (
+                <GlassCard className="p-4 border border-amber-200 bg-amber-50/60">
+                  <div className="text-sm font-semibold text-amber-900">Avisos</div>
+                  <ul className="mt-2 text-sm text-amber-900 list-disc pl-5 space-y-1">
+                    {previewWarnings.map((w, idx) => (
+                      <li key={idx}>{w}</li>
+                    ))}
+                  </ul>
+                </GlassCard>
+              ) : null}
+
+              <div className="flex items-center justify-between gap-3">
+                <div className="text-sm font-semibold text-slate-800">XML (preview)</div>
+                <Button
+                  variant="secondary"
+                  onClick={async () => {
+                    try {
+                      await navigator.clipboard.writeText(previewXml || '');
+                      addToast('XML copiado.', 'success');
+                    } catch {
+                      addToast('Não foi possível copiar.', 'error');
+                    }
+                  }}
+                  disabled={!previewXml}
+                >
+                  <Copy size={18} />
+                  <span className="ml-2">Copiar</span>
+                </Button>
+              </div>
+
+              <pre className="text-xs whitespace-pre-wrap break-words p-4 rounded-xl border border-slate-200 bg-slate-50 max-h-[60vh] overflow-auto">
+                {previewXml || '—'}
+              </pre>
+            </>
+          )}
         </div>
       </Modal>
     </div>
