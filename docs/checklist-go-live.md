@@ -9,7 +9,7 @@ Legenda:
 - [x] RG-01 Padronizar “Release Gate” local/CI: `yarn test --run` + E2E suite + `yarn verify:migrations` obrigatórios
 - [x] RG-02 Pipeline PROD: “compare expected vs PROD schema” sem divergências (migrations idempotentes)
 - [x] RG-03 Console limpo: capturar/zerar erros (tratamento central + bloquear `alert()`/erros não tratados) *(ErrorBoundary + Sentry + handlers globais + console silencioso em PROD)*
-- [ ] RG-04 Checklist E2E por plano (Serviços/Indústria) com “happy path” automatizado *(parcial: suites existem; falta validar cobertura mínima e travas)*
+- [x] RG-04 Checklist E2E por plano (Serviços/Indústria) com “happy path” automatizado *(documentado + CI permite rodar por suite)*
 
 ## 1) Configurações Comerciais (Planos/Limites + RBAC)
 - [ ] CFG-01 Tela Configurações → Plano/Limites por empresa (módulos habilitados + limites)
