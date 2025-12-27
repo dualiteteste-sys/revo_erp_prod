@@ -11,6 +11,7 @@ import { useEmpresaFeatures } from '@/hooks/useEmpresaFeatures';
 import { Loader2, Plus, Receipt, Search, Settings, Send } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import ClientAutocomplete from '@/components/common/ClientAutocomplete';
+import ProductAutocomplete from '@/components/common/ProductAutocomplete';
 
 type AmbienteNfe = 'homologacao' | 'producao';
 
@@ -23,11 +24,26 @@ type NfeEmissao = {
   destinatario_pessoa_id: string | null;
   destinatario_nome: string | null;
   valor_total: number | null;
+  total_produtos?: number | null;
+  total_descontos?: number | null;
+  total_frete?: number | null;
+  total_impostos?: number | null;
+  total_nfe?: number | null;
   ambiente: AmbienteNfe;
   payload: any;
   last_error: string | null;
   created_at: string;
   updated_at: string;
+};
+
+type NfeItemForm = {
+  id: string;
+  produto_id: string | null;
+  produto_nome: string;
+  unidade: string;
+  quantidade: number;
+  valor_unitario: number;
+  valor_desconto: number;
 };
 
 const STATUS_LABEL: Record<string, string> = {
@@ -72,10 +88,12 @@ export default function NfeEmissoesPage() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editing, setEditing] = useState<NfeEmissao | null>(null);
   const [formAmbiente, setFormAmbiente] = useState<AmbienteNfe>('homologacao');
-  const [formValor, setFormValor] = useState<string>('');
+  const [formFrete, setFormFrete] = useState<string>('');
   const [formDestinatarioId, setFormDestinatarioId] = useState<string | null>(null);
   const [formDestinatarioName, setFormDestinatarioName] = useState<string | undefined>(undefined);
-  const [formPayload, setFormPayload] = useState<string>('{}');
+  const [items, setItems] = useState<NfeItemForm[]>([]);
+  const [productToAddId, setProductToAddId] = useState<string | null>(null);
+  const [productToAddName, setProductToAddName] = useState<string | undefined>(undefined);
 
   const canShow = useMemo(() => !!empresaId, [empresaId]);
 
@@ -86,7 +104,7 @@ export default function NfeEmissoesPage() {
       let query = supabase
         .from('fiscal_nfe_emissoes')
         .select(
-          'id,status,numero,serie,chave_acesso,destinatario_pessoa_id,ambiente,valor_total,payload,last_error,created_at,updated_at,destinatario:pessoas(nome)'
+          'id,status,numero,serie,chave_acesso,destinatario_pessoa_id,ambiente,valor_total,total_produtos,total_descontos,total_frete,total_impostos,total_nfe,payload,last_error,created_at,updated_at,destinatario:pessoas(nome)'
         )
         .eq('empresa_id', empresaId)
         .order('updated_at', { ascending: false })
@@ -106,6 +124,11 @@ export default function NfeEmissoesPage() {
         destinatario_pessoa_id: r.destinatario_pessoa_id ?? null,
         destinatario_nome: r?.destinatario?.nome ?? null,
         valor_total: r.valor_total ?? null,
+        total_produtos: typeof r.total_produtos === 'number' ? r.total_produtos : null,
+        total_descontos: typeof r.total_descontos === 'number' ? r.total_descontos : null,
+        total_frete: typeof r.total_frete === 'number' ? r.total_frete : null,
+        total_impostos: typeof r.total_impostos === 'number' ? r.total_impostos : null,
+        total_nfe: typeof r.total_nfe === 'number' ? r.total_nfe : null,
         ambiente: (r.ambiente ?? 'homologacao') as AmbienteNfe,
         payload: r.payload ?? {},
         last_error: r.last_error ?? null,
@@ -153,20 +176,49 @@ export default function NfeEmissoesPage() {
   const openNew = async () => {
     setEditing(null);
     setFormAmbiente('homologacao');
-    setFormValor('');
+    setFormFrete('');
     setFormDestinatarioId(null);
     setFormDestinatarioName(undefined);
-    setFormPayload('{}');
+    setItems([]);
+    setProductToAddId(null);
+    setProductToAddName(undefined);
     setIsModalOpen(true);
   };
 
-  const openEdit = (row: NfeEmissao) => {
+  const openEdit = async (row: NfeEmissao) => {
     setEditing(row);
     setFormAmbiente(row.ambiente || 'homologacao');
-    setFormValor(row.valor_total != null ? String(row.valor_total) : '');
+    setFormFrete(row.total_frete != null ? String(row.total_frete) : '');
     setFormDestinatarioId(row.destinatario_pessoa_id ?? null);
     setFormDestinatarioName(row.destinatario_nome ?? undefined);
-    setFormPayload(JSON.stringify(row.payload ?? {}, null, 2));
+    setProductToAddId(null);
+    setProductToAddName(undefined);
+
+    try {
+      const { data, error } = await supabase
+        .from('fiscal_nfe_emissao_itens')
+        .select('id,produto_id,descricao,unidade,quantidade,valor_unitario,valor_desconto')
+        .eq('empresa_id', empresaId)
+        .eq('emissao_id', row.id)
+        .order('ordem', { ascending: true });
+      if (error) throw error;
+
+      setItems(
+        (data || []).map((it: any) => ({
+          id: it.id,
+          produto_id: it.produto_id ?? null,
+          produto_nome: (it.descricao || 'Item').toString(),
+          unidade: (it.unidade || 'un').toString(),
+          quantidade: Number(it.quantidade ?? 1) || 1,
+          valor_unitario: Number(it.valor_unitario ?? 0) || 0,
+          valor_desconto: Number(it.valor_desconto ?? 0) || 0,
+        }))
+      );
+    } catch (e: any) {
+      addToast(e?.message || 'Erro ao carregar itens do rascunho.', 'error');
+      setItems([]);
+    }
+
     setIsModalOpen(true);
   };
 
@@ -175,50 +227,141 @@ export default function NfeEmissoesPage() {
     setEditing(null);
   };
 
+  const totalsDraft = useMemo(() => {
+    const frete = formFrete.trim() ? Number(String(formFrete).replace(',', '.')) : 0;
+    const total_produtos = items.reduce((acc, it) => acc + it.quantidade * it.valor_unitario, 0);
+    const total_descontos = items.reduce((acc, it) => acc + (it.valor_desconto || 0), 0);
+    const total_nfe = Math.max(0, total_produtos - total_descontos + (Number.isFinite(frete) ? frete : 0));
+    return { frete, total_produtos, total_descontos, total_nfe };
+  }, [items, formFrete]);
+
+  const newId = () => {
+    const c: any = (globalThis as any).crypto;
+    if (c?.randomUUID) return c.randomUUID() as string;
+    return `tmp_${Date.now()}_${Math.random().toString(16).slice(2)}`;
+  };
+
+  const addItemFromProduct = (productId: string, hit?: any) => {
+    const nome = (hit?.nome || hit?.label || productToAddName || 'Produto').toString();
+    const unidade = (hit?.unidade || 'un').toString();
+    const preco = typeof hit?.preco_venda === 'number' ? hit.preco_venda : 0;
+    setItems((prev) => [
+      ...prev,
+      {
+        id: newId(),
+        produto_id: productId,
+        produto_nome: nome,
+        unidade,
+        quantidade: 1,
+        valor_unitario: Number.isFinite(preco) ? preco : 0,
+        valor_desconto: 0,
+      },
+    ]);
+    setProductToAddId(null);
+    setProductToAddName(undefined);
+  };
+
+  const updateItem = (id: string, patch: Partial<NfeItemForm>) => {
+    setItems((prev) => prev.map((it) => (it.id === id ? { ...it, ...patch } : it)));
+  };
+
+  const removeItem = (id: string) => {
+    setItems((prev) => prev.filter((it) => it.id !== id));
+  };
+
   const handleSave = async () => {
     if (!empresaId) return;
-    let payloadJson: any = {};
-    try {
-      payloadJson = formPayload.trim() ? JSON.parse(formPayload) : {};
-    } catch (e: any) {
-      addToast('JSON inválido no payload. Corrija antes de salvar.', 'error');
+    if (!items.length) {
+      addToast('Adicione ao menos 1 item ao rascunho.', 'error');
       return;
     }
 
-    const valor = formValor.trim() ? Number(String(formValor).replace(',', '.')) : null;
-    if (formValor.trim() && (Number.isNaN(valor) || valor! < 0)) {
-      addToast('Valor total inválido.', 'error');
+    const frete = totalsDraft.frete;
+    if (formFrete.trim() && (!Number.isFinite(frete) || frete < 0)) {
+      addToast('Frete inválido.', 'error');
       return;
     }
 
     setSaving(true);
     try {
-      if (editing?.id) {
+      const payloadJson = {
+        version: 1,
+        ambiente: formAmbiente,
+        destinatario_pessoa_id: formDestinatarioId ?? null,
+        totais: {
+          total_produtos: totalsDraft.total_produtos,
+          total_descontos: totalsDraft.total_descontos,
+          total_frete: frete,
+          total_impostos: 0,
+          total_nfe: totalsDraft.total_nfe,
+        },
+        itens: items.map((it) => ({
+          produto_id: it.produto_id,
+          descricao: it.produto_nome,
+          unidade: it.unidade,
+          quantidade: it.quantidade,
+          valor_unitario: it.valor_unitario,
+          valor_desconto: it.valor_desconto,
+        })),
+      };
+
+      let emissaoId = editing?.id ?? null;
+      if (emissaoId) {
         const { error } = await supabase
           .from('fiscal_nfe_emissoes')
           .update({
             destinatario_pessoa_id: formDestinatarioId ?? null,
             ambiente: formAmbiente,
-            valor_total: valor,
+            total_frete: frete,
             payload: payloadJson,
           })
-          .eq('id', editing.id)
+          .eq('id', emissaoId)
           .eq('empresa_id', empresaId);
         if (error) throw error;
-        addToast('Rascunho atualizado.', 'success');
       } else {
-        const { error } = await supabase.from('fiscal_nfe_emissoes').insert({
+        const { data, error } = await supabase.from('fiscal_nfe_emissoes').insert({
           empresa_id: empresaId,
           provider_slug: 'NFE_IO',
           ambiente: formAmbiente,
           status: 'rascunho',
           destinatario_pessoa_id: formDestinatarioId ?? null,
-          valor_total: valor,
+          total_frete: frete,
           payload: payloadJson,
-        });
+        }).select('id').single();
         if (error) throw error;
-        addToast('Rascunho criado.', 'success');
+        emissaoId = data?.id ?? null;
       }
+
+      if (!emissaoId) throw new Error('Falha ao persistir rascunho (sem id).');
+
+      // Atualiza itens (simples e idempotente)
+      const { error: delErr } = await supabase
+        .from('fiscal_nfe_emissao_itens')
+        .delete()
+        .eq('empresa_id', empresaId)
+        .eq('emissao_id', emissaoId);
+      if (delErr) throw delErr;
+
+      const rowsToInsert = items.map((it, idx) => ({
+        empresa_id: empresaId,
+        emissao_id: emissaoId,
+        produto_id: it.produto_id,
+        ordem: idx + 1,
+        descricao: it.produto_nome,
+        unidade: it.unidade,
+        quantidade: it.quantidade,
+        valor_unitario: it.valor_unitario,
+        valor_desconto: it.valor_desconto,
+        valor_total: Math.max(0, it.quantidade * it.valor_unitario - (it.valor_desconto || 0)),
+      }));
+
+      const { error: insErr } = await supabase.from('fiscal_nfe_emissao_itens').insert(rowsToInsert);
+      if (insErr) throw insErr;
+
+      // Recalcula totais no cabeçalho (e mantém valor_total)
+      await supabase.rpc('fiscal_nfe_recalc_totais', { p_emissao_id: emissaoId });
+
+      addToast(editing?.id ? 'Rascunho atualizado.' : 'Rascunho criado.', 'success');
 
       closeModal();
       await fetchList();
@@ -364,11 +507,13 @@ export default function NfeEmissoesPage() {
                         <span className="px-2 py-1 rounded-full text-xs font-semibold bg-blue-100 text-blue-700">Homologação</span>
                       )}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">{formatCurrency(row.valor_total)}</td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
+                      {formatCurrency(row.total_nfe ?? row.valor_total)}
+                    </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{formatDate(row.updated_at)}</td>
                     <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                       <div className="flex items-center justify-end gap-3">
-                        <button className="text-blue-600 hover:text-blue-900" onClick={() => openEdit(row)} title="Abrir rascunho">
+                        <button className="text-blue-600 hover:text-blue-900" onClick={() => void openEdit(row)} title="Abrir rascunho">
                           Abrir
                         </button>
                         <button
@@ -396,7 +541,7 @@ export default function NfeEmissoesPage() {
 
       <Modal isOpen={isModalOpen} onClose={closeModal} title={editing ? 'Editar rascunho NF-e' : 'Novo rascunho NF-e'} size="80pct">
         <div className="p-6 space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             <div>
               <label className="block text-sm font-semibold text-slate-700 mb-2">Ambiente</label>
               <Select value={formAmbiente} onChange={(e) => setFormAmbiente(e.target.value as AmbienteNfe)} className="min-w-[220px]">
@@ -405,15 +550,36 @@ export default function NfeEmissoesPage() {
               </Select>
             </div>
             <div>
-              <label className="block text-sm font-semibold text-slate-700 mb-2">Valor total</label>
+              <label className="block text-sm font-semibold text-slate-700 mb-2">Frete (opcional)</label>
               <input
-                value={formValor}
-                onChange={(e) => setFormValor(e.target.value)}
-                placeholder="Ex.: 1500,00"
+                value={formFrete}
+                onChange={(e) => setFormFrete(e.target.value)}
+                placeholder="Ex.: 25,00"
                 className="w-full p-3 border border-gray-300 rounded-xl shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
               />
             </div>
-            <div className="md:col-span-2">
+            <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
+              <div className="text-xs text-slate-600 font-semibold">Totais (prévia)</div>
+              <div className="mt-2 space-y-1 text-sm text-slate-800">
+                <div className="flex items-center justify-between gap-4">
+                  <span>Produtos</span>
+                  <span className="font-semibold">{formatCurrency(totalsDraft.total_produtos)}</span>
+                </div>
+                <div className="flex items-center justify-between gap-4">
+                  <span>Descontos</span>
+                  <span className="font-semibold">{formatCurrency(totalsDraft.total_descontos)}</span>
+                </div>
+                <div className="flex items-center justify-between gap-4">
+                  <span>Frete</span>
+                  <span className="font-semibold">{formatCurrency(totalsDraft.frete)}</span>
+                </div>
+                <div className="pt-2 mt-2 border-t border-slate-200 flex items-center justify-between gap-4">
+                  <span className="font-semibold">Total</span>
+                  <span className="font-bold">{formatCurrency(totalsDraft.total_nfe)}</span>
+                </div>
+              </div>
+            </div>
+            <div className="md:col-span-3">
               <label className="block text-sm font-semibold text-slate-700 mb-2">Destinatário (cliente)</label>
               <ClientAutocomplete
                 value={formDestinatarioId}
@@ -424,20 +590,127 @@ export default function NfeEmissoesPage() {
                 }}
                 placeholder="Nome/CPF/CNPJ..."
               />
-              <p className="text-xs text-slate-500 mt-2">Neste MVP, o rascunho aceita destinatário opcional. A composição completa do XML será implementada na próxima etapa do motor fiscal.</p>
+              <p className="text-xs text-slate-500 mt-2">NFE-01: destinatário e itens ficam no rascunho. O cadastro fiscal completo virá em NFE-02.</p>
             </div>
           </div>
 
-          <div>
-            <label className="block text-sm font-semibold text-slate-700 mb-2">Payload (JSON)</label>
-            <textarea
-              value={formPayload}
-              onChange={(e) => setFormPayload(e.target.value)}
-              className="w-full min-h-[280px] font-mono text-xs p-3 border border-gray-300 rounded-xl shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-            />
-            <p className="text-xs text-slate-500 mt-2">
-              Dica: você pode deixar <span className="font-semibold">{'{}'}</span> e evoluir depois. Emissão real ficará disponível quando ativarmos a integração.
-            </p>
+          <div className="rounded-2xl border border-gray-200 bg-white/70 p-5">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <h3 className="text-lg font-bold text-slate-900">Itens</h3>
+                <p className="text-xs text-slate-500 mt-1">Adicione produtos e ajuste quantidade/valor. Tributos serão calculados na etapa do motor fiscal.</p>
+              </div>
+              <div className="text-xs text-slate-500">
+                {items.length} {items.length === 1 ? 'item' : 'itens'}
+              </div>
+            </div>
+
+            <div className="mt-4 grid grid-cols-1 md:grid-cols-3 gap-3 items-end">
+              <div className="md:col-span-2">
+                <label className="block text-sm font-semibold text-slate-700 mb-2">Adicionar produto</label>
+                <ProductAutocomplete
+                  value={productToAddId}
+                  initialName={productToAddName}
+                  onChange={(id, hit) => {
+                    setProductToAddId(id);
+                    setProductToAddName(hit?.nome);
+                    if (id) void addItemFromProduct(id, hit);
+                  }}
+                  placeholder="Buscar produto..."
+                />
+              </div>
+              <div className="text-xs text-slate-500">
+                Dica: digite 2+ caracteres.
+              </div>
+            </div>
+
+            <div className="mt-4 overflow-auto border border-gray-200 rounded-xl bg-white">
+              <table className="min-w-[980px] w-full text-sm">
+                <thead className="bg-gray-50 text-gray-600">
+                  <tr>
+                    <th className="text-left p-3 min-w-[320px]">Produto</th>
+                    <th className="text-left p-3 min-w-[90px]">Un</th>
+                    <th className="text-right p-3 min-w-[110px]">Qtd</th>
+                    <th className="text-right p-3 min-w-[140px]">Vlr Unit</th>
+                    <th className="text-right p-3 min-w-[140px]">Desconto</th>
+                    <th className="text-right p-3 min-w-[140px]">Total</th>
+                    <th className="text-right p-3 min-w-[90px]">Ação</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100">
+                  {items.length === 0 ? (
+                    <tr>
+                      <td className="p-4 text-gray-500" colSpan={7}>
+                        Nenhum item ainda. Use “Adicionar produto”.
+                      </td>
+                    </tr>
+                  ) : (
+                    items.map((it) => {
+                      const totalLine = Math.max(0, it.quantidade * it.valor_unitario - (it.valor_desconto || 0));
+                      return (
+                        <tr key={it.id} className="hover:bg-gray-50/40">
+                          <td className="p-3">
+                            <input
+                              value={it.produto_nome}
+                              onChange={(e) => updateItem(it.id, { produto_nome: e.target.value })}
+                              className="w-full border border-gray-200 rounded-lg px-3 py-2"
+                              placeholder="Descrição do item"
+                            />
+                          </td>
+                          <td className="p-3">
+                            <input
+                              value={it.unidade}
+                              onChange={(e) => updateItem(it.id, { unidade: e.target.value })}
+                              className="w-full border border-gray-200 rounded-lg px-3 py-2"
+                            />
+                          </td>
+                          <td className="p-3 text-right">
+                            <input
+                              type="number"
+                              min={0}
+                              step={0.0001}
+                              value={String(it.quantidade)}
+                              onChange={(e) => updateItem(it.id, { quantidade: Number(e.target.value) || 0 })}
+                              className="w-full text-right border border-gray-200 rounded-lg px-3 py-2"
+                            />
+                          </td>
+                          <td className="p-3 text-right">
+                            <input
+                              type="number"
+                              min={0}
+                              step={0.0001}
+                              value={String(it.valor_unitario)}
+                              onChange={(e) => updateItem(it.id, { valor_unitario: Number(e.target.value) || 0 })}
+                              className="w-full text-right border border-gray-200 rounded-lg px-3 py-2"
+                            />
+                          </td>
+                          <td className="p-3 text-right">
+                            <input
+                              type="number"
+                              min={0}
+                              step={0.0001}
+                              value={String(it.valor_desconto)}
+                              onChange={(e) => updateItem(it.id, { valor_desconto: Number(e.target.value) || 0 })}
+                              className="w-full text-right border border-gray-200 rounded-lg px-3 py-2"
+                            />
+                          </td>
+                          <td className="p-3 text-right font-semibold">{formatCurrency(totalLine)}</td>
+                          <td className="p-3 text-right">
+                            <button
+                              type="button"
+                              onClick={() => removeItem(it.id)}
+                              className="text-sm font-semibold text-red-600 hover:text-red-700"
+                            >
+                              Remover
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    })
+                  )}
+                </tbody>
+              </table>
+            </div>
           </div>
 
           <div className="flex items-center justify-end gap-3">

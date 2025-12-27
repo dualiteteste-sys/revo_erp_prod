@@ -18,7 +18,7 @@ Legenda:
 - [x] CFG-04 Feature flags por empresa (incluindo NF‑e) com fallback seguro e auditoria
 
 ## 2) NF‑e Ativa (MVP real SP/PR, regime “Ambos”)
-- [ ] NFE-01 Modelos/tabelas internas + UI base (rascunho NF‑e, itens, totais, destinatário/emitente)
+- [x] NFE-01 Modelos/tabelas internas + UI base (rascunho NF‑e, itens, totais, destinatário/emitente)
 - [ ] NFE-02 Cadastro fiscal completo: empresa emitente (certificado A1), série/numeração, ambiente, CSC (se aplicável)
 - [ ] NFE-03 Cadastro fiscal de cliente/produto (NCM/CFOP/CST/CSOSN, natureza operação, regras por UF/regime)
 - [ ] NFE-04 Motor fiscal parametrizável v1 (cálculo + validação + preview do XML antes de emitir)
