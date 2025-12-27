@@ -6,6 +6,13 @@ interface LogContext {
     [key: string]: any;
 }
 
+const originalConsole = {
+    info: console.info.bind(console),
+    warn: console.warn.bind(console),
+    error: console.error.bind(console),
+    debug: console.debug.bind(console),
+};
+
 class Logger {
     private isDev = import.meta.env.DEV;
 
@@ -21,7 +28,7 @@ class Logger {
 
     info(message: string, context?: LogContext) {
         if (this.isDev) {
-            console.info(`[INFO] ${message}`, context || "");
+            originalConsole.info(`[INFO] ${message}`, context || "");
         }
         // We generally don't send info logs to Sentry to save quota, 
         // unless breadcrumbs are desired.
@@ -35,7 +42,7 @@ class Logger {
 
     warn(message: string, context?: LogContext) {
         if (this.isDev) {
-            console.warn(`[WARN] ${message}`, context || "");
+            originalConsole.warn(`[WARN] ${message}`, context || "");
         }
         Sentry.addBreadcrumb({
             category: "log",
@@ -47,7 +54,7 @@ class Logger {
 
     error(message: string, error?: any, context?: LogContext) {
         if (this.isDev) {
-            console.error(`[ERROR] ${message}`, error || "", context || "");
+            originalConsole.error(`[ERROR] ${message}`, error || "", context || "");
         }
 
         Sentry.captureException(error || new Error(message), {
@@ -60,7 +67,7 @@ class Logger {
 
     debug(message: string, context?: LogContext) {
         if (this.isDev) {
-            console.debug(`[DEBUG] ${message}`, context || "");
+            originalConsole.debug(`[DEBUG] ${message}`, context || "");
         }
     }
 }
