@@ -21,7 +21,7 @@ Legenda:
 - [x] NFE-01 Modelos/tabelas internas + UI base (rascunho NF‑e, itens, totais, destinatário/emitente)
 - [x] NFE-02 Cadastro fiscal completo: empresa emitente (certificado A1), série/numeração, ambiente, CSC (se aplicável)
 - [x] NFE-03 Cadastro fiscal de cliente/produto (NCM/CFOP/CST/CSOSN, natureza operação, regras por UF/regime)
-- [ ] NFE-04 Motor fiscal parametrizável v1 (cálculo + validação + preview do XML antes de emitir)
+- [x] NFE-04 Motor fiscal parametrizável v1 (cálculo + validação + preview do XML antes de emitir)
 - [ ] NFE-05 Integração NFE.io (emissão): enviar, consultar status, armazenar XML/DANFE, logs
 - [ ] NFE-06 Webhooks + fila/retry idempotente (processar eventos NFE.io; reprocessar com segurança)
 - [ ] NFE-07 Operações fiscais essenciais: cancelamento, CCe (se aplicável), inutilização (se necessário), reimpressão DANFE
