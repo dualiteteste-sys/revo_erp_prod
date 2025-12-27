@@ -232,16 +232,19 @@ jobs:
           fi
 
       - name: Deploy Edge Functions to PROD
-        if: ${{ secrets.SUPABASE_ACCESS_TOKEN != '' && secrets.SUPABASE_PROJECT_REF_PROD != '' }}
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
           SUPABASE_PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_REF_PROD }}
+        if: ${{ env.SUPABASE_ACCESS_TOKEN != '' && env.SUPABASE_PROJECT_REF != '' }}
         run: |
           set -euo pipefail
           bash scripts/deploy_edge_functions.sh
 
       - name: Skip Edge Function deploy (missing secrets)
-        if: ${{ secrets.SUPABASE_ACCESS_TOKEN == '' || secrets.SUPABASE_PROJECT_REF_PROD == '' }}
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_REF_PROD }}
+        if: ${{ env.SUPABASE_ACCESS_TOKEN == '' || env.SUPABASE_PROJECT_REF == '' }}
         run: |
           echo "::warning::Pulando deploy de Edge Functions: configure os secrets SUPABASE_ACCESS_TOKEN e SUPABASE_PROJECT_REF_PROD para habilitar."
 
