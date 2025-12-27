@@ -8,7 +8,7 @@ Legenda:
 ## 0) Release Gate (qualidade e deploy)
 - [x] RG-01 Padronizar “Release Gate” local/CI: `yarn test --run` + E2E suite + `yarn verify:migrations` obrigatórios
 - [x] RG-02 Pipeline PROD: “compare expected vs PROD schema” sem divergências (migrations idempotentes)
-- [ ] RG-03 Console limpo: capturar/zerar erros (tratamento central + bloquear `alert()`/erros não tratados) *(parcial: ErrorBoundary + Sentry ok, falta hardening de console/unhandled)*
+- [x] RG-03 Console limpo: capturar/zerar erros (tratamento central + bloquear `alert()`/erros não tratados) *(ErrorBoundary + Sentry + handlers globais + console silencioso em PROD)*
 - [ ] RG-04 Checklist E2E por plano (Serviços/Indústria) com “happy path” automatizado *(parcial: suites existem; falta validar cobertura mínima e travas)*
 
 ## 1) Configurações Comerciais (Planos/Limites + RBAC)
@@ -51,4 +51,3 @@ Legenda:
 - [ ] GL-01 Onboarding por empresa (checklist de config fiscal/financeiro/RH)
 - [ ] GL-02 Backup/restore + rotinas de suporte (exportações, trilha de auditoria)
 - [ ] GL-03 Hardening final (permissões, RLS, RPCs, rate limits, erros amigáveis)
-
