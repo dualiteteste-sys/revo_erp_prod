@@ -12,10 +12,10 @@ Legenda:
 - [x] RG-04 Checklist E2E por plano (Serviços/Indústria) com “happy path” automatizado *(documentado + CI permite rodar por suite)*
 
 ## 1) Configurações Comerciais (Planos/Limites + RBAC)
-- [ ] CFG-01 Tela Configurações → Plano/Limites por empresa (módulos habilitados + limites)
-- [ ] CFG-02 Enforcement em 3 camadas: Menu + Rotas + RPC/DB (ninguém burla via console)
+- [x] CFG-01 Tela Configurações → Plano/Limites por empresa (módulos habilitados + limites)
+- [ ] (parcial) CFG-02 Enforcement em 3 camadas: Menu + Rotas + RPC/DB *(Menu/Rotas/DB ok; falta padronizar “check de plano” em RPCs SECURITY DEFINER críticas)*
 - [ ] CFG-03 Gestão de permissões por usuário (Super Admin sempre full; perfis Member/Viewer)
-- [ ] CFG-04 Feature flags por empresa (incluindo NF‑e) com fallback seguro e auditoria
+- [x] CFG-04 Feature flags por empresa (incluindo NF‑e) com fallback seguro e auditoria
 
 ## 2) NF‑e Ativa (MVP real SP/PR, regime “Ambos”)
 - [ ] NFE-01 Modelos/tabelas internas + UI base (rascunho NF‑e, itens, totais, destinatário/emitente)
