@@ -12,6 +12,8 @@ function toNumberOrNull(v: NumIn): number | null {
 export function normalizeProductPayload(input: any) {
   const out = { ...input };
 
+  const digitsOnly = (v: any) => String(v ?? '').replace(/\D/g, '');
+
   // campos de embalagem (nomes reais do banco)
   out.tipo_embalagem = out.tipo_embalagem ? String(out.tipo_embalagem).trim() : null;
 
@@ -26,6 +28,20 @@ export function normalizeProductPayload(input: any) {
 
   // Garantir que campos booleanos obrigatórios tenham um valor
   out.controlar_lotes = out.controlar_lotes ?? false;
+
+  // Defaults fiscais (opcionais) para NF-e
+  out.cfop_padrao = (() => {
+    const v = digitsOnly(out.cfop_padrao);
+    return v ? v : null;
+  })();
+  out.cst_padrao = (() => {
+    const v = digitsOnly(out.cst_padrao);
+    return v ? v : null;
+  })();
+  out.csosn_padrao = (() => {
+    const v = digitsOnly(out.csosn_padrao);
+    return v ? v : null;
+  })();
 
   return out;
 }

@@ -49,6 +49,35 @@ const FiscalFields: React.FC<FiscalFieldsProps> = ({ data, onChange }) => {
         placeholder="00.000.00"
         className="sm:col-span-3"
       />
+
+      <div className="sm:col-span-6 mt-2 text-xs text-slate-600">
+        Defaults abaixo são opcionais e servem para pré-preencher a NF-e. Para Simples Nacional, use CSOSN; para Regime Normal, use CST.
+      </div>
+
+      <Input
+        label="CFOP padrão"
+        name="cfop_padrao"
+        value={data.cfop_padrao || ''}
+        onChange={(e) => onChange('cfop_padrao', e.target.value)}
+        placeholder="Ex.: 5102"
+        className="sm:col-span-2"
+      />
+      <Input
+        label="CST padrão"
+        name="cst_padrao"
+        value={data.cst_padrao || ''}
+        onChange={(e) => onChange('cst_padrao', e.target.value)}
+        placeholder="Ex.: 00"
+        className="sm:col-span-2"
+      />
+      <Input
+        label="CSOSN padrão"
+        name="csosn_padrao"
+        value={data.csosn_padrao || ''}
+        onChange={(e) => onChange('csosn_padrao', e.target.value)}
+        placeholder="Ex.: 102"
+        className="sm:col-span-2"
+      />
     </Section>
   );
 };

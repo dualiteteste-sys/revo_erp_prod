@@ -565,6 +565,9 @@ export interface Database {
           icms_origem: number
           ncm: string | null
           cest: string | null
+          cfop_padrao: string | null
+          cst_padrao: string | null
+          csosn_padrao: string | null
           tipo_embalagem: tipo_embalagem
           embalagem: string | null
           peso_liquido_kg: number | null
@@ -625,6 +628,9 @@ export interface Database {
           icms_origem: number
           ncm?: string | null
           cest?: string | null
+          cfop_padrao?: string | null
+          cst_padrao?: string | null
+          csosn_padrao?: string | null
           tipo_embalagem?: tipo_embalagem
           embalagem?: string | null
           peso_liquido_kg?: number | null
@@ -685,6 +691,9 @@ export interface Database {
           icms_origem?: number
           ncm?: string | null
           cest?: string | null
+          cfop_padrao?: string | null
+          cst_padrao?: string | null
+          csosn_padrao?: string | null
           tipo_embalagem?: tipo_embalagem
           embalagem?: string | null
           peso_liquido_kg?: number | null

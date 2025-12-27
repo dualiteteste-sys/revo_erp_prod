@@ -37,9 +37,11 @@ export type EnderecoPayload = {
   complemento?: string | null;
   bairro?: string | null;
   cidade?: string | null;
+  cidade_codigo?: string | null; // IBGE (7 dígitos) - opcional
   uf?: string | null;
   cep?: string | null;
   pais?: string | null;
+  pais_codigo?: string | null; // Ex.: 1058 (Brasil) - opcional
 };
 
 export type ContatoPayload = {
@@ -82,7 +84,13 @@ export async function savePartner(payload: PartnerPayload): Promise<PartnerDetai
 
     const cleanedPayload = {
       pessoa: pessoaPayload,
-      enderecos: payload.enderecos?.map(e => ({ ...e, cep: e.cep?.replace(/\D/g, '') || null })) || [],
+      enderecos:
+        payload.enderecos?.map((e) => ({
+          ...e,
+          cep: e.cep?.replace(/\D/g, '') || null,
+          cidade_codigo: e.cidade_codigo?.replace(/\D/g, '') || null,
+          pais_codigo: e.pais_codigo?.replace(/\D/g, '') || null,
+        })) || [],
       contatos: payload.contatos?.map(c => ({ ...c, telefone: c.telefone?.replace(/\D/g, '') || null })) || [],
     };
 

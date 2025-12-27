@@ -129,6 +129,25 @@ const AddressFields: React.FC<AddressFieldsProps> = ({ address, onAddressChange,
           className="sm:col-span-2"
           disabled={isFetchingCep}
         />
+
+        <Input
+          label="Código município (IBGE)"
+          name="cidade_codigo"
+          value={address.cidade_codigo || ''}
+          onChange={handleFieldChange}
+          className="sm:col-span-3"
+          placeholder="Ex.: 3550308"
+          disabled={isFetchingCep}
+        />
+        <Input
+          label="Código país"
+          name="pais_codigo"
+          value={address.pais_codigo || ''}
+          onChange={handleFieldChange}
+          className="sm:col-span-3"
+          placeholder="Ex.: 1058"
+          disabled={isFetchingCep}
+        />
       </div>
     </div>
   );

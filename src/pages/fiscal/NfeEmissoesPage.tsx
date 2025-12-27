@@ -29,6 +29,7 @@ type NfeEmissao = {
   total_frete?: number | null;
   total_impostos?: number | null;
   total_nfe?: number | null;
+  natureza_operacao?: string | null;
   ambiente: AmbienteNfe;
   payload: any;
   last_error: string | null;
@@ -44,6 +45,10 @@ type NfeItemForm = {
   quantidade: number;
   valor_unitario: number;
   valor_desconto: number;
+  ncm: string;
+  cfop: string;
+  cst: string;
+  csosn: string;
 };
 
 const STATUS_LABEL: Record<string, string> = {
@@ -89,6 +94,7 @@ export default function NfeEmissoesPage() {
   const [editing, setEditing] = useState<NfeEmissao | null>(null);
   const [formAmbiente, setFormAmbiente] = useState<AmbienteNfe>('homologacao');
   const [formFrete, setFormFrete] = useState<string>('');
+  const [formNaturezaOperacao, setFormNaturezaOperacao] = useState<string>('');
   const [formDestinatarioId, setFormDestinatarioId] = useState<string | null>(null);
   const [formDestinatarioName, setFormDestinatarioName] = useState<string | undefined>(undefined);
   const [items, setItems] = useState<NfeItemForm[]>([]);
@@ -104,7 +110,7 @@ export default function NfeEmissoesPage() {
       let query = supabase
         .from('fiscal_nfe_emissoes')
         .select(
-          'id,status,numero,serie,chave_acesso,destinatario_pessoa_id,ambiente,valor_total,total_produtos,total_descontos,total_frete,total_impostos,total_nfe,payload,last_error,created_at,updated_at,destinatario:pessoas(nome)'
+          'id,status,numero,serie,chave_acesso,destinatario_pessoa_id,ambiente,natureza_operacao,valor_total,total_produtos,total_descontos,total_frete,total_impostos,total_nfe,payload,last_error,created_at,updated_at,destinatario:pessoas(nome)'
         )
         .eq('empresa_id', empresaId)
         .order('updated_at', { ascending: false })
@@ -115,26 +121,27 @@ export default function NfeEmissoesPage() {
       const { data, error } = await query;
       if (error) throw error;
 
-      const list: NfeEmissao[] = (data || []).map((r: any) => ({
-        id: r.id,
-        status: r.status,
-        numero: r.numero ?? null,
-        serie: r.serie ?? null,
-        chave_acesso: r.chave_acesso ?? null,
-        destinatario_pessoa_id: r.destinatario_pessoa_id ?? null,
-        destinatario_nome: r?.destinatario?.nome ?? null,
-        valor_total: r.valor_total ?? null,
-        total_produtos: typeof r.total_produtos === 'number' ? r.total_produtos : null,
-        total_descontos: typeof r.total_descontos === 'number' ? r.total_descontos : null,
-        total_frete: typeof r.total_frete === 'number' ? r.total_frete : null,
-        total_impostos: typeof r.total_impostos === 'number' ? r.total_impostos : null,
-        total_nfe: typeof r.total_nfe === 'number' ? r.total_nfe : null,
-        ambiente: (r.ambiente ?? 'homologacao') as AmbienteNfe,
-        payload: r.payload ?? {},
-        last_error: r.last_error ?? null,
-        created_at: r.created_at,
-        updated_at: r.updated_at,
-      }));
+        const list: NfeEmissao[] = (data || []).map((r: any) => ({
+          id: r.id,
+          status: r.status,
+          numero: r.numero ?? null,
+          serie: r.serie ?? null,
+          chave_acesso: r.chave_acesso ?? null,
+          destinatario_pessoa_id: r.destinatario_pessoa_id ?? null,
+          destinatario_nome: r?.destinatario?.nome ?? null,
+          valor_total: r.valor_total ?? null,
+          total_produtos: typeof r.total_produtos === 'number' ? r.total_produtos : null,
+          total_descontos: typeof r.total_descontos === 'number' ? r.total_descontos : null,
+          total_frete: typeof r.total_frete === 'number' ? r.total_frete : null,
+          total_impostos: typeof r.total_impostos === 'number' ? r.total_impostos : null,
+          total_nfe: typeof r.total_nfe === 'number' ? r.total_nfe : null,
+          natureza_operacao: r.natureza_operacao ?? null,
+          ambiente: (r.ambiente ?? 'homologacao') as AmbienteNfe,
+          payload: r.payload ?? {},
+          last_error: r.last_error ?? null,
+          created_at: r.created_at,
+          updated_at: r.updated_at,
+        }));
 
       const filtered = search.trim()
         ? list.filter((row) => {
@@ -177,6 +184,7 @@ export default function NfeEmissoesPage() {
     setEditing(null);
     setFormAmbiente('homologacao');
     setFormFrete('');
+    setFormNaturezaOperacao('');
     setFormDestinatarioId(null);
     setFormDestinatarioName(undefined);
     setItems([]);
@@ -189,6 +197,7 @@ export default function NfeEmissoesPage() {
     setEditing(row);
     setFormAmbiente(row.ambiente || 'homologacao');
     setFormFrete(row.total_frete != null ? String(row.total_frete) : '');
+    setFormNaturezaOperacao((row.natureza_operacao ?? '').toString());
     setFormDestinatarioId(row.destinatario_pessoa_id ?? null);
     setFormDestinatarioName(row.destinatario_nome ?? undefined);
     setProductToAddId(null);
@@ -197,7 +206,7 @@ export default function NfeEmissoesPage() {
     try {
       const { data, error } = await supabase
         .from('fiscal_nfe_emissao_itens')
-        .select('id,produto_id,descricao,unidade,quantidade,valor_unitario,valor_desconto')
+        .select('id,produto_id,descricao,unidade,quantidade,valor_unitario,valor_desconto,ncm,cfop,cst,csosn')
         .eq('empresa_id', empresaId)
         .eq('emissao_id', row.id)
         .order('ordem', { ascending: true });
@@ -212,6 +221,10 @@ export default function NfeEmissoesPage() {
           quantidade: Number(it.quantidade ?? 1) || 1,
           valor_unitario: Number(it.valor_unitario ?? 0) || 0,
           valor_desconto: Number(it.valor_desconto ?? 0) || 0,
+          ncm: (it.ncm ?? '').toString(),
+          cfop: (it.cfop ?? '').toString(),
+          cst: (it.cst ?? '').toString(),
+          csosn: (it.csosn ?? '').toString(),
         }))
       );
     } catch (e: any) {
@@ -241,10 +254,23 @@ export default function NfeEmissoesPage() {
     return `tmp_${Date.now()}_${Math.random().toString(16).slice(2)}`;
   };
 
-  const addItemFromProduct = (productId: string, hit?: any) => {
+  const addItemFromProduct = async (productId: string, hit?: any) => {
     const nome = (hit?.nome || hit?.label || productToAddName || 'Produto').toString();
     const unidade = (hit?.unidade || 'un').toString();
     const preco = typeof hit?.preco_venda === 'number' ? hit.preco_venda : 0;
+
+    let fiscalDefaults: any = {};
+    try {
+      const { data } = await supabase
+        .from('produtos')
+        .select('ncm,cfop_padrao,cst_padrao,csosn_padrao')
+        .eq('id', productId)
+        .maybeSingle();
+      fiscalDefaults = data || {};
+    } catch {
+      fiscalDefaults = {};
+    }
+
     setItems((prev) => [
       ...prev,
       {
@@ -255,6 +281,10 @@ export default function NfeEmissoesPage() {
         quantidade: 1,
         valor_unitario: Number.isFinite(preco) ? preco : 0,
         valor_desconto: 0,
+        ncm: (fiscalDefaults?.ncm ?? '').toString(),
+        cfop: (fiscalDefaults?.cfop_padrao ?? '').toString(),
+        cst: (fiscalDefaults?.cst_padrao ?? '').toString(),
+        csosn: (fiscalDefaults?.csosn_padrao ?? '').toString(),
       },
     ]);
     setProductToAddId(null);
@@ -287,6 +317,7 @@ export default function NfeEmissoesPage() {
       const payloadJson = {
         version: 1,
         ambiente: formAmbiente,
+        natureza_operacao: formNaturezaOperacao?.trim() || null,
         destinatario_pessoa_id: formDestinatarioId ?? null,
         totais: {
           total_produtos: totalsDraft.total_produtos,
@@ -302,6 +333,10 @@ export default function NfeEmissoesPage() {
           quantidade: it.quantidade,
           valor_unitario: it.valor_unitario,
           valor_desconto: it.valor_desconto,
+          ncm: it.ncm || null,
+          cfop: it.cfop || null,
+          cst: it.cst || null,
+          csosn: it.csosn || null,
         })),
       };
 
@@ -312,6 +347,7 @@ export default function NfeEmissoesPage() {
           .update({
             destinatario_pessoa_id: formDestinatarioId ?? null,
             ambiente: formAmbiente,
+            natureza_operacao: formNaturezaOperacao?.trim() || null,
             total_frete: frete,
             payload: payloadJson,
           })
@@ -325,6 +361,7 @@ export default function NfeEmissoesPage() {
           ambiente: formAmbiente,
           status: 'rascunho',
           destinatario_pessoa_id: formDestinatarioId ?? null,
+          natureza_operacao: formNaturezaOperacao?.trim() || null,
           total_frete: frete,
           payload: payloadJson,
         }).select('id').single();
@@ -353,6 +390,10 @@ export default function NfeEmissoesPage() {
         valor_unitario: it.valor_unitario,
         valor_desconto: it.valor_desconto,
         valor_total: Math.max(0, it.quantidade * it.valor_unitario - (it.valor_desconto || 0)),
+        ncm: it.ncm || null,
+        cfop: it.cfop || null,
+        cst: it.cst || null,
+        csosn: it.csosn || null,
       }));
 
       const { error: insErr } = await supabase.from('fiscal_nfe_emissao_itens').insert(rowsToInsert);
@@ -550,6 +591,15 @@ export default function NfeEmissoesPage() {
               </Select>
             </div>
             <div>
+              <label className="block text-sm font-semibold text-slate-700 mb-2">Natureza da operação</label>
+              <input
+                value={formNaturezaOperacao}
+                onChange={(e) => setFormNaturezaOperacao(e.target.value)}
+                placeholder="Ex.: Venda de mercadoria"
+                className="w-full p-3 border border-gray-300 rounded-xl shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              />
+            </div>
+            <div>
               <label className="block text-sm font-semibold text-slate-700 mb-2">Frete (opcional)</label>
               <input
                 value={formFrete}
@@ -558,7 +608,7 @@ export default function NfeEmissoesPage() {
                 className="w-full p-3 border border-gray-300 rounded-xl shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
               />
             </div>
-            <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
+            <div className="md:col-span-3 rounded-xl border border-slate-200 bg-slate-50 p-3">
               <div className="text-xs text-slate-600 font-semibold">Totais (prévia)</div>
               <div className="mt-2 space-y-1 text-sm text-slate-800">
                 <div className="flex items-center justify-between gap-4">
@@ -590,7 +640,9 @@ export default function NfeEmissoesPage() {
                 }}
                 placeholder="Nome/CPF/CNPJ..."
               />
-              <p className="text-xs text-slate-500 mt-2">NFE-01: destinatário e itens ficam no rascunho. O cadastro fiscal completo virá em NFE-02.</p>
+              <p className="text-xs text-slate-500 mt-2">
+                NFE-03: CFOP/CST/CSOSN podem ser preenchidos por item; defaults podem vir do cadastro do produto.
+              </p>
             </div>
           </div>
 
@@ -625,11 +677,15 @@ export default function NfeEmissoesPage() {
             </div>
 
             <div className="mt-4 overflow-auto border border-gray-200 rounded-xl bg-white">
-              <table className="min-w-[980px] w-full text-sm">
+              <table className="min-w-[1320px] w-full text-sm">
                 <thead className="bg-gray-50 text-gray-600">
                   <tr>
                     <th className="text-left p-3 min-w-[320px]">Produto</th>
                     <th className="text-left p-3 min-w-[90px]">Un</th>
+                    <th className="text-left p-3 min-w-[110px]">NCM</th>
+                    <th className="text-left p-3 min-w-[90px]">CFOP</th>
+                    <th className="text-left p-3 min-w-[90px]">CST</th>
+                    <th className="text-left p-3 min-w-[110px]">CSOSN</th>
                     <th className="text-right p-3 min-w-[110px]">Qtd</th>
                     <th className="text-right p-3 min-w-[140px]">Vlr Unit</th>
                     <th className="text-right p-3 min-w-[140px]">Desconto</th>
@@ -640,7 +696,7 @@ export default function NfeEmissoesPage() {
                 <tbody className="divide-y divide-gray-100">
                   {items.length === 0 ? (
                     <tr>
-                      <td className="p-4 text-gray-500" colSpan={7}>
+                      <td className="p-4 text-gray-500" colSpan={11}>
                         Nenhum item ainda. Use “Adicionar produto”.
                       </td>
                     </tr>
@@ -662,6 +718,38 @@ export default function NfeEmissoesPage() {
                               value={it.unidade}
                               onChange={(e) => updateItem(it.id, { unidade: e.target.value })}
                               className="w-full border border-gray-200 rounded-lg px-3 py-2"
+                            />
+                          </td>
+                          <td className="p-3">
+                            <input
+                              value={it.ncm}
+                              onChange={(e) => updateItem(it.id, { ncm: e.target.value })}
+                              className="w-full border border-gray-200 rounded-lg px-3 py-2"
+                              placeholder="00000000"
+                            />
+                          </td>
+                          <td className="p-3">
+                            <input
+                              value={it.cfop}
+                              onChange={(e) => updateItem(it.id, { cfop: e.target.value })}
+                              className="w-full border border-gray-200 rounded-lg px-3 py-2"
+                              placeholder="0000"
+                            />
+                          </td>
+                          <td className="p-3">
+                            <input
+                              value={it.cst}
+                              onChange={(e) => updateItem(it.id, { cst: e.target.value })}
+                              className="w-full border border-gray-200 rounded-lg px-3 py-2"
+                              placeholder="00"
+                            />
+                          </td>
+                          <td className="p-3">
+                            <input
+                              value={it.csosn}
+                              onChange={(e) => updateItem(it.id, { csosn: e.target.value })}
+                              className="w-full border border-gray-200 rounded-lg px-3 py-2"
+                              placeholder="000"
                             />
                           </td>
                           <td className="p-3 text-right">
