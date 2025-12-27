@@ -15,7 +15,7 @@ concurrency:
 
 jobs:
   verify-migrations:
-    name: Verify + Deploy DEV (db)
+    name: Verify migrations (clean DB)
     runs-on: ubuntu-latest
 
     steps:
@@ -58,7 +58,7 @@ jobs:
           supabase stop
 
       - name: Apply migrations to DEV (remote)
-        if: github.ref == 'refs/heads/dev'
+        if: github.event_name == 'workflow_dispatch'
         env:
           SUPABASE_DB_URL_DEV: ${{ secrets.SUPABASE_DB_URL_DEV }}
         run: |
@@ -72,7 +72,7 @@ jobs:
           echo "[DEV] Migrations applied successfully."
 
       - name: Snapshot current schema (public) from DEV (remote)
-        if: github.ref == 'refs/heads/dev'
+        if: github.event_name == 'workflow_dispatch'
         env:
           SUPABASE_DB_URL_DEV: ${{ secrets.SUPABASE_DB_URL_DEV }}
         run: |
@@ -80,7 +80,7 @@ jobs:
           psql "$SUPABASE_DB_URL_DEV" -v ON_ERROR_STOP=1 -X -qAt -f scripts/public_schema_snapshot.sql > dev_public_schema.txt
 
       - name: Compare expected vs DEV schema (public)
-        if: github.ref == 'refs/heads/dev'
+        if: github.event_name == 'workflow_dispatch'
         run: |
           set -euo pipefail
           sort expected_public_schema.txt > expected_public_schema.sorted.txt
