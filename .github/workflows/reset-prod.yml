@@ -66,4 +66,3 @@ jobs:
           name: prod_public_schema_after_reset
           path: prod_public_schema.txt
           retention-days: 7
-
