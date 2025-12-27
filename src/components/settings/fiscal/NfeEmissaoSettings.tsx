@@ -4,6 +4,7 @@ import { useAuth } from '@/contexts/AuthProvider';
 import { useToast } from '@/contexts/ToastProvider';
 import { useSupabase } from '@/providers/SupabaseProvider';
 import { useEmpresaFeatures } from '@/hooks/useEmpresaFeatures';
+import { roleAtLeast, useEmpresaRole } from '@/hooks/useEmpresaRole';
 
 type AmbienteNfe = 'homologacao' | 'producao';
 
@@ -24,6 +25,8 @@ const NfeEmissaoSettings: React.FC = () => {
   const { activeEmpresa } = useAuth();
   const { addToast } = useToast();
   const features = useEmpresaFeatures();
+  const empresaRoleQuery = useEmpresaRole();
+  const canAdmin = empresaRoleQuery.isFetched && roleAtLeast(empresaRoleQuery.data, 'admin');
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -67,6 +70,10 @@ const NfeEmissaoSettings: React.FC = () => {
 
   const handleToggleNfeEnabled = async (next: boolean) => {
     if (!activeEmpresa?.id) return;
+    if (!canAdmin) {
+      addToast('Sem permissão para alterar a emissão. Apenas admin/owner.', 'error');
+      return;
+    }
     setSavingFeatureFlag(true);
     try {
       const { error } = await supabase
@@ -92,6 +99,10 @@ const NfeEmissaoSettings: React.FC = () => {
 
   const handleSave = async () => {
     if (!activeEmpresa?.id) return;
+    if (!canAdmin) {
+      addToast('Sem permissão para salvar configurações. Apenas admin/owner.', 'error');
+      return;
+    }
     setSaving(true);
     try {
       const payload = {
@@ -158,11 +169,11 @@ const NfeEmissaoSettings: React.FC = () => {
               <button
                 type="button"
                 onClick={() => void handleToggleNfeEnabled(!nfeEnabled)}
-                disabled={savingFeatureFlag || features.loading}
+                disabled={savingFeatureFlag || features.loading || !canAdmin}
                 className={[
                   'relative inline-flex h-7 w-12 items-center rounded-full transition-colors',
                   nfeEnabled ? 'bg-blue-600' : 'bg-gray-300',
-                  (savingFeatureFlag || features.loading) ? 'opacity-60 cursor-not-allowed' : 'cursor-pointer',
+                  (savingFeatureFlag || features.loading || !canAdmin) ? 'opacity-60 cursor-not-allowed' : 'cursor-pointer',
                 ].join(' ')}
                 aria-pressed={nfeEnabled}
                 aria-label="Alternar emissão de NF-e"
@@ -252,7 +263,7 @@ const NfeEmissaoSettings: React.FC = () => {
           <button
             type="button"
             onClick={handleSave}
-            disabled={loading || saving || !isDirty}
+            disabled={loading || saving || !isDirty || !canAdmin}
             className="inline-flex items-center gap-2 bg-blue-600 text-white font-bold py-2 px-5 rounded-lg hover:bg-blue-700 transition-colors disabled:bg-blue-400 disabled:cursor-not-allowed"
           >
             <Save size={18} />

@@ -8,6 +8,7 @@ import { useAuth } from '@/contexts/AuthProvider';
 import { useToast } from '@/contexts/ToastProvider';
 import { useEmpresaFeatures } from '@/hooks/useEmpresaFeatures';
 import { Loader2, Receipt, Save, ShieldCheck } from 'lucide-react';
+import { roleAtLeast, useEmpresaRole } from '@/hooks/useEmpresaRole';
 
 type AmbienteNfe = 'homologacao' | 'producao';
 
@@ -25,6 +26,8 @@ export default function NfeSettingsPage() {
   const { activeEmpresa } = useAuth();
   const { addToast } = useToast();
   const features = useEmpresaFeatures();
+  const empresaRoleQuery = useEmpresaRole();
+  const canAdmin = empresaRoleQuery.isFetched && roleAtLeast(empresaRoleQuery.data, 'admin');
 
   const empresaId = activeEmpresa?.id;
 
@@ -87,6 +90,10 @@ export default function NfeSettingsPage() {
 
   const handleSaveFlag = async () => {
     if (!empresaId) return;
+    if (!canAdmin) {
+      addToast('Sem permissão para alterar a emissão. Apenas admin/owner.', 'error');
+      return;
+    }
     setSavingFlag(true);
     try {
       const { error } = await supabase
@@ -105,6 +112,10 @@ export default function NfeSettingsPage() {
 
   const handleSaveConfig = async () => {
     if (!empresaId || !config) return;
+    if (!canAdmin) {
+      addToast('Sem permissão para salvar configurações. Apenas admin/owner.', 'error');
+      return;
+    }
     setSaving(true);
     try {
       const payload = {
@@ -166,7 +177,7 @@ export default function NfeSettingsPage() {
                 </p>
               </div>
 
-              <Button onClick={handleSaveFlag} disabled={savingFlag}>
+              <Button onClick={handleSaveFlag} disabled={savingFlag || !canAdmin}>
                 {savingFlag ? <Loader2 className="animate-spin" size={18} /> : <Save size={18} />}
                 <span className="ml-2">Salvar</span>
               </Button>
@@ -188,6 +199,7 @@ export default function NfeSettingsPage() {
                   type="checkbox"
                   checked={nfeEnabled}
                   onChange={(e) => setNfeEnabled(e.target.checked)}
+                  disabled={!canAdmin}
                   className="h-5 w-5 accent-blue-600"
                 />
               </label>
@@ -200,7 +212,7 @@ export default function NfeSettingsPage() {
                 <h2 className="text-lg font-bold text-slate-900">Provedor (NFE.io)</h2>
                 <p className="text-sm text-slate-600 mt-1">Sem segredos aqui. Tokens e certificados ficarão em vault/edge function quando ativarmos a emissão.</p>
               </div>
-              <Button onClick={handleSaveConfig} disabled={saving || !config}>
+              <Button onClick={handleSaveConfig} disabled={saving || !config || !canAdmin}>
                 {saving ? <Loader2 className="animate-spin" size={18} /> : <Save size={18} />}
                 <span className="ml-2">Salvar</span>
               </Button>
@@ -248,4 +260,3 @@ export default function NfeSettingsPage() {
     </div>
   );
 }
-

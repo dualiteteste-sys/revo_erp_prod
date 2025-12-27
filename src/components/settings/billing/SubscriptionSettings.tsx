@@ -6,6 +6,7 @@ import { motion } from 'framer-motion';
 import { useToast } from '../../../contexts/ToastProvider';
 import { useSupabase } from '@/providers/SupabaseProvider';
 import { Database } from '../../../types/database.types';
+import { roleAtLeast, useEmpresaRole } from '@/hooks/useEmpresaRole';
 
 type EmpresaAddon = Database['public']['Tables']['empresa_addons']['Row'];
 type PlanoMvp = 'ambos' | 'servicos' | 'industria';
@@ -72,6 +73,8 @@ const SubscriptionSettings: React.FC<SubscriptionSettingsProps> = ({ onSwitchToP
   const { session, activeEmpresa } = useAuth();
   const { subscription, loadingSubscription, refetchSubscription } = useSubscription();
   const { addToast } = useToast();
+  const empresaRoleQuery = useEmpresaRole();
+  const canAdmin = empresaRoleQuery.isFetched && roleAtLeast(empresaRoleQuery.data, 'admin');
   const [isPortalLoading, setIsPortalLoading] = useState(false);
   const [addons, setAddons] = useState<EmpresaAddon[]>([]);
   const [loadingAddons, setLoadingAddons] = useState(true);
@@ -261,6 +264,10 @@ const SubscriptionSettings: React.FC<SubscriptionSettingsProps> = ({ onSwitchToP
       addToast('Nenhuma empresa ativa selecionada.', 'error');
       return;
     }
+    if (!canAdmin) {
+      addToast('Sem permissão para alterar Plano MVP/Limites. Apenas admin/owner.', 'error');
+      return;
+    }
 
     const nextMaxUsers = Number.isFinite(maxUsers) ? Math.max(1, Math.trunc(maxUsers)) : 999;
 
@@ -296,10 +303,15 @@ const SubscriptionSettings: React.FC<SubscriptionSettingsProps> = ({ onSwitchToP
           <p className="text-sm text-gray-500 mt-1">
             Use esta configuração para simular os 2 planos iniciais (Serviços / Indústria) e limites de usuários.
           </p>
+          {!canAdmin && (
+            <p className="mt-2 text-xs text-amber-700">
+              Apenas <span className="font-semibold">admin/owner</span> podem alterar estas configurações.
+            </p>
+          )}
         </div>
         <button
           onClick={handleSaveEntitlements}
-          disabled={savingEntitlements || loadingEntitlements}
+          disabled={savingEntitlements || loadingEntitlements || !canAdmin}
           className="bg-blue-600 text-white font-bold py-2 px-5 rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50"
         >
           {savingEntitlements ? 'Salvando…' : 'Salvar'}
@@ -312,7 +324,7 @@ const SubscriptionSettings: React.FC<SubscriptionSettingsProps> = ({ onSwitchToP
           <select
             value={planoMvp}
             onChange={(e) => setPlanoMvp(e.target.value as PlanoMvp)}
-            disabled={loadingEntitlements}
+            disabled={loadingEntitlements || !canAdmin}
             className="w-full bg-white border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
           >
             <option value="ambos">Ambos (sem bloqueios)</option>
@@ -332,7 +344,7 @@ const SubscriptionSettings: React.FC<SubscriptionSettingsProps> = ({ onSwitchToP
             step={1}
             value={Number.isFinite(maxUsers) ? String(maxUsers) : ''}
             onChange={(e) => setMaxUsers(Number(e.target.value))}
-            disabled={loadingEntitlements}
+            disabled={loadingEntitlements || !canAdmin}
             className="w-full bg-white border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
             placeholder="Ex.: 3"
           />
