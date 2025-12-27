@@ -44,18 +44,56 @@ jobs:
           set -euo pipefail
           psql "$SUPABASE_DB_URL_PROD" -v ON_ERROR_STOP=1 -X -qAt -f scripts/public_schema_snapshot.sql > prod_public_schema.txt
 
+      - name: Snapshot storage schema from DEV
+        run: |
+          set -euo pipefail
+          psql "$SUPABASE_DB_URL_DEV" -v ON_ERROR_STOP=1 -X -qAt -f scripts/storage_snapshot.sql > dev_storage_snapshot.txt
+
+      - name: Snapshot storage schema from PROD
+        run: |
+          set -euo pipefail
+          psql "$SUPABASE_DB_URL_PROD" -v ON_ERROR_STOP=1 -X -qAt -f scripts/storage_snapshot.sql > prod_storage_snapshot.txt
+
+      - name: Snapshot applied migrations (DEV)
+        run: |
+          set -euo pipefail
+          psql "$SUPABASE_DB_URL_DEV" -v ON_ERROR_STOP=1 -X -qAt -c "select version from supabase_migrations.schema_migrations order by version;" > dev_migrations.txt
+
+      - name: Snapshot applied migrations (PROD)
+        run: |
+          set -euo pipefail
+          psql "$SUPABASE_DB_URL_PROD" -v ON_ERROR_STOP=1 -X -qAt -c "select version from supabase_migrations.schema_migrations order by version;" > prod_migrations.txt
+
       - name: Diff DEV vs PROD (public)
         id: diff
         run: |
           set -euo pipefail
           diff -u dev_public_schema.txt prod_public_schema.txt > dev_vs_prod_public_schema.diff || true
+          diff -u dev_storage_snapshot.txt prod_storage_snapshot.txt > dev_vs_prod_storage_snapshot.diff || true
+          diff -u dev_migrations.txt prod_migrations.txt > dev_vs_prod_migrations.diff || true
+
+          has_diff=false
           if [[ -s dev_vs_prod_public_schema.diff ]]; then
-            echo "has_diff=true" >> "$GITHUB_OUTPUT"
             echo "::error::DEV e PROD estão com drift no schema public (veja o artifact dev_vs_prod_public_schema.diff)."
-            echo "Diff lines: $(wc -l < dev_vs_prod_public_schema.diff)" >> "$GITHUB_STEP_SUMMARY"
-          else
-            echo "has_diff=false" >> "$GITHUB_OUTPUT"
-            echo "DEV e PROD estão alinhados (schema public)." >> "$GITHUB_STEP_SUMMARY"
+            echo "Diff public lines: $(wc -l < dev_vs_prod_public_schema.diff)" >> "$GITHUB_STEP_SUMMARY"
+            has_diff=true
+          fi
+
+          if [[ -s dev_vs_prod_storage_snapshot.diff ]]; then
+            echo "::error::DEV e PROD estão com drift no Storage (buckets/policies) (veja o artifact dev_vs_prod_storage_snapshot.diff)."
+            echo "Diff storage lines: $(wc -l < dev_vs_prod_storage_snapshot.diff)" >> "$GITHUB_STEP_SUMMARY"
+            has_diff=true
+          fi
+
+          if [[ -s dev_vs_prod_migrations.diff ]]; then
+            echo "::error::DEV e PROD estão com drift no histórico de migrations (supabase_migrations.schema_migrations) (veja o artifact dev_vs_prod_migrations.diff)."
+            echo "Diff migrations lines: $(wc -l < dev_vs_prod_migrations.diff)" >> "$GITHUB_STEP_SUMMARY"
+            has_diff=true
+          fi
+
+          echo "has_diff=$has_diff" >> "$GITHUB_OUTPUT"
+          if [[ "$has_diff" == "false" ]]; then
+            echo "DEV e PROD estão alinhados (public + storage + migrations)." >> "$GITHUB_STEP_SUMMARY"
           fi
 
       - name: Upload schema snapshots + diff (debug)
@@ -67,10 +105,15 @@ jobs:
             dev_public_schema.txt
             prod_public_schema.txt
             dev_vs_prod_public_schema.diff
+            dev_storage_snapshot.txt
+            prod_storage_snapshot.txt
+            dev_vs_prod_storage_snapshot.diff
+            dev_migrations.txt
+            prod_migrations.txt
+            dev_vs_prod_migrations.diff
           retention-days: 7
 
       - name: Fail if drift detected
         if: steps.diff.outputs.has_diff == 'true'
         run: |
           exit 1
-

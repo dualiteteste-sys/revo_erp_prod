@@ -55,14 +55,35 @@ jobs:
           set -euo pipefail
           echo "y" | supabase db push --include-all --db-url "$SUPABASE_DB_URL_PROD"
 
+      - name: Deploy Edge Functions to PROD
+        if: ${{ secrets.SUPABASE_ACCESS_TOKEN != '' && secrets.SUPABASE_PROJECT_REF_PROD != '' }}
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_REF_PROD }}
+        run: |
+          set -euo pipefail
+          bash scripts/deploy_edge_functions.sh
+
+      - name: Skip Edge Function deploy (missing secrets)
+        if: ${{ secrets.SUPABASE_ACCESS_TOKEN == '' || secrets.SUPABASE_PROJECT_REF_PROD == '' }}
+        run: |
+          echo "::warning::Pulando deploy de Edge Functions: configure os secrets SUPABASE_ACCESS_TOKEN e SUPABASE_PROJECT_REF_PROD para habilitar."
+
       - name: Snapshot current schema (public) from PROD
         run: |
           set -euo pipefail
           psql "$SUPABASE_DB_URL_PROD" -v ON_ERROR_STOP=1 -X -qAt -f scripts/public_schema_snapshot.sql > prod_public_schema.txt
 
+      - name: Snapshot current schema (storage) from PROD
+        run: |
+          set -euo pipefail
+          psql "$SUPABASE_DB_URL_PROD" -v ON_ERROR_STOP=1 -X -qAt -f scripts/storage_snapshot.sql > prod_storage_snapshot.txt
+
       - name: Upload PROD schema snapshot (debug)
         uses: actions/upload-artifact@v4
         with:
           name: prod_public_schema_after_reset
-          path: prod_public_schema.txt
+          path: |
+            prod_public_schema.txt
+            prod_storage_snapshot.txt
           retention-days: 7

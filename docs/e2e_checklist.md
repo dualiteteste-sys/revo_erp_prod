@@ -16,4 +16,14 @@ Rodar smoke real:
 E2E_USER="..." E2E_PASS="..." npm run test:e2e -- e2e/real-smoke.spec.ts
 ```
 
+## Release Gate (sem mocks)
+
+Para validar o “ponto de lançamento” no CI, usamos um gate que falha em qualquer `console.error`/`pageerror`
+(ver `e2e/fixtures.ts`).
+
+- Gate completo: `yarn test:e2e:gate:all`
+- Gate por plano:
+  - Serviços: `yarn test:e2e:gate:servicos`
+  - Indústria: `yarn test:e2e:gate:industria`
+
 Adapte para cada feature criando um novo spec real usando o template abaixo.
