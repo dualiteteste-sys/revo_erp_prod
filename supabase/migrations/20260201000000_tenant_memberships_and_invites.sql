@@ -21,11 +21,13 @@ BEGIN;
 alter table public.empresa_usuarios
   add column if not exists status text;
 
--- Se o projeto antigo tiver `status` como enum (ex.: user_status_in_empresa),
--- converte para TEXT para manter compatibilidade com Edge Functions/JS.
+-- Em alguns projetos antigos `status` era enum (ex.: user_status_in_empresa).
+-- Para manter compatibilidade, garantimos que os valores existam no enum.
 do $$
 declare
   v_udt_name text;
+  v_type_schema text;
+  v_is_enum boolean := false;
 begin
   select c.udt_name
     into v_udt_name
@@ -36,7 +38,21 @@ begin
   limit 1;
 
   if v_udt_name is not null and v_udt_name <> 'text' then
-    execute 'alter table public.empresa_usuarios alter column status type text using status::text';
+    select n.nspname,
+           (t.typtype = 'e')
+      into v_type_schema,
+           v_is_enum
+    from pg_type t
+    join pg_namespace n on n.oid = t.typnamespace
+    where t.typname = v_udt_name
+    limit 1;
+
+    if coalesce(v_is_enum, false) then
+      execute format('alter type %I.%I add value if not exists %L', v_type_schema, v_udt_name, 'ACTIVE');
+      execute format('alter type %I.%I add value if not exists %L', v_type_schema, v_udt_name, 'PENDING');
+      execute format('alter type %I.%I add value if not exists %L', v_type_schema, v_udt_name, 'INACTIVE');
+      execute format('alter type %I.%I add value if not exists %L', v_type_schema, v_udt_name, 'SUSPENDED');
+    end if;
   end if;
 end$$;
 
