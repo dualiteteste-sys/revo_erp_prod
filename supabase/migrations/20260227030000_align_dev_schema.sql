@@ -1,35 +1,35 @@
 do $$
 begin
   if to_regtype('public.billing_cycle') is null then
-    execute $$create type "public"."billing_cycle" as enum ('monthly', 'yearly')$$;
+    execute $sql$create type "public"."billing_cycle" as enum ('monthly', 'yearly')$sql$;
   end if;
 
   if to_regtype('public.status_centro_custo') is null then
-    execute $$create type "public"."status_centro_custo" as enum ('ativo', 'inativo')$$;
+    execute $sql$create type "public"."status_centro_custo" as enum ('ativo', 'inativo')$sql$;
   end if;
 
   if to_regtype('public.status_parcela') is null then
-    execute $$create type "public"."status_parcela" as enum ('aberta', 'paga', 'cancelada')$$;
+    execute $sql$create type "public"."status_parcela" as enum ('aberta', 'paga', 'cancelada')$sql$;
   end if;
 
   if to_regtype('public.status_produto') is null then
-    execute $$create type "public"."status_produto" as enum ('ativo', 'inativo')$$;
+    execute $sql$create type "public"."status_produto" as enum ('ativo', 'inativo')$sql$;
   end if;
 
   if to_regtype('public.status_transportadora') is null then
-    execute $$create type "public"."status_transportadora" as enum ('ativa', 'inativa')$$;
+    execute $sql$create type "public"."status_transportadora" as enum ('ativa', 'inativa')$sql$;
   end if;
 
   if to_regtype('public.sub_status') is null then
-    execute $$create type "public"."sub_status" as enum ('trialing', 'active', 'past_due', 'canceled', 'unpaid', 'incomplete', 'incomplete_expired')$$;
+    execute $sql$create type "public"."sub_status" as enum ('trialing', 'active', 'past_due', 'canceled', 'unpaid', 'incomplete', 'incomplete_expired')$sql$;
   end if;
 
   if to_regtype('public.tipo_embalagem') is null then
-    execute $$create type "public"."tipo_embalagem" as enum ('pacote_caixa', 'envelope', 'rolo_cilindro', 'outro', 'pacote')$$;
+    execute $sql$create type "public"."tipo_embalagem" as enum ('pacote_caixa', 'envelope', 'rolo_cilindro', 'outro', 'pacote')$sql$;
   end if;
 
   if to_regtype('public.user_status_in_empresa') is null then
-    execute $$create type "public"."user_status_in_empresa" as enum ('ACTIVE', 'PENDING', 'INACTIVE')$$;
+    execute $sql$create type "public"."user_status_in_empresa" as enum ('ACTIVE', 'PENDING', 'INACTIVE')$sql$;
   end if;
 end$$;
 
