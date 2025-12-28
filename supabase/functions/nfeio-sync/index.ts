@@ -2,6 +2,7 @@ import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import { createClient } from "@supabase/supabase-js";
 import { buildCorsHeaders } from "../_shared/cors.ts";
 import { nfeioBaseUrl, nfeioFetchJson, type NfeioEnvironment } from "../_shared/nfeio.ts";
+import { sanitizeForLog } from "../_shared/sanitize.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY")!;
@@ -101,7 +102,7 @@ serve(async (req) => {
   });
 
   await admin.from("fiscal_nfe_nfeio_emissoes").update({
-    response_payload: result.data ?? {},
+    response_payload: sanitizeForLog(result.data ?? {}),
     provider_status: result.data?.status ?? null,
     last_sync_at: new Date().toISOString(),
   }).eq("emissao_id", emissaoId);
@@ -130,7 +131,7 @@ serve(async (req) => {
   if (!result.ok) {
     await admin.from("fiscal_nfe_emissoes").update({
       status: "erro",
-      last_error: JSON.stringify(result.data).slice(0, 900),
+      last_error: JSON.stringify(sanitizeForLog(result.data)).slice(0, 900),
     }).eq("id", emissaoId);
     return json(502, { ok: false, error: "NFEIO_SYNC_FAILED", status: result.status, data: result.data }, cors);
   }

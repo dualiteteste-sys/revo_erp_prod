@@ -3,6 +3,7 @@ import { createClient } from "@supabase/supabase-js";
 import { buildCorsHeaders } from "../_shared/cors.ts";
 import { hasPermissionOrOwnerAdmin } from "../_shared/rbac.ts";
 import { nfeioBaseUrl, type NfeioEnvironment } from "../_shared/nfeio.ts";
+import { sanitizeForLog } from "../_shared/sanitize.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY")!;
@@ -79,7 +80,7 @@ serve(async (req) => {
     provider: "nfeio",
     event_type: "cancel",
     status: "requested",
-    request_payload: { url },
+    request_payload: sanitizeForLog({ url }),
   }).select("id").maybeSingle();
 
   const resp = await fetch(url, {
@@ -105,10 +106,9 @@ serve(async (req) => {
   await admin.from("fiscal_nfe_provider_events").update({
     status: "error",
     http_status: resp.status,
-    response_payload: raw ? { raw } : {},
+    response_payload: sanitizeForLog(raw ? { raw } : {}),
     error_message: `HTTP_${resp.status}`,
   }).eq("id", ev?.id ?? "");
 
   return json(502, { ok: false, error: "NFEIO_CANCEL_FAILED", status: resp.status, raw }, cors);
 });
-

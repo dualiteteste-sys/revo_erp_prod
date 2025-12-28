@@ -3,6 +3,7 @@ import { createClient } from "@supabase/supabase-js";
 import { buildCorsHeaders } from "../_shared/cors.ts";
 import { hasPermissionOrOwnerAdmin } from "../_shared/rbac.ts";
 import { nfeioBaseUrl, type NfeioEnvironment } from "../_shared/nfeio.ts";
+import { sanitizeForLog } from "../_shared/sanitize.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY")!;
@@ -116,7 +117,7 @@ serve(async (req) => {
     provider: "nfeio",
     event_type: eventType,
     status: "requested",
-    request_payload: { url },
+    request_payload: sanitizeForLog({ url }),
   }).select("id").maybeSingle();
 
   const bin = await fetchBinary(url, NFEIO_API_KEY);
@@ -124,7 +125,7 @@ serve(async (req) => {
     await admin.from("fiscal_nfe_provider_events").update({
       status: "error",
       http_status: bin.status,
-      response_payload: bin.rawText ? { raw: bin.rawText } : {},
+      response_payload: sanitizeForLog(bin.rawText ? { raw: bin.rawText } : {}),
       error_message: `HTTP_${bin.status}`,
     }).eq("id", ev?.id ?? "");
     return json(502, { ok: false, error: "NFEIO_DOC_FETCH_FAILED", status: bin.status, raw: bin.rawText }, cors);
@@ -146,9 +147,8 @@ serve(async (req) => {
   await admin.from("fiscal_nfe_provider_events").update({
     status: "ok",
     http_status: bin.status,
-    response_payload: { storage_path: storagePath, content_type: contentType },
+    response_payload: sanitizeForLog({ storage_path: storagePath, content_type: contentType }),
   }).eq("id", ev?.id ?? "");
 
   return json(200, { ok: true, storage_path: storagePath }, cors);
 });
-

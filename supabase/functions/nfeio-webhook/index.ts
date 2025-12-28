@@ -2,6 +2,7 @@ import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import { createClient } from "@supabase/supabase-js";
 import { buildCorsHeaders } from "../_shared/cors.ts";
 import { hmacSha256Base64, hmacSha256Hex, sha256Hex, timingSafeEqual } from "../_shared/crypto.ts";
+import { sanitizeForLog, sanitizeHeaders } from "../_shared/sanitize.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -34,9 +35,7 @@ function normalizeSig(sig: string): string {
 }
 
 function headersToJson(headers: Headers): Record<string, string> {
-  const out: Record<string, string> = {};
-  for (const [k, v] of headers.entries()) out[k.toLowerCase()] = v;
-  return out;
+  return sanitizeHeaders(headers);
 }
 
 function extractMeta(payload: any): { eventType: string | null; nfeioId: string | null } {
@@ -110,7 +109,7 @@ serve(async (req) => {
       nfeio_id: meta.nfeioId,
       dedupe_key: dedupeKey,
       headers: headersToJson(req.headers),
-      payload,
+      payload: sanitizeForLog(payload),
       received_at: new Date().toISOString(),
     },
     { onConflict: "provider,dedupe_key" },
@@ -118,4 +117,3 @@ serve(async (req) => {
 
   return json(200, { ok: true }, cors);
 });
-

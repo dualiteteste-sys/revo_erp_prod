@@ -2,6 +2,7 @@ import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import { createClient } from "@supabase/supabase-js";
 import { buildCorsHeaders } from "../_shared/cors.ts";
 import { digitsOnly, nfeioBaseUrl, nfeioFetchJson, type NfeioEnvironment } from "../_shared/nfeio.ts";
+import { sanitizeForLog } from "../_shared/sanitize.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY")!;
@@ -56,7 +57,7 @@ async function logEvent(
       provider: "nfeio",
       level,
       message,
-      payload,
+      payload: sanitizeForLog(payload),
     });
   } catch {
     // best-effort
@@ -189,8 +190,8 @@ serve(async (req) => {
     idempotency_key: idempotencyKey,
     nfeio_id: result.data?.id ?? null,
     provider_status: result.data?.status ?? null,
-    request_payload: payload,
-    response_payload: result.data ?? {},
+    request_payload: sanitizeForLog(payload),
+    response_payload: sanitizeForLog(result.data ?? {}),
     last_sync_at: new Date().toISOString(),
   }, { onConflict: "emissao_id" });
 

@@ -106,6 +106,10 @@ export default function NfeEmissoesPage() {
   const [cceModalOpen, setCceModalOpen] = useState(false);
   const [cceEmissaoId, setCceEmissaoId] = useState<string | null>(null);
   const [cceText, setCceText] = useState('');
+  const [auditOpen, setAuditOpen] = useState(false);
+  const [auditLoading, setAuditLoading] = useState(false);
+  const [auditItems, setAuditItems] = useState<any[]>([]);
+  const [auditEmissaoId, setAuditEmissaoId] = useState<string | null>(null);
 
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
@@ -609,6 +613,28 @@ export default function NfeEmissoesPage() {
     setCceModalOpen(true);
   };
 
+  const openAudit = async (emissaoId: string) => {
+    setAuditEmissaoId(emissaoId);
+    setAuditOpen(true);
+    setAuditLoading(true);
+    setAuditItems([]);
+    try {
+      const { data, error } = await supabase
+        .from('fiscal_nfe_audit_timeline')
+        .select('kind,occurred_at,message,payload,source')
+        .eq('emissao_id', emissaoId)
+        .order('occurred_at', { ascending: false })
+        .limit(200);
+      if (error) throw error;
+      setAuditItems(Array.isArray(data) ? data : []);
+    } catch (e: any) {
+      addToast(e?.message || 'Erro ao carregar auditoria.', 'error');
+      setAuditItems([]);
+    } finally {
+      setAuditLoading(false);
+    }
+  };
+
   const handleSendCce = async () => {
     if (!cceEmissaoId) return;
     if (!cceText.trim()) {
@@ -775,6 +801,14 @@ export default function NfeEmissoesPage() {
                       <div className="flex items-center justify-end gap-3">
                         <button className="text-blue-600 hover:text-blue-900" onClick={() => void openEdit(row)} title="Abrir rascunho">
                           Abrir
+                        </button>
+                        <button
+                          className="inline-flex items-center gap-2 px-3 py-2 rounded-lg font-semibold bg-slate-100 text-slate-800 hover:bg-slate-200"
+                          onClick={() => void openAudit(row.id)}
+                          title="Auditoria da NF-e"
+                        >
+                          <Search size={16} />
+                          Auditoria
                         </button>
                         {row.nfeio_id ? (
                           <button
@@ -1232,6 +1266,60 @@ export default function NfeEmissoesPage() {
               <span className="ml-2">Enviar CC-e</span>
             </Button>
           </div>
+        </div>
+      </Modal>
+
+      <Modal isOpen={auditOpen} onClose={() => setAuditOpen(false)} title="Auditoria da NF-e (NFE-08)" size="80pct">
+        <div className="p-6 space-y-4">
+          {auditLoading ? (
+            <div className="h-40 flex items-center justify-center">
+              <Loader2 className="animate-spin text-blue-600" size={28} />
+            </div>
+          ) : auditItems.length === 0 ? (
+            <GlassCard className="p-4">
+              <p className="text-sm text-slate-700">Sem eventos de auditoria para esta emissão.</p>
+            </GlassCard>
+          ) : (
+            <div className="space-y-3">
+              {auditItems.map((it, idx) => (
+                <GlassCard key={idx} className="p-4">
+                  <div className="flex items-start justify-between gap-4">
+                    <div>
+                      <div className="text-sm font-semibold text-slate-900">{it?.message || it?.kind || 'Evento'}</div>
+                      <div className="text-xs text-slate-500 mt-1">
+                        {formatDate(it?.occurred_at)} • {it?.source || '—'}
+                      </div>
+                    </div>
+                    <Button
+                      variant="secondary"
+                      onClick={async () => {
+                        try {
+                          await navigator.clipboard.writeText(JSON.stringify(it?.payload ?? {}, null, 2));
+                          addToast('Payload copiado.', 'success');
+                        } catch {
+                          addToast('Não foi possível copiar.', 'error');
+                        }
+                      }}
+                    >
+                      <Copy size={18} />
+                      <span className="ml-2">Copiar</span>
+                    </Button>
+                  </div>
+                  <pre className="mt-3 text-xs whitespace-pre-wrap break-words p-3 rounded-xl border border-slate-200 bg-slate-50 max-h-[40vh] overflow-auto">
+                    {JSON.stringify(it?.payload ?? {}, null, 2)}
+                  </pre>
+                </GlassCard>
+              ))}
+            </div>
+          )}
+          {auditEmissaoId ? (
+            <div className="flex items-center justify-end">
+              <Button variant="secondary" onClick={() => void openAudit(auditEmissaoId!)}>
+                <Search size={18} />
+                <span className="ml-2">Recarregar</span>
+              </Button>
+            </div>
+          ) : null}
         </div>
       </Modal>
     </div>

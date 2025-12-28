@@ -3,6 +3,7 @@ import { createClient } from "@supabase/supabase-js";
 import { buildCorsHeaders } from "../_shared/cors.ts";
 import { hasPermissionOrOwnerAdmin } from "../_shared/rbac.ts";
 import { nfeioBaseUrl, nfeioFetchJson, type NfeioEnvironment } from "../_shared/nfeio.ts";
+import { sanitizeForLog } from "../_shared/sanitize.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY")!;
@@ -121,7 +122,7 @@ serve(async (req) => {
     provider: "nfeio",
     event_type: eventType,
     status: "requested",
-    request_payload: { url, payload },
+    request_payload: sanitizeForLog({ url, payload }),
   }).select("id").maybeSingle();
 
   const result = await nfeioFetchJson(url, {
@@ -136,7 +137,7 @@ serve(async (req) => {
   await admin.from("fiscal_nfe_provider_events").update({
     status: result.ok ? "ok" : "error",
     http_status: result.status,
-    response_payload: result.data ?? {},
+    response_payload: sanitizeForLog(result.data ?? {}),
     error_message: result.ok ? null : `HTTP_${result.status}`,
   }).eq("id", ev?.id ?? "");
 
@@ -148,4 +149,3 @@ serve(async (req) => {
 
   return json(200, { ok: true, data: result.data }, cors);
 });
-
