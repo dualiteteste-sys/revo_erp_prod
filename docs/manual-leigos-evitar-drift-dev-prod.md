@@ -96,6 +96,15 @@ Use apenas quando:
 
 **Nunca** trate como operação do dia a dia.
 
+### 5.4 “NFE.io Worker (dev)”
+
+Pense como um “funcionário do balcão” que:
+- pega os eventos que chegaram via webhook (fila)
+- atualiza o status da NF-e (autorizada/rejeitada/etc.)
+- baixa XML/DANFE quando disponível
+
+Ele roda automaticamente a cada 5 minutos no `dev` (GitHub Actions).
+
 ## 6) Checklist de operação (o que fazer sempre)
 
 ### Antes de mergear `dev → main`
@@ -174,4 +183,3 @@ Crie uma regra interna:
 - **RLS/Policy**: regras de segurança do banco (quem pode ver/editar).
 - **Drift**: quando DEV e PROD não estão iguais no schema/histórico.
 - **Migration**: arquivo SQL versionado que descreve mudanças no banco.
-

@@ -60,6 +60,7 @@ export default function NfeSettingsPage() {
   const canAdmin = empresaRoleQuery.isFetched && roleAtLeast(empresaRoleQuery.data, 'admin');
 
   const empresaId = activeEmpresa?.id;
+  const webhookUrl = `${(import.meta as any).env?.VITE_SUPABASE_URL}/functions/v1/nfeio-webhook`;
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -637,6 +638,14 @@ export default function NfeSettingsPage() {
             </div>
 
             <div className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="md:col-span-2 rounded-xl border border-slate-200 bg-slate-50 p-4">
+                <p className="text-sm font-semibold text-slate-800">Webhook NFE.io (NFE-06)</p>
+                <p className="text-xs text-slate-600 mt-1">
+                  Use este endpoint no painel da NFE.io. Configure o HMAC com o mesmo valor do secret <span className="font-mono">NFEIO_WEBHOOK_SECRET</span> (Supabase secrets).
+                </p>
+                <div className="mt-2 text-xs text-slate-700 font-mono break-all">{webhookUrl}</div>
+              </div>
+
               <div>
                 <label className="block text-sm font-semibold text-slate-700 mb-2">Ambiente</label>
                 <Select

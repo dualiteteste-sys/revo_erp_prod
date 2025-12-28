@@ -32,6 +32,7 @@ jobs:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
           NFEIO_API_KEY_DEV: ${{ secrets.NFEIO_API_KEY_DEV }}
           NFEIO_WEBHOOK_SECRET_DEV: ${{ secrets.NFEIO_WEBHOOK_SECRET_DEV }}
+          NFEIO_WORKER_SECRET_DEV: ${{ secrets.NFEIO_WORKER_SECRET_DEV }}
         run: |
           set -euo pipefail
 
@@ -51,8 +52,14 @@ jobs:
           if [[ -n "${NFEIO_WEBHOOK_SECRET_DEV:-}" ]]; then
             supabase secrets set --project-ref "$PROJECT_REF" NFEIO_WEBHOOK_SECRET="$NFEIO_WEBHOOK_SECRET_DEV"
           fi
+          if [[ -n "${NFEIO_WORKER_SECRET_DEV:-}" ]]; then
+            supabase secrets set --project-ref "$PROJECT_REF" NFEIO_WORKER_SECRET="$NFEIO_WORKER_SECRET_DEV"
+          else
+            echo "::warning::Missing secret NFEIO_WORKER_SECRET_DEV (worker will not be callable)."
+          fi
 
           echo "[DEV] Deploying Edge Functions..."
           supabase functions deploy nfeio-emit --project-ref "$PROJECT_REF"
           supabase functions deploy nfeio-sync --project-ref "$PROJECT_REF"
-
+          supabase functions deploy nfeio-webhook --project-ref "$PROJECT_REF"
+          supabase functions deploy nfeio-worker --project-ref "$PROJECT_REF"
