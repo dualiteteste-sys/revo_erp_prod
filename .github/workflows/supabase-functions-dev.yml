@@ -61,3 +61,7 @@ jobs:
           supabase functions deploy nfeio-sync --project-ref "$PROJECT_REF"
           supabase functions deploy nfeio-webhook --project-ref "$PROJECT_REF"
           supabase functions deploy nfeio-worker --project-ref "$PROJECT_REF"
+          supabase functions deploy nfeio-cancel --project-ref "$PROJECT_REF"
+          supabase functions deploy nfeio-cce --project-ref "$PROJECT_REF"
+          supabase functions deploy nfeio-disablement --project-ref "$PROJECT_REF"
+          supabase functions deploy nfeio-docs --project-ref "$PROJECT_REF"

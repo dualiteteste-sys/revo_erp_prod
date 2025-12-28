@@ -1,7 +1,10 @@
 export type NfeioEnvironment = "homologacao" | "producao";
 
 export function nfeioBaseUrl(ambiente: NfeioEnvironment): string {
-  return ambiente === "homologacao" ? "https://sandbox.api.nfe.io" : "https://api.nfe.io";
+  // A documentação pública atual da NFE.io usa o mesmo host para produção e homologação.
+  // O ambiente é definido do lado da conta/empresa, não por subdomínio.
+  // (sandbox.api.nfe.io não resolve via DNS)
+  return "https://api.nfe.io";
 }
 
 export async function nfeioFetchJson(
@@ -22,4 +25,3 @@ export async function nfeioFetchJson(
 export function digitsOnly(value: string | null | undefined): string {
   return (value ?? "").replace(/\D+/g, "");
 }
-

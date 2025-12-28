@@ -8,7 +8,7 @@ import { useSupabase } from '@/providers/SupabaseProvider';
 import { useAuth } from '@/contexts/AuthProvider';
 import { useToast } from '@/contexts/ToastProvider';
 import { useEmpresaFeatures } from '@/hooks/useEmpresaFeatures';
-import { Copy, Eye, Loader2, Plus, Receipt, Search, Settings, Send } from 'lucide-react';
+import { Copy, Eye, FileKey, Loader2, Plus, Receipt, Search, Settings, Send, Trash2 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import ClientAutocomplete from '@/components/common/ClientAutocomplete';
 import ProductAutocomplete from '@/components/common/ProductAutocomplete';
@@ -36,6 +36,8 @@ type NfeEmissao = {
   nfeio_last_sync_at?: string | null;
   nfeio_xml_path?: string | null;
   nfeio_danfe_path?: string | null;
+  nfeio_cce_pdf_path?: string | null;
+  nfeio_cce_xml_path?: string | null;
   payload: any;
   last_error: string | null;
   created_at: string;
@@ -99,6 +101,11 @@ export default function NfeEmissoesPage() {
   const [sendingId, setSendingId] = useState<string | null>(null);
   const [syncingId, setSyncingId] = useState<string | null>(null);
   const [downloadingPath, setDownloadingPath] = useState<string | null>(null);
+  const [cancelingId, setCancelingId] = useState<string | null>(null);
+  const [docsFetchingId, setDocsFetchingId] = useState<string | null>(null);
+  const [cceModalOpen, setCceModalOpen] = useState(false);
+  const [cceEmissaoId, setCceEmissaoId] = useState<string | null>(null);
+  const [cceText, setCceText] = useState('');
 
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
@@ -123,7 +130,7 @@ export default function NfeEmissoesPage() {
       let query = supabase
         .from('fiscal_nfe_emissoes')
         .select(
-          'id,status,numero,serie,chave_acesso,destinatario_pessoa_id,ambiente,natureza_operacao,valor_total,total_produtos,total_descontos,total_frete,total_impostos,total_nfe,payload,last_error,created_at,updated_at,destinatario:pessoas(nome),nfeio:fiscal_nfe_nfeio_emissoes(nfeio_id,provider_status,last_sync_at,xml_storage_path,danfe_storage_path)'
+          'id,status,numero,serie,chave_acesso,destinatario_pessoa_id,ambiente,natureza_operacao,valor_total,total_produtos,total_descontos,total_frete,total_impostos,total_nfe,payload,last_error,created_at,updated_at,destinatario:pessoas(nome),nfeio:fiscal_nfe_nfeio_emissoes(nfeio_id,provider_status,last_sync_at,xml_storage_path,danfe_storage_path,cce_pdf_storage_path,cce_xml_storage_path)'
         )
         .eq('empresa_id', empresaId)
         .order('updated_at', { ascending: false })
@@ -155,6 +162,8 @@ export default function NfeEmissoesPage() {
           nfeio_last_sync_at: r?.nfeio?.last_sync_at ?? null,
           nfeio_xml_path: r?.nfeio?.xml_storage_path ?? null,
           nfeio_danfe_path: r?.nfeio?.danfe_storage_path ?? null,
+          nfeio_cce_pdf_path: r?.nfeio?.cce_pdf_storage_path ?? null,
+          nfeio_cce_xml_path: r?.nfeio?.cce_xml_storage_path ?? null,
           payload: r.payload ?? {},
           last_error: r.last_error ?? null,
           created_at: r.created_at,
@@ -554,6 +563,77 @@ export default function NfeEmissoesPage() {
     }
   };
 
+  const fetchDocFromProvider = async (emissaoId: string, docType: 'danfe_pdf' | 'cce_pdf' | 'cce_xml') => {
+    setDocsFetchingId(emissaoId);
+    try {
+      const { data, error } = await supabase.functions.invoke('nfeio-docs', {
+        body: { emissao_id: emissaoId, doc_type: docType },
+      });
+      if (error) throw error;
+      if (!data?.ok) throw new Error(data?.error || 'Falha ao gerar documento.');
+      addToast('Documento atualizado.', 'success');
+      await fetchList();
+      const path = (data?.storage_path || '').toString();
+      if (path) await openDoc(path, 'Documento');
+    } catch (e: any) {
+      const msg = e?.context ? await edgeErrorMessage(e) : (e?.message || 'Erro ao obter documento.');
+      addToast(msg, 'error');
+      await fetchList();
+    } finally {
+      setDocsFetchingId(null);
+    }
+  };
+
+  const handleCancel = async (emissaoId: string) => {
+    const ok = window.confirm('Tem certeza que deseja solicitar o cancelamento desta NF-e? (Operação assíncrona)');
+    if (!ok) return;
+    setCancelingId(emissaoId);
+    try {
+      const { data, error } = await supabase.functions.invoke('nfeio-cancel', { body: { emissao_id: emissaoId } });
+      if (error) throw error;
+      if (!data?.ok) throw new Error(data?.error || 'Falha ao solicitar cancelamento.');
+      addToast('Cancelamento enfileirado na NFE.io (aguardando processamento).', 'success');
+      await fetchList();
+    } catch (e: any) {
+      const msg = e?.context ? await edgeErrorMessage(e) : (e?.message || 'Erro ao cancelar.');
+      addToast(msg, 'error');
+      await fetchList();
+    } finally {
+      setCancelingId(null);
+    }
+  };
+
+  const openCceModal = (emissaoId: string) => {
+    setCceEmissaoId(emissaoId);
+    setCceText('');
+    setCceModalOpen(true);
+  };
+
+  const handleSendCce = async () => {
+    if (!cceEmissaoId) return;
+    if (!cceText.trim()) {
+      addToast('Informe o texto da carta de correção.', 'warning');
+      return;
+    }
+    setSaving(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('nfeio-cce', {
+        body: { emissao_id: cceEmissaoId, correction_text: cceText.trim() },
+      });
+      if (error) throw error;
+      if (!data?.ok) throw new Error(data?.error || 'Falha ao enviar CC-e.');
+      addToast('CC-e enfileirada na NFE.io (aguardando processamento).', 'success');
+      setCceModalOpen(false);
+      await fetchList();
+    } catch (e: any) {
+      const msg = e?.context ? await edgeErrorMessage(e) : (e?.message || 'Erro ao enviar CC-e.');
+      addToast(msg, 'error');
+      await fetchList();
+    } finally {
+      setSaving(false);
+    }
+  };
+
   if (!canShow) {
     return (
       <div className="p-6">
@@ -730,6 +810,84 @@ export default function NfeEmissoesPage() {
                             <Eye size={16} />
                             DANFE
                           </button>
+                        ) : row.nfeio_id ? (
+                          <button
+                            className="inline-flex items-center gap-2 px-3 py-2 rounded-lg font-semibold bg-slate-100 text-slate-800 hover:bg-slate-200"
+                            disabled={docsFetchingId === row.id}
+                            onClick={() => void fetchDocFromProvider(row.id, 'danfe_pdf')}
+                            title="Buscar DANFE via NFE.io"
+                          >
+                            {docsFetchingId === row.id ? <Loader2 className="animate-spin" size={16} /> : <Eye size={16} />}
+                            DANFE
+                          </button>
+                        ) : null}
+
+                        {row.nfeio_cce_pdf_path ? (
+                          <button
+                            className="inline-flex items-center gap-2 px-3 py-2 rounded-lg font-semibold bg-slate-100 text-slate-800 hover:bg-slate-200"
+                            disabled={downloadingPath === row.nfeio_cce_pdf_path}
+                            onClick={() => void openDoc(row.nfeio_cce_pdf_path!, 'CC-e PDF')}
+                            title="Abrir DANFE da CC-e"
+                          >
+                            <Eye size={16} />
+                            CC-e PDF
+                          </button>
+                        ) : row.nfeio_id ? (
+                          <button
+                            className="inline-flex items-center gap-2 px-3 py-2 rounded-lg font-semibold bg-slate-100 text-slate-800 hover:bg-slate-200"
+                            disabled={docsFetchingId === row.id}
+                            onClick={() => void fetchDocFromProvider(row.id, 'cce_pdf')}
+                            title="Buscar DANFE da CC-e via NFE.io"
+                          >
+                            {docsFetchingId === row.id ? <Loader2 className="animate-spin" size={16} /> : <Eye size={16} />}
+                            CC-e PDF
+                          </button>
+                        ) : null}
+
+                        {row.nfeio_cce_xml_path ? (
+                          <button
+                            className="inline-flex items-center gap-2 px-3 py-2 rounded-lg font-semibold bg-slate-100 text-slate-800 hover:bg-slate-200"
+                            disabled={downloadingPath === row.nfeio_cce_xml_path}
+                            onClick={() => void openDoc(row.nfeio_cce_xml_path!, 'CC-e XML')}
+                            title="Abrir XML da CC-e"
+                          >
+                            <Eye size={16} />
+                            CC-e XML
+                          </button>
+                        ) : row.nfeio_id ? (
+                          <button
+                            className="inline-flex items-center gap-2 px-3 py-2 rounded-lg font-semibold bg-slate-100 text-slate-800 hover:bg-slate-200"
+                            disabled={docsFetchingId === row.id}
+                            onClick={() => void fetchDocFromProvider(row.id, 'cce_xml')}
+                            title="Buscar XML da CC-e via NFE.io"
+                          >
+                            {docsFetchingId === row.id ? <Loader2 className="animate-spin" size={16} /> : <Eye size={16} />}
+                            CC-e XML
+                          </button>
+                        ) : null}
+
+                        {row.status === 'autorizada' ? (
+                          <>
+                            <button
+                              className={`inline-flex items-center gap-2 px-3 py-2 rounded-lg font-semibold transition-colors ${
+                                cancelingId === row.id ? 'bg-rose-200 text-rose-800 cursor-wait' : 'bg-rose-100 text-rose-800 hover:bg-rose-200'
+                              }`}
+                              disabled={cancelingId === row.id}
+                              onClick={() => void handleCancel(row.id)}
+                              title="Solicitar cancelamento (NFE.io)"
+                            >
+                              {cancelingId === row.id ? <Loader2 className="animate-spin" size={16} /> : <Trash2 size={16} />}
+                              Cancelar
+                            </button>
+                            <button
+                              className="inline-flex items-center gap-2 px-3 py-2 rounded-lg font-semibold bg-amber-100 text-amber-900 hover:bg-amber-200"
+                              onClick={() => openCceModal(row.id)}
+                              title="Enviar Carta de Correção (CC-e)"
+                            >
+                              <FileKey size={16} />
+                              CC-e
+                            </button>
+                          </>
                         ) : null}
                         <button
                           className={`inline-flex items-center gap-2 px-3 py-2 rounded-lg font-semibold transition-colors ${
@@ -1045,6 +1203,35 @@ export default function NfeEmissoesPage() {
               </pre>
             </>
           )}
+        </div>
+      </Modal>
+
+      <Modal isOpen={cceModalOpen} onClose={() => setCceModalOpen(false)} title="Carta de Correção (CC-e) — NFE-07" size="60pct">
+        <div className="p-6 space-y-4">
+          <p className="text-sm text-slate-700">
+            Observação: a NFE.io processa de forma <span className="font-semibold">assíncrona</span>. O status final será refletido via webhook/worker.
+          </p>
+          <div>
+            <label className="block text-sm font-semibold text-slate-700 mb-2">Texto da correção</label>
+            <textarea
+              value={cceText}
+              onChange={(e) => setCceText(e.target.value)}
+              placeholder="Descreva a correção (ex.: ajuste de descrição, endereço, etc.)"
+              className="w-full min-h-[160px] p-3 border border-gray-300 rounded-xl shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+            />
+            <p className="text-xs text-slate-500 mt-2">
+              Se a API da NFE.io exigir campos adicionais, podemos evoluir para um payload avançado.
+            </p>
+          </div>
+          <div className="flex items-center justify-end gap-3">
+            <Button variant="secondary" onClick={() => setCceModalOpen(false)} disabled={saving}>
+              Cancelar
+            </Button>
+            <Button onClick={handleSendCce} disabled={saving}>
+              {saving ? <Loader2 className="animate-spin" size={18} /> : <FileKey size={18} />}
+              <span className="ml-2">Enviar CC-e</span>
+            </Button>
+          </div>
         </div>
       </Modal>
     </div>
