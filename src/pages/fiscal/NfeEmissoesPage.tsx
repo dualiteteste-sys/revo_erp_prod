@@ -31,6 +31,11 @@ type NfeEmissao = {
   total_nfe?: number | null;
   natureza_operacao?: string | null;
   ambiente: AmbienteNfe;
+  nfeio_id?: string | null;
+  nfeio_status?: string | null;
+  nfeio_last_sync_at?: string | null;
+  nfeio_xml_path?: string | null;
+  nfeio_danfe_path?: string | null;
   payload: any;
   last_error: string | null;
   created_at: string;
@@ -91,6 +96,9 @@ export default function NfeEmissoesPage() {
   const [previewErrors, setPreviewErrors] = useState<string[]>([]);
   const [previewWarnings, setPreviewWarnings] = useState<string[]>([]);
   const [previewXml, setPreviewXml] = useState<string>('');
+  const [sendingId, setSendingId] = useState<string | null>(null);
+  const [syncingId, setSyncingId] = useState<string | null>(null);
+  const [downloadingPath, setDownloadingPath] = useState<string | null>(null);
 
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
@@ -115,7 +123,7 @@ export default function NfeEmissoesPage() {
       let query = supabase
         .from('fiscal_nfe_emissoes')
         .select(
-          'id,status,numero,serie,chave_acesso,destinatario_pessoa_id,ambiente,natureza_operacao,valor_total,total_produtos,total_descontos,total_frete,total_impostos,total_nfe,payload,last_error,created_at,updated_at,destinatario:pessoas(nome)'
+          'id,status,numero,serie,chave_acesso,destinatario_pessoa_id,ambiente,natureza_operacao,valor_total,total_produtos,total_descontos,total_frete,total_impostos,total_nfe,payload,last_error,created_at,updated_at,destinatario:pessoas(nome),nfeio:fiscal_nfe_nfeio_emissoes(nfeio_id,provider_status,last_sync_at,xml_storage_path,danfe_storage_path)'
         )
         .eq('empresa_id', empresaId)
         .order('updated_at', { ascending: false })
@@ -142,6 +150,11 @@ export default function NfeEmissoesPage() {
           total_nfe: typeof r.total_nfe === 'number' ? r.total_nfe : null,
           natureza_operacao: r.natureza_operacao ?? null,
           ambiente: (r.ambiente ?? 'homologacao') as AmbienteNfe,
+          nfeio_id: r?.nfeio?.nfeio_id ?? null,
+          nfeio_status: r?.nfeio?.provider_status ?? null,
+          nfeio_last_sync_at: r?.nfeio?.last_sync_at ?? null,
+          nfeio_xml_path: r?.nfeio?.xml_storage_path ?? null,
+          nfeio_danfe_path: r?.nfeio?.danfe_storage_path ?? null,
           payload: r.payload ?? {},
           last_error: r.last_error ?? null,
           created_at: r.created_at,
@@ -469,12 +482,76 @@ export default function NfeEmissoesPage() {
     }
   };
 
-  const handleSend = () => {
+  async function edgeErrorMessage(error: any): Promise<string> {
+    let detail: string | undefined = error?.message;
+    try {
+      const ctx: any = error?.context;
+      if (ctx && typeof ctx.text === 'function') {
+        const raw = await ctx.text();
+        try {
+          const parsed = JSON.parse(raw);
+          detail = parsed?.detail || parsed?.error || raw;
+        } catch {
+          detail = raw;
+        }
+      }
+    } catch {
+      // ignore
+    }
+    return (detail || 'Falha ao executar.').toString();
+  }
+
+  const handleSend = async (emissaoId: string) => {
     if (!features.nfe_emissao_enabled) {
       addToast('Emissão está desativada. Ative em Fiscal → Configurações de NF-e.', 'warning');
       return;
     }
-    addToast('Integração com provedor será habilitada quando ativarmos a emissão (NFE.io).', 'info');
+
+    setSendingId(emissaoId);
+    try {
+      const { data, error } = await supabase.functions.invoke('nfeio-emit', { body: { emissao_id: emissaoId } });
+      if (error) throw error;
+      if (!data?.ok) throw new Error(data?.error || 'Falha ao emitir.');
+      addToast('Enviado para NFE.io. Status: enfileirada.', 'success');
+      await fetchList();
+    } catch (e: any) {
+      const msg = e?.context ? await edgeErrorMessage(e) : (e?.message || 'Erro ao enviar para NFE.io.');
+      addToast(msg, 'error');
+      await fetchList();
+    } finally {
+      setSendingId(null);
+    }
+  };
+
+  const handleSync = async (emissaoId: string) => {
+    setSyncingId(emissaoId);
+    try {
+      const { data, error } = await supabase.functions.invoke('nfeio-sync', { body: { emissao_id: emissaoId } });
+      if (error) throw error;
+      if (!data?.ok) throw new Error(data?.error || 'Falha ao sincronizar.');
+      addToast('Status sincronizado (NFE.io).', 'success');
+      await fetchList();
+    } catch (e: any) {
+      const msg = e?.context ? await edgeErrorMessage(e) : (e?.message || 'Erro ao sincronizar status.');
+      addToast(msg, 'error');
+      await fetchList();
+    } finally {
+      setSyncingId(null);
+    }
+  };
+
+  const openDoc = async (path: string, label: string) => {
+    setDownloadingPath(path);
+    try {
+      const { data, error } = await supabase.storage.from('nfe_docs').createSignedUrl(path, 60);
+      if (error) throw error;
+      if (data?.signedUrl) window.open(data.signedUrl, '_blank', 'noopener,noreferrer');
+      else throw new Error('URL não gerada.');
+    } catch (e: any) {
+      addToast(e?.message || `Erro ao abrir ${label}.`, 'error');
+    } finally {
+      setDownloadingPath(null);
+    }
   };
 
   if (!canShow) {
@@ -592,6 +669,12 @@ export default function NfeEmissoesPage() {
                   <tr key={row.id} className="hover:bg-gray-50">
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
                       <span className="font-semibold">{STATUS_LABEL[row.status] || row.status}</span>
+                      {row.nfeio_status ? (
+                        <div className="text-xs text-slate-500 mt-1">
+                          NFE.io: <span className="font-semibold">{row.nfeio_status}</span>
+                          {row.nfeio_last_sync_at ? <span className="ml-2">({formatDate(row.nfeio_last_sync_at)})</span> : null}
+                        </div>
+                      ) : null}
                       {row.last_error ? <div className="text-xs text-red-600 mt-1">{row.last_error}</div> : null}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
@@ -613,6 +696,41 @@ export default function NfeEmissoesPage() {
                         <button className="text-blue-600 hover:text-blue-900" onClick={() => void openEdit(row)} title="Abrir rascunho">
                           Abrir
                         </button>
+                        {row.nfeio_id ? (
+                          <button
+                            className={`inline-flex items-center gap-2 px-3 py-2 rounded-lg font-semibold transition-colors ${
+                              syncingId === row.id ? 'bg-slate-200 text-slate-600 cursor-wait' : 'bg-slate-100 text-slate-800 hover:bg-slate-200'
+                            }`}
+                            disabled={syncingId === row.id}
+                            onClick={() => void handleSync(row.id)}
+                            title="Sincronizar status (NFE.io)"
+                          >
+                            {syncingId === row.id ? <Loader2 className="animate-spin" size={16} /> : <Search size={16} />}
+                            Sync
+                          </button>
+                        ) : null}
+                        {row.nfeio_xml_path ? (
+                          <button
+                            className="inline-flex items-center gap-2 px-3 py-2 rounded-lg font-semibold bg-slate-100 text-slate-800 hover:bg-slate-200"
+                            disabled={downloadingPath === row.nfeio_xml_path}
+                            onClick={() => void openDoc(row.nfeio_xml_path!, 'XML')}
+                            title="Abrir XML (assinado)"
+                          >
+                            <Eye size={16} />
+                            XML
+                          </button>
+                        ) : null}
+                        {row.nfeio_danfe_path ? (
+                          <button
+                            className="inline-flex items-center gap-2 px-3 py-2 rounded-lg font-semibold bg-slate-100 text-slate-800 hover:bg-slate-200"
+                            disabled={downloadingPath === row.nfeio_danfe_path}
+                            onClick={() => void openDoc(row.nfeio_danfe_path!, 'DANFE')}
+                            title="Abrir DANFE (assinado)"
+                          >
+                            <Eye size={16} />
+                            DANFE
+                          </button>
+                        ) : null}
                         <button
                           className={`inline-flex items-center gap-2 px-3 py-2 rounded-lg font-semibold transition-colors ${
                             features.nfe_emissao_enabled
@@ -620,11 +738,11 @@ export default function NfeEmissoesPage() {
                               : 'bg-slate-200 text-slate-600 cursor-not-allowed'
                           }`}
                           disabled={!features.nfe_emissao_enabled}
-                          onClick={handleSend}
-                          title={features.nfe_emissao_enabled ? 'Enviar para autorização (quando habilitarmos)' : 'Ative a emissão para enviar'}
+                          onClick={() => void handleSend(row.id)}
+                          title={features.nfe_emissao_enabled ? 'Enviar para NFE.io' : 'Ative a emissão para enviar'}
                         >
-                          <Send size={16} />
-                          Enviar
+                          {sendingId === row.id ? <Loader2 className="animate-spin" size={16} /> : <Send size={16} />}
+                          {sendingId === row.id ? 'Enviando' : 'Enviar'}
                         </button>
                       </div>
                     </td>
