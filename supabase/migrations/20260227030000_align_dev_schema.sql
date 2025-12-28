@@ -43,35 +43,35 @@ drop trigger if exists "tg_subscriptions_updated_at" on "public"."subscriptions"
 
 drop trigger if exists "tg_user_active_empresa_updated_at" on "public"."user_active_empresa";
 
-drop policy "crm_etapas_all" on "public"."crm_etapas";
+drop policy if exists "crm_etapas_all" on "public"."crm_etapas";
 
-drop policy "crm_funis_all" on "public"."crm_funis";
+drop policy if exists "crm_funis_all" on "public"."crm_funis";
 
-drop policy "crm_oportunidades_all" on "public"."crm_oportunidades";
+drop policy if exists "crm_oportunidades_all" on "public"."crm_oportunidades";
 
-drop policy "plans_public_select" on "public"."plans";
+drop policy if exists "plans_public_select" on "public"."plans";
 
-drop policy "plans_write_service_role" on "public"."plans";
+drop policy if exists "plans_write_service_role" on "public"."plans";
 
-drop policy "del_servicos_same_empresa" on "public"."servicos";
+drop policy if exists "del_servicos_same_empresa" on "public"."servicos";
 
-drop policy "ins_servicos_same_empresa" on "public"."servicos";
+drop policy if exists "ins_servicos_same_empresa" on "public"."servicos";
 
-drop policy "sel_servicos_by_empresa" on "public"."servicos";
+drop policy if exists "sel_servicos_by_empresa" on "public"."servicos";
 
-drop policy "upd_servicos_same_empresa" on "public"."servicos";
+drop policy if exists "upd_servicos_same_empresa" on "public"."servicos";
 
-drop policy "subscriptions_select_by_membership" on "public"."subscriptions";
+drop policy if exists "subscriptions_select_by_membership" on "public"."subscriptions";
 
-drop policy "subscriptions_write_service_role" on "public"."subscriptions";
+drop policy if exists "subscriptions_write_service_role" on "public"."subscriptions";
 
-drop policy "user_active_empresa_del" on "public"."user_active_empresa";
+drop policy if exists "user_active_empresa_del" on "public"."user_active_empresa";
 
-drop policy "user_active_empresa_ins" on "public"."user_active_empresa";
+drop policy if exists "user_active_empresa_ins" on "public"."user_active_empresa";
 
-drop policy "user_active_empresa_sel" on "public"."user_active_empresa";
+drop policy if exists "user_active_empresa_sel" on "public"."user_active_empresa";
 
-drop policy "user_active_empresa_upd" on "public"."user_active_empresa";
+drop policy if exists "user_active_empresa_upd" on "public"."user_active_empresa";
 
 revoke delete on table "public"."_bak_empresa_usuarios" from "anon";
 
