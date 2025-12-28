@@ -19,11 +19,13 @@ jobs:
         env:
           PROJECT_REF: ovzdjeczmtqnuytqdtsc
           NFEIO_WORKER_SECRET_DEV: ${{ secrets.NFEIO_WORKER_SECRET_DEV }}
+          NFEIO_WEBHOOK_SECRET_DEV: ${{ secrets.NFEIO_WEBHOOK_SECRET_DEV }}
         run: |
           set -euo pipefail
 
-          if [[ -z "${NFEIO_WORKER_SECRET_DEV:-}" ]]; then
-            echo "::warning::Missing secret NFEIO_WORKER_SECRET_DEV (skipping worker run)"
+          WORKER_SECRET="${NFEIO_WORKER_SECRET_DEV:-${NFEIO_WEBHOOK_SECRET_DEV:-}}"
+          if [[ -z "${WORKER_SECRET}" ]]; then
+            echo "::warning::Missing secret NFEIO_WORKER_SECRET_DEV and NFEIO_WEBHOOK_SECRET_DEV (skipping worker run)"
             exit 0
           fi
 
@@ -31,5 +33,5 @@ jobs:
           echo "[DEV] Calling $URL"
           curl -sS -X POST "$URL" \
             -H "Content-Type: application/json" \
-            -H "X-Worker-Secret: ${NFEIO_WORKER_SECRET_DEV}" \
+            -H "X-Worker-Secret: ${WORKER_SECRET}" \
             --data '{"limit":25}'

@@ -54,8 +54,6 @@ jobs:
           fi
           if [[ -n "${NFEIO_WORKER_SECRET_DEV:-}" ]]; then
             supabase secrets set --project-ref "$PROJECT_REF" NFEIO_WORKER_SECRET="$NFEIO_WORKER_SECRET_DEV"
-          else
-            echo "::warning::Missing secret NFEIO_WORKER_SECRET_DEV (worker will not be callable)."
           fi
 
           echo "[DEV] Deploying Edge Functions..."

@@ -105,6 +105,10 @@ Pense como um “funcionário do balcão” que:
 
 Ele roda automaticamente a cada 5 minutos no `dev` (GitHub Actions).
 
+Se você ainda não configurou secrets:
+- `NFEIO_WEBHOOK_SECRET_DEV` no GitHub (mesmo valor configurado no painel da NFE.io)
+- Ele também serve como “chave” do worker para processar a fila no DEV (fallback)
+
 ## 6) Checklist de operação (o que fazer sempre)
 
 ### Antes de mergear `dev → main`

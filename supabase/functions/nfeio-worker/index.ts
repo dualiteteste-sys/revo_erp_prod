@@ -8,6 +8,7 @@ const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
 const NFEIO_API_KEY = Deno.env.get("NFEIO_API_KEY") ?? "";
 const NFEIO_WORKER_SECRET = Deno.env.get("NFEIO_WORKER_SECRET") ?? "";
+const NFEIO_WEBHOOK_SECRET = Deno.env.get("NFEIO_WEBHOOK_SECRET") ?? "";
 
 type WorkerBody = { limit?: number };
 
@@ -38,9 +39,10 @@ serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { status: 204, headers: cors });
   if (req.method !== "POST") return json(405, { ok: false, error: "METHOD_NOT_ALLOWED" }, cors);
 
-  if (!NFEIO_WORKER_SECRET) return json(500, { ok: false, error: "MISSING_NFEIO_WORKER_SECRET" }, cors);
+  const secret = NFEIO_WORKER_SECRET || NFEIO_WEBHOOK_SECRET;
+  if (!secret) return json(500, { ok: false, error: "MISSING_WORKER_SECRET" }, cors);
   const got = (req.headers.get("x-worker-secret") ?? "").trim();
-  if (!got || got !== NFEIO_WORKER_SECRET) return json(401, { ok: false, error: "UNAUTHORIZED" }, cors);
+  if (!got || got !== secret) return json(401, { ok: false, error: "UNAUTHORIZED" }, cors);
 
   const admin = createClient(SUPABASE_URL, SERVICE_KEY, {
     auth: { persistSession: false, autoRefreshToken: false },
@@ -203,4 +205,3 @@ serve(async (req) => {
 
   return json(200, { ok: true, processed }, cors);
 });
-
