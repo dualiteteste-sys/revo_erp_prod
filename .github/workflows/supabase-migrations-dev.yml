@@ -8,11 +8,6 @@ on:
     branches:
       - dev
   workflow_dispatch:
-    inputs:
-      force_reset_dev:
-        description: "DANGER: faz reset do banco DEV remoto antes de aplicar migrations (perde dados)"
-        required: false
-        default: "false"
 
 concurrency:
   group: verify-migrations-verify-db
@@ -77,47 +72,6 @@ jobs:
         run: |
           set -euo pipefail
           supabase stop
-
-      - name: (Optional) Reset DEV database (remote) [DESTRUTIVO]
-        if: github.event_name == 'workflow_dispatch' && github.event.inputs.force_reset_dev == 'true'
-        env:
-          SUPABASE_DB_URL_DEV: ${{ secrets.SUPABASE_DB_URL_DEV }}
-        run: |
-          set -euo pipefail
-          if [[ -z "${SUPABASE_DB_URL_DEV:-}" ]]; then
-            echo "::error::Missing secret SUPABASE_DB_URL_DEV"
-            exit 1
-          fi
-
-          echo "[DEV][RESET] Resetando banco remoto (destrutivo)..."
-
-          ENCODED_DB_URL="$(
-            python3 - <<'PY'
-import os
-from urllib.parse import urlsplit, urlunsplit, quote, unquote
-
-url = os.environ["SUPABASE_DB_URL_DEV"]
-u = urlsplit(url)
-
-if "@" not in u.netloc:
-    print(url)
-    raise SystemExit(0)
-
-userinfo, hostport = u.netloc.rsplit("@", 1)
-if ":" in userinfo:
-    user, pwd = userinfo.split(":", 1)
-else:
-    user, pwd = userinfo, ""
-
-user_q = quote(unquote(user), safe="")
-pwd_q = quote(unquote(pwd), safe="")
-netloc = f"{user_q}:{pwd_q}@{hostport}"
-print(urlunsplit((u.scheme, netloc, u.path, u.query, u.fragment)))
-PY
-          )"
-
-          supabase db reset --db-url "$ENCODED_DB_URL" --yes
-          echo "[DEV][RESET] Reset concluído."
 
       - name: Apply migrations to DEV (remote)
         if: github.event_name == 'workflow_dispatch'
