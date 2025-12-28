@@ -43,8 +43,9 @@ export default function MatrizCompetenciasPage() {
   // Extract all unique competencies to build columns
   const allCompetencies = React.useMemo(() => {
     const comps = new Map<string, { id: string; nome: string; tipo: string }>();
-    matrixData.forEach(row => {
-      row.competencias.forEach(c => {
+    matrixData.forEach((row) => {
+      const competencias = Array.isArray(row.competencias) ? row.competencias : [];
+      competencias.forEach((c) => {
         comps.set(c.id, { id: c.id, nome: c.nome, tipo: c.tipo });
       });
     });
@@ -52,7 +53,8 @@ export default function MatrizCompetenciasPage() {
   }, [matrixData]);
 
   const renderCell = (row: MatrixRow, compId: string) => {
-    const comp = row.competencias.find(c => c.id === compId);
+    const competencias = Array.isArray(row.competencias) ? row.competencias : [];
+    const comp = competencias.find((c) => c.id === compId);
     
     if (!comp) {
       return <div className="h-full w-full bg-gray-50/50"></div>;

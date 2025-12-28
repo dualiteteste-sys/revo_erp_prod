@@ -284,7 +284,16 @@ export async function seedColaboradores(): Promise<void> {
 
 // Matriz
 export async function getCompetencyMatrix(cargoId?: string): Promise<MatrixRow[]> {
-  return callRpc<MatrixRow[]>('rh_get_competency_matrix', { p_cargo_id: cargoId || null });
+  type MatrixRowApi = Omit<MatrixRow, 'competencias'> & {
+    competencias: MatrixCompetencia[] | null;
+  };
+
+  const data = await callRpc<MatrixRowApi[]>('rh_get_competency_matrix', { p_cargo_id: cargoId || null });
+
+  return (data || []).map((row) => ({
+    ...row,
+    competencias: Array.isArray(row.competencias) ? row.competencias : [],
+  }));
 }
 
 // Treinamentos
