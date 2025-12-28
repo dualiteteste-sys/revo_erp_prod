@@ -75,7 +75,7 @@ alter table public.empresa_usuarios
 
 alter table public.empresa_usuarios
   add constraint empresa_usuarios_status_check
-  check (status in ('ACTIVE','PENDING','INACTIVE','SUSPENDED'));
+  check ((status::text) in ('ACTIVE','PENDING','INACTIVE','SUSPENDED'));
 
 create index if not exists idx_empresa_usuarios_empresa_status_role
   on public.empresa_usuarios (empresa_id, status, role_id, created_at);
