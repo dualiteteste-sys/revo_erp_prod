@@ -79,7 +79,7 @@ jobs:
           supabase stop
 
       - name: (Optional) Reset DEV database (remote) [DESTRUTIVO]
-        if: github.event_name == 'workflow_dispatch' && inputs.force_reset_dev == 'true'
+        if: github.event_name == 'workflow_dispatch' && github.event.inputs.force_reset_dev == 'true'
         env:
           SUPABASE_DB_URL_DEV: ${{ secrets.SUPABASE_DB_URL_DEV }}
         run: |
