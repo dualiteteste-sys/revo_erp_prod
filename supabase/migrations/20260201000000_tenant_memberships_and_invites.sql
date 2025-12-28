@@ -84,6 +84,8 @@ create index if not exists idx_empresa_usuarios_empresa_status_role
 -- 2) RPC: accept invite
 -- ---------------------------------------------------------------------------
 
+drop function if exists public.accept_invite_for_current_user(uuid);
+
 create or replace function public.accept_invite_for_current_user(p_empresa_id uuid)
 returns table (
   empresa_id uuid,
@@ -143,6 +145,8 @@ grant execute on function public.accept_invite_for_current_user(uuid) to authent
 -- 3) RPCs: list/count/manage users (UI)
 -- ---------------------------------------------------------------------------
 
+drop function if exists public.count_users_for_current_empresa(text, text[], text[]);
+
 create or replace function public.count_users_for_current_empresa(
   p_q text default null,
   p_status text[] default null,
@@ -193,6 +197,8 @@ $$;
 
 revoke all on function public.count_users_for_current_empresa(text, text[], text[]) from public;
 grant execute on function public.count_users_for_current_empresa(text, text[], text[]) to authenticated;
+
+drop function if exists public.list_users_for_current_empresa_v2(int, int, text, text[], text[]);
 
 create or replace function public.list_users_for_current_empresa_v2(
   p_limit int default 25,
@@ -266,6 +272,8 @@ $$;
 revoke all on function public.list_users_for_current_empresa_v2(int, int, text, text[], text[]) from public;
 grant execute on function public.list_users_for_current_empresa_v2(int, int, text, text[], text[]) to authenticated;
 
+drop function if exists public.deactivate_user_for_current_empresa(uuid);
+
 create or replace function public.deactivate_user_for_current_empresa(p_user_id uuid)
 returns void
 language plpgsql
@@ -289,6 +297,8 @@ $$;
 revoke all on function public.deactivate_user_for_current_empresa(uuid) from public;
 grant execute on function public.deactivate_user_for_current_empresa(uuid) to authenticated;
 
+drop function if exists public.reactivate_user_for_current_empresa(uuid);
+
 create or replace function public.reactivate_user_for_current_empresa(p_user_id uuid)
 returns void
 language plpgsql
@@ -311,6 +321,8 @@ $$;
 
 revoke all on function public.reactivate_user_for_current_empresa(uuid) from public;
 grant execute on function public.reactivate_user_for_current_empresa(uuid) to authenticated;
+
+drop function if exists public.delete_pending_invitation(uuid);
 
 create or replace function public.delete_pending_invitation(p_user_id uuid)
 returns int
@@ -337,6 +349,8 @@ $$;
 
 revoke all on function public.delete_pending_invitation(uuid) from public;
 grant execute on function public.delete_pending_invitation(uuid) to authenticated;
+
+drop function if exists public.update_user_role_for_current_empresa(uuid, text);
 
 create or replace function public.update_user_role_for_current_empresa(
   p_user_id uuid,
