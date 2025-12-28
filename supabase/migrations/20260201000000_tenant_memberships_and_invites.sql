@@ -21,6 +21,25 @@ BEGIN;
 alter table public.empresa_usuarios
   add column if not exists status text;
 
+-- Se o projeto antigo tiver `status` como enum (ex.: user_status_in_empresa),
+-- converte para TEXT para manter compatibilidade com Edge Functions/JS.
+do $$
+declare
+  v_udt_name text;
+begin
+  select c.udt_name
+    into v_udt_name
+  from information_schema.columns c
+  where c.table_schema = 'public'
+    and c.table_name = 'empresa_usuarios'
+    and c.column_name = 'status'
+  limit 1;
+
+  if v_udt_name is not null and v_udt_name <> 'text' then
+    execute 'alter table public.empresa_usuarios alter column status type text using status::text';
+  end if;
+end$$;
+
 update public.empresa_usuarios
 set status = coalesce(status, 'ACTIVE')
 where status is null;
@@ -35,19 +54,12 @@ alter table public.empresa_usuarios
   add column if not exists is_principal boolean not null default false;
 
 -- Constraint (idempotente)
-do $$
-begin
-  if not exists (
-    select 1
-    from pg_constraint
-    where conname = 'empresa_usuarios_status_check'
-      and conrelid = 'public.empresa_usuarios'::regclass
-  ) then
-    alter table public.empresa_usuarios
-      add constraint empresa_usuarios_status_check
-      check (status in ('ACTIVE','PENDING','INACTIVE','SUSPENDED'));
-  end if;
-end$$;
+alter table public.empresa_usuarios
+  drop constraint if exists empresa_usuarios_status_check;
+
+alter table public.empresa_usuarios
+  add constraint empresa_usuarios_status_check
+  check (status in ('ACTIVE','PENDING','INACTIVE','SUSPENDED'));
 
 create index if not exists idx_empresa_usuarios_empresa_status_role
   on public.empresa_usuarios (empresa_id, status, role_id, created_at);
@@ -350,4 +362,3 @@ grant execute on function public.update_user_role_for_current_empresa(uuid, text
 select pg_notify('pgrst','reload schema');
 
 COMMIT;
-
