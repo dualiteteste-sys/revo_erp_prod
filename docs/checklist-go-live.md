@@ -25,7 +25,7 @@ Legenda:
 - [x] NFE-05 Integração NFE.io (emissão): enviar, consultar status, armazenar XML/DANFE, logs
 - [x] NFE-06 Webhooks + fila/retry idempotente (processar eventos NFE.io; reprocessar com segurança)
 - [x] NFE-07 Operações fiscais essenciais: cancelamento, CCe (se aplicável), inutilização (se necessário), reimpressão DANFE
-- [ ] NFE-08 Observabilidade fiscal: auditoria por NF (eventos, falhas, tentativas, payloads saneados)
+- [x] NFE-08 Observabilidade fiscal: auditoria por NF (eventos, falhas, tentativas, payloads saneados)
 
 ## 3) Financeiro Essencial (core comum)
 - [ ] FIN-01 Contas a Receber ponta‑a‑ponta (criar/baixar/estornar/cancelar) + conciliação mínima
