@@ -85,30 +85,7 @@ jobs:
           fi
           echo "[DEV] Reset + apply migrations..."
 
-          ENCODED_DB_URL="$(
-            python3 - <<'PY'
-import os
-from urllib.parse import urlsplit, urlunsplit, quote, unquote
-
-url = os.environ["SUPABASE_DB_URL_DEV"]
-u = urlsplit(url)
-
-if "@" not in u.netloc:
-    print(url)
-    raise SystemExit(0)
-
-userinfo, hostport = u.netloc.rsplit("@", 1)
-if ":" in userinfo:
-    user, pwd = userinfo.split(":", 1)
-else:
-    user, pwd = userinfo, ""
-
-user_q = quote(unquote(user), safe="")
-pwd_q = quote(unquote(pwd), safe="")
-netloc = f"{user_q}:{pwd_q}@{hostport}"
-print(urlunsplit((u.scheme, netloc, u.path, u.query, u.fragment)))
-PY
-          )"
+          ENCODED_DB_URL="$(python3 scripts/encode_db_url.py)"
 
           echo "[DEV] Resetando banco remoto (destrutivo)..."
           supabase db reset --db-url "$ENCODED_DB_URL" --yes
