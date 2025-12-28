@@ -1,22 +1,41 @@
-create type "public"."billing_cycle" as enum ('monthly', 'yearly');
+do $$
+begin
+  if to_regtype('public.billing_cycle') is null then
+    execute $$create type "public"."billing_cycle" as enum ('monthly', 'yearly')$$;
+  end if;
 
-create type "public"."status_centro_custo" as enum ('ativo', 'inativo');
+  if to_regtype('public.status_centro_custo') is null then
+    execute $$create type "public"."status_centro_custo" as enum ('ativo', 'inativo')$$;
+  end if;
 
-create type "public"."status_parcela" as enum ('aberta', 'paga', 'cancelada');
+  if to_regtype('public.status_parcela') is null then
+    execute $$create type "public"."status_parcela" as enum ('aberta', 'paga', 'cancelada')$$;
+  end if;
 
-create type "public"."status_produto" as enum ('ativo', 'inativo');
+  if to_regtype('public.status_produto') is null then
+    execute $$create type "public"."status_produto" as enum ('ativo', 'inativo')$$;
+  end if;
 
-create type "public"."status_transportadora" as enum ('ativa', 'inativa');
+  if to_regtype('public.status_transportadora') is null then
+    execute $$create type "public"."status_transportadora" as enum ('ativa', 'inativa')$$;
+  end if;
 
-create type "public"."sub_status" as enum ('trialing', 'active', 'past_due', 'canceled', 'unpaid', 'incomplete', 'incomplete_expired');
+  if to_regtype('public.sub_status') is null then
+    execute $$create type "public"."sub_status" as enum ('trialing', 'active', 'past_due', 'canceled', 'unpaid', 'incomplete', 'incomplete_expired')$$;
+  end if;
 
-create type "public"."tipo_embalagem" as enum ('pacote_caixa', 'envelope', 'rolo_cilindro', 'outro', 'pacote');
+  if to_regtype('public.tipo_embalagem') is null then
+    execute $$create type "public"."tipo_embalagem" as enum ('pacote_caixa', 'envelope', 'rolo_cilindro', 'outro', 'pacote')$$;
+  end if;
 
-create type "public"."user_status_in_empresa" as enum ('ACTIVE', 'PENDING', 'INACTIVE');
+  if to_regtype('public.user_status_in_empresa') is null then
+    execute $$create type "public"."user_status_in_empresa" as enum ('ACTIVE', 'PENDING', 'INACTIVE')$$;
+  end if;
+end$$;
 
-create sequence "public"."compras_pedidos_numero_seq";
+create sequence if not exists "public"."compras_pedidos_numero_seq";
 
-create sequence "public"."industria_benef_ordens_numero_seq";
+create sequence if not exists "public"."industria_benef_ordens_numero_seq";
 
 drop trigger if exists "tg_servicos_set_updated_at" on "public"."servicos";
 
