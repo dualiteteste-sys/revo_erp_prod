@@ -13,7 +13,7 @@
 
 - [x] CFG-01 Tela Configurações → Plano/Limites por empresa (módulos habilitados + limites)
 - [x] CFG-02 Enforcement em 3 camadas: Menu + Rotas + RPC/DB (ninguém burla via console)
-- [ ] CFG-03 Gestão de permissões por usuário (Super Admin sempre full; perfis Member/Viewer/Ops/Finance)
+- [x] CFG-03 Gestão de permissões por usuário (Super Admin sempre full; perfis Member/Viewer/Ops/Finance)
 - [ ] CFG-04 Feature flags por empresa (incluindo NF‑e) com fallback seguro e auditoria
 
 ## 2) NF‑e Ativa (MVP real SP/PR, regime “Ambos”)
@@ -30,9 +30,9 @@
 ## 3) Financeiro Essencial (core comum)
 
 - [x] FIN-01 Contas a Receber ponta‑a‑ponta (criar/baixar/estornar/cancelar) + conciliação mínima
-- [ ] FIN-02 Contas a Pagar ponta‑a‑ponta (criar/baixar/estornar/cancelar)
+- [x] FIN-02 Contas a Pagar ponta‑a‑ponta (criar/baixar/estornar/cancelar)
 - [ ] FIN-03 Tesouraria/Caixa + movimentações/saldos confiáveis
-- [ ] FIN-04 Integração de origens (OS → A Receber; Compras/Recebimentos → A Pagar)
+- [x] FIN-04 Integração de origens (OS → A Receber; Compras/Recebimentos → A Pagar)
 - [ ] FIN-05 Relatórios essenciais (A receber/A pagar/Caixa; faturamento por período)
 
 ## 4) Plano A — Serviços (OS) “pronto para vender”
@@ -54,4 +54,4 @@
 
 - [ ] GL-01 Onboarding por empresa (checklist de config fiscal/financeiro/RH)
 - [ ] GL-02 Backup/restore + rotinas de suporte (exportações, trilha de auditoria)
-- [ ] GL-03 Hardening final (permissões, RLS, RPCs, rate limits, erros amigáveis)
+- [x] GL-03 Hardening final (permissões, RLS, RPCs, rate limits, erros amigáveis)
