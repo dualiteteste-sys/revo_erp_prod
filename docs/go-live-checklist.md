@@ -47,8 +47,8 @@
 - [x] IND-02 Execução (operações/apontamentos/entregas) com permissões e sem inconsistências
 - [x] IND-03 Roteiros + BOM (produção/beneficiamento/ambos) + persistência e seleção corretas
 - [x] IND-04 Suprimentos mínimo: recebimentos XML + conferência + vínculos + estoque/saldos/movimentações
-- [ ] IND-05 Qualidade mínimo: planos/motivos/lotes/bloqueio com auditoria
-- [ ] IND-06 Relatórios essenciais: WIP/filas/eficiência/estoque/qualidade
+- [x] IND-05 Qualidade mínimo: planos/motivos/lotes/bloqueio com auditoria
+- [x] IND-06 Relatórios essenciais: WIP/filas/eficiência/estoque/qualidade
 
 ## 6) Go‑Live Operacional
 
