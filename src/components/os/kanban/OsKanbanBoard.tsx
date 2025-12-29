@@ -15,6 +15,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { useHasPermission } from '@/hooks/useHasPermission';
 
 export type KanbanColumn = {
   id: ColumnId;
@@ -33,12 +34,14 @@ const STATUS_LABEL: Record<status_os, string> = {
   cancelada: 'Cancelada',
 };
 
-const OsKanbanBoard: React.FC<{ onOpenOs?: (osId: string) => void }> = ({ onOpenOs }) => {
+const OsKanbanBoard: React.FC<{ onOpenOs?: (osId: string) => void; canUpdate?: boolean }> = ({ onOpenOs, canUpdate }) => {
   const [columns, setColumns] = useState<KanbanColumns | null>(null);
   const [loading, setLoading] = useState(true);
   const { addToast } = useToast();
   const [search, setSearch] = useState('');
   const [status, setStatus] = useState<status_os[]>(DEFAULT_STATUS);
+  const permUpdate = useHasPermission('os', 'update');
+  const canEdit = typeof canUpdate === 'boolean' ? canUpdate : permUpdate.data;
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -62,6 +65,10 @@ const OsKanbanBoard: React.FC<{ onOpenOs?: (osId: string) => void }> = ({ onOpen
 
     if (!destination) return;
     if (source.droppableId === destination.droppableId && source.index === destination.index) return;
+    if (!canEdit) {
+      addToast('Você não tem permissão para reagendar O.S.', 'warning');
+      return;
+    }
 
     const startCol = columns?.[source.droppableId as ColumnId];
     const endCol = columns?.[destination.droppableId as ColumnId];
@@ -160,6 +167,10 @@ const OsKanbanBoard: React.FC<{ onOpenOs?: (osId: string) => void }> = ({ onOpen
             column={col}
             onOpenOs={onOpenOs}
             onSetStatus={async (osId, next) => {
+              if (!canEdit) {
+                addToast('Você não tem permissão para alterar status.', 'warning');
+                return;
+              }
               try {
                 await setOsStatus(osId, next);
                 addToast(`Status atualizado para "${STATUS_LABEL[next]}".`, 'success');
@@ -168,6 +179,7 @@ const OsKanbanBoard: React.FC<{ onOpenOs?: (osId: string) => void }> = ({ onOpen
                 addToast(e?.message || 'Falha ao atualizar status.', 'error');
               }
             }}
+            canUpdate={canEdit}
           />
         ))}
         </div>

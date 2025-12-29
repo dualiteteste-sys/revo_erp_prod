@@ -10,12 +10,14 @@ interface OsFormItemsProps {
   onRemoveItem: (itemId: string) => void;
   onAddItem: (item: OsItemSearchResult) => void;
   isAddingItem: boolean;
+  readOnly?: boolean;
 }
 
 const ItemRow: React.FC<{
   item: OrdemServicoItem;
   onRemove: (itemId: string) => void;
-}> = ({ item, onRemove }) => {
+  readOnly?: boolean;
+}> = ({ item, onRemove, readOnly = false }) => {
   
   const total = (item.quantidade || 0) * (item.preco || 0) * (1 - (item.desconto_pct || 0) / 100);
   const isService = !!item.servico_id;
@@ -42,7 +44,12 @@ const ItemRow: React.FC<{
         {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(total)}
       </td>
       <td className="px-2 py-2 align-middle text-center w-16">
-        <button type="button" onClick={() => onRemove(item.id)} className="p-2 text-red-500 hover:text-red-700 hover:bg-red-100 rounded-full">
+        <button
+          type="button"
+          onClick={() => onRemove(item.id)}
+          disabled={readOnly}
+          className="p-2 text-red-500 hover:text-red-700 hover:bg-red-100 rounded-full disabled:opacity-40 disabled:hover:bg-transparent disabled:hover:text-red-500"
+        >
           <Trash2 size={16} />
         </button>
       </td>
@@ -50,11 +57,11 @@ const ItemRow: React.FC<{
   );
 };
 
-const OsFormItems: React.FC<OsFormItemsProps> = ({ items, onRemoveItem, onAddItem, isAddingItem }) => {
+const OsFormItems: React.FC<OsFormItemsProps> = ({ items, onRemoveItem, onAddItem, isAddingItem, readOnly = false }) => {
   return (
     <Section title="Itens da Ordem de Serviço" description="Adicione os produtos e serviços que compõem esta O.S.">
         <div className="sm:col-span-6">
-            <ItemAutocomplete onSelect={onAddItem} disabled={isAddingItem} />
+            <ItemAutocomplete onSelect={onAddItem} disabled={isAddingItem || readOnly} />
             <div className="mt-4 overflow-x-auto">
                 <table className="min-w-full">
                     <thead className="border-b border-gray-200">
@@ -70,7 +77,7 @@ const OsFormItems: React.FC<OsFormItemsProps> = ({ items, onRemoveItem, onAddIte
                     <tbody>
                         <AnimatePresence>
                             {items.map((item) => (
-                                <ItemRow key={item.id} item={item} onRemove={onRemoveItem} />
+                                <ItemRow key={item.id} item={item} onRemove={onRemoveItem} readOnly={readOnly} />
                             ))}
                         </AnimatePresence>
                         {items.length === 0 && (

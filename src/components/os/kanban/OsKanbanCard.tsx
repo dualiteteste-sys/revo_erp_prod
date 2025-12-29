@@ -16,6 +16,7 @@ interface OsKanbanCardProps {
   index: number;
   onOpenOs?: (osId: string) => void;
   onSetStatus?: (osId: string, next: status_os) => void | Promise<void>;
+  canUpdate?: boolean;
 }
 
 const STATUS_BADGE: Record<status_os, string> = {
@@ -32,14 +33,14 @@ const STATUS_LABEL: Record<status_os, string> = {
   cancelada: 'Cancelada',
 };
 
-const OsKanbanCard: React.FC<OsKanbanCardProps> = ({ item, index, onOpenOs, onSetStatus }) => {
+const OsKanbanCard: React.FC<OsKanbanCardProps> = ({ item, index, onOpenOs, onSetStatus, canUpdate = true }) => {
   return (
-    <Draggable draggableId={item.id} index={index}>
+    <Draggable draggableId={item.id} index={index} isDragDisabled={!canUpdate}>
       {(provided, snapshot) => (
         <div
           ref={provided.innerRef}
           {...provided.draggableProps}
-          {...provided.dragHandleProps}
+          {...(canUpdate ? provided.dragHandleProps : {})}
           className={`p-3 mb-2 bg-white rounded-lg shadow-sm border border-gray-200 ${snapshot.isDragging ? 'shadow-lg' : ''}`}
         >
           <div className="flex items-start justify-between gap-2">
@@ -71,19 +72,19 @@ const OsKanbanCard: React.FC<OsKanbanCardProps> = ({ item, index, onOpenOs, onSe
                   Abrir O.S.
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={() => onSetStatus?.(item.id, 'orcamento')}>
+                <DropdownMenuItem onClick={() => onSetStatus?.(item.id, 'orcamento')} disabled={!canUpdate}>
                   <ClipboardCheck className="mr-2 h-4 w-4" />
                   Marcar como Orçamento
                 </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => onSetStatus?.(item.id, 'aberta')}>
+                <DropdownMenuItem onClick={() => onSetStatus?.(item.id, 'aberta')} disabled={!canUpdate}>
                   <ArrowUpRight className="mr-2 h-4 w-4" />
                   Marcar como Aberta
                 </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => onSetStatus?.(item.id, 'concluida')}>
+                <DropdownMenuItem onClick={() => onSetStatus?.(item.id, 'concluida')} disabled={!canUpdate}>
                   <CheckCircle2 className="mr-2 h-4 w-4 text-green-600" />
                   Concluir O.S.
                 </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => onSetStatus?.(item.id, 'cancelada')}>
+                <DropdownMenuItem onClick={() => onSetStatus?.(item.id, 'cancelada')} disabled={!canUpdate}>
                   <XCircle className="mr-2 h-4 w-4 text-rose-600" />
                   Cancelar O.S.
                 </DropdownMenuItem>
