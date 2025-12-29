@@ -87,3 +87,6 @@ Checklist mental para qualquer feature:
 
 Checklist oficial: `docs/go-live-checklist.md`
 
+## 9) Backup/Restore (GL-02)
+
+Rotina e instruções: `docs/backup-restore.md`

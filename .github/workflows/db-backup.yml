@@ -1,0 +1,111 @@
+name: DB Backup (Supabase)
+
+on:
+  workflow_dispatch:
+    inputs:
+      target:
+        description: "Qual banco fazer backup?"
+        type: choice
+        required: true
+        options:
+          - dev
+          - prod
+          - verify
+      mode:
+        description: "Tipo de backup"
+        type: choice
+        required: true
+        default: full
+        options:
+          - full
+          - schema-only
+      label:
+        description: "Rótulo opcional (vai no nome do arquivo)"
+        required: false
+        default: ""
+  schedule:
+    # Diário 03:10 UTC (ajuste se quiser)
+    - cron: "10 3 * * *"
+
+permissions:
+  contents: read
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install PostgreSQL client
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y postgresql-client
+
+      - name: Resolve target DB URL
+        id: db
+        shell: bash
+        env:
+          INPUT_TARGET: ${{ inputs.target }}
+          DEV_URL: ${{ secrets.SUPABASE_DB_URL_DEV }}
+          PROD_URL: ${{ secrets.SUPABASE_DB_URL_PROD }}
+          VERIFY_URL: ${{ secrets.SUPABASE_DB_URL_VERIFY }}
+        run: |
+          target="${INPUT_TARGET}"
+          if [[ -z "$target" ]]; then
+            # schedule fallback: prod
+            target="prod"
+          fi
+
+          case "$target" in
+            dev) url="$DEV_URL" ;;
+            prod) url="$PROD_URL" ;;
+            verify) url="$VERIFY_URL" ;;
+            *)
+              echo "Target inválido: $target"
+              exit 1
+              ;;
+          esac
+
+          if [[ -z "$url" ]]; then
+            echo "Secret do DB URL não configurado para target=$target"
+            exit 1
+          fi
+
+          echo "target=$target" >> "$GITHUB_OUTPUT"
+          echo "url=$url" >> "$GITHUB_OUTPUT"
+
+      - name: Dump
+        shell: bash
+        env:
+          DATABASE_URL: ${{ steps.db.outputs.url }}
+          TARGET: ${{ steps.db.outputs.target }}
+          MODE: ${{ inputs.mode }}
+          LABEL: ${{ inputs.label }}
+        run: |
+          ts="$(date -u +'%Y%m%d_%H%M%S')"
+          label="${LABEL:-}"
+          if [[ -n "$label" ]]; then
+            label="_${label// /_}"
+          fi
+
+          file="supabase_${TARGET}_${ts}${label}.dump"
+
+          args=(--format=custom --no-owner --no-privileges)
+          if [[ "$MODE" == "schema-only" ]]; then
+            args+=(--schema-only)
+          fi
+
+          echo "Gerando $file (mode=$MODE)"
+          pg_dump "${args[@]}" "$DATABASE_URL" -f "$file"
+
+          ls -lh "$file"
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: supabase-db-backup-${{ steps.db.outputs.target }}
+          path: "*.dump"
+          retention-days: 14
+

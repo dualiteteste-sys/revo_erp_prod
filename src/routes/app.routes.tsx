@@ -35,6 +35,7 @@ const NfeInputPage = lazyImport(() => import("../pages/tools/NfeInputPage"));
 const XmlTesterPage = lazyImport(() => import('../pages/tools/XmlTesterPage'));
 const LogsPage = lazyImport(() => import("../pages/dev/LogsPage"));
 const SupabaseDemoPage = lazyImport(() => import("../pages/tools/SupabaseDemoPage"));
+const SettingsPage = lazyImport(() => import("../pages/settings/SettingsPage"));
 
 // Fiscal Pages
 const NfeEmissoesPage = lazyImport(() => import("../pages/fiscal/NfeEmissoesPage"));
@@ -97,6 +98,10 @@ export const appRoutes: RouteObject[] = [
                 path: "dashboard",
                 element: <Suspense fallback={<PageLoader />}><Dashboard /></Suspense>
             },
+
+            // Configurações (painel)
+            { path: "configuracoes", element: <Navigate to="/app/configuracoes/geral/empresa" replace /> },
+            { path: "configuracoes/:section/:page", element: <Suspense fallback={<PageLoader />}><SettingsPage /></Suspense> },
 
             // Cadastros
             { path: "products", element: <Suspense fallback={<PageLoader />}><ProductsPage /></Suspense> },

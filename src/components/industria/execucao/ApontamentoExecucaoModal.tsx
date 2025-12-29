@@ -81,6 +81,7 @@ export default function ApontamentoExecucaoModal({
 
         <Input
           label="Quantidade Boa"
+          name="qtd_boas"
           type="number"
           value={qtdBoas}
           onChange={(e) => setQtdBoas(Number(e.target.value) || 0)}
@@ -88,6 +89,7 @@ export default function ApontamentoExecucaoModal({
         />
         <Input
           label="Quantidade Refugada"
+          name="qtd_refugadas"
           type="number"
           value={qtdRefugadas}
           onChange={(e) => setQtdRefugadas(Number(e.target.value) || 0)}
@@ -96,6 +98,7 @@ export default function ApontamentoExecucaoModal({
         {qtdRefugadas > 0 && (
           <Input
             label="Motivo do Refugo"
+            name="motivo_refugo"
             value={motivoRefugo}
             onChange={(e) => setMotivoRefugo(e.target.value)}
             disabled={saving || isLocked}
@@ -133,4 +136,3 @@ export default function ApontamentoExecucaoModal({
     </Modal>
   );
 }
-

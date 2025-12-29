@@ -58,8 +58,8 @@ export function useEmpresaFeatures(): EmpresaFeatures {
         nfe_emissao_enabled: !!data?.nfe_emissao_enabled,
         plano_mvp: (data?.plano_mvp ?? 'ambos') as PlanoMvp,
         max_users: typeof data?.max_users === 'number' ? data.max_users : 999,
-        servicos_enabled: data?.servicos_enabled ?? true,
-        industria_enabled: data?.industria_enabled ?? true,
+        servicos_enabled: !!data?.servicos_enabled,
+        industria_enabled: !!data?.industria_enabled,
         error: null,
       });
     } catch (error) {

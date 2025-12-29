@@ -92,6 +92,10 @@ export const handlers = [
             empresa_id: 'empresa-1',
             revo_send_enabled: false,
             nfe_emissao_enabled: false,
+            plano_mvp: 'ambos',
+            max_users: 999,
+            servicos_enabled: true,
+            industria_enabled: true,
         });
     }),
 
