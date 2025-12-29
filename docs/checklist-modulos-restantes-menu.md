@@ -41,4 +41,5 @@ Para cada item abaixo, escolha **uma** estratégia:
 
 - [x] MENU-01 Nenhum item clicável com `href: '#'` sem handler (evitar “cliques mortos”).
 - [x] MENU-02 Itens ocultados devem estar alinhados com RBAC/PlanGuard (não aparecer no menu se o usuário não tem permissão).
-- [ ] MENU-03 Rodar varredura de console em PROD e DEV após ajustes do menu (sem erros de rota/React Router).
+- [x] MENU-03 Varredura automatizada (E2E) para capturar `console.error` nas rotas principais.
+- [ ] MENU-04 Varredura manual em DEV/PROD (ambiente real) após deploy (sem 403/400/RPC faltando).
