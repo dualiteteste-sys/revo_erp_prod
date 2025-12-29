@@ -7,6 +7,7 @@ import { useToast } from '../../../contexts/ToastProvider';
 import { useSupabase } from '@/providers/SupabaseProvider';
 import { Database } from '../../../types/database.types';
 import { roleAtLeast, useEmpresaRole } from '@/hooks/useEmpresaRole';
+import { useEmpresaFeatures } from '@/hooks/useEmpresaFeatures';
 
 type EmpresaAddon = Database['public']['Tables']['empresa_addons']['Row'];
 type PlanoMvp = 'ambos' | 'servicos' | 'industria';
@@ -73,6 +74,7 @@ const SubscriptionSettings: React.FC<SubscriptionSettingsProps> = ({ onSwitchToP
   const { session, activeEmpresa } = useAuth();
   const { subscription, loadingSubscription, refetchSubscription } = useSubscription();
   const { addToast } = useToast();
+  const empresaFeatures = useEmpresaFeatures();
   const empresaRoleQuery = useEmpresaRole();
   const canAdmin = empresaRoleQuery.isFetched && roleAtLeast(empresaRoleQuery.data, 'admin');
   const [isPortalLoading, setIsPortalLoading] = useState(false);
@@ -82,6 +84,7 @@ const SubscriptionSettings: React.FC<SubscriptionSettingsProps> = ({ onSwitchToP
   const [savingEntitlements, setSavingEntitlements] = useState(false);
   const [planoMvp, setPlanoMvp] = useState<PlanoMvp>('ambos');
   const [maxUsers, setMaxUsers] = useState<number>(999);
+  const [currentUsersCount, setCurrentUsersCount] = useState<number | null>(null);
 
   const fetchAddons = useCallback(async () => {
     if (!activeEmpresa?.id) return;
@@ -124,10 +127,31 @@ const SubscriptionSettings: React.FC<SubscriptionSettingsProps> = ({ onSwitchToP
     }
   }, [activeEmpresa?.id, addToast, supabase]);
 
+  const fetchCurrentUsersCount = useCallback(async () => {
+    const empresaId = activeEmpresa?.id;
+    if (!empresaId) {
+      setCurrentUsersCount(null);
+      return;
+    }
+
+    try {
+      const { count, error } = await (supabase as any)
+        .from('empresa_usuarios')
+        .select('user_id', { count: 'exact', head: true })
+        .eq('empresa_id', empresaId);
+
+      if (error) throw error;
+      setCurrentUsersCount(typeof count === 'number' ? count : null);
+    } catch {
+      setCurrentUsersCount(null);
+    }
+  }, [activeEmpresa?.id, supabase]);
+
   useEffect(() => {
     fetchAddons();
     fetchEntitlements();
-  }, [fetchAddons, fetchEntitlements]);
+    fetchCurrentUsersCount();
+  }, [fetchAddons, fetchEntitlements, fetchCurrentUsersCount]);
 
   const handleManageBilling = async () => {
     if (!activeEmpresa) {
@@ -295,8 +319,16 @@ const SubscriptionSettings: React.FC<SubscriptionSettingsProps> = ({ onSwitchToP
     }
   };
 
-  const renderEntitlements = () => (
-    <div className="bg-white/80 rounded-2xl p-6 md:p-8 border border-gray-200 shadow-sm">
+  const renderEntitlements = () => {
+    const nextServicosEnabled = planoMvp === 'servicos' || planoMvp === 'ambos';
+    const nextIndustriaEnabled = planoMvp === 'industria' || planoMvp === 'ambos';
+    const normalizedMaxUsers = Number.isFinite(maxUsers) ? Math.max(1, Math.trunc(maxUsers)) : 999;
+    const currentUsers = currentUsersCount ?? 0;
+    const isOverLimit = currentUsersCount !== null && currentUsers > normalizedMaxUsers;
+    const isAtLimit = currentUsersCount !== null && currentUsers >= normalizedMaxUsers;
+
+    return (
+      <div className="bg-white/80 rounded-2xl p-6 md:p-8 border border-gray-200 shadow-sm">
       <div className="flex items-start justify-between gap-4">
         <div>
           <h2 className="text-xl font-bold text-gray-800">Plano MVP e Limites</h2>
@@ -334,6 +366,26 @@ const SubscriptionSettings: React.FC<SubscriptionSettingsProps> = ({ onSwitchToP
           <p className="text-xs text-gray-500 mt-2">
             Esta configuração afeta menus e rotas (guards) e serve como base para a política de planos/limites.
           </p>
+
+          <div className="mt-4 rounded-lg border border-gray-200 bg-white/60 p-3">
+            <p className="text-xs font-semibold text-gray-700 mb-2">Módulos habilitados (efeito do plano)</p>
+            <div className="flex flex-wrap gap-2">
+              <span className={`px-2.5 py-1 text-xs font-semibold rounded-full ${nextServicosEnabled ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}`}>
+                Serviços {nextServicosEnabled ? 'ON' : 'OFF'}
+              </span>
+              <span className={`px-2.5 py-1 text-xs font-semibold rounded-full ${nextIndustriaEnabled ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}`}>
+                Indústria {nextIndustriaEnabled ? 'ON' : 'OFF'}
+              </span>
+              <span className={`px-2.5 py-1 text-xs font-semibold rounded-full ${empresaFeatures.nfe_emissao_enabled ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}`}>
+                NF-e (emissão) {empresaFeatures.nfe_emissao_enabled ? 'ON' : 'OFF'}
+              </span>
+            </div>
+            {!!empresaFeatures.error && (
+              <p className="mt-2 text-[11px] text-amber-700">
+                Não foi possível validar o estado atual em <span className="font-semibold">empresa_features</span>. O sistema pode bloquear acesso até normalizar.
+              </p>
+            )}
+          </div>
         </div>
 
         <div>
@@ -351,10 +403,24 @@ const SubscriptionSettings: React.FC<SubscriptionSettingsProps> = ({ onSwitchToP
           <p className="text-xs text-gray-500 mt-2">
             O banco bloqueia novos vínculos em <span className="font-semibold">empresa_usuarios</span> quando o limite é atingido.
           </p>
+          <div className="mt-3 flex items-center justify-between rounded-lg border border-gray-200 bg-white/60 px-3 py-2">
+            <div className="text-xs text-gray-700">
+              Usuários na empresa: <span className="font-semibold">{currentUsersCount === null ? '—' : currentUsers}</span>
+            </div>
+            <div className={`text-xs font-semibold ${isOverLimit ? 'text-red-700' : isAtLimit ? 'text-amber-700' : 'text-gray-600'}`}>
+              {currentUsersCount === null ? 'Sem leitura' : `${currentUsers} / ${normalizedMaxUsers}`}
+            </div>
+          </div>
+          {isOverLimit && (
+            <p className="mt-2 text-xs text-red-700">
+              A empresa está acima do limite configurado. Ajuste o limite ou remova vínculos em <span className="font-semibold">Usuários</span>.
+            </p>
+          )}
         </div>
       </div>
     </div>
-  );
+    );
+  };
 
   return (
     <div className="space-y-8">
