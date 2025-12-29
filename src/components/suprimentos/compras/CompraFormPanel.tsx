@@ -3,6 +3,7 @@ import { AlertTriangle, BarChart3, CheckCircle, Loader2, Save, Trash2, Wand2 } f
 import { CompraDetails, CompraPayload, saveCompra, manageCompraItem, getCompraDetails, receberCompra } from '@/services/compras';
 import { useToast } from '@/contexts/ToastProvider';
 import { useConfirm } from '@/contexts/ConfirmProvider';
+import { useNavigate } from 'react-router-dom';
 import Section from '@/components/ui/forms/Section';
 import Input from '@/components/ui/forms/Input';
 import Select from '@/components/ui/forms/Select';
@@ -13,6 +14,7 @@ import { useNumericField } from '@/hooks/useNumericField';
 import Modal from '@/components/ui/Modal';
 import { getRelatorioBaixoEstoque, type RelatorioBaixoEstoqueItem } from '@/services/suprimentos';
 import { listMrpDemandas, type MrpDemanda } from '@/services/industriaProducao';
+import { createContaPagarFromCompra, getContaPagarFromCompra } from '@/services/financeiro';
 
 interface Props {
   compraId: string | null;
@@ -23,6 +25,7 @@ interface Props {
 export default function CompraFormPanel({ compraId, onSaveSuccess, onClose }: Props) {
   const { addToast } = useToast();
   const { confirm } = useConfirm();
+  const navigate = useNavigate();
   const [loading, setLoading] = useState(!!compraId);
   const [isSaving, setIsSaving] = useState(false);
   const [formData, setFormData] = useState<Partial<CompraDetails>>({
@@ -156,6 +159,25 @@ export default function CompraFormPanel({ compraId, onSaveSuccess, onClose }: Pr
       await receberCompra(formData.id!);
       addToast('Pedido recebido e estoque atualizado!', 'success');
       onSaveSuccess();
+
+      const wantConta = await confirm({
+        title: 'Gerar Conta a Pagar',
+        description: 'Deseja gerar automaticamente uma Conta a Pagar a partir desta compra recebida?',
+        confirmText: 'Gerar agora',
+        cancelText: 'Agora não',
+        variant: 'default',
+      });
+      if (!wantConta) return;
+
+      const existing = await getContaPagarFromCompra(String(formData.id));
+      const contaId =
+        existing ||
+        (await createContaPagarFromCompra({
+          compraId: String(formData.id),
+          dataVencimento: null,
+        }));
+      addToast('Conta a pagar gerada com sucesso!', 'success');
+      navigate(`/app/financeiro/contas-a-pagar?contaId=${encodeURIComponent(contaId)}`);
     } catch (e: any) {
       addToast(e.message, 'error');
     } finally {

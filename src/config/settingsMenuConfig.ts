@@ -26,6 +26,7 @@ export const settingsMenuConfig: SettingsTab[] = [
     name: 'Avançado',
     menu: [
       { name: 'Limpeza de Dados', icon: Trash2, href: '/app/configuracoes/avancado/limpeza' },
+      { name: 'Auditoria', icon: ShieldCheck, href: '/app/configuracoes/avancado/auditoria' },
     ],
   },
   {

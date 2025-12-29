@@ -37,6 +37,11 @@ function isRateLimit(err: any): boolean {
   return err?.status === 429 || msg.includes("rate limit");
 }
 
+function normalizeRoleForDb(role: UserRole): Exclude<UserRole, "READONLY"> {
+  if (role === "READONLY") return "VIEWER";
+  return role;
+}
+
 /* ==================== Listagem e contagem ==================== */
 export async function listUsers(
   filters: UsersFilters,
@@ -113,9 +118,10 @@ export async function reactivateUser(userId: string): Promise<void> {
 }
 
 export async function updateUserRole(userId: string, role: UserRole): Promise<void> {
-  console.log("[RPC][UPDATE_ROLE] update_user_role_for_current_empresa", { userId, role });
+  const normalized = normalizeRoleForDb(role);
+  console.log("[RPC][UPDATE_ROLE] update_user_role_for_current_empresa", { userId, role: normalized });
   const { error } = await supabase.rpc("update_user_role_for_current_empresa", {
-    p_role: role,
+    p_role: normalized,
     p_user_id: userId,
   });
   if (error) {
@@ -151,9 +157,10 @@ export async function inviteUser(arg1: any, arg2?: string, arg3?: string): Promi
   const role: string = (typeof arg1 === "object" ? arg1?.role : arg2) ?? "ADMIN";
   const empresa_id: string | undefined = typeof arg1 === "object" ? arg1?.empresa_id : arg3;
 
-  console.log("[INVITE] (edge) invoke invite-user", { email, role, empresa_id });
+  const normalizedRole = role === "READONLY" ? "VIEWER" : role;
+  console.log("[INVITE] (edge) invoke invite-user", { email, role: normalizedRole, empresa_id });
   const { data, error } = await supabase.functions.invoke("invite-user", {
-    body: { email, role, ...(empresa_id ? { empresa_id } : {}) },
+    body: { email, role: normalizedRole, ...(empresa_id ? { empresa_id } : {}) },
   });
   if (error) {
     let detail: string | undefined = (error as any)?.message;

@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { cancelarRecebimento, deleteRecebimento, listRecebimentos, Recebimento } from '@/services/recebimento';
 import { useNavigate } from 'react-router-dom';
-import { Loader2, PackageCheck, AlertTriangle, CheckCircle, Clock, FileText, Trash2, RotateCcw } from 'lucide-react';
+import { Loader2, PackageCheck, AlertTriangle, CheckCircle, Clock, FileText, Trash2, RotateCcw, TrendingDown } from 'lucide-react';
 import { useToast } from '@/contexts/ToastProvider';
 import ConfirmationModal from '@/components/ui/ConfirmationModal';
 import Modal from '@/components/ui/Modal';
+import { createContaPagarFromRecebimento, getContaPagarFromRecebimento } from '@/services/financeiro';
 
 export default function RecebimentoListPage() {
     const [recebimentos, setRecebimentos] = useState<Recebimento[]>([]);
@@ -18,6 +19,7 @@ export default function RecebimentoListPage() {
     const [canceling, setCanceling] = useState(false);
     const [toCancel, setToCancel] = useState<Recebimento | null>(null);
     const [cancelMotivo, setCancelMotivo] = useState('');
+    const [creatingConta, setCreatingConta] = useState(false);
 
     useEffect(() => {
         loadData();
@@ -92,6 +94,25 @@ export default function RecebimentoListPage() {
             addToast(e.message || 'Erro ao cancelar recebimento.', 'error');
         } finally {
             setCanceling(false);
+        }
+    };
+
+    const handleCreateContaPagar = async (rec: Recebimento) => {
+        setCreatingConta(true);
+        try {
+            const existing = await getContaPagarFromRecebimento(rec.id);
+            const contaId =
+                existing ||
+                (await createContaPagarFromRecebimento({
+                    recebimentoId: rec.id,
+                    dataVencimento: null,
+                }));
+            addToast('Conta a pagar gerada com sucesso!', 'success');
+            navigate(`/app/financeiro/contas-a-pagar?contaId=${encodeURIComponent(contaId)}`);
+        } catch (e: any) {
+            addToast(e?.message || 'Erro ao gerar conta a pagar.', 'error');
+        } finally {
+            setCreatingConta(false);
         }
     };
 
@@ -188,6 +209,17 @@ export default function RecebimentoListPage() {
                                                         <Trash2 size={16} />
                                                     </button>
                                                 )}
+
+                                                {rec.status === 'concluido' ? (
+                                                    <button
+                                                        onClick={() => void handleCreateContaPagar(rec)}
+                                                        disabled={creatingConta}
+                                                        className="text-gray-400 hover:text-emerald-700 transition-colors flex items-center gap-1 disabled:opacity-50"
+                                                        title="Gerar Conta a Pagar"
+                                                    >
+                                                        {creatingConta ? <Loader2 className="animate-spin" size={16} /> : <TrendingDown size={16} />}
+                                                    </button>
+                                                ) : null}
                                             </div>
                                         </td>
                                     </tr>

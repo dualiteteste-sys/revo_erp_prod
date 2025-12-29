@@ -7,11 +7,13 @@ type UsersTableProps = {
   onEditRole: (user: EmpresaUser) => void;
 };
 
-const roleLabels: Record<EmpresaUser['role'], string> = {
+const roleLabels: Partial<Record<EmpresaUser['role'], string>> = {
   OWNER: 'Proprietário',
   ADMIN: 'Admin',
+  MEMBER: 'Membro',
   FINANCE: 'Financeiro',
   OPS: 'Operações',
+  VIEWER: 'Somente Leitura',
   READONLY: 'Somente Leitura',
 };
 

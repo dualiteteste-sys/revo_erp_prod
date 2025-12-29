@@ -13,7 +13,7 @@
 
 - [x] CFG-01 Tela Configurações → Plano/Limites por empresa (módulos habilitados + limites)
 - [x] CFG-02 Enforcement em 3 camadas: Menu + Rotas + RPC/DB (ninguém burla via console)
-- [ ] CFG-03 Gestão de permissões por usuário (Super Admin sempre full; perfis Member/Viewer)
+- [ ] CFG-03 Gestão de permissões por usuário (Super Admin sempre full; perfis Member/Viewer/Ops/Finance)
 - [ ] CFG-04 Feature flags por empresa (incluindo NF‑e) com fallback seguro e auditoria
 
 ## 2) NF‑e Ativa (MVP real SP/PR, regime “Ambos”)

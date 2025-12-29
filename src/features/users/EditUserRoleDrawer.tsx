@@ -20,19 +20,21 @@ type Props = {
 const roleOptions: { value: UserRole, label: string }[] = [
   { value: 'OWNER', label: 'Proprietário' },
   { value: 'ADMIN', label: 'Admin' },
+  { value: 'MEMBER', label: 'Membro' },
   { value: 'FINANCE', label: 'Financeiro' },
   { value: 'OPS', label: 'Operações' },
-  { value: 'READONLY', label: 'Somente Leitura' },
+  { value: 'VIEWER', label: 'Somente Leitura' },
 ];
 
 export function EditUserRoleDrawer({ open, user, onClose, onUpdate }: Props) {
-  const [role, setRole] = useState<UserRole>('READONLY');
+  const [role, setRole] = useState<UserRole>('VIEWER');
   const [loading, setLoading] = useState(false);
   const { addToast } = useToast();
   const canManageUsers = useCan('usuarios', 'manage');
 
   useEffect(() => {
-    if (user) setRole(user.role);
+    if (!user) return;
+    setRole(user.role === 'READONLY' ? 'VIEWER' : user.role);
   }, [user]);
 
   if (!user) return null;

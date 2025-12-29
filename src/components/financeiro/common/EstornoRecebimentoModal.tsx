@@ -14,6 +14,7 @@ type EstornoRecebimentoModalProps = {
   title: string;
   description?: string;
   defaultDateISO?: string;
+  defaultContaTipo?: 'recebimentos' | 'pagamentos';
   confirmLabel: string;
   onConfirm: (params: { contaCorrenteId: string | null; dataISO: string; motivo: string }) => Promise<void>;
 };
@@ -24,6 +25,7 @@ export default function EstornoRecebimentoModal({
   title,
   description,
   defaultDateISO,
+  defaultContaTipo = 'recebimentos',
   confirmLabel,
   onConfirm,
 }: EstornoRecebimentoModalProps) {
@@ -51,7 +53,10 @@ export default function EstornoRecebimentoModal({
         if (cancelled) return;
         const list = result.data ?? [];
         setContas(list);
-        const preferred = list.find((c) => c.padrao_para_recebimentos) || list[0] || null;
+        const preferred =
+          defaultContaTipo === 'pagamentos'
+            ? list.find((c) => c.padrao_para_pagamentos) || list[0] || null
+            : list.find((c) => c.padrao_para_recebimentos) || list[0] || null;
         setContaId(preferred?.id || '');
       } catch (e: any) {
         if (!cancelled) addToast(e?.message || 'Erro ao carregar contas correntes.', 'error');
@@ -62,7 +67,7 @@ export default function EstornoRecebimentoModal({
     return () => {
       cancelled = true;
     };
-  }, [addToast, isOpen]);
+  }, [addToast, defaultContaTipo, isOpen]);
 
   const canSubmit = useMemo(() => {
     return !!dataISO && !isLoadingContas && !isSubmitting;
@@ -149,4 +154,3 @@ export default function EstornoRecebimentoModal({
     </Modal>
   );
 }
-

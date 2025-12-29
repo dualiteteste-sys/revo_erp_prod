@@ -6,6 +6,7 @@ import DataManagementContent from './data-management/DataManagementContent';
 import RolesPage from '@/pages/settings/roles/RolesPage';
 import UsersPage from '@/pages/settings/general/UsersPage';
 import NfeEmissaoSettings from '@/components/settings/fiscal/NfeEmissaoSettings';
+import AuditLogsPage from '@/components/settings/audit/AuditLogsPage';
 
 interface SettingsContentProps {
   activeItem: string;
@@ -26,6 +27,8 @@ const SettingsContent: React.FC<SettingsContentProps> = ({ activeItem }) => {
         return <NfeEmissaoSettings />;
       case 'Limpeza de Dados':
         return <DataManagementContent />;
+      case 'Auditoria':
+        return <AuditLogsPage />;
       default:
         return (
           <div>

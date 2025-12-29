@@ -18,7 +18,7 @@ type Props = {
 const schema = z.object({
   email: z.string().email({ message: "Formato de e-mail inválido." }),
   password: z.string().min(8, { message: "Senha precisa ter pelo menos 8 caracteres." }),
-  role: z.enum(["OWNER", "ADMIN", "FINANCE", "OPS", "READONLY"], {
+  role: z.enum(["OWNER", "ADMIN", "MEMBER", "FINANCE", "OPS", "VIEWER"], {
     required_error: "Selecione um papel.",
     invalid_type_error: "Papel inválido.",
   }),
@@ -121,9 +121,10 @@ export default function CreateUserManualDialog({ onCreated, defaultRole = "ADMIN
             <Select label="Papel" id="role" value={role} onChange={(e) => setRole(e.target.value)}>
                 <option value="OWNER">OWNER</option>
                 <option value="ADMIN">ADMIN</option>
+                <option value="MEMBER">MEMBER</option>
                 <option value="FINANCE">FINANCE</option>
                 <option value="OPS">OPS</option>
-                <option value="READONLY">READONLY</option>
+                <option value="VIEWER">VIEWER</option>
             </Select>
             {errors.role && <p className="text-sm text-red-600 mt-1">{errors.role}</p>}
           </div>

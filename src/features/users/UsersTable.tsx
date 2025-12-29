@@ -9,11 +9,13 @@ type Props = {
   onDeleteInvite: (u: EmpresaUser) => void;
 };
 
-const roleLabels: Record<EmpresaUser['role'], string> = {
+const roleLabels: Partial<Record<EmpresaUser['role'], string>> = {
   OWNER: 'Proprietário',
   ADMIN: 'Admin',
+  MEMBER: 'Membro',
   FINANCE: 'Financeiro',
   OPS: 'Operações',
+  VIEWER: 'Somente Leitura',
   READONLY: 'Somente Leitura',
 };
 
@@ -46,7 +48,7 @@ export function UsersTable({ rows, onEditRole, onDeleteInvite }: Props) {
                   <div className="font-medium text-gray-900">{user.name || '(Não confirmado)'}</div>
                   <div className="text-sm text-gray-500">{user.email}</div>
                 </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{roleLabels[user.role]}</td>
+                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{roleLabels[user.role] || user.role}</td>
                 <td className="px-6 py-4 whitespace-nowrap">
                   <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${statusConfig[user.status].color}`}>
                     {statusConfig[user.status].label}
