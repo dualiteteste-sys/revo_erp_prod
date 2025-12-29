@@ -6,7 +6,7 @@
 
 - [x] RG-01 Padronizar “Release Gate” local/CI: `yarn test --run` + E2E suite + `yarn verify:migrations` obrigatórios
 - [ ] RG-02 Pipeline PROD: “compare expected vs PROD schema” sem divergências (migrations idempotentes)
-- [ ] RG-03 Console limpo: capturar/zerar erros (tratamento central + bloquear alert()/erros não tratados)
+- [x] RG-03 Console limpo: capturar/zerar erros (tratamento central + bloquear alert()/erros não tratados)
 - [ ] RG-04 Checklist E2E por plano (Serviços/Indústria) com “happy path” automatizado
 
 ## 1) Configurações Comerciais (Planos/Limites + RBAC)
@@ -55,4 +55,3 @@
 - [ ] GL-01 Onboarding por empresa (checklist de config fiscal/financeiro/RH)
 - [ ] GL-02 Backup/restore + rotinas de suporte (exportações, trilha de auditoria)
 - [ ] GL-03 Hardening final (permissões, RLS, RPCs, rate limits, erros amigáveis)
-
