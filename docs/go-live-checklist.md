@@ -14,7 +14,7 @@
 - [x] CFG-01 Tela Configurações → Plano/Limites por empresa (módulos habilitados + limites)
 - [x] CFG-02 Enforcement em 3 camadas: Menu + Rotas + RPC/DB (ninguém burla via console)
 - [x] CFG-03 Gestão de permissões por usuário (Super Admin sempre full; perfis Member/Viewer/Ops/Finance)
-- [ ] CFG-04 Feature flags por empresa (incluindo NF‑e) com fallback seguro e auditoria
+- [x] CFG-04 Feature flags por empresa (incluindo NF‑e) com fallback seguro e auditoria
 
 ## 2) NF‑e Ativa (MVP real SP/PR, regime “Ambos”)
 
@@ -38,13 +38,13 @@
 ## 4) Plano A — Serviços (OS) “pronto para vender”
 
 - [x] OS-01 OS UX “estado da arte” (status/agenda/anexos/histórico/custos) — ajustes finais + permissão UI
-- [ ] OS-02 Relatórios de OS (status/cliente/período + faturamento) validados com dados reais
+- [x] OS-02 Relatórios de OS (status/cliente/período + faturamento) validados com dados reais
 - [x] OS-03 Amarração OS ↔ financeiro (gerar/abrir/baixar conta) com auditoria
 
 ## 5) Plano B — Indústria Essencial “pronto para vender”
 
 - [x] IND-01 OP/OB wizard consistente e travas de estados (inclui cancelados/readonly correto)
-- [ ] IND-02 Execução (operações/apontamentos/entregas) com permissões e sem inconsistências
+- [x] IND-02 Execução (operações/apontamentos/entregas) com permissões e sem inconsistências
 - [ ] IND-03 Roteiros + BOM (produção/beneficiamento/ambos) + persistência e seleção corretas
 - [x] IND-04 Suprimentos mínimo: recebimentos XML + conferência + vínculos + estoque/saldos/movimentações
 - [ ] IND-05 Qualidade mínimo: planos/motivos/lotes/bloqueio com auditoria
@@ -53,5 +53,5 @@
 ## 6) Go‑Live Operacional
 
 - [x] GL-01 Onboarding por empresa (checklist de config fiscal/financeiro/RH)
-- [ ] GL-02 Backup/restore + rotinas de suporte (exportações, trilha de auditoria)
+- [x] GL-02 Backup/restore + rotinas de suporte (exportações, trilha de auditoria)
 - [x] GL-03 Hardening final (permissões, RLS, RPCs, rate limits, erros amigáveis)
