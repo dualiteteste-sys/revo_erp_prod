@@ -43,7 +43,7 @@
 
 ## 5) Plano B — Indústria Essencial “pronto para vender”
 
-- [ ] IND-01 OP/OB wizard consistente e travas de estados (inclui cancelados/readonly correto)
+- [x] IND-01 OP/OB wizard consistente e travas de estados (inclui cancelados/readonly correto)
 - [ ] IND-02 Execução (operações/apontamentos/entregas) com permissões e sem inconsistências
 - [ ] IND-03 Roteiros + BOM (produção/beneficiamento/ambos) + persistência e seleção corretas
 - [ ] IND-04 Suprimentos mínimo: recebimentos XML + conferência + vínculos + estoque/saldos/movimentações
