@@ -179,8 +179,7 @@ jobs:
       - name: Compare expected vs PROD schema (public)
         run: |
           set -euo pipefail
-          # Queremos garantir que o PROD contém (no mínimo) tudo que o schema esperado (VERIFY) define.
-          # PROD pode ter objetos extras (legado/feature flags) sem quebrar o app; isso não deve bloquear deploy.
+          # RG-02: PROD deve estar exatamente igual ao schema esperado (VERIFY).
           sort expected_public_schema.txt > expected_public_schema.sorted.txt
           sort prod_public_schema.txt > prod_public_schema.sorted.txt
 
@@ -199,20 +198,20 @@ jobs:
           extra="$(comm -13 expected_public_schema.sorted.txt prod_public_schema.sorted.txt || true)"
           if [[ -n "${extra}" ]]; then
             echo ""
-            echo "::warning::PROD possui objetos extras vs schema esperado (VERIFY)."
-            echo "Isso não bloqueia o deploy, mas indica drift/legado; ideal alinhar quando possível."
+            echo "::error::PROD possui objetos extras vs schema esperado (VERIFY)."
+            echo "Isso indica drift/legado. Para RG-02, o deploy deve bloquear até alinhar/remover o extra."
             echo ""
-            # evita pipefail em head (SIGPIPE do echo)
             tmp_extra="$(mktemp)"
             printf '%s\n' "$extra" > "$tmp_extra"
-            head -n 50 "$tmp_extra"
+            head -n 200 "$tmp_extra"
             rm -f "$tmp_extra"
+            exit 1
           fi
 
       - name: Compare expected vs PROD schema (storage)
         run: |
           set -euo pipefail
-          # Para Storage, queremos garantir que o PROD tem os buckets/policies esperados.
+          # RG-02: PROD deve estar exatamente igual ao snapshot esperado (VERIFY).
           sort expected_storage_snapshot.txt > expected_storage_snapshot.sorted.txt
           sort prod_storage_snapshot.txt > prod_storage_snapshot.sorted.txt
 
@@ -229,11 +228,13 @@ jobs:
           extra="$(comm -13 expected_storage_snapshot.sorted.txt prod_storage_snapshot.sorted.txt || true)"
           if [[ -n "${extra}" ]]; then
             echo ""
-            echo "::warning::PROD possui entradas extras no Storage vs snapshot esperado (VERIFY)."
+            echo "::error::PROD possui entradas extras no Storage vs snapshot esperado (VERIFY)."
+            echo "Isso indica drift/legado. Para RG-02, o deploy deve bloquear até alinhar/remover o extra."
             tmp_extra="$(mktemp)"
             printf '%s\n' "$extra" > "$tmp_extra"
-            head -n 50 "$tmp_extra"
+            head -n 200 "$tmp_extra"
             rm -f "$tmp_extra"
+            exit 1
           fi
 
       - name: Deploy Edge Functions to PROD
