@@ -31,27 +31,27 @@
 
 - [x] FIN-01 Contas a Receber ponta‑a‑ponta (criar/baixar/estornar/cancelar) + conciliação mínima
 - [x] FIN-02 Contas a Pagar ponta‑a‑ponta (criar/baixar/estornar/cancelar)
-- [ ] FIN-03 Tesouraria/Caixa + movimentações/saldos confiáveis
+- [x] FIN-03 Tesouraria/Caixa + movimentações/saldos confiáveis
 - [x] FIN-04 Integração de origens (OS → A Receber; Compras/Recebimentos → A Pagar)
-- [ ] FIN-05 Relatórios essenciais (A receber/A pagar/Caixa; faturamento por período)
+- [x] FIN-05 Relatórios essenciais (A receber/A pagar/Caixa; faturamento por período)
 
 ## 4) Plano A — Serviços (OS) “pronto para vender”
 
 - [x] OS-01 OS UX “estado da arte” (status/agenda/anexos/histórico/custos) — ajustes finais + permissão UI
 - [ ] OS-02 Relatórios de OS (status/cliente/período + faturamento) validados com dados reais
-- [ ] OS-03 Amarração OS ↔ financeiro (gerar/abrir/baixar conta) com auditoria
+- [x] OS-03 Amarração OS ↔ financeiro (gerar/abrir/baixar conta) com auditoria
 
 ## 5) Plano B — Indústria Essencial “pronto para vender”
 
 - [x] IND-01 OP/OB wizard consistente e travas de estados (inclui cancelados/readonly correto)
 - [ ] IND-02 Execução (operações/apontamentos/entregas) com permissões e sem inconsistências
 - [ ] IND-03 Roteiros + BOM (produção/beneficiamento/ambos) + persistência e seleção corretas
-- [ ] IND-04 Suprimentos mínimo: recebimentos XML + conferência + vínculos + estoque/saldos/movimentações
+- [x] IND-04 Suprimentos mínimo: recebimentos XML + conferência + vínculos + estoque/saldos/movimentações
 - [ ] IND-05 Qualidade mínimo: planos/motivos/lotes/bloqueio com auditoria
 - [ ] IND-06 Relatórios essenciais: WIP/filas/eficiência/estoque/qualidade
 
 ## 6) Go‑Live Operacional
 
-- [ ] GL-01 Onboarding por empresa (checklist de config fiscal/financeiro/RH)
+- [x] GL-01 Onboarding por empresa (checklist de config fiscal/financeiro/RH)
 - [ ] GL-02 Backup/restore + rotinas de suporte (exportações, trilha de auditoria)
 - [x] GL-03 Hardening final (permissões, RLS, RPCs, rate limits, erros amigáveis)
