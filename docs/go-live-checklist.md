@@ -12,7 +12,7 @@
 ## 1) Configurações Comerciais (Planos/Limites + RBAC)
 
 - [ ] CFG-01 Tela Configurações → Plano/Limites por empresa (módulos habilitados + limites)
-- [ ] CFG-02 Enforcement em 3 camadas: Menu + Rotas + RPC/DB (ninguém burla via console)
+- [x] CFG-02 Enforcement em 3 camadas: Menu + Rotas + RPC/DB (ninguém burla via console)
 - [ ] CFG-03 Gestão de permissões por usuário (Super Admin sempre full; perfis Member/Viewer)
 - [ ] CFG-04 Feature flags por empresa (incluindo NF‑e) com fallback seguro e auditoria
 
@@ -29,7 +29,7 @@
 
 ## 3) Financeiro Essencial (core comum)
 
-- [ ] FIN-01 Contas a Receber ponta‑a‑ponta (criar/baixar/estornar/cancelar) + conciliação mínima
+- [x] FIN-01 Contas a Receber ponta‑a‑ponta (criar/baixar/estornar/cancelar) + conciliação mínima
 - [ ] FIN-02 Contas a Pagar ponta‑a‑ponta (criar/baixar/estornar/cancelar)
 - [ ] FIN-03 Tesouraria/Caixa + movimentações/saldos confiáveis
 - [ ] FIN-04 Integração de origens (OS → A Receber; Compras/Recebimentos → A Pagar)
