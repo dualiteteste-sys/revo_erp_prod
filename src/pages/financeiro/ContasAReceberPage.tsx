@@ -10,6 +10,8 @@ import ContasAReceberTable from '@/components/financeiro/contas-a-receber/Contas
 import ContasAReceberFormPanel from '@/components/financeiro/contas-a-receber/ContasAReceberFormPanel';
 import ContasAReceberSummary from '@/components/financeiro/contas-a-receber/ContasAReceberSummary';
 import BaixaRapidaModal from '@/components/financeiro/common/BaixaRapidaModal';
+import MotivoModal from '@/components/financeiro/common/MotivoModal';
+import EstornoRecebimentoModal from '@/components/financeiro/common/EstornoRecebimentoModal';
 import Select from '@/components/ui/forms/Select';
 import { Button } from '@/components/ui/button';
 import { useSearchParams } from 'react-router-dom';
@@ -49,6 +51,11 @@ const ContasAReceberPage: React.FC = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const [isBaixaOpen, setIsBaixaOpen] = useState(false);
   const [contaToReceive, setContaToReceive] = useState<contasAReceberService.ContaAReceber | null>(null);
+  const [isCancelOpen, setIsCancelOpen] = useState(false);
+  const [contaToCancel, setContaToCancel] = useState<contasAReceberService.ContaAReceber | null>(null);
+  const [isCanceling, setIsCanceling] = useState(false);
+  const [isEstornoOpen, setIsEstornoOpen] = useState(false);
+  const [contaToReverse, setContaToReverse] = useState<contasAReceberService.ContaAReceber | null>(null);
 
   useEffect(() => {
     const contaId = searchParams.get('contaId');
@@ -138,6 +145,26 @@ const ContasAReceberPage: React.FC = () => {
   const handleCloseBaixa = () => {
     setIsBaixaOpen(false);
     setContaToReceive(null);
+  };
+
+  const handleOpenCancel = (conta: contasAReceberService.ContaAReceber) => {
+    setContaToCancel(conta);
+    setIsCancelOpen(true);
+  };
+
+  const handleCloseCancel = () => {
+    setIsCancelOpen(false);
+    setContaToCancel(null);
+  };
+
+  const handleOpenEstorno = (conta: contasAReceberService.ContaAReceber) => {
+    setContaToReverse(conta);
+    setIsEstornoOpen(true);
+  };
+
+  const handleCloseEstorno = () => {
+    setIsEstornoOpen(false);
+    setContaToReverse(null);
   };
 
   const handleSort = (column: string) => {
@@ -255,6 +282,8 @@ const ContasAReceberPage: React.FC = () => {
             contas={contas}
             onEdit={handleOpenForm}
             onReceive={handleReceive}
+            onCancel={handleOpenCancel}
+            onReverse={handleOpenEstorno}
             onDelete={handleOpenDeleteModal}
             sortBy={sortBy}
             onSort={handleSort}
@@ -300,6 +329,61 @@ const ContasAReceberPage: React.FC = () => {
             refresh();
           } catch (e: any) {
             addToast(e?.message || 'Erro ao registrar recebimento.', 'error');
+            throw e;
+          }
+        }}
+      />
+
+      <MotivoModal
+        isOpen={isCancelOpen}
+        onClose={handleCloseCancel}
+        title="Cancelar conta a receber"
+        description={
+          contaToCancel?.descricao
+            ? `Cancelar a conta "${contaToCancel.descricao}"? Isso não apaga o registro, apenas marca como cancelado.`
+            : 'Cancelar esta conta?'
+        }
+        confirmLabel="Cancelar"
+        isSubmitting={isCanceling}
+        onConfirm={async (motivo) => {
+          if (!contaToCancel?.id) return;
+          setIsCanceling(true);
+          try {
+            await contasAReceberService.cancelarContaAReceber({ id: contaToCancel.id, motivo });
+            addToast('Conta cancelada com sucesso!', 'success');
+            refresh();
+          } catch (e: any) {
+            addToast(e?.message || 'Erro ao cancelar a conta.', 'error');
+            throw e;
+          } finally {
+            setIsCanceling(false);
+          }
+        }}
+      />
+
+      <EstornoRecebimentoModal
+        isOpen={isEstornoOpen}
+        onClose={handleCloseEstorno}
+        title="Estornar recebimento"
+        description={
+          contaToReverse?.descricao
+            ? `Estornar o recebimento da conta "${contaToReverse.descricao}"? A conta voltará para pendente e será registrada uma movimentação de estorno.`
+            : 'Estornar recebimento?'
+        }
+        confirmLabel="Estornar"
+        onConfirm={async ({ contaCorrenteId, dataISO, motivo }) => {
+          if (!contaToReverse?.id) return;
+          try {
+            await contasAReceberService.estornarContaAReceber({
+              id: contaToReverse.id,
+              dataEstorno: dataISO,
+              contaCorrenteId,
+              motivo,
+            });
+            addToast('Estorno registrado com sucesso!', 'success');
+            refresh();
+          } catch (e: any) {
+            addToast(e?.message || 'Erro ao estornar.', 'error');
             throw e;
           }
         }}

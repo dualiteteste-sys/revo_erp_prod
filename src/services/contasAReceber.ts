@@ -128,6 +128,48 @@ export async function receberContaAReceber(params: {
   }
 }
 
+export async function cancelarContaAReceber(params: { id: string; motivo?: string | null }): Promise<ContaAReceber> {
+  try {
+    return await callRpc<ContaAReceber>('financeiro_conta_a_receber_cancelar', {
+      p_id: params.id,
+      p_motivo: params.motivo ?? null,
+    });
+  } catch (error: any) {
+    console.error('[SERVICE][CANCELAR_CONTA_A_RECEBER]', error);
+    throw new Error(error.message || 'Erro ao cancelar a conta.');
+  }
+}
+
+export async function estornarContaAReceber(params: {
+  id: string;
+  dataEstorno?: string | null;
+  contaCorrenteId?: string | null;
+  motivo?: string | null;
+}): Promise<ContaAReceber> {
+  try {
+    try {
+      return await callRpc<ContaAReceber>('financeiro_conta_a_receber_estornar_v2', {
+        p_id: params.id,
+        p_data_estorno: params.dataEstorno ?? null,
+        p_conta_corrente_id: params.contaCorrenteId ?? null,
+        p_motivo: params.motivo ?? null,
+      });
+    } catch (e: any) {
+      const msg = String(e?.message || '');
+      if (!msg.includes('Could not find the function') && !msg.includes('PGRST202')) {
+        throw e;
+      }
+      return await callRpc<ContaAReceber>('financeiro_conta_a_receber_estornar', {
+        p_id: params.id,
+        p_data_estorno: params.dataEstorno ?? null,
+      });
+    }
+  } catch (error: any) {
+    console.error('[SERVICE][ESTORNAR_CONTA_A_RECEBER]', error);
+    throw new Error(error.message || 'Erro ao estornar o recebimento.');
+  }
+}
+
 export async function deleteContaAReceber(id: string): Promise<void> {
     try {
         await callRpc('delete_conta_a_receber', { p_id: id });

@@ -298,7 +298,7 @@ test('RH & Qualidade: navegação e render sem erros de console', async ({ page 
     });
   });
 
-  await page.route('**/rest/v1/rpc/rh_docs_list', async (route) => {
+  await page.route('**/rpc/rh_docs_list*', async (route) => {
     await route.fulfill({ json: [] });
   });
 
