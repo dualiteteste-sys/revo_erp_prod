@@ -37,6 +37,17 @@ export async function createContaAReceberFromOs(params: { osId: string; dataVenc
   }
 }
 
+export async function createContasAReceberFromOsParcelas(osId: string): Promise<ContaAReceber[]> {
+  try {
+    return await callRpc<ContaAReceber[]>('financeiro_contas_a_receber_from_os_parcelas_create', {
+      p_os_id: osId,
+    });
+  } catch (error: any) {
+    console.error('[SERVICE][CREATE_CONTAS_A_RECEBER_FROM_OS_PARCELAS]', error);
+    throw new Error(error.message || 'Erro ao gerar contas a receber (parcelas) a partir da OS.');
+  }
+}
+
 export async function listContasAReceber(options: {
     page: number;
     pageSize: number;

@@ -7,6 +7,7 @@ import RolesPage from '@/pages/settings/roles/RolesPage';
 import UsersPage from '@/pages/settings/general/UsersPage';
 import NfeEmissaoSettings from '@/components/settings/fiscal/NfeEmissaoSettings';
 import AuditLogsPage from '@/components/settings/audit/AuditLogsPage';
+import OnboardingChecklistPage from '@/components/settings/onboarding/OnboardingChecklistPage';
 
 interface SettingsContentProps {
   activeItem: string;
@@ -17,6 +18,8 @@ const SettingsContent: React.FC<SettingsContentProps> = ({ activeItem }) => {
     switch (activeItem) {
       case 'Empresa':
         return <CompanySettingsForm />;
+      case 'Onboarding (Checklist)':
+        return <OnboardingChecklistPage />;
       case 'Usuários':
         return <UsersPage />;
       case 'Papéis e Permissões':

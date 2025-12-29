@@ -1,4 +1,4 @@
-import { Building, Users, UserCog, CreditCard, Trash2, ShieldCheck, Receipt } from 'lucide-react';
+import { Building, Users, UserCog, CreditCard, Trash2, ShieldCheck, Receipt, ListChecks } from 'lucide-react';
 
 export interface SettingsTab {
   name: string;
@@ -16,6 +16,7 @@ export const settingsMenuConfig: SettingsTab[] = [
     name: 'Geral',
     menu: [
       { name: 'Empresa', icon: Building, href: '/app/configuracoes/geral/empresa' },
+      { name: 'Onboarding (Checklist)', icon: ListChecks, href: '/app/configuracoes/geral/onboarding' },
       { name: 'Usuários', icon: Users, href: '/app/configuracoes/geral/users' },
       { name: 'Papéis e Permissões', icon: ShieldCheck, href: '/app/configuracoes/geral/papeis' },
       { name: 'Perfil de Usuário', icon: UserCog, href: '/app/configuracoes/geral/perfil' },

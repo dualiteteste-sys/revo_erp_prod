@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { CheckCircle2, FileText, Loader2, Save, Paperclip, Plus, Trash2 } from 'lucide-react';
+import { CheckCircle2, FileText, Layers, Loader2, Save, Paperclip, Plus, Trash2 } from 'lucide-react';
 import { OrdemServicoDetails, saveOs, deleteOsItem, getOsDetails, OsItemSearchResult, addOsItem } from '@/services/os';
 import { getPartnerDetails } from '@/services/partners';
 import { useToast } from '@/contexts/ToastProvider';
@@ -13,13 +13,14 @@ import { useNumericField } from '@/hooks/useNumericField';
 import ClientAutocomplete from '../common/ClientAutocomplete';
 import { Button } from '@/components/ui/button';
 import OsAuditTrailPanel from '@/components/os/OsAuditTrailPanel';
-import { createContaAReceberFromOs, getContaAReceberDetails, getContaAReceberFromOs, receberContaAReceber, type ContaAReceber } from '@/services/contasAReceber';
+import { createContaAReceberFromOs, createContasAReceberFromOsParcelas, getContaAReceberDetails, getContaAReceberFromOs, receberContaAReceber, type ContaAReceber } from '@/services/contasAReceber';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { useNavigate } from 'react-router-dom';
 import { useConfirm } from '@/contexts/ConfirmProvider';
 import { useAuth } from '@/contexts/AuthProvider';
 import { createOsDocSignedUrl, deleteOsDoc, listOsDocs, uploadOsDoc, type OsDoc } from '@/services/osDocs';
 import { useHasPermission } from '@/hooks/useHasPermission';
+import { generateOsParcelas, listOsParcelas, type OsParcela } from '@/services/osParcelas';
 
 interface OsFormPanelProps {
   os: OrdemServicoDetails | null;
@@ -58,6 +59,13 @@ const OsFormPanel: React.FC<OsFormPanelProps> = ({ os, onSaveSuccess, onClose })
   const [contaVencimento, setContaVencimento] = useState<string>('');
   const [isCreatingConta, setIsCreatingConta] = useState(false);
   const [isReceivingConta, setIsReceivingConta] = useState(false);
+  const [parcelas, setParcelas] = useState<OsParcela[]>([]);
+  const [parcelasLoading, setParcelasLoading] = useState(false);
+  const [parcelasDialogOpen, setParcelasDialogOpen] = useState(false);
+  const [parcelasCondicao, setParcelasCondicao] = useState('');
+  const [parcelasBaseDate, setParcelasBaseDate] = useState('');
+  const [isGeneratingParcelas, setIsGeneratingParcelas] = useState(false);
+  const [isGeneratingContasParcelas, setIsGeneratingContasParcelas] = useState(false);
 
   const canEdit = formData.id ? permUpdate.data : permCreate.data;
   const permLoading = formData.id ? permUpdate.isLoading : permCreate.isLoading;
@@ -136,6 +144,30 @@ const OsFormPanel: React.FC<OsFormPanelProps> = ({ os, onSaveSuccess, onClose })
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [formData.id]);
 
+  useEffect(() => {
+    const osId = formData.id ? String(formData.id) : null;
+    if (!osId) {
+      setParcelas([]);
+      return;
+    }
+    let cancelled = false;
+    void (async () => {
+      setParcelasLoading(true);
+      try {
+        const rows = await listOsParcelas(osId);
+        if (!cancelled) setParcelas(rows ?? []);
+      } catch {
+        if (!cancelled) setParcelas([]);
+      } finally {
+        if (!cancelled) setParcelasLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [formData.id]);
+
   const statusOs = (formData.status as any) as Database['public']['Enums']['status_os'] | undefined;
   const canGenerateConta = !!formData.id && statusOs === 'concluida';
 
@@ -147,6 +179,66 @@ const OsFormPanel: React.FC<OsFormPanelProps> = ({ os, onSaveSuccess, onClose })
   const handleOpenContaDialog = () => {
     setContaVencimento(contaVencimento || defaultVencimento);
     setIsContaDialogOpen(true);
+  };
+
+  const handleOpenParcelasDialog = () => {
+    const today = new Date().toISOString().slice(0, 10);
+    setParcelasBaseDate(parcelasBaseDate || today);
+    setParcelasCondicao(parcelasCondicao || String(formData.condicao_pagamento || '').trim() || '1x');
+    setParcelasDialogOpen(true);
+  };
+
+  const refreshParcelas = async () => {
+    if (!formData.id) return;
+    try {
+      setParcelasLoading(true);
+      const rows = await listOsParcelas(String(formData.id));
+      setParcelas(rows ?? []);
+    } finally {
+      setParcelasLoading(false);
+    }
+  };
+
+  const handleGerarParcelas = async () => {
+    if (!formData.id) return;
+    setIsGeneratingParcelas(true);
+    try {
+      await generateOsParcelas({
+        osId: String(formData.id),
+        condicao: parcelasCondicao || null,
+        total: Number(formData.total_geral || 0) || null,
+        baseDateISO: parcelasBaseDate || null,
+      });
+      addToast('Parcelas geradas com sucesso!', 'success');
+      await refreshParcelas();
+    } catch (e: any) {
+      addToast(e?.message || 'Erro ao gerar parcelas.', 'error');
+    } finally {
+      setIsGeneratingParcelas(false);
+    }
+  };
+
+  const handleGerarContasPorParcelas = async () => {
+    if (!formData.id) return;
+    if (parcelas.length === 0) {
+      addToast('Gere as parcelas antes (ou use “Gerar Conta a Receber” para conta única).', 'warning');
+      return;
+    }
+    setIsGeneratingContasParcelas(true);
+    try {
+      const contas = await createContasAReceberFromOsParcelas(String(formData.id));
+      if (!contas || contas.length === 0) {
+        addToast('Nenhuma conta foi gerada (verifique se há parcelas canceladas).', 'warning');
+        return;
+      }
+      addToast(`${contas.length} conta(s) a receber gerada(s).`, 'success');
+      setParcelasDialogOpen(false);
+      navigate(`/app/financeiro/contas-a-receber?contaId=${encodeURIComponent(contas[0].id)}`);
+    } catch (e: any) {
+      addToast(e?.message || 'Erro ao gerar contas por parcelas.', 'error');
+    } finally {
+      setIsGeneratingContasParcelas(false);
+    }
   };
 
   const handleCreateConta = async () => {
@@ -477,6 +569,17 @@ const OsFormPanel: React.FC<OsFormPanelProps> = ({ os, onSaveSuccess, onClose })
                 {contaStatusBadge}
               </div>
               <div className="flex gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={handleOpenParcelasDialog}
+                  disabled={parcelasLoading}
+                  className="gap-2"
+                  title="Parcelar e/ou gerar contas por parcela"
+                >
+                  {parcelasLoading ? <Loader2 className="animate-spin" size={18} /> : <Layers size={18} />}
+                  Parcelas
+                </Button>
                 {contaReceberId ? (
                   <>
                     {contaReceber && contaReceber.status !== 'pago' && contaReceber.status !== 'cancelado' ? (
@@ -668,6 +771,111 @@ const OsFormPanel: React.FC<OsFormPanelProps> = ({ os, onSaveSuccess, onClose })
             <Button type="button" onClick={handleCreateConta} disabled={isCreatingConta} className="gap-2">
               {isCreatingConta ? <Loader2 className="animate-spin" size={18} /> : <FileText size={18} />}
               Gerar
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={parcelasDialogOpen}
+        onOpenChange={(open) => {
+          setParcelasDialogOpen(open);
+          if (open) void refreshParcelas();
+        }}
+      >
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Parcelas & Financeiro</DialogTitle>
+            <DialogDescription>
+              Gere parcelas (condição de pagamento) e, se desejar, crie <b>contas a receber</b> por parcela (idempotente).
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="mt-3 grid grid-cols-1 md:grid-cols-6 gap-3 items-end">
+            <Input
+              label="Condição (ex.: 30 60 90 | 3x | 2x +1x)"
+              name="parcelas_cond"
+              value={parcelasCondicao}
+              onChange={(e) => setParcelasCondicao(e.target.value)}
+              className="md:col-span-4"
+            />
+            <Input
+              label="Base"
+              name="parcelas_base"
+              type="date"
+              value={parcelasBaseDate}
+              onChange={(e) => setParcelasBaseDate(e.target.value)}
+              className="md:col-span-2"
+            />
+          </div>
+
+          <div className="mt-3 flex justify-end gap-2">
+            <Button type="button" variant="outline" onClick={() => void refreshParcelas()} disabled={parcelasLoading}>
+              {parcelasLoading ? <Loader2 className="animate-spin" size={18} /> : 'Atualizar'}
+            </Button>
+            <Button type="button" onClick={handleGerarParcelas} disabled={isGeneratingParcelas} className="gap-2">
+              {isGeneratingParcelas ? <Loader2 className="animate-spin" size={18} /> : <Layers size={18} />}
+              Gerar parcelas
+            </Button>
+          </div>
+
+          <div className="mt-4 rounded-lg border border-gray-200 overflow-hidden">
+            <div className="bg-gray-50 px-4 py-2 text-xs font-semibold text-gray-600 uppercase">
+              Parcelas ({parcelas.length})
+            </div>
+            <div className="max-h-[280px] overflow-auto bg-white">
+              {parcelasLoading ? (
+                <div className="p-6 flex items-center justify-center text-sm text-gray-500">
+                  <Loader2 className="animate-spin mr-2" size={18} />
+                  Carregando parcelas…
+                </div>
+              ) : parcelas.length === 0 ? (
+                <div className="p-4 text-sm text-gray-600">
+                  Nenhuma parcela gerada ainda. Use “Gerar parcelas” acima.
+                </div>
+              ) : (
+                <table className="min-w-full divide-y divide-gray-200">
+                  <thead className="bg-white sticky top-0">
+                    <tr>
+                      <th className="px-4 py-2 text-left text-xs font-semibold text-gray-500 uppercase">#</th>
+                      <th className="px-4 py-2 text-left text-xs font-semibold text-gray-500 uppercase">Vencimento</th>
+                      <th className="px-4 py-2 text-right text-xs font-semibold text-gray-500 uppercase">Valor</th>
+                      <th className="px-4 py-2 text-left text-xs font-semibold text-gray-500 uppercase">Status</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-200">
+                    {parcelas.map((p) => (
+                      <tr key={p.id} className="hover:bg-gray-50">
+                        <td className="px-4 py-2 text-sm text-gray-800">{p.numero_parcela}</td>
+                        <td className="px-4 py-2 text-sm text-gray-800">
+                          {new Date(`${p.vencimento}T00:00:00`).toLocaleDateString('pt-BR')}
+                        </td>
+                        <td className="px-4 py-2 text-sm text-gray-800 text-right">
+                          {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Number(p.valor || 0))}
+                        </td>
+                        <td className="px-4 py-2 text-sm text-gray-700">
+                          {p.status === 'paga' ? 'Paga' : p.status === 'cancelada' ? 'Cancelada' : 'Aberta'}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+            </div>
+          </div>
+
+          <div className="mt-5 flex justify-end gap-2">
+            <Button type="button" variant="outline" onClick={() => setParcelasDialogOpen(false)}>
+              Fechar
+            </Button>
+            <Button
+              type="button"
+              onClick={handleGerarContasPorParcelas}
+              disabled={isGeneratingContasParcelas || parcelas.length === 0}
+              className="gap-2"
+            >
+              {isGeneratingContasParcelas ? <Loader2 className="animate-spin" size={18} /> : <FileText size={18} />}
+              Gerar contas por parcelas
             </Button>
           </div>
         </DialogContent>
