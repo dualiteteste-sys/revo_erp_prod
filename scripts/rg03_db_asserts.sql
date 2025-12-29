@@ -40,6 +40,46 @@ begin
     raise exception 'RG-03: role authenticated sem SELECT em public.pessoas (causa 403 em parceiros/RPCs).';
   end if;
 
+  -- 4.1) MVP Menu: tabelas/perm/grants (evita 403/404 nos novos módulos)
+  if not exists (select 1 from public.permissions where module='vendedores' and action='view') then
+    raise exception 'RG-03: permissão vendedores:view ausente (MVP menu).';
+  end if;
+  if not exists (select 1 from public.permissions where module='suporte' and action='view') then
+    raise exception 'RG-03: permissão suporte:view ausente (MVP menu).';
+  end if;
+
+  if to_regclass('public.vendedores') is null then
+    raise exception 'RG-03: tabela public.vendedores ausente (MVP menu).';
+  end if;
+  if to_regclass('public.vendas_expedicoes') is null then
+    raise exception 'RG-03: tabela public.vendas_expedicoes ausente (MVP menu).';
+  end if;
+  if to_regclass('public.vendas_automacoes') is null then
+    raise exception 'RG-03: tabela public.vendas_automacoes ausente (MVP menu).';
+  end if;
+  if to_regclass('public.vendas_devolucoes') is null then
+    raise exception 'RG-03: tabela public.vendas_devolucoes ausente (MVP menu).';
+  end if;
+  if to_regclass('public.vendas_devolucao_itens') is null then
+    raise exception 'RG-03: tabela public.vendas_devolucao_itens ausente (MVP menu).';
+  end if;
+  if to_regclass('public.servicos_contratos') is null then
+    raise exception 'RG-03: tabela public.servicos_contratos ausente (MVP menu).';
+  end if;
+  if to_regclass('public.servicos_notas') is null then
+    raise exception 'RG-03: tabela public.servicos_notas ausente (MVP menu).';
+  end if;
+  if to_regclass('public.servicos_cobrancas') is null then
+    raise exception 'RG-03: tabela public.servicos_cobrancas ausente (MVP menu).';
+  end if;
+
+  if not has_table_privilege('authenticated', 'public.vendedores', 'select') then
+    raise exception 'RG-03: role authenticated sem SELECT em public.vendedores (MVP menu).';
+  end if;
+  if not has_table_privilege('authenticated', 'public.servicos_contratos', 'select') then
+    raise exception 'RG-03: role authenticated sem SELECT em public.servicos_contratos (MVP menu).';
+  end if;
+
   -- 5) IND-03: Gerar Execução deve aceitar roteiro tipo_bom='ambos' (evita erro em OP/OB sem roteiro específico)
   IF to_regprocedure('public.industria_ordem_gerar_execucao(uuid, uuid)') IS NOT NULL THEN
     <<ind03>>

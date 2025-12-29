@@ -81,6 +81,24 @@ const RecebimentoManualPage = lazyImport(() => import("../pages/suprimentos/Rece
 // Vendas Pages
 const PedidosVendasPage = lazyImport(() => import("../pages/vendas/PedidosVendasPage"));
 const CrmPage = lazyImport(() => import("../pages/vendas/crm/CrmPage"));
+const PropostasPage = lazyImport(() => import("../pages/vendas/PropostasPage"));
+const PdvPage = lazyImport(() => import("../pages/vendas/PdvPage"));
+const ExpedicaoPage = lazyImport(() => import("../pages/vendas/ExpedicaoPage"));
+const ComissoesPage = lazyImport(() => import("../pages/vendas/ComissoesPage"));
+const AutomacoesVendasPage = lazyImport(() => import("../pages/vendas/AutomacoesVendasPage"));
+const DevolucoesPage = lazyImport(() => import("../pages/vendas/DevolucoesPage"));
+const RelatoriosVendasPage = lazyImport(() => import("../pages/vendas/RelatoriosVendasPage"));
+
+// Cadastros extras
+const VendedoresPage = lazyImport(() => import("../pages/cadastros/VendedoresPage"));
+
+// Serviços (Contratos/Notas/Cobranças)
+const ContratosServicosPage = lazyImport(() => import("../pages/servicos/ContratosPage"));
+const NotasServicoPage = lazyImport(() => import("../pages/servicos/NotasServicoPage"));
+const CobrancasServicosPage = lazyImport(() => import("../pages/servicos/CobrancasServicosPage"));
+
+// Suporte
+const SuportePage = lazyImport(() => import("../pages/support/SuportePage"));
 
 export const appRoutes: RouteObject[] = [
     {
@@ -111,6 +129,14 @@ export const appRoutes: RouteObject[] = [
             { path: "cadastros/grupos-produtos", element: <Suspense fallback={<PageLoader />}><GrupoProdutosPage /></Suspense> },
             { path: "cadastros/unidades-medida", element: <Suspense fallback={<PageLoader />}><UnidadesPage /></Suspense> },
             { path: "cadastros/embalagens", element: <Suspense fallback={<PageLoader />}><EmbalagensPage /></Suspense> },
+            {
+              path: "cadastros/vendedores",
+              element: (
+                <RequirePermission permission={{ domain: "vendedores", action: "view" }}>
+                  <Suspense fallback={<PageLoader />}><VendedoresPage /></Suspense>
+                </RequirePermission>
+              ),
+            },
 
             // Indústria
             { path: "industria/qualidade/motivos", element: <PlanGuard feature="industria"><Suspense fallback={<PageLoader />}><MotivosRefugoPage /></Suspense></PlanGuard> },
@@ -138,6 +164,62 @@ export const appRoutes: RouteObject[] = [
             { path: "vendas/metas", element: <Suspense fallback={<PageLoader />}><SalesGoalsPage /></Suspense> },
             { path: "vendas/pedidos", element: <Suspense fallback={<PageLoader />}><PedidosVendasPage /></Suspense> },
             { path: "vendas/crm", element: <Suspense fallback={<PageLoader />}><CrmPage /></Suspense> },
+            {
+              path: "vendas/propostas",
+              element: (
+                <RequirePermission permission={{ domain: "vendas", action: "view" }}>
+                  <Suspense fallback={<PageLoader />}><PropostasPage /></Suspense>
+                </RequirePermission>
+              ),
+            },
+            {
+              path: "vendas/pdv",
+              element: (
+                <RequirePermission permission={{ domain: "vendas", action: "view" }}>
+                  <Suspense fallback={<PageLoader />}><PdvPage /></Suspense>
+                </RequirePermission>
+              ),
+            },
+            {
+              path: "vendas/expedicao",
+              element: (
+                <RequirePermission permission={{ domain: "vendas", action: "view" }}>
+                  <Suspense fallback={<PageLoader />}><ExpedicaoPage /></Suspense>
+                </RequirePermission>
+              ),
+            },
+            {
+              path: "vendas/comissoes",
+              element: (
+                <RequirePermission permission={{ domain: "vendas", action: "view" }}>
+                  <Suspense fallback={<PageLoader />}><ComissoesPage /></Suspense>
+                </RequirePermission>
+              ),
+            },
+            {
+              path: "vendas/automacoes",
+              element: (
+                <RequirePermission permission={{ domain: "vendas", action: "view" }}>
+                  <Suspense fallback={<PageLoader />}><AutomacoesVendasPage /></Suspense>
+                </RequirePermission>
+              ),
+            },
+            {
+              path: "vendas/devolucoes",
+              element: (
+                <RequirePermission permission={{ domain: "vendas", action: "view" }}>
+                  <Suspense fallback={<PageLoader />}><DevolucoesPage /></Suspense>
+                </RequirePermission>
+              ),
+            },
+            {
+              path: "vendas/relatorios",
+              element: (
+                <RequirePermission permission={{ domain: "vendas", action: "view" }}>
+                  <Suspense fallback={<PageLoader />}><RelatoriosVendasPage /></Suspense>
+                </RequirePermission>
+              ),
+            },
 
             // Relatórios (Central)
             { path: "relatorios", element: <Suspense fallback={<PageLoader />}><RelatoriosHubPage /></Suspense> },
@@ -161,6 +243,40 @@ export const appRoutes: RouteObject[] = [
                     <Suspense fallback={<PageLoader />}><OsRelatoriosPage /></Suspense>
                   </RequirePermission>
                 </PlanGuard>
+              ),
+            },
+            {
+              path: "servicos/contratos",
+              element: (
+                <PlanGuard feature="servicos">
+                  <Suspense fallback={<PageLoader />}><ContratosServicosPage /></Suspense>
+                </PlanGuard>
+              ),
+            },
+            {
+              path: "servicos/notas",
+              element: (
+                <PlanGuard feature="servicos">
+                  <Suspense fallback={<PageLoader />}><NotasServicoPage /></Suspense>
+                </PlanGuard>
+              ),
+            },
+            {
+              path: "servicos/cobrancas",
+              element: (
+                <PlanGuard feature="servicos">
+                  <Suspense fallback={<PageLoader />}><CobrancasServicosPage /></Suspense>
+                </PlanGuard>
+              ),
+            },
+
+            // Suporte
+            {
+              path: "suporte",
+              element: (
+                <RequirePermission permission={{ domain: "suporte", action: "view" }}>
+                  <Suspense fallback={<PageLoader />}><SuportePage /></Suspense>
+                </RequirePermission>
               ),
             },
 
