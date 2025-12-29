@@ -14,6 +14,33 @@ function formatBRL(value: number) {
   return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value || 0);
 }
 
+function downloadTextFile(filename: string, content: string, mime = 'text/plain;charset=utf-8') {
+  const blob = new Blob([content], { type: mime });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+}
+
+function toCsv(rows: (string | number | null | undefined)[][]) {
+  const escape = (value: string) => `"${value.replace(/"/g, '""')}"`;
+  return rows
+    .map((row) =>
+      row
+        .map((cell) => {
+          if (cell === null || cell === undefined) return '';
+          if (typeof cell === 'number') return String(cell);
+          return escape(String(cell));
+        })
+        .join(';')
+    )
+    .join('\n');
+}
+
 function toDateOrNull(value: string): Date | null {
   if (!value) return null;
   const d = new Date(`${value}T00:00:00`);
@@ -106,6 +133,28 @@ export default function RelatoriosFinanceiroPage() {
     ? `${data.periodo.inicio} → ${data.periodo.fim}`
     : '—';
 
+  const handleExportCsv = () => {
+    if (!data) return;
+    const rows: (string | number | null | undefined)[][] = [
+      ['Periodo', data.periodo?.inicio, data.periodo?.fim],
+      [],
+      ['KPIs — Receber', 'total_pendente', data.receber.total_pendente],
+      ['KPIs — Receber', 'total_vencido', data.receber.total_vencido],
+      ['KPIs — Receber', 'total_pago', data.receber.total_pago],
+      ['KPIs — Pagar', 'total_aberta', data.pagar.total_aberta],
+      ['KPIs — Pagar', 'total_parcial', data.pagar.total_parcial],
+      ['KPIs — Pagar', 'total_paga', data.pagar.total_paga],
+      ['KPIs — Caixa', 'contas_ativas', data.caixa.contas_ativas],
+      ['KPIs — Caixa', 'saldo_total', data.caixa.saldo_total],
+      [],
+      ['Serie', 'mes', 'entradas', 'saidas', 'receber_pago', 'pagar_pago'],
+      ...series.map((s) => ['serie', s.mes, s.entradas, s.saidas, s.receber_pago, s.pagar_pago]),
+    ];
+    const csv = toCsv(rows);
+    const filename = `financeiro_relatorios_${data.periodo.inicio}_${data.periodo.fim}.csv`;
+    downloadTextFile(filename, csv, 'text/csv;charset=utf-8');
+  };
+
   return (
     <div className="p-1 h-full flex flex-col gap-4">
       <PageHeader
@@ -129,6 +178,10 @@ export default function RelatoriosFinanceiroPage() {
             <Button onClick={() => navigate('/app/servicos/relatorios')} variant="outline" className="gap-2">
               <FileText size={16} />
               Relatórios de Serviços
+            </Button>
+            <Button onClick={handleExportCsv} variant="outline" className="gap-2" disabled={!data || loading}>
+              <FileText size={16} />
+              Exportar CSV
             </Button>
             <Button onClick={fetchData} variant="outline" className="gap-2">
               <RefreshCw size={16} />

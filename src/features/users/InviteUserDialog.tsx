@@ -20,7 +20,7 @@ type Props = {
 export function InviteUserDialog({ onClose, onInviteSent }: Props) {
   const { addToast } = useToast();
   const [email, setEmail] = React.useState("");
-  const [role, setRole] = React.useState("READONLY");
+  const [role, setRole] = React.useState("VIEWER");
   const [loading, setLoading] = React.useState(false);
   const [errors, setErrors] = React.useState<{ email?: string; role?: string }>({});
   const [dialogError, setDialogError] = React.useState<string | null>(null);
@@ -82,7 +82,8 @@ export function InviteUserDialog({ onClose, onInviteSent }: Props) {
 
       <div>
         <Select label="Papel" id="role" value={role} onChange={(e) => setRole(e.target.value)}>
-          <option value="READONLY">Leitura</option>
+          <option value="VIEWER">Leitura</option>
+          <option value="MEMBER">Membro</option>
           <option value="OPS">Operações</option>
           <option value="FINANCE">Financeiro</option>
           <option value="ADMIN">Admin</option>

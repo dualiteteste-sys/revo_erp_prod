@@ -11,6 +11,7 @@ const COLUMNS: { id: StatusProducao; title: string }[] = [
   { id: 'em_producao', title: 'Em Produção' },
   { id: 'em_inspecao', title: 'Em Inspeção' },
   { id: 'concluida', title: 'Concluída' },
+  { id: 'cancelada', title: 'Cancelada' },
 ];
 
 type Props = {
@@ -52,6 +53,14 @@ const ProducaoKanbanBoard: React.FC<Props> = ({ search, statusFilter, refreshTok
     const newStatus = destination.droppableId as StatusProducao;
     const item = items.find(i => i.id === draggableId);
     if (!item) return;
+    if ((item.status as any) === 'concluida' || (item.status as any) === 'cancelada') {
+      addToast('OPs concluídas/canceladas não podem ser movidas.', 'warning');
+      return;
+    }
+    if ((newStatus as any) === 'concluida' || (newStatus as any) === 'cancelada') {
+      addToast('Para concluir/cancelar, use a tela da ordem (wizard).', 'warning');
+      return;
+    }
 
     // Optimistic Update
     const updatedItems = items.map(i => 
@@ -95,6 +104,7 @@ const ProducaoKanbanBoard: React.FC<Props> = ({ search, statusFilter, refreshTok
             items={getItemsForColumn(col.id)}
             onOpenOrder={onOpenOrder as any}
             onCloneOrder={onCloneOrder as any}
+            isDropDisabled={(col.id as any) === 'concluida' || (col.id as any) === 'cancelada'}
           />
         ))}
       </div>

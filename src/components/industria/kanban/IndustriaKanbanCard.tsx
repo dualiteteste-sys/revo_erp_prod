@@ -1,7 +1,7 @@
 import React from 'react';
 import { Draggable } from '@hello-pangea/dnd';
 import { OrdemIndustria, StatusOrdem } from '@/services/industria';
-import { User, Calendar, Package, Pencil, MoreVertical, ArrowUp, ArrowDown, CheckCircle2, Copy } from 'lucide-react';
+import { User, Calendar, Package, Pencil, Eye, MoreVertical, ArrowUp, ArrowDown, CheckCircle2, Copy } from 'lucide-react';
 import { formatOrderNumber } from '@/lib/utils';
 import {
   DropdownMenu,
@@ -24,23 +24,34 @@ interface Props {
   onCloneOrder?: (order: OrdemIndustria) => void;
 }
 
-const STATUS_OPTIONS: { id: StatusOrdem; label: string }[] = [
+const STATUS_OPTIONS_INDUSTRIALIZACAO: { id: StatusOrdem; label: string }[] = [
   { id: 'planejada', label: 'Planejada' },
   { id: 'em_programacao', label: 'Em Programação' },
   { id: 'em_producao', label: 'Em Produção' },
   { id: 'em_inspecao', label: 'Em Inspeção' },
   { id: 'parcialmente_concluida', label: 'Parcialmente Concluída' },
-  { id: 'concluida', label: 'Concluída' },
 ];
 
 const IndustriaKanbanCard: React.FC<Props> = ({ item, index, onOpenOrder, onQuickStatus, onQuickPriority, onCloneOrder }) => {
+  const isLocked = item.status === 'concluida' || item.status === 'cancelada';
+  const statusOptions: { id: StatusOrdem; label: string }[] =
+    item.tipo_ordem === 'beneficiamento'
+      ? [
+          { id: 'rascunho', label: 'Rascunho' },
+          { id: 'planejada', label: 'Planejada' },
+          { id: 'aguardando_material', label: 'Aguardando Material' },
+          { id: 'em_programacao', label: 'Em Programação' },
+          { id: 'em_beneficiamento', label: 'Em Beneficiamento' },
+          { id: 'parcialmente_entregue', label: 'Parcialmente Entregue' },
+        ]
+      : STATUS_OPTIONS_INDUSTRIALIZACAO;
   return (
-    <Draggable draggableId={item.id} index={index}>
+    <Draggable draggableId={item.id} index={index} isDragDisabled={isLocked}>
       {(provided, snapshot) => (
         <div
           ref={provided.innerRef}
           {...provided.draggableProps}
-          {...provided.dragHandleProps}
+          {...(isLocked ? {} : provided.dragHandleProps)}
           className={`p-3 mb-2 bg-white rounded-lg shadow-sm border border-gray-200 hover:shadow-md transition-shadow ${snapshot.isDragging ? 'shadow-lg ring-2 ring-blue-400 rotate-2' : ''}`}
         >
           <div className="flex justify-between items-start mb-1">
@@ -58,9 +69,9 @@ const IndustriaKanbanCard: React.FC<Props> = ({ item, index, onOpenOrder, onQuic
                     onOpenOrder(item);
                   }}
                   className="p-1 rounded-md text-gray-500 hover:text-blue-700 hover:bg-blue-50"
-                  title="Abrir ordem"
+                  title={isLocked ? 'Visualizar ordem' : 'Abrir ordem'}
                 >
-                  <Pencil size={14} />
+                  {isLocked ? <Eye size={14} /> : <Pencil size={14} />}
                 </button>
               )}
               {(onQuickStatus || onQuickPriority) && (
@@ -86,7 +97,7 @@ const IndustriaKanbanCard: React.FC<Props> = ({ item, index, onOpenOrder, onQuic
                         }}
                       >
                         <Pencil className="mr-2 h-4 w-4" />
-                        Abrir
+                        {isLocked ? 'Visualizar' : 'Abrir'}
                       </DropdownMenuItem>
                     )}
                     {onCloneOrder && (
@@ -108,6 +119,7 @@ const IndustriaKanbanCard: React.FC<Props> = ({ item, index, onOpenOrder, onQuic
                             e.preventDefault();
                             onQuickPriority(item, -1);
                           }}
+                          disabled={isLocked}
                         >
                           <ArrowUp className="mr-2 h-4 w-4" />
                           Aumentar prioridade
@@ -117,6 +129,7 @@ const IndustriaKanbanCard: React.FC<Props> = ({ item, index, onOpenOrder, onQuic
                             e.preventDefault();
                             onQuickPriority(item, +1);
                           }}
+                          disabled={isLocked}
                         >
                           <ArrowDown className="mr-2 h-4 w-4" />
                           Reduzir prioridade
@@ -132,13 +145,14 @@ const IndustriaKanbanCard: React.FC<Props> = ({ item, index, onOpenOrder, onQuic
                             Mudar status
                           </DropdownMenuSubTrigger>
                           <DropdownMenuSubContent>
-                            {STATUS_OPTIONS.map((s) => (
+                            {statusOptions.map((s) => (
                               <DropdownMenuItem
                                 key={s.id}
                                 onSelect={(e) => {
                                   e.preventDefault();
                                   onQuickStatus(item, s.id);
                                 }}
+                                disabled={isLocked}
                               >
                                 {s.label}
                               </DropdownMenuItem>

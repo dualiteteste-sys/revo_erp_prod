@@ -37,6 +37,17 @@ export async function createContaAReceberFromOs(params: { osId: string; dataVenc
   }
 }
 
+export async function createContasAReceberFromOsParcelas(osId: string): Promise<ContaAReceber[]> {
+  try {
+    return await callRpc<ContaAReceber[]>('financeiro_contas_a_receber_from_os_parcelas_create', {
+      p_os_id: osId,
+    });
+  } catch (error: any) {
+    console.error('[SERVICE][CREATE_CONTAS_A_RECEBER_FROM_OS_PARCELAS]', error);
+    throw new Error(error.message || 'Erro ao gerar contas a receber (parcelas) a partir da OS.');
+  }
+}
+
 export async function listContasAReceber(options: {
     page: number;
     pageSize: number;
@@ -125,6 +136,48 @@ export async function receberContaAReceber(params: {
   } catch (error: any) {
     console.error('[SERVICE][RECEBER_CONTA_A_RECEBER]', error);
     throw new Error(error.message || 'Erro ao registrar recebimento.');
+  }
+}
+
+export async function cancelarContaAReceber(params: { id: string; motivo?: string | null }): Promise<ContaAReceber> {
+  try {
+    return await callRpc<ContaAReceber>('financeiro_conta_a_receber_cancelar', {
+      p_id: params.id,
+      p_motivo: params.motivo ?? null,
+    });
+  } catch (error: any) {
+    console.error('[SERVICE][CANCELAR_CONTA_A_RECEBER]', error);
+    throw new Error(error.message || 'Erro ao cancelar a conta.');
+  }
+}
+
+export async function estornarContaAReceber(params: {
+  id: string;
+  dataEstorno?: string | null;
+  contaCorrenteId?: string | null;
+  motivo?: string | null;
+}): Promise<ContaAReceber> {
+  try {
+    try {
+      return await callRpc<ContaAReceber>('financeiro_conta_a_receber_estornar_v2', {
+        p_id: params.id,
+        p_data_estorno: params.dataEstorno ?? null,
+        p_conta_corrente_id: params.contaCorrenteId ?? null,
+        p_motivo: params.motivo ?? null,
+      });
+    } catch (e: any) {
+      const msg = String(e?.message || '');
+      if (!msg.includes('Could not find the function') && !msg.includes('PGRST202')) {
+        throw e;
+      }
+      return await callRpc<ContaAReceber>('financeiro_conta_a_receber_estornar', {
+        p_id: params.id,
+        p_data_estorno: params.dataEstorno ?? null,
+      });
+    }
+  } catch (error: any) {
+    console.error('[SERVICE][ESTORNAR_CONTA_A_RECEBER]', error);
+    throw new Error(error.message || 'Erro ao estornar o recebimento.');
   }
 }
 

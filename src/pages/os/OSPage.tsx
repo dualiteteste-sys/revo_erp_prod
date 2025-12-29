@@ -17,6 +17,7 @@ import SearchField from '@/components/ui/forms/SearchField';
 import { Button } from '@/components/ui/button';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useConfirm } from '@/contexts/ConfirmProvider';
+import { useHasPermission } from '@/hooks/useHasPermission';
 
 const OSPage: React.FC = () => {
   const {
@@ -39,6 +40,10 @@ const OSPage: React.FC = () => {
   const { addToast } = useToast();
   const { confirm } = useConfirm();
   const navigate = useNavigate();
+  const permCreate = useHasPermission('os', 'create');
+  const permUpdate = useHasPermission('os', 'update');
+  const permDelete = useHasPermission('os', 'delete');
+  const permReports = useHasPermission('relatorios_servicos', 'view');
 
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [selectedOs, setSelectedOs] = useState<osService.OrdemServicoDetails | null>(null);
@@ -169,6 +174,10 @@ const OSPage: React.FC = () => {
   
   const onDragEnd = async (result: DropResult) => {
     if (!result.destination) return;
+    if (!permUpdate.data) {
+      addToast('Você não tem permissão para reordenar O.S.', 'warning');
+      return;
+    }
 
     const startIndex = result.source.index;
     const endIndex = result.destination.index;
@@ -189,17 +198,21 @@ const OSPage: React.FC = () => {
         icon={<ClipboardCheck className="w-5 h-5" />}
         actions={
           <>
-            <Button onClick={() => navigate('/app/servicos/relatorios')} variant="outline" className="gap-2">
-              Relatórios
-            </Button>
+            {permReports.data ? (
+              <Button onClick={() => navigate('/app/servicos/relatorios')} variant="outline" className="gap-2">
+                Relatórios
+              </Button>
+            ) : null}
             <Button onClick={() => setIsKanbanModalOpen(true)} variant="outline" className="gap-2">
               <LayoutGrid size={18} />
               Agenda
             </Button>
-            <Button onClick={() => handleOpenForm()} className="gap-2">
-              <PlusCircle size={18} />
-              Nova O.S.
-            </Button>
+            {permCreate.data ? (
+              <Button onClick={() => handleOpenForm()} className="gap-2">
+                <PlusCircle size={18} />
+                Nova O.S.
+              </Button>
+            ) : null}
           </>
         }
       />
@@ -247,6 +260,8 @@ const OSPage: React.FC = () => {
               onSetStatus={handleSetStatus}
               sortBy={sortBy}
               onSort={handleSort}
+              canUpdate={permUpdate.data}
+              canDelete={permDelete.data}
             />
           </DragDropContext>
         )}
@@ -277,7 +292,7 @@ const OSPage: React.FC = () => {
         variant="danger"
       />
       
-      <OsKanbanModal isOpen={isKanbanModalOpen} onClose={() => setIsKanbanModalOpen(false)} />
+      <OsKanbanModal isOpen={isKanbanModalOpen} onClose={() => setIsKanbanModalOpen(false)} canUpdate={permUpdate.data} />
     </div>
   );
 };

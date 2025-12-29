@@ -13,9 +13,10 @@ type UsersFiltersProps = {
 const roleOptions: { value: UserRole; label: string }[] = [
   { value: 'OWNER', label: 'Proprietário' },
   { value: 'ADMIN', label: 'Admin' },
+  { value: 'MEMBER', label: 'Membro' },
   { value: 'FINANCE', label: 'Financeiro' },
   { value: 'OPS', label: 'Operações' },
-  { value: 'READONLY', label: 'Somente Leitura' },
+  { value: 'VIEWER', label: 'Somente Leitura' },
 ];
 
 const statusOptions: { value: UserStatus; label: string }[] = [

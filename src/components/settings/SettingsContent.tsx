@@ -6,6 +6,9 @@ import DataManagementContent from './data-management/DataManagementContent';
 import RolesPage from '@/pages/settings/roles/RolesPage';
 import UsersPage from '@/pages/settings/general/UsersPage';
 import NfeEmissaoSettings from '@/components/settings/fiscal/NfeEmissaoSettings';
+import AuditLogsPage from '@/components/settings/audit/AuditLogsPage';
+import OnboardingChecklistPage from '@/components/settings/onboarding/OnboardingChecklistPage';
+import FeatureFlagsPage from '@/components/settings/feature-flags/FeatureFlagsPage';
 
 interface SettingsContentProps {
   activeItem: string;
@@ -16,6 +19,8 @@ const SettingsContent: React.FC<SettingsContentProps> = ({ activeItem }) => {
     switch (activeItem) {
       case 'Empresa':
         return <CompanySettingsForm />;
+      case 'Onboarding (Checklist)':
+        return <OnboardingChecklistPage />;
       case 'Usuários':
         return <UsersPage />;
       case 'Papéis e Permissões':
@@ -26,6 +31,10 @@ const SettingsContent: React.FC<SettingsContentProps> = ({ activeItem }) => {
         return <NfeEmissaoSettings />;
       case 'Limpeza de Dados':
         return <DataManagementContent />;
+      case 'Feature Flags':
+        return <FeatureFlagsPage />;
+      case 'Auditoria':
+        return <AuditLogsPage />;
       default:
         return (
           <div>

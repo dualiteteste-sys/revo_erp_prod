@@ -83,6 +83,8 @@ export type ImportarExtratoPayload = {
   valor: number;
   saldo_apos_lancamento?: number;
   identificador_banco?: string;
+  hash_importacao?: string;
+  linha_bruta?: string;
 };
 
 // --- Contas Correntes ---

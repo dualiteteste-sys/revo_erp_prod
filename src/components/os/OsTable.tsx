@@ -20,6 +20,8 @@ interface OsTableProps {
   onSetStatus: (os: OrdemServico, next: Database['public']['Enums']['status_os']) => void;
   sortBy: { column: keyof OrdemServico; ascending: boolean };
   onSort: (column: keyof OrdemServico) => void;
+  canUpdate?: boolean;
+  canDelete?: boolean;
 }
 
 const statusConfig: Record<Database['public']['Enums']['status_os'], { label: string; color: string }> = {
@@ -54,7 +56,7 @@ const SortableHeader: React.FC<{
   );
 };
 
-const OsTable: React.FC<OsTableProps> = ({ serviceOrders, onEdit, onDelete, onOpenAgenda, onSetStatus, sortBy, onSort }) => {
+const OsTable: React.FC<OsTableProps> = ({ serviceOrders, onEdit, onDelete, onOpenAgenda, onSetStatus, sortBy, onSort, canUpdate = true, canDelete = true }) => {
   const formatDate = (value?: string | null) => (value ? new Date(value).toLocaleDateString('pt-BR') : '—');
   const formatTime = (value?: string | null) => (value ? String(value).slice(0, 5) : '');
 
@@ -77,7 +79,7 @@ const OsTable: React.FC<OsTableProps> = ({ serviceOrders, onEdit, onDelete, onOp
                 <tbody ref={provided.innerRef} {...provided.droppableProps} className="bg-white divide-y divide-gray-200">
                     <AnimatePresence>
                         {serviceOrders.map((os, index) => (
-                            <Draggable key={os.id} draggableId={os.id} index={index}>
+                            <Draggable key={os.id} draggableId={os.id} index={index} isDragDisabled={!canUpdate}>
                                 {(provided, snapshot) => (
                                     <motion.tr
                                         ref={provided.innerRef}
@@ -88,8 +90,11 @@ const OsTable: React.FC<OsTableProps> = ({ serviceOrders, onEdit, onDelete, onOp
                                         transition={{ duration: 0.3 }}
                                         className={`hover:bg-gray-50 ${snapshot.isDragging ? 'bg-blue-50 shadow-lg' : ''}`}
                                     >
-                                        <td className="px-2 py-4 whitespace-nowrap text-sm text-gray-400 cursor-grab" {...provided.dragHandleProps}>
-                                            <GripVertical className="mx-auto" />
+                                        <td
+                                          className={`px-2 py-4 whitespace-nowrap text-sm text-gray-400 ${canUpdate ? 'cursor-grab' : 'cursor-default opacity-50'}`}
+                                          {...(canUpdate ? provided.dragHandleProps : {})}
+                                        >
+                                          <GripVertical className="mx-auto" />
                                         </td>
                                         <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{os.numero}</td>
                                         <td className="px-6 py-4 whitespace-normal">
@@ -143,19 +148,19 @@ const OsTable: React.FC<OsTableProps> = ({ serviceOrders, onEdit, onDelete, onOp
                                                   Abrir Agenda
                                                 </DropdownMenuItem>
                                                 <DropdownMenuSeparator />
-                                                <DropdownMenuItem onClick={() => onSetStatus(os, 'orcamento')} className="gap-2">
+                                                <DropdownMenuItem onClick={() => onSetStatus(os, 'orcamento')} className="gap-2" disabled={!canUpdate}>
                                                   <ClipboardCheck size={16} />
                                                   Marcar como Orçamento
                                                 </DropdownMenuItem>
-                                                <DropdownMenuItem onClick={() => onSetStatus(os, 'aberta')} className="gap-2">
+                                                <DropdownMenuItem onClick={() => onSetStatus(os, 'aberta')} className="gap-2" disabled={!canUpdate}>
                                                   <ClipboardCheck size={16} />
                                                   Marcar como Aberta
                                                 </DropdownMenuItem>
-                                                <DropdownMenuItem onClick={() => onSetStatus(os, 'concluida')} className="gap-2">
+                                                <DropdownMenuItem onClick={() => onSetStatus(os, 'concluida')} className="gap-2" disabled={!canUpdate}>
                                                   <CheckCircle2 size={16} />
                                                   Concluir
                                                 </DropdownMenuItem>
-                                                <DropdownMenuItem onClick={() => onSetStatus(os, 'cancelada')} className="gap-2">
+                                                <DropdownMenuItem onClick={() => onSetStatus(os, 'cancelada')} className="gap-2" disabled={!canUpdate}>
                                                   <XCircle size={16} />
                                                   Cancelar
                                                 </DropdownMenuItem>
@@ -163,7 +168,9 @@ const OsTable: React.FC<OsTableProps> = ({ serviceOrders, onEdit, onDelete, onOp
                                             </DropdownMenu>
 
                                             <button onClick={() => onEdit(os)} className="text-indigo-600 hover:text-indigo-900" title="Editar"><Edit size={18} /></button>
-                                            <button onClick={() => onDelete(os)} className="text-red-600 hover:text-red-900" title="Excluir"><Trash2 size={18} /></button>
+                                            {canDelete ? (
+                                              <button onClick={() => onDelete(os)} className="text-red-600 hover:text-red-900" title="Excluir"><Trash2 size={18} /></button>
+                                            ) : null}
                                         </div>
                                         </td>
                                     </motion.tr>

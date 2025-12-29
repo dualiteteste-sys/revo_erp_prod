@@ -11,9 +11,10 @@ interface Props {
   onQuickStatus?: (order: OrdemIndustria, status: StatusOrdem) => void;
   onQuickPriority?: (order: OrdemIndustria, delta: number) => void;
   onCloneOrder?: (order: OrdemIndustria) => void;
+  isDropDisabled?: boolean;
 }
 
-const IndustriaKanbanColumn: React.FC<Props> = ({ columnId, title, items, onOpenOrder, onQuickStatus, onQuickPriority, onCloneOrder }) => {
+const IndustriaKanbanColumn: React.FC<Props> = ({ columnId, title, items, onOpenOrder, onQuickStatus, onQuickPriority, onCloneOrder, isDropDisabled = false }) => {
   return (
     <div className="flex flex-col w-72 bg-gray-100/80 rounded-xl flex-shrink-0 h-full border border-gray-200/50">
       <div className="p-3 border-b border-gray-200 flex justify-between items-center">
@@ -22,7 +23,7 @@ const IndustriaKanbanColumn: React.FC<Props> = ({ columnId, title, items, onOpen
             {items.length}
         </span>
       </div>
-      <Droppable droppableId={columnId}>
+      <Droppable droppableId={columnId} isDropDisabled={isDropDisabled}>
         {(provided, snapshot) => (
           <div
             ref={provided.innerRef}

@@ -34,6 +34,7 @@ As suites são scripts em `package.json`:
 - OS (lista/criação): `e2e/os-smoke.spec.ts`
 - OS docs (upload/list): `e2e/os-docs-smoke.spec.ts`
 - Relatórios de OS/Serviços: `e2e/os-relatorios-smoke.spec.ts`
+- Happy path OS → Financeiro (Conta a Receber): `e2e/rg04-servicos-os-financeiro.spec.ts`
 
 ### Plano B — Indústria
 
@@ -62,4 +63,3 @@ Workflow: `E2E Release Gate (dev)` (`.github/workflows/e2e-release-gate-dev.yml:
 - Se você está trabalhando só em **Serviços**, rode `gate:servicos` localmente.
 - Se você está trabalhando só em **Indústria**, rode `gate:industria` localmente.
 - Antes de mergear para `main`, deixe o CI rodar `gate:all`.
-

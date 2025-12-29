@@ -1,4 +1,6 @@
-export type UserRole = 'OWNER' | 'ADMIN' | 'FINANCE' | 'OPS' | 'READONLY';
+// OBS: o banco usa slugs em public.roles (OWNER/ADMIN/MEMBER/OPS/FINANCE/VIEWER).
+// Mantemos 'READONLY' como alias legado (mapeado para VIEWER) para compatibilidade.
+export type UserRole = 'OWNER' | 'ADMIN' | 'FINANCE' | 'OPS' | 'MEMBER' | 'VIEWER' | 'READONLY';
 export type UserStatus = 'ACTIVE' | 'PENDING' | 'SUSPENDED' | 'INACTIVE';
 
 export type EmpresaUser = {

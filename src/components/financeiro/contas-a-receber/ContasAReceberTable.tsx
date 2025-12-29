@@ -1,13 +1,15 @@
 import React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ContaAReceber } from '@/services/contasAReceber';
-import { CheckCircle2, Edit, Trash2, ArrowUpDown } from 'lucide-react';
+import { CheckCircle2, Edit, Trash2, ArrowUpDown, Ban, RotateCcw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
 interface ContasAReceberTableProps {
   contas: ContaAReceber[];
   onEdit: (conta: ContaAReceber) => void;
   onReceive?: (conta: ContaAReceber) => void;
+  onCancel?: (conta: ContaAReceber) => void;
+  onReverse?: (conta: ContaAReceber) => void;
   onDelete: (conta: ContaAReceber) => void;
   sortBy: { column: string; ascending: boolean };
   onSort: (column: string) => void;
@@ -42,7 +44,16 @@ const SortableHeader: React.FC<{
   );
 };
 
-const ContasAReceberTable: React.FC<ContasAReceberTableProps> = ({ contas, onEdit, onReceive, onDelete, sortBy, onSort }) => {
+const ContasAReceberTable: React.FC<ContasAReceberTableProps> = ({
+  contas,
+  onEdit,
+  onReceive,
+  onCancel,
+  onReverse,
+  onDelete,
+  sortBy,
+  onSort,
+}) => {
   return (
     <div className="overflow-x-auto">
       <table className="min-w-full divide-y divide-gray-200">
@@ -90,6 +101,32 @@ const ContasAReceberTable: React.FC<ContasAReceberTableProps> = ({ contas, onEdi
                         className="text-emerald-600 hover:text-emerald-900"
                       >
                         <CheckCircle2 size={18} />
+                      </Button>
+                    ) : null}
+                    {onReverse && conta.status === 'pago' ? (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => onReverse(conta)}
+                        title="Estornar recebimento"
+                        aria-label="Estornar recebimento"
+                        className="text-amber-600 hover:text-amber-900"
+                      >
+                        <RotateCcw size={18} />
+                      </Button>
+                    ) : null}
+                    {onCancel && (conta.status === 'pendente' || conta.status === 'vencido') ? (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => onCancel(conta)}
+                        title="Cancelar"
+                        aria-label="Cancelar"
+                        className="text-gray-600 hover:text-gray-900"
+                      >
+                        <Ban size={18} />
                       </Button>
                     ) : null}
                     <Button

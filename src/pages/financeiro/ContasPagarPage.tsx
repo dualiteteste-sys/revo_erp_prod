@@ -10,6 +10,7 @@ import ContasPagarTable from '@/components/financeiro/contas-pagar/ContasPagarTa
 import ContasPagarFormPanel from '@/components/financeiro/contas-pagar/ContasPagarFormPanel';
 import ContasPagarSummary from '@/components/financeiro/contas-pagar/ContasPagarSummary';
 import BaixaRapidaModal from '@/components/financeiro/common/BaixaRapidaModal';
+import EstornoRecebimentoModal from '@/components/financeiro/common/EstornoRecebimentoModal';
 import Select from '@/components/ui/forms/Select';
 import DatePicker from '@/components/ui/DatePicker';
 import ErrorAlert from '@/components/ui/ErrorAlert';
@@ -44,10 +45,16 @@ const ContasPagarPage: React.FC = () => {
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [contaToDelete, setContaToDelete] = useState<financeiroService.ContaPagar | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [isCancelOpen, setIsCancelOpen] = useState(false);
+  const [canceling, setCanceling] = useState(false);
+  const [contaToCancel, setContaToCancel] = useState<financeiroService.ContaPagar | null>(null);
+  const [cancelMotivo, setCancelMotivo] = useState('');
   const [isFetchingDetails, setIsFetchingDetails] = useState(false);
   const [isSeeding, setIsSeeding] = useState(false);
   const [isBaixaOpen, setIsBaixaOpen] = useState(false);
   const [contaToPay, setContaToPay] = useState<financeiroService.ContaPagar | null>(null);
+  const [isEstornoOpen, setIsEstornoOpen] = useState(false);
+  const [contaToReverse, setContaToReverse] = useState<financeiroService.ContaPagar | null>(null);
 
   const handleOpenForm = async (conta: financeiroService.ContaPagar | null = null) => {
     if (conta?.id) {
@@ -84,6 +91,33 @@ const ContasPagarPage: React.FC = () => {
     setIsDeleteModalOpen(true);
   };
 
+  const handleOpenCancel = (conta: financeiroService.ContaPagar) => {
+    setContaToCancel(conta);
+    setCancelMotivo('');
+    setIsCancelOpen(true);
+  };
+
+  const handleCloseCancel = () => {
+    setIsCancelOpen(false);
+    setContaToCancel(null);
+    setCancelMotivo('');
+  };
+
+  const handleCancel = async () => {
+    if (!contaToCancel?.id) return;
+    setCanceling(true);
+    try {
+      await financeiroService.cancelarContaPagar({ id: contaToCancel.id, motivo: cancelMotivo || null });
+      addToast('Conta a pagar cancelada.', 'success');
+      refresh();
+      handleCloseCancel();
+    } catch (e: any) {
+      addToast(e?.message || 'Erro ao cancelar.', 'error');
+    } finally {
+      setCanceling(false);
+    }
+  };
+
   const handleCloseDeleteModal = () => {
     setIsDeleteModalOpen(false);
     setContaToDelete(null);
@@ -108,6 +142,16 @@ const ContasPagarPage: React.FC = () => {
     if (!conta?.id) return;
     setContaToPay(conta);
     setIsBaixaOpen(true);
+  };
+
+  const handleOpenReverse = (conta: financeiroService.ContaPagar) => {
+    setContaToReverse(conta);
+    setIsEstornoOpen(true);
+  };
+
+  const handleCloseReverse = () => {
+    setIsEstornoOpen(false);
+    setContaToReverse(null);
   };
 
   const handleCloseBaixa = () => {
@@ -240,6 +284,8 @@ const ContasPagarPage: React.FC = () => {
                 contas={contas}
                 onEdit={handleOpenForm}
                 onPay={handlePay}
+                onReverse={handleOpenReverse}
+                onCancel={handleOpenCancel}
                 onDelete={handleOpenDeleteModal}
                 sortBy={sortBy}
                 onSort={handleSort}
@@ -296,6 +342,60 @@ const ContasPagarPage: React.FC = () => {
           }
         }}
       />
+
+      <EstornoRecebimentoModal
+        isOpen={isEstornoOpen}
+        onClose={handleCloseReverse}
+        title="Estornar pagamento"
+        description={
+          contaToReverse?.descricao
+            ? `Estornar o pagamento da conta "${contaToReverse.descricao}"? O status voltará para aberta e será registrada uma movimentação de estorno.`
+            : 'Estornar pagamento?'
+        }
+        confirmLabel="Estornar"
+        defaultContaTipo="pagamentos"
+        onConfirm={async ({ contaCorrenteId, dataISO, motivo }) => {
+          if (!contaToReverse?.id) return;
+          await financeiroService.estornarContaPagar({
+            id: contaToReverse.id,
+            dataEstorno: dataISO,
+            contaCorrenteId,
+            motivo,
+          });
+          addToast('Estorno registrado com sucesso!', 'success');
+          refresh();
+        }}
+      />
+
+      <Modal isOpen={isCancelOpen} onClose={handleCloseCancel} title="Cancelar conta a pagar" size="md">
+        <div className="p-6 space-y-4">
+          <p className="text-sm text-gray-700">
+            Cancelar esta conta a pagar? Esta ação é recomendada apenas para contas <b>abertas/parciais</b>.
+            Para contas pagas, use <b>Estorno</b>.
+          </p>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Motivo (opcional)</label>
+            <textarea
+              value={cancelMotivo}
+              onChange={(e) => setCancelMotivo(e.target.value)}
+              rows={4}
+              className="w-full rounded-lg border border-gray-200 bg-white/70 p-3 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              placeholder="Ex.: lançamento duplicado / compra cancelada / ajuste administrativo..."
+            />
+          </div>
+
+          <div className="flex justify-end gap-2 pt-2">
+            <Button variant="outline" onClick={handleCloseCancel} disabled={canceling}>
+              Voltar
+            </Button>
+            <Button onClick={handleCancel} disabled={canceling} className="bg-gray-800 hover:bg-gray-900">
+              {canceling ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+              Cancelar conta
+            </Button>
+          </div>
+        </div>
+      </Modal>
 
       <ConfirmationModal
         isOpen={isDeleteModalOpen}

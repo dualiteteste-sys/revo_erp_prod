@@ -132,6 +132,92 @@ export async function deleteContaPagar(id: string): Promise<void> {
     }
 }
 
+export async function cancelarContaPagar(params: { id: string; motivo?: string | null }): Promise<void> {
+  try {
+    await callRpc('financeiro_conta_pagar_cancelar', {
+      p_id: params.id,
+      p_motivo: params.motivo ?? null,
+    });
+  } catch (error: any) {
+    console.error('[SERVICE][CANCELAR_CONTA_PAGAR]', error);
+    throw new Error(error.message || 'Erro ao cancelar a conta.');
+  }
+}
+
+export async function estornarContaPagar(params: {
+  id: string;
+  dataEstorno?: string | null;
+  contaCorrenteId?: string | null;
+  motivo?: string | null;
+}): Promise<void> {
+  try {
+    try {
+      await callRpc('financeiro_conta_pagar_estornar_v2', {
+        p_id: params.id,
+        p_data_estorno: params.dataEstorno ?? null,
+        p_conta_corrente_id: params.contaCorrenteId ?? null,
+        p_motivo: params.motivo ?? null,
+      });
+    } catch (e: any) {
+      const msg = String(e?.message || '');
+      if (!msg.includes('Could not find the function') && !msg.includes('PGRST202')) throw e;
+      await callRpc('financeiro_conta_pagar_estornar', {
+        p_id: params.id,
+        p_data_estorno: params.dataEstorno ?? null,
+      });
+    }
+  } catch (error: any) {
+    console.error('[SERVICE][ESTORNAR_CONTA_PAGAR]', error);
+    throw new Error(error.message || 'Erro ao estornar pagamento.');
+  }
+}
+
+export async function getContaPagarFromCompra(compraId: string): Promise<string | null> {
+  try {
+    const result = await callRpc<string | null>('financeiro_conta_a_pagar_from_compra_get', { p_compra_id: compraId });
+    return result || null;
+  } catch (error: any) {
+    console.error('[SERVICE][GET_CONTA_PAGAR_FROM_COMPRA]', error);
+    return null;
+  }
+}
+
+export async function createContaPagarFromCompra(params: { compraId: string; dataVencimento?: string | null }): Promise<string> {
+  try {
+    const id = await callRpc<string>('financeiro_conta_a_pagar_from_compra_create', {
+      p_compra_id: params.compraId,
+      p_data_vencimento: params.dataVencimento ?? null,
+    });
+    return id;
+  } catch (error: any) {
+    console.error('[SERVICE][CREATE_CONTA_PAGAR_FROM_COMPRA]', error);
+    throw new Error(error.message || 'Erro ao gerar conta a pagar a partir da compra.');
+  }
+}
+
+export async function getContaPagarFromRecebimento(recebimentoId: string): Promise<string | null> {
+  try {
+    const result = await callRpc<string | null>('financeiro_conta_a_pagar_from_recebimento_get', { p_recebimento_id: recebimentoId });
+    return result || null;
+  } catch (error: any) {
+    console.error('[SERVICE][GET_CONTA_PAGAR_FROM_RECEBIMENTO]', error);
+    return null;
+  }
+}
+
+export async function createContaPagarFromRecebimento(params: { recebimentoId: string; dataVencimento?: string | null }): Promise<string> {
+  try {
+    const id = await callRpc<string>('financeiro_conta_a_pagar_from_recebimento_create', {
+      p_recebimento_id: params.recebimentoId,
+      p_data_vencimento: params.dataVencimento ?? null,
+    });
+    return id;
+  } catch (error: any) {
+    console.error('[SERVICE][CREATE_CONTA_PAGAR_FROM_RECEBIMENTO]', error);
+    throw new Error(error.message || 'Erro ao gerar conta a pagar a partir do recebimento.');
+  }
+}
+
 export async function getContasPagarSummary(startDate?: Date | null, endDate?: Date | null): Promise<ContasPagarSummary> {
     try {
         const result = await callRpc<ContasPagarSummary>('financeiro_contas_pagar_summary', {
