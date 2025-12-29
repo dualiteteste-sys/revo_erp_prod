@@ -132,6 +132,15 @@ revoke all on function public.set_active_empresa_for_current_user(uuid) from pub
 grant execute on function public.set_active_empresa_for_current_user(uuid) to authenticated, service_role, postgres;
 
 -- 4) RPC: bootstrap de empresa (idempotente)
+-- Em alguns bancos antigos, essa função pode existir com um retorno diferente.
+-- `CREATE OR REPLACE` não permite mudar o return type, então garantimos DROP antes.
+drop function if exists public.secure_bootstrap_empresa_for_current_user(text, text);
+drop function if exists public.secure_bootstrap_empresa_for_current_user(text);
+drop function if exists public.secure_bootstrap_empresa_for_current_user();
+drop function if exists public.bootstrap_empresa_for_current_user(text, text);
+drop function if exists public.bootstrap_empresa_for_current_user(text);
+drop function if exists public.bootstrap_empresa_for_current_user();
+
 create or replace function public.bootstrap_empresa_for_current_user(
   p_razao_social text default null,
   p_fantasia text default null
@@ -220,4 +229,3 @@ grant select on table public.empresas to authenticated, service_role, postgres;
 select pg_notify('pgrst','reload schema');
 
 COMMIT;
-

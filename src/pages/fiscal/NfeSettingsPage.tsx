@@ -17,6 +17,7 @@ type NfeConfig = {
   empresa_id: string;
   provider_slug: string;
   ambiente: AmbienteNfe;
+  nfeio_company_id: string | null;
   webhook_secret_hint: string | null;
   observacoes: string | null;
 };
@@ -60,6 +61,7 @@ export default function NfeSettingsPage() {
   const canAdmin = empresaRoleQuery.isFetched && roleAtLeast(empresaRoleQuery.data, 'admin');
 
   const empresaId = activeEmpresa?.id;
+  const webhookUrl = `${(import.meta as any).env?.VITE_SUPABASE_URL}/functions/v1/nfeio-webhook`;
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -73,6 +75,11 @@ export default function NfeSettingsPage() {
   const [config, setConfig] = useState<NfeConfig | null>(null);
   const [emitente, setEmitente] = useState<NfeEmitente | null>(null);
   const [numeracao, setNumeracao] = useState<NfeNumeracao | null>(null);
+  const [disablementSerie, setDisablementSerie] = useState<string>('1');
+  const [disablementStart, setDisablementStart] = useState<string>('');
+  const [disablementEnd, setDisablementEnd] = useState<string>('');
+  const [disablementJust, setDisablementJust] = useState<string>('');
+  const [runningDisablement, setRunningDisablement] = useState(false);
 
   const canShow = useMemo(() => !!empresaId, [empresaId]);
 
@@ -91,7 +98,7 @@ export default function NfeSettingsPage() {
         supabase.from('empresa_feature_flags').select('nfe_emissao_enabled').eq('empresa_id', empresaId).maybeSingle(),
         supabase
           .from('fiscal_nfe_emissao_configs')
-          .select('id, empresa_id, provider_slug, ambiente, webhook_secret_hint, observacoes')
+          .select('id, empresa_id, provider_slug, ambiente, nfeio_company_id, webhook_secret_hint, observacoes')
           .eq('empresa_id', empresaId)
           .eq('provider_slug', 'NFE_IO')
           .maybeSingle(),
@@ -123,6 +130,7 @@ export default function NfeSettingsPage() {
               empresa_id: cfgRow.empresa_id,
               provider_slug: cfgRow.provider_slug ?? 'NFE_IO',
               ambiente: (cfgRow.ambiente ?? 'homologacao') as AmbienteNfe,
+              nfeio_company_id: cfgRow.nfeio_company_id ?? null,
               webhook_secret_hint: cfgRow.webhook_secret_hint ?? null,
               observacoes: cfgRow.observacoes ?? null,
             }
@@ -130,6 +138,7 @@ export default function NfeSettingsPage() {
               empresa_id: empresaId,
               provider_slug: 'NFE_IO',
               ambiente: 'homologacao',
+              nfeio_company_id: null,
               webhook_secret_hint: null,
               observacoes: null,
             }
@@ -244,6 +253,7 @@ export default function NfeSettingsPage() {
         empresa_id: empresaId,
         provider_slug: 'NFE_IO',
         ambiente: config.ambiente,
+        nfeio_company_id: config.nfeio_company_id || null,
         webhook_secret_hint: config.webhook_secret_hint || null,
         observacoes: config.observacoes || null,
       };
@@ -257,6 +267,60 @@ export default function NfeSettingsPage() {
       addToast(e?.message || 'Erro ao salvar configurações do provedor.', 'error');
     } finally {
       setSaving(false);
+    }
+  };
+
+  const edgeErrorMessage = async (error: any): Promise<string> => {
+    let detail: string | undefined = (error as any)?.message;
+    try {
+      const ctx: any = (error as any)?.context;
+      if (ctx && typeof ctx.text === 'function') {
+        const raw = await ctx.text();
+        try {
+          const parsed = JSON.parse(raw);
+          detail = parsed?.detail || parsed?.error || raw;
+        } catch {
+          detail = raw;
+        }
+      }
+    } catch {
+      // ignore
+    }
+    return (detail || 'Falha ao executar.').toString();
+  };
+
+  const handleDisableNumbers = async () => {
+    if (!canAdmin) {
+      addToast('Sem permissão. Apenas admin/owner.', 'error');
+      return;
+    }
+    const serie = Math.max(1, Math.trunc(Number(disablementSerie) || 1));
+    const start = Math.max(1, Math.trunc(Number(disablementStart) || 0));
+    const end = Math.max(start, Math.trunc(Number(disablementEnd) || start));
+    const justificativa = disablementJust.trim();
+    if (!justificativa) {
+      addToast('Informe a justificativa.', 'warning');
+      return;
+    }
+    const ok = window.confirm(`Inutilizar números ${start} até ${end} (série ${serie})?`);
+    if (!ok) return;
+
+    setRunningDisablement(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('nfeio-disablement', {
+        body: { mode: 'numbers', serie, numero_inicial: start, numero_final: end, justificativa },
+      });
+      if (error) throw error;
+      if (!data?.ok) throw new Error(data?.error || 'Falha ao solicitar inutilização.');
+      addToast('Inutilização enfileirada na NFE.io (aguardando processamento).', 'success');
+      setDisablementStart('');
+      setDisablementEnd('');
+      setDisablementJust('');
+    } catch (e: any) {
+      const msg = e?.context ? await edgeErrorMessage(e) : (e?.message || 'Erro ao inutilizar números.');
+      addToast(msg, 'error');
+    } finally {
+      setRunningDisablement(false);
     }
   };
 
@@ -637,6 +701,30 @@ export default function NfeSettingsPage() {
             </div>
 
             <div className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="md:col-span-2 rounded-xl border border-slate-200 bg-slate-50 p-4">
+                <p className="text-sm font-semibold text-slate-800">Webhook NFE.io (NFE-06)</p>
+                <p className="text-xs text-slate-600 mt-1">
+                  Use este endpoint no painel da NFE.io. Configure o HMAC com o mesmo valor do secret <span className="font-mono">NFEIO_WEBHOOK_SECRET</span> (Supabase secrets).
+                </p>
+                <div className="mt-2 text-xs text-slate-700 font-mono break-all">{webhookUrl}</div>
+              </div>
+
+              <div className="md:col-span-2">
+                <label className="block text-sm font-semibold text-slate-700 mb-2">NFE.io Company ID (obrigatório para NFE-07)</label>
+                <input
+                  type="text"
+                  value={config?.nfeio_company_id ?? ''}
+                  onChange={(e) =>
+                    setConfig((prev) => (prev ? { ...prev, nfeio_company_id: e.target.value || null } : prev))
+                  }
+                  placeholder="Ex.: 0f2c... (id da empresa no painel/API da NFE.io)"
+                  className="w-full p-3 border border-gray-300 rounded-xl shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                />
+                <p className="text-xs text-slate-500 mt-2">
+                  Esse ID é exigido pelos endpoints de <span className="font-semibold">cancelamento</span>, <span className="font-semibold">CC-e</span>, <span className="font-semibold">inutilização</span> e <span className="font-semibold">DANFE</span>.
+                </p>
+              </div>
+
               <div>
                 <label className="block text-sm font-semibold text-slate-700 mb-2">Ambiente</label>
                 <Select
@@ -670,6 +758,60 @@ export default function NfeSettingsPage() {
                   placeholder="Anotações internas sobre homologação, certificado, responsável, etc."
                   className="w-full min-h-[120px] p-3 border border-gray-300 rounded-xl shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                 />
+              </div>
+
+              <div className="md:col-span-2 rounded-xl border border-slate-200 bg-white/70 p-4">
+                <div className="flex items-start justify-between gap-4">
+                  <div>
+                    <p className="text-sm font-bold text-slate-900">Inutilização de números (NFE-07)</p>
+                    <p className="text-xs text-slate-600 mt-1">
+                      Use quando a numeração ficou com “buraco” e você precisa inutilizar uma faixa (operação assíncrona).
+                    </p>
+                  </div>
+                  <Button onClick={handleDisableNumbers} disabled={!canAdmin || runningDisablement}>
+                    {runningDisablement ? <Loader2 className="animate-spin" size={18} /> : <ShieldCheck size={18} />}
+                    <span className="ml-2">Inutilizar</span>
+                  </Button>
+                </div>
+
+                <div className="mt-4 grid grid-cols-1 md:grid-cols-4 gap-4">
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-700 mb-2">Série</label>
+                    <input
+                      value={disablementSerie}
+                      onChange={(e) => setDisablementSerie(e.target.value)}
+                      className="w-full p-3 border border-gray-300 rounded-xl shadow-sm"
+                      placeholder="1"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-700 mb-2">Número inicial</label>
+                    <input
+                      value={disablementStart}
+                      onChange={(e) => setDisablementStart(e.target.value)}
+                      className="w-full p-3 border border-gray-300 rounded-xl shadow-sm"
+                      placeholder="Ex.: 10"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-700 mb-2">Número final</label>
+                    <input
+                      value={disablementEnd}
+                      onChange={(e) => setDisablementEnd(e.target.value)}
+                      className="w-full p-3 border border-gray-300 rounded-xl shadow-sm"
+                      placeholder="Ex.: 15"
+                    />
+                  </div>
+                  <div className="md:col-span-4">
+                    <label className="block text-xs font-semibold text-slate-700 mb-2">Justificativa</label>
+                    <input
+                      value={disablementJust}
+                      onChange={(e) => setDisablementJust(e.target.value)}
+                      className="w-full p-3 border border-gray-300 rounded-xl shadow-sm"
+                      placeholder="Ex.: falha técnica, número não utilizado, etc."
+                    />
+                  </div>
+                </div>
               </div>
             </div>
           </GlassCard>

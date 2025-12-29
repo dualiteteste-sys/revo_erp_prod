@@ -21,6 +21,41 @@ BEGIN;
 alter table public.empresa_usuarios
   add column if not exists status text;
 
+-- Em alguns projetos antigos `status` era enum (ex.: user_status_in_empresa).
+-- Para manter compatibilidade, garantimos que os valores existam no enum.
+do $$
+declare
+  v_udt_name text;
+  v_type_schema text;
+  v_is_enum boolean := false;
+begin
+  select c.udt_name
+    into v_udt_name
+  from information_schema.columns c
+  where c.table_schema = 'public'
+    and c.table_name = 'empresa_usuarios'
+    and c.column_name = 'status'
+  limit 1;
+
+  if v_udt_name is not null and v_udt_name <> 'text' then
+    select n.nspname,
+           (t.typtype = 'e')
+      into v_type_schema,
+           v_is_enum
+    from pg_type t
+    join pg_namespace n on n.oid = t.typnamespace
+    where t.typname = v_udt_name
+    limit 1;
+
+    if coalesce(v_is_enum, false) then
+      execute format('alter type %I.%I add value if not exists %L', v_type_schema, v_udt_name, 'ACTIVE');
+      execute format('alter type %I.%I add value if not exists %L', v_type_schema, v_udt_name, 'PENDING');
+      execute format('alter type %I.%I add value if not exists %L', v_type_schema, v_udt_name, 'INACTIVE');
+      execute format('alter type %I.%I add value if not exists %L', v_type_schema, v_udt_name, 'SUSPENDED');
+    end if;
+  end if;
+end$$;
+
 update public.empresa_usuarios
 set status = coalesce(status, 'ACTIVE')
 where status is null;
@@ -35,19 +70,12 @@ alter table public.empresa_usuarios
   add column if not exists is_principal boolean not null default false;
 
 -- Constraint (idempotente)
-do $$
-begin
-  if not exists (
-    select 1
-    from pg_constraint
-    where conname = 'empresa_usuarios_status_check'
-      and conrelid = 'public.empresa_usuarios'::regclass
-  ) then
-    alter table public.empresa_usuarios
-      add constraint empresa_usuarios_status_check
-      check (status in ('ACTIVE','PENDING','INACTIVE','SUSPENDED'));
-  end if;
-end$$;
+alter table public.empresa_usuarios
+  drop constraint if exists empresa_usuarios_status_check;
+
+alter table public.empresa_usuarios
+  add constraint empresa_usuarios_status_check
+  check ((status::text) in ('ACTIVE','PENDING','INACTIVE','SUSPENDED'));
 
 create index if not exists idx_empresa_usuarios_empresa_status_role
   on public.empresa_usuarios (empresa_id, status, role_id, created_at);
@@ -55,6 +83,8 @@ create index if not exists idx_empresa_usuarios_empresa_status_role
 -- ---------------------------------------------------------------------------
 -- 2) RPC: accept invite
 -- ---------------------------------------------------------------------------
+
+drop function if exists public.accept_invite_for_current_user(uuid);
 
 create or replace function public.accept_invite_for_current_user(p_empresa_id uuid)
 returns table (
@@ -115,6 +145,8 @@ grant execute on function public.accept_invite_for_current_user(uuid) to authent
 -- 3) RPCs: list/count/manage users (UI)
 -- ---------------------------------------------------------------------------
 
+drop function if exists public.count_users_for_current_empresa(text, text[], text[]);
+
 create or replace function public.count_users_for_current_empresa(
   p_q text default null,
   p_status text[] default null,
@@ -165,6 +197,8 @@ $$;
 
 revoke all on function public.count_users_for_current_empresa(text, text[], text[]) from public;
 grant execute on function public.count_users_for_current_empresa(text, text[], text[]) to authenticated;
+
+drop function if exists public.list_users_for_current_empresa_v2(int, int, text, text[], text[]);
 
 create or replace function public.list_users_for_current_empresa_v2(
   p_limit int default 25,
@@ -238,6 +272,8 @@ $$;
 revoke all on function public.list_users_for_current_empresa_v2(int, int, text, text[], text[]) from public;
 grant execute on function public.list_users_for_current_empresa_v2(int, int, text, text[], text[]) to authenticated;
 
+drop function if exists public.deactivate_user_for_current_empresa(uuid);
+
 create or replace function public.deactivate_user_for_current_empresa(p_user_id uuid)
 returns void
 language plpgsql
@@ -261,6 +297,8 @@ $$;
 revoke all on function public.deactivate_user_for_current_empresa(uuid) from public;
 grant execute on function public.deactivate_user_for_current_empresa(uuid) to authenticated;
 
+drop function if exists public.reactivate_user_for_current_empresa(uuid);
+
 create or replace function public.reactivate_user_for_current_empresa(p_user_id uuid)
 returns void
 language plpgsql
@@ -283,6 +321,8 @@ $$;
 
 revoke all on function public.reactivate_user_for_current_empresa(uuid) from public;
 grant execute on function public.reactivate_user_for_current_empresa(uuid) to authenticated;
+
+drop function if exists public.delete_pending_invitation(uuid);
 
 create or replace function public.delete_pending_invitation(p_user_id uuid)
 returns int
@@ -309,6 +349,8 @@ $$;
 
 revoke all on function public.delete_pending_invitation(uuid) from public;
 grant execute on function public.delete_pending_invitation(uuid) to authenticated;
+
+drop function if exists public.update_user_role_for_current_empresa(uuid, text);
 
 create or replace function public.update_user_role_for_current_empresa(
   p_user_id uuid,
@@ -350,4 +392,3 @@ grant execute on function public.update_user_role_for_current_empresa(uuid, text
 select pg_notify('pgrst','reload schema');
 
 COMMIT;
-

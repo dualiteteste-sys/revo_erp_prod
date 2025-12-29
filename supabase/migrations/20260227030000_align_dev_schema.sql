@@ -1,22 +1,41 @@
-create type "public"."billing_cycle" as enum ('monthly', 'yearly');
+do $$
+begin
+  if to_regtype('public.billing_cycle') is null then
+    execute $sql$create type "public"."billing_cycle" as enum ('monthly', 'yearly')$sql$;
+  end if;
 
-create type "public"."status_centro_custo" as enum ('ativo', 'inativo');
+  if to_regtype('public.status_centro_custo') is null then
+    execute $sql$create type "public"."status_centro_custo" as enum ('ativo', 'inativo')$sql$;
+  end if;
 
-create type "public"."status_parcela" as enum ('aberta', 'paga', 'cancelada');
+  if to_regtype('public.status_parcela') is null then
+    execute $sql$create type "public"."status_parcela" as enum ('aberta', 'paga', 'cancelada')$sql$;
+  end if;
 
-create type "public"."status_produto" as enum ('ativo', 'inativo');
+  if to_regtype('public.status_produto') is null then
+    execute $sql$create type "public"."status_produto" as enum ('ativo', 'inativo')$sql$;
+  end if;
 
-create type "public"."status_transportadora" as enum ('ativa', 'inativa');
+  if to_regtype('public.status_transportadora') is null then
+    execute $sql$create type "public"."status_transportadora" as enum ('ativa', 'inativa')$sql$;
+  end if;
 
-create type "public"."sub_status" as enum ('trialing', 'active', 'past_due', 'canceled', 'unpaid', 'incomplete', 'incomplete_expired');
+  if to_regtype('public.sub_status') is null then
+    execute $sql$create type "public"."sub_status" as enum ('trialing', 'active', 'past_due', 'canceled', 'unpaid', 'incomplete', 'incomplete_expired')$sql$;
+  end if;
 
-create type "public"."tipo_embalagem" as enum ('pacote_caixa', 'envelope', 'rolo_cilindro', 'outro', 'pacote');
+  if to_regtype('public.tipo_embalagem') is null then
+    execute $sql$create type "public"."tipo_embalagem" as enum ('pacote_caixa', 'envelope', 'rolo_cilindro', 'outro', 'pacote')$sql$;
+  end if;
 
-create type "public"."user_status_in_empresa" as enum ('ACTIVE', 'PENDING', 'INACTIVE');
+  if to_regtype('public.user_status_in_empresa') is null then
+    execute $sql$create type "public"."user_status_in_empresa" as enum ('ACTIVE', 'PENDING', 'INACTIVE')$sql$;
+  end if;
+end$$;
 
-create sequence "public"."compras_pedidos_numero_seq";
+create sequence if not exists "public"."compras_pedidos_numero_seq";
 
-create sequence "public"."industria_benef_ordens_numero_seq";
+create sequence if not exists "public"."industria_benef_ordens_numero_seq";
 
 drop trigger if exists "tg_servicos_set_updated_at" on "public"."servicos";
 
@@ -24,35 +43,35 @@ drop trigger if exists "tg_subscriptions_updated_at" on "public"."subscriptions"
 
 drop trigger if exists "tg_user_active_empresa_updated_at" on "public"."user_active_empresa";
 
-drop policy "crm_etapas_all" on "public"."crm_etapas";
+drop policy if exists "crm_etapas_all" on "public"."crm_etapas";
 
-drop policy "crm_funis_all" on "public"."crm_funis";
+drop policy if exists "crm_funis_all" on "public"."crm_funis";
 
-drop policy "crm_oportunidades_all" on "public"."crm_oportunidades";
+drop policy if exists "crm_oportunidades_all" on "public"."crm_oportunidades";
 
-drop policy "plans_public_select" on "public"."plans";
+drop policy if exists "plans_public_select" on "public"."plans";
 
-drop policy "plans_write_service_role" on "public"."plans";
+drop policy if exists "plans_write_service_role" on "public"."plans";
 
-drop policy "del_servicos_same_empresa" on "public"."servicos";
+drop policy if exists "del_servicos_same_empresa" on "public"."servicos";
 
-drop policy "ins_servicos_same_empresa" on "public"."servicos";
+drop policy if exists "ins_servicos_same_empresa" on "public"."servicos";
 
-drop policy "sel_servicos_by_empresa" on "public"."servicos";
+drop policy if exists "sel_servicos_by_empresa" on "public"."servicos";
 
-drop policy "upd_servicos_same_empresa" on "public"."servicos";
+drop policy if exists "upd_servicos_same_empresa" on "public"."servicos";
 
-drop policy "subscriptions_select_by_membership" on "public"."subscriptions";
+drop policy if exists "subscriptions_select_by_membership" on "public"."subscriptions";
 
-drop policy "subscriptions_write_service_role" on "public"."subscriptions";
+drop policy if exists "subscriptions_write_service_role" on "public"."subscriptions";
 
-drop policy "user_active_empresa_del" on "public"."user_active_empresa";
+drop policy if exists "user_active_empresa_del" on "public"."user_active_empresa";
 
-drop policy "user_active_empresa_ins" on "public"."user_active_empresa";
+drop policy if exists "user_active_empresa_ins" on "public"."user_active_empresa";
 
-drop policy "user_active_empresa_sel" on "public"."user_active_empresa";
+drop policy if exists "user_active_empresa_sel" on "public"."user_active_empresa";
 
-drop policy "user_active_empresa_upd" on "public"."user_active_empresa";
+drop policy if exists "user_active_empresa_upd" on "public"."user_active_empresa";
 
 revoke delete on table "public"."_bak_empresa_usuarios" from "anon";
 
@@ -3376,61 +3395,61 @@ revoke truncate on table "public"."vendas_pedidos" from "service_role";
 
 revoke update on table "public"."vendas_pedidos" from "service_role";
 
-alter table "public"."compras_pedidos" drop constraint "compras_pedidos_empresa_id_fkey";
+alter table "public"."compras_pedidos" drop constraint if exists "compras_pedidos_empresa_id_fkey";
 
-alter table "public"."compras_pedidos" drop constraint "compras_pedidos_fornecedor_id_fkey";
+alter table "public"."compras_pedidos" drop constraint if exists "compras_pedidos_fornecedor_id_fkey";
 
-alter table "public"."empresa_usuarios" drop constraint "empresa_usuarios_status_check";
+alter table "public"."empresa_usuarios" drop constraint if exists "empresa_usuarios_status_check";
 
-alter table "public"."industria_materiais_cliente" drop constraint "industria_materiais_cliente_empresa_fkey";
+alter table "public"."industria_materiais_cliente" drop constraint if exists "industria_materiais_cliente_empresa_fkey";
 
-alter table "public"."ordem_servico_itens" drop constraint "ordem_servico_itens_servico_id_fkey";
+alter table "public"."ordem_servico_itens" drop constraint if exists "ordem_servico_itens_servico_id_fkey";
 
-alter table "public"."ordem_servicos" drop constraint "ordem_servicos_cliente_id_fkey";
+alter table "public"."ordem_servicos" drop constraint if exists "ordem_servicos_cliente_id_fkey";
 
-alter table "public"."permissions" drop constraint "permissions_action_chk";
+alter table "public"."permissions" drop constraint if exists "permissions_action_chk";
 
-alter table "public"."permissions" drop constraint "permissions_unique";
+alter table "public"."permissions" drop constraint if exists "permissions_unique";
 
-alter table "public"."plans" drop constraint "plans_slug_check";
+alter table "public"."plans" drop constraint if exists "plans_slug_check";
 
-alter table "public"."rh_cargo_competencias" drop constraint "rh_cargo_competencias_cargo_id_fkey";
+alter table "public"."rh_cargo_competencias" drop constraint if exists "rh_cargo_competencias_cargo_id_fkey";
 
-alter table "public"."rh_cargo_competencias" drop constraint "rh_cargo_competencias_competencia_id_fkey";
+alter table "public"."rh_cargo_competencias" drop constraint if exists "rh_cargo_competencias_competencia_id_fkey";
 
-alter table "public"."rh_colaborador_competencias" drop constraint "rh_colaborador_competencias_colaborador_id_fkey";
+alter table "public"."rh_colaborador_competencias" drop constraint if exists "rh_colaborador_competencias_colaborador_id_fkey";
 
-alter table "public"."rh_colaborador_competencias" drop constraint "rh_colaborador_competencias_competencia_id_fkey";
+alter table "public"."rh_colaborador_competencias" drop constraint if exists "rh_colaborador_competencias_competencia_id_fkey";
 
-alter table "public"."rh_colaborador_competencias" drop constraint "rh_colaborador_competencias_empresa_id_fkey";
+alter table "public"."rh_colaborador_competencias" drop constraint if exists "rh_colaborador_competencias_empresa_id_fkey";
 
-alter table "public"."rh_treinamento_participantes" drop constraint "rh_treinamento_participantes_colaborador_id_fkey";
+alter table "public"."rh_treinamento_participantes" drop constraint if exists "rh_treinamento_participantes_colaborador_id_fkey";
 
-alter table "public"."rh_treinamento_participantes" drop constraint "rh_treinamento_participantes_empresa_id_fkey";
+alter table "public"."rh_treinamento_participantes" drop constraint if exists "rh_treinamento_participantes_empresa_id_fkey";
 
-alter table "public"."rh_treinamento_participantes" drop constraint "rh_treinamento_participantes_treinamento_id_fkey";
+alter table "public"."rh_treinamento_participantes" drop constraint if exists "rh_treinamento_participantes_treinamento_id_fkey";
 
-alter table "public"."rh_treinamentos" drop constraint "rh_treinamentos_empresa_id_fkey";
+alter table "public"."rh_treinamentos" drop constraint if exists "rh_treinamentos_empresa_id_fkey";
 
-alter table "public"."subscriptions" drop constraint "subscriptions_empresa_unique";
+alter table "public"."subscriptions" drop constraint if exists "subscriptions_empresa_unique";
 
-alter table "public"."financeiro_cobrancas_bancarias" drop constraint "fin_cobr_cliente_fkey";
+alter table "public"."financeiro_cobrancas_bancarias" drop constraint if exists "fin_cobr_cliente_fkey";
 
-alter table "public"."financeiro_contas_pagar" drop constraint "financeiro_cp_fornecedor_fkey";
+alter table "public"."financeiro_contas_pagar" drop constraint if exists "financeiro_cp_fornecedor_fkey";
 
-alter table "public"."industria_ordens" drop constraint "industria_ordens_cliente_fkey";
+alter table "public"."industria_ordens" drop constraint if exists "industria_ordens_cliente_fkey";
 
-alter table "public"."industria_ordens" drop constraint "industria_ordens_produto_fkey";
+alter table "public"."industria_ordens" drop constraint if exists "industria_ordens_produto_fkey";
 
-alter table "public"."industria_ordens_componentes" drop constraint "industria_componentes_produto_fkey";
+alter table "public"."industria_ordens_componentes" drop constraint if exists "industria_componentes_produto_fkey";
 
-alter table "public"."logistica_transportadoras" drop constraint "logistica_transportadoras_pessoa_fkey";
+alter table "public"."logistica_transportadoras" drop constraint if exists "logistica_transportadoras_pessoa_fkey";
 
-alter table "public"."subscriptions" drop constraint "subscriptions_billing_cycle_check";
+alter table "public"."subscriptions" drop constraint if exists "subscriptions_billing_cycle_check";
 
-alter table "public"."vendas_itens_pedido" drop constraint "vendas_itens_pedido_produto_fkey";
+alter table "public"."vendas_itens_pedido" drop constraint if exists "vendas_itens_pedido_produto_fkey";
 
-alter table "public"."vendas_pedidos" drop constraint "vendas_pedidos_cliente_fkey";
+alter table "public"."vendas_pedidos" drop constraint if exists "vendas_pedidos_cliente_fkey";
 
 drop function if exists "public"."accept_invite_for_current_user"(p_empresa_id uuid);
 
@@ -3462,7 +3481,7 @@ drop function if exists "public"."mrp_list_demandas"(p_status text);
 
 drop function if exists "public"."secure_bootstrap_empresa_for_current_user"(p_razao_social text, p_fantasia text);
 
-alter table "public"."_bak_empresa_usuarios" drop constraint "_bak_empresa_usuarios_pkey";
+alter table "public"."_bak_empresa_usuarios" drop constraint if exists "_bak_empresa_usuarios_pkey";
 
 alter table "public"."industria_producao_componentes" drop constraint if exists "industria_producao_componentes_pkey" cascade;
 
@@ -3470,13 +3489,13 @@ alter table "public"."industria_producao_entregas" drop constraint if exists "in
 
 alter table "public"."industria_producao_ordens" drop constraint if exists "industria_producao_ordens_pkey" cascade;
 
-alter table "public"."rh_colaborador_competencias" drop constraint "rh_colaborador_competencias_pkey";
+alter table "public"."rh_colaborador_competencias" drop constraint if exists "rh_colaborador_competencias_pkey";
 
-alter table "public"."rh_treinamento_participantes" drop constraint "rh_treinamento_participantes_pkey";
+alter table "public"."rh_treinamento_participantes" drop constraint if exists "rh_treinamento_participantes_pkey";
 
-alter table "public"."empresa_addons" drop constraint "empresa_addons_pkey";
+alter table "public"."empresa_addons" drop constraint if exists "empresa_addons_pkey";
 
-alter table "public"."empresa_usuarios" drop constraint "empresa_usuarios_pkey";
+alter table "public"."empresa_usuarios" drop constraint if exists "empresa_usuarios_pkey";
 
 drop index if exists "public"."_bak_empresa_usuarios_pkey";
 

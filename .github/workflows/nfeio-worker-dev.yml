@@ -1,0 +1,37 @@
+name: NFE.io Worker (dev)
+
+on:
+  schedule:
+    - cron: "*/5 * * * *"
+  workflow_dispatch:
+
+concurrency:
+  group: nfeio-worker-dev
+  cancel-in-progress: false
+
+jobs:
+  run-worker:
+    name: Process NFE.io webhook queue (DEV)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Call worker function
+        env:
+          PROJECT_REF: ovzdjeczmtqnuytqdtsc
+          NFEIO_WORKER_SECRET_DEV: ${{ secrets.NFEIO_WORKER_SECRET_DEV }}
+          NFEIO_WEBHOOK_SECRET_DEV: ${{ secrets.NFEIO_WEBHOOK_SECRET_DEV }}
+        run: |
+          set -euo pipefail
+
+          WORKER_SECRET="${NFEIO_WORKER_SECRET_DEV:-${NFEIO_WEBHOOK_SECRET_DEV:-}}"
+          if [[ -z "${WORKER_SECRET}" ]]; then
+            echo "::warning::Missing secret NFEIO_WORKER_SECRET_DEV and NFEIO_WEBHOOK_SECRET_DEV (skipping worker run)"
+            exit 0
+          fi
+
+          URL="https://${PROJECT_REF}.supabase.co/functions/v1/nfeio-worker"
+          echo "[DEV] Calling $URL"
+          curl -sS -X POST "$URL" \
+            -H "Content-Type: application/json" \
+            -H "X-Worker-Secret: ${WORKER_SECRET}" \
+            --data '{"limit":25}'
