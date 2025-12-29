@@ -93,4 +93,13 @@ select format('FUNCTION|%s', p.oid::regprocedure)
 from pg_proc p
 join pg_namespace n on n.oid = p.pronamespace
 where n.nspname = 'public'
+  -- Ignora funções que pertencem a extensões (elas variam entre ambientes e não são parte do app).
+  and not exists (
+    select 1
+    from pg_depend d
+    where d.classid = 'pg_proc'::regclass
+      and d.objid = p.oid
+      and d.refclassid = 'pg_extension'::regclass
+      and d.deptype = 'e'
+  )
 order by p.oid::regprocedure::text;
