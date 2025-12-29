@@ -127,7 +127,13 @@ export default function RoteiroSelector({ ordemId, produtoId, tipoBom, disabled,
                                                   </span>
                                                 );
                                               })()}
-                                              {rot.padrao_para_producao && <span className="text-xs bg-green-100 text-green-800 px-2 py-0.5 rounded-full">Padrão</span>}
+                                              {(
+                                                tipoBom === 'beneficiamento'
+                                                  ? rot.padrao_para_beneficiamento
+                                                  : tipoBom === 'producao'
+                                                    ? rot.padrao_para_producao
+                                                    : (rot.padrao_para_producao || rot.padrao_para_beneficiamento)
+                                              ) && <span className="text-xs bg-green-100 text-green-800 px-2 py-0.5 rounded-full">Padrão</span>}
                                             </div>
                                         <p className="text-sm text-gray-600">{rot.descricao}</p>
                                         <p className="text-xs text-gray-500 mt-1">Produto: {rot.produto_nome}</p>
