@@ -40,6 +40,15 @@ join pg_namespace n on n.oid = c.relnamespace
 join pg_type t on t.oid = a.atttypid
 where n.nspname = 'public'
   and c.relkind in ('r','p')
+  -- Ignora tabelas que pertencem a extensões (elas variam entre ambientes).
+  and not exists (
+    select 1
+    from pg_depend d
+    where d.classid = 'pg_class'::regclass
+      and d.objid = c.oid
+      and d.refclassid = 'pg_extension'::regclass
+      and d.deptype = 'e'
+  )
   and a.attnum > 0
   and not a.attisdropped
 order by 1;
@@ -49,16 +58,27 @@ order by 1;
 -- Policies de RLS
 select format(
   'POLICY|%s|%s|%s|cmd=%s|roles=%s|using=%s|check=%s',
-  schemaname,
-  tablename,
-  policyname,
-  cmd,
-  coalesce(array_to_string(roles, ','), ''),
-  coalesce(regexp_replace(qual, E'\\s+', ' ', 'g'), ''),
-  coalesce(regexp_replace(with_check, E'\\s+', ' ', 'g'), '')
+  p.schemaname,
+  p.tablename,
+  p.policyname,
+  p.cmd,
+  coalesce(array_to_string(p.roles, ','), ''),
+  coalesce(regexp_replace(p.qual, E'\\s+', ' ', 'g'), ''),
+  coalesce(regexp_replace(p.with_check, E'\\s+', ' ', 'g'), '')
 )
-from pg_policies
-where schemaname = 'public'
+from pg_policies p
+join pg_namespace n on n.nspname = p.schemaname
+join pg_class c on c.relnamespace = n.oid and c.relname = p.tablename
+where p.schemaname = 'public'
+  -- Ignora policies em tabelas pertencentes a extensões.
+  and not exists (
+    select 1
+    from pg_depend d
+    where d.classid = 'pg_class'::regclass
+      and d.objid = c.oid
+      and d.refclassid = 'pg_extension'::regclass
+      and d.deptype = 'e'
+  )
 order by 1;
 
 -- Triggers (exceto internos)
@@ -73,6 +93,15 @@ join pg_class c on c.oid = t.tgrelid
 join pg_namespace n on n.oid = c.relnamespace
 where n.nspname = 'public'
   and not t.tgisinternal
+  -- Ignora triggers em tabelas pertencentes a extensões.
+  and not exists (
+    select 1
+    from pg_depend d
+    where d.classid = 'pg_class'::regclass
+      and d.objid = c.oid
+      and d.refclassid = 'pg_extension'::regclass
+      and d.deptype = 'e'
+  )
 order by 1;
 
 -- Views e materialized views (apenas presença)
@@ -86,6 +115,15 @@ from pg_class c
 join pg_namespace n on n.oid = c.relnamespace
 where n.nspname = 'public'
   and c.relkind in ('v','m')
+  -- Ignora views/materialized views pertencentes a extensões.
+  and not exists (
+    select 1
+    from pg_depend d
+    where d.classid = 'pg_class'::regclass
+      and d.objid = c.oid
+      and d.refclassid = 'pg_extension'::regclass
+      and d.deptype = 'e'
+  )
 order by 1;
 
 -- Funções no schema public (apenas assinatura; definição varia por versão/formatador)
