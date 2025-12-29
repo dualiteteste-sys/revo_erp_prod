@@ -114,4 +114,65 @@ begin
       NULL;
     END ind03;
   END IF;
+
+  -- 6) IND-05: Qualidade deve ter auditoria (triggers em tabelas críticas)
+  IF to_regclass('public.audit_logs') IS NOT NULL AND to_regprocedure('public.process_audit_log()') IS NOT NULL THEN
+    IF to_regclass('public.estoque_lotes') IS NOT NULL THEN
+      IF NOT EXISTS (
+        SELECT 1 FROM pg_trigger
+        WHERE tgname = 'audit_logs_trigger'
+          AND tgrelid = 'public.estoque_lotes'::regclass
+      ) THEN
+        RAISE EXCEPTION 'RG-03: audit_logs_trigger ausente em public.estoque_lotes (IND-05).';
+      END IF;
+    END IF;
+
+    IF to_regclass('public.industria_qualidade_motivos') IS NOT NULL THEN
+      IF NOT EXISTS (
+        SELECT 1 FROM pg_trigger
+        WHERE tgname = 'audit_logs_trigger'
+          AND tgrelid = 'public.industria_qualidade_motivos'::regclass
+      ) THEN
+        RAISE EXCEPTION 'RG-03: audit_logs_trigger ausente em public.industria_qualidade_motivos (IND-05).';
+      END IF;
+    END IF;
+
+    IF to_regclass('public.industria_qualidade_planos') IS NOT NULL THEN
+      IF NOT EXISTS (
+        SELECT 1 FROM pg_trigger
+        WHERE tgname = 'audit_logs_trigger'
+          AND tgrelid = 'public.industria_qualidade_planos'::regclass
+      ) THEN
+        RAISE EXCEPTION 'RG-03: audit_logs_trigger ausente em public.industria_qualidade_planos (IND-05).';
+      END IF;
+    END IF;
+
+    IF to_regclass('public.industria_qualidade_plano_caracteristicas') IS NOT NULL THEN
+      IF NOT EXISTS (
+        SELECT 1 FROM pg_trigger
+        WHERE tgname = 'audit_logs_trigger'
+          AND tgrelid = 'public.industria_qualidade_plano_caracteristicas'::regclass
+      ) THEN
+        RAISE EXCEPTION 'RG-03: audit_logs_trigger ausente em public.industria_qualidade_plano_caracteristicas (IND-05).';
+      END IF;
+    END IF;
+
+    IF to_regclass('public.industria_qualidade_inspecoes') IS NOT NULL THEN
+      IF NOT EXISTS (
+        SELECT 1 FROM pg_trigger
+        WHERE tgname = 'audit_logs_trigger'
+          AND tgrelid = 'public.industria_qualidade_inspecoes'::regclass
+      ) THEN
+        RAISE EXCEPTION 'RG-03: audit_logs_trigger ausente em public.industria_qualidade_inspecoes (IND-05).';
+      END IF;
+    END IF;
+  END IF;
+
+  -- 7) IND-06: Relatórios essenciais devem existir (RPCs leves)
+  IF to_regprocedure('public.industria_relatorio_wip(integer)') IS NULL THEN
+    RAISE EXCEPTION 'RG-03: RPC public.industria_relatorio_wip(integer) não existe (IND-06).';
+  END IF;
+  IF to_regprocedure('public.qualidade_kpis(integer)') IS NULL THEN
+    RAISE EXCEPTION 'RG-03: RPC public.qualidade_kpis(integer) não existe (IND-06).';
+  END IF;
 end $$;
