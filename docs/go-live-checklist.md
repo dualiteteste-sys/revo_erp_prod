@@ -37,7 +37,7 @@
 
 ## 4) Plano A — Serviços (OS) “pronto para vender”
 
-- [ ] OS-01 OS UX “estado da arte” (status/agenda/anexos/histórico/custos) — ajustes finais + permissão UI
+- [x] OS-01 OS UX “estado da arte” (status/agenda/anexos/histórico/custos) — ajustes finais + permissão UI
 - [ ] OS-02 Relatórios de OS (status/cliente/período + faturamento) validados com dados reais
 - [ ] OS-03 Amarração OS ↔ financeiro (gerar/abrir/baixar conta) com auditoria
 
