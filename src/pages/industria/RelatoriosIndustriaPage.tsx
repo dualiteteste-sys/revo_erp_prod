@@ -8,7 +8,16 @@ import PageHeader from '@/components/ui/PageHeader';
 import Input from '@/components/ui/forms/Input';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/contexts/ToastProvider';
-import { listPcpCargaCapacidade, listPcpKpis, type PcpCargaCapacidade, type PcpKpis } from '@/services/industriaProducao';
+import {
+  getIndustriaWipKpis,
+  getQualidadeKpis,
+  listPcpCargaCapacidade,
+  listPcpKpis,
+  type IndustriaWipKpis,
+  type PcpCargaCapacidade,
+  type PcpKpis,
+  type QualidadeKpis,
+} from '@/services/industriaProducao';
 import { getRelatorioBaixoEstoque, type RelatorioBaixoEstoqueItem } from '@/services/suprimentos';
 
 function formatNumber(value: number, digits = 0) {
@@ -37,6 +46,8 @@ function toDateOrNull(value: string): string | null {
 type DashboardData = {
   carga: PcpCargaCapacidade[];
   kpis: PcpKpis;
+  wip: IndustriaWipKpis;
+  qualidade: QualidadeKpis;
   baixoEstoque: RelatorioBaixoEstoqueItem[];
 };
 
@@ -58,12 +69,14 @@ export default function RelatoriosIndustriaPage() {
   const fetchData = useCallback(async () => {
     setLoading(true);
     try {
-      const [carga, kpis, baixoEstoque] = await Promise.all([
+      const [carga, kpis, wip, qualidade, baixoEstoque] = await Promise.all([
         listPcpCargaCapacidade(toDateOrNull(startDate) || undefined, toDateOrNull(endDate) || undefined),
         listPcpKpis(periodoKpis),
+        getIndustriaWipKpis(periodoKpis),
+        getQualidadeKpis(periodoKpis),
         getRelatorioBaixoEstoque(searchBaixoEstoque),
       ]);
-      setData({ carga, kpis, baixoEstoque });
+      setData({ carga, kpis, wip, qualidade, baixoEstoque });
     } catch (e: any) {
       addToast(e?.message || 'Falha ao carregar relatórios de Indústria.', 'error');
       setData(null);
@@ -78,6 +91,8 @@ export default function RelatoriosIndustriaPage() {
 
   const carga = data?.carga ?? [];
   const kpis = data?.kpis ?? null;
+  const wip = data?.wip ?? null;
+  const qualidade = data?.qualidade ?? null;
   const baixoEstoque = data?.baixoEstoque ?? [];
 
   const totals = useMemo(() => {
@@ -268,6 +283,72 @@ export default function RelatoriosIndustriaPage() {
               <div className="text-3xl font-bold text-gray-900 mt-2">{formatPercent(kpis?.otif_percent ?? 0, 1)}</div>
               <p className="text-xs text-gray-500 mt-1">
                 {formatNumber(kpis?.ordens_concluidas ?? 0)} OPs concluídas · Refugo {formatPercent(kpis?.percentual_refugo ?? 0, 1)}
+              </p>
+            </GlassCard>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-12 gap-4">
+            <GlassCard className="p-5 md:col-span-6">
+              <div className="flex items-center justify-between">
+                <p className="text-sm text-gray-500">WIP & Fila (últimos {wip?.periodo_dias ?? periodoKpis} dias)</p>
+                <PackageSearch className="w-5 h-5 text-sky-600" />
+              </div>
+              <div className="mt-3 grid grid-cols-2 md:grid-cols-5 gap-3">
+                <div>
+                  <p className="text-xs text-gray-500">Ordens WIP</p>
+                  <p className="text-xl font-bold text-gray-900">{formatNumber(wip?.ordens_wip ?? 0)}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-gray-500">Na fila</p>
+                  <p className="text-xl font-bold text-gray-900">{formatNumber(wip?.operacoes_na_fila ?? 0)}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-gray-500">Em execução</p>
+                  <p className="text-xl font-bold text-gray-900">{formatNumber(wip?.operacoes_em_execucao ?? 0)}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-gray-500">Pausadas</p>
+                  <p className="text-xl font-bold text-gray-900">{formatNumber(wip?.operacoes_pausadas ?? 0)}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-gray-500">Concluídas</p>
+                  <p className="text-xl font-bold text-gray-900">{formatNumber(wip?.operacoes_concluidas_periodo ?? 0)}</p>
+                </div>
+              </div>
+            </GlassCard>
+
+            <GlassCard className="p-5 md:col-span-6">
+              <div className="flex items-center justify-between">
+                <p className="text-sm text-gray-500">Qualidade (lotes)</p>
+                <PackageSearch className="w-5 h-5 text-rose-600" />
+              </div>
+              <div className="mt-3 grid grid-cols-2 md:grid-cols-4 gap-3">
+                <div>
+                  <p className="text-xs text-gray-500">Total</p>
+                  <p className="text-xl font-bold text-gray-900">{formatNumber(qualidade?.lotes_total ?? 0)}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-gray-500">Bloqueados</p>
+                  <p className="text-xl font-bold text-gray-900">{formatNumber(qualidade?.lotes_bloqueados ?? 0)}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-gray-500">Em análise</p>
+                  <p className="text-xl font-bold text-gray-900">{formatNumber(qualidade?.lotes_em_analise ?? 0)}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-gray-500">Saldo bloqueado (un)</p>
+                  <p className="text-xl font-bold text-gray-900">{formatNumber(qualidade?.saldo_bloqueado ?? 0, 2)}</p>
+                </div>
+              </div>
+              <p className="text-xs text-gray-500 mt-3">
+                Inspeções no período: {formatNumber(qualidade?.inspecoes_periodo ?? 0)} ·{' '}
+                <button
+                  type="button"
+                  className="text-blue-700 hover:underline"
+                  onClick={() => navigate('/app/industria/qualidade/lotes')}
+                >
+                  Abrir Lotes & Bloqueio
+                </button>
               </p>
             </GlassCard>
           </div>

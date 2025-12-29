@@ -763,6 +763,60 @@ export async function listPcpKpis(periodoDias?: number): Promise<PcpKpis> {
       };
 }
 
+export type IndustriaWipKpis = {
+  periodo_dias: number;
+  ordens_wip: number;
+  operacoes_na_fila: number;
+  operacoes_em_execucao: number;
+  operacoes_pausadas: number;
+  operacoes_concluidas_periodo: number;
+};
+
+export async function getIndustriaWipKpis(periodoDias?: number): Promise<IndustriaWipKpis> {
+  const result = await callRpc<IndustriaWipKpis[]>('industria_relatorio_wip', {
+    p_periodo_dias: periodoDias || null
+  });
+  return result && result.length > 0
+    ? result[0]
+    : {
+        periodo_dias: periodoDias || 30,
+        ordens_wip: 0,
+        operacoes_na_fila: 0,
+        operacoes_em_execucao: 0,
+        operacoes_pausadas: 0,
+        operacoes_concluidas_periodo: 0,
+      };
+}
+
+export type QualidadeKpis = {
+  periodo_dias: number;
+  lotes_total: number;
+  lotes_aprovados: number;
+  lotes_em_analise: number;
+  lotes_bloqueados: number;
+  lotes_reprovados: number;
+  saldo_bloqueado: number;
+  inspecoes_periodo: number;
+};
+
+export async function getQualidadeKpis(periodoDias?: number): Promise<QualidadeKpis> {
+  const result = await callRpc<QualidadeKpis[]>('qualidade_kpis', {
+    p_periodo_dias: periodoDias || null
+  });
+  return result && result.length > 0
+    ? result[0]
+    : {
+        periodo_dias: periodoDias || 30,
+        lotes_total: 0,
+        lotes_aprovados: 0,
+        lotes_em_analise: 0,
+        lotes_bloqueados: 0,
+        lotes_reprovados: 0,
+        saldo_bloqueado: 0,
+        inspecoes_periodo: 0,
+      };
+}
+
 export async function listPcpAtpCtp(dataFinal?: string): Promise<PcpAtpCtp[]> {
   return callRpc<PcpAtpCtp[]>('pcp_atp_ctp_produtos', {
     p_data_final: dataFinal || null

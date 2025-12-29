@@ -919,10 +919,25 @@ export default function OrdemFormPanel({
                     produtoId={formData.produto_final_id}
                     tipoBom={formData.tipo_ordem === 'beneficiamento' ? 'beneficiamento' : 'producao'}
                     disabled={isExecucaoGerada || isLockedEffective}
-                    onApplied={(roteiro) => {
-                      handleHeaderChange('roteiro_aplicado_id', roteiro.id);
+                    onApplied={async (roteiro) => {
                       const label = `${roteiro.codigo || 'Sem código'} (v${roteiro.versao})${roteiro.descricao ? ` - ${roteiro.descricao}` : ''}`;
+                      handleHeaderChange('roteiro_aplicado_id', roteiro.id);
                       handleHeaderChange('roteiro_aplicado_desc', label);
+                      try {
+                        const currentId = await ensureOrderSaved();
+                        if (!currentId) return;
+                        await saveOrdem({
+                          ...formData,
+                          id: currentId,
+                          roteiro_aplicado_id: roteiro.id,
+                          roteiro_aplicado_desc: label,
+                        });
+                        await loadDetails(currentId);
+                        addToast('Roteiro vinculado com sucesso!', 'success');
+                      } catch (e: any) {
+                        logger.error('[Indústria][OP/OB] Falha ao salvar roteiro aplicado', e, { ordemId: formData.id, roteiroId: roteiro?.id });
+                        addToast('Roteiro selecionado, mas falha ao persistir. Tente salvar novamente.', 'warning');
+                      }
                     }}
                   />
                 </div>
