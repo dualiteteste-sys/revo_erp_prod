@@ -18,14 +18,14 @@
 
 ## 2) NF‑e Ativa (MVP real SP/PR, regime “Ambos”)
 
-- [ ] NFE-01 Modelos/tabelas internas + UI base (rascunho NF‑e, itens, totais, destinatário/emitente)
-- [ ] NFE-02 Cadastro fiscal completo: empresa emitente (certificado A1), série/numeração, ambiente, CSC (se aplicável)
-- [ ] NFE-03 Cadastro fiscal de cliente/produto (NCM/CFOP/CST/CSOSN, natureza operação, regras por UF/regime)
-- [ ] NFE-04 Motor fiscal parametrizável v1 (cálculo + validação + preview do XML antes de emitir)
-- [ ] NFE-05 Integração NFE.io (emissão): enviar, consultar status, armazenar XML/DANFE, logs
-- [ ] NFE-06 Webhooks + fila/retry idempotente (processar eventos NFE.io; reprocessar com segurança)
-- [ ] NFE-07 Operações fiscais essenciais: cancelamento, CCe (se aplicável), inutilização (se necessário), reimpressão DANFE
-- [ ] NFE-08 Observabilidade fiscal: auditoria por NF (eventos, falhas, tentativas, payloads saneados)
+- [x] NFE-01 Modelos/tabelas internas + UI base (rascunho NF‑e, itens, totais, destinatário/emitente)
+- [x] NFE-02 Cadastro fiscal completo: empresa emitente (certificado A1), série/numeração, ambiente, CSC (se aplicável)
+- [x] NFE-03 Cadastro fiscal de cliente/produto (NCM/CFOP/CST/CSOSN, natureza operação, regras por UF/regime)
+- [x] NFE-04 Motor fiscal parametrizável v1 (cálculo + validação + preview do XML antes de emitir)
+- [x] NFE-05 Integração NFE.io (emissão): enviar, consultar status, armazenar XML/DANFE, logs
+- [x] NFE-06 Webhooks + fila/retry idempotente (processar eventos NFE.io; reprocessar com segurança)
+- [x] NFE-07 Operações fiscais essenciais: cancelamento, CCe (se aplicável), inutilização (se necessário), reimpressão DANFE
+- [x] NFE-08 Observabilidade fiscal: auditoria por NF (eventos, falhas, tentativas, payloads saneados)
 
 ## 3) Financeiro Essencial (core comum)
 
