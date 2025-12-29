@@ -5,14 +5,27 @@ import { useToast } from '@/contexts/ToastProvider';
 import { Loader2 } from 'lucide-react';
 import IndustriaKanbanColumn from './IndustriaKanbanColumn';
 
-const COLUMNS: { id: StatusOrdem; title: string }[] = [
-  { id: 'planejada', title: 'Planejada' },
-  { id: 'em_programacao', title: 'Em Programação' },
-  { id: 'em_producao', title: 'Em Produção' },
-  { id: 'em_inspecao', title: 'Em Inspeção' },
-  { id: 'parcialmente_concluida', title: 'Parcialmente Concluída' },
-  { id: 'concluida', title: 'Concluída' },
-];
+const COLUMNS_BY_TIPO: Record<TipoOrdemIndustria, { id: StatusOrdem; title: string }[]> = {
+  beneficiamento: [
+    { id: 'rascunho', title: 'Rascunho' },
+    { id: 'planejada', title: 'Planejada' },
+    { id: 'aguardando_material', title: 'Aguardando Material' },
+    { id: 'em_programacao', title: 'Em Programação' },
+    { id: 'em_beneficiamento', title: 'Em Beneficiamento' },
+    { id: 'parcialmente_entregue', title: 'Parcialmente Entregue' },
+    { id: 'concluida', title: 'Concluída' },
+    { id: 'cancelada', title: 'Cancelada' },
+  ],
+  industrializacao: [
+    { id: 'planejada', title: 'Planejada' },
+    { id: 'em_programacao', title: 'Em Programação' },
+    { id: 'em_producao', title: 'Em Produção' },
+    { id: 'em_inspecao', title: 'Em Inspeção' },
+    { id: 'parcialmente_concluida', title: 'Parcialmente Concluída' },
+    { id: 'concluida', title: 'Concluída' },
+    { id: 'cancelada', title: 'Cancelada' },
+  ],
+};
 
 type Props = {
   tipoOrdem?: TipoOrdemIndustria;
@@ -53,6 +66,14 @@ const IndustriaKanbanBoard: React.FC<Props> = ({ tipoOrdem, search, refreshToken
     const newStatus = destination.droppableId as StatusOrdem;
     const item = items.find(i => i.id === draggableId);
     if (!item) return;
+    if (item.status === 'concluida' || item.status === 'cancelada') {
+      addToast('Ordens concluídas/canceladas não podem ser movidas.', 'warning');
+      return;
+    }
+    if (newStatus === 'concluida' || newStatus === 'cancelada') {
+      addToast('Para concluir/cancelar, use a tela da ordem (wizard).', 'warning');
+      return;
+    }
 
     // Optimistic Update
     const updatedItems = items.map(i => 
@@ -76,6 +97,11 @@ const IndustriaKanbanBoard: React.FC<Props> = ({ tipoOrdem, search, refreshToken
 
   const handleQuickStatus = async (order: OrdemIndustria, newStatus: StatusOrdem) => {
     if (order.status === newStatus) return;
+    if (order.status === 'concluida' || order.status === 'cancelada') return;
+    if (newStatus === 'concluida' || newStatus === 'cancelada') {
+      addToast('Para concluir/cancelar, use a tela da ordem (wizard).', 'warning');
+      return;
+    }
     updateItem(order.id, { status: newStatus });
     try {
       await updateOrdemStatus(order.id, newStatus, order.prioridade);
@@ -110,11 +136,12 @@ const IndustriaKanbanBoard: React.FC<Props> = ({ tipoOrdem, search, refreshToken
   const getItemsForColumn = (status: string) => {
     return items.filter(i => i.status === status).sort((a, b) => a.prioridade - b.prioridade);
   };
+  const columns = COLUMNS_BY_TIPO[(tipoOrdem || 'beneficiamento') as TipoOrdemIndustria] || COLUMNS_BY_TIPO.beneficiamento;
 
   return (
     <DragDropContext onDragEnd={onDragEnd}>
       <div className="flex gap-4 h-full overflow-x-auto p-1 pb-4">
-        {COLUMNS.map(col => (
+        {columns.map(col => (
           <IndustriaKanbanColumn 
             key={col.id} 
             columnId={col.id} 
@@ -124,6 +151,7 @@ const IndustriaKanbanBoard: React.FC<Props> = ({ tipoOrdem, search, refreshToken
             onQuickStatus={handleQuickStatus}
             onQuickPriority={handleQuickPriority}
             onCloneOrder={onCloneOrder}
+            isDropDisabled={col.id === 'concluida' || col.id === 'cancelada'}
           />
         ))}
       </div>
