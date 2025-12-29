@@ -124,7 +124,9 @@ export default function CommandPalette() {
 
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
-      const isK = e.key.toLowerCase() === 'k';
+      // Alguns eventos podem chegar sem `key` (ou com value inesperado) dependendo do browser/extensões.
+      const key = typeof e.key === 'string' ? e.key : '';
+      const isK = key.toLowerCase() === 'k';
       const isMeta = e.metaKey || e.ctrlKey;
       if (!isK || !isMeta) return;
       if (isEditableTarget(e.target)) return;
