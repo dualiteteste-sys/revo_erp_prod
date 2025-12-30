@@ -11,7 +11,7 @@ import { useAuth } from "@/contexts/AuthProvider";
  */
 
 type Plan = {
-  slug: "START" | "PRO" | "MAX" | "ULTRA";
+  slug: "essencial" | "pro" | "operacao" | "industria" | "scale";
   title: string;
   priceLabel: string; // estático p/ landing (pode vir de env no futuro)
   billingNote?: string;
@@ -21,33 +21,77 @@ type Plan = {
 
 const STATIC_PLANS: Plan[] = [
   {
-    slug: "START",
-    title: "Start",
-    priceLabel: "R$ 59/mês",
-    billingNote: "Teste grátis 30 dias",
-    features: ["Multi-tenant básico", "Cadastros essenciais", "Relatórios simples"],
-  },
-  {
-    slug: "PRO",
-    title: "Pro",
-    priceLabel: "R$ 129/mês",
-    billingNote: "Teste grátis 30 dias",
-    features: ["Tudo do Start", "Ordens de serviço", "Integrações principais"],
+    slug: "essencial",
+    title: "Revo Essencial",
+    priceLabel: "R$ 119/mês",
+    billingNote: "Teste grátis 30 dias • Sem cartão",
+    features: [
+      "Comércio + Serviços (o mínimo redondo)",
+      "Pedidos + PDV simples (1 caixa)",
+      "OS + Notas de Serviço (MVP)",
+      "Estoque + OC + Recebimentos + Importação XML",
+      "Financeiro básico (caixa, pagar/receber, extrato)",
+      "NF-e: rascunhos + configurações",
+      "Limites para manter suporte leve (2 usuários)",
+    ],
     highlight: true,
   },
   {
-    slug: "MAX",
-    title: "Max",
+    slug: "pro",
+    title: "Revo Pro",
     priceLabel: "R$ 249/mês",
-    billingNote: "Teste grátis 30 dias",
-    features: ["Tudo do Pro", "Automação avançada", "Dashboards"],
+    billingNote: "Comércio em crescimento",
+    features: [
+      "Tudo do Essencial",
+      "Comissões + metas + painel de vendas",
+      "Expedição (fluxo completo)",
+      "Automações de vendas (MVP)",
+      "CRM (funil/oportunidades) (MVP)",
+      "Relatórios avançados (vendas/financeiro/estoque)",
+      "PDV até 3 caixas • até 5 usuários",
+    ],
   },
   {
-    slug: "ULTRA",
-    title: "Ultra",
-    priceLabel: "Sob consulta",
-    billingNote: "Implantação assistida",
-    features: ["Tudo do Max", "Recursos enterprise", "SLA prioritário"],
+    slug: "operacao",
+    title: "Revo Operação",
+    priceLabel: "R$ 390/mês",
+    billingNote: "Serviços + Financeiro forte",
+    features: [
+      "Tudo do Pro",
+      "Contratos + cobranças recorrentes",
+      "Relatórios de serviços (OS) mais completos",
+      "Centros de custo e visão financeira mais detalhada",
+      "Ideal para serviços recorrentes",
+    ],
+  },
+  {
+    slug: "industria",
+    title: "Revo Indústria",
+    priceLabel: "R$ 590/mês",
+    billingNote: "Chão de fábrica (PCP/OP) • Implantação recomendada",
+    features: [
+      "Tudo do Pro + pacote completo Indústria",
+      "BOM + roteiros + OP/OB + execução",
+      "Tela do operador / chão de fábrica",
+      "Qualidade (planos/motivos) + lotes/bloqueio",
+      "MRP/PCP/capacidade (progressivo)",
+      "Relatórios industriais",
+      "Até 10 usuários (operadores com add-on barato)",
+    ],
+  },
+  {
+    slug: "scale",
+    title: "Revo Scale",
+    priceLabel: "R$ 990/mês",
+    billingNote: "Multiunidade + governança + integrações",
+    features: [
+      "Tudo do Indústria",
+      "Multiunidade / governança",
+      "Perfis e permissões avançadas",
+      "Auditoria/logs e SLAs",
+      "API/Webhooks e integrações (pacotes)",
+      "Suporte prioritário",
+    ],
   },
 ];
 
@@ -66,7 +110,7 @@ export default function Pricing() {
       return;
     }
     // anônimo: levar para a rota de signup (sem tocar no Supabase aqui)
-    nav(`/auth/signup?plan=${slug.toLowerCase()}&cycle=monthly`, { replace: false });
+    nav(`/auth/signup?plan=${slug}&cycle=monthly`, { replace: false });
   };
 
   return (
@@ -81,7 +125,7 @@ export default function Pricing() {
           </p>
         </header>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-5 gap-6">
           {plans.map((p) => (
             <article
               key={p.slug}
@@ -121,7 +165,7 @@ export default function Pricing() {
         </div>
 
         <footer className="mt-8 text-center text-xs text-neutral-500">
-          Valores meramente ilustrativos nesta landing. A cobrança efetiva é configurada no app.
+          Os limites e add-ons são ajustados no app. O objetivo do Essencial é ser simples e estável (baixo suporte).
         </footer>
       </div>
     </section>
