@@ -80,7 +80,7 @@ export default function OnboardingForm() {
         razao_social: form.nome,
         fantasia: form.fantasia || form.nome,
       });
-      navigate("/app", { replace: true });
+      navigate("/app?onboarding=1", { replace: true });
     } catch (err: any) {
       const msg = String(err?.message || err);
       setError(msg);

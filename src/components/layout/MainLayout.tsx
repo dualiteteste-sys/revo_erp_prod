@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import { AnimatePresence } from 'framer-motion';
 import { Outlet, useLocation, useNavigate } from 'react-router-dom';
 import Sidebar from './Sidebar';
@@ -8,6 +8,7 @@ import SubscriptionGuard from './SubscriptionGuard';
 import { menuConfig } from '../../config/menuConfig';
 import { useAuth } from '../../contexts/AuthProvider';
 import CommandPalette from './CommandPalette';
+import OnboardingWizardModal from '@/components/settings/onboarding/OnboardingWizardModal';
 
 const findActiveHref = (pathname: string): string => {
   for (const group of menuConfig) {
@@ -50,10 +51,21 @@ const MainLayout: React.FC = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const [activeItem, setActiveItem] = useState(() => findActiveHref(location.pathname));
+  const [isOnboardingWizardOpen, setIsOnboardingWizardOpen] = useState(false);
+  const [onboardingAutoOpenPending, setOnboardingAutoOpenPending] = useState(false);
 
   useEffect(() => {
     setActiveItem(findActiveHref(location.pathname));
   }, [location.pathname]);
+
+  const onboardingParam = useMemo(() => {
+    try {
+      const params = new URLSearchParams(location.search);
+      return params.get('onboarding') === '1';
+    } catch {
+      return false;
+    }
+  }, [location.search]);
 
   useEffect(() => {
     try {
@@ -78,6 +90,12 @@ const MainLayout: React.FC = () => {
     const isProfileIncomplete = requiredFields.some(field => !field || field.trim() === '');
     console.log('[MainLayout] Profile Check:', { isProfileIncomplete, activeEmpresa });
 
+    // On first access after onboarding form, open wizard once profile is not forcing settings.
+    if (onboardingParam) {
+      setOnboardingAutoOpenPending(true);
+      navigate(location.pathname, { replace: true });
+    }
+
     if (isProfileIncomplete || activeEmpresa.nome_razao_social === 'Empresa sem Nome') {
       if (!isSettingsPanelOpen) {
         console.log('[MainLayout] Forcing Settings Open');
@@ -97,8 +115,25 @@ const MainLayout: React.FC = () => {
         setIsSettingsPanelOpen(false);
         setIsSidebarCollapsed(!wasSidebarExpandedBeforeSettings);
       }
+
+      if (onboardingAutoOpenPending && !isOnboardingWizardOpen) {
+        setOnboardingAutoOpenPending(false);
+        setIsOnboardingWizardOpen(true);
+      }
     }
-  }, [activeEmpresa, authLoading, isSettingsPanelOpen, isSidebarCollapsed, settingsCanClose, wasSidebarExpandedBeforeSettings]);
+  }, [
+    activeEmpresa,
+    authLoading,
+    isSettingsPanelOpen,
+    isSidebarCollapsed,
+    settingsCanClose,
+    wasSidebarExpandedBeforeSettings,
+    onboardingAutoOpenPending,
+    onboardingParam,
+    navigate,
+    location.pathname,
+    isOnboardingWizardOpen,
+  ]);
 
   const handleOpenSettings = () => {
     setWasSidebarExpandedBeforeSettings(!isSidebarCollapsed);
@@ -122,6 +157,11 @@ const MainLayout: React.FC = () => {
     <SubscriptionProvider>
       <div className="h-screen p-4 flex gap-4">
         <CommandPalette />
+        <OnboardingWizardModal
+          isOpen={isOnboardingWizardOpen}
+          mode="auto"
+          onClose={() => setIsOnboardingWizardOpen(false)}
+        />
         <Sidebar
           isCollapsed={isSidebarCollapsed}
           setIsCollapsed={setIsSidebarCollapsed}
