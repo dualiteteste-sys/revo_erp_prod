@@ -1,12 +1,15 @@
 import React, { useState, useEffect } from 'react';
 import { listPosicaoEstoque, getKardex, EstoquePosicao, EstoqueMovimento } from '@/services/suprimentos';
-import { Search, Package, ArrowRightLeft, History, AlertCircle, Loader2 } from 'lucide-react';
-import GlassCard from '@/components/ui/GlassCard';
+import { Search, ArrowRightLeft, History, Download, Loader2 } from 'lucide-react';
 import Modal from '@/components/ui/Modal';
 import MovimentoModal from '@/components/suprimentos/MovimentoModal';
 import { useDebounce } from '@/hooks/useDebounce';
 import Toggle from '@/components/ui/forms/Toggle';
 import { useSearchParams } from 'react-router-dom';
+import { downloadCsv } from '@/utils/csv';
+import { Button } from '@/components/ui/button';
+import { useToast } from '@/contexts/ToastProvider';
+import { useHasPermission } from '@/hooks/useHasPermission';
 
 export default function EstoquePage() {
   const [produtos, setProdutos] = useState<EstoquePosicao[]>([]);
@@ -23,6 +26,10 @@ export default function EstoquePage() {
   const [isKardexOpen, setIsKardexOpen] = useState(false);
   const [kardexData, setKardexData] = useState<EstoqueMovimento[]>([]);
   const [loadingKardex, setLoadingKardex] = useState(false);
+  const { addToast } = useToast();
+  const permUpdate = useHasPermission('suprimentos', 'update');
+  const canUpdate = !!permUpdate.data;
+  const permsLoading = permUpdate.isLoading;
 
   const fetchEstoque = async () => {
     setLoading(true);
@@ -30,7 +37,7 @@ export default function EstoquePage() {
       const data = await listPosicaoEstoque(debouncedSearch, showBaixoEstoque);
       setProdutos(data);
     } catch (error) {
-      console.error(error);
+      addToast('Falha ao carregar estoque. Tente novamente.', 'error');
     } finally {
       setLoading(false);
     }
@@ -65,6 +72,10 @@ export default function EstoquePage() {
   }, [pendingFocusTerm, produtos, loading]);
 
   const handleOpenMovimento = (produto: EstoquePosicao) => {
+    if (!permsLoading && !canUpdate) {
+      addToast('Você não tem permissão para movimentar estoque.', 'warning');
+      return;
+    }
     setSelectedProduto(produto);
     setIsMovimentoOpen(true);
   };
@@ -76,9 +87,53 @@ export default function EstoquePage() {
     try {
       const data = await getKardex(produto.produto_id);
       setKardexData(data);
+    } catch {
+      addToast('Falha ao carregar kardex. Tente novamente.', 'error');
+      setKardexData([]);
     } finally {
       setLoadingKardex(false);
     }
+  };
+
+  const handleExportEstoqueCsv = () => {
+    if (produtos.length === 0) {
+      addToast('Nada para exportar.', 'warning');
+      return;
+    }
+    downloadCsv({
+      filename: `estoque_posicao_${new Date().toISOString().slice(0, 10)}`,
+      headers: ['produto', 'sku', 'unidade', 'saldo', 'custo_medio', 'estoque_min', 'status'],
+      rows: produtos.map((p) => [
+        p.nome,
+        p.sku ?? '',
+        p.unidade,
+        p.saldo,
+        p.custo_medio,
+        p.estoque_min ?? '',
+        p.status_estoque,
+      ]),
+    });
+  };
+
+  const handleExportKardexCsv = () => {
+    if (!selectedProduto) return;
+    if (kardexData.length === 0) {
+      addToast('Nada para exportar.', 'warning');
+      return;
+    }
+    downloadCsv({
+      filename: `kardex_${selectedProduto.nome}_${new Date().toISOString().slice(0, 10)}`,
+      headers: ['data', 'tipo', 'qtd', 'saldo_anterior', 'saldo_novo', 'ref', 'usuario'],
+      rows: kardexData.map((m) => [
+        new Date(m.created_at).toLocaleString('pt-BR'),
+        m.tipo,
+        m.quantidade,
+        m.saldo_anterior,
+        m.saldo_novo,
+        m.documento_ref ?? m.observacao ?? '',
+        m.usuario_email ?? '',
+      ]),
+    });
   };
 
   const getStatusBadge = (status: string) => {
@@ -98,6 +153,12 @@ export default function EstoquePage() {
         <div>
           <h1 className="text-3xl font-bold text-gray-800">Controle de Estoque</h1>
           <p className="text-gray-600 text-sm mt-1">Gerencie saldos e movimentações.</p>
+        </div>
+        <div className="flex items-center gap-2">
+          <Button type="button" variant="secondary" onClick={handleExportEstoqueCsv} className="gap-2">
+            <Download size={18} />
+            Exportar CSV
+          </Button>
         </div>
       </div>
 
@@ -137,7 +198,23 @@ export default function EstoquePage() {
               {loading ? (
                 <tr><td colSpan={4} className="p-8 text-center"><Loader2 className="animate-spin mx-auto text-blue-500" /></td></tr>
               ) : produtos.length === 0 ? (
-                <tr><td colSpan={4} className="p-8 text-center text-gray-500">Nenhum produto encontrado.</td></tr>
+                <tr>
+                  <td colSpan={4} className="p-8 text-center">
+                    <div className="text-gray-500">Nenhum produto encontrado.</div>
+                    {search || showBaixoEstoque ? (
+                      <button
+                        type="button"
+                        className="mt-3 text-sm text-blue-600 hover:underline"
+                        onClick={() => {
+                          setSearch('');
+                          setShowBaixoEstoque(false);
+                        }}
+                      >
+                        Limpar filtros
+                      </button>
+                    ) : null}
+                  </td>
+                </tr>
               ) : (
                 produtos.map((prod) => {
                   const isHighlighted = highlightProdutoId === prod.produto_id;
@@ -157,8 +234,9 @@ export default function EstoquePage() {
                     <td className="px-6 py-4 text-right space-x-2">
                       <button 
                         onClick={() => handleOpenMovimento(prod)}
-                        className="text-blue-600 hover:bg-blue-50 p-2 rounded-lg" 
-                        title="Nova Movimentação"
+                        className="text-blue-600 hover:bg-blue-50 p-2 rounded-lg disabled:opacity-50 disabled:hover:bg-transparent" 
+                        title={!permsLoading && !canUpdate ? 'Sem permissão para movimentar estoque' : 'Nova Movimentação'}
+                        disabled={permsLoading || !canUpdate}
                       >
                         <ArrowRightLeft size={18} />
                       </button>
@@ -190,6 +268,12 @@ export default function EstoquePage() {
 
       <Modal isOpen={isKardexOpen} onClose={() => setIsKardexOpen(false)} title={`Kardex: ${selectedProduto?.nome}`} size="4xl">
         <div className="p-6">
+            <div className="flex justify-end mb-3">
+              <Button type="button" variant="secondary" onClick={handleExportKardexCsv} disabled={loadingKardex || kardexData.length === 0} className="gap-2">
+                <Download size={18} />
+                Exportar CSV
+              </Button>
+            </div>
             {loadingKardex ? (
                 <div className="flex justify-center p-8"><Loader2 className="animate-spin text-blue-500" /></div>
             ) : kardexData.length === 0 ? (

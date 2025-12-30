@@ -12,6 +12,7 @@ export interface EmpresaFeatures {
   max_users: number;
   servicos_enabled: boolean;
   industria_enabled: boolean;
+  isFallback: boolean;
   loading: boolean;
   error: unknown | null;
   refetch: () => Promise<void>;
@@ -24,6 +25,7 @@ const DEFAULT_FEATURES: Omit<EmpresaFeatures, 'loading' | 'refetch'> = {
   max_users: 999,
   servicos_enabled: false,
   industria_enabled: false,
+  isFallback: false,
   error: null,
 };
 
@@ -60,16 +62,21 @@ export function useEmpresaFeatures(): EmpresaFeatures {
         max_users: typeof data?.max_users === 'number' ? data.max_users : 999,
         servicos_enabled: !!data?.servicos_enabled,
         industria_enabled: !!data?.industria_enabled,
+        isFallback: false,
         error: null,
       });
     } catch (error) {
-      logger.warn('[EmpresaFeatures] Falha ao buscar empresa_features; bloqueando acesso até validar plano/limites', {
+      logger.warn('[EmpresaFeatures] Falha ao buscar empresa_features; usando fallback seguro', {
         error,
       });
       setFeatures((prev) => ({
         ...prev,
-        servicos_enabled: false,
-        industria_enabled: false,
+        // Fallback seguro:
+        // - UI não fica "travada" por erro/transiente de permissão.
+        // - O enforcement real deve acontecer no DB via RPCs/Policies.
+        servicos_enabled: true,
+        industria_enabled: true,
+        isFallback: true,
         error,
       }));
     } finally {
