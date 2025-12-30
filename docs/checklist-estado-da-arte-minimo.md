@@ -34,7 +34,7 @@ Regras:
 
 ### 0.4 Release gate (qualidade)
 - [x] RG-01 Release Gate local/CI: `yarn test --run` + suite E2E + `yarn verify:migrations`
-- [ ] RG-02 Pipeline PROD: “expected vs PROD schema” sem divergências
+- [x] RG-02 Pipeline PROD: “expected vs PROD schema” sem divergências
 - [x] RG-03 Console limpo: varredura de módulos críticos sem erros/warns relevantes
 - [ ] RG-04 E2E “Happy path” por plano (Comércio/Serviços/Indústria) automatizado
 
