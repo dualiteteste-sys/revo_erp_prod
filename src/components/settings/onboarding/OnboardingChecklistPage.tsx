@@ -1,21 +1,13 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { CheckCircle2, Circle, ExternalLink, Loader2, RefreshCw, XCircle } from 'lucide-react';
+import { CheckCircle2, Circle, ExternalLink, Loader2, RefreshCw, Sparkles, XCircle } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
 import { useAuth } from '@/contexts/AuthProvider';
 import { useToast } from '@/contexts/ToastProvider';
 import { useSupabase } from '@/providers/SupabaseProvider';
 import { Button } from '@/components/ui/button';
-
-type CheckStatus = 'ok' | 'warn' | 'missing';
-
-type CheckItem = {
-  title: string;
-  description: string;
-  status: CheckStatus;
-  actionLabel: string;
-  actionHref: string;
-};
+import OnboardingWizardModal from './OnboardingWizardModal';
+import { fetchOnboardingChecks, type CheckStatus, type OnboardingCheck } from './onboardingChecks';
 
 function StatusIcon({ status }: { status: CheckStatus }) {
   if (status === 'ok') return <CheckCircle2 className="text-emerald-600" size={18} />;
@@ -30,7 +22,8 @@ export default function OnboardingChecklistPage() {
   const navigate = useNavigate();
 
   const [loading, setLoading] = useState(true);
-  const [checks, setChecks] = useState<CheckItem[]>([]);
+  const [checks, setChecks] = useState<OnboardingCheck[]>([]);
+  const [isWizardOpen, setIsWizardOpen] = useState(false);
 
   const empresaId = activeEmpresa?.id ?? null;
 
@@ -38,75 +31,8 @@ export default function OnboardingChecklistPage() {
     if (!empresaId) return;
     setLoading(true);
     try {
-      const [
-        ccAny,
-        ccRec,
-        ccPag,
-        nfeEmitente,
-        nfeNumeracao,
-        centrosCusto,
-      ] = await Promise.all([
-        supabase.from('financeiro_contas_correntes').select('id', { count: 'exact', head: true }).eq('empresa_id', empresaId),
-        supabase.from('financeiro_contas_correntes').select('id').eq('empresa_id', empresaId).eq('padrao_para_recebimentos', true).limit(1),
-        supabase.from('financeiro_contas_correntes').select('id').eq('empresa_id', empresaId).eq('padrao_para_pagamentos', true).limit(1),
-        supabase.from('fiscal_nfe_emitente').select('empresa_id').eq('empresa_id', empresaId).maybeSingle(),
-        supabase.from('fiscal_nfe_numeracao').select('empresa_id').eq('empresa_id', empresaId).maybeSingle(),
-        supabase.from('centros_de_custo').select('id', { count: 'exact', head: true }).eq('empresa_id', empresaId),
-      ]);
-
-      const hasContaCorrente = !ccAny.error && (ccAny.count ?? 0) > 0;
-      const hasPadraoReceb = !ccRec.error && (ccRec.data?.length ?? 0) > 0;
-      const hasPadraoPag = !ccPag.error && (ccPag.data?.length ?? 0) > 0;
-      const hasEmitente = !nfeEmitente.error && !!nfeEmitente.data?.empresa_id;
-      const hasNumeracao = !nfeNumeracao.error && !!nfeNumeracao.data?.empresa_id;
-      const hasCentros = !centrosCusto.error && (centrosCusto.count ?? 0) > 0;
-
-      const next: CheckItem[] = [
-        {
-          title: 'Contas Correntes',
-          description: hasContaCorrente ? 'Ok: já existe pelo menos 1 conta.' : 'Cadastre pelo menos 1 conta corrente (Caixa/Banco).',
-          status: hasContaCorrente ? 'ok' : 'missing',
-          actionLabel: 'Abrir Tesouraria',
-          actionHref: '/app/financeiro/tesouraria',
-        },
-        {
-          title: 'Conta padrão (Recebimentos)',
-          description: hasPadraoReceb ? 'Ok: há conta padrão para recebimentos.' : 'Defina uma conta padrão para recebimentos (para baixar títulos).',
-          status: hasPadraoReceb ? 'ok' : hasContaCorrente ? 'warn' : 'missing',
-          actionLabel: 'Definir na Tesouraria',
-          actionHref: '/app/financeiro/tesouraria',
-        },
-        {
-          title: 'Conta padrão (Pagamentos)',
-          description: hasPadraoPag ? 'Ok: há conta padrão para pagamentos.' : 'Defina uma conta padrão para pagamentos (para pagar títulos).',
-          status: hasPadraoPag ? 'ok' : hasContaCorrente ? 'warn' : 'missing',
-          actionLabel: 'Definir na Tesouraria',
-          actionHref: '/app/financeiro/tesouraria',
-        },
-        {
-          title: 'Centro de Custo',
-          description: hasCentros ? 'Ok: já existe pelo menos 1 centro de custo.' : 'Cadastre centros de custo para relatórios e auditoria.',
-          status: hasCentros ? 'ok' : 'warn',
-          actionLabel: 'Abrir Centros de Custo',
-          actionHref: '/app/financeiro/centros-de-custo',
-        },
-        {
-          title: 'NF-e: Emitente',
-          description: hasEmitente ? 'Ok: emitente configurado.' : 'Cadastre os dados do emitente para emitir NF-e.',
-          status: hasEmitente ? 'ok' : 'warn',
-          actionLabel: 'Configurar NF-e',
-          actionHref: '/app/fiscal/nfe/configuracoes',
-        },
-        {
-          title: 'NF-e: Numeração',
-          description: hasNumeracao ? 'Ok: série/numeração configurada.' : 'Configure série/numeração para emitir NF-e.',
-          status: hasNumeracao ? 'ok' : 'warn',
-          actionLabel: 'Configurar NF-e',
-          actionHref: '/app/fiscal/nfe/configuracoes',
-        },
-      ];
-
-      setChecks(next);
+      const res = await fetchOnboardingChecks(supabase, empresaId);
+      setChecks(res.checks);
     } catch (e: any) {
       addToast(e?.message || 'Falha ao carregar checklist de onboarding.', 'error');
       setChecks([]);
@@ -140,6 +66,15 @@ export default function OnboardingChecklistPage() {
         </div>
 
         <div className="flex items-center gap-2">
+          <Button
+            onClick={() => setIsWizardOpen(true)}
+            variant="outline"
+            className="gap-2"
+            disabled={!empresaId}
+          >
+            <Sparkles size={16} />
+            Assistente
+          </Button>
           <Button onClick={() => void load()} variant="outline" className="gap-2" disabled={loading || !empresaId}>
             {loading ? <Loader2 className="animate-spin" size={16} /> : <RefreshCw size={16} />}
             Atualizar
@@ -190,7 +125,15 @@ export default function OnboardingChecklistPage() {
           </div>
         )}
       </div>
+
+      <OnboardingWizardModal
+        isOpen={isWizardOpen}
+        mode="manual"
+        onClose={() => {
+          setIsWizardOpen(false);
+          void load();
+        }}
+      />
     </div>
   );
 }
-
