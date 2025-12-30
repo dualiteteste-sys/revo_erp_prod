@@ -15,9 +15,17 @@ import { Button } from '@/components/ui/button';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { downloadCsv } from '@/utils/csv';
 import { isSeedEnabled } from '@/utils/seed';
+import { useHasPermission } from '@/hooks/useHasPermission';
 
 const PartnersPage: React.FC = () => {
   const enableSeed = isSeedEnabled();
+  const permCreate = useHasPermission('partners', 'create');
+  const permUpdate = useHasPermission('partners', 'update');
+  const permDelete = useHasPermission('partners', 'delete');
+  const permsLoading = permCreate.isLoading || permUpdate.isLoading || permDelete.isLoading;
+  const canCreate = !!permCreate.data;
+  const canUpdate = !!permUpdate.data;
+  const canDelete = !!permDelete.data;
 
   const {
     partners,
@@ -52,6 +60,15 @@ const PartnersPage: React.FC = () => {
     partner: partnersService.PartnerListItem | null = null,
     initialValues?: Partial<partnersService.PartnerDetails>
   ) => {
+    const needsUpdate = !!partner?.id;
+    if (!permsLoading && needsUpdate && !canUpdate) {
+      addToast('Você não tem permissão para editar parceiros.', 'warning');
+      return;
+    }
+    if (!permsLoading && !needsUpdate && !canCreate) {
+      addToast('Você não tem permissão para criar parceiros.', 'warning');
+      return;
+    }
     setInitialFormValues(initialValues);
     if (partner?.id) {
       setIsFetchingDetails(true);
@@ -87,6 +104,10 @@ const PartnersPage: React.FC = () => {
   };
 
   const handleOpenDeleteModal = (partner: partnersService.PartnerListItem) => {
+    if (!permsLoading && !canDelete) {
+      addToast('Você não tem permissão para inativar parceiros.', 'warning');
+      return;
+    }
     setPartnerToDelete(partner);
     setIsDeleteModalOpen(true);
   };
@@ -98,6 +119,10 @@ const PartnersPage: React.FC = () => {
 
   const handleDelete = async () => {
     if (!partnerToDelete?.id) return;
+    if (!permsLoading && !canDelete) {
+      addToast('Você não tem permissão para inativar parceiros.', 'warning');
+      return;
+    }
     setIsDeleting(true);
     try {
       await partnersService.deletePartner(partnerToDelete.id);
@@ -112,6 +137,10 @@ const PartnersPage: React.FC = () => {
   };
 
   const handleRestore = async (partner: partnersService.PartnerListItem) => {
+    if (!permsLoading && !canUpdate) {
+      addToast('Você não tem permissão para reativar parceiros.', 'warning');
+      return;
+    }
     try {
       await partnersService.restorePartner(partner.id);
       addToast('Registro reativado com sucesso!', 'success');
@@ -129,6 +158,10 @@ const PartnersPage: React.FC = () => {
   };
 
   const handleSeedPartners = async () => {
+    if (!permsLoading && !canCreate) {
+      addToast('Você não tem permissão para popular dados.', 'warning');
+      return;
+    }
     setIsSeeding(true);
     try {
       const seededPartners = await partnersService.seedDefaultPartners();
@@ -169,7 +202,13 @@ const PartnersPage: React.FC = () => {
         </Button>
 
         {enableSeed ? (
-          <Button onClick={handleSeedPartners} disabled={isSeeding || loading} variant="secondary" className="gap-2">
+          <Button
+            onClick={handleSeedPartners}
+            disabled={isSeeding || loading || permsLoading || !canCreate}
+            title={!canCreate ? 'Sem permissão para popular dados' : undefined}
+            variant="secondary"
+            className="gap-2"
+          >
             {isSeeding ? <Loader2 className="animate-spin" size={18} /> : <DatabaseBackup size={18} />}
             Popular dados
           </Button>
@@ -177,7 +216,7 @@ const PartnersPage: React.FC = () => {
 
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button className="gap-2">
+            <Button className="gap-2" disabled={permsLoading || !canCreate} title={!canCreate ? 'Sem permissão para criar' : undefined}>
               <Plus size={18} />
               Novo
             </Button>
@@ -196,7 +235,7 @@ const PartnersPage: React.FC = () => {
         </DropdownMenu>
       </>
     );
-  }, [enableSeed, handleSeedPartners, handleOpenForm, isSeeding, loading, partners]);
+  }, [enableSeed, handleSeedPartners, handleOpenForm, isSeeding, loading, partners, permsLoading, canCreate]);
 
   const formTitle = useMemo(() => {
     if (selectedPartner) return 'Editar Cliente/Fornecedor';
