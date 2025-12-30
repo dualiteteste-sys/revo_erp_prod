@@ -9,8 +9,10 @@ import Modal from '../../components/ui/Modal';
 import CarriersTable from '../../components/carriers/CarriersTable';
 import CarrierFormPanel from '../../components/carriers/CarrierFormPanel';
 import Select from '@/components/ui/forms/Select';
+import { isSeedEnabled } from '@/utils/seed';
 
 const CarriersPage: React.FC = () => {
+  const enableSeed = isSeedEnabled();
   const {
     carriers,
     loading,
@@ -120,14 +122,16 @@ const CarriersPage: React.FC = () => {
             <p className="text-gray-600 text-sm mt-1">Gerencie as empresas responsáveis pelo transporte de suas mercadorias.</p>
         </div>
         <div className="flex items-center gap-2">
-            <button
-              onClick={handleSeed}
-              disabled={isSeeding || loading}
-              className="flex items-center gap-2 bg-gray-100 text-gray-700 font-semibold py-2 px-4 rounded-lg hover:bg-gray-200 transition-colors disabled:opacity-50"
-            >
-              {isSeeding ? <Loader2 className="animate-spin" size={20} /> : <DatabaseBackup size={20} />}
-              Popular Dados
-            </button>
+            {enableSeed ? (
+              <button
+                onClick={handleSeed}
+                disabled={isSeeding || loading}
+                className="flex items-center gap-2 bg-gray-100 text-gray-700 font-semibold py-2 px-4 rounded-lg hover:bg-gray-200 transition-colors disabled:opacity-50"
+              >
+                {isSeeding ? <Loader2 className="animate-spin" size={20} /> : <DatabaseBackup size={20} />}
+                Popular Dados
+              </button>
+            ) : null}
             <button
               onClick={() => handleOpenForm()}
               className="flex items-center gap-2 bg-blue-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-blue-700 transition-colors shadow-sm"
@@ -176,16 +180,20 @@ const CarriersPage: React.FC = () => {
                 <Truck size={48} className="text-gray-400" />
             </div>
             <p className="font-semibold text-lg text-gray-700">Nenhuma transportadora encontrada.</p>
-            <p className="text-sm mb-6">Comece cadastrando uma nova transportadora ou popule com dados de exemplo.</p>
+            <p className="text-sm mb-6">
+              Comece cadastrando uma nova transportadora{enableSeed ? ' ou popule com dados de exemplo.' : '.'}
+            </p>
             <div className="flex gap-3">
-                <button
-                    onClick={handleSeed}
-                    disabled={isSeeding}
-                    className="flex items-center gap-2 bg-blue-100 text-blue-700 font-bold py-2 px-4 rounded-lg hover:bg-blue-200 transition-colors disabled:opacity-50"
-                >
-                    {isSeeding ? <Loader2 className="animate-spin" size={20} /> : <DatabaseBackup size={20} />}
-                    Popular Dados
-                </button>
+                {enableSeed ? (
+                  <button
+                      onClick={handleSeed}
+                      disabled={isSeeding}
+                      className="flex items-center gap-2 bg-blue-100 text-blue-700 font-bold py-2 px-4 rounded-lg hover:bg-blue-200 transition-colors disabled:opacity-50"
+                  >
+                      {isSeeding ? <Loader2 className="animate-spin" size={20} /> : <DatabaseBackup size={20} />}
+                      Popular Dados
+                  </button>
+                ) : null}
                 <button
                     onClick={() => handleOpenForm()}
                     className="text-blue-600 hover:text-blue-800 font-medium hover:underline flex items-center"

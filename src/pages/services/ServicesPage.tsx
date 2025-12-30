@@ -11,8 +11,10 @@ import Modal from '@/components/ui/Modal';
 import PageHeader from '@/components/ui/PageHeader';
 import { Button } from '@/components/ui/button';
 import Select from '@/components/ui/forms/Select';
+import { isSeedEnabled } from '@/utils/seed';
 
 export default function ServicesPage() {
+  const enableSeed = isSeedEnabled();
   const {
     services,
     loading,
@@ -137,10 +139,12 @@ export default function ServicesPage() {
           icon={<Wrench size={20} />}
           actions={
             <>
-              <Button onClick={handleSeedServices} disabled={isSeeding || loading} variant="secondary">
-                {isSeeding ? <Loader2 className="animate-spin" size={18} /> : <DatabaseBackup size={18} />}
-                <span className="ml-2">Popular dados</span>
-              </Button>
+              {enableSeed ? (
+                <Button onClick={handleSeedServices} disabled={isSeeding || loading} variant="secondary" className="gap-2">
+                  {isSeeding ? <Loader2 className="animate-spin" size={18} /> : <DatabaseBackup size={18} />}
+                  Popular dados
+                </Button>
+              ) : null}
               <Button onClick={() => handleOpenForm()}>
                 <Plus size={18} />
                 <span className="ml-2">Novo serviço</span>
@@ -198,12 +202,16 @@ export default function ServicesPage() {
           <div className="h-96 flex flex-col items-center justify-center text-center text-gray-500 p-4">
             <Wrench size={48} className="mb-4" />
             <p className="font-semibold text-lg">Nenhum serviço encontrado.</p>
-            <p className="text-sm mb-4">Comece cadastrando um novo serviço ou popule com dados de exemplo.</p>
+            <p className="text-sm mb-4">
+              Comece cadastrando um novo serviço{enableSeed ? ' ou popule com dados de exemplo.' : '.'}
+            </p>
             {searchTerm && <p className="text-sm">Tente ajustar sua busca.</p>}
-            <Button onClick={handleSeedServices} disabled={isSeeding} variant="secondary" className="mt-4">
-              {isSeeding ? <Loader2 className="animate-spin" size={18} /> : <DatabaseBackup size={18} />}
-              <span className="ml-2">Popular com dados de exemplo</span>
-            </Button>
+            {enableSeed ? (
+              <Button onClick={handleSeedServices} disabled={isSeeding} variant="secondary" className="mt-4 gap-2">
+                {isSeeding ? <Loader2 className="animate-spin" size={18} /> : <DatabaseBackup size={18} />}
+                Popular com dados de exemplo
+              </Button>
+            ) : null}
           </div>
         ) : (
           <ServicesTable services={services} onEdit={handleOpenForm} onDelete={openDeleteModal} onClone={handleClone} sortBy={sortBy} onSort={handleSort} />

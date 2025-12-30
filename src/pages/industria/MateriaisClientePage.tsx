@@ -16,8 +16,10 @@ import ClientAutocomplete from '@/components/common/ClientAutocomplete';
 import { useNavigate } from 'react-router-dom';
 import { logger } from '@/lib/logger';
 import { Button } from '@/components/ui/button';
+import { isSeedEnabled } from '@/utils/seed';
 
 export default function MateriaisClientePage() {
+  const enableSeed = isSeedEnabled();
   const [materiais, setMateriais] = useState<MaterialClienteListItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -187,10 +189,12 @@ export default function MateriaisClientePage() {
             <FileUp size={18} />
             Classificar Recebimento
           </Button>
-          <Button onClick={handleSeed} disabled={isSeeding || loading} variant="secondary" className="gap-2">
-            {isSeeding ? <Loader2 className="animate-spin" size={18} /> : <DatabaseBackup size={18} />}
-            Popular Dados
-          </Button>
+          {enableSeed ? (
+            <Button onClick={handleSeed} disabled={isSeeding || loading} variant="secondary" className="gap-2">
+              {isSeeding ? <Loader2 className="animate-spin" size={18} /> : <DatabaseBackup size={18} />}
+              Popular Dados
+            </Button>
+          ) : null}
           <Button onClick={handleNew} className="gap-2">
             <PlusCircle size={18} />
             Novo Material

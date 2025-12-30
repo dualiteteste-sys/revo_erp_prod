@@ -12,8 +12,10 @@ import CobrancasSummary from '@/components/financeiro/cobrancas/CobrancasSummary
 import Select from '@/components/ui/forms/Select';
 import DatePicker from '@/components/ui/DatePicker';
 import { Button } from '@/components/ui/button';
+import { isSeedEnabled } from '@/utils/seed';
 
 export default function CobrancasBancariasPage() {
+  const enableSeed = isSeedEnabled();
   const {
     cobrancas,
     summary,
@@ -110,10 +112,12 @@ export default function CobrancasBancariasPage() {
             <p className="text-gray-600 text-sm mt-1">Gestão de boletos, Pix e links de pagamento.</p>
         </div>
         <div className="flex items-center gap-2">
-          <Button onClick={handleSeed} disabled={isSeeding || loading} variant="outline" className="gap-2">
-            {isSeeding ? <Loader2 className="animate-spin" size={20} /> : <DatabaseBackup size={20} />}
-            Popular Dados
-          </Button>
+          {enableSeed ? (
+            <Button onClick={handleSeed} disabled={isSeeding || loading} variant="outline" className="gap-2">
+              {isSeeding ? <Loader2 className="animate-spin" size={20} /> : <DatabaseBackup size={20} />}
+              Popular Dados
+            </Button>
+          ) : null}
           <Button onClick={() => handleOpenForm()} className="gap-2">
             <PlusCircle size={20} />
             Nova Cobrança

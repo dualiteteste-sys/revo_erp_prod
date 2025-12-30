@@ -2,7 +2,7 @@ import React, { useMemo, useState } from 'react';
 import { usePartners } from '../../hooks/usePartners';
 import { useToast } from '../../contexts/ToastProvider';
 import * as partnersService from '../../services/partners';
-import { Loader2, Search, Users2, DatabaseBackup, UsersRound, Plus } from 'lucide-react';
+import { Loader2, Search, Users2, DatabaseBackup, UsersRound, Plus, FileDown } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
 import Pagination from '../../components/ui/Pagination';
 import ConfirmationModal from '../../components/ui/ConfirmationModal';
@@ -13,8 +13,12 @@ import Select from '@/components/ui/forms/Select';
 import PageHeader from '@/components/ui/PageHeader';
 import { Button } from '@/components/ui/button';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import { downloadCsv } from '@/utils/csv';
+import { isSeedEnabled } from '@/utils/seed';
 
 const PartnersPage: React.FC = () => {
+  const enableSeed = isSeedEnabled();
+
   const {
     partners,
     loading,
@@ -140,16 +144,42 @@ const PartnersPage: React.FC = () => {
   const headerActions = useMemo(() => {
     return (
       <>
-        <Button onClick={handleSeedPartners} disabled={isSeeding || loading} variant="secondary">
-          {isSeeding ? <Loader2 className="animate-spin" size={18} /> : <DatabaseBackup size={18} />}
-          <span className="ml-2">Popular dados</span>
+        <Button
+          onClick={() => {
+            downloadCsv({
+              filename: 'clientes-fornecedores.csv',
+              headers: ['Nome', 'Tipo', 'Documento', 'Email', 'Telefone', 'Status'],
+              rows: partners.map((p: any) => [
+                p.nome || '',
+                p.tipo || '',
+                p.documento || p.cnpj || p.cpf || '',
+                p.email || '',
+                p.telefone || '',
+                p.ativo === false ? 'Inativo' : 'Ativo',
+              ]),
+            });
+          }}
+          disabled={loading || partners.length === 0}
+          variant="secondary"
+          title="Exportar a lista atual"
+          className="gap-2"
+        >
+          <FileDown size={18} />
+          Exportar CSV
         </Button>
+
+        {enableSeed ? (
+          <Button onClick={handleSeedPartners} disabled={isSeeding || loading} variant="secondary" className="gap-2">
+            {isSeeding ? <Loader2 className="animate-spin" size={18} /> : <DatabaseBackup size={18} />}
+            Popular dados
+          </Button>
+        ) : null}
 
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button>
+            <Button className="gap-2">
               <Plus size={18} />
-              <span className="ml-2">Novo</span>
+              Novo
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
@@ -166,7 +196,7 @@ const PartnersPage: React.FC = () => {
         </DropdownMenu>
       </>
     );
-  }, [handleSeedPartners, handleOpenForm, isSeeding, loading]);
+  }, [enableSeed, handleSeedPartners, handleOpenForm, isSeeding, loading, partners]);
 
   const formTitle = useMemo(() => {
     if (selectedPartner) return 'Editar Cliente/Fornecedor';
@@ -229,12 +259,16 @@ const PartnersPage: React.FC = () => {
           <div className="h-96 flex flex-col items-center justify-center text-center text-gray-500 p-4">
             <Users2 size={48} className="mb-4" />
             <p className="font-semibold text-lg">Nenhum cliente ou fornecedor encontrado.</p>
-            <p className="text-sm mb-4">Comece cadastrando um novo parceiro ou popule com dados de exemplo.</p>
+            <p className="text-sm mb-4">
+              Comece cadastrando um novo parceiro{enableSeed ? ' ou popule com dados de exemplo.' : '.'}
+            </p>
             {searchTerm && <p className="text-sm">Tente ajustar sua busca.</p>}
-            <Button onClick={handleSeedPartners} disabled={isSeeding} variant="secondary" className="mt-4">
-              {isSeeding ? <Loader2 className="animate-spin" size={18} /> : <DatabaseBackup size={18} />}
-              <span className="ml-2">Popular com dados de exemplo</span>
-            </Button>
+            {enableSeed ? (
+              <Button onClick={handleSeedPartners} disabled={isSeeding} variant="secondary" className="mt-4 gap-2">
+                {isSeeding ? <Loader2 className="animate-spin" size={18} /> : <DatabaseBackup size={18} />}
+                Popular com dados de exemplo
+              </Button>
+            ) : null}
           </div>
         ) : (
           <PartnersTable

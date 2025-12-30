@@ -11,8 +11,10 @@ import { Button } from '@/components/ui/button';
 import PageHeader from '@/components/ui/PageHeader';
 import SearchField from '@/components/ui/forms/SearchField';
 import { useHasPermission } from '@/hooks/useHasPermission';
+import { isSeedEnabled } from '@/utils/seed';
 
 export default function CompetenciasPage() {
+  const enableSeed = isSeedEnabled();
   const [competencias, setCompetencias] = useState<Competencia[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -90,16 +92,18 @@ export default function CompetenciasPage() {
         icon={<BookOpen className="w-5 h-5" />}
         actions={
           <>
-            <Button
-              onClick={handleSeed}
-              disabled={isSeeding || loading || permsLoading || !canManage}
-              title={!canManage ? 'Sem permissão para popular dados' : undefined}
-              variant="outline"
-              className="gap-2"
-            >
-              {isSeeding ? <Loader2 className="animate-spin" size={16} /> : <DatabaseBackup size={16} />}
-              Popular Dados
-            </Button>
+            {enableSeed ? (
+              <Button
+                onClick={handleSeed}
+                disabled={isSeeding || loading || permsLoading || !canManage}
+                title={!canManage ? 'Sem permissão para popular dados' : undefined}
+                variant="outline"
+                className="gap-2"
+              >
+                {isSeeding ? <Loader2 className="animate-spin" size={16} /> : <DatabaseBackup size={16} />}
+                Popular Dados
+              </Button>
+            ) : null}
             <Button
               onClick={handleNew}
               disabled={permsLoading || !canCreate}
