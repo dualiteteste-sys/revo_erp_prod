@@ -9,8 +9,10 @@ import PageHeader from '@/components/ui/PageHeader';
 import { Button } from '@/components/ui/button';
 import { RefreshCw } from 'lucide-react';
 import { useHasPermission } from '@/hooks/useHasPermission';
+import { isSeedEnabled } from '@/utils/seed';
 
 export default function RHDashboard() {
+  const enableSeed = isSeedEnabled();
   const [stats, setStats] = useState<RHDashboardStats | null>(null);
   const [loading, setLoading] = useState(true);
   const [seeding, setSeeding] = useState(false);
@@ -70,12 +72,15 @@ export default function RHDashboard() {
         </div>
         <h2 className="text-2xl font-bold text-gray-800 mb-2">Módulo de RH Vazio</h2>
         <p className="text-gray-600 max-w-md mb-8">
-          Parece que você ainda não cadastrou nenhum dado. Que tal popular o sistema com dados de exemplo para ver os indicadores em ação?
+          Parece que você ainda não cadastrou nenhum dado.
+          {enableSeed ? ' Que tal popular com dados de exemplo para ver os indicadores em ação?' : ''}
         </p>
-        <Button onClick={handleSeed} disabled={seeding || permManage.isLoading || !canManage} className="gap-2">
-          {seeding ? <Loader2 className="animate-spin" /> : <DatabaseBackup />}
-          Popular com Dados de Exemplo
-        </Button>
+        {enableSeed ? (
+          <Button onClick={handleSeed} disabled={seeding || permManage.isLoading || !canManage} className="gap-2">
+            {seeding ? <Loader2 className="animate-spin" /> : <DatabaseBackup />}
+            Popular com Dados de Exemplo
+          </Button>
+        ) : null}
       </div>
     );
   }

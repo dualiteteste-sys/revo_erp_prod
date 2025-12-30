@@ -12,8 +12,10 @@ import { useSearchParams } from 'react-router-dom';
 import { logger } from '@/lib/logger';
 import { Button } from '@/components/ui/button';
 import { useConfirm } from '@/contexts/ConfirmProvider';
+import { isSeedEnabled } from '@/utils/seed';
 
 export default function BomsPage() {
+  const enableSeed = isSeedEnabled();
   const [boms, setBoms] = useState<BomListItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -149,10 +151,12 @@ export default function BomsPage() {
           <p className="text-gray-600 text-sm mt-1">Estruturas de produtos e listas de materiais.</p>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
-          <Button onClick={handleSeed} disabled={isSeeding || loading} variant="secondary" className="gap-2">
-            {isSeeding ? <Loader2 className="animate-spin" size={18} /> : <DatabaseBackup size={18} />}
-            Popular Dados
-          </Button>
+          {enableSeed ? (
+            <Button onClick={handleSeed} disabled={isSeeding || loading} variant="secondary" className="gap-2">
+              {isSeeding ? <Loader2 className="animate-spin" size={18} /> : <DatabaseBackup size={18} />}
+              Popular Dados
+            </Button>
+          ) : null}
           <Button onClick={handleNew} className="gap-2">
             <PlusCircle size={18} />
             Nova Ficha Técnica

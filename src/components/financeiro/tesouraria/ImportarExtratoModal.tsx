@@ -5,6 +5,7 @@ import { FileUp, Loader2, UploadCloud, DatabaseBackup, FileText } from 'lucide-r
 import { ImportarExtratoPayload, seedExtratos } from '@/services/treasury';
 import { useToast } from '@/contexts/ToastProvider';
 import { Button } from '@/components/ui/button';
+import { isSeedEnabled } from '@/utils/seed';
 
 interface Props {
   isOpen: boolean;
@@ -15,6 +16,7 @@ interface Props {
 }
 
 export default function ImportarExtratoModal({ isOpen, onClose, onImport, contaCorrenteId, onImported }: Props) {
+  const enableSeed = isSeedEnabled();
   const { addToast } = useToast();
   const [csvText, setCsvText] = useState('');
   const [file, setFile] = useState<File | null>(null);
@@ -277,15 +279,19 @@ export default function ImportarExtratoModal({ isOpen, onClose, onImport, contaC
         />
 
         <div className="flex justify-between items-center pt-4 border-t border-gray-100">
-            <Button
-              variant="secondary"
-              onClick={handleSeed}
-              disabled={isSeeding || isProcessing}
-              className="gap-2"
-            >
-              {isSeeding ? <Loader2 className="animate-spin" size={16} /> : <DatabaseBackup size={16} />}
-              Gerar dados de teste
-            </Button>
+            {enableSeed ? (
+              <Button
+                variant="secondary"
+                onClick={handleSeed}
+                disabled={isSeeding || isProcessing}
+                className="gap-2"
+              >
+                {isSeeding ? <Loader2 className="animate-spin" size={16} /> : <DatabaseBackup size={16} />}
+                Gerar dados de teste
+              </Button>
+            ) : (
+              <div />
+            )}
 
             <div className="flex gap-3">
                 <Button variant="outline" onClick={onClose}>Cancelar</Button>

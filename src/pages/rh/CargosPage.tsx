@@ -13,8 +13,10 @@ import SearchField from '@/components/ui/forms/SearchField';
 import { useConfirm } from '@/contexts/ConfirmProvider';
 import CargosTable from '@/components/rh/CargosTable';
 import { useHasPermission } from '@/hooks/useHasPermission';
+import { isSeedEnabled } from '@/utils/seed';
 
 export default function CargosPage() {
+  const enableSeed = isSeedEnabled();
   const [cargos, setCargos] = useState<Cargo[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -159,16 +161,18 @@ export default function CargosPage() {
         icon={<Briefcase className="w-5 h-5" />}
         actions={
           <>
-            <Button
-              onClick={handleSeed}
-              disabled={isSeeding || loading || permsLoading || !canManage}
-              title={!canManage ? 'Sem permissão para popular dados' : undefined}
-              variant="outline"
-              className="gap-2"
-            >
-              {isSeeding ? <Loader2 className="animate-spin" size={16} /> : <DatabaseBackup size={16} />}
-              Popular Dados
-            </Button>
+            {enableSeed ? (
+              <Button
+                onClick={handleSeed}
+                disabled={isSeeding || loading || permsLoading || !canManage}
+                title={!canManage ? 'Sem permissão para popular dados' : undefined}
+                variant="outline"
+                className="gap-2"
+              >
+                {isSeeding ? <Loader2 className="animate-spin" size={16} /> : <DatabaseBackup size={16} />}
+                Popular Dados
+              </Button>
+            ) : null}
             <div className="flex items-center gap-2">
               <Button
                 type="button"

@@ -10,8 +10,10 @@ import CentrosDeCustoTable from '@/components/financeiro/centros-de-custo/Centro
 import CentrosDeCustoFormPanel from '@/components/financeiro/centros-de-custo/CentrosDeCustoFormPanel';
 import Select from '@/components/ui/forms/Select';
 import { Button } from '@/components/ui/button';
+import { isSeedEnabled } from '@/utils/seed';
 
 const CentrosDeCustoPage: React.FC = () => {
+  const enableSeed = isSeedEnabled();
   const {
     centros,
     loading,
@@ -118,10 +120,12 @@ const CentrosDeCustoPage: React.FC = () => {
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-3xl font-bold text-gray-800">Centro de Custos</h1>
         <div className="flex items-center gap-2">
-          <Button onClick={handleSeed} disabled={isSeeding || loading} variant="outline" className="gap-2">
-            {isSeeding ? <Loader2 className="animate-spin" size={20} /> : <DatabaseBackup size={20} />}
-            Popular Dados
-          </Button>
+          {enableSeed ? (
+            <Button onClick={handleSeed} disabled={isSeeding || loading} variant="outline" className="gap-2">
+              {isSeeding ? <Loader2 className="animate-spin" size={20} /> : <DatabaseBackup size={20} />}
+              Popular Dados
+            </Button>
+          ) : null}
           <Button onClick={() => handleOpenForm()} className="gap-2">
             <PlusCircle size={20} />
             Novo Centro de Custo

@@ -13,8 +13,10 @@ import { useToast } from '@/contexts/ToastProvider';
 import { useSearchParams } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { useConfirm } from '@/contexts/ConfirmProvider';
+import { isSeedEnabled } from '@/utils/seed';
 
 export default function ProducaoPage() {
+  const enableSeed = isSeedEnabled();
   const [viewMode, setViewMode] = useLocalStorageState<'list' | 'kanban'>('industria:producao:viewMode', 'list');
   const [orders, setOrders] = useState<OrdemProducao[]>([]);
   const [loading, setLoading] = useState(true);
@@ -155,10 +157,12 @@ export default function ProducaoPage() {
               <LayoutGrid size={20} />
             </button>
           </div>
-          <Button onClick={handleSeed} disabled={isSeeding || loading} variant="secondary" className="gap-2">
-            {isSeeding ? <Loader2 className="animate-spin" size={18} /> : <DatabaseBackup size={18} />}
-            Popular Dados
-          </Button>
+          {enableSeed ? (
+            <Button onClick={handleSeed} disabled={isSeeding || loading} variant="secondary" className="gap-2">
+              {isSeeding ? <Loader2 className="animate-spin" size={18} /> : <DatabaseBackup size={18} />}
+              Popular Dados
+            </Button>
+          ) : null}
           <Button onClick={handleNew} className="gap-2">
             <PlusCircle size={18} />
             Nova OP

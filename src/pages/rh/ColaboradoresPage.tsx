@@ -23,8 +23,10 @@ import Select from '@/components/ui/forms/Select';
 import { useConfirm } from '@/contexts/ConfirmProvider';
 import ColaboradoresTable from '@/components/rh/ColaboradoresTable';
 import { useHasPermission } from '@/hooks/useHasPermission';
+import { isSeedEnabled } from '@/utils/seed';
 
 export default function ColaboradoresPage() {
+  const enableSeed = isSeedEnabled();
   const [colaboradores, setColaboradores] = useState<Colaborador[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -184,16 +186,18 @@ export default function ColaboradoresPage() {
         icon={<Users className="w-5 h-5" />}
         actions={
           <>
-            <Button
-              onClick={handleSeed}
-              disabled={isSeeding || loading || permsLoading || !canManage}
-              title={!canManage ? 'Sem permissão para popular dados' : undefined}
-              variant="outline"
-              className="gap-2"
-            >
-              {isSeeding ? <Loader2 className="animate-spin" size={16} /> : <DatabaseBackup size={16} />}
-              Popular Dados
-            </Button>
+            {enableSeed ? (
+              <Button
+                onClick={handleSeed}
+                disabled={isSeeding || loading || permsLoading || !canManage}
+                title={!canManage ? 'Sem permissão para popular dados' : undefined}
+                variant="outline"
+                className="gap-2"
+              >
+                {isSeeding ? <Loader2 className="animate-spin" size={16} /> : <DatabaseBackup size={16} />}
+                Popular Dados
+              </Button>
+            ) : null}
             <div className="flex items-center gap-2">
               <Button
                 type="button"

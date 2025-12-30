@@ -15,8 +15,10 @@ import Select from '@/components/ui/forms/Select';
 import DatePicker from '@/components/ui/DatePicker';
 import ErrorAlert from '@/components/ui/ErrorAlert';
 import { Button } from '@/components/ui/button';
+import { isSeedEnabled } from '@/utils/seed';
 
 const ContasPagarPage: React.FC = () => {
+  const enableSeed = isSeedEnabled();
   const {
     contas,
     summary,
@@ -189,15 +191,17 @@ const ContasPagarPage: React.FC = () => {
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-3xl font-bold text-gray-800">Contas a Pagar</h1>
         <div className="flex items-center gap-2">
-            <Button
-              variant="secondary"
-              onClick={handleSeed}
-              disabled={isSeeding || loading}
-              className="gap-2"
-            >
-              {isSeeding ? <Loader2 className="animate-spin" size={18} /> : <DatabaseBackup size={18} />}
-              Popular Dados
-            </Button>
+            {enableSeed ? (
+              <Button
+                variant="secondary"
+                onClick={handleSeed}
+                disabled={isSeeding || loading}
+                className="gap-2"
+              >
+                {isSeeding ? <Loader2 className="animate-spin" size={18} /> : <DatabaseBackup size={18} />}
+                Popular Dados
+              </Button>
+            ) : null}
             <Button onClick={() => handleOpenForm()} className="gap-2">
               <PlusCircle size={18} />
               Nova Conta

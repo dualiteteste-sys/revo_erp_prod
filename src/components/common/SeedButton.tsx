@@ -1,6 +1,7 @@
 import React from 'react';
 import { DatabaseBackup, Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { isSeedEnabled } from '@/utils/seed';
 
 interface SeedButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
   onSeed: () => Promise<void>;
@@ -18,6 +19,8 @@ export const SeedButton: React.FC<SeedButtonProps> = ({
   disabled,
   ...props 
 }) => {
+  if (!isSeedEnabled()) return null;
+
   return (
     <button
       onClick={onSeed}
