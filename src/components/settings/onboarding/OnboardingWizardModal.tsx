@@ -8,6 +8,7 @@ import { useSupabase } from '@/providers/SupabaseProvider';
 import { useAuth } from '@/contexts/AuthProvider';
 import { useToast } from '@/contexts/ToastProvider';
 import { fetchOnboardingChecks, type OnboardingCheck } from './onboardingChecks';
+import OnboardingStepModal, { isEmbeddedOnboardingStep } from './OnboardingStepModal';
 
 type Props = {
   isOpen: boolean;
@@ -33,6 +34,7 @@ export default function OnboardingWizardModal({ isOpen, onClose, mode = 'manual'
   const [loading, setLoading] = useState(false);
   const [checks, setChecks] = useState<OnboardingCheck[]>([]);
   const [currentKey, setCurrentKey] = useState<string | null>(null);
+  const [activeStepModalKey, setActiveStepModalKey] = useState<string | null>(null);
 
   const ensureOnboardingRow = useCallback(async () => {
     if (!empresaId) return;
@@ -58,18 +60,29 @@ export default function OnboardingWizardModal({ isOpen, onClose, mode = 'manual'
     [empresaId, supabase]
   );
 
-  const refresh = useCallback(async () => {
+  const refresh = useCallback(async (): Promise<OnboardingCheck[]> => {
     if (!empresaId) return;
     setLoading(true);
     try {
       const res = await fetchOnboardingChecks(supabase, empresaId);
       setChecks(res.checks);
+      return res.checks;
     } catch (e: any) {
       addToast(e?.message || 'Falha ao carregar assistente de onboarding.', 'error');
+      return [];
     } finally {
       setLoading(false);
     }
   }, [addToast, empresaId, supabase]);
+
+  const afterStepDone = useCallback(async () => {
+    const updated = await refresh();
+    const nextCurrent = updated.find((c) => c.status !== 'ok');
+    if (nextCurrent) {
+      await updateState({ last_step_key: nextCurrent.key, wizard_dismissed_at: null });
+      setCurrentKey(nextCurrent.key);
+    }
+  }, [refresh, updateState]);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -109,6 +122,12 @@ export default function OnboardingWizardModal({ isOpen, onClose, mode = 'manual'
   const handleGoToStep = async () => {
     if (!current) return;
     await updateState({ last_step_key: current.key, wizard_dismissed_at: null });
+
+    if (isEmbeddedOnboardingStep(current.key)) {
+      setActiveStepModalKey(current.key);
+      return;
+    }
+
     onClose();
     navigate(current.actionHref);
   };
@@ -215,7 +234,7 @@ export default function OnboardingWizardModal({ isOpen, onClose, mode = 'manual'
                   </div>
                   <Button className="gap-2" onClick={() => void handleGoToStep()}>
                     <ExternalLink size={16} />
-                    {current.actionLabel}
+                    {isEmbeddedOnboardingStep(current.key) ? 'Configurar agora' : current.actionLabel}
                   </Button>
                 </div>
               </>
@@ -227,7 +246,18 @@ export default function OnboardingWizardModal({ isOpen, onClose, mode = 'manual'
           {mode === 'auto' ? 'Você pode reabrir depois em Configurações → Geral → Onboarding (Checklist) → Assistente.' : null}
         </div>
       </div>
+
+      {empresaId && activeStepModalKey ? (
+        <OnboardingStepModal
+          isOpen={!!activeStepModalKey}
+          empresaId={empresaId}
+          step={checks.find((c) => c.key === activeStepModalKey) ?? current ?? checks[0]}
+          onClose={() => setActiveStepModalKey(null)}
+          onDone={async () => {
+            await afterStepDone();
+          }}
+        />
+      ) : null}
     </Modal>
   );
 }
-
