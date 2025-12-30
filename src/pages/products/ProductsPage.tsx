@@ -13,9 +13,17 @@ import PageHeader from '@/components/ui/PageHeader';
 import { Button } from '@/components/ui/button';
 import { downloadCsv } from '@/utils/csv';
 import { isSeedEnabled } from '@/utils/seed';
+import { useHasPermission } from '@/hooks/useHasPermission';
 
 const ProductsPage: React.FC = () => {
   const enableSeed = isSeedEnabled();
+  const permCreate = useHasPermission('produtos', 'create');
+  const permUpdate = useHasPermission('produtos', 'update');
+  const permDelete = useHasPermission('produtos', 'delete');
+  const permsLoading = permCreate.isLoading || permUpdate.isLoading || permDelete.isLoading;
+  const canCreate = !!permCreate.data;
+  const canUpdate = !!permUpdate.data;
+  const canDelete = !!permDelete.data;
 
   const {
     products,
@@ -50,6 +58,15 @@ const ProductsPage: React.FC = () => {
   }, [setPage, setSearchTerm]);
 
   const handleOpenForm = async (product: productsService.Product | null = null) => {
+    const needsUpdate = !!product?.id;
+    if (!permsLoading && needsUpdate && !canUpdate) {
+      addToast('Você não tem permissão para editar produtos.', 'warning');
+      return;
+    }
+    if (!permsLoading && !needsUpdate && !canCreate) {
+      addToast('Você não tem permissão para criar produtos.', 'warning');
+      return;
+    }
     if (product && product.id) {
       setIsFetchingDetails(true);
       setIsFormOpen(true);
@@ -92,6 +109,10 @@ const ProductsPage: React.FC = () => {
 
   const handleDelete = async () => {
     if (!productToDelete || !productToDelete.id) return;
+    if (!permsLoading && !canDelete) {
+      addToast('Você não tem permissão para excluir produtos.', 'warning');
+      return;
+    }
     setIsDeleting(true);
     try {
       await deleteProduct(productToDelete.id);
@@ -113,6 +134,10 @@ const ProductsPage: React.FC = () => {
 
   const handleClone = async (product: productsService.Product) => {
     if (!product.id) return;
+    if (!permsLoading && !canCreate) {
+      addToast('Você não tem permissão para clonar produtos.', 'warning');
+      return;
+    }
     try {
       const clone = await productsService.cloneProduct(product.id);
       addToast('Produto clonado com sucesso!', 'success');
@@ -176,7 +201,12 @@ const ProductsPage: React.FC = () => {
                 </Button>
               ) : null}
 
-              <Button onClick={() => handleOpenForm()} className="gap-2">
+              <Button
+                onClick={() => handleOpenForm()}
+                className="gap-2"
+                disabled={permsLoading || !canCreate}
+                title={!canCreate ? 'Sem permissão para criar' : undefined}
+              >
                 <Plus size={18} />
                 Novo produto
               </Button>
