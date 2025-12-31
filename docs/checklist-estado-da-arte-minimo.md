@@ -53,13 +53,13 @@ Regras:
 ## 3) Vendas (mínimo competitivo no lançamento)
 
 ### 3.1 Pedidos + precificação simples
-- [ ] VEN-01 Pedido de venda: CRUD + itens + impostos básicos (se aplicável) + status
-- [ ] VEN-02 Regras mínimas: desconto (com permissão), frete, arredondamentos e validações
+- [x] VEN-01 Pedido de venda: CRUD + itens + impostos básicos (se aplicável) + status
+- [x] VEN-02 Regras mínimas: desconto (com permissão), frete, arredondamentos e validações
 - [ ] VEN-03 Reserva/baixa de estoque (mínimo: baixa ao faturar/finalizar)
 
 ### 3.2 PDV (1 caixa no plano básico)
 - [ ] PDV-01 “Nova venda” rápido: cliente opcional, leitura por SKU, atalhos de teclado
-- [ ] PDV-02 Finalizar: gera recebimento + baixa de estoque + comprovante (print/PDF simples)
+- [x] PDV-02 Finalizar: gera recebimento + baixa de estoque + comprovante (print/PDF simples)
 - [ ] PDV-03 Estorno: reversão financeira + reversão estoque + auditoria
 
 ### 3.3 Expedição (fluxo completo no Pro)
@@ -93,8 +93,8 @@ Regras:
 - [ ] OS-04 Relatórios de OS: período/status/cliente + faturamento
 
 ### 5.2 Financeiro essencial
-- [ ] FIN-01 A Receber: criar/baixar/estornar/cancelar + conciliação mínima
-- [ ] FIN-02 A Pagar: criar/baixar/estornar/cancelar
+- [x] FIN-01 A Receber: criar/baixar/estornar/cancelar + conciliação mínima
+- [x] FIN-02 A Pagar: criar/baixar/estornar/cancelar
 - [ ] FIN-03 Tesouraria: extrato bancário (import) + vincular lançamentos + saldo confiável
 - [ ] FIN-04 Centros de custo (quando ativo): alocação simples + relatórios
 - [ ] FIN-05 Relatórios essenciais: pagar/receber/caixa/faturamento por período
