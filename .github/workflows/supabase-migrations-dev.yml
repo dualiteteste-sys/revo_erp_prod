@@ -74,7 +74,7 @@ jobs:
           supabase stop
 
       - name: Apply migrations to DEV (remote)
-        if: github.event_name == 'workflow_dispatch'
+        if: github.event_name == 'workflow_dispatch' || github.event_name == 'push'
         env:
           SUPABASE_DB_URL_DEV: ${{ secrets.SUPABASE_DB_URL_DEV }}
         run: |
@@ -83,19 +83,13 @@ jobs:
             echo "::error::Missing secret SUPABASE_DB_URL_DEV"
             exit 1
           fi
-          echo "[DEV] Reset + apply migrations..."
+          echo "[DEV] Apply migrations (non-destructive)..."
 
-          ENCODED_DB_URL="$(python3 scripts/encode_db_url.py)"
-
-          echo "[DEV] Resetando banco remoto (destrutivo)..."
-          supabase db reset --db-url "$ENCODED_DB_URL" --yes
-
-          echo "[DEV] Aplicando migrations (garantia)..."
           echo "y" | supabase db push --include-all --db-url "$SUPABASE_DB_URL_DEV"
           echo "[DEV] Migrations applied successfully."
 
       - name: Reload PostgREST schema cache (DEV)
-        if: github.event_name == 'workflow_dispatch'
+        if: github.event_name == 'workflow_dispatch' || github.event_name == 'push'
         env:
           SUPABASE_DB_URL_DEV: ${{ secrets.SUPABASE_DB_URL_DEV }}
         run: |
