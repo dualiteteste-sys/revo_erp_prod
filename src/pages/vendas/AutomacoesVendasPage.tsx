@@ -4,8 +4,10 @@ import Modal from '@/components/ui/Modal';
 import { useToast } from '@/contexts/ToastProvider';
 import {
   deleteAutomacaoVendas,
+  enqueueAutomacaoNow,
   listAutomacoesVendas,
   upsertAutomacaoVendas,
+  validateAutomacaoConfig,
   type VendaAutomacao,
 } from '@/services/vendasMvp';
 
@@ -15,14 +17,16 @@ type FormState = {
   gatilho: string;
   enabled: boolean;
   configJson: string;
+  entityId: string;
 };
 
-const emptyForm: FormState = { id: null, nome: '', gatilho: 'manual', enabled: true, configJson: '{}' };
+const emptyForm: FormState = { id: null, nome: '', gatilho: 'manual', enabled: true, configJson: '{}', entityId: '' };
 
 export default function AutomacoesVendasPage() {
   const { addToast } = useToast();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [running, setRunning] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [rows, setRows] = useState<VendaAutomacao[]>([]);
   const [isOpen, setIsOpen] = useState(false);
@@ -57,6 +61,7 @@ export default function AutomacoesVendasPage() {
       gatilho: row.gatilho || 'manual',
       enabled: !!row.enabled,
       configJson: JSON.stringify(row.config ?? {}, null, 2),
+      entityId: '',
     });
     setIsOpen(true);
   };
@@ -66,18 +71,37 @@ export default function AutomacoesVendasPage() {
     setForm(emptyForm);
   };
 
+  const parseConfig = (): any | null => {
+    try {
+      return JSON.parse(form.configJson || '{}');
+    } catch {
+      addToast('Config inválida (JSON).', 'error');
+      return null;
+    }
+  };
+
+  const validate = async () => {
+    const config = parseConfig();
+    if (!config) return;
+    try {
+      const result = await validateAutomacaoConfig(config);
+      if (result.ok) {
+        addToast('Config válida.', 'success');
+      } else {
+        addToast(`Config inválida: ${result.errors.join('; ')}`, 'error');
+      }
+    } catch (e: any) {
+      addToast(e.message || 'Falha ao validar config.', 'error');
+    }
+  };
+
   const save = async () => {
     if (!form.nome.trim()) {
       addToast('Informe o nome da automação.', 'error');
       return;
     }
-    let config: any = {};
-    try {
-      config = JSON.parse(form.configJson || '{}');
-    } catch {
-      addToast('Config inválida (JSON).', 'error');
-      return;
-    }
+    const config = parseConfig();
+    if (!config) return;
 
     setSaving(true);
     try {
@@ -95,6 +119,41 @@ export default function AutomacoesVendasPage() {
       addToast(e.message || 'Falha ao salvar automação.', 'error');
     } finally {
       setSaving(false);
+    }
+  };
+
+  const runNow = async () => {
+    if (!form.id) {
+      addToast('Salve a automação antes de executar.', 'warning');
+      return;
+    }
+    const entityId = form.entityId.trim();
+    if (!entityId) {
+      addToast('Informe o ID do Pedido (UUID) para executar.', 'warning');
+      return;
+    }
+    const config = parseConfig();
+    if (!config) return;
+
+    setRunning(true);
+    try {
+      const valid = await validateAutomacaoConfig(config);
+      if (!valid.ok) {
+        addToast(`Config inválida: ${valid.errors.join('; ')}`, 'error');
+        return;
+      }
+
+      await enqueueAutomacaoNow({
+        automacaoId: form.id,
+        entityId,
+        gatilho: 'manual',
+        payload: { pedido_id: entityId },
+      });
+      addToast('Automação enfileirada. O worker vai processar em até ~5 min.', 'success');
+    } catch (e: any) {
+      addToast(e.message || 'Falha ao enfileirar automação.', 'error');
+    } finally {
+      setRunning(false);
     }
   };
 
@@ -215,6 +274,38 @@ export default function AutomacoesVendasPage() {
               className="mt-1 w-full p-3 border border-gray-300 rounded-lg font-mono text-xs"
               rows={10}
             />
+            <div className="mt-2 text-xs text-gray-500">
+              Exemplo: <span className="font-mono">{'{"actions":[{"type":"expedicao_criar"}]}'}</span>
+            </div>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <div>
+              <label className="text-sm text-gray-700">Executar agora (Pedido ID)</label>
+              <input
+                value={form.entityId}
+                onChange={(e) => setForm((s) => ({ ...s, entityId: e.target.value }))}
+                className="mt-1 w-full p-3 border border-gray-300 rounded-lg font-mono text-xs"
+                placeholder="UUID do pedido"
+              />
+              <div className="mt-1 text-xs text-gray-500">
+                Dica: pegue o ID ao abrir um pedido e copiar o UUID (debug) ou via banco.
+              </div>
+            </div>
+            <div className="flex items-end justify-end gap-2">
+              <button
+                onClick={validate}
+                className="px-4 py-2 rounded-lg bg-gray-100 hover:bg-gray-200"
+              >
+                Validar
+              </button>
+              <button
+                onClick={runNow}
+                disabled={running}
+                className="px-4 py-2 rounded-lg bg-gray-900 text-white font-bold hover:bg-black disabled:opacity-50"
+              >
+                {running ? 'Enfileirando…' : 'Executar agora'}
+              </button>
+            </div>
           </div>
           <div className="flex justify-end gap-2 pt-2">
             <button onClick={close} className="px-4 py-2 rounded-lg bg-gray-100 hover:bg-gray-200">
@@ -233,4 +324,3 @@ export default function AutomacoesVendasPage() {
     </div>
   );
 }
-

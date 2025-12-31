@@ -1,0 +1,48 @@
+name: Vendas Automations Worker (dev)
+
+on:
+  schedule:
+    - cron: "*/5 * * * *"
+  workflow_dispatch:
+    inputs:
+      limit:
+        description: "Quantidade máxima de jobs por execução"
+        required: false
+        default: "25"
+
+concurrency:
+  group: vendas-automations-worker-dev
+  cancel-in-progress: false
+
+jobs:
+  run-worker:
+    name: Process vendas automations queue (DEV)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Install PostgreSQL client (psql)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y postgresql-client
+
+      - name: Run queue processor
+        env:
+          SUPABASE_DB_URL_DEV: ${{ secrets.SUPABASE_DB_URL_DEV }}
+          LIMIT: ${{ inputs.limit }}
+        run: |
+          set -euo pipefail
+
+          if [[ -z "${SUPABASE_DB_URL_DEV:-}" ]]; then
+            echo "::warning::Missing secret SUPABASE_DB_URL_DEV (skipping worker run)"
+            exit 0
+          fi
+
+          limit="${LIMIT:-25}"
+          if ! [[ "$limit" =~ ^[0-9]+$ ]]; then
+            limit="25"
+          fi
+
+          echo "[DEV] Processing vendas automations queue (limit=$limit)"
+          psql "$SUPABASE_DB_URL_DEV" -v ON_ERROR_STOP=1 -X -qAt -c "select public.vendas_automacao_process_queue_admin(${limit});"
+

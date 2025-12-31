@@ -1,6 +1,19 @@
 import React, { useState, useEffect } from 'react';
-import { Loader2, Save, Trash2 } from 'lucide-react';
-import { CrmOportunidade, OportunidadePayload, saveOportunidade, deleteOportunidade, getCrmKanbanData } from '@/services/crm';
+import { CheckCircle2, Loader2, Save, ShoppingCart, Trash2, XCircle } from 'lucide-react';
+import {
+  CrmAtividade,
+  CrmAtividadeTipo,
+  CrmOportunidade,
+  OportunidadePayload,
+  convertOportunidadeToPedido,
+  deleteAtividade,
+  deleteOportunidade,
+  getCrmKanbanData,
+  listAtividades,
+  markAtividadeDone,
+  saveOportunidade,
+  upsertAtividade,
+} from '@/services/crm';
 import { useToast } from '@/contexts/ToastProvider';
 import { useConfirm } from '@/contexts/ConfirmProvider';
 import Section from '@/components/ui/forms/Section';
@@ -9,6 +22,7 @@ import Select from '@/components/ui/forms/Select';
 import TextArea from '@/components/ui/forms/TextArea';
 import ClientAutocomplete from '@/components/common/ClientAutocomplete';
 import { useNumericField } from '@/hooks/useNumericField';
+import { useNavigate } from 'react-router-dom';
 
 interface Props {
   deal: CrmOportunidade | null;
@@ -21,9 +35,18 @@ interface Props {
 export default function DealFormPanel({ deal, funilId, etapaId, onSaveSuccess, onClose }: Props) {
   const { addToast } = useToast();
   const { confirm } = useConfirm();
+  const navigate = useNavigate();
   const [isSaving, setIsSaving] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [isConverting, setIsConverting] = useState(false);
   const [currentFunilId, setCurrentFunilId] = useState(funilId);
+  const [atividades, setAtividades] = useState<CrmAtividade[]>([]);
+  const [atividadesLoading, setAtividadesLoading] = useState(false);
+  const [atividadeSaving, setAtividadeSaving] = useState(false);
+  const [atividadeType, setAtividadeType] = useState<CrmAtividadeTipo>('nota');
+  const [atividadeTitulo, setAtividadeTitulo] = useState('');
+  const [atividadeDescricao, setAtividadeDescricao] = useState('');
+  const [atividadeDueDate, setAtividadeDueDate] = useState('');
   
   const [formData, setFormData] = useState<OportunidadePayload>({
     funil_id: funilId,
@@ -53,6 +76,28 @@ export default function DealFormPanel({ deal, funilId, etapaId, onSaveSuccess, o
     };
     init();
   }, [deal, funilId]);
+
+  const loadAtividades = async (oportunidadeId: string) => {
+    setAtividadesLoading(true);
+    try {
+      const rows = await listAtividades(oportunidadeId);
+      setAtividades(rows || []);
+    } catch (e: any) {
+      setAtividades([]);
+      addToast(e.message || 'Erro ao carregar atividades.', 'error');
+    } finally {
+      setAtividadesLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!deal?.id) {
+      setAtividades([]);
+      return;
+    }
+    loadAtividades(deal.id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [deal?.id]);
 
   const handleChange = (field: keyof OportunidadePayload, value: any) => {
     setFormData(prev => ({ ...prev, [field]: value }));
@@ -99,6 +144,103 @@ export default function DealFormPanel({ deal, funilId, etapaId, onSaveSuccess, o
     } catch(e: any) {
         addToast(e.message, 'error');
         setIsDeleting(false);
+    }
+  };
+
+  const handleAddAtividade = async () => {
+    if (!deal?.id) {
+      addToast('Salve a oportunidade antes de adicionar atividades.', 'warning');
+      return;
+    }
+
+    const titulo = atividadeTitulo.trim() || null;
+    const descricao = atividadeDescricao.trim() || null;
+    const due_at = atividadeType === 'tarefa' && atividadeDueDate ? new Date(`${atividadeDueDate}T12:00:00`).toISOString() : null;
+
+    if (!titulo && !descricao) {
+      addToast('Informe um título ou uma descrição.', 'warning');
+      return;
+    }
+
+    setAtividadeSaving(true);
+    try {
+      await upsertAtividade({
+        oportunidade_id: deal.id,
+        tipo: atividadeType,
+        titulo,
+        descricao,
+        due_at,
+      });
+      setAtividadeTitulo('');
+      setAtividadeDescricao('');
+      setAtividadeDueDate('');
+      await loadAtividades(deal.id);
+      addToast('Atividade adicionada.', 'success');
+    } catch (e: any) {
+      addToast(e.message || 'Falha ao adicionar atividade.', 'error');
+    } finally {
+      setAtividadeSaving(false);
+    }
+  };
+
+  const toggleDone = async (row: CrmAtividade) => {
+    if (!deal?.id) return;
+    try {
+      await markAtividadeDone(row.id, !row.done_at);
+      await loadAtividades(deal.id);
+    } catch (e: any) {
+      addToast(e.message || 'Falha ao atualizar atividade.', 'error');
+    }
+  };
+
+  const removeAtividade = async (row: CrmAtividade) => {
+    if (!deal?.id) return;
+    const ok = await confirm({
+      title: 'Remover atividade',
+      description: 'Tem certeza que deseja remover esta atividade?',
+      confirmText: 'Remover',
+      cancelText: 'Cancelar',
+      variant: 'danger',
+    });
+    if (!ok) return;
+    try {
+      await deleteAtividade(row.id);
+      await loadAtividades(deal.id);
+      addToast('Atividade removida.', 'success');
+    } catch (e: any) {
+      addToast(e.message || 'Falha ao remover atividade.', 'error');
+    }
+  };
+
+  const handleConvertToPedido = async () => {
+    if (!deal?.id) {
+      addToast('Salve a oportunidade antes de converter.', 'warning');
+      return;
+    }
+    if (!formData.cliente_id) {
+      addToast('Selecione um cliente antes de converter em pedido.', 'warning');
+      return;
+    }
+
+    const ok = await confirm({
+      title: 'Converter em Pedido',
+      description: 'Criar um Pedido de Venda (Orçamento) vinculado a esta oportunidade?',
+      confirmText: 'Converter',
+      cancelText: 'Cancelar',
+      variant: 'primary',
+    });
+    if (!ok) return;
+
+    setIsConverting(true);
+    try {
+      const pedidoId = await convertOportunidadeToPedido(deal.id);
+      addToast('Pedido criado. Abrindo…', 'success');
+      onClose();
+      navigate(`/app/vendas/pedidos?open=${pedidoId}`);
+    } catch (e: any) {
+      addToast(e.message || 'Falha ao converter em pedido.', 'error');
+    } finally {
+      setIsConverting(false);
     }
   };
 
@@ -174,6 +316,107 @@ export default function DealFormPanel({ deal, funilId, etapaId, onSaveSuccess, o
             className="sm:col-span-6" 
           />
         </Section>
+
+        <Section title="Atividades" description="Anotações e tarefas relacionadas a esta oportunidade.">
+          {!deal?.id ? (
+            <div className="sm:col-span-6 text-sm text-gray-500">Salve a oportunidade para habilitar atividades.</div>
+          ) : atividadesLoading ? (
+            <div className="sm:col-span-6 flex items-center gap-2 text-sm text-gray-500">
+              <Loader2 className="animate-spin" size={16} /> Carregando…
+            </div>
+          ) : (
+            <div className="sm:col-span-6 space-y-3">
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+                <div>
+                  <label className="text-sm text-gray-700">Tipo</label>
+                  <select
+                    value={atividadeType}
+                    onChange={(e) => setAtividadeType(e.target.value as CrmAtividadeTipo)}
+                    className="mt-1 w-full p-3 border border-gray-300 rounded-lg"
+                  >
+                    <option value="nota">Nota</option>
+                    <option value="tarefa">Tarefa</option>
+                    <option value="ligacao">Ligação</option>
+                    <option value="email">Email</option>
+                    <option value="whatsapp">WhatsApp</option>
+                  </select>
+                </div>
+                <div className="md:col-span-2">
+                  <label className="text-sm text-gray-700">Título</label>
+                  <input
+                    value={atividadeTitulo}
+                    onChange={(e) => setAtividadeTitulo(e.target.value)}
+                    className="mt-1 w-full p-3 border border-gray-300 rounded-lg"
+                    placeholder="Ex: Ligar para confirmar requisitos"
+                  />
+                </div>
+                <div>
+                  <label className="text-sm text-gray-700">Vencimento</label>
+                  <input
+                    type="date"
+                    value={atividadeDueDate}
+                    onChange={(e) => setAtividadeDueDate(e.target.value)}
+                    disabled={atividadeType !== 'tarefa'}
+                    className="mt-1 w-full p-3 border border-gray-300 rounded-lg disabled:opacity-50"
+                  />
+                </div>
+                <div className="md:col-span-4">
+                  <label className="text-sm text-gray-700">Descrição</label>
+                  <textarea
+                    value={atividadeDescricao}
+                    onChange={(e) => setAtividadeDescricao(e.target.value)}
+                    className="mt-1 w-full p-3 border border-gray-300 rounded-lg"
+                    rows={3}
+                    placeholder="Detalhes (opcional)"
+                  />
+                </div>
+                <div className="md:col-span-4 flex justify-end">
+                  <button
+                    onClick={handleAddAtividade}
+                    disabled={!deal?.id || atividadeSaving}
+                    className="px-4 py-2 rounded-lg bg-gray-900 text-white font-semibold hover:bg-black disabled:opacity-50"
+                  >
+                    {atividadeSaving ? 'Adicionando…' : 'Adicionar'}
+                  </button>
+                </div>
+              </div>
+
+              {atividades.length === 0 ? (
+                <div className="text-sm text-gray-500">Nenhuma atividade registrada.</div>
+              ) : (
+                <div className="divide-y border rounded-lg bg-white">
+                  {atividades.map((a) => (
+                    <div key={a.id} className="p-3 flex items-start justify-between gap-3">
+                      <button
+                        onClick={() => toggleDone(a)}
+                        className="mt-0.5 text-gray-500 hover:text-gray-800"
+                        title={a.done_at ? 'Marcar como pendente' : 'Marcar como concluída'}
+                      >
+                        {a.done_at ? <CheckCircle2 className="text-green-600" size={18} /> : <XCircle size={18} />}
+                      </button>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2">
+                          <div className="text-xs uppercase tracking-wide text-gray-400">{a.tipo}</div>
+                          {a.due_at ? <div className="text-xs text-gray-500">Vence: {new Date(a.due_at).toLocaleDateString('pt-BR')}</div> : null}
+                        </div>
+                        <div className={`font-medium text-gray-900 truncate ${a.done_at ? 'line-through opacity-60' : ''}`}>
+                          {a.titulo || '(sem título)'}
+                        </div>
+                        {a.descricao ? <div className="text-sm text-gray-600 whitespace-pre-wrap">{a.descricao}</div> : null}
+                      </div>
+                      <button
+                        onClick={() => removeAtividade(a)}
+                        className="text-sm px-3 py-1 rounded-md bg-red-50 text-red-700 hover:bg-red-100"
+                      >
+                        Remover
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+        </Section>
       </div>
 
       <footer className="flex-shrink-0 p-4 flex justify-between items-center border-t border-white/20 bg-gray-50">
@@ -190,6 +433,15 @@ export default function DealFormPanel({ deal, funilId, etapaId, onSaveSuccess, o
             )}
         </div>
         <div className="flex gap-3">
+          <button
+            onClick={handleConvertToPedido}
+            disabled={!deal?.id || isConverting || isSaving}
+            className="flex items-center gap-2 rounded-md border border-gray-300 bg-white py-2 px-4 text-sm font-semibold text-gray-800 shadow-sm hover:bg-gray-50 disabled:opacity-50"
+            title="Converter oportunidade em Pedido de Venda (Orçamento)"
+          >
+            {isConverting ? <Loader2 className="animate-spin" size={18} /> : <ShoppingCart size={18} />}
+            Converter em Pedido
+          </button>
           <button onClick={onClose} className="rounded-md border border-gray-300 bg-white py-2 px-4 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50">
             Cancelar
           </button>

@@ -72,9 +72,9 @@ Regras:
 - [x] DASH-01 Painel de vendas: KPIs principais e filtros por período/canal/vendedor
 
 ### 3.5 CRM + automações (MVP “bem feito”, sem prometer demais)
-- [ ] CRM-01 Funil: etapas configuráveis + cards + atividades/anotações
-- [ ] CRM-02 Conversão: oportunidade → pedido (link consistente + rastreável)
-- [ ] AUTO-01 Automações: CRUD + simulação/validação + execução assíncrona (fila)
+- [x] CRM-01 Funil: etapas configuráveis + cards + atividades/anotações
+- [x] CRM-02 Conversão: oportunidade → pedido (link consistente + rastreável)
+- [x] AUTO-01 Automações: CRUD + simulação/validação + execução assíncrona (fila)
 
 ## 4) Fiscal (NF-e)
 - [x] NFE-01 Config fiscal completa (emitente, série/numeração, ambiente, CSC se aplicável)
@@ -108,8 +108,8 @@ Regras:
 - [x] IND-06 Relatórios essenciais: WIP/filas/eficiência/estoque/qualidade
 
 ## 7) Go-live (sem onboarding avançado por enquanto)
-- [ ] GL-02 Backup/restore + rotinas de suporte (exportações, trilha de auditoria)
-- [ ] GL-03 Hardening final (permissões, RLS, RPCs, rate limits, erros amigáveis)
+- [x] GL-02 Backup/restore + rotinas de suporte (exportações, trilha de auditoria)
+- [x] GL-03 Hardening final (permissões, RLS, RPCs, rate limits, erros amigáveis)
 
 ## Ordem recomendada (para velocidade com excelência)
 1) 0) Plataforma (RG-01/02/03/04 + SEC + OPS) — reduz retrabalho
