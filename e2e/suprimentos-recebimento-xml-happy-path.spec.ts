@@ -113,6 +113,7 @@ test('SUP-03: importar XML → criar recebimento → finalizar (happy path)', as
   test.setTimeout(120_000);
 
   const nowIso = new Date().toISOString();
+  const context = page.context();
 
   const importId = 'import-1';
   const recebimentoId = 'rec-1';
@@ -146,8 +147,9 @@ test('SUP-03: importar XML → criar recebimento → finalizar (happy path)', as
 
   let recebimentos: any[] = [];
   let recebimentoItens: any[] = [];
+  let cancelReqSeen = false;
 
-  await page.route('**/rest/v1/**', async (route) => {
+  await context.route('**/rest/v1/**', async (route) => {
     const req = route.request();
     const url = req.url();
 
@@ -268,6 +270,15 @@ test('SUP-03: importar XML → criar recebimento → finalizar (happy path)', as
     await route.fulfill({ json: [] });
   });
 
+  // RPC: cancelar recebimento (SUP-04) — rota específica para não depender de ordem/prioridade
+  await context.route('**/rest/v1/rpc/recebimento_cancelar*', async (route) => {
+    cancelReqSeen = true;
+    recebimentos = recebimentos.map((r) =>
+      r.id === recebimentoId ? { ...r, status: 'cancelado', updated_at: new Date().toISOString() } : r
+    );
+    await route.fulfill({ json: { status: 'ok' } });
+  });
+
   await mockAuthAndEmpresa(page);
 
   // Login
@@ -353,4 +364,20 @@ test('SUP-03: importar XML → criar recebimento → finalizar (happy path)', as
   await expect(page.getByText(/Confer[iê]ncia de Recebimento|Detalhes do Recebimento/)).toBeVisible({ timeout: 15000 });
   await page.getByRole('button', { name: 'Finalizar Recebimento' }).click();
   await expect(page.getByText('Recebimento concluído.', { exact: true })).toBeVisible({ timeout: 15000 });
+
+  // Volta e cancela (estorno) — SUP-04
+  await page.goto('/app/suprimentos/recebimentos');
+  await expect(page.getByRole('heading', { name: 'Recebimento de Mercadorias' })).toBeVisible({ timeout: 15000 });
+  await expect(page.getByText('Fornecedor XML')).toBeVisible({ timeout: 15000 });
+  await page.getByTitle('Cancelar recebimento (estorno)').click();
+  await expect(page.getByText('Cancelar recebimento (estorno)')).toBeVisible({ timeout: 15000 });
+  const cancelReq = page.waitForRequest(
+    (r) => r.method() === 'POST' && r.url().includes('/rest/v1/rpc/recebimento_cancelar')
+  );
+  const cancelRes = page.waitForResponse((r) => r.url().includes('/rest/v1/rpc/recebimento_cancelar'));
+  await page.getByRole('button', { name: 'Cancelar recebimento', exact: true }).click();
+  await cancelReq;
+  await cancelRes;
+
+  expect(cancelReqSeen).toBeTruthy();
 });

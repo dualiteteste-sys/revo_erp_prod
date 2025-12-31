@@ -35,7 +35,7 @@ describe('RecebimentoListPage', () => {
     expect(await screen.findByText(/Fornecedor X/i)).toBeInTheDocument();
 
     // Botão de cancelar (ícone) está presente apenas para concluído
-    const cancelBtn = await screen.findByTitle(/Cancelar \(estornar\) recebimento/i);
+    const cancelBtn = await screen.findByTitle(/Cancelar recebimento \(estorno\)/i);
     fireEvent.click(cancelBtn);
 
     expect(await screen.findByText(/Cancelar recebimento \(estorno\)/i)).toBeInTheDocument();
@@ -43,11 +43,10 @@ describe('RecebimentoListPage', () => {
     const motivo = screen.getByPlaceholderText(/NF-e importada errada/i);
     fireEvent.change(motivo, { target: { value: 'teste' } });
 
-    const confirm = screen.getByRole('button', { name: /Cancelar recebimento/i });
+    const confirm = screen.getByRole('button', { name: /^Cancelar recebimento$/i });
     fireEvent.click(confirm);
 
     const { cancelarRecebimento } = await import('@/services/recebimento');
     await waitFor(() => expect(cancelarRecebimento).toHaveBeenCalledWith('rec-1', 'teste'));
   });
 });
-

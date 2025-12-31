@@ -10,6 +10,8 @@ export type VendaPedido = {
   numero: number;
   cliente_id: string;
   cliente_nome?: string;
+  vendedor_id?: string | null;
+  comissao_percent?: number;
   data_emissao: string;
   data_entrega: string | null;
   status: StatusVenda;

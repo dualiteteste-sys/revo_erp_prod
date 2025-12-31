@@ -1,7 +1,7 @@
 import React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { SalesGoal } from '@/services/salesGoals';
-import { Edit, Trash2, ArrowUpDown } from 'lucide-react';
+import { Edit, Trash2, ArrowUpDown, AlertTriangle } from 'lucide-react';
 
 interface SalesGoalsTableProps {
   goals: SalesGoal[];
@@ -58,6 +58,7 @@ const ProgressBar: React.FC<{ value: number }> = ({ value }) => {
 const SalesGoalsTable: React.FC<SalesGoalsTableProps> = ({ goals, onEdit, onDelete, sortBy, onSort }) => {
   const formatCurrency = (value: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value);
   const formatDate = (date: string) => new Date(date).toLocaleDateString('pt-BR');
+  const daysUntil = (date: string) => Math.ceil((new Date(date).getTime() - Date.now()) / (1000 * 60 * 60 * 24));
 
   return (
     <div className="overflow-x-auto">
@@ -69,6 +70,9 @@ const SalesGoalsTable: React.FC<SalesGoalsTableProps> = ({ goals, onEdit, onDele
             <SortableHeader column="valor_meta" label="Meta" sortBy={sortBy} onSort={onSort} />
             <SortableHeader column="valor_realizado" label="Realizado" sortBy={sortBy} onSort={onSort} />
             <SortableHeader column="atingimento" label="Atingimento" sortBy={sortBy} onSort={onSort} className="w-48" />
+            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+              Alerta
+            </th>
             <SortableHeader column="status" label="Status" sortBy={sortBy} onSort={onSort} />
             <th scope="col" className="relative px-6 py-3"><span className="sr-only">Ações</span></th>
           </tr>
@@ -94,6 +98,15 @@ const SalesGoalsTable: React.FC<SalesGoalsTableProps> = ({ goals, onEdit, onDele
                         <ProgressBar value={goal.atingimento} />
                         <span>{goal.atingimento.toFixed(1)}%</span>
                     </div>
+                </td>
+                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
+                  {goal.status !== 'concluida' && goal.status !== 'cancelada' && daysUntil(goal.data_fim) <= 7 && goal.atingimento < 80 ? (
+                    <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-semibold bg-amber-100 text-amber-800">
+                      <AlertTriangle size={14} /> Em risco
+                    </span>
+                  ) : (
+                    <span className="text-xs text-gray-400">—</span>
+                  )}
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap">
                   <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${statusConfig[goal.status]?.color || 'bg-gray-100 text-gray-800'}`}>

@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useSalesGoals } from '@/hooks/useSalesGoals';
 import { useToast } from '@/contexts/ToastProvider';
 import * as salesGoalsService from '@/services/salesGoals';
-import { Loader2, PlusCircle, Search, Target } from 'lucide-react';
+import { AlertTriangle, Loader2, PlusCircle, Search, Target } from 'lucide-react';
 import Pagination from '@/components/ui/Pagination';
 import ConfirmationModal from '@/components/ui/ConfirmationModal';
 import Modal from '@/components/ui/Modal';
@@ -100,6 +100,12 @@ const SalesGoalsPage: React.FC = () => {
     }));
   };
 
+  const riskCount = goals.filter((g) => {
+    if (g.status === 'concluida' || g.status === 'cancelada') return false;
+    const days = Math.ceil((new Date(g.data_fim).getTime() - Date.now()) / (1000 * 60 * 60 * 24));
+    return days <= 7 && g.atingimento < 80;
+  }).length;
+
   const handleSeed = async () => {
     setIsSeeding(true);
     try {
@@ -153,7 +159,13 @@ const SalesGoalsPage: React.FC = () => {
           <option value="nao_iniciada">Não Iniciada</option>
           <option value="em_andamento">Em Andamento</option>
           <option value="concluida">Concluída</option>
+          <option value="cancelada">Cancelada</option>
         </Select>
+        {riskCount > 0 ? (
+          <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-amber-50 text-amber-800 border border-amber-100 text-sm">
+            <AlertTriangle size={16} /> {riskCount} meta(s) em risco (fim em ≤ 7 dias e < 80%)
+          </div>
+        ) : null}
       </div>
 
       <div className="bg-white rounded-lg shadow overflow-hidden">
