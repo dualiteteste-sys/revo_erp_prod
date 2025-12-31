@@ -7,6 +7,35 @@
 BEGIN;
 
 -- -----------------------------------------------------------------------------
+-- 0) Expandir allowed actions em public.permissions (compat)
+-- -----------------------------------------------------------------------------
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1
+    FROM pg_constraint
+    WHERE conname = 'ck_action'
+      AND conrelid = 'public.permissions'::regclass
+  ) THEN
+    ALTER TABLE public.permissions DROP CONSTRAINT ck_action;
+  END IF;
+
+  IF EXISTS (
+    SELECT 1
+    FROM pg_constraint
+    WHERE conname = 'permissions_action_chk'
+      AND conrelid = 'public.permissions'::regclass
+  ) THEN
+    ALTER TABLE public.permissions DROP CONSTRAINT permissions_action_chk;
+  END IF;
+END $$;
+
+ALTER TABLE public.permissions
+  ADD CONSTRAINT ck_action
+  CHECK (action = ANY (ARRAY['view'::text,'create'::text,'update'::text,'delete'::text,'manage'::text,'discount'::text])) NOT VALID;
+ALTER TABLE public.permissions VALIDATE CONSTRAINT ck_action;
+
+-- -----------------------------------------------------------------------------
 -- 1) Nova permissão: vendas.discount (idempotente)
 -- -----------------------------------------------------------------------------
 INSERT INTO public.permissions(module, action)
@@ -381,4 +410,3 @@ GRANT EXECUTE ON FUNCTION public.vendas_upsert_pedido(jsonb) TO authenticated, s
 SELECT pg_notify('pgrst','reload schema');
 
 COMMIT;
-
