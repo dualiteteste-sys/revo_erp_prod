@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Loader2, Percent } from 'lucide-react';
+import { Download, Loader2, Percent, Search } from 'lucide-react';
 import { useToast } from '@/contexts/ToastProvider';
 import { supabase } from '@/lib/supabaseClient';
 import { listVendedores, type Vendedor } from '@/services/vendedores';
@@ -16,11 +16,34 @@ type VendaComissaoRow = {
 
 const sb = supabase as any;
 
+function formatMoneyBRL(n: number | null | undefined): string {
+  return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Number(n ?? 0));
+}
+
+function downloadCsv(filename: string, headers: string[], rows: string[][]) {
+  const escape = (s: string) => `"${String(s ?? '').replaceAll('"', '""')}"`;
+  const csv = [headers.map(escape).join(';'), ...rows.map((r) => r.map(escape).join(';'))].join('\n');
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+}
+
 export default function ComissoesPage() {
   const { addToast } = useToast();
   const [loading, setLoading] = useState(true);
   const [rows, setRows] = useState<VendaComissaoRow[]>([]);
   const [vendedores, setVendedores] = useState<Vendedor[]>([]);
+  const [search, setSearch] = useState('');
+  const [vendedorFilter, setVendedorFilter] = useState<string>('all');
+  const [statusFilter, setStatusFilter] = useState<'all' | 'orcamento' | 'aprovado' | 'concluido' | 'cancelado'>('all');
+  const [startDate, setStartDate] = useState<string>('');
+  const [endDate, setEndDate] = useState<string>('');
 
   async function load() {
     setLoading(true);
@@ -57,9 +80,22 @@ export default function ComissoesPage() {
     return map;
   }, [vendedores]);
 
+  const filteredRows = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    return rows.filter((r) => {
+      if (vendedorFilter !== 'all' && r.vendedor_id !== vendedorFilter) return false;
+      if (statusFilter !== 'all' && r.status !== statusFilter) return false;
+      if (startDate && String(r.data_emissao) < startDate) return false;
+      if (endDate && String(r.data_emissao) > endDate) return false;
+      if (!q) return true;
+      const vendedorNome = r.vendedor_id ? (vendedorById.get(r.vendedor_id)?.nome || '') : '';
+      return `${r.numero} ${vendedorNome}`.toLowerCase().includes(q);
+    });
+  }, [rows, search, vendedorFilter, statusFilter, startDate, endDate, vendedorById]);
+
   const resumo = useMemo(() => {
     const map = new Map<string, { vendedor: Vendedor; totalVendas: number; totalComissao: number; pedidos: number }>();
-    for (const r of rows) {
+    for (const r of filteredRows) {
       if (!r.vendedor_id) continue;
       const v = vendedorById.get(r.vendedor_id);
       if (!v) continue;
@@ -74,7 +110,7 @@ export default function ComissoesPage() {
       map.set(key, cur);
     }
     return Array.from(map.values()).sort((a, b) => b.totalComissao - a.totalComissao);
-  }, [rows, vendedorById]);
+  }, [filteredRows, vendedorById]);
 
   return (
     <div className="p-1 h-full flex flex-col">
@@ -85,9 +121,80 @@ export default function ComissoesPage() {
           </h1>
           <p className="text-gray-600 text-sm mt-1">Resumo por vendedor (base: pedidos com `vendedor_id`).</p>
         </div>
-        <button onClick={() => load()} className="px-4 py-2 rounded-lg bg-gray-100 hover:bg-gray-200 text-sm">
-          Atualizar
-        </button>
+        <div className="flex items-center gap-2">
+          <button onClick={() => load()} className="px-4 py-2 rounded-lg bg-gray-100 hover:bg-gray-200 text-sm">
+            Atualizar
+          </button>
+          <button
+            onClick={() => {
+              const headers = ['Vendedor', 'Pedidos', 'Total Vendas', 'Total Comissão'];
+              const csvRows = resumo.map((r) => [
+                r.vendedor.nome,
+                String(r.pedidos),
+                formatMoneyBRL(r.totalVendas),
+                formatMoneyBRL(r.totalComissao),
+              ]);
+              downloadCsv(`comissoes-resumo-${new Date().toISOString().slice(0, 10)}.csv`, headers, csvRows);
+              addToast('CSV gerado.', 'success');
+            }}
+            disabled={loading || resumo.length === 0}
+            className="flex items-center gap-2 px-4 py-2 rounded-lg bg-blue-600 text-white font-bold hover:bg-blue-700 disabled:opacity-50 text-sm"
+          >
+            <Download size={16} /> Exportar resumo CSV
+          </button>
+        </div>
+      </div>
+
+      <div className="mb-4 flex gap-4 flex-shrink-0 flex-wrap">
+        <div className="relative flex-grow max-w-md">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
+          <input
+            type="text"
+            placeholder="Buscar por nº pedido ou vendedor…"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="w-full p-2.5 pl-9 border border-gray-300 rounded-xl shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+          />
+        </div>
+        <select
+          value={vendedorFilter}
+          onChange={(e) => setVendedorFilter(e.target.value)}
+          className="p-2.5 border border-gray-300 rounded-xl min-w-[220px]"
+        >
+          <option value="all">Todos os vendedores</option>
+          {vendedores.map((v) => (
+            <option key={v.id} value={v.id}>
+              {v.nome}
+            </option>
+          ))}
+        </select>
+        <select
+          value={statusFilter}
+          onChange={(e) => setStatusFilter(e.target.value as any)}
+          className="p-2.5 border border-gray-300 rounded-xl min-w-[180px]"
+        >
+          <option value="all">Todos os status</option>
+          <option value="orcamento">Orçamento</option>
+          <option value="aprovado">Aprovado</option>
+          <option value="concluido">Concluído</option>
+          <option value="cancelado">Cancelado</option>
+        </select>
+        <div className="flex items-center gap-2">
+          <label className="text-xs text-gray-600">De</label>
+          <input
+            type="date"
+            value={startDate}
+            onChange={(e) => setStartDate(e.target.value)}
+            className="p-2 border border-gray-300 rounded-lg"
+          />
+          <label className="text-xs text-gray-600">Até</label>
+          <input
+            type="date"
+            value={endDate}
+            onChange={(e) => setEndDate(e.target.value)}
+            className="p-2 border border-gray-300 rounded-lg"
+          />
+        </div>
       </div>
 
       <div className="bg-white rounded-lg shadow overflow-hidden flex-grow flex flex-col">
@@ -97,7 +204,7 @@ export default function ComissoesPage() {
           </div>
         ) : resumo.length === 0 ? (
           <div className="flex justify-center h-64 items-center text-gray-500">
-            Nenhum pedido com vendedor atribuído ainda.
+            {rows.length === 0 ? 'Nenhum pedido com vendedor atribuído ainda.' : 'Nenhum resultado para os filtros.'}
           </div>
         ) : (
           <div className="overflow-auto">
@@ -115,8 +222,8 @@ export default function ComissoesPage() {
                   <tr key={r.vendedor.id} className="hover:bg-gray-50">
                     <td className="px-4 py-3 font-medium text-gray-800">{r.vendedor.nome}</td>
                     <td className="px-4 py-3">{r.pedidos}</td>
-                    <td className="px-4 py-3">{r.totalVendas.toFixed(2)}</td>
-                    <td className="px-4 py-3">{r.totalComissao.toFixed(2)}</td>
+                    <td className="px-4 py-3">{formatMoneyBRL(r.totalVendas)}</td>
+                    <td className="px-4 py-3">{formatMoneyBRL(r.totalComissao)}</td>
                   </tr>
                 ))}
               </tbody>
@@ -124,7 +231,76 @@ export default function ComissoesPage() {
           </div>
         )}
       </div>
+
+      <div className="mt-4 bg-white rounded-lg shadow overflow-hidden">
+        <div className="flex items-center justify-between px-4 py-3 border-b">
+          <div className="font-semibold text-gray-800 text-sm">Pedidos (detalhes)</div>
+          <button
+            onClick={() => {
+              const headers = ['Pedido', 'Data', 'Vendedor', 'Status', 'Comissão %', 'Total', 'Comissão R$'];
+              const csvRows = filteredRows.map((r) => {
+                const vendedorNome = r.vendedor_id ? (vendedorById.get(r.vendedor_id)?.nome || '') : '';
+                const total = Number(r.total_geral || 0);
+                const pct = Number(r.comissao_percent || 0);
+                const com = total * (pct / 100);
+                return [String(r.numero), String(r.data_emissao), vendedorNome, r.status, String(pct), formatMoneyBRL(total), formatMoneyBRL(com)];
+              });
+              downloadCsv(`comissoes-pedidos-${new Date().toISOString().slice(0, 10)}.csv`, headers, csvRows);
+              addToast('CSV gerado.', 'success');
+            }}
+            disabled={loading || filteredRows.length === 0}
+            className="flex items-center gap-2 px-3 py-2 rounded-lg bg-gray-100 hover:bg-gray-200 disabled:opacity-50 text-sm"
+          >
+            <Download size={16} /> Exportar pedidos CSV
+          </button>
+        </div>
+
+        {loading ? (
+          <div className="flex justify-center h-40 items-center">
+            <Loader2 className="animate-spin text-blue-600 w-10 h-10" />
+          </div>
+        ) : filteredRows.length === 0 ? (
+          <div className="flex justify-center h-40 items-center text-gray-500">Nada para exibir.</div>
+        ) : (
+          <div className="overflow-auto">
+            <table className="min-w-full text-sm">
+              <thead className="bg-gray-50">
+                <tr className="text-left text-gray-600">
+                  <th className="px-4 py-3">Pedido</th>
+                  <th className="px-4 py-3">Data</th>
+                  <th className="px-4 py-3">Vendedor</th>
+                  <th className="px-4 py-3">Status</th>
+                  <th className="px-4 py-3 text-right">%</th>
+                  <th className="px-4 py-3 text-right">Total</th>
+                  <th className="px-4 py-3 text-right">Comissão</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-200">
+                {filteredRows.slice(0, 300).map((r) => {
+                  const vendedorNome = r.vendedor_id ? (vendedorById.get(r.vendedor_id)?.nome || '') : '';
+                  const total = Number(r.total_geral || 0);
+                  const pct = Number(r.comissao_percent || 0);
+                  const com = total * (pct / 100);
+                  return (
+                    <tr key={r.id} className="hover:bg-gray-50">
+                      <td className="px-4 py-3 font-medium text-gray-800">#{r.numero}</td>
+                      <td className="px-4 py-3">{r.data_emissao}</td>
+                      <td className="px-4 py-3">{vendedorNome || '-'}</td>
+                      <td className="px-4 py-3">{r.status}</td>
+                      <td className="px-4 py-3 text-right">{pct.toFixed(2)}</td>
+                      <td className="px-4 py-3 text-right">{formatMoneyBRL(total)}</td>
+                      <td className="px-4 py-3 text-right">{formatMoneyBRL(com)}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+            {filteredRows.length > 300 ? (
+              <div className="px-4 py-3 text-xs text-gray-500 border-t">Mostrando 300 primeiros registros (export CSV contém todos).</div>
+            ) : null}
+          </div>
+        )}
+      </div>
     </div>
   );
 }
-

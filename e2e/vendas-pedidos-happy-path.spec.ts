@@ -90,6 +90,7 @@ test('Vendas: pedido (VEN-01/02) happy path (CRUD + itens + impostos básicos + 
 
   const clientHit = { id: 'cli-1', label: 'Cliente E2E', nome: 'Cliente E2E', doc_unico: '00000000000191' };
   const productHit = { id: 'prod-1', descricao: 'Produto E2E', unidade: 'un', preco_venda: 100, type: 'product', codigo: 'SKU-1' };
+  const vendedor = { id: 'ven-1', empresa_id: 'empresa-1', nome: 'Vendedor E2E', email: null, telefone: null, comissao_percent: 5, ativo: true, created_at: nowIso, updated_at: nowIso };
 
   let pedido: any = null;
   let itens: any[] = [];
@@ -121,6 +122,12 @@ test('Vendas: pedido (VEN-01/02) happy path (CRUD + itens + impostos básicos + 
       return;
     }
 
+    // Vendedores (REST)
+    if (url.includes('/rest/v1/vendedores')) {
+      await route.fulfill({ json: [vendedor] });
+      return;
+    }
+
     // Details
     if (url.includes('/rest/v1/rpc/vendas_get_pedido_details')) {
       await route.fulfill({
@@ -145,6 +152,8 @@ test('Vendas: pedido (VEN-01/02) happy path (CRUD + itens + impostos básicos + 
           numero: 9002,
           cliente_id: payload.cliente_id,
           cliente_nome: clientHit.nome,
+          vendedor_id: payload.vendedor_id ?? null,
+          comissao_percent: payload.comissao_percent ?? 0,
           data_emissao: payload.data_emissao || today,
           data_entrega: payload.data_entrega || null,
           status: payload.status || 'orcamento',
@@ -221,6 +230,9 @@ test('Vendas: pedido (VEN-01/02) happy path (CRUD + itens + impostos básicos + 
 
   await page.getByRole('button', { name: 'Novo Pedido' }).click();
   await expect(page.getByText('Dados do Pedido')).toBeVisible({ timeout: 20000 });
+
+  // Selecionar vendedor (opcional)
+  await page.getByLabel('Vendedor (opcional)').selectOption(vendedor.id);
 
   // Selecionar cliente via autocomplete (precisa >= 2 chars)
   await page.getByPlaceholder('Nome/CPF/CNPJ...').fill('Cl');

@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { menuConfig } from '@/config/menuConfig';
 import { PlusCircle } from 'lucide-react';
@@ -101,6 +101,7 @@ export default function CommandPalette() {
   const [query, setQuery] = useState('');
   const [recents, setRecents] = useState<RecentEntry[]>(() => readRecents());
   const { industria_enabled, servicos_enabled, loading, error: featuresError } = useEmpresaFeatures();
+  const inputRef = useRef<HTMLInputElement | null>(null);
 
   const filteredMenu = useMemo(() => {
     if (loading || featuresError) return menuConfig;
@@ -141,8 +142,16 @@ export default function CommandPalette() {
     if (open) {
       setQuery('');
       setRecents(readRecents());
+      // Garante foco no input (UX-01)
+      setTimeout(() => inputRef.current?.focus(), 0);
     }
   }, [open]);
+
+  // Se a rota mudou por qualquer motivo, fecha o palette (evita sobreposição)
+  useEffect(() => {
+    if (open) setOpen(false);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [location.pathname]);
 
   const handleSelect = (item: PaletteItem | RecentEntry) => {
     if (!item.href || item.href === '#') return;
@@ -158,7 +167,13 @@ export default function CommandPalette() {
 
   return (
     <CommandDialog open={open} onOpenChange={setOpen}>
-      <CommandInput placeholder="Buscar páginas… (Ctrl/Cmd + K)" value={query} onValueChange={setQuery} />
+      <CommandInput
+        // @ts-expect-error ref typing from cmdk
+        ref={inputRef as any}
+        placeholder="Buscar páginas… (Ctrl/Cmd + K)"
+        value={query}
+        onValueChange={setQuery}
+      />
       <CommandList>
         <CommandEmpty>Nenhum resultado.</CommandEmpty>
 

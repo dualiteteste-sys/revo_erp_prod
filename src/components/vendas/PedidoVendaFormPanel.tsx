@@ -12,6 +12,7 @@ import { useNumericField } from '@/hooks/useNumericField';
 import { useHasPermission } from '@/hooks/useHasPermission';
 import { searchItemsForOs } from '@/services/os';
 import { ensurePdvDefaultClienteId } from '@/services/vendasMvp';
+import { listVendedores, type Vendedor } from '@/services/vendedores';
 
 interface Props {
   vendaId: string | null;
@@ -36,11 +37,14 @@ export default function PedidoVendaFormPanel({ vendaId, onSaveSuccess, onClose, 
   const { confirm } = useConfirm();
   const [loading, setLoading] = useState(!!vendaId);
   const [isSaving, setIsSaving] = useState(false);
+  const [vendedores, setVendedores] = useState<Vendedor[]>([]);
   const [formData, setFormData] = useState<Partial<VendaDetails>>({
     status: 'orcamento',
     data_emissao: new Date().toISOString().split('T')[0],
     frete: 0,
     desconto: 0,
+    vendedor_id: null,
+    comissao_percent: 0,
     total_geral: 0,
     itens: []
   });
@@ -59,6 +63,18 @@ export default function PedidoVendaFormPanel({ vendaId, onSaveSuccess, onClose, 
       loadDetails();
     }
   }, [vendaId]);
+
+  useEffect(() => {
+    // COM-01: vendedores para comissões (opcional)
+    void (async () => {
+      try {
+        const data = await listVendedores(undefined, true);
+        setVendedores(data);
+      } catch {
+        setVendedores([]);
+      }
+    })();
+  }, []);
 
   useEffect(() => {
     if (mode !== 'pdv') return;
@@ -130,9 +146,12 @@ export default function PedidoVendaFormPanel({ vendaId, onSaveSuccess, onClose, 
         addToast('Selecione um cliente.', 'error');
         return null;
       }
+      const comissaoPercent = Math.max(0, Math.min(100, Number(formData.comissao_percent ?? 0) || 0));
       const payload: VendaPayload = {
         id: formData.id,
         cliente_id: clienteId,
+        vendedor_id: formData.vendedor_id || null,
+        comissao_percent: comissaoPercent,
         data_emissao: formData.data_emissao,
         data_entrega: formData.data_entrega,
         status: formData.status,
@@ -397,6 +416,40 @@ export default function PedidoVendaFormPanel({ vendaId, onSaveSuccess, onClose, 
                 Opcional no PDV (se vazio, usamos <span className="font-semibold">Consumidor Final</span> automaticamente).
               </div>
             ) : null}
+          </div>
+          <div className="sm:col-span-2">
+            <label htmlFor="vendas_vendedor_id" className="block text-sm font-medium text-gray-700 mb-1">
+              Vendedor (opcional)
+            </label>
+            <select
+              id="vendas_vendedor_id"
+              value={formData.vendedor_id || ''}
+              onChange={(e) => {
+                const id = e.target.value || null;
+                const v = vendedores.find((x) => x.id === id);
+                handleHeaderChange('vendedor_id', id);
+                if (v) handleHeaderChange('comissao_percent', Number(v.comissao_percent || 0));
+              }}
+              className="w-full p-3 border border-gray-300 rounded-lg"
+              disabled={isLocked}
+            >
+              <option value="">—</option>
+              {vendedores.map((v) => (
+                <option key={v.id} value={v.id}>
+                  {v.nome}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="sm:col-span-2">
+            <Input
+              label="Comissão (%)"
+              type="number"
+              value={String(formData.comissao_percent ?? 0)}
+              onChange={(e) => handleHeaderChange('comissao_percent', e.target.value)}
+              disabled={isLocked}
+              placeholder="0"
+            />
           </div>
           <div className="sm:col-span-2">
              <Input label="Data Emissão" type="date" value={formData.data_emissao} onChange={e => handleHeaderChange('data_emissao', e.target.value)} disabled={isLocked} />

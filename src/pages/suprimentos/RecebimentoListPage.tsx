@@ -196,7 +196,7 @@ export default function RecebimentoListPage() {
                                                     <button
                                                         onClick={() => openCancel(rec)}
                                                         className="text-gray-400 hover:text-orange-600 transition-colors flex items-center gap-1"
-                                                        title="Cancelar (estornar) recebimento"
+                                                        title="Cancelar recebimento (estorno)"
                                                     >
                                                         <RotateCcw size={16} />
                                                     </button>

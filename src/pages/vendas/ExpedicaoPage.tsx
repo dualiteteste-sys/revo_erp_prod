@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Loader2, PlusCircle, Truck } from 'lucide-react';
+import { Loader2, PlusCircle, Search, Truck } from 'lucide-react';
 import Modal from '@/components/ui/Modal';
 import { useToast } from '@/contexts/ToastProvider';
 import { listVendas, type VendaPedido } from '@/services/vendas';
@@ -29,6 +29,8 @@ export default function ExpedicaoPage() {
   const [saving, setSaving] = useState(false);
   const [rows, setRows] = useState<Expedicao[]>([]);
   const [orders, setOrders] = useState<VendaPedido[]>([]);
+  const [search, setSearch] = useState('');
+  const [statusFilter, setStatusFilter] = useState<ExpedicaoStatus | 'all'>('all');
   const [selectedExpedicaoId, setSelectedExpedicaoId] = useState<string | null>(null);
   const [eventos, setEventos] = useState<ExpedicaoEvento[]>([]);
 
@@ -40,6 +42,17 @@ export default function ExpedicaoPage() {
     for (const o of orders) map.set(o.id, o);
     return map;
   }, [orders]);
+
+  const filteredRows = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    return rows.filter((r) => {
+      if (statusFilter !== 'all' && r.status !== statusFilter) return false;
+      if (!q) return true;
+      const order = orderById.get(r.pedido_id);
+      const hay = `${order?.numero ?? ''} ${order?.cliente_nome ?? ''} ${r.tracking_code ?? ''}`.toLowerCase();
+      return hay.includes(q);
+    });
+  }, [rows, search, statusFilter, orderById]);
 
   async function load() {
     setLoading(true);
@@ -157,13 +170,49 @@ export default function ExpedicaoPage() {
         </button>
       </div>
 
+      <div className="mb-4 flex gap-4 flex-shrink-0">
+        <div className="relative flex-grow max-w-md">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
+          <input
+            type="text"
+            placeholder="Buscar por pedido, cliente ou tracking…"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="w-full p-2.5 pl-9 border border-gray-300 rounded-xl shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+          />
+        </div>
+        <select
+          value={statusFilter}
+          onChange={(e) => setStatusFilter(e.target.value as any)}
+          className="p-2.5 border border-gray-300 rounded-xl min-w-[180px]"
+        >
+          <option value="all">Todos</option>
+          <option value="separando">Separando</option>
+          <option value="embalado">Embalado</option>
+          <option value="enviado">Enviado</option>
+          <option value="entregue">Entregue</option>
+          <option value="cancelado">Cancelado</option>
+        </select>
+      </div>
+
       <div className="bg-white rounded-lg shadow overflow-hidden flex-grow flex flex-col">
         {loading ? (
           <div className="flex justify-center h-64 items-center">
             <Loader2 className="animate-spin text-blue-600 w-10 h-10" />
           </div>
-        ) : rows.length === 0 ? (
-          <div className="flex justify-center h-64 items-center text-gray-500">Nenhuma expedição cadastrada.</div>
+        ) : filteredRows.length === 0 ? (
+          <div className="flex justify-center h-64 items-center text-gray-500">
+            {rows.length === 0 ? (
+              <div className="text-center space-y-2">
+                <div>Nenhuma expedição cadastrada.</div>
+                <button onClick={openNew} className="px-4 py-2 rounded-lg bg-blue-600 text-white font-bold hover:bg-blue-700">
+                  Nova Expedição
+                </button>
+              </div>
+            ) : (
+              <div>Nenhum resultado para os filtros.</div>
+            )}
+          </div>
         ) : (
           <div className="overflow-auto">
             <table className="min-w-full text-sm">
@@ -178,7 +227,7 @@ export default function ExpedicaoPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200">
-                {rows.map((r) => {
+                {filteredRows.map((r) => {
                   const o = orderById.get(r.pedido_id);
                   return (
                     <tr key={r.id} className="hover:bg-gray-50">
