@@ -10,8 +10,8 @@ Regras:
 ## 0) Plataforma (obrigatório para todos os módulos)
 
 ### 0.1 UX padrão produto
-- [ ] UX-01 Busca global + atalhos (Ctrl/Cmd+K) sem erros e com foco/teclado
-- [ ] UX-02 Listas: filtros + ordenação + paginação eficiente + “estado vazio” com CTA
+- [x] UX-01 Busca global + atalhos (Ctrl/Cmd+K) sem erros e com foco/teclado
+- [x] UX-02 Listas: filtros + ordenação + paginação eficiente + “estado vazio” com CTA
 - [ ] UX-03 Colunas configuráveis + exportação CSV (mínimo) nas listas principais
 - [ ] UX-04 Ações em massa (mínimo: excluir/ativar/inativar quando existir) nas listas principais
 - [ ] UX-05 Formulários: validação forte + mensagens claras + máscaras BR (CNPJ/CPF/CEP/telefone)
@@ -48,7 +48,7 @@ Regras:
 - [x] SUP-01 Estoque: saldo por produto + movimentações + ajuste manual auditável
 - [x] SUP-02 Compras (OC): criar/aprovar (simples) + itens + status + histórico
 - [x] SUP-03 Recebimentos: importar XML + conferência + vincular produtos + dar entrada no estoque
-- [ ] SUP-04 Cancelar/estornar recebimento com reversão de estoque (quando permitido) + auditoria
+- [x] SUP-04 Cancelar/estornar recebimento com reversão de estoque (quando permitido) + auditoria
 
 ## 3) Vendas (mínimo competitivo no lançamento)
 
@@ -67,8 +67,8 @@ Regras:
 - [x] EXP-02 Vincular pedido + rastreio + observações + histórico
 
 ### 3.4 Comissões + metas + painel (Pro)
-- [ ] COM-01 Comissões: regra simples por vendedor (% ou tabela) + relatório + export
-- [ ] MET-01 Metas: CRUD + acompanhamento (atingido x meta) + alertas simples
+- [x] COM-01 Comissões: regra simples por vendedor (% ou tabela) + relatório + export
+- [x] MET-01 Metas: CRUD + acompanhamento (atingido x meta) + alertas simples
 - [ ] DASH-01 Painel de vendas: KPIs principais e filtros por período/canal/vendedor
 
 ### 3.5 CRM + automações (MVP “bem feito”, sem prometer demais)
