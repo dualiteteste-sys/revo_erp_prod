@@ -141,6 +141,7 @@ test('Menu missing modules: rotas principais abrem (MVP)', async ({ page }) => {
 
   const cases: Array<{ path: string; heading: string }> = [
     { path: '/app/cadastros/vendedores', heading: 'Vendedores' },
+    { path: '/app/vendas/crm', heading: 'CRM - Funil de Vendas' },
     { path: '/app/vendas/propostas', heading: 'Propostas Comerciais' },
     { path: '/app/vendas/pdv', heading: 'PDV' },
     { path: '/app/vendas/expedicao', heading: 'Expedição' },

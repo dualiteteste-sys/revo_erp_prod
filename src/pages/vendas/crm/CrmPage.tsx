@@ -1,14 +1,16 @@
 import React, { useState } from 'react';
-import { HeartHandshake, PlusCircle } from 'lucide-react';
+import { HeartHandshake, PlusCircle, Settings } from 'lucide-react';
 import CrmKanbanBoard from '@/components/vendas/crm/CrmKanbanBoard';
 import Modal from '@/components/ui/Modal';
 import DealFormPanel from '@/components/vendas/crm/DealFormPanel';
 import { CrmOportunidade, seedCrm } from '@/services/crm';
 import { SeedButton } from '@/components/common/SeedButton';
 import { useToast } from '@/contexts/ToastProvider';
+import PipelineConfigPanel from '@/components/vendas/crm/PipelineConfigPanel';
 
 export default function CrmPage() {
   const [isFormOpen, setIsFormOpen] = useState(false);
+  const [isConfigOpen, setIsConfigOpen] = useState(false);
   const [selectedDeal, setSelectedDeal] = useState<CrmOportunidade | null>(null);
   const [targetEtapaId, setTargetEtapaId] = useState<string>('');
   const [refreshTrigger, setRefreshTrigger] = useState(0);
@@ -60,6 +62,14 @@ export default function CrmPage() {
               isSeeding={isSeeding} 
             />
             <button
+              onClick={() => setIsConfigOpen(true)}
+              className="flex items-center gap-2 bg-white border border-gray-300 text-gray-800 font-semibold py-2 px-4 rounded-lg hover:bg-gray-50 transition-colors"
+              title="Configurar etapas do funil"
+            >
+              <Settings size={20} />
+              Configurar Etapas
+            </button>
+            <button
               onClick={() => handleNewDeal('')} // Empty string will use default logic in form or fail gracefully
               className="flex items-center gap-2 bg-blue-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-blue-700 transition-colors"
             >
@@ -84,6 +94,19 @@ export default function CrmPage() {
             etapaId={targetEtapaId}
             onSaveSuccess={handleSuccess} 
             onClose={() => setIsFormOpen(false)} 
+        />
+      </Modal>
+
+      <Modal
+        isOpen={isConfigOpen}
+        onClose={() => setIsConfigOpen(false)}
+        title="Configurar Etapas do Funil"
+        size="4xl"
+      >
+        <PipelineConfigPanel
+          onChanged={() => {
+            setRefreshTrigger((v) => v + 1);
+          }}
         />
       </Modal>
     </div>

@@ -99,6 +99,21 @@ export async function deleteAutomacaoVendas(id: string): Promise<void> {
   if (error) throw error;
 }
 
+export type AutomacaoValidationResult = { ok: boolean; errors: string[] };
+
+export async function validateAutomacaoConfig(config: any): Promise<AutomacaoValidationResult> {
+  return callRpc<AutomacaoValidationResult>('vendas_automacao_validate_config', { p_config: config });
+}
+
+export async function enqueueAutomacaoNow(params: { automacaoId: string; entityId: string; gatilho?: string; payload?: any }): Promise<string> {
+  return callRpc<string>('vendas_automacao_enqueue_single', {
+    p_automacao_id: params.automacaoId,
+    p_entity_id: params.entityId,
+    p_gatilho: params.gatilho ?? 'manual',
+    p_payload: params.payload ?? null,
+  });
+}
+
 export type DevolucaoStatus = 'registrada' | 'processada' | 'cancelada';
 export type Devolucao = {
   id: string;

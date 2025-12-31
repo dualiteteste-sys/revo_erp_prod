@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useVendas } from '@/hooks/useVendas';
 import { VendaPedido, seedVendas } from '@/services/vendas';
 import { PlusCircle, Search, ShoppingCart } from 'lucide-react';
@@ -11,6 +11,7 @@ import Pagination from '@/components/ui/Pagination';
 import { useToast } from '@/contexts/ToastProvider';
 import { SeedButton } from '@/components/common/SeedButton';
 import CsvExportDialog from '@/components/ui/CsvExportDialog';
+import { useLocation } from 'react-router-dom';
 
 export default function PedidosVendasPage() {
   const {
@@ -28,6 +29,12 @@ export default function PedidosVendasPage() {
     refresh,
   } = useVendas();
   const { addToast } = useToast();
+  const location = useLocation();
+
+  const openFromQuery = useMemo(() => {
+    const params = new URLSearchParams(location.search);
+    return params.get('open');
+  }, [location.search]);
 
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -52,6 +59,13 @@ export default function PedidosVendasPage() {
     refresh();
     if (!selectedId) handleClose();
   };
+
+  useEffect(() => {
+    if (!openFromQuery) return;
+    setSelectedId(openFromQuery);
+    setIsFormOpen(true);
+    // Não limpa query automaticamente para permitir refresh/back
+  }, [openFromQuery]);
 
   const handleSeed = async () => {
     setIsSeeding(true);
