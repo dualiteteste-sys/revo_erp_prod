@@ -34,14 +34,16 @@ const STATUS_LABEL: Record<status_os, string> = {
   cancelada: 'Cancelada',
 };
 
-const OsKanbanBoard: React.FC<{ onOpenOs?: (osId: string) => void; canUpdate?: boolean }> = ({ onOpenOs, canUpdate }) => {
+const OsKanbanBoard: React.FC<{ onOpenOs?: (osId: string) => void; canUpdate?: boolean; canManage?: boolean }> = ({ onOpenOs, canUpdate, canManage }) => {
   const [columns, setColumns] = useState<KanbanColumns | null>(null);
   const [loading, setLoading] = useState(true);
   const { addToast } = useToast();
   const [search, setSearch] = useState('');
   const [status, setStatus] = useState<status_os[]>(DEFAULT_STATUS);
   const permUpdate = useHasPermission('os', 'update');
+  const permManage = useHasPermission('os', 'manage');
   const canEdit = typeof canUpdate === 'boolean' ? canUpdate : permUpdate.data;
+  const canClose = typeof canManage === 'boolean' ? canManage : permManage.data;
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -171,6 +173,10 @@ const OsKanbanBoard: React.FC<{ onOpenOs?: (osId: string) => void; canUpdate?: b
                 addToast('Você não tem permissão para alterar status.', 'warning');
                 return;
               }
+              if ((next === 'concluida' || next === 'cancelada') && !canClose) {
+                addToast('Você não tem permissão para concluir/cancelar O.S.', 'warning');
+                return;
+              }
               try {
                 await setOsStatus(osId, next);
                 addToast(`Status atualizado para "${STATUS_LABEL[next]}".`, 'success');
@@ -180,6 +186,7 @@ const OsKanbanBoard: React.FC<{ onOpenOs?: (osId: string) => void; canUpdate?: b
               }
             }}
             canUpdate={canEdit}
+            canManage={canClose}
           />
         ))}
         </div>

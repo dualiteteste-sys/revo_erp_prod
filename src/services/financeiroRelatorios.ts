@@ -36,6 +36,13 @@ export type FinanceiroRelatoriosResumo = {
   series: FinanceiroRelatoriosSerie[];
 };
 
+export type FinanceiroPorCentroCustoRow = {
+  centro_id: string | null;
+  centro_nome: string;
+  entradas: number;
+  saidas: number;
+};
+
 export async function getFinanceiroRelatoriosResumo(params: {
   startDate?: Date | null;
   endDate?: Date | null;
@@ -47,3 +54,12 @@ export async function getFinanceiroRelatoriosResumo(params: {
   return callRpc<FinanceiroRelatoriosResumo>('financeiro_relatorios_resumo', payload);
 }
 
+export async function listFinanceiroPorCentroCusto(params: {
+  startDate?: Date | null;
+  endDate?: Date | null;
+}): Promise<FinanceiroPorCentroCustoRow[]> {
+  return callRpc<FinanceiroPorCentroCustoRow[]>('financeiro_relatorio_por_centro_custo', {
+    p_start_date: params.startDate ? params.startDate.toISOString().slice(0, 10) : null,
+    p_end_date: params.endDate ? params.endDate.toISOString().slice(0, 10) : null,
+  });
+}

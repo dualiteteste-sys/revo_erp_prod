@@ -9,6 +9,7 @@ import Select from '@/components/ui/forms/Select';
 import TextArea from '@/components/ui/forms/TextArea';
 import { useNumericField } from '@/hooks/useNumericField';
 import ClientAutocomplete from '@/components/common/ClientAutocomplete';
+import CentroDeCustoAutocomplete from '@/components/common/CentroDeCustoAutocomplete';
 
 interface ContasAReceberFormPanelProps {
   conta: Partial<ContaAReceber> | null;
@@ -47,8 +48,8 @@ const ContasAReceberFormPanel: React.FC<ContasAReceberFormPanelProps> = ({ conta
     }
   }, [conta]);
 
-  const handleFormChange = (field: keyof ContaAReceber, value: any) => {
-    setFormData(prev => ({ ...prev, [field]: value }));
+  const handleFormChange = (field: keyof ContaAReceber | 'centro_de_custo_id', value: any) => {
+    setFormData(prev => ({ ...(prev as any), [field]: value } as any));
   };
 
   const handleSave = async () => {
@@ -99,6 +100,22 @@ const ContasAReceberFormPanel: React.FC<ContasAReceberFormPanelProps> = ({ conta
             {isPago ? <option value="pago">Pago (registrado)</option> : null}
             {statusOptions.map(opt => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
           </Select>
+        </Section>
+        <Section title="Centro de Custo" description="Opcional (quando você quiser analisar por centro).">
+          <div className="sm:col-span-6">
+            <label className="block text-sm font-medium text-gray-700 mb-1">Centro de Custo</label>
+            <CentroDeCustoAutocomplete
+              value={(formData as any).centro_de_custo_id || null}
+              onChange={(id, name) => {
+                handleFormChange('centro_de_custo_id', id);
+                if (name) {
+                  // compat: algumas RPCs antigas ainda usam centro_custo text
+                  handleFormChange('centro_custo' as any, name);
+                }
+              }}
+              placeholder="Buscar centro de custo…"
+            />
+          </div>
         </Section>
         <Section title="Detalhes do Recebimento" description="Informações sobre o recebimento da conta.">
           <div className="sm:col-span-6 text-sm text-gray-600">

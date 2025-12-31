@@ -18,9 +18,8 @@ type Props = {
 
 const SOURCE_OPTIONS = [
   { value: 'ALL', label: 'Todos' },
-  { value: 'postgrest', label: 'API' },
-  { value: 'trigger', label: 'Gatilho (DB)' },
-  { value: 'func', label: 'Função (RPC)' },
+  { value: 'db', label: 'Banco (audit_logs)' },
+  { value: 'app', label: 'App (erros/handlers)' },
 ];
 
 const OP_OPTIONS = [

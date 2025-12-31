@@ -6,7 +6,7 @@ import {
   Bot, Undo2, ClipboardCheck, Banknote, Wallet, TrendingUp,
   TrendingDown, Landmark, FileSpreadsheet, LogOut, Search, Building, Code, Database, Target,
   Briefcase, BookOpen, Grid, GraduationCap, PieChart, Factory, Hammer, Layers, FileCog, Route, PlayCircle, HardHat, FileCode, MonitorUp,
-  PackageCheck, FileUp, FolderTree, Ruler, BarChart3, Shield, ShieldCheck
+  PackageCheck, FileUp, FolderTree, Ruler, BarChart3, Shield, ShieldCheck, Activity
 } from 'lucide-react';
 
 export interface MenuItem {
@@ -173,6 +173,7 @@ export const menuConfig: { name: string; icon: React.ElementType; href: string; 
     href: '#',
     gradient: 'from-purple-500 to-purple-600',
     children: [
+      { name: 'Saúde', icon: Activity, href: '/app/desenvolvedor/saude' },
       { name: 'Logs', icon: FileText, href: '/app/desenvolvedor/logs' },
       { name: 'Supabase Demo', icon: Database, href: '/app/desenvolvedor/supabase-demo' },
     ],

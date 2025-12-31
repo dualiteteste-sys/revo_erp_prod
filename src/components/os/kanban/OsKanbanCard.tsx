@@ -17,6 +17,7 @@ interface OsKanbanCardProps {
   onOpenOs?: (osId: string) => void;
   onSetStatus?: (osId: string, next: status_os) => void | Promise<void>;
   canUpdate?: boolean;
+  canManage?: boolean;
 }
 
 const STATUS_BADGE: Record<status_os, string> = {
@@ -33,7 +34,7 @@ const STATUS_LABEL: Record<status_os, string> = {
   cancelada: 'Cancelada',
 };
 
-const OsKanbanCard: React.FC<OsKanbanCardProps> = ({ item, index, onOpenOs, onSetStatus, canUpdate = true }) => {
+const OsKanbanCard: React.FC<OsKanbanCardProps> = ({ item, index, onOpenOs, onSetStatus, canUpdate = true, canManage = false }) => {
   return (
     <Draggable draggableId={item.id} index={index} isDragDisabled={!canUpdate}>
       {(provided, snapshot) => (
@@ -80,11 +81,11 @@ const OsKanbanCard: React.FC<OsKanbanCardProps> = ({ item, index, onOpenOs, onSe
                   <ArrowUpRight className="mr-2 h-4 w-4" />
                   Marcar como Aberta
                 </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => onSetStatus?.(item.id, 'concluida')} disabled={!canUpdate}>
+                <DropdownMenuItem onClick={() => onSetStatus?.(item.id, 'concluida')} disabled={!canManage}>
                   <CheckCircle2 className="mr-2 h-4 w-4 text-green-600" />
                   Concluir O.S.
                 </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => onSetStatus?.(item.id, 'cancelada')} disabled={!canUpdate}>
+                <DropdownMenuItem onClick={() => onSetStatus?.(item.id, 'cancelada')} disabled={!canManage}>
                   <XCircle className="mr-2 h-4 w-4 text-rose-600" />
                   Cancelar O.S.
                 </DropdownMenuItem>

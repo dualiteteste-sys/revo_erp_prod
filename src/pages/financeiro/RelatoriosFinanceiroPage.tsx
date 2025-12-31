@@ -7,7 +7,7 @@ import GlassCard from '@/components/ui/GlassCard';
 import Input from '@/components/ui/forms/Input';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/contexts/ToastProvider';
-import { getFinanceiroRelatoriosResumo, type FinanceiroRelatoriosResumo } from '@/services/financeiroRelatorios';
+import { getFinanceiroRelatoriosResumo, listFinanceiroPorCentroCusto, type FinanceiroPorCentroCustoRow, type FinanceiroRelatoriosResumo } from '@/services/financeiroRelatorios';
 import { useNavigate } from 'react-router-dom';
 
 function formatBRL(value: number) {
@@ -54,18 +54,23 @@ export default function RelatoriosFinanceiroPage() {
   const [startDate, setStartDate] = useState<string>('');
   const [endDate, setEndDate] = useState<string>('');
   const [data, setData] = useState<FinanceiroRelatoriosResumo | null>(null);
+  const [porCentro, setPorCentro] = useState<FinanceiroPorCentroCustoRow[]>([]);
 
   const fetchData = useCallback(async () => {
     setLoading(true);
     try {
-      const result = await getFinanceiroRelatoriosResumo({
-        startDate: toDateOrNull(startDate),
-        endDate: toDateOrNull(endDate),
-      });
+      const start = toDateOrNull(startDate);
+      const end = toDateOrNull(endDate);
+      const [result, centros] = await Promise.all([
+        getFinanceiroRelatoriosResumo({ startDate: start, endDate: end }),
+        listFinanceiroPorCentroCusto({ startDate: start, endDate: end }),
+      ]);
       setData(result);
+      setPorCentro(centros ?? []);
     } catch (e: any) {
       addToast(e?.message || 'Falha ao carregar relatórios do Financeiro.', 'error');
       setData(null);
+      setPorCentro([]);
     } finally {
       setLoading(false);
     }
@@ -129,6 +134,21 @@ export default function RelatoriosFinanceiroPage() {
     };
   }, [series]);
 
+  const porCentroOption = useMemo(() => {
+    const top = (porCentro ?? []).slice(0, 10);
+    return {
+      tooltip: { trigger: 'axis' },
+      legend: { top: 0 },
+      grid: { left: 40, right: 20, bottom: 30, top: 40 },
+      xAxis: { type: 'category', data: top.map((c) => c.centro_nome), axisLabel: { rotate: 20 } },
+      yAxis: { type: 'value' },
+      series: [
+        { name: 'Entradas', type: 'bar', data: top.map((c) => c.entradas), itemStyle: { color: '#10b981' } },
+        { name: 'Saídas', type: 'bar', data: top.map((c) => c.saidas), itemStyle: { color: '#ef4444' } },
+      ],
+    };
+  }, [porCentro]);
+
   const periodoLabel = data?.periodo
     ? `${data.periodo.inicio} → ${data.periodo.fim}`
     : '—';
@@ -149,6 +169,9 @@ export default function RelatoriosFinanceiroPage() {
       [],
       ['Serie', 'mes', 'entradas', 'saidas', 'receber_pago', 'pagar_pago'],
       ...series.map((s) => ['serie', s.mes, s.entradas, s.saidas, s.receber_pago, s.pagar_pago]),
+      [],
+      ['Por centro de custo', 'centro', 'entradas', 'saidas'],
+      ...(porCentro ?? []).map((c) => ['centro', c.centro_nome, c.entradas, c.saidas]),
     ];
     const csv = toCsv(rows);
     const filename = `financeiro_relatorios_${data.periodo.inicio}_${data.periodo.fim}.csv`;
@@ -277,6 +300,15 @@ export default function RelatoriosFinanceiroPage() {
             <GlassCard className="p-4">
               <div className="text-sm font-semibold text-gray-800 mb-2">Pagos no período (Receber x Pagar)</div>
               <ReactECharts option={pagosOption} style={{ height: 320, width: '100%' }} />
+            </GlassCard>
+
+            <GlassCard className="p-4 xl:col-span-2">
+              <div className="text-sm font-semibold text-gray-800 mb-2">Por centro de custo (pagos) — Top 10</div>
+              {porCentro.length === 0 ? (
+                <div className="text-sm text-gray-600">Sem dados por centro de custo no período.</div>
+              ) : (
+                <ReactECharts option={porCentroOption} style={{ height: 340, width: '100%' }} />
+              )}
             </GlassCard>
           </div>
         </>

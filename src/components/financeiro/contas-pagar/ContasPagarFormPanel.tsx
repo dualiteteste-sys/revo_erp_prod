@@ -9,6 +9,7 @@ import Select from '@/components/ui/forms/Select';
 import TextArea from '@/components/ui/forms/TextArea';
 import { useNumericField } from '@/hooks/useNumericField';
 import ClientAutocomplete from '@/components/common/ClientAutocomplete';
+import CentroDeCustoAutocomplete from '@/components/common/CentroDeCustoAutocomplete';
 
 interface ContasPagarFormPanelProps {
   conta: Partial<ContaPagar> | null;
@@ -140,6 +141,22 @@ const ContasPagarFormPanel: React.FC<ContasPagarFormPanelProps> = ({ conta, onSa
 
           <Input label="Forma de Pagamento" name="forma_pagamento" value={formData.forma_pagamento || ''} onChange={e => handleFormChange('forma_pagamento', e.target.value)} className="sm:col-span-3" placeholder="Ex: Boleto, Pix" />
           <Input label="Categoria" name="categoria" value={formData.categoria || ''} onChange={e => handleFormChange('categoria', e.target.value)} className="sm:col-span-3" />
+
+          <div className="sm:col-span-6">
+            <label className="block text-sm font-medium text-gray-700 mb-1">Centro de Custo (opcional)</label>
+            <CentroDeCustoAutocomplete
+              value={(formData as any).centro_de_custo_id || null}
+              initialName={formData.centro_custo || ''}
+              onChange={(id, name) => {
+                handleFormChange('centro_de_custo_id' as any, id);
+                if (name) handleFormChange('centro_custo' as any, name);
+              }}
+              placeholder="Buscar centro de custo…"
+            />
+            <div className="mt-1 text-xs text-gray-500">
+              Dica: o campo legado <span className="font-medium">centro_custo</span> ainda existe para compatibilidade; ao selecionar aqui, ele é preenchido automaticamente.
+            </div>
+          </div>
 
           <TextArea label="Observações" name="observacoes" value={formData.observacoes || ''} onChange={e => handleFormChange('observacoes', e.target.value)} rows={3} className="sm:col-span-6" />
         </Section>

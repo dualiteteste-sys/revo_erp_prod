@@ -21,6 +21,7 @@ export type ContaPagar = {
     saldo?: number; // Campo calculado retornado pela RPC
     forma_pagamento: string | null;
     centro_custo: string | null;
+    centro_de_custo_id?: string | null;
     categoria: string | null;
     status: 'aberta' | 'parcial' | 'paga' | 'cancelada';
     observacoes: string | null;

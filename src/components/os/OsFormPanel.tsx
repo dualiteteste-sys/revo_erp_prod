@@ -42,6 +42,7 @@ const OsFormPanel: React.FC<OsFormPanelProps> = ({ os, onSaveSuccess, onClose })
   const { activeEmpresaId } = useAuth();
   const permCreate = useHasPermission('os', 'create');
   const permUpdate = useHasPermission('os', 'update');
+  const permManage = useHasPermission('os', 'manage');
   const [isSaving, setIsSaving] = useState(false);
   const [isAddingItem, setIsAddingItem] = useState(false);
   const [formData, setFormData] = useState<Partial<OrdemServicoDetails>>({});
@@ -69,7 +70,9 @@ const OsFormPanel: React.FC<OsFormPanelProps> = ({ os, onSaveSuccess, onClose })
 
   const canEdit = formData.id ? permUpdate.data : permCreate.data;
   const permLoading = formData.id ? permUpdate.isLoading : permCreate.isLoading;
-  const readOnly = permLoading ? true : !canEdit;
+  const isClosed = formData.status === 'concluida' || formData.status === 'cancelada';
+  const stageReadOnly = isClosed && !permManage.data;
+  const readOnly = permLoading || !canEdit || stageReadOnly;
 
   const descontoProps = useNumericField(formData.desconto_valor, (value) => handleFormChange('desconto_valor', value));
   const custoEstimadoProps = useNumericField((formData as any).custo_estimado, (value) => handleFormChange('custo_estimado' as any, value));

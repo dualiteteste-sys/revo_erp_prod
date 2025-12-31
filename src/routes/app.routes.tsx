@@ -34,6 +34,7 @@ const CnpjSearchPage = lazyImport(() => import("../pages/tools/CnpjSearchPage"))
 const NfeInputPage = lazyImport(() => import("../pages/tools/NfeInputPage"));
 const XmlTesterPage = lazyImport(() => import('../pages/tools/XmlTesterPage'));
 const LogsPage = lazyImport(() => import("../pages/dev/LogsPage"));
+const HealthPage = lazyImport(() => import("../pages/dev/HealthPage"));
 const SupabaseDemoPage = lazyImport(() => import("../pages/tools/SupabaseDemoPage"));
 const SettingsPage = lazyImport(() => import("../pages/settings/SettingsPage"));
 
@@ -406,7 +407,22 @@ export const appRoutes: RouteObject[] = [
             { path: "cnpj-search", element: <Suspense fallback={<PageLoader />}><CnpjSearchPage /></Suspense> },
 
             // Desenvolvedor
-            { path: "desenvolvedor/logs", element: <Suspense fallback={<PageLoader />}><LogsPage /></Suspense> },
+            {
+              path: "desenvolvedor/saude",
+              element: (
+                <RequirePermission permission={{ domain: "ops", action: "view" }}>
+                  <Suspense fallback={<PageLoader />}><HealthPage /></Suspense>
+                </RequirePermission>
+              ),
+            },
+            {
+              path: "desenvolvedor/logs",
+              element: (
+                <RequirePermission permission={{ domain: "logs", action: "view" }}>
+                  <Suspense fallback={<PageLoader />}><LogsPage /></Suspense>
+                </RequirePermission>
+              ),
+            },
             { path: "desenvolvedor/supabase-demo", element: <Suspense fallback={<PageLoader />}><SupabaseDemoPage /></Suspense> },
             {
                 path: 'tools/xml-tester',
