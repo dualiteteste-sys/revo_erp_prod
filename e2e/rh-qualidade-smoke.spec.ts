@@ -369,7 +369,7 @@ test('RH & Qualidade: navegação e render sem erros de console', async ({ page 
   await expect(page.getByText('Ana Silva')).toBeVisible();
 
   await page.goto('/app/rh/cargos');
-  await expect(page.getByText('Cargos e Funções')).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Cargos e Funções' })).toBeVisible();
   await expect(page.getByText('Operador')).toBeVisible();
 
   await page.goto('/app/rh/competencias');
@@ -395,7 +395,7 @@ test('RH & Qualidade: navegação e render sem erros de console', async ({ page 
   await expect(page.getByText('DIM-01')).toBeVisible();
 
   await page.goto('/app/industria/qualidade/planos');
-  await expect(page.getByText('Planos de Inspeção')).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Planos de Inspeção' })).toBeVisible();
   await expect(page.getByText('Plano IP - Produto A')).toBeVisible({ timeout: 15000 });
 
   await page.goto('/app/industria/qualidade/lotes');

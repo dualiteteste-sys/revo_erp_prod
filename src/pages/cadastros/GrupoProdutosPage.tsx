@@ -6,6 +6,7 @@ import { listProdutoGrupos, upsertProdutoGrupo, deleteProdutoGrupo, ProdutoGrupo
 import Modal from '../../components/ui/Modal';
 import GrupoProdutoForm from '../../components/cadastros/GrupoProdutoForm';
 import { Button } from '../../components/ui/button';
+import CsvExportDialog from '@/components/ui/CsvExportDialog';
 
 const GrupoProdutosPage: React.FC = () => {
     const { addToast } = useToast();
@@ -83,10 +84,20 @@ const GrupoProdutosPage: React.FC = () => {
                     <FolderTree className="text-blue-600" size={28} />
                     <h1 className="text-2xl font-bold text-gray-800">Grupos de Produtos</h1>
                 </div>
-                <Button onClick={() => handleOpenModal()}>
-                    <Plus size={20} className="mr-2" />
-                    Novo Grupo
-                </Button>
+                <div className="flex items-center gap-2">
+                    <CsvExportDialog
+                        filename="grupos-produtos.csv"
+                        rows={grupos}
+                        disabled={loading}
+                        columns={[
+                            { key: 'nome', label: 'Nome', getValue: (r) => r.nome },
+                        ]}
+                    />
+                    <Button onClick={() => handleOpenModal()}>
+                        <Plus size={20} className="mr-2" />
+                        Novo Grupo
+                    </Button>
+                </div>
             </div>
 
             <div className="mb-6 relative max-w-md">

@@ -8,6 +8,7 @@ import EmbalagemFormPanel from '../../components/cadastros/EmbalagemFormPanel';
 import { useToast } from '../../contexts/ToastProvider';
 import { tipo_embalagem } from '../../types/database.types';
 import { useConfirm } from '@/contexts/ConfirmProvider';
+import CsvExportDialog from '@/components/ui/CsvExportDialog';
 
 const EmbalagensPage: React.FC = () => {
     const [embalagens, setEmbalagens] = useState<Embalagem[]>([]);
@@ -112,10 +113,27 @@ const EmbalagensPage: React.FC = () => {
                         <span>Embalagens</span>
                     </div>
                 </div>
-                <Button onClick={handleNew} className="bg-blue-600 hover:bg-blue-700 text-white">
-                    <Plus className="w-4 h-4 mr-2" />
-                    Nova Embalagem
-                </Button>
+                <div className="flex items-center gap-2">
+                    <CsvExportDialog
+                        filename="embalagens.csv"
+                        rows={embalagens}
+                        disabled={isLoading}
+                        columns={[
+                            { key: 'nome', label: 'Nome', getValue: (r) => r.nome },
+                            { key: 'tipo', label: 'Tipo', getValue: (r) => r.tipo },
+                            { key: 'largura', label: 'Largura (cm)', getValue: (r) => r.largura ?? '' },
+                            { key: 'altura', label: 'Altura (cm)', getValue: (r) => r.altura ?? '' },
+                            { key: 'comprimento', label: 'Comprimento (cm)', getValue: (r) => r.comprimento ?? '' },
+                            { key: 'diametro', label: 'Diâmetro (cm)', getValue: (r) => r.diametro ?? '' },
+                            { key: 'origem', label: 'Origem', getValue: (r) => (r.empresa_id ? 'Próprio' : 'Sistema') },
+                            { key: 'status', label: 'Status', getValue: (r) => (r.ativo ? 'Ativo' : 'Inativo') },
+                        ]}
+                    />
+                    <Button onClick={handleNew} className="bg-blue-600 hover:bg-blue-700 text-white">
+                        <Plus className="w-4 h-4 mr-2" />
+                        Nova Embalagem
+                    </Button>
+                </div>
             </div>
 
             <div className="space-y-6 flex-grow flex flex-col">

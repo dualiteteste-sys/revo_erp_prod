@@ -12,6 +12,7 @@ import PageHeader from '@/components/ui/PageHeader';
 import { Button } from '@/components/ui/button';
 import Select from '@/components/ui/forms/Select';
 import { isSeedEnabled } from '@/utils/seed';
+import CsvExportDialog from '@/components/ui/CsvExportDialog';
 
 export default function ServicesPage() {
   const enableSeed = isSeedEnabled();
@@ -139,6 +140,21 @@ export default function ServicesPage() {
           icon={<Wrench size={20} />}
           actions={
             <>
+              <CsvExportDialog
+                filename="servicos.csv"
+                rows={services}
+                disabled={loading}
+                columns={[
+                  { key: 'descricao', label: 'Descrição', getValue: (r) => r.descricao },
+                  { key: 'codigo', label: 'Código', getValue: (r) => r.codigo ?? '' },
+                  { key: 'preco', label: 'Preço de venda', getValue: (r) => r.preco_venda ?? '' },
+                  { key: 'unidade', label: 'Unidade', getValue: (r) => r.unidade ?? '' },
+                  { key: 'status', label: 'Status', getValue: (r) => r.status },
+                  { key: 'codigo_servico', label: 'Código serviço', getValue: (r) => r.codigo_servico ?? '' },
+                  { key: 'nbs', label: 'NBS', getValue: (r) => r.nbs ?? '' },
+                  { key: 'nbs_req', label: 'NBS/IBPT obrigatório', getValue: (r) => (r.nbs_ibpt_required ? 'Sim' : 'Não') },
+                ]}
+              />
               {enableSeed ? (
                 <Button onClick={handleSeedServices} disabled={isSeeding || loading} variant="secondary" className="gap-2">
                   {isSeeding ? <Loader2 className="animate-spin" size={18} /> : <DatabaseBackup size={18} />}

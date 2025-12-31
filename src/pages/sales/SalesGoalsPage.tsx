@@ -163,7 +163,7 @@ const SalesGoalsPage: React.FC = () => {
         </Select>
         {riskCount > 0 ? (
           <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-amber-50 text-amber-800 border border-amber-100 text-sm">
-            <AlertTriangle size={16} /> {riskCount} meta(s) em risco (fim em ≤ 7 dias e < 80%)
+            <AlertTriangle size={16} /> {riskCount} meta(s) em risco (fim em ≤ 7 dias e &lt; 80%)
           </div>
         ) : null}
       </div>

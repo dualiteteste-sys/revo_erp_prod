@@ -10,6 +10,7 @@ import CarriersTable from '../../components/carriers/CarriersTable';
 import CarrierFormPanel from '../../components/carriers/CarrierFormPanel';
 import Select from '@/components/ui/forms/Select';
 import { isSeedEnabled } from '@/utils/seed';
+import CsvExportDialog from '@/components/ui/CsvExportDialog';
 
 const CarriersPage: React.FC = () => {
   const enableSeed = isSeedEnabled();
@@ -122,6 +123,23 @@ const CarriersPage: React.FC = () => {
             <p className="text-gray-600 text-sm mt-1">Gerencie as empresas responsáveis pelo transporte de suas mercadorias.</p>
         </div>
         <div className="flex items-center gap-2">
+            <CsvExportDialog
+              filename="transportadoras.csv"
+              rows={carriers}
+              disabled={loading}
+              columns={[
+                { key: 'nome', label: 'Nome', getValue: (r) => r.nome },
+                { key: 'codigo', label: 'Código', getValue: (r) => r.codigo ?? '' },
+                { key: 'documento', label: 'Documento', getValue: (r) => r.documento ?? '' },
+                { key: 'cidade', label: 'Cidade', getValue: (r) => r.cidade ?? '' },
+                { key: 'uf', label: 'UF', getValue: (r) => r.uf ?? '' },
+                { key: 'modal', label: 'Modal', getValue: (r) => r.modal_principal ?? '' },
+                { key: 'frete_tipo', label: 'Frete padrão', getValue: (r) => r.frete_tipo_padrao ?? '' },
+                { key: 'prazo', label: 'Prazo médio (dias)', getValue: (r) => r.prazo_medio_dias ?? '' },
+                { key: 'status', label: 'Status', getValue: (r) => (r.ativo ? 'Ativa' : 'Inativa') },
+                { key: 'padrao', label: 'Padrão para frete', getValue: (r) => (r.padrao_para_frete ? 'Sim' : 'Não') },
+              ]}
+            />
             {enableSeed ? (
               <button
                 onClick={handleSeed}

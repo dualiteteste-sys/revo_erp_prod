@@ -217,7 +217,7 @@ test('RG-04 (Serviços): concluir OS → gerar Conta a Receber (happy path)', as
 
   // Concluir OS
   await page.goto('/app/ordens-de-servico');
-  await expect(page.getByText('Ordens de Serviço')).toBeVisible({ timeout: 15000 });
+  await expect(page.getByRole('heading', { name: 'Ordens de Serviço' })).toBeVisible({ timeout: 15000 });
   await expect(page.getByText('Manutenção preventiva')).toBeVisible({ timeout: 15000 });
 
   await page.getByTitle('Mais ações').click();
@@ -230,4 +230,3 @@ test('RG-04 (Serviços): concluir OS → gerar Conta a Receber (happy path)', as
   await expect(page.getByRole('heading', { name: 'Contas a Receber' })).toBeVisible({ timeout: 20000 });
   await expect(page.getByText('OS #1001')).toBeVisible({ timeout: 20000 });
 });
-

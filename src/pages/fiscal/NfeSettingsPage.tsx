@@ -74,7 +74,9 @@ export default function NfeSettingsPage() {
   const [nfeEnabled, setNfeEnabled] = useState(false);
   const [config, setConfig] = useState<NfeConfig | null>(null);
   const [emitente, setEmitente] = useState<NfeEmitente | null>(null);
+  const [numeracoes, setNumeracoes] = useState<NfeNumeracao[]>([]);
   const [numeracao, setNumeracao] = useState<NfeNumeracao | null>(null);
+  const [newSerie, setNewSerie] = useState<string>('');
   const [disablementSerie, setDisablementSerie] = useState<string>('1');
   const [disablementStart, setDisablementStart] = useState<string>('');
   const [disablementEnd, setDisablementEnd] = useState<string>('');
@@ -93,7 +95,7 @@ export default function NfeSettingsPage() {
         { data: flagRow, error: flagError },
         { data: cfgRow, error: cfgError },
         { data: emitRow, error: emitErr },
-        { data: numRow, error: numErr },
+        { data: numsRows, error: numErr },
       ] = await Promise.all([
         supabase.from('empresa_feature_flags').select('nfe_emissao_enabled').eq('empresa_id', empresaId).maybeSingle(),
         supabase
@@ -113,8 +115,7 @@ export default function NfeSettingsPage() {
           .from('fiscal_nfe_numeracao')
           .select('id,empresa_id,serie,proximo_numero,ativo')
           .eq('empresa_id', empresaId)
-          .eq('serie', 1)
-          .maybeSingle(),
+          .order('serie', { ascending: true }),
       ]);
 
       if (flagError) throw flagError;
@@ -190,21 +191,23 @@ export default function NfeSettingsPage() {
             }
       );
 
+      const mappedNums: NfeNumeracao[] = (Array.isArray(numsRows) ? numsRows : []).map((n: any) => ({
+        id: n.id,
+        empresa_id: n.empresa_id,
+        serie: Number(n.serie),
+        proximo_numero: Number(n.proximo_numero),
+        ativo: !!n.ativo,
+      }));
+      setNumeracoes(mappedNums);
+
+      const active = mappedNums.find((n) => n.ativo) || mappedNums.find((n) => n.serie === 1) || mappedNums[0] || null;
       setNumeracao(
-        numRow
-          ? {
-              id: numRow.id,
-              empresa_id: numRow.empresa_id,
-              serie: Number(numRow.serie ?? 1) || 1,
-              proximo_numero: Number(numRow.proximo_numero ?? 1) || 1,
-              ativo: numRow.ativo ?? true,
-            }
-          : {
-              empresa_id: empresaId,
-              serie: 1,
-              proximo_numero: 1,
-              ativo: true,
-            }
+        active || {
+          empresa_id: empresaId,
+          serie: 1,
+          proximo_numero: 1,
+          ativo: true,
+        }
       );
     } catch (e: any) {
       addToast(e?.message || 'Erro ao carregar configurações da NF-e.', 'error');
@@ -390,6 +393,28 @@ export default function NfeSettingsPage() {
     } finally {
       setSavingNumeracao(false);
     }
+  };
+
+  const handlePickSerie = (serie: number) => {
+    const found = numeracoes.find((n) => n.serie === serie) || null;
+    setNumeracao(
+      found || {
+        empresa_id: empresaId!,
+        serie,
+        proximo_numero: 1,
+        ativo: true,
+      }
+    );
+  };
+
+  const handleAddSerie = () => {
+    const serie = Number(newSerie);
+    if (!serie || serie < 1 || serie > 999) {
+      addToast('Série inválida. Use um número entre 1 e 999.', 'warning');
+      return;
+    }
+    setNewSerie('');
+    handlePickSerie(serie);
   };
 
   const handleUploadCert = async (file: File) => {
@@ -600,7 +625,7 @@ export default function NfeSettingsPage() {
             <div className="flex items-start justify-between gap-6">
               <div>
                 <h2 className="text-lg font-bold text-slate-900">Numeração (NF-e)</h2>
-                <p className="text-sm text-slate-600 mt-1">Configure série e o próximo número a emitir (MVP: série 1).</p>
+                <p className="text-sm text-slate-600 mt-1">Configure série(s) e o próximo número a emitir.</p>
               </div>
               <Button onClick={handleSaveNumeracao} disabled={savingNumeracao || !numeracao || !canAdmin}>
                 {savingNumeracao ? <Loader2 className="animate-spin" size={18} /> : <Save size={18} />}
@@ -610,15 +635,37 @@ export default function NfeSettingsPage() {
             <div className="mt-6 grid grid-cols-1 md:grid-cols-3 gap-6">
               <div>
                 <label className="block text-sm font-semibold text-slate-700 mb-2">Série</label>
-                <input
-                  type="number"
-                  min={1}
-                  step={1}
-                  value={String(numeracao?.serie ?? 1)}
-                  onChange={(e) => setNumeracao((prev) => (prev ? { ...prev, serie: Number(e.target.value) || 1 } : prev))}
-                  disabled={!canAdmin}
-                  className="w-full p-3 border border-gray-300 rounded-xl shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                />
+                <div className="flex gap-2">
+                  <Select
+                    value={String(numeracao?.serie ?? 1)}
+                    onChange={(e) => handlePickSerie(Number(e.target.value))}
+                    disabled={!canAdmin}
+                    className="min-w-[160px]"
+                  >
+                    {(numeracoes.length ? numeracoes : [{ serie: 1, ativo: true } as any]).map((n) => (
+                      <option key={String(n.serie)} value={String(n.serie)}>
+                        Série {n.serie}{n.ativo ? ' (ativa)' : ''}
+                      </option>
+                    ))}
+                  </Select>
+                  <input
+                    type="number"
+                    min={1}
+                    max={999}
+                    step={1}
+                    value={newSerie}
+                    onChange={(e) => setNewSerie(e.target.value)}
+                    disabled={!canAdmin}
+                    className="w-full p-3 border border-gray-300 rounded-xl shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    placeholder="Nova série"
+                  />
+                  <Button type="button" variant="secondary" onClick={handleAddSerie} disabled={!canAdmin || !newSerie}>
+                    Adicionar
+                  </Button>
+                </div>
+                <p className="text-xs text-slate-500 mt-2">
+                  Dica: use séries diferentes para fluxos/filiais. Marque apenas uma como <b>ativa</b> para emissão padrão.
+                </p>
               </div>
               <div>
                 <label className="block text-sm font-semibold text-slate-700 mb-2">Próximo número</label>
