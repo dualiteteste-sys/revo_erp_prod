@@ -3,7 +3,7 @@ import { Loader2, PlusCircle, Truck } from 'lucide-react';
 import Modal from '@/components/ui/Modal';
 import { useToast } from '@/contexts/ToastProvider';
 import { listVendas, type VendaPedido } from '@/services/vendas';
-import { listExpedicoes, upsertExpedicao, type Expedicao, type ExpedicaoStatus } from '@/services/vendasMvp';
+import { listExpedicaoEventos, listExpedicoes, upsertExpedicao, type Expedicao, type ExpedicaoEvento, type ExpedicaoStatus } from '@/services/vendasMvp';
 
 type FormState = {
   pedido_id: string;
@@ -29,6 +29,8 @@ export default function ExpedicaoPage() {
   const [saving, setSaving] = useState(false);
   const [rows, setRows] = useState<Expedicao[]>([]);
   const [orders, setOrders] = useState<VendaPedido[]>([]);
+  const [selectedExpedicaoId, setSelectedExpedicaoId] = useState<string | null>(null);
+  const [eventos, setEventos] = useState<ExpedicaoEvento[]>([]);
 
   const [isOpen, setIsOpen] = useState(false);
   const [form, setForm] = useState<FormState>(emptyForm);
@@ -61,6 +63,8 @@ export default function ExpedicaoPage() {
 
   const openNew = () => {
     setForm(emptyForm);
+    setSelectedExpedicaoId(null);
+    setEventos([]);
     setIsOpen(true);
   };
 
@@ -73,13 +77,28 @@ export default function ExpedicaoPage() {
       data_entrega: row.data_entrega || '',
       observacoes: row.observacoes || '',
     });
+    setSelectedExpedicaoId(row.id);
     setIsOpen(true);
   };
 
   const close = () => {
     setIsOpen(false);
     setForm(emptyForm);
+    setSelectedExpedicaoId(null);
+    setEventos([]);
   };
+
+  useEffect(() => {
+    if (!isOpen || !selectedExpedicaoId) return;
+    (async () => {
+      try {
+        const ev = await listExpedicaoEventos(selectedExpedicaoId);
+        setEventos(ev);
+      } catch {
+        setEventos([]);
+      }
+    })();
+  }, [isOpen, selectedExpedicaoId]);
 
   const save = async () => {
     if (!form.pedido_id) {
@@ -88,7 +107,7 @@ export default function ExpedicaoPage() {
     }
     setSaving(true);
     try {
-      await upsertExpedicao({
+      const saved = await upsertExpedicao({
         pedido_id: form.pedido_id,
         status: form.status,
         tracking_code: form.tracking_code.trim() || null,
@@ -97,13 +116,27 @@ export default function ExpedicaoPage() {
         observacoes: form.observacoes.trim() || null,
       } as any);
       addToast('Expedição salva.', 'success');
-      close();
+      try {
+        const ev = await listExpedicaoEventos(saved.id);
+        setSelectedExpedicaoId(saved.id);
+        setEventos(ev);
+      } catch {
+        // ignore
+      }
       await load();
     } catch (e: any) {
       addToast(e.message || 'Falha ao salvar expedição.', 'error');
     } finally {
       setSaving(false);
     }
+  };
+
+  const statusLabel: Record<ExpedicaoStatus, string> = {
+    separando: 'Separação',
+    embalado: 'Embalagem',
+    enviado: 'Envio',
+    entregue: 'Entrega',
+    cancelado: 'Cancelado',
   };
 
   return (
@@ -173,90 +206,138 @@ export default function ExpedicaoPage() {
       </div>
 
       <Modal isOpen={isOpen} onClose={close} title="Expedição (MVP)">
-        <div className="space-y-4">
-          <div>
-            <label className="text-sm text-gray-700">Pedido</label>
-            <select
-              value={form.pedido_id}
-              onChange={(e) => setForm((s) => ({ ...s, pedido_id: e.target.value }))}
-              className="mt-1 w-full p-3 border border-gray-300 rounded-lg"
-            >
-              <option value="">Selecione…</option>
-              {orders.map((o) => (
-                <option key={o.id} value={o.id}>
-                  #{o.numero} — {o.cliente_nome}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
+          <div className="lg:col-span-3 space-y-4">
             <div>
-              <label className="text-sm text-gray-700">Status</label>
+              <label className="text-sm text-gray-700">Pedido</label>
               <select
-                value={form.status}
-                onChange={(e) => setForm((s) => ({ ...s, status: e.target.value as ExpedicaoStatus }))}
+                value={form.pedido_id}
+                onChange={(e) => setForm((s) => ({ ...s, pedido_id: e.target.value }))}
                 className="mt-1 w-full p-3 border border-gray-300 rounded-lg"
+                disabled={!!selectedExpedicaoId}
               >
-                <option value="separando">Separando</option>
-                <option value="embalado">Embalado</option>
-                <option value="enviado">Enviado</option>
-                <option value="entregue">Entregue</option>
-                <option value="cancelado">Cancelado</option>
+                <option value="">Selecione…</option>
+                {orders.map((o) => (
+                  <option key={o.id} value={o.id}>
+                    #{o.numero} — {o.cliente_nome}
+                  </option>
+                ))}
               </select>
+              {!!selectedExpedicaoId ? (
+                <div className="mt-1 text-xs text-gray-500">Pedido já vinculado (EXP-02): para trocar, crie outra expedição.</div>
+              ) : null}
             </div>
+
+            <div className="rounded-lg border border-gray-200 bg-white p-3">
+              <div className="text-sm font-semibold text-gray-800 mb-2">Etapas</div>
+              <div className="flex flex-wrap gap-2">
+                {(['separando', 'embalado', 'enviado', 'entregue', 'cancelado'] as ExpedicaoStatus[]).map((st) => (
+                  <button
+                    key={st}
+                    type="button"
+                    onClick={() => setForm((s) => ({ ...s, status: st }))}
+                    className={`px-3 py-1.5 rounded-full text-sm font-semibold border ${
+                      form.status === st ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-gray-700 border-gray-200 hover:bg-gray-50'
+                    }`}
+                  >
+                    {statusLabel[st]}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="text-sm text-gray-700">Tracking</label>
+                <input
+                  value={form.tracking_code}
+                  onChange={(e) => setForm((s) => ({ ...s, tracking_code: e.target.value }))}
+                  className="mt-1 w-full p-3 border border-gray-300 rounded-lg"
+                  placeholder="Código de rastreio"
+                />
+              </div>
+              <div>
+                <label className="text-sm text-gray-700">Status atual</label>
+                <div className="mt-1 w-full p-3 border border-gray-200 rounded-lg bg-gray-50 font-semibold text-gray-800">
+                  {statusLabel[form.status]}
+                </div>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="text-sm text-gray-700">Data de envio</label>
+                <input
+                  type="date"
+                  value={form.data_envio}
+                  onChange={(e) => setForm((s) => ({ ...s, data_envio: e.target.value }))}
+                  className="mt-1 w-full p-3 border border-gray-300 rounded-lg"
+                />
+                <div className="mt-1 text-xs text-gray-500">Se marcar “Enviado/Entregue”, preenchimento automático se vazio.</div>
+              </div>
+              <div>
+                <label className="text-sm text-gray-700">Data de entrega</label>
+                <input
+                  type="date"
+                  value={form.data_entrega}
+                  onChange={(e) => setForm((s) => ({ ...s, data_entrega: e.target.value }))}
+                  className="mt-1 w-full p-3 border border-gray-300 rounded-lg"
+                />
+              </div>
+            </div>
+
             <div>
-              <label className="text-sm text-gray-700">Tracking</label>
-              <input
-                value={form.tracking_code}
-                onChange={(e) => setForm((s) => ({ ...s, tracking_code: e.target.value }))}
+              <label className="text-sm text-gray-700">Observações</label>
+              <textarea
+                value={form.observacoes}
+                onChange={(e) => setForm((s) => ({ ...s, observacoes: e.target.value }))}
                 className="mt-1 w-full p-3 border border-gray-300 rounded-lg"
+                rows={3}
+                placeholder="Ex.: Embalagem frágil, deixar com porteiro..."
               />
             </div>
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label className="text-sm text-gray-700">Data de envio</label>
-              <input
-                type="date"
-                value={form.data_envio}
-                onChange={(e) => setForm((s) => ({ ...s, data_envio: e.target.value }))}
-                className="mt-1 w-full p-3 border border-gray-300 rounded-lg"
-              />
-            </div>
-            <div>
-              <label className="text-sm text-gray-700">Data de entrega</label>
-              <input
-                type="date"
-                value={form.data_entrega}
-                onChange={(e) => setForm((s) => ({ ...s, data_entrega: e.target.value }))}
-                className="mt-1 w-full p-3 border border-gray-300 rounded-lg"
-              />
+
+            <div className="flex justify-end gap-2 pt-2">
+              <button onClick={close} className="px-4 py-2 rounded-lg bg-gray-100 hover:bg-gray-200">
+                Fechar
+              </button>
+              <button
+                onClick={save}
+                disabled={saving}
+                className="px-4 py-2 rounded-lg bg-blue-600 text-white font-bold hover:bg-blue-700 disabled:opacity-50"
+              >
+                {saving ? 'Salvando…' : 'Salvar'}
+              </button>
             </div>
           </div>
-          <div>
-            <label className="text-sm text-gray-700">Observações</label>
-            <textarea
-              value={form.observacoes}
-              onChange={(e) => setForm((s) => ({ ...s, observacoes: e.target.value }))}
-              className="mt-1 w-full p-3 border border-gray-300 rounded-lg"
-              rows={3}
-            />
-          </div>
-          <div className="flex justify-end gap-2 pt-2">
-            <button onClick={close} className="px-4 py-2 rounded-lg bg-gray-100 hover:bg-gray-200">
-              Cancelar
-            </button>
-            <button
-              onClick={save}
-              disabled={saving}
-              className="px-4 py-2 rounded-lg bg-blue-600 text-white font-bold hover:bg-blue-700 disabled:opacity-50"
-            >
-              {saving ? 'Salvando…' : 'Salvar'}
-            </button>
+
+          <div className="lg:col-span-2">
+            <div className="rounded-lg border border-gray-200 bg-white p-3 h-full">
+              <div className="text-sm font-semibold text-gray-800 mb-3">Histórico</div>
+              {!selectedExpedicaoId ? (
+                <div className="text-sm text-gray-500">Salve a expedição para ver o histórico (EXP-02).</div>
+              ) : eventos.length === 0 ? (
+                <div className="text-sm text-gray-500">Nenhum evento ainda.</div>
+              ) : (
+                <div className="space-y-2 max-h-[55vh] overflow-auto">
+                  {eventos.map((ev) => (
+                    <div key={ev.id} className="p-2 rounded-lg bg-gray-50 border border-gray-100">
+                      <div className="text-xs text-gray-500">{new Date(ev.created_at).toLocaleString('pt-BR')}</div>
+                      <div className="text-sm font-semibold text-gray-800">{ev.mensagem || ev.tipo}</div>
+                      {ev.tipo === 'status' ? (
+                        <div className="text-xs text-gray-600">
+                          {ev.de_status ? `${statusLabel[ev.de_status as ExpedicaoStatus] ?? ev.de_status} → ` : ''}
+                          {statusLabel[ev.para_status as ExpedicaoStatus] ?? ev.para_status}
+                        </div>
+                      ) : null}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
         </div>
       </Modal>
     </div>
   );
 }
-

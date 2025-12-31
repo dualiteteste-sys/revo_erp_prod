@@ -4,7 +4,7 @@ import Modal from '@/components/ui/Modal';
 import { useToast } from '@/contexts/ToastProvider';
 import PedidoVendaFormPanel from '@/components/vendas/PedidoVendaFormPanel';
 import { listContasCorrentes, type ContaCorrente } from '@/services/treasury';
-import { finalizePdv } from '@/services/vendasMvp';
+import { estornarPdv, finalizePdv } from '@/services/vendasMvp';
 import { supabase } from '@/lib/supabaseClient';
 import { getVendaDetails, type VendaDetails } from '@/services/vendas';
 
@@ -15,6 +15,7 @@ type PdvRow = {
   total_geral: number;
   data_emissao: string;
   updated_at: string;
+  pdv_estornado_at?: string | null;
 };
 
 const sb = supabase as any;
@@ -100,7 +101,7 @@ export default function PdvPage() {
         listContasCorrentes({ page: 1, pageSize: 50, searchTerm: '', ativo: true }),
         sb
           .from('vendas_pedidos')
-          .select('id,numero,status,total_geral,data_emissao,updated_at')
+          .select('id,numero,status,total_geral,data_emissao,updated_at,pdv_estornado_at')
           .eq('canal', 'pdv')
           .order('updated_at', { ascending: false })
           .limit(200),
@@ -164,6 +165,23 @@ export default function PdvPage() {
       await load();
     } catch (e: any) {
       addToast(e.message || 'Falha ao finalizar PDV.', 'error');
+    } finally {
+      setFinalizingId(null);
+    }
+  };
+
+  const handleEstornar = async (pedidoId: string) => {
+    if (!contaCorrenteId) {
+      addToast('Selecione uma conta corrente para lançar o estorno.', 'error');
+      return;
+    }
+    setFinalizingId(pedidoId);
+    try {
+      await estornarPdv({ pedidoId, contaCorrenteId });
+      addToast('PDV estornado (financeiro + estoque).', 'success');
+      await load();
+    } catch (e: any) {
+      addToast(e.message || 'Falha ao estornar PDV.', 'error');
     } finally {
       setFinalizingId(null);
     }
@@ -283,13 +301,25 @@ export default function PdvPage() {
                             <Printer size={16} /> Comprovante
                           </button>
                         ) : null}
-                        <button
-                          onClick={() => handleFinalize(r.id)}
-                          disabled={finalizingId === r.id}
-                          className="px-3 py-1 rounded-md bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50"
-                        >
-                          {finalizingId === r.id ? 'Finalizando…' : 'Finalizar'}
-                        </button>
+                        {r.status !== 'concluido' ? (
+                          <button
+                            onClick={() => handleFinalize(r.id)}
+                            disabled={finalizingId === r.id}
+                            className="px-3 py-1 rounded-md bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50"
+                          >
+                            {finalizingId === r.id ? 'Finalizando…' : 'Finalizar'}
+                          </button>
+                        ) : r.pdv_estornado_at ? (
+                          <span className="px-3 py-1 rounded-md bg-red-100 text-red-800 font-semibold">Estornado</span>
+                        ) : (
+                          <button
+                            onClick={() => void handleEstornar(r.id)}
+                            disabled={finalizingId === r.id}
+                            className="px-3 py-1 rounded-md bg-red-600 text-white hover:bg-red-700 disabled:opacity-50"
+                          >
+                            {finalizingId === r.id ? 'Estornando…' : 'Estornar'}
+                          </button>
+                        )}
                       </div>
                     </td>
                   </tr>
@@ -300,8 +330,14 @@ export default function PdvPage() {
         )}
       </div>
 
-      <Modal isOpen={isFormOpen} onClose={close} title={selectedId ? 'Editar venda' : 'Nova venda'} size="6xl">
-        <PedidoVendaFormPanel vendaId={selectedId} onSaveSuccess={handleSaveSuccess} onClose={close} />
+      <Modal isOpen={isFormOpen} onClose={close} title={selectedId ? 'Editar venda' : 'Nova venda'} size="6xl" containerClassName="h-[90vh] max-h-[90vh]">
+        <PedidoVendaFormPanel
+          vendaId={selectedId}
+          onSaveSuccess={handleSaveSuccess}
+          onClose={close}
+          mode="pdv"
+          onFinalizePdv={handleFinalize}
+        />
       </Modal>
 
       <Modal

@@ -242,8 +242,8 @@ test('RG-04 (Comércio): finalizar PDV gera movimento financeiro + baixa de esto
       return;
     }
 
-    // Estoque movement (RPC)
-    if (url.includes('/rest/v1/rpc/suprimentos_registrar_movimento')) {
+    // Estoque baixa (RPC idempotente)
+    if (url.includes('/rest/v1/rpc/vendas_baixar_estoque')) {
       estoqueBaixado = true;
       await route.fulfill({ json: {} });
       return;
