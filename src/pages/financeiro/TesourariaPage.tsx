@@ -22,6 +22,7 @@ export default function TesourariaPage() {
   const [activeTab, setActiveTab] = useState<'contas' | 'movimentos' | 'conciliacao'>('contas');
   const { addToast } = useToast();
   const { confirm } = useConfirm();
+  const [busyExtratoId, setBusyExtratoId] = useState<string | null>(null);
 
   // --- Contas State ---
   const {
@@ -142,6 +143,8 @@ export default function TesourariaPage() {
 
   const handleConciliate = async (movimentacaoId: string) => {
     if (!conciliacaoItem) return;
+    if (busyExtratoId) return;
+    setBusyExtratoId(conciliacaoItem.id);
     try {
         await conciliarExtrato(conciliacaoItem.id, movimentacaoId);
         addToast('Conciliação realizada!', 'success');
@@ -150,6 +153,8 @@ export default function TesourariaPage() {
         refreshMov(); // Update movements list too
     } catch (e: any) {
         addToast(e.message, 'error');
+    } finally {
+        setBusyExtratoId(null);
     }
   };
 
@@ -162,6 +167,8 @@ export default function TesourariaPage() {
       variant: 'danger',
     });
     if (!ok) return;
+    if (busyExtratoId) return;
+    setBusyExtratoId(item.id);
     try {
         await desconciliarExtrato(item.id);
         addToast('Conciliação desfeita.', 'success');
@@ -169,6 +176,8 @@ export default function TesourariaPage() {
         refreshMov();
     } catch (e: any) {
         addToast(e.message, 'error');
+    } finally {
+        setBusyExtratoId(null);
     }
   };
 
@@ -333,8 +342,9 @@ export default function TesourariaPage() {
                 ) : (
                     <ExtratosTable 
                         extratos={extratos} 
-                        onConciliate={setConciliacaoItem} 
-                        onUnconciliate={handleUnconciliate} 
+                        onConciliate={(item) => (busyExtratoId ? undefined : setConciliacaoItem(item))} 
+                        onUnconciliate={handleUnconciliate}
+                        busyExtratoId={busyExtratoId}
                     />
                 )}
             </div>

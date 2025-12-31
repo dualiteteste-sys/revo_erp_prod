@@ -22,6 +22,7 @@ interface OsTableProps {
   onSort: (column: keyof OrdemServico) => void;
   canUpdate?: boolean;
   canDelete?: boolean;
+  busyOsId?: string | null;
 }
 
 const statusConfig: Record<Database['public']['Enums']['status_os'], { label: string; color: string }> = {
@@ -56,7 +57,7 @@ const SortableHeader: React.FC<{
   );
 };
 
-const OsTable: React.FC<OsTableProps> = ({ serviceOrders, onEdit, onDelete, onOpenAgenda, onSetStatus, sortBy, onSort, canUpdate = true, canDelete = true }) => {
+const OsTable: React.FC<OsTableProps> = ({ serviceOrders, onEdit, onDelete, onOpenAgenda, onSetStatus, sortBy, onSort, canUpdate = true, canDelete = true, busyOsId }) => {
   const formatDate = (value?: string | null) => (value ? new Date(value).toLocaleDateString('pt-BR') : '—');
   const formatTime = (value?: string | null) => (value ? String(value).slice(0, 5) : '');
 
@@ -78,8 +79,10 @@ const OsTable: React.FC<OsTableProps> = ({ serviceOrders, onEdit, onDelete, onOp
             {(provided) => (
                 <tbody ref={provided.innerRef} {...provided.droppableProps} className="bg-white divide-y divide-gray-200">
                     <AnimatePresence>
-                        {serviceOrders.map((os, index) => (
-                            <Draggable key={os.id} draggableId={os.id} index={index} isDragDisabled={!canUpdate}>
+                        {serviceOrders.map((os, index) => {
+                          const busy = !!busyOsId && busyOsId === os.id;
+                          return (
+                            <Draggable key={os.id} draggableId={os.id} index={index} isDragDisabled={!canUpdate || busy}>
                                 {(provided, snapshot) => (
                                     <motion.tr
                                         ref={provided.innerRef}
@@ -92,7 +95,7 @@ const OsTable: React.FC<OsTableProps> = ({ serviceOrders, onEdit, onDelete, onOp
                                     >
                                         <td
                                           className={`px-2 py-4 whitespace-nowrap text-sm text-gray-400 ${canUpdate ? 'cursor-grab' : 'cursor-default opacity-50'}`}
-                                          {...(canUpdate ? provided.dragHandleProps : {})}
+                                          {...(canUpdate && !busy ? provided.dragHandleProps : {})}
                                         >
                                           <GripVertical className="mx-auto" />
                                         </td>
@@ -134,49 +137,54 @@ const OsTable: React.FC<OsTableProps> = ({ serviceOrders, onEdit, onDelete, onOp
                                         <div className="flex items-center justify-end gap-4">
                                             <DropdownMenu>
                                               <DropdownMenuTrigger asChild>
-                                                <button className="text-slate-600 hover:text-slate-800" title="Mais ações">
+                                                <button
+                                                  className="text-slate-600 hover:text-slate-800 disabled:opacity-60 disabled:cursor-not-allowed"
+                                                  title="Mais ações"
+                                                  disabled={busy}
+                                                >
                                                   <MoreHorizontal size={18} />
                                                 </button>
                                               </DropdownMenuTrigger>
                                               <DropdownMenuContent align="end" sideOffset={6} className="w-56">
-                                                <DropdownMenuItem onClick={() => onEdit(os)} className="gap-2">
+                                                <DropdownMenuItem onClick={() => onEdit(os)} className="gap-2" disabled={busy}>
                                                   <ArrowUpRight size={16} />
                                                   Abrir
                                                 </DropdownMenuItem>
-                                                <DropdownMenuItem onClick={() => onOpenAgenda()} className="gap-2">
+                                                <DropdownMenuItem onClick={() => onOpenAgenda()} className="gap-2" disabled={busy}>
                                                   <CalendarClock size={16} />
                                                   Abrir Agenda
                                                 </DropdownMenuItem>
                                                 <DropdownMenuSeparator />
-                                                <DropdownMenuItem onClick={() => onSetStatus(os, 'orcamento')} className="gap-2" disabled={!canUpdate}>
+                                                <DropdownMenuItem onClick={() => onSetStatus(os, 'orcamento')} className="gap-2" disabled={!canUpdate || busy}>
                                                   <ClipboardCheck size={16} />
                                                   Marcar como Orçamento
                                                 </DropdownMenuItem>
-                                                <DropdownMenuItem onClick={() => onSetStatus(os, 'aberta')} className="gap-2" disabled={!canUpdate}>
+                                                <DropdownMenuItem onClick={() => onSetStatus(os, 'aberta')} className="gap-2" disabled={!canUpdate || busy}>
                                                   <ClipboardCheck size={16} />
                                                   Marcar como Aberta
                                                 </DropdownMenuItem>
-                                                <DropdownMenuItem onClick={() => onSetStatus(os, 'concluida')} className="gap-2" disabled={!canUpdate}>
+                                                <DropdownMenuItem onClick={() => onSetStatus(os, 'concluida')} className="gap-2" disabled={!canUpdate || busy}>
                                                   <CheckCircle2 size={16} />
                                                   Concluir
                                                 </DropdownMenuItem>
-                                                <DropdownMenuItem onClick={() => onSetStatus(os, 'cancelada')} className="gap-2" disabled={!canUpdate}>
+                                                <DropdownMenuItem onClick={() => onSetStatus(os, 'cancelada')} className="gap-2" disabled={!canUpdate || busy}>
                                                   <XCircle size={16} />
                                                   Cancelar
                                                 </DropdownMenuItem>
                                               </DropdownMenuContent>
                                             </DropdownMenu>
 
-                                            <button onClick={() => onEdit(os)} className="text-indigo-600 hover:text-indigo-900" title="Editar"><Edit size={18} /></button>
+                                            <button onClick={() => onEdit(os)} disabled={busy} className="text-indigo-600 hover:text-indigo-900 disabled:opacity-60 disabled:cursor-not-allowed" title="Editar"><Edit size={18} /></button>
                                             {canDelete ? (
-                                              <button onClick={() => onDelete(os)} className="text-red-600 hover:text-red-900" title="Excluir"><Trash2 size={18} /></button>
+                                              <button onClick={() => onDelete(os)} disabled={busy} className="text-red-600 hover:text-red-900 disabled:opacity-60 disabled:cursor-not-allowed" title="Excluir"><Trash2 size={18} /></button>
                                             ) : null}
                                         </div>
                                         </td>
                                     </motion.tr>
                                 )}
                             </Draggable>
-                        ))}
+                          );
+                        })}
                     </AnimatePresence>
                     {provided.placeholder}
                 </tbody>

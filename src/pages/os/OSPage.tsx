@@ -53,6 +53,7 @@ const OSPage: React.FC = () => {
   const [isFetchingDetails, setIsFetchingDetails] = useState(false);
   const [isKanbanModalOpen, setIsKanbanModalOpen] = useState(false);
   const [searchParams, setSearchParams] = useSearchParams();
+  const [statusUpdatingId, setStatusUpdatingId] = useState<string | null>(null);
 
   useEffect(() => {
     const osId = searchParams.get('osId');
@@ -134,6 +135,7 @@ const OSPage: React.FC = () => {
   };
 
   const handleSetStatus = async (os: osService.OrdemServico, next: Database['public']['Enums']['status_os']) => {
+    if (statusUpdatingId === os.id) return;
     const labelMap: Record<Database['public']['Enums']['status_os'], string> = {
       orcamento: 'Orçamento',
       aberta: 'Aberta',
@@ -157,11 +159,14 @@ const OSPage: React.FC = () => {
     }
 
     try {
+      setStatusUpdatingId(os.id);
       await osService.setOsStatus(os.id, next);
       addToast(`Status atualizado para “${labelMap[next]}”.`, 'success');
       refresh();
     } catch (e: any) {
       addToast(e?.message || 'Falha ao atualizar status.', 'error');
+    } finally {
+      setStatusUpdatingId(null);
     }
   };
 
@@ -262,6 +267,7 @@ const OSPage: React.FC = () => {
               onSort={handleSort}
               canUpdate={permUpdate.data}
               canDelete={permDelete.data}
+              busyOsId={statusUpdatingId}
             />
           </DragDropContext>
         )}
