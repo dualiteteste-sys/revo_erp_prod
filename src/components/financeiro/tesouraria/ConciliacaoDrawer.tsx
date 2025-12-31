@@ -19,6 +19,7 @@ export default function ConciliacaoDrawer({ isOpen, onClose, extratoItem, contaC
   const [loading, setLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [isCreating, setIsCreating] = useState(false);
+  const [linkingId, setLinkingId] = useState<string | null>(null);
 
   useEffect(() => {
     if (isOpen && extratoItem) {
@@ -88,6 +89,19 @@ export default function ConciliacaoDrawer({ isOpen, onClose, extratoItem, contaC
     }
   };
 
+  const handleLink = async (movId: string) => {
+    if (!extratoItem) return;
+    if (linkingId) return;
+    setLinkingId(movId);
+    try {
+      await onConciliate(movId);
+    } catch (e: any) {
+      addToast(e?.message || 'Erro ao conciliar.', 'error');
+    } finally {
+      setLinkingId(null);
+    }
+  };
+
   if (!isOpen) return null;
 
   return (
@@ -122,7 +136,13 @@ export default function ConciliacaoDrawer({ isOpen, onClose, extratoItem, contaC
         <div className="flex-1 overflow-y-auto p-4">
             <div className="flex justify-between items-center mb-4">
                 <h4 className="font-semibold text-gray-700">Movimentações Sugeridas</h4>
-                <button onClick={fetchSuggestions} className="text-blue-600 text-xs hover:underline">Atualizar</button>
+                <button
+                  onClick={fetchSuggestions}
+                  disabled={loading || !!linkingId}
+                  className="text-blue-600 text-xs hover:underline disabled:opacity-60"
+                >
+                  Atualizar
+                </button>
             </div>
 
             {loading ? (
@@ -143,6 +163,7 @@ export default function ConciliacaoDrawer({ isOpen, onClose, extratoItem, contaC
                 <div className="space-y-3">
                     {movements.map(mov => {
                         const isExactMatch = mov.valor === extratoItem?.valor;
+                        const isLinking = linkingId === mov.id;
                         return (
                             <div key={mov.id} className={`p-3 border rounded-lg hover:border-blue-400 cursor-pointer transition-colors ${isExactMatch ? 'bg-green-50 border-green-200' : 'bg-white'}`}>
                                 <div className="flex justify-between items-start mb-1">
@@ -156,10 +177,11 @@ export default function ConciliacaoDrawer({ isOpen, onClose, extratoItem, contaC
                                     {isExactMatch && <span className="bg-green-100 text-green-800 px-2 py-0.5 rounded-full">Valor Exato</span>}
                                 </div>
                                 <button 
-                                    onClick={() => onConciliate(mov.id)}
-                                    className="w-full py-1.5 bg-blue-600 text-white rounded text-sm font-medium hover:bg-blue-700 flex items-center justify-center gap-2"
+                                    onClick={() => void handleLink(mov.id)}
+                                    disabled={!!linkingId}
+                                    className="w-full py-1.5 bg-blue-600 text-white rounded text-sm font-medium hover:bg-blue-700 flex items-center justify-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed"
                                 >
-                                    <Link2 size={14} /> Vincular
+                                    {isLinking ? <Loader2 className="animate-spin" size={14} /> : <Link2 size={14} />} Vincular
                                 </button>
                             </div>
                         );
@@ -171,7 +193,7 @@ export default function ConciliacaoDrawer({ isOpen, onClose, extratoItem, contaC
                  <div className="mt-6 pt-6 border-t">
                     <button 
                         onClick={handleCreateAndConciliate}
-                        disabled={isCreating}
+                        disabled={isCreating || !!linkingId}
                         className="w-full py-3 border-2 border-dashed border-gray-300 text-gray-600 rounded-lg hover:border-blue-400 hover:text-blue-600 transition-colors flex items-center justify-center gap-2"
                     >
                         {isCreating ? <Loader2 className="animate-spin" size={18} /> : <Plus size={18} />}

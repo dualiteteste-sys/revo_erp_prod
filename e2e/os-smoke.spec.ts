@@ -163,7 +163,7 @@ test('OS: lista e abre modal de criação', async ({ page }) => {
   await expect(page).toHaveURL(/\/app\//);
 
   await page.goto('/app/ordens-de-servico');
-  await expect(page.getByText('Ordens de Serviço')).toBeVisible({ timeout: 15000 });
+  await expect(page.getByRole('heading', { name: 'Ordens de Serviço' })).toBeVisible({ timeout: 15000 });
   await expect(page.getByText('Cliente Teste')).toBeVisible({ timeout: 15000 });
   await expect(page.getByText('Manutenção preventiva')).toBeVisible({ timeout: 15000 });
 

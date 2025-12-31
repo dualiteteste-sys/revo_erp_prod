@@ -1,14 +1,15 @@
 import React from 'react';
 import { ExtratoItem } from '@/services/treasury';
-import { Link2, Unlink, CheckCircle, AlertCircle } from 'lucide-react';
+import { Link2, Unlink, AlertCircle, Loader2 } from 'lucide-react';
 
 interface Props {
   extratos: ExtratoItem[];
   onConciliate: (item: ExtratoItem) => void;
   onUnconciliate: (item: ExtratoItem) => void;
+  busyExtratoId?: string | null;
 }
 
-export default function ExtratosTable({ extratos, onConciliate, onUnconciliate }: Props) {
+export default function ExtratosTable({ extratos, onConciliate, onUnconciliate, busyExtratoId }: Props) {
   return (
     <div className="overflow-x-auto">
       <table className="min-w-full divide-y divide-gray-200">
@@ -23,6 +24,9 @@ export default function ExtratosTable({ extratos, onConciliate, onUnconciliate }
         </thead>
         <tbody className="bg-white divide-y divide-gray-200">
           {extratos.map(item => (
+            (() => {
+              const isBusy = !!busyExtratoId && busyExtratoId === item.id;
+              return (
             <tr key={item.id} className={`hover:bg-gray-50 ${item.conciliado ? 'bg-green-50/30' : ''}`}>
               <td className="px-6 py-4 text-sm text-gray-900 whitespace-nowrap">
                 {new Date(item.data_lancamento).toLocaleDateString('pt-BR')}
@@ -50,24 +54,28 @@ export default function ExtratosTable({ extratos, onConciliate, onUnconciliate }
               <td className="px-6 py-4 text-center">
                 {item.conciliado ? (
                     <button 
-                        onClick={() => onUnconciliate(item)} 
-                        className="text-red-500 hover:text-red-700 p-2 rounded-full hover:bg-red-50 transition-colors"
+                        onClick={() => (isBusy ? undefined : onUnconciliate(item))}
+                        disabled={isBusy}
+                        className="text-red-500 hover:text-red-700 p-2 rounded-full hover:bg-red-50 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
                         title="Desfazer Conciliação"
                     >
-                        <Unlink size={18} />
+                        {isBusy ? <Loader2 className="animate-spin" size={18} /> : <Unlink size={18} />}
                     </button>
                 ) : (
                     <button 
-                        onClick={() => onConciliate(item)} 
-                        className="text-blue-600 hover:text-blue-800 p-2 rounded-full hover:bg-blue-50 transition-colors flex items-center gap-1 mx-auto"
+                        onClick={() => (isBusy ? undefined : onConciliate(item))}
+                        disabled={isBusy}
+                        className="text-blue-600 hover:text-blue-800 p-2 rounded-full hover:bg-blue-50 transition-colors flex items-center gap-1 mx-auto disabled:opacity-60 disabled:cursor-not-allowed"
                         title="Conciliar"
                     >
-                        <Link2 size={18} />
+                        {isBusy ? <Loader2 className="animate-spin" size={18} /> : <Link2 size={18} />}
                         <span className="text-xs font-semibold">Conciliar</span>
                     </button>
                 )}
               </td>
             </tr>
+              );
+            })()
           ))}
           {extratos.length === 0 && (
             <tr>
