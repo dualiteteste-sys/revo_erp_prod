@@ -7,12 +7,15 @@ export type CompraPedido = {
   fornecedor_nome?: string;
   data_emissao: string;
   data_prevista: string | null;
+  data_recebimento?: string | null;
   status: 'rascunho' | 'enviado' | 'recebido' | 'cancelado';
   total_produtos: number;
   frete: number;
   desconto: number;
   total_geral: number;
   observacoes: string | null;
+  created_at?: string;
+  updated_at?: string;
 };
 
 export type CompraItem = {

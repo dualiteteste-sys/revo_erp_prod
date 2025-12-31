@@ -4,7 +4,7 @@ import { useToast } from '../../contexts/ToastProvider';
 import ProductsTable from '../../components/products/ProductsTable';
 import Pagination from '../../components/ui/Pagination';
 import DeleteProductModal from '../../components/products/DeleteProductModal';
-import { Loader2, Search, Package, DatabaseBackup, Plus, FileDown } from 'lucide-react';
+import { Loader2, Search, Package, DatabaseBackup, Plus, FileDown, FileUp } from 'lucide-react';
 import Modal from '../../components/ui/Modal';
 import ProductFormPanel from '../../components/products/ProductFormPanel';
 import * as productsService from '../../services/products';
@@ -14,6 +14,7 @@ import { Button } from '@/components/ui/button';
 import { downloadCsv } from '@/utils/csv';
 import { isSeedEnabled } from '@/utils/seed';
 import { useHasPermission } from '@/hooks/useHasPermission';
+import ImportProductsCsvModal from '@/components/products/ImportProductsCsvModal';
 
 const ProductsPage: React.FC = () => {
   const enableSeed = isSeedEnabled();
@@ -51,6 +52,7 @@ const ProductsPage: React.FC = () => {
   const [isDeleting, setIsDeleting] = useState(false);
   const [isFetchingDetails, setIsFetchingDetails] = useState(false);
   const [isSeeding, setIsSeeding] = useState(false);
+  const [isImportOpen, setIsImportOpen] = useState(false);
 
   const refreshList = useCallback(() => {
     setPage(1);
@@ -194,6 +196,16 @@ const ProductsPage: React.FC = () => {
                 Exportar CSV
               </Button>
 
+              <Button
+                onClick={() => setIsImportOpen(true)}
+                variant="secondary"
+                className="gap-2"
+                title="Importar produtos por CSV"
+              >
+                <FileUp size={18} />
+                Importar CSV
+              </Button>
+
               {enableSeed ? (
                 <Button onClick={handleSeedProducts} disabled={isSeeding || loading} variant="secondary" className="gap-2">
                   {isSeeding ? <Loader2 className="animate-spin" size={18} /> : <DatabaseBackup size={18} />}
@@ -291,6 +303,16 @@ const ProductsPage: React.FC = () => {
           />
         )}
       </Modal>
+
+      <ImportProductsCsvModal
+        isOpen={isImportOpen}
+        onClose={() => setIsImportOpen(false)}
+        importFn={saveProduct}
+        onImported={() => {
+          setIsImportOpen(false);
+          refreshList();
+        }}
+      />
 
       <DeleteProductModal
         isOpen={isDeleteModalOpen}

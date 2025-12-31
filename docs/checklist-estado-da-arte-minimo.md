@@ -39,15 +39,15 @@ Regras:
 - [x] RG-04 E2E “Happy path” por plano (Comércio/Serviços/Indústria) automatizado
 
 ## 1) Cadastros (base do ERP)
-- [ ] CAD-01 Parceiros (clientes/fornecedores): CRUD + busca + validações (CPF/CNPJ) + endereços
-- [ ] CAD-02 Produtos: CRUD + unidade + NCM/tributação básica + import/export CSV
+- [x] CAD-01 Parceiros (clientes/fornecedores): CRUD + busca + validações (CPF/CNPJ) + endereços
+- [x] CAD-02 Produtos: CRUD + unidade + NCM/tributação básica + import/export CSV
 - [ ] CAD-03 Serviços: CRUD + preço + impostos básicos (se aplicável)
 - [ ] CAD-04 Transportadoras + embalagens + grupos/unidades: CRUD consistente
 
 ## 2) Suprimentos + Estoque (mínimo “redondo”)
-- [ ] SUP-01 Estoque: saldo por produto + movimentações + ajuste manual auditável
-- [ ] SUP-02 Compras (OC): criar/aprovar (simples) + itens + status + histórico
-- [ ] SUP-03 Recebimentos: importar XML + conferência + vincular produtos + dar entrada no estoque
+- [x] SUP-01 Estoque: saldo por produto + movimentações + ajuste manual auditável
+- [x] SUP-02 Compras (OC): criar/aprovar (simples) + itens + status + histórico
+- [x] SUP-03 Recebimentos: importar XML + conferência + vincular produtos + dar entrada no estoque
 - [ ] SUP-04 Cancelar/estornar recebimento com reversão de estoque (quando permitido) + auditoria
 
 ## 3) Vendas (mínimo competitivo no lançamento)
