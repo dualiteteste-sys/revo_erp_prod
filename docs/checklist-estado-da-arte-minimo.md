@@ -27,8 +27,8 @@ Regras:
 - [ ] OPS-06 Monitor “saúde” (mínimo: página/indicador de falhas recentes por integração)
 
 ### 0.3 Segurança (sem isso vira suporte infinito)
-- [ ] SEC-01 RLS consistente nos dados por `empresa_id` (e `unidade_id` quando aplicável)
-- [ ] SEC-02 Permissões por ação (ver/criar/editar/excluir) para os módulos do MVP
+- [x] SEC-01 RLS consistente nos dados por `empresa_id` (e `unidade_id` quando aplicável)
+- [x] SEC-02 Permissões por ação (ver/criar/editar/excluir) para os módulos do MVP
 - [x] SEC-03 “PlanGuard/assinatura” não pode bloquear o app por falso-positivo (fallback seguro)
 - [x] SEC-04 Seed/dados de demo só em DEV (ou behind flag), nunca afetar PROD
 
