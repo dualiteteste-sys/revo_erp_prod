@@ -6,6 +6,7 @@ import { useToast } from '@/contexts/ToastProvider';
 import ConfirmationModal from '@/components/ui/ConfirmationModal';
 import Modal from '@/components/ui/Modal';
 import { createContaPagarFromRecebimento, getContaPagarFromRecebimento } from '@/services/financeiro';
+import CsvExportDialog from '@/components/ui/CsvExportDialog';
 
 export default function RecebimentoListPage() {
     const [recebimentos, setRecebimentos] = useState<Recebimento[]>([]);
@@ -124,6 +125,20 @@ export default function RecebimentoListPage() {
                     <p className="text-gray-600">Gerencie a entrada e conferência de notas fiscais.</p>
                 </div>
                 <div className="flex gap-3">
+                    <CsvExportDialog
+                        filename="recebimentos.csv"
+                        rows={recebimentos}
+                        disabled={loading}
+                        columns={[
+                            { key: 'data', label: 'Data', getValue: (r) => r.data_recebimento },
+                            { key: 'fornecedor', label: 'Fornecedor/Cliente', getValue: (r) => r.fiscal_nfe_imports?.emitente_nome || '' },
+                            { key: 'cnpj', label: 'CNPJ', getValue: (r) => r.fiscal_nfe_imports?.emitente_cnpj || '' },
+                            { key: 'numero', label: 'Número', getValue: (r) => r.fiscal_nfe_imports?.numero || '' },
+                            { key: 'serie', label: 'Série', getValue: (r) => r.fiscal_nfe_imports?.serie || '' },
+                            { key: 'total', label: 'Total NF', getValue: (r) => r.fiscal_nfe_imports?.total_nf || '' },
+                            { key: 'status', label: 'Status', getValue: (r) => r.status },
+                        ]}
+                    />
                     <button
                         onClick={() => navigate('/app/suprimentos/recebimento-manual')}
                         className="bg-white border border-gray-300 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-50 transition-colors flex items-center gap-2 font-medium"

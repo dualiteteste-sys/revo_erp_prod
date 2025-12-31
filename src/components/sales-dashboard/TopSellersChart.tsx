@@ -1,15 +1,15 @@
 import React from 'react';
 import ReactECharts from 'echarts-for-react';
 import GlassCard from '../ui/GlassCard';
-import { faker } from '@faker-js/faker';
 
-const TopSellersChart: React.FC = () => {
-  const sellers = Array.from({ length: 5 }, () => faker.person.firstName());
-  const data = sellers.map(() => faker.number.int({ min: 5000, max: 25000 }));
+export default function TopSellersChart(props: { items: Array<{ name: string; value: number }>; title?: string }) {
+  const sellers = props.items.map((i) => i.name);
+  const data = props.items.map((i) => i.value);
+  const title = props.title ?? 'Top 5 Vendedores';
 
   const option = {
     title: {
-        text: 'Top 5 Vendedores',
+        text: title,
         left: 'center',
         textStyle: {
             color: '#334155',
@@ -68,6 +68,4 @@ const TopSellersChart: React.FC = () => {
       <ReactECharts option={option} style={{ height: '100%', width: '100%' }} />
     </GlassCard>
   );
-};
-
-export default TopSellersChart;
+}

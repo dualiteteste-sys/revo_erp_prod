@@ -4,6 +4,7 @@ import Modal from '@/components/ui/Modal';
 import { useToast } from '@/contexts/ToastProvider';
 import { listVendas, type VendaPedido } from '@/services/vendas';
 import { listExpedicaoEventos, listExpedicoes, upsertExpedicao, type Expedicao, type ExpedicaoEvento, type ExpedicaoStatus } from '@/services/vendasMvp';
+import CsvExportDialog from '@/components/ui/CsvExportDialog';
 
 type FormState = {
   pedido_id: string;
@@ -193,6 +194,19 @@ export default function ExpedicaoPage() {
           <option value="entregue">Entregue</option>
           <option value="cancelado">Cancelado</option>
         </select>
+        <CsvExportDialog
+          filename="expedicoes.csv"
+          rows={filteredRows}
+          disabled={loading}
+          columns={[
+            { key: 'pedido', label: 'Pedido', getValue: (r) => orderById.get(r.pedido_id)?.numero ?? '' },
+            { key: 'cliente', label: 'Cliente', getValue: (r) => orderById.get(r.pedido_id)?.cliente_nome ?? '' },
+            { key: 'status', label: 'Status', getValue: (r) => statusLabels[r.status] ?? r.status },
+            { key: 'tracking', label: 'Tracking', getValue: (r) => r.tracking_code ?? '' },
+            { key: 'envio', label: 'Data envio', getValue: (r) => r.data_envio ?? '' },
+            { key: 'entrega', label: 'Data entrega', getValue: (r) => r.data_entrega ?? '' },
+          ]}
+        />
       </div>
 
       <div className="bg-white rounded-lg shadow overflow-hidden flex-grow flex flex-col">

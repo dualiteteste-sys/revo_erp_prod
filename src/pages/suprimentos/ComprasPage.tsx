@@ -7,6 +7,7 @@ import Modal from '@/components/ui/Modal';
 import ComprasTable from '@/components/suprimentos/compras/ComprasTable';
 import CompraFormPanel from '@/components/suprimentos/compras/CompraFormPanel';
 import Select from '@/components/ui/forms/Select';
+import CsvExportDialog from '@/components/ui/CsvExportDialog';
 
 export default function ComprasPage() {
   const [orders, setOrders] = useState<CompraPedido[]>([]);
@@ -61,13 +62,27 @@ export default function ComprasPage() {
           <h1 className="text-3xl font-bold text-gray-800">Ordens de Compra</h1>
           <p className="text-gray-600 text-sm mt-1">Gestão de aquisições e recebimento de mercadorias.</p>
         </div>
-        <button
-          onClick={handleNew}
-          className="flex items-center gap-2 bg-blue-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-blue-700 transition-colors"
-        >
-          <PlusCircle size={20} />
-          Nova Compra
-        </button>
+        <div className="flex items-center gap-2">
+          <CsvExportDialog
+            filename="ordens-compra.csv"
+            rows={orders}
+            disabled={loading}
+            columns={[
+              { key: 'numero', label: 'Número', getValue: (r) => r.numero },
+              { key: 'fornecedor', label: 'Fornecedor', getValue: (r) => r.fornecedor_nome ?? '' },
+              { key: 'data', label: 'Data emissão', getValue: (r) => r.data_emissao ?? '' },
+              { key: 'status', label: 'Status', getValue: (r) => r.status },
+              { key: 'total', label: 'Total geral', getValue: (r) => r.total_geral },
+            ]}
+          />
+          <button
+            onClick={handleNew}
+            className="flex items-center gap-2 bg-blue-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-blue-700 transition-colors"
+          >
+            <PlusCircle size={20} />
+            Nova Compra
+          </button>
+        </div>
       </div>
 
       <div className="mb-6 flex gap-4">

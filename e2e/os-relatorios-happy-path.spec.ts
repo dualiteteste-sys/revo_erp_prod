@@ -233,7 +233,7 @@ test('OS-02: concluir OS e ver refletir nos relatórios', async ({ page }) => {
 
   // Concluir OS
   await page.goto('/app/ordens-de-servico');
-  await expect(page.getByText('Ordens de Serviço')).toBeVisible({ timeout: 15000 });
+  await expect(page.getByRole('heading', { name: 'Ordens de Serviço' })).toBeVisible({ timeout: 15000 });
   await expect(page.getByText('Manutenção preventiva')).toBeVisible({ timeout: 15000 });
 
   await page.getByTitle('Mais ações').click();
@@ -247,4 +247,3 @@ test('OS-02: concluir OS e ver refletir nos relatórios', async ({ page }) => {
   await expect(page.getByText('1 Concluídas')).toBeVisible();
   await expect(page.getByText('#1001')).toBeVisible();
 });
-

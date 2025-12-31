@@ -1,15 +1,19 @@
-import React, { useState, useEffect } from 'react';
-import { Ruler, PlusCircle, Edit, Trash2 } from 'lucide-react';
+import React, { useMemo, useState, useEffect } from 'react';
+import { Ruler, PlusCircle, Edit, Trash2, Search } from 'lucide-react';
 import Modal from '@/components/ui/Modal';
 import UnidadeFormPanel from '@/components/cadastros/UnidadeFormPanel';
 import { listUnidades, deleteUnidade, UnidadeMedida } from '@/services/unidades';
 import { useToast } from '@/contexts/ToastProvider';
 import { useConfirm } from '@/contexts/ConfirmProvider';
 import { Button } from '@/components/ui/button';
+import Select from '@/components/ui/forms/Select';
+import CsvExportDialog from '@/components/ui/CsvExportDialog';
 
 export default function UnidadesPage() {
     const [unidades, setUnidades] = useState<UnidadeMedida[]>([]);
     const [loading, setLoading] = useState(true);
+    const [search, setSearch] = useState('');
+    const [statusFilter, setStatusFilter] = useState<'all' | 'ativo' | 'inativo'>('all');
     const [isFormOpen, setIsFormOpen] = useState(false);
     const [selectedUnidade, setSelectedUnidade] = useState<UnidadeMedida | null>(null);
     const { addToast } = useToast();
@@ -31,6 +35,16 @@ export default function UnidadesPage() {
     useEffect(() => {
         loadUnidades();
     }, []);
+
+    const filtered = useMemo(() => {
+        const q = search.trim().toLowerCase();
+        return unidades.filter((u) => {
+            if (statusFilter === 'ativo' && !u.ativo) return false;
+            if (statusFilter === 'inativo' && u.ativo) return false;
+            if (!q) return true;
+            return `${u.sigla} ${u.descricao}`.toLowerCase().includes(q);
+        });
+    }, [search, statusFilter, unidades]);
 
     const handleNew = () => {
         setSelectedUnidade(null);
@@ -80,10 +94,45 @@ export default function UnidadesPage() {
                     </h1>
                     <p className="text-gray-600 mt-1">Gerencie as unidades de medida disponíveis no sistema.</p>
                 </div>
-                <Button onClick={handleNew} className="gap-2">
-                    <PlusCircle size={18} />
-                    Nova Unidade
-                </Button>
+                <div className="flex items-center gap-2">
+                    <CsvExportDialog
+                        filename="unidades-medida.csv"
+                        rows={filtered}
+                        disabled={loading}
+                        columns={[
+                            { key: 'sigla', label: 'Sigla', getValue: (r) => r.sigla },
+                            { key: 'descricao', label: 'Descrição', getValue: (r) => r.descricao },
+                            { key: 'origem', label: 'Origem', getValue: (r) => (r.empresa_id ? 'Personalizada' : 'Padrão') },
+                            { key: 'ativo', label: 'Status', getValue: (r) => (r.ativo ? 'Ativo' : 'Inativo') },
+                        ]}
+                    />
+                    <Button onClick={handleNew} className="gap-2">
+                        <PlusCircle size={18} />
+                        Nova Unidade
+                    </Button>
+                </div>
+            </div>
+
+            <div className="mb-4 flex gap-4 flex-shrink-0">
+                <div className="relative flex-grow max-w-md">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
+                    <input
+                        type="text"
+                        placeholder="Buscar por sigla ou descrição..."
+                        value={search}
+                        onChange={(e) => setSearch(e.target.value)}
+                        className="w-full p-3 pl-10 border border-gray-300 rounded-xl shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    />
+                </div>
+                <Select
+                    value={statusFilter}
+                    onChange={(e) => setStatusFilter(e.target.value as any)}
+                    className="min-w-[200px]"
+                >
+                    <option value="all">Todos</option>
+                    <option value="ativo">Ativos</option>
+                    <option value="inativo">Inativos</option>
+                </Select>
             </div>
 
             <div className="bg-white rounded-lg shadow overflow-hidden flex-grow">
@@ -105,14 +154,14 @@ export default function UnidadesPage() {
                                         Carregando...
                                     </td>
                                 </tr>
-                            ) : unidades.length === 0 ? (
+                            ) : filtered.length === 0 ? (
                                 <tr>
                                     <td colSpan={5} className="text-center py-8 text-gray-500">
-                                        Nenhuma unidade encontrada.
+                                        {unidades.length === 0 ? 'Nenhuma unidade encontrada.' : 'Nenhum resultado para os filtros.'}
                                     </td>
                                 </tr>
                             ) : (
-                                unidades.map((u) => (
+                                filtered.map((u) => (
                                     <tr key={u.id} className="hover:bg-gray-50">
                                         <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-900">{u.sigla}</td>
                                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">{u.descricao}</td>

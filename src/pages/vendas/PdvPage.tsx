@@ -7,6 +7,7 @@ import { listContasCorrentes, type ContaCorrente } from '@/services/treasury';
 import { estornarPdv, finalizePdv } from '@/services/vendasMvp';
 import { supabase } from '@/lib/supabaseClient';
 import { getVendaDetails, type VendaDetails } from '@/services/vendas';
+import CsvExportDialog from '@/components/ui/CsvExportDialog';
 
 type PdvRow = {
   id: string;
@@ -290,6 +291,17 @@ export default function PdvPage() {
           <option value="concluido">Concluído</option>
           <option value="cancelado">Cancelado</option>
         </select>
+        <CsvExportDialog
+          filename="pdv.csv"
+          rows={filteredRows}
+          disabled={loading}
+          columns={[
+            { key: 'numero', label: 'Número', getValue: (r) => r.numero },
+            { key: 'data', label: 'Data', getValue: (r) => r.data_emissao },
+            { key: 'status', label: 'Status', getValue: (r) => r.status },
+            { key: 'total', label: 'Total', getValue: (r) => r.total_geral },
+          ]}
+        />
       </div>
 
       <div className="bg-white rounded-lg shadow overflow-hidden flex-grow flex flex-col">

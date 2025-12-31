@@ -10,6 +10,7 @@ import Select from '@/components/ui/forms/Select';
 import Pagination from '@/components/ui/Pagination';
 import { useToast } from '@/contexts/ToastProvider';
 import { SeedButton } from '@/components/common/SeedButton';
+import CsvExportDialog from '@/components/ui/CsvExportDialog';
 
 export default function PedidosVendasPage() {
   const {
@@ -76,6 +77,21 @@ export default function PedidosVendasPage() {
           <p className="text-gray-600 text-sm mt-1">Gestão comercial e faturamento.</p>
         </div>
         <div className="flex items-center gap-2">
+            <CsvExportDialog
+              filename="pedidos-venda.csv"
+              rows={orders}
+              disabled={loading}
+              columns={[
+                { key: 'numero', label: 'Número', getValue: (r) => r.numero },
+                { key: 'cliente', label: 'Cliente', getValue: (r) => r.cliente_nome ?? '' },
+                { key: 'canal', label: 'Canal', getValue: (r) => (r as any).canal ?? '' },
+                { key: 'data', label: 'Data emissão', getValue: (r) => r.data_emissao ?? '' },
+                { key: 'status', label: 'Status', getValue: (r) => r.status ?? '' },
+                { key: 'total', label: 'Total geral', getValue: (r) => (r as any).total_geral ?? '' },
+                { key: 'vendedor', label: 'Vendedor', getValue: (r) => (r as any).vendedor_nome ?? '' },
+                { key: 'comissao', label: 'Comissão (%)', getValue: (r) => (r as any).comissao_percent ?? '' },
+              ]}
+            />
             <SeedButton 
               onSeed={handleSeed} 
               isSeeding={isSeeding} 

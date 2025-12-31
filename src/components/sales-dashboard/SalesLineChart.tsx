@@ -1,15 +1,15 @@
 import React from 'react';
 import ReactECharts from 'echarts-for-react';
 import GlassCard from '../ui/GlassCard';
-import { faker } from '@faker-js/faker';
 
-const SalesLineChart: React.FC = () => {
-  const months = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
-  const data = months.map(() => faker.number.int({ min: 20000, max: 80000 }));
+export default function SalesLineChart(props: { labels: string[]; values: number[]; title?: string }) {
+  const labels = props.labels;
+  const data = props.values;
+  const title = props.title ?? 'Faturamento por Período';
 
   const option = {
     title: {
-        text: 'Faturamento por Período',
+        text: title,
         left: 'center',
         textStyle: {
             color: '#334155',
@@ -31,7 +31,7 @@ const SalesLineChart: React.FC = () => {
     xAxis: {
       type: 'category',
       boundaryGap: false,
-      data: months,
+      data: labels,
       axisLine: { show: false },
       axisTick: { show: false },
     },
@@ -81,6 +81,4 @@ const SalesLineChart: React.FC = () => {
       <ReactECharts option={option} style={{ height: '100%', width: '100%' }} />
     </GlassCard>
   );
-};
-
-export default SalesLineChart;
+}
