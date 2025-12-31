@@ -19,8 +19,8 @@ Regras:
 - [x] UX-07 Acessibilidade básica: navegação por teclado e foco visível nos modais
 
 ### 0.2 Confiabilidade e observabilidade
-- [ ] OPS-01 Idempotência em ações críticas (emitir/cancelar, finalizar PDV, baixa/estorno financeiro, recebimento)
-- [ ] OPS-02 Locks/anti-double-click e estados “em progresso” em botões críticos
+- [x] OPS-01 Idempotência em ações críticas (emitir/cancelar, finalizar PDV, baixa/estorno financeiro, recebimento)
+- [x] OPS-02 Locks/anti-double-click e estados “em progresso” em botões críticos
 - [ ] OPS-03 Auditoria por entidade (quem/quando/o que mudou) nos fluxos críticos
 - [ ] OPS-04 Logs estruturados (mínimo: contexto + empresa_id + user_id + entity_id)
 - [ ] OPS-05 Reprocessamento seguro de jobs/webhooks (fila + retry/backoff + dead-letter)
@@ -87,7 +87,7 @@ Regras:
 ## 5) Serviços (OS) + Financeiro (forte o suficiente para vender)
 
 ### 5.1 OS “estado da arte” (fluxo)
-- [ ] OS-01 OS: criar + agenda/status + anexos + histórico + custos
+- [x] OS-01 OS: criar + agenda/status + anexos + histórico + custos
 - [ ] OS-02 Permissões por etapa (ex.: técnico vs gestor)
 - [ ] OS-03 OS → Financeiro: gerar parcelas/contas a receber + estorno + auditoria
 - [ ] OS-04 Relatórios de OS: período/status/cliente + faturamento
@@ -95,9 +95,9 @@ Regras:
 ### 5.2 Financeiro essencial
 - [x] FIN-01 A Receber: criar/baixar/estornar/cancelar + conciliação mínima
 - [x] FIN-02 A Pagar: criar/baixar/estornar/cancelar
-- [ ] FIN-03 Tesouraria: extrato bancário (import) + vincular lançamentos + saldo confiável
+- [x] FIN-03 Tesouraria: extrato bancário (import) + vincular lançamentos + saldo confiável
 - [ ] FIN-04 Centros de custo (quando ativo): alocação simples + relatórios
-- [ ] FIN-05 Relatórios essenciais: pagar/receber/caixa/faturamento por período
+- [x] FIN-05 Relatórios essenciais: pagar/receber/caixa/faturamento por período
 
 ## 6) Indústria (mínimo para “pronto para vender”)
 - [ ] IND-01 OP/OB wizard consistente + travas de estados + cancelados/readonly corretos
