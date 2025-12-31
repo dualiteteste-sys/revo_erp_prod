@@ -12,7 +12,7 @@ Regras:
 ### 0.1 UX padrão produto
 - [x] UX-01 Busca global + atalhos (Ctrl/Cmd+K) sem erros e com foco/teclado
 - [x] UX-02 Listas: filtros + ordenação + paginação eficiente + “estado vazio” com CTA
-- [ ] UX-03 Colunas configuráveis + exportação CSV (mínimo) nas listas principais
+- [x] UX-03 Colunas configuráveis + exportação CSV (mínimo) nas listas principais
 - [ ] UX-04 Ações em massa (mínimo: excluir/ativar/inativar quando existir) nas listas principais
 - [ ] UX-05 Formulários: validação forte + mensagens claras + máscaras BR (CNPJ/CPF/CEP/telefone)
 - [ ] UX-06 Feedback consistente: loading/skeleton, sucesso, erro (sem alert), “tentar novamente”
@@ -41,8 +41,8 @@ Regras:
 ## 1) Cadastros (base do ERP)
 - [x] CAD-01 Parceiros (clientes/fornecedores): CRUD + busca + validações (CPF/CNPJ) + endereços
 - [x] CAD-02 Produtos: CRUD + unidade + NCM/tributação básica + import/export CSV
-- [ ] CAD-03 Serviços: CRUD + preço + impostos básicos (se aplicável)
-- [ ] CAD-04 Transportadoras + embalagens + grupos/unidades: CRUD consistente
+- [x] CAD-03 Serviços: CRUD + preço + impostos básicos (se aplicável)
+- [x] CAD-04 Transportadoras + embalagens + grupos/unidades: CRUD consistente
 
 ## 2) Suprimentos + Estoque (mínimo “redondo”)
 - [x] SUP-01 Estoque: saldo por produto + movimentações + ajuste manual auditável
@@ -69,7 +69,7 @@ Regras:
 ### 3.4 Comissões + metas + painel (Pro)
 - [x] COM-01 Comissões: regra simples por vendedor (% ou tabela) + relatório + export
 - [x] MET-01 Metas: CRUD + acompanhamento (atingido x meta) + alertas simples
-- [ ] DASH-01 Painel de vendas: KPIs principais e filtros por período/canal/vendedor
+- [x] DASH-01 Painel de vendas: KPIs principais e filtros por período/canal/vendedor
 
 ### 3.5 CRM + automações (MVP “bem feito”, sem prometer demais)
 - [ ] CRM-01 Funil: etapas configuráveis + cards + atividades/anotações
@@ -77,7 +77,7 @@ Regras:
 - [ ] AUTO-01 Automações: CRUD + simulação/validação + execução assíncrona (fila)
 
 ## 4) Fiscal (NF-e)
-- [ ] NFE-01 Config fiscal completa (emitente, série/numeração, ambiente, CSC se aplicável)
+- [x] NFE-01 Config fiscal completa (emitente, série/numeração, ambiente, CSC se aplicável)
 - [ ] NFE-02 Rascunho + validação local (motor fiscal v1) + preview do XML
 - [ ] NFE-03 Emissão via provedor (NFE.io): enviar + consultar status + armazenar XML/DANFE + logs
 - [ ] NFE-04 Webhooks: assinatura/HMAC + fila + retry idempotente + reprocessar manual
