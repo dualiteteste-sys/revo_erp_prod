@@ -87,6 +87,10 @@ export async function aprovarVenda(id: string): Promise<void> {
   await callRpc('vendas_aprovar_pedido', { p_id: id });
 }
 
+export async function concluirVendaPedido(id: string): Promise<void> {
+  await callRpc('vendas_concluir_pedido', { p_id: id, p_baixar_estoque: true });
+}
+
 export async function seedVendas(): Promise<void> {
   // 1. Buscar produtos ativos
   const { data: products } = await getProducts({ 

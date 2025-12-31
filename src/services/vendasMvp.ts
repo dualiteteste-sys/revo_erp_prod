@@ -19,11 +19,35 @@ export type Expedicao = {
   updated_at: string;
 };
 
+export type ExpedicaoEventoTipo = 'created' | 'status' | 'tracking' | 'observacoes';
+export type ExpedicaoEvento = {
+  id: string;
+  empresa_id: string;
+  expedicao_id: string;
+  tipo: ExpedicaoEventoTipo;
+  de_status: string | null;
+  para_status: string | null;
+  mensagem: string | null;
+  meta: any;
+  created_at: string;
+  created_by: string | null;
+};
+
 export async function listExpedicoes(): Promise<Expedicao[]> {
   const { data, error } = await sb
     .from('vendas_expedicoes')
     .select('*')
     .order('updated_at', { ascending: false });
+  if (error) throw error;
+  return (data || []) as any;
+}
+
+export async function listExpedicaoEventos(expedicaoId: string): Promise<ExpedicaoEvento[]> {
+  const { data, error } = await sb
+    .from('vendas_expedicao_eventos')
+    .select('*')
+    .eq('expedicao_id', expedicaoId)
+    .order('created_at', { ascending: false });
   if (error) throw error;
   return (data || []) as any;
 }
@@ -174,6 +198,19 @@ export async function createDevolucaoWithSideEffects(params: {
   return devolucaoId;
 }
 
+export async function ensurePdvDefaultClienteId(): Promise<string> {
+  const id = await callRpc<string>('vendas_pdv_ensure_default_cliente', {});
+  return id as any;
+}
+
+export async function estornarPdv(params: { pedidoId: string; contaCorrenteId: string }): Promise<void> {
+  await callRpc('vendas_pdv_estornar', { p_pedido_id: params.pedidoId, p_conta_corrente_id: params.contaCorrenteId });
+}
+
+export async function concluirVendaComBaixaEstoque(pedidoId: string): Promise<void> {
+  await callRpc('vendas_concluir_pedido', { p_id: pedidoId, p_baixar_estoque: true });
+}
+
 export async function finalizePdv(params: {
   pedidoId: string;
   contaCorrenteId: string;
@@ -204,16 +241,7 @@ export async function finalizePdv(params: {
   });
 
   if (params.estoqueEnabled !== false) {
-    for (const it of venda.itens || []) {
-      await callRpc('suprimentos_registrar_movimento', {
-        p_produto_id: it.produto_id,
-        p_tipo: 'saida',
-        p_quantidade: it.quantidade,
-        p_custo_unitario: null,
-        p_documento_ref: `PDV-${venda.numero}`,
-        p_observacao: 'Saída de estoque (PDV MVP)',
-      });
-    }
+    await callRpc('vendas_baixar_estoque', { p_pedido_id: venda.id, p_documento_ref: `PDV-${venda.numero}` });
   }
 
   return updated;
