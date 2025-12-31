@@ -7,9 +7,10 @@ interface OsKanbanModalProps {
   isOpen: boolean;
   onClose: () => void;
   canUpdate?: boolean;
+  canManage?: boolean;
 }
 
-const OsKanbanModal: React.FC<OsKanbanModalProps> = ({ isOpen, onClose, canUpdate = true }) => {
+const OsKanbanModal: React.FC<OsKanbanModalProps> = ({ isOpen, onClose, canUpdate = true, canManage = false }) => {
   const navigate = useNavigate();
 
   return (
@@ -17,6 +18,7 @@ const OsKanbanModal: React.FC<OsKanbanModalProps> = ({ isOpen, onClose, canUpdat
       <div className="p-4 h-full">
         <OsKanbanBoard
           canUpdate={canUpdate}
+          canManage={canManage}
           onOpenOs={(osId) => {
             onClose();
             navigate(`/app/ordens-de-servico?osId=${encodeURIComponent(osId)}`);

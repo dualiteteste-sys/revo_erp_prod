@@ -9,9 +9,10 @@ interface OsKanbanColumnProps {
   onOpenOs?: (osId: string) => void;
   onSetStatus?: (osId: string, next: status_os) => void | Promise<void>;
   canUpdate?: boolean;
+  canManage?: boolean;
 }
 
-const OsKanbanColumn: React.FC<OsKanbanColumnProps> = ({ column, onOpenOs, onSetStatus, canUpdate = true }) => {
+const OsKanbanColumn: React.FC<OsKanbanColumnProps> = ({ column, onOpenOs, onSetStatus, canUpdate = true, canManage = false }) => {
   return (
     <div className="flex flex-col w-80 bg-gray-100/80 rounded-2xl flex-shrink-0 h-full">
       <div className="p-4 border-b border-gray-200">
@@ -25,7 +26,7 @@ const OsKanbanColumn: React.FC<OsKanbanColumnProps> = ({ column, onOpenOs, onSet
             className={`flex-1 p-2 overflow-y-auto scrollbar-styled transition-colors ${snapshot.isDraggingOver ? 'bg-blue-50' : ''}`}
           >
             {column.items.map((item, index) => (
-              <OsKanbanCard key={item.id} item={item} index={index} onOpenOs={onOpenOs} onSetStatus={onSetStatus} canUpdate={canUpdate} />
+              <OsKanbanCard key={item.id} item={item} index={index} onOpenOs={onOpenOs} onSetStatus={onSetStatus} canUpdate={canUpdate} canManage={canManage} />
             ))}
             {provided.placeholder}
           </div>

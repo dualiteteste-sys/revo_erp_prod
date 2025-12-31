@@ -43,6 +43,7 @@ const OSPage: React.FC = () => {
   const permCreate = useHasPermission('os', 'create');
   const permUpdate = useHasPermission('os', 'update');
   const permDelete = useHasPermission('os', 'delete');
+  const permManage = useHasPermission('os', 'manage');
   const permReports = useHasPermission('relatorios_servicos', 'view');
 
   const [isFormOpen, setIsFormOpen] = useState(false);
@@ -144,6 +145,10 @@ const OSPage: React.FC = () => {
     };
 
     const shouldConfirm = next === 'concluida' || next === 'cancelada';
+    if (shouldConfirm && !permManage.data) {
+      addToast('Você não tem permissão para concluir/cancelar O.S.', 'warning');
+      return;
+    }
     if (shouldConfirm) {
       const ok = await confirm({
         title: next === 'concluida' ? 'Concluir O.S.' : 'Cancelar O.S.',
@@ -266,6 +271,7 @@ const OSPage: React.FC = () => {
               sortBy={sortBy}
               onSort={handleSort}
               canUpdate={permUpdate.data}
+              canManage={permManage.data}
               canDelete={permDelete.data}
               busyOsId={statusUpdatingId}
             />
@@ -298,7 +304,12 @@ const OSPage: React.FC = () => {
         variant="danger"
       />
       
-      <OsKanbanModal isOpen={isKanbanModalOpen} onClose={() => setIsKanbanModalOpen(false)} canUpdate={permUpdate.data} />
+      <OsKanbanModal
+        isOpen={isKanbanModalOpen}
+        onClose={() => setIsKanbanModalOpen(false)}
+        canUpdate={permUpdate.data}
+        canManage={permManage.data}
+      />
     </div>
   );
 };

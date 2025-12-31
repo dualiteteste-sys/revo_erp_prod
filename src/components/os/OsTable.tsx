@@ -21,6 +21,7 @@ interface OsTableProps {
   sortBy: { column: keyof OrdemServico; ascending: boolean };
   onSort: (column: keyof OrdemServico) => void;
   canUpdate?: boolean;
+  canManage?: boolean;
   canDelete?: boolean;
   busyOsId?: string | null;
 }
@@ -57,7 +58,7 @@ const SortableHeader: React.FC<{
   );
 };
 
-const OsTable: React.FC<OsTableProps> = ({ serviceOrders, onEdit, onDelete, onOpenAgenda, onSetStatus, sortBy, onSort, canUpdate = true, canDelete = true, busyOsId }) => {
+const OsTable: React.FC<OsTableProps> = ({ serviceOrders, onEdit, onDelete, onOpenAgenda, onSetStatus, sortBy, onSort, canUpdate = true, canManage = false, canDelete = true, busyOsId }) => {
   const formatDate = (value?: string | null) => (value ? new Date(value).toLocaleDateString('pt-BR') : '—');
   const formatTime = (value?: string | null) => (value ? String(value).slice(0, 5) : '');
 
@@ -163,11 +164,11 @@ const OsTable: React.FC<OsTableProps> = ({ serviceOrders, onEdit, onDelete, onOp
                                                   <ClipboardCheck size={16} />
                                                   Marcar como Aberta
                                                 </DropdownMenuItem>
-                                                <DropdownMenuItem onClick={() => onSetStatus(os, 'concluida')} className="gap-2" disabled={!canUpdate || busy}>
+                                                <DropdownMenuItem onClick={() => onSetStatus(os, 'concluida')} className="gap-2" disabled={!canManage || busy}>
                                                   <CheckCircle2 size={16} />
                                                   Concluir
                                                 </DropdownMenuItem>
-                                                <DropdownMenuItem onClick={() => onSetStatus(os, 'cancelada')} className="gap-2" disabled={!canUpdate || busy}>
+                                                <DropdownMenuItem onClick={() => onSetStatus(os, 'cancelada')} className="gap-2" disabled={!canManage || busy}>
                                                   <XCircle size={16} />
                                                   Cancelar
                                                 </DropdownMenuItem>
