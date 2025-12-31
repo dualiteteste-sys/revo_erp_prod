@@ -13,10 +13,10 @@ Regras:
 - [x] UX-01 Busca global + atalhos (Ctrl/Cmd+K) sem erros e com foco/teclado
 - [x] UX-02 Listas: filtros + ordenação + paginação eficiente + “estado vazio” com CTA
 - [x] UX-03 Colunas configuráveis + exportação CSV (mínimo) nas listas principais
-- [ ] UX-04 Ações em massa (mínimo: excluir/ativar/inativar quando existir) nas listas principais
-- [ ] UX-05 Formulários: validação forte + mensagens claras + máscaras BR (CNPJ/CPF/CEP/telefone)
-- [ ] UX-06 Feedback consistente: loading/skeleton, sucesso, erro (sem alert), “tentar novamente”
-- [ ] UX-07 Acessibilidade básica: navegação por teclado e foco visível nos modais
+- [x] UX-04 Ações em massa (mínimo: excluir/ativar/inativar quando existir) nas listas principais
+- [x] UX-05 Formulários: validação forte + mensagens claras + máscaras BR (CNPJ/CPF/CEP/telefone)
+- [x] UX-06 Feedback consistente: loading/skeleton, sucesso, erro (sem alert), “tentar novamente”
+- [x] UX-07 Acessibilidade básica: navegação por teclado e foco visível nos modais
 
 ### 0.2 Confiabilidade e observabilidade
 - [ ] OPS-01 Idempotência em ações críticas (emitir/cancelar, finalizar PDV, baixa/estorno financeiro, recebimento)
@@ -78,7 +78,7 @@ Regras:
 
 ## 4) Fiscal (NF-e)
 - [x] NFE-01 Config fiscal completa (emitente, série/numeração, ambiente, CSC se aplicável)
-- [ ] NFE-02 Rascunho + validação local (motor fiscal v1) + preview do XML
+- [x] NFE-02 Rascunho + validação local (motor fiscal v1) + preview do XML
 - [ ] NFE-03 Emissão via provedor (NFE.io): enviar + consultar status + armazenar XML/DANFE + logs
 - [ ] NFE-04 Webhooks: assinatura/HMAC + fila + retry idempotente + reprocessar manual
 - [ ] NFE-05 Eventos: cancelamento + CCe (se aplicável) + inutilização + reimpressão DANFE
