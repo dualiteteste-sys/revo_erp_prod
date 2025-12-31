@@ -1,20 +1,30 @@
 import React, { useState, useEffect } from 'react';
-import { Loader2, Save, CheckCircle, Trash2, AlertTriangle } from 'lucide-react';
+import { Loader2, Save, CheckCircle, Trash2, ShieldAlert, Ban } from 'lucide-react';
 import { VendaDetails, VendaPayload, saveVenda, manageVendaItem, getVendaDetails, aprovarVenda } from '@/services/vendas';
 import { useToast } from '@/contexts/ToastProvider';
 import { useConfirm } from '@/contexts/ConfirmProvider';
 import Section from '@/components/ui/forms/Section';
 import Input from '@/components/ui/forms/Input';
-import Select from '@/components/ui/forms/Select';
 import TextArea from '@/components/ui/forms/TextArea';
 import ClientAutocomplete from '@/components/common/ClientAutocomplete';
 import ItemAutocomplete from '@/components/os/ItemAutocomplete';
 import { useNumericField } from '@/hooks/useNumericField';
+import { useHasPermission } from '@/hooks/useHasPermission';
 
 interface Props {
   vendaId: string | null;
   onSaveSuccess: () => void;
   onClose: () => void;
+}
+
+function toMoney(n: number | null | undefined): number {
+  const v = Number(n ?? 0);
+  if (!Number.isFinite(v)) return 0;
+  return Math.round(v * 100) / 100;
+}
+
+function formatMoneyBRL(n: number | null | undefined): string {
+  return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Number(n ?? 0));
 }
 
 export default function PedidoVendaFormPanel({ vendaId, onSaveSuccess, onClose }: Props) {
@@ -33,6 +43,8 @@ export default function PedidoVendaFormPanel({ vendaId, onSaveSuccess, onClose }
 
   const freteProps = useNumericField(formData.frete, (v) => handleHeaderChange('frete', v));
   const descontoProps = useNumericField(formData.desconto, (v) => handleHeaderChange('desconto', v));
+  const canDiscountQuery = useHasPermission('vendas', 'discount');
+  const canDiscount = !!canDiscountQuery.data;
 
   useEffect(() => {
     if (vendaId) {
@@ -58,10 +70,22 @@ export default function PedidoVendaFormPanel({ vendaId, onSaveSuccess, onClose }
   };
 
   const handleSaveHeader = async () => {
+    if (!canDiscount && toMoney(formData.desconto) > 0) {
+      addToast('Você não tem permissão para aplicar desconto.', 'error');
+      return null;
+    }
     if (!formData.cliente_id) {
       addToast('Selecione um cliente.', 'error');
       return;
     }
+    const subtotal = toMoney(formData.itens?.reduce((acc, i) => acc + toMoney(i.total), 0) || 0);
+    const frete = toMoney(formData.frete);
+    const desconto = toMoney(formData.desconto);
+    if ((formData.itens?.length || 0) > 0 && desconto > subtotal + frete) {
+      addToast('Desconto não pode ser maior que (subtotal + frete).', 'error');
+      return null;
+    }
+
     setIsSaving(true);
     try {
       const payload: VendaPayload = {
@@ -70,8 +94,8 @@ export default function PedidoVendaFormPanel({ vendaId, onSaveSuccess, onClose }
         data_emissao: formData.data_emissao,
         data_entrega: formData.data_entrega,
         status: formData.status,
-        frete: formData.frete,
-        desconto: formData.desconto,
+        frete,
+        desconto,
         condicao_pagamento: formData.condicao_pagamento,
         observacoes: formData.observacoes
       };
@@ -126,12 +150,37 @@ export default function PedidoVendaFormPanel({ vendaId, onSaveSuccess, onClose }
   const handleUpdateItem = async (itemId: string, field: string, value: number) => {
     const item = formData.itens?.find(i => i.id === itemId);
     if (!item) return;
-    
+
+    if (field === 'desconto' && !canDiscount) {
+      addToast('Você não tem permissão para aplicar desconto.', 'error');
+      return;
+    }
+
+    const safe = Number.isFinite(value) ? value : 0;
     const updates = {
-      quantidade: field === 'quantidade' ? value : item.quantidade,
-      preco_unitario: field === 'preco' ? value : item.preco_unitario,
-      desconto: field === 'desconto' ? value : item.desconto,
+      quantidade: field === 'quantidade' ? safe : item.quantidade,
+      preco_unitario: field === 'preco' ? safe : item.preco_unitario,
+      desconto: field === 'desconto' ? safe : item.desconto,
     };
+
+    if (updates.quantidade <= 0) {
+      addToast('Quantidade deve ser maior que zero.', 'error');
+      return;
+    }
+    if (updates.preco_unitario < 0) {
+      addToast('Preço unitário deve ser >= 0.', 'error');
+      return;
+    }
+    if (updates.desconto < 0) {
+      addToast('Desconto deve ser >= 0.', 'error');
+      return;
+    }
+
+    const maxDesconto = toMoney(updates.quantidade * updates.preco_unitario);
+    if (updates.desconto > maxDesconto) {
+      updates.desconto = maxDesconto;
+      addToast('Desconto do item não pode ser maior que o total do item.', 'warning');
+    }
 
     try {
       await manageVendaItem(formData.id!, itemId, item.produto_id, updates.quantidade, updates.preco_unitario, updates.desconto, 'update');
@@ -171,9 +220,34 @@ export default function PedidoVendaFormPanel({ vendaId, onSaveSuccess, onClose }
     }
   };
 
+  const handleCancel = async () => {
+    const ok = await confirm({
+      title: 'Cancelar pedido',
+      description: 'Cancelar este pedido? Essa ação pode ser revertida apenas reabrindo um novo pedido.',
+      confirmText: 'Cancelar pedido',
+      cancelText: 'Voltar',
+      variant: 'danger',
+    });
+    if (!ok) return;
+    setIsSaving(true);
+    try {
+      await saveVenda({ id: formData.id!, status: 'cancelado' });
+      addToast('Pedido cancelado.', 'success');
+      onSaveSuccess();
+    } catch (e: any) {
+      addToast(e.message, 'error');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
   if (loading) return <div className="flex justify-center p-8"><Loader2 className="animate-spin" /></div>;
 
   const isLocked = formData.status !== 'orcamento';
+  const subtotal = toMoney(formData.itens?.reduce((acc, i) => acc + toMoney(i.total), 0) || 0);
+  const frete = toMoney(formData.frete);
+  const desconto = toMoney(formData.desconto);
+  const previewTotalGeral = Math.max(0, toMoney(subtotal + frete - desconto));
 
   return (
     <div className="flex flex-col h-full">
@@ -238,7 +312,15 @@ export default function PedidoVendaFormPanel({ vendaId, onSaveSuccess, onClose }
                 {formData.itens?.map(item => (
                   <tr key={item.id}>
                     <td className="px-3 py-2 text-sm text-gray-900">
-                      {item.produto_nome}
+                      <div className="font-medium">{item.produto_nome}</div>
+                      {(item.produto_ncm || item.produto_cfop || item.produto_cst || item.produto_csosn) ? (
+                        <div className="text-xs text-gray-500 mt-0.5">
+                          {item.produto_ncm ? <span>NCM: {item.produto_ncm}</span> : null}
+                          {item.produto_cfop ? <span>{item.produto_ncm ? ' · ' : ''}CFOP: {item.produto_cfop}</span> : null}
+                          {item.produto_cst ? <span>{(item.produto_ncm || item.produto_cfop) ? ' · ' : ''}CST: {item.produto_cst}</span> : null}
+                          {item.produto_csosn ? <span>{(item.produto_ncm || item.produto_cfop || item.produto_cst) ? ' · ' : ''}CSOSN: {item.produto_csosn}</span> : null}
+                        </div>
+                      ) : null}
                     </td>
                     <td className="px-3 py-2">
                       <input 
@@ -266,13 +348,13 @@ export default function PedidoVendaFormPanel({ vendaId, onSaveSuccess, onClose }
                         type="number" 
                         value={item.desconto} 
                         onChange={e => handleUpdateItem(item.id, 'desconto', parseFloat(e.target.value))}
-                        disabled={isLocked}
+                        disabled={isLocked || !canDiscount}
                         className="w-full text-right p-1 border rounded text-sm"
                         step="0.01"
                       />
                     </td>
                     <td className="px-3 py-2 text-right text-sm font-semibold">
-                      {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(item.total)}
+                      {formatMoneyBRL(item.total)}
                     </td>
                     {!isLocked && (
                       <td className="px-3 py-2 text-center">
@@ -295,15 +377,25 @@ export default function PedidoVendaFormPanel({ vendaId, onSaveSuccess, onClose }
           <div className="sm:col-span-2">
             <label className="block text-sm font-medium text-gray-700 mb-1">Total Produtos</label>
             <div className="p-3 bg-gray-100 rounded-lg text-right font-semibold text-gray-700">
-              {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(formData.itens?.reduce((acc, i) => acc + i.total, 0) || 0)}
+              {formatMoneyBRL(subtotal)}
             </div>
           </div>
           <Input label="Frete (R$)" name="frete" {...freteProps} disabled={isLocked} className="sm:col-span-2" />
-          <Input label="Desconto Extra (R$)" name="desconto" {...descontoProps} disabled={isLocked} className="sm:col-span-2" />
+          <div className="sm:col-span-2">
+            <Input label="Desconto Extra (R$)" name="desconto" {...descontoProps} disabled={isLocked || !canDiscount} />
+            {!canDiscount ? (
+              <div className="mt-1 text-xs text-amber-700 flex items-center gap-1">
+                <ShieldAlert size={14} /> Sem permissão para desconto
+              </div>
+            ) : null}
+          </div>
           
           <div className="sm:col-span-6 flex justify-end mt-4 pt-4 border-t border-gray-100">
-            <div className="text-2xl font-bold text-blue-800">
-              Total Geral: {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(formData.total_geral || 0)}
+            <div className="text-right">
+              <div className="text-xs text-gray-500">Prévia</div>
+              <div className="text-2xl font-bold text-blue-800">
+                Total Geral: {formatMoneyBRL(previewTotalGeral)}
+              </div>
             </div>
           </div>
 
@@ -316,6 +408,15 @@ export default function PedidoVendaFormPanel({ vendaId, onSaveSuccess, onClose }
           Fechar
         </button>
         <div className="flex gap-3">
+          {formData.id && formData.status !== 'cancelado' && (
+            <button
+              onClick={handleCancel}
+              disabled={isSaving}
+              className="flex items-center gap-2 bg-red-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-red-700 disabled:opacity-50"
+            >
+              <Ban size={20} /> Cancelar
+            </button>
+          )}
           {formData.id && !isLocked && (
             <button 
               onClick={handleAprovar} 

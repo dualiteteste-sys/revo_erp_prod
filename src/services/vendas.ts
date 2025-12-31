@@ -27,6 +27,10 @@ export type VendaItem = {
   pedido_id: string;
   produto_id: string;
   produto_nome?: string;
+  produto_ncm?: string | null;
+  produto_cfop?: string | null;
+  produto_cst?: string | null;
+  produto_csosn?: string | null;
   quantidade: number;
   preco_unitario: number;
   desconto: number;

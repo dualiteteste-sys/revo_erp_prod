@@ -114,6 +114,21 @@ test('Financeiro: registrar recebimento e pagamento (fluxo básico)', async ({ p
       data_pagamento: null,
       valor_pago: null,
     },
+    {
+      id: 'car-2',
+      empresa_id: 'empresa-1',
+      cliente_id: 'cli-2',
+      descricao: 'Venda #20',
+      valor: 50,
+      data_vencimento: today,
+      status: 'pendente',
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+      cliente_nome: 'Cliente E2E 2',
+      observacoes: null,
+      data_pagamento: null,
+      valor_pago: null,
+    },
   ];
 
   const contasPagar = [
@@ -141,6 +156,31 @@ test('Financeiro: registrar recebimento e pagamento (fluxo básico)', async ({ p
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
       total_count: 1,
+    },
+    {
+      id: 'cp-2',
+      empresa_id: 'empresa-1',
+      fornecedor_id: 'for-2',
+      fornecedor_nome: 'Fornecedor E2E 2',
+      documento_ref: 'NF-222',
+      descricao: 'Serviço terceirizado',
+      data_emissao: today,
+      data_vencimento: today,
+      data_pagamento: null,
+      valor_total: 120,
+      valor_pago: 0,
+      multa: 0,
+      juros: 0,
+      desconto: 0,
+      saldo: 120,
+      forma_pagamento: 'Boleto',
+      centro_custo: null,
+      categoria: null,
+      status: 'aberta',
+      observacoes: null,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+      total_count: 2,
     },
   ];
 
@@ -177,13 +217,52 @@ test('Financeiro: registrar recebimento e pagamento (fluxo básico)', async ({ p
     }
 
     if (url.includes('/rest/v1/rpc/financeiro_conta_a_receber_receber')) {
-      contasReceber[0] = {
-        ...contasReceber[0],
-        status: 'pago',
-        data_pagamento: today,
-        valor_pago: contasReceber[0].valor,
-        updated_at: new Date().toISOString(),
-      };
+      const body = (await req.postDataJSON()) as any;
+      const id = body?.p_id;
+      const idx = contasReceber.findIndex((c) => c.id === id);
+      if (idx >= 0) {
+        contasReceber[idx] = {
+          ...contasReceber[idx],
+          status: 'pago',
+          data_pagamento: today,
+          valor_pago: contasReceber[idx].valor,
+          updated_at: new Date().toISOString(),
+        };
+        await route.fulfill({ json: contasReceber[idx] });
+        return;
+      }
+      await route.fulfill({ json: contasReceber[0] });
+      return;
+    }
+
+    if (url.includes('/rest/v1/rpc/financeiro_conta_a_receber_cancelar')) {
+      const body = (await req.postDataJSON()) as any;
+      const id = body?.p_id;
+      const idx = contasReceber.findIndex((c) => c.id === id);
+      if (idx >= 0) {
+        contasReceber[idx] = { ...contasReceber[idx], status: 'cancelado', updated_at: new Date().toISOString() };
+        await route.fulfill({ json: contasReceber[idx] });
+        return;
+      }
+      await route.fulfill({ json: contasReceber[0] });
+      return;
+    }
+
+    if (url.includes('/rest/v1/rpc/financeiro_conta_a_receber_estornar_v2') || url.includes('/rest/v1/rpc/financeiro_conta_a_receber_estornar')) {
+      const body = (await req.postDataJSON()) as any;
+      const id = body?.p_id;
+      const idx = contasReceber.findIndex((c) => c.id === id);
+      if (idx >= 0) {
+        contasReceber[idx] = {
+          ...contasReceber[idx],
+          status: 'pendente',
+          data_pagamento: null,
+          valor_pago: null,
+          updated_at: new Date().toISOString(),
+        };
+        await route.fulfill({ json: contasReceber[idx] });
+        return;
+      }
       await route.fulfill({ json: contasReceber[0] });
       return;
     }
@@ -194,20 +273,56 @@ test('Financeiro: registrar recebimento e pagamento (fluxo básico)', async ({ p
     }
 
     if (url.includes('/rest/v1/rpc/financeiro_contas_pagar_summary')) {
-      await route.fulfill({ json: { abertas: 1, parciais: 0, pagas: 0, vencidas: 0 } });
+      await route.fulfill({ json: { abertas: 2, parciais: 0, pagas: 0, vencidas: 0 } });
       return;
     }
 
     if (url.includes('/rest/v1/rpc/financeiro_conta_pagar_pagar')) {
-      contasPagar[0] = {
-        ...contasPagar[0],
-        status: 'paga',
-        data_pagamento: today,
-        valor_pago: contasPagar[0].valor_total,
-        saldo: 0,
-        updated_at: new Date().toISOString(),
-      };
+      const body = (await req.postDataJSON()) as any;
+      const id = body?.p_id;
+      const idx = contasPagar.findIndex((c) => c.id === id);
+      if (idx >= 0) {
+        contasPagar[idx] = {
+          ...contasPagar[idx],
+          status: 'paga',
+          data_pagamento: today,
+          valor_pago: contasPagar[idx].valor_total,
+          saldo: 0,
+          updated_at: new Date().toISOString(),
+        };
+        await route.fulfill({ json: contasPagar[idx] });
+        return;
+      }
       await route.fulfill({ json: contasPagar[0] });
+      return;
+    }
+
+    if (url.includes('/rest/v1/rpc/financeiro_conta_pagar_cancelar')) {
+      const body = (await req.postDataJSON()) as any;
+      const id = body?.p_id;
+      const idx = contasPagar.findIndex((c) => c.id === id);
+      if (idx >= 0) {
+        contasPagar[idx] = { ...contasPagar[idx], status: 'cancelada', updated_at: new Date().toISOString() };
+      }
+      await route.fulfill({ json: {} });
+      return;
+    }
+
+    if (url.includes('/rest/v1/rpc/financeiro_conta_pagar_estornar_v2') || url.includes('/rest/v1/rpc/financeiro_conta_pagar_estornar')) {
+      const body = (await req.postDataJSON()) as any;
+      const id = body?.p_id;
+      const idx = contasPagar.findIndex((c) => c.id === id);
+      if (idx >= 0) {
+        contasPagar[idx] = {
+          ...contasPagar[idx],
+          status: 'aberta',
+          data_pagamento: null,
+          valor_pago: 0,
+          saldo: contasPagar[idx].valor_total,
+          updated_at: new Date().toISOString(),
+        };
+      }
+      await route.fulfill({ json: {} });
       return;
     }
 
@@ -233,6 +348,25 @@ test('Financeiro: registrar recebimento e pagamento (fluxo básico)', async ({ p
     .click();
   await expect(page.getByRole('table').getByText('Pago')).toBeVisible();
 
+  // Estornar recebimento (volta para pendente)
+  await page.getByRole('button', { name: 'Estornar recebimento' }).click();
+  await page
+    .locator('div.fixed.inset-0')
+    .filter({ hasText: 'Estornar recebimento' })
+    .getByRole('button', { name: 'Estornar' })
+    .click();
+  await expect(page.getByRole('table').getByText('Pendente')).toBeVisible();
+
+  // Cancelar conta a receber (segunda linha)
+  await page.getByRole('button', { name: 'Cancelar' }).last().click();
+  await page
+    .locator('div.fixed.inset-0')
+    .filter({ hasText: 'Cancelar conta a receber' })
+    .getByRole('button', { name: 'Cancelar' })
+    .nth(1)
+    .click();
+  await expect(page.getByRole('table').getByText('Cancelado')).toBeVisible();
+
   await page.goto('/app/financeiro/contas-a-pagar');
   await expect(page.getByRole('heading', { name: 'Contas a Pagar' })).toBeVisible({ timeout: 20000 });
   await page.getByRole('button', { name: 'Registrar pagamento' }).first().click();
@@ -242,4 +376,22 @@ test('Financeiro: registrar recebimento e pagamento (fluxo básico)', async ({ p
     .getByRole('button', { name: 'Registrar pagamento' })
     .click();
   await expect(page.getByRole('table').getByText('Paga')).toBeVisible();
+
+  // Estornar pagamento (volta para aberta)
+  await page.getByRole('button', { name: 'Estornar pagamento' }).click();
+  await page
+    .locator('div.fixed.inset-0')
+    .filter({ hasText: 'Estornar pagamento' })
+    .getByRole('button', { name: 'Estornar' })
+    .click();
+  await expect(page.getByRole('table').getByText('Aberta')).toBeVisible();
+
+  // Cancelar conta a pagar (segunda linha)
+  await page.getByRole('button', { name: 'Cancelar' }).last().click();
+  await page
+    .locator('div.fixed.inset-0')
+    .filter({ hasText: 'Cancelar conta a pagar' })
+    .getByRole('button', { name: 'Cancelar conta' })
+    .click();
+  await expect(page.getByRole('table').getByText('Cancelada')).toBeVisible();
 });

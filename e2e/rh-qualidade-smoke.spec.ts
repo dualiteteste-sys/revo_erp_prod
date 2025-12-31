@@ -122,6 +122,11 @@ test('RH & Qualidade: navegação e render sem erros de console', async ({ page 
 
   await mockAuthAndEmpresa(page);
 
+  // RH docs (anexos): evita fetch real e garante retorno consistente
+  await page.route('**/rest/v1/rpc/rh_docs_list', async (route) => {
+    await route.fulfill({ json: [] });
+  });
+
   // RH: dashboard
   await page.route('**/rest/v1/rpc/get_rh_dashboard_stats', async (route) => {
     await route.fulfill({
@@ -372,7 +377,7 @@ test('RH & Qualidade: navegação e render sem erros de console', async ({ page 
   await expect(page.getByText('Leitura e Interpretação')).toBeVisible();
 
   await page.goto('/app/rh/matriz');
-  await expect(page.getByText('Matriz de Competências')).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Matriz de Competências' })).toBeVisible();
   await expect(page.getByText('Ana Silva')).toBeVisible();
 
   await page.goto('/app/rh/treinamentos');

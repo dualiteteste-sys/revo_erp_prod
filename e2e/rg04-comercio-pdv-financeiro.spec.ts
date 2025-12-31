@@ -269,10 +269,17 @@ test('RG-04 (Comércio): finalizar PDV gera movimento financeiro + baixa de esto
   await page.getByRole('button', { name: 'Finalizar' }).click();
   await expect(page.getByText('PDV finalizado (financeiro + estoque).')).toBeVisible({ timeout: 20000 });
 
+  // Comprovante (modal) abre automaticamente após finalizar
+  await expect(page.getByText(`Comprovante PDV #${pdvPedido.numero}`)).toBeVisible({ timeout: 20000 });
+
+  // Imprimir (iframe) não deve bloquear fluxo
+  await page.getByRole('button', { name: 'Imprimir' }).click();
+
+  await page.getByText('Fechar').click();
+
   // Reloaded list should reflect new status
   await expect(page.getByText('concluido')).toBeVisible({ timeout: 20000 });
 
   expect(movimentoGerado).toBeTruthy();
   expect(estoqueBaixado).toBeTruthy();
 });
-
