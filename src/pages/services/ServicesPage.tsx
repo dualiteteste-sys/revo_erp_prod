@@ -13,6 +13,8 @@ import { Button } from '@/components/ui/button';
 import Select from '@/components/ui/forms/Select';
 import { isSeedEnabled } from '@/utils/seed';
 import CsvExportDialog from '@/components/ui/CsvExportDialog';
+import { useBulkSelection } from '@/hooks/useBulkSelection';
+import BulkActionsBar from '@/components/ui/BulkActionsBar';
 
 export default function ServicesPage() {
   const enableSeed = isSeedEnabled();
@@ -40,7 +42,15 @@ export default function ServicesPage() {
   const [isDeleting, setIsDeleting] = useState(false);
   const [isFetchingDetails, setIsFetchingDetails] = useState(false);
   const [isSeeding, setIsSeeding] = useState(false);
+  const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false);
+  const [bulkLoading, setBulkLoading] = useState(false);
   const { addToast } = useToast();
+
+  const bulk = useBulkSelection(services, (s) => s.id);
+  const selectedServices = useMemo(
+    () => services.filter((s) => bulk.selectedIds.has(s.id)),
+    [services, bulk.selectedIds]
+  );
 
   const handleOpenForm = async (service: svc.Service | null = null) => {
     if (service?.id) {
@@ -89,6 +99,25 @@ export default function ServicesPage() {
         addToast(e.message || 'Erro ao remover serviço.', 'error');
     } finally {
         setIsDeleting(false);
+    }
+  }
+
+  async function handleBulkDelete() {
+    if (!selectedServices.length) return;
+    setBulkLoading(true);
+    try {
+      const results = await Promise.allSettled(selectedServices.map((s) => svc.deleteService(s.id)));
+      const ok = results.filter((r) => r.status === 'fulfilled').length;
+      const fail = results.length - ok;
+      if (ok) addToast(`${ok} serviço(s) removido(s).`, 'success');
+      if (fail) addToast(`${fail} falha(s) ao remover.`, 'warning');
+      bulk.clear();
+      setBulkDeleteOpen(false);
+      refresh();
+    } catch (e: any) {
+      addToast(e?.message || 'Erro ao remover selecionados.', 'error');
+    } finally {
+      setBulkLoading(false);
     }
   }
 
@@ -230,7 +259,34 @@ export default function ServicesPage() {
             ) : null}
           </div>
         ) : (
-          <ServicesTable services={services} onEdit={handleOpenForm} onDelete={openDeleteModal} onClone={handleClone} sortBy={sortBy} onSort={handleSort} />
+          <>
+            <BulkActionsBar
+              selectedCount={bulk.selectedCount}
+              onClear={bulk.clear}
+              actions={[
+                {
+                  key: 'delete',
+                  label: 'Remover',
+                  onClick: () => setBulkDeleteOpen(true),
+                  variant: 'destructive',
+                  disabled: bulkLoading,
+                },
+              ]}
+            />
+            <ServicesTable
+              services={services}
+              onEdit={handleOpenForm}
+              onDelete={openDeleteModal}
+              onClone={handleClone}
+              sortBy={sortBy}
+              onSort={handleSort}
+              selectedIds={bulk.selectedIds}
+              allSelected={bulk.allSelected}
+              someSelected={bulk.someSelected}
+              onToggleSelect={(id) => bulk.toggle(id)}
+              onToggleSelectAll={() => bulk.toggleAll(bulk.allIds)}
+            />
+          </>
         )}
       </div>
 
@@ -264,6 +320,17 @@ export default function ServicesPage() {
         description={`Tem certeza que deseja remover o serviço "${serviceToDelete?.descricao}"?`}
         confirmText="Sim, Remover"
         isLoading={isDeleting}
+        variant="danger"
+      />
+
+      <ConfirmationModal
+        isOpen={bulkDeleteOpen}
+        onClose={() => setBulkDeleteOpen(false)}
+        onConfirm={handleBulkDelete}
+        title="Confirmar Remoção em Massa"
+        description={`Tem certeza que deseja remover ${selectedServices.length} serviço(s)? Esta ação não pode ser desfeita.`}
+        confirmText="Sim, Remover"
+        isLoading={bulkLoading}
         variant="danger"
       />
     </div>

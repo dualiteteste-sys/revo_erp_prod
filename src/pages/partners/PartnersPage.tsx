@@ -16,6 +16,8 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { downloadCsv } from '@/utils/csv';
 import { isSeedEnabled } from '@/utils/seed';
 import { useHasPermission } from '@/hooks/useHasPermission';
+import { useBulkSelection } from '@/hooks/useBulkSelection';
+import BulkActionsBar from '@/components/ui/BulkActionsBar';
 
 const PartnersPage: React.FC = () => {
   const enableSeed = isSeedEnabled();
@@ -55,6 +57,15 @@ const PartnersPage: React.FC = () => {
   const [isDeleting, setIsDeleting] = useState(false);
   const [isFetchingDetails, setIsFetchingDetails] = useState(false);
   const [isSeeding, setIsSeeding] = useState(false);
+  const [bulkLoading, setBulkLoading] = useState(false);
+
+  const bulk = useBulkSelection(partners, (p) => p.id);
+  const selectedPartners = useMemo(
+    () => partners.filter((p) => bulk.selectedIds.has(p.id)),
+    [partners, bulk.selectedIds]
+  );
+  const hasSelectedActive = selectedPartners.some((p) => !p.deleted_at);
+  const hasSelectedInactive = selectedPartners.some((p) => !!p.deleted_at);
 
   const handleOpenForm = async (
     partner: partnersService.PartnerListItem | null = null,
@@ -147,6 +158,54 @@ const PartnersPage: React.FC = () => {
       refresh();
     } catch (e: any) {
       addToast(e.message || 'Erro ao reativar.', 'error');
+    }
+  };
+
+  const handleBulkInativar = async () => {
+    if (!selectedPartners.length) return;
+    if (!permsLoading && !canDelete) {
+      addToast('Você não tem permissão para inativar parceiros.', 'warning');
+      return;
+    }
+
+    setBulkLoading(true);
+    try {
+      const actives = selectedPartners.filter((p) => !p.deleted_at);
+      const results = await Promise.allSettled(actives.map((p) => partnersService.deletePartner(p.id)));
+      const ok = results.filter((r) => r.status === 'fulfilled').length;
+      const fail = results.length - ok;
+      if (ok) addToast(`${ok} parceiro(s) inativado(s).`, 'success');
+      if (fail) addToast(`${fail} falha(s) ao inativar.`, 'warning');
+      bulk.clear();
+      refresh();
+    } catch (e: any) {
+      addToast(e?.message || 'Erro ao inativar selecionados.', 'error');
+    } finally {
+      setBulkLoading(false);
+    }
+  };
+
+  const handleBulkReativar = async () => {
+    if (!selectedPartners.length) return;
+    if (!permsLoading && !canUpdate) {
+      addToast('Você não tem permissão para reativar parceiros.', 'warning');
+      return;
+    }
+
+    setBulkLoading(true);
+    try {
+      const inactives = selectedPartners.filter((p) => !!p.deleted_at);
+      const results = await Promise.allSettled(inactives.map((p) => partnersService.restorePartner(p.id)));
+      const ok = results.filter((r) => r.status === 'fulfilled').length;
+      const fail = results.length - ok;
+      if (ok) addToast(`${ok} parceiro(s) reativado(s).`, 'success');
+      if (fail) addToast(`${fail} falha(s) ao reativar.`, 'warning');
+      bulk.clear();
+      refresh();
+    } catch (e: any) {
+      addToast(e?.message || 'Erro ao reativar selecionados.', 'error');
+    } finally {
+      setBulkLoading(false);
     }
   };
 
@@ -310,14 +369,41 @@ const PartnersPage: React.FC = () => {
             ) : null}
           </div>
         ) : (
-          <PartnersTable
-            partners={partners}
-            onEdit={handleOpenForm}
-            onDelete={handleOpenDeleteModal}
-            onRestore={handleRestore}
-            sortBy={sortBy}
-            onSort={handleSort}
-          />
+          <>
+            <BulkActionsBar
+              selectedCount={bulk.selectedCount}
+              onClear={bulk.clear}
+              actions={[
+                {
+                  key: 'inativar',
+                  label: 'Inativar',
+                  onClick: handleBulkInativar,
+                  variant: 'secondary',
+                  disabled: bulkLoading || permsLoading || !canDelete || !hasSelectedActive,
+                },
+                {
+                  key: 'reativar',
+                  label: 'Reativar',
+                  onClick: handleBulkReativar,
+                  variant: 'secondary',
+                  disabled: bulkLoading || permsLoading || !canUpdate || !hasSelectedInactive,
+                },
+              ]}
+            />
+            <PartnersTable
+              partners={partners}
+              onEdit={handleOpenForm}
+              onDelete={handleOpenDeleteModal}
+              onRestore={handleRestore}
+              sortBy={sortBy}
+              onSort={handleSort}
+              selectedIds={bulk.selectedIds}
+              allSelected={bulk.allSelected}
+              someSelected={bulk.someSelected}
+              onToggleSelect={(id) => bulk.toggle(id)}
+              onToggleSelectAll={() => bulk.toggleAll(bulk.allIds)}
+            />
+          </>
         )}
       </div>
 

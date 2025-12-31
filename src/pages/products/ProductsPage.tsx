@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import { useProducts } from '../../hooks/useProducts';
 import { useToast } from '../../contexts/ToastProvider';
 import ProductsTable from '../../components/products/ProductsTable';
@@ -15,6 +15,9 @@ import { downloadCsv } from '@/utils/csv';
 import { isSeedEnabled } from '@/utils/seed';
 import { useHasPermission } from '@/hooks/useHasPermission';
 import ImportProductsCsvModal from '@/components/products/ImportProductsCsvModal';
+import { useBulkSelection } from '@/hooks/useBulkSelection';
+import BulkActionsBar from '@/components/ui/BulkActionsBar';
+import ConfirmationModal from '@/components/ui/ConfirmationModal';
 
 const ProductsPage: React.FC = () => {
   const enableSeed = isSeedEnabled();
@@ -53,6 +56,14 @@ const ProductsPage: React.FC = () => {
   const [isFetchingDetails, setIsFetchingDetails] = useState(false);
   const [isSeeding, setIsSeeding] = useState(false);
   const [isImportOpen, setIsImportOpen] = useState(false);
+  const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false);
+  const [bulkLoading, setBulkLoading] = useState(false);
+
+  const bulk = useBulkSelection(products, (p) => p.id);
+  const selectedProducts = useMemo(
+    () => products.filter((p) => bulk.selectedIds.has(p.id)),
+    [products, bulk.selectedIds]
+  );
 
   const refreshList = useCallback(() => {
     setPage(1);
@@ -160,6 +171,29 @@ const ProductsPage: React.FC = () => {
       addToast(e.message || 'Erro ao popular produtos.', 'error');
     } finally {
       setIsSeeding(false);
+    }
+  };
+
+  const confirmBulkDelete = async () => {
+    if (!selectedProducts.length) return;
+    if (!permsLoading && !canDelete) {
+      addToast('Você não tem permissão para excluir produtos.', 'warning');
+      return;
+    }
+    setBulkLoading(true);
+    try {
+      const results = await Promise.allSettled(selectedProducts.map((p) => deleteProduct(p.id)));
+      const ok = results.filter((r) => r.status === 'fulfilled').length;
+      const fail = results.length - ok;
+      if (ok) addToast(`${ok} produto(s) excluído(s).`, 'success');
+      if (fail) addToast(`${fail} falha(s) ao excluir.`, 'warning');
+      bulk.clear();
+      setBulkDeleteOpen(false);
+      refreshList();
+    } catch (e: any) {
+      addToast(e?.message || 'Erro ao excluir selecionados.', 'error');
+    } finally {
+      setBulkLoading(false);
     }
   };
 
@@ -272,7 +306,34 @@ const ProductsPage: React.FC = () => {
             ) : null}
           </div>
         ) : (
-          <ProductsTable products={products} onEdit={(p) => handleOpenForm(p)} onDelete={handleOpenDeleteModal} onClone={handleClone} sortBy={sortBy} onSort={handleSort} />
+          <>
+            <BulkActionsBar
+              selectedCount={bulk.selectedCount}
+              onClear={bulk.clear}
+              actions={[
+                {
+                  key: 'delete',
+                  label: 'Excluir',
+                  onClick: () => setBulkDeleteOpen(true),
+                  variant: 'destructive',
+                  disabled: bulkLoading || permsLoading || !canDelete,
+                },
+              ]}
+            />
+            <ProductsTable
+              products={products}
+              onEdit={(p) => handleOpenForm(p)}
+              onDelete={handleOpenDeleteModal}
+              onClone={handleClone}
+              sortBy={sortBy}
+              onSort={handleSort}
+              selectedIds={bulk.selectedIds}
+              allSelected={bulk.allSelected}
+              someSelected={bulk.someSelected}
+              onToggleSelect={(id) => bulk.toggle(id)}
+              onToggleSelectAll={() => bulk.toggleAll(bulk.allIds)}
+            />
+          </>
         )}
       </div>
 
@@ -320,6 +381,17 @@ const ProductsPage: React.FC = () => {
         onConfirm={handleDelete}
         product={productToDelete as any}
         isDeleting={isDeleting}
+      />
+
+      <ConfirmationModal
+        isOpen={bulkDeleteOpen}
+        onClose={() => setBulkDeleteOpen(false)}
+        onConfirm={confirmBulkDelete}
+        title="Confirmar Exclusão em Massa"
+        description={`Tem certeza que deseja excluir ${selectedProducts.length} produto(s)? Esta ação não pode ser desfeita.`}
+        confirmText="Sim, Excluir"
+        isLoading={bulkLoading}
+        variant="danger"
       />
     </div>
   );

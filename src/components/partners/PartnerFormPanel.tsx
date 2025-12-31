@@ -8,6 +8,7 @@ import AddressSection from './form-sections/AddressSection';
 import AdditionalContactsSection from './form-sections/AdditionalContactsSection';
 import FinancialSection from './form-sections/FinancialSection';
 import { Pessoa } from '../../services/partners';
+import { isValidCpfOrCnpj } from '@/lib/masks';
 import { Button } from '@/components/ui/button';
 
 interface PartnerFormPanelProps {
@@ -84,12 +85,11 @@ const PartnerFormPanel: React.FC<PartnerFormPanelProps> = ({ partner, initialVal
 
     const tipoPessoa = formData.tipo_pessoa || 'juridica';
     const docDigits = String(formData.doc_unico || '').replace(/\D/g, '');
-    const isAllSameDigits = docDigits.length > 0 && /^(\d)\1+$/.test(docDigits);
     const expectedLen = tipoPessoa === 'fisica' ? 11 : tipoPessoa === 'juridica' ? 14 : null;
 
     // Documento é opcional; mas se for informado, valida tamanho e evita sequências inválidas.
     if (expectedLen && docDigits) {
-      if (docDigits.length !== expectedLen || isAllSameDigits) {
+      if (docDigits.length !== expectedLen || !isValidCpfOrCnpj(docDigits)) {
         addToast(`Documento inválido. Informe um ${tipoPessoa === 'fisica' ? 'CPF' : 'CNPJ'} com ${expectedLen} dígitos.`, 'error');
         setActiveTab('identificacao');
         return;

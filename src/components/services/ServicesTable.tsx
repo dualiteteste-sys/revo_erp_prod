@@ -12,6 +12,11 @@ type Props = {
   onClone: (s: Service) => void;
   sortBy: { column: keyof Service; ascending: boolean };
   onSort: (column: keyof Service) => void;
+  selectedIds?: Set<string>;
+  allSelected?: boolean;
+  someSelected?: boolean;
+  onToggleSelect?: (id: string) => void;
+  onToggleSelectAll?: () => void;
 };
 
 const SortableHeader: React.FC<{
@@ -35,12 +40,38 @@ const SortableHeader: React.FC<{
   );
 };
 
-export default function ServicesTable({ services, onEdit, onDelete, onClone, sortBy, onSort }: Props) {
+export default function ServicesTable({
+  services,
+  onEdit,
+  onDelete,
+  onClone,
+  sortBy,
+  onSort,
+  selectedIds,
+  allSelected,
+  someSelected,
+  onToggleSelect,
+  onToggleSelectAll,
+}: Props) {
   return (
     <div className="overflow-x-auto">
       <table className="min-w-full divide-y divide-gray-200">
         <thead className="bg-gray-50">
           <tr>
+            {onToggleSelect ? (
+              <th scope="col" className="px-4 py-3">
+                <input
+                  type="checkbox"
+                  aria-label="Selecionar todos"
+                  checked={!!allSelected}
+                  ref={(el) => {
+                    if (el) el.indeterminate = !allSelected && !!someSelected;
+                  }}
+                  onChange={() => onToggleSelectAll?.()}
+                  className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-600"
+                />
+              </th>
+            ) : null}
             <SortableHeader column="descricao" label="Descrição" sortBy={sortBy} onSort={onSort} />
             <SortableHeader column="codigo" label="Código" sortBy={sortBy} onSort={onSort} />
             <SortableHeader column="preco_venda" label="Preço" sortBy={sortBy} onSort={onSort} />
@@ -52,6 +83,17 @@ export default function ServicesTable({ services, onEdit, onDelete, onClone, sor
         <tbody className="bg-white divide-y divide-gray-200">
           {services.map((s) => (
             <tr key={s.id}>
+              {onToggleSelect ? (
+                <td className="px-4 py-4 whitespace-nowrap">
+                  <input
+                    type="checkbox"
+                    aria-label={`Selecionar ${s.descricao || 'serviço'}`}
+                    checked={!!selectedIds?.has(s.id)}
+                    onChange={() => onToggleSelect(s.id)}
+                    className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-600"
+                  />
+                </td>
+              ) : null}
               <td className="px-6 py-4 text-sm text-gray-900">{s.descricao}</td>
               <td className="px-6 py-4 text-sm text-gray-500">{s.codigo || '—'}</td>
               <td className="px-6 py-4 text-sm text-gray-500">{s.preco_venda ? formatCurrency(Math.round(Number(s.preco_venda) * 100)) : '—'}</td>
@@ -102,7 +144,9 @@ export default function ServicesTable({ services, onEdit, onDelete, onClone, sor
           ))}
           {services.length === 0 && (
             <tr>
-              <td colSpan={6} className="px-6 py-16 text-center text-gray-400">Nenhum serviço encontrado.</td>
+              <td colSpan={onToggleSelect ? 7 : 6} className="px-6 py-16 text-center text-gray-400">
+                Nenhum serviço encontrado.
+              </td>
             </tr>
           )}
         </tbody>

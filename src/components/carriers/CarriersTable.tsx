@@ -10,6 +10,11 @@ interface CarriersTableProps {
   onDelete: (carrier: CarrierListItem) => void;
   sortBy: { column: keyof CarrierListItem; ascending: boolean };
   onSort: (column: keyof CarrierListItem) => void;
+  selectedIds?: Set<string>;
+  allSelected?: boolean;
+  someSelected?: boolean;
+  onToggleSelect?: (id: string) => void;
+  onToggleSelectAll?: () => void;
 }
 
 const SortableHeader: React.FC<{
@@ -34,7 +39,18 @@ const SortableHeader: React.FC<{
   );
 };
 
-const CarriersTable: React.FC<CarriersTableProps> = ({ carriers, onEdit, onDelete, sortBy, onSort }) => {
+const CarriersTable: React.FC<CarriersTableProps> = ({
+  carriers,
+  onEdit,
+  onDelete,
+  sortBy,
+  onSort,
+  selectedIds,
+  allSelected,
+  someSelected,
+  onToggleSelect,
+  onToggleSelectAll,
+}) => {
   const formatDocument = (doc: string | null) => {
     if (!doc) return '-';
     if (doc.length <= 11) return cpfMask(doc);
@@ -46,6 +62,20 @@ const CarriersTable: React.FC<CarriersTableProps> = ({ carriers, onEdit, onDelet
       <table className="min-w-full divide-y divide-gray-200">
         <thead className="bg-gray-50">
           <tr>
+            {onToggleSelect ? (
+              <th scope="col" className="px-4 py-3">
+                <input
+                  type="checkbox"
+                  aria-label="Selecionar todos"
+                  checked={!!allSelected}
+                  ref={(el) => {
+                    if (el) el.indeterminate = !allSelected && !!someSelected;
+                  }}
+                  onChange={() => onToggleSelectAll?.()}
+                  className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-600"
+                />
+              </th>
+            ) : null}
             <SortableHeader column="nome" label="Nome" sortBy={sortBy} onSort={onSort} />
             <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Documento</th>
             <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Localização</th>
@@ -66,6 +96,17 @@ const CarriersTable: React.FC<CarriersTableProps> = ({ carriers, onEdit, onDelet
                 transition={{ duration: 0.2 }}
                 className="hover:bg-gray-50 transition-colors"
               >
+                {onToggleSelect ? (
+                  <td className="px-4 py-4 whitespace-nowrap">
+                    <input
+                      type="checkbox"
+                      aria-label={`Selecionar ${carrier.nome || 'transportadora'}`}
+                      checked={!!selectedIds?.has(carrier.id)}
+                      onChange={() => onToggleSelect(carrier.id)}
+                      className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-600"
+                    />
+                  </td>
+                ) : null}
                 <td className="px-6 py-4 whitespace-nowrap">
                   <div className="flex items-center">
                     <div className="flex-shrink-0 h-10 w-10 bg-blue-100 rounded-full flex items-center justify-center text-blue-600 relative">

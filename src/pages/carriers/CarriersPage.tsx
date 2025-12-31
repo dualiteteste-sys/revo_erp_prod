@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { useCarriers } from '../../hooks/useCarriers';
 import { useToast } from '../../contexts/ToastProvider';
 import * as carriersService from '../../services/carriers';
@@ -11,6 +11,8 @@ import CarrierFormPanel from '../../components/carriers/CarrierFormPanel';
 import Select from '@/components/ui/forms/Select';
 import { isSeedEnabled } from '@/utils/seed';
 import CsvExportDialog from '@/components/ui/CsvExportDialog';
+import { useBulkSelection } from '@/hooks/useBulkSelection';
+import BulkActionsBar from '@/components/ui/BulkActionsBar';
 
 const CarriersPage: React.FC = () => {
   const enableSeed = isSeedEnabled();
@@ -39,6 +41,14 @@ const CarriersPage: React.FC = () => {
   const [isDeleting, setIsDeleting] = useState(false);
   const [isFetchingDetails, setIsFetchingDetails] = useState(false);
   const [isSeeding, setIsSeeding] = useState(false);
+  const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false);
+  const [bulkLoading, setBulkLoading] = useState(false);
+
+  const bulk = useBulkSelection(carriers, (c) => c.id);
+  const selectedCarriers = useMemo(
+    () => carriers.filter((c) => bulk.selectedIds.has(c.id)),
+    [carriers, bulk.selectedIds]
+  );
 
   const handleOpenForm = async (carrier: carriersService.CarrierListItem | null = null) => {
     if (carrier?.id) {
@@ -92,6 +102,25 @@ const CarriersPage: React.FC = () => {
       addToast(e.message || 'Erro ao excluir.', 'error');
     } finally {
       setIsDeleting(false);
+    }
+  };
+
+  const handleBulkDelete = async () => {
+    if (!selectedCarriers.length) return;
+    setBulkLoading(true);
+    try {
+      const results = await Promise.allSettled(selectedCarriers.map((c) => carriersService.deleteCarrier(c.id)));
+      const ok = results.filter((r) => r.status === 'fulfilled').length;
+      const fail = results.length - ok;
+      if (ok) addToast(`${ok} transportadora(s) excluída(s).`, 'success');
+      if (fail) addToast(`${fail} falha(s) ao excluir.`, 'warning');
+      bulk.clear();
+      setBulkDeleteOpen(false);
+      refresh();
+    } catch (e: any) {
+      addToast(e?.message || 'Erro ao excluir selecionados.', 'error');
+    } finally {
+      setBulkLoading(false);
     }
   };
 
@@ -221,7 +250,33 @@ const CarriersPage: React.FC = () => {
             </div>
           </div>
         ) : (
-          <CarriersTable carriers={carriers} onEdit={handleOpenForm} onDelete={handleOpenDeleteModal} sortBy={sortBy} onSort={handleSort} />
+          <>
+            <BulkActionsBar
+              selectedCount={bulk.selectedCount}
+              onClear={bulk.clear}
+              actions={[
+                {
+                  key: 'delete',
+                  label: 'Excluir',
+                  onClick: () => setBulkDeleteOpen(true),
+                  variant: 'destructive',
+                  disabled: bulkLoading,
+                },
+              ]}
+            />
+            <CarriersTable
+              carriers={carriers}
+              onEdit={handleOpenForm}
+              onDelete={handleOpenDeleteModal}
+              sortBy={sortBy}
+              onSort={handleSort}
+              selectedIds={bulk.selectedIds}
+              allSelected={bulk.allSelected}
+              someSelected={bulk.someSelected}
+              onToggleSelect={(id) => bulk.toggle(id)}
+              onToggleSelectAll={() => bulk.toggleAll(bulk.allIds)}
+            />
+          </>
         )}
       </div>
 
@@ -247,6 +302,17 @@ const CarriersPage: React.FC = () => {
         description={`Tem certeza que deseja excluir a transportadora "${carrierToDelete?.nome}"? Esta ação não pode ser desfeita.`}
         confirmText="Sim, Excluir"
         isLoading={isDeleting}
+        variant="danger"
+      />
+
+      <ConfirmationModal
+        isOpen={bulkDeleteOpen}
+        onClose={() => setBulkDeleteOpen(false)}
+        onConfirm={handleBulkDelete}
+        title="Confirmar Exclusão em Massa"
+        description={`Tem certeza que deseja excluir ${selectedCarriers.length} transportadora(s)? Esta ação não pode ser desfeita.`}
+        confirmText="Sim, Excluir"
+        isLoading={bulkLoading}
         variant="danger"
       />
     </div>
