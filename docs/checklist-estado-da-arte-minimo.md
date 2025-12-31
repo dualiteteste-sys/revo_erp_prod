@@ -103,7 +103,7 @@ Regras:
 - [x] IND-01 OP/OB wizard consistente + travas de estados + cancelados/readonly corretos
 - [x] IND-02 Execução: operações/apontamentos/entregas com permissões e consistência
 - [x] IND-03 Roteiros + BOM (produção/beneficiamento/ambos) persistência/seleção corretas
-- [ ] IND-04 Suprimentos mínimo: recebimentos XML + conferência + vínculos + estoque ok (sem custo por enquanto)
+- [x] IND-04 Suprimentos mínimo: recebimentos XML + conferência + vínculos + estoque ok (sem custo por enquanto)
 - [x] IND-05 Qualidade mínimo: planos/motivos/lotes/bloqueio com auditoria
 - [x] IND-06 Relatórios essenciais: WIP/filas/eficiência/estoque/qualidade
 
