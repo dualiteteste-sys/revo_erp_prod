@@ -124,6 +124,7 @@ export default function NfeEmissoesPage() {
   const [items, setItems] = useState<NfeItemForm[]>([]);
   const [productToAddId, setProductToAddId] = useState<string | null>(null);
   const [productToAddName, setProductToAddName] = useState<string | undefined>(undefined);
+  const [draftErrors, setDraftErrors] = useState<string[]>([]);
 
   const canShow = useMemo(() => !!empresaId, [empresaId]);
 
@@ -269,7 +270,76 @@ export default function NfeEmissoesPage() {
   const closeModal = () => {
     setIsModalOpen(false);
     setEditing(null);
+    setDraftErrors([]);
   };
+
+  const totalsDraft = useMemo(() => {
+    const frete = formFrete.trim() ? Number(String(formFrete).replace(',', '.')) : 0;
+    const total_produtos = items.reduce((acc, it) => acc + it.quantidade * it.valor_unitario, 0);
+    const total_descontos = items.reduce((acc, it) => acc + (it.valor_desconto || 0), 0);
+    const total_nfe = Math.max(0, total_produtos - total_descontos + (Number.isFinite(frete) ? frete : 0));
+    return { frete, total_produtos, total_descontos, total_nfe };
+  }, [items, formFrete]);
+
+  const validateDraftLocal = useCallback(() => {
+    const errors: string[] = [];
+
+    const frete = totalsDraft.frete;
+    if (formFrete.trim() && (!Number.isFinite(frete) || frete < 0)) {
+      errors.push('Frete inválido.');
+    }
+
+    if (!formNaturezaOperacao?.trim()) {
+      errors.push('Natureza da operação é obrigatória.');
+    }
+
+    if (!formDestinatarioId) {
+      errors.push('Selecione um destinatário.');
+    }
+
+    if (!items.length) {
+      errors.push('Adicione ao menos 1 item ao rascunho.');
+    }
+
+    items.forEach((it, idx) => {
+      const prefix = `Item ${idx + 1}`;
+
+      if (!it.produto_nome?.trim()) {
+        errors.push(`${prefix}: descrição é obrigatória.`);
+      }
+      if (!Number.isFinite(it.quantidade) || it.quantidade <= 0) {
+        errors.push(`${prefix}: quantidade inválida.`);
+      }
+      if (!Number.isFinite(it.valor_unitario) || it.valor_unitario < 0) {
+        errors.push(`${prefix}: valor unitário inválido.`);
+      }
+      if (!Number.isFinite(it.valor_desconto) || it.valor_desconto < 0) {
+        errors.push(`${prefix}: desconto inválido.`);
+      } else if (it.valor_desconto > it.quantidade * it.valor_unitario) {
+        errors.push(`${prefix}: desconto não pode ser maior que o total do item.`);
+      }
+
+      const ncm = (it.ncm || '').replace(/\D/g, '');
+      if (ncm.length !== 8) {
+        errors.push(`${prefix}: NCM deve ter 8 dígitos.`);
+      }
+
+      const cfop = (it.cfop || '').replace(/\D/g, '');
+      if (cfop.length !== 4) {
+        errors.push(`${prefix}: CFOP deve ter 4 dígitos.`);
+      }
+
+      const cst = (it.cst || '').trim();
+      const csosn = (it.csosn || '').trim();
+      if (!cst && !csosn) {
+        errors.push(`${prefix}: informe CST ou CSOSN.`);
+      }
+    });
+
+    const uniq = Array.from(new Set(errors));
+    setDraftErrors(uniq);
+    return { ok: uniq.length === 0, errors: uniq };
+  }, [formDestinatarioId, formFrete, formNaturezaOperacao, items, totalsDraft.frete]);
 
   const persistDraft = async (): Promise<string> => {
     if (!empresaId) throw new Error('Selecione uma empresa ativa.');
@@ -372,14 +442,6 @@ export default function NfeEmissoesPage() {
     return emissaoId;
   };
 
-  const totalsDraft = useMemo(() => {
-    const frete = formFrete.trim() ? Number(String(formFrete).replace(',', '.')) : 0;
-    const total_produtos = items.reduce((acc, it) => acc + it.quantidade * it.valor_unitario, 0);
-    const total_descontos = items.reduce((acc, it) => acc + (it.valor_desconto || 0), 0);
-    const total_nfe = Math.max(0, total_produtos - total_descontos + (Number.isFinite(frete) ? frete : 0));
-    return { frete, total_produtos, total_descontos, total_nfe };
-  }, [items, formFrete]);
-
   const newId = () => {
     const c: any = (globalThis as any).crypto;
     if (c?.randomUUID) return c.randomUUID() as string;
@@ -433,14 +495,9 @@ export default function NfeEmissoesPage() {
 
   const handleSave = async () => {
     if (!empresaId) return;
-    if (!items.length) {
-      addToast('Adicione ao menos 1 item ao rascunho.', 'error');
-      return;
-    }
-
-    const frete = totalsDraft.frete;
-    if (formFrete.trim() && (!Number.isFinite(frete) || frete < 0)) {
-      addToast('Frete inválido.', 'error');
+    const local = validateDraftLocal();
+    if (!local.ok) {
+      addToast('Revise o rascunho: há campos obrigatórios pendentes.', 'warning');
       return;
     }
 
@@ -461,6 +518,17 @@ export default function NfeEmissoesPage() {
 
   const handlePreviewXml = async () => {
     if (!empresaId) return;
+
+    const local = validateDraftLocal();
+    if (!local.ok) {
+      setPreviewOpen(true);
+      setPreviewLoading(false);
+      setPreviewErrors(local.errors);
+      setPreviewWarnings([]);
+      setPreviewXml('');
+      addToast('Preview não gerado: corrija os erros do rascunho.', 'warning');
+      return;
+    }
 
     setPreviewOpen(true);
     setPreviewLoading(true);
@@ -948,6 +1016,16 @@ export default function NfeEmissoesPage() {
 
       <Modal isOpen={isModalOpen} onClose={closeModal} title={editing ? 'Editar rascunho NF-e' : 'Novo rascunho NF-e'} size="80pct">
         <div className="p-6 space-y-6">
+          {draftErrors.length ? (
+            <div className="rounded-xl border border-red-200 bg-red-50 p-4">
+              <div className="text-sm font-semibold text-red-800">Revise o rascunho</div>
+              <ul className="mt-2 list-disc list-inside text-sm text-red-700 space-y-1">
+                {draftErrors.map((err, idx) => (
+                  <li key={idx}>{err}</li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             <div>
               <label className="block text-sm font-semibold text-slate-700 mb-2">Ambiente</label>

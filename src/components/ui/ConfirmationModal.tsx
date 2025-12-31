@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useMemo, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Loader2, AlertTriangle } from 'lucide-react';
 
@@ -25,6 +25,70 @@ const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
   isLoading,
   variant = 'primary',
 }) => {
+  const overlayRef = useRef<HTMLDivElement | null>(null);
+  const dialogRef = useRef<HTMLDivElement | null>(null);
+  const cancelRef = useRef<HTMLButtonElement | null>(null);
+  const previouslyFocused = useRef<HTMLElement | null>(null);
+
+  const ariaLabel = useMemo(() => title || 'Confirmação', [title]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    previouslyFocused.current = document.activeElement as HTMLElement | null;
+
+    const t = window.setTimeout(() => {
+      cancelRef.current?.focus();
+    }, 0);
+
+    const getFocusable = () => {
+      const root = dialogRef.current;
+      if (!root) return [] as HTMLElement[];
+      const selector = [
+        'button:not([disabled])',
+        'a[href]',
+        'input:not([disabled]):not([type="hidden"])',
+        'select:not([disabled])',
+        'textarea:not([disabled])',
+        '[tabindex]:not([tabindex="-1"])',
+      ].join(',');
+      return Array.from(root.querySelectorAll<HTMLElement>(selector));
+    };
+
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (!isOpen) return;
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        onClose();
+        return;
+      }
+      if (e.key !== 'Tab') return;
+      const focusables = getFocusable();
+      if (focusables.length === 0) return;
+      const first = focusables[0];
+      const last = focusables[focusables.length - 1];
+      const active = document.activeElement as HTMLElement | null;
+      if (e.shiftKey) {
+        if (!active || active === first) {
+          e.preventDefault();
+          last.focus();
+        }
+        return;
+      }
+      if (active === last) {
+        e.preventDefault();
+        first.focus();
+      }
+    };
+
+    document.addEventListener('keydown', onKeyDown);
+    return () => {
+      window.clearTimeout(t);
+      document.removeEventListener('keydown', onKeyDown);
+      previouslyFocused.current?.focus?.();
+      previouslyFocused.current = null;
+    };
+  }, [isOpen, onClose]);
+
   const confirmButtonClasses: Record<NonNullable<typeof variant>, string> = {
     danger: 'bg-red-600 hover:bg-red-500',
     primary: 'bg-blue-600 hover:bg-blue-500',
@@ -35,10 +99,14 @@ const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
     <AnimatePresence>
       {isOpen && (
         <motion.div
+          ref={overlayRef}
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
           className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+          onMouseDown={(e) => {
+            if (e.target === overlayRef.current) onClose();
+          }}
         >
           <motion.div
             initial={{ scale: 0.95, y: 20 }}
@@ -46,6 +114,10 @@ const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
             exit={{ scale: 0.95, y: 20 }}
             className="bg-white rounded-2xl shadow-xl w-full min-w-[50vw] max-w-md relative p-8"
             onClick={(e) => e.stopPropagation()}
+            role="dialog"
+            aria-modal="true"
+            aria-label={ariaLabel}
+            ref={dialogRef}
           >
             <div className="flex items-start">
               {variant === 'danger' && (
@@ -76,6 +148,7 @@ const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
                 type="button"
                 className="mt-3 inline-flex w-full justify-center rounded-md bg-white px-3 py-2 text-sm font-semibold text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50 sm:mt-0 sm:w-auto"
                 onClick={onClose}
+                ref={cancelRef}
               >
                 {cancelText}
               </button>

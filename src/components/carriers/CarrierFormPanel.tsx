@@ -7,7 +7,7 @@ import Input from '../ui/forms/Input';
 import Select from '../ui/forms/Select';
 import TextArea from '../ui/forms/TextArea';
 import Toggle from '../ui/forms/Toggle';
-import { cnpjMask, cpfMask, phoneMask, cepMask } from '../../lib/masks';
+import { cnpjMask, cpfMask, phoneMask, cepMask, isValidCNPJ, isValidCPF } from '../../lib/masks';
 import { UFS } from '../../lib/constants';
 
 interface CarrierFormPanelProps {
@@ -66,11 +66,25 @@ const CarrierFormPanel: React.FC<CarrierFormPanelProps> = ({ carrier, onSaveSucc
 
     if (formData.documento) {
       const cleanDoc = formData.documento.replace(/\D/g, '');
-      if (formData.tipo_pessoa === 'pj' && cleanDoc.length > 0 && cleanDoc.length !== 14) {
-        newErrors.documento = 'CNPJ inválido (14 dígitos).';
+      if (formData.tipo_pessoa === 'pj' && cleanDoc.length > 0 && !isValidCNPJ(cleanDoc)) {
+        newErrors.documento = 'CNPJ inválido.';
       }
-      if (formData.tipo_pessoa === 'pf' && cleanDoc.length > 0 && cleanDoc.length !== 11) {
-        newErrors.documento = 'CPF inválido (11 dígitos).';
+      if (formData.tipo_pessoa === 'pf' && cleanDoc.length > 0 && !isValidCPF(cleanDoc)) {
+        newErrors.documento = 'CPF inválido.';
+      }
+    }
+
+    if (formData.cep) {
+      const clean = formData.cep.replace(/\D/g, '');
+      if (clean.length > 0 && clean.length !== 8) {
+        newErrors.cep = 'CEP inválido (8 dígitos).';
+      }
+    }
+
+    if (formData.telefone) {
+      const clean = formData.telefone.replace(/\D/g, '');
+      if (clean.length > 0 && clean.length < 10) {
+        newErrors.telefone = 'Telefone inválido.';
       }
     }
 
@@ -197,6 +211,7 @@ const CarrierFormPanel: React.FC<CarrierFormPanelProps> = ({ carrier, onSaveSucc
                 value={phoneMask(formData.telefone || '')} 
                 onChange={(e) => handleFormChange('telefone', e.target.value)} 
                 className="sm:col-span-3" 
+                error={errors.telefone}
             />
             <Input 
                 label="Contato Principal" 
@@ -212,6 +227,7 @@ const CarrierFormPanel: React.FC<CarrierFormPanelProps> = ({ carrier, onSaveSucc
                 value={cepMask(formData.cep || '')} 
                 onChange={(e) => handleFormChange('cep', e.target.value)} 
                 className="sm:col-span-2" 
+                error={errors.cep}
             />
             <Input 
                 label="Endereço" 

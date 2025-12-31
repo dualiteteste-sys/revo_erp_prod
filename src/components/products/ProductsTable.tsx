@@ -10,6 +10,11 @@ interface ProductsTableProps {
   onClone: (product: Product) => void;
   sortBy: { column: keyof Product; ascending: boolean };
   onSort: (column: keyof Product) => void;
+  selectedIds?: Set<string>;
+  allSelected?: boolean;
+  someSelected?: boolean;
+  onToggleSelect?: (id: string) => void;
+  onToggleSelectAll?: () => void;
 }
 
 const SortableHeader: React.FC<{
@@ -33,12 +38,38 @@ const SortableHeader: React.FC<{
   );
 };
 
-const ProductsTable: React.FC<ProductsTableProps> = ({ products, onEdit, onDelete, onClone, sortBy, onSort }) => {
+const ProductsTable: React.FC<ProductsTableProps> = ({
+  products,
+  onEdit,
+  onDelete,
+  onClone,
+  sortBy,
+  onSort,
+  selectedIds,
+  allSelected,
+  someSelected,
+  onToggleSelect,
+  onToggleSelectAll,
+}) => {
   return (
     <div className="overflow-x-auto">
       <table className="min-w-full divide-y divide-gray-200">
         <thead className="bg-gray-50">
           <tr>
+            {onToggleSelect ? (
+              <th scope="col" className="px-4 py-3">
+                <input
+                  type="checkbox"
+                  aria-label="Selecionar todos"
+                  checked={!!allSelected}
+                  ref={(el) => {
+                    if (el) el.indeterminate = !allSelected && !!someSelected;
+                  }}
+                  onChange={() => onToggleSelectAll?.()}
+                  className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-600"
+                />
+              </th>
+            ) : null}
             <SortableHeader column="nome" label="Nome" sortBy={sortBy} onSort={onSort} />
             <SortableHeader column="sku" label="SKU" sortBy={sortBy} onSort={onSort} />
             <SortableHeader column="preco_venda" label="Preço" sortBy={sortBy} onSort={onSort} />
@@ -61,6 +92,17 @@ const ProductsTable: React.FC<ProductsTableProps> = ({ products, onEdit, onDelet
                 transition={{ duration: 0.3 }}
                 className="hover:bg-gray-50"
               >
+                {onToggleSelect ? (
+                  <td className="px-4 py-4 whitespace-nowrap">
+                    <input
+                      type="checkbox"
+                      aria-label={`Selecionar ${product.nome || 'produto'}`}
+                      checked={!!selectedIds?.has(product.id)}
+                      onChange={() => onToggleSelect(product.id)}
+                      className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-600"
+                    />
+                  </td>
+                ) : null}
                 <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{product.nome}</td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{product.sku}</td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">

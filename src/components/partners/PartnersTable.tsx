@@ -12,6 +12,11 @@ interface PartnersTableProps {
   onRestore?: (partner: PartnerListItem) => void;
   sortBy: { column: keyof PartnerListItem; ascending: boolean };
   onSort: (column: keyof PartnerListItem) => void;
+  selectedIds?: Set<string>;
+  allSelected?: boolean;
+  someSelected?: boolean;
+  onToggleSelect?: (id: string) => void;
+  onToggleSelectAll?: () => void;
 }
 
 const tipoLabels: { [key: string]: string } = {
@@ -42,12 +47,38 @@ const SortableHeader: React.FC<{
   );
 };
 
-const PartnersTable: React.FC<PartnersTableProps> = ({ partners, onEdit, onDelete, onRestore, sortBy, onSort }) => {
+const PartnersTable: React.FC<PartnersTableProps> = ({
+  partners,
+  onEdit,
+  onDelete,
+  onRestore,
+  sortBy,
+  onSort,
+  selectedIds,
+  allSelected,
+  someSelected,
+  onToggleSelect,
+  onToggleSelectAll,
+}) => {
   return (
     <div className="overflow-x-auto">
       <table className="min-w-full divide-y divide-gray-200">
         <thead className="bg-gray-50">
           <tr>
+            {onToggleSelect ? (
+              <th scope="col" className="px-4 py-3">
+                <input
+                  type="checkbox"
+                  aria-label="Selecionar todos"
+                  checked={!!allSelected}
+                  ref={(el) => {
+                    if (el) el.indeterminate = !allSelected && !!someSelected;
+                  }}
+                  onChange={() => onToggleSelectAll?.()}
+                  className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-600"
+                />
+              </th>
+            ) : null}
             <SortableHeader column="nome" label="Nome" sortBy={sortBy} onSort={onSort} />
             <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Tipo</th>
             <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Documento</th>
@@ -67,6 +98,17 @@ const PartnersTable: React.FC<PartnersTableProps> = ({ partners, onEdit, onDelet
                 transition={{ duration: 0.3 }}
                 className="hover:bg-gray-50"
               >
+                {onToggleSelect ? (
+                  <td className="px-4 py-4 whitespace-nowrap">
+                    <input
+                      type="checkbox"
+                      aria-label={`Selecionar ${partner.nome || 'parceiro'}`}
+                      checked={!!selectedIds?.has(partner.id)}
+                      onChange={() => onToggleSelect(partner.id)}
+                      className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-600"
+                    />
+                  </td>
+                ) : null}
                 <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{partner.nome}</td>
                 <td className="px-6 py-4 whitespace-nowrap">
                   <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
