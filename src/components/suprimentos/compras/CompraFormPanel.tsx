@@ -330,6 +330,29 @@ export default function CompraFormPanel({ compraId, onSaveSuccess, onClose }: Pr
           <Input label="Data Prevista" type="date" value={formData.data_prevista || ''} onChange={e => handleHeaderChange('data_prevista', e.target.value)} disabled={isLocked} className="sm:col-span-3" />
         </Section>
 
+        {formData.id ? (
+          <Section title="Histórico" description="Datas e auditoria simples do pedido.">
+            <div className="sm:col-span-2">
+              <label className="block text-sm font-medium text-gray-700 mb-1">Criado em</label>
+              <div className="p-3 bg-gray-50 rounded-lg text-sm text-gray-800">
+                {formData.created_at ? new Date(formData.created_at).toLocaleString('pt-BR') : '—'}
+              </div>
+            </div>
+            <div className="sm:col-span-2">
+              <label className="block text-sm font-medium text-gray-700 mb-1">Atualizado em</label>
+              <div className="p-3 bg-gray-50 rounded-lg text-sm text-gray-800">
+                {formData.updated_at ? new Date(formData.updated_at).toLocaleString('pt-BR') : '—'}
+              </div>
+            </div>
+            <div className="sm:col-span-2">
+              <label className="block text-sm font-medium text-gray-700 mb-1">Recebido em</label>
+              <div className="p-3 bg-gray-50 rounded-lg text-sm text-gray-800">
+                {formData.data_recebimento ? new Date(String(formData.data_recebimento)).toLocaleDateString('pt-BR') : '—'}
+              </div>
+            </div>
+          </Section>
+        ) : null}
+
         <Section title="Itens" description="Produtos a serem comprados.">
           {!isLocked && (
             <div className="sm:col-span-6 mb-4 flex flex-col gap-2">

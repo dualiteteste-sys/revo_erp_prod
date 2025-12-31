@@ -81,6 +81,20 @@ const PartnerFormPanel: React.FC<PartnerFormPanelProps> = ({ partner, initialVal
       addToast('O Nome/Razão Social é obrigatório.', 'error');
       return;
     }
+
+    const tipoPessoa = formData.tipo_pessoa || 'juridica';
+    const docDigits = String(formData.doc_unico || '').replace(/\D/g, '');
+    const isAllSameDigits = docDigits.length > 0 && /^(\d)\1+$/.test(docDigits);
+    const expectedLen = tipoPessoa === 'fisica' ? 11 : tipoPessoa === 'juridica' ? 14 : null;
+
+    // Documento é opcional; mas se for informado, valida tamanho e evita sequências inválidas.
+    if (expectedLen && docDigits) {
+      if (docDigits.length !== expectedLen || isAllSameDigits) {
+        addToast(`Documento inválido. Informe um ${tipoPessoa === 'fisica' ? 'CPF' : 'CNPJ'} com ${expectedLen} dígitos.`, 'error');
+        setActiveTab('identificacao');
+        return;
+      }
+    }
     
     setIsSaving(true);
     try {
