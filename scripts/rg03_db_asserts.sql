@@ -215,4 +215,119 @@ begin
   IF to_regprocedure('public.qualidade_kpis(integer)') IS NULL THEN
     RAISE EXCEPTION 'RG-03: RPC public.qualidade_kpis(integer) não existe (IND-06).';
   END IF;
+
+  -- 8) SEC-01: tabelas com empresa_id devem ter RLS habilitado (evita vazamento cross-empresa)
+  IF EXISTS (
+    SELECT 1
+    FROM pg_class c
+    JOIN pg_namespace n ON n.oid = c.relnamespace
+    WHERE n.nspname = 'public'
+      AND c.relkind = 'r'
+      AND c.relrowsecurity IS FALSE
+      AND EXISTS (
+        SELECT 1
+        FROM information_schema.columns ic
+        WHERE ic.table_schema = 'public'
+          AND ic.table_name = c.relname
+          AND ic.column_name = 'empresa_id'
+      )
+  ) THEN
+    RAISE EXCEPTION 'SEC-01/RG-03: existem tabelas com empresa_id sem RLS habilitado (verifique migrations).';
+  END IF;
+
+  -- 9) SEC-02: RPCs SECURITY DEFINER usadas pelo app devem exigir permissão (anti-burla via console)
+  IF EXISTS (
+    SELECT 1
+    FROM pg_proc p
+    JOIN pg_namespace n ON n.oid = p.pronamespace
+    WHERE n.nspname = 'public'
+      AND p.prosecdef IS TRUE
+      AND p.proname = ANY(ARRAY[
+        'compras_manage_item',
+        'compras_receber_pedido',
+        'conferir_item_recebimento',
+        'crm_delete_oportunidade',
+        'crm_ensure_default_pipeline',
+        'crm_move_oportunidade',
+        'crm_upsert_oportunidade',
+        'delete_conta_a_receber',
+        'delete_meta_venda',
+        'delete_os_for_current_user',
+        'delete_partner',
+        'delete_product_for_current_user',
+        'finalizar_recebimento',
+        'financeiro_centros_custos_delete',
+        'financeiro_cobrancas_bancarias_delete',
+        'financeiro_conta_pagar_cancelar',
+        'financeiro_conta_pagar_estornar',
+        'financeiro_conta_pagar_estornar_v2',
+        'financeiro_contas_correntes_delete',
+        'financeiro_contas_pagar_delete',
+        'financeiro_movimentacoes_delete',
+        'financeiro_movimentacoes_upsert',
+        'industria_aplicar_bom_em_ordem_beneficiamento',
+        'industria_aplicar_bom_em_ordem_producao',
+        'industria_automacao_upsert',
+        'industria_bom_delete',
+        'industria_bom_manage_componente',
+        'industria_ct_aps_config_upsert',
+        'industria_ct_calendario_upsert',
+        'industria_delete_ordem',
+        'industria_manage_componente',
+        'industria_manage_entrega',
+        'industria_materiais_cliente_delete',
+        'industria_operacao_aps_lock_set',
+        'industria_operacao_doc_delete',
+        'industria_operacao_replanejar',
+        'industria_operacao_update_status',
+        'industria_operador_delete',
+        'industria_producao_apontar_producao',
+        'industria_producao_consumir',
+        'industria_producao_delete_apontamento',
+        'industria_producao_fechar',
+        'industria_producao_gerar_operacoes',
+        'industria_producao_manage_componente',
+        'industria_producao_manage_entrega',
+        'industria_producao_ordens_delete',
+        'industria_producao_registrar_entrega',
+        'industria_producao_registrar_evento',
+        'industria_producao_reservar',
+        'industria_producao_reset_operacao',
+        'industria_producao_reset_ordem',
+        'industria_producao_set_qa_requirements',
+        'industria_producao_transferir_lote',
+        'industria_producao_update_status',
+        'industria_roteiros_manage_etapa',
+        'industria_update_ordem_status',
+        'logistica_transportadoras_delete',
+        'mrp_reprocessar_ordem',
+        'os_doc_delete',
+        'os_set_status_for_current_user',
+        'qualidade_adicionar_motivo',
+        'qualidade_alterar_status_lote',
+        'qualidade_excluir_motivo',
+        'qualidade_plano_delete_caracteristica',
+        'qualidade_planos_delete',
+        'qualidade_registrar_inspecao',
+        'recebimento_cancelar',
+        'recebimento_delete',
+        'recebimento_set_classificacao',
+        'recebimento_sync_materiais_cliente',
+        'restore_partner',
+        'rh_doc_delete',
+        'rh_encerrar_afastamento',
+        'rh_manage_participante',
+        'rh_set_cargo_ativo',
+        'rh_set_colaborador_ativo',
+        'seed_rh_module',
+        'suprimentos_registrar_movimento',
+        'update_os_data_prevista',
+        'update_os_order',
+        'vendas_aprovar_pedido',
+        'vendas_manage_item'
+      ])
+      AND pg_get_functiondef(p.oid) NOT ILIKE '%require_permission_for_current_user%'
+  ) THEN
+    RAISE EXCEPTION 'SEC-02/RG-03: existem RPCs SECURITY DEFINER usadas pelo app sem guard de permissão.';
+  END IF;
 end $$;
