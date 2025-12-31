@@ -55,16 +55,16 @@ Regras:
 ### 3.1 Pedidos + precificação simples
 - [x] VEN-01 Pedido de venda: CRUD + itens + impostos básicos (se aplicável) + status
 - [x] VEN-02 Regras mínimas: desconto (com permissão), frete, arredondamentos e validações
-- [ ] VEN-03 Reserva/baixa de estoque (mínimo: baixa ao faturar/finalizar)
+- [x] VEN-03 Reserva/baixa de estoque (mínimo: baixa ao faturar/finalizar)
 
 ### 3.2 PDV (1 caixa no plano básico)
-- [ ] PDV-01 “Nova venda” rápido: cliente opcional, leitura por SKU, atalhos de teclado
+- [x] PDV-01 “Nova venda” rápido: cliente opcional, leitura por SKU, atalhos de teclado
 - [x] PDV-02 Finalizar: gera recebimento + baixa de estoque + comprovante (print/PDF simples)
-- [ ] PDV-03 Estorno: reversão financeira + reversão estoque + auditoria
+- [x] PDV-03 Estorno: reversão financeira + reversão estoque + auditoria
 
 ### 3.3 Expedição (fluxo completo no Pro)
-- [ ] EXP-01 Separação/embalagem/envio/entrega com status e datas
-- [ ] EXP-02 Vincular pedido + rastreio + observações + histórico
+- [x] EXP-01 Separação/embalagem/envio/entrega com status e datas
+- [x] EXP-02 Vincular pedido + rastreio + observações + histórico
 
 ### 3.4 Comissões + metas + painel (Pro)
 - [ ] COM-01 Comissões: regra simples por vendedor (% ou tabela) + relatório + export
