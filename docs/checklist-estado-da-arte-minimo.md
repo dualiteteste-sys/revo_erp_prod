@@ -36,7 +36,7 @@ Regras:
 - [x] RG-01 Release Gate local/CI: `yarn test --run` + suite E2E + `yarn verify:migrations`
 - [x] RG-02 Pipeline PROD: “expected vs PROD schema” sem divergências
 - [x] RG-03 Console limpo: varredura de módulos críticos sem erros/warns relevantes
-- [ ] RG-04 E2E “Happy path” por plano (Comércio/Serviços/Indústria) automatizado
+- [x] RG-04 E2E “Happy path” por plano (Comércio/Serviços/Indústria) automatizado
 
 ## 1) Cadastros (base do ERP)
 - [ ] CAD-01 Parceiros (clientes/fornecedores): CRUD + busca + validações (CPF/CNPJ) + endereços
