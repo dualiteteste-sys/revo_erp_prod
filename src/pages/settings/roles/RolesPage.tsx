@@ -41,9 +41,9 @@ export default function RolesPage() {
   }
 
   return (
-    <div className="flex flex-col md:flex-row h-full gap-4">
+    <div className="flex flex-col md:flex-row h-full min-h-0 gap-4">
       <RolesList selectedRoleId={selectedRoleId} onSelectRole={setSelectedRoleId} />
-      <div className="flex-1 overflow-hidden">
+      <div className="flex-1 min-h-0 overflow-auto">
         <PermissionsMatrix selectedRole={selectedRole} />
       </div>
     </div>
