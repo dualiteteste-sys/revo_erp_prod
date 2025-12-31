@@ -100,12 +100,12 @@ Regras:
 - [x] FIN-05 Relatórios essenciais: pagar/receber/caixa/faturamento por período
 
 ## 6) Indústria (mínimo para “pronto para vender”)
-- [ ] IND-01 OP/OB wizard consistente + travas de estados + cancelados/readonly corretos
-- [ ] IND-02 Execução: operações/apontamentos/entregas com permissões e consistência
-- [ ] IND-03 Roteiros + BOM (produção/beneficiamento/ambos) persistência/seleção corretas
+- [x] IND-01 OP/OB wizard consistente + travas de estados + cancelados/readonly corretos
+- [x] IND-02 Execução: operações/apontamentos/entregas com permissões e consistência
+- [x] IND-03 Roteiros + BOM (produção/beneficiamento/ambos) persistência/seleção corretas
 - [ ] IND-04 Suprimentos mínimo: recebimentos XML + conferência + vínculos + estoque ok (sem custo por enquanto)
-- [ ] IND-05 Qualidade mínimo: planos/motivos/lotes/bloqueio com auditoria
-- [ ] IND-06 Relatórios essenciais: WIP/filas/eficiência/estoque/qualidade
+- [x] IND-05 Qualidade mínimo: planos/motivos/lotes/bloqueio com auditoria
+- [x] IND-06 Relatórios essenciais: WIP/filas/eficiência/estoque/qualidade
 
 ## 7) Go-live (sem onboarding avançado por enquanto)
 - [ ] GL-02 Backup/restore + rotinas de suporte (exportações, trilha de auditoria)
