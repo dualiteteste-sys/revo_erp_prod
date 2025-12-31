@@ -8,12 +8,13 @@ on:
   workflow_dispatch:
     inputs:
       suite:
-        description: "Qual suite rodar? all|servicos|industria"
+        description: "Qual suite rodar? all|comercio|servicos|industria"
         required: true
         default: "all"
         type: choice
         options:
           - all
+          - comercio
           - servicos
           - industria
 
@@ -113,7 +114,7 @@ jobs:
         run: |
           set -euo pipefail
           case "${E2E_SUITE}" in
-            all|servicos|industria) ;;
-            *) echo "::error::Suite inválida: ${E2E_SUITE} (use all|servicos|industria)"; exit 1 ;;
+            all|comercio|servicos|industria) ;;
+            *) echo "::error::Suite inválida: ${E2E_SUITE} (use all|comercio|servicos|industria)"; exit 1 ;;
           esac
           yarn "test:e2e:gate:${E2E_SUITE}" -- --shard=${{ matrix.shard }}/${{ matrix.total }}
