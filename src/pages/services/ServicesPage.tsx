@@ -15,6 +15,8 @@ import { isSeedEnabled } from '@/utils/seed';
 import CsvExportDialog from '@/components/ui/CsvExportDialog';
 import { useBulkSelection } from '@/hooks/useBulkSelection';
 import BulkActionsBar from '@/components/ui/BulkActionsBar';
+import PageShell from '@/components/ui/PageShell';
+import PageCard from '@/components/ui/PageCard';
 
 export default function ServicesPage() {
   const enableSeed = isSeedEnabled();
@@ -160,83 +162,91 @@ export default function ServicesPage() {
     return { total, ativos, inativos };
   }, [services]);
 
-  return (
-    <div className="p-1">
-      <div className="mb-6">
-        <PageHeader
-          title="Serviços"
-          description="Catálogo de serviços para propostas, pedidos e ordens de serviço."
-          icon={<Wrench size={20} />}
-          actions={
-            <>
-              <CsvExportDialog
-                filename="servicos.csv"
-                rows={services}
-                disabled={loading}
-                columns={[
-                  { key: 'descricao', label: 'Descrição', getValue: (r) => r.descricao },
-                  { key: 'codigo', label: 'Código', getValue: (r) => r.codigo ?? '' },
-                  { key: 'preco', label: 'Preço de venda', getValue: (r) => r.preco_venda ?? '' },
-                  { key: 'unidade', label: 'Unidade', getValue: (r) => r.unidade ?? '' },
-                  { key: 'status', label: 'Status', getValue: (r) => r.status },
-                  { key: 'codigo_servico', label: 'Código serviço', getValue: (r) => r.codigo_servico ?? '' },
-                  { key: 'nbs', label: 'NBS', getValue: (r) => r.nbs ?? '' },
-                  { key: 'nbs_req', label: 'NBS/IBPT obrigatório', getValue: (r) => (r.nbs_ibpt_required ? 'Sim' : 'Não') },
-                ]}
-              />
-              {enableSeed ? (
-                <Button onClick={handleSeedServices} disabled={isSeeding || loading} variant="secondary" className="gap-2">
-                  {isSeeding ? <Loader2 className="animate-spin" size={18} /> : <DatabaseBackup size={18} />}
-                  Popular dados
-                </Button>
-              ) : null}
-              <Button onClick={() => handleOpenForm()}>
-                <Plus size={18} />
-                <span className="ml-2">Novo serviço</span>
-              </Button>
-            </>
-          }
+  const header = (
+    <PageHeader
+      title="Serviços"
+      description="Catálogo de serviços para propostas, pedidos e ordens de serviço."
+      icon={<Wrench size={20} />}
+      actions={
+        <>
+          <CsvExportDialog
+            filename="servicos.csv"
+            rows={services}
+            disabled={loading}
+            columns={[
+              { key: 'descricao', label: 'Descrição', getValue: (r) => r.descricao },
+              { key: 'codigo', label: 'Código', getValue: (r) => r.codigo ?? '' },
+              { key: 'preco', label: 'Preço de venda', getValue: (r) => r.preco_venda ?? '' },
+              { key: 'unidade', label: 'Unidade', getValue: (r) => r.unidade ?? '' },
+              { key: 'status', label: 'Status', getValue: (r) => r.status },
+              { key: 'codigo_servico', label: 'Código serviço', getValue: (r) => r.codigo_servico ?? '' },
+              { key: 'nbs', label: 'NBS', getValue: (r) => r.nbs ?? '' },
+              { key: 'nbs_req', label: 'NBS/IBPT obrigatório', getValue: (r) => (r.nbs_ibpt_required ? 'Sim' : 'Não') },
+            ]}
+          />
+          {enableSeed ? (
+            <Button onClick={handleSeedServices} disabled={isSeeding || loading} variant="secondary" className="gap-2">
+              {isSeeding ? <Loader2 className="animate-spin" size={18} /> : <DatabaseBackup size={18} />}
+              Popular dados
+            </Button>
+          ) : null}
+          <Button onClick={() => handleOpenForm()}>
+            <Plus size={18} />
+            <span className="ml-2">Novo serviço</span>
+          </Button>
+        </>
+      }
+    />
+  );
+
+  const summary = (
+    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="bg-indigo-50 border border-indigo-100 rounded-xl p-4">
+        <p className="text-xs text-indigo-700 font-semibold">Serviços (página atual)</p>
+        <p className="text-2xl font-bold text-indigo-800">{totals.total}</p>
+      </div>
+      <div className="bg-emerald-50 border border-emerald-100 rounded-xl p-4">
+        <p className="text-xs text-emerald-700 font-semibold">Ativos</p>
+        <p className="text-2xl font-bold text-emerald-800">{totals.ativos}</p>
+      </div>
+      <div className="bg-slate-50 border border-slate-100 rounded-xl p-4">
+        <p className="text-xs text-slate-700 font-semibold">Inativos</p>
+        <p className="text-2xl font-bold text-slate-800">{totals.inativos}</p>
+      </div>
+    </div>
+  );
+
+  const filters = (
+    <div className="flex gap-4">
+      <div className="relative flex-grow max-w-md">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={20} />
+        <input
+          type="text"
+          placeholder="Buscar por descrição ou código..."
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+          className="w-full p-3 pl-10 border border-gray-300 rounded-xl shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
         />
       </div>
+      <Select
+        value={statusFilter || ''}
+        onChange={(e) => setStatusFilter((e.target.value as any) || null)}
+        className="min-w-[220px]"
+      >
+        <option value="">Todos os status</option>
+        <option value="ativo">Ativo</option>
+        <option value="inativo">Inativo</option>
+      </Select>
+    </div>
+  );
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <div className="bg-indigo-50 border border-indigo-100 rounded-xl p-4">
-          <p className="text-xs text-indigo-700 font-semibold">Serviços (página atual)</p>
-          <p className="text-2xl font-bold text-indigo-800">{totals.total}</p>
-        </div>
-        <div className="bg-emerald-50 border border-emerald-100 rounded-xl p-4">
-          <p className="text-xs text-emerald-700 font-semibold">Ativos</p>
-          <p className="text-2xl font-bold text-emerald-800">{totals.ativos}</p>
-        </div>
-        <div className="bg-slate-50 border border-slate-100 rounded-xl p-4">
-          <p className="text-xs text-slate-700 font-semibold">Inativos</p>
-          <p className="text-2xl font-bold text-slate-800">{totals.inativos}</p>
-        </div>
-      </div>
+  const footer = count > pageSize ? (
+    <Pagination currentPage={page} totalCount={count} pageSize={pageSize} onPageChange={setPage} />
+  ) : null;
 
-      <div className="mb-4 flex gap-4">
-        <div className="relative flex-grow max-w-md">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={20} />
-          <input
-            type="text"
-            placeholder="Buscar por descrição ou código..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full p-3 pl-10 border border-gray-300 rounded-xl shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-          />
-        </div>
-        <Select
-          value={statusFilter || ''}
-          onChange={(e) => setStatusFilter((e.target.value as any) || null)}
-          className="min-w-[220px]"
-        >
-          <option value="">Todos os status</option>
-          <option value="ativo">Ativo</option>
-          <option value="inativo">Inativo</option>
-        </Select>
-      </div>
-
-      <div className="bg-white rounded-lg shadow overflow-hidden">
+  return (
+    <PageShell header={header} summary={summary} filters={filters} footer={footer}>
+      <PageCard>
         {loading && services.length === 0 ? (
           <div className="h-96 flex items-center justify-center">
             <Loader2 className="animate-spin text-blue-500" size={32} />
@@ -288,11 +298,7 @@ export default function ServicesPage() {
             />
           </>
         )}
-      </div>
-
-      {count > pageSize && (
-        <Pagination currentPage={page} totalCount={count} pageSize={pageSize} onPageChange={setPage} />
-      )}
+      </PageCard>
 
       <Modal
         isOpen={isFormOpen}
@@ -333,6 +339,6 @@ export default function ServicesPage() {
         isLoading={bulkLoading}
         variant="danger"
       />
-    </div>
+    </PageShell>
   );
 }

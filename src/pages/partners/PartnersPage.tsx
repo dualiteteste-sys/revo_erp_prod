@@ -18,6 +18,8 @@ import { isSeedEnabled } from '@/utils/seed';
 import { useHasPermission } from '@/hooks/useHasPermission';
 import { useBulkSelection } from '@/hooks/useBulkSelection';
 import BulkActionsBar from '@/components/ui/BulkActionsBar';
+import PageShell from '@/components/ui/PageShell';
+import PageCard from '@/components/ui/PageCard';
 
 const PartnersPage: React.FC = () => {
   const enableSeed = isSeedEnabled();
@@ -303,50 +305,56 @@ const PartnersPage: React.FC = () => {
     return 'Novo Cliente';
   }, [initialFormValues?.tipo, selectedPartner]);
 
-  return (
-    <div className="p-1">
-      <div className="mb-6">
-        <PageHeader
-          title="Clientes e Fornecedores"
-          description="Cadastre e gerencie clientes, fornecedores e perfis que são ambos."
-          icon={<UsersRound size={20} />}
-          actions={headerActions}
+  const header = (
+    <PageHeader
+      title="Clientes e Fornecedores"
+      description="Cadastre e gerencie clientes, fornecedores e perfis que são ambos."
+      icon={<UsersRound size={20} />}
+      actions={headerActions}
+    />
+  );
+
+  const filters = (
+    <div className="flex gap-4">
+      <div className="relative">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={20} />
+        <input
+          type="text"
+          placeholder="Buscar por nome, doc ou email..."
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+          className="w-full max-w-xs p-3 pl-10 border border-gray-300 rounded-lg"
         />
       </div>
+      <Select
+        value={filterType || ''}
+        onChange={(e) => setFilterType(e.target.value || null)}
+        className="min-w-[200px]"
+      >
+        <option value="">Todos os tipos</option>
+        <option value="cliente">Cliente</option>
+        <option value="fornecedor">Fornecedor</option>
+        <option value="ambos">Ambos</option>
+      </Select>
+      <Select
+        value={statusFilter || 'active'}
+        onChange={(e) => setStatusFilter((e.target.value as any) || 'active')}
+        className="min-w-[220px]"
+      >
+        <option value="active">Apenas ativos</option>
+        <option value="inactive">Apenas inativos</option>
+        <option value="all">Ativos e inativos</option>
+      </Select>
+    </div>
+  );
 
-      <div className="mb-4 flex gap-4">
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={20} />
-          <input
-            type="text"
-            placeholder="Buscar por nome, doc ou email..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full max-w-xs p-3 pl-10 border border-gray-300 rounded-lg"
-          />
-        </div>
-        <Select
-          value={filterType || ''}
-          onChange={(e) => setFilterType(e.target.value || null)}
-          className="min-w-[200px]"
-        >
-          <option value="">Todos os tipos</option>
-          <option value="cliente">Cliente</option>
-          <option value="fornecedor">Fornecedor</option>
-          <option value="ambos">Ambos</option>
-        </Select>
-        <Select
-          value={statusFilter || 'active'}
-          onChange={(e) => setStatusFilter((e.target.value as any) || 'active')}
-          className="min-w-[220px]"
-        >
-          <option value="active">Apenas ativos</option>
-          <option value="inactive">Apenas inativos</option>
-          <option value="all">Ativos e inativos</option>
-        </Select>
-      </div>
+  const footer = count > pageSize ? (
+    <Pagination currentPage={page} totalCount={count} pageSize={pageSize} onPageChange={setPage} />
+  ) : null;
 
-      <div className="bg-white rounded-lg shadow overflow-hidden">
+  return (
+    <PageShell header={header} filters={filters} footer={footer}>
+      <PageCard>
         {loading && partners.length === 0 ? (
           <div className="h-96 flex items-center justify-center">
             <Loader2 className="animate-spin text-blue-500" size={32} />
@@ -405,11 +413,7 @@ const PartnersPage: React.FC = () => {
             />
           </>
         )}
-      </div>
-
-      {count > pageSize && (
-        <Pagination currentPage={page} totalCount={count} pageSize={pageSize} onPageChange={setPage} />
-      )}
+      </PageCard>
 
       <Modal isOpen={isFormOpen} onClose={handleCloseForm} title={formTitle}>
         {isFetchingDetails ? (
@@ -436,7 +440,7 @@ const PartnersPage: React.FC = () => {
         isLoading={isDeleting}
         variant="danger"
       />
-    </div>
+    </PageShell>
   );
 };
 

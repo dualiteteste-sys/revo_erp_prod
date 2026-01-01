@@ -18,6 +18,8 @@ import ImportProductsCsvModal from '@/components/products/ImportProductsCsvModal
 import { useBulkSelection } from '@/hooks/useBulkSelection';
 import BulkActionsBar from '@/components/ui/BulkActionsBar';
 import ConfirmationModal from '@/components/ui/ConfirmationModal';
+import PageShell from '@/components/ui/PageShell';
+import PageCard from '@/components/ui/PageCard';
 
 const ProductsPage: React.FC = () => {
   const enableSeed = isSeedEnabled();
@@ -198,92 +200,98 @@ const ProductsPage: React.FC = () => {
   };
 
 
-  return (
-    <div className="p-1">
-      <div className="mb-6">
-        <PageHeader
-          title="Produtos"
-          description="Catálogo de produtos e configurações fiscais básicas."
-          icon={<Package size={20} />}
-          actions={
-            <div className="flex items-center gap-2">
-              <Button
-                onClick={() => {
-                  downloadCsv({
-                    filename: 'produtos.csv',
-                    headers: ['Nome', 'SKU', 'Status', 'Preço', 'Unidade'],
-                    rows: products.map((p: any) => [
-                      p.nome || '',
-                      p.sku || '',
-                      p.status || p.ativo || '',
-                      p.preco_venda ?? p.preco ?? '',
-                      p.unidade_sigla || p.unidade || '',
-                    ]),
-                  });
-                }}
-                disabled={loading || products.length === 0}
-                variant="secondary"
-                className="gap-2"
-                title="Exportar a lista atual"
-              >
-                <FileDown size={18} />
-                Exportar CSV
-              </Button>
+  const header = (
+    <PageHeader
+      title="Produtos"
+      description="Catálogo de produtos e configurações fiscais básicas."
+      icon={<Package size={20} />}
+      actions={
+        <div className="flex items-center gap-2">
+          <Button
+            onClick={() => {
+              downloadCsv({
+                filename: 'produtos.csv',
+                headers: ['Nome', 'SKU', 'Status', 'Preço', 'Unidade'],
+                rows: products.map((p: any) => [
+                  p.nome || '',
+                  p.sku || '',
+                  p.status || p.ativo || '',
+                  p.preco_venda ?? p.preco ?? '',
+                  p.unidade_sigla || p.unidade || '',
+                ]),
+              });
+            }}
+            disabled={loading || products.length === 0}
+            variant="secondary"
+            className="gap-2"
+            title="Exportar a lista atual"
+          >
+            <FileDown size={18} />
+            Exportar CSV
+          </Button>
 
-              <Button
-                onClick={() => setIsImportOpen(true)}
-                variant="secondary"
-                className="gap-2"
-                title="Importar produtos por CSV"
-              >
-                <FileUp size={18} />
-                Importar CSV
-              </Button>
+          <Button
+            onClick={() => setIsImportOpen(true)}
+            variant="secondary"
+            className="gap-2"
+            title="Importar produtos por CSV"
+          >
+            <FileUp size={18} />
+            Importar CSV
+          </Button>
 
-              {enableSeed ? (
-                <Button onClick={handleSeedProducts} disabled={isSeeding || loading} variant="secondary" className="gap-2">
-                  {isSeeding ? <Loader2 className="animate-spin" size={18} /> : <DatabaseBackup size={18} />}
-                  Popular dados
-                </Button>
-              ) : null}
+          {enableSeed ? (
+            <Button onClick={handleSeedProducts} disabled={isSeeding || loading} variant="secondary" className="gap-2">
+              {isSeeding ? <Loader2 className="animate-spin" size={18} /> : <DatabaseBackup size={18} />}
+              Popular dados
+            </Button>
+          ) : null}
 
-              <Button
-                onClick={() => handleOpenForm()}
-                className="gap-2"
-                disabled={permsLoading || !canCreate}
-                title={!canCreate ? 'Sem permissão para criar' : undefined}
-              >
-                <Plus size={18} />
-                Novo produto
-              </Button>
-            </div>
-          }
+          <Button
+            onClick={() => handleOpenForm()}
+            className="gap-2"
+            disabled={permsLoading || !canCreate}
+            title={!canCreate ? 'Sem permissão para criar' : undefined}
+          >
+            <Plus size={18} />
+            Novo produto
+          </Button>
+        </div>
+      }
+    />
+  );
+
+  const filters = (
+    <div className="flex gap-4">
+      <div className="relative">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={20} />
+        <input
+          type="text"
+          placeholder="Buscar por nome ou SKU..."
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+          className="w-full max-w-sm p-3 pl-10 border border-gray-300 rounded-lg"
         />
       </div>
+      <Select
+        value={filterStatus || ''}
+        onChange={(e) => setFilterStatus((e.target.value as 'ativo' | 'inativo') || null)}
+        className="min-w-[200px]"
+      >
+        <option value="">Todos os status</option>
+        <option value="ativo">Ativo</option>
+        <option value="inativo">Inativo</option>
+      </Select>
+    </div>
+  );
 
-      <div className="mb-4 flex gap-4">
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={20} />
-          <input
-            type="text"
-            placeholder="Buscar por nome ou SKU..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full max-w-sm p-3 pl-10 border border-gray-300 rounded-lg"
-          />
-        </div>
-        <Select
-          value={filterStatus || ''}
-          onChange={(e) => setFilterStatus(e.target.value as 'ativo' | 'inativo' || null)}
-          className="min-w-[200px]"
-        >
-          <option value="">Todos os status</option>
-          <option value="ativo">Ativo</option>
-          <option value="inativo">Inativo</option>
-        </Select>
-      </div>
+  const footer = count > pageSize ? (
+    <Pagination currentPage={page} totalCount={count} pageSize={pageSize} onPageChange={setPage} />
+  ) : null;
 
-      <div className="bg-white rounded-lg shadow overflow-hidden">
+  return (
+    <PageShell header={header} filters={filters} footer={footer}>
+      <PageCard>
         {loading && products.length === 0 ? (
           <div className="h-96 flex items-center justify-center">
             <Loader2 className="animate-spin text-blue-500" size={32} />
@@ -335,16 +343,7 @@ const ProductsPage: React.FC = () => {
             />
           </>
         )}
-      </div>
-
-      {count > pageSize && (
-        <Pagination
-          currentPage={page}
-          totalCount={count}
-          pageSize={pageSize}
-          onPageChange={setPage}
-        />
-      )}
+      </PageCard>
 
       <Modal
         isOpen={isFormOpen}
@@ -393,7 +392,7 @@ const ProductsPage: React.FC = () => {
         isLoading={bulkLoading}
         variant="danger"
       />
-    </div>
+    </PageShell>
   );
 };
 
