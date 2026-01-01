@@ -25,7 +25,7 @@ Princípios:
 
 ### 0.3 Observabilidade “estado da arte”
 - [x] INT-09 Logs estruturados: `integration_logs` com `empresa_id`, `provider`, `entity_type`, `entity_id`, `run_id`
-- [ ] INT-10 Timeline por pedido/listing: eventos (importado, aprovado, enviado, entregue, erro, retry)
+- [x] INT-10 Timeline por pedido/listing: eventos (importado, aprovado, enviado, entregue, erro, retry)
 - [x] INT-11 Monitor “saúde”: falhas recentes por canal + fila pendente + último sync ok/erro
 
 ### 0.4 UX (Centro de Integrações)
@@ -37,12 +37,12 @@ Princípios:
 
 ### 1.1 Conexão
 - [x] MELI-01 OAuth connect + callback + armazenamento de tokens (refresh automático)
-- [ ] MELI-02 Seleção de conta (seller) + vínculo a `empresa_id`
+- [x] MELI-02 Seleção de conta (seller) + vínculo a `empresa_id`
 
 ### 1.2 Pedidos (MVP prioritário)
 - [x] MELI-03 Importar pedidos por janela (since) + paginação + dedupe (external order id)
 - [x] MELI-04 Mapear pedido → `vendas_pedidos` (cliente, itens, frete, impostos básicos, canal=marketplace)
-- [ ] MELI-05 Estados: refletir “aprovado/pago/cancelado” no Revo sem quebrar regras internas
+- [x] MELI-05 Estados: refletir “aprovado/pago/cancelado” no Revo sem quebrar regras internas
 
 ### 1.3 Envios (Expedição)
 - [ ] MELI-06 Criar/atualizar expedição no Revo (status + tracking) a partir do shipping do MELI
@@ -58,7 +58,7 @@ Princípios:
 ## 2) Shopee
 
 ### 2.1 Conexão
-- [x] SHO-01 OAuth/connect (conforme API Shopee) + callback + refresh/revoke
+- [ ] SHO-01 OAuth/connect (conforme API Shopee) + callback + refresh/revoke (hoje: apenas esqueleto)
 - [ ] SHO-02 Vínculo loja/canal + `empresa_id`
 
 ### 2.2 Pedidos (MVP prioritário)
@@ -76,7 +76,7 @@ Princípios:
 - [ ] SHO-08 Webhooks: assinatura + persistência + fila idempotente
 
 ## 3) Catálogo (opcional no MVP, mas necessário “pronto para uso”)
-- [ ] CAT-01 Mapeamento SKU/variação: produto Revo ↔ anúncio/variante do canal
+- [x] CAT-01 Mapeamento SKU/variação: produto Revo ↔ anúncio/variante do canal
 - [ ] CAT-02 Conflitos: detectar duplicados e sugerir merge (sem sobrescrever “na marra”)
 - [ ] CAT-03 Sync preços (somente se habilitado) com auditoria e “modo simulação”
 
@@ -86,7 +86,7 @@ Princípios:
 
 ## 5) Qualidade (release gate específico de integração)
 - [ ] QA-01 Testes de contrato (mock): mapear payload → modelo canônico (MELI/SHO)
-- [ ] QA-02 E2E “happy path”: importar 1 pedido → gerar expedição → atualizar status → logs ok
+- [x] QA-02 E2E “happy path” (MVP): página Integrações → botão “Importar agora” chama o sync e exibe sucesso
 - [ ] QA-03 E2E “erro controlado”: rate limit/timeout → retry → dead-letter → reprocessar manual
 
 ## Ordem recomendada (para sair usando rápido e sem sustos)

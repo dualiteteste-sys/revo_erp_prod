@@ -19,6 +19,8 @@ import {
 } from '@/services/ecommerceIntegrations';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Switch } from '@/components/ui/switch';
+import { listEcommerceProductMappings, upsertEcommerceProductMapping, type EcommerceProductMappingRow } from '@/services/ecommerceCatalog';
+import Input from '@/components/ui/forms/Input';
 
 type Provider = 'meli' | 'shopee';
 
@@ -60,6 +62,12 @@ export default function MarketplaceIntegrationsPage() {
   const [testingProvider, setTestingProvider] = useState<Provider | null>(null);
   const [diagnostics, setDiagnostics] = useState<Record<string, any> | null>(null);
   const [syncingOrders, setSyncingOrders] = useState<Provider | null>(null);
+  const [mappingsOpen, setMappingsOpen] = useState(false);
+  const [mappingsLoading, setMappingsLoading] = useState(false);
+  const [mappingsProvider, setMappingsProvider] = useState<Provider>('meli');
+  const [mappingsQuery, setMappingsQuery] = useState('');
+  const [mappings, setMappings] = useState<EcommerceProductMappingRow[]>([]);
+  const [savingMapId, setSavingMapId] = useState<string | null>(null);
 
   const canView = !!permView.data;
   const canManage = !!permManage.data;
@@ -217,6 +225,51 @@ export default function MarketplaceIntegrationsPage() {
       addToast(e?.message || 'Falha ao salvar configurações.', 'error');
     } finally {
       setSavingConfig(false);
+    }
+  };
+
+  const loadMappings = useCallback(
+    async (provider: Provider, q?: string) => {
+      setMappingsLoading(true);
+      try {
+        const rows = await listEcommerceProductMappings({ provider, q: q ?? '', limit: 50, offset: 0 });
+        setMappings(rows);
+      } catch (e: any) {
+        addToast(e?.message || 'Falha ao carregar mapeamentos.', 'error');
+        setMappings([]);
+      } finally {
+        setMappingsLoading(false);
+      }
+    },
+    [addToast],
+  );
+
+  const openMappings = async (provider: Provider) => {
+    if (!canManage) {
+      addToast('Sem permissão para gerenciar integrações.', 'warning');
+      return;
+    }
+    setMappingsProvider(provider);
+    setMappingsQuery('');
+    setMappingsOpen(true);
+    await loadMappings(provider, '');
+  };
+
+  const handleSaveMapping = async (row: EcommerceProductMappingRow, identificador: string) => {
+    if (!canManage) {
+      addToast('Sem permissão para gerenciar integrações.', 'warning');
+      return;
+    }
+    if (savingMapId) return;
+    setSavingMapId(row.produto_id);
+    try {
+      await upsertEcommerceProductMapping({ provider: mappingsProvider, produto_id: row.produto_id, identificador });
+      addToast('Mapeamento salvo.', 'success');
+      await loadMappings(mappingsProvider, mappingsQuery);
+    } catch (e: any) {
+      addToast(e?.message || 'Falha ao salvar mapeamento.', 'error');
+    } finally {
+      setSavingMapId(null);
     }
   };
 
@@ -521,6 +574,25 @@ export default function MarketplaceIntegrationsPage() {
                 </div>
               </div>
 
+              <GlassCard className="p-3">
+                <div className="text-sm font-medium text-gray-900">3) Mapear produtos (recomendado)</div>
+                <div className="mt-1 text-xs text-gray-600">
+                  Para importar itens corretamente, mapeie cada produto do Revo com o ID do anúncio no canal.
+                </div>
+                <div className="mt-3 flex justify-end">
+                  <Button
+                    variant="outline"
+                    className="gap-2"
+                    disabled={!canManage}
+                    onClick={() => void openMappings(activeConnection.provider as Provider)}
+                    title={canManage ? 'Abrir mapeamento' : 'Sem permissão'}
+                  >
+                    <SettingsIcon size={16} />
+                    Abrir mapeamento
+                  </Button>
+                </div>
+              </GlassCard>
+
               <div className="flex justify-end gap-2 pt-2">
                 <Button variant="outline" onClick={() => setConfigOpen(false)}>
                   Cancelar
@@ -533,6 +605,93 @@ export default function MarketplaceIntegrationsPage() {
           )}
         </DialogContent>
       </Dialog>
+
+      <Dialog open={mappingsOpen} onOpenChange={(v) => setMappingsOpen(v)}>
+        <DialogContent className="max-w-4xl">
+          <DialogHeader>
+            <DialogTitle>Mapeamento de produtos — {providerLabels[mappingsProvider]}</DialogTitle>
+          </DialogHeader>
+
+          <div className="space-y-3">
+            <div className="flex items-end gap-2">
+              <div className="flex-1">
+                <Input
+                  label="Buscar produto (nome/SKU) ou anúncio"
+                  value={mappingsQuery}
+                  onChange={(e) => setMappingsQuery((e.target as HTMLInputElement).value)}
+                  placeholder="Ex.: Parafuso, SKU-123, MLB123..."
+                />
+              </div>
+              <Button variant="outline" className="gap-2" onClick={() => void loadMappings(mappingsProvider, mappingsQuery)} disabled={mappingsLoading}>
+                <RefreshCw size={16} />
+                Buscar
+              </Button>
+            </div>
+
+            {mappingsLoading ? (
+              <div className="text-sm text-gray-600">Carregando…</div>
+            ) : mappings.length === 0 ? (
+              <div className="text-sm text-gray-600">Nenhum produto encontrado.</div>
+            ) : (
+              <div className="overflow-x-auto border rounded-xl bg-white">
+                <table className="min-w-full divide-y divide-gray-200">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Produto</th>
+                      <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">SKU</th>
+                      <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">ID anúncio no canal</th>
+                      <th className="px-3 py-2" />
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-200">
+                    {mappings.map((row) => {
+                      const busy = savingMapId === row.produto_id;
+                      return (
+                        <MappingRow
+                          key={row.produto_id}
+                          row={row}
+                          busy={busy}
+                          onSave={(value) => void handleSaveMapping(row, value)}
+                        />
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
+  );
+}
+
+function MappingRow(props: {
+  row: EcommerceProductMappingRow;
+  busy: boolean;
+  onSave: (value: string) => void;
+}) {
+  const [value, setValue] = useState(props.row.anuncio_identificador ?? '');
+  useEffect(() => setValue(props.row.anuncio_identificador ?? ''), [props.row.anuncio_identificador]);
+
+  return (
+    <tr className="hover:bg-gray-50">
+      <td className="px-3 py-2 text-sm text-gray-800">{props.row.produto_nome}</td>
+      <td className="px-3 py-2 text-sm text-gray-600">{props.row.produto_sku || '—'}</td>
+      <td className="px-3 py-2">
+        <input
+          value={value}
+          onChange={(e) => setValue(e.target.value)}
+          placeholder="Ex.: MLB123..."
+          className="w-full px-3 py-2 border rounded-lg text-sm"
+        />
+      </td>
+      <td className="px-3 py-2 text-right">
+        <Button size="sm" variant="outline" disabled={props.busy} onClick={() => props.onSave(value)} className="gap-2">
+          <SettingsIcon size={14} />
+          {props.busy ? 'Salvando…' : 'Salvar'}
+        </Button>
+      </td>
+    </tr>
   );
 }

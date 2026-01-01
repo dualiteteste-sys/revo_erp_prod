@@ -13,6 +13,7 @@ import { useHasPermission } from '@/hooks/useHasPermission';
 import { searchItemsForOs } from '@/services/os';
 import { ensurePdvDefaultClienteId } from '@/services/vendasMvp';
 import { listVendedores, type Vendedor } from '@/services/vendedores';
+import { listMarketplaceOrderTimeline, type MarketplaceTimelineEvent } from '@/services/ecommerceOrders';
 
 interface Props {
   vendaId: string | null;
@@ -57,6 +58,8 @@ export default function PedidoVendaFormPanel({ vendaId, onSaveSuccess, onClose, 
   const [skuQuery, setSkuQuery] = useState('');
   const [addingSku, setAddingSku] = useState(false);
   const canFinalizePdv = mode === 'pdv' && typeof onFinalizePdv === 'function';
+  const [marketplaceTimeline, setMarketplaceTimeline] = useState<MarketplaceTimelineEvent[]>([]);
+  const [loadingMarketplaceTimeline, setLoadingMarketplaceTimeline] = useState(false);
 
   useEffect(() => {
     if (vendaId) {
@@ -99,6 +102,21 @@ export default function PedidoVendaFormPanel({ vendaId, onSaveSuccess, onClose, 
     try {
       const data = await getVendaDetails(vendaId!);
       setFormData(data);
+
+      const canal = (data as any)?.canal;
+      if (canal === 'marketplace' && data?.id) {
+        setLoadingMarketplaceTimeline(true);
+        try {
+          const ev = await listMarketplaceOrderTimeline(data.id);
+          setMarketplaceTimeline(ev ?? []);
+        } catch {
+          setMarketplaceTimeline([]);
+        } finally {
+          setLoadingMarketplaceTimeline(false);
+        }
+      } else {
+        setMarketplaceTimeline([]);
+      }
     } catch (e) {
       console.error(e);
       addToast('Erro ao carregar pedido.', 'error');
@@ -162,6 +180,16 @@ export default function PedidoVendaFormPanel({ vendaId, onSaveSuccess, onClose, 
       };
       const saved = await saveVenda(payload);
       setFormData(prev => ({ ...prev, ...saved }));
+
+      const canal = (saved as any)?.canal ?? (formData as any)?.canal;
+      if (canal === 'marketplace' && saved?.id) {
+        try {
+          const ev = await listMarketplaceOrderTimeline(saved.id);
+          setMarketplaceTimeline(ev ?? []);
+        } catch {
+          setMarketplaceTimeline([]);
+        }
+      }
       
       if (!formData.id) {
         addToast('Pedido criado! Agora adicione os itens.', 'success');
@@ -351,6 +379,7 @@ export default function PedidoVendaFormPanel({ vendaId, onSaveSuccess, onClose, 
   if (loading) return <div className="flex justify-center p-8"><Loader2 className="animate-spin" /></div>;
 
   const isLocked = formData.status !== 'orcamento';
+  const isMarketplaceOrder = (formData as any)?.canal === 'marketplace';
   const subtotal = toMoney(formData.itens?.reduce((acc, i) => acc + toMoney(i.total), 0) || 0);
   const frete = toMoney(formData.frete);
   const desconto = toMoney(formData.desconto);
@@ -397,6 +426,40 @@ export default function PedidoVendaFormPanel({ vendaId, onSaveSuccess, onClose, 
               {formData.status}
             </span>
           </div>
+        )}
+
+        {isMarketplaceOrder && (
+          <Section title="Marketplace" description="Histórico e eventos da integração">
+            {loadingMarketplaceTimeline ? (
+              <div className="text-sm text-gray-600 flex items-center gap-2">
+                <Loader2 className="w-4 h-4 animate-spin" />
+                Carregando timeline…
+              </div>
+            ) : marketplaceTimeline.length === 0 ? (
+              <div className="text-sm text-gray-600">Sem eventos registrados para este pedido.</div>
+            ) : (
+              <div className="overflow-x-auto border rounded-lg bg-white">
+                <table className="min-w-full divide-y divide-gray-200">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th className="px-3 py-2 text-left text-xs font-medium text-gray-500">Quando</th>
+                      <th className="px-3 py-2 text-left text-xs font-medium text-gray-500">Tipo</th>
+                      <th className="px-3 py-2 text-left text-xs font-medium text-gray-500">Mensagem</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-200">
+                    {marketplaceTimeline.map((e, idx) => (
+                      <tr key={`${e.kind}-${e.occurred_at}-${idx}`} className="hover:bg-gray-50">
+                        <td className="px-3 py-2 text-sm text-gray-600 whitespace-nowrap">{new Date(e.occurred_at).toLocaleString('pt-BR')}</td>
+                        <td className="px-3 py-2 text-sm text-gray-700 whitespace-nowrap">{e.kind}</td>
+                        <td className="px-3 py-2 text-sm text-gray-800">{e.message}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </Section>
         )}
 
         <Section title="Dados do Pedido" description="Informações do cliente e condições.">
