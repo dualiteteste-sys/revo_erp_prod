@@ -12,6 +12,7 @@ interface ModalProps {
   title: string;
   size?: ModalSize;
   containerClassName?: string;
+  overlayClassName?: string;
 }
 
 const sizeClasses: Record<ModalSize, string> = {
@@ -48,7 +49,7 @@ function getFocusableElements(root: HTMLElement | null): HTMLElement[] {
   });
 }
 
-const Modal: React.FC<ModalProps> = ({ isOpen, onClose, children, title, size = '7xl', containerClassName }) => {
+const Modal: React.FC<ModalProps> = ({ isOpen, onClose, children, title, size = '7xl', containerClassName, overlayClassName }) => {
   const overlayRef = useRef<HTMLDivElement | null>(null);
   const dialogRef = useRef<HTMLDivElement | null>(null);
   const closeBtnRef = useRef<HTMLButtonElement | null>(null);
@@ -118,7 +119,7 @@ const Modal: React.FC<ModalProps> = ({ isOpen, onClose, children, title, size = 
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
           transition={{ duration: 0.3 }}
-          className="fixed inset-0 bg-black/30 backdrop-blur-sm z-40 flex items-center justify-center p-4"
+          className={`fixed inset-0 bg-black/30 backdrop-blur-sm z-40 flex items-center justify-center p-4 ${overlayClassName || ''}`}
           onMouseDown={(e) => {
             // clique no backdrop fecha (sem fechar ao clicar dentro do modal)
             if (e.target === overlayRef.current) onClose();
