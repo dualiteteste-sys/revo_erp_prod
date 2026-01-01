@@ -12,6 +12,8 @@ import CentrosDeCustoFormPanel from '@/components/financeiro/centros-de-custo/Ce
 import type { ContaCorrente } from '@/services/treasury';
 import { setContaCorrentePadrao } from '@/services/treasury';
 import type { CentroDeCusto } from '@/services/centrosDeCusto';
+import CompanySettingsForm from '@/components/settings/company/CompanySettingsForm';
+import NfeSettingsPage from '@/pages/fiscal/NfeSettingsPage';
 
 type Props = {
   isOpen: boolean;
@@ -23,10 +25,13 @@ type Props = {
 
 export function isEmbeddedOnboardingStep(stepKey: string) {
   return (
+    stepKey === 'empresa.perfil_basico' ||
     stepKey === 'tesouraria.contas_correntes' ||
     stepKey === 'tesouraria.padrao_recebimentos' ||
     stepKey === 'tesouraria.padrao_pagamentos' ||
-    stepKey === 'financeiro.centros_de_custo'
+    stepKey === 'financeiro.centros_de_custo' ||
+    stepKey === 'fiscal.nfe.emitente' ||
+    stepKey === 'fiscal.nfe.numeracao'
   );
 }
 
@@ -88,7 +93,7 @@ export default function OnboardingStepModal({ isOpen, onClose, empresaId, step, 
 
   if (step.key === 'tesouraria.contas_correntes') {
     return (
-      <Modal isOpen={isOpen} onClose={onClose} title="Tesouraria — Criar Conta Corrente" size="6xl">
+      <Modal isOpen={isOpen} onClose={onClose} title="Tesouraria — Criar Conta Corrente" size="6xl" overlayClassName="z-50">
         <ContaCorrenteFormPanel
           conta={null}
           onClose={onClose}
@@ -109,6 +114,7 @@ export default function OnboardingStepModal({ isOpen, onClose, empresaId, step, 
         onClose={onClose}
         title={`Tesouraria — Definir conta padrão (${para})`}
         size="3xl"
+        overlayClassName="z-50"
       >
         <div className="p-6">
           <p className="text-sm text-gray-600">
@@ -165,7 +171,7 @@ export default function OnboardingStepModal({ isOpen, onClose, empresaId, step, 
 
   if (step.key === 'financeiro.centros_de_custo') {
     return (
-      <Modal isOpen={isOpen} onClose={onClose} title="Financeiro — Criar Centro de Custo" size="6xl">
+      <Modal isOpen={isOpen} onClose={onClose} title="Financeiro — Criar Centro de Custo" size="6xl" overlayClassName="z-50">
         <CentrosDeCustoFormPanel
           centro={null}
           onClose={onClose}
@@ -174,6 +180,40 @@ export default function OnboardingStepModal({ isOpen, onClose, empresaId, step, 
             onClose();
           }}
         />
+      </Modal>
+    );
+  }
+
+  if (step.key === 'empresa.perfil_basico') {
+    return (
+      <Modal isOpen={isOpen} onClose={onClose} title="Empresa — Dados básicos" size="7xl" overlayClassName="z-50">
+        <div className="p-6">
+          <CompanySettingsForm
+            onSaved={async () => {
+              await onDone();
+              onClose();
+            }}
+          />
+        </div>
+      </Modal>
+    );
+  }
+
+  if (step.key === 'fiscal.nfe.emitente' || step.key === 'fiscal.nfe.numeracao') {
+    return (
+      <Modal isOpen={isOpen} onClose={onClose} title="Fiscal — NF-e (Configurações)" size="7xl" overlayClassName="z-50">
+        <div className="p-6">
+          <NfeSettingsPage
+            onEmitenteSaved={async () => {
+              await onDone();
+              onClose();
+            }}
+            onNumeracaoSaved={async () => {
+              await onDone();
+              onClose();
+            }}
+          />
+        </div>
       </Modal>
     );
   }

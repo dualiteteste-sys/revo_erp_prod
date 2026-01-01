@@ -7,7 +7,11 @@ import { fetchCnpjData } from '@/services/externalApis';
 import LogoUploader from './LogoUploader';
 import { documentMask, cepMask, phoneMask } from '@/lib/masks';
 
-const CompanySettingsForm: React.FC = () => {
+type Props = {
+  onSaved?: () => void | Promise<void>;
+};
+
+const CompanySettingsForm: React.FC<Props> = ({ onSaved }) => {
   const { activeEmpresa, refreshEmpresas } = useAuth();
   const { addToast } = useToast();
 
@@ -125,6 +129,7 @@ const CompanySettingsForm: React.FC = () => {
       setInitialData(newFormState);
       setFormData(newFormState);
       await refreshEmpresas();
+      await onSaved?.();
     } catch (error: any) {
       addToast(`Erro ao atualizar empresa: ${error.message}`, 'error');
     }

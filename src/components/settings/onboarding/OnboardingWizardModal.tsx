@@ -123,12 +123,12 @@ export default function OnboardingWizardModal({ isOpen, onClose, mode = 'manual'
     if (!current) return;
     await updateState({ last_step_key: current.key, wizard_dismissed_at: null });
 
+    // Gate suave “in-place”: todas as etapas abrem em modal por cima do assistente.
+    // Se a etapa não tiver UI embutida, mantemos como fallback navegar (mas hoje todas estão embutidas).
     if (isEmbeddedOnboardingStep(current.key)) {
       setActiveStepModalKey(current.key);
       return;
     }
-
-    onClose();
     navigate(current.actionHref);
   };
 

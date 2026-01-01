@@ -52,7 +52,12 @@ type NfeNumeracao = {
   ativo: boolean;
 };
 
-export default function NfeSettingsPage() {
+type Props = {
+  onEmitenteSaved?: () => void | Promise<void>;
+  onNumeracaoSaved?: () => void | Promise<void>;
+};
+
+export default function NfeSettingsPage({ onEmitenteSaved, onNumeracaoSaved }: Props) {
   const supabase = useSupabase() as any;
   const { activeEmpresa } = useAuth();
   const { addToast } = useToast();
@@ -357,6 +362,7 @@ export default function NfeSettingsPage() {
       if (error) throw error;
       addToast('Emitente salvo.', 'success');
       await fetchData();
+      await onEmitenteSaved?.();
     } catch (e: any) {
       addToast(e?.message || 'Erro ao salvar emitente.', 'error');
     } finally {
@@ -388,6 +394,7 @@ export default function NfeSettingsPage() {
       if (error) throw error;
       addToast('Numeração salva.', 'success');
       await fetchData();
+      await onNumeracaoSaved?.();
     } catch (e: any) {
       addToast(e?.message || 'Erro ao salvar numeração.', 'error');
     } finally {
