@@ -9,6 +9,7 @@ import { menuConfig } from '../../config/menuConfig';
 import { useAuth } from '../../contexts/AuthProvider';
 import CommandPalette from './CommandPalette';
 import OnboardingWizardModal from '@/components/settings/onboarding/OnboardingWizardModal';
+import OnboardingGateBanner from '@/components/onboarding/OnboardingGateBanner';
 
 const findActiveHref = (pathname: string): string => {
   for (const group of menuConfig) {
@@ -67,6 +68,15 @@ const MainLayout: React.FC = () => {
     }
   }, [location.search]);
 
+  const settingsParam = useMemo(() => {
+    try {
+      const params = new URLSearchParams(location.search);
+      return params.get('settings');
+    } catch {
+      return null;
+    }
+  }, [location.search]);
+
   useEffect(() => {
     try {
       localStorage.setItem(STORAGE_SIDEBAR_COLLAPSED, String(isSidebarCollapsed));
@@ -75,20 +85,10 @@ const MainLayout: React.FC = () => {
     }
   }, [isSidebarCollapsed]);
 
-  // Guard: Force Complete Profile
+  // Gate suave: abre o assistente automaticamente quando vindo do onboarding inicial (query param),
+  // e permite abrir o SettingsPanel via query param sem travar o app inteiro.
   useEffect(() => {
     if (authLoading || !activeEmpresa) return;
-
-    // Define required fields
-    const requiredFields = [
-      activeEmpresa.endereco_logradouro,
-      activeEmpresa.telefone,
-      activeEmpresa.cnpj,
-      activeEmpresa.nome_razao_social
-    ];
-
-    const isProfileIncomplete = requiredFields.some(field => !field || field.trim() === '');
-    console.log('[MainLayout] Profile Check:', { isProfileIncomplete, activeEmpresa });
 
     // On first access after onboarding form, open wizard once profile is not forcing settings.
     if (onboardingParam) {
@@ -96,30 +96,26 @@ const MainLayout: React.FC = () => {
       navigate(location.pathname, { replace: true });
     }
 
-    if (isProfileIncomplete || activeEmpresa.nome_razao_social === 'Empresa sem Nome') {
-      if (!isSettingsPanelOpen) {
-        console.log('[MainLayout] Forcing Settings Open');
-        forcedSettingsOpenRef.current = true;
-        setWasSidebarExpandedBeforeSettings(!isSidebarCollapsed);
-        setSettingsCanClose(false);
+    if (settingsParam && !isSettingsPanelOpen) {
+      // Ex.: /app?settings=empresa
+      setWasSidebarExpandedBeforeSettings(!isSidebarCollapsed);
+      setIsSidebarCollapsed(true);
+      setSettingsCanClose(true);
+      setIsSettingsPanelOpen(true);
+      forcedSettingsOpenRef.current = false;
+      if (settingsParam === 'empresa') {
         setSettingsInitialTab('Geral');
         setSettingsInitialItem('Empresa');
-        setIsSettingsPanelOpen(true);
-        setIsSidebarCollapsed(true);
+      } else if (settingsParam === 'onboarding') {
+        setSettingsInitialTab('Geral');
+        setSettingsInitialItem('Onboarding (Checklist)');
       }
-    } else {
-      // Libera fechamento e, se foi aberto automaticamente, fecha para o usuário seguir usando o sistema
-      if (!settingsCanClose) setSettingsCanClose(true);
-      if (isSettingsPanelOpen && forcedSettingsOpenRef.current) {
-        forcedSettingsOpenRef.current = false;
-        setIsSettingsPanelOpen(false);
-        setIsSidebarCollapsed(!wasSidebarExpandedBeforeSettings);
-      }
+      navigate(location.pathname, { replace: true });
+    }
 
-      if (onboardingAutoOpenPending && !isOnboardingWizardOpen) {
-        setOnboardingAutoOpenPending(false);
-        setIsOnboardingWizardOpen(true);
-      }
+    if (onboardingAutoOpenPending && !isOnboardingWizardOpen) {
+      setOnboardingAutoOpenPending(false);
+      setIsOnboardingWizardOpen(true);
     }
   }, [
     activeEmpresa,
@@ -130,6 +126,7 @@ const MainLayout: React.FC = () => {
     wasSidebarExpandedBeforeSettings,
     onboardingAutoOpenPending,
     onboardingParam,
+    settingsParam,
     navigate,
     location.pathname,
     isOnboardingWizardOpen,
@@ -172,6 +169,9 @@ const MainLayout: React.FC = () => {
         />
         <div className="flex-1 flex flex-col overflow-hidden">
           <SubscriptionGuard>
+            <div className="pb-3">
+              <OnboardingGateBanner onOpenWizard={() => setIsOnboardingWizardOpen(true)} />
+            </div>
             <main className="flex-1 overflow-y-auto scrollbar-styled pr-2">
               <Outlet />
             </main>

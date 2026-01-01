@@ -42,14 +42,14 @@ export default function OnboardingStepModal({ isOpen, onClose, empresaId, step, 
   const loadContas = useCallback(async () => {
     setLoading(true);
     try {
-      const { data, error } = await supabase
-        .from('financeiro_contas_correntes')
-        .select('*')
-        .eq('empresa_id', empresaId)
-        .order('created_at', { ascending: true })
-        .limit(200);
+      const { data, error } = await supabase.rpc('financeiro_contas_correntes_list', {
+        p_q: null,
+        p_ativo: true,
+        p_limit: 200,
+        p_offset: 0,
+      });
       if (error) throw error;
-      const rows = (data ?? []) as ContaCorrente[];
+      const rows = (data ?? []) as unknown as ContaCorrente[];
       setContas(rows);
       setSelectedContaId((prev) => prev ?? rows[0]?.id ?? null);
     } catch (e: any) {
@@ -180,4 +180,3 @@ export default function OnboardingStepModal({ isOpen, onClose, empresaId, step, 
 
   return null;
 }
-
