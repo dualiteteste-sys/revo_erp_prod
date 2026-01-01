@@ -8,6 +8,7 @@ import { estornarPdv, finalizePdv } from '@/services/vendasMvp';
 import { supabase } from '@/lib/supabaseClient';
 import { getVendaDetails, type VendaDetails } from '@/services/vendas';
 import CsvExportDialog from '@/components/ui/CsvExportDialog';
+import { useOnboardingGate } from '@/contexts/OnboardingGateContext';
 
 type PdvRow = {
   id: string;
@@ -83,6 +84,7 @@ function buildReceiptHtml(venda: VendaDetails, contaNome?: string) {
 
 export default function PdvPage() {
   const { addToast } = useToast();
+  const { ensure } = useOnboardingGate();
 
   const [loading, setLoading] = useState(true);
   const [rows, setRows] = useState<PdvRow[]>([]);
@@ -157,6 +159,9 @@ export default function PdvPage() {
   };
 
   const handleFinalize = async (pedidoId: string) => {
+    const gate = await ensure(['tesouraria.contas_correntes']);
+    if (!gate.ok) return;
+
     if (!contaCorrenteId) {
       addToast('Cadastre/seleciona uma conta corrente para receber no PDV.', 'error');
       return;
@@ -181,6 +186,9 @@ export default function PdvPage() {
   };
 
   const handleEstornar = async (pedidoId: string) => {
+    const gate = await ensure(['tesouraria.contas_correntes']);
+    if (!gate.ok) return;
+
     if (!contaCorrenteId) {
       addToast('Selecione uma conta corrente para lançar o estorno.', 'error');
       return;

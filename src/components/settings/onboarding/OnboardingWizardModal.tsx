@@ -14,6 +14,7 @@ type Props = {
   isOpen: boolean;
   onClose: () => void;
   mode?: 'auto' | 'manual';
+  forceStepKey?: string | null;
 };
 
 type EmpresaOnboardingRow = {
@@ -23,7 +24,7 @@ type EmpresaOnboardingRow = {
   steps: Record<string, unknown>;
 };
 
-export default function OnboardingWizardModal({ isOpen, onClose, mode = 'manual' }: Props) {
+export default function OnboardingWizardModal({ isOpen, onClose, mode = 'manual', forceStepKey }: Props) {
   const supabase = useSupabase();
   const { activeEmpresa } = useAuth();
   const { addToast } = useToast();
@@ -92,14 +93,17 @@ export default function OnboardingWizardModal({ isOpen, onClose, mode = 'manual'
         await ensureOnboardingRow();
         const state = await loadState();
         await refresh();
-        if (state?.last_step_key) {
+        if (forceStepKey) {
+          setCurrentKey(forceStepKey);
+          await updateState({ last_step_key: forceStepKey, wizard_dismissed_at: null });
+        } else if (state?.last_step_key) {
           setCurrentKey(state.last_step_key);
         }
       } catch {
         // ignore
       }
     })();
-  }, [empresaId, ensureOnboardingRow, isOpen, loadState, refresh]);
+  }, [empresaId, ensureOnboardingRow, forceStepKey, isOpen, loadState, refresh, updateState]);
 
   const progress = useMemo(() => {
     if (checks.length === 0) return { ok: 0, total: 0 };

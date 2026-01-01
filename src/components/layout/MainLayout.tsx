@@ -10,6 +10,7 @@ import { useAuth } from '../../contexts/AuthProvider';
 import CommandPalette from './CommandPalette';
 import OnboardingWizardModal from '@/components/settings/onboarding/OnboardingWizardModal';
 import OnboardingGateBanner from '@/components/onboarding/OnboardingGateBanner';
+import { OnboardingGateProvider } from '@/contexts/OnboardingGateContext';
 
 const findActiveHref = (pathname: string): string => {
   for (const group of menuConfig) {
@@ -54,6 +55,7 @@ const MainLayout: React.FC = () => {
   const [activeItem, setActiveItem] = useState(() => findActiveHref(location.pathname));
   const [isOnboardingWizardOpen, setIsOnboardingWizardOpen] = useState(false);
   const [onboardingAutoOpenPending, setOnboardingAutoOpenPending] = useState(false);
+  const [onboardingForceStepKey, setOnboardingForceStepKey] = useState<string | null>(null);
 
   useEffect(() => {
     setActiveItem(findActiveHref(location.pathname));
@@ -152,43 +154,59 @@ const MainLayout: React.FC = () => {
 
   return (
     <SubscriptionProvider>
-      <div className="h-screen p-4 flex gap-4">
-        <CommandPalette />
-        <OnboardingWizardModal
-          isOpen={isOnboardingWizardOpen}
-          mode="auto"
-          onClose={() => setIsOnboardingWizardOpen(false)}
-        />
-        <Sidebar
-          isCollapsed={isSidebarCollapsed}
-          setIsCollapsed={setIsSidebarCollapsed}
-          onOpenSettings={handleOpenSettings}
-          onOpenCreateCompanyModal={() => { /* No-op, modal removido */ }}
-          activeItem={activeItem}
-          setActiveItem={handleSetActiveItem}
-        />
-        <div className="flex-1 flex flex-col overflow-hidden">
-          <SubscriptionGuard>
-            <div className="pb-3">
-              <OnboardingGateBanner onOpenWizard={() => setIsOnboardingWizardOpen(true)} />
-            </div>
-            <main className="flex-1 overflow-y-auto scrollbar-styled pr-2">
-              <Outlet />
-            </main>
-          </SubscriptionGuard>
-        </div>
+      <OnboardingGateProvider
+        openWizard={async (stepKey) => {
+          setOnboardingForceStepKey(stepKey ?? null);
+          setIsOnboardingWizardOpen(true);
+        }}
+      >
+        <div className="h-screen p-4 flex gap-4">
+          <CommandPalette />
+          <OnboardingWizardModal
+            isOpen={isOnboardingWizardOpen}
+            mode="auto"
+            forceStepKey={onboardingForceStepKey}
+            onClose={() => {
+              setIsOnboardingWizardOpen(false);
+              setOnboardingForceStepKey(null);
+            }}
+          />
+          <Sidebar
+            isCollapsed={isSidebarCollapsed}
+            setIsCollapsed={setIsSidebarCollapsed}
+            onOpenSettings={handleOpenSettings}
+            onOpenCreateCompanyModal={() => { /* No-op, modal removido */ }}
+            activeItem={activeItem}
+            setActiveItem={handleSetActiveItem}
+          />
+          <div className="flex-1 flex flex-col overflow-hidden">
+            <SubscriptionGuard>
+              <div className="pb-3">
+                <OnboardingGateBanner
+                  onOpenWizard={() => {
+                    setOnboardingForceStepKey(null);
+                    setIsOnboardingWizardOpen(true);
+                  }}
+                />
+              </div>
+              <main className="flex-1 overflow-y-auto scrollbar-styled pr-2">
+                <Outlet />
+              </main>
+            </SubscriptionGuard>
+          </div>
 
-        <AnimatePresence>
-          {isSettingsPanelOpen && (
-            <SettingsPanel
-              onClose={handleCloseSettings}
-              canClose={settingsCanClose}
-              initialTab={settingsInitialTab}
-              initialItem={settingsInitialItem}
-            />
-          )}
-        </AnimatePresence>
-      </div>
+          <AnimatePresence>
+            {isSettingsPanelOpen && (
+              <SettingsPanel
+                onClose={handleCloseSettings}
+                canClose={settingsCanClose}
+                initialTab={settingsInitialTab}
+                initialItem={settingsInitialItem}
+              />
+            )}
+          </AnimatePresence>
+        </div>
+      </OnboardingGateProvider>
     </SubscriptionProvider>
   );
 };

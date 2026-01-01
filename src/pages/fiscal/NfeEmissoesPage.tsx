@@ -7,6 +7,7 @@ import Select from '@/components/ui/forms/Select';
 import { useSupabase } from '@/providers/SupabaseProvider';
 import { useAuth } from '@/contexts/AuthProvider';
 import { useToast } from '@/contexts/ToastProvider';
+import { useOnboardingGate } from '@/contexts/OnboardingGateContext';
 import { useEmpresaFeatures } from '@/hooks/useEmpresaFeatures';
 import { traceAction } from '@/lib/tracing';
 import { Copy, Eye, FileKey, Loader2, Plus, Receipt, Search, Settings, Send, Trash2 } from 'lucide-react';
@@ -87,6 +88,7 @@ export default function NfeEmissoesPage() {
   const supabase = useSupabase() as any;
   const { activeEmpresa } = useAuth();
   const { addToast } = useToast();
+  const { ensure } = useOnboardingGate();
   const features = useEmpresaFeatures();
 
   const empresaId = activeEmpresa?.id;
@@ -589,6 +591,9 @@ export default function NfeEmissoesPage() {
       return;
     }
 
+    const gate = await ensure(['fiscal.nfe.emitente', 'fiscal.nfe.numeracao']);
+    if (!gate.ok) return;
+
     setSendingId(emissaoId);
     try {
       await traceAction(
@@ -651,6 +656,9 @@ export default function NfeEmissoesPage() {
   };
 
   const fetchDocFromProvider = async (emissaoId: string, docType: 'danfe_pdf' | 'cce_pdf' | 'cce_xml') => {
+    const gate = await ensure(['fiscal.nfe.emitente', 'fiscal.nfe.numeracao']);
+    if (!gate.ok) return;
+
     setDocsFetchingId(emissaoId);
     try {
       const { data, error } = await supabase.functions.invoke('nfeio-docs', {
@@ -674,6 +682,10 @@ export default function NfeEmissoesPage() {
   const handleCancel = async (emissaoId: string) => {
     const ok = window.confirm('Tem certeza que deseja solicitar o cancelamento desta NF-e? (Operação assíncrona)');
     if (!ok) return;
+
+    const gate = await ensure(['fiscal.nfe.emitente', 'fiscal.nfe.numeracao']);
+    if (!gate.ok) return;
+
     setCancelingId(emissaoId);
     try {
       const { data, error } = await supabase.functions.invoke('nfeio-cancel', { body: { emissao_id: emissaoId } });
@@ -724,6 +736,10 @@ export default function NfeEmissoesPage() {
       addToast('Informe o texto da carta de correção.', 'warning');
       return;
     }
+
+    const gate = await ensure(['fiscal.nfe.emitente', 'fiscal.nfe.numeracao']);
+    if (!gate.ok) return;
+
     setSaving(true);
     try {
       const { data, error } = await supabase.functions.invoke('nfeio-cce', {
