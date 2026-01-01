@@ -9,6 +9,7 @@ import NfeEmissaoSettings from '@/components/settings/fiscal/NfeEmissaoSettings'
 import AuditLogsPage from '@/components/settings/audit/AuditLogsPage';
 import OnboardingChecklistPage from '@/components/settings/onboarding/OnboardingChecklistPage';
 import FeatureFlagsPage from '@/components/settings/feature-flags/FeatureFlagsPage';
+import MarketplaceIntegrationsPage from '@/components/settings/ecommerce/MarketplaceIntegrationsPage';
 
 interface SettingsContentProps {
   activeItem: string;
@@ -35,6 +36,8 @@ const SettingsContent: React.FC<SettingsContentProps> = ({ activeItem }) => {
         return <FeatureFlagsPage />;
       case 'Auditoria':
         return <AuditLogsPage />;
+      case 'Integrações (Marketplaces)':
+        return <MarketplaceIntegrationsPage />;
       default:
         return (
           <div>

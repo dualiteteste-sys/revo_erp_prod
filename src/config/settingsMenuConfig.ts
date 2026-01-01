@@ -1,4 +1,4 @@
-import { Building, Users, UserCog, CreditCard, Trash2, ShieldCheck, Receipt, ListChecks, ToggleLeft } from 'lucide-react';
+import { Building, Users, UserCog, CreditCard, Trash2, ShieldCheck, Receipt, ListChecks, ToggleLeft, Plug } from 'lucide-react';
 
 export interface SettingsTab {
   name: string;
@@ -59,6 +59,8 @@ export const settingsMenuConfig: SettingsTab[] = [
   },
   {
     name: 'E-Commerce',
-    menu: [],
+    menu: [
+      { name: 'Integrações (Marketplaces)', icon: Plug, href: '/app/configuracoes/ecommerce/marketplaces' },
+    ],
   },
 ];
