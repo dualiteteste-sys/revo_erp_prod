@@ -1,0 +1,76 @@
+import { callRpc } from '@/lib/api';
+
+export type EcommerceProvider = 'meli' | 'shopee';
+
+export type EcommerceConnectionConfig = {
+  import_orders?: boolean;
+  sync_stock?: boolean;
+  push_tracking?: boolean;
+  safe_mode?: boolean;
+  [key: string]: unknown;
+};
+
+export type EcommerceConnection = {
+  id: string;
+  empresa_id: string;
+  provider: EcommerceProvider;
+  nome: string;
+  status: string;
+  external_account_id: string | null;
+  config: EcommerceConnectionConfig | null;
+  last_sync_at: string | null;
+  last_error: string | null;
+  connected_at: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type EcommerceHealthSummary = {
+  pending: number;
+  failed_24h: number;
+  last_sync_at: string | null;
+};
+
+export function normalizeEcommerceConfig(value: unknown): EcommerceConnectionConfig {
+  const raw = value && typeof value === 'object' && !Array.isArray(value) ? (value as Record<string, unknown>) : {};
+  const import_orders = raw.import_orders === false ? false : true;
+  const sync_stock = raw.sync_stock === true;
+  const push_tracking = raw.push_tracking === true;
+  const safe_mode = raw.safe_mode === false ? false : true;
+  return { ...raw, import_orders, sync_stock, push_tracking, safe_mode };
+}
+
+export async function listEcommerceConnections(): Promise<EcommerceConnection[]> {
+  return callRpc<EcommerceConnection[]>('ecommerce_connections_list', {});
+}
+
+export async function upsertEcommerceConnection(params: {
+  provider: EcommerceProvider;
+  nome: string;
+  status?: string | null;
+  external_account_id?: string | null;
+  config?: EcommerceConnectionConfig | null;
+}): Promise<EcommerceConnection> {
+  return callRpc<EcommerceConnection>('ecommerce_connections_upsert', {
+    p_provider: params.provider,
+    p_nome: params.nome,
+    p_status: params.status ?? null,
+    p_external_account_id: params.external_account_id ?? null,
+    p_config: params.config ?? null,
+  });
+}
+
+export async function updateEcommerceConnectionConfig(connectionId: string, config: EcommerceConnectionConfig): Promise<void> {
+  await callRpc('ecommerce_connections_update_config', {
+    p_id: connectionId,
+    p_config: normalizeEcommerceConfig(config),
+  });
+}
+
+export async function disconnectEcommerceConnection(connectionId: string): Promise<void> {
+  await callRpc('ecommerce_connections_disconnect', { p_id: connectionId });
+}
+
+export async function getEcommerceHealthSummary(): Promise<EcommerceHealthSummary> {
+  return callRpc<EcommerceHealthSummary>('ecommerce_health_summary', { p_window: null });
+}
