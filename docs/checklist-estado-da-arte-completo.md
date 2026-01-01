@@ -36,7 +36,7 @@ Regra de ouro:
 
 ### 1.1 Logs/Tracing/Métricas (com contexto de negócio)
 - [x] OBS-01 Correlation ID (request_id) propagado: front → edge functions → DB logs
-- [ ] OBS-02 Tracing por ação crítica (ex.: emitir NF, finalizar PDV, importar marketplace)
+- [x] OBS-02 Tracing por ação crítica (ex.: emitir NF, finalizar PDV, importar marketplace)
 - [ ] OBS-03 Métricas de produto: tempo de carregamento, taxas de erro, funis (setup → primeira venda)
 - [ ] OBS-04 Painel “Operação”: fila, falhas, webhooks, retries, status, últimos eventos
 
