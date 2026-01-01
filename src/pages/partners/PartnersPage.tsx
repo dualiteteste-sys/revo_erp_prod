@@ -20,6 +20,8 @@ import { useBulkSelection } from '@/hooks/useBulkSelection';
 import BulkActionsBar from '@/components/ui/BulkActionsBar';
 import PageShell from '@/components/ui/PageShell';
 import PageCard from '@/components/ui/PageCard';
+import EmptyState from '@/components/ui/EmptyState';
+import { uiMessages } from '@/lib/ui/messages';
 
 const PartnersPage: React.FC = () => {
   const enableSeed = isSeedEnabled();
@@ -362,20 +364,20 @@ const PartnersPage: React.FC = () => {
         ) : error ? (
           <div className="h-96 flex items-center justify-center text-red-500">{error}</div>
         ) : partners.length === 0 ? (
-          <div className="h-96 flex flex-col items-center justify-center text-center text-gray-500 p-4">
-            <Users2 size={48} className="mb-4" />
-            <p className="font-semibold text-lg">Nenhum cliente ou fornecedor encontrado.</p>
-            <p className="text-sm mb-4">
-              Comece cadastrando um novo parceiro{enableSeed ? ' ou popule com dados de exemplo.' : '.'}
-            </p>
-            {searchTerm && <p className="text-sm">Tente ajustar sua busca.</p>}
-            {enableSeed ? (
-              <Button onClick={handleSeedPartners} disabled={isSeeding} variant="secondary" className="mt-4 gap-2">
-                {isSeeding ? <Loader2 className="animate-spin" size={18} /> : <DatabaseBackup size={18} />}
-                Popular com dados de exemplo
-              </Button>
-            ) : null}
-          </div>
+          <EmptyState
+            icon={<Users2 size={48} />}
+            title="Nenhum cliente ou fornecedor encontrado"
+            description={`Comece cadastrando um novo parceiro${enableSeed ? ' ou popule com dados de exemplo.' : '.'}`}
+            hint={searchTerm ? uiMessages.empty.tryAdjustFilters : undefined}
+            actions={
+              enableSeed ? (
+                <Button onClick={handleSeedPartners} disabled={isSeeding} variant="secondary" className="gap-2">
+                  {isSeeding ? <Loader2 className="animate-spin" size={18} /> : <DatabaseBackup size={18} />}
+                  Popular com dados de exemplo
+                </Button>
+              ) : null
+            }
+          />
         ) : (
           <>
             <BulkActionsBar

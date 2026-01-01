@@ -17,6 +17,8 @@ import { useBulkSelection } from '@/hooks/useBulkSelection';
 import BulkActionsBar from '@/components/ui/BulkActionsBar';
 import PageShell from '@/components/ui/PageShell';
 import PageCard from '@/components/ui/PageCard';
+import EmptyState from '@/components/ui/EmptyState';
+import { uiMessages } from '@/lib/ui/messages';
 
 export default function ServicesPage() {
   const enableSeed = isSeedEnabled();
@@ -254,20 +256,20 @@ export default function ServicesPage() {
         ) : error ? (
           <div className="h-96 flex items-center justify-center text-red-500">{error}</div>
         ) : services.length === 0 ? (
-          <div className="h-96 flex flex-col items-center justify-center text-center text-gray-500 p-4">
-            <Wrench size={48} className="mb-4" />
-            <p className="font-semibold text-lg">Nenhum serviço encontrado.</p>
-            <p className="text-sm mb-4">
-              Comece cadastrando um novo serviço{enableSeed ? ' ou popule com dados de exemplo.' : '.'}
-            </p>
-            {searchTerm && <p className="text-sm">Tente ajustar sua busca.</p>}
-            {enableSeed ? (
-              <Button onClick={handleSeedServices} disabled={isSeeding} variant="secondary" className="mt-4 gap-2">
-                {isSeeding ? <Loader2 className="animate-spin" size={18} /> : <DatabaseBackup size={18} />}
-                Popular com dados de exemplo
-              </Button>
-            ) : null}
-          </div>
+          <EmptyState
+            icon={<Wrench size={48} />}
+            title="Nenhum serviço encontrado"
+            description={`Comece cadastrando um novo serviço${enableSeed ? ' ou popule com dados de exemplo.' : '.'}`}
+            hint={searchTerm ? uiMessages.empty.tryAdjustFilters : undefined}
+            actions={
+              enableSeed ? (
+                <Button onClick={handleSeedServices} disabled={isSeeding} variant="secondary" className="gap-2">
+                  {isSeeding ? <Loader2 className="animate-spin" size={18} /> : <DatabaseBackup size={18} />}
+                  Popular com dados de exemplo
+                </Button>
+              ) : null
+            }
+          />
         ) : (
           <>
             <BulkActionsBar
