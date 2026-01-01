@@ -19,6 +19,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useConfirm } from '@/contexts/ConfirmProvider';
 import { useHasPermission } from '@/hooks/useHasPermission';
 import { traceAction } from '@/lib/tracing';
+import { useOnboardingGate } from '@/contexts/OnboardingGateContext';
 
 const OSPage: React.FC = () => {
   const {
@@ -41,6 +42,7 @@ const OSPage: React.FC = () => {
   const { addToast } = useToast();
   const { confirm } = useConfirm();
   const navigate = useNavigate();
+  const { ensure } = useOnboardingGate();
   const permCreate = useHasPermission('os', 'create');
   const permUpdate = useHasPermission('os', 'update');
   const permDelete = useHasPermission('os', 'delete');
@@ -162,6 +164,11 @@ const OSPage: React.FC = () => {
         variant: next === 'cancelada' ? 'danger' : 'default',
       });
       if (!ok) return;
+    }
+
+    if (next === 'concluida') {
+      const gate = await ensure(['tesouraria.padrao_recebimentos']);
+      if (!gate.ok) return;
     }
 
     try {
