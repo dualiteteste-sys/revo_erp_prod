@@ -59,6 +59,7 @@ export default function MarketplaceIntegrationsPage() {
   const [busyProvider, setBusyProvider] = useState<Provider | null>(null);
   const [testingProvider, setTestingProvider] = useState<Provider | null>(null);
   const [diagnostics, setDiagnostics] = useState<Record<string, any> | null>(null);
+  const [syncingOrders, setSyncingOrders] = useState<Provider | null>(null);
 
   const canView = !!permView.data;
   const canManage = !!permManage.data;
@@ -219,6 +220,34 @@ export default function MarketplaceIntegrationsPage() {
     }
   };
 
+  const handleImportOrdersNow = async (provider: Provider) => {
+    if (!supabase) {
+      addToast('Supabase client indisponível.', 'error');
+      return;
+    }
+    if (!canManage) {
+      addToast('Sem permissão para gerenciar integrações.', 'warning');
+      return;
+    }
+    if (syncingOrders) return;
+
+    setSyncingOrders(provider);
+    try {
+      const { data, error } = await supabase.functions.invoke('marketplaces-sync', {
+        body: { provider, action: 'import_orders' },
+      });
+      if (error) throw error;
+      const imported = (data as any)?.imported ?? 0;
+      const skipped = (data as any)?.skipped_items ?? 0;
+      addToast(`Importação concluída: ${imported} pedidos. Itens sem mapeamento: ${skipped}.`, 'success');
+      await fetchAll();
+    } catch (e: any) {
+      addToast(e?.message || 'Falha ao importar pedidos.', 'error');
+    } finally {
+      setSyncingOrders(null);
+    }
+  };
+
   if (permView.isLoading) {
     return <div className="text-sm text-gray-600">Carregando…</div>;
   }
@@ -344,6 +373,24 @@ export default function MarketplaceIntegrationsPage() {
                     <span className="text-xs text-gray-500">{conn?.config?.push_tracking ? 'Ativo' : 'Inativo'}</span>
                   </li>
                 </ul>
+
+                {provider === 'meli' && conn?.status === 'connected' && conn?.config?.import_orders ? (
+                  <div className="mt-4 flex items-center justify-between gap-2">
+                    <div className="text-xs text-gray-500">
+                      Importa pedidos recentes e cria/atualiza `Pedidos de Venda` automaticamente.
+                    </div>
+                    <Button
+                      variant="outline"
+                      className="gap-2"
+                      disabled={!canManage || syncingOrders === 'meli'}
+                      onClick={() => void handleImportOrdersNow('meli')}
+                      title={canManage ? 'Importar agora' : 'Sem permissão'}
+                    >
+                      <RefreshCw size={16} />
+                      {syncingOrders === 'meli' ? 'Importando…' : 'Importar agora'}
+                    </Button>
+                  </div>
+                ) : null}
               </div>
             </GlassCard>
           );

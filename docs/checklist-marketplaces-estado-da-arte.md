@@ -40,8 +40,8 @@ Princípios:
 - [ ] MELI-02 Seleção de conta (seller) + vínculo a `empresa_id`
 
 ### 1.2 Pedidos (MVP prioritário)
-- [ ] MELI-03 Importar pedidos por janela (since) + paginação + dedupe (external order id)
-- [ ] MELI-04 Mapear pedido → `vendas_pedidos` (cliente, itens, frete, impostos básicos, canal=marketplace)
+- [x] MELI-03 Importar pedidos por janela (since) + paginação + dedupe (external order id)
+- [x] MELI-04 Mapear pedido → `vendas_pedidos` (cliente, itens, frete, impostos básicos, canal=marketplace)
 - [ ] MELI-05 Estados: refletir “aprovado/pago/cancelado” no Revo sem quebrar regras internas
 
 ### 1.3 Envios (Expedição)
