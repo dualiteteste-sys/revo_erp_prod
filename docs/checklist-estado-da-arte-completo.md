@@ -16,7 +16,7 @@ Regra de ouro:
 ### 0.1 Design System “de verdade”
 - [x] DS-01 Tokens de design (cores, tipografia, espaçamentos, radius, shadows) centralizados e usados em tudo
 - [x] DS-02 Componentes base padronizados (Button/Input/Select/Modal/Table/Toast/Skeleton) com variantes consistentes
-- [ ] DS-03 Padrão de layout por módulo (header, filtros, tabela, actions, detalhes) e padrões “do Revo”
+- [x] DS-03 Padrão de layout por módulo (header, filtros, tabela, actions, detalhes) e padrões “do Revo” (template + aplicado em módulos-chave)
 - [ ] DS-04 Ícones, estados vazios e mensagens (tom/voz) consistentes
 
 ### 0.2 UX de elite
