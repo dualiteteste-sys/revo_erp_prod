@@ -9,6 +9,7 @@ import { useHasPermission } from '@/hooks/useHasPermission';
 import {
   type EcommerceConnection,
   disconnectEcommerceConnection,
+  getEcommerceConnectionDiagnostics,
   getEcommerceHealthSummary,
   listEcommerceConnections,
   upsertEcommerceConnection,
@@ -55,6 +56,8 @@ export default function MarketplaceIntegrationsPage() {
   const [activeConnection, setActiveConnection] = useState<EcommerceConnection | null>(null);
   const [savingConfig, setSavingConfig] = useState(false);
   const [busyProvider, setBusyProvider] = useState<Provider | null>(null);
+  const [testingProvider, setTestingProvider] = useState<Provider | null>(null);
+  const [diagnostics, setDiagnostics] = useState<Record<string, any> | null>(null);
 
   const canView = !!permView.data;
   const canManage = !!permManage.data;
@@ -94,14 +97,17 @@ export default function MarketplaceIntegrationsPage() {
 
     setBusyProvider(provider);
     try {
-      await upsertEcommerceConnection({
+      const created = await upsertEcommerceConnection({
         provider,
         nome: providerLabels[provider],
         status: 'pending',
         config: defaultConfig(),
       });
-      addToast('Integração criada. Agora configure as credenciais do canal para concluir a conexão.', 'success');
+      addToast('Integração criada. Configure as credenciais do canal e use “Testar conexão”.', 'success');
       await fetchAll();
+      setActiveConnection(created);
+      setDiagnostics(null);
+      setConfigOpen(true);
     } catch (e: any) {
       addToast(e?.message || 'Falha ao iniciar conexão.', 'error');
     } finally {
@@ -134,7 +140,30 @@ export default function MarketplaceIntegrationsPage() {
     const conn = byProvider.get(provider);
     if (!conn) return;
     setActiveConnection(conn);
+    setDiagnostics(null);
     setConfigOpen(true);
+  };
+
+  const handleTestConnection = async () => {
+    if (!activeConnection) return;
+    const provider = activeConnection.provider as Provider;
+    if (testingProvider) return;
+
+    setTestingProvider(provider);
+    try {
+      const diag = await getEcommerceConnectionDiagnostics(provider);
+      setDiagnostics(diag as any);
+      if (diag.status === 'connected' && diag.has_token && !diag.token_expired) {
+        addToast('Conexão OK.', 'success');
+      } else {
+        addToast('Conexão ainda incompleta. Veja os detalhes no assistente.', 'warning');
+      }
+    } catch (e: any) {
+      addToast(e?.message || 'Falha ao testar conexão.', 'error');
+      setDiagnostics(null);
+    } finally {
+      setTestingProvider(null);
+    }
   };
 
   const handleSaveConfig = async () => {
@@ -293,16 +322,65 @@ export default function MarketplaceIntegrationsPage() {
       <Dialog open={configOpen} onOpenChange={(v) => setConfigOpen(v)}>
         <DialogContent className="max-w-xl">
           <DialogHeader>
-            <DialogTitle>Configurar integração</DialogTitle>
+            <DialogTitle>Assistente de integração</DialogTitle>
           </DialogHeader>
 
           {!activeConnection ? null : (
             <div className="space-y-4">
               <div className="text-sm text-gray-700">
-                {providerLabels[activeConnection.provider as Provider]} — <span className="text-gray-500">recursos e modo seguro</span>
+                {providerLabels[activeConnection.provider as Provider]} — <span className="text-gray-500">passo a passo + recursos</span>
               </div>
 
+              <GlassCard className="p-3">
+                <div className="text-sm font-medium text-gray-900">1) Conectar</div>
+                <div className="mt-1 text-xs text-gray-600">
+                  Neste MVP, a conexão técnica (OAuth/tokens) será configurada pelo módulo de integração. Quando estiver pronta, use “Testar conexão”
+                  para validar.
+                </div>
+                <div className="mt-3 flex flex-wrap items-center gap-2">
+                  <Button
+                    variant="outline"
+                    className="gap-2"
+                    onClick={() => void handleTestConnection()}
+                    disabled={testingProvider === (activeConnection.provider as Provider)}
+                  >
+                    <RefreshCw size={16} />
+                    {testingProvider === (activeConnection.provider as Provider) ? 'Testando…' : 'Testar conexão'}
+                  </Button>
+                  <div className="text-xs text-gray-500">
+                    Status atual: <span className="font-medium text-gray-700">{(diagnostics?.status ?? activeConnection.status) || '—'}</span>
+                  </div>
+                </div>
+                {diagnostics ? (
+                  <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+                    <div className="rounded-lg bg-white/70 border border-gray-100 p-2">
+                      <div className="text-gray-500">Conta</div>
+                      <div className="font-medium text-gray-800">{diagnostics.external_account_id || '—'}</div>
+                    </div>
+                    <div className="rounded-lg bg-white/70 border border-gray-100 p-2">
+                      <div className="text-gray-500">Token</div>
+                      <div className="font-medium text-gray-800">
+                        {diagnostics.has_token ? (diagnostics.token_expired ? 'Expirado' : 'OK') : 'Ausente'}
+                      </div>
+                    </div>
+                    <div className="rounded-lg bg-white/70 border border-gray-100 p-2">
+                      <div className="text-gray-500">Último sync</div>
+                      <div className="font-medium text-gray-800">
+                        {diagnostics.last_sync_at ? new Date(diagnostics.last_sync_at).toLocaleString('pt-BR') : '—'}
+                      </div>
+                    </div>
+                    <div className="rounded-lg bg-white/70 border border-gray-100 p-2">
+                      <div className="text-gray-500">Erro</div>
+                      <div className="font-medium text-gray-800 truncate" title={diagnostics.last_error || ''}>
+                        {diagnostics.last_error || '—'}
+                      </div>
+                    </div>
+                  </div>
+                ) : null}
+              </GlassCard>
+
               <div className="space-y-3">
+                <div className="text-sm font-medium text-gray-900">2) Ativar recursos</div>
                 <div className="flex items-center justify-between gap-3">
                   <div>
                     <div className="text-sm font-medium text-gray-800">Importar pedidos</div>
@@ -371,4 +449,3 @@ export default function MarketplaceIntegrationsPage() {
     </div>
   );
 }
-

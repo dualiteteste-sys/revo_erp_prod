@@ -31,6 +31,20 @@ export type EcommerceHealthSummary = {
   last_sync_at: string | null;
 };
 
+export type EcommerceConnectionDiagnostics = {
+  provider: EcommerceProvider;
+  has_connection: boolean;
+  status: string;
+  external_account_id: string | null;
+  connected_at: string | null;
+  last_sync_at: string | null;
+  last_error: string | null;
+  has_token: boolean;
+  has_refresh_token: boolean;
+  token_expires_at: string | null;
+  token_expired: boolean;
+};
+
 export function normalizeEcommerceConfig(value: unknown): EcommerceConnectionConfig {
   const raw = value && typeof value === 'object' && !Array.isArray(value) ? (value as Record<string, unknown>) : {};
   const import_orders = raw.import_orders === false ? false : true;
@@ -73,4 +87,8 @@ export async function disconnectEcommerceConnection(connectionId: string): Promi
 
 export async function getEcommerceHealthSummary(): Promise<EcommerceHealthSummary> {
   return callRpc<EcommerceHealthSummary>('ecommerce_health_summary', { p_window: null });
+}
+
+export async function getEcommerceConnectionDiagnostics(provider: EcommerceProvider): Promise<EcommerceConnectionDiagnostics> {
+  return callRpc<EcommerceConnectionDiagnostics>('ecommerce_connection_diagnostics', { p_provider: provider });
 }

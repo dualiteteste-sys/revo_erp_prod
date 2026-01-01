@@ -12,7 +12,7 @@ Princípios:
 ## 0) Base (plataforma de integração)
 
 ### 0.1 Conexões e segurança
-- [ ] INT-01 Modelo canônico: `connections` + `accounts` + `mappings` (externo ↔ interno) com `empresa_id`
+- [x] INT-01 Modelo canônico: `connections` + `accounts` + `mappings` (externo ↔ interno) com `empresa_id`
 - [ ] INT-02 Credenciais seguras: secrets no provedor (Supabase/Actions) + tokens no DB apenas criptografados/rotacionáveis (quando aplicável)
 - [ ] INT-03 OAuth “redondo”: connect → refresh token → revoke/disconnect + auditoria
 - [x] INT-04 RLS + RBAC: só admins gerenciam integrações; dados sempre filtrados por `empresa_id`
@@ -30,7 +30,7 @@ Princípios:
 
 ### 0.4 UX (Centro de Integrações)
 - [x] INT-12 Página “Integrações”: cards por canal (status, conectado, último sync, falhas)
-- [ ] INT-13 Conectar em 1 minuto: wizard com ajuda + botão “Testar conexão”
+- [x] INT-13 Conectar em 1 minuto: wizard com ajuda + botão “Testar conexão”
 - [x] INT-14 “Modo seguro” (MVP): toggles por recurso (importar pedidos / atualizar status / sync estoque)
 
 ## 1) Mercado Livre (MELI)
