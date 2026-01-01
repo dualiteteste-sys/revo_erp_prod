@@ -82,8 +82,15 @@ function mapMeliOrderStatus(order: any): "orcamento" | "aprovado" | "cancelado" 
   const payments = Array.isArray(order?.payments) ? order.payments : [];
   const hasApprovedPayment = payments.some((p: any) => String(p?.status ?? "").toLowerCase() === "approved");
   if (["cancelled", "invalid", "expired"].includes(status)) return "cancelado";
-  if (status === "paid" || hasApprovedPayment) return "aprovado";
+  if (["paid", "confirmed"].includes(status) || hasApprovedPayment) return "aprovado";
   return "orcamento";
+}
+
+function chooseNextStatus(current: any, desired: "orcamento" | "aprovado" | "cancelado"): any {
+  const cur = String(current ?? "").toLowerCase();
+  if (cur === "concluido") return "concluido";
+  if (cur === "cancelado") return "cancelado";
+  return desired;
 }
 
 function num(value: any, fallback = 0): number {
@@ -152,7 +159,7 @@ async function upsertPedidoFromMeliOrder(params: {
   const buyer = order?.buyer ?? {};
   const clienteId = await ensureBuyerAsPartner(admin, empresaId, buyer);
 
-  const status = mapMeliOrderStatus(order);
+  const desiredStatus = mapMeliOrderStatus(order);
   const createdAtIso = toIsoOrNull(order?.date_created) ?? new Date().toISOString();
   const dataEmissao = createdAtIso.slice(0, 10); // date
 
@@ -185,9 +192,12 @@ async function upsertPedidoFromMeliOrder(params: {
   let pedidoId: string | null = linkExisting?.vendas_pedido_id ? String(linkExisting.vendas_pedido_id) : null;
 
   if (pedidoId) {
+    const { data: existing } = await admin.from("vendas_pedidos").select("status").eq("id", pedidoId).eq("empresa_id", empresaId).maybeSingle();
+    basePedido.status = chooseNextStatus(existing?.status, desiredStatus);
     await admin.from("vendas_pedidos").update(basePedido).eq("id", pedidoId).eq("empresa_id", empresaId);
     await admin.from("vendas_itens_pedido").delete().eq("empresa_id", empresaId).eq("pedido_id", pedidoId);
   } else {
+    basePedido.status = desiredStatus;
     const { data: created, error } = await admin.from("vendas_pedidos").insert(basePedido).select("id").single();
     if (error) throw error;
     pedidoId = String(created.id);
@@ -281,7 +291,7 @@ serve(async (req) => {
   // Conexão
   const { data: conn } = await admin
     .from("ecommerces")
-    .select("id,empresa_id,provider,status,external_account_id,last_sync_at,config")
+    .select("id,empresa_id,provider,status,external_account_id,active_account_id,last_sync_at,config")
     .eq("provider", "meli")
     .limit(1)
     .maybeSingle();
@@ -289,7 +299,11 @@ serve(async (req) => {
   if (!conn?.id || !conn?.empresa_id) return json(404, { ok: false, error: "NOT_CONNECTED" }, cors);
   const ecommerceId = String(conn.id);
   const empresaId = String(conn.empresa_id);
-  const sellerId = conn.external_account_id ? String(conn.external_account_id) : "";
+  let sellerId = conn.external_account_id ? String(conn.external_account_id) : "";
+  if (conn.active_account_id) {
+    const { data: acct } = await admin.from("ecommerce_accounts").select("external_account_id").eq("id", conn.active_account_id).maybeSingle();
+    if (acct?.external_account_id) sellerId = String(acct.external_account_id);
+  }
   if (!sellerId) return json(409, { ok: false, error: "MISSING_SELLER_ID" }, cors);
 
   const { data: sec } = await admin
@@ -429,4 +443,3 @@ serve(async (req) => {
     return json(502, { ok: false, provider: "meli", error: msg }, cors);
   }
 });
-

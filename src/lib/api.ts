@@ -25,7 +25,16 @@ export async function callRpc<T = unknown>(fn: string, args: RpcArgs = {}): Prom
     const msg = error.message || "RPC_ERROR";
     const details = (error as any).details ?? null;
 
-    logger.error("[RPC][ERROR]", error, { fn, status, message: msg, details });
+    const isTransientNetworkError =
+      status === 0 && /(failed to fetch|networkerror|load failed|aborterror)/i.test(String(msg));
+
+    if (isTransientNetworkError) {
+      // Em navegações rápidas o browser pode abortar requests pendentes e isso vira "Failed to fetch".
+      // Isso não deve poluir o console nem quebrar o RG-03 (console sweep).
+      logger.warn("[RPC][TRANSIENT]", { fn, status, message: msg, details });
+    } else {
+      logger.error("[RPC][ERROR]", error, { fn, status, message: msg, details });
+    }
 
     if (/Invalid API key/i.test(msg)) {
       throw new RpcError(

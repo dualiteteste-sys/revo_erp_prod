@@ -151,7 +151,7 @@ serve(async (req) => {
     }).eq("id", stRow.ecommerce_id);
 
     if (userId) {
-      await admin.from("ecommerce_accounts").upsert(
+      const { data: acct } = await admin.from("ecommerce_accounts").upsert(
         {
           empresa_id: stRow.empresa_id,
           ecommerce_id: stRow.ecommerce_id,
@@ -161,8 +161,12 @@ serve(async (req) => {
           connected_at: new Date().toISOString(),
           meta: { user_id: userId },
         },
-        { onConflict: "ecommerce_id,external_account_id" },
-      );
+        { onConflict: "ecommerce_id,external_account_id" }
+      ).select("id").maybeSingle();
+
+      if (acct?.id) {
+        await admin.from("ecommerces").update({ active_account_id: acct.id }).eq("id", stRow.ecommerce_id);
+      }
     }
 
     await admin.from("ecommerce_oauth_states").update({ consumed_at: new Date().toISOString() }).eq("id", stRow.id);
@@ -212,4 +216,3 @@ serve(async (req) => {
   // Shopee: esqueleto (a URL/parametrização varia conforme SDK/contrato do parceiro)
   return json(501, { ok: false, provider: "shopee", error: "NOT_IMPLEMENTED_YET", hint: "SHO-01 será implementado após definição de credenciais/fluxo Shopee." }, cors);
 });
-
