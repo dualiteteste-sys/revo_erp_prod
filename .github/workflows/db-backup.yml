@@ -38,11 +38,6 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Install PostgreSQL client
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y postgresql-client
-
       - name: Resolve target DB URL
         id: db
         shell: bash
@@ -98,7 +93,12 @@ jobs:
           fi
 
           echo "Gerando $file (mode=$MODE)"
-          pg_dump "${args[@]}" "$DATABASE_URL" -f "$file"
+          # Usar pg_dump compatível com o Postgres do Supabase (evita mismatch de versão do runner).
+          docker run --rm \
+            -v "$PWD:/work" \
+            -w /work \
+            postgres:17 \
+            pg_dump "${args[@]}" "$DATABASE_URL" -f "$file"
 
           ls -lh "$file"
 
@@ -108,4 +108,3 @@ jobs:
           name: supabase-db-backup-${{ steps.db.outputs.target }}
           path: "*.dump"
           retention-days: 14
-
