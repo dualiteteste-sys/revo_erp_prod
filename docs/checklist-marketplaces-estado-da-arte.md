@@ -36,7 +36,7 @@ Princípios:
 ## 1) Mercado Livre (MELI)
 
 ### 1.1 Conexão
-- [ ] MELI-01 OAuth connect + callback + armazenamento de tokens (refresh automático)
+- [x] MELI-01 OAuth connect + callback + armazenamento de tokens (refresh automático)
 - [ ] MELI-02 Seleção de conta (seller) + vínculo a `empresa_id`
 
 ### 1.2 Pedidos (MVP prioritário)
@@ -58,7 +58,7 @@ Princípios:
 ## 2) Shopee
 
 ### 2.1 Conexão
-- [ ] SHO-01 OAuth/connect (conforme API Shopee) + callback + refresh/revoke
+- [x] SHO-01 OAuth/connect (conforme API Shopee) + callback + refresh/revoke
 - [ ] SHO-02 Vínculo loja/canal + `empresa_id`
 
 ### 2.2 Pedidos (MVP prioritário)

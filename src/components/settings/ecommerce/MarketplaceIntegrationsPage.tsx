@@ -6,6 +6,7 @@ import GlassCard from '@/components/ui/GlassCard';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/contexts/ToastProvider';
 import { useHasPermission } from '@/hooks/useHasPermission';
+import { supabase } from '@/lib/supabaseClient';
 import {
   type EcommerceConnection,
   disconnectEcommerceConnection,
@@ -161,6 +162,36 @@ export default function MarketplaceIntegrationsPage() {
     } catch (e: any) {
       addToast(e?.message || 'Falha ao testar conexão.', 'error');
       setDiagnostics(null);
+    } finally {
+      setTestingProvider(null);
+    }
+  };
+
+  const handleAuthorize = async () => {
+    if (!activeConnection) return;
+    const provider = activeConnection.provider as Provider;
+    if (!supabase) {
+      addToast('Supabase client indisponível.', 'error');
+      return;
+    }
+    if (!canManage) {
+      addToast('Sem permissão para gerenciar integrações.', 'warning');
+      return;
+    }
+    if (testingProvider) return;
+
+    setTestingProvider(provider);
+    try {
+      const redirect_to = `${window.location.origin}/app/configuracoes/ecommerce/marketplaces`;
+      const { data, error } = await supabase.functions.invoke('marketplaces-oauth', {
+        body: { action: 'start', provider, redirect_to },
+      });
+      if (error) throw error;
+      const url = (data as any)?.url as string | undefined;
+      if (!url) throw new Error('URL de autorização não retornada.');
+      window.location.assign(url);
+    } catch (e: any) {
+      addToast(e?.message || 'Falha ao iniciar OAuth.', 'error');
     } finally {
       setTestingProvider(null);
     }
@@ -334,10 +365,19 @@ export default function MarketplaceIntegrationsPage() {
               <GlassCard className="p-3">
                 <div className="text-sm font-medium text-gray-900">1) Conectar</div>
                 <div className="mt-1 text-xs text-gray-600">
-                  Neste MVP, a conexão técnica (OAuth/tokens) será configurada pelo módulo de integração. Quando estiver pronta, use “Testar conexão”
-                  para validar.
+                  Clique em “Autorizar no canal” para conectar. Ao voltar, use “Testar conexão” para validar (token/expiração/erro).
                 </div>
                 <div className="mt-3 flex flex-wrap items-center gap-2">
+                  <Button
+                    variant="outline"
+                    className="gap-2"
+                    onClick={() => void handleAuthorize()}
+                    disabled={!canManage || testingProvider === (activeConnection.provider as Provider)}
+                    title={canManage ? 'Abrir autorização do canal' : 'Sem permissão'}
+                  >
+                    <Link2 size={16} />
+                    {testingProvider === (activeConnection.provider as Provider) ? 'Aguarde…' : 'Autorizar no canal'}
+                  </Button>
                   <Button
                     variant="outline"
                     className="gap-2"
