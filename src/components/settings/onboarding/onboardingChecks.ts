@@ -20,6 +20,21 @@ export async function fetchOnboardingChecks(
   supabase: SupabaseClient,
   empresaId: string
 ): Promise<OnboardingChecksResult> {
+  // Preferência: status consolidado via RPC (evita múltiplos HEAD/GET que podem falhar por RLS).
+  // Mantém fallback para queries diretas (DEV/local) caso a RPC ainda não exista.
+  try {
+    const { data, error } = await supabase.rpc('onboarding_checks_for_current_empresa');
+    if (!error && data && typeof data === 'object') {
+      const checks = Array.isArray((data as any).checks) ? ((data as any).checks as OnboardingCheck[]) : [];
+      const progress = (data as any).progress as { ok: number; total: number } | undefined;
+      if (checks.length > 0 && progress?.total) {
+        return { checks, progress };
+      }
+    }
+  } catch {
+    // ignore and fallback
+  }
+
   const [
     ccAny,
     ccRec,
@@ -110,4 +125,3 @@ export async function fetchOnboardingChecks(
   const progress = { ok: checks.filter((c) => c.status === 'ok').length, total: checks.length };
   return { checks, progress };
 }
-
