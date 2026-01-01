@@ -8,6 +8,7 @@ import { useSupabase } from '@/providers/SupabaseProvider';
 import { useAuth } from '@/contexts/AuthProvider';
 import { useToast } from '@/contexts/ToastProvider';
 import { useEmpresaFeatures } from '@/hooks/useEmpresaFeatures';
+import { traceAction } from '@/lib/tracing';
 import { Copy, Eye, FileKey, Loader2, Plus, Receipt, Search, Settings, Send, Trash2 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import ClientAutocomplete from '@/components/common/ClientAutocomplete';
@@ -590,9 +591,16 @@ export default function NfeEmissoesPage() {
 
     setSendingId(emissaoId);
     try {
-      const { data, error } = await supabase.functions.invoke('nfeio-emit', { body: { emissao_id: emissaoId } });
-      if (error) throw error;
-      if (!data?.ok) throw new Error(data?.error || 'Falha ao emitir.');
+      await traceAction(
+        'nfe.emit',
+        async () => {
+          const { data, error } = await supabase.functions.invoke('nfeio-emit', { body: { emissao_id: emissaoId } });
+          if (error) throw error;
+          if (!data?.ok) throw new Error(data?.error || 'Falha ao emitir.');
+          return data;
+        },
+        { emissao_id: emissaoId }
+      );
       addToast('Enviado para NFE.io. Status: enfileirada.', 'success');
       await fetchList();
     } catch (e: any) {
@@ -607,9 +615,16 @@ export default function NfeEmissoesPage() {
   const handleSync = async (emissaoId: string) => {
     setSyncingId(emissaoId);
     try {
-      const { data, error } = await supabase.functions.invoke('nfeio-sync', { body: { emissao_id: emissaoId } });
-      if (error) throw error;
-      if (!data?.ok) throw new Error(data?.error || 'Falha ao sincronizar.');
+      await traceAction(
+        'nfe.sync',
+        async () => {
+          const { data, error } = await supabase.functions.invoke('nfeio-sync', { body: { emissao_id: emissaoId } });
+          if (error) throw error;
+          if (!data?.ok) throw new Error(data?.error || 'Falha ao sincronizar.');
+          return data;
+        },
+        { emissao_id: emissaoId }
+      );
       addToast('Status sincronizado (NFE.io).', 'success');
       await fetchList();
     } catch (e: any) {
