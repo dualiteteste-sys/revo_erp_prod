@@ -2,6 +2,7 @@ import React from "react";
 import ReactDOM from "react-dom/client";
 import { RouterProvider } from "react-router-dom";
 import router from "./router";
+import "./styles/tokens.css";
 import "./index.css";
 import { ToastProvider } from "./contexts/ToastProvider";
 import { AuthProvider } from "./contexts/AuthProvider";

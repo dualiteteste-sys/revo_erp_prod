@@ -7,11 +7,11 @@ export default {
   theme: {
     extend: {
       colors: {
-        'glass-50': 'rgba(255, 255, 255, 0.05)',
-        'glass-100': 'rgba(255, 255, 255, 0.1)',
-        'glass-200': 'rgba(255, 255, 255, 0.7)',
-        'glass-border': 'rgba(255, 255, 255, 0.3)',
-        'filled-text': '#292c37',
+        'glass-50': 'var(--glass-50)',
+        'glass-100': 'var(--glass-100)',
+        'glass-200': 'var(--glass-200)',
+        'glass-border': 'var(--glass-border)',
+        'filled-text': 'var(--revo-filled-text)',
         border: "hsl(var(--border))",
         input: "hsl(var(--input))",
         ring: "hsl(var(--ring))",
@@ -52,7 +52,7 @@ export default {
         sm: "calc(var(--radius) - 4px)",
       },
       boxShadow: {
-        'glass-lg': '0 8px 32px 0 rgba(31, 38, 135, 0.37)',
+        'glass-lg': 'var(--shadow-glass-lg)',
       },
       keyframes: {
         "accordion-down": {

@@ -2,6 +2,7 @@ import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import { createClient } from "@supabase/supabase-js";
 import { buildCorsHeaders } from "../_shared/cors.ts";
 import { nfeioBaseUrl, nfeioFetchJson, type NfeioEnvironment } from "../_shared/nfeio.ts";
+import { getRequestId } from "../_shared/request.ts";
 import { sanitizeForLog } from "../_shared/sanitize.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
@@ -53,6 +54,7 @@ serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { status: 204, headers: cors });
   if (req.method !== "POST") return json(405, { ok: false, error: "METHOD_NOT_ALLOWED" }, cors);
 
+  const requestId = getRequestId(req);
   const authHeader = req.headers.get("authorization") ?? "";
   const token = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : "";
   if (!token) return json(401, { ok: false, error: "UNAUTHENTICATED" }, cors);
@@ -106,6 +108,16 @@ serve(async (req) => {
     provider_status: result.data?.status ?? null,
     last_sync_at: new Date().toISOString(),
   }).eq("emissao_id", emissaoId);
+
+  await admin.from("fiscal_nfe_provider_logs").insert({
+    empresa_id: empresaId,
+    emissao_id: emissaoId,
+    provider: "nfeio",
+    level: result.ok ? "info" : "error",
+    message: "NFEIO_SYNC",
+    request_id: requestId,
+    payload: sanitizeForLog({ status: result.status, data: result.data ?? {} }),
+  });
 
   // Best-effort: baixar XML/DANFE se a API devolver links
   const maybeXmlUrl =

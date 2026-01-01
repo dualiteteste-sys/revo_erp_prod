@@ -14,8 +14,8 @@ Regra de ouro:
 ## 0) Fundamentos do produto (Design System + consistência)
 
 ### 0.1 Design System “de verdade”
-- [ ] DS-01 Tokens de design (cores, tipografia, espaçamentos, radius, shadows) centralizados e usados em tudo
-- [ ] DS-02 Componentes base padronizados (Button/Input/Select/Modal/Table/Toast/Skeleton) com variantes consistentes
+- [x] DS-01 Tokens de design (cores, tipografia, espaçamentos, radius, shadows) centralizados e usados em tudo
+- [x] DS-02 Componentes base padronizados (Button/Input/Select/Modal/Table/Toast/Skeleton) com variantes consistentes
 - [ ] DS-03 Padrão de layout por módulo (header, filtros, tabela, actions, detalhes) e padrões “do Revo”
 - [ ] DS-04 Ícones, estados vazios e mensagens (tom/voz) consistentes
 
@@ -35,7 +35,7 @@ Regra de ouro:
 ## 1) Observabilidade e Operação (SRE-lite “estado da arte”)
 
 ### 1.1 Logs/Tracing/Métricas (com contexto de negócio)
-- [ ] OBS-01 Correlation ID (request_id) propagado: front → edge functions → DB logs
+- [x] OBS-01 Correlation ID (request_id) propagado: front → edge functions → DB logs
 - [ ] OBS-02 Tracing por ação crítica (ex.: emitir NF, finalizar PDV, importar marketplace)
 - [ ] OBS-03 Métricas de produto: tempo de carregamento, taxas de erro, funis (setup → primeira venda)
 - [ ] OBS-04 Painel “Operação”: fila, falhas, webhooks, retries, status, últimos eventos
@@ -79,7 +79,7 @@ Regra de ouro:
 
 ### 4.1 Pirâmide de testes (realista)
 - [ ] QA+-01 Testes de contrato para integrações (payloads reais “golden files”)
-- [ ] QA+-02 Regressão visual (screenshots) para páginas críticas
+- [x] QA+-02 Regressão visual (screenshots) para páginas críticas
 - [ ] QA+-03 Suite E2E por plano (Essencial/Pro/Operação/Indústria/Scale) com cenários principais e edge cases
 - [ ] QA+-04 Chaos-lite: simular timeout/rate limit e validar retry/dead-letter/reprocess
 
