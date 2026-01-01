@@ -1,6 +1,7 @@
 import { supabase } from '../lib/supabaseClient';
 import { callRpc } from '@/lib/api';
 import { getVendaDetails, saveVenda, type VendaDetails } from './vendas';
+import { traceAction } from '@/lib/tracing';
 
 const sb = supabase as any;
 
@@ -231,33 +232,43 @@ export async function finalizePdv(params: {
   contaCorrenteId: string;
   estoqueEnabled?: boolean;
 }): Promise<VendaDetails> {
-  const venda = await getVendaDetails(params.pedidoId);
+  return traceAction(
+    'pdv.finalize',
+    async () => {
+      const venda = await getVendaDetails(params.pedidoId);
 
-  // Marca canal PDV + status concluído (idempotente)
-  const updated = await saveVenda({
-    id: venda.id,
-    canal: 'pdv' as any,
-    status: 'concluido' as any,
-  } as any);
+      // Marca canal PDV + status concluído (idempotente)
+      const updated = await saveVenda({
+        id: venda.id,
+        canal: 'pdv' as any,
+        status: 'concluido' as any,
+      } as any);
 
-  // Financeiro: entrada do PDV
-  await callRpc('financeiro_movimentacoes_upsert', {
-    p_payload: {
-      conta_corrente_id: params.contaCorrenteId,
-      tipo_mov: 'entrada',
-      valor: venda.total_geral,
-      descricao: `Venda PDV #${venda.numero}`,
-      documento_ref: `PDV-${venda.numero}`,
-      origem_tipo: 'venda_pdv',
-      origem_id: venda.id,
-      categoria: 'Vendas',
-      observacoes: 'Gerado automaticamente pelo PDV (MVP)',
+      // Financeiro: entrada do PDV
+      await callRpc('financeiro_movimentacoes_upsert', {
+        p_payload: {
+          conta_corrente_id: params.contaCorrenteId,
+          tipo_mov: 'entrada',
+          valor: venda.total_geral,
+          descricao: `Venda PDV #${venda.numero}`,
+          documento_ref: `PDV-${venda.numero}`,
+          origem_tipo: 'venda_pdv',
+          origem_id: venda.id,
+          categoria: 'Vendas',
+          observacoes: 'Gerado automaticamente pelo PDV (MVP)',
+        },
+      });
+
+      if (params.estoqueEnabled !== false) {
+        await callRpc('vendas_baixar_estoque', { p_pedido_id: venda.id, p_documento_ref: `PDV-${venda.numero}` });
+      }
+
+      return updated;
     },
-  });
-
-  if (params.estoqueEnabled !== false) {
-    await callRpc('vendas_baixar_estoque', { p_pedido_id: venda.id, p_documento_ref: `PDV-${venda.numero}` });
-  }
-
-  return updated;
+    {
+      pedido_id: params.pedidoId,
+      conta_corrente_id: params.contaCorrenteId,
+      estoque_enabled: params.estoqueEnabled !== false,
+    }
+  );
 }

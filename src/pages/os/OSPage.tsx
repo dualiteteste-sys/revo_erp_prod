@@ -18,6 +18,7 @@ import { Button } from '@/components/ui/button';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useConfirm } from '@/contexts/ConfirmProvider';
 import { useHasPermission } from '@/hooks/useHasPermission';
+import { traceAction } from '@/lib/tracing';
 
 const OSPage: React.FC = () => {
   const {
@@ -165,7 +166,11 @@ const OSPage: React.FC = () => {
 
     try {
       setStatusUpdatingId(os.id);
-      await osService.setOsStatus(os.id, next);
+      await traceAction(
+        'os.set_status',
+        () => osService.setOsStatus(os.id, next),
+        { os_id: os.id, from_status: os.status, to_status: next }
+      );
       addToast(`Status atualizado para “${labelMap[next]}”.`, 'success');
       refresh();
     } catch (e: any) {

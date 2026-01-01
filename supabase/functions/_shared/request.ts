@@ -7,4 +7,3 @@ export function getRequestId(req: Request): string {
     return `req_${Date.now()}_${Math.random().toString(16).slice(2)}`;
   }
 }
-
