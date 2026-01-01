@@ -1261,7 +1261,7 @@ export default function NfeEmissoesPage() {
         </div>
       </Modal>
 
-      <Modal isOpen={previewOpen} onClose={() => setPreviewOpen(false)} title="Preview XML (NFE-04)" size="80pct">
+      <Modal isOpen={previewOpen} onClose={() => setPreviewOpen(false)} title="Preview XML (NFE-02)" size="80pct">
         <div className="p-6 space-y-4">
           {previewLoading ? (
             <div className="h-40 flex items-center justify-center">
@@ -1318,7 +1318,7 @@ export default function NfeEmissoesPage() {
         </div>
       </Modal>
 
-      <Modal isOpen={cceModalOpen} onClose={() => setCceModalOpen(false)} title="Carta de Correção (CC-e) — NFE-07" size="60pct">
+      <Modal isOpen={cceModalOpen} onClose={() => setCceModalOpen(false)} title="Carta de Correção (CC-e) — NFE-05" size="60pct">
         <div className="p-6 space-y-4">
           <p className="text-sm text-slate-700">
             Observação: a NFE.io processa de forma <span className="font-semibold">assíncrona</span>. O status final será refletido via webhook/worker.
@@ -1347,7 +1347,7 @@ export default function NfeEmissoesPage() {
         </div>
       </Modal>
 
-      <Modal isOpen={auditOpen} onClose={() => setAuditOpen(false)} title="Auditoria da NF-e (NFE-08)" size="80pct">
+      <Modal isOpen={auditOpen} onClose={() => setAuditOpen(false)} title="Observabilidade da NF-e (NFE-06)" size="80pct">
         <div className="p-6 space-y-4">
           {auditLoading ? (
             <div className="h-40 flex items-center justify-center">

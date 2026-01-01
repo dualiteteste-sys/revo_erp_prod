@@ -27,10 +27,15 @@ export async function listAuditLogsForTables(tables: string[], limit = 300): Pro
     .limit(limit);
 
   if (error) {
+    const msg = String((error as any)?.message ?? '');
+    const isTransientNetworkError = /(failed to fetch|networkerror|load failed|aborterror)/i.test(msg);
+    if (isTransientNetworkError) {
+      logger.warn('[AuditLogs] Falha transitória ao listar audit_logs', { message: msg, tables: uniqueTables, limit });
+      return [];
+    }
     logger.error('[AuditLogs] Falha ao listar audit_logs', error, { tables: uniqueTables, limit });
-    throw new Error(error.message);
+    throw new Error(msg || 'Falha ao listar audit_logs');
   }
 
   return (data || []) as AuditLogRow[];
 }
-

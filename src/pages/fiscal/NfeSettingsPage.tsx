@@ -810,7 +810,7 @@ export default function NfeSettingsPage() {
               <div className="md:col-span-2 rounded-xl border border-slate-200 bg-white/70 p-4">
                 <div className="flex items-start justify-between gap-4">
                   <div>
-                    <p className="text-sm font-bold text-slate-900">Inutilização de números (NFE-07)</p>
+                    <p className="text-sm font-bold text-slate-900">Inutilização de números (NFE-05)</p>
                     <p className="text-xs text-slate-600 mt-1">
                       Use quando a numeração ficou com “buraco” e você precisa inutilizar uma faixa (operação assíncrona).
                     </p>
