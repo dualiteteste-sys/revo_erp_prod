@@ -15,7 +15,7 @@ export function buildCorsHeaders(req: Request) {
     ? (origin || "*")
     : (isExact || isSuffix) ? origin : (Deno.env.get("SITE_URL") || "*");
 
-  const allowHeaders = acrh || "authorization, x-client-info, apikey, content-type";
+  const allowHeaders = acrh || "authorization, x-client-info, apikey, content-type, x-revo-request-id";
 
   return {
     "Access-Control-Allow-Origin": allowOrigin,

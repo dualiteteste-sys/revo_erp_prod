@@ -2,6 +2,7 @@ import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import { createClient } from "@supabase/supabase-js";
 import { buildCorsHeaders } from "../_shared/cors.ts";
 import { digitsOnly, nfeioBaseUrl, nfeioFetchJson, type NfeioEnvironment } from "../_shared/nfeio.ts";
+import { getRequestId } from "../_shared/request.ts";
 import { sanitizeForLog } from "../_shared/sanitize.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
@@ -49,6 +50,7 @@ async function logEvent(
   level: "debug" | "info" | "warn" | "error",
   message: string,
   payload: any,
+  requestId?: string,
 ) {
   try {
     await admin.from("fiscal_nfe_provider_logs").insert({
@@ -57,6 +59,7 @@ async function logEvent(
       provider: "nfeio",
       level,
       message,
+      request_id: requestId ?? null,
       payload: sanitizeForLog(payload),
     });
   } catch {
@@ -69,6 +72,7 @@ serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { status: 204, headers: cors });
   if (req.method !== "POST") return json(405, { ok: false, error: "METHOD_NOT_ALLOWED" }, cors);
 
+  const requestId = getRequestId(req);
   const authHeader = req.headers.get("authorization") ?? "";
   const token = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : "";
   if (!token) return json(401, { ok: false, error: "UNAUTHENTICATED" }, cors);
@@ -171,7 +175,7 @@ serve(async (req) => {
   const base = nfeioBaseUrl(ambiente);
   const url = `${base}/v2/nota-fiscal`;
 
-  await logEvent(admin, empresaId, emissaoId, "info", "NFEIO_EMIT_REQUEST", { url, payload, idempotencyKey, ambiente });
+  await logEvent(admin, empresaId, emissaoId, "info", "NFEIO_EMIT_REQUEST", { url, payload, idempotencyKey, ambiente }, requestId);
 
   const result = await nfeioFetchJson(url, {
     method: "POST",
@@ -196,12 +200,12 @@ serve(async (req) => {
   }, { onConflict: "emissao_id" });
 
   if (!result.ok) {
-    await logEvent(admin, empresaId, emissaoId, "error", "NFEIO_EMIT_FAILED", { status: result.status, data: result.data });
+    await logEvent(admin, empresaId, emissaoId, "error", "NFEIO_EMIT_FAILED", { status: result.status, data: result.data }, requestId);
     await admin.from("fiscal_nfe_emissoes").update({ status: "erro", last_error: JSON.stringify(result.data).slice(0, 900) }).eq("id", emissaoId);
     return json(502, { ok: false, error: "NFEIO_EMIT_FAILED", status: result.status, data: result.data }, cors);
   }
 
-  await logEvent(admin, empresaId, emissaoId, "info", "NFEIO_EMIT_OK", { status: result.status, data: result.data });
+  await logEvent(admin, empresaId, emissaoId, "info", "NFEIO_EMIT_OK", { status: result.status, data: result.data }, requestId);
   await admin.from("fiscal_nfe_emissoes").update({ status: "enfileirada", last_error: null }).eq("id", emissaoId);
 
   return json(200, { ok: true, nfeio_id: result.data?.id ?? null, data: result.data }, cors);

@@ -1,7 +1,29 @@
 import React from 'react';
+import { cva, type VariantProps } from 'class-variance-authority';
+import { cn } from '@/lib/utils';
 
-interface InputProps extends React.InputHTMLAttributes<HTMLInputElement> {
-  label: React.ReactNode;
+const inputVariants = cva(
+  'w-full bg-white/80 border rounded-lg transition shadow-sm text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ring-offset-background disabled:opacity-60 disabled:cursor-not-allowed',
+  {
+    variants: {
+      size: {
+        default: 'h-11 px-3',
+        sm: 'h-10 px-3 text-sm',
+      },
+      state: {
+        default: 'border-input',
+        error: 'border-destructive focus-visible:ring-destructive',
+      },
+    },
+    defaultVariants: {
+      size: 'default',
+      state: 'default',
+    },
+  },
+);
+
+interface InputProps extends React.InputHTMLAttributes<HTMLInputElement>, VariantProps<typeof inputVariants> {
+  label?: React.ReactNode;
   startAdornment?: React.ReactNode;
   endAdornment?: React.ReactNode;
   helperText?: React.ReactNode;
@@ -10,16 +32,13 @@ interface InputProps extends React.InputHTMLAttributes<HTMLInputElement> {
 
 const Input = React.forwardRef<HTMLInputElement, InputProps>(
   ({ label, name, className, startAdornment, endAdornment, helperText, error, ...props }, ref) => {
-  const errorClasses = error
-    ? 'border-red-500 focus:border-red-500 focus:ring-red-500'
-    : 'border-gray-300 focus:ring-blue-500 focus:border-blue-500';
-
   const startPadding = startAdornment ? 'pl-12' : 'pl-3';
   const endPadding = endAdornment ? 'pr-12' : 'pr-3';
+  const state = error ? 'error' : 'default';
 
   return (
     <div className={className}>
-      {label && <label htmlFor={name} className="block text-sm font-medium text-gray-700 mb-1">{label}</label>}
+      {label ? <label htmlFor={name} className="block text-sm font-medium text-gray-700 mb-1">{label}</label> : null}
       <div className="relative">
         {startAdornment && (
           <div className="absolute inset-y-0 left-0 flex items-center pl-4 pointer-events-none">
@@ -31,7 +50,13 @@ const Input = React.forwardRef<HTMLInputElement, InputProps>(
           id={name}
           name={name}
           {...props}
-          className={`w-full p-3 bg-white/80 border rounded-lg transition shadow-sm ${errorClasses} ${startPadding} ${endPadding}`}
+          aria-invalid={!!error}
+          className={cn(
+            inputVariants({ size: props.size ?? 'default', state }),
+            startPadding,
+            endPadding,
+            props.className,
+          )}
         />
         {endAdornment && (
           <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">

@@ -2,6 +2,7 @@ import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import { createClient } from "@supabase/supabase-js";
 import { buildCorsHeaders } from "../_shared/cors.ts";
 import { hmacSha256Base64, hmacSha256Hex, sha256Hex, timingSafeEqual } from "../_shared/crypto.ts";
+import { getRequestId } from "../_shared/request.ts";
 import { sanitizeForLog, sanitizeHeaders } from "../_shared/sanitize.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
@@ -58,6 +59,7 @@ serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { status: 204, headers: cors });
   if (req.method !== "POST") return json(405, { ok: false, error: "METHOD_NOT_ALLOWED" }, cors);
 
+  const requestId = getRequestId(req);
   const signatureRaw = pickSignature(req.headers);
   const rawBody = await req.text();
 
@@ -108,6 +110,7 @@ serve(async (req) => {
       event_type: meta.eventType,
       nfeio_id: meta.nfeioId,
       dedupe_key: dedupeKey,
+      request_id: requestId,
       headers: headersToJson(req.headers),
       payload: sanitizeForLog(payload),
       received_at: new Date().toISOString(),
