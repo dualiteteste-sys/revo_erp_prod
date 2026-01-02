@@ -156,7 +156,7 @@ const Sidebar: React.FC<SidebarProps> = ({
                     onMouseLeave={handleMouseLeaveItem}
                   >
                     <motion.div
-                      className={`w-14 h-14 rounded-full flex items-center justify-center shadow-lg cursor-pointer transition-all duration-200 hover:brightness-110 bg-gradient-to-br ${item.gradient}`}
+                      className={`w-14 h-14 rounded-full flex items-center justify-center shadow-lg cursor-pointer transition-all duration-200 hover:brightness-110 bg-gradient-to-br ${item.gradient ?? 'from-slate-500 to-slate-600'}`}
                       onClick={(e) => handleCollapsedClick(e, item)}
                       whileHover={{ scale: 1.1, y: -2 }}
                     >

@@ -123,13 +123,64 @@ export const appRoutes: RouteObject[] = [
             { path: "configuracoes/:section/:page", element: <Suspense fallback={<PageLoader />}><SettingsPage /></Suspense> },
 
             // Cadastros
-            { path: "products", element: <Suspense fallback={<PageLoader />}><ProductsPage /></Suspense> },
-            { path: "partners", element: <Suspense fallback={<PageLoader />}><PartnersPage /></Suspense> },
-            { path: "carriers", element: <Suspense fallback={<PageLoader />}><CarriersPage /></Suspense> },
-            { path: "services", element: <PlanGuard feature="servicos"><Suspense fallback={<PageLoader />}><ServicesPage /></Suspense></PlanGuard> },
-            { path: "cadastros/grupos-produtos", element: <Suspense fallback={<PageLoader />}><GrupoProdutosPage /></Suspense> },
-            { path: "cadastros/unidades-medida", element: <Suspense fallback={<PageLoader />}><UnidadesPage /></Suspense> },
-            { path: "cadastros/embalagens", element: <Suspense fallback={<PageLoader />}><EmbalagensPage /></Suspense> },
+            {
+              path: "products",
+              element: (
+                <RequirePermission permission={{ domain: "produtos", action: "view" }}>
+                  <Suspense fallback={<PageLoader />}><ProductsPage /></Suspense>
+                </RequirePermission>
+              ),
+            },
+            {
+              path: "partners",
+              element: (
+                <RequirePermission permission={{ domain: "partners", action: "view" }}>
+                  <Suspense fallback={<PageLoader />}><PartnersPage /></Suspense>
+                </RequirePermission>
+              ),
+            },
+            {
+              path: "carriers",
+              element: (
+                <RequirePermission permission={{ domain: "logistica", action: "view" }}>
+                  <Suspense fallback={<PageLoader />}><CarriersPage /></Suspense>
+                </RequirePermission>
+              ),
+            },
+            {
+              path: "services",
+              element: (
+                <PlanGuard feature="servicos">
+                  <RequirePermission permission={{ domain: "servicos", action: "view" }}>
+                    <Suspense fallback={<PageLoader />}><ServicesPage /></Suspense>
+                  </RequirePermission>
+                </PlanGuard>
+              ),
+            },
+            {
+              path: "cadastros/grupos-produtos",
+              element: (
+                <RequirePermission permission={{ domain: "produtos", action: "view" }}>
+                  <Suspense fallback={<PageLoader />}><GrupoProdutosPage /></Suspense>
+                </RequirePermission>
+              ),
+            },
+            {
+              path: "cadastros/unidades-medida",
+              element: (
+                <RequirePermission permission={{ domain: "produtos", action: "view" }}>
+                  <Suspense fallback={<PageLoader />}><UnidadesPage /></Suspense>
+                </RequirePermission>
+              ),
+            },
+            {
+              path: "cadastros/embalagens",
+              element: (
+                <RequirePermission permission={{ domain: "produtos", action: "view" }}>
+                  <Suspense fallback={<PageLoader />}><EmbalagensPage /></Suspense>
+                </RequirePermission>
+              ),
+            },
             {
               path: "cadastros/vendedores",
               element: (
@@ -140,31 +191,31 @@ export const appRoutes: RouteObject[] = [
             },
 
             // Indústria
-            { path: "industria/qualidade/motivos", element: <PlanGuard feature="industria"><Suspense fallback={<PageLoader />}><MotivosRefugoPage /></Suspense></PlanGuard> },
-            { path: "industria/qualidade/planos", element: <PlanGuard feature="industria"><Suspense fallback={<PageLoader />}><PlanosInspecaoPage /></Suspense></PlanGuard> },
-            { path: "industria/qualidade/lotes", element: <PlanGuard feature="industria"><Suspense fallback={<PageLoader />}><LotesQualidadePage /></Suspense></PlanGuard> },
-            { path: "industria/dashboard", element: <PlanGuard feature="industria"><Suspense fallback={<PageLoader />}><IndustriaDashboardPage /></Suspense></PlanGuard> },
-            { path: "industria/status-beneficiamentos", element: <PlanGuard feature="industria"><Suspense fallback={<PageLoader />}><StatusBeneficiamentosPage /></Suspense></PlanGuard> },
-            { path: "industria/producao", element: <PlanGuard feature="industria"><Suspense fallback={<PageLoader />}><ProducaoPage /></Suspense></PlanGuard> },
-            { path: "industria/ordens", element: <PlanGuard feature="industria"><Suspense fallback={<PageLoader />}><OrdensPage /></Suspense></PlanGuard> },
-            { path: "industria/mrp", element: <PlanGuard feature="industria"><Suspense fallback={<PageLoader />}><MrpDemandasPage /></Suspense></PlanGuard> },
-            { path: "industria/pcp", element: <PlanGuard feature="industria"><Suspense fallback={<PageLoader />}><PcpDashboardPage /></Suspense></PlanGuard> },
-            { path: "industria/relatorios", element: <PlanGuard feature="industria"><Suspense fallback={<PageLoader />}><RelatoriosIndustriaPage /></Suspense></PlanGuard> },
-            { path: "industria/boms", element: <PlanGuard feature="industria"><Suspense fallback={<PageLoader />}><BomsPage /></Suspense></PlanGuard> },
-            { path: "industria/roteiros", element: <PlanGuard feature="industria"><Suspense fallback={<PageLoader />}><RoteirosPage /></Suspense></PlanGuard> },
-            { path: "industria/centros-trabalho", element: <PlanGuard feature="industria"><Suspense fallback={<PageLoader />}><CentrosTrabalhoPage /></Suspense></PlanGuard> },
-            { path: "industria/execucao", element: <PlanGuard feature="industria"><Suspense fallback={<PageLoader />}><ExecucaoPage /></Suspense></PlanGuard> },
-            { path: "industria/chao-de-fabrica", element: <PlanGuard feature="industria"><Suspense fallback={<PageLoader />}><ChaoDeFabricaPage /></Suspense></PlanGuard> },
-            { path: "industria/operador", element: <PlanGuard feature="industria"><Suspense fallback={<PageLoader />}><OperadorPage /></Suspense></PlanGuard> },
-            { path: "industria/operadores", element: <PlanGuard feature="industria"><Suspense fallback={<PageLoader />}><OperadoresPage /></Suspense></PlanGuard> },
-            { path: "industria/automacao", element: <PlanGuard feature="industria"><Suspense fallback={<PageLoader />}><AutomacaoPage /></Suspense></PlanGuard> },
-            { path: "industria/materiais-cliente", element: <PlanGuard feature="industria"><Suspense fallback={<PageLoader />}><MateriaisClientePage /></Suspense></PlanGuard> },
+            { path: "industria/qualidade/motivos", element: <PlanGuard feature="industria"><RequirePermission permission={{ domain: "qualidade", action: "view" }}><Suspense fallback={<PageLoader />}><MotivosRefugoPage /></Suspense></RequirePermission></PlanGuard> },
+            { path: "industria/qualidade/planos", element: <PlanGuard feature="industria"><RequirePermission permission={{ domain: "qualidade", action: "view" }}><Suspense fallback={<PageLoader />}><PlanosInspecaoPage /></Suspense></RequirePermission></PlanGuard> },
+            { path: "industria/qualidade/lotes", element: <PlanGuard feature="industria"><RequirePermission permission={{ domain: "qualidade", action: "view" }}><Suspense fallback={<PageLoader />}><LotesQualidadePage /></Suspense></RequirePermission></PlanGuard> },
+            { path: "industria/dashboard", element: <PlanGuard feature="industria"><RequirePermission permission={{ domain: "industria", action: "view" }}><Suspense fallback={<PageLoader />}><IndustriaDashboardPage /></Suspense></RequirePermission></PlanGuard> },
+            { path: "industria/status-beneficiamentos", element: <PlanGuard feature="industria"><RequirePermission permission={{ domain: "industria", action: "view" }}><Suspense fallback={<PageLoader />}><StatusBeneficiamentosPage /></Suspense></RequirePermission></PlanGuard> },
+            { path: "industria/producao", element: <PlanGuard feature="industria"><RequirePermission permission={{ domain: "industria", action: "view" }}><Suspense fallback={<PageLoader />}><ProducaoPage /></Suspense></RequirePermission></PlanGuard> },
+            { path: "industria/ordens", element: <PlanGuard feature="industria"><RequirePermission permission={{ domain: "industria", action: "view" }}><Suspense fallback={<PageLoader />}><OrdensPage /></Suspense></RequirePermission></PlanGuard> },
+            { path: "industria/mrp", element: <PlanGuard feature="industria"><RequirePermission permission={{ domain: "mrp", action: "view" }}><Suspense fallback={<PageLoader />}><MrpDemandasPage /></Suspense></RequirePermission></PlanGuard> },
+            { path: "industria/pcp", element: <PlanGuard feature="industria"><RequirePermission permission={{ domain: "mrp", action: "view" }}><Suspense fallback={<PageLoader />}><PcpDashboardPage /></Suspense></RequirePermission></PlanGuard> },
+            { path: "industria/relatorios", element: <PlanGuard feature="industria"><RequirePermission permission={{ domain: "industria", action: "view" }}><Suspense fallback={<PageLoader />}><RelatoriosIndustriaPage /></Suspense></RequirePermission></PlanGuard> },
+            { path: "industria/boms", element: <PlanGuard feature="industria"><RequirePermission permission={{ domain: "industria", action: "view" }}><Suspense fallback={<PageLoader />}><BomsPage /></Suspense></RequirePermission></PlanGuard> },
+            { path: "industria/roteiros", element: <PlanGuard feature="industria"><RequirePermission permission={{ domain: "industria", action: "view" }}><Suspense fallback={<PageLoader />}><RoteirosPage /></Suspense></RequirePermission></PlanGuard> },
+            { path: "industria/centros-trabalho", element: <PlanGuard feature="industria"><RequirePermission permission={{ domain: "industria", action: "view" }}><Suspense fallback={<PageLoader />}><CentrosTrabalhoPage /></Suspense></RequirePermission></PlanGuard> },
+            { path: "industria/execucao", element: <PlanGuard feature="industria"><RequirePermission permission={{ domain: "industria", action: "view" }}><Suspense fallback={<PageLoader />}><ExecucaoPage /></Suspense></RequirePermission></PlanGuard> },
+            { path: "industria/chao-de-fabrica", element: <PlanGuard feature="industria"><RequirePermission permission={{ domain: "industria", action: "view" }}><Suspense fallback={<PageLoader />}><ChaoDeFabricaPage /></Suspense></RequirePermission></PlanGuard> },
+            { path: "industria/operador", element: <PlanGuard feature="industria"><RequirePermission permission={{ domain: "industria", action: "view" }}><Suspense fallback={<PageLoader />}><OperadorPage /></Suspense></RequirePermission></PlanGuard> },
+            { path: "industria/operadores", element: <PlanGuard feature="industria"><RequirePermission permission={{ domain: "industria", action: "view" }}><Suspense fallback={<PageLoader />}><OperadoresPage /></Suspense></RequirePermission></PlanGuard> },
+            { path: "industria/automacao", element: <PlanGuard feature="industria"><RequirePermission permission={{ domain: "industria", action: "view" }}><Suspense fallback={<PageLoader />}><AutomacaoPage /></Suspense></RequirePermission></PlanGuard> },
+            { path: "industria/materiais-cliente", element: <PlanGuard feature="industria"><RequirePermission permission={{ domain: "industria", action: "view" }}><Suspense fallback={<PageLoader />}><MateriaisClientePage /></Suspense></RequirePermission></PlanGuard> },
 
             // Vendas
-            { path: "sales-dashboard", element: <Suspense fallback={<PageLoader />}><SalesDashboard /></Suspense> },
-            { path: "vendas/metas", element: <Suspense fallback={<PageLoader />}><SalesGoalsPage /></Suspense> },
-            { path: "vendas/pedidos", element: <Suspense fallback={<PageLoader />}><PedidosVendasPage /></Suspense> },
-            { path: "vendas/crm", element: <Suspense fallback={<PageLoader />}><CrmPage /></Suspense> },
+            { path: "sales-dashboard", element: <RequirePermission permission={{ domain: "vendas", action: "view" }}><Suspense fallback={<PageLoader />}><SalesDashboard /></Suspense></RequirePermission> },
+            { path: "vendas/metas", element: <RequirePermission permission={{ domain: "vendas", action: "view" }}><Suspense fallback={<PageLoader />}><SalesGoalsPage /></Suspense></RequirePermission> },
+            { path: "vendas/pedidos", element: <RequirePermission permission={{ domain: "vendas", action: "view" }}><Suspense fallback={<PageLoader />}><PedidosVendasPage /></Suspense></RequirePermission> },
+            { path: "vendas/crm", element: <RequirePermission permission={{ domain: "crm", action: "view" }}><Suspense fallback={<PageLoader />}><CrmPage /></Suspense></RequirePermission> },
             {
               path: "vendas/propostas",
               element: (
@@ -250,7 +301,9 @@ export const appRoutes: RouteObject[] = [
               path: "servicos/contratos",
               element: (
                 <PlanGuard feature="servicos">
-                  <Suspense fallback={<PageLoader />}><ContratosServicosPage /></Suspense>
+                  <RequirePermission permission={{ domain: "servicos", action: "view" }}>
+                    <Suspense fallback={<PageLoader />}><ContratosServicosPage /></Suspense>
+                  </RequirePermission>
                 </PlanGuard>
               ),
             },
@@ -258,7 +311,9 @@ export const appRoutes: RouteObject[] = [
               path: "servicos/notas",
               element: (
                 <PlanGuard feature="servicos">
-                  <Suspense fallback={<PageLoader />}><NotasServicoPage /></Suspense>
+                  <RequirePermission permission={{ domain: "servicos", action: "view" }}>
+                    <Suspense fallback={<PageLoader />}><NotasServicoPage /></Suspense>
+                  </RequirePermission>
                 </PlanGuard>
               ),
             },
@@ -266,7 +321,9 @@ export const appRoutes: RouteObject[] = [
               path: "servicos/cobrancas",
               element: (
                 <PlanGuard feature="servicos">
-                  <Suspense fallback={<PageLoader />}><CobrancasServicosPage /></Suspense>
+                  <RequirePermission permission={{ domain: "servicos", action: "view" }}>
+                    <Suspense fallback={<PageLoader />}><CobrancasServicosPage /></Suspense>
+                  </RequirePermission>
                 </PlanGuard>
               ),
             },
@@ -282,17 +339,17 @@ export const appRoutes: RouteObject[] = [
             },
 
             // Suprimentos
-            { path: "suprimentos/estoque", element: <Suspense fallback={<PageLoader />}><EstoquePage /></Suspense> },
-            { path: "suprimentos/compras", element: <Suspense fallback={<PageLoader />}><ComprasPage /></Suspense> },
+            { path: "suprimentos/estoque", element: <RequirePermission permission={{ domain: "suprimentos", action: "view" }}><Suspense fallback={<PageLoader />}><EstoquePage /></Suspense></RequirePermission> },
+            { path: "suprimentos/compras", element: <RequirePermission permission={{ domain: "suprimentos", action: "view" }}><Suspense fallback={<PageLoader />}><ComprasPage /></Suspense></RequirePermission> },
             { path: "nfe-input", element: <Suspense fallback={<PageLoader />}><NfeInputPage /></Suspense> },
-            { path: "suprimentos/relatorios", element: <Suspense fallback={<PageLoader />}><RelatoriosSuprimentosPage /></Suspense> },
-            { path: "suprimentos/recebimentos", element: <Suspense fallback={<PageLoader />}><RecebimentoListPage /></Suspense> },
-            { path: "suprimentos/recebimento-manual", element: <Suspense fallback={<PageLoader />}><RecebimentoManualPage /></Suspense> },
-            { path: "suprimentos/recebimento/:id", element: <Suspense fallback={<PageLoader />}><ConferenciaPage /></Suspense> },
+            { path: "suprimentos/relatorios", element: <RequirePermission permission={{ domain: "suprimentos", action: "view" }}><Suspense fallback={<PageLoader />}><RelatoriosSuprimentosPage /></Suspense></RequirePermission> },
+            { path: "suprimentos/recebimentos", element: <RequirePermission permission={{ domain: "suprimentos", action: "view" }}><Suspense fallback={<PageLoader />}><RecebimentoListPage /></Suspense></RequirePermission> },
+            { path: "suprimentos/recebimento-manual", element: <RequirePermission permission={{ domain: "suprimentos", action: "view" }}><Suspense fallback={<PageLoader />}><RecebimentoManualPage /></Suspense></RequirePermission> },
+            { path: "suprimentos/recebimento/:id", element: <RequirePermission permission={{ domain: "suprimentos", action: "view" }}><Suspense fallback={<PageLoader />}><ConferenciaPage /></Suspense></RequirePermission> },
 
             // Fiscal (NF-e)
-            { path: "fiscal/nfe", element: <Suspense fallback={<PageLoader />}><NfeEmissoesPage /></Suspense> },
-            { path: "fiscal/nfe/configuracoes", element: <Suspense fallback={<PageLoader />}><NfeSettingsPage /></Suspense> },
+            { path: "fiscal/nfe", element: <RequirePermission permission={{ domain: "vendas", action: "view" }}><Suspense fallback={<PageLoader />}><NfeEmissoesPage /></Suspense></RequirePermission> },
+            { path: "fiscal/nfe/configuracoes", element: <RequirePermission permission={{ domain: "vendas", action: "view" }}><Suspense fallback={<PageLoader />}><NfeSettingsPage /></Suspense></RequirePermission> },
 
             // Financeiro
             {
