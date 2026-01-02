@@ -1,6 +1,7 @@
 import React from 'react';
 import { motion } from 'framer-motion';
 import { CheckCircle } from 'lucide-react';
+import GlassCard from '@/components/ui/GlassCard';
 
 const Hero: React.FC = () => {
   const scrollToPricing = () => {
@@ -8,21 +9,25 @@ const Hero: React.FC = () => {
   };
 
   return (
-    <section className="pt-28 pb-16 md:pt-32 md:pb-24">
+    <section className="pt-28 pb-16 md:pt-32 md:pb-24 relative overflow-hidden">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="pointer-events-none absolute inset-0 -z-10">
+          <div className="absolute -top-24 -left-24 h-72 w-72 rounded-full bg-blue-200/30 blur-3xl" />
+          <div className="absolute -bottom-24 -right-24 h-80 w-80 rounded-full bg-indigo-200/30 blur-3xl" />
+        </div>
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-10 items-center">
           <div className="text-center lg:text-left">
             <motion.h1
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6 }}
-              className="text-4xl md:text-6xl font-semibold tracking-tight text-slate-900"
+              className="text-4xl md:text-6xl font-semibold tracking-tight text-gray-900"
             >
               Um ERP que parece{' '}
-              <span className="bg-gradient-to-r from-slate-900 to-slate-500 bg-clip-text text-transparent">
+              <span className="bg-gradient-to-r from-blue-700 to-indigo-600 bg-clip-text text-transparent">
                 simples
               </span>
-              . E é poderoso.
+              . Mas é poderoso.
             </motion.h1>
             <motion.p
           initial={{ opacity: 0, y: 20 }}
@@ -41,7 +46,7 @@ const Hero: React.FC = () => {
             >
               <button
                 onClick={scrollToPricing}
-                className="px-6 py-3 rounded-full bg-slate-900 text-white font-semibold hover:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-slate-900 transition-colors"
+                className="px-6 py-3 rounded-full bg-blue-600 text-white font-semibold hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-600 transition-colors"
               >
                 Começar teste grátis
               </button>
@@ -71,7 +76,7 @@ const Hero: React.FC = () => {
             className="relative"
           >
             <div className="absolute -inset-6 bg-gradient-to-tr from-slate-100 via-white to-slate-100 rounded-[36px] blur-2xl opacity-70" />
-            <div className="relative rounded-[28px] border border-slate-200 bg-white shadow-[0_20px_60px_-35px_rgba(15,23,42,0.35)] overflow-hidden">
+            <GlassCard className="relative rounded-[28px] overflow-hidden bg-glass-200">
               <div className="h-10 px-4 flex items-center gap-2 border-b border-slate-200 bg-white/60">
                 <span className="h-2.5 w-2.5 rounded-full bg-slate-200" />
                 <span className="h-2.5 w-2.5 rounded-full bg-slate-200" />
@@ -93,7 +98,7 @@ const Hero: React.FC = () => {
                     <div className="rounded-2xl border border-slate-200 bg-white p-4">
                       <div className="flex items-center justify-between">
                         <div className="h-3 w-40 bg-slate-200 rounded" />
-                        <div className="h-8 w-24 rounded-full bg-slate-900" />
+                        <div className="h-8 w-24 rounded-full bg-blue-600" />
                       </div>
                       <div className="mt-4 grid grid-cols-3 gap-3">
                         <div className="h-20 rounded-2xl bg-slate-50 border border-slate-200" />
@@ -115,7 +120,7 @@ const Hero: React.FC = () => {
                   Prévia ilustrativa — o app real segue o mesmo padrão de clareza e controle.
                 </div>
               </div>
-            </div>
+            </GlassCard>
           </motion.div>
         </div>
       </div>
