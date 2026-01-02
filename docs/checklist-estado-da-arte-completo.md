@@ -40,7 +40,7 @@ Este é o checklist único (por módulo) para levar o REVO ao nível **top mundi
 ### A2) UX “Estado da Arte”
 - [ ] PLAT-UX-01 (P1) Microinterações consistentes (hover/press/transition) sem flicker/layout shift
 - [ ] PLAT-UX-02 (P0) Ações destrutivas com “zero-surpresa”: undo/confirm + explicação clara
-- [ ] PLAT-UX-03 (P0) Feedback resiliente: retry, “o que fazer agora”, link para logs/diagnóstico quando falhar
+- [x] PLAT-UX-03 (P0) Feedback resiliente: retry, “o que fazer agora”, link para logs/diagnóstico quando falhar
 - [ ] PLAT-UX-04 (P1) Fluxos complexos com assistentes (wizard) por contexto (NF-e, PDV, Indústria, Integrações)
 
 **Validar**
@@ -89,7 +89,7 @@ Este é o checklist único (por módulo) para levar o REVO ao nível **top mundi
 - [x] OBS-TRC-01 (P0) Tracing por ação crítica (emitir NF, PDV, importar marketplace, finalizar recebimento)
 - [ ] OBS-MET-01 (P0) Métricas de produto (latência, taxa de erro, tempo de first value)
 - [ ] OBS-MET-02 (P1) KPIs de negócio: funil (setup → 1ª venda → 1ª NF → 1º pagamento)
-- [ ] OBS-OPS-01 (P0) Painel “Operação” (Dev → Saúde): filas, falhas, retries, webhooks, últimos eventos
+- [x] OBS-OPS-01 (P0) Painel “Operação” (Dev → Saúde): filas, falhas, retries, webhooks, últimos eventos
 
 **Validar**
 - Tela “Saúde” mostra: últimas falhas, fila pendente, e link para logs por entidade.
@@ -145,7 +145,7 @@ Este é o checklist único (por módulo) para levar o REVO ao nível **top mundi
 
 ### E2) Banco e deploy
 - [ ] DB-MIG-01 (P0) Idempotência “garantida”: migrations repetíveis (e reversão quando fizer sentido)
-- [ ] DB-DRIFT-01 (P0) Drift gate agendado com alerta (DEV vs PROD) e bloqueio quando necessário
+- [x] DB-DRIFT-01 (P0) Drift gate agendado com alerta (DEV vs PROD) e bloqueio quando necessário
 - [ ] DB-RPC-01 (P0) Cobertura RPC app ↔ migrations sempre verde (sem função “fantasma”)
 
 ---

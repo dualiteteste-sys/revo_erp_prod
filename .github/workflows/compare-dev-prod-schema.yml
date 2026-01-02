@@ -2,6 +2,13 @@ name: Compare DEV vs PROD schema (public)
 
 on:
   workflow_dispatch:
+  schedule:
+    # Diário 07:00 UTC (04:00 Brasil) — ajuste se preferir
+    - cron: "0 7 * * *"
+
+permissions:
+  contents: read
+  issues: write
 
 jobs:
   compare:
@@ -112,6 +119,61 @@ jobs:
             prod_migrations.txt
             dev_vs_prod_migrations.diff
           retention-days: 7
+
+      - name: Alert (Issue) if drift detected
+        if: steps.diff.outputs.has_diff == 'true'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+            const label = 'drift';
+            const runUrl = `${context.serverUrl}/${owner}/${repo}/actions/runs/${context.runId}`;
+            const title = `Drift detectado: DEV vs PROD (${new Date().toISOString().slice(0, 10)})`;
+            const body = [
+              'Detectamos divergência entre DEV e PROD (schema public / storage / migrations).',
+              '',
+              `Run: ${runUrl}`,
+              '',
+              'Próximo passo:',
+              '- Baixar o artifact `dev_prod_public_schema` e transformar os diffs em migrations.',
+              '- Aplicar via PR dev→main (checks verdes) e revalidar.',
+            ].join('\n');
+
+            // Garante label (sem falhar se já existir)
+            try {
+              await github.rest.issues.getLabel({ owner, repo, name: label });
+            } catch {
+              await github.rest.issues.createLabel({ owner, repo, name: label, color: 'd73a4a', description: 'Divergência DEV vs PROD (drift)' });
+            }
+
+            const { data: issues } = await github.rest.issues.listForRepo({
+              owner,
+              repo,
+              state: 'open',
+              labels: label,
+              per_page: 20,
+            });
+
+            const existing = issues.find((i) => i.title.startsWith('Drift detectado: DEV vs PROD'));
+            if (existing) {
+              await github.rest.issues.createComment({
+                owner,
+                repo,
+                issue_number: existing.number,
+                body: `Novo drift detectado.\n\n${runUrl}`,
+              });
+              core.notice(`Comentado no issue existente #${existing.number}`);
+            } else {
+              const created = await github.rest.issues.create({
+                owner,
+                repo,
+                title,
+                body,
+                labels: [label],
+              });
+              core.notice(`Issue criado: ${created.data.html_url}`);
+            }
 
       - name: Fail if drift detected
         if: steps.diff.outputs.has_diff == 'true'

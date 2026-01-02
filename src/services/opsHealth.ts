@@ -10,6 +10,11 @@ export type OpsHealthSummary = {
     failed: number;
     locked: number;
   };
+  finance?: {
+    pending: number;
+    failed: number;
+    locked: number;
+  };
 };
 
 export type OpsRecentFailure = {
@@ -18,6 +23,23 @@ export type OpsRecentFailure = {
   message: string;
   source: string;
   meta: Record<string, unknown> | null;
+};
+
+export type FinanceDlqRow = {
+  id: string;
+  dead_lettered_at: string;
+  job_type: string;
+  idempotency_key: string | null;
+  last_error: string | null;
+};
+
+export type EcommerceDlqRow = {
+  id: string;
+  failed_at: string;
+  provider: string;
+  kind: string;
+  dedupe_key: string | null;
+  last_error: string;
 };
 
 export async function getOpsHealthSummary(): Promise<OpsHealthSummary> {
@@ -35,3 +57,10 @@ export async function reprocessNfeioWebhookEvent(id: string): Promise<void> {
   await callRpc('ops_nfeio_webhook_reprocess', { p_id: id });
 }
 
+export async function reprocessFinanceDlq(dlqId: string): Promise<string> {
+  return callRpc<string>('ops_finance_dlq_reprocess', { p_dlq_id: dlqId });
+}
+
+export async function reprocessEcommerceDlq(dlqId: string): Promise<string> {
+  return callRpc<string>('ops_ecommerce_dlq_reprocess', { p_dlq_id: dlqId });
+}
