@@ -1,4 +1,4 @@
-import React, { useMemo } from "react";
+import React, { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthProvider";
 
@@ -112,6 +112,7 @@ export default function Pricing() {
 
   const isAuthenticated = !!session?.user;
   const plans = useMemo(() => STATIC_PLANS, []);
+  const [activeSlug, setActiveSlug] = useState<Plan["slug"]>("operacao");
 
   const compareRows = useMemo<CompareRow[]>(
     () => [
@@ -141,6 +142,7 @@ export default function Pricing() {
 
   const handleCTA = (slug: Plan["slug"]) => {
     console.log("[PRICING] CTA click", { isAuthenticated, slug });
+    setActiveSlug(slug);
     if (isAuthenticated) {
       // usuário já logado: ir para app
       nav("/app", { replace: false });
@@ -162,14 +164,20 @@ export default function Pricing() {
           </p>
         </header>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-5 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-5 gap-4 items-stretch">
           {plans.map((p) => (
             <article
               key={p.slug}
               className={[
-                "rounded-3xl border p-6 shadow-sm bg-white",
-                p.highlight ? "border-blue-600 ring-1 ring-blue-600/10" : "border-slate-200",
+                "rounded-3xl border p-6 shadow-sm bg-white flex flex-col h-full cursor-pointer transition-colors",
+                activeSlug === p.slug ? "border-blue-600 ring-1 ring-blue-600/10" : "border-slate-200 hover:border-slate-300",
               ].join(" ")}
+              onClick={() => setActiveSlug(p.slug)}
+              role="button"
+              tabIndex={0}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" || e.key === " ") setActiveSlug(p.slug);
+              }}
             >
               <h3 className="text-lg font-semibold text-slate-900">{p.title}</h3>
               <div className="mt-2 text-3xl font-semibold text-slate-900">{p.priceLabel}</div>
@@ -177,7 +185,7 @@ export default function Pricing() {
                 <div className="mt-1 text-xs text-slate-500">{p.billingNote}</div>
               ) : null}
 
-              <ul className="mt-4 space-y-2 text-sm text-slate-700">
+              <ul className="mt-4 space-y-2 text-sm text-slate-700 flex-1">
                 {p.features.map((f, i) => (
                   <li key={i} className="flex items-start gap-2">
                     <span className="mt-2 h-1.5 w-1.5 rounded-full bg-slate-900" />
@@ -189,8 +197,8 @@ export default function Pricing() {
               <button
                 onClick={() => handleCTA(p.slug)}
                 className={[
-                  "mt-6 w-full rounded-full px-4 py-2.5 font-semibold transition-colors",
-                  p.highlight
+                  "mt-6 w-full rounded-full px-4 py-2.5 font-semibold transition-colors self-stretch",
+                  activeSlug === p.slug
                     ? "bg-blue-600 text-white hover:bg-blue-700"
                     : "bg-slate-100 text-slate-900 hover:bg-slate-200",
                 ].join(" ")}
