@@ -243,6 +243,7 @@ begin
     WHERE n.nspname = 'public'
       AND p.prosecdef IS TRUE
       AND p.proname = ANY(ARRAY[
+        'create_recebimento_from_xml',
         'compras_manage_item',
         'compras_receber_pedido',
         'conferir_item_recebimento',
@@ -255,6 +256,11 @@ begin
         'delete_os_for_current_user',
         'delete_partner',
         'delete_product_for_current_user',
+        'delete_product_image_db',
+        'set_principal_product_image',
+        'list_produto_grupos',
+        'upsert_produto_grupo',
+        'delete_produto_grupo',
         'finalizar_recebimento',
         'financeiro_centros_custos_delete',
         'financeiro_cobrancas_bancarias_delete',
@@ -265,6 +271,8 @@ begin
         'financeiro_contas_pagar_delete',
         'financeiro_movimentacoes_delete',
         'financeiro_movimentacoes_upsert',
+        'fiscal_nfe_preview_xml',
+        'fiscal_nfe_recalc_totais',
         'industria_aplicar_bom_em_ordem_beneficiamento',
         'industria_aplicar_bom_em_ordem_producao',
         'industria_automacao_upsert',
@@ -276,6 +284,7 @@ begin
         'industria_manage_componente',
         'industria_manage_entrega',
         'industria_materiais_cliente_delete',
+        'industria_operacao_apontar_execucao',
         'industria_operacao_aps_lock_set',
         'industria_operacao_doc_delete',
         'industria_operacao_replanejar',
@@ -299,6 +308,8 @@ begin
         'industria_producao_update_status',
         'industria_roteiros_manage_etapa',
         'industria_update_ordem_status',
+        'log_app_event',
+        'log_app_trace',
         'logistica_transportadoras_delete',
         'mrp_reprocessar_ordem',
         'os_doc_delete',
@@ -329,5 +340,76 @@ begin
       AND pg_get_functiondef(p.oid) NOT ILIKE '%require_permission_for_current_user%'
   ) THEN
     RAISE EXCEPTION 'SEC-02/RG-03: existem RPCs SECURITY DEFINER usadas pelo app sem guard de permissão.';
+  END IF;
+
+  -- 10) SEC-MT-04: isolamento multi-tenant (A não pode ver B)
+  IF to_regclass('public.empresas') IS NOT NULL
+     AND to_regclass('public.empresa_usuarios') IS NOT NULL
+     AND to_regclass('public.user_active_empresa') IS NOT NULL
+     AND to_regclass('public.app_logs') IS NOT NULL
+  THEN
+    <<sec_mt04>>
+    DECLARE
+      v_user_a uuid := gen_random_uuid();
+      v_user_b uuid := gen_random_uuid();
+      v_emp_a uuid := gen_random_uuid();
+      v_emp_b uuid := gen_random_uuid();
+      v_count int;
+    BEGIN
+      -- Setup (como postgres) - cria 2 empresas e 2 usuários, cada um em sua empresa
+      INSERT INTO auth.users(id, aud, role, email, created_at, updated_at)
+      VALUES
+        (v_user_a, 'authenticated', 'authenticated', 'secmt04+' || replace(v_user_a::text, '-', '') || '@example.com', now(), now()),
+        (v_user_b, 'authenticated', 'authenticated', 'secmt04+' || replace(v_user_b::text, '-', '') || '@example.com', now(), now())
+      ON CONFLICT (id) DO NOTHING;
+
+      INSERT INTO public.empresas(id, nome_razao_social, razao_social, fantasia, nome)
+      VALUES
+        (v_emp_a, 'SEC MT04 A LTDA', 'SEC MT04 A LTDA', 'A', 'A'),
+        (v_emp_b, 'SEC MT04 B LTDA', 'SEC MT04 B LTDA', 'B', 'B')
+      ON CONFLICT DO NOTHING;
+
+      -- Vincula usuários à empresa (se o schema tiver colunas extras, ajusta via defaults)
+      INSERT INTO public.empresa_usuarios(empresa_id, user_id, role, created_at)
+      VALUES
+        (v_emp_a, v_user_a, 'member', now()),
+        (v_emp_b, v_user_b, 'member', now())
+      ON CONFLICT DO NOTHING;
+
+      INSERT INTO public.user_active_empresa(user_id, empresa_id, updated_at)
+      VALUES
+        (v_user_a, v_emp_a, now()),
+        (v_user_b, v_emp_b, now())
+      ON CONFLICT (user_id) DO UPDATE SET empresa_id = excluded.empresa_id, updated_at = excluded.updated_at;
+
+      -- Dados de teste
+      INSERT INTO public.app_logs(empresa_id, level, source, event, message, context, actor_id, created_at)
+      VALUES
+        (v_emp_a, 'info', 'test', 'sec_mt04', 'A', '{}'::jsonb, v_user_a, now()),
+        (v_emp_b, 'info', 'test', 'sec_mt04', 'B', '{}'::jsonb, v_user_b, now());
+
+      -- A só vê A
+      EXECUTE 'SET LOCAL ROLE authenticated';
+      PERFORM set_config('request.jwt.claim.sub', v_user_a::text, true);
+      SELECT count(*)::int INTO v_count FROM public.app_logs WHERE event='sec_mt04';
+      IF v_count <> 1 THEN
+        RAISE EXCEPTION 'SEC-MT-04: usuário A consegue ver % linhas (esperado 1).', v_count;
+      END IF;
+      SELECT count(*)::int INTO v_count FROM public.app_logs WHERE event='sec_mt04' AND message='B';
+      IF v_count <> 0 THEN
+        RAISE EXCEPTION 'SEC-MT-04: usuário A conseguiu enxergar dados da empresa B.';
+      END IF;
+
+      -- B só vê B
+      PERFORM set_config('request.jwt.claim.sub', v_user_b::text, true);
+      SELECT count(*)::int INTO v_count FROM public.app_logs WHERE event='sec_mt04';
+      IF v_count <> 1 THEN
+        RAISE EXCEPTION 'SEC-MT-04: usuário B consegue ver % linhas (esperado 1).', v_count;
+      END IF;
+      SELECT count(*)::int INTO v_count FROM public.app_logs WHERE event='sec_mt04' AND message='A';
+      IF v_count <> 0 THEN
+        RAISE EXCEPTION 'SEC-MT-04: usuário B conseguiu enxergar dados da empresa A.';
+      END IF;
+    END;
   END IF;
 end $$;

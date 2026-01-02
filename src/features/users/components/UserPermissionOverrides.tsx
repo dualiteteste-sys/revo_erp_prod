@@ -8,7 +8,7 @@ import { useToast } from '@/contexts/ToastProvider';
 type PermissionRow = {
   id: string;
   module: string;
-  action: 'view' | 'create' | 'update' | 'delete' | 'manage';
+  action: 'view' | 'create' | 'update' | 'delete' | 'manage' | 'export';
 };
 
 type OverrideRow = {
@@ -18,13 +18,14 @@ type OverrideRow = {
   allow: boolean;
 };
 
-const ACTIONS: PermissionRow['action'][] = ['view', 'create', 'update', 'delete', 'manage'];
+const ACTIONS: PermissionRow['action'][] = ['view', 'create', 'update', 'delete', 'manage', 'export'];
 const ACTION_LABEL: Record<PermissionRow['action'], string> = {
   view: 'Ver',
   create: 'Criar',
   update: 'Editar',
   delete: 'Excluir',
   manage: 'Gerenciar',
+  export: 'Exportar',
 };
 
 export default function UserPermissionOverrides({ userId }: { userId: string }) {
