@@ -9,6 +9,7 @@ import { supabase } from '@/lib/supabaseClient';
 import { getVendaDetails, type VendaDetails } from '@/services/vendas';
 import CsvExportDialog from '@/components/ui/CsvExportDialog';
 import { useOnboardingGate } from '@/contexts/OnboardingGateContext';
+import { ActionLockedError, runWithActionLock } from '@/lib/actionLock';
 
 type PdvRow = {
   id: string;
@@ -166,9 +167,12 @@ export default function PdvPage() {
       addToast('Cadastre/seleciona uma conta corrente para receber no PDV.', 'error');
       return;
     }
+    const lockKey = `pdv:finalize:${pedidoId}`;
     setFinalizingId(pedidoId);
     try {
-      await finalizePdv({ pedidoId, contaCorrenteId, estoqueEnabled: true });
+      await runWithActionLock(lockKey, async () => {
+        await finalizePdv({ pedidoId, contaCorrenteId, estoqueEnabled: true });
+      });
       addToast('PDV finalizado (financeiro + estoque).', 'success');
       try {
         const venda = await getVendaDetails(pedidoId);
@@ -179,7 +183,11 @@ export default function PdvPage() {
       }
       await load();
     } catch (e: any) {
-      addToast(e.message || 'Falha ao finalizar PDV.', 'error');
+      if (e instanceof ActionLockedError) {
+        addToast('Já estamos finalizando este PDV. Aguarde alguns segundos.', 'info');
+      } else {
+        addToast(e.message || 'Falha ao finalizar PDV.', 'error');
+      }
     } finally {
       setFinalizingId(null);
     }
@@ -193,13 +201,20 @@ export default function PdvPage() {
       addToast('Selecione uma conta corrente para lançar o estorno.', 'error');
       return;
     }
+    const lockKey = `pdv:estornar:${pedidoId}`;
     setFinalizingId(pedidoId);
     try {
-      await estornarPdv({ pedidoId, contaCorrenteId });
+      await runWithActionLock(lockKey, async () => {
+        await estornarPdv({ pedidoId, contaCorrenteId });
+      });
       addToast('PDV estornado (financeiro + estoque).', 'success');
       await load();
     } catch (e: any) {
-      addToast(e.message || 'Falha ao estornar PDV.', 'error');
+      if (e instanceof ActionLockedError) {
+        addToast('Já estamos estornando este PDV. Aguarde alguns segundos.', 'info');
+      } else {
+        addToast(e.message || 'Falha ao estornar PDV.', 'error');
+      }
     } finally {
       setFinalizingId(null);
     }

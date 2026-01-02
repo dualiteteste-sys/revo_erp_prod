@@ -21,6 +21,7 @@ import { useAuth } from '@/contexts/AuthProvider';
 import { createOsDocSignedUrl, deleteOsDoc, listOsDocs, uploadOsDoc, type OsDoc } from '@/services/osDocs';
 import { useHasPermission } from '@/hooks/useHasPermission';
 import { generateOsParcelas, listOsParcelas, type OsParcela } from '@/services/osParcelas';
+import { ActionLockedError, runWithActionLock } from '@/lib/actionLock';
 
 interface OsFormPanelProps {
   os: OrdemServicoDetails | null;
@@ -206,16 +207,23 @@ const OsFormPanel: React.FC<OsFormPanelProps> = ({ os, onSaveSuccess, onClose })
     if (!formData.id) return;
     setIsGeneratingParcelas(true);
     try {
-      await generateOsParcelas({
-        osId: String(formData.id),
-        condicao: parcelasCondicao || null,
-        total: Number(formData.total_geral || 0) || null,
-        baseDateISO: parcelasBaseDate || null,
+      const osId = String(formData.id);
+      await runWithActionLock(`os:parcelas:${osId}`, async () => {
+        await generateOsParcelas({
+          osId,
+          condicao: parcelasCondicao || null,
+          total: Number(formData.total_geral || 0) || null,
+          baseDateISO: parcelasBaseDate || null,
+        });
       });
       addToast('Parcelas geradas com sucesso!', 'success');
       await refreshParcelas();
     } catch (e: any) {
-      addToast(e?.message || 'Erro ao gerar parcelas.', 'error');
+      if (e instanceof ActionLockedError) {
+        addToast('Já estamos gerando parcelas desta OS. Aguarde alguns segundos.', 'info');
+      } else {
+        addToast(e?.message || 'Erro ao gerar parcelas.', 'error');
+      }
     } finally {
       setIsGeneratingParcelas(false);
     }
@@ -229,7 +237,10 @@ const OsFormPanel: React.FC<OsFormPanelProps> = ({ os, onSaveSuccess, onClose })
     }
     setIsGeneratingContasParcelas(true);
     try {
-      const contas = await createContasAReceberFromOsParcelas(String(formData.id));
+      const osId = String(formData.id);
+      const contas = await runWithActionLock(`os:contas_parcelas:${osId}`, async () => {
+        return await createContasAReceberFromOsParcelas(osId);
+      });
       if (!contas || contas.length === 0) {
         addToast('Nenhuma conta foi gerada (verifique se há parcelas canceladas).', 'warning');
         return;
@@ -238,7 +249,11 @@ const OsFormPanel: React.FC<OsFormPanelProps> = ({ os, onSaveSuccess, onClose })
       setParcelasDialogOpen(false);
       navigate(`/app/financeiro/contas-a-receber?contaId=${encodeURIComponent(contas[0].id)}`);
     } catch (e: any) {
-      addToast(e?.message || 'Erro ao gerar contas por parcelas.', 'error');
+      if (e instanceof ActionLockedError) {
+        addToast('Já estamos gerando contas desta OS. Aguarde alguns segundos.', 'info');
+      } else {
+        addToast(e?.message || 'Erro ao gerar contas por parcelas.', 'error');
+      }
     } finally {
       setIsGeneratingContasParcelas(false);
     }
@@ -248,16 +263,23 @@ const OsFormPanel: React.FC<OsFormPanelProps> = ({ os, onSaveSuccess, onClose })
     if (!formData.id) return;
     setIsCreatingConta(true);
     try {
-      const conta = await createContaAReceberFromOs({
-        osId: String(formData.id),
-        dataVencimento: contaVencimento || null,
+      const osId = String(formData.id);
+      const conta = await runWithActionLock(`os:conta_unica:${osId}`, async () => {
+        return await createContaAReceberFromOs({
+          osId,
+          dataVencimento: contaVencimento || null,
+        });
       });
       setContaReceberId(conta.id);
       addToast('Conta a receber gerada com sucesso!', 'success');
       setIsContaDialogOpen(false);
       navigate(`/app/financeiro/contas-a-receber?contaId=${encodeURIComponent(conta.id)}`);
     } catch (e: any) {
-      addToast(e?.message || 'Erro ao gerar conta a receber.', 'error');
+      if (e instanceof ActionLockedError) {
+        addToast('Já estamos gerando a conta desta OS. Aguarde alguns segundos.', 'info');
+      } else {
+        addToast(e?.message || 'Erro ao gerar conta a receber.', 'error');
+      }
     } finally {
       setIsCreatingConta(false);
     }

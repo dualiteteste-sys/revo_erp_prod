@@ -67,7 +67,7 @@ Este é o checklist único (por módulo) para levar o REVO ao nível **top mundi
 ### B2) RBAC de verdade
 - [x] SEC-RBAC-01 (P0) Matriz de permissões revisada por módulo (view/create/update/delete/manage/export)
 - [x] SEC-RBAC-02 (P0) Enforcement em 3 camadas: menu + rotas + DB (RLS/RPC)
-- [ ] SEC-RBAC-03 (P1) Perfis prontos (Owner/Admin/Finance/Ops/Member/Viewer) + auditoria de mudanças
+- [x] SEC-RBAC-03 (P1) Perfis prontos (Owner/Admin/Finance/Ops/Member/Viewer) + auditoria de mudanças
 
 ### B3) Segredos e integrações (segurança operacional)
 - [ ] SEC-INT-01 (P0) Rotação de tokens (NFE.io/marketplaces) com procedimento e “health check”
@@ -119,11 +119,11 @@ Este é o checklist único (por módulo) para levar o REVO ao nível **top mundi
 - [ ] FINOPS-02 (P1) Limites por plano com enforcement real e alertas (evitar suporte)
 
 ### D4) Resiliência / Escalabilidade (sem “ERP frágil”)
-- [ ] RES-01 (P0) Idempotência padrão em ações críticas (idempotency key + dedupe no backend)
+- [x] RES-01 (P0) Idempotência padrão em ações críticas (idempotency key + dedupe no backend)
 - [ ] RES-02 (P0) Retry padrão com backoff+jitter (HTTP/RPC/filas) + limites (não “loop infinito”)
 - [ ] RES-03 (P0) Timeouts consistentes por camada (front/edge/RPC) + cancelamento (AbortController)
 - [ ] RES-04 (P0) Filas por domínio (NF/marketplace/financeiro) com DLQ + reprocessamento seguro
-- [ ] RES-05 (P0) “Anti double-click”/locks por entidade (ex.: emitir NF, fechar caixa, finalizar OS)
+- [x] RES-05 (P0) “Anti double-click”/locks por entidade (ex.: emitir NF, fechar caixa, finalizar OS)
 - [ ] RES-06 (P1) Circuit breaker + bulkheads (evitar efeito cascata quando integração cair)
 - [ ] RES-07 (P1) Degradação elegante (feature off / fallback) + mensagens “o que fazer agora”
 - [ ] RES-08 (P1) Teste de carga mínimo (Top 5 RPCs + 2 fluxos E2E) com budget de latência
