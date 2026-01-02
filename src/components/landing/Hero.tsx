@@ -8,26 +8,77 @@ const Hero: React.FC = () => {
     document.getElementById('pricing')?.scrollIntoView({ behavior: 'smooth' });
   };
 
+  const headline = {
+    hidden: {},
+    show: { transition: { staggerChildren: 0.08, delayChildren: 0.05 } },
+  };
+
+  const word = {
+    hidden: { opacity: 0, y: 18, filter: 'blur(10px)', textShadow: '0 0 0 rgba(37, 99, 235, 0)' },
+    show: {
+      opacity: 1,
+      y: 0,
+      filter: 'blur(0px)',
+      textShadow: '0 0 28px rgba(37, 99, 235, 0.18)',
+      transition: { duration: 0.55, ease: [0.22, 1, 0.36, 1] },
+    },
+  };
+
   return (
     <section className="pt-28 pb-16 md:pt-32 md:pb-24 relative overflow-hidden">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="pointer-events-none absolute inset-0 -z-10">
-          <div className="absolute -top-24 -left-24 h-72 w-72 rounded-full bg-blue-200/30 blur-3xl" />
-          <div className="absolute -bottom-24 -right-24 h-80 w-80 rounded-full bg-indigo-200/30 blur-3xl" />
+          <motion.div
+            className="absolute -top-28 -left-28 h-80 w-80 rounded-full bg-blue-200/35 blur-3xl"
+            initial={{ opacity: 0.5, scale: 0.95 }}
+            animate={{ opacity: [0.35, 0.55, 0.35], scale: [0.95, 1.05, 0.95] }}
+            transition={{ duration: 10, repeat: Infinity, ease: 'easeInOut' }}
+          />
+          <motion.div
+            className="absolute -bottom-32 -right-32 h-96 w-96 rounded-full bg-indigo-200/35 blur-3xl"
+            initial={{ opacity: 0.45, scale: 0.98 }}
+            animate={{ opacity: [0.3, 0.5, 0.3], scale: [0.98, 1.08, 0.98] }}
+            transition={{ duration: 12, repeat: Infinity, ease: 'easeInOut' }}
+          />
+          <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-blue-300/40 to-transparent" />
         </div>
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-10 items-center">
           <div className="text-center lg:text-left">
             <motion.h1
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6 }}
-              className="text-4xl md:text-6xl font-semibold tracking-tight text-gray-900"
+              variants={headline}
+              initial="hidden"
+              animate="show"
+              className="text-4xl md:text-6xl font-semibold tracking-tight text-slate-900"
             >
-              Um ERP que parece{' '}
-              <span className="bg-gradient-to-r from-blue-700 to-indigo-600 bg-clip-text text-transparent">
-                simples
-              </span>
-              . Mas é poderoso.
+              <motion.span variants={word} className="inline-block mr-3">
+                Um
+              </motion.span>
+              <motion.span variants={word} className="inline-block mr-3">
+                ERP
+              </motion.span>
+              <motion.span variants={word} className="inline-block mr-3">
+                <span className="bg-gradient-to-r from-blue-700 via-sky-500 to-indigo-600 bg-clip-text text-transparent">
+                  Simples
+                </span>
+              </motion.span>
+              <motion.span variants={word} className="inline-block mr-3">
+                de
+              </motion.span>
+              <motion.span variants={word} className="inline-block mr-3">
+                usar.
+              </motion.span>
+              <motion.span variants={word} className="inline-block mr-3">
+                Mas
+              </motion.span>
+              <motion.span variants={word} className="inline-block mr-3">
+                poderoso
+              </motion.span>
+              <motion.span variants={word} className="inline-block mr-3">
+                no
+              </motion.span>
+              <motion.span variants={word} className="inline-block">
+                CORE.
+              </motion.span>
             </motion.h1>
             <motion.p
           initial={{ opacity: 0, y: 20 }}
