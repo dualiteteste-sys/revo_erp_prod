@@ -80,8 +80,8 @@ const Hero: React.FC = () => {
               transition={{ duration: 0.6, delay: 0.45 }}
               className="mt-5 max-w-xl mx-auto lg:mx-0 text-base md:text-lg text-slate-600 leading-relaxed"
             >
-              Comece a operar em 3 minutos. Cadastros, vendas, financeiro, serviços e indústria — primeiro uso guiado, UX moderna e
-              upgrades por necessidade.
+              Comece a operar em 3 minutos. Cadastros, Vendas, Financeiro, Indústria Forte, Serviços completos e Comércio Simples —
+              Primeiro uso guiado, UX moderna e upgrades por necessidade.
             </motion.p>
             <motion.div
           initial={{ opacity: 0, y: 20 }}

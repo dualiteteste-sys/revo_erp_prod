@@ -3,6 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import Header from '../../components/landing/Header';
 import Hero from '../../components/landing/Hero';
 import IndustrySection from '../../components/landing/IndustrySection';
+import ServicesSection from '../../components/landing/ServicesSection';
+import CommerceSection from '../../components/landing/CommerceSection';
 import Features from '../../components/landing/Features';
 import Pricing from '../../components/landing/Pricing';
 import FAQ from '../../components/landing/FAQ';
@@ -17,6 +19,8 @@ const LandingPage: React.FC = () => {
       <main>
         <Hero />
         <IndustrySection />
+        <ServicesSection />
+        <CommerceSection />
         <Pricing />
         <Features />
         <FAQ />
