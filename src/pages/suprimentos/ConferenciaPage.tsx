@@ -4,6 +4,7 @@ import { getRecebimento, listRecebimentoItens, conferirItem, finalizarRecebiment
 import { Loader2, ArrowLeft, CheckCircle, AlertTriangle, Save, Layers, RefreshCw, Hammer } from 'lucide-react';
 import { useToast } from '@/contexts/ToastProvider';
 import { useConfirm } from '@/contexts/ConfirmProvider';
+import { ActionLockedError, runWithActionLock } from '@/lib/actionLock';
 import ItemAutocomplete from '@/components/os/ItemAutocomplete';
 import ClientAutocomplete from '@/components/common/ClientAutocomplete';
 import Modal from '@/components/ui/Modal';
@@ -141,7 +142,9 @@ export default function ConferenciaPage() {
             // Para evitar precisar de 2 cliques, aguardamos qualquer salvamento pendente.
             await lastSavePromiseRef.current;
 
-            const result = await finalizarRecebimentoV2(id);
+            const result = await runWithActionLock(`recebimento:finalizar:${id}`, async () => {
+                return await finalizarRecebimentoV2(id);
+            });
             if (result.status === 'pendente_classificacao') {
                 setIsClassificacaoOpen(true);
                 addToast(result.message, 'warning');
@@ -164,8 +167,12 @@ export default function ConferenciaPage() {
                 loadData(id);
             }
         } catch (error) {
-            console.error(error);
-            addToast((error as any)?.message || 'Erro ao finalizar recebimento.', 'error');
+            if (error instanceof ActionLockedError) {
+                addToast('Já estamos finalizando este recebimento. Aguarde alguns segundos.', 'info');
+            } else {
+                console.error(error);
+                addToast((error as any)?.message || 'Erro ao finalizar recebimento.', 'error');
+            }
         } finally {
             setFinalizing(false);
         }
