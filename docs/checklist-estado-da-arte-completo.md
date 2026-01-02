@@ -57,15 +57,15 @@ Este é o checklist único (por módulo) para levar o REVO ao nível **top mundi
 
 ### B1) Multi-tenant “sem bypass”
 - [x] SEC-MT-01 (P0) Checklist de isolamento por recurso: todo dado tem `empresa_id` + RLS consistente
-- [ ] SEC-MT-02 (P0) RPCs `security definer` com `require_permission_for_current_user` quando expostos
+- [x] SEC-MT-02 (P0) RPCs `security definer` com `require_permission_for_current_user` quando expostos
 - [x] SEC-MT-03 (P0) “Sem bypass via console”: nenhuma tabela crítica exposta sem RLS/RPC wrapper
-- [ ] SEC-MT-04 (P1) Testes automatizados de isolamento (tentativa cross-empresa deve falhar)
+- [x] SEC-MT-04 (P1) Testes automatizados de isolamento (tentativa cross-empresa deve falhar)
 
 **Validar**
 - Teste e2e/fixture com 2 empresas: tentar ler/alterar registros da empresa B usando sessão da A (deve falhar).
 
 ### B2) RBAC de verdade
-- [ ] SEC-RBAC-01 (P0) Matriz de permissões revisada por módulo (view/create/update/delete/manage/export)
+- [x] SEC-RBAC-01 (P0) Matriz de permissões revisada por módulo (view/create/update/delete/manage/export)
 - [x] SEC-RBAC-02 (P0) Enforcement em 3 camadas: menu + rotas + DB (RLS/RPC)
 - [ ] SEC-RBAC-03 (P1) Perfis prontos (Owner/Admin/Finance/Ops/Member/Viewer) + auditoria de mudanças
 

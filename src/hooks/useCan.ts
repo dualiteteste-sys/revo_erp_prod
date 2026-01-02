@@ -4,14 +4,32 @@ import { useHasPermission } from './useHasPermission';
 export type PermissionModule = 
   | 'usuarios' 
   | 'roles'
+  | 'partners'
   | 'contas_a_receber' 
+  | 'contas_a_pagar'
+  | 'tesouraria'
   | 'centros_de_custo' 
+  | 'relatorios_financeiro'
   | 'produtos' 
+  | 'vendedores'
+  | 'logistica'
+  | 'suprimentos'
+  | 'vendas'
+  | 'metas'
+  | 'crm'
+  | 'fiscal'
   | 'servicos' 
+  | 'os'
+  | 'relatorios_servicos'
+  | 'industria'
+  | 'mrp'
+  | 'qualidade'
+  | 'ecommerce'
+  | 'ops'
   | 'rh'
   | 'logs';
 
-export type PermissionAction = 'view' | 'create' | 'update' | 'delete' | 'manage';
+export type PermissionAction = 'view' | 'create' | 'update' | 'delete' | 'manage' | 'export';
 
 /**
  * A simple synchronous hook to check for a permission.
