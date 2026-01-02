@@ -11,18 +11,22 @@ const Hero: React.FC = () => {
   const line = {
     hidden: {
       opacity: 0,
-      y: 18,
-      scale: 0.985,
-      filter: 'blur(12px)',
+      y: 32,
+      scale: 0.92,
+      rotateX: 18,
+      z: -140,
+      filter: 'blur(18px)',
       textShadow: '0 0 0 rgba(37, 99, 235, 0)',
     },
     show: {
       opacity: 1,
       y: 0,
       scale: 1,
+      rotateX: 0,
+      z: 0,
       filter: 'blur(0px)',
-      textShadow: '0 0 28px rgba(37, 99, 235, 0.18)',
-      transition: { duration: 0.7, ease: [0.22, 1, 0.36, 1] },
+      textShadow: '0 0 42px rgba(37, 99, 235, 0.22)',
+      transition: { type: 'spring', stiffness: 140, damping: 18, mass: 0.8 },
     },
   };
 
