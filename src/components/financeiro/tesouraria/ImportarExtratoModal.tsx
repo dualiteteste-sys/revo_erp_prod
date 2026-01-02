@@ -57,7 +57,7 @@ export default function ImportarExtratoModal({ isOpen, onClose, onImport, contaC
     if (/^\d{8}$/.test(value)) return `${value.slice(0, 4)}-${value.slice(4, 6)}-${value.slice(6, 8)}`;
 
     // DD/MM/YYYY or DD-MM-YYYY
-    const m = value.match(/^(\d{2})[\/-](\d{2})[\/-](\d{4})$/);
+    const m = value.match(/^(\d{2})[/-](\d{2})[/-](\d{4})$/);
     if (m) return `${m[3]}-${m[2]}-${m[1]}`;
 
     return null;

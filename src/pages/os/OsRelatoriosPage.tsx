@@ -142,16 +142,16 @@ export default function OsRelatoriosPage() {
 
       const headers = ['Número', 'Descrição', 'Status', 'Data', 'Cliente', 'Total', 'Custo Real', 'Margem'];
       const lines = all.data.map((r) => {
-        const cols = [
-          String(r.numero ?? ''),
-          `"${String(r.descricao ?? '').replace(/\"/g, '""')}"`,
-          STATUS_LABEL[r.status] || r.status,
-          r.data_ref,
-          `"${String(r.cliente_nome ?? '').replace(/\"/g, '""')}"`,
-          String(r.total_geral ?? 0).replace('.', ','),
-          String(r.custo_real ?? 0).replace('.', ','),
-          String(r.margem ?? 0).replace('.', ','),
-        ];
+          const cols = [
+            String(r.numero ?? ''),
+            `"${String(r.descricao ?? '').replace(/"/g, '""')}"`,
+            STATUS_LABEL[r.status] || r.status,
+            r.data_ref,
+            `"${String(r.cliente_nome ?? '').replace(/"/g, '""')}"`,
+            String(r.total_geral ?? 0).replace('.', ','),
+            String(r.custo_real ?? 0).replace('.', ','),
+            String(r.margem ?? 0).replace('.', ','),
+          ];
         return cols.join(';');
       });
 
