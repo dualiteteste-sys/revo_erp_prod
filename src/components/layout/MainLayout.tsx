@@ -11,6 +11,8 @@ import CommandPalette from './CommandPalette';
 import OnboardingWizardModal from '@/components/settings/onboarding/OnboardingWizardModal';
 import OnboardingGateBanner from '@/components/onboarding/OnboardingGateBanner';
 import { OnboardingGateProvider } from '@/contexts/OnboardingGateContext';
+import RoadmapWizardModal from '@/components/roadmap/RoadmapWizardModal';
+import RoadmapButton from '@/components/roadmap/RoadmapButton';
 
 const findActiveHref = (pathname: string): string => {
   for (const group of menuConfig) {
@@ -56,6 +58,7 @@ const MainLayout: React.FC = () => {
   const [isOnboardingWizardOpen, setIsOnboardingWizardOpen] = useState(false);
   const [onboardingAutoOpenPending, setOnboardingAutoOpenPending] = useState(false);
   const [onboardingForceStepKey, setOnboardingForceStepKey] = useState<string | null>(null);
+  const [isRoadmapOpen, setIsRoadmapOpen] = useState(false);
 
   useEffect(() => {
     setActiveItem(findActiveHref(location.pathname));
@@ -171,6 +174,10 @@ const MainLayout: React.FC = () => {
               setOnboardingForceStepKey(null);
             }}
           />
+          <RoadmapWizardModal
+            isOpen={isRoadmapOpen}
+            onClose={() => setIsRoadmapOpen(false)}
+          />
           <Sidebar
             isCollapsed={isSidebarCollapsed}
             setIsCollapsed={setIsSidebarCollapsed}
@@ -182,12 +189,15 @@ const MainLayout: React.FC = () => {
           <div className="flex-1 flex flex-col overflow-hidden">
             <SubscriptionGuard>
               <div className="pb-3">
-                <OnboardingGateBanner
-                  onOpenWizard={() => {
-                    setOnboardingForceStepKey(null);
-                    setIsOnboardingWizardOpen(true);
-                  }}
-                />
+                <div className="flex justify-end gap-2 items-start flex-wrap">
+                  <OnboardingGateBanner
+                    onOpenWizard={() => {
+                      setOnboardingForceStepKey(null);
+                      setIsOnboardingWizardOpen(true);
+                    }}
+                  />
+                  <RoadmapButton onClick={() => setIsRoadmapOpen(true)} />
+                </div>
               </div>
               <main className="flex-1 overflow-y-auto scrollbar-styled pr-2">
                 <Outlet />
