@@ -2,6 +2,7 @@ import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import Header from '../../components/landing/Header';
 import Hero from '../../components/landing/Hero';
+import IndustrySection from '../../components/landing/IndustrySection';
 import Features from '../../components/landing/Features';
 import Pricing from '../../components/landing/Pricing';
 import FAQ from '../../components/landing/FAQ';
@@ -15,6 +16,7 @@ const LandingPage: React.FC = () => {
       <Header onLoginClick={() => navigate('/auth/login')} />
       <main>
         <Hero />
+        <IndustrySection />
         <Pricing />
         <Features />
         <FAQ />

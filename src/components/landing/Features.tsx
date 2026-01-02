@@ -59,7 +59,7 @@ export default function Features() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <header className="text-center max-w-3xl mx-auto">
           <h2 className="text-3xl md:text-4xl font-semibold tracking-tight text-slate-900">
-            Tudo que você precisa, com a sensação de “tá no controle”.
+            Tudo que você precisa, com a sensação de “Estar no controle”.
           </h2>
           <p className="mt-4 text-base md:text-lg text-slate-600">
             Um ERP moderno é menos “tela” e mais “fluxo”. Menos ruído, mais previsibilidade.
