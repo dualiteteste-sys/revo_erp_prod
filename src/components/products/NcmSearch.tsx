@@ -1,9 +1,9 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Check, ChevronsUpDown, FileText, Folder, Loader2, Search } from 'lucide-react';
-import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from 'cmdk';
+import { Command, CommandGroup, CommandInput, CommandItem, CommandList } from 'cmdk';
 import { Popover, PopoverContent, PopoverTrigger } from '@radix-ui/react-popover';
-import axios from 'axios';
 import { useDebounce } from '@/hooks/useDebounce';
+import { fetchNcmByCode, searchNcm } from '@/services/externalApis';
 import { cn } from '@/lib/utils'; // Assuming utils exists, if not I'll use a local helper or inline clsx
 
 // Simple cn utility if not available, but usually is in these stacks.
@@ -43,17 +43,8 @@ const NcmSearch: React.FC<NcmSearchProps> = ({ value, onChange }) => {
     const searchNcm = async () => {
       setLoading(true);
       try {
-        // Decide if we are searching or getting details
-        // If the user types a code that looks like a parent category (e.g. "34.01"), 
-        // the API might return that specific item or search results.
-        // BrasilAPI search endpoint is powerful.
-        const url = `https://brasilapi.com.br/api/ncm/v1?search=${encodeURIComponent(debouncedSearch)}`;
-        const response = await axios.get(url);
-
-        const rawData = Array.isArray(response.data) ? response.data : [response.data].filter(Boolean);
-        // Deduplicate
-        const uniqueData = Array.from(new Map(rawData.map((item: NcmResult) => [item.codigo, item])).values());
-        setResults(uniqueData as NcmResult[]);
+        const data = await searchNcm(debouncedSearch);
+        setResults(data as NcmResult[]);
       } catch (error) {
         console.error("NCM Search Error:", error);
         setResults([]);
@@ -76,9 +67,9 @@ const NcmSearch: React.FC<NcmSearchProps> = ({ value, onChange }) => {
 
       setIsLoadingDescription(true);
       try {
-        const response = await axios.get(`https://brasilapi.com.br/api/ncm/v1/${cleanCode}`);
-        if (response.data && response.data.descricao) {
-          setDescription(response.data.descricao);
+        const data = await fetchNcmByCode(cleanCode);
+        if (data?.descricao) {
+          setDescription(data.descricao);
         } else {
           setDescription(null);
         }

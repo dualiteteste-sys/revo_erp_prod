@@ -120,9 +120,9 @@ Este é o checklist único (por módulo) para levar o REVO ao nível **top mundi
 
 ### D4) Resiliência / Escalabilidade (sem “ERP frágil”)
 - [x] RES-01 (P0) Idempotência padrão em ações críticas (idempotency key + dedupe no backend)
-- [ ] RES-02 (P0) Retry padrão com backoff+jitter (HTTP/RPC/filas) + limites (não “loop infinito”)
-- [ ] RES-03 (P0) Timeouts consistentes por camada (front/edge/RPC) + cancelamento (AbortController)
-- [ ] RES-04 (P0) Filas por domínio (NF/marketplace/financeiro) com DLQ + reprocessamento seguro
+- [x] RES-02 (P0) Retry padrão com backoff+jitter (HTTP/RPC/filas) + limites (não “loop infinito”)
+- [x] RES-03 (P0) Timeouts consistentes por camada (front/edge/RPC) + cancelamento (AbortController)
+- [x] RES-04 (P0) Filas por domínio (NF/marketplace/financeiro) com DLQ + reprocessamento seguro
 - [x] RES-05 (P0) “Anti double-click”/locks por entidade (ex.: emitir NF, fechar caixa, finalizar OS)
 - [ ] RES-06 (P1) Circuit breaker + bulkheads (evitar efeito cascata quando integração cair)
 - [ ] RES-07 (P1) Degradação elegante (feature off / fallback) + mensagens “o que fazer agora”

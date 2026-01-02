@@ -5,6 +5,7 @@
 import { supabase } from "@/lib/supabaseClient"; // mantenha seu caminho atual
 import { logger } from "@/lib/logger";
 import { getLastRequestId } from "@/lib/requestId";
+import { withRetry } from "@/lib/retry";
 
 type RpcArgs = Record<string, any>;
 
@@ -19,40 +20,56 @@ export class RpcError extends Error {
   }
 }
 
+function isRetryableRpcFailure(status: number | undefined, message: string): boolean {
+  const msg = String(message || "");
+  if (status === 0 && /(failed to fetch|networkerror|load failed)/i.test(msg)) return true;
+  if (status === 408) return true;
+  if (status === 429) return true;
+  if (status && status >= 500) return true;
+  return false;
+}
+
 export async function callRpc<T = unknown>(fn: string, args: RpcArgs = {}): Promise<T> {
-  const { data, error, status } = await supabase.rpc(fn, args);
+  return withRetry(
+    async (attempt) => {
+      const { data, error, status } = await supabase.rpc(fn, args);
 
-  if (error) {
-    const msg = error.message || "RPC_ERROR";
-    const details = (error as any).details ?? null;
-    const request_id = getLastRequestId();
+      if (!error) return data as T;
 
-    const isTransientNetworkError =
-      status === 0 && /(failed to fetch|networkerror|load failed|aborterror)/i.test(String(msg));
+      const msg = error.message || "RPC_ERROR";
+      const details = (error as any).details ?? null;
+      const request_id = getLastRequestId();
 
-    if (isTransientNetworkError) {
-      // Em navegações rápidas o browser pode abortar requests pendentes e isso vira "Failed to fetch".
-      // Isso não deve poluir o console nem quebrar o RG-03 (console sweep).
-      logger.warn("[RPC][TRANSIENT]", { fn, status, message: msg, details, request_id });
-    } else {
-      logger.error("[RPC][ERROR]", error, { fn, status, message: msg, details, request_id });
+      const transient = isRetryableRpcFailure(status, msg);
+      const willRetry = transient && attempt < 3;
+
+      if (transient) {
+        logger.warn("[RPC][TRANSIENT]", { fn, attempt, status, message: msg, details, request_id, willRetry });
+      } else {
+        logger.error("[RPC][ERROR]", error, { fn, attempt, status, message: msg, details, request_id });
+      }
+
+      if (/Invalid API key/i.test(msg)) {
+        throw new RpcError(
+          "HTTP_401: Invalid API key — confira VITE_SUPABASE_URL/VITE_SUPABASE_ANON_KEY e reinicie o dev server.",
+          { status, details }
+        );
+      }
+      if (/JWT/i.test(msg) && status === 401) {
+        throw new RpcError("HTTP_401: JWT inválido/ausente — garanta que o usuário está autenticado.", { status, details });
+      }
+
+      throw new RpcError(`HTTP_${status}: ${msg}`, { status, details });
+    },
+    {
+      maxAttempts: 3,
+      baseDelayMs: 400,
+      maxDelayMs: 5000,
+      jitterRatio: 0.3,
+      shouldRetry: (err) => {
+        if (!(err instanceof RpcError)) return false;
+        return isRetryableRpcFailure(err.status, err.message);
+      },
     }
-
-    if (/Invalid API key/i.test(msg)) {
-      throw new RpcError(
-        "HTTP_401: Invalid API key — confira VITE_SUPABASE_URL/VITE_SUPABASE_ANON_KEY e reinicie o dev server.",
-        { status, details }
-      );
-    }
-    if (/JWT/i.test(msg) && status === 401) {
-      throw new RpcError(
-        "HTTP_401: JWT inválido/ausente — garanta que o usuário está autenticado.",
-        { status, details }
-      );
-    }
-
-    throw new RpcError(`HTTP_${status}: ${msg}`, { status, details });
-  }
-
-  return data as T;
+  );
 }

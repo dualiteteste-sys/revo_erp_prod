@@ -27,12 +27,39 @@ export const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey, {
     detectSessionInUrl: true,
   },
   global: {
-    fetch: (input, init) => {
+    fetch: async (input, init) => {
       const requestId = newRequestId();
+      const url = typeof input === "string" ? input : (input as Request).url;
+      const method = (init?.method || (input instanceof Request ? input.method : "GET")).toUpperCase();
+      const isRpc = /\/rest\/v1\/rpc\//.test(url);
+      const isEdgeFn = /\/functions\/v1\//.test(url);
+      const timeoutMs = method === "GET" || method === "HEAD"
+        ? 30000
+        : isRpc || isEdgeFn
+          ? 60000
+          : 45000;
+
       try {
         const headers = new Headers(init?.headers ?? (input instanceof Request ? input.headers : undefined));
         if (!headers.has("x-revo-request-id")) headers.set("x-revo-request-id", requestId);
-        return fetch(input as any, { ...(init ?? {}), headers });
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), timeoutMs);
+        const originalSignal = init?.signal ?? (input instanceof Request ? input.signal : undefined);
+        if (originalSignal) {
+          if (originalSignal.aborted) controller.abort();
+          else originalSignal.addEventListener("abort", () => controller.abort(), { once: true });
+        }
+
+        try {
+          return await fetch(input as any, { ...(init ?? {}), headers, signal: controller.signal });
+        } catch (e) {
+          if ((e as any)?.name === "AbortError") {
+            logger.warn("[HTTP][TIMEOUT]", { method, url, timeoutMs, requestId });
+          }
+          throw e;
+        } finally {
+          clearTimeout(timeout);
+        }
       } catch {
         return fetch(input as any, init as any);
       }
