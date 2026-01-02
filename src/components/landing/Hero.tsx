@@ -81,12 +81,12 @@ const Hero: React.FC = () => {
               </motion.span>
             </motion.h1>
             <motion.p
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6, delay: 0.2 }}
+              initial={{ opacity: 0, y: 20, filter: "blur(10px)" }}
+              animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
+              transition={{ duration: 0.6, delay: 0.2 }}
               className="mt-5 max-w-xl mx-auto lg:mx-0 text-base md:text-lg text-slate-600 leading-relaxed"
             >
-              Comece a operar em minutos. Cadastros, vendas, financeiro, serviços e indústria — com onboarding guiado, UX moderna e
+              Comece a operar em 3 minutos. Cadastros, vendas, financeiro, serviços e indústria — primeiro uso guiado, UX moderna e
               upgrades por necessidade.
             </motion.p>
             <motion.div
