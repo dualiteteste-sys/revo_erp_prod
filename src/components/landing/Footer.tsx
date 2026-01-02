@@ -4,44 +4,44 @@ import { Link } from 'react-router-dom';
 
 const Footer: React.FC = () => {
   return (
-    <footer className="bg-gray-800 text-white">
+    <footer className="bg-white border-t border-slate-200">
       <div className="max-w-7xl mx-auto py-12 px-4 sm:px-6 lg:px-8">
         <div className="grid grid-cols-2 md:grid-cols-4 gap-8">
           <div>
-            <h3 className="text-sm font-semibold tracking-wider uppercase">Produtos</h3>
+            <h3 className="text-xs font-semibold tracking-wider uppercase text-slate-500">Produtos</h3>
             <ul className="mt-4 space-y-2">
-              <li><Link to="/" className="text-base text-gray-300 hover:text-white">REVO ERP</Link></li>
-              <li><Link to="/revo-send" className="text-base text-gray-300 hover:text-white">REVO Send</Link></li>
-              <li><Link to="/revo-fluxo" className="text-base text-gray-300 hover:text-white">REVO Fluxo</Link></li>
+              <li><Link to="/" className="text-sm text-slate-700 hover:text-slate-900">REVO ERP</Link></li>
+              <li><Link to="/revo-send" className="text-sm text-slate-700 hover:text-slate-900">REVO Send</Link></li>
+              <li><Link to="/revo-fluxo" className="text-sm text-slate-700 hover:text-slate-900">REVO Fluxo</Link></li>
             </ul>
           </div>
           <div>
-            <h3 className="text-sm font-semibold tracking-wider uppercase">Suporte</h3>
+            <h3 className="text-xs font-semibold tracking-wider uppercase text-slate-500">Suporte</h3>
             <ul className="mt-4 space-y-2">
-              <li><a href="#faq" className="text-base text-gray-300 hover:text-white">FAQ</a></li>
-              <li><a href="#" className="text-base text-gray-300 hover:text-white">Documentação API</a></li>
-              <li><a href="#" className="text-base text-gray-300 hover:text-white">Status do Serviço</a></li>
+              <li><a href="#faq" className="text-sm text-slate-700 hover:text-slate-900">FAQ</a></li>
+              <li><a href="#" className="text-sm text-slate-700 hover:text-slate-900">Documentação API</a></li>
+              <li><a href="#" className="text-sm text-slate-700 hover:text-slate-900">Status do Serviço</a></li>
             </ul>
           </div>
           <div>
-            <h3 className="text-sm font-semibold tracking-wider uppercase">Empresa</h3>
+            <h3 className="text-xs font-semibold tracking-wider uppercase text-slate-500">Empresa</h3>
             <ul className="mt-4 space-y-2">
-              <li><a href="#" className="text-base text-gray-300 hover:text-white">Sobre Nós</a></li>
-              <li><a href="#" className="text-base text-gray-300 hover:text-white">Carreiras</a></li>
-              <li><a href="#" className="text-base text-gray-300 hover:text-white">Contato</a></li>
+              <li><a href="#" className="text-sm text-slate-700 hover:text-slate-900">Sobre Nós</a></li>
+              <li><a href="#" className="text-sm text-slate-700 hover:text-slate-900">Carreiras</a></li>
+              <li><a href="#" className="text-sm text-slate-700 hover:text-slate-900">Contato</a></li>
             </ul>
           </div>
           <div>
-            <h3 className="text-sm font-semibold tracking-wider uppercase">Legal</h3>
+            <h3 className="text-xs font-semibold tracking-wider uppercase text-slate-500">Legal</h3>
             <ul className="mt-4 space-y-2">
-              <li><a href="#" className="text-base text-gray-300 hover:text-white">Termos de Serviço</a></li>
-              <li><a href="#" className="text-base text-gray-300 hover:text-white">Política de Privacidade</a></li>
+              <li><a href="#" className="text-sm text-slate-700 hover:text-slate-900">Termos de Serviço</a></li>
+              <li><a href="#" className="text-sm text-slate-700 hover:text-slate-900">Política de Privacidade</a></li>
             </ul>
           </div>
         </div>
-        <div className="mt-12 border-t border-gray-700 pt-8 flex flex-col md:flex-row justify-between items-center">
-          <RevoLogo className="h-8 w-auto text-white" />
-          <p className="mt-4 md:mt-0 text-base text-gray-400">&copy; 2025 REVO ERP. Todos os direitos reservados.</p>
+        <div className="mt-12 border-t border-slate-200 pt-8 flex flex-col md:flex-row justify-between items-center">
+          <RevoLogo className="h-7 w-auto text-slate-900" />
+          <p className="mt-4 md:mt-0 text-sm text-slate-500">&copy; 2026 REVO ERP. Todos os direitos reservados.</p>
         </div>
       </div>
     </footer>

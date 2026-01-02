@@ -151,36 +151,36 @@ export default function Pricing() {
   };
 
   return (
-    <section className="w-full py-12 md:py-16 lg:py-20 bg-neutral-950 text-neutral-200">
-      <div className="container mx-auto px-4">
-        <header className="text-center mb-10">
-          <h2 className="text-3xl md:text-4xl font-semibold tracking-tight">
-            Planos simples, crescimento real
+    <section id="pricing" className="w-full py-16 md:py-24 bg-white">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <header className="text-center mb-10 md:mb-14 max-w-3xl mx-auto">
+          <h2 className="text-3xl md:text-5xl font-semibold tracking-tight text-slate-900">
+            Planos simples. Crescimento natural.
           </h2>
-          <p className="mt-3 text-neutral-400">
-            Comece agora — sem cartão. Sem fricção. Sem surpresas.
+          <p className="mt-4 text-base md:text-lg text-slate-600">
+            Escolha o mínimo que te deixa operar com segurança. Quando a operação pedir, você evolui.
           </p>
         </header>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-5 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-5 gap-4">
           {plans.map((p) => (
             <article
               key={p.slug}
               className={[
-                "rounded-2xl border border-neutral-800 p-6 shadow-sm",
-                p.highlight ? "ring-1 ring-neutral-700" : "",
+                "rounded-3xl border p-6 shadow-sm bg-white",
+                p.highlight ? "border-slate-900 ring-1 ring-slate-900/10" : "border-slate-200",
               ].join(" ")}
             >
-              <h3 className="text-xl font-medium">{p.title}</h3>
-              <div className="mt-2 text-3xl font-semibold">{p.priceLabel}</div>
+              <h3 className="text-lg font-semibold text-slate-900">{p.title}</h3>
+              <div className="mt-2 text-3xl font-semibold text-slate-900">{p.priceLabel}</div>
               {p.billingNote ? (
-                <div className="mt-1 text-xs text-neutral-400">{p.billingNote}</div>
+                <div className="mt-1 text-xs text-slate-500">{p.billingNote}</div>
               ) : null}
 
-              <ul className="mt-4 space-y-2 text-sm text-neutral-300">
+              <ul className="mt-4 space-y-2 text-sm text-slate-700">
                 {p.features.map((f, i) => (
                   <li key={i} className="flex items-start gap-2">
-                    <span className="mt-1 h-1.5 w-1.5 rounded-full bg-neutral-500" />
+                    <span className="mt-2 h-1.5 w-1.5 rounded-full bg-slate-900" />
                     <span>{f}</span>
                   </li>
                 ))}
@@ -189,10 +189,10 @@ export default function Pricing() {
               <button
                 onClick={() => handleCTA(p.slug)}
                 className={[
-                  "mt-6 w-full rounded-2xl px-4 py-2.5 font-medium",
+                  "mt-6 w-full rounded-full px-4 py-2.5 font-semibold transition-colors",
                   p.highlight
-                    ? "bg-white text-neutral-900 hover:bg-neutral-200"
-                    : "bg-neutral-800 text-neutral-100 hover:bg-neutral-700",
+                    ? "bg-slate-900 text-white hover:bg-slate-800"
+                    : "bg-slate-100 text-slate-900 hover:bg-slate-200",
                 ].join(" ")}
               >
                 {isAuthenticated ? "Ir para o app" : "Começar teste grátis"}
@@ -202,34 +202,34 @@ export default function Pricing() {
         </div>
 
         <div className="mt-12">
-          <h3 className="text-2xl md:text-3xl font-semibold tracking-tight text-center">
+          <h3 className="text-2xl md:text-4xl font-semibold tracking-tight text-center text-slate-900">
             Compare os recursos
           </h3>
-          <p className="mt-3 text-center text-sm text-neutral-400">
+          <p className="mt-4 text-center text-sm md:text-base text-slate-600">
             Uma visão rápida do que entra em cada plano (sem termos técnicos).
           </p>
 
-          <div className="mt-6 overflow-x-auto rounded-2xl border border-neutral-800 bg-neutral-950">
+          <div className="mt-6 overflow-x-auto rounded-3xl border border-slate-200 bg-white shadow-sm">
             <table className="min-w-[900px] w-full text-sm">
-              <thead className="sticky top-0 bg-neutral-950">
-                <tr className="text-left text-neutral-200">
-                  <th className="p-4 border-b border-neutral-800">Recurso</th>
-                  <th className="p-4 border-b border-neutral-800">Essencial</th>
-                  <th className="p-4 border-b border-neutral-800">Pro</th>
-                  <th className="p-4 border-b border-neutral-800">Operação</th>
-                  <th className="p-4 border-b border-neutral-800">Indústria</th>
-                  <th className="p-4 border-b border-neutral-800">Scale</th>
+              <thead className="sticky top-0 bg-white">
+                <tr className="text-left text-slate-700">
+                  <th className="p-4 border-b border-slate-200">Recurso</th>
+                  <th className="p-4 border-b border-slate-200">Essencial</th>
+                  <th className="p-4 border-b border-slate-200">Pro</th>
+                  <th className="p-4 border-b border-slate-200">Max</th>
+                  <th className="p-4 border-b border-slate-200">Indústria</th>
+                  <th className="p-4 border-b border-slate-200">Scale</th>
                 </tr>
               </thead>
-              <tbody className="text-neutral-300">
+              <tbody className="text-slate-700">
                 {compareRows.map((row) => (
-                  <tr key={row.feature} className="odd:bg-neutral-950 even:bg-neutral-900/30">
-                    <td className="p-4 border-b border-neutral-800 text-neutral-200">{row.feature}</td>
-                    <td className="p-4 border-b border-neutral-800">{row.essencial}</td>
-                    <td className="p-4 border-b border-neutral-800">{row.pro}</td>
-                    <td className="p-4 border-b border-neutral-800">{row.operacao}</td>
-                    <td className="p-4 border-b border-neutral-800">{row.industria}</td>
-                    <td className="p-4 border-b border-neutral-800">{row.scale}</td>
+                  <tr key={row.feature} className="odd:bg-white even:bg-slate-50/40">
+                    <td className="p-4 border-b border-slate-200 font-medium text-slate-900">{row.feature}</td>
+                    <td className="p-4 border-b border-slate-200">{row.essencial}</td>
+                    <td className="p-4 border-b border-slate-200">{row.pro}</td>
+                    <td className="p-4 border-b border-slate-200">{row.operacao}</td>
+                    <td className="p-4 border-b border-slate-200">{row.industria}</td>
+                    <td className="p-4 border-b border-slate-200">{row.scale}</td>
                   </tr>
                 ))}
               </tbody>
@@ -237,7 +237,7 @@ export default function Pricing() {
           </div>
         </div>
 
-        <footer className="mt-8 text-center text-xs text-neutral-500">
+        <footer className="mt-10 text-center text-xs text-slate-500">
           Os limites e add-ons são ajustados no app. O objetivo do Essencial é ser simples e estável (baixo suporte).
         </footer>
       </div>

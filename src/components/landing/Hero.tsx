@@ -8,53 +8,116 @@ const Hero: React.FC = () => {
   };
 
   return (
-    <section className="bg-gray-50 pt-32 pb-24 md:pt-40 md:pb-32">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-        <motion.h1 
+    <section className="pt-28 pb-16 md:pt-32 md:pb-24">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-10 items-center">
+          <div className="text-center lg:text-left">
+            <motion.h1
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6 }}
-          className="text-4xl md:text-6xl font-extrabold text-gray-900 tracking-tight"
-        >
-          <span className="text-blue-600">Seu ERP completo, pronto para crescer com você.</span>
-        </motion.h1>
-        <motion.p 
+              className="text-4xl md:text-6xl font-semibold tracking-tight text-slate-900"
+            >
+              Um ERP que parece{' '}
+              <span className="bg-gradient-to-r from-slate-900 to-slate-500 bg-clip-text text-transparent">
+                simples
+              </span>
+              . E é poderoso.
+            </motion.h1>
+            <motion.p
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6, delay: 0.2 }}
-          className="mt-6 max-w-3xl mx-auto text-lg md:text-xl text-gray-600"
-        >
-          Implante em minutos um ERP multiempresa e multi-usuário com API aberta e segurança de ponta.
-        </motion.p>
-        <motion.div 
+              className="mt-5 max-w-xl mx-auto lg:mx-0 text-base md:text-lg text-slate-600 leading-relaxed"
+            >
+              Comece a operar em minutos. Cadastros, vendas, financeiro, serviços e indústria — com onboarding guiado, UX moderna e
+              upgrades por necessidade.
+            </motion.p>
+            <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6, delay: 0.4 }}
-          className="mt-10 flex justify-center gap-4 flex-wrap"
-        >
-          <a
-            href="#pricing"
-            className="px-8 py-3 bg-blue-600 text-white font-semibold rounded-lg shadow-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-transform transform hover:scale-105"
-          >
-            Teste grátis por 30 dias
-          </a>
-          <button
-            onClick={scrollToPricing}
-            className="px-8 py-3 bg-white text-blue-600 font-semibold rounded-lg shadow-md hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-200 transition-transform transform hover:scale-105"
-          >
-            Ver planos
-          </button>
-        </motion.div>
-        <motion.div 
+              className="mt-8 flex justify-center lg:justify-start gap-3 flex-wrap"
+            >
+              <button
+                onClick={scrollToPricing}
+                className="px-6 py-3 rounded-full bg-slate-900 text-white font-semibold hover:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-slate-900 transition-colors"
+              >
+                Começar teste grátis
+              </button>
+              <a
+                href="#pricing"
+                className="px-6 py-3 rounded-full bg-slate-100 text-slate-900 font-semibold hover:bg-slate-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-slate-200 transition-colors"
+              >
+                Ver planos
+              </a>
+            </motion.div>
+            <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6, delay: 0.6 }}
-          className="mt-8 flex justify-center items-center gap-4 text-gray-500"
-        >
-          <span className="flex items-center gap-1.5"><CheckCircle size={16} className="text-green-500" /> Multiempresa</span>
-          <span className="flex items-center gap-1.5"><CheckCircle size={16} className="text-green-500" /> Multi-usuário</span>
-          <span className="flex items-center gap-1.5"><CheckCircle size={16} className="text-green-500" /> API Aberta</span>
-        </motion.div>
+              className="mt-8 flex justify-center lg:justify-start items-center gap-4 text-slate-500 flex-wrap"
+            >
+              <span className="flex items-center gap-1.5"><CheckCircle size={16} className="text-emerald-600" /> Sem cartão</span>
+              <span className="flex items-center gap-1.5"><CheckCircle size={16} className="text-emerald-600" /> Onboarding guiado</span>
+              <span className="flex items-center gap-1.5"><CheckCircle size={16} className="text-emerald-600" /> Cresce por módulos</span>
+            </motion.div>
+          </div>
+
+          <motion.div
+            initial={{ opacity: 0, y: 18 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.7, delay: 0.15 }}
+            className="relative"
+          >
+            <div className="absolute -inset-6 bg-gradient-to-tr from-slate-100 via-white to-slate-100 rounded-[36px] blur-2xl opacity-70" />
+            <div className="relative rounded-[28px] border border-slate-200 bg-white shadow-[0_20px_60px_-35px_rgba(15,23,42,0.35)] overflow-hidden">
+              <div className="h-10 px-4 flex items-center gap-2 border-b border-slate-200 bg-white/60">
+                <span className="h-2.5 w-2.5 rounded-full bg-slate-200" />
+                <span className="h-2.5 w-2.5 rounded-full bg-slate-200" />
+                <span className="h-2.5 w-2.5 rounded-full bg-slate-200" />
+                <div className="ml-3 h-6 flex-1 rounded-full bg-slate-100" />
+              </div>
+              <div className="p-5">
+                <div className="grid grid-cols-12 gap-4">
+                  <div className="col-span-4 rounded-2xl bg-slate-50 border border-slate-200 p-4">
+                    <div className="h-3 w-24 bg-slate-200 rounded" />
+                    <div className="mt-4 space-y-2">
+                      <div className="h-2.5 w-full bg-slate-200/80 rounded" />
+                      <div className="h-2.5 w-10/12 bg-slate-200/70 rounded" />
+                      <div className="h-2.5 w-9/12 bg-slate-200/60 rounded" />
+                      <div className="h-2.5 w-11/12 bg-slate-200/70 rounded" />
+                    </div>
+                  </div>
+                  <div className="col-span-8 space-y-4">
+                    <div className="rounded-2xl border border-slate-200 bg-white p-4">
+                      <div className="flex items-center justify-between">
+                        <div className="h-3 w-40 bg-slate-200 rounded" />
+                        <div className="h-8 w-24 rounded-full bg-slate-900" />
+                      </div>
+                      <div className="mt-4 grid grid-cols-3 gap-3">
+                        <div className="h-20 rounded-2xl bg-slate-50 border border-slate-200" />
+                        <div className="h-20 rounded-2xl bg-slate-50 border border-slate-200" />
+                        <div className="h-20 rounded-2xl bg-slate-50 border border-slate-200" />
+                      </div>
+                    </div>
+                    <div className="rounded-2xl border border-slate-200 bg-white p-4">
+                      <div className="h-3 w-36 bg-slate-200 rounded" />
+                      <div className="mt-4 space-y-3">
+                        <div className="h-3 w-full bg-slate-200/70 rounded" />
+                        <div className="h-3 w-11/12 bg-slate-200/60 rounded" />
+                        <div className="h-3 w-10/12 bg-slate-200/50 rounded" />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                <div className="mt-4 text-xs text-slate-500">
+                  Prévia ilustrativa — o app real segue o mesmo padrão de clareza e controle.
+                </div>
+              </div>
+            </div>
+          </motion.div>
+        </div>
       </div>
     </section>
   );

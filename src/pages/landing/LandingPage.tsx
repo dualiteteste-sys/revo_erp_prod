@@ -11,7 +11,7 @@ const LandingPage: React.FC = () => {
   const navigate = useNavigate();
 
   return (
-    <div className="bg-white">
+    <div className="bg-white text-slate-900">
       <Header onLoginClick={() => navigate('/auth/login')} />
       <main>
         <Hero />

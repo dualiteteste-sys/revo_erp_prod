@@ -25,19 +25,19 @@ const FAQ: React.FC = () => {
   const [openIndex, setOpenIndex] = useState<number | null>(null);
 
   return (
-    <section id="faq" className="bg-white py-20">
+    <section id="faq" className="bg-white py-16 md:py-24">
       <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8">
-        <h2 className="text-center text-3xl font-extrabold text-gray-900 mb-8">
+        <h2 className="text-center text-3xl md:text-4xl font-semibold tracking-tight text-slate-900 mb-10">
           Perguntas Frequentes
         </h2>
         <div className="space-y-4">
           {faqs.map((faq, index) => (
-            <div key={index} className="border border-gray-200 rounded-lg">
+            <div key={index} className="border border-slate-200 rounded-2xl bg-white shadow-sm">
               <button
                 onClick={() => setOpenIndex(openIndex === index ? null : index)}
                 className="w-full flex justify-between items-center p-6 text-left"
               >
-                <span className="font-medium text-gray-900">{faq.question}</span>
+                <span className="font-semibold text-slate-900">{faq.question}</span>
                 <ChevronDown
                   className={`transform transition-transform duration-300 ${
                     openIndex === index ? 'rotate-180' : ''
@@ -53,7 +53,7 @@ const FAQ: React.FC = () => {
                     transition={{ duration: 0.3, ease: 'easeInOut' }}
                     className="overflow-hidden"
                   >
-                    <div className="px-6 pb-6 text-gray-600">
+                    <div className="px-6 pb-6 text-slate-600 leading-relaxed">
                       {faq.answer}
                     </div>
                   </motion.div>
