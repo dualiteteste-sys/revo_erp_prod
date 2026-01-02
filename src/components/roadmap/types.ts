@@ -1,6 +1,13 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 
-export type RoadmapGroupKey = 'industria' | 'servicos' | 'comercio';
+export type RoadmapGroupKey =
+  | 'cadastros'
+  | 'vendas'
+  | 'suprimentos'
+  | 'financeiro'
+  | 'fiscal'
+  | 'servicos'
+  | 'industria';
 
 export type RoadmapStepStatus = 'done' | 'todo' | 'unknown';
 
@@ -19,4 +26,3 @@ export type RoadmapGroup = {
   subtitle: string;
   steps: RoadmapStep[];
 };
-

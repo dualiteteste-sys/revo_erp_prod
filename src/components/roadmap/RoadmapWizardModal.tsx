@@ -30,7 +30,19 @@ type EmpresaOnboardingRow = {
 function safeGetRoadmapState(steps: Record<string, unknown> | null | undefined): RoadmapState {
   const rm = (steps?.roadmap ?? null) as any;
   if (!rm || typeof rm !== 'object') return {};
-  const active = typeof rm.active === 'string' ? (rm.active as RoadmapGroupKey) : undefined;
+  const rawActive = typeof rm.active === 'string' ? (rm.active as string) : undefined;
+  // Back-compat: versões antigas usavam "comercio" como grupo principal.
+  const normalizedActive = rawActive === 'comercio' ? 'vendas' : rawActive;
+  const allowed: Record<RoadmapGroupKey, true> = {
+    cadastros: true,
+    vendas: true,
+    suprimentos: true,
+    financeiro: true,
+    fiscal: true,
+    servicos: true,
+    industria: true,
+  };
+  const active = normalizedActive && (allowed as any)[normalizedActive] ? (normalizedActive as RoadmapGroupKey) : undefined;
   const ack = rm.ack && typeof rm.ack === 'object' ? (rm.ack as Record<string, true>) : undefined;
   return { active, ack };
 }
@@ -44,7 +56,7 @@ export default function RoadmapWizardModal({ isOpen, onClose }: Props) {
 
   const empresaId = activeEmpresa?.id ?? null;
   const [loading, setLoading] = useState(false);
-  const [activeKey, setActiveKey] = useState<RoadmapGroupKey>('comercio');
+  const [activeKey, setActiveKey] = useState<RoadmapGroupKey>('vendas');
   const [statuses, setStatuses] = useState<Record<string, RoadmapStepStatus>>({});
   const [unknownKeys, setUnknownKeys] = useState<Set<string>>(new Set());
   const ackRef = useRef<Record<string, true>>({});
@@ -54,9 +66,10 @@ export default function RoadmapWizardModal({ isOpen, onClose }: Props) {
     return all.filter((g) => {
       if (g.key === 'industria') return features.industria_enabled;
       if (g.key === 'servicos') return features.servicos_enabled;
+      if (g.key === 'fiscal') return features.nfe_emissao_enabled;
       return true;
     });
-  }, [features.industria_enabled, features.servicos_enabled]);
+  }, [features.industria_enabled, features.nfe_emissao_enabled, features.servicos_enabled]);
 
   const active = useMemo(() => roadmaps.find((r) => r.key === activeKey) ?? roadmaps[0] ?? null, [activeKey, roadmaps]);
 
@@ -142,7 +155,7 @@ export default function RoadmapWizardModal({ isOpen, onClose }: Props) {
     void (async () => {
       await ensureRow();
       const state = await loadState();
-      const preferred = state.active && roadmaps.some((r) => r.key === state.active) ? state.active : (roadmaps[0]?.key ?? 'comercio');
+      const preferred = state.active && roadmaps.some((r) => r.key === state.active) ? state.active : (roadmaps[0]?.key ?? 'vendas');
       setActiveKey(preferred);
       await updateState({ active: preferred });
     })();
@@ -291,4 +304,3 @@ export default function RoadmapWizardModal({ isOpen, onClose }: Props) {
     </Modal>
   );
 }
-

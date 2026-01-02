@@ -376,8 +376,6 @@ export default function PedidoVendaFormPanel({ vendaId, onSaveSuccess, onClose, 
     }
   };
 
-  if (loading) return <div className="flex justify-center p-8"><Loader2 className="animate-spin" /></div>;
-
   const isLocked = formData.status !== 'orcamento';
   const isMarketplaceOrder = (formData as any)?.canal === 'marketplace';
   const subtotal = toMoney(formData.itens?.reduce((acc, i) => acc + toMoney(i.total), 0) || 0);
@@ -388,6 +386,8 @@ export default function PedidoVendaFormPanel({ vendaId, onSaveSuccess, onClose, 
   const canConcluir = useMemo(() => {
     return !!formData.id && formData.status === 'aprovado';
   }, [formData.id, formData.status]);
+
+  if (loading) return <div className="flex justify-center p-8"><Loader2 className="animate-spin" /></div>;
 
   const handleConcluir = async () => {
     if (!formData.id) return;

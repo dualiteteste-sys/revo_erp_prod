@@ -277,7 +277,7 @@ export default function ExpedicaoPage() {
                 value={form.pedido_id}
                 onChange={(e) => setForm((s) => ({ ...s, pedido_id: e.target.value }))}
                 className="mt-1 w-full p-3 border border-gray-300 rounded-lg"
-                disabled={!!selectedExpedicaoId}
+                disabled={selectedExpedicaoId !== null}
               >
                 <option value="">Selecione…</option>
                 {orders.map((o) => (
@@ -286,7 +286,7 @@ export default function ExpedicaoPage() {
                   </option>
                 ))}
               </select>
-              {!!selectedExpedicaoId ? (
+              {selectedExpedicaoId ? (
                 <div className="mt-1 text-xs text-gray-500">Pedido já vinculado (EXP-02): para trocar, crie outra expedição.</div>
               ) : null}
             </div>
