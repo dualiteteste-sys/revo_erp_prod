@@ -64,7 +64,7 @@ const STATIC_PLANS: Plan[] = [
   },
   {
     slug: "operacao",
-    title: "Revo Operação",
+    title: "Revo Max",
     priceLabel: "R$ 390/mês",
     billingNote: "Serviços + Financeiro forte",
     features: [
