@@ -10,10 +10,10 @@ const Hero: React.FC = () => {
 
   const headline = {
     hidden: {},
-    show: { transition: { staggerChildren: 0.08, delayChildren: 0.05 } },
+    show: { transition: { staggerChildren: 0.14, delayChildren: 0.05 } },
   };
 
-  const word = {
+  const chunk = {
     hidden: { opacity: 0, y: 18, filter: 'blur(10px)', textShadow: '0 0 0 rgba(37, 99, 235, 0)' },
     show: {
       opacity: 1,
@@ -23,6 +23,21 @@ const Hero: React.FC = () => {
       transition: { duration: 0.55, ease: [0.22, 1, 0.36, 1] },
     },
   };
+
+  const headlineChunks: Array<{ key: string; node: React.ReactNode }> = [
+    { key: 'um-erp', node: 'Um ERP' },
+    {
+      key: 'simples',
+      node: (
+        <span className="bg-gradient-to-r from-blue-700 via-sky-500 to-indigo-600 bg-clip-text text-transparent">
+          Simples
+        </span>
+      ),
+    },
+    { key: 'de-usar', node: 'de usar.' },
+    { key: 'mas-poderoso', node: 'Mas poderoso' },
+    { key: 'no-core', node: 'no CORE.' },
+  ];
 
   return (
     <section className="pt-28 pb-16 md:pt-32 md:pb-24 relative overflow-hidden">
@@ -50,35 +65,15 @@ const Hero: React.FC = () => {
               animate="show"
               className="text-4xl md:text-6xl font-semibold tracking-tight text-slate-900"
             >
-              <motion.span variants={word} className="inline-block mr-3">
-                Um
-              </motion.span>
-              <motion.span variants={word} className="inline-block mr-3">
-                ERP
-              </motion.span>
-              <motion.span variants={word} className="inline-block mr-3">
-                <span className="bg-gradient-to-r from-blue-700 via-sky-500 to-indigo-600 bg-clip-text text-transparent">
-                  Simples
-                </span>
-              </motion.span>
-              <motion.span variants={word} className="inline-block mr-3">
-                de
-              </motion.span>
-              <motion.span variants={word} className="inline-block mr-3">
-                usar.
-              </motion.span>
-              <motion.span variants={word} className="inline-block mr-3">
-                Mas
-              </motion.span>
-              <motion.span variants={word} className="inline-block mr-3">
-                poderoso
-              </motion.span>
-              <motion.span variants={word} className="inline-block mr-3">
-                no
-              </motion.span>
-              <motion.span variants={word} className="inline-block">
-                CORE.
-              </motion.span>
+              {headlineChunks.map((item, idx) => (
+                <motion.span
+                  key={item.key}
+                  variants={chunk}
+                  className={idx === headlineChunks.length - 1 ? 'inline-block' : 'inline-block mr-3'}
+                >
+                  {item.node}
+                </motion.span>
+              ))}
             </motion.h1>
             <motion.p
               initial={{ opacity: 0, y: 20, filter: "blur(10px)" }}
