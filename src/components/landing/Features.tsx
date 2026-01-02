@@ -1,62 +1,154 @@
-import React from 'react';
-import { featureCategories } from '../../config/pricingConfig';
-import { Check, Minus } from 'lucide-react';
+import React, { useMemo, useState } from 'react';
+import { BarChart3, CheckCircle2, Factory, ShieldCheck, Sparkles, Wrench } from 'lucide-react';
 
-const Features: React.FC = () => {
-    const renderValue = (value: string | boolean) => {
-        if (typeof value === 'boolean') {
-            return value ? <Check className="text-green-500 mx-auto" /> : <Minus className="text-gray-400 mx-auto" />;
-        }
-        return <span className="text-gray-700 text-sm">{value}</span>;
+type Segment = 'comercio' | 'servicos' | 'industria';
+
+const segments: Array<{ key: Segment; title: string; description: string; icon: React.ElementType }> = [
+  { key: 'comercio', title: 'Comércio', description: 'Vendas, estoque e expedição com fluidez.', icon: BarChart3 },
+  { key: 'servicos', title: 'Serviços', description: 'OS, contratos e cobrança recorrente.', icon: Wrench },
+  { key: 'industria', title: 'Indústria', description: 'BOM, OP/OB, execução e qualidade.', icon: Factory },
+];
+
+const highlights = [
+  {
+    title: 'Onboarding que guia (sem travar)',
+    description: 'Você entra no sistema e só é guiado quando tentar executar algo que precisa de configuração mínima.',
+    icon: Sparkles,
+  },
+  {
+    title: 'Permissões por função',
+    description: 'Controle por perfis e regras claras. Mais segurança, menos retrabalho.',
+    icon: ShieldCheck,
+  },
+  {
+    title: 'Operação confiável',
+    description: 'Ações críticas com proteção contra duplicidade e rastreio por auditoria.',
+    icon: CheckCircle2,
+  },
+];
+
+export default function Features() {
+  const [segment, setSegment] = useState<Segment>('comercio');
+
+  const segmentCopy = useMemo(() => {
+    if (segment === 'comercio') {
+      return {
+        title: 'Venda com velocidade, sem bagunçar o financeiro.',
+        bullets: ['Pedidos e PDV com fluxo simples', 'Expedição e histórico de pedidos', 'Estoque e compras integrados'],
+      };
+    }
+    if (segment === 'servicos') {
+      return {
+        title: 'Serviços com gestão de ponta a ponta.',
+        bullets: ['Ordem de serviço com etapas e anexos', 'Contratos e cobranças recorrentes', 'Relatórios para acompanhar desempenho'],
+      };
+    }
+    return {
+      title: 'Chão de fábrica com visibilidade real.',
+      bullets: ['BOM + roteiros + OP/OB', 'Execução e tela do operador', 'Qualidade mínimo (planos/lotes/bloqueio)'],
     };
+  }, [segment]);
 
-    return (
-        <section id="features" className="py-20 bg-gray-50">
-            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-                <div className="text-center mb-12">
-                    <h2 className="text-3xl font-extrabold text-gray-900 sm:text-4xl">
-                        Compare os Recursos
-                    </h2>
-                    <p className="mt-4 text-lg text-gray-600">
-                        Encontre o plano perfeito com os recursos que sua empresa precisa.
-                    </p>
-                </div>
-                <div className="overflow-x-auto">
-                    <table className="min-w-full divide-y divide-gray-200">
-                        <thead className="bg-gray-100">
-                            <tr>
-                                <th scope="col" className="py-3.5 pl-4 pr-3 text-left text-sm font-semibold text-gray-900 sm:pl-6 sticky left-0 bg-gray-100">Recurso</th>
-                                <th scope="col" className="px-3 py-3.5 text-center text-sm font-semibold text-gray-900">Start</th>
-                                <th scope="col" className="px-3 py-3.5 text-center text-sm font-semibold text-gray-900 border-2 border-y-0 border-blue-500 bg-blue-50">Pro</th>
-                                <th scope="col" className="px-3 py-3.5 text-center text-sm font-semibold text-gray-900">Max</th>
-                                <th scope="col" className="px-3 py-3.5 text-center text-sm font-semibold text-gray-900">Ultra</th>
-                            </tr>
-                        </thead>
-                        <tbody className="divide-y divide-gray-200 bg-white">
-                            {featureCategories.map((category) => (
-                                <React.Fragment key={category.name}>
-                                    <tr>
-                                        <td colSpan={5} className="bg-gray-100 px-4 py-2 text-sm font-bold text-gray-800 sm:pl-6 sticky left-0">
-                                            {category.name}
-                                        </td>
-                                    </tr>
-                                    {category.features.map((feature) => (
-                                        <tr key={feature.name}>
-                                            <td className="py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-6 sticky left-0 bg-white">{feature.name}</td>
-                                            <td className="whitespace-nowrap px-3 py-4 text-center text-sm text-gray-500">{renderValue(feature.start)}</td>
-                                            <td className="whitespace-nowrap px-3 py-4 text-center text-sm text-gray-500 bg-blue-50/50">{renderValue(feature.pro)}</td>
-                                            <td className="whitespace-nowrap px-3 py-4 text-center text-sm text-gray-500">{renderValue(feature.max)}</td>
-                                            <td className="whitespace-nowrap px-3 py-4 text-center text-sm text-gray-500">{renderValue(feature.ultra)}</td>
-                                        </tr>
-                                    ))}
-                                </React.Fragment>
-                            ))}
-                        </tbody>
-                    </table>
-                </div>
+  return (
+    <section id="features" className="py-16 md:py-24 bg-white">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <header className="text-center max-w-3xl mx-auto">
+          <h2 className="text-3xl md:text-4xl font-semibold tracking-tight text-slate-900">
+            Tudo que você precisa, com a sensação de “tá no controle”.
+          </h2>
+          <p className="mt-4 text-base md:text-lg text-slate-600">
+            Um ERP moderno é menos “tela” e mais “fluxo”. Menos ruído, mais previsibilidade.
+          </p>
+        </header>
+
+        <div className="mt-10 grid grid-cols-1 md:grid-cols-3 gap-4">
+          {highlights.map((h) => (
+            <div key={h.title} className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+              <div className="h-11 w-11 rounded-2xl bg-slate-900 text-white flex items-center justify-center">
+                <h.icon size={20} />
+              </div>
+              <h3 className="mt-4 text-lg font-semibold text-slate-900">{h.title}</h3>
+              <p className="mt-2 text-sm text-slate-600 leading-relaxed">{h.description}</p>
             </div>
-        </section>
-    );
-};
+          ))}
+        </div>
 
-export default Features;
+        <div className="mt-12 rounded-[28px] border border-slate-200 bg-slate-50 p-6 md:p-8">
+          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+            <div>
+              <h3 className="text-xl md:text-2xl font-semibold text-slate-900">Feito para o seu tipo de operação</h3>
+              <p className="mt-1 text-sm md:text-base text-slate-600">
+                Escolha um foco — os planos crescem por módulos e add-ons.
+              </p>
+            </div>
+            <div className="inline-flex rounded-full bg-white p-1 border border-slate-200 shadow-sm">
+              {segments.map((s) => (
+                <button
+                  key={s.key}
+                  type="button"
+                  onClick={() => setSegment(s.key)}
+                  className={[
+                    'px-4 py-2 rounded-full text-sm font-semibold transition-colors',
+                    segment === s.key ? 'bg-slate-900 text-white' : 'text-slate-700 hover:bg-slate-100',
+                  ].join(' ')}
+                >
+                  {s.title}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="mt-6 grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
+            <div className="rounded-3xl bg-white border border-slate-200 p-6">
+              <div className="flex items-center gap-3">
+                <div className="h-10 w-10 rounded-2xl bg-slate-900 text-white flex items-center justify-center">
+                  {React.createElement(segments.find((s) => s.key === segment)?.icon ?? BarChart3, { size: 18 })}
+                </div>
+                <div>
+                  <div className="text-sm font-semibold text-slate-900">{segments.find((s) => s.key === segment)?.title}</div>
+                  <div className="text-sm text-slate-600">{segments.find((s) => s.key === segment)?.description}</div>
+                </div>
+              </div>
+
+              <h4 className="mt-5 text-lg font-semibold text-slate-900">{segmentCopy.title}</h4>
+              <ul className="mt-4 space-y-2 text-sm text-slate-700">
+                {segmentCopy.bullets.map((b) => (
+                  <li key={b} className="flex items-start gap-2">
+                    <span className="mt-1.5 h-2 w-2 rounded-full bg-slate-900" />
+                    <span>{b}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+
+            <div className="rounded-3xl bg-white border border-slate-200 p-6">
+              <div className="text-sm font-semibold text-slate-900">O que muda na prática</div>
+              <p className="mt-2 text-sm text-slate-600 leading-relaxed">
+                Você não precisa decidir tudo no primeiro dia. Comece com o essencial e, conforme a operação pedir (CRM, automações,
+                expedição avançada, chão de fábrica), você habilita o que fizer sentido.
+              </p>
+              <div className="mt-5 grid grid-cols-2 gap-3">
+                <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                  <div className="text-xs text-slate-500">Primeiro valor</div>
+                  <div className="mt-1 text-sm font-semibold text-slate-900">Operar sem fricção</div>
+                </div>
+                <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                  <div className="text-xs text-slate-500">Evolução</div>
+                  <div className="mt-1 text-sm font-semibold text-slate-900">Upgrade por necessidade</div>
+                </div>
+                <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                  <div className="text-xs text-slate-500">Controle</div>
+                  <div className="mt-1 text-sm font-semibold text-slate-900">Auditoria + consistência</div>
+                </div>
+                <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                  <div className="text-xs text-slate-500">Time</div>
+                  <div className="mt-1 text-sm font-semibold text-slate-900">Permissões por função</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
