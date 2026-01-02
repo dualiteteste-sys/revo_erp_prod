@@ -38,6 +38,9 @@ Regras:
 - [x] RG-03 Console limpo: varredura de módulos críticos sem erros/warns relevantes
 - [x] RG-04 E2E “Happy path” por plano (Comércio/Serviços/Indústria) automatizado
 
+### 0.5 Onboarding “estado da arte” (opt-in)
+- [x] ONB-01 Roadmap por grupo de módulos (opt-in): guia passo a passo + checks automáticos + parabéns por etapa
+
 ## 1) Cadastros (base do ERP)
 - [x] CAD-01 Parceiros (clientes/fornecedores): CRUD + busca + validações (CPF/CNPJ) + endereços
 - [x] CAD-02 Produtos: CRUD + unidade + NCM/tributação básica + import/export CSV
