@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { BarChart3, CheckCircle2, Factory, ShieldCheck, Sparkles, Wrench } from 'lucide-react';
+import GlassCard from '@/components/ui/GlassCard';
 
 type Segment = 'comercio' | 'servicos' | 'industria';
 
@@ -11,7 +12,7 @@ const segments: Array<{ key: Segment; title: string; description: string; icon: 
 
 const highlights = [
   {
-    title: 'Onboarding que guia (sem travar)',
+    title: 'Assistente de configurações (sem travar)',
     description: 'Você entra no sistema e só é guiado quando tentar executar algo que precisa de configuração mínima.',
     icon: Sparkles,
   },
@@ -33,8 +34,8 @@ export default function Features() {
   const segmentCopy = useMemo(() => {
     if (segment === 'comercio') {
       return {
-        title: 'Venda com velocidade, sem bagunçar o financeiro.',
-        bullets: ['Pedidos e PDV com fluxo simples', 'Expedição e histórico de pedidos', 'Estoque e compras integrados'],
+        title: 'Venda com velocidade com financeiro forte',
+        bullets: ['Pedidos e PDV com fluxo simples', 'Expedição e relatórios completos', 'Integração com Marketplaces'],
       };
     }
     if (segment === 'servicos') {
@@ -44,8 +45,12 @@ export default function Features() {
       };
     }
     return {
-      title: 'Chão de fábrica com visibilidade real.',
-      bullets: ['BOM + roteiros + OP/OB', 'Execução e tela do operador', 'Qualidade mínimo (planos/lotes/bloqueio)'],
+      title: 'Indústria com controle real.',
+      bullets: [
+        'Ficha Técnica + Roteiros + Ordem de Produção e Beneficiamento',
+        'Execução e tela do operador (Tablet e Celular)',
+        'Controle de Qualidade e rastreabilidade',
+      ],
     };
   }, [segment]);
 
@@ -63,17 +68,17 @@ export default function Features() {
 
         <div className="mt-10 grid grid-cols-1 md:grid-cols-3 gap-4">
           {highlights.map((h) => (
-            <div key={h.title} className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
-              <div className="h-11 w-11 rounded-2xl bg-slate-900 text-white flex items-center justify-center">
+            <GlassCard key={h.title} className="rounded-3xl p-6">
+              <div className="h-11 w-11 rounded-2xl bg-blue-600 text-white flex items-center justify-center">
                 <h.icon size={20} />
               </div>
               <h3 className="mt-4 text-lg font-semibold text-slate-900">{h.title}</h3>
               <p className="mt-2 text-sm text-slate-600 leading-relaxed">{h.description}</p>
-            </div>
+            </GlassCard>
           ))}
         </div>
 
-        <div className="mt-12 rounded-[28px] border border-slate-200 bg-slate-50 p-6 md:p-8">
+        <GlassCard className="mt-12 rounded-[28px] p-6 md:p-8">
           <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
             <div>
               <h3 className="text-xl md:text-2xl font-semibold text-slate-900">Feito para o seu tipo de operação</h3>
@@ -89,7 +94,7 @@ export default function Features() {
                   onClick={() => setSegment(s.key)}
                   className={[
                     'px-4 py-2 rounded-full text-sm font-semibold transition-colors',
-                    segment === s.key ? 'bg-slate-900 text-white' : 'text-slate-700 hover:bg-slate-100',
+                    segment === s.key ? 'bg-blue-600 text-white' : 'text-slate-700 hover:bg-slate-100',
                   ].join(' ')}
                 >
                   {s.title}
@@ -99,9 +104,9 @@ export default function Features() {
           </div>
 
           <div className="mt-6 grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
-            <div className="rounded-3xl bg-white border border-slate-200 p-6">
+            <div className="rounded-3xl bg-white/80 border border-white/30 p-6">
               <div className="flex items-center gap-3">
-                <div className="h-10 w-10 rounded-2xl bg-slate-900 text-white flex items-center justify-center">
+                <div className="h-10 w-10 rounded-2xl bg-blue-600 text-white flex items-center justify-center">
                   {React.createElement(segments.find((s) => s.key === segment)?.icon ?? BarChart3, { size: 18 })}
                 </div>
                 <div>
@@ -121,33 +126,33 @@ export default function Features() {
               </ul>
             </div>
 
-            <div className="rounded-3xl bg-white border border-slate-200 p-6">
+            <div className="rounded-3xl bg-white/80 border border-white/30 p-6">
               <div className="text-sm font-semibold text-slate-900">O que muda na prática</div>
               <p className="mt-2 text-sm text-slate-600 leading-relaxed">
                 Você não precisa decidir tudo no primeiro dia. Comece com o essencial e, conforme a operação pedir (CRM, automações,
                 expedição avançada, chão de fábrica), você habilita o que fizer sentido.
               </p>
               <div className="mt-5 grid grid-cols-2 gap-3">
-                <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                <div className="rounded-2xl border border-slate-200 bg-white/70 p-4">
                   <div className="text-xs text-slate-500">Primeiro valor</div>
                   <div className="mt-1 text-sm font-semibold text-slate-900">Operar sem fricção</div>
                 </div>
-                <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                <div className="rounded-2xl border border-slate-200 bg-white/70 p-4">
                   <div className="text-xs text-slate-500">Evolução</div>
                   <div className="mt-1 text-sm font-semibold text-slate-900">Upgrade por necessidade</div>
                 </div>
-                <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                <div className="rounded-2xl border border-slate-200 bg-white/70 p-4">
                   <div className="text-xs text-slate-500">Controle</div>
                   <div className="mt-1 text-sm font-semibold text-slate-900">Auditoria + consistência</div>
                 </div>
-                <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                <div className="rounded-2xl border border-slate-200 bg-white/70 p-4">
                   <div className="text-xs text-slate-500">Time</div>
                   <div className="mt-1 text-sm font-semibold text-slate-900">Permissões por função</div>
                 </div>
               </div>
             </div>
           </div>
-        </div>
+        </GlassCard>
       </div>
     </section>
   );

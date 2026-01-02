@@ -54,7 +54,7 @@ const Header: React.FC<HeaderProps> = ({ onLoginClick }) => {
           <div className="flex items-center justify-between h-16">
             <div className="flex-shrink-0">
               <Link to="/" aria-label="REVO ERP Home">
-                <RevoLogo className="h-7 w-auto text-slate-900" />
+                <RevoLogo className="h-7 w-auto text-gray-900" />
               </Link>
             </div>
             <nav className="hidden md:flex items-center space-x-8">
@@ -91,13 +91,13 @@ const Header: React.FC<HeaderProps> = ({ onLoginClick }) => {
               <div className="flex items-center gap-2">
                 <button
                   onClick={() => handleLinkClick('#pricing')}
-                  className="px-4 py-2 rounded-full text-sm font-semibold text-slate-900 hover:bg-slate-100 transition-colors"
+                  className="px-4 py-2 rounded-full text-sm font-semibold text-gray-800 hover:bg-gray-100 transition-colors"
                 >
                   Começar
                 </button>
                 <button
                   onClick={onLoginClick}
-                  className="px-4 py-2 rounded-full bg-slate-900 text-white text-sm font-semibold hover:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-slate-900 transition-colors"
+                  className="px-4 py-2 rounded-full bg-blue-600 text-white text-sm font-semibold hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-600 transition-colors"
                 >
                   Entrar
                 </button>
@@ -148,7 +148,7 @@ const Header: React.FC<HeaderProps> = ({ onLoginClick }) => {
                     handleLinkClick('#pricing');
                     setIsMenuOpen(false);
                   }}
-                  className="block w-full text-center px-6 py-2.5 rounded-full bg-slate-900 text-white font-semibold hover:bg-slate-800"
+                  className="block w-full text-center px-6 py-2.5 rounded-full bg-blue-600 text-white font-semibold hover:bg-blue-700"
                 >
                   Começar
                 </button>

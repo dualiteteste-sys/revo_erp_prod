@@ -168,7 +168,7 @@ export default function Pricing() {
               key={p.slug}
               className={[
                 "rounded-3xl border p-6 shadow-sm bg-white",
-                p.highlight ? "border-slate-900 ring-1 ring-slate-900/10" : "border-slate-200",
+                p.highlight ? "border-blue-600 ring-1 ring-blue-600/10" : "border-slate-200",
               ].join(" ")}
             >
               <h3 className="text-lg font-semibold text-slate-900">{p.title}</h3>
@@ -191,7 +191,7 @@ export default function Pricing() {
                 className={[
                   "mt-6 w-full rounded-full px-4 py-2.5 font-semibold transition-colors",
                   p.highlight
-                    ? "bg-slate-900 text-white hover:bg-slate-800"
+                    ? "bg-blue-600 text-white hover:bg-blue-700"
                     : "bg-slate-100 text-slate-900 hover:bg-slate-200",
                 ].join(" ")}
               >
