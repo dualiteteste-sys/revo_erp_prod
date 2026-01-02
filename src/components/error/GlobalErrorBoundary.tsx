@@ -50,6 +50,21 @@ export class GlobalErrorBoundary extends Component<Props, State> {
                             Encontramos um erro inesperado. Nossa equipe já foi notificada (se os logs estiverem configurados).
                         </p>
 
+                        <div className="mb-6 grid grid-cols-1 gap-2">
+                            <a
+                                href="/app/desenvolvedor/saude"
+                                className="text-sm font-medium text-blue-700 hover:text-blue-800 hover:underline"
+                            >
+                                Abrir diagnóstico (Saúde)
+                            </a>
+                            <a
+                                href="/app/desenvolvedor/logs"
+                                className="text-sm font-medium text-blue-700 hover:text-blue-800 hover:underline"
+                            >
+                                Abrir logs (se habilitado)
+                            </a>
+                        </div>
+
                         {import.meta.env.DEV && this.state.error && (
                             <div className="mb-6 p-4 bg-gray-100 rounded text-left overflow-auto max-h-48">
                                 <p className="font-mono text-xs text-red-600 break-all">

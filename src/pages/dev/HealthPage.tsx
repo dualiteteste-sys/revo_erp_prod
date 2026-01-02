@@ -6,8 +6,19 @@ import GlassCard from '@/components/ui/GlassCard';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/contexts/ToastProvider';
 import { supabase } from '@/lib/supabaseClient';
-import { getOpsHealthSummary, listOpsRecentFailures, reprocessNfeioWebhookEvent, type OpsHealthSummary, type OpsRecentFailure } from '@/services/opsHealth';
+import {
+  getOpsHealthSummary,
+  listOpsRecentFailures,
+  reprocessEcommerceDlq,
+  reprocessFinanceDlq,
+  reprocessNfeioWebhookEvent,
+  type EcommerceDlqRow,
+  type FinanceDlqRow,
+  type OpsHealthSummary,
+  type OpsRecentFailure,
+} from '@/services/opsHealth';
 import { useHasPermission } from '@/hooks/useHasPermission';
+import { getEcommerceHealthSummary, type EcommerceHealthSummary } from '@/services/ecommerceIntegrations';
 
 type NfeWebhookRow = {
   id: string;
@@ -29,52 +40,93 @@ function formatDateTimeBR(value?: string | null) {
 export default function HealthPage() {
   const { addToast } = useToast();
   const permManage = useHasPermission('ops', 'manage');
+  const permEcommerceView = useHasPermission('ecommerce', 'view');
 
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [summary, setSummary] = useState<OpsHealthSummary | null>(null);
+  const [ecommerceHealth, setEcommerceHealth] = useState<EcommerceHealthSummary | null>(null);
   const [recent, setRecent] = useState<OpsRecentFailure[]>([]);
   const [nfeRows, setNfeRows] = useState<NfeWebhookRow[]>([]);
+  const [financeDlqRows, setFinanceDlqRows] = useState<FinanceDlqRow[]>([]);
+  const [ecommerceDlqRows, setEcommerceDlqRows] = useState<EcommerceDlqRow[]>([]);
   const [reprocessingId, setReprocessingId] = useState<string | null>(null);
+  const [reprocessingFinanceDlqId, setReprocessingFinanceDlqId] = useState<string | null>(null);
+  const [reprocessingEcommerceDlqId, setReprocessingEcommerceDlqId] = useState<string | null>(null);
 
   const hasSupabase = !!supabase;
 
   const fetchAll = useCallback(async () => {
     setLoading(true);
+    setLoadError(null);
     try {
-      const [s, r] = await Promise.all([getOpsHealthSummary(), listOpsRecentFailures({ limit: 30 })]);
+      const [s, r, eh] = await Promise.all([
+        getOpsHealthSummary(),
+        listOpsRecentFailures({ limit: 30 }),
+        permEcommerceView.data ? getEcommerceHealthSummary().catch(() => null) : Promise.resolve(null),
+      ]);
       setSummary(s);
       setRecent(r ?? []);
+      setEcommerceHealth(eh);
 
       if (!hasSupabase) {
         setNfeRows([]);
+        setFinanceDlqRows([]);
+        setEcommerceDlqRows([]);
         return;
       }
 
-      const { data, error } = await supabase
-        .from('fiscal_nfe_webhook_events')
-        .select('id,received_at,event_type,nfeio_id,process_attempts,next_retry_at,locked_at,last_error')
-        .is('processed_at', null)
-        .not('last_error', 'is', null)
-        .order('received_at', { ascending: false })
-        .limit(30);
+      const [{ data: nfeData, error: nfeError }, { data: finDlqData, error: finDlqError }, { data: ecoDlqData, error: ecoDlqError }] =
+        await Promise.all([
+          supabase
+            .from('fiscal_nfe_webhook_events')
+            .select('id,received_at,event_type,nfeio_id,process_attempts,next_retry_at,locked_at,last_error')
+            .is('processed_at', null)
+            .not('last_error', 'is', null)
+            .order('received_at', { ascending: false })
+            .limit(30),
+          supabase
+            .from('finance_job_dead_letters')
+            .select('id,dead_lettered_at,job_type,idempotency_key,last_error')
+            .order('dead_lettered_at', { ascending: false })
+            .limit(30),
+          permEcommerceView.data
+            ? supabase
+                .from('ecommerce_job_dead_letters')
+                .select('id,failed_at,provider,kind,dedupe_key,last_error')
+                .order('failed_at', { ascending: false })
+                .limit(30)
+            : Promise.resolve({ data: [], error: null } as any),
+        ]);
 
-      if (error) throw error;
-      setNfeRows((data ?? []) as unknown as NfeWebhookRow[]);
+      if (nfeError) throw nfeError;
+      if (finDlqError) throw finDlqError;
+      if (ecoDlqError) throw ecoDlqError;
+
+      setNfeRows((nfeData ?? []) as unknown as NfeWebhookRow[]);
+      setFinanceDlqRows((finDlqData ?? []) as unknown as FinanceDlqRow[]);
+      setEcommerceDlqRows((ecoDlqData ?? []) as unknown as EcommerceDlqRow[]);
     } catch (e: any) {
-      addToast(e?.message || 'Falha ao carregar monitor de saúde.', 'error');
+      const msg = e?.message || 'Falha ao carregar monitor de saúde.';
+      addToast(msg, 'error');
+      setLoadError(msg);
       setSummary(null);
+      setEcommerceHealth(null);
       setRecent([]);
       setNfeRows([]);
+      setFinanceDlqRows([]);
+      setEcommerceDlqRows([]);
     } finally {
       setLoading(false);
     }
-  }, [addToast, hasSupabase]);
+  }, [addToast, hasSupabase, permEcommerceView.data]);
 
   useEffect(() => {
     void fetchAll();
   }, [fetchAll]);
 
   const canReprocess = !!permManage.data;
+  const canSeeEcommerce = !!permEcommerceView.data;
 
   const handleReprocess = async (id: string) => {
     if (!canReprocess) {
@@ -92,6 +144,44 @@ export default function HealthPage() {
       addToast(e?.message || 'Falha ao reenfileirar evento.', 'error');
     } finally {
       setReprocessingId(null);
+    }
+  };
+
+  const handleReprocessFinanceDlq = async (dlqId: string) => {
+    if (!canReprocess) {
+      addToast('Sem permissão para reprocessar.', 'warning');
+      return;
+    }
+    if (reprocessingFinanceDlqId) return;
+
+    setReprocessingFinanceDlqId(dlqId);
+    try {
+      await reprocessFinanceDlq(dlqId);
+      addToast('Job reenfileirado a partir da DLQ.', 'success');
+      await fetchAll();
+    } catch (e: any) {
+      addToast(e?.message || 'Falha ao reenfileirar job da DLQ.', 'error');
+    } finally {
+      setReprocessingFinanceDlqId(null);
+    }
+  };
+
+  const handleReprocessEcommerceDlq = async (dlqId: string) => {
+    if (!canReprocess) {
+      addToast('Sem permissão para reprocessar.', 'warning');
+      return;
+    }
+    if (reprocessingEcommerceDlqId) return;
+
+    setReprocessingEcommerceDlqId(dlqId);
+    try {
+      await reprocessEcommerceDlq(dlqId);
+      addToast('Job reenfileirado a partir da DLQ.', 'success');
+      await fetchAll();
+    } catch (e: any) {
+      addToast(e?.message || 'Falha ao reenfileirar job da DLQ.', 'error');
+    } finally {
+      setReprocessingEcommerceDlqId(null);
     }
   };
 
@@ -122,6 +212,18 @@ export default function HealthPage() {
         icon: <AlertTriangle className="w-5 h-5 text-red-600" />,
         hint: 'Webhooks sem processed_at e com last_error.',
       },
+      {
+        title: 'Financeiro pendentes',
+        value: s?.finance?.pending ?? 0,
+        icon: <Activity className="w-5 h-5 text-emerald-600" />,
+        hint: 'Jobs pendentes/processando no financeiro.',
+      },
+      {
+        title: 'Financeiro com falha',
+        value: s?.finance?.failed ?? 0,
+        icon: <AlertTriangle className="w-5 h-5 text-rose-600" />,
+        hint: 'Jobs com status failed (retriáveis).',
+      },
     ];
   }, [summary]);
 
@@ -129,7 +231,7 @@ export default function HealthPage() {
     <div className="p-1 flex flex-col gap-4">
       <PageHeader
         title="Saúde do sistema"
-        description="Falhas recentes, integrações e sinais de drift operacional."
+        description="Falhas recentes, filas, DLQs e sinais de drift operacional."
         icon={<Activity className="w-5 h-5" />}
         actions={
           <Button onClick={fetchAll} variant="outline" className="gap-2" disabled={loading}>
@@ -139,7 +241,33 @@ export default function HealthPage() {
         }
       />
 
-      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-3">
+      {!loading && loadError && (
+        <GlassCard className="p-4 border border-rose-200 bg-rose-50/60">
+          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+            <div>
+              <div className="text-sm font-semibold text-rose-900">Não foi possível carregar o painel</div>
+              <div className="text-sm text-rose-800">{loadError}</div>
+              <div className="mt-1 text-xs text-rose-700">
+                Dica: tente novamente. Se persistir, abra os logs para identificar a falha.
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <Button onClick={fetchAll} variant="outline" className="gap-2">
+                <RefreshCw size={16} />
+                Tentar novamente
+              </Button>
+              <a
+                href="/app/desenvolvedor/logs"
+                className="text-sm font-medium text-blue-700 hover:text-blue-800 hover:underline"
+              >
+                Abrir logs
+              </a>
+            </div>
+          </div>
+        </GlassCard>
+      )}
+
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
         {cards.map((c) => (
           <GlassCard key={c.title} className="p-4">
             <div className="flex items-center justify-between">
@@ -152,6 +280,26 @@ export default function HealthPage() {
             <div className="mt-2 text-xs text-gray-500">{c.hint}</div>
           </GlassCard>
         ))}
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+        <GlassCard className="p-4">
+          <div className="text-sm font-medium text-gray-700">Marketplaces (fila)</div>
+          <div className="mt-2 text-2xl font-bold text-gray-900">{ecommerceHealth?.pending ?? '—'}</div>
+          <div className="mt-1 text-xs text-gray-500">pendentes/processando</div>
+        </GlassCard>
+        <GlassCard className="p-4">
+          <div className="text-sm font-medium text-gray-700">Marketplaces (falhas 24h)</div>
+          <div className="mt-2 text-2xl font-bold text-gray-900">{ecommerceHealth?.failed_24h ?? '—'}</div>
+          <div className="mt-1 text-xs text-gray-500">últimas 24h</div>
+        </GlassCard>
+        <GlassCard className="p-4">
+          <div className="text-sm font-medium text-gray-700">Marketplaces (último sync)</div>
+          <div className="mt-2 text-sm font-semibold text-gray-900">
+            {ecommerceHealth?.last_sync_at ? formatDateTimeBR(ecommerceHealth.last_sync_at) : '—'}
+          </div>
+          <div className="mt-1 text-xs text-gray-500">{canSeeEcommerce ? 'conexões meli/shopee' : 'sem permissão ecommerce:view'}</div>
+        </GlassCard>
       </div>
 
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
@@ -247,7 +395,120 @@ export default function HealthPage() {
           )}
         </GlassCard>
       </div>
+
+      <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+        <GlassCard className="p-4">
+          <div className="flex items-center justify-between mb-3">
+            <div className="text-lg font-semibold text-gray-900">Financeiro — DLQ</div>
+            <div className="text-xs text-gray-500">{canReprocess ? 'reprocessamento habilitado' : 'sem permissão para reprocessar'}</div>
+          </div>
+
+          {loading ? (
+            <div className="text-sm text-gray-500">Carregando…</div>
+          ) : financeDlqRows.length === 0 ? (
+            <div className="text-sm text-gray-600">Nenhum item na DLQ.</div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="min-w-full divide-y divide-gray-200">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Quando</th>
+                    <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Tipo</th>
+                    <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Erro</th>
+                    <th className="px-3 py-2" />
+                  </tr>
+                </thead>
+                <tbody className="bg-white divide-y divide-gray-200">
+                  {financeDlqRows.map((row) => {
+                    const busy = reprocessingFinanceDlqId === row.id;
+                    return (
+                      <tr key={row.id} className="hover:bg-gray-50">
+                        <td className="px-3 py-2 text-sm text-gray-600 whitespace-nowrap">{formatDateTimeBR(row.dead_lettered_at)}</td>
+                        <td className="px-3 py-2 text-sm text-gray-700 whitespace-nowrap">{row.job_type}</td>
+                        <td className="px-3 py-2 text-sm text-gray-700 max-w-[420px] truncate" title={row.last_error || ''}>
+                          {row.last_error || '—'}
+                        </td>
+                        <td className="px-3 py-2 text-right">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="gap-2"
+                            onClick={() => void handleReprocessFinanceDlq(row.id)}
+                            disabled={!canReprocess || busy}
+                            title={canReprocess ? 'Reenfileirar agora' : 'Sem permissão'}
+                          >
+                            <RotateCcw size={14} />
+                            Reprocessar
+                          </Button>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </GlassCard>
+
+        <GlassCard className="p-4">
+          <div className="flex items-center justify-between mb-3">
+            <div className="text-lg font-semibold text-gray-900">Marketplaces — DLQ</div>
+            <div className="text-xs text-gray-500">
+              {!canSeeEcommerce ? 'sem permissão ecommerce:view' : canReprocess ? 'reprocessamento habilitado' : 'sem permissão para reprocessar'}
+            </div>
+          </div>
+
+          {loading ? (
+            <div className="text-sm text-gray-500">Carregando…</div>
+          ) : !canSeeEcommerce ? (
+            <div className="text-sm text-gray-600">Sem permissão para visualizar integrações (ecommerce:view).</div>
+          ) : ecommerceDlqRows.length === 0 ? (
+            <div className="text-sm text-gray-600">Nenhum item na DLQ.</div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="min-w-full divide-y divide-gray-200">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Quando</th>
+                    <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Provider</th>
+                    <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Tipo</th>
+                    <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Erro</th>
+                    <th className="px-3 py-2" />
+                  </tr>
+                </thead>
+                <tbody className="bg-white divide-y divide-gray-200">
+                  {ecommerceDlqRows.map((row) => {
+                    const busy = reprocessingEcommerceDlqId === row.id;
+                    return (
+                      <tr key={row.id} className="hover:bg-gray-50">
+                        <td className="px-3 py-2 text-sm text-gray-600 whitespace-nowrap">{formatDateTimeBR(row.failed_at)}</td>
+                        <td className="px-3 py-2 text-sm text-gray-700 whitespace-nowrap">{row.provider}</td>
+                        <td className="px-3 py-2 text-sm text-gray-700 whitespace-nowrap">{row.kind}</td>
+                        <td className="px-3 py-2 text-sm text-gray-700 max-w-[420px] truncate" title={row.last_error || ''}>
+                          {row.last_error || '—'}
+                        </td>
+                        <td className="px-3 py-2 text-right">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="gap-2"
+                            onClick={() => void handleReprocessEcommerceDlq(row.id)}
+                            disabled={!canReprocess || busy}
+                            title={canReprocess ? 'Reenfileirar agora' : 'Sem permissão'}
+                          >
+                            <RotateCcw size={14} />
+                            Reprocessar
+                          </Button>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </GlassCard>
+      </div>
     </div>
   );
 }
-
