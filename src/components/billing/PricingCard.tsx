@@ -56,7 +56,10 @@ const PricingCard: React.FC<PricingCardProps> = ({
   const isYearly = plan.billing_cycle === 'yearly';
   const monthlyBase = typeof monthlyAmountCentsForYearly === 'number' ? monthlyAmountCentsForYearly : null;
   const yearlyTotalCents = monthlyBase ? monthlyBase * 10 : plan.amount_cents;
-  const yearlyPerMonthCents = monthlyBase ? Math.round((monthlyBase * 10) / 12) : Math.round(plan.amount_cents / 12);
+  // UX: no anual, mostrar "R$ 125/mês" (arredondado) e explicar o total anual (pague 10 meses).
+  const yearlyPerMonthCents = monthlyBase
+    ? Math.round(((monthlyBase * 10) / 12) / 100) * 100
+    : Math.round((plan.amount_cents / 12) / 100) * 100;
   const displayCents = isYearly ? yearlyPerMonthCents : plan.amount_cents;
 
   const cardVariants = {

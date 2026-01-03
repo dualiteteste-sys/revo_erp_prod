@@ -108,6 +108,15 @@ Deno.serve(async (req) => {
         .from("empresas")
         .update({ stripe_customer_id: customerId })
         .eq("id", empresa_id);
+    } else {
+      // Compat: clientes antigos podem existir sem metadata.empresa_id (webhook depende disso).
+      try {
+        await stripe.customers.update(customerId, {
+          metadata: { empresa_id },
+        });
+      } catch (_e) {
+        // best-effort
+      }
     }
 
     // 6) SITE_URL sanity
@@ -127,7 +136,10 @@ Deno.serve(async (req) => {
       success_url: `${siteUrl}/app/billing/success?session_id={CHECKOUT_SESSION_ID}`,
       cancel_url:  `${siteUrl}/app/billing/cancel`,
       metadata: { empresa_id, plan_slug: String(plan_slug).toUpperCase(), billing_cycle, kind: 'subscription' },
-      ...(trial ? { subscription_data: { trial_period_days: 30 } } : {}),
+      subscription_data: {
+        ...(trial ? { trial_period_days: 30 } : {}),
+        metadata: { empresa_id, plan_slug: String(plan_slug).toUpperCase(), billing_cycle },
+      },
     });
 
     return new Response(JSON.stringify({ url: session.url }), {
