@@ -17,8 +17,10 @@ Deno.serve(async (req: Request): Promise<Response> => {
 
   let event: Stripe.Event;
   try {
-    const raw = await req.arrayBuffer();
-    event = stripe.webhooks.constructEvent(Buffer.from(raw), sig, STRIPE_WEBHOOK_SECRET);
+    // Deno/Supabase Edge: usar o corpo bruto como string para evitar dependência de Buffer (Node).
+    // Importante: NÃO parsear JSON antes da verificação de assinatura.
+    const payload = await req.text();
+    event = stripe.webhooks.constructEvent(payload, sig, STRIPE_WEBHOOK_SECRET);
   } catch (err) {
     return new Response(`Erro no Webhook: ${(err as Error).message}`, { status: 400 });
   }
