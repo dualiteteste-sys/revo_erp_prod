@@ -8,7 +8,13 @@ import sys
 from pathlib import Path
 
 
-RPC_CALL_RE = re.compile(r"\.rpc\(\s*['\"]([a-zA-Z0-9_]+)['\"]")
+RPC_CALL_RES: list[re.Pattern[str]] = [
+    # Direct supabase-js usage: supabase.rpc("fn", ...)
+    re.compile(r"\.rpc\(\s*['\"]([a-zA-Z0-9_]+)['\"]"),
+    # App wrapper: callRpc("fn", ...)
+    # Also supports generics: callRpc<Foo>("fn", ...)
+    re.compile(r"\bcallRpc(?:<[^>]+>)?\(\s*['\"]([a-zA-Z0-9_]+)['\"]"),
+]
 SQL_FN_RE = re.compile(
     r"(?is)\bcreate\s+(?:or\s+replace\s+)?function\s+(?:[a-zA-Z0-9_]+\.)?([a-zA-Z0-9_]+)\s*\(",
 )
@@ -38,8 +44,9 @@ def find_rpc_calls(search_roots: list[Path]) -> set[str]:
                 text = file.read_text(encoding="utf-8", errors="ignore")
             except OSError:
                 continue
-            for match in RPC_CALL_RE.finditer(text):
-                rpcs.add(match.group(1))
+            for rx in RPC_CALL_RES:
+                for match in rx.finditer(text):
+                    rpcs.add(match.group(1))
     return rpcs
 
 

@@ -2,6 +2,7 @@ import React from 'react';
 import { useAuth } from '../../contexts/AuthProvider';
 import { CreditCard, AlertTriangle } from 'lucide-react';
 import { Database } from '../../types/database.types';
+import { useNavigate } from 'react-router-dom';
 
 type Subscription = Database['public']['Tables']['subscriptions']['Row'];
 
@@ -11,6 +12,7 @@ interface BillingBlockPageProps {
 
 const BillingBlockPage: React.FC<BillingBlockPageProps> = ({ subscription }) => {
   const { activeEmpresa, signOut } = useAuth();
+  const navigate = useNavigate();
 
   const statusMessages: { [key: string]: string } = {
     past_due: 'Seu pagamento está pendente.',
@@ -41,6 +43,7 @@ const BillingBlockPage: React.FC<BillingBlockPageProps> = ({ subscription }) => 
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
             <button
+              onClick={() => navigate('/app?settings=billing')}
               className="w-full sm:w-auto flex items-center justify-center gap-2 bg-blue-600 text-white font-bold py-3 px-6 rounded-lg hover:bg-blue-700 transition-colors"
             >
               <CreditCard size={20} />

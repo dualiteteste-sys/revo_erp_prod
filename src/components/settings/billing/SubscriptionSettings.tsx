@@ -326,6 +326,8 @@ const SubscriptionSettings: React.FC<SubscriptionSettingsProps> = ({ onSwitchToP
     const currentUsers = currentUsersCount ?? 0;
     const isOverLimit = currentUsersCount !== null && currentUsers > normalizedMaxUsers;
     const isAtLimit = currentUsersCount !== null && currentUsers >= normalizedMaxUsers;
+    const isSyncedFromBilling = !!subscription;
+    const canEditEntitlements = canAdmin && !isSyncedFromBilling;
 
     return (
       <div className="bg-white/80 rounded-2xl p-6 md:p-8 border border-gray-200 shadow-sm">
@@ -333,9 +335,15 @@ const SubscriptionSettings: React.FC<SubscriptionSettingsProps> = ({ onSwitchToP
         <div>
           <h2 className="text-xl font-bold text-gray-800">Plano MVP e Limites</h2>
           <p className="text-sm text-gray-500 mt-1">
-            Use esta configuração para simular os 2 planos iniciais (Serviços / Indústria) e limites de usuários.
+            Quando existe assinatura ativa/trial, estes valores são sincronizados automaticamente a partir do plano contratado (Stripe).
           </p>
-          {!canAdmin && (
+          {isSyncedFromBilling ? (
+            <p className="mt-2 text-xs text-slate-600">
+              Para alterar, use <span className="font-semibold">Alterar Plano Principal</span> acima ou acesse{' '}
+              <span className="font-semibold">Gerenciar Pagamento</span>.
+            </p>
+          ) : null}
+          {!canAdmin && !isSyncedFromBilling && (
             <p className="mt-2 text-xs text-amber-700">
               Apenas <span className="font-semibold">admin/owner</span> podem alterar estas configurações.
             </p>
@@ -343,7 +351,7 @@ const SubscriptionSettings: React.FC<SubscriptionSettingsProps> = ({ onSwitchToP
         </div>
         <button
           onClick={handleSaveEntitlements}
-          disabled={savingEntitlements || loadingEntitlements || !canAdmin}
+          disabled={savingEntitlements || loadingEntitlements || !canEditEntitlements}
           className="bg-blue-600 text-white font-bold py-2 px-5 rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50"
         >
           {savingEntitlements ? 'Salvando…' : 'Salvar'}
@@ -356,7 +364,7 @@ const SubscriptionSettings: React.FC<SubscriptionSettingsProps> = ({ onSwitchToP
           <select
             value={planoMvp}
             onChange={(e) => setPlanoMvp(e.target.value as PlanoMvp)}
-            disabled={loadingEntitlements || !canAdmin}
+            disabled={loadingEntitlements || !canEditEntitlements}
             className="w-full bg-white border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
           >
             <option value="ambos">Ambos (sem bloqueios)</option>
@@ -396,7 +404,7 @@ const SubscriptionSettings: React.FC<SubscriptionSettingsProps> = ({ onSwitchToP
             step={1}
             value={Number.isFinite(maxUsers) ? String(maxUsers) : ''}
             onChange={(e) => setMaxUsers(Number(e.target.value))}
-            disabled={loadingEntitlements || !canAdmin}
+            disabled={loadingEntitlements || !canEditEntitlements}
             className="w-full bg-white border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
             placeholder="Ex.: 3"
           />

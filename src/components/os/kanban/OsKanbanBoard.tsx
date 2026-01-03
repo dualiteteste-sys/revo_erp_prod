@@ -16,6 +16,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { useHasPermission } from '@/hooks/useHasPermission';
+import { useBillingGate } from '@/hooks/useBillingGate';
 
 export type KanbanColumn = {
   id: ColumnId;
@@ -38,6 +39,7 @@ const OsKanbanBoard: React.FC<{ onOpenOs?: (osId: string) => void; canUpdate?: b
   const [columns, setColumns] = useState<KanbanColumns | null>(null);
   const [loading, setLoading] = useState(true);
   const { addToast } = useToast();
+  const billing = useBillingGate();
   const [search, setSearch] = useState('');
   const [status, setStatus] = useState<status_os[]>(DEFAULT_STATUS);
   const permUpdate = useHasPermission('os', 'update');
@@ -177,6 +179,7 @@ const OsKanbanBoard: React.FC<{ onOpenOs?: (osId: string) => void; canUpdate?: b
                 addToast('Você não tem permissão para concluir/cancelar O.S.', 'warning');
                 return;
               }
+              if (!billing.ensureCanWrite({ actionLabel: `Alterar status da O.S. (${STATUS_LABEL[next]})` })) return;
               try {
                 await setOsStatus(osId, next);
                 addToast(`Status atualizado para "${STATUS_LABEL[next]}".`, 'success');

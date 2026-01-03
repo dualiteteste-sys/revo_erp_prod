@@ -8,6 +8,7 @@ import { useSupabase } from '@/providers/SupabaseProvider';
 import { useAuth } from '@/contexts/AuthProvider';
 import { useToast } from '@/contexts/ToastProvider';
 import { useOnboardingGate } from '@/contexts/OnboardingGateContext';
+import { useBillingGate } from '@/hooks/useBillingGate';
 import { useEmpresaFeatures } from '@/hooks/useEmpresaFeatures';
 import { traceAction } from '@/lib/tracing';
 import { Copy, Eye, FileKey, Loader2, Plus, Receipt, Search, Settings, Send, Trash2 } from 'lucide-react';
@@ -89,6 +90,7 @@ export default function NfeEmissoesPage() {
   const { activeEmpresa } = useAuth();
   const { addToast } = useToast();
   const { ensure } = useOnboardingGate();
+  const billing = useBillingGate();
   const features = useEmpresaFeatures();
 
   const empresaId = activeEmpresa?.id;
@@ -586,6 +588,7 @@ export default function NfeEmissoesPage() {
   }
 
   const handleSend = async (emissaoId: string) => {
+    if (!billing.ensureCanWrite({ actionLabel: 'Emitir NF-e' })) return;
     if (!features.nfe_emissao_enabled) {
       addToast('Emissão está desativada. Ative em Fiscal → Configurações de NF-e.', 'warning');
       return;
@@ -618,6 +621,7 @@ export default function NfeEmissoesPage() {
   };
 
   const handleSync = async (emissaoId: string) => {
+    if (!billing.ensureCanWrite({ actionLabel: 'Sincronizar NF-e' })) return;
     setSyncingId(emissaoId);
     try {
       await traceAction(
@@ -656,6 +660,7 @@ export default function NfeEmissoesPage() {
   };
 
   const fetchDocFromProvider = async (emissaoId: string, docType: 'danfe_pdf' | 'cce_pdf' | 'cce_xml') => {
+    if (!billing.ensureCanWrite({ actionLabel: 'Atualizar documentos' })) return;
     const gate = await ensure(['fiscal.nfe.emitente', 'fiscal.nfe.numeracao']);
     if (!gate.ok) return;
 
@@ -680,6 +685,7 @@ export default function NfeEmissoesPage() {
   };
 
   const handleCancel = async (emissaoId: string) => {
+    if (!billing.ensureCanWrite({ actionLabel: 'Cancelar NF-e' })) return;
     const ok = window.confirm('Tem certeza que deseja solicitar o cancelamento desta NF-e? (Operação assíncrona)');
     if (!ok) return;
 
@@ -731,6 +737,7 @@ export default function NfeEmissoesPage() {
   };
 
   const handleSendCce = async () => {
+    if (!billing.ensureCanWrite({ actionLabel: 'Enviar CC-e' })) return;
     if (!cceEmissaoId) return;
     if (!cceText.trim()) {
       addToast('Informe o texto da carta de correção.', 'warning');

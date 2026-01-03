@@ -1,6 +1,7 @@
 import React from 'react';
 import { useSubscription } from '../../contexts/SubscriptionProvider';
 import BillingBlockPage from '../../pages/billing/BillingBlockPage';
+import { getBillingAccessLevel } from '@/lib/billingAccess';
 
 interface SubscriptionGuardProps {
   children: React.ReactNode;
@@ -22,14 +23,15 @@ const SubscriptionGuard: React.FC<SubscriptionGuardProps> = ({ children }) => {
     return <>{children}</>;
   }
 
-  // If subscription exists, check its status
-  const validStatus = ['active', 'trialing'];
-  if (validStatus.includes(subscription.status)) {
-    return <>{children}</>;
-  }
+  const level = getBillingAccessLevel(subscription);
 
-  // If status is not valid, show the billing block page
-  return <BillingBlockPage subscription={subscription} />;
+  // Soft block: allow navigation, but critical actions should be gated.
+  if (level === 'soft') return <>{children}</>;
+
+  // Hard block: block the app.
+  if (level === 'hard') return <BillingBlockPage subscription={subscription} />;
+
+  return <>{children}</>;
 };
 
 export default SubscriptionGuard;
