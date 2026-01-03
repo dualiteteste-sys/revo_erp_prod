@@ -2,14 +2,14 @@ import { callRpc } from "@/lib/api";
 import { logger } from "@/lib/logger";
 import { supabase } from "@/lib/supabaseClient";
 
-type PendingMarketingPlan = "essencial" | "pro" | "operacao" | "industria" | "scale";
+type PendingMarketingPlan = "essencial" | "pro" | "max" | "industria" | "scale";
 
 function readPendingMarketingPlan(): { slug: PendingMarketingPlan; cycle?: string } | null {
   try {
     const raw = localStorage.getItem("pending_plan_slug");
     if (!raw) return null;
     const slug = raw.toLowerCase() as PendingMarketingPlan;
-    if (!["essencial", "pro", "operacao", "industria", "scale"].includes(slug)) return null;
+    if (!["essencial", "pro", "max", "industria", "scale"].includes(slug)) return null;
     const cycle = localStorage.getItem("pending_plan_cycle") ?? undefined;
     return { slug, cycle };
   } catch {
@@ -24,7 +24,7 @@ async function applyMarketingPlanEntitlements(empresaId: string) {
   const map: Record<PendingMarketingPlan, { plano_mvp: "servicos" | "industria" | "ambos"; max_users: number }> = {
     essencial: { plano_mvp: "servicos", max_users: 2 },
     pro: { plano_mvp: "servicos", max_users: 5 },
-    operacao: { plano_mvp: "servicos", max_users: 5 },
+    max: { plano_mvp: "servicos", max_users: 8 },
     industria: { plano_mvp: "industria", max_users: 10 },
     scale: { plano_mvp: "ambos", max_users: 999 },
   };
