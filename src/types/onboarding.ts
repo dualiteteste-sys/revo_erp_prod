@@ -1,5 +1,5 @@
 export type OnboardingIntent = {
-    planSlug: "START" | "PRO" | "MAX" | "ULTRA";
+    planSlug: "ESSENCIAL" | "PRO" | "MAX" | "INDUSTRIA" | "SCALE" | "START" | "ULTRA";
     billingCycle: "monthly" | "yearly";
     type: "trial" | "subscribe";
 };

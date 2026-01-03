@@ -16,6 +16,14 @@ const SubscriptionPlansPage: React.FC = () => {
   const { session, activeEmpresa } = useAuth();
   const { addToast } = useToast();
 
+  const monthlyBySlug = React.useMemo(() => {
+    const map = new Map<string, number>();
+    for (const p of plans) {
+      if (p.billing_cycle === 'monthly') map.set(p.slug, p.amount_cents);
+    }
+    return map;
+  }, [plans]);
+
   useEffect(() => {
     const fetchPlans = async () => {
       setLoading(true);
@@ -103,9 +111,11 @@ const SubscriptionPlansPage: React.FC = () => {
         <span className={`text-sm font-medium ${billingCycle === 'yearly' ? 'text-blue-600' : 'text-gray-500'}`}>
           Anual
         </span>
-        <span className="ml-3 bg-green-100 text-green-800 text-xs font-semibold px-2.5 py-0.5 rounded-full">
-          Economize!
-        </span>
+        {billingCycle === 'yearly' && (
+          <span className="ml-3 bg-green-100 text-green-800 text-xs font-semibold px-2.5 py-0.5 rounded-full">
+            Economize 2 meses
+          </span>
+        )}
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 max-w-7xl mx-auto mt-12">
@@ -116,6 +126,7 @@ const SubscriptionPlansPage: React.FC = () => {
             onStartTrial={() => handleCheckout(plan)}
             isLoading={checkoutLoading === plan.stripe_price_id}
             index={index}
+            monthlyAmountCentsForYearly={plan.billing_cycle === 'yearly' ? (monthlyBySlug.get(plan.slug) ?? undefined) : undefined}
           />
         ))}
       </div>
