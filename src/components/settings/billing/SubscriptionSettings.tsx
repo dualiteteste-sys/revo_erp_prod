@@ -62,6 +62,9 @@ const getStatusDetails = (status: string) => {
     }
 };
 
+const formatDatePtBr = (d: Date) =>
+  d.toLocaleDateString('pt-BR', { year: 'numeric', month: 'short', day: '2-digit' });
+
 const badgeColors: { [key: string]: string } = {
     blue: 'bg-blue-100 text-blue-700',
     green: 'bg-green-100 text-green-700',
@@ -215,8 +218,18 @@ const SubscriptionSettings: React.FC<SubscriptionSettingsProps> = ({ onSwitchToP
             </div>
             <div>
               <p className="text-sm text-gray-500">Detalhes do Período</p>
-              <p className="text-sm text-gray-700 mt-1">Início em: {startDate.toLocaleDateString('pt-BR')}</p>
-              <p className="text-sm text-gray-700">{subscription.status === 'active' ? 'Próxima renovação:' : 'Termina em:'} {endDate.toLocaleDateString('pt-BR')}</p>
+              <p className="text-sm text-gray-700 mt-1">Início em: {formatDatePtBr(startDate)}</p>
+              {subscription.status === 'trialing' ? (
+                <>
+                  <p className="text-sm text-gray-700">Testes terminam em: {formatDatePtBr(endDate)}</p>
+                  <p className="text-sm text-gray-700">Cobrança inicia em: {formatDatePtBr(endDate)}</p>
+                </>
+              ) : (
+                <p className="text-sm text-gray-700">
+                  {subscription.status === 'active' ? 'Próxima cobrança/renovação:' : 'Período atual encerra em:'}{' '}
+                  {formatDatePtBr(endDate)}
+                </p>
+              )}
             </div>
           </div>
           <div className="flex flex-col justify-center">
