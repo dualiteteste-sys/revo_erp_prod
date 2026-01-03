@@ -4,6 +4,25 @@ import { buildCorsHeaders } from "../_shared/cors.ts";
 
 type Cycle = 'monthly' | 'yearly';
 
+function pickSiteUrl(req: Request): string | null {
+  const envUrl = (Deno.env.get("SITE_URL") ?? "").trim();
+
+  // Preferir o domínio do front que está chamando a função (evita "dev" em PROD).
+  const origin = (req.headers.get("origin") ?? "").trim();
+
+  const allowedExact = new Set<string>([
+    "https://erprevo.com",
+    "https://erprevodev.com",
+  ]);
+
+  const candidate = allowedExact.has(origin) ? origin : envUrl;
+
+  // Segurança: evita open redirect se SITE_URL estiver errado/malicioso.
+  if (allowedExact.has(candidate)) return candidate;
+  if (candidate) return candidate; // fallback: mantém compatibilidade (localhost / previews), assumindo env correto
+  return null;
+}
+
 Deno.serve(async (req) => {
   const corsHeaders = buildCorsHeaders(req);
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
@@ -119,8 +138,8 @@ Deno.serve(async (req) => {
       }
     }
 
-    // 6) SITE_URL sanity
-    const siteUrl = Deno.env.get("SITE_URL");
+    // 6) SITE_URL sanity (prefer origin when it's a known domain)
+    const siteUrl = pickSiteUrl(req);
     if (!siteUrl) {
       return new Response(JSON.stringify({ error: 'config_error', message: 'SITE_URL não configurada' }), {
         status: 500, headers: { 'Content-Type': 'application/json', ...corsHeaders },
