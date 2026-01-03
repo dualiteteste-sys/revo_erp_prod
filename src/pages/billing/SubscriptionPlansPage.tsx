@@ -59,6 +59,7 @@ const SubscriptionPlansPage: React.FC = () => {
           empresa_id: activeEmpresa.id,
           plan_slug: plan.slug.toUpperCase(),
           billing_cycle: plan.billing_cycle,
+          trial: true,
         },
       });
 

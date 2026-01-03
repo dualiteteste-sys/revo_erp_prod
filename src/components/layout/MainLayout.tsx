@@ -14,6 +14,7 @@ import { OnboardingGateProvider } from '@/contexts/OnboardingGateContext';
 import RoadmapWizardModal from '@/components/roadmap/RoadmapWizardModal';
 import RoadmapButton from '@/components/roadmap/RoadmapButton';
 import SubscriptionStatusBanner from '@/components/billing/SubscriptionStatusBanner';
+import { PlanIntentCheckoutModal } from '@/components/billing/PlanIntentCheckoutModal';
 
 const findActiveHref = (pathname: string): string => {
   for (const group of menuConfig) {
@@ -178,6 +179,7 @@ const MainLayout: React.FC = () => {
               setOnboardingForceStepKey(null);
             }}
           />
+          <PlanIntentCheckoutModal />
           <RoadmapWizardModal
             isOpen={isRoadmapOpen}
             onClose={() => setIsRoadmapOpen(false)}
