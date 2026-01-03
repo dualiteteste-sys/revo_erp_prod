@@ -9,7 +9,7 @@ import { supabase } from '@/lib/supabaseClient';
  */
 export async function startCheckout(
   empresaId: string,
-  planSlug: "START" | "PRO" | "MAX" | "ULTRA",
+  planSlug: string,
   cycle: "monthly" | "yearly",
   trial?: boolean
 ) {

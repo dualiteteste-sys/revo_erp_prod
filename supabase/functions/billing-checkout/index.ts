@@ -3,14 +3,6 @@ import Stripe from "stripe";
 import { buildCorsHeaders } from "../_shared/cors.ts";
 
 type Cycle = 'monthly' | 'yearly';
-type Plan = 'START' | 'PRO' | 'MAX' | 'ULTRA';
-
-const PRICES: Record<Plan, Record<Cycle, string>> = {
-  START: { monthly: 'price_1SKVBl5Ay7EJ5Bv6okyrWPlI', yearly: 'price_1SKWSN5Ay7EJ5Bv6pLg1MOLW' },
-  PRO:   { monthly: 'price_1SKVHv5Ay7EJ5Bv64qGOFrm4', yearly: 'price_1SKWTT5Ay7EJ5Bv6RvN50bIA' },
-  MAX:   { monthly: 'price_1SKVJ15Ay7EJ5Bv6uJzqBFYg', yearly: 'price_1SKWVd5Ay7EJ5Bv6fS4tSYsB' },
-  ULTRA: { monthly: 'price_1SKVK45Ay7EJ5Bv6Oy6clS9u', yearly: 'price_1SKWWv5Ay7EJ5Bv6zA632lIA' },
-};
 
 Deno.serve(async (req) => {
   const corsHeaders = buildCorsHeaders(req);
@@ -40,7 +32,7 @@ Deno.serve(async (req) => {
 
     // 2) Payload
     const { empresa_id, plan_slug, billing_cycle, trial } = await req.json() as {
-      empresa_id?: string; plan_slug?: Plan; billing_cycle?: Cycle; trial?: boolean;
+      empresa_id?: string; plan_slug?: string; billing_cycle?: Cycle; trial?: boolean;
     };
     if (!empresa_id || !plan_slug || !billing_cycle) {
       return new Response(JSON.stringify({ error: 'invalid_payload', message: 'empresa_id, plan_slug e billing_cycle são obrigatórios.' }), {
@@ -48,20 +40,36 @@ Deno.serve(async (req) => {
       });
     }
 
-    // 3) Price
-    const priceId = PRICES?.[plan_slug]?.[billing_cycle];
-    if (!priceId || !priceId.startsWith('price_')) {
-      return new Response(JSON.stringify({ error: 'misconfigured_price_id', message: `PriceID ausente para ${plan_slug}/${billing_cycle}.` }), {
-        status: 500, headers: { 'Content-Type': 'application/json', ...corsHeaders },
-      });
-    }
-    console.log('billing-checkout→price', { plan_slug, billing_cycle, priceId });
-
     // 4) DB & permission
     const supabaseAdmin = createClient(
       Deno.env.get('SUPABASE_URL')!,
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
     );
+
+    // 4.1) Buscar Price ID no catálogo (fonte de verdade)
+    const { data: planRow, error: planErr } = await supabaseAdmin
+      .from("plans")
+      .select("stripe_price_id, active")
+      .eq("slug", String(plan_slug).toUpperCase())
+      .eq("billing_cycle", billing_cycle)
+      .eq("active", true)
+      .maybeSingle();
+    if (planErr || !planRow?.stripe_price_id) {
+      return new Response(JSON.stringify({
+        error: 'plan_not_mapped',
+        message: `Plano não encontrado/ativo ou sem stripe_price_id: ${String(plan_slug).toUpperCase()}/${billing_cycle}`
+      }), { status: 400, headers: { 'Content-Type': 'application/json', ...corsHeaders } });
+    }
+
+    const priceId = String(planRow.stripe_price_id);
+    if (!priceId.startsWith("price_")) {
+      return new Response(JSON.stringify({
+        error: 'misconfigured_price_id',
+        message: `stripe_price_id inválido no banco (precisa ser price_*): ${String(plan_slug).toUpperCase()}/${billing_cycle}`
+      }), { status: 500, headers: { 'Content-Type': 'application/json', ...corsHeaders } });
+    }
+
+    console.log('billing-checkout→price', { plan_slug: String(plan_slug).toUpperCase(), billing_cycle, priceId });
 
     const { data: empresa, error: empErr } = await supabaseAdmin
       .from("empresas")
@@ -118,7 +126,7 @@ Deno.serve(async (req) => {
       allow_promotion_codes: true,
       success_url: `${siteUrl}/app/billing/success?session_id={CHECKOUT_SESSION_ID}`,
       cancel_url:  `${siteUrl}/app/billing/cancel`,
-      metadata: { empresa_id, plan_slug, billing_cycle, kind: 'subscription' },
+      metadata: { empresa_id, plan_slug: String(plan_slug).toUpperCase(), billing_cycle, kind: 'subscription' },
       ...(trial ? { subscription_data: { trial_period_days: 30 } } : {}),
     });
 

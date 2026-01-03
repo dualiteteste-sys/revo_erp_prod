@@ -12,23 +12,31 @@ interface PricingCardProps {
   index: number;
 }
 
-const planDetails: { [key: string]: { description: string, features: string[], isPopular?: boolean } } = {
+const planDetails: Record<string, { description: string; features: string[]; isPopular?: boolean }> = {
   START: {
     description: 'Para empreendedores e micro empresas.',
     features: ['Usuários ilimitados', 'Até 20 NFS-e/mês', 'Suporte via ticket'],
   },
   PRO: {
     description: 'Para PMEs em crescimento.',
-    features: ['Tudo do Start', 'Até 200 NFS-e/mês', 'Suporte via chat', 'Módulo de PDV'],
-    isPopular: true,
+    features: ['Tudo do Essencial/Start', 'Relatórios e fluxos mais completos', 'Suporte via chat', 'PDV'],
   },
   MAX: {
-    description: 'Para operações avançadas.',
-    features: ['Tudo do Pro', 'Controle de produção (BOM/OP)', 'Suporte por telefone'],
+    description: 'Para operações com mais controle e governança.',
+    features: ['Tudo do Pro', 'Financeiro forte + mais automações', 'Relatórios avançados'],
+    isPopular: true,
+  },
+  INDUSTRIA: {
+    description: 'Para chão de fábrica e PCP (quando ativado).',
+    features: ['OP/OB + roteiros + Ficha Técnica', 'Execução + tela do operador', 'Qualidade mínimo'],
+  },
+  SCALE: {
+    description: 'Para multiunidade, integrações e governança.',
+    features: ['Tudo do Indústria', 'Integrações e webhooks', 'Auditoria e observabilidade'],
   },
   ULTRA: {
-    description: 'Para indústrias e alto volume.',
-    features: ['Tudo do Max', 'Implementação personalizada', 'Gerente de contas'],
+    description: 'Plano legado (não recomendado).',
+    features: ['Entre em contato com o suporte'],
   },
 };
 
@@ -38,8 +46,11 @@ const PricingCard: React.FC<PricingCardProps> = ({
   isLoading,
   index,
 }) => {
-  const details = planDetails[plan.slug];
-  const isPopular = details?.isPopular || false;
+  const details = planDetails[plan.slug] ?? {
+    description: 'Plano sob medida para sua operação.',
+    features: ['Recursos conforme contratação'],
+  };
+  const isPopular = details.isPopular || false;
 
   const cardVariants = {
     initial: { opacity: 0, y: 50 },
