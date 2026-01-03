@@ -104,14 +104,14 @@ Este é o checklist único (por módulo) para levar o REVO ao nível **top mundi
 ## D) Performance / Eficiência
 
 ### D1) Front-end
-- [ ] PERF-FE-01 (P0) Budgets (bundle/route) no CI com falha quando estourar
+- [x] PERF-FE-01 (P0) Budgets (bundle/route) no CI com falha quando estourar
 - [ ] PERF-FE-02 (P1) Virtualização para listas grandes (tabelas críticas)
-- [ ] PERF-FE-03 (P0) Padrão de cache/invalidação (React Query) por recurso
+- [x] PERF-FE-03 (P0) Padrão de cache/invalidação (React Query) por recurso
 - [ ] PERF-FE-04 (P1) Lighthouse budget (Perf/A11y/Best Practices) para landing + app shell
 
 ### D2) Banco/RPC
 - [ ] PERF-DB-01 (P0) EXPLAIN/índices nos top RPCs (vendas, estoque, financeiro, indústria)
-- [ ] PERF-DB-02 (P0) Guard rails: paginação obrigatória + limites + filtros no backend
+- [x] PERF-DB-02 (P0) Guard rails: paginação obrigatória + limites + filtros no backend
 - [ ] PERF-DB-03 (P1) Rate limit/backoff por canal/ação (integrações, emissão)
 
 ### D3) FinOps (eficiência operacional)
@@ -159,7 +159,7 @@ Este é o checklist único (por módulo) para levar o REVO ao nível **top mundi
 
 ### F2) Ajuda e diagnóstico
 - [ ] GTM-HELP-01 (P1) Ajuda contextual (tooltips + artigos por página)
-- [ ] GTM-HELP-02 (P0) Diagnóstico “por que não funciona?” com checklist + links (NF/PDV/integrações)
+- [x] GTM-HELP-02 (P0) Diagnóstico “por que não funciona?” com checklist + links (NF/PDV/integrações)
 
 ---
 
@@ -238,7 +238,7 @@ Este é o checklist único (por módulo) para levar o REVO ao nível **top mundi
 - [ ] INT-STA-01 (P0) Rate limit por canal + filas separadas + backoff com jitter
 - [ ] INT-STA-02 (P0) Reprocessamento seguro (dry-run, replay, dead-letter) com trilha por entidade
 - [ ] INT-STA-03 (P1) Versionamento de adaptadores (migração de payloads sem quebrar)
-- [ ] INT-STA-04 (P1) Health por conexão (token expirado, webhook parado, atraso de fila)
+- [x] INT-STA-04 (P1) Health por conexão (token expirado, webhook parado, atraso de fila)
 
 ---
 

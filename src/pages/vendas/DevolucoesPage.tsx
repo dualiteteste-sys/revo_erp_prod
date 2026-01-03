@@ -40,7 +40,7 @@ export default function DevolucoesPage() {
     try {
       const [devs, ord, cc] = await Promise.all([
         listDevolucoes(),
-        listVendas('', 'concluido'),
+        listVendas({ search: '', status: 'concluido', limit: 500, offset: 0 }),
         listContasCorrentes({ page: 1, pageSize: 50, searchTerm: '', ativo: true }),
       ]);
       setRows(devs as any);
@@ -325,4 +325,3 @@ export default function DevolucoesPage() {
     </div>
   );
 }
-

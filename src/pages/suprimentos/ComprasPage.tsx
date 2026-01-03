@@ -8,6 +8,7 @@ import ComprasTable from '@/components/suprimentos/compras/ComprasTable';
 import CompraFormPanel from '@/components/suprimentos/compras/CompraFormPanel';
 import Select from '@/components/ui/forms/Select';
 import CsvExportDialog from '@/components/ui/CsvExportDialog';
+import Pagination from '@/components/ui/Pagination';
 
 export default function ComprasPage() {
   const [orders, setOrders] = useState<CompraPedido[]>([]);
@@ -15,6 +16,9 @@ export default function ComprasPage() {
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
   const debouncedSearch = useDebounce(search, 500);
+  const [page, setPage] = useState(1);
+  const [pageSize] = useState(15);
+  const [totalCount, setTotalCount] = useState(0);
 
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -22,10 +26,19 @@ export default function ComprasPage() {
   const fetchOrders = async () => {
     setLoading(true);
     try {
-      const data = await listCompras(debouncedSearch, statusFilter);
+      const data = await listCompras({
+        search: debouncedSearch || undefined,
+        status: statusFilter || undefined,
+        limit: pageSize,
+        offset: (page - 1) * pageSize,
+      });
       setOrders(data);
+      const count = Number((data?.[0] as any)?.total_count ?? 0);
+      setTotalCount(Number.isFinite(count) ? count : 0);
     } catch (e) {
       console.error(e);
+      setOrders([]);
+      setTotalCount(0);
     } finally {
       setLoading(false);
     }
@@ -33,6 +46,10 @@ export default function ComprasPage() {
 
   useEffect(() => {
     fetchOrders();
+  }, [debouncedSearch, statusFilter, page]);
+
+  useEffect(() => {
+    setPage(1);
   }, [debouncedSearch, statusFilter]);
 
   const handleNew = () => {
@@ -118,6 +135,12 @@ export default function ComprasPage() {
           <ComprasTable orders={orders} onEdit={handleEdit} />
         )}
       </div>
+
+      {totalCount > pageSize ? (
+        <div className="mt-4">
+          <Pagination currentPage={page} totalCount={totalCount} pageSize={pageSize} onPageChange={setPage} />
+        </div>
+      ) : null}
 
       <Modal isOpen={isFormOpen} onClose={handleClose} title={selectedId ? 'Editar Pedido de Compra' : 'Novo Pedido de Compra'} size="5xl">
         <CompraFormPanel compraId={selectedId} onSaveSuccess={handleSuccess} onClose={handleClose} />
