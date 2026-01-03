@@ -48,12 +48,18 @@ export type VendaPayload = Partial<Omit<VendaPedido, 'numero' | 'total_produtos'
 
 /**
  * Lista pedidos de venda.
- * Nota: A RPC atual retorna todos os registros filtrados, sem paginação no servidor (limit/offset).
  */
-export async function listVendas(search?: string, status?: string): Promise<VendaPedido[]> {
+export async function listVendas(params: {
+  search?: string;
+  status?: string;
+  limit?: number;
+  offset?: number;
+}): Promise<VendaPedido[]> {
   return callRpc<VendaPedido[]>('vendas_list_pedidos', {
-    p_search: search || null,
-    p_status: status || null,
+    p_search: params.search || null,
+    p_status: params.status || null,
+    p_limit: params.limit ?? 50,
+    p_offset: params.offset ?? 0,
   });
 }
 

@@ -16,6 +16,7 @@ export type CompraPedido = {
   observacoes: string | null;
   created_at?: string;
   updated_at?: string;
+  total_count?: number;
 };
 
 export type CompraItem = {
@@ -35,10 +36,17 @@ export type CompraDetails = CompraPedido & {
 
 export type CompraPayload = Partial<Omit<CompraPedido, 'numero' | 'total_produtos' | 'total_geral' | 'fornecedor_nome'>>;
 
-export async function listCompras(search?: string, status?: string): Promise<CompraPedido[]> {
+export async function listCompras(params: {
+  search?: string;
+  status?: string;
+  limit?: number;
+  offset?: number;
+}): Promise<CompraPedido[]> {
   return callRpc<CompraPedido[]>('compras_list_pedidos', {
-    p_search: search || null,
-    p_status: status || null,
+    p_search: params.search || null,
+    p_status: params.status || null,
+    p_limit: params.limit ?? 50,
+    p_offset: params.offset ?? 0,
   });
 }
 

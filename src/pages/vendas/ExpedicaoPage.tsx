@@ -58,7 +58,7 @@ export default function ExpedicaoPage() {
   async function load() {
     setLoading(true);
     try {
-      const [exp, ord] = await Promise.all([listExpedicoes(), listVendas('', undefined)]);
+      const [exp, ord] = await Promise.all([listExpedicoes(), listVendas({ search: '', status: undefined, limit: 500, offset: 0 })]);
       setRows(exp);
       setOrders(ord);
     } catch (e: any) {

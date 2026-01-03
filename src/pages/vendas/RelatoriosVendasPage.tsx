@@ -28,7 +28,7 @@ export default function RelatoriosVendasPage() {
     setLoading(true);
     try {
       const [all, pdvAgg, devAgg] = await Promise.all([
-        listVendas('', undefined),
+        listVendas({ search: '', status: undefined, limit: 500, offset: 0 }),
         sb.from('vendas_pedidos').select('total_geral').eq('canal', 'pdv'),
         sb.from('vendas_devolucoes').select('valor_total'),
       ]);
@@ -113,4 +113,3 @@ export default function RelatoriosVendasPage() {
     </div>
   );
 }
-

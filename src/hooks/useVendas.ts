@@ -1,11 +1,12 @@
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useDebounce } from './useDebounce';
 import * as vendasService from '../services/vendas';
 import { useAuth } from '../contexts/AuthProvider';
 
 export const useVendas = () => {
   const { activeEmpresa } = useAuth();
-  const [allOrders, setAllOrders] = useState<vendasService.VendaPedido[]>([]);
+  const [orders, setOrders] = useState<vendasService.VendaPedido[]>([]);
+  const [totalCount, setTotalCount] = useState(0);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -13,46 +14,54 @@ export const useVendas = () => {
   const debouncedSearchTerm = useDebounce(searchTerm, 500);
   const [filterStatus, setFilterStatus] = useState<string | null>(null);
   
-  // Paginação Client-Side (já que a RPC retorna tudo por enquanto)
   const [page, setPage] = useState(1);
   const [pageSize] = useState(15);
 
+  useEffect(() => {
+    setPage(1);
+  }, [debouncedSearchTerm, filterStatus]);
+
   const fetchOrders = useCallback(async () => {
     if (!activeEmpresa) {
-      setAllOrders([]);
+      setOrders([]);
+      setTotalCount(0);
       return;
     }
     setLoading(true);
     setError(null);
     try {
-      const data = await vendasService.listVendas(debouncedSearchTerm, filterStatus || undefined);
-      setAllOrders(data);
-      setPage(1); // Reset para primeira página ao filtrar
+      const limit = pageSize;
+      const offset = (page - 1) * pageSize;
+      const data = await vendasService.listVendas({
+        search: debouncedSearchTerm || undefined,
+        status: filterStatus || undefined,
+        limit,
+        offset,
+      });
+
+      setOrders(data);
+      const count = Number((data?.[0] as any)?.total_count ?? 0);
+      setTotalCount(Number.isFinite(count) ? count : 0);
     } catch (e: any) {
       setError(e.message);
-      setAllOrders([]);
+      setOrders([]);
+      setTotalCount(0);
     } finally {
       setLoading(false);
     }
-  }, [debouncedSearchTerm, filterStatus, activeEmpresa]);
+  }, [activeEmpresa, debouncedSearchTerm, filterStatus, page, pageSize]);
 
   useEffect(() => {
     fetchOrders();
   }, [fetchOrders]);
-
-  // Lógica de paginação no cliente
-  const paginatedOrders = useMemo(() => {
-    const start = (page - 1) * pageSize;
-    return allOrders.slice(start, start + pageSize);
-  }, [allOrders, page, pageSize]);
 
   const refresh = () => {
     fetchOrders();
   };
 
   return {
-    orders: paginatedOrders,
-    totalCount: allOrders.length,
+    orders,
+    totalCount,
     loading,
     error,
     searchTerm,
