@@ -146,7 +146,7 @@ Este é o checklist único (por módulo) para levar o REVO ao nível **top mundi
 ### E2) Banco e deploy
 - [ ] DB-MIG-01 (P0) Idempotência “garantida”: migrations repetíveis (e reversão quando fizer sentido)
 - [x] DB-DRIFT-01 (P0) Drift gate agendado com alerta (DEV vs PROD) e bloqueio quando necessário
-- [ ] DB-RPC-01 (P0) Cobertura RPC app ↔ migrations sempre verde (sem função “fantasma”)
+- [x] DB-RPC-01 (P0) Cobertura RPC app ↔ migrations sempre verde (sem função “fantasma”)
 
 ---
 
@@ -212,12 +212,12 @@ Este é o checklist único (por módulo) para levar o REVO ao nível **top mundi
 
 ### G9) Configurações / Administração
 - [ ] ADM-STA-01 (P0) Usuários, papéis e permissões “sem fricção” (scroll ok, busca, presets)
-- [ ] ADM-STA-02 (P0) Planos/Limites por empresa com enforcement 3 camadas (UI/Rotas/DB)
+- [x] ADM-STA-02 (P0) Planos/Limites por empresa com enforcement 3 camadas (UI/Rotas/DB)
 - [ ] ADM-STA-03 (P1) Multiunidade/filiais (quando aplicável): escopo claro + permissões
 - [ ] ADM-STA-04 (P1) Auditoria de mudanças administrativas (quem mudou o quê e quando)
 
 ### G10) Assinatura / Billing (Stripe)
-- [ ] BILL-STA-01 (P0) Ciclo completo de trial → ativo → inadimplente → bloqueio suave → cancelado
+- [x] BILL-STA-01 (P0) Ciclo completo de trial → ativo → inadimplente → bloqueio suave → cancelado
 - [ ] BILL-STA-02 (P0) Webhooks Stripe idempotentes + trilha por evento (reprocessável)
 - [ ] BILL-STA-03 (P1) Proration/upgrade/downgrade com comunicação clara + histórico
 - [ ] BILL-STA-04 (P1) “Self-serve” de faturas/boletos/recibos (quando aplicável) e dados fiscais
