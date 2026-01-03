@@ -55,7 +55,7 @@ BEGIN
   $v$;
 
   -- Mantém comentário canônico (idempotente).
-  EXECUTE $$COMMENT ON VIEW public.industria_roteiro_etapas IS 'Canonical view for roteiro stages'$$;
+  EXECUTE 'COMMENT ON VIEW public.industria_roteiro_etapas IS ''Canonical view for roteiro stages''';
 END $$;
 
 -- -----------------------------------------------------------------------------
@@ -148,4 +148,3 @@ where n.nspname = 'public'
 order by p.proname;
 
 COMMIT;
-
