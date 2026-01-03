@@ -128,6 +128,18 @@ Deno.serve(async (req) => {
     }
 
     // 7) Checkout session (trial via código)
+    let allowTrial = !!trial;
+    if (allowTrial) {
+      try {
+        const existing = await stripe.subscriptions.list({ customer: customerId, status: "all", limit: 1 });
+        if ((existing?.data?.length ?? 0) > 0) {
+          allowTrial = false;
+        }
+      } catch (_e) {
+        // best-effort: se não der pra verificar, mantém o comportamento padrão sem travar o checkout
+      }
+    }
+
     const session = await stripe.checkout.sessions.create({
       mode: "subscription",
       customer: customerId,
@@ -137,7 +149,7 @@ Deno.serve(async (req) => {
       cancel_url:  `${siteUrl}/app/billing/cancel`,
       metadata: { empresa_id, plan_slug: String(plan_slug).toUpperCase(), billing_cycle, kind: 'subscription' },
       subscription_data: {
-        ...(trial ? { trial_period_days: 30 } : {}),
+        ...(allowTrial ? { trial_period_days: 30 } : {}),
         metadata: { empresa_id, plan_slug: String(plan_slug).toUpperCase(), billing_cycle },
       },
     });
