@@ -43,7 +43,7 @@ Deno.serve(async (req) => {
         const customerId = sub.customer as string;
         
         const customer = await stripe.customers.retrieve(customerId) as Stripe.Customer;
-        const empresaId = (customer.metadata?.empresa_id) as string | undefined;
+        const empresaId = (sub.metadata?.empresa_id || customer.metadata?.empresa_id) as string | undefined;
 
         if (!empresaId) {
           console.warn(`Webhook: empresa_id não encontrado no metadata do customer ${customerId} para a assinatura ${sub.id}`);

@@ -96,6 +96,15 @@ Deno.serve(async (req) => {
         .update({ stripe_customer_id: customerId })
         .eq("id", empresa_id);
       if (upErr) return cors(req, 500, { error: "Falha ao salvar o ID do cliente Stripe" });
+    } else {
+      // Compat: clientes antigos podem existir sem metadata.empresa_id (webhook depende disso).
+      try {
+        await stripe.customers.update(customerId, {
+          metadata: { empresa_id },
+        });
+      } catch (_e) {
+        // best-effort
+      }
     }
 
     const session = await stripe.checkout.sessions.create({
