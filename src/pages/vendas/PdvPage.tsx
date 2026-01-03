@@ -10,6 +10,7 @@ import { getVendaDetails, type VendaDetails } from '@/services/vendas';
 import CsvExportDialog from '@/components/ui/CsvExportDialog';
 import { useOnboardingGate } from '@/contexts/OnboardingGateContext';
 import { ActionLockedError, runWithActionLock } from '@/lib/actionLock';
+import { useBillingGate } from '@/hooks/useBillingGate';
 
 type PdvRow = {
   id: string;
@@ -86,6 +87,7 @@ function buildReceiptHtml(venda: VendaDetails, contaNome?: string) {
 export default function PdvPage() {
   const { addToast } = useToast();
   const { ensure } = useOnboardingGate();
+  const billing = useBillingGate();
 
   const [loading, setLoading] = useState(true);
   const [rows, setRows] = useState<PdvRow[]>([]);
@@ -160,6 +162,7 @@ export default function PdvPage() {
   };
 
   const handleFinalize = async (pedidoId: string) => {
+    if (!billing.ensureCanWrite({ actionLabel: 'Finalizar PDV' })) return;
     const gate = await ensure(['tesouraria.contas_correntes']);
     if (!gate.ok) return;
 
@@ -194,6 +197,7 @@ export default function PdvPage() {
   };
 
   const handleEstornar = async (pedidoId: string) => {
+    if (!billing.ensureCanWrite({ actionLabel: 'Estornar PDV' })) return;
     const gate = await ensure(['tesouraria.contas_correntes']);
     if (!gate.ok) return;
 

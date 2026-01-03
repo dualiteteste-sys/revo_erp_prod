@@ -79,8 +79,7 @@ export default function PlanGuard({ feature, children }: PlanGuardProps) {
             </h1>
             <p className="text-sm text-slate-600">
               O módulo <span className="font-semibold">{featureLabel[feature]}</span> não está habilitado para esta empresa.
-              Para liberar, ajuste o <span className="font-semibold">Plano MVP</span> em{' '}
-              <span className="font-semibold">Configurações → Minha Assinatura</span>.
+              Para liberar, ajuste seu plano em <span className="font-semibold">Configurações → Minha Assinatura</span>.
             </p>
           </div>
         </div>

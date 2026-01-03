@@ -13,6 +13,7 @@ import OnboardingGateBanner from '@/components/onboarding/OnboardingGateBanner';
 import { OnboardingGateProvider } from '@/contexts/OnboardingGateContext';
 import RoadmapWizardModal from '@/components/roadmap/RoadmapWizardModal';
 import RoadmapButton from '@/components/roadmap/RoadmapButton';
+import SubscriptionStatusBanner from '@/components/billing/SubscriptionStatusBanner';
 
 const findActiveHref = (pathname: string): string => {
   for (const group of menuConfig) {
@@ -114,6 +115,9 @@ const MainLayout: React.FC = () => {
       } else if (settingsParam === 'onboarding') {
         setSettingsInitialTab('Geral');
         setSettingsInitialItem('Onboarding (Checklist)');
+      } else if (settingsParam === 'billing') {
+        setSettingsInitialTab('Geral');
+        setSettingsInitialItem('Minha Assinatura');
       }
       navigate(location.pathname, { replace: true });
     }
@@ -190,6 +194,7 @@ const MainLayout: React.FC = () => {
             <SubscriptionGuard>
               <div className="pb-3">
                 <div className="flex justify-end gap-2 items-start flex-wrap">
+                  <SubscriptionStatusBanner />
                   <OnboardingGateBanner
                     onOpenWizard={() => {
                       setOnboardingForceStepKey(null);
