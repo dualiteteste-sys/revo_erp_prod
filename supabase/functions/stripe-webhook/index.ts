@@ -59,7 +59,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
             console.error(`Erro no Webhook: Preço ${stripePriceId} não mapeado em public.plans`);
             return new Response("Preço não mapeado em public.plans", { status: 400 });
         }
-        const planSlug = planRow.slug as "START" | "PRO" | "MAX" | "ULTRA";
+        const planSlug = planRow.slug as string;
 
         const status = event.type === "customer.subscription.deleted" ? "canceled" : (sub.status as any);
         const currentPeriodEnd = sub.current_period_end ? new Date(sub.current_period_end * 1000).toISOString() : null;
