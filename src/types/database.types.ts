@@ -341,7 +341,7 @@ export interface Database {
       plans: {
         Row: {
           id: string
-          slug: "START" | "PRO" | "MAX" | "ULTRA"
+          slug: "ESSENCIAL" | "PRO" | "MAX" | "INDUSTRIA" | "SCALE" | "START" | "ULTRA"
           name: string
           billing_cycle: "monthly" | "yearly"
           currency: string
@@ -352,7 +352,7 @@ export interface Database {
         }
         Insert: {
           id?: string
-          slug: "START" | "PRO" | "MAX" | "ULTRA"
+          slug: "ESSENCIAL" | "PRO" | "MAX" | "INDUSTRIA" | "SCALE" | "START" | "ULTRA"
           name: string
           billing_cycle: "monthly" | "yearly"
           currency?: string
@@ -363,7 +363,7 @@ export interface Database {
         }
         Update: {
           id?: string
-          slug?: "START" | "PRO" | "MAX" | "ULTRA"
+          slug?: "ESSENCIAL" | "PRO" | "MAX" | "INDUSTRIA" | "SCALE" | "START" | "ULTRA"
           name?: string
           billing_cycle?: "monthly" | "yearly"
           currency?: string

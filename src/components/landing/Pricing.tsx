@@ -11,10 +11,9 @@ import { useAuth } from "@/contexts/AuthProvider";
  */
 
 type Plan = {
-  slug: "essencial" | "pro" | "operacao" | "industria" | "scale";
+  slug: "essencial" | "pro" | "max" | "industria" | "scale";
   title: string;
-  priceLabel: string; // estático p/ landing (pode vir de env no futuro)
-  billingNote?: string;
+  monthlyAmountCents: number;
   features: string[];
   highlight?: boolean;
 };
@@ -25,7 +24,7 @@ type CompareRow = {
   feature: string;
   essencial: CompareValue | string;
   pro: CompareValue | string;
-  operacao: CompareValue | string;
+  max: CompareValue | string;
   industria: CompareValue | string;
   scale: CompareValue | string;
 };
@@ -34,8 +33,7 @@ const STATIC_PLANS: Plan[] = [
   {
     slug: "essencial",
     title: "Revo Essencial",
-    priceLabel: "R$ 119/mês",
-    billingNote: "Teste grátis 30 dias • Sem cartão",
+    monthlyAmountCents: 14900,
     features: [
       "Comércio + Serviços (o mínimo redondo)",
       "Pedidos + PDV simples (1 caixa)",
@@ -50,8 +48,7 @@ const STATIC_PLANS: Plan[] = [
   {
     slug: "pro",
     title: "Revo Pro",
-    priceLabel: "R$ 249/mês",
-    billingNote: "Comércio em crescimento",
+    monthlyAmountCents: 24900,
     features: [
       "Tudo do Essencial",
       "Comissões + metas + painel de vendas",
@@ -63,10 +60,9 @@ const STATIC_PLANS: Plan[] = [
     ],
   },
   {
-    slug: "operacao",
+    slug: "max",
     title: "Revo Max",
-    priceLabel: "R$ 390/mês",
-    billingNote: "Serviços + Financeiro forte",
+    monthlyAmountCents: 39000,
     features: [
       "Tudo do Pro",
       "Contratos + cobranças recorrentes",
@@ -78,8 +74,7 @@ const STATIC_PLANS: Plan[] = [
   {
     slug: "industria",
     title: "Revo Indústria",
-    priceLabel: "R$ 590/mês",
-    billingNote: "Chão de fábrica (PCP/OP) • Implantação recomendada",
+    monthlyAmountCents: 59000,
     features: [
       "Tudo do Pro + pacote completo Indústria",
       "BOM + roteiros + OP/OB + execução",
@@ -93,8 +88,7 @@ const STATIC_PLANS: Plan[] = [
   {
     slug: "scale",
     title: "Revo Scale",
-    priceLabel: "R$ 990/mês",
-    billingNote: "Multiunidade + governança + integrações",
+    monthlyAmountCents: 99000,
     features: [
       "Tudo do Indústria",
       "Multiunidade / governança",
@@ -112,33 +106,49 @@ export default function Pricing() {
 
   const isAuthenticated = !!session?.user;
   const plans = useMemo(() => STATIC_PLANS, []);
-  const [activeSlug, setActiveSlug] = useState<Plan["slug"]>("operacao");
+  const [activeSlug, setActiveSlug] = useState<Plan["slug"]>("max");
+  const [billingCycle, setBillingCycle] = useState<"monthly" | "yearly">("yearly");
 
   const compareRows = useMemo<CompareRow[]>(
     () => [
-      { feature: "Usuários incluídos", essencial: "2", pro: "5", operacao: "5", industria: "10", scale: "Ilimitado" },
-      { feature: "PDV (caixas)", essencial: "1", pro: "até 3", operacao: "até 3", industria: "Add-on", scale: "Add-on" },
-      { feature: "Cadastros (clientes, produtos, serviços, etc.)", essencial: "Inclui", pro: "Inclui", operacao: "Inclui", industria: "Inclui", scale: "Inclui" },
-      { feature: "Vendas (pedidos/orçamentos)", essencial: "Inclui", pro: "Inclui", operacao: "Inclui", industria: "Inclui", scale: "Inclui" },
-      { feature: "Estoque + OC + recebimentos + importação XML", essencial: "Inclui", pro: "Inclui", operacao: "Inclui", industria: "Inclui", scale: "Inclui" },
-      { feature: "Financeiro (caixa, pagar/receber, extrato)", essencial: "Inclui", pro: "Inclui", operacao: "Inclui", industria: "Inclui", scale: "Inclui" },
-      { feature: "Centros de custo (visão detalhada)", essencial: "Básico", pro: "Inclui", operacao: "Inclui (forte)", industria: "Inclui", scale: "Inclui" },
-      { feature: "NF-e (config + rascunhos)", essencial: "Inclui", pro: "Inclui", operacao: "Inclui", industria: "Inclui", scale: "Inclui" },
-      { feature: "Emissão NF-e via provedor (volume)", essencial: "Add-on", pro: "Add-on", operacao: "Add-on", industria: "Add-on/Inclui", scale: "Inclui (pacotes)" },
-      { feature: "CRM (funil/oportunidades)", essencial: "—", pro: "Inclui", operacao: "Inclui", industria: "Inclui", scale: "Inclui" },
-      { feature: "Comissões", essencial: "—", pro: "Inclui", operacao: "Inclui", industria: "Inclui", scale: "Inclui" },
-      { feature: "Expedição (fluxo completo)", essencial: "—", pro: "Inclui", operacao: "Inclui", industria: "Inclui", scale: "Inclui" },
-      { feature: "Automações (vendas)", essencial: "—", pro: "Inclui", operacao: "Inclui", industria: "Inclui", scale: "Inclui" },
-      { feature: "Serviços: OS", essencial: "Inclui", pro: "Inclui", operacao: "Inclui", industria: "Add-on", scale: "Add-on/Inclui" },
-      { feature: "Contratos + cobrança recorrente", essencial: "—", pro: "Add-on", operacao: "Inclui", industria: "Add-on", scale: "Inclui" },
-      { feature: "Indústria (BOM/roteiros/OP/execução)", essencial: "—", pro: "—", operacao: "—", industria: "Inclui", scale: "Inclui" },
-      { feature: "Qualidade + lotes/bloqueio", essencial: "—", pro: "—", operacao: "—", industria: "Inclui", scale: "Inclui" },
-      { feature: "Multiunidade / governança", essencial: "—", pro: "—", operacao: "—", industria: "Add-on", scale: "Inclui" },
-      { feature: "API/Webhooks e integrações (pacotes)", essencial: "—", pro: "Add-on", operacao: "Add-on", industria: "Add-on", scale: "Inclui" },
-      { feature: "Suporte prioritário / SLA", essencial: "—", pro: "—", operacao: "—", industria: "—", scale: "Inclui" },
+      { feature: "Usuários incluídos", essencial: "2", pro: "5", max: "5", industria: "10", scale: "Ilimitado" },
+      { feature: "PDV (caixas)", essencial: "1", pro: "até 3", max: "até 3", industria: "Add-on", scale: "Add-on" },
+      { feature: "Cadastros (clientes, produtos, serviços, etc.)", essencial: "Inclui", pro: "Inclui", max: "Inclui", industria: "Inclui", scale: "Inclui" },
+      { feature: "Vendas (pedidos/orçamentos)", essencial: "Inclui", pro: "Inclui", max: "Inclui", industria: "Inclui", scale: "Inclui" },
+      { feature: "Estoque + OC + recebimentos + importação XML", essencial: "Inclui", pro: "Inclui", max: "Inclui", industria: "Inclui", scale: "Inclui" },
+      { feature: "Financeiro (caixa, pagar/receber, extrato)", essencial: "Inclui", pro: "Inclui", max: "Inclui", industria: "Inclui", scale: "Inclui" },
+      { feature: "Centros de custo (visão detalhada)", essencial: "Básico", pro: "Inclui", max: "Inclui (forte)", industria: "Inclui", scale: "Inclui" },
+      { feature: "NF-e (config + rascunhos)", essencial: "Inclui", pro: "Inclui", max: "Inclui", industria: "Inclui", scale: "Inclui" },
+      { feature: "Emissão NF-e via provedor (volume)", essencial: "Add-on", pro: "Add-on", max: "Add-on", industria: "Add-on/Inclui", scale: "Inclui (pacotes)" },
+      { feature: "CRM (funil/oportunidades)", essencial: "—", pro: "Inclui", max: "Inclui", industria: "Inclui", scale: "Inclui" },
+      { feature: "Comissões", essencial: "—", pro: "Inclui", max: "Inclui", industria: "Inclui", scale: "Inclui" },
+      { feature: "Expedição (fluxo completo)", essencial: "—", pro: "Inclui", max: "Inclui", industria: "Inclui", scale: "Inclui" },
+      { feature: "Automações (vendas)", essencial: "—", pro: "Inclui", max: "Inclui", industria: "Inclui", scale: "Inclui" },
+      { feature: "Serviços: OS", essencial: "Inclui", pro: "Inclui", max: "Inclui", industria: "Add-on", scale: "Add-on/Inclui" },
+      { feature: "Contratos + cobrança recorrente", essencial: "—", pro: "Add-on", max: "Inclui", industria: "Add-on", scale: "Inclui" },
+      { feature: "Indústria (Ficha Técnica/OP/execução)", essencial: "—", pro: "—", max: "—", industria: "Inclui", scale: "Inclui" },
+      { feature: "Qualidade + lotes/bloqueio", essencial: "—", pro: "—", max: "—", industria: "Inclui", scale: "Inclui" },
+      { feature: "Multiunidade / governança", essencial: "—", pro: "—", max: "—", industria: "Add-on", scale: "Inclui" },
+      { feature: "API/Webhooks e integrações (pacotes)", essencial: "—", pro: "Add-on", max: "Add-on", industria: "Add-on", scale: "Inclui" },
+      { feature: "Suporte prioritário / SLA", essencial: "—", pro: "—", max: "—", industria: "—", scale: "Inclui" },
     ],
     []
   );
+
+  const money = (cents: number) =>
+    `R$ ${new Intl.NumberFormat("pt-BR", { style: "decimal", minimumFractionDigits: 2 }).format(cents / 100)}`;
+
+  const getPricing = (p: Plan) => {
+    if (billingCycle === "monthly") {
+      return { label: `${money(p.monthlyAmountCents)}/mês`, sub: "Teste grátis 30 dias • Sem cartão" };
+    }
+    const yearlyTotal = p.monthlyAmountCents * 10;
+    const perMonth = Math.round(yearlyTotal / 12);
+    return {
+      label: `${money(perMonth)}/mês`,
+      sub: `Cobrado anualmente (${money(yearlyTotal)}) • economize 2 meses`,
+    };
+  };
 
   const handleCTA = (slug: Plan["slug"]) => {
     console.log("[PRICING] CTA click", { isAuthenticated, slug });
@@ -149,7 +159,7 @@ export default function Pricing() {
       return;
     }
     // anônimo: levar para a rota de signup (sem tocar no Supabase aqui)
-    nav(`/auth/signup?plan=${slug}&cycle=monthly`, { replace: false });
+    nav(`/auth/signup?plan=${slug}&cycle=${billingCycle}`, { replace: false });
   };
 
   return (
@@ -163,6 +173,28 @@ export default function Pricing() {
             Escolha o mínimo que te deixa operar com segurança. Quando a operação pedir, você evolui.
           </p>
         </header>
+
+        <div className="mt-2 flex justify-center items-center">
+          <span className={`text-sm font-medium ${billingCycle === "monthly" ? "text-blue-600" : "text-slate-500"}`}>
+            Mensal
+          </span>
+          <button
+            onClick={() => setBillingCycle(billingCycle === "monthly" ? "yearly" : "monthly")}
+            className={`mx-4 relative inline-flex flex-shrink-0 h-6 w-11 border-2 border-transparent rounded-full cursor-pointer transition-colors ease-in-out duration-200 focus:outline-none ${billingCycle === "yearly" ? "bg-blue-600" : "bg-slate-200"}`}
+          >
+            <span
+              className={`inline-block h-5 w-5 rounded-full bg-white shadow transform ring-0 transition ease-in-out duration-200 ${billingCycle === "yearly" ? "translate-x-5" : "translate-x-0"}`}
+            />
+          </button>
+          <span className={`text-sm font-medium ${billingCycle === "yearly" ? "text-blue-600" : "text-slate-500"}`}>
+            Anual
+          </span>
+          {billingCycle === "yearly" && (
+            <span className="ml-3 bg-emerald-100 text-emerald-800 text-xs font-semibold px-2.5 py-0.5 rounded-full">
+              Economize 2 meses
+            </span>
+          )}
+        </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-5 gap-4 items-stretch">
           {plans.map((p) => (
@@ -180,10 +212,15 @@ export default function Pricing() {
               }}
             >
               <h3 className="text-lg font-semibold text-slate-900">{p.title}</h3>
-              <div className="mt-2 text-3xl font-semibold text-slate-900">{p.priceLabel}</div>
-              {p.billingNote ? (
-                <div className="mt-1 text-xs text-slate-500">{p.billingNote}</div>
-              ) : null}
+              {(() => {
+                const pricing = getPricing(p);
+                return (
+                  <>
+                    <div className="mt-2 text-3xl font-semibold text-slate-900">{pricing.label}</div>
+                    <div className="mt-1 text-xs text-slate-500">{pricing.sub}</div>
+                  </>
+                );
+              })()}
 
               <ul className="mt-4 space-y-2 text-sm text-slate-700 flex-1">
                 {p.features.map((f, i) => (
@@ -235,7 +272,7 @@ export default function Pricing() {
                     <td className="p-4 border-b border-slate-200 font-medium text-slate-900">{row.feature}</td>
                     <td className="p-4 border-b border-slate-200">{row.essencial}</td>
                     <td className="p-4 border-b border-slate-200">{row.pro}</td>
-                    <td className="p-4 border-b border-slate-200">{row.operacao}</td>
+                    <td className="p-4 border-b border-slate-200">{row.max}</td>
                     <td className="p-4 border-b border-slate-200">{row.industria}</td>
                     <td className="p-4 border-b border-slate-200">{row.scale}</td>
                   </tr>

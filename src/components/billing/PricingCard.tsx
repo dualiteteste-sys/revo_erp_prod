@@ -10,6 +10,7 @@ interface PricingCardProps {
   onStartTrial: () => void;
   isLoading: boolean;
   index: number;
+  monthlyAmountCentsForYearly?: number;
 }
 
 const planDetails: Record<string, { description: string; features: string[]; isPopular?: boolean }> = {
@@ -45,12 +46,18 @@ const PricingCard: React.FC<PricingCardProps> = ({
   onStartTrial,
   isLoading,
   index,
+  monthlyAmountCentsForYearly,
 }) => {
   const details = planDetails[plan.slug] ?? {
     description: 'Plano sob medida para sua operação.',
     features: ['Recursos conforme contratação'],
   };
   const isPopular = details.isPopular || false;
+  const isYearly = plan.billing_cycle === 'yearly';
+  const monthlyBase = typeof monthlyAmountCentsForYearly === 'number' ? monthlyAmountCentsForYearly : null;
+  const yearlyTotalCents = monthlyBase ? monthlyBase * 10 : plan.amount_cents;
+  const yearlyPerMonthCents = monthlyBase ? Math.round((monthlyBase * 10) / 12) : Math.round(plan.amount_cents / 12);
+  const displayCents = isYearly ? yearlyPerMonthCents : plan.amount_cents;
 
   const cardVariants = {
     initial: { opacity: 0, y: 50 },
@@ -90,12 +97,23 @@ const PricingCard: React.FC<PricingCardProps> = ({
       <div className="mt-4 flex items-baseline gap-1">
         <span className={`text-xl font-semibold ${isPopular ? 'text-gray-300' : 'text-gray-500'}`}>R$</span>
         <span className={`font-extrabold text-4xl leading-none tracking-tight ${isPopular ? 'text-white' : 'text-gray-900'}`}>
-          {new Intl.NumberFormat('pt-BR', { style: 'decimal', minimumFractionDigits: 2 }).format(plan.amount_cents / 100)}
+          {new Intl.NumberFormat('pt-BR', { style: 'decimal', minimumFractionDigits: 2 }).format(displayCents / 100)}
         </span>
         <span className={`ml-1 text-base font-medium ${isPopular ? 'text-gray-400' : 'text-gray-500'}`}>
           /mês
         </span>
       </div>
+      {isYearly && (
+        <div className={`mt-2 text-xs ${isPopular ? 'text-gray-300' : 'text-gray-500'}`}>
+          <div>Cobrado anualmente • economize 2 meses</div>
+          <div className="mt-1">
+            Total anual:{' '}
+            <span className={isPopular ? 'text-gray-200' : 'text-gray-700'}>
+              R$ {new Intl.NumberFormat('pt-BR', { style: 'decimal', minimumFractionDigits: 2 }).format(yearlyTotalCents / 100)}
+            </span>
+          </div>
+        </div>
+      )}
 
       <ul className="mt-8 space-y-3 flex-grow">
         {details.features.map((feature, i) => (
