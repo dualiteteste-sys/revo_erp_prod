@@ -37,11 +37,24 @@ Deno.serve(async (req: Request): Promise<Response> => {
         
         // Obter empresa_id dos metadados da assinatura, com fallback para os metadados do cliente
         let empresaId = sub.metadata?.empresa_id ?? null;
-        if (!empresaId && sub.customer) {
-            const customer = await stripe.customers.retrieve(sub.customer as string);
-            if (!customer.deleted) {
-                empresaId = customer.metadata?.empresa_id ?? null;
-            }
+        const customerId = sub.customer ? String(sub.customer) : null;
+        if (!empresaId && customerId) {
+          const customer = await stripe.customers.retrieve(customerId);
+          if (!customer.deleted) {
+            empresaId = customer.metadata?.empresa_id ?? null;
+          }
+        }
+        // Fallback final: mapear customerId → empresa via DB (evita depender de metadata)
+        if (!empresaId && customerId) {
+          const { data: empRow, error: empErr } = await supabaseAdmin
+            .from("empresas")
+            .select("id")
+            .eq("stripe_customer_id", customerId)
+            .maybeSingle();
+          if (empErr) {
+            console.error("Erro no Webhook: falha ao buscar empresa por stripe_customer_id", { customerId, empErr });
+          }
+          empresaId = empRow?.id ?? null;
         }
         if (!empresaId) {
             console.error("Erro no Webhook: empresa_id não encontrado para a assinatura", sub.id);
