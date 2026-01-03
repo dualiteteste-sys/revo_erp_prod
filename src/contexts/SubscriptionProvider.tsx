@@ -32,7 +32,8 @@ export const SubscriptionProvider = ({ children }: { children: ReactNode }) => {
         .from('subscriptions')
         .select('*')
         .eq('empresa_id', empresaId)
-        .eq('empresa_id', empresaId)
+        .order('updated_at', { ascending: false })
+        .limit(1)
         .maybeSingle();
 
       if (subError) {
