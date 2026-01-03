@@ -228,8 +228,8 @@ Este é o checklist único (por módulo) para levar o REVO ao nível **top mundi
 - [ ] SUPP-STA-03 (P1) Central de notificações (incidentes, mudanças fiscais, integrações) com histórico
 
 ### G12) Desenvolvedor (Operação interna)
-- [ ] DEV-STA-01 (P0) Logs do usuário/empresa com filtros (ação, data, status) e drill-down por entidade
-- [ ] DEV-STA-02 (P0) Monitor “Saúde” (filas, DLQ, falhas, webhooks, jobs) com reprocess/dry-run
+- [x] DEV-STA-01 (P0) Logs do usuário/empresa com filtros (ação, data, status) e drill-down por entidade
+- [x] DEV-STA-02 (P0) Monitor “Saúde” (filas, DLQ, falhas, webhooks, jobs) com reprocess/dry-run
 - [ ] DEV-STA-03 (P1) Ferramentas de diagnóstico de schema/RPC (drift, migrations pendentes, cache)
 
 ---
