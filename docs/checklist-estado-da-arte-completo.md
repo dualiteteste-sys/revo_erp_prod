@@ -71,11 +71,11 @@ Este é o checklist único (por módulo) para levar o REVO ao nível **top mundi
 
 ### B3) Segredos e integrações (segurança operacional)
 - [x] SEC-INT-01 (P0) Rotação de tokens (NFE.io/marketplaces) com procedimento e “health check”
-- [ ] SEC-INT-02 (P0) Revogação (disconnect) consistente + limpeza de secrets
+- [x] SEC-INT-02 (P0) Revogação (disconnect) consistente + limpeza de secrets
 - [ ] SEC-INT-03 (P1) Scopes mínimos por integração (OAuth) e auditoria de acessos
 
 ### B4) Privacidade/LGPD (mínimo vendável)
-- [ ] LGPD-01 (P0) Inventário de dados pessoais (campos, finalidade, base legal, retenção)
+- [x] LGPD-01 (P0) Inventário de dados pessoais (campos, finalidade, base legal, retenção)
 - [ ] LGPD-02 (P0) Export do titular (dados do usuário/empresa) + trilha do que foi exportado
 - [ ] LGPD-03 (P0) Retenção/expurgo (política) + execução segura (soft delete onde precisa)
 - [ ] LGPD-04 (P1) Minimização de logs: payload saneado e sem PII sensível
@@ -88,7 +88,7 @@ Este é o checklist único (por módulo) para levar o REVO ao nível **top mundi
 - [x] OBS-LOG-01 (P0) Correlation ID propagado (front → edge → DB) em ações críticas
 - [x] OBS-TRC-01 (P0) Tracing por ação crítica (emitir NF, PDV, importar marketplace, finalizar recebimento)
 - [x] OBS-MET-01 (P0) Métricas de produto (latência, taxa de erro, tempo de first value)
-- [ ] OBS-MET-02 (P1) KPIs de negócio: funil (setup → 1ª venda → 1ª NF → 1º pagamento)
+- [x] OBS-MET-02 (P1) KPIs de negócio: funil (setup → 1ª venda → 1ª NF → 1º pagamento)
 - [x] OBS-OPS-01 (P0) Painel “Operação” (Dev → Saúde): filas, falhas, retries, webhooks, últimos eventos
 
 **Validar**

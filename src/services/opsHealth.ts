@@ -32,6 +32,17 @@ export type ProductMetricsSummary = {
   };
 };
 
+export type BusinessKpisFunnelSummary = {
+  ok: boolean;
+  reason?: string;
+  empresa_id?: string;
+  empresa_created_at?: string | null;
+  setup?: { ok: number; total: number; done: boolean };
+  first_sale?: { at: string | null; days_to_first: number | null };
+  first_nfe?: { at: string | null; days_to_first: number | null };
+  first_payment?: { at: string | null; days_to_first: number | null };
+};
+
 export type OpsRecentFailure = {
   kind: string;
   occurred_at: string;
@@ -63,6 +74,10 @@ export async function getOpsHealthSummary(): Promise<OpsHealthSummary> {
 
 export async function getProductMetricsSummary(): Promise<ProductMetricsSummary> {
   return callRpc<ProductMetricsSummary>('product_metrics_summary', { p_window: null });
+}
+
+export async function getBusinessKpisFunnelSummary(): Promise<BusinessKpisFunnelSummary> {
+  return callRpc<BusinessKpisFunnelSummary>('business_kpis_funnel_for_current_empresa', {});
 }
 
 export async function listOpsRecentFailures(params?: { from?: string | null; limit?: number }): Promise<OpsRecentFailure[]> {

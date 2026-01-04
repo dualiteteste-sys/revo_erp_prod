@@ -8,6 +8,7 @@ import { useToast } from '@/contexts/ToastProvider';
 import { supabase } from '@/lib/supabaseClient';
 import {
   getOpsHealthSummary,
+  getBusinessKpisFunnelSummary,
   getProductMetricsSummary,
   listOpsRecentFailures,
   reprocessEcommerceDlq,
@@ -16,6 +17,7 @@ import {
   type EcommerceDlqRow,
   type FinanceDlqRow,
   type OpsHealthSummary,
+  type BusinessKpisFunnelSummary,
   type ProductMetricsSummary,
   type OpsRecentFailure,
 } from '@/services/opsHealth';
@@ -48,6 +50,7 @@ export default function HealthPage() {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [summary, setSummary] = useState<OpsHealthSummary | null>(null);
   const [productMetrics, setProductMetrics] = useState<ProductMetricsSummary | null>(null);
+  const [businessKpis, setBusinessKpis] = useState<BusinessKpisFunnelSummary | null>(null);
   const [ecommerceHealth, setEcommerceHealth] = useState<EcommerceHealthSummary | null>(null);
   const [recent, setRecent] = useState<OpsRecentFailure[]>([]);
   const [nfeRows, setNfeRows] = useState<NfeWebhookRow[]>([]);
@@ -63,14 +66,16 @@ export default function HealthPage() {
     setLoading(true);
     setLoadError(null);
     try {
-      const [s, m, r, eh] = await Promise.all([
+      const [s, m, k, r, eh] = await Promise.all([
         getOpsHealthSummary(),
         getProductMetricsSummary().catch(() => null),
+        getBusinessKpisFunnelSummary().catch(() => null),
         listOpsRecentFailures({ limit: 30 }),
         permEcommerceView.data ? getEcommerceHealthSummary().catch(() => null) : Promise.resolve(null),
       ]);
       setSummary(s);
       setProductMetrics(m);
+      setBusinessKpis(k);
       setRecent(r ?? []);
       setEcommerceHealth(eh);
 
@@ -117,6 +122,7 @@ export default function HealthPage() {
       setLoadError(msg);
       setSummary(null);
       setProductMetrics(null);
+      setBusinessKpis(null);
       setEcommerceHealth(null);
       setRecent([]);
       setNfeRows([]);
@@ -257,6 +263,42 @@ export default function HealthPage() {
     ];
   }, [productMetrics]);
 
+  const funnelCards = useMemo(() => {
+    const k = businessKpis;
+    const ok = !!k?.ok;
+    const setupText = ok && k?.setup ? `${k.setup.ok}/${k.setup.total}` : '—';
+    const setupHint = ok && k?.setup?.done ? 'Setup concluído.' : 'Complete o mínimo para operar.';
+    const saleDays = ok ? k?.first_sale?.days_to_first : null;
+    const nfeDays = ok ? k?.first_nfe?.days_to_first : null;
+    const payDays = ok ? k?.first_payment?.days_to_first : null;
+    return [
+      {
+        title: 'Setup (onboarding)',
+        value: setupText as string | number,
+        icon: <ShieldCheck className="w-5 h-5 text-slate-700" />,
+        hint: setupHint,
+      },
+      {
+        title: '1ª venda (dias)',
+        value: (typeof saleDays === 'number' ? saleDays : '—') as string | number,
+        icon: <Activity className="w-5 h-5 text-indigo-600" />,
+        hint: ok && k?.first_sale?.at ? `Primeira venda em ${formatDateTimeBR(k.first_sale.at)}.` : 'Ainda não houve venda.',
+      },
+      {
+        title: '1ª NF-e (dias)',
+        value: (typeof nfeDays === 'number' ? nfeDays : '—') as string | number,
+        icon: <Activity className="w-5 h-5 text-blue-600" />,
+        hint: ok && k?.first_nfe?.at ? `Primeira NF-e em ${formatDateTimeBR(k.first_nfe.at)}.` : 'Ainda não houve NF-e emitida.',
+      },
+      {
+        title: '1º recebimento (dias)',
+        value: (typeof payDays === 'number' ? payDays : '—') as string | number,
+        icon: <Activity className="w-5 h-5 text-emerald-600" />,
+        hint: ok && k?.first_payment?.at ? `Primeiro recebimento em ${formatDateTimeBR(k.first_payment.at)}.` : 'Ainda não houve recebimento.',
+      },
+    ];
+  }, [businessKpis]);
+
   return (
     <div className="p-1 flex flex-col gap-4">
       <PageHeader
@@ -314,6 +356,21 @@ export default function HealthPage() {
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
         {metricCards.map((c) => (
+          <GlassCard key={c.title} className="p-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                {c.icon}
+                <div className="text-sm font-medium text-gray-700">{c.title}</div>
+              </div>
+              <div className="text-2xl font-bold text-gray-900">{c.value}</div>
+            </div>
+            <div className="mt-2 text-xs text-gray-500">{c.hint}</div>
+          </GlassCard>
+        ))}
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-3">
+        {funnelCards.map((c) => (
           <GlassCard key={c.title} className="p-4">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
