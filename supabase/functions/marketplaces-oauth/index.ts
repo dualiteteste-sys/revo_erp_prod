@@ -130,6 +130,8 @@ serve(async (req) => {
     const expiresIn = Number(ex.data?.expires_in ?? 0);
     const userId = ex.data?.user_id != null ? String(ex.data.user_id) : null;
     const expiresAt = expiresIn > 0 ? new Date(Date.now() + expiresIn * 1000).toISOString() : null;
+    const tokenScopes = ex.data?.scope != null ? String(ex.data.scope) : null;
+    const tokenType = ex.data?.token_type != null ? String(ex.data.token_type) : null;
 
     await admin.from("ecommerce_connection_secrets").upsert(
       {
@@ -138,6 +140,8 @@ serve(async (req) => {
         access_token: accessToken || null,
         refresh_token: refreshToken || null,
         token_expires_at: expiresAt,
+        token_scopes: tokenScopes,
+        token_type: tokenType,
       },
       { onConflict: "ecommerce_id" },
     );

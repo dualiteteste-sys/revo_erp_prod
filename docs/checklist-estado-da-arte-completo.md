@@ -72,7 +72,7 @@ Este é o checklist único (por módulo) para levar o REVO ao nível **top mundi
 ### B3) Segredos e integrações (segurança operacional)
 - [x] SEC-INT-01 (P0) Rotação de tokens (NFE.io/marketplaces) com procedimento e “health check”
 - [x] SEC-INT-02 (P0) Revogação (disconnect) consistente + limpeza de secrets
-- [ ] SEC-INT-03 (P1) Scopes mínimos por integração (OAuth) e auditoria de acessos
+- [x] SEC-INT-03 (P1) Scopes mínimos por integração (OAuth) e auditoria de acessos
 
 ### B4) Privacidade/LGPD (mínimo vendável)
 - [x] LGPD-01 (P0) Inventário de dados pessoais (campos, finalidade, base legal, retenção)
@@ -124,8 +124,8 @@ Este é o checklist único (por módulo) para levar o REVO ao nível **top mundi
 - [x] RES-03 (P0) Timeouts consistentes por camada (front/edge/RPC) + cancelamento (AbortController)
 - [x] RES-04 (P0) Filas por domínio (NF/marketplace/financeiro) com DLQ + reprocessamento seguro
 - [x] RES-05 (P0) “Anti double-click”/locks por entidade (ex.: emitir NF, fechar caixa, finalizar OS)
-- [ ] RES-06 (P1) Circuit breaker + bulkheads (evitar efeito cascata quando integração cair)
-- [ ] RES-07 (P1) Degradação elegante (feature off / fallback) + mensagens “o que fazer agora”
+- [x] RES-06 (P1) Circuit breaker + bulkheads (evitar efeito cascata quando integração cair)
+- [x] RES-07 (P1) Degradação elegante (feature off / fallback) + mensagens “o que fazer agora”
 - [ ] RES-08 (P1) Teste de carga mínimo (Top 5 RPCs + 2 fluxos E2E) com budget de latência
 - [ ] RES-09 (P1) Multitenancy-friendly scaling: filas/locks/limites por empresa (não “uma empresa derruba todas”)
 

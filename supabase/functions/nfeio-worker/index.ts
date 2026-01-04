@@ -27,6 +27,57 @@ function extractStatus(payload: any): string | null {
   return status ? String(status).toLowerCase() : null;
 }
 
+function retryAfterSeconds(nextRetryAt: any): number | null {
+  if (!nextRetryAt) return null;
+  const d = new Date(String(nextRetryAt));
+  if (Number.isNaN(d.getTime())) return null;
+  return Math.max(1, Math.ceil((d.getTime() - Date.now()) / 1000));
+}
+
+async function circuitBreakerShouldAllow(params: {
+  admin: any;
+  empresaId: string;
+  domain: string;
+  provider: string;
+}): Promise<{ allowed: boolean; state: string | null; next_retry_at: string | null }> {
+  try {
+    const { data, error } = await params.admin.rpc("integration_circuit_breaker_should_allow", {
+      p_empresa_id: params.empresaId,
+      p_domain: params.domain,
+      p_provider: params.provider,
+    });
+    if (error) return { allowed: true, state: null, next_retry_at: null };
+    return {
+      allowed: !!data?.allowed,
+      state: data?.state != null ? String(data.state) : null,
+      next_retry_at: data?.next_retry_at != null ? String(data.next_retry_at) : null,
+    };
+  } catch {
+    return { allowed: true, state: null, next_retry_at: null };
+  }
+}
+
+async function circuitBreakerRecord(params: {
+  admin: any;
+  empresaId: string;
+  domain: string;
+  provider: string;
+  ok: boolean;
+  error?: string | null;
+}) {
+  try {
+    await params.admin.rpc("integration_circuit_breaker_record_result", {
+      p_empresa_id: params.empresaId,
+      p_domain: params.domain,
+      p_provider: params.provider,
+      p_ok: params.ok,
+      p_error: params.error ?? null,
+    });
+  } catch {
+    // ignore
+  }
+}
+
 async function tryUploadFromUrl(admin: any, bucket: string, path: string, url: string, contentType: string) {
   const resp = await fetch(url);
   if (!resp.ok) return;
@@ -103,6 +154,8 @@ serve(async (req) => {
       const emissaoId = link.emissao_id as string;
       const ambiente = (link.ambiente ?? "homologacao") as NfeioEnvironment;
       const tenantId = (empresaId ?? link.empresa_id ?? null) as string | null;
+      const cbEmpresaId = tenantId ?? link.empresa_id ?? empresaId ?? null;
+      if (!cbEmpresaId) throw new Error("MISSING_EMPRESA_ID");
 
       // Atualização rápida com o que veio no webhook
       const statusFromWebhook = extractStatus(payload);
@@ -140,6 +193,19 @@ serve(async (req) => {
 
       // Se não temos doc links ou status, tenta consultar a NFE.io
       if ((!statusFromWebhook || !maybeXmlUrl || !maybeDanfeUrl) && NFEIO_API_KEY) {
+        const cb = await circuitBreakerShouldAllow({ admin, empresaId: cbEmpresaId, domain: "nfeio", provider: "nfeio" });
+        if (!cb.allowed) {
+          const retryAt = cb.next_retry_at ?? new Date(Date.now() + 60_000).toISOString();
+          await admin.from("fiscal_nfe_webhook_events").update({
+            process_attempts: Number(ev.process_attempts ?? 0) + 1,
+            next_retry_at: retryAt,
+            last_error: `CIRCUIT_OPEN:nfeio (retry_after=${retryAfterSeconds(retryAt) ?? "?"}s)`,
+            locked_at: null,
+            locked_by: null,
+          }).eq("id", eventId);
+          continue;
+        }
+
         const base = nfeioBaseUrl(ambiente);
         const url = `${base}/v2/nota-fiscal/${encodeURIComponent(nfeioId)}`;
         const result = await nfeioFetchJson(url, {
@@ -154,8 +220,18 @@ serve(async (req) => {
         }).eq("emissao_id", emissaoId);
 
         if (!result.ok) {
+          await circuitBreakerRecord({
+            admin,
+            empresaId: cbEmpresaId,
+            domain: "nfeio",
+            provider: "nfeio",
+            ok: false,
+            error: `NFEIO_SYNC_FAILED:${result.status}`,
+          });
           throw new Error(`NFEIO_SYNC_FAILED:${result.status}`);
         }
+
+        await circuitBreakerRecord({ admin, empresaId: cbEmpresaId, domain: "nfeio", provider: "nfeio", ok: true });
 
         const nextStatus = (result.data?.status ?? "").toString().toLowerCase();
         if (nextStatus) {

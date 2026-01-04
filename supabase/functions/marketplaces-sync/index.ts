@@ -23,6 +23,57 @@ function json(status: number, body: unknown, headers: Record<string, string>) {
   return new Response(JSON.stringify(body), { status, headers: { ...headers, "Content-Type": "application/json" } });
 }
 
+function retryAfterSeconds(nextRetryAt: any): number | null {
+  if (!nextRetryAt) return null;
+  const d = new Date(String(nextRetryAt));
+  if (Number.isNaN(d.getTime())) return null;
+  return Math.max(1, Math.ceil((d.getTime() - Date.now()) / 1000));
+}
+
+async function circuitBreakerShouldAllow(params: {
+  admin: any;
+  empresaId: string;
+  domain: string;
+  provider: string;
+}): Promise<{ allowed: boolean; state: string | null; next_retry_at: string | null }> {
+  try {
+    const { data, error } = await params.admin.rpc("integration_circuit_breaker_should_allow", {
+      p_empresa_id: params.empresaId,
+      p_domain: params.domain,
+      p_provider: params.provider,
+    });
+    if (error) return { allowed: true, state: null, next_retry_at: null };
+    return {
+      allowed: !!data?.allowed,
+      state: data?.state != null ? String(data.state) : null,
+      next_retry_at: data?.next_retry_at != null ? String(data.next_retry_at) : null,
+    };
+  } catch {
+    return { allowed: true, state: null, next_retry_at: null };
+  }
+}
+
+async function circuitBreakerRecord(params: {
+  admin: any;
+  empresaId: string;
+  domain: string;
+  provider: string;
+  ok: boolean;
+  error?: string | null;
+}) {
+  try {
+    await params.admin.rpc("integration_circuit_breaker_record_result", {
+      p_empresa_id: params.empresaId,
+      p_domain: params.domain,
+      p_provider: params.provider,
+      p_ok: params.ok,
+      p_error: params.error ?? null,
+    });
+  } catch {
+    // ignore
+  }
+}
+
 function toIsoOrNull(value: unknown): string | null {
   if (!value) return null;
   const s = String(value).trim();
@@ -172,7 +223,6 @@ async function upsertPedidoFromMeliOrder(params: {
     empresa_id: empresaId,
     cliente_id: clienteId,
     data_emissao: dataEmissao,
-    status,
     frete: num(order?.shipping?.cost, 0),
     desconto: 0,
     condicao_pagamento: null,
@@ -308,18 +358,71 @@ serve(async (req) => {
 
   const { data: sec } = await admin
     .from("ecommerce_connection_secrets")
-    .select("access_token,refresh_token,token_expires_at")
+    .select("access_token,refresh_token,token_expires_at,token_scopes,token_type")
     .eq("ecommerce_id", ecommerceId)
     .maybeSingle();
 
   let accessToken = sec?.access_token ? String(sec.access_token) : "";
   const refreshToken = sec?.refresh_token ? String(sec.refresh_token) : "";
+  const tokenScopes = sec?.token_scopes != null ? String(sec.token_scopes) : null;
+  const tokenType = sec?.token_type != null ? String(sec.token_type) : null;
   const expiresAtIso = toIsoOrNull(sec?.token_expires_at);
   const expired = expiresAtIso ? new Date(expiresAtIso).getTime() <= Date.now() + 60000 : false;
 
+  // Circuit breaker: avoid cascades when provider is unstable
+  const cb = await circuitBreakerShouldAllow({ admin, empresaId, domain: "ecommerce", provider });
+  if (!cb.allowed) {
+    const retryAt = cb.next_retry_at;
+    return json(
+      503,
+      {
+        ok: false,
+        provider,
+        error: "CIRCUIT_OPEN",
+        next_retry_at: retryAt,
+        retry_after_seconds: retryAfterSeconds(retryAt),
+      },
+      cors,
+    );
+  }
+
+  // Bulkhead: prevent concurrent long imports (best-effort)
+  const inflightCutoff = new Date(Date.now() - 10 * 60 * 1000).toISOString();
+  const { data: inflight } = await admin
+    .from("ecommerce_jobs")
+    .select("id,dedupe_key,locked_at")
+    .eq("empresa_id", empresaId)
+    .eq("provider", provider)
+    .eq("kind", "import_orders")
+    .eq("status", "processing")
+    .gte("locked_at", inflightCutoff)
+    .limit(1)
+    .maybeSingle();
+  if (inflight?.id) {
+    return json(
+      409,
+      {
+        ok: false,
+        provider,
+        error: "ALREADY_RUNNING",
+        job_id: String(inflight.id),
+        locked_at: inflight.locked_at ?? null,
+      },
+      cors,
+    );
+  }
+
+  let tokenRefreshCalls = 0;
+  let searchCalls = 0;
+  let orderDetailCalls = 0;
+
   if ((!accessToken || expired) && refreshToken) {
     const r = await refreshMeliToken({ refreshToken });
-    if (!r.ok) return json(502, { ok: false, error: "MELI_REFRESH_FAILED", status: r.status, data: sanitizeForLog(r.data) }, cors);
+    if (!r.ok) {
+      await circuitBreakerRecord({ admin, empresaId, domain: "ecommerce", provider, ok: false, error: `MELI_REFRESH_FAILED:${r.status}` });
+      return json(502, { ok: false, error: "MELI_REFRESH_FAILED", status: r.status, data: sanitizeForLog(r.data) }, cors);
+    }
+    tokenRefreshCalls += 1;
     accessToken = String(r.data?.access_token ?? "");
     const newRefresh = String(r.data?.refresh_token ?? refreshToken);
     const expiresIn = Number(r.data?.expires_in ?? 0);
@@ -379,6 +482,7 @@ serve(async (req) => {
       q.searchParams.set("limit", String(limit));
       q.searchParams.set("offset", String(offset));
 
+      searchCalls += 1;
       const page = await meliFetchJson(q.toString(), accessToken);
       if (!page.ok) throw new Error(`MELI_SEARCH_FAILED:${page.status}`);
       const results = Array.isArray(page.data?.results) ? page.data.results : [];
@@ -387,6 +491,7 @@ serve(async (req) => {
       for (const r of results) {
         const orderId = r?.id != null ? String(r.id) : null;
         if (!orderId) continue;
+        orderDetailCalls += 1;
         const detail = await meliFetchJson(`https://api.mercadolibre.com/orders/${encodeURIComponent(orderId)}`, accessToken);
         if (!detail.ok) {
           await admin.from("ecommerce_logs").insert({
@@ -434,12 +539,35 @@ serve(async (req) => {
     if (jobId) await admin.from("ecommerce_jobs").update({ status: "done", locked_at: null, locked_by: null, last_error: null }).eq("id", jobId);
     if (runId) await admin.from("ecommerce_job_runs").update({ ok: true, finished_at: new Date().toISOString() }).eq("id", runId);
 
+    await admin.from("ecommerce_logs").insert({
+      empresa_id: empresaId,
+      ecommerce_id: ecommerceId,
+      provider: "meli",
+      level: "info",
+      event: "meli_import_audit",
+      message: `Importação concluída: ${imported} pedidos (itens: ${totalItems}, skipped: ${skippedItemsTotal})`,
+      entity_type: "run",
+      entity_id: runId,
+      run_id: runId,
+      context: sanitizeForLog({
+        from: windowFrom,
+        to: windowTo,
+        token_refresh_calls: tokenRefreshCalls,
+        search_calls: searchCalls,
+        order_detail_calls: orderDetailCalls,
+        token_scopes: tokenScopes,
+        token_type: tokenType,
+      }),
+    });
+
+    await circuitBreakerRecord({ admin, empresaId, domain: "ecommerce", provider, ok: true });
     return json(200, { ok: true, provider: "meli", imported, total_items: totalItems, skipped_items: skippedItemsTotal, from: windowFrom, to: windowTo }, cors);
   } catch (e: any) {
     const msg = e?.message || "MELI_IMPORT_FAILED";
     if (jobId) await admin.from("ecommerce_jobs").update({ status: "error", locked_at: null, locked_by: null, last_error: msg }).eq("id", jobId);
     if (runId) await admin.from("ecommerce_job_runs").update({ ok: false, finished_at: new Date().toISOString(), error: msg }).eq("id", runId);
     await admin.from("ecommerces").update({ status: "error", last_error: msg }).eq("id", ecommerceId);
+    await circuitBreakerRecord({ admin, empresaId, domain: "ecommerce", provider, ok: false, error: msg });
     return json(502, { ok: false, provider: "meli", error: msg }, cors);
   }
 });
