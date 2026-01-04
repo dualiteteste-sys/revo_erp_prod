@@ -98,6 +98,7 @@ export default function UserPermissionOverrides({ userId }: { userId: string }) 
 
   const clearOverride = async (permissionId: string) => {
     if (!empresaId) return;
+    const previous = overridesByPermission.has(permissionId) ? overridesByPermission.get(permissionId)! : null;
     setSavingKey(permissionId);
     try {
       const { error } = await supabase
@@ -108,7 +109,24 @@ export default function UserPermissionOverrides({ userId }: { userId: string }) 
         .eq('permission_id', permissionId);
       if (error) throw error;
       await overridesQuery.refetch();
-      addToast('Permissão específica removida.', 'success');
+      addToast('Permissão específica removida.', 'success', previous === null ? undefined : {
+        title: 'Ação concluída',
+        durationMs: 8000,
+        action: {
+          label: 'Desfazer',
+          ariaLabel: 'Desfazer remoção da permissão específica',
+          onClick: async () => {
+            await supabase
+              .from('user_permission_overrides')
+              .upsert(
+                { empresa_id: empresaId, user_id: userId, permission_id: permissionId, allow: previous },
+                { onConflict: 'empresa_id,user_id,permission_id' }
+              );
+            await overridesQuery.refetch();
+            addToast('Permissão específica restaurada.', 'success');
+          },
+        },
+      });
     } catch (e: any) {
       addToast(e?.message || 'Erro ao limpar permissão específica.', 'error');
     } finally {

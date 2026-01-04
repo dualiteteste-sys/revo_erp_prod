@@ -64,7 +64,19 @@ export function EditUserRoleDrawer({ open, user, onClose, onUpdate }: Props) {
     setLoading(true);
     try {
       await deactivateUser(user.user_id);
-      addToast('Usuário desativado.', 'success');
+      addToast('Usuário desativado.', 'success', {
+        title: 'Ação concluída',
+        durationMs: 8000,
+        action: {
+          label: 'Desfazer',
+          ariaLabel: 'Desfazer desativação do usuário',
+          onClick: async () => {
+            await reactivateUser(user.user_id);
+            addToast('Usuário reativado.', 'success');
+            onUpdate();
+          },
+        },
+      });
       onUpdate();
       onClose();
     } catch (err: any) {
@@ -78,7 +90,19 @@ export function EditUserRoleDrawer({ open, user, onClose, onUpdate }: Props) {
     setLoading(true);
     try {
       await reactivateUser(user.user_id);
-      addToast('Usuário reativado.', 'success');
+      addToast('Usuário reativado.', 'success', {
+        title: 'Ação concluída',
+        durationMs: 8000,
+        action: {
+          label: 'Desfazer',
+          ariaLabel: 'Desfazer reativação do usuário',
+          onClick: async () => {
+            await deactivateUser(user.user_id);
+            addToast('Usuário desativado.', 'success');
+            onUpdate();
+          },
+        },
+      });
       onUpdate();
       onClose();
     } catch (err: any) {
