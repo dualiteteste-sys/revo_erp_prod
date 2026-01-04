@@ -8,6 +8,7 @@ import { useToast } from '@/contexts/ToastProvider';
 import { supabase } from '@/lib/supabaseClient';
 import {
   getOpsHealthSummary,
+  getProductMetricsSummary,
   listOpsRecentFailures,
   reprocessEcommerceDlq,
   reprocessFinanceDlq,
@@ -15,6 +16,7 @@ import {
   type EcommerceDlqRow,
   type FinanceDlqRow,
   type OpsHealthSummary,
+  type ProductMetricsSummary,
   type OpsRecentFailure,
 } from '@/services/opsHealth';
 import { useHasPermission } from '@/hooks/useHasPermission';
@@ -45,6 +47,7 @@ export default function HealthPage() {
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [summary, setSummary] = useState<OpsHealthSummary | null>(null);
+  const [productMetrics, setProductMetrics] = useState<ProductMetricsSummary | null>(null);
   const [ecommerceHealth, setEcommerceHealth] = useState<EcommerceHealthSummary | null>(null);
   const [recent, setRecent] = useState<OpsRecentFailure[]>([]);
   const [nfeRows, setNfeRows] = useState<NfeWebhookRow[]>([]);
@@ -60,12 +63,14 @@ export default function HealthPage() {
     setLoading(true);
     setLoadError(null);
     try {
-      const [s, r, eh] = await Promise.all([
+      const [s, m, r, eh] = await Promise.all([
         getOpsHealthSummary(),
+        getProductMetricsSummary().catch(() => null),
         listOpsRecentFailures({ limit: 30 }),
         permEcommerceView.data ? getEcommerceHealthSummary().catch(() => null) : Promise.resolve(null),
       ]);
       setSummary(s);
+      setProductMetrics(m);
       setRecent(r ?? []);
       setEcommerceHealth(eh);
 
@@ -111,6 +116,7 @@ export default function HealthPage() {
       addToast(msg, 'error');
       setLoadError(msg);
       setSummary(null);
+      setProductMetrics(null);
       setEcommerceHealth(null);
       setRecent([]);
       setNfeRows([]);
@@ -227,6 +233,30 @@ export default function HealthPage() {
     ];
   }, [summary]);
 
+  const metricCards = useMemo(() => {
+    const m = productMetrics;
+    return [
+      {
+        title: 'RPC p95 (ms)',
+        value: m?.rpc?.p95_ms ?? 0,
+        icon: <Activity className="w-5 h-5 text-indigo-600" />,
+        hint: 'Latência p95 (eventos metric.rpc).',
+      },
+      {
+        title: 'RPC erro (%)',
+        value: m?.rpc?.error_rate_pct ?? 0,
+        icon: <AlertTriangle className="w-5 h-5 text-amber-700" />,
+        hint: 'Taxa de erro na janela (metric.rpc ok=false).',
+      },
+      {
+        title: 'First value (min ms)',
+        value: m?.first_value?.min_ms ?? 0,
+        icon: <ShieldCheck className="w-5 h-5 text-slate-700" />,
+        hint: 'Tempo mínimo até “primeiro valor” (metric.first_value).',
+      },
+    ];
+  }, [productMetrics]);
+
   return (
     <div className="p-1 flex flex-col gap-4">
       <PageHeader
@@ -269,6 +299,21 @@ export default function HealthPage() {
 
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
         {cards.map((c) => (
+          <GlassCard key={c.title} className="p-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                {c.icon}
+                <div className="text-sm font-medium text-gray-700">{c.title}</div>
+              </div>
+              <div className="text-2xl font-bold text-gray-900">{c.value}</div>
+            </div>
+            <div className="mt-2 text-xs text-gray-500">{c.hint}</div>
+          </GlassCard>
+        ))}
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+        {metricCards.map((c) => (
           <GlassCard key={c.title} className="p-4">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">

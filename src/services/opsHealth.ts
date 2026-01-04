@@ -17,6 +17,21 @@ export type OpsHealthSummary = {
   };
 };
 
+export type ProductMetricsSummary = {
+  from: string;
+  to: string;
+  rpc: {
+    count: number;
+    error_count: number;
+    error_rate_pct: number;
+    p50_ms: number;
+    p95_ms: number;
+  };
+  first_value: {
+    min_ms: number;
+  };
+};
+
 export type OpsRecentFailure = {
   kind: string;
   occurred_at: string;
@@ -44,6 +59,10 @@ export type EcommerceDlqRow = {
 
 export async function getOpsHealthSummary(): Promise<OpsHealthSummary> {
   return callRpc<OpsHealthSummary>('ops_health_summary', { p_window: null });
+}
+
+export async function getProductMetricsSummary(): Promise<ProductMetricsSummary> {
+  return callRpc<ProductMetricsSummary>('product_metrics_summary', { p_window: null });
 }
 
 export async function listOpsRecentFailures(params?: { from?: string | null; limit?: number }): Promise<OpsRecentFailure[]> {
