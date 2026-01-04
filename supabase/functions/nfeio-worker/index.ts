@@ -2,6 +2,8 @@ import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import { createClient } from "@supabase/supabase-js";
 import { buildCorsHeaders } from "../_shared/cors.ts";
 import { nfeioBaseUrl, nfeioFetchJson, type NfeioEnvironment } from "../_shared/nfeio.ts";
+import { rateLimitCheck } from "../_shared/rate_limit.ts";
+import { extractNfeioStatus } from "../_shared/nfeio_payload.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -20,11 +22,6 @@ function backoffSeconds(attempt: number): number {
   // 1m, 5m, 15m, 1h, 6h (cap)
   const steps = [60, 300, 900, 3600, 21600];
   return steps[Math.min(Math.max(attempt, 0), steps.length - 1)];
-}
-
-function extractStatus(payload: any): string | null {
-  const status = payload?.status ?? payload?.data?.status ?? payload?.nota_fiscal?.status ?? null;
-  return status ? String(status).toLowerCase() : null;
 }
 
 function retryAfterSeconds(nextRetryAt: any): number | null {
@@ -158,7 +155,7 @@ serve(async (req) => {
       if (!cbEmpresaId) throw new Error("MISSING_EMPRESA_ID");
 
       // Atualização rápida com o que veio no webhook
-      const statusFromWebhook = extractStatus(payload);
+      const statusFromWebhook = extractNfeioStatus(payload);
       if (statusFromWebhook) {
         await admin.from("fiscal_nfe_nfeio_emissoes").update({
           provider_status: statusFromWebhook,
@@ -200,6 +197,26 @@ serve(async (req) => {
             process_attempts: Number(ev.process_attempts ?? 0) + 1,
             next_retry_at: retryAt,
             last_error: `CIRCUIT_OPEN:nfeio (retry_after=${retryAfterSeconds(retryAt) ?? "?"}s)`,
+            locked_at: null,
+            locked_by: null,
+          }).eq("id", eventId);
+          continue;
+        }
+
+        const rl = await rateLimitCheck({
+          admin,
+          empresaId: cbEmpresaId,
+          domain: "nfeio",
+          action: "worker_sync",
+          limit: 120,
+          windowSeconds: 60,
+        });
+        if (!rl.allowed) {
+          const retryAt = new Date(Date.now() + (rl.retry_after_seconds ?? 60) * 1000).toISOString();
+          await admin.from("fiscal_nfe_webhook_events").update({
+            process_attempts: Number(ev.process_attempts ?? 0) + 1,
+            next_retry_at: retryAt,
+            last_error: `RATE_LIMITED:nfeio (retry_after=${rl.retry_after_seconds ?? "?"}s)`,
             locked_at: null,
             locked_by: null,
           }).eq("id", eventId);

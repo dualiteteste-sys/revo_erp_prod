@@ -1,0 +1,15 @@
+{
+  "id": 123,
+  "status": "paid",
+  "payments": [
+    { "id": 1, "status": "approved" }
+  ],
+  "buyer": {
+    "id": 999,
+    "first_name": "João",
+    "last_name": "da Silva",
+    "email": "joao@example.com",
+    "doc_unico": "123.456.789-09"
+  }
+}
+

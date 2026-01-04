@@ -321,6 +321,13 @@ export default function MarketplaceIntegrationsPage() {
         return;
       }
 
+      if (status === 429 && body?.error === 'RATE_LIMITED') {
+        const retryAfter = body?.retry_after_seconds ? Number(body.retry_after_seconds) : null;
+        const seconds = retryAfter ? Math.max(1, Math.ceil(retryAfter)) : null;
+        addToast(`Muitas tentativas em pouco tempo. Tente novamente${seconds ? ` em ~${seconds}s` : ''}.`, 'warning');
+        return;
+      }
+
       addToast(e?.message || 'Falha ao importar pedidos.', 'error');
     } finally {
       setSyncingOrders(null);

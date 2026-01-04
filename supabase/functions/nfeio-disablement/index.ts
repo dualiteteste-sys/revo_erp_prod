@@ -5,6 +5,7 @@ import { hasPermissionOrOwnerAdmin } from "../_shared/rbac.ts";
 import { nfeioBaseUrl, nfeioFetchJson, type NfeioEnvironment } from "../_shared/nfeio.ts";
 import { getRequestId } from "../_shared/request.ts";
 import { sanitizeForLog } from "../_shared/sanitize.ts";
+import { rateLimitCheck } from "../_shared/rate_limit.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY")!;
@@ -105,6 +106,27 @@ serve(async (req) => {
 
   const allowed = await hasPermissionOrOwnerAdmin(user, admin, userId, empresaId, "fiscal", "nfe_manage");
   if (!allowed) return json(403, { ok: false, error: "FORBIDDEN_RBAC" }, cors);
+
+  const rl = await rateLimitCheck({
+    admin,
+    empresaId,
+    domain: "nfeio",
+    action: "disablement",
+    limit: 5,
+    windowSeconds: 60,
+  });
+  if (!rl.allowed) {
+    await admin.from("fiscal_nfe_provider_events").insert({
+      empresa_id: empresaId,
+      emissao_id: emissaoId,
+      provider: "nfeio",
+      event_type: "rate_limited",
+      status: "error",
+      request_id: requestId,
+      request_payload: { action: "disablement", retry_after_seconds: rl.retry_after_seconds },
+    });
+    return json(429, { ok: false, error: "RATE_LIMITED", retry_after_seconds: rl.retry_after_seconds }, cors);
+  }
 
   const { data: cfg } = await admin
     .from("fiscal_nfe_emissao_configs")

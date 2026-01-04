@@ -1,0 +1,21 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`QA-CT-01 Mercado Livre contracts > sanitizes payloads for logs (golden) 1`] = `
+{
+  "buyer": {
+    "doc_unico": "123******09",
+    "email": "joao@example.com",
+    "first_name": "João",
+    "id": 999,
+    "last_name": "da Silva",
+  },
+  "id": 123,
+  "payments": [
+    {
+      "id": 1,
+      "status": "approved",
+    },
+  ],
+  "status": "paid",
+}
+`;
