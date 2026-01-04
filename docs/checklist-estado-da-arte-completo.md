@@ -76,8 +76,8 @@ Este é o checklist único (por módulo) para levar o REVO ao nível **top mundi
 
 ### B4) Privacidade/LGPD (mínimo vendável)
 - [x] LGPD-01 (P0) Inventário de dados pessoais (campos, finalidade, base legal, retenção)
-- [ ] LGPD-02 (P0) Export do titular (dados do usuário/empresa) + trilha do que foi exportado
-- [ ] LGPD-03 (P0) Retenção/expurgo (política) + execução segura (soft delete onde precisa)
+- [x] LGPD-02 (P0) Export do titular (dados do usuário/empresa) + trilha do que foi exportado
+- [x] LGPD-03 (P0) Retenção/expurgo (política) + execução segura (soft delete onde precisa)
 - [ ] LGPD-04 (P1) Minimização de logs: payload saneado e sem PII sensível
 
 ---
@@ -140,7 +140,7 @@ Este é o checklist único (por módulo) para levar o REVO ao nível **top mundi
 ### E1) Testes
 - [x] QA-CT-01 (P0) Testes de contrato de integrações (golden files payloads reais)
 - [x] QA-VIS-01 (P1) Regressão visual (screenshots) para páginas críticas
-- [ ] QA-E2E-01 (P0) Suites E2E por plano (Essencial/Pro/Max/Indústria/Scale) com edge cases
+- [x] QA-E2E-01 (P0) Suites E2E por plano (Essencial/Pro/Max/Indústria/Scale) com edge cases
 - [ ] QA-CHAOS-01 (P1) Chaos-lite: timeout/rate-limit/retry/dead-letter/reprocess
 
 ### E2) Banco e deploy
