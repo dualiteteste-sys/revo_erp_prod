@@ -1,4 +1,4 @@
-import { Building, Users, UserCog, CreditCard, Trash2, ShieldCheck, Receipt, ListChecks, ToggleLeft, Plug } from 'lucide-react';
+import { Building, Users, UserCog, CreditCard, Trash2, ShieldCheck, Receipt, ListChecks, ToggleLeft, Plug, FileDown } from 'lucide-react';
 
 export interface SettingsTab {
   name: string;
@@ -20,6 +20,7 @@ export const settingsMenuConfig: SettingsTab[] = [
       { name: 'Usuários', icon: Users, href: '/app/configuracoes/geral/users' },
       { name: 'Papéis e Permissões', icon: ShieldCheck, href: '/app/configuracoes/geral/papeis' },
       { name: 'Perfil de Usuário', icon: UserCog, href: '/app/configuracoes/geral/perfil' },
+      { name: 'Privacidade (LGPD)', icon: FileDown, href: '/app/configuracoes/geral/privacidade' },
       { name: 'Minha Assinatura', icon: CreditCard, href: '/app/configuracoes/geral/assinatura' },
     ],
   },

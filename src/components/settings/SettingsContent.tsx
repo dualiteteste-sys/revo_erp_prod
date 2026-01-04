@@ -5,6 +5,7 @@ import SubscriptionPage from '../../pages/billing/SubscriptionPage';
 import DataManagementContent from './data-management/DataManagementContent';
 import RolesPage from '@/pages/settings/roles/RolesPage';
 import UsersPage from '@/pages/settings/general/UsersPage';
+import PrivacyLgpdPage from '@/pages/settings/general/PrivacyLgpdPage';
 import NfeEmissaoSettings from '@/components/settings/fiscal/NfeEmissaoSettings';
 import AuditLogsPage from '@/components/settings/audit/AuditLogsPage';
 import OnboardingChecklistPage from '@/components/settings/onboarding/OnboardingChecklistPage';
@@ -26,6 +27,8 @@ const SettingsContent: React.FC<SettingsContentProps> = ({ activeItem }) => {
         return <UsersPage />;
       case 'Papéis e Permissões':
         return <RolesPage />;
+      case 'Privacidade (LGPD)':
+        return <PrivacyLgpdPage />;
       case 'Minha Assinatura':
         return <SubscriptionPage />;
       case 'NF-e (Emissão)':
