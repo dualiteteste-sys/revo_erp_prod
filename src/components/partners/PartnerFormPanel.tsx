@@ -95,6 +95,25 @@ const PartnerFormPanel: React.FC<PartnerFormPanelProps> = ({ partner, initialVal
         return;
       }
     }
+
+    const email = String(formData.email || '').trim();
+    if (email) {
+      const ok = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+      if (!ok) {
+        addToast('E-mail inválido. Verifique o formato.', 'error');
+        setActiveTab('contato');
+        return;
+      }
+    }
+
+    const telDigits = String(formData.telefone || '').replace(/\D/g, '');
+    const celDigits = String((formData as any).celular || '').replace(/\D/g, '');
+    const invalidPhone = (d: string) => d.length > 0 && d.length < 10;
+    if (invalidPhone(telDigits) || invalidPhone(celDigits)) {
+      addToast('Telefone/celular inválido. Use DDD + número (mín. 10 dígitos).', 'error');
+      setActiveTab('contato');
+      return;
+    }
     
     setIsSaving(true);
     try {

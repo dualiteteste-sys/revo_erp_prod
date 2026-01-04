@@ -2,7 +2,7 @@ import React, { useMemo, useState } from 'react';
 import { usePartners } from '../../hooks/usePartners';
 import { useToast } from '../../contexts/ToastProvider';
 import * as partnersService from '../../services/partners';
-import { Loader2, Search, Users2, DatabaseBackup, UsersRound, Plus, FileDown } from 'lucide-react';
+import { Loader2, Search, Users2, DatabaseBackup, UsersRound, Plus, FileDown, FileUp } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
 import Pagination from '../../components/ui/Pagination';
 import ConfirmationModal from '../../components/ui/ConfirmationModal';
@@ -22,6 +22,7 @@ import PageShell from '@/components/ui/PageShell';
 import PageCard from '@/components/ui/PageCard';
 import EmptyState from '@/components/ui/EmptyState';
 import { uiMessages } from '@/lib/ui/messages';
+import ImportPartnersCsvModal from '@/components/partners/ImportPartnersCsvModal';
 
 const PartnersPage: React.FC = () => {
   const enableSeed = isSeedEnabled();
@@ -62,6 +63,7 @@ const PartnersPage: React.FC = () => {
   const [isFetchingDetails, setIsFetchingDetails] = useState(false);
   const [isSeeding, setIsSeeding] = useState(false);
   const [bulkLoading, setBulkLoading] = useState(false);
+  const [isImportOpen, setIsImportOpen] = useState(false);
 
   const bulk = useBulkSelection(partners, (p) => p.id);
   const selectedPartners = useMemo(
@@ -264,6 +266,17 @@ const PartnersPage: React.FC = () => {
           Exportar CSV
         </Button>
 
+        <Button
+          onClick={() => setIsImportOpen(true)}
+          variant="secondary"
+          className="gap-2"
+          disabled={permsLoading || !canCreate}
+          title={!canCreate ? 'Sem permissão para importar' : 'Importar clientes/fornecedores por CSV'}
+        >
+          <FileUp size={18} />
+          Importar CSV
+        </Button>
+
         {enableSeed ? (
           <Button
             onClick={handleSeedPartners}
@@ -431,6 +444,16 @@ const PartnersPage: React.FC = () => {
           />
         )}
       </Modal>
+
+      <ImportPartnersCsvModal
+        isOpen={isImportOpen}
+        onClose={() => setIsImportOpen(false)}
+        importFn={(payload) => partnersService.savePartner(payload)}
+        onImported={() => {
+          setIsImportOpen(false);
+          refresh();
+        }}
+      />
 
       <ConfirmationModal
         isOpen={isDeleteModalOpen}

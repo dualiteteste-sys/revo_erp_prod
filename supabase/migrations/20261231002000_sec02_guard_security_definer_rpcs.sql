@@ -237,6 +237,6 @@ BEGIN
   PERFORM public._sec02_wrap_guard('mrp_reprocessar_ordem', 'mrp', 'manage');
 END $$;
 
-DROP FUNCTION public._sec02_wrap_guard(text, text, text);
+DROP FUNCTION IF EXISTS public._sec02_wrap_guard(text, text, text);
 
 COMMIT;
