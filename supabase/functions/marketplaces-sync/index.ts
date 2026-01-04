@@ -2,6 +2,7 @@ import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import { createClient } from "@supabase/supabase-js";
 import { buildCorsHeaders } from "../_shared/cors.ts";
 import { sanitizeForLog } from "../_shared/sanitize.ts";
+import { chooseNextPedidoStatus, mapMeliOrderStatus } from "../_shared/meli_mapping.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY")!;
@@ -74,6 +75,34 @@ async function circuitBreakerRecord(params: {
   }
 }
 
+async function rateLimitCheck(params: {
+  admin: any;
+  empresaId: string;
+  domain: string;
+  action: string;
+  limit: number;
+  windowSeconds: number;
+  cost?: number;
+}): Promise<{ allowed: boolean; retry_after_seconds: number | null }> {
+  try {
+    const { data, error } = await params.admin.rpc("integration_rate_limit_check", {
+      p_empresa_id: params.empresaId,
+      p_domain: params.domain,
+      p_action: params.action,
+      p_limit: params.limit,
+      p_window_seconds: params.windowSeconds,
+      p_cost: params.cost ?? 1,
+    });
+    if (error) return { allowed: true, retry_after_seconds: null };
+    return {
+      allowed: !!data?.allowed,
+      retry_after_seconds: data?.retry_after_seconds != null ? Number(data.retry_after_seconds) : null,
+    };
+  } catch {
+    return { allowed: true, retry_after_seconds: null };
+  }
+}
+
 function toIsoOrNull(value: unknown): string | null {
   if (!value) return null;
   const s = String(value).trim();
@@ -126,22 +155,6 @@ async function meliFetchJson(url: string, accessToken: string): Promise<{ ok: bo
   });
   const data = await resp.json().catch(() => ({}));
   return { ok: resp.ok, status: resp.status, data };
-}
-
-function mapMeliOrderStatus(order: any): "orcamento" | "aprovado" | "cancelado" {
-  const status = String(order?.status ?? "").toLowerCase();
-  const payments = Array.isArray(order?.payments) ? order.payments : [];
-  const hasApprovedPayment = payments.some((p: any) => String(p?.status ?? "").toLowerCase() === "approved");
-  if (["cancelled", "invalid", "expired"].includes(status)) return "cancelado";
-  if (["paid", "confirmed"].includes(status) || hasApprovedPayment) return "aprovado";
-  return "orcamento";
-}
-
-function chooseNextStatus(current: any, desired: "orcamento" | "aprovado" | "cancelado"): any {
-  const cur = String(current ?? "").toLowerCase();
-  if (cur === "concluido") return "concluido";
-  if (cur === "cancelado") return "cancelado";
-  return desired;
 }
 
 function num(value: any, fallback = 0): number {
@@ -243,7 +256,7 @@ async function upsertPedidoFromMeliOrder(params: {
 
   if (pedidoId) {
     const { data: existing } = await admin.from("vendas_pedidos").select("status").eq("id", pedidoId).eq("empresa_id", empresaId).maybeSingle();
-    basePedido.status = chooseNextStatus(existing?.status, desiredStatus);
+    basePedido.status = chooseNextPedidoStatus(existing?.status, desiredStatus);
     await admin.from("vendas_pedidos").update(basePedido).eq("id", pedidoId).eq("empresa_id", empresaId);
     await admin.from("vendas_itens_pedido").delete().eq("empresa_id", empresaId).eq("pedido_id", pedidoId);
   } else {
@@ -381,6 +394,28 @@ serve(async (req) => {
         error: "CIRCUIT_OPEN",
         next_retry_at: retryAt,
         retry_after_seconds: retryAfterSeconds(retryAt),
+      },
+      cors,
+    );
+  }
+
+  // Rate limit: avoid bursts (per company) on manual import
+  const rl = await rateLimitCheck({
+    admin,
+    empresaId,
+    domain: "ecommerce",
+    action: "import_orders",
+    limit: 3,
+    windowSeconds: 60,
+  });
+  if (!rl.allowed) {
+    return json(
+      429,
+      {
+        ok: false,
+        provider,
+        error: "RATE_LIMITED",
+        retry_after_seconds: rl.retry_after_seconds,
       },
       cors,
     );

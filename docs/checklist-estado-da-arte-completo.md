@@ -112,7 +112,7 @@ Este é o checklist único (por módulo) para levar o REVO ao nível **top mundi
 ### D2) Banco/RPC
 - [x] PERF-DB-01 (P0) EXPLAIN/índices nos top RPCs (vendas, estoque, financeiro, indústria)
 - [x] PERF-DB-02 (P0) Guard rails: paginação obrigatória + limites + filtros no backend
-- [ ] PERF-DB-03 (P1) Rate limit/backoff por canal/ação (integrações, emissão)
+- [x] PERF-DB-03 (P1) Rate limit/backoff por canal/ação (integrações, emissão)
 
 ### D3) FinOps (eficiência operacional)
 - [ ] FINOPS-01 (P1) Telemetria de custo: jobs, webhooks, filas (volume) por empresa
@@ -126,7 +126,7 @@ Este é o checklist único (por módulo) para levar o REVO ao nível **top mundi
 - [x] RES-05 (P0) “Anti double-click”/locks por entidade (ex.: emitir NF, fechar caixa, finalizar OS)
 - [x] RES-06 (P1) Circuit breaker + bulkheads (evitar efeito cascata quando integração cair)
 - [x] RES-07 (P1) Degradação elegante (feature off / fallback) + mensagens “o que fazer agora”
-- [ ] RES-08 (P1) Teste de carga mínimo (Top 5 RPCs + 2 fluxos E2E) com budget de latência
+- [x] RES-08 (P1) Teste de carga mínimo (Top 5 RPCs + 2 fluxos E2E) com budget de latência
 - [ ] RES-09 (P1) Multitenancy-friendly scaling: filas/locks/limites por empresa (não “uma empresa derruba todas”)
 
 **Validar**
@@ -138,7 +138,7 @@ Este é o checklist único (por módulo) para levar o REVO ao nível **top mundi
 ## E) Qualidade (QA) / Regressão / Migrations
 
 ### E1) Testes
-- [ ] QA-CT-01 (P0) Testes de contrato de integrações (golden files payloads reais)
+- [x] QA-CT-01 (P0) Testes de contrato de integrações (golden files payloads reais)
 - [x] QA-VIS-01 (P1) Regressão visual (screenshots) para páginas críticas
 - [ ] QA-E2E-01 (P0) Suites E2E por plano (Essencial/Pro/Max/Indústria/Scale) com edge cases
 - [ ] QA-CHAOS-01 (P1) Chaos-lite: timeout/rate-limit/retry/dead-letter/reprocess

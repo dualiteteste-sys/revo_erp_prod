@@ -1,0 +1,7 @@
+{
+  "id": 124,
+  "status": "cancelled",
+  "payments": [],
+  "buyer": { "id": 998, "nickname": "cliente_teste" }
+}
+

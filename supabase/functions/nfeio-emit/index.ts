@@ -4,6 +4,7 @@ import { buildCorsHeaders } from "../_shared/cors.ts";
 import { digitsOnly, nfeioBaseUrl, nfeioFetchJson, type NfeioEnvironment } from "../_shared/nfeio.ts";
 import { getRequestId } from "../_shared/request.ts";
 import { sanitizeForLog } from "../_shared/sanitize.ts";
+import { rateLimitCheck } from "../_shared/rate_limit.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY")!;
@@ -109,6 +110,20 @@ serve(async (req) => {
   const allowed = await canEmitNfe(user, admin, userId, empresaId);
   if (!allowed) {
     return json(403, { ok: false, error: "FORBIDDEN_RBAC" }, cors);
+  }
+
+  // Rate limit (per empresa): evitar bursts em emissão/sincronização
+  const rl = await rateLimitCheck({
+    admin,
+    empresaId,
+    domain: "nfeio",
+    action: "emit",
+    limit: 10,
+    windowSeconds: 60,
+  });
+  if (!rl.allowed) {
+    await logEvent(admin, empresaId, emissaoId, "warn", "NFEIO_RATE_LIMITED", { retry_after_seconds: rl.retry_after_seconds }, requestId);
+    return json(429, { ok: false, error: "RATE_LIMITED", retry_after_seconds: rl.retry_after_seconds }, cors);
   }
 
   await admin.from("fiscal_nfe_emissoes").update({ status: "processando", last_error: null }).eq("id", emissaoId);

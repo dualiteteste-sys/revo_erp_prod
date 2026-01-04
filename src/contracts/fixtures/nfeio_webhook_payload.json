@@ -1,0 +1,10 @@
+{
+  "data": {
+    "status": "AUTHORIZED",
+    "links": {
+      "xml": "https://example.com/doc.xml",
+      "danfe": "https://example.com/doc.pdf"
+    }
+  }
+}
+
