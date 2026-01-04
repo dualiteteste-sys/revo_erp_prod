@@ -66,10 +66,9 @@ export default function RoadmapWizardModal({ isOpen, onClose }: Props) {
     return all.filter((g) => {
       if (g.key === 'industria') return features.industria_enabled;
       if (g.key === 'servicos') return features.servicos_enabled;
-      if (g.key === 'fiscal') return features.nfe_emissao_enabled;
       return true;
     });
-  }, [features.industria_enabled, features.nfe_emissao_enabled, features.servicos_enabled]);
+  }, [features.industria_enabled, features.servicos_enabled]);
 
   const active = useMemo(() => roadmaps.find((r) => r.key === activeKey) ?? roadmaps[0] ?? null, [activeKey, roadmaps]);
 

@@ -4060,13 +4060,13 @@ alter table "public"."compras_pedidos" alter column "total_produtos" set data ty
 
 alter table "public"."compras_pedidos" alter column "updated_at" drop not null;
 
-alter table "public"."empresa_addons" add column "billing_cycle" text not null;
+alter table "public"."empresa_addons" add column if not exists "billing_cycle" text not null;
 
-alter table "public"."empresa_addons" add column "current_period_end" timestamp with time zone;
+alter table "public"."empresa_addons" add column if not exists "current_period_end" timestamp with time zone;
 
-alter table "public"."empresa_addons" add column "stripe_price_id" text;
+alter table "public"."empresa_addons" add column if not exists "stripe_price_id" text;
 
-alter table "public"."empresa_addons" add column "stripe_subscription_id" text;
+alter table "public"."empresa_addons" add column if not exists "stripe_subscription_id" text;
 
 alter table "public"."empresa_addons" alter column "cancel_at_period_end" set not null;
 
@@ -4096,11 +4096,11 @@ alter table "public"."empresas" drop column "inscr_municipal";
 
 alter table "public"."empresas" drop column "nome_fantasia";
 
-alter table "public"."empresas" add column "fantasia" text;
+alter table "public"."empresas" add column if not exists "fantasia" text;
 
-alter table "public"."empresas" add column "razao_social" text not null;
+alter table "public"."empresas" add column if not exists "razao_social" text not null;
 
-alter table "public"."empresas" add column "stripe_customer_id" text;
+alter table "public"."empresas" add column if not exists "stripe_customer_id" text;
 
 alter table "public"."empresas" alter column "created_at" set not null;
 
@@ -4110,43 +4110,43 @@ alter table "public"."empresas" alter column "nome_razao_social" set not null;
 
 alter table "public"."empresas" alter column "updated_at" set not null;
 
-alter table "public"."estoque_movimentos" add column "created_by" uuid default public.current_user_id();
+alter table "public"."estoque_movimentos" add column if not exists "created_by" uuid default public.current_user_id();
 
-alter table "public"."estoque_movimentos" add column "custo_unitario" numeric(15,4);
+alter table "public"."estoque_movimentos" add column if not exists "custo_unitario" numeric(15,4);
 
-alter table "public"."estoque_movimentos" add column "documento_ref" text;
+alter table "public"."estoque_movimentos" add column if not exists "documento_ref" text;
 
-alter table "public"."estoque_movimentos" add column "observacao" text;
+alter table "public"."estoque_movimentos" add column if not exists "observacao" text;
 
-alter table "public"."estoque_movimentos" add column "saldo_novo" numeric(15,4);
+alter table "public"."estoque_movimentos" add column if not exists "saldo_novo" numeric(15,4);
 
 alter table "public"."estoque_movimentos" alter column "saldo_anterior" drop not null;
 
 alter table "public"."estoque_movimentos" alter column "saldo_atual" drop not null;
 
-alter table "public"."estoque_saldos" add column "localizacao" text;
+alter table "public"."estoque_saldos" add column if not exists "localizacao" text;
 
 alter table "public"."estoque_saldos" alter column "custo_medio" drop not null;
 
-alter table "public"."industria_centros_trabalho" add column "capacidade_unidade_hora" numeric(15,4);
+alter table "public"."industria_centros_trabalho" add column if not exists "capacidade_unidade_hora" numeric(15,4);
 
-alter table "public"."industria_centros_trabalho" add column "tipo_uso" text not null default 'ambos'::text;
+alter table "public"."industria_centros_trabalho" add column if not exists "tipo_uso" text not null default 'ambos'::text;
 
 alter table "public"."industria_centros_trabalho" alter column "ativo" set not null;
 
 alter table "public"."industria_centros_trabalho" alter column "capacidade_horas_dia" set data type numeric using "capacidade_horas_dia"::numeric;
 
-alter table "public"."industria_producao_componentes" add column "origem" text not null default 'manual'::text;
+alter table "public"."industria_producao_componentes" add column if not exists "origem" text not null default 'manual'::text;
 
-alter table "public"."industria_producao_componentes" add column "quantidade_consumida" numeric(15,4) not null default 0;
+alter table "public"."industria_producao_componentes" add column if not exists "quantidade_consumida" numeric(15,4) not null default 0;
 
 alter table "public"."industria_producao_componentes" alter column "unidade" set not null;
 
-alter table "public"."industria_producao_entregas" add column "status_integracao" text not null default 'nao_integrado'::text;
+alter table "public"."industria_producao_entregas" add column if not exists "status_integracao" text not null default 'nao_integrado'::text;
 
 alter table "public"."industria_producao_entregas" alter column "data_entrega" set not null;
 
-alter table "public"."industria_producao_ordens" add column "recurso_principal_id" uuid;
+alter table "public"."industria_producao_ordens" add column if not exists "recurso_principal_id" uuid;
 
 alter table "public"."industria_producao_ordens" alter column "prioridade" set not null;
 
@@ -4154,13 +4154,13 @@ alter table "public"."industria_producao_ordens" alter column "status" set not n
 
 alter table "public"."industria_producao_ordens" alter column "unidade" set not null;
 
-alter table "public"."industria_roteiros" add column "codigo" text;
+alter table "public"."industria_roteiros" add column if not exists "codigo" text;
 
-alter table "public"."industria_roteiros" add column "observacoes" text;
+alter table "public"."industria_roteiros" add column if not exists "observacoes" text;
 
-alter table "public"."industria_roteiros" add column "padrao_para_beneficiamento" boolean not null default false;
+alter table "public"."industria_roteiros" add column if not exists "padrao_para_beneficiamento" boolean not null default false;
 
-alter table "public"."industria_roteiros" add column "padrao_para_producao" boolean not null default false;
+alter table "public"."industria_roteiros" add column if not exists "padrao_para_producao" boolean not null default false;
 
 alter table "public"."industria_roteiros" alter column "ativo" set not null;
 
@@ -4172,15 +4172,15 @@ alter table "public"."industria_roteiros" alter column "tipo_bom" set not null;
 
 alter table "public"."industria_roteiros" alter column "versao" set not null;
 
-alter table "public"."industria_roteiros_etapas" add column "observacoes" text;
+alter table "public"."industria_roteiros_etapas" add column if not exists "observacoes" text;
 
-alter table "public"."industria_roteiros_etapas" add column "permitir_overlap" boolean not null default false;
+alter table "public"."industria_roteiros_etapas" add column if not exists "permitir_overlap" boolean not null default false;
 
-alter table "public"."industria_roteiros_etapas" add column "tempo_ciclo_min_por_unidade" numeric(10,4);
+alter table "public"."industria_roteiros_etapas" add column if not exists "tempo_ciclo_min_por_unidade" numeric(10,4);
 
-alter table "public"."industria_roteiros_etapas" add column "tempo_setup_min" numeric(10,2);
+alter table "public"."industria_roteiros_etapas" add column if not exists "tempo_setup_min" numeric(10,2);
 
-alter table "public"."industria_roteiros_etapas" add column "tipo_operacao" text not null default 'producao'::text;
+alter table "public"."industria_roteiros_etapas" add column if not exists "tipo_operacao" text not null default 'producao'::text;
 
 alter table "public"."industria_roteiros_etapas" alter column "centro_trabalho_id" set not null;
 
@@ -4194,9 +4194,9 @@ alter table "public"."pessoa_enderecos" alter column "empresa_id" drop default;
 
 alter table "public"."pessoa_enderecos" alter column "tipo_endereco" set default 'principal'::text;
 
-alter table "public"."pessoas" add column "carteira_habilitacao" text;
+alter table "public"."pessoas" add column if not exists "carteira_habilitacao" text;
 
-alter table "public"."pessoas" add column "rg" text;
+alter table "public"."pessoas" add column if not exists "rg" text;
 
 alter table "public"."pessoas" alter column "contribuinte_icms" set not null;
 
@@ -4212,95 +4212,95 @@ alter table "public"."pessoas" alter column "tipo_pessoa" set not null;
 
 alter table "public"."pessoas" alter column "updated_at" set not null;
 
-alter table "public"."produto_imagens" add column "ordem" integer not null default 0;
+alter table "public"."produto_imagens" add column if not exists "ordem" integer not null default 0;
 
 alter table "public"."produto_imagens" alter column "created_at" set not null;
 
 alter table "public"."produto_imagens" alter column "updated_at" set not null;
 
-alter table "public"."produtos" add column "altura_cm" numeric(10,1) default 0;
+alter table "public"."produtos" add column if not exists "altura_cm" numeric(10,1) default 0;
 
-alter table "public"."produtos" add column "cest" text;
+alter table "public"."produtos" add column if not exists "cest" text;
 
-alter table "public"."produtos" add column "codigo_enquadramento_ipi" text;
+alter table "public"."produtos" add column if not exists "codigo_enquadramento_ipi" text;
 
-alter table "public"."produtos" add column "codigo_enquadramento_legal_ipi" text;
+alter table "public"."produtos" add column if not exists "codigo_enquadramento_legal_ipi" text;
 
-alter table "public"."produtos" add column "comprimento_cm" numeric(10,1) default 0;
+alter table "public"."produtos" add column if not exists "comprimento_cm" numeric(10,1) default 0;
 
-alter table "public"."produtos" add column "controla_estoque" boolean not null default true;
+alter table "public"."produtos" add column if not exists "controla_estoque" boolean not null default true;
 
-alter table "public"."produtos" add column "descricao_complementar" text;
+alter table "public"."produtos" add column if not exists "descricao_complementar" text;
 
-alter table "public"."produtos" add column "diametro_cm" numeric(10,1) default 0;
+alter table "public"."produtos" add column if not exists "diametro_cm" numeric(10,1) default 0;
 
-alter table "public"."produtos" add column "dias_preparacao" integer default 0;
+alter table "public"."produtos" add column if not exists "dias_preparacao" integer default 0;
 
-alter table "public"."produtos" add column "embalagem" text;
+alter table "public"."produtos" add column if not exists "embalagem" text;
 
-alter table "public"."produtos" add column "estoque_max" numeric(14,3) default 0;
+alter table "public"."produtos" add column if not exists "estoque_max" numeric(14,3) default 0;
 
-alter table "public"."produtos" add column "estoque_min" numeric(14,3) default 0;
+alter table "public"."produtos" add column if not exists "estoque_min" numeric(14,3) default 0;
 
-alter table "public"."produtos" add column "ex_tipi" text;
+alter table "public"."produtos" add column if not exists "ex_tipi" text;
 
-alter table "public"."produtos" add column "fator_conversao" numeric(14,6);
+alter table "public"."produtos" add column if not exists "fator_conversao" numeric(14,6);
 
-alter table "public"."produtos" add column "garantia_meses" integer;
+alter table "public"."produtos" add column if not exists "garantia_meses" integer;
 
-alter table "public"."produtos" add column "gtin" text;
+alter table "public"."produtos" add column if not exists "gtin" text;
 
-alter table "public"."produtos" add column "gtin_tributavel" text;
+alter table "public"."produtos" add column if not exists "gtin_tributavel" text;
 
-alter table "public"."produtos" add column "icms_origem" smallint not null;
+alter table "public"."produtos" add column if not exists "icms_origem" smallint not null;
 
-alter table "public"."produtos" add column "itens_por_caixa" integer default 0;
+alter table "public"."produtos" add column if not exists "itens_por_caixa" integer default 0;
 
-alter table "public"."produtos" add column "keywords" text;
+alter table "public"."produtos" add column if not exists "keywords" text;
 
-alter table "public"."produtos" add column "largura_cm" numeric(10,1) default 0;
+alter table "public"."produtos" add column if not exists "largura_cm" numeric(10,1) default 0;
 
-alter table "public"."produtos" add column "linha_produto_id" uuid;
+alter table "public"."produtos" add column if not exists "linha_produto_id" uuid;
 
-alter table "public"."produtos" add column "localizacao" text;
+alter table "public"."produtos" add column if not exists "localizacao" text;
 
-alter table "public"."produtos" add column "marca_id" uuid;
+alter table "public"."produtos" add column if not exists "marca_id" uuid;
 
-alter table "public"."produtos" add column "markup" numeric(10,5) default 0;
+alter table "public"."produtos" add column if not exists "markup" numeric(10,5) default 0;
 
-alter table "public"."produtos" add column "moeda" character(3) not null default 'BRL'::bpchar;
+alter table "public"."produtos" add column if not exists "moeda" character(3) not null default 'BRL'::bpchar;
 
-alter table "public"."produtos" add column "ncm" text;
+alter table "public"."produtos" add column if not exists "ncm" text;
 
-alter table "public"."produtos" add column "num_volumes" integer default 0;
+alter table "public"."produtos" add column if not exists "num_volumes" integer default 0;
 
-alter table "public"."produtos" add column "observacoes_internas" text;
+alter table "public"."produtos" add column if not exists "observacoes_internas" text;
 
-alter table "public"."produtos" add column "permitir_inclusao_vendas" boolean not null default true;
+alter table "public"."produtos" add column if not exists "permitir_inclusao_vendas" boolean not null default true;
 
-alter table "public"."produtos" add column "peso_bruto_kg" numeric(10,3) default 0;
+alter table "public"."produtos" add column if not exists "peso_bruto_kg" numeric(10,3) default 0;
 
-alter table "public"."produtos" add column "peso_liquido_kg" numeric(10,3) default 0;
+alter table "public"."produtos" add column if not exists "peso_liquido_kg" numeric(10,3) default 0;
 
-alter table "public"."produtos" add column "produto_pai_id" uuid;
+alter table "public"."produtos" add column if not exists "produto_pai_id" uuid;
 
-alter table "public"."produtos" add column "seo_descricao" text;
+alter table "public"."produtos" add column if not exists "seo_descricao" text;
 
-alter table "public"."produtos" add column "seo_titulo" text;
+alter table "public"."produtos" add column if not exists "seo_titulo" text;
 
-alter table "public"."produtos" add column "slug" text;
+alter table "public"."produtos" add column if not exists "slug" text;
 
-alter table "public"."produtos" add column "status" public.status_produto not null default 'ativo'::public.status_produto;
+alter table "public"."produtos" add column if not exists "status" public.status_produto not null default 'ativo'::public.status_produto;
 
-alter table "public"."produtos" add column "tabela_medidas_id" uuid;
+alter table "public"."produtos" add column if not exists "tabela_medidas_id" uuid;
 
-alter table "public"."produtos" add column "tipo_embalagem" public.tipo_embalagem not null default 'pacote_caixa'::public.tipo_embalagem;
+alter table "public"."produtos" add column if not exists "tipo_embalagem" public.tipo_embalagem not null default 'pacote_caixa'::public.tipo_embalagem;
 
-alter table "public"."produtos" add column "unidade_tributavel" text;
+alter table "public"."produtos" add column if not exists "unidade_tributavel" text;
 
-alter table "public"."produtos" add column "valor_ipi_fixo" numeric(14,2);
+alter table "public"."produtos" add column if not exists "valor_ipi_fixo" numeric(14,2);
 
-alter table "public"."produtos" add column "video_url" text;
+alter table "public"."produtos" add column if not exists "video_url" text;
 
 alter table "public"."produtos" alter column "controlar_lotes" set not null;
 
@@ -4328,487 +4328,487 @@ alter sequence "public"."compras_pedidos_numero_seq" owned by "public"."compras_
 
 alter sequence "public"."industria_benef_ordens_numero_seq" owned by "public"."industria_benef_ordens"."numero";
 
-CREATE UNIQUE INDEX addons_pkey ON public.addons USING btree (id);
+CREATE UNIQUE INDEX IF NOT EXISTS addons_pkey ON public.addons USING btree (id);
 
-CREATE UNIQUE INDEX addons_slug_billing_cycle_key ON public.addons USING btree (slug, billing_cycle);
+CREATE UNIQUE INDEX IF NOT EXISTS addons_slug_billing_cycle_key ON public.addons USING btree (slug, billing_cycle);
 
-CREATE UNIQUE INDEX addons_stripe_price_id_key ON public.addons USING btree (stripe_price_id);
+CREATE UNIQUE INDEX IF NOT EXISTS addons_stripe_price_id_key ON public.addons USING btree (stripe_price_id);
 
-CREATE UNIQUE INDEX anuncio_identificador_unique ON public.produto_anuncios USING btree (ecommerce_id, identificador);
+CREATE UNIQUE INDEX IF NOT EXISTS anuncio_identificador_unique ON public.produto_anuncios USING btree (ecommerce_id, identificador);
 
-CREATE UNIQUE INDEX atributos_pkey ON public.atributos USING btree (id);
+CREATE UNIQUE INDEX IF NOT EXISTS atributos_pkey ON public.atributos USING btree (id);
 
-CREATE UNIQUE INDEX atributos_unique_per_company ON public.atributos USING btree (empresa_id, nome);
+CREATE UNIQUE INDEX IF NOT EXISTS atributos_unique_per_company ON public.atributos USING btree (empresa_id, nome);
 
-CREATE UNIQUE INDEX centros_de_custo_pkey ON public.centros_de_custo USING btree (id);
+CREATE UNIQUE INDEX IF NOT EXISTS centros_de_custo_pkey ON public.centros_de_custo USING btree (id);
 
-CREATE UNIQUE INDEX compras_itens_pkey ON public.compras_itens USING btree (id);
+CREATE UNIQUE INDEX IF NOT EXISTS compras_itens_pkey ON public.compras_itens USING btree (id);
 
-CREATE UNIQUE INDEX crm_etapas_funil_nome_uk ON public.crm_etapas USING btree (funil_id, nome);
+CREATE UNIQUE INDEX IF NOT EXISTS crm_etapas_funil_nome_uk ON public.crm_etapas USING btree (funil_id, nome);
 
-CREATE UNIQUE INDEX ecommerces_pkey ON public.ecommerces USING btree (id);
+CREATE UNIQUE INDEX IF NOT EXISTS ecommerces_pkey ON public.ecommerces USING btree (id);
 
-CREATE UNIQUE INDEX ecommerces_unique_per_company ON public.ecommerces USING btree (empresa_id, nome);
+CREATE UNIQUE INDEX IF NOT EXISTS ecommerces_unique_per_company ON public.ecommerces USING btree (empresa_id, nome);
 
-CREATE INDEX empresa_addons_sub_idx ON public.empresa_addons USING btree (stripe_subscription_id);
+CREATE INDEX IF NOT EXISTS empresa_addons_sub_idx ON public.empresa_addons USING btree (stripe_subscription_id);
 
-CREATE INDEX empresa_usuarios_user_id_idx ON public.empresa_usuarios USING btree (user_id);
+CREATE INDEX IF NOT EXISTS empresa_usuarios_user_id_idx ON public.empresa_usuarios USING btree (user_id);
 
-CREATE UNIQUE INDEX empresas_cnpj_unique_not_null ON public.empresas USING btree (cnpj) WHERE (cnpj IS NOT NULL);
+CREATE UNIQUE INDEX IF NOT EXISTS empresas_cnpj_unique_not_null ON public.empresas USING btree (cnpj) WHERE (cnpj IS NOT NULL);
 
-CREATE UNIQUE INDEX empresas_stripe_customer_id_key ON public.empresas USING btree (stripe_customer_id);
+CREATE UNIQUE INDEX IF NOT EXISTS empresas_stripe_customer_id_key ON public.empresas USING btree (stripe_customer_id);
 
-CREATE UNIQUE INDEX fornecedores_pkey ON public.fornecedores USING btree (id);
+CREATE UNIQUE INDEX IF NOT EXISTS fornecedores_pkey ON public.fornecedores USING btree (id);
 
-CREATE UNIQUE INDEX fornecedores_unq ON public.fornecedores USING btree (empresa_id, nome);
+CREATE UNIQUE INDEX IF NOT EXISTS fornecedores_unq ON public.fornecedores USING btree (empresa_id, nome);
 
-CREATE INDEX idx__bak_empresa_usuarios_empresa_status_created ON public._bak_empresa_usuarios USING btree (empresa_id, status, created_at);
+CREATE INDEX IF NOT EXISTS idx__bak_empresa_usuarios_empresa_status_created ON public._bak_empresa_usuarios USING btree (empresa_id, status, created_at);
 
-CREATE INDEX idx_atributos_empresa_created ON public.atributos USING btree (empresa_id, created_at);
+CREATE INDEX IF NOT EXISTS idx_atributos_empresa_created ON public.atributos USING btree (empresa_id, created_at);
 
-CREATE INDEX idx_benef_ordens_usa_matcli ON public.industria_benef_ordens USING btree (usa_material_cliente);
+CREATE INDEX IF NOT EXISTS idx_benef_ordens_usa_matcli ON public.industria_benef_ordens USING btree (usa_material_cliente);
 
-CREATE INDEX idx_centros_de_custo_empresa_status_created ON public.centros_de_custo USING btree (empresa_id, status, created_at);
+CREATE INDEX IF NOT EXISTS idx_centros_de_custo_empresa_status_created ON public.centros_de_custo USING btree (empresa_id, status, created_at);
 
-CREATE INDEX idx_centros_de_custo_status ON public.centros_de_custo USING btree (status);
+CREATE INDEX IF NOT EXISTS idx_centros_de_custo_status ON public.centros_de_custo USING btree (status);
 
-CREATE INDEX idx_compras_itens_empresa_id_114b3b ON public.compras_itens USING btree (empresa_id);
+CREATE INDEX IF NOT EXISTS idx_compras_itens_empresa_id_114b3b ON public.compras_itens USING btree (empresa_id);
 
-CREATE INDEX idx_compras_itens_pedido_id_8ab9b0 ON public.compras_itens USING btree (pedido_id);
+CREATE INDEX IF NOT EXISTS idx_compras_itens_pedido_id_8ab9b0 ON public.compras_itens USING btree (pedido_id);
 
-CREATE INDEX idx_compras_itens_produto_id_0ba593 ON public.compras_itens USING btree (produto_id);
+CREATE INDEX IF NOT EXISTS idx_compras_itens_produto_id_0ba593 ON public.compras_itens USING btree (produto_id);
 
-CREATE INDEX idx_compras_pedidos_empresa_status_created ON public.compras_pedidos USING btree (empresa_id, status, created_at);
+CREATE INDEX IF NOT EXISTS idx_compras_pedidos_empresa_status_created ON public.compras_pedidos USING btree (empresa_id, status, created_at);
 
-CREATE INDEX idx_compras_pedidos_fornecedor_id_7d5f9e ON public.compras_pedidos USING btree (fornecedor_id);
+CREATE INDEX IF NOT EXISTS idx_compras_pedidos_fornecedor_id_7d5f9e ON public.compras_pedidos USING btree (fornecedor_id);
 
-CREATE INDEX idx_contas_a_receber_cliente_id_7e25f4 ON public.contas_a_receber USING btree (cliente_id);
+CREATE INDEX IF NOT EXISTS idx_contas_a_receber_cliente_id_7e25f4 ON public.contas_a_receber USING btree (cliente_id);
 
-CREATE INDEX idx_contas_a_receber_empresa_status_created ON public.contas_a_receber USING btree (empresa_id, status, created_at);
+CREATE INDEX IF NOT EXISTS idx_contas_a_receber_empresa_status_created ON public.contas_a_receber USING btree (empresa_id, status, created_at);
 
-CREATE INDEX idx_crm_etapas_empresa_funil ON public.crm_etapas USING btree (empresa_id, funil_id, ordem);
+CREATE INDEX IF NOT EXISTS idx_crm_etapas_empresa_funil ON public.crm_etapas USING btree (empresa_id, funil_id, ordem);
 
-CREATE INDEX idx_crm_funis_empresa_padrao ON public.crm_funis USING btree (empresa_id, padrao);
+CREATE INDEX IF NOT EXISTS idx_crm_funis_empresa_padrao ON public.crm_funis USING btree (empresa_id, padrao);
 
-CREATE INDEX idx_crm_oportunidades_cliente_id_1767ea ON public.crm_oportunidades USING btree (cliente_id);
+CREATE INDEX IF NOT EXISTS idx_crm_oportunidades_cliente_id_1767ea ON public.crm_oportunidades USING btree (cliente_id);
 
-CREATE INDEX idx_crm_oportunidades_empresa_status_created ON public.crm_oportunidades USING btree (empresa_id, status, created_at);
+CREATE INDEX IF NOT EXISTS idx_crm_oportunidades_empresa_status_created ON public.crm_oportunidades USING btree (empresa_id, status, created_at);
 
-CREATE INDEX idx_crm_oportunidades_etapa_id_57d18e ON public.crm_oportunidades USING btree (etapa_id);
+CREATE INDEX IF NOT EXISTS idx_crm_oportunidades_etapa_id_57d18e ON public.crm_oportunidades USING btree (etapa_id);
 
-CREATE INDEX idx_crm_oportunidades_funil_id_35d633 ON public.crm_oportunidades USING btree (funil_id);
+CREATE INDEX IF NOT EXISTS idx_crm_oportunidades_funil_id_35d633 ON public.crm_oportunidades USING btree (funil_id);
 
-CREATE INDEX idx_ecommerces_empresa_created ON public.ecommerces USING btree (empresa_id, created_at);
+CREATE INDEX IF NOT EXISTS idx_ecommerces_empresa_created ON public.ecommerces USING btree (empresa_id, created_at);
 
-CREATE INDEX idx_empresa_addons_addon_slug_billing_cycle_8463e2 ON public.empresa_addons USING btree (addon_slug, billing_cycle);
+CREATE INDEX IF NOT EXISTS idx_empresa_addons_addon_slug_billing_cycle_8463e2 ON public.empresa_addons USING btree (addon_slug, billing_cycle);
 
-CREATE INDEX idx_empresa_addons_empresa_status_created ON public.empresa_addons USING btree (empresa_id, status, created_at);
+CREATE INDEX IF NOT EXISTS idx_empresa_addons_empresa_status_created ON public.empresa_addons USING btree (empresa_id, status, created_at);
 
-CREATE INDEX idx_empresa_usuarios__empresa_created_at ON public.empresa_usuarios USING btree (empresa_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_empresa_usuarios__empresa_created_at ON public.empresa_usuarios USING btree (empresa_id, created_at DESC);
 
-CREATE INDEX idx_empresa_usuarios_empresa_status_created ON public.empresa_usuarios USING btree (empresa_id, status, created_at);
+CREATE INDEX IF NOT EXISTS idx_empresa_usuarios_empresa_status_created ON public.empresa_usuarios USING btree (empresa_id, status, created_at);
 
-CREATE INDEX idx_empresa_usuarios_role_id_b5c8a7 ON public.empresa_usuarios USING btree (role_id);
+CREATE INDEX IF NOT EXISTS idx_empresa_usuarios_role_id_b5c8a7 ON public.empresa_usuarios USING btree (role_id);
 
-CREATE INDEX idx_estoque_movimentos_data ON public.estoque_movimentos USING btree (created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_estoque_movimentos_data ON public.estoque_movimentos USING btree (created_at DESC);
 
-CREATE INDEX idx_estoque_movimentos_produto ON public.estoque_movimentos USING btree (produto_id);
+CREATE INDEX IF NOT EXISTS idx_estoque_movimentos_produto ON public.estoque_movimentos USING btree (produto_id);
 
-CREATE INDEX idx_estoque_saldos_produto ON public.estoque_saldos USING btree (produto_id);
+CREATE INDEX IF NOT EXISTS idx_estoque_saldos_produto ON public.estoque_saldos USING btree (produto_id);
 
-CREATE INDEX idx_financeiro_centros_custos_parent_id_47af81 ON public.financeiro_centros_custos USING btree (parent_id);
+CREATE INDEX IF NOT EXISTS idx_financeiro_centros_custos_parent_id_47af81 ON public.financeiro_centros_custos USING btree (parent_id);
 
-CREATE INDEX idx_financeiro_cobrancas_bancarias_cliente_id_e97989 ON public.financeiro_cobrancas_bancarias USING btree (cliente_id);
+CREATE INDEX IF NOT EXISTS idx_financeiro_cobrancas_bancarias_cliente_id_e97989 ON public.financeiro_cobrancas_bancarias USING btree (cliente_id);
 
-CREATE INDEX idx_financeiro_cobrancas_bancarias_conta_corrente_id_8898fe ON public.financeiro_cobrancas_bancarias USING btree (conta_corrente_id);
+CREATE INDEX IF NOT EXISTS idx_financeiro_cobrancas_bancarias_conta_corrente_id_8898fe ON public.financeiro_cobrancas_bancarias USING btree (conta_corrente_id);
 
-CREATE INDEX idx_financeiro_cobrancas_bancarias_empresa_status_created ON public.financeiro_cobrancas_bancarias USING btree (empresa_id, status, created_at);
+CREATE INDEX IF NOT EXISTS idx_financeiro_cobrancas_bancarias_empresa_status_created ON public.financeiro_cobrancas_bancarias USING btree (empresa_id, status, created_at);
 
-CREATE INDEX idx_financeiro_cobrancas_bancarias_eventos_cobranca_id_ca78b2 ON public.financeiro_cobrancas_bancarias_eventos USING btree (cobranca_id);
+CREATE INDEX IF NOT EXISTS idx_financeiro_cobrancas_bancarias_eventos_cobranca_id_ca78b2 ON public.financeiro_cobrancas_bancarias_eventos USING btree (cobranca_id);
 
-CREATE INDEX idx_financeiro_contas_pagar_empresa_status_created ON public.financeiro_contas_pagar USING btree (empresa_id, status, created_at);
+CREATE INDEX IF NOT EXISTS idx_financeiro_contas_pagar_empresa_status_created ON public.financeiro_contas_pagar USING btree (empresa_id, status, created_at);
 
-CREATE INDEX idx_financeiro_contas_pagar_fornecedor_id_910ae7 ON public.financeiro_contas_pagar USING btree (fornecedor_id);
+CREATE INDEX IF NOT EXISTS idx_financeiro_contas_pagar_fornecedor_id_910ae7 ON public.financeiro_contas_pagar USING btree (fornecedor_id);
 
-CREATE INDEX idx_financeiro_extratos_bancarios_conta_corrente_id_7bba86 ON public.financeiro_extratos_bancarios USING btree (conta_corrente_id);
+CREATE INDEX IF NOT EXISTS idx_financeiro_extratos_bancarios_conta_corrente_id_7bba86 ON public.financeiro_extratos_bancarios USING btree (conta_corrente_id);
 
-CREATE INDEX idx_financeiro_extratos_bancarios_movimentacao_id_d3d9ac ON public.financeiro_extratos_bancarios USING btree (movimentacao_id);
+CREATE INDEX IF NOT EXISTS idx_financeiro_extratos_bancarios_movimentacao_id_d3d9ac ON public.financeiro_extratos_bancarios USING btree (movimentacao_id);
 
-CREATE INDEX idx_financeiro_movimentacoes_conta_corrente_id_011dac ON public.financeiro_movimentacoes USING btree (conta_corrente_id);
+CREATE INDEX IF NOT EXISTS idx_financeiro_movimentacoes_conta_corrente_id_011dac ON public.financeiro_movimentacoes USING btree (conta_corrente_id);
 
-CREATE INDEX idx_fk_industria_ordens_ent_empresa_id_0fc9b6 ON public.industria_ordens_entregas USING btree (empresa_id);
+CREATE INDEX IF NOT EXISTS idx_fk_industria_ordens_ent_empresa_id_0fc9b6 ON public.industria_ordens_entregas USING btree (empresa_id);
 
-CREATE INDEX idx_fk_industria_ordens_ent_ordem_id_dfb6ce ON public.industria_ordens_entregas USING btree (ordem_id);
+CREATE INDEX IF NOT EXISTS idx_fk_industria_ordens_ent_ordem_id_dfb6ce ON public.industria_ordens_entregas USING btree (ordem_id);
 
-CREATE INDEX idx_fk_rh_colaborador_compe_competencia_id_faf9af ON public.rh_colaborador_competencias USING btree (competencia_id);
+CREATE INDEX IF NOT EXISTS idx_fk_rh_colaborador_compe_competencia_id_faf9af ON public.rh_colaborador_competencias USING btree (competencia_id);
 
-CREATE INDEX idx_fk_rh_colaboradores_cargo_id_b0a22b ON public.rh_colaboradores USING btree (cargo_id);
+CREATE INDEX IF NOT EXISTS idx_fk_rh_colaboradores_cargo_id_b0a22b ON public.rh_colaboradores USING btree (cargo_id);
 
-CREATE INDEX idx_fk_rh_colaboradores_empresa_id_5d6e0b ON public.rh_colaboradores USING btree (empresa_id);
+CREATE INDEX IF NOT EXISTS idx_fk_rh_colaboradores_empresa_id_5d6e0b ON public.rh_colaboradores USING btree (empresa_id);
 
-CREATE INDEX idx_fk_rh_colaboradores_user_id_48ffff ON public.rh_colaboradores USING btree (user_id);
+CREATE INDEX IF NOT EXISTS idx_fk_rh_colaboradores_user_id_48ffff ON public.rh_colaboradores USING btree (user_id);
 
-CREATE INDEX idx_fk_rh_treinamento_parti_colaborador_id_e99352 ON public.rh_treinamento_participantes USING btree (colaborador_id);
+CREATE INDEX IF NOT EXISTS idx_fk_rh_treinamento_parti_colaborador_id_e99352 ON public.rh_treinamento_participantes USING btree (colaborador_id);
 
-CREATE INDEX idx_fk_user_active_empresa_empresa_id_93c5cf ON public.user_active_empresa USING btree (empresa_id);
+CREATE INDEX IF NOT EXISTS idx_fk_user_active_empresa_empresa_id_93c5cf ON public.user_active_empresa USING btree (empresa_id);
 
-CREATE INDEX idx_fk_user_permission_over_permission_id_125dcb ON public.user_permission_overrides USING btree (permission_id);
+CREATE INDEX IF NOT EXISTS idx_fk_user_permission_over_permission_id_125dcb ON public.user_permission_overrides USING btree (permission_id);
 
-CREATE INDEX idx_fornecedores_empresa_created ON public.fornecedores USING btree (empresa_id, created_at);
+CREATE INDEX IF NOT EXISTS idx_fornecedores_empresa_created ON public.fornecedores USING btree (empresa_id, created_at);
 
-CREATE INDEX idx_ind_benef_ordens_status ON public.industria_benef_ordens USING btree (status);
+CREATE INDEX IF NOT EXISTS idx_ind_benef_ordens_status ON public.industria_benef_ordens USING btree (status);
 
-CREATE INDEX idx_ind_boms_comp_empresa_bom ON public.industria_boms_componentes USING btree (empresa_id, bom_id);
+CREATE INDEX IF NOT EXISTS idx_ind_boms_comp_empresa_bom ON public.industria_boms_componentes USING btree (empresa_id, bom_id);
 
-CREATE INDEX idx_ind_boms_comp_empresa_produto ON public.industria_boms_componentes USING btree (empresa_id, produto_id);
+CREATE INDEX IF NOT EXISTS idx_ind_boms_comp_empresa_produto ON public.industria_boms_componentes USING btree (empresa_id, produto_id);
 
-CREATE UNIQUE INDEX idx_ind_boms_empresa_produto_tipo_versao ON public.industria_boms USING btree (empresa_id, produto_final_id, tipo_bom, versao);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_ind_boms_empresa_produto_tipo_versao ON public.industria_boms USING btree (empresa_id, produto_final_id, tipo_bom, versao);
 
-CREATE INDEX idx_ind_ct_empresa_ativo ON public.industria_centros_trabalho USING btree (empresa_id, ativo);
+CREATE INDEX IF NOT EXISTS idx_ind_ct_empresa_ativo ON public.industria_centros_trabalho USING btree (empresa_id, ativo);
 
-CREATE INDEX idx_ind_ct_empresa_nome ON public.industria_centros_trabalho USING btree (empresa_id, nome);
+CREATE INDEX IF NOT EXISTS idx_ind_ct_empresa_nome ON public.industria_centros_trabalho USING btree (empresa_id, nome);
 
-CREATE UNIQUE INDEX idx_ind_matcli_emp_cli_codigo_uk ON public.industria_materiais_cliente USING btree (empresa_id, cliente_id, codigo_cliente) WHERE (codigo_cliente IS NOT NULL);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_ind_matcli_emp_cli_codigo_uk ON public.industria_materiais_cliente USING btree (empresa_id, cliente_id, codigo_cliente) WHERE (codigo_cliente IS NOT NULL);
 
-CREATE INDEX idx_ind_op_apont_empresa_op ON public.industria_operacoes_apontamentos USING btree (empresa_id, operacao_id);
+CREATE INDEX IF NOT EXISTS idx_ind_op_apont_empresa_op ON public.industria_operacoes_apontamentos USING btree (empresa_id, operacao_id);
 
-CREATE INDEX idx_ind_op_empresa_ct_status ON public.industria_operacoes USING btree (empresa_id, centro_trabalho_id, status);
+CREATE INDEX IF NOT EXISTS idx_ind_op_empresa_ct_status ON public.industria_operacoes USING btree (empresa_id, centro_trabalho_id, status);
 
-CREATE INDEX idx_ind_op_empresa_ordem ON public.industria_operacoes USING btree (empresa_id, tipo_ordem, ordem_id);
+CREATE INDEX IF NOT EXISTS idx_ind_op_empresa_ordem ON public.industria_operacoes USING btree (empresa_id, tipo_ordem, ordem_id);
 
-CREATE INDEX idx_ind_op_empresa_prioridade ON public.industria_operacoes USING btree (empresa_id, prioridade);
+CREATE INDEX IF NOT EXISTS idx_ind_op_empresa_prioridade ON public.industria_operacoes USING btree (empresa_id, prioridade);
 
-CREATE INDEX idx_ind_ord_comp_emp_ordem ON public.industria_ordem_componentes USING btree (empresa_id, ordem_id);
+CREATE INDEX IF NOT EXISTS idx_ind_ord_comp_emp_ordem ON public.industria_ordem_componentes USING btree (empresa_id, ordem_id);
 
-CREATE INDEX idx_ind_ord_comp_emp_produto ON public.industria_ordem_componentes USING btree (empresa_id, produto_id);
+CREATE INDEX IF NOT EXISTS idx_ind_ord_comp_emp_produto ON public.industria_ordem_componentes USING btree (empresa_id, produto_id);
 
-CREATE INDEX idx_ind_ord_ent_emp_data ON public.industria_ordem_entregas USING btree (empresa_id, data_entrega);
+CREATE INDEX IF NOT EXISTS idx_ind_ord_ent_emp_data ON public.industria_ordem_entregas USING btree (empresa_id, data_entrega);
 
-CREATE INDEX idx_ind_ord_ent_emp_ordem ON public.industria_ordem_entregas USING btree (empresa_id, ordem_id);
+CREATE INDEX IF NOT EXISTS idx_ind_ord_ent_emp_ordem ON public.industria_ordem_entregas USING btree (empresa_id, ordem_id);
 
-CREATE INDEX idx_ind_prod_comp_ordem ON public.industria_producao_componentes USING btree (ordem_id);
+CREATE INDEX IF NOT EXISTS idx_ind_prod_comp_ordem ON public.industria_producao_componentes USING btree (ordem_id);
 
-CREATE INDEX idx_ind_prod_entregas_ordem ON public.industria_producao_entregas USING btree (ordem_id);
+CREATE INDEX IF NOT EXISTS idx_ind_prod_entregas_ordem ON public.industria_producao_entregas USING btree (ordem_id);
 
-CREATE INDEX idx_ind_prod_ordens_status ON public.industria_producao_ordens USING btree (status);
+CREATE INDEX IF NOT EXISTS idx_ind_prod_ordens_status ON public.industria_producao_ordens USING btree (status);
 
-CREATE UNIQUE INDEX idx_ind_rot_empresa_produto_tipo_versao ON public.industria_roteiros USING btree (empresa_id, produto_id, tipo_bom, versao);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_ind_rot_empresa_produto_tipo_versao ON public.industria_roteiros USING btree (empresa_id, produto_id, tipo_bom, versao);
 
-CREATE UNIQUE INDEX idx_ind_rot_etapas_seq ON public.industria_roteiros_etapas USING btree (empresa_id, roteiro_id, sequencia);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_ind_rot_etapas_seq ON public.industria_roteiros_etapas USING btree (empresa_id, roteiro_id, sequencia);
 
-CREATE INDEX idx_industria_benef_componentes_empresa_id_16aa8e ON public.industria_benef_componentes USING btree (empresa_id);
+CREATE INDEX IF NOT EXISTS idx_industria_benef_componentes_empresa_id_16aa8e ON public.industria_benef_componentes USING btree (empresa_id);
 
-CREATE INDEX idx_industria_benef_componentes_ordem_id_6052c0 ON public.industria_benef_componentes USING btree (ordem_id);
+CREATE INDEX IF NOT EXISTS idx_industria_benef_componentes_ordem_id_6052c0 ON public.industria_benef_componentes USING btree (ordem_id);
 
-CREATE INDEX idx_industria_benef_componentes_produto_id_081c4a ON public.industria_benef_componentes USING btree (produto_id);
+CREATE INDEX IF NOT EXISTS idx_industria_benef_componentes_produto_id_081c4a ON public.industria_benef_componentes USING btree (produto_id);
 
-CREATE INDEX idx_industria_benef_entregas_empresa_id_eca06b ON public.industria_benef_entregas USING btree (empresa_id);
+CREATE INDEX IF NOT EXISTS idx_industria_benef_entregas_empresa_id_eca06b ON public.industria_benef_entregas USING btree (empresa_id);
 
-CREATE INDEX idx_industria_benef_entregas_ordem_id_82d66b ON public.industria_benef_entregas USING btree (ordem_id);
+CREATE INDEX IF NOT EXISTS idx_industria_benef_entregas_ordem_id_82d66b ON public.industria_benef_entregas USING btree (ordem_id);
 
-CREATE INDEX idx_industria_benef_ordens_cliente_id_1d7a4b ON public.industria_benef_ordens USING btree (cliente_id);
+CREATE INDEX IF NOT EXISTS idx_industria_benef_ordens_cliente_id_1d7a4b ON public.industria_benef_ordens USING btree (cliente_id);
 
-CREATE INDEX idx_industria_benef_ordens_empresa_status_created ON public.industria_benef_ordens USING btree (empresa_id, status, created_at);
+CREATE INDEX IF NOT EXISTS idx_industria_benef_ordens_empresa_status_created ON public.industria_benef_ordens USING btree (empresa_id, status, created_at);
 
-CREATE INDEX idx_industria_benef_ordens_produto_material_cliente_id_0809a8 ON public.industria_benef_ordens USING btree (produto_material_cliente_id);
+CREATE INDEX IF NOT EXISTS idx_industria_benef_ordens_produto_material_cliente_id_0809a8 ON public.industria_benef_ordens USING btree (produto_material_cliente_id);
 
-CREATE INDEX idx_industria_benef_ordens_produto_servico_id_2c1f82 ON public.industria_benef_ordens USING btree (produto_servico_id);
+CREATE INDEX IF NOT EXISTS idx_industria_benef_ordens_produto_servico_id_2c1f82 ON public.industria_benef_ordens USING btree (produto_servico_id);
 
-CREATE INDEX idx_industria_boms_componentes_bom_id_2fa6d6 ON public.industria_boms_componentes USING btree (bom_id);
+CREATE INDEX IF NOT EXISTS idx_industria_boms_componentes_bom_id_2fa6d6 ON public.industria_boms_componentes USING btree (bom_id);
 
-CREATE INDEX idx_industria_boms_componentes_produto_id_802149 ON public.industria_boms_componentes USING btree (produto_id);
+CREATE INDEX IF NOT EXISTS idx_industria_boms_componentes_produto_id_802149 ON public.industria_boms_componentes USING btree (produto_id);
 
-CREATE INDEX idx_industria_boms_produto_final_id_cc55d1 ON public.industria_boms USING btree (produto_final_id);
+CREATE INDEX IF NOT EXISTS idx_industria_boms_produto_final_id_cc55d1 ON public.industria_boms USING btree (produto_final_id);
 
-CREATE INDEX idx_industria_materiais_cliente_cliente_id_cf5bee ON public.industria_materiais_cliente USING btree (cliente_id);
+CREATE INDEX IF NOT EXISTS idx_industria_materiais_cliente_cliente_id_cf5bee ON public.industria_materiais_cliente USING btree (cliente_id);
 
-CREATE INDEX idx_industria_materiais_cliente_produto_id_2b50d3 ON public.industria_materiais_cliente USING btree (produto_id);
+CREATE INDEX IF NOT EXISTS idx_industria_materiais_cliente_produto_id_2b50d3 ON public.industria_materiais_cliente USING btree (produto_id);
 
-CREATE INDEX idx_industria_operacoes_apontamentos_operacao_id_47b4c7 ON public.industria_operacoes_apontamentos USING btree (operacao_id);
+CREATE INDEX IF NOT EXISTS idx_industria_operacoes_apontamentos_operacao_id_47b4c7 ON public.industria_operacoes_apontamentos USING btree (operacao_id);
 
-CREATE INDEX idx_industria_operacoes_centro_trabalho_id_87a1b5 ON public.industria_operacoes USING btree (centro_trabalho_id);
+CREATE INDEX IF NOT EXISTS idx_industria_operacoes_centro_trabalho_id_87a1b5 ON public.industria_operacoes USING btree (centro_trabalho_id);
 
-CREATE INDEX idx_industria_operacoes_empresa_status_created ON public.industria_operacoes USING btree (empresa_id, status, created_at);
+CREATE INDEX IF NOT EXISTS idx_industria_operacoes_empresa_status_created ON public.industria_operacoes USING btree (empresa_id, status, created_at);
 
-CREATE INDEX idx_industria_operacoes_roteiro_etapa_id_7d3283 ON public.industria_operacoes USING btree (roteiro_etapa_id);
+CREATE INDEX IF NOT EXISTS idx_industria_operacoes_roteiro_etapa_id_7d3283 ON public.industria_operacoes USING btree (roteiro_etapa_id);
 
-CREATE INDEX idx_industria_operacoes_roteiro_id_0ca081 ON public.industria_operacoes USING btree (roteiro_id);
+CREATE INDEX IF NOT EXISTS idx_industria_operacoes_roteiro_id_0ca081 ON public.industria_operacoes USING btree (roteiro_id);
 
-CREATE INDEX idx_industria_ordem_componentes_ordem_id_f4c99a ON public.industria_ordem_componentes USING btree (ordem_id);
+CREATE INDEX IF NOT EXISTS idx_industria_ordem_componentes_ordem_id_f4c99a ON public.industria_ordem_componentes USING btree (ordem_id);
 
-CREATE INDEX idx_industria_ordem_componentes_produto_id_56ac86 ON public.industria_ordem_componentes USING btree (produto_id);
+CREATE INDEX IF NOT EXISTS idx_industria_ordem_componentes_produto_id_56ac86 ON public.industria_ordem_componentes USING btree (produto_id);
 
-CREATE INDEX idx_industria_ordem_entregas_ordem_id_26d5ca ON public.industria_ordem_entregas USING btree (ordem_id);
+CREATE INDEX IF NOT EXISTS idx_industria_ordem_entregas_ordem_id_26d5ca ON public.industria_ordem_entregas USING btree (ordem_id);
 
-CREATE INDEX idx_industria_ordens_cliente_id_9aa899 ON public.industria_ordens USING btree (cliente_id);
+CREATE INDEX IF NOT EXISTS idx_industria_ordens_cliente_id_9aa899 ON public.industria_ordens USING btree (cliente_id);
 
-CREATE INDEX idx_industria_ordens_componentes_ordem_id_0a15f7 ON public.industria_ordens_componentes USING btree (ordem_id);
+CREATE INDEX IF NOT EXISTS idx_industria_ordens_componentes_ordem_id_0a15f7 ON public.industria_ordens_componentes USING btree (ordem_id);
 
-CREATE INDEX idx_industria_ordens_componentes_produto_id_f28249 ON public.industria_ordens_componentes USING btree (produto_id);
+CREATE INDEX IF NOT EXISTS idx_industria_ordens_componentes_produto_id_f28249 ON public.industria_ordens_componentes USING btree (produto_id);
 
-CREATE INDEX idx_industria_ordens_empresa_status_created ON public.industria_ordens USING btree (empresa_id, status, created_at);
+CREATE INDEX IF NOT EXISTS idx_industria_ordens_empresa_status_created ON public.industria_ordens USING btree (empresa_id, status, created_at);
 
-CREATE INDEX idx_industria_ordens_produto_final_id_febfd1 ON public.industria_ordens USING btree (produto_final_id);
+CREATE INDEX IF NOT EXISTS idx_industria_ordens_produto_final_id_febfd1 ON public.industria_ordens USING btree (produto_final_id);
 
-CREATE INDEX idx_industria_producao_componentes_empresa_id_35174b ON public.industria_producao_componentes USING btree (empresa_id);
+CREATE INDEX IF NOT EXISTS idx_industria_producao_componentes_empresa_id_35174b ON public.industria_producao_componentes USING btree (empresa_id);
 
-CREATE INDEX idx_industria_producao_componentes_produto_id_10674d ON public.industria_producao_componentes USING btree (produto_id);
+CREATE INDEX IF NOT EXISTS idx_industria_producao_componentes_produto_id_10674d ON public.industria_producao_componentes USING btree (produto_id);
 
-CREATE INDEX idx_industria_producao_entregas_empresa_id_774fa8 ON public.industria_producao_entregas USING btree (empresa_id);
+CREATE INDEX IF NOT EXISTS idx_industria_producao_entregas_empresa_id_774fa8 ON public.industria_producao_entregas USING btree (empresa_id);
 
-CREATE INDEX idx_industria_producao_ordens_empresa_status_created ON public.industria_producao_ordens USING btree (empresa_id, status, created_at);
+CREATE INDEX IF NOT EXISTS idx_industria_producao_ordens_empresa_status_created ON public.industria_producao_ordens USING btree (empresa_id, status, created_at);
 
-CREATE INDEX idx_industria_producao_ordens_produto_final_id_bb0003 ON public.industria_producao_ordens USING btree (produto_final_id);
+CREATE INDEX IF NOT EXISTS idx_industria_producao_ordens_produto_final_id_bb0003 ON public.industria_producao_ordens USING btree (produto_final_id);
 
-CREATE INDEX idx_industria_roteiros_etapas_centro_trabalho_id_3623bc ON public.industria_roteiros_etapas USING btree (centro_trabalho_id);
+CREATE INDEX IF NOT EXISTS idx_industria_roteiros_etapas_centro_trabalho_id_3623bc ON public.industria_roteiros_etapas USING btree (centro_trabalho_id);
 
-CREATE INDEX idx_industria_roteiros_etapas_roteiro_id_72b583 ON public.industria_roteiros_etapas USING btree (roteiro_id);
+CREATE INDEX IF NOT EXISTS idx_industria_roteiros_etapas_roteiro_id_72b583 ON public.industria_roteiros_etapas USING btree (roteiro_id);
 
-CREATE INDEX idx_industria_roteiros_produto_id_e0230e ON public.industria_roteiros USING btree (produto_id);
+CREATE INDEX IF NOT EXISTS idx_industria_roteiros_produto_id_e0230e ON public.industria_roteiros USING btree (produto_id);
 
-CREATE INDEX idx_linhas_produto_empresa_created ON public.linhas_produto USING btree (empresa_id, created_at);
+CREATE INDEX IF NOT EXISTS idx_linhas_produto_empresa_created ON public.linhas_produto USING btree (empresa_id, created_at);
 
-CREATE INDEX idx_logistica_transportadoras_pessoa_id_5b1746 ON public.logistica_transportadoras USING btree (pessoa_id);
+CREATE INDEX IF NOT EXISTS idx_logistica_transportadoras_pessoa_id_5b1746 ON public.logistica_transportadoras USING btree (pessoa_id);
 
-CREATE INDEX idx_marcas_empresa_created ON public.marcas USING btree (empresa_id, created_at);
+CREATE INDEX IF NOT EXISTS idx_marcas_empresa_created ON public.marcas USING btree (empresa_id, created_at);
 
-CREATE INDEX idx_metas_vendas_empresa_id_96b435 ON public.metas_vendas USING btree (empresa_id);
+CREATE INDEX IF NOT EXISTS idx_metas_vendas_empresa_id_96b435 ON public.metas_vendas USING btree (empresa_id);
 
-CREATE INDEX idx_ordem_servico_itens_empresa_id_9af1f4 ON public.ordem_servico_itens USING btree (empresa_id);
+CREATE INDEX IF NOT EXISTS idx_ordem_servico_itens_empresa_id_9af1f4 ON public.ordem_servico_itens USING btree (empresa_id);
 
-CREATE INDEX idx_ordem_servico_parcelas_empresa_status_created ON public.ordem_servico_parcelas USING btree (empresa_id, status, created_at);
+CREATE INDEX IF NOT EXISTS idx_ordem_servico_parcelas_empresa_status_created ON public.ordem_servico_parcelas USING btree (empresa_id, status, created_at);
 
-CREATE INDEX idx_ordem_servicos_empresa_status_created ON public.ordem_servicos USING btree (empresa_id, status, created_at);
+CREATE INDEX IF NOT EXISTS idx_ordem_servicos_empresa_status_created ON public.ordem_servicos USING btree (empresa_id, status, created_at);
 
-CREATE INDEX idx_os_emp_status_prevista ON public.ordem_servicos USING btree (empresa_id, status, data_prevista);
+CREATE INDEX IF NOT EXISTS idx_os_emp_status_prevista ON public.ordem_servicos USING btree (empresa_id, status, data_prevista);
 
-CREATE INDEX idx_os_empresa_cliente ON public.ordem_servicos USING btree (empresa_id, cliente_id);
+CREATE INDEX IF NOT EXISTS idx_os_empresa_cliente ON public.ordem_servicos USING btree (empresa_id, cliente_id);
 
-CREATE INDEX idx_os_empresa_created_at ON public.ordem_servicos USING btree (empresa_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_os_empresa_created_at ON public.ordem_servicos USING btree (empresa_id, created_at DESC);
 
-CREATE INDEX idx_os_empresa_ordem ON public.ordem_servicos USING btree (empresa_id, ordem);
+CREATE INDEX IF NOT EXISTS idx_os_empresa_ordem ON public.ordem_servicos USING btree (empresa_id, ordem);
 
-CREATE INDEX idx_os_itens_os ON public.ordem_servico_itens USING btree (ordem_servico_id);
+CREATE INDEX IF NOT EXISTS idx_os_itens_os ON public.ordem_servico_itens USING btree (ordem_servico_id);
 
-CREATE INDEX idx_os_parcela_os ON public.ordem_servico_parcelas USING btree (ordem_servico_id);
+CREATE INDEX IF NOT EXISTS idx_os_parcela_os ON public.ordem_servico_parcelas USING btree (ordem_servico_id);
 
-CREATE INDEX idx_pessoa_contatos_pessoa_id_0253c9 ON public.pessoa_contatos USING btree (pessoa_id);
+CREATE INDEX IF NOT EXISTS idx_pessoa_contatos_pessoa_id_0253c9 ON public.pessoa_contatos USING btree (pessoa_id);
 
-CREATE INDEX idx_pessoa_enderecos_pessoa_id_75595d ON public.pessoa_enderecos USING btree (pessoa_id);
+CREATE INDEX IF NOT EXISTS idx_pessoa_enderecos_pessoa_id_75595d ON public.pessoa_enderecos USING btree (pessoa_id);
 
-CREATE INDEX idx_pessoas_emp_nome ON public.pessoas USING btree (empresa_id, nome);
+CREATE INDEX IF NOT EXISTS idx_pessoas_emp_nome ON public.pessoas USING btree (empresa_id, nome);
 
-CREATE INDEX idx_pessoas_empresa_created_at ON public.pessoas USING btree (empresa_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_pessoas_empresa_created_at ON public.pessoas USING btree (empresa_id, created_at DESC);
 
-CREATE UNIQUE INDEX idx_pessoas_empresa_id_doc_unico_not_null ON public.pessoas USING btree (empresa_id, doc_unico) WHERE (doc_unico IS NOT NULL);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_pessoas_empresa_id_doc_unico_not_null ON public.pessoas USING btree (empresa_id, doc_unico) WHERE (doc_unico IS NOT NULL);
 
-CREATE INDEX idx_pessoas_empresa_tipo ON public.pessoas USING btree (empresa_id, tipo);
+CREATE INDEX IF NOT EXISTS idx_pessoas_empresa_tipo ON public.pessoas USING btree (empresa_id, tipo);
 
-CREATE INDEX idx_products_legacy_archive_deleted_at ON public.products_legacy_archive USING btree (deleted_at);
+CREATE INDEX IF NOT EXISTS idx_products_legacy_archive_deleted_at ON public.products_legacy_archive USING btree (deleted_at);
 
-CREATE INDEX idx_products_legacy_archive_emp ON public.products_legacy_archive USING btree (empresa_id);
+CREATE INDEX IF NOT EXISTS idx_products_legacy_archive_emp ON public.products_legacy_archive USING btree (empresa_id);
 
-CREATE INDEX idx_produto_anuncios_produto_id_bc4ab2 ON public.produto_anuncios USING btree (produto_id);
+CREATE INDEX IF NOT EXISTS idx_produto_anuncios_produto_id_bc4ab2 ON public.produto_anuncios USING btree (produto_id);
 
-CREATE INDEX idx_produto_atributos_atributo_id_7a106e ON public.produto_atributos USING btree (atributo_id);
+CREATE INDEX IF NOT EXISTS idx_produto_atributos_atributo_id_7a106e ON public.produto_atributos USING btree (atributo_id);
 
-CREATE INDEX idx_produto_atributos_empresa_created ON public.produto_atributos USING btree (empresa_id, created_at);
+CREATE INDEX IF NOT EXISTS idx_produto_atributos_empresa_created ON public.produto_atributos USING btree (empresa_id, created_at);
 
-CREATE INDEX idx_produto_atributos_produto ON public.produto_atributos USING btree (produto_id);
+CREATE INDEX IF NOT EXISTS idx_produto_atributos_produto ON public.produto_atributos USING btree (produto_id);
 
-CREATE INDEX idx_produto_componentes_componente_id_b16e1b ON public.produto_componentes USING btree (componente_id);
+CREATE INDEX IF NOT EXISTS idx_produto_componentes_componente_id_b16e1b ON public.produto_componentes USING btree (componente_id);
 
-CREATE INDEX idx_produto_fornecedores_fornecedor_id_cacf44 ON public.produto_fornecedores USING btree (fornecedor_id);
+CREATE INDEX IF NOT EXISTS idx_produto_fornecedores_fornecedor_id_cacf44 ON public.produto_fornecedores USING btree (fornecedor_id);
 
-CREATE INDEX idx_produto_imagens_produto_id_d6415e ON public.produto_imagens USING btree (produto_id);
+CREATE INDEX IF NOT EXISTS idx_produto_imagens_produto_id_d6415e ON public.produto_imagens USING btree (produto_id);
 
-CREATE INDEX idx_produto_tags_empresa ON public.produto_tags USING btree (empresa_id);
+CREATE INDEX IF NOT EXISTS idx_produto_tags_empresa ON public.produto_tags USING btree (empresa_id);
 
-CREATE INDEX idx_produto_tags_tag_id_5008ae ON public.produto_tags USING btree (tag_id);
+CREATE INDEX IF NOT EXISTS idx_produto_tags_tag_id_5008ae ON public.produto_tags USING btree (tag_id);
 
-CREATE INDEX idx_produtos_empresa_linha ON public.produtos USING btree (empresa_id, linha_produto_id);
+CREATE INDEX IF NOT EXISTS idx_produtos_empresa_linha ON public.produtos USING btree (empresa_id, linha_produto_id);
 
-CREATE UNIQUE INDEX idx_produtos_empresa_sku_unique ON public.produtos USING btree (empresa_id, sku) WHERE (sku IS NOT NULL);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_produtos_empresa_sku_unique ON public.produtos USING btree (empresa_id, sku) WHERE (sku IS NOT NULL);
 
-CREATE INDEX idx_produtos_empresa_slug_unique ON public.produtos USING btree (empresa_id, slug);
+CREATE INDEX IF NOT EXISTS idx_produtos_empresa_slug_unique ON public.produtos USING btree (empresa_id, slug);
 
-CREATE INDEX idx_produtos_empresa_status_created ON public.produtos USING btree (empresa_id, status, created_at);
+CREATE INDEX IF NOT EXISTS idx_produtos_empresa_status_created ON public.produtos USING btree (empresa_id, status, created_at);
 
-CREATE INDEX idx_produtos_gtin_tributavel ON public.produtos USING btree (gtin_tributavel);
+CREATE INDEX IF NOT EXISTS idx_produtos_gtin_tributavel ON public.produtos USING btree (gtin_tributavel);
 
-CREATE UNIQUE INDEX idx_produtos_gtin_unique ON public.produtos USING btree (gtin) WHERE (gtin IS NOT NULL);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_produtos_gtin_unique ON public.produtos USING btree (gtin) WHERE (gtin IS NOT NULL);
 
-CREATE INDEX idx_produtos_linha_produto_id_d06206 ON public.produtos USING btree (linha_produto_id);
+CREATE INDEX IF NOT EXISTS idx_produtos_linha_produto_id_d06206 ON public.produtos USING btree (linha_produto_id);
 
-CREATE INDEX idx_produtos_produto_pai_id_e96ae9 ON public.produtos USING btree (produto_pai_id);
+CREATE INDEX IF NOT EXISTS idx_produtos_produto_pai_id_e96ae9 ON public.produtos USING btree (produto_pai_id);
 
-CREATE INDEX idx_rh_cargo_comp_cargo ON public.rh_cargo_competencias USING btree (cargo_id);
+CREATE INDEX IF NOT EXISTS idx_rh_cargo_comp_cargo ON public.rh_cargo_competencias USING btree (cargo_id);
 
-CREATE INDEX idx_rh_cargo_comp_empresa ON public.rh_cargo_competencias USING btree (empresa_id);
+CREATE INDEX IF NOT EXISTS idx_rh_cargo_comp_empresa ON public.rh_cargo_competencias USING btree (empresa_id);
 
-CREATE INDEX idx_rh_cargo_competencias_competencia_id_cd3407 ON public.rh_cargo_competencias USING btree (competencia_id);
+CREATE INDEX IF NOT EXISTS idx_rh_cargo_competencias_competencia_id_cd3407 ON public.rh_cargo_competencias USING btree (competencia_id);
 
-CREATE INDEX idx_rh_cargos_empresa ON public.rh_cargos USING btree (empresa_id);
+CREATE INDEX IF NOT EXISTS idx_rh_cargos_empresa ON public.rh_cargos USING btree (empresa_id);
 
-CREATE INDEX idx_rh_colab_comp_colab ON public.rh_colaborador_competencias USING btree (colaborador_id);
+CREATE INDEX IF NOT EXISTS idx_rh_colab_comp_colab ON public.rh_colaborador_competencias USING btree (colaborador_id);
 
-CREATE INDEX idx_rh_colab_comp_empresa ON public.rh_colaborador_competencias USING btree (empresa_id);
+CREATE INDEX IF NOT EXISTS idx_rh_colab_comp_empresa ON public.rh_colaborador_competencias USING btree (empresa_id);
 
-CREATE INDEX idx_rh_colaboradores_cargo ON public.rh_colaboradores USING btree (cargo_id);
+CREATE INDEX IF NOT EXISTS idx_rh_colaboradores_cargo ON public.rh_colaboradores USING btree (cargo_id);
 
-CREATE INDEX idx_rh_colaboradores_empresa ON public.rh_colaboradores USING btree (empresa_id);
+CREATE INDEX IF NOT EXISTS idx_rh_colaboradores_empresa ON public.rh_colaboradores USING btree (empresa_id);
 
-CREATE INDEX idx_rh_competencias_empresa ON public.rh_competencias USING btree (empresa_id);
+CREATE INDEX IF NOT EXISTS idx_rh_competencias_empresa ON public.rh_competencias USING btree (empresa_id);
 
-CREATE INDEX idx_rh_part_colaborador ON public.rh_treinamento_participantes USING btree (colaborador_id);
+CREATE INDEX IF NOT EXISTS idx_rh_part_colaborador ON public.rh_treinamento_participantes USING btree (colaborador_id);
 
-CREATE INDEX idx_rh_part_empresa ON public.rh_treinamento_participantes USING btree (empresa_id);
+CREATE INDEX IF NOT EXISTS idx_rh_part_empresa ON public.rh_treinamento_participantes USING btree (empresa_id);
 
-CREATE INDEX idx_rh_part_treinamento ON public.rh_treinamento_participantes USING btree (treinamento_id);
+CREATE INDEX IF NOT EXISTS idx_rh_part_treinamento ON public.rh_treinamento_participantes USING btree (treinamento_id);
 
-CREATE INDEX idx_rh_treinamento_participantes_empresa_status_created ON public.rh_treinamento_participantes USING btree (empresa_id, status, created_at);
+CREATE INDEX IF NOT EXISTS idx_rh_treinamento_participantes_empresa_status_created ON public.rh_treinamento_participantes USING btree (empresa_id, status, created_at);
 
-CREATE INDEX idx_rh_treinamentos_empresa ON public.rh_treinamentos USING btree (empresa_id);
+CREATE INDEX IF NOT EXISTS idx_rh_treinamentos_empresa ON public.rh_treinamentos USING btree (empresa_id);
 
-CREATE INDEX idx_rh_treinamentos_empresa_status_created ON public.rh_treinamentos USING btree (empresa_id, status, created_at);
+CREATE INDEX IF NOT EXISTS idx_rh_treinamentos_empresa_status_created ON public.rh_treinamentos USING btree (empresa_id, status, created_at);
 
-CREATE INDEX idx_servicos_empresa_status_created ON public.servicos USING btree (empresa_id, status, created_at);
+CREATE INDEX IF NOT EXISTS idx_servicos_empresa_status_created ON public.servicos USING btree (empresa_id, status, created_at);
 
-CREATE INDEX idx_subscriptions_empresa_status_created ON public.subscriptions USING btree (empresa_id, status, created_at);
+CREATE INDEX IF NOT EXISTS idx_subscriptions_empresa_status_created ON public.subscriptions USING btree (empresa_id, status, created_at);
 
-CREATE INDEX idx_tabelas_medidas_empresa_created ON public.tabelas_medidas USING btree (empresa_id, created_at);
+CREATE INDEX IF NOT EXISTS idx_tabelas_medidas_empresa_created ON public.tabelas_medidas USING btree (empresa_id, created_at);
 
-CREATE INDEX idx_tags_empresa_created ON public.tags USING btree (empresa_id, created_at);
+CREATE INDEX IF NOT EXISTS idx_tags_empresa_created ON public.tags USING btree (empresa_id, created_at);
 
-CREATE INDEX idx_transportadoras_empresa_status_created ON public.transportadoras USING btree (empresa_id, status, created_at);
+CREATE INDEX IF NOT EXISTS idx_transportadoras_empresa_status_created ON public.transportadoras USING btree (empresa_id, status, created_at);
 
-CREATE INDEX idx_user_active_empresa__user_updated_at ON public.user_active_empresa USING btree (user_id, updated_at DESC);
+CREATE INDEX IF NOT EXISTS idx_user_active_empresa__user_updated_at ON public.user_active_empresa USING btree (user_id, updated_at DESC);
 
-CREATE INDEX idx_vendas_itens_pedido_pedido_id_f08419 ON public.vendas_itens_pedido USING btree (pedido_id);
+CREATE INDEX IF NOT EXISTS idx_vendas_itens_pedido_pedido_id_f08419 ON public.vendas_itens_pedido USING btree (pedido_id);
 
-CREATE INDEX idx_vendas_itens_pedido_produto_id_ed598c ON public.vendas_itens_pedido USING btree (produto_id);
+CREATE INDEX IF NOT EXISTS idx_vendas_itens_pedido_produto_id_ed598c ON public.vendas_itens_pedido USING btree (produto_id);
 
-CREATE INDEX idx_vendas_pedidos_cliente_id_78a483 ON public.vendas_pedidos USING btree (cliente_id);
+CREATE INDEX IF NOT EXISTS idx_vendas_pedidos_cliente_id_78a483 ON public.vendas_pedidos USING btree (cliente_id);
 
-CREATE INDEX idx_vendas_pedidos_empresa_status_created ON public.vendas_pedidos USING btree (empresa_id, status, created_at);
+CREATE INDEX IF NOT EXISTS idx_vendas_pedidos_empresa_status_created ON public.vendas_pedidos USING btree (empresa_id, status, created_at);
 
-CREATE UNIQUE INDEX ind_benef_comp_pkey ON public.industria_benef_componentes USING btree (id);
+CREATE UNIQUE INDEX IF NOT EXISTS ind_benef_comp_pkey ON public.industria_benef_componentes USING btree (id);
 
-CREATE UNIQUE INDEX ind_benef_entregas_pkey ON public.industria_benef_entregas USING btree (id);
+CREATE UNIQUE INDEX IF NOT EXISTS ind_benef_entregas_pkey ON public.industria_benef_entregas USING btree (id);
 
-CREATE UNIQUE INDEX ind_benef_ordens_pkey ON public.industria_benef_ordens USING btree (id);
+CREATE UNIQUE INDEX IF NOT EXISTS ind_benef_ordens_pkey ON public.industria_benef_ordens USING btree (id);
 
-CREATE UNIQUE INDEX ind_matcli_emp_cli_prod_uk ON public.industria_materiais_cliente USING btree (empresa_id, cliente_id, produto_id);
+CREATE UNIQUE INDEX IF NOT EXISTS ind_matcli_emp_cli_prod_uk ON public.industria_materiais_cliente USING btree (empresa_id, cliente_id, produto_id);
 
-CREATE UNIQUE INDEX ind_prod_comp_pkey ON public.industria_producao_componentes USING btree (id);
+CREATE UNIQUE INDEX IF NOT EXISTS ind_prod_comp_pkey ON public.industria_producao_componentes USING btree (id);
 
-CREATE UNIQUE INDEX ind_prod_entregas_pkey ON public.industria_producao_entregas USING btree (id);
+CREATE UNIQUE INDEX IF NOT EXISTS ind_prod_entregas_pkey ON public.industria_producao_entregas USING btree (id);
 
-CREATE UNIQUE INDEX ind_prod_ordens_pkey ON public.industria_producao_ordens USING btree (id);
+CREATE UNIQUE INDEX IF NOT EXISTS ind_prod_ordens_pkey ON public.industria_producao_ordens USING btree (id);
 
-CREATE UNIQUE INDEX industria_boms_comp_pkey ON public.industria_boms_componentes USING btree (id);
+CREATE UNIQUE INDEX IF NOT EXISTS industria_boms_comp_pkey ON public.industria_boms_componentes USING btree (id);
 
-CREATE UNIQUE INDEX industria_boms_pkey ON public.industria_boms USING btree (id);
+CREATE UNIQUE INDEX IF NOT EXISTS industria_boms_pkey ON public.industria_boms USING btree (id);
 
-CREATE UNIQUE INDEX industria_operacoes_apontamentos_pkey ON public.industria_operacoes_apontamentos USING btree (id);
+CREATE UNIQUE INDEX IF NOT EXISTS industria_operacoes_apontamentos_pkey ON public.industria_operacoes_apontamentos USING btree (id);
 
-CREATE UNIQUE INDEX industria_operacoes_pkey ON public.industria_operacoes USING btree (id);
+CREATE UNIQUE INDEX IF NOT EXISTS industria_operacoes_pkey ON public.industria_operacoes USING btree (id);
 
-CREATE UNIQUE INDEX industria_ordem_componentes_pkey ON public.industria_ordem_componentes USING btree (id);
+CREATE UNIQUE INDEX IF NOT EXISTS industria_ordem_componentes_pkey ON public.industria_ordem_componentes USING btree (id);
 
-CREATE UNIQUE INDEX industria_ordem_entregas_pkey ON public.industria_ordem_entregas USING btree (id);
+CREATE UNIQUE INDEX IF NOT EXISTS industria_ordem_entregas_pkey ON public.industria_ordem_entregas USING btree (id);
 
-CREATE UNIQUE INDEX linhas_produto_pkey ON public.linhas_produto USING btree (id);
+CREATE UNIQUE INDEX IF NOT EXISTS linhas_produto_pkey ON public.linhas_produto USING btree (id);
 
-CREATE UNIQUE INDEX linhas_produto_unq ON public.linhas_produto USING btree (empresa_id, nome);
+CREATE UNIQUE INDEX IF NOT EXISTS linhas_produto_unq ON public.linhas_produto USING btree (empresa_id, nome);
 
-CREATE UNIQUE INDEX marcas_nome_unique_per_company ON public.marcas USING btree (empresa_id, nome);
+CREATE UNIQUE INDEX IF NOT EXISTS marcas_nome_unique_per_company ON public.marcas USING btree (empresa_id, nome);
 
-CREATE UNIQUE INDEX marcas_pkey ON public.marcas USING btree (id);
+CREATE UNIQUE INDEX IF NOT EXISTS marcas_pkey ON public.marcas USING btree (id);
 
-CREATE UNIQUE INDEX ordem_servico_parcelas_empresa_id_ordem_servico_id_numero_p_key ON public.ordem_servico_parcelas USING btree (empresa_id, ordem_servico_id, numero_parcela);
+CREATE UNIQUE INDEX IF NOT EXISTS ordem_servico_parcelas_empresa_id_ordem_servico_id_numero_p_key ON public.ordem_servico_parcelas USING btree (empresa_id, ordem_servico_id, numero_parcela);
 
-CREATE UNIQUE INDEX ordem_servico_parcelas_pkey ON public.ordem_servico_parcelas USING btree (id);
+CREATE UNIQUE INDEX IF NOT EXISTS ordem_servico_parcelas_pkey ON public.ordem_servico_parcelas USING btree (id);
 
-CREATE UNIQUE INDEX plans_slug_billing_cycle_key ON public.plans USING btree (slug, billing_cycle);
+CREATE UNIQUE INDEX IF NOT EXISTS plans_slug_billing_cycle_key ON public.plans USING btree (slug, billing_cycle);
 
-CREATE UNIQUE INDEX products_legacy_archive_pkey ON public.products_legacy_archive USING btree (id);
+CREATE UNIQUE INDEX IF NOT EXISTS products_legacy_archive_pkey ON public.products_legacy_archive USING btree (id);
 
-CREATE INDEX produto_anuncios__empresa_id ON public.produto_anuncios USING btree (empresa_id);
+CREATE INDEX IF NOT EXISTS produto_anuncios__empresa_id ON public.produto_anuncios USING btree (empresa_id);
 
-CREATE UNIQUE INDEX produto_anuncios_pkey ON public.produto_anuncios USING btree (id);
+CREATE UNIQUE INDEX IF NOT EXISTS produto_anuncios_pkey ON public.produto_anuncios USING btree (id);
 
-CREATE UNIQUE INDEX produto_atributos_pkey ON public.produto_atributos USING btree (id);
+CREATE UNIQUE INDEX IF NOT EXISTS produto_atributos_pkey ON public.produto_atributos USING btree (id);
 
-CREATE UNIQUE INDEX produto_atributos_unq ON public.produto_atributos USING btree (empresa_id, produto_id, atributo_id);
+CREATE UNIQUE INDEX IF NOT EXISTS produto_atributos_unq ON public.produto_atributos USING btree (empresa_id, produto_id, atributo_id);
 
-CREATE INDEX produto_componentes__empresa_id ON public.produto_componentes USING btree (empresa_id);
+CREATE INDEX IF NOT EXISTS produto_componentes__empresa_id ON public.produto_componentes USING btree (empresa_id);
 
-CREATE UNIQUE INDEX produto_componentes_pkey ON public.produto_componentes USING btree (kit_id, componente_id);
+CREATE UNIQUE INDEX IF NOT EXISTS produto_componentes_pkey ON public.produto_componentes USING btree (kit_id, componente_id);
 
-CREATE INDEX produto_fornecedores__empresa_id ON public.produto_fornecedores USING btree (empresa_id);
+CREATE INDEX IF NOT EXISTS produto_fornecedores__empresa_id ON public.produto_fornecedores USING btree (empresa_id);
 
-CREATE UNIQUE INDEX produto_fornecedores_pkey ON public.produto_fornecedores USING btree (produto_id, fornecedor_id);
+CREATE UNIQUE INDEX IF NOT EXISTS produto_fornecedores_pkey ON public.produto_fornecedores USING btree (produto_id, fornecedor_id);
 
-CREATE INDEX produto_imagens__empresa_id ON public.produto_imagens USING btree (empresa_id);
+CREATE INDEX IF NOT EXISTS produto_imagens__empresa_id ON public.produto_imagens USING btree (empresa_id);
 
-CREATE UNIQUE INDEX produto_tags_pkey ON public.produto_tags USING btree (produto_id, tag_id);
+CREATE UNIQUE INDEX IF NOT EXISTS produto_tags_pkey ON public.produto_tags USING btree (produto_id, tag_id);
 
-CREATE UNIQUE INDEX profiles_cpf_unique_not_null ON public.profiles USING btree (cpf) WHERE (cpf IS NOT NULL);
+CREATE UNIQUE INDEX IF NOT EXISTS profiles_cpf_unique_not_null ON public.profiles USING btree (cpf) WHERE (cpf IS NOT NULL);
 
-CREATE UNIQUE INDEX profiles_pkey ON public.profiles USING btree (id);
+CREATE UNIQUE INDEX IF NOT EXISTS profiles_pkey ON public.profiles USING btree (id);
 
-CREATE UNIQUE INDEX rh_cargo_competencias_unique ON public.rh_cargo_competencias USING btree (empresa_id, cargo_id, competencia_id);
+CREATE UNIQUE INDEX IF NOT EXISTS rh_cargo_competencias_unique ON public.rh_cargo_competencias USING btree (empresa_id, cargo_id, competencia_id);
 
-CREATE UNIQUE INDEX rh_cargos_empresa_nome_key ON public.rh_cargos USING btree (empresa_id, nome);
+CREATE UNIQUE INDEX IF NOT EXISTS rh_cargos_empresa_nome_key ON public.rh_cargos USING btree (empresa_id, nome);
 
-CREATE UNIQUE INDEX rh_col_competencias_pkey ON public.rh_colaborador_competencias USING btree (id);
+CREATE UNIQUE INDEX IF NOT EXISTS rh_col_competencias_pkey ON public.rh_colaborador_competencias USING btree (id);
 
-CREATE UNIQUE INDEX rh_col_competencias_unique ON public.rh_colaborador_competencias USING btree (empresa_id, colaborador_id, competencia_id);
+CREATE UNIQUE INDEX IF NOT EXISTS rh_col_competencias_unique ON public.rh_colaborador_competencias USING btree (empresa_id, colaborador_id, competencia_id);
 
-CREATE UNIQUE INDEX rh_competencias_empresa_nome_key ON public.rh_competencias USING btree (empresa_id, nome);
+CREATE UNIQUE INDEX IF NOT EXISTS rh_competencias_empresa_nome_key ON public.rh_competencias USING btree (empresa_id, nome);
 
-CREATE UNIQUE INDEX rh_treinamento_part_pkey ON public.rh_treinamento_participantes USING btree (id);
+CREATE UNIQUE INDEX IF NOT EXISTS rh_treinamento_part_pkey ON public.rh_treinamento_participantes USING btree (id);
 
-CREATE UNIQUE INDEX rh_treinamento_participantes_unique ON public.rh_treinamento_participantes USING btree (empresa_id, treinamento_id, colaborador_id);
+CREATE UNIQUE INDEX IF NOT EXISTS rh_treinamento_participantes_unique ON public.rh_treinamento_participantes USING btree (empresa_id, treinamento_id, colaborador_id);
 
-CREATE UNIQUE INDEX subscriptions_empresa_id_key ON public.subscriptions USING btree (empresa_id);
+CREATE UNIQUE INDEX IF NOT EXISTS subscriptions_empresa_id_key ON public.subscriptions USING btree (empresa_id);
 
-CREATE UNIQUE INDEX tabelas_medidas_nome_unique_per_company ON public.tabelas_medidas USING btree (empresa_id, nome);
+CREATE UNIQUE INDEX IF NOT EXISTS tabelas_medidas_nome_unique_per_company ON public.tabelas_medidas USING btree (empresa_id, nome);
 
-CREATE UNIQUE INDEX tabelas_medidas_pkey ON public.tabelas_medidas USING btree (id);
+CREATE UNIQUE INDEX IF NOT EXISTS tabelas_medidas_pkey ON public.tabelas_medidas USING btree (id);
 
-CREATE UNIQUE INDEX tags_pkey ON public.tags USING btree (id);
+CREATE UNIQUE INDEX IF NOT EXISTS tags_pkey ON public.tags USING btree (id);
 
-CREATE UNIQUE INDEX tags_unique_per_company ON public.tags USING btree (empresa_id, nome);
+CREATE UNIQUE INDEX IF NOT EXISTS tags_unique_per_company ON public.tags USING btree (empresa_id, nome);
 
-CREATE UNIQUE INDEX transportadoras_pkey ON public.transportadoras USING btree (id);
+CREATE UNIQUE INDEX IF NOT EXISTS transportadoras_pkey ON public.transportadoras USING btree (id);
 
-CREATE UNIQUE INDEX uq_centros_de_custo_empresa_codigo ON public.centros_de_custo USING btree (empresa_id, codigo);
+CREATE UNIQUE INDEX IF NOT EXISTS uq_centros_de_custo_empresa_codigo ON public.centros_de_custo USING btree (empresa_id, codigo);
 
-CREATE UNIQUE INDEX uq_centros_de_custo_empresa_nome ON public.centros_de_custo USING btree (empresa_id, nome);
+CREATE UNIQUE INDEX IF NOT EXISTS uq_centros_de_custo_empresa_nome ON public.centros_de_custo USING btree (empresa_id, nome);
 
-CREATE UNIQUE INDEX uq_permissions ON public.permissions USING btree (module, action);
+CREATE UNIQUE INDEX IF NOT EXISTS uq_permissions ON public.permissions USING btree (module, action);
 
-CREATE UNIQUE INDEX ux_produto_imagens_principal ON public.produto_imagens USING btree (produto_id) WHERE (principal = true);
+CREATE UNIQUE INDEX IF NOT EXISTS ux_produto_imagens_principal ON public.produto_imagens USING btree (produto_id) WHERE (principal = true);
 
-CREATE UNIQUE INDEX ux_transportadoras_empresa_cnpj ON public.transportadoras USING btree (empresa_id, cnpj) WHERE (cnpj IS NOT NULL);
+CREATE UNIQUE INDEX IF NOT EXISTS ux_transportadoras_empresa_cnpj ON public.transportadoras USING btree (empresa_id, cnpj) WHERE (cnpj IS NOT NULL);
 
-CREATE UNIQUE INDEX empresa_addons_pkey ON public.empresa_addons USING btree (empresa_id, addon_slug);
+CREATE UNIQUE INDEX IF NOT EXISTS empresa_addons_pkey ON public.empresa_addons USING btree (empresa_id, addon_slug);
 
-CREATE UNIQUE INDEX empresa_usuarios_pkey ON public.empresa_usuarios USING btree (empresa_id, user_id);
+CREATE UNIQUE INDEX IF NOT EXISTS empresa_usuarios_pkey ON public.empresa_usuarios USING btree (empresa_id, user_id);
 
-CREATE INDEX idx_compras_pedidos_empresa_status ON public.compras_pedidos USING btree (empresa_id, status, data_emissao);
+CREATE INDEX IF NOT EXISTS idx_compras_pedidos_empresa_status ON public.compras_pedidos USING btree (empresa_id, status, data_emissao);
 
-CREATE INDEX idx_empresa_usuarios_empresa_status_role ON public.empresa_usuarios USING btree (empresa_id, status, role_id, created_at);
+CREATE INDEX IF NOT EXISTS idx_empresa_usuarios_empresa_status_role ON public.empresa_usuarios USING btree (empresa_id, status, role_id, created_at);
 
-CREATE INDEX idx_rh_treinamentos_status ON public.rh_treinamentos USING btree (status);
+CREATE INDEX IF NOT EXISTS idx_rh_treinamentos_status ON public.rh_treinamentos USING btree (status);
 
-CREATE UNIQUE INDEX industria_producao_componentes_pkey ON public.industria_producao_componentes USING btree (id);
+CREATE UNIQUE INDEX IF NOT EXISTS industria_producao_componentes_pkey ON public.industria_producao_componentes USING btree (id);
 
-CREATE UNIQUE INDEX industria_producao_entregas_pkey ON public.industria_producao_entregas USING btree (id);
+CREATE UNIQUE INDEX IF NOT EXISTS industria_producao_entregas_pkey ON public.industria_producao_entregas USING btree (id);
 
-CREATE UNIQUE INDEX industria_producao_ordens_pkey ON public.industria_producao_ordens USING btree (id);
+CREATE UNIQUE INDEX IF NOT EXISTS industria_producao_ordens_pkey ON public.industria_producao_ordens USING btree (id);
 
 alter table "public"."addons" add constraint "addons_pkey" PRIMARY KEY using index "addons_pkey";
 

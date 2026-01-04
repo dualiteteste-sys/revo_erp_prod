@@ -163,7 +163,6 @@ BEGIN
   PERFORM public._sec_mt02_wrap_guard('log_app_trace', 'logs', 'create');
 END $$;
 
-DROP FUNCTION public._sec_mt02_wrap_guard(text, text, text);
+DROP FUNCTION IF EXISTS public._sec_mt02_wrap_guard(text, text, text);
 
 COMMIT;
-

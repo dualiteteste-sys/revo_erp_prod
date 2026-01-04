@@ -144,7 +144,7 @@ Este é o checklist único (por módulo) para levar o REVO ao nível **top mundi
 - [ ] QA-CHAOS-01 (P1) Chaos-lite: timeout/rate-limit/retry/dead-letter/reprocess
 
 ### E2) Banco e deploy
-- [ ] DB-MIG-01 (P0) Idempotência “garantida”: migrations repetíveis (e reversão quando fizer sentido)
+- [x] DB-MIG-01 (P0) Idempotência “garantida”: migrations repetíveis (e reversão quando fizer sentido)
 - [x] DB-DRIFT-01 (P0) Drift gate agendado com alerta (DEV vs PROD) e bloqueio quando necessário
 - [x] DB-RPC-01 (P0) Cobertura RPC app ↔ migrations sempre verde (sem função “fantasma”)
 
@@ -154,7 +154,7 @@ Este é o checklist único (por módulo) para levar o REVO ao nível **top mundi
 
 ### F1) Primeiro uso guiado (opt-in e sem travar)
 - [x] GTM-ONB-01 (P0) Roadmap por grupo de módulos (opt-in) com checks automáticos e links corretos
-- [ ] GTM-ONB-02 (P0) Roadmap por plano: recomendações e “próximo passo” (só mostra o que faz sentido)
+- [x] GTM-ONB-02 (P0) Roadmap por plano: recomendações e “próximo passo” (só mostra o que faz sentido)
 - [ ] GTM-ONB-03 (P1) Importadores sem dor (clientes/produtos) com preview + validação + rollback
 
 ### F2) Ajuda e diagnóstico
@@ -166,7 +166,7 @@ Este é o checklist único (por módulo) para levar o REVO ao nível **top mundi
 ## G) Módulos do ERP (por domínio)
 
 ### G1) Cadastros
-- [ ] CAD-STA-01 (P0) CRUDs com validação forte + import/export (clientes, produtos, serviços, transportadoras)
+- [ ] CAD-STA-01 (P0) CRUDs com validação forte + import/export (clientes, produtos, serviços, transportadoras) — em progresso (clientes+produtos OK; faltam imports de serviços/transportadoras)
 - [ ] CAD-STA-02 (P1) Normalização tributária básica (NCM/CFOP/CST/CSOSN) e consistência de unidade/sku
 - [ ] CAD-STA-03 (P1) Dedupe e saneamento (CNPJ/CPF/email/telefone) com alertas de duplicidade
 
