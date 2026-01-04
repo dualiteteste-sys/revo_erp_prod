@@ -133,9 +133,9 @@ SELECT
   COALESCE(ef.nfe_emissao_enabled, false) AS nfe_emissao_enabled,
   COALESCE(ent.plano_mvp, 'ambos') AS plano_mvp,
   COALESCE(ent.max_users, 999) AS max_users,
-  COALESCE(ent.max_nfe_monthly, 999) AS max_nfe_monthly,
   (COALESCE(ent.plano_mvp, 'ambos') IN ('servicos', 'ambos')) AS servicos_enabled,
-  (COALESCE(ent.plano_mvp, 'ambos') IN ('industria', 'ambos')) AS industria_enabled
+  (COALESCE(ent.plano_mvp, 'ambos') IN ('industria', 'ambos')) AS industria_enabled,
+  COALESCE(ent.max_nfe_monthly, 999) AS max_nfe_monthly
 FROM public.empresas e
 LEFT JOIN public.empresa_feature_flags ef
   ON ef.empresa_id = e.id
@@ -314,4 +314,3 @@ GRANT EXECUTE ON FUNCTION public.finops_limits_status() TO authenticated, servic
 SELECT pg_notify('pgrst','reload schema');
 
 COMMIT;
-
