@@ -43,6 +43,8 @@ export type EcommerceConnectionDiagnostics = {
   has_refresh_token: boolean;
   token_expires_at: string | null;
   token_expired: boolean;
+  token_expires_soon?: boolean;
+  token_expires_in_days?: number | null;
 };
 
 export function normalizeEcommerceConfig(value: unknown): EcommerceConnectionConfig {
