@@ -295,6 +295,32 @@ export default function MarketplaceIntegrationsPage() {
       addToast(`Importação concluída: ${imported} pedidos. Itens sem mapeamento: ${skipped}.`, 'success');
       await fetchAll();
     } catch (e: any) {
+      const status = e?.context?.status ?? e?.status ?? null;
+      const rawBody = e?.context?.body ?? null;
+      let body: any = null;
+      if (rawBody) {
+        try {
+          body = typeof rawBody === 'string' ? JSON.parse(rawBody) : rawBody;
+        } catch {
+          body = rawBody;
+        }
+      }
+
+      if (status === 409 && body?.error === 'ALREADY_RUNNING') {
+        addToast('Já existe uma importação em andamento. Aguarde alguns instantes e tente novamente.', 'info');
+        return;
+      }
+
+      if (status === 503 && body?.error === 'CIRCUIT_OPEN') {
+        const retryAfter = body?.retry_after_seconds ? Number(body.retry_after_seconds) : null;
+        const minutes = retryAfter ? Math.max(1, Math.ceil(retryAfter / 60)) : null;
+        addToast(
+          `Integração temporariamente instável. Tente novamente${minutes ? ` em ~${minutes} min` : ''}. Se persistir, abra Dev → Saúde para ver filas/DLQ.`,
+          'warning',
+        );
+        return;
+      }
+
       addToast(e?.message || 'Falha ao importar pedidos.', 'error');
     } finally {
       setSyncingOrders(null);
