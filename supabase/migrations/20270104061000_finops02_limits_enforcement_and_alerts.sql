@@ -153,7 +153,12 @@ GRANT SELECT ON public.empresa_features TO authenticated, service_role;
 -- -----------------------------------------------------------------------------
 -- 4) Billing sync: plan_slug -> (plano_mvp, max_users, max_nfe_monthly)
 -- -----------------------------------------------------------------------------
-CREATE OR REPLACE FUNCTION public.billing_plan_entitlements(p_plan_slug text)
+-- Importante: não é permitido mudar o "return type" via CREATE OR REPLACE em funções já existentes.
+-- Para evitar falha em ambientes com a versão antiga (sem max_nfe_monthly), dropamos e recriamos.
+DROP FUNCTION IF EXISTS public.sync_empresa_entitlements_from_subscription(uuid);
+DROP FUNCTION IF EXISTS public.billing_plan_entitlements(text);
+
+CREATE FUNCTION public.billing_plan_entitlements(p_plan_slug text)
 RETURNS TABLE(plano_mvp text, max_users integer, max_nfe_monthly integer)
 LANGUAGE sql
 STABLE
