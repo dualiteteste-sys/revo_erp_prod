@@ -21,12 +21,15 @@ async function applyMarketingPlanEntitlements(empresaId: string) {
   const pending = readPendingMarketingPlan();
   if (!pending) return;
 
-  const map: Record<PendingMarketingPlan, { plano_mvp: "servicos" | "industria" | "ambos"; max_users: number }> = {
-    essencial: { plano_mvp: "servicos", max_users: 2 },
-    pro: { plano_mvp: "servicos", max_users: 5 },
-    max: { plano_mvp: "servicos", max_users: 8 },
-    industria: { plano_mvp: "industria", max_users: 10 },
-    scale: { plano_mvp: "ambos", max_users: 999 },
+  const map: Record<
+    PendingMarketingPlan,
+    { plano_mvp: "servicos" | "industria" | "ambos"; max_users: number; max_nfe_monthly: number }
+  > = {
+    essencial: { plano_mvp: "servicos", max_users: 2, max_nfe_monthly: 150 },
+    pro: { plano_mvp: "servicos", max_users: 5, max_nfe_monthly: 500 },
+    max: { plano_mvp: "servicos", max_users: 8, max_nfe_monthly: 1200 },
+    industria: { plano_mvp: "industria", max_users: 10, max_nfe_monthly: 300 },
+    scale: { plano_mvp: "ambos", max_users: 999, max_nfe_monthly: 5000 },
   };
 
   const next = map[pending.slug];
@@ -34,7 +37,12 @@ async function applyMarketingPlanEntitlements(empresaId: string) {
     const { error } = await (supabase as any)
       .from("empresa_entitlements")
       .upsert(
-        { empresa_id: empresaId, plano_mvp: next.plano_mvp, max_users: next.max_users },
+        {
+          empresa_id: empresaId,
+          plano_mvp: next.plano_mvp,
+          max_users: next.max_users,
+          max_nfe_monthly: next.max_nfe_monthly,
+        },
         { onConflict: "empresa_id" }
       );
     if (error) throw error;

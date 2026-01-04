@@ -10,6 +10,7 @@ export interface EmpresaFeatures {
   nfe_emissao_enabled: boolean;
   plano_mvp: PlanoMvp;
   max_users: number;
+  max_nfe_monthly: number;
   servicos_enabled: boolean;
   industria_enabled: boolean;
   isFallback: boolean;
@@ -23,6 +24,7 @@ const DEFAULT_FEATURES: Omit<EmpresaFeatures, 'loading' | 'refetch'> = {
   nfe_emissao_enabled: false,
   plano_mvp: 'ambos',
   max_users: 999,
+  max_nfe_monthly: 999,
   servicos_enabled: false,
   industria_enabled: false,
   isFallback: false,
@@ -48,7 +50,7 @@ export function useEmpresaFeatures(): EmpresaFeatures {
       const { data, error } = await supabase
         .from('empresa_features')
         .select(
-          'revo_send_enabled, nfe_emissao_enabled, plano_mvp, max_users, servicos_enabled, industria_enabled'
+          'revo_send_enabled, nfe_emissao_enabled, plano_mvp, max_users, max_nfe_monthly, servicos_enabled, industria_enabled'
         )
         .eq('empresa_id', empresaId)
         .single();
@@ -60,6 +62,7 @@ export function useEmpresaFeatures(): EmpresaFeatures {
         nfe_emissao_enabled: !!data?.nfe_emissao_enabled,
         plano_mvp: (data?.plano_mvp ?? 'ambos') as PlanoMvp,
         max_users: typeof data?.max_users === 'number' ? data.max_users : 999,
+        max_nfe_monthly: typeof data?.max_nfe_monthly === 'number' ? data.max_nfe_monthly : 999,
         servicos_enabled: !!data?.servicos_enabled,
         industria_enabled: !!data?.industria_enabled,
         isFallback: false,

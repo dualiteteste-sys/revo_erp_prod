@@ -241,10 +241,21 @@ export default function SuportePage() {
                     const ok = d?.status === 'connected' && d?.has_token && !d?.token_expired;
                     const st: CheckStatus = ok ? 'ok' : d?.has_connection ? 'warn' : 'missing';
                     const title = p === 'meli' ? 'Mercado Livre' : 'Shopee';
+                    const expiresSoon = !!d?.token_expires_soon;
+                    const expiresInDays =
+                      typeof d?.token_expires_in_days === 'number' ? d.token_expires_in_days : null;
                     const desc = ok
-                      ? 'Ok: conectado e token válido.'
+                      ? expiresSoon
+                        ? `Ok: conectado. Token expira em breve${expiresInDays !== null ? ` (${expiresInDays}d)` : ''}.`
+                        : 'Ok: conectado e token válido.'
                       : d?.has_connection
-                        ? (d?.token_expired ? 'Token expirado. Reautorize a conexão.' : 'Conexão incompleta. Configure/autorize.')
+                        ? (
+                            d?.token_expired
+                              ? 'Token expirado. Reautorize a conexão.'
+                              : expiresSoon
+                                ? `Token expira em breve${expiresInDays !== null ? ` (${expiresInDays}d)` : ''}. Reautorize para evitar falhas.`
+                                : 'Conexão incompleta. Configure/autorize.'
+                          )
                         : 'Sem conexão. Inicie a integração.';
                     return (
                       <div key={p} className="flex items-start gap-2 rounded-xl border border-gray-100 bg-gray-50 p-2">

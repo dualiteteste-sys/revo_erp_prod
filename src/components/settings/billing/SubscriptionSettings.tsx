@@ -16,6 +16,15 @@ interface SubscriptionSettingsProps {
   onSwitchToPlans: () => void;
 }
 
+type FinopsLimitsStatus = {
+  ok: boolean;
+  reason?: string;
+  month_start?: string;
+  month_end?: string;
+  users?: { current: number; max: number; remaining: number; at_limit: boolean };
+  nfe?: { used: number; max: number; remaining: number; at_limit: boolean };
+};
+
 const SubscriptionSkeleton = () => (
   <div className="bg-white/80 rounded-2xl p-6 border border-gray-200 shadow-sm animate-pulse">
     <div className="h-6 bg-gray-200 rounded w-1/3 mb-8"></div>
@@ -87,7 +96,10 @@ const SubscriptionSettings: React.FC<SubscriptionSettingsProps> = ({ onSwitchToP
   const [savingEntitlements, setSavingEntitlements] = useState(false);
   const [planoMvp, setPlanoMvp] = useState<PlanoMvp>('ambos');
   const [maxUsers, setMaxUsers] = useState<number>(999);
+  const [maxNfeMonthly, setMaxNfeMonthly] = useState<number>(999);
   const [currentUsersCount, setCurrentUsersCount] = useState<number | null>(null);
+  const [finopsStatus, setFinopsStatus] = useState<FinopsLimitsStatus | null>(null);
+  const [loadingFinopsStatus, setLoadingFinopsStatus] = useState(false);
 
   const fetchAddons = useCallback(async () => {
     if (!activeEmpresa?.id) return;
@@ -113,7 +125,7 @@ const SubscriptionSettings: React.FC<SubscriptionSettingsProps> = ({ onSwitchToP
     try {
       const { data, error } = await (supabase as any)
         .from('empresa_entitlements')
-        .select('plano_mvp, max_users')
+        .select('plano_mvp, max_users, max_nfe_monthly')
         .eq('empresa_id', empresaId)
         .maybeSingle();
 
@@ -121,10 +133,12 @@ const SubscriptionSettings: React.FC<SubscriptionSettingsProps> = ({ onSwitchToP
 
       setPlanoMvp((data?.plano_mvp ?? 'ambos') as PlanoMvp);
       setMaxUsers(typeof data?.max_users === 'number' ? data.max_users : 999);
+      setMaxNfeMonthly(typeof data?.max_nfe_monthly === 'number' ? data.max_nfe_monthly : 999);
     } catch (error: any) {
       addToast('Não foi possível carregar o Plano MVP (usando padrão).', 'warning');
       setPlanoMvp('ambos');
       setMaxUsers(999);
+      setMaxNfeMonthly(999);
     } finally {
       setLoadingEntitlements(false);
     }
@@ -150,11 +164,31 @@ const SubscriptionSettings: React.FC<SubscriptionSettingsProps> = ({ onSwitchToP
     }
   }, [activeEmpresa?.id, supabase]);
 
+  const fetchFinopsLimitsStatus = useCallback(async () => {
+    const empresaId = activeEmpresa?.id;
+    if (!empresaId) {
+      setFinopsStatus(null);
+      return;
+    }
+
+    setLoadingFinopsStatus(true);
+    try {
+      const { data, error } = await (supabase as any).rpc('finops_limits_status');
+      if (error) throw error;
+      setFinopsStatus((data ?? null) as FinopsLimitsStatus | null);
+    } catch {
+      setFinopsStatus(null);
+    } finally {
+      setLoadingFinopsStatus(false);
+    }
+  }, [activeEmpresa?.id, supabase]);
+
   useEffect(() => {
     fetchAddons();
     fetchEntitlements();
     fetchCurrentUsersCount();
-  }, [fetchAddons, fetchEntitlements, fetchCurrentUsersCount]);
+    fetchFinopsLimitsStatus();
+  }, [fetchAddons, fetchEntitlements, fetchCurrentUsersCount, fetchFinopsLimitsStatus]);
 
   const handleManageBilling = async () => {
     if (!activeEmpresa) {
@@ -307,6 +341,7 @@ const SubscriptionSettings: React.FC<SubscriptionSettingsProps> = ({ onSwitchToP
     }
 
     const nextMaxUsers = Number.isFinite(maxUsers) ? Math.max(1, Math.trunc(maxUsers)) : 999;
+    const nextMaxNfeMonthly = Number.isFinite(maxNfeMonthly) ? Math.max(0, Math.trunc(maxNfeMonthly)) : 999;
 
     setSavingEntitlements(true);
     try {
@@ -317,6 +352,7 @@ const SubscriptionSettings: React.FC<SubscriptionSettingsProps> = ({ onSwitchToP
             empresa_id: empresaId,
             plano_mvp: planoMvp,
             max_users: nextMaxUsers,
+            max_nfe_monthly: nextMaxNfeMonthly,
           },
           { onConflict: 'empresa_id' }
         );
@@ -324,6 +360,7 @@ const SubscriptionSettings: React.FC<SubscriptionSettingsProps> = ({ onSwitchToP
       if (error) throw error;
       addToast('Plano MVP salvo com sucesso.', 'success');
       await fetchEntitlements();
+      await fetchFinopsLimitsStatus();
       window.dispatchEvent(new Event('empresa-features-refresh'));
     } catch (error: any) {
       addToast(error?.message || 'Erro ao salvar Plano MVP.', 'error');
@@ -336,11 +373,15 @@ const SubscriptionSettings: React.FC<SubscriptionSettingsProps> = ({ onSwitchToP
     const nextServicosEnabled = planoMvp === 'servicos' || planoMvp === 'ambos';
     const nextIndustriaEnabled = planoMvp === 'industria' || planoMvp === 'ambos';
     const normalizedMaxUsers = Number.isFinite(maxUsers) ? Math.max(1, Math.trunc(maxUsers)) : 999;
+    const normalizedMaxNfeMonthly = Number.isFinite(maxNfeMonthly) ? Math.max(0, Math.trunc(maxNfeMonthly)) : 999;
     const currentUsers = currentUsersCount ?? 0;
     const isOverLimit = currentUsersCount !== null && currentUsers > normalizedMaxUsers;
     const isAtLimit = currentUsersCount !== null && currentUsers >= normalizedMaxUsers;
     const isSyncedFromBilling = !!subscription;
     const canEditEntitlements = canAdmin && !isSyncedFromBilling;
+    const nfeUsed = finopsStatus?.ok ? finopsStatus?.nfe?.used ?? null : null;
+    const nfeMax = finopsStatus?.ok ? finopsStatus?.nfe?.max ?? null : null;
+    const nfeAtLimit = finopsStatus?.ok ? !!finopsStatus?.nfe?.at_limit : false;
 
     return (
       <div className="bg-white/80 rounded-2xl p-6 md:p-8 border border-gray-200 shadow-sm">
@@ -437,6 +478,36 @@ const SubscriptionSettings: React.FC<SubscriptionSettingsProps> = ({ onSwitchToP
               A empresa está acima do limite configurado. Ajuste o limite ou remova vínculos em <span className="font-semibold">Usuários</span>.
             </p>
           )}
+
+          <div className="mt-6">
+            <label className="block text-sm font-semibold text-gray-700 mb-2">Limite de NF-e por mês</label>
+            <input
+              type="number"
+              min={0}
+              step={1}
+              value={Number.isFinite(maxNfeMonthly) ? String(maxNfeMonthly) : ''}
+              onChange={(e) => setMaxNfeMonthly(Number(e.target.value))}
+              disabled={loadingEntitlements || !canEditEntitlements}
+              className="w-full bg-white border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              placeholder="Ex.: 150"
+            />
+            <p className="text-xs text-gray-500 mt-2">
+              O banco bloqueia a emissão quando a NF sai de <span className="font-semibold">rascunho</span> e o limite mensal já foi atingido.
+            </p>
+            <div className="mt-3 flex items-center justify-between rounded-lg border border-gray-200 bg-white/60 px-3 py-2">
+              <div className="text-xs text-gray-700">
+                Consumo no mês: <span className="font-semibold">{loadingFinopsStatus ? '…' : (nfeUsed ?? '—')}</span>
+              </div>
+              <div className={`text-xs font-semibold ${nfeAtLimit ? 'text-amber-700' : 'text-gray-600'}`}>
+                {loadingFinopsStatus ? '…' : (nfeUsed !== null && nfeMax !== null ? `${nfeUsed} / ${nfeMax}` : `— / ${normalizedMaxNfeMonthly}`)}
+              </div>
+            </div>
+            {finopsStatus && finopsStatus.ok === false ? (
+              <p className="mt-2 text-xs text-amber-700">
+                Não foi possível obter o status de limites ({finopsStatus.reason ?? 'erro'}). Ainda assim, o enforcement ocorre no banco.
+              </p>
+            ) : null}
+          </div>
         </div>
       </div>
     </div>

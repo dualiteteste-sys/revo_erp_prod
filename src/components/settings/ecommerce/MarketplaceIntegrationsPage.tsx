@@ -500,7 +500,13 @@ export default function MarketplaceIntegrationsPage() {
                     <div className="rounded-lg bg-white/70 border border-gray-100 p-2">
                       <div className="text-gray-500">Token</div>
                       <div className="font-medium text-gray-800">
-                        {diagnostics.has_token ? (diagnostics.token_expired ? 'Expirado' : 'OK') : 'Ausente'}
+                        {diagnostics.has_token
+                          ? diagnostics.token_expired
+                            ? 'Expirado'
+                            : diagnostics.token_expires_soon
+                              ? `Expira em breve${typeof diagnostics.token_expires_in_days === 'number' ? ` (${diagnostics.token_expires_in_days}d)` : ''}`
+                              : 'OK'
+                          : 'Ausente'}
                       </div>
                     </div>
                     <div className="rounded-lg bg-white/70 border border-gray-100 p-2">
