@@ -6,6 +6,7 @@ import { supabase } from "@/lib/supabaseClient"; // mantenha seu caminho atual
 import { logger } from "@/lib/logger";
 import { getLastRequestId } from "@/lib/requestId";
 import { withRetry } from "@/lib/retry";
+import { logRpcMetric, maybeLogFirstValue } from "@/lib/metrics";
 
 type RpcArgs = Record<string, any>;
 
@@ -32,9 +33,15 @@ function isRetryableRpcFailure(status: number | undefined, message: string): boo
 export async function callRpc<T = unknown>(fn: string, args: RpcArgs = {}): Promise<T> {
   return withRetry(
     async (attempt) => {
+      const startedAt = performance.now();
       const { data, error, status } = await supabase.rpc(fn, args);
+      const durationMs = performance.now() - startedAt;
 
-      if (!error) return data as T;
+      if (!error) {
+        logRpcMetric({ fn, ok: true, status, durationMs, attempt });
+        maybeLogFirstValue();
+        return data as T;
+      }
 
       const msg = error.message || "RPC_ERROR";
       const details = (error as any).details ?? null;
@@ -42,6 +49,8 @@ export async function callRpc<T = unknown>(fn: string, args: RpcArgs = {}): Prom
 
       const transient = isRetryableRpcFailure(status, msg);
       const willRetry = transient && attempt < 3;
+
+      logRpcMetric({ fn, ok: false, status, durationMs, attempt });
 
       if (transient) {
         logger.warn("[RPC][TRANSIENT]", { fn, attempt, status, message: msg, details, request_id, willRetry });

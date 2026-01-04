@@ -87,7 +87,7 @@ Este é o checklist único (por módulo) para levar o REVO ao nível **top mundi
 ### C1) Logs, métricas e tracing
 - [x] OBS-LOG-01 (P0) Correlation ID propagado (front → edge → DB) em ações críticas
 - [x] OBS-TRC-01 (P0) Tracing por ação crítica (emitir NF, PDV, importar marketplace, finalizar recebimento)
-- [ ] OBS-MET-01 (P0) Métricas de produto (latência, taxa de erro, tempo de first value)
+- [x] OBS-MET-01 (P0) Métricas de produto (latência, taxa de erro, tempo de first value)
 - [ ] OBS-MET-02 (P1) KPIs de negócio: funil (setup → 1ª venda → 1ª NF → 1º pagamento)
 - [x] OBS-OPS-01 (P0) Painel “Operação” (Dev → Saúde): filas, falhas, retries, webhooks, últimos eventos
 
@@ -95,9 +95,9 @@ Este é o checklist único (por módulo) para levar o REVO ao nível **top mundi
 - Tela “Saúde” mostra: últimas falhas, fila pendente, e link para logs por entidade.
 
 ### C2) SLO/alertas/runbooks
-- [ ] SRE-01 (P0) SLOs mínimos (erro RPC <1%, fila < X, emissão NF success rate)
+- [x] SRE-01 (P0) SLOs mínimos (erro RPC <1%, fila < X, emissão NF success rate)
 - [x] SRE-02 (P0) Alertas (email/Slack) para quedas críticas (NF, fila, backups, drift)
-- [ ] SRE-03 (P1) Runbooks simples (playbooks) por incidente
+- [x] SRE-03 (P1) Runbooks simples (playbooks) por incidente
 
 ---
 
