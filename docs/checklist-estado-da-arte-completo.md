@@ -70,7 +70,7 @@ Este é o checklist único (por módulo) para levar o REVO ao nível **top mundi
 - [x] SEC-RBAC-03 (P1) Perfis prontos (Owner/Admin/Finance/Ops/Member/Viewer) + auditoria de mudanças
 
 ### B3) Segredos e integrações (segurança operacional)
-- [ ] SEC-INT-01 (P0) Rotação de tokens (NFE.io/marketplaces) com procedimento e “health check”
+- [x] SEC-INT-01 (P0) Rotação de tokens (NFE.io/marketplaces) com procedimento e “health check”
 - [ ] SEC-INT-02 (P0) Revogação (disconnect) consistente + limpeza de secrets
 - [ ] SEC-INT-03 (P1) Scopes mínimos por integração (OAuth) e auditoria de acessos
 
@@ -110,13 +110,13 @@ Este é o checklist único (por módulo) para levar o REVO ao nível **top mundi
 - [ ] PERF-FE-04 (P1) Lighthouse budget (Perf/A11y/Best Practices) para landing + app shell
 
 ### D2) Banco/RPC
-- [ ] PERF-DB-01 (P0) EXPLAIN/índices nos top RPCs (vendas, estoque, financeiro, indústria)
+- [x] PERF-DB-01 (P0) EXPLAIN/índices nos top RPCs (vendas, estoque, financeiro, indústria)
 - [x] PERF-DB-02 (P0) Guard rails: paginação obrigatória + limites + filtros no backend
 - [ ] PERF-DB-03 (P1) Rate limit/backoff por canal/ação (integrações, emissão)
 
 ### D3) FinOps (eficiência operacional)
 - [ ] FINOPS-01 (P1) Telemetria de custo: jobs, webhooks, filas (volume) por empresa
-- [ ] FINOPS-02 (P1) Limites por plano com enforcement real e alertas (evitar suporte)
+- [x] FINOPS-02 (P1) Limites por plano com enforcement real e alertas (evitar suporte)
 
 ### D4) Resiliência / Escalabilidade (sem “ERP frágil”)
 - [x] RES-01 (P0) Idempotência padrão em ações críticas (idempotency key + dedupe no backend)
