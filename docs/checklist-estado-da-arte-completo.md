@@ -39,7 +39,7 @@ Este é o checklist único (por módulo) para levar o REVO ao nível **top mundi
 
 ### A2) UX “Estado da Arte”
 - [ ] PLAT-UX-01 (P1) Microinterações consistentes (hover/press/transition) sem flicker/layout shift
-- [ ] PLAT-UX-02 (P0) Ações destrutivas com “zero-surpresa”: undo/confirm + explicação clara
+- [x] PLAT-UX-02 (P0) Ações destrutivas com “zero-surpresa”: undo/confirm + explicação clara
 - [x] PLAT-UX-03 (P0) Feedback resiliente: retry, “o que fazer agora”, link para logs/diagnóstico quando falhar
 - [ ] PLAT-UX-04 (P1) Fluxos complexos com assistentes (wizard) por contexto (NF-e, PDV, Indústria, Integrações)
 
@@ -96,7 +96,7 @@ Este é o checklist único (por módulo) para levar o REVO ao nível **top mundi
 
 ### C2) SLO/alertas/runbooks
 - [ ] SRE-01 (P0) SLOs mínimos (erro RPC <1%, fila < X, emissão NF success rate)
-- [ ] SRE-02 (P0) Alertas (email/Slack) para quedas críticas (NF, fila, backups, drift)
+- [x] SRE-02 (P0) Alertas (email/Slack) para quedas críticas (NF, fila, backups, drift)
 - [ ] SRE-03 (P1) Runbooks simples (playbooks) por incidente
 
 ---
@@ -211,7 +211,7 @@ Este é o checklist único (por módulo) para levar o REVO ao nível **top mundi
 - [ ] RH-STA-02 (P1) Matriz de competências utilizável (gap, plano de ação, histórico)
 
 ### G9) Configurações / Administração
-- [ ] ADM-STA-01 (P0) Usuários, papéis e permissões “sem fricção” (scroll ok, busca, presets)
+- [x] ADM-STA-01 (P0) Usuários, papéis e permissões “sem fricção” (scroll ok, busca, presets)
 - [x] ADM-STA-02 (P0) Planos/Limites por empresa com enforcement 3 camadas (UI/Rotas/DB)
 - [ ] ADM-STA-03 (P1) Multiunidade/filiais (quando aplicável): escopo claro + permissões
 - [ ] ADM-STA-04 (P1) Auditoria de mudanças administrativas (quem mudou o quê e quando)

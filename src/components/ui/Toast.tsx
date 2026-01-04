@@ -6,6 +6,9 @@ export type ToastProps = {
   type?: ToastType;
   title?: string;
   message?: string;
+  actionLabel?: string;
+  actionAriaLabel?: string;
+  onAction?: () => void;
   onClose?: () => void;
   // opcional: permite passar um ícone custom
   icon?: React.ReactNode;
@@ -24,6 +27,9 @@ export default function Toast(props: ToastProps) {
     type = "info",
     title,
     message,
+    actionLabel,
+    actionAriaLabel,
+    onAction,
     onClose,
     icon,
     className = "",
@@ -42,6 +48,16 @@ export default function Toast(props: ToastProps) {
       <div className="min-w-0">
         {title && <p className="font-semibold leading-5">{title}</p>}
         {message && <p className="text-sm opacity-90">{message}</p>}
+        {actionLabel && onAction && (
+          <button
+            type="button"
+            onClick={onAction}
+            aria-label={actionAriaLabel ?? actionLabel}
+            className="mt-2 inline-flex items-center rounded-md bg-white/15 px-2 py-1 text-xs font-semibold text-current hover:bg-white/25 focus:outline-none focus:ring-2 focus:ring-white/50"
+          >
+            {actionLabel}
+          </button>
+        )}
       </div>
       {onClose && (
         <button

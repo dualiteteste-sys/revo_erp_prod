@@ -4,15 +4,29 @@ import Toast, { ToastProps } from '../components/ui/Toast';
 
 type ToastType = "success" | "error" | "warning" | "info";
 
+export type ToastAction = {
+  label: string;
+  onClick: () => void | Promise<void>;
+  ariaLabel?: string;
+};
+
+export type ToastOptions = {
+  title?: string;
+  durationMs?: number;
+  action?: ToastAction;
+};
+
 interface ToastMessage {
   id: number;
   message: string;
   type: ToastType;
   title?: string;
+  durationMs: number;
+  action?: ToastAction;
 }
 
 interface ToastContextType {
-  addToast: (message: string, type: ToastType, title?: string) => void;
+  addToast: (message: string, type: ToastType, titleOrOptions?: string | ToastOptions) => void;
 }
 
 const ToastContext = createContext<ToastContextType | undefined>(undefined);
@@ -20,18 +34,31 @@ const ToastContext = createContext<ToastContextType | undefined>(undefined);
 export const ToastProvider = ({ children }: { children: ReactNode }) => {
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
   const toastId = useRef(0);
+  const timeoutsRef = useRef<Map<number, number>>(new Map());
 
   const removeToast = useCallback((id: number) => {
+    const t = timeoutsRef.current.get(id);
+    if (t) {
+      window.clearTimeout(t);
+      timeoutsRef.current.delete(id);
+    }
     setToasts((prevToasts) => prevToasts.filter((toast) => toast.id !== id));
   }, []);
 
-  const addToast = useCallback((message: string, type: ToastType, title?: string) => {
+  const addToast = useCallback((message: string, type: ToastType, titleOrOptions?: string | ToastOptions) => {
     const id = toastId.current++;
-    setToasts((prevToasts) => [...prevToasts, { id, message, type, title }]);
+    const options: ToastOptions =
+      typeof titleOrOptions === 'string'
+        ? { title: titleOrOptions }
+        : (titleOrOptions ?? {});
 
-    setTimeout(() => {
+    const durationMs = typeof options.durationMs === 'number' ? options.durationMs : 5000;
+    setToasts((prevToasts) => [...prevToasts, { id, message, type, title: options.title, durationMs, action: options.action }]);
+
+    const t = window.setTimeout(() => {
       removeToast(id);
-    }, 5000);
+    }, durationMs);
+    timeoutsRef.current.set(id, t);
   }, [removeToast]);
 
   return (
@@ -52,6 +79,15 @@ export const ToastProvider = ({ children }: { children: ReactNode }) => {
                 type={toast.type}
                 title={toast.title}
                 message={toast.message}
+                actionLabel={toast.action?.label}
+                actionAriaLabel={toast.action?.ariaLabel}
+                onAction={toast.action ? async () => {
+                  try {
+                    await toast.action.onClick();
+                  } finally {
+                    removeToast(toast.id);
+                  }
+                } : undefined}
                 onClose={() => removeToast(toast.id)}
               />
             </motion.div>

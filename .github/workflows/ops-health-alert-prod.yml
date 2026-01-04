@@ -1,0 +1,215 @@
+name: OPS health alert (PROD)
+
+on:
+  schedule:
+    - cron: "*/15 * * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+concurrency:
+  group: ops-health-alert-prod
+  cancel-in-progress: false
+
+jobs:
+  ops-health:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      # Limiares conservadores para evitar ruído (ajuste conforme volume).
+      THRESHOLD_DLQ: "0"
+      THRESHOLD_FAILED: "0"
+      THRESHOLD_PENDING: "200"
+    steps:
+      - name: Install psql + jq
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y postgresql-client jq
+
+      - name: Collect queue health from PROD
+        id: health
+        env:
+          DATABASE_URL: ${{ secrets.SUPABASE_DB_URL_PROD }}
+        run: |
+          set -euo pipefail
+
+          if [[ -z "${DATABASE_URL:-}" ]]; then
+            echo "Missing secret SUPABASE_DB_URL_PROD" >&2
+            exit 1
+          fi
+
+          HEALTH_JSON="$(psql "$DATABASE_URL" -Atc "
+            select jsonb_build_object(
+              'nfe_pending',
+                case when to_regclass('public.fiscal_nfe_webhook_events') is null then 0 else (
+                  select count(*)::int
+                  from public.fiscal_nfe_webhook_events
+                  where processed_at is null
+                    and (next_retry_at is null or next_retry_at <= now())
+                    and (locked_at is null or locked_at < (now() - interval '10 minutes'))
+                ) end,
+              'nfe_failed',
+                case when to_regclass('public.fiscal_nfe_webhook_events') is null then 0 else (
+                  select count(*)::int
+                  from public.fiscal_nfe_webhook_events
+                  where processed_at is null
+                    and last_error is not null
+                ) end,
+              'nfe_locked',
+                case when to_regclass('public.fiscal_nfe_webhook_events') is null then 0 else (
+                  select count(*)::int
+                  from public.fiscal_nfe_webhook_events
+                  where processed_at is null
+                    and locked_at is not null
+                    and locked_at >= (now() - interval '10 minutes')
+                ) end,
+
+              'ecommerce_pending',
+                case when to_regclass('public.ecommerce_jobs') is null then 0 else (
+                  select count(*)::int
+                  from public.ecommerce_jobs
+                  where status in ('pending','processing')
+                    and (next_retry_at is null or next_retry_at <= now())
+                    and (scheduled_for is null or scheduled_for <= now())
+                    and (locked_at is null or locked_at < (now() - interval '10 minutes'))
+                ) end,
+              'ecommerce_failed',
+                case when to_regclass('public.ecommerce_jobs') is null then 0 else (
+                  select count(*)::int
+                  from public.ecommerce_jobs
+                  where status = 'error'
+                    and last_error is not null
+                ) end,
+              'ecommerce_dlq',
+                case when to_regclass('public.ecommerce_job_dead_letters') is null then 0 else (
+                  select count(*)::int
+                  from public.ecommerce_job_dead_letters
+                ) end,
+
+              'finance_pending',
+                case when to_regclass('public.finance_jobs') is null then 0 else (
+                  select count(*)::int
+                  from public.finance_jobs
+                  where status in ('pending','processing')
+                    and (next_retry_at is null or next_retry_at <= now())
+                    and (locked_at is null or locked_at < (now() - interval '10 minutes'))
+                ) end,
+              'finance_failed',
+                case when to_regclass('public.finance_jobs') is null then 0 else (
+                  select count(*)::int
+                  from public.finance_jobs
+                  where status = 'failed'
+                    and last_error is not null
+                ) end,
+              'finance_dlq',
+                case when to_regclass('public.finance_job_dead_letters') is null then 0 else (
+                  select count(*)::int
+                  from public.finance_job_dead_letters
+                ) end
+            )::text;
+          ")"
+
+          echo "health_json=$HEALTH_JSON" >> "$GITHUB_OUTPUT"
+
+          pending_max="$(echo "$HEALTH_JSON" | jq -r '[.nfe_pending,.ecommerce_pending,.finance_pending] | max')"
+          failed_sum="$(echo "$HEALTH_JSON" | jq -r '.nfe_failed + .ecommerce_failed + .finance_failed')"
+          dlq_sum="$(echo "$HEALTH_JSON" | jq -r '.ecommerce_dlq + .finance_dlq')"
+
+          echo "pending_max=$pending_max" >> "$GITHUB_OUTPUT"
+          echo "failed_sum=$failed_sum" >> "$GITHUB_OUTPUT"
+          echo "dlq_sum=$dlq_sum" >> "$GITHUB_OUTPUT"
+
+          alert="false"
+          if [[ "$dlq_sum" -gt "${THRESHOLD_DLQ}" ]]; then alert="true"; fi
+          if [[ "$failed_sum" -gt "${THRESHOLD_FAILED}" ]]; then alert="true"; fi
+          if [[ "$pending_max" -gt "${THRESHOLD_PENDING}" ]]; then alert="true"; fi
+
+          echo "alert=$alert" >> "$GITHUB_OUTPUT"
+
+      - name: Upsert ops alert issue (when alert=true)
+        if: steps.health.outputs.alert == 'true'
+        uses: actions/github-script@v7
+        env:
+          HEALTH_JSON: ${{ steps.health.outputs.health_json }}
+          PENDING_MAX: ${{ steps.health.outputs.pending_max }}
+          FAILED_SUM: ${{ steps.health.outputs.failed_sum }}
+          DLQ_SUM: ${{ steps.health.outputs.dlq_sum }}
+        with:
+          script: |
+            const title = "OPS ALERT (PROD): filas/DLQ acima do limite";
+            const labels = ["ops-alert"];
+            const body = [
+              "Detectado possível problema operacional em PROD (filas/DLQ).",
+              "",
+              `- pending_max: ${process.env.PENDING_MAX}`,
+              `- failed_sum: ${process.env.FAILED_SUM}`,
+              `- dlq_sum: ${process.env.DLQ_SUM}`,
+              "",
+              "Detalhes (JSON):",
+              "```json",
+              String(process.env.HEALTH_JSON ?? "{}"),
+              "```",
+              "",
+              `Run: ${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`,
+              "",
+              "Próximos passos sugeridos:",
+              "- Abrir `Dev → Saúde` no app para ver DLQ e reprocessar com segurança.",
+              "- Verificar workers (NF/marketplace/financeiro) e logs.",
+            ].join("\n");
+
+            const { data: issues } = await github.rest.issues.listForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: "open",
+              labels: labels.join(","),
+              per_page: 100,
+            });
+            const existing = issues.find(i => i.title === title);
+            if (existing) {
+              await github.rest.issues.update({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: existing.number,
+                body,
+              });
+            } else {
+              await github.rest.issues.create({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                title,
+                body,
+                labels,
+              });
+            }
+
+      - name: Auto-close ops alert issue (when alert=false)
+        if: steps.health.outputs.alert == 'false'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const title = "OPS ALERT (PROD): filas/DLQ acima do limite";
+            const labels = ["ops-alert"];
+            const { data: issues } = await github.rest.issues.listForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: "open",
+              labels: labels.join(","),
+              per_page: 100,
+            });
+            const existing = issues.find(i => i.title === title);
+            if (!existing) return;
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: existing.number,
+              body: `✅ Resolvido automaticamente. Run: ${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`,
+            });
+            await github.rest.issues.update({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: existing.number,
+              state: "closed",
+            });
+
