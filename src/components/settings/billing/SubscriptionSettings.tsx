@@ -46,18 +46,40 @@ const SubscriptionSkeleton = () => (
   </div>
 );
 
-const EmptyState = ({ onRefresh }: { onRefresh: () => void }) => (
+const EmptyState = ({
+  onRefresh,
+  onSync,
+  syncing,
+  canSync,
+}: {
+  onRefresh: () => void;
+  onSync: () => void;
+  syncing: boolean;
+  canSync: boolean;
+}) => (
   <div className="text-center p-10 bg-white/80 rounded-2xl border border-gray-200 shadow-sm">
     <ServerOff className="mx-auto h-12 w-12 text-gray-400" />
     <h3 className="mt-4 text-lg font-medium text-gray-800">Nenhuma assinatura encontrada</h3>
     <p className="mt-1 text-sm text-gray-500">Não foi possível encontrar uma assinatura para esta empresa.</p>
-    <button
-      onClick={onRefresh}
-      className="mt-6 inline-flex items-center gap-2 bg-blue-100 text-blue-700 font-semibold py-2 px-4 rounded-lg hover:bg-blue-200 transition-colors"
-    >
-      <RefreshCw size={16} />
-      Tentar Novamente
-    </button>
+    <div className="mt-6 flex flex-col sm:flex-row gap-2 justify-center">
+      <button
+        onClick={onRefresh}
+        className="inline-flex items-center gap-2 bg-blue-100 text-blue-700 font-semibold py-2 px-4 rounded-lg hover:bg-blue-200 transition-colors"
+      >
+        <RefreshCw size={16} />
+        Atualizar
+      </button>
+      {canSync ? (
+        <button
+          onClick={onSync}
+          disabled={syncing}
+          className="inline-flex items-center gap-2 bg-blue-600 text-white font-semibold py-2 px-4 rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50"
+        >
+          {syncing ? <Loader2 className="animate-spin" size={16} /> : <CreditCard size={16} />}
+          Sincronizar com Stripe
+        </button>
+      ) : null}
+    </div>
   </div>
 );
 
@@ -100,6 +122,7 @@ const SubscriptionSettings: React.FC<SubscriptionSettingsProps> = ({ onSwitchToP
   const [currentUsersCount, setCurrentUsersCount] = useState<number | null>(null);
   const [finopsStatus, setFinopsStatus] = useState<FinopsLimitsStatus | null>(null);
   const [loadingFinopsStatus, setLoadingFinopsStatus] = useState(false);
+  const [syncingStripe, setSyncingStripe] = useState(false);
 
   const fetchAddons = useCallback(async () => {
     if (!activeEmpresa?.id) return;
@@ -215,12 +238,49 @@ const SubscriptionSettings: React.FC<SubscriptionSettingsProps> = ({ onSwitchToP
     }
   };
 
+  const handleSyncFromStripe = async () => {
+    const empresaId = activeEmpresa?.id;
+    if (!empresaId) {
+      addToast('Nenhuma empresa ativa selecionada.', 'error');
+      return;
+    }
+    if (!canAdmin) {
+      addToast('Apenas administradores podem sincronizar com o Stripe.', 'warning');
+      return;
+    }
+
+    setSyncingStripe(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('billing-sync-subscription', {
+        headers: { Authorization: `Bearer ${session?.access_token}` },
+        body: { empresa_id: empresaId },
+      });
+      if (error) throw error;
+      if (!data?.synced) {
+        throw new Error(data?.message || 'Não foi possível sincronizar a assinatura.');
+      }
+      addToast('Assinatura sincronizada com o Stripe.', 'success');
+      refetchSubscription();
+    } catch (e: any) {
+      addToast(e.message || 'Erro ao sincronizar assinatura com o Stripe.', 'error');
+    } finally {
+      setSyncingStripe(false);
+    }
+  };
+
   const renderMainSubscription = () => {
     if (loadingSubscription) {
       return <SubscriptionSkeleton />;
     }
     if (!subscription) {
-      return <EmptyState onRefresh={refetchSubscription} />;
+      return (
+        <EmptyState
+          onRefresh={refetchSubscription}
+          onSync={handleSyncFromStripe}
+          syncing={syncingStripe}
+          canSync={canAdmin}
+        />
+      );
     }
 
     const statusDetails = getStatusDetails(subscription.status);
@@ -519,12 +579,19 @@ const SubscriptionSettings: React.FC<SubscriptionSettingsProps> = ({ onSwitchToP
       <div className="flex justify-between items-center">
         <h1 className="text-2xl font-bold text-gray-800">Minha Assinatura</h1>
         <button
-          onClick={() => { refetchSubscription(); fetchAddons(); }}
+          onClick={() => {
+            if (canAdmin) {
+              void handleSyncFromStripe();
+              return;
+            }
+            refetchSubscription();
+            fetchAddons();
+          }}
           className="flex items-center gap-2 text-sm text-gray-600 hover:text-blue-600 transition-colors px-3 py-1 rounded-md hover:bg-blue-50"
           aria-label="Atualizar dados da assinatura"
         >
-          <RefreshCw size={16} />
-          <span>Atualizar</span>
+          {syncingStripe ? <Loader2 className="animate-spin" size={16} /> : <RefreshCw size={16} />}
+          <span>{canAdmin ? 'Sincronizar' : 'Atualizar'}</span>
         </button>
       </div>
       {renderMainSubscription()}

@@ -75,6 +75,50 @@ Deno.serve(async (req) => {
     const kind = checkoutSession.metadata?.kind;
     let subscriptionData, planData, error;
 
+    // Self-healing: garante que a assinatura principal exista no banco assim que o Checkout terminar
+    // (não depende do webhook chegar a tempo).
+    if (kind !== 'addon') {
+      try {
+        const expandedSub = checkoutSession.subscription as Stripe.Subscription | string | null;
+        if (expandedSub && typeof expandedSub !== "string") {
+          const priceId = expandedSub.items?.data?.[0]?.price?.id ?? null;
+          const interval = expandedSub.items?.data?.[0]?.price?.recurring?.interval ?? null;
+          const billingCycle = interval === "year" ? "yearly" : "monthly";
+          const currentEnd = expandedSub.current_period_end
+            ? new Date(expandedSub.current_period_end * 1000).toISOString()
+            : null;
+
+          if (priceId) {
+            const admin = createClient(
+              Deno.env.get("SUPABASE_URL")!,
+              Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
+              { auth: { autoRefreshToken: false, persistSession: false } }
+            );
+
+            const { data: planRow } = await admin
+              .from("plans")
+              .select("slug")
+              .eq("stripe_price_id", priceId)
+              .maybeSingle();
+
+            await admin.rpc("upsert_subscription", {
+              p_empresa_id: empresaId,
+              p_status: expandedSub.status,
+              p_current_period_end: currentEnd,
+              p_price_id: priceId,
+              p_sub_id: expandedSub.id,
+              p_plan_slug: planRow?.slug ?? null,
+              p_billing_cycle: billingCycle,
+              p_cancel_at_period_end: !!expandedSub.cancel_at_period_end,
+            });
+          }
+        }
+      } catch (e) {
+        // best-effort: não bloqueia o flow do usuário
+        console.error("billing-success-session: best-effort upsert failed", e);
+      }
+    }
+
     if (kind === 'addon') {
         const { data, error: addonSubError } = await supabase.from("empresa_addons").select("*").eq("empresa_id", empresaId).eq("addon_slug", checkoutSession.metadata?.addon_slug?.toUpperCase()).single();
         subscriptionData = data;
