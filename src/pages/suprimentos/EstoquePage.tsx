@@ -1,5 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { listPosicaoEstoque, getKardex, EstoquePosicao, EstoqueMovimento } from '@/services/suprimentos';
+import {
+  EstoqueDeposito,
+  EstoqueMovimento,
+  EstoquePosicao,
+  getKardexV2,
+  listDepositos,
+  listPosicaoEstoqueV2,
+} from '@/services/suprimentos';
 import { Search, ArrowRightLeft, History, Download, Loader2 } from 'lucide-react';
 import Modal from '@/components/ui/Modal';
 import MovimentoModal from '@/components/suprimentos/MovimentoModal';
@@ -22,6 +29,9 @@ export default function EstoquePage() {
   const [pendingFocusTerm, setPendingFocusTerm] = useState<string | null>(null);
   const [highlightProdutoId, setHighlightProdutoId] = useState<string | null>(null);
 
+  const [depositos, setDepositos] = useState<EstoqueDeposito[]>([]);
+  const [depositoId, setDepositoId] = useState<string | null>(null);
+
   const [selectedProduto, setSelectedProduto] = useState<EstoquePosicao | null>(null);
   const [isMovimentoOpen, setIsMovimentoOpen] = useState(false);
   const [isKardexOpen, setIsKardexOpen] = useState(false);
@@ -33,10 +43,35 @@ export default function EstoquePage() {
   const canUpdate = !!permUpdate.data;
   const permsLoading = permUpdate.isLoading;
 
+  const selectedDeposito = depositos.find((d) => d.id === depositoId) ?? depositos.find((d) => d.is_default) ?? null;
+
+  const fetchDepositos = async () => {
+    try {
+      const deps = await listDepositos({ onlyActive: true });
+      setDepositos(deps);
+
+      const selectable = deps.filter((d) => d.ativo && d.can_view);
+      const nextDefault =
+        selectable.find((d) => d.is_default)?.id ?? selectable[0]?.id ?? deps.find((d) => d.is_default)?.id ?? deps[0]?.id ?? null;
+      setDepositoId((current) => {
+        if (current && selectable.some((d) => d.id === current)) return current;
+        return nextDefault;
+      });
+    } catch {
+      // fallback: segue sem multi-depósito
+      setDepositos([]);
+      setDepositoId(null);
+    }
+  };
+
   const fetchEstoque = async () => {
     setLoading(true);
     try {
-      const data = await listPosicaoEstoque(debouncedSearch, showBaixoEstoque);
+      const data = await listPosicaoEstoqueV2({
+        search: debouncedSearch || null,
+        baixoEstoque: showBaixoEstoque,
+        depositoId,
+      });
       setProdutos(data);
     } catch (error) {
       addToast('Falha ao carregar estoque. Tente novamente.', 'error');
@@ -46,8 +81,12 @@ export default function EstoquePage() {
   };
 
   useEffect(() => {
+    fetchDepositos();
+  }, []);
+
+  useEffect(() => {
     fetchEstoque();
-  }, [debouncedSearch, showBaixoEstoque]);
+  }, [debouncedSearch, showBaixoEstoque, depositoId]);
 
   useEffect(() => {
     const produto = searchParams.get('produto');
@@ -87,7 +126,7 @@ export default function EstoquePage() {
     setIsKardexOpen(true);
     setLoadingKardex(true);
     try {
-      const data = await getKardex(produto.produto_id);
+      const data = await getKardexV2(produto.produto_id, { depositoId, limit: 50 });
       setKardexData(data);
     } catch {
       addToast('Falha ao carregar kardex. Tente novamente.', 'error');
@@ -103,9 +142,10 @@ export default function EstoquePage() {
       return;
     }
     downloadCsv({
-      filename: `estoque_posicao_${new Date().toISOString().slice(0, 10)}`,
-      headers: ['produto', 'sku', 'unidade', 'saldo', 'custo_medio', 'estoque_min', 'status'],
+      filename: `estoque_posicao_${selectedDeposito?.nome ?? 'deposito'}_${new Date().toISOString().slice(0, 10)}`,
+      headers: ['deposito', 'produto', 'sku', 'unidade', 'saldo', 'custo_medio', 'estoque_min', 'status'],
       rows: produtos.map((p) => [
+        selectedDeposito?.nome ?? '',
         p.nome,
         p.sku ?? '',
         p.unidade,
@@ -125,8 +165,9 @@ export default function EstoquePage() {
     }
     downloadCsv({
       filename: `kardex_${selectedProduto.nome}_${new Date().toISOString().slice(0, 10)}`,
-      headers: ['data', 'tipo', 'qtd', 'saldo_anterior', 'saldo_novo', 'ref', 'usuario'],
+      headers: ['deposito', 'data', 'tipo', 'qtd', 'saldo_anterior', 'saldo_novo', 'ref', 'usuario'],
       rows: kardexData.map((m) => [
+        m.deposito_nome ?? selectedDeposito?.nome ?? '',
         new Date(m.created_at).toLocaleString('pt-BR'),
         m.tipo,
         m.quantidade,
@@ -147,14 +188,16 @@ export default function EstoquePage() {
   };
 
   // Tipos de movimento que somam ao estoque
-  const entryTypes = ['entrada', 'ajuste_entrada', 'entrada_beneficiamento'];
+  const entryTypes = ['entrada', 'ajuste_entrada', 'entrada_beneficiamento', 'transfer_in'];
 
   return (
     <div className="p-1">
       <div className="flex flex-col md:flex-row justify-between items-center mb-6 gap-4">
         <div>
           <h1 className="text-3xl font-bold text-gray-800">Controle de Estoque</h1>
-          <p className="text-gray-600 text-sm mt-1">Gerencie saldos e movimentações.</p>
+          <p className="text-gray-600 text-sm mt-1">
+            Gerencie saldos e movimentações{selectedDeposito ? ` • Depósito: ${selectedDeposito.nome}` : ''}.
+          </p>
         </div>
         <div className="flex items-center gap-2">
           <Button
@@ -183,6 +226,28 @@ export default function EstoquePage() {
             className="w-full p-3 pl-10 border border-gray-300 rounded-xl shadow-sm focus:ring-2 focus:ring-blue-500"
           />
         </div>
+        {depositos.length > 0 ? (
+          <div className="bg-white p-2 rounded-lg border border-gray-200 min-w-[220px]">
+            <label className="block text-xs font-semibold text-gray-600 mb-1" htmlFor="deposito">
+              Depósito
+            </label>
+            <select
+              id="deposito"
+              className="w-full p-2 border border-gray-300 rounded-lg text-sm"
+              value={depositoId ?? ''}
+              onChange={(e) => setDepositoId(e.target.value || null)}
+            >
+              {depositos
+                .filter((d) => d.ativo && d.can_view)
+                .map((d) => (
+                  <option key={d.id} value={d.id}>
+                    {d.nome}
+                    {d.is_default ? ' (padrão)' : ''}
+                  </option>
+                ))}
+            </select>
+          </div>
+        ) : null}
         <div className="bg-white p-2 rounded-lg border border-gray-200">
             <Toggle 
                 label="Apenas Estoque Baixo/Zerado" 
@@ -273,6 +338,8 @@ export default function EstoquePage() {
             onClose={() => setIsMovimentoOpen(false)} 
             produto={selectedProduto}
             onSuccess={fetchEstoque}
+            depositos={depositos.filter((d) => d.can_view)}
+            depositoId={depositoId}
         />
       )}
 
@@ -309,6 +376,10 @@ export default function EstoquePage() {
                                     <td className="p-3 capitalize">
                                         {mov.tipo === 'entrada_beneficiamento' 
                                             ? 'Entrada Benef.' 
+                                            : mov.tipo === 'transfer_in'
+                                              ? 'Transferência (Entrada)'
+                                              : mov.tipo === 'transfer_out'
+                                                ? 'Transferência (Saída)'
                                             : mov.tipo.replace(/_/g, ' ')}
                                     </td>
                                     <td className={`p-3 text-right font-bold ${entryTypes.includes(mov.tipo) ? 'text-green-600' : 'text-red-600'}`}>
