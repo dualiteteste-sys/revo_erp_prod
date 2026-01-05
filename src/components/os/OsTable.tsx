@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { OrdemServico } from '@/services/os';
 import { Edit, Trash2, ArrowUpDown, GripVertical, MoreHorizontal, CalendarClock, Paperclip, CheckCircle2, XCircle, ClipboardCheck, ArrowUpRight, UserRound } from 'lucide-react';
@@ -61,10 +61,18 @@ const SortableHeader: React.FC<{
 const OsTable: React.FC<OsTableProps> = ({ serviceOrders, onEdit, onDelete, onOpenAgenda, onSetStatus, sortBy, onSort, canUpdate = true, canManage = false, canDelete = true, busyOsId }) => {
   const formatDate = (value?: string | null) => (value ? new Date(value).toLocaleDateString('pt-BR') : '—');
   const formatTime = (value?: string | null) => (value ? String(value).slice(0, 5) : '');
+  const [isMobile, setIsMobile] = useState(() => (typeof window !== 'undefined' ? window.innerWidth < 768 : false));
+
+  useEffect(() => {
+    const onResize = () => setIsMobile(window.innerWidth < 768);
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, []);
 
   return (
     <div>
-      <div className="md:hidden space-y-3 p-3">
+      {isMobile ? (
+      <div className="space-y-3 p-3">
         {serviceOrders.map((os) => {
           const busy = !!busyOsId && busyOsId === os.id;
           const tecnicoNome = (os as any).tecnico_nome || (os as any).tecnico || null;
@@ -161,8 +169,9 @@ const OsTable: React.FC<OsTableProps> = ({ serviceOrders, onEdit, onDelete, onOp
           );
         })}
       </div>
+      ) : null}
 
-      <div className="hidden md:block overflow-x-auto">
+      <div className={isMobile ? 'hidden' : 'overflow-x-auto'}>
         <table className="min-w-full divide-y divide-gray-200">
         <thead className="bg-gray-50">
           <tr>
