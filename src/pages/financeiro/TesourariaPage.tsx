@@ -12,6 +12,7 @@ import MovimentacaoFormPanel from '@/components/financeiro/tesouraria/Movimentac
 import ExtratosTable from '@/components/financeiro/tesouraria/ExtratosTable';
 import ImportarExtratoModal from '@/components/financeiro/tesouraria/ImportarExtratoModal';
 import ConciliacaoDrawer from '@/components/financeiro/tesouraria/ConciliacaoDrawer';
+import ConciliacaoRegrasPanel from '@/components/financeiro/tesouraria/ConciliacaoRegrasPanel';
 import { ContaCorrente, Movimentacao, ExtratoItem, deleteContaCorrente, deleteMovimentacao, importarExtrato, conciliarExtrato, desconciliarExtrato, setContaCorrentePadrao } from '@/services/treasury';
 import ConfirmationModal from '@/components/ui/ConfirmationModal';
 import DatePicker from '@/components/ui/DatePicker';
@@ -19,7 +20,7 @@ import Toggle from '@/components/ui/forms/Toggle';
 import { Button } from '@/components/ui/button';
 
 export default function TesourariaPage() {
-  const [activeTab, setActiveTab] = useState<'contas' | 'movimentos' | 'conciliacao'>('contas');
+  const [activeTab, setActiveTab] = useState<'contas' | 'movimentos' | 'conciliacao' | 'regras'>('contas');
   const { addToast } = useToast();
   const { confirm } = useConfirm();
   const [busyExtratoId, setBusyExtratoId] = useState<string | null>(null);
@@ -210,6 +211,12 @@ export default function TesourariaPage() {
             >
                 Conciliação
             </button>
+            <button
+                onClick={() => setActiveTab('regras')}
+                className={`px-4 py-2 rounded-md text-sm font-medium transition-all ${activeTab === 'regras' ? 'bg-white shadow text-blue-600' : 'text-gray-600 hover:text-gray-800'}`}
+            >
+                Regras
+            </button>
         </div>
       </div>
 
@@ -349,6 +356,14 @@ export default function TesourariaPage() {
                 )}
             </div>
         </>
+      )}
+
+      {activeTab === 'regras' && (
+        <ConciliacaoRegrasPanel
+          contas={contas}
+          selectedContaId={selectedContaId}
+          setSelectedContaId={setSelectedContaId}
+        />
       )}
 
       {/* Modals */}
