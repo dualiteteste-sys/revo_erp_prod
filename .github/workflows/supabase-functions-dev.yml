@@ -27,12 +27,14 @@ jobs:
         with:
           version: latest
 
-      - name: Deploy NFE.io edge functions (DEV)
+      - name: Deploy Edge Functions (DEV)
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
           NFEIO_API_KEY_DEV: ${{ secrets.NFEIO_API_KEY_DEV }}
           NFEIO_WEBHOOK_SECRET_DEV: ${{ secrets.NFEIO_WEBHOOK_SECRET_DEV }}
           NFEIO_WORKER_SECRET_DEV: ${{ secrets.NFEIO_WORKER_SECRET_DEV }}
+          STRIPE_SECRET_KEY_DEV: ${{ secrets.STRIPE_SECRET_KEY_DEV }}
+          STRIPE_WEBHOOK_SECRET_DEV: ${{ secrets.STRIPE_WEBHOOK_SECRET_DEV }}
         run: |
           set -euo pipefail
 
@@ -56,12 +58,13 @@ jobs:
             supabase secrets set --project-ref "$PROJECT_REF" NFEIO_WORKER_SECRET="$NFEIO_WORKER_SECRET_DEV"
           fi
 
+          if [[ -n "${STRIPE_SECRET_KEY_DEV:-}" ]]; then
+            supabase secrets set --project-ref "$PROJECT_REF" STRIPE_SECRET_KEY="$STRIPE_SECRET_KEY_DEV"
+          fi
+          if [[ -n "${STRIPE_WEBHOOK_SECRET_DEV:-}" ]]; then
+            supabase secrets set --project-ref "$PROJECT_REF" STRIPE_WEBHOOK_SECRET="$STRIPE_WEBHOOK_SECRET_DEV"
+          fi
+
           echo "[DEV] Deploying Edge Functions..."
-          supabase functions deploy nfeio-emit --project-ref "$PROJECT_REF"
-          supabase functions deploy nfeio-sync --project-ref "$PROJECT_REF"
-          supabase functions deploy nfeio-webhook --project-ref "$PROJECT_REF"
-          supabase functions deploy nfeio-worker --project-ref "$PROJECT_REF"
-          supabase functions deploy nfeio-cancel --project-ref "$PROJECT_REF"
-          supabase functions deploy nfeio-cce --project-ref "$PROJECT_REF"
-          supabase functions deploy nfeio-disablement --project-ref "$PROJECT_REF"
-          supabase functions deploy nfeio-docs --project-ref "$PROJECT_REF"
+          export SUPABASE_PROJECT_REF="$PROJECT_REF"
+          bash scripts/deploy_edge_functions.sh

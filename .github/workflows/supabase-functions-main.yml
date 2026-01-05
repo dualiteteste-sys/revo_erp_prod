@@ -27,13 +27,15 @@ jobs:
         with:
           version: latest
 
-      - name: Deploy NFE.io edge functions (PROD)
+      - name: Deploy Edge Functions (PROD)
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
           PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_REF_PROD }}
           NFEIO_API_KEY_PROD: ${{ secrets.NFEIO_API_KEY_PROD }}
           NFEIO_WEBHOOK_SECRET_PROD: ${{ secrets.NFEIO_WEBHOOK_SECRET_PROD }}
           NFEIO_WORKER_SECRET_PROD: ${{ secrets.NFEIO_WORKER_SECRET_PROD }}
+          STRIPE_SECRET_KEY_PROD: ${{ secrets.STRIPE_SECRET_KEY_PROD }}
+          STRIPE_WEBHOOK_SECRET_PROD: ${{ secrets.STRIPE_WEBHOOK_SECRET_PROD }}
         run: |
           set -euo pipefail
 
@@ -63,12 +65,17 @@ jobs:
             echo "::warning::Missing secret NFEIO_WORKER_SECRET_PROD (worker will fallback to webhook secret)."
           fi
 
+          if [[ -n "${STRIPE_SECRET_KEY_PROD:-}" ]]; then
+            supabase secrets set --project-ref "$PROJECT_REF" STRIPE_SECRET_KEY="$STRIPE_SECRET_KEY_PROD"
+          else
+            echo "::warning::Missing secret STRIPE_SECRET_KEY_PROD (billing/stripe functions may fail at runtime)."
+          fi
+          if [[ -n "${STRIPE_WEBHOOK_SECRET_PROD:-}" ]]; then
+            supabase secrets set --project-ref "$PROJECT_REF" STRIPE_WEBHOOK_SECRET="$STRIPE_WEBHOOK_SECRET_PROD"
+          else
+            echo "::warning::Missing secret STRIPE_WEBHOOK_SECRET_PROD (stripe-webhook will reject events)."
+          fi
+
           echo "[PROD] Deploying Edge Functions..."
-          supabase functions deploy nfeio-emit --project-ref "$PROJECT_REF"
-          supabase functions deploy nfeio-sync --project-ref "$PROJECT_REF"
-          supabase functions deploy nfeio-webhook --project-ref "$PROJECT_REF"
-          supabase functions deploy nfeio-worker --project-ref "$PROJECT_REF"
-          supabase functions deploy nfeio-cancel --project-ref "$PROJECT_REF"
-          supabase functions deploy nfeio-cce --project-ref "$PROJECT_REF"
-          supabase functions deploy nfeio-disablement --project-ref "$PROJECT_REF"
-          supabase functions deploy nfeio-docs --project-ref "$PROJECT_REF"
+          export SUPABASE_PROJECT_REF="$PROJECT_REF"
+          bash scripts/deploy_edge_functions.sh
