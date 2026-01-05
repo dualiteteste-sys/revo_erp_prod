@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { CheckCircle2, FileText, Layers, Loader2, Save, Paperclip, Plus, Trash2 } from 'lucide-react';
-import { OrdemServicoDetails, saveOs, deleteOsItem, getOsDetails, OsItemSearchResult, addOsItem } from '@/services/os';
+import { OrdemServicoDetails, saveOs, deleteOsItem, getOsDetails, OsItemSearchResult, addOsItem, listOsTecnicos, setOsTecnico, type OsTecnicoRow } from '@/services/os';
 import { getPartnerDetails } from '@/services/partners';
 import { useToast } from '@/contexts/ToastProvider';
 import Section from '../ui/forms/Section';
@@ -41,7 +41,7 @@ const OsFormPanel: React.FC<OsFormPanelProps> = ({ os, onSaveSuccess, onClose })
   const { addToast } = useToast();
   const navigate = useNavigate();
   const { confirm } = useConfirm();
-  const { activeEmpresaId } = useAuth();
+  const { activeEmpresaId, userId } = useAuth();
   const permCreate = useHasPermission('os', 'create');
   const permUpdate = useHasPermission('os', 'update');
   const permManage = useHasPermission('os', 'manage');
@@ -69,6 +69,8 @@ const OsFormPanel: React.FC<OsFormPanelProps> = ({ os, onSaveSuccess, onClose })
   const [parcelasBaseDate, setParcelasBaseDate] = useState('');
   const [isGeneratingParcelas, setIsGeneratingParcelas] = useState(false);
   const [isGeneratingContasParcelas, setIsGeneratingContasParcelas] = useState(false);
+  const [tecnicos, setTecnicos] = useState<OsTecnicoRow[]>([]);
+  const [tecnicosLoading, setTecnicosLoading] = useState(false);
 
   const canEdit = formData.id ? permUpdate.data : permCreate.data;
   const permLoading = formData.id ? permUpdate.isLoading : permCreate.isLoading;
@@ -109,6 +111,27 @@ const OsFormPanel: React.FC<OsFormPanelProps> = ({ os, onSaveSuccess, onClose })
       setContaVencimento('');
     }
   }, [os]);
+
+  useEffect(() => {
+    if (!activeEmpresaId) return;
+    if (readOnly) return;
+    let cancelled = false;
+    void (async () => {
+      setTecnicosLoading(true);
+      try {
+        const rows = await listOsTecnicos({ limit: 100 });
+        if (!cancelled) setTecnicos(rows ?? []);
+      } catch {
+        if (!cancelled) setTecnicos([]);
+      } finally {
+        if (!cancelled) setTecnicosLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeEmpresaId, readOnly]);
 
   const loadDocs = async (osId: string) => {
     setIsDocsLoading(true);
@@ -518,8 +541,19 @@ const OsFormPanel: React.FC<OsFormPanelProps> = ({ os, onSaveSuccess, onClose })
     setIsSaving(true);
     try {
       const savedOs = await saveOs(formData);
+      const desiredTecnicoUserId = (formData as any).tecnico_user_id ?? null;
+      const currentTecnicoUserId = (savedOs as any).tecnico_user_id ?? null;
+      if (desiredTecnicoUserId !== currentTecnicoUserId) {
+        try {
+          await setOsTecnico(String(savedOs.id), desiredTecnicoUserId);
+        } catch (e: any) {
+          addToast(e?.message || 'Não foi possível atribuir técnico.', 'warning');
+        }
+      }
+
+      const finalOs = await getOsDetails(String(savedOs.id));
       addToast('Ordem de Serviço salva com sucesso!', 'success');
-      onSaveSuccess(savedOs);
+      onSaveSuccess(finalOs);
     } catch (error: any) {
       addToast(error.message, 'error');
     } finally {
@@ -561,6 +595,35 @@ const OsFormPanel: React.FC<OsFormPanelProps> = ({ os, onSaveSuccess, onClose })
           <Select label="Status" name="status" value={formData.status || 'orcamento'} onChange={e => handleFormChange('status', e.target.value)} className="sm:col-span-2" disabled={readOnly}>
             {statusOptions.map(opt => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
           </Select>
+          <div className="sm:col-span-2">
+            <label className="block text-sm font-medium text-gray-700 mb-1">Técnico responsável</label>
+            <div className="flex gap-2 items-center">
+              <Select
+                name="tecnico_user_id"
+                value={(formData as any).tecnico_user_id || ''}
+                onChange={(e) => handleFormChange('tecnico_user_id' as any, e.target.value || null)}
+                disabled={readOnly || tecnicosLoading}
+                className="flex-1"
+              >
+                <option value="">Sem técnico</option>
+                {tecnicos.map((t) => (
+                  <option key={t.user_id} value={t.user_id}>
+                    {t.nome || t.email}
+                  </option>
+                ))}
+              </Select>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => handleFormChange('tecnico_user_id' as any, userId)}
+                disabled={readOnly || !userId}
+                title="Atribuir a mim"
+              >
+                Atribuir a mim
+              </Button>
+            </div>
+            {tecnicosLoading ? <div className="text-xs text-gray-500 mt-1">Carregando técnicos…</div> : null}
+          </div>
         </Section>
 
         <OsEquipamentoPanel
