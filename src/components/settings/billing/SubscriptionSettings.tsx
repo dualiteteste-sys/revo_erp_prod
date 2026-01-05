@@ -256,7 +256,23 @@ const SubscriptionSettings: React.FC<SubscriptionSettingsProps> = ({ onSwitchToP
         body: { empresa_id: empresaId },
       });
       if (error) {
-        const raw: any = data ?? null;
+        // `supabase.functions.invoke` pode retornar `data: null` em respostas não-2xx,
+        // mesmo quando a Edge Function devolve um JSON útil (ex.: { error: "missing_customer" }).
+        const raw: any =
+          data ??
+          ((): any => {
+            const ctx: any = (error as any)?.context ?? null;
+            const body = ctx?.body ?? null;
+            if (!body) return null;
+            if (typeof body === 'string') {
+              try {
+                return JSON.parse(body);
+              } catch {
+                return null;
+              }
+            }
+            return body;
+          })();
         if (raw?.error === 'missing_customer') {
           addToast('Sem cliente Stripe vinculado para esta empresa. Vincule o customer (cus_...) e tente novamente.', 'warning');
           if (canAdmin) setIsLinkCustomerOpen(true);

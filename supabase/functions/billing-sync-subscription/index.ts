@@ -85,7 +85,8 @@ Deno.serve(async (req) => {
 
     const customerId = empresa.stripe_customer_id ? String(empresa.stripe_customer_id) : "";
     if (!customerId) {
-      return json(corsHeaders, 404, { error: "missing_customer", message: "Cliente Stripe não encontrado para esta empresa." });
+      // 400 (e não 404) para evitar confusão com "Edge Function não encontrada".
+      return json(corsHeaders, 400, { error: "missing_customer", message: "Cliente Stripe não encontrado para esta empresa." });
     }
 
     const stripe = new Stripe(Deno.env.get("STRIPE_SECRET_KEY")!, { apiVersion: "2024-06-20" });
@@ -148,4 +149,3 @@ Deno.serve(async (req) => {
     return json(corsHeaders, 500, { error: "internal_error", detail: String(e) });
   }
 });
-
