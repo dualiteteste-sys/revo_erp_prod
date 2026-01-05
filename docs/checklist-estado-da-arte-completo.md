@@ -195,10 +195,15 @@ Este é o checklist único (por módulo) para levar o REVO ao nível **top mundi
 
 ### G5) Serviços / OS (assistência técnica)
 - [x] OS-STA-01 (P0) Cadastro de equipamento (modelo/serial/IMEI/acessórios/garantia/fotos) vinculado cliente↔OS
-- [ ] OS-STA-02 (P0) Atribuição por técnico + fila por técnico + visão mobile/tablet
+- [x] OS-STA-02 (P0) Atribuição por técnico + fila por técnico + visão mobile/tablet
 - [ ] OS-STA-03 (P0) Fluxo de orçamento/aprovação (enviar/aprovar/reprovar) com registro de aceite
 - [ ] OS-STA-04 (P1) Checklists por tipo de serviço (diagnóstico→execução→teste→entrega) com “done” automático
 - [ ] OS-STA-05 (P1) Comunicação (WhatsApp/email) com templates + log + portal simples do cliente
+
+**Validar (OS-STA-02)**
+- Serviços → OS → `Minha fila`: deve listar apenas OS atribuídas ao usuário logado.
+- Abrir uma OS e definir `Técnico responsável`: salvar e verificar que aparece na lista/na OS.
+- Em mobile/tablet: lista em cards (sem overflow de tabela) e ações funcionam.
 
 ### G6) Financeiro
 - [x] FIN-STA-01 (P0) Conciliação por extrato com matching sugerido + regras e auditoria

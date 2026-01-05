@@ -151,7 +151,7 @@ test('RG-04 (Serviços): concluir OS → gerar Conta a Receber (happy path)', as
     }
 
     // OS
-    if (url.includes('/rest/v1/rpc/list_os_for_current_user')) {
+    if (url.includes('/rest/v1/rpc/list_os_for_current_user_v2') || url.includes('/rest/v1/rpc/list_os_for_current_user')) {
       await route.fulfill({ json: osList });
       return;
     }

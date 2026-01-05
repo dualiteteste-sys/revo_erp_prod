@@ -148,7 +148,7 @@ test('OS-02: concluir OS e ver refletir nos relatórios', async ({ page }) => {
       return;
     }
 
-    if (url.includes('/rest/v1/rpc/list_os_for_current_user')) {
+    if (url.includes('/rest/v1/rpc/list_os_for_current_user_v2') || url.includes('/rest/v1/rpc/list_os_for_current_user')) {
       await route.fulfill({ json: osList });
       return;
     }

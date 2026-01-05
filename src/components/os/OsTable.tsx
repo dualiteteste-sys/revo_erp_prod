@@ -1,7 +1,7 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { OrdemServico } from '@/services/os';
-import { Edit, Trash2, ArrowUpDown, GripVertical, MoreHorizontal, CalendarClock, Paperclip, CheckCircle2, XCircle, ClipboardCheck, ArrowUpRight } from 'lucide-react';
+import { Edit, Trash2, ArrowUpDown, GripVertical, MoreHorizontal, CalendarClock, Paperclip, CheckCircle2, XCircle, ClipboardCheck, ArrowUpRight, UserRound } from 'lucide-react';
 import { Database } from '@/types/database.types';
 import { Droppable, Draggable } from '@hello-pangea/dnd';
 import {
@@ -61,10 +61,118 @@ const SortableHeader: React.FC<{
 const OsTable: React.FC<OsTableProps> = ({ serviceOrders, onEdit, onDelete, onOpenAgenda, onSetStatus, sortBy, onSort, canUpdate = true, canManage = false, canDelete = true, busyOsId }) => {
   const formatDate = (value?: string | null) => (value ? new Date(value).toLocaleDateString('pt-BR') : '—');
   const formatTime = (value?: string | null) => (value ? String(value).slice(0, 5) : '');
+  const [isMobile, setIsMobile] = useState(() => (typeof window !== 'undefined' ? window.innerWidth < 768 : false));
+
+  useEffect(() => {
+    const onResize = () => setIsMobile(window.innerWidth < 768);
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, []);
 
   return (
-    <div className="overflow-x-auto">
-      <table className="min-w-full divide-y divide-gray-200">
+    <div>
+      {isMobile ? (
+      <div className="space-y-3 p-3">
+        {serviceOrders.map((os) => {
+          const busy = !!busyOsId && busyOsId === os.id;
+          const tecnicoNome = (os as any).tecnico_nome || (os as any).tecnico || null;
+          return (
+            <div key={os.id} className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <div className="text-xs text-gray-500">O.S. #{os.numero}</div>
+                  <div className="font-semibold text-gray-900">{os.cliente_nome || 'Sem cliente'}</div>
+                </div>
+                <span className={`px-2 py-1 text-xs font-semibold rounded-full ${statusConfig[os.status].color}`}>{statusConfig[os.status].label}</span>
+              </div>
+
+              <div className="mt-2 text-sm text-gray-600">{os.descricao || '—'}</div>
+              {tecnicoNome ? (
+                <div className="mt-2 inline-flex items-center gap-2 text-xs text-gray-600">
+                  <UserRound size={14} />
+                  <span>Técnico: {tecnicoNome}</span>
+                </div>
+              ) : null}
+              {Array.isArray((os as any).anexos) && (os as any).anexos.length ? (
+                <div className="mt-2 inline-flex items-center gap-2 text-xs text-gray-500">
+                  <Paperclip size={14} />
+                  <span>{(os as any).anexos.length} anexo(s)</span>
+                </div>
+              ) : null}
+
+              <div className="mt-3 flex items-center justify-between">
+                <div className="text-xs text-gray-500">
+                  <div>Prevista: {formatDate((os as any).data_prevista || (os as any).data_inicio)}</div>
+                  <div>{formatTime((os as any).hora) || '—'}</div>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <button
+                        className="text-slate-600 hover:text-slate-800 disabled:opacity-60 disabled:cursor-not-allowed"
+                        title="Mais ações"
+                        disabled={busy}
+                      >
+                        <MoreHorizontal size={18} />
+                      </button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end" sideOffset={6} className="w-56">
+                      <DropdownMenuItem onClick={() => onEdit(os)} className="gap-2" disabled={busy}>
+                        <ArrowUpRight size={16} />
+                        Abrir
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => onOpenAgenda()} className="gap-2" disabled={busy}>
+                        <CalendarClock size={16} />
+                        Abrir Agenda
+                      </DropdownMenuItem>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem onClick={() => onSetStatus(os, 'orcamento')} className="gap-2" disabled={!canUpdate || busy}>
+                        <ClipboardCheck size={16} />
+                        Marcar como Orçamento
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => onSetStatus(os, 'aberta')} className="gap-2" disabled={!canUpdate || busy}>
+                        <ClipboardCheck size={16} />
+                        Marcar como Aberta
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => onSetStatus(os, 'concluida')} className="gap-2" disabled={!canManage || busy}>
+                        <CheckCircle2 size={16} />
+                        Concluir
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => onSetStatus(os, 'cancelada')} className="gap-2" disabled={!canManage || busy}>
+                        <XCircle size={16} />
+                        Cancelar
+                      </DropdownMenuItem>
+                      {canDelete ? (
+                        <>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem onClick={() => onDelete(os)} className="gap-2 text-red-600" disabled={busy}>
+                            <Trash2 size={16} />
+                            Excluir
+                          </DropdownMenuItem>
+                        </>
+                      ) : null}
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+
+                  <button
+                    onClick={() => onEdit(os)}
+                    disabled={busy}
+                    className="text-indigo-600 hover:text-indigo-900 disabled:opacity-60 disabled:cursor-not-allowed text-sm font-medium"
+                    title="Abrir"
+                  >
+                    Abrir
+                  </button>
+                </div>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+      ) : null}
+
+      <div className={isMobile ? 'hidden' : 'overflow-x-auto'}>
+        <table className="min-w-full divide-y divide-gray-200">
         <thead className="bg-gray-50">
           <tr>
             <SortableHeader column="ordem" label="" sortBy={sortBy} onSort={onSort} className="w-12" />
@@ -110,6 +218,12 @@ const OsTable: React.FC<OsTableProps> = ({ serviceOrders, onEdit, onDelete, onOp
                                             <p className="text-sm text-gray-500 break-words">
                                                 {os.descricao || '-'}
                                             </p>
+                                            {((os as any).tecnico_nome || (os as any).tecnico) ? (
+                                              <div className="mt-1 flex items-center gap-1 text-xs text-gray-600">
+                                                <UserRound size={14} />
+                                                <span>Técnico: {(os as any).tecnico_nome || (os as any).tecnico}</span>
+                                              </div>
+                                            ) : null}
                                             {Array.isArray((os as any).anexos) && (os as any).anexos.length ? (
                                               <div className="mt-1 flex items-center gap-1 text-xs text-gray-500">
                                                 <Paperclip size={14} />
@@ -191,7 +305,8 @@ const OsTable: React.FC<OsTableProps> = ({ serviceOrders, onEdit, onDelete, onOp
                 </tbody>
             )}
         </Droppable>
-      </table>
+        </table>
+      </div>
     </div>
   );
 };

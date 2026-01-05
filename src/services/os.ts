@@ -1,4 +1,4 @@
-import { callRpc } from '@/lib/api';
+import { callRpc, RpcError } from '@/lib/api';
 import { Database } from '@/types/database.types';
 
 // --- Placeholder Types for missing DB schema ---
@@ -10,6 +10,8 @@ export type OrdemServico = {
   numero: number | string;
   cliente_id: string | null;
   equipamento_id?: string | null;
+  tecnico_user_id?: string | null;
+  tecnico_nome?: string | null;
   descricao: string | null;
   status: status_os;
   data_inicio: string | null;
@@ -86,6 +88,8 @@ export async function listOs(params: {
   offset?: number;
   orderBy?: string;
   orderDir?: 'asc' | 'desc';
+  tecnicoUserId?: string | null;
+  onlyMine?: boolean;
 }) {
   const p = {
     p_search: params.search ?? null,
@@ -94,8 +98,24 @@ export async function listOs(params: {
     p_offset: params.offset ?? 0,
     p_order_by: params.orderBy ?? 'ordem',
     p_order_dir: params.orderDir ?? 'asc',
+    p_tecnico_user_id: params.tecnicoUserId ?? null,
+    p_only_mine: params.onlyMine ?? false,
   };
-  return callRpc<OrdemServico[]>('list_os_for_current_user', p);
+  try {
+    return await callRpc<OrdemServico[]>('list_os_for_current_user_v2', p);
+  } catch (e: any) {
+    if (e instanceof RpcError && e.status === 404) {
+      return callRpc<OrdemServico[]>('list_os_for_current_user', {
+        p_search: p.p_search,
+        p_status: p.p_status,
+        p_limit: p.p_limit,
+        p_offset: p.p_offset,
+        p_order_by: p.p_order_by,
+        p_order_dir: p.p_order_dir,
+      });
+    }
+    throw e;
+  }
 }
 
 export async function getOs(id: string): Promise<OrdemServico> {
@@ -171,6 +191,26 @@ export async function saveOs(osData: Partial<OrdemServicoDetails>): Promise<Orde
     throw new Error('A operação no banco de dados não retornou uma O.S. válida.');
   }
   return getOsDetails(saved.id);
+}
+
+export type OsTecnicoRow = {
+  user_id: string;
+  email: string;
+  nome: string;
+};
+
+export async function listOsTecnicos(params?: { q?: string | null; limit?: number }): Promise<OsTecnicoRow[]> {
+  return callRpc<OsTecnicoRow[]>('os_tecnicos_list', {
+    p_q: params?.q ?? null,
+    p_limit: params?.limit ?? 50,
+  });
+}
+
+export async function setOsTecnico(osId: string, tecnicoUserId: string | null): Promise<void> {
+  await callRpc('os_set_tecnico_for_current_user', {
+    p_os_id: osId,
+    p_tecnico_user_id: tecnicoUserId,
+  });
 }
 
 export async function seedDefaultOs(): Promise<OrdemServico[]> {

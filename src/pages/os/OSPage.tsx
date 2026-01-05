@@ -20,6 +20,7 @@ import { useConfirm } from '@/contexts/ConfirmProvider';
 import { useHasPermission } from '@/hooks/useHasPermission';
 import { traceAction } from '@/lib/tracing';
 import { useOnboardingGate } from '@/contexts/OnboardingGateContext';
+import { useAuth } from '@/contexts/AuthProvider';
 
 const OSPage: React.FC = () => {
   const {
@@ -32,10 +33,12 @@ const OSPage: React.FC = () => {
     searchTerm,
     filterStatus,
     sortBy,
+    onlyMine,
     setPage,
     setSearchTerm,
     setFilterStatus,
     setSortBy,
+    setOnlyMine,
     refresh,
     reorderOs,
   } = useOs();
@@ -43,6 +46,7 @@ const OSPage: React.FC = () => {
   const { confirm } = useConfirm();
   const navigate = useNavigate();
   const { ensure } = useOnboardingGate();
+  const { userId } = useAuth();
   const permCreate = useHasPermission('os', 'create');
   const permUpdate = useHasPermission('os', 'update');
   const permDelete = useHasPermission('os', 'delete');
@@ -240,6 +244,25 @@ const OSPage: React.FC = () => {
       />
 
       <div className="mb-4 mt-6 flex gap-4 flex-wrap items-end">
+        <div className="flex items-center gap-2">
+          <Button
+            type="button"
+            variant={!onlyMine ? 'default' : 'outline'}
+            onClick={() => setOnlyMine(false)}
+          >
+            Todas
+          </Button>
+          <Button
+            type="button"
+            variant={onlyMine ? 'default' : 'outline'}
+            onClick={() => {
+              if (!userId) return;
+              setOnlyMine(true);
+            }}
+          >
+            Minha fila
+          </Button>
+        </div>
         <SearchField
           placeholder="Buscar por cliente ou descrição..."
           value={searchTerm}

@@ -5,7 +5,7 @@ import { useAuth } from '../contexts/AuthProvider';
 import { Database } from '@/types/database.types';
 
 export const useOs = () => {
-  const { activeEmpresa } = useAuth();
+  const { activeEmpresa, userId } = useAuth();
   const [serviceOrders, setServiceOrders] = useState<osService.OrdemServico[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -17,6 +17,7 @@ export const useOs = () => {
   const [filterStatus, setFilterStatus] = useState<Database['public']['Enums']['status_os'] | null>(null);
   const [page, setPage] = useState(1);
   const [pageSize] = useState(15);
+  const [onlyMine, setOnlyMine] = useState(false);
 
   const [sortBy, setSortBy] = useState<{ column: keyof osService.OrdemServico; ascending: boolean }>({
     column: 'ordem',
@@ -39,6 +40,8 @@ export const useOs = () => {
         status: filterStatus ? [filterStatus] : null,
         orderBy: sortBy.column as string,
         orderDir: sortBy.ascending ? 'asc' : 'desc',
+        onlyMine,
+        tecnicoUserId: onlyMine ? userId : null,
       });
       setServiceOrders(data);
       const newCount = data.length < pageSize ? (page - 1) * pageSize + data.length : (page * pageSize) + 1;
@@ -50,7 +53,7 @@ export const useOs = () => {
     } finally {
       setLoading(false);
     }
-  }, [page, pageSize, debouncedSearchTerm, filterStatus, sortBy, activeEmpresa]);
+  }, [page, pageSize, debouncedSearchTerm, filterStatus, sortBy, activeEmpresa, onlyMine, userId]);
 
   useEffect(() => {
     fetchOs();
@@ -87,10 +90,15 @@ export const useOs = () => {
     searchTerm,
     filterStatus,
     sortBy,
+    onlyMine,
     setPage,
     setSearchTerm,
     setFilterStatus,
     setSortBy,
+    setOnlyMine: (value: boolean) => {
+      setOnlyMine(value);
+      setPage(1);
+    },
     refresh,
     reorderOs,
   };
