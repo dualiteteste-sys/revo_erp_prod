@@ -14,6 +14,7 @@ import { searchItemsForOs } from '@/services/os';
 import { ensurePdvDefaultClienteId } from '@/services/vendasMvp';
 import { listVendedores, type Vendedor } from '@/services/vendedores';
 import { listMarketplaceOrderTimeline, type MarketplaceTimelineEvent } from '@/services/ecommerceOrders';
+import { listAuditLogsForTables, type AuditLogRow } from '@/services/auditLogs';
 
 interface Props {
   vendaId: string | null;
@@ -22,6 +23,16 @@ interface Props {
   mode?: 'erp' | 'pdv';
   onFinalizePdv?: (pedidoId: string) => Promise<void>;
 }
+
+type DiscountAuditRow = {
+  scope: 'pedido' | 'item';
+  itemLabel?: string;
+  field: 'desconto' | 'preco_unitario';
+  from: number;
+  to: number;
+  changedAt: string;
+  changedBy: string | null;
+};
 
 function toMoney(n: number | null | undefined): number {
   const v = Number(n ?? 0);
@@ -60,6 +71,8 @@ export default function PedidoVendaFormPanel({ vendaId, onSaveSuccess, onClose, 
   const canFinalizePdv = mode === 'pdv' && typeof onFinalizePdv === 'function';
   const [marketplaceTimeline, setMarketplaceTimeline] = useState<MarketplaceTimelineEvent[]>([]);
   const [loadingMarketplaceTimeline, setLoadingMarketplaceTimeline] = useState(false);
+  const [discountAudit, setDiscountAudit] = useState<DiscountAuditRow[]>([]);
+  const [loadingDiscountAudit, setLoadingDiscountAudit] = useState(false);
 
   useEffect(() => {
     if (vendaId) {
@@ -125,6 +138,81 @@ export default function PedidoVendaFormPanel({ vendaId, onSaveSuccess, onClose, 
       setLoading(false);
     }
   };
+
+  const buildDiscountAudit = (rows: AuditLogRow[], pedidoId: string, items: any[]): DiscountAuditRow[] => {
+    const itemById = new Map<string, any>();
+    items.forEach((i) => {
+      if (i?.id) itemById.set(i.id, i);
+    });
+
+    const out: DiscountAuditRow[] = [];
+
+    for (const r of rows) {
+      if (r.operation !== 'UPDATE') continue;
+      if (!r.record_id) continue;
+
+      const oldData = r.old_data || {};
+      const newData = r.new_data || {};
+
+      const pushIfChanged = (
+        scope: DiscountAuditRow['scope'],
+        field: DiscountAuditRow['field'],
+        fromRaw: unknown,
+        toRaw: unknown,
+        itemLabel?: string
+      ) => {
+        const from = Number(fromRaw ?? 0);
+        const to = Number(toRaw ?? 0);
+        if (!Number.isFinite(from) || !Number.isFinite(to)) return;
+        if (from === to) return;
+        out.push({
+          scope,
+          field,
+          from,
+          to,
+          itemLabel,
+          changedAt: r.changed_at,
+          changedBy: r.changed_by,
+        });
+      };
+
+      if (r.table_name === 'vendas_pedidos' && r.record_id === pedidoId) {
+        pushIfChanged('pedido', 'desconto', (oldData as any).desconto, (newData as any).desconto);
+      }
+
+      if (r.table_name === 'vendas_itens_pedido') {
+        const item = itemById.get(r.record_id);
+        if (!item) continue;
+        const label = item?.produto_nome ? String(item.produto_nome) : 'Item';
+        pushIfChanged('item', 'preco_unitario', (oldData as any).preco_unitario, (newData as any).preco_unitario, label);
+        pushIfChanged('item', 'desconto', (oldData as any).desconto, (newData as any).desconto, label);
+      }
+    }
+
+    return out.sort((a, b) => (a.changedAt < b.changedAt ? 1 : -1)).slice(0, 50);
+  };
+
+  const loadDiscountAudit = async (pedidoId: string) => {
+    setLoadingDiscountAudit(true);
+    try {
+      const rows = await listAuditLogsForTables(['vendas_pedidos', 'vendas_itens_pedido'], 300);
+      const items = (formData as any)?.itens || [];
+      setDiscountAudit(buildDiscountAudit(rows, pedidoId, items));
+    } catch {
+      setDiscountAudit([]);
+    } finally {
+      setLoadingDiscountAudit(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!formData.id) {
+      setDiscountAudit([]);
+      return;
+    }
+    void loadDiscountAudit(formData.id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [formData.id, (formData.itens || []).length]);
 
   const handleHeaderChange = (field: keyof VendaPayload, value: any) => {
     setFormData(prev => ({ ...prev, [field]: value }));
@@ -666,6 +754,56 @@ export default function PedidoVendaFormPanel({ vendaId, onSaveSuccess, onClose, 
           </div>
 
           <TextArea label="Observações" name="observacoes" value={formData.observacoes || ''} onChange={e => handleHeaderChange('observacoes', e.target.value)} rows={3} disabled={isLocked} className="sm:col-span-6" />
+        </Section>
+
+        <Section title="Auditoria de preço/desconto" description="Quem alterou preço/desconto e quando.">
+          {loadingDiscountAudit ? (
+            <div className="text-sm text-gray-600 flex items-center gap-2">
+              <Loader2 className="w-4 h-4 animate-spin" />
+              Carregando auditoria…
+            </div>
+          ) : discountAudit.length === 0 ? (
+            <div className="text-sm text-gray-600">Sem alterações registradas para preço/desconto.</div>
+          ) : (
+            <div className="overflow-x-auto border rounded-lg bg-white">
+              <table className="min-w-full divide-y divide-gray-200">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="px-3 py-2 text-left text-xs font-medium text-gray-500">Quando</th>
+                    <th className="px-3 py-2 text-left text-xs font-medium text-gray-500">Onde</th>
+                    <th className="px-3 py-2 text-left text-xs font-medium text-gray-500">Campo</th>
+                    <th className="px-3 py-2 text-right text-xs font-medium text-gray-500">De</th>
+                    <th className="px-3 py-2 text-right text-xs font-medium text-gray-500">Para</th>
+                    <th className="px-3 py-2 text-left text-xs font-medium text-gray-500">Quem</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-200">
+                  {discountAudit.map((e, idx) => (
+                    <tr key={`${e.changedAt}-${e.field}-${idx}`} className="hover:bg-gray-50">
+                      <td className="px-3 py-2 text-sm text-gray-600 whitespace-nowrap">
+                        {new Date(e.changedAt).toLocaleString('pt-BR')}
+                      </td>
+                      <td className="px-3 py-2 text-sm text-gray-800">
+                        {e.scope === 'pedido' ? 'Pedido' : e.itemLabel || 'Item'}
+                      </td>
+                      <td className="px-3 py-2 text-sm text-gray-700 whitespace-nowrap">
+                        {e.field === 'preco_unitario' ? 'Preço unit.' : 'Desconto'}
+                      </td>
+                      <td className="px-3 py-2 text-sm text-gray-800 text-right whitespace-nowrap">
+                        {formatMoneyBRL(e.from)}
+                      </td>
+                      <td className="px-3 py-2 text-sm text-gray-900 text-right font-semibold whitespace-nowrap">
+                        {formatMoneyBRL(e.to)}
+                      </td>
+                      <td className="px-3 py-2 text-xs text-gray-600 whitespace-nowrap">
+                        {e.changedBy ? `${e.changedBy.slice(0, 8)}…` : '—'}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
         </Section>
       </div>
 
