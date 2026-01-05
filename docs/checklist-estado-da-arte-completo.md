@@ -268,10 +268,15 @@ Este é o checklist único (por módulo) para levar o REVO ao nível **top mundi
 ---
 
 ## H) Integrações (plataforma)
-- [ ] INT-STA-01 (P0) Rate limit por canal + filas separadas + backoff com jitter
+- [x] INT-STA-01 (P0) Rate limit por canal + filas separadas + backoff com jitter
 - [ ] INT-STA-02 (P0) Reprocessamento seguro (dry-run, replay, dead-letter) com trilha por entidade
 - [ ] INT-STA-03 (P1) Versionamento de adaptadores (migração de payloads sem quebrar)
 - [x] INT-STA-04 (P1) Health por conexão (token expirado, webhook parado, atraso de fila)
+
+**Validar (INT-STA-01)**
+- Simular importação de pedidos com volume (Mercado Livre): deve aplicar `rate limit` e responder com `retry_after_seconds` quando necessário.
+- Em caso de falha: evento/job deve ir para DLQ e aparecer em `Dev → Saúde` com botão de reprocesso.
+- Confirmar que filas são separadas por domínio (NF / marketplaces / financeiro) e que uma fila “ruim” não trava as demais.
 
 ---
 
