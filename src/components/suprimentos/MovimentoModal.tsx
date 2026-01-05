@@ -4,7 +4,7 @@ import Input from '@/components/ui/forms/Input';
 import Select from '@/components/ui/forms/Select';
 import TextArea from '@/components/ui/forms/TextArea';
 import { Loader2, Save } from 'lucide-react';
-import { registrarMovimento, EstoquePosicao } from '@/services/suprimentos';
+import { registrarMovimento, transferirEstoque, EstoqueDeposito, EstoquePosicao } from '@/services/suprimentos';
 import { useToast } from '@/contexts/ToastProvider';
 import { useNumericField } from '@/hooks/useNumericField';
 
@@ -13,9 +13,11 @@ interface MovimentoModalProps {
   onClose: () => void;
   produto: EstoquePosicao;
   onSuccess: () => void;
+  depositos?: EstoqueDeposito[];
+  depositoId?: string | null;
 }
 
-const MovimentoModal: React.FC<MovimentoModalProps> = ({ isOpen, onClose, produto, onSuccess }) => {
+const MovimentoModal: React.FC<MovimentoModalProps> = ({ isOpen, onClose, produto, onSuccess, depositos = [], depositoId = null }) => {
   const { addToast } = useToast();
   const [isSaving, setIsSaving] = useState(false);
   const [tipo, setTipo] = useState('entrada');
@@ -23,8 +25,19 @@ const MovimentoModal: React.FC<MovimentoModalProps> = ({ isOpen, onClose, produt
   const [custo, setCusto] = useState<number | null>(null);
   const [docRef, setDocRef] = useState('');
   const [obs, setObs] = useState('');
+  const [deposito, setDeposito] = useState<string>(depositoId || '');
+  const [depositoFrom, setDepositoFrom] = useState<string>(depositoId || '');
+  const [depositoTo, setDepositoTo] = useState<string>('');
 
   const custoProps = useNumericField(custo, setCusto);
+
+  const canUseDepositos = depositos.length > 0;
+  const canMoveDeposito = (id: string) => {
+    const d = depositos.find((x) => x.id === id);
+    return d ? d.can_move : true;
+  };
+
+  const depositosAtivos = depositos.filter((d) => d.ativo && d.can_view);
 
   const handleSave = async () => {
     if (!quantidade || Number(quantidade) <= 0) {
@@ -34,15 +47,44 @@ const MovimentoModal: React.FC<MovimentoModalProps> = ({ isOpen, onClose, produt
 
     setIsSaving(true);
     try {
-      await registrarMovimento({
-        produto_id: produto.produto_id,
-        tipo,
-        quantidade: Number(quantidade),
-        custo_unitario: custo || undefined,
-        documento_ref: docRef,
-        observacao: obs,
-      });
-      addToast('Movimentação registrada com sucesso!', 'success');
+      if (tipo === 'transferencia') {
+        if (!depositoFrom || !depositoTo || depositoFrom === depositoTo) {
+          addToast('Selecione depósitos diferentes para transferir.', 'error');
+          return;
+        }
+        if (!canMoveDeposito(depositoFrom) || !canMoveDeposito(depositoTo)) {
+          addToast('Sem permissão para transferir em um dos depósitos.', 'warning');
+          return;
+        }
+        await transferirEstoque({
+          produtoId: produto.produto_id,
+          depositoFromId: depositoFrom,
+          depositoToId: depositoTo,
+          quantidade: Number(quantidade),
+          documentoRef: docRef || null,
+          observacao: obs || null,
+        });
+        addToast('Transferência registrada com sucesso!', 'success');
+      } else {
+        if (canUseDepositos && !deposito) {
+          addToast('Selecione um depósito.', 'warning');
+          return;
+        }
+        if (canUseDepositos && !canMoveDeposito(deposito)) {
+          addToast('Sem permissão para movimentar neste depósito.', 'warning');
+          return;
+        }
+        await registrarMovimento({
+          produto_id: produto.produto_id,
+          tipo,
+          quantidade: Number(quantidade),
+          custo_unitario: custo || undefined,
+          documento_ref: docRef,
+          observacao: obs,
+          deposito_id: canUseDepositos ? deposito : null,
+        });
+        addToast('Movimentação registrada com sucesso!', 'success');
+      }
       onSuccess();
       onClose();
     } catch (error: any) {
@@ -67,6 +109,7 @@ const MovimentoModal: React.FC<MovimentoModalProps> = ({ isOpen, onClose, produt
             <option value="ajuste_entrada">Ajuste de Entrada (Inventário)</option>
             <option value="ajuste_saida">Ajuste de Saída (Inventário)</option>
             <option value="perda">Perda / Quebra</option>
+            {canUseDepositos ? <option value="transferencia">Transferência entre depósitos</option> : null}
           </Select>
 
           <Input 
@@ -87,6 +130,42 @@ const MovimentoModal: React.FC<MovimentoModalProps> = ({ isOpen, onClose, produt
                 placeholder="0,00"
             />
         )}
+
+        {canUseDepositos ? (
+          tipo === 'transferencia' ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <Select label="De depósito" name="deposito_from" value={depositoFrom} onChange={(e) => setDepositoFrom(e.target.value)}>
+                <option value="">Selecione…</option>
+                {depositosAtivos.map((d) => (
+                  <option key={d.id} value={d.id} disabled={!d.can_move}>
+                    {d.nome}
+                    {!d.can_move ? ' (sem permissão)' : ''}
+                  </option>
+                ))}
+              </Select>
+              <Select label="Para depósito" name="deposito_to" value={depositoTo} onChange={(e) => setDepositoTo(e.target.value)}>
+                <option value="">Selecione…</option>
+                {depositosAtivos.map((d) => (
+                  <option key={d.id} value={d.id} disabled={!d.can_move}>
+                    {d.nome}
+                    {!d.can_move ? ' (sem permissão)' : ''}
+                  </option>
+                ))}
+              </Select>
+            </div>
+          ) : (
+            <Select label="Depósito" name="deposito" value={deposito} onChange={(e) => setDeposito(e.target.value)}>
+              <option value="">Selecione…</option>
+              {depositosAtivos.map((d) => (
+                <option key={d.id} value={d.id} disabled={!d.can_move}>
+                  {d.nome}
+                  {d.is_default ? ' (padrão)' : ''}
+                  {!d.can_move ? ' (sem permissão)' : ''}
+                </option>
+              ))}
+            </Select>
+          )
+        ) : null}
 
         <Input 
             label="Documento de Referência" 
