@@ -851,7 +851,7 @@ const OsFormPanel: React.FC<OsFormPanelProps> = ({ os, onSaveSuccess, onClose })
                 title={!formData.id ? 'Salve a OS antes.' : undefined}
               >
                 <Send size={18} />
-                Enviar orçamento
+                Marcar como enviado
               </Button>
               <Button
                 type="button"
@@ -1117,7 +1117,7 @@ const OsFormPanel: React.FC<OsFormPanelProps> = ({ os, onSaveSuccess, onClose })
             </Button>
             <Button type="button" onClick={handleEnviarOrcamento} disabled={orcamentoSending} className="gap-2">
               {orcamentoSending ? <Loader2 className="animate-spin" size={18} /> : <Send size={18} />}
-              Enviar
+              Marcar como enviado
             </Button>
           </div>
         </DialogContent>
