@@ -9,6 +9,7 @@ export type OrdemServico = {
   empresa_id: string;
   numero: number | string;
   cliente_id: string | null;
+  equipamento_id?: string | null;
   descricao: string | null;
   status: status_os;
   data_inicio: string | null;

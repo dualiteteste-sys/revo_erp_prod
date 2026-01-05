@@ -22,6 +22,7 @@ import { createOsDocSignedUrl, deleteOsDoc, listOsDocs, uploadOsDoc, type OsDoc 
 import { useHasPermission } from '@/hooks/useHasPermission';
 import { generateOsParcelas, listOsParcelas, type OsParcela } from '@/services/osParcelas';
 import { ActionLockedError, runWithActionLock } from '@/lib/actionLock';
+import OsEquipamentoPanel from '@/components/os/OsEquipamentoPanel';
 
 interface OsFormPanelProps {
   os: OrdemServicoDetails | null;
@@ -550,6 +551,7 @@ const OsFormPanel: React.FC<OsFormPanelProps> = ({ os, onSaveSuccess, onClose })
               disabled={readOnly}
               onChange={(id, name) => {
                 handleFormChange('cliente_id', id);
+                handleFormChange('equipamento_id' as any, null);
                 if (name) setClientName(name);
               }}
               placeholder="Buscar cliente..."
@@ -560,6 +562,13 @@ const OsFormPanel: React.FC<OsFormPanelProps> = ({ os, onSaveSuccess, onClose })
             {statusOptions.map(opt => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
           </Select>
         </Section>
+
+        <OsEquipamentoPanel
+          clienteId={formData.cliente_id || null}
+          equipamentoId={(formData as any).equipamento_id ?? null}
+          onChangeEquipamentoId={(id) => handleFormChange('equipamento_id' as any, id)}
+          readOnly={readOnly}
+        />
 
         <Section title="Datas e Prazos" description="Agendamento e execução do serviço">
           <Input label="Data de Início" name="data_inicio" type="date" value={formData.data_inicio?.split('T')[0] || ''} onChange={e => handleFormChange('data_inicio', e.target.value)} className="sm:col-span-2" disabled={readOnly} />

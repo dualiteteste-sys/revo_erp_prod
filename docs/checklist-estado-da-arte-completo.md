@@ -190,7 +190,7 @@ Este é o checklist único (por módulo) para levar o REVO ao nível **top mundi
 - [ ] NFE-STA-03 (P1) Relatórios fiscais mínimos + export/arquivos (quando aplicável)
 
 ### G5) Serviços / OS (assistência técnica)
-- [ ] OS-STA-01 (P0) Cadastro de equipamento (modelo/serial/IMEI/acessórios/garantia/fotos) vinculado cliente↔OS
+- [x] OS-STA-01 (P0) Cadastro de equipamento (modelo/serial/IMEI/acessórios/garantia/fotos) vinculado cliente↔OS
 - [ ] OS-STA-02 (P0) Atribuição por técnico + fila por técnico + visão mobile/tablet
 - [ ] OS-STA-03 (P0) Fluxo de orçamento/aprovação (enviar/aprovar/reprovar) com registro de aceite
 - [ ] OS-STA-04 (P1) Checklists por tipo de serviço (diagnóstico→execução→teste→entrega) com “done” automático
