@@ -224,7 +224,12 @@ export default function VendedoresPage() {
         )}
       </div>
 
-      <Modal isOpen={isOpen} onClose={close} title={form.id ? 'Editar Vendedor' : 'Novo Vendedor'}>
+      <Modal
+        isOpen={isOpen}
+        onClose={close}
+        title={form.id ? 'Editar Vendedor' : 'Novo Vendedor'}
+        bodyClassName="p-6 md:p-8"
+      >
         <div className="space-y-4">
           <div>
             <label className="text-sm text-gray-700">Nome</label>
@@ -284,4 +289,3 @@ export default function VendedoresPage() {
     </div>
   );
 }
-

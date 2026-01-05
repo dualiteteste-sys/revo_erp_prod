@@ -195,7 +195,7 @@ export default function DevolucoesPage() {
         )}
       </div>
 
-      <Modal isOpen={isOpen} onClose={close} title="Nova devolução (MVP)" size="5xl">
+      <Modal isOpen={isOpen} onClose={close} title="Nova devolução (MVP)" size="5xl" bodyClassName="p-6 md:p-8">
         <div className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
