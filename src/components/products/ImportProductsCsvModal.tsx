@@ -173,7 +173,13 @@ export default function ImportProductsCsvModal(props: {
   };
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title="Importar Produtos (CSV)" size="4xl">
+    <Modal
+      isOpen={isOpen}
+      onClose={onClose}
+      title="Importar Produtos (CSV)"
+      size="4xl"
+      bodyClassName="p-6 md:p-8"
+    >
       <div className="space-y-4">
         <div className="flex items-center justify-between gap-3">
           <div className="text-sm text-gray-600">
@@ -222,4 +228,3 @@ export default function ImportProductsCsvModal(props: {
     </Modal>
   );
 }
-

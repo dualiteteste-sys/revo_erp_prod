@@ -234,7 +234,7 @@ export default function AutomacoesVendasPage() {
         )}
       </div>
 
-      <Modal isOpen={isOpen} onClose={close} title="Automação de Vendas (MVP)" size="3xl">
+      <Modal isOpen={isOpen} onClose={close} title="Automação de Vendas (MVP)" size="3xl" bodyClassName="p-6 md:p-8">
         <div className="space-y-4">
           <div>
             <label className="text-sm text-gray-700">Nome</label>

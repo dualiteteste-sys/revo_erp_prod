@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X } from 'lucide-react';
+import { cn } from '@/lib/utils';
 import GlassCard from './GlassCard';
 
 type ModalSize = 'sm' | 'md' | 'lg' | 'xl' | '2xl' | '3xl' | '4xl' | '5xl' | '6xl' | '7xl' | 'full' | '60pct' | '70pct' | '80pct' | '90pct';
@@ -13,6 +14,10 @@ interface ModalProps {
   size?: ModalSize;
   containerClassName?: string;
   overlayClassName?: string;
+  headerClassName?: string;
+  titleClassName?: string;
+  bodyClassName?: string;
+  glassClassName?: string;
 }
 
 const sizeClasses: Record<ModalSize, string> = {
@@ -49,7 +54,19 @@ function getFocusableElements(root: HTMLElement | null): HTMLElement[] {
   });
 }
 
-const Modal: React.FC<ModalProps> = ({ isOpen, onClose, children, title, size = '7xl', containerClassName, overlayClassName }) => {
+const Modal: React.FC<ModalProps> = ({
+  isOpen,
+  onClose,
+  children,
+  title,
+  size = '7xl',
+  containerClassName,
+  overlayClassName,
+  headerClassName,
+  titleClassName,
+  bodyClassName,
+  glassClassName,
+}) => {
   const overlayRef = useRef<HTMLDivElement | null>(null);
   const dialogRef = useRef<HTMLDivElement | null>(null);
   const closeBtnRef = useRef<HTMLButtonElement | null>(null);
@@ -119,7 +136,10 @@ const Modal: React.FC<ModalProps> = ({ isOpen, onClose, children, title, size = 
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
           transition={{ duration: 0.3 }}
-          className={`fixed inset-0 bg-black/30 backdrop-blur-sm z-40 flex items-center justify-center p-4 ${overlayClassName || ''}`}
+          className={cn(
+            'fixed inset-0 z-40 flex items-center justify-center p-4 bg-slate-950/30 backdrop-blur-md',
+            overlayClassName,
+          )}
           onMouseDown={(e) => {
             // clique no backdrop fecha (sem fechar ao clicar dentro do modal)
             if (e.target === overlayRef.current) onClose();
@@ -130,26 +150,30 @@ const Modal: React.FC<ModalProps> = ({ isOpen, onClose, children, title, size = 
             animate={{ scale: 1, y: 0 }}
             exit={{ scale: 0.95, y: 20 }}
             transition={{ type: 'spring', stiffness: 300, damping: 30 }}
-            className={`w-full min-w-[50vw] h-full max-h-[95vh] flex flex-col relative ${sizeClasses[size]} ${containerClassName || ''}`}
+            className={cn(
+              'w-full max-h-[95vh] flex flex-col relative',
+              sizeClasses[size],
+              containerClassName,
+            )}
             onClick={(e) => e.stopPropagation()}
             role="dialog"
             aria-modal="true"
             aria-label={ariaLabel}
             ref={dialogRef}
           >
-            <GlassCard className="h-full flex flex-col overflow-hidden">
-              <header className="flex-shrink-0 p-4 flex justify-between items-center border-b border-white/20">
-                <h2 className="text-xl font-bold text-gray-800">{title}</h2>
+            <GlassCard className={cn('h-full flex flex-col overflow-hidden', glassClassName)}>
+              <header className={cn('flex-shrink-0 px-6 py-5 flex justify-between items-center border-b border-white/20', headerClassName)}>
+                <h2 className={cn('text-lg md:text-xl font-bold text-gray-900', titleClassName)}>{title}</h2>
                 <button
                   ref={closeBtnRef}
                   onClick={onClose}
-                  className="text-gray-500 hover:text-gray-800 z-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 rounded"
+                  className="text-gray-600 hover:text-gray-900 z-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 rounded-full p-2 hover:bg-white/40 active:bg-white/50 transition"
                   aria-label="Fechar modal"
                 >
                   <X size={24} />
                 </button>
               </header>
-              <div className="flex-grow overflow-y-auto scrollbar-styled">
+              <div className={cn('flex-grow overflow-y-auto scrollbar-styled', bodyClassName)}>
                 {children}
               </div>
             </GlassCard>
