@@ -179,7 +179,7 @@ Este é o checklist único (por módulo) para levar o REVO ao nível **top mundi
 - [ ] SUP-STA-06 (P1) WMS light (leitura barcode/QR na conferência/separação) + checklists
 
 ### G3) Vendas / PDV / Expedição
-- [ ] VEN-STA-01 (P0) Regras de preço/desconto com permissão + trilha (quem deu desconto)
+- [x] VEN-STA-01 (P0) Regras de preço/desconto com permissão + trilha (quem deu desconto)
 - [ ] VEN-STA-02 (P0) PDV resiliente (offline-lite, retry idempotente, fila local) quando fizer sentido
 - [ ] VEN-STA-03 (P1) Expedição com eventos, rastreio, SLA e relatórios (atrasos/pendências)
 - [ ] VEN-STA-04 (P1) Multi-caixa (PDV) + perfis por caixa + fechamento
