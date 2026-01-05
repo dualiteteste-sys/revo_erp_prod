@@ -72,14 +72,18 @@ export default function RelatoriosFinanceiroPage() {
     try {
       const start = toDateOrNull(startDate);
       const end = toDateOrNull(endDate);
-      const [result, centros, dreResult] = await Promise.all([
+      const [result, centros] = await Promise.all([
         getFinanceiroRelatoriosResumo({ startDate: start, endDate: end }),
         listFinanceiroPorCentroCusto({ startDate: start, endDate: end }),
-        getFinanceiroDreSimplificada({ startDate: start, endDate: end, centroDeCustoId: dreCentroId }),
       ]);
       setData(result);
       setPorCentro(centros ?? []);
-      setDre(dreResult);
+      try {
+        const dreResult = await getFinanceiroDreSimplificada({ startDate: start, endDate: end, centroDeCustoId: dreCentroId });
+        setDre(dreResult);
+      } catch {
+        setDre(null);
+      }
     } catch (e: any) {
       addToast(e?.message || 'Falha ao carregar relatórios do Financeiro.', 'error');
       setData(null);

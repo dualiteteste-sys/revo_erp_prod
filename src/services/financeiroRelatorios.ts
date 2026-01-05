@@ -86,10 +86,15 @@ export async function getFinanceiroDreSimplificada(params: {
   startDate?: Date | null;
   endDate?: Date | null;
   centroDeCustoId?: string | null;
-}): Promise<FinanceiroDreSimplificada> {
-  return callRpc<FinanceiroDreSimplificada>('financeiro_dre_simplificada', {
+}): Promise<FinanceiroDreSimplificada | null> {
+  const raw = await callRpc<any>('financeiro_dre_simplificada', {
     p_start_date: params.startDate ? params.startDate.toISOString().slice(0, 10) : null,
     p_end_date: params.endDate ? params.endDate.toISOString().slice(0, 10) : null,
     p_centro_de_custo_id: params.centroDeCustoId ?? null,
   });
+
+  const data = Array.isArray(raw) ? raw[0] : raw;
+  if (!data || typeof data !== 'object') return null;
+  if (!('totais' in data) || (data as any).totais == null) return null;
+  return data as FinanceiroDreSimplificada;
 }
