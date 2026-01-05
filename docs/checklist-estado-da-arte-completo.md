@@ -197,8 +197,8 @@ Este é o checklist único (por módulo) para levar o REVO ao nível **top mundi
 - [x] OS-STA-01 (P0) Cadastro de equipamento (modelo/serial/IMEI/acessórios/garantia/fotos) vinculado cliente↔OS
 - [x] OS-STA-02 (P0) Atribuição por técnico + fila por técnico + visão mobile/tablet
 - [x] OS-STA-03 (P0) Fluxo de orçamento/aprovação (enviar/aprovar/reprovar) com registro de aceite
-- [ ] OS-STA-04 (P1) Checklists por tipo de serviço (diagnóstico→execução→teste→entrega) com “done” automático
-- [ ] OS-STA-05 (P1) Comunicação (WhatsApp/email) com templates + log + portal simples do cliente
+- [x] OS-STA-04 (P1) Checklists por tipo de serviço (diagnóstico→execução→teste→entrega) com “done” automático
+- [x] OS-STA-05 (P1) Comunicação (WhatsApp/email) com templates + log + portal simples do cliente
 
 **Validar (OS-STA-02)**
 - Serviços → OS → `Minha fila`: deve listar apenas OS atribuídas ao usuário logado.
@@ -210,6 +210,18 @@ Este é o checklist único (por módulo) para levar o REVO ao nível **top mundi
 - Clicar `Enviar orçamento` (mensagem opcional): deve marcar como `Enviado` e criar “Último evento”.
 - Com permissão `OS → Gerenciar`: clicar `Aprovar` ou `Reprovar`, informar `Nome do cliente/responsável`, salvar.
 - Reabrir a OS: deve mostrar status `Aprovado/Reprovado`, datas e “Último evento” correspondente.
+
+**Validar (OS-STA-04)**
+- Serviços → OS → abrir uma OS → seção `Checklist do serviço`.
+- Clicar `Selecionar checklist` e escolher `Assistência técnica`.
+- Confirmar progresso (ex.: 0/6) e marcar um item manualmente.
+- Ver “Auto” mudar para concluído quando: adicionar itens / anexos / marcar OS como concluída.
+
+**Validar (OS-STA-05)**
+- Serviços → OS → abrir uma OS → seção `Comunicação`.
+- Clicar `Gerar link do portal`: deve copiar o link e abrir o acompanhamento em outra aba.
+- No portal, preencher nome/mensagem e enviar: deve aparecer como log “Entrada” na OS.
+- Em `Abrir templates`, selecionar template, copiar/abrir WhatsApp/e-mail e `Registrar envio`: deve aparecer no log.
 
 ### G6) Financeiro
 - [x] FIN-STA-01 (P0) Conciliação por extrato com matching sugerido + regras e auditoria
