@@ -1,5 +1,4 @@
 import { callRpc, RpcError } from '@/lib/api';
-import { Database } from '@/types/database.types';
 
 // --- Placeholder Types for missing DB schema ---
 export type status_os = "orcamento" | "aberta" | "concluida" | "cancelada";
@@ -77,6 +76,29 @@ export type KanbanOs = {
   status: status_os;
   data_prevista: string | null;
   cliente_nome: string | null;
+};
+
+export type OsOrcamentoEvent = {
+  id: string;
+  tipo: 'sent' | 'approved' | 'rejected';
+  mensagem: string | null;
+  cliente_nome: string | null;
+  observacao: string | null;
+  actor_user_id: string | null;
+  actor_email: string | null;
+  created_at: string;
+};
+
+export type OsOrcamentoSummary = {
+  os_id: string;
+  status: status_os;
+  orcamento_status: 'draft' | 'sent' | 'approved' | 'rejected';
+  sent_at: string | null;
+  decided_at: string | null;
+  decided_by: string | null;
+  cliente_nome: string | null;
+  observacao: string | null;
+  last_event: OsOrcamentoEvent | null;
 };
 
 // --- OS Header Functions ---
@@ -216,6 +238,32 @@ export async function setOsTecnico(osId: string, tecnicoUserId: string | null): 
 export async function seedDefaultOs(): Promise<OrdemServico[]> {
   console.log('[RPC] seed_os_for_current_user');
   return callRpc<OrdemServico[]>('seed_os_for_current_user', { p_count: 20 });
+}
+
+export async function getOsOrcamento(osId: string): Promise<OsOrcamentoSummary> {
+  const payload = await callRpc<any>('os_orcamento_get', { p_os_id: osId });
+  if (!payload?.os_id) {
+    throw new Error('Resposta inválida ao carregar orçamento da O.S.');
+  }
+  return payload as OsOrcamentoSummary;
+}
+
+export async function enviarOrcamento(osId: string, mensagem?: string | null): Promise<void> {
+  await callRpc('os_orcamento_enviar', { p_os_id: osId, p_mensagem: mensagem ?? null });
+}
+
+export async function decidirOrcamento(params: {
+  osId: string;
+  decisao: 'approved' | 'rejected';
+  clienteNome?: string | null;
+  observacao?: string | null;
+}): Promise<void> {
+  await callRpc('os_orcamento_decidir', {
+    p_os_id: params.osId,
+    p_decisao: params.decisao,
+    p_cliente_nome: params.clienteNome ?? null,
+    p_observacao: params.observacao ?? null,
+  });
 }
 
 // --- Kanban Functions ---
