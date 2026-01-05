@@ -46,14 +46,38 @@ const ServiceFormPanel: React.FC<ServiceFormPanelProps> = ({ service, onSaveSucc
       return;
     }
 
+    const preco = Number(formData.preco_venda ?? 0);
+    if (!Number.isFinite(preco) || preco < 0) {
+      addToast('Preço de venda inválido.', 'error');
+      setActiveTab('geral');
+      return;
+    }
+
+    const nbs = String(formData.nbs || '').trim();
+    if (nbs) {
+      const digits = nbs.replace(/\D/g, '');
+      if (digits.length !== 9) {
+        addToast('NBS inválido. Use 9 dígitos (apenas números).', 'warning');
+        setActiveTab('fiscal');
+        return;
+      }
+    }
+
     setIsSaving(true);
     try {
+      const payload: Partial<Service> = {
+        ...formData,
+        descricao: String(formData.descricao).trim(),
+        codigo: formData.codigo ? String(formData.codigo).trim() : null,
+        unidade: formData.unidade ? String(formData.unidade).trim() : null,
+        nbs: nbs ? nbs.replace(/\D/g, '') : null,
+      };
       let savedService: Service;
-      if (formData.id) {
-        savedService = await updateService(formData.id, formData);
+      if (payload.id) {
+        savedService = await updateService(payload.id, payload);
         addToast('Serviço atualizado com sucesso!', 'success');
       } else {
-        savedService = await createService(formData);
+        savedService = await createService(payload);
         addToast('Serviço criado com sucesso!', 'success');
       }
       onSaveSuccess(savedService);

@@ -74,6 +74,12 @@ const CarrierFormPanel: React.FC<CarrierFormPanelProps> = ({ carrier, onSaveSucc
       }
     }
 
+    if (formData.email) {
+      const email = String(formData.email).trim();
+      const ok = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+      if (!ok) newErrors.email = 'E-mail inválido.';
+    }
+
     if (formData.cep) {
       const clean = formData.cep.replace(/\D/g, '');
       if (clean.length > 0 && clean.length !== 8) {
@@ -204,6 +210,7 @@ const CarrierFormPanel: React.FC<CarrierFormPanelProps> = ({ carrier, onSaveSucc
                 value={formData.email || ''} 
                 onChange={(e) => handleFormChange('email', e.target.value)} 
                 className="sm:col-span-3" 
+                error={errors.email}
             />
             <Input 
                 label="Telefone" 
