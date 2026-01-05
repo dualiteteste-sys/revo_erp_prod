@@ -8,6 +8,7 @@ import { useSupabase } from '@/providers/SupabaseProvider';
 import { Database } from '../../../types/database.types';
 import { roleAtLeast, useEmpresaRole } from '@/hooks/useEmpresaRole';
 import { useEmpresaFeatures } from '@/hooks/useEmpresaFeatures';
+import Modal from '@/components/ui/Modal';
 
 type EmpresaAddon = Database['public']['Tables']['empresa_addons']['Row'];
 type PlanoMvp = 'ambos' | 'servicos' | 'industria';
@@ -123,6 +124,9 @@ const SubscriptionSettings: React.FC<SubscriptionSettingsProps> = ({ onSwitchToP
   const [finopsStatus, setFinopsStatus] = useState<FinopsLimitsStatus | null>(null);
   const [loadingFinopsStatus, setLoadingFinopsStatus] = useState(false);
   const [syncingStripe, setSyncingStripe] = useState(false);
+  const [isLinkCustomerOpen, setIsLinkCustomerOpen] = useState(false);
+  const [stripeCustomerId, setStripeCustomerId] = useState('');
+  const [linkingCustomer, setLinkingCustomer] = useState(false);
 
   const fetchAddons = useCallback(async () => {
     if (!activeEmpresa?.id) return;
@@ -244,10 +248,6 @@ const SubscriptionSettings: React.FC<SubscriptionSettingsProps> = ({ onSwitchToP
       addToast('Nenhuma empresa ativa selecionada.', 'error');
       return;
     }
-    if (!canAdmin) {
-      addToast('Apenas administradores podem sincronizar com o Stripe.', 'warning');
-      return;
-    }
 
     setSyncingStripe(true);
     try {
@@ -255,7 +255,15 @@ const SubscriptionSettings: React.FC<SubscriptionSettingsProps> = ({ onSwitchToP
         headers: { Authorization: `Bearer ${session?.access_token}` },
         body: { empresa_id: empresaId },
       });
-      if (error) throw error;
+      if (error) {
+        const raw: any = data ?? null;
+        if (raw?.error === 'missing_customer') {
+          addToast('Sem cliente Stripe vinculado para esta empresa. Vincule o customer (cus_...) e tente novamente.', 'warning');
+          if (canAdmin) setIsLinkCustomerOpen(true);
+          return;
+        }
+        throw error;
+      }
       if (!data?.synced) {
         throw new Error(data?.message || 'Não foi possível sincronizar a assinatura.');
       }
@@ -265,6 +273,34 @@ const SubscriptionSettings: React.FC<SubscriptionSettingsProps> = ({ onSwitchToP
       addToast(e.message || 'Erro ao sincronizar assinatura com o Stripe.', 'error');
     } finally {
       setSyncingStripe(false);
+    }
+  };
+
+  const handleLinkCustomer = async () => {
+    const empresaId = activeEmpresa?.id;
+    if (!empresaId) return;
+    const id = stripeCustomerId.trim();
+    if (!id.startsWith('cus_')) {
+      addToast('Informe um Customer ID válido (cus_...).', 'error');
+      return;
+    }
+
+    setLinkingCustomer(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('billing-link-customer', {
+        headers: { Authorization: `Bearer ${session?.access_token}` },
+        body: { empresa_id: empresaId, stripe_customer_id: id },
+      });
+      if (error) throw error;
+      if (!data?.linked) throw new Error('Falha ao vincular cliente Stripe.');
+      addToast('Cliente Stripe vinculado. Sincronizando assinatura...', 'success');
+      setIsLinkCustomerOpen(false);
+      setStripeCustomerId('');
+      await handleSyncFromStripe();
+    } catch (e: any) {
+      addToast(e.message || 'Erro ao vincular cliente Stripe.', 'error');
+    } finally {
+      setLinkingCustomer(false);
     }
   };
 
@@ -278,7 +314,7 @@ const SubscriptionSettings: React.FC<SubscriptionSettingsProps> = ({ onSwitchToP
           onRefresh={refetchSubscription}
           onSync={handleSyncFromStripe}
           syncing={syncingStripe}
-          canSync={canAdmin}
+          canSync={!!activeEmpresa?.id}
         />
       );
     }
@@ -597,6 +633,45 @@ const SubscriptionSettings: React.FC<SubscriptionSettingsProps> = ({ onSwitchToP
       {renderMainSubscription()}
       {renderAddons()}
       {renderEntitlements()}
+
+      <Modal
+        isOpen={isLinkCustomerOpen}
+        onClose={() => setIsLinkCustomerOpen(false)}
+        title="Vincular Cliente Stripe (cus_...)"
+        size="lg"
+        bodyClassName="p-6 md:p-8"
+      >
+        <div className="space-y-4">
+          <div className="text-sm text-gray-600">
+            Use isso apenas se você já tem uma assinatura no Stripe, mas esta empresa ainda não está vinculada ao Customer.
+          </div>
+          <div>
+            <label className="text-sm text-gray-700">Customer ID</label>
+            <input
+              value={stripeCustomerId}
+              onChange={(e) => setStripeCustomerId(e.target.value)}
+              placeholder="cus_..."
+              className="mt-1 w-full p-3 border border-gray-300 rounded-lg"
+            />
+          </div>
+          <div className="flex justify-end gap-2 pt-2">
+            <button
+              onClick={() => setIsLinkCustomerOpen(false)}
+              className="px-4 py-2 rounded-lg bg-gray-100 hover:bg-gray-200"
+              disabled={linkingCustomer}
+            >
+              Cancelar
+            </button>
+            <button
+              onClick={() => void handleLinkCustomer()}
+              disabled={linkingCustomer}
+              className="px-4 py-2 rounded-lg bg-blue-600 text-white font-bold hover:bg-blue-700 disabled:opacity-50"
+            >
+              {linkingCustomer ? 'Vinculando…' : 'Vincular e sincronizar'}
+            </button>
+          </div>
+        </div>
+      </Modal>
     </div>
   );
 };
