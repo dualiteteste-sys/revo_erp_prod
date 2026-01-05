@@ -35,7 +35,7 @@ async function mockAuthAndEmpresa(page: Page) {
   });
 
   await page.route('**/rest/v1/user_active_empresa*', async (route) => {
-    await route.fulfill({ json: { empresa_id: 'empresa-1' } });
+    await route.fulfill({ json: [{ empresa_id: 'empresa-1' }] });
   });
 
   await page.route('**/rest/v1/empresa_usuarios*', async (route) => {
@@ -216,4 +216,3 @@ test('IND-02: Execução (iniciar → concluir) sem erros', async ({ page }) => 
   await page.getByRole('button', { name: 'Confirmar' }).click();
   await expect(page.getByText('Operação concluída.')).toBeVisible();
 });
-

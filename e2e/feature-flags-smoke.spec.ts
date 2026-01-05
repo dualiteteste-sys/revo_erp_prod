@@ -37,7 +37,7 @@ async function mockAuthAndEmpresa(page: Page, opts?: { role?: 'member' | 'admin'
   });
 
   await page.route('**/rest/v1/user_active_empresa*', async (route) => {
-    await route.fulfill({ json: { empresa_id: 'empresa-1' } });
+    await route.fulfill({ json: [{ empresa_id: 'empresa-1' }] });
   });
 
   await page.route('**/rest/v1/empresa_usuarios*', async (route) => {
@@ -159,4 +159,3 @@ test('CFG-04: Feature Flags (NF-e) salva por admin', async ({ page }) => {
 
   await expect(page.getByText('Feature flags salvas.')).toBeVisible();
 });
-

@@ -30,7 +30,7 @@ async function mockAuthAndEmpresa(page: Page) {
   });
 
   await page.route('**/rest/v1/user_active_empresa*', async (route) => {
-    await route.fulfill({ json: { empresa_id: 'empresa-1' } });
+    await route.fulfill({ json: [{ empresa_id: 'empresa-1' }] });
   });
 
   await page.route('**/rest/v1/empresa_usuarios*', async (route) => {
