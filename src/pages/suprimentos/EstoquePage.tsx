@@ -10,6 +10,7 @@ import { downloadCsv } from '@/utils/csv';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/contexts/ToastProvider';
 import { useHasPermission } from '@/hooks/useHasPermission';
+import InventarioCiclicoModal from '@/components/suprimentos/InventarioCiclicoModal';
 
 export default function EstoquePage() {
   const [produtos, setProdutos] = useState<EstoquePosicao[]>([]);
@@ -26,6 +27,7 @@ export default function EstoquePage() {
   const [isKardexOpen, setIsKardexOpen] = useState(false);
   const [kardexData, setKardexData] = useState<EstoqueMovimento[]>([]);
   const [loadingKardex, setLoadingKardex] = useState(false);
+  const [isInventarioOpen, setIsInventarioOpen] = useState(false);
   const { addToast } = useToast();
   const permUpdate = useHasPermission('suprimentos', 'update');
   const canUpdate = !!permUpdate.data;
@@ -155,6 +157,14 @@ export default function EstoquePage() {
           <p className="text-gray-600 text-sm mt-1">Gerencie saldos e movimentações.</p>
         </div>
         <div className="flex items-center gap-2">
+          <Button
+            type="button"
+            variant="secondary"
+            onClick={() => setIsInventarioOpen(true)}
+            className="gap-2"
+          >
+            Inventário cíclico
+          </Button>
           <Button type="button" variant="secondary" onClick={handleExportEstoqueCsv} className="gap-2">
             <Download size={18} />
             Exportar CSV
@@ -318,6 +328,15 @@ export default function EstoquePage() {
             )}
         </div>
       </Modal>
+
+      <InventarioCiclicoModal
+        isOpen={isInventarioOpen}
+        onClose={() => setIsInventarioOpen(false)}
+        produtoIdsParaNovoInventario={produtos.map((p) => p.produto_id)}
+        hasUpdatePermission={canUpdate}
+        permsLoading={permsLoading}
+        onAjustesAplicados={fetchEstoque}
+      />
     </div>
   );
 }
