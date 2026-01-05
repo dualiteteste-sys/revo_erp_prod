@@ -209,43 +209,14 @@ test('RG-04 (Comércio): finalizar PDV gera movimento financeiro + baixa de esto
       return;
     }
 
-    // Upsert venda (RPC) — PDV finaliza marcando canal + status concluído
-    if (url.includes('/rest/v1/rpc/vendas_upsert_pedido')) {
-      const body = (await req.postDataJSON()) as any;
-      const payload = body?.p_payload || {};
-      if (payload?.id === pdvPedido.id && payload?.status) {
-        pdvPedido.status = payload.status;
-        pdvPedido.updated_at = new Date().toISOString();
-        (vendaDetails as any).status = payload.status;
-      }
-      await route.fulfill({ json: vendaDetails });
-      return;
-    }
-
-    // Financeiro movement (RPC)
-    if (url.includes('/rest/v1/rpc/financeiro_movimentacoes_upsert')) {
+    // Finalize PDV (RPC idempotente server-side)
+    if (url.includes('/rest/v1/rpc/vendas_pdv_finalize_v2')) {
       movimentoGerado = true;
-      await route.fulfill({
-        json: {
-          id: 'mov-1',
-          empresa_id: 'empresa-1',
-          conta_corrente_id: 'cc-1',
-          data_movimento: today,
-          tipo_mov: 'entrada',
-          valor: pdvPedido.total_geral,
-          descricao: `Venda PDV #${pdvPedido.numero}`,
-          documento_ref: `PDV-${pdvPedido.numero}`,
-          created_at: nowIso,
-          updated_at: nowIso,
-        },
-      });
-      return;
-    }
-
-    // Estoque baixa (RPC idempotente)
-    if (url.includes('/rest/v1/rpc/vendas_baixar_estoque')) {
       estoqueBaixado = true;
-      await route.fulfill({ json: {} });
+      pdvPedido.status = 'concluido';
+      pdvPedido.updated_at = new Date().toISOString();
+      (vendaDetails as any).status = 'concluido';
+      await route.fulfill({ json: { ok: true, pedido_id: pdvPedido.id } });
       return;
     }
 
@@ -282,4 +253,134 @@ test('RG-04 (Comércio): finalizar PDV gera movimento financeiro + baixa de esto
 
   expect(movimentoGerado).toBeTruthy();
   expect(estoqueBaixado).toBeTruthy();
+});
+
+test('VEN-STA-02: PDV offline-lite enfileira e sincroniza depois (sem duplicar)', async ({ page }) => {
+  test.setTimeout(90_000);
+
+  const today = new Date().toISOString().slice(0, 10);
+  const nowIso = new Date().toISOString();
+
+  const pdvPedido = {
+    id: 'ped-2',
+    numero: 9002,
+    status: 'orcamento',
+    total_geral: 200,
+    data_emissao: today,
+    updated_at: nowIso,
+  };
+
+  const vendaDetails = {
+    id: pdvPedido.id,
+    numero: pdvPedido.numero,
+    cliente_id: 'cli-1',
+    cliente_nome: 'Cliente PDV',
+    data_emissao: today,
+    data_entrega: null,
+    status: pdvPedido.status,
+    total_produtos: 200,
+    frete: 0,
+    desconto: 0,
+    total_geral: pdvPedido.total_geral,
+    condicao_pagamento: null,
+    observacoes: null,
+    itens: [
+      {
+        id: 'it-1',
+        pedido_id: pdvPedido.id,
+        produto_id: 'prod-1',
+        produto_nome: 'Produto PDV',
+        quantidade: 1,
+        preco_unitario: 200,
+        desconto: 0,
+        total: 200,
+      },
+    ],
+  };
+
+  let failFinalize = true;
+  let finalizeCalls = 0;
+
+  await page.route('**/rest/v1/**', async (route) => {
+    const req = route.request();
+    const url = req.url();
+
+    if (req.method() === 'OPTIONS') {
+      await route.fulfill({ status: 204, body: '' });
+      return;
+    }
+
+    if (url.includes('/rest/v1/vendas_pedidos')) {
+      await route.fulfill({ json: [pdvPedido] });
+      return;
+    }
+
+    if (url.includes('/rest/v1/rpc/financeiro_contas_correntes_list')) {
+      await route.fulfill({
+        json: [
+          {
+            total_count: 1,
+            id: 'cc-1',
+            empresa_id: 'empresa-1',
+            nome: 'Caixa Principal',
+            ativo: true,
+            padrao_para_pagamentos: false,
+            padrao_para_recebimentos: true,
+            created_at: nowIso,
+            updated_at: nowIso,
+          },
+        ],
+      });
+      return;
+    }
+
+    if (url.includes('/rest/v1/rpc/vendas_get_pedido_details')) {
+      await route.fulfill({ json: vendaDetails });
+      return;
+    }
+
+    if (url.includes('/rest/v1/rpc/vendas_pdv_finalize_v2')) {
+      finalizeCalls += 1;
+      if (failFinalize) {
+        await route.fulfill({ status: 503, json: { message: 'Service Unavailable' } });
+        return;
+      }
+
+      pdvPedido.status = 'concluido';
+      pdvPedido.updated_at = new Date().toISOString();
+      (vendaDetails as any).status = 'concluido';
+      await route.fulfill({ json: { ok: true, pedido_id: pdvPedido.id } });
+      return;
+    }
+
+    await route.fulfill({ json: [] });
+  });
+
+  await mockAuthAndEmpresa(page);
+
+  await page.goto('/auth/login');
+  await page.getByPlaceholder('seu@email.com').fill('test@example.com');
+  await page.getByLabel('Senha').fill('password123');
+  await page.getByRole('button', { name: 'Entrar' }).click();
+  await expect(page).toHaveURL(/\/app\//);
+
+  await page.goto('/app/vendas/pdv');
+  await expect(page.getByRole('heading', { name: 'PDV' })).toBeVisible({ timeout: 20000 });
+  await expect(page.getByText(`#${pdvPedido.numero}`)).toBeVisible({ timeout: 20000 });
+
+  await page.getByRole('button', { name: 'Finalizar' }).click();
+  await expect(page.getByText('Sem conexão: o PDV ficou pendente e será sincronizado automaticamente.')).toBeVisible({
+    timeout: 20000,
+  });
+
+  // Queue badge
+  await expect(page.getByText('pendente', { exact: true })).toBeVisible({ timeout: 20000 });
+  expect(finalizeCalls).toBeGreaterThan(0);
+
+  // "volta a internet"
+  failFinalize = false;
+  await page.getByRole('button', { name: 'Sincronizar agora' }).click();
+  await expect(page.getByText('Sincronizado: 1 PDV(s).')).toBeVisible({ timeout: 20000 });
+  await expect(page.getByText('pendente')).toHaveCount(0);
+  await expect(page.getByText('concluido')).toBeVisible({ timeout: 20000 });
 });

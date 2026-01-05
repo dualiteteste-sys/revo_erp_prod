@@ -1,7 +1,13 @@
 import { supabase } from '../lib/supabaseClient';
-import { callRpc } from '@/lib/api';
+import { callRpc, RpcError } from '@/lib/api';
 import { getVendaDetails, saveVenda, type VendaDetails } from './vendas';
 import { traceAction } from '@/lib/tracing';
+import {
+  bumpPdvFinalizeAttempt,
+  listPdvFinalizeQueue,
+  removePdvFinalizeQueue,
+  upsertPdvFinalizeQueue,
+} from '@/lib/offlineQueue';
 
 const sb = supabase as any;
 
@@ -235,35 +241,30 @@ export async function finalizePdv(params: {
   return traceAction(
     'pdv.finalize',
     async () => {
-      const venda = await getVendaDetails(params.pedidoId);
-
-      // Marca canal PDV + status concluído (idempotente)
-      const updated = await saveVenda({
-        id: venda.id,
-        canal: 'pdv' as any,
-        status: 'concluido' as any,
-      } as any);
-
-      // Financeiro: entrada do PDV
-      await callRpc('financeiro_movimentacoes_upsert', {
-        p_payload: {
-          conta_corrente_id: params.contaCorrenteId,
-          tipo_mov: 'entrada',
-          valor: venda.total_geral,
-          descricao: `Venda PDV #${venda.numero}`,
-          documento_ref: `PDV-${venda.numero}`,
-          origem_tipo: 'venda_pdv',
-          origem_id: venda.id,
-          categoria: 'Vendas',
-          observacoes: 'Gerado automaticamente pelo PDV (MVP)',
-        },
-      });
-
-      if (params.estoqueEnabled !== false) {
-        await callRpc('vendas_baixar_estoque', { p_pedido_id: venda.id, p_documento_ref: `PDV-${venda.numero}` });
+      try {
+        await callRpc('vendas_pdv_finalize_v2', {
+          p_pedido_id: params.pedidoId,
+          p_conta_corrente_id: params.contaCorrenteId,
+          p_baixar_estoque: params.estoqueEnabled !== false,
+        });
+        removePdvFinalizeQueue(params.pedidoId);
+      } catch (e: any) {
+        if (e instanceof RpcError && isRetryableForOfflineQueue(e)) {
+          const now = Date.now();
+          upsertPdvFinalizeQueue({
+            pedidoId: params.pedidoId,
+            contaCorrenteId: params.contaCorrenteId,
+            createdAt: now,
+            attempts: 0,
+            lastError: e.message || null,
+          });
+          throw new PdvQueuedError();
+        }
+        throw e;
       }
 
-      return updated;
+      const updated = await getVendaDetails(params.pedidoId);
+      return updated as any;
     },
     {
       pedido_id: params.pedidoId,
@@ -271,4 +272,56 @@ export async function finalizePdv(params: {
       estoque_enabled: params.estoqueEnabled !== false,
     }
   );
+}
+
+export class PdvQueuedError extends Error {
+  constructor() {
+    super('PDV pendente de sincronização');
+    this.name = 'PdvQueuedError';
+  }
+}
+
+function isRetryableForOfflineQueue(e: RpcError): boolean {
+  const status = e.status;
+  const msg = String(e.message || '');
+  if (status === 0 && /(failed to fetch|networkerror|load failed)/i.test(msg)) return true;
+  if (status === 408) return true;
+  if (status === 429) return true;
+  if (status && status >= 500) return true;
+  return false;
+}
+
+export function getQueuedPdvFinalizeIds(): Set<string> {
+  return new Set(listPdvFinalizeQueue().map((x) => x.pedidoId));
+}
+
+let flushing = false;
+
+export async function flushPdvFinalizeQueue(): Promise<{ ok: number; failed: number }> {
+  if (flushing) return { ok: 0, failed: 0 };
+  flushing = true;
+  try {
+    const items = listPdvFinalizeQueue();
+    let ok = 0;
+    let failed = 0;
+
+    for (const it of items) {
+      try {
+        await callRpc('vendas_pdv_finalize_v2', {
+          p_pedido_id: it.pedidoId,
+          p_conta_corrente_id: it.contaCorrenteId,
+          p_baixar_estoque: true,
+        });
+        removePdvFinalizeQueue(it.pedidoId);
+        ok += 1;
+      } catch (e: any) {
+        failed += 1;
+        bumpPdvFinalizeAttempt(it.pedidoId, e?.message || 'Falha ao sincronizar');
+      }
+    }
+
+    return { ok, failed };
+  } finally {
+    flushing = false;
+  }
 }
