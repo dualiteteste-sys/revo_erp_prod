@@ -256,9 +256,14 @@ Este é o checklist único (por módulo) para levar o REVO ao nível **top mundi
 - [ ] BILL-STA-04 (P1) “Self-serve” de faturas/boletos/recibos (quando aplicável) e dados fiscais
 
 ### G11) Suporte (reduzir suporte humano)
-- [ ] SUPP-STA-01 (P0) Ajuda contextual por página (o que é + 3 passos + links) sem abrir ticket
+- [x] SUPP-STA-01 (P0) Ajuda contextual por página (o que é + 3 passos + links) sem abrir ticket
 - [ ] SUPP-STA-02 (P1) Coleta de diagnóstico (últimas falhas, correlation id) anexável ao suporte
 - [ ] SUPP-STA-03 (P1) Central de notificações (incidentes, mudanças fiscais, integrações) com histórico
+
+**Validar (SUPP-STA-01)**
+- Abrir páginas core (Clientes, Produtos, Estoque, PDV, Tesouraria): deve existir “Ajuda” colapsável com “O que é”, “3 passos” e links.
+- Clicar em `Diagnóstico guiado (Suporte)` deve abrir `/app/suporte`.
+- Perfis `ops/manage` devem ver também o link `Saúde (Ops)` para `/app/desenvolvedor/saude`.
 
 ### G12) Desenvolvedor (Operação interna)
 - [x] DEV-STA-01 (P0) Logs do usuário/empresa com filtros (ação, data, status) e drill-down por entidade

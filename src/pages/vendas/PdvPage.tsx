@@ -11,6 +11,7 @@ import CsvExportDialog from '@/components/ui/CsvExportDialog';
 import { useOnboardingGate } from '@/contexts/OnboardingGateContext';
 import { ActionLockedError, runWithActionLock } from '@/lib/actionLock';
 import { useBillingGate } from '@/hooks/useBillingGate';
+import PageHelp from '@/components/support/PageHelp';
 
 type PdvRow = {
   id: string;
@@ -409,6 +410,20 @@ export default function PdvPage() {
           </div>
         )}
       </div>
+
+      <PageHelp
+        title="PDV: guia rápido"
+        whatIs="PDV é venda rápida com baixa de estoque e lançamento no financeiro. O foco aqui é velocidade sem bagunçar o caixa."
+        steps={[
+          'Selecione a conta para recebimento e clique em “Nova venda”.',
+          'Adicione itens e salve; quando estiver pronto clique em “Finalizar”.',
+          'Valide: status “Concluído”, comprovante disponível e saldo/estoque refletindo.',
+        ]}
+        links={[
+          { label: 'Abrir Tesouraria', href: '/app/financeiro/tesouraria', kind: 'internal' },
+          { label: 'Abrir Estoque', href: '/app/suprimentos/estoque', kind: 'internal' },
+        ]}
+      />
 
       <Modal isOpen={isFormOpen} onClose={close} title={selectedId ? 'Editar venda' : 'Nova venda'} size="6xl" containerClassName="h-[90vh] max-h-[90vh]">
         <PedidoVendaFormPanel
