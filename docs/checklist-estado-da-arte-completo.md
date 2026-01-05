@@ -166,7 +166,7 @@ Este é o checklist único (por módulo) para levar o REVO ao nível **top mundi
 ## G) Módulos do ERP (por domínio)
 
 ### G1) Cadastros
-- [ ] CAD-STA-01 (P0) CRUDs com validação forte + import/export (clientes, produtos, serviços, transportadoras) — em progresso (clientes+produtos OK; faltam imports de serviços/transportadoras)
+- [x] CAD-STA-01 (P0) CRUDs com validação forte + import/export (clientes, produtos, serviços, transportadoras)
 - [ ] CAD-STA-02 (P1) Normalização tributária básica (NCM/CFOP/CST/CSOSN) e consistência de unidade/sku
 - [ ] CAD-STA-03 (P1) Dedupe e saneamento (CNPJ/CPF/email/telefone) com alertas de duplicidade
 
