@@ -68,6 +68,14 @@ export type EcommerceDlqRow = {
   last_error: string;
 };
 
+export type DlqReprocessResult = {
+  mode: 'dry_run' | 'reprocess';
+  preview?: Record<string, unknown> | null;
+  new_job_id?: string | null;
+  before?: Record<string, unknown> | null;
+  after?: Record<string, unknown> | null;
+};
+
 export async function getOpsHealthSummary(): Promise<OpsHealthSummary> {
   return callRpc<OpsHealthSummary>('ops_health_summary', { p_window: null });
 }
@@ -97,4 +105,24 @@ export async function reprocessFinanceDlq(dlqId: string): Promise<string> {
 
 export async function reprocessEcommerceDlq(dlqId: string): Promise<string> {
   return callRpc<string>('ops_ecommerce_dlq_reprocess', { p_dlq_id: dlqId });
+}
+
+export async function dryRunFinanceDlq(dlqId: string): Promise<DlqReprocessResult> {
+  return callRpc<DlqReprocessResult>('ops_finance_dlq_reprocess_v2', { p_dlq_id: dlqId, p_dry_run: true });
+}
+
+export async function dryRunEcommerceDlq(dlqId: string): Promise<DlqReprocessResult> {
+  return callRpc<DlqReprocessResult>('ops_ecommerce_dlq_reprocess_v2', { p_dlq_id: dlqId, p_dry_run: true });
+}
+
+export async function dryRunNfeioWebhookEvent(id: string): Promise<DlqReprocessResult> {
+  return callRpc<DlqReprocessResult>('ops_nfeio_webhook_reprocess_v2', { p_id: id, p_dry_run: true });
+}
+
+export async function seedFinanceDlq(jobType?: string): Promise<string> {
+  return callRpc<string>('ops_finance_dlq_seed', { p_job_type: jobType ?? 'test' });
+}
+
+export async function seedEcommerceDlq(provider?: string, kind?: string): Promise<string> {
+  return callRpc<string>('ops_ecommerce_dlq_seed', { p_provider: provider ?? 'meli', p_kind: kind ?? 'test' });
 }
