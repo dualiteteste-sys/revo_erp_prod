@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState, ReactNode, useCallback } from 'react';
+import { createContext, useContext, useEffect, useMemo, useState, ReactNode, useCallback } from 'react';
 import { useSupabase } from '@/providers/SupabaseProvider';
 import { useAuth } from './AuthProvider';
 import { Database } from '../types/database.types';
@@ -24,6 +24,8 @@ export const SubscriptionProvider = ({ children }: { children: ReactNode }) => {
   const { activeEmpresa } = useAuth();
   const [subscription, setSubscription] = useState<SubscriptionWithPlan | null>(null);
   const [loadingSubscription, setLoadingSubscription] = useState(true);
+
+  const empresaId = useMemo(() => activeEmpresa?.id ?? null, [activeEmpresa?.id]);
 
   const fetchSubscription = useCallback(async (empresaId: string) => {
     setLoadingSubscription(true);
@@ -66,17 +68,36 @@ export const SubscriptionProvider = ({ children }: { children: ReactNode }) => {
   }, [supabase]);
 
   useEffect(() => {
-    if (activeEmpresa?.id) {
-      fetchSubscription(activeEmpresa.id);
+    if (empresaId) {
+      fetchSubscription(empresaId);
     } else {
       setSubscription(null);
       setLoadingSubscription(false);
     }
-  }, [activeEmpresa, fetchSubscription]);
+  }, [empresaId, fetchSubscription]);
+
+  useEffect(() => {
+    if (!empresaId) return;
+
+    const channel = supabase
+      .channel(`revo:subscriptions:${empresaId}`)
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'subscriptions', filter: `empresa_id=eq.${empresaId}` },
+        () => {
+          fetchSubscription(empresaId);
+        },
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [empresaId, fetchSubscription, supabase]);
 
   const refetchSubscription = () => {
-    if (activeEmpresa?.id) {
-      fetchSubscription(activeEmpresa.id);
+    if (empresaId) {
+      fetchSubscription(empresaId);
     }
   };
 
