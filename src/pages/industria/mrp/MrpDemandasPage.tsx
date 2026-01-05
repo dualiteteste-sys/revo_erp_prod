@@ -12,7 +12,8 @@ import {
   registrarAcaoMrpDemanda,
   upsertMrpParametro,
   MrpDemandaAcao,
-  listMrpDemandaAcoes
+  listMrpDemandaAcoes,
+  mrpCriarOcParaDemanda
 } from '@/services/industriaProducao';
 import Modal from '@/components/ui/Modal';
 import Input from '@/components/ui/forms/Input';
@@ -23,6 +24,7 @@ import DecimalInput from '@/components/ui/forms/DecimalInput';
 import { Button } from '@/components/ui/button';
 import TextArea from '@/components/ui/forms/TextArea';
 import { useSearchParams } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 
 type ParamModalState = {
   open: boolean;
@@ -42,6 +44,7 @@ type HistoricoModalState = {
 export default function MrpDemandasPage() {
   const { addToast } = useToast();
   const [searchParams, setSearchParams] = useSearchParams();
+  const navigate = useNavigate();
   const [parametros, setParametros] = useState<MrpParametro[]>([]);
   const [demandas, setDemandas] = useState<MrpDemanda[]>([]);
   const [loadingParametros, setLoadingParametros] = useState(true);
@@ -66,6 +69,7 @@ export default function MrpDemandasPage() {
     observacoes: ''
   });
   const [savingAcao, setSavingAcao] = useState(false);
+  const [creatingOcId, setCreatingOcId] = useState<string | null>(null);
   const [historicoModal, setHistoricoModal] = useState<HistoricoModalState>({ open: false });
   const [historicoAcoes, setHistoricoAcoes] = useState<MrpDemandaAcao[]>([]);
   const [loadingHistorico, setLoadingHistorico] = useState(false);
@@ -265,6 +269,25 @@ export default function MrpDemandasPage() {
       addToast(error.message || 'Erro ao registrar ação.', 'error');
     } finally {
       setSavingAcao(false);
+    }
+  };
+
+  const handleCriarOc = async (demanda: MrpDemanda) => {
+    setCreatingOcId(demanda.id);
+    try {
+      const res = await mrpCriarOcParaDemanda(demanda.id);
+      addToast(
+        res.already_exists
+          ? `OC já existe (#${res.compra_pedido_numero}).`
+          : `OC criada (#${res.compra_pedido_numero}).`,
+        'success'
+      );
+      await loadDemandas();
+      navigate(`/app/suprimentos/compras?open=${encodeURIComponent(res.compra_pedido_id)}`);
+    } catch (error: any) {
+      addToast(error?.message || 'Erro ao criar OC pelo MRP.', 'error');
+    } finally {
+      setCreatingOcId(null);
     }
   };
 
@@ -485,6 +508,16 @@ export default function MrpDemandasPage() {
                       <button className="text-blue-600 hover:underline block w-full" onClick={() => handleReprocessar(demanda.ordem_id)}>
                         Reprocessar OP
                       </button>
+                      {demanda.necessidade_liquida > 0 ? (
+                        <button
+                          className="text-indigo-600 hover:underline block w-full disabled:opacity-50"
+                          onClick={() => handleCriarOc(demanda)}
+                          disabled={creatingOcId === demanda.id}
+                          title="Cria uma Ordem de Compra (rascunho) usando o fornecedor preferencial do item"
+                        >
+                          {creatingOcId === demanda.id ? 'Criando OC…' : 'Criar OC (rascunho)'}
+                        </button>
+                      ) : null}
                       <button className="text-green-600 hover:underline block w-full" onClick={() => openAcao(demanda)}>
                         Registrar ação
                       </button>

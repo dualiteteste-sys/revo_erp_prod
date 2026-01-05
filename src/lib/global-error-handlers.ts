@@ -1,5 +1,6 @@
 import { logger } from "@/lib/logger";
 import { supabase } from "@/lib/supabaseClient";
+import { sanitizeLogData } from "@/lib/sanitizeLog";
 
 type AnyFunction = (...args: any[]) => any;
 
@@ -29,11 +30,12 @@ export function setupGlobalErrorHandlers() {
       if (now - last < DEDUPE_WINDOW_MS) return;
       recentlySent.set(key, now);
 
+      const safe = sanitizeLogData({ message: params.message, context: params.context ?? {} }) as any;
       void supabase.rpc("log_app_event", {
         p_level: "error",
         p_event: params.event,
-        p_message: params.message,
-        p_context: params.context ?? {},
+        p_message: String(safe?.message ?? params.message),
+        p_context: (safe?.context ?? {}) as any,
         p_source: "ui",
       });
     } catch {
@@ -75,17 +77,18 @@ export function setupGlobalErrorHandlers() {
   const originalConsoleWarn = console.warn.bind(console);
 
   console.error = ((...args: unknown[]) => {
+    const safeArgs = sanitizeLogData(args) as any;
     trySendAppLog({
       event: "console.error",
       message: safeToString(args[0]),
-      context: { args: args.slice(0, 5).map(safeToString) },
+      context: { args: (Array.isArray(safeArgs) ? safeArgs : []).slice(0, 5) },
     });
-    logger.error("[console.error]", args[0], { args });
+    logger.error("[console.error]", args[0], { args: safeArgs });
     if (!isProd) originalConsoleError(...(args as any[]));
   }) as AnyFunction;
 
   console.warn = ((...args: unknown[]) => {
-    logger.warn("[console.warn]", { args });
+    logger.warn("[console.warn]", { args: sanitizeLogData(args) as any });
     if (!isProd) originalConsoleWarn(...(args as any[]));
   }) as AnyFunction;
 

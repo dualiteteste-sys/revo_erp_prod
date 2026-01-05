@@ -732,6 +732,18 @@ export async function listMrpDemandaAcoes(demandaId: string): Promise<MrpDemanda
   });
 }
 
+export type MrpCriarOcResult = {
+  ok: boolean;
+  already_exists: boolean;
+  compra_pedido_id: string;
+  compra_pedido_numero: number;
+  quantidade?: number;
+};
+
+export async function mrpCriarOcParaDemanda(demandaId: string): Promise<MrpCriarOcResult> {
+  return callRpc<MrpCriarOcResult>('mrp_criar_oc_para_demanda', { p_demanda_id: demandaId, p_preco_unitario: 0 });
+}
+
 export async function listPcpCargaCapacidade(startDate?: string, endDate?: string): Promise<PcpCargaCapacidade[]> {
   return callRpc<PcpCargaCapacidade[]>('pcp_carga_capacidade', {
     p_data_inicial: startDate || null,

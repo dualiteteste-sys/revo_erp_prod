@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { cancelarRecebimento, deleteRecebimento, listRecebimentos, Recebimento } from '@/services/recebimento';
+import { cancelarRecebimento, deleteRecebimento, listRecebimentoItens, listRecebimentos, Recebimento, type RecebimentoItem } from '@/services/recebimento';
 import { useNavigate } from 'react-router-dom';
 import { Loader2, PackageCheck, AlertTriangle, CheckCircle, Clock, FileText, Trash2, RotateCcw, TrendingDown } from 'lucide-react';
 import { useToast } from '@/contexts/ToastProvider';
@@ -7,6 +7,8 @@ import ConfirmationModal from '@/components/ui/ConfirmationModal';
 import Modal from '@/components/ui/Modal';
 import { createContaPagarFromRecebimento, getContaPagarFromRecebimento } from '@/services/financeiro';
 import CsvExportDialog from '@/components/ui/CsvExportDialog';
+import { listDepositos, type EstoqueDeposito } from '@/services/suprimentos';
+import { applyDevolucaoFornecedor, createDevolucaoFornecedor } from '@/services/devolucaoFornecedor';
 
 export default function RecebimentoListPage() {
     const [recebimentos, setRecebimentos] = useState<Recebimento[]>([]);
@@ -21,6 +23,15 @@ export default function RecebimentoListPage() {
     const [toCancel, setToCancel] = useState<Recebimento | null>(null);
     const [cancelMotivo, setCancelMotivo] = useState('');
     const [creatingConta, setCreatingConta] = useState(false);
+
+    const [isDevolucaoOpen, setIsDevolucaoOpen] = useState(false);
+    const [devolvendo, setDevolvendo] = useState(false);
+    const [toDevolver, setToDevolver] = useState<Recebimento | null>(null);
+    const [devolucaoMotivo, setDevolucaoMotivo] = useState('');
+    const [devolucaoItens, setDevolucaoItens] = useState<RecebimentoItem[]>([]);
+    const [devolucaoQtd, setDevolucaoQtd] = useState<Record<string, number>>({});
+    const [depositos, setDepositos] = useState<EstoqueDeposito[]>([]);
+    const [depositoId, setDepositoId] = useState<string | null>(null);
 
     useEffect(() => {
         loadData();
@@ -58,6 +69,25 @@ export default function RecebimentoListPage() {
         setToCancel(rec);
         setCancelMotivo('');
         setIsCancelOpen(true);
+    };
+
+    const openDevolucao = async (rec: Recebimento) => {
+        setToDevolver(rec);
+        setDevolucaoMotivo('');
+        setDevolucaoQtd({});
+        setDevolucaoItens([]);
+        setDepositos([]);
+        setDepositoId(null);
+        setIsDevolucaoOpen(true);
+        try {
+            const [itens, deps] = await Promise.all([listRecebimentoItens(rec.id), listDepositos({ onlyActive: true })]);
+            setDevolucaoItens(itens);
+            const selectable = deps.filter((d) => d.ativo && d.can_move);
+            setDepositos(selectable);
+            setDepositoId(selectable.find((d) => d.is_default)?.id ?? selectable[0]?.id ?? null);
+        } catch (e: any) {
+            addToast(e.message || 'Falha ao carregar itens para devolução.', 'error');
+        }
     };
 
     const confirmDelete = async () => {
@@ -114,6 +144,37 @@ export default function RecebimentoListPage() {
             addToast(e?.message || 'Erro ao gerar conta a pagar.', 'error');
         } finally {
             setCreatingConta(false);
+        }
+    };
+
+    const confirmDevolucao = async () => {
+        if (!toDevolver) return;
+        const itens = devolucaoItens
+            .map((i) => ({ recebimentoItemId: i.id, quantidade: Number(devolucaoQtd[i.id] || 0) }))
+            .filter((i) => i.quantidade > 0);
+
+        if (itens.length === 0) {
+            addToast('Selecione ao menos 1 item com quantidade > 0.', 'warning');
+            return;
+        }
+
+        setDevolvendo(true);
+        try {
+            const devolucaoId = await createDevolucaoFornecedor({
+                recebimentoId: toDevolver.id,
+                depositoId,
+                motivo: devolucaoMotivo || null,
+                itens,
+            });
+            await applyDevolucaoFornecedor(devolucaoId);
+            addToast('Devolução aplicada e estoque ajustado.', 'success');
+            setIsDevolucaoOpen(false);
+            setToDevolver(null);
+            await loadData();
+        } catch (e: any) {
+            addToast(e.message || 'Erro ao aplicar devolução ao fornecedor.', 'error');
+        } finally {
+            setDevolvendo(false);
         }
     };
 
@@ -226,14 +287,24 @@ export default function RecebimentoListPage() {
                                                 )}
 
                                                 {rec.status === 'concluido' ? (
-                                                    <button
-                                                        onClick={() => void handleCreateContaPagar(rec)}
-                                                        disabled={creatingConta}
-                                                        className="text-gray-400 hover:text-emerald-700 transition-colors flex items-center gap-1 disabled:opacity-50"
-                                                        title="Gerar Conta a Pagar"
-                                                    >
-                                                        {creatingConta ? <Loader2 className="animate-spin" size={16} /> : <TrendingDown size={16} />}
-                                                    </button>
+                                                    <>
+                                                        <button
+                                                            onClick={() => void handleCreateContaPagar(rec)}
+                                                            disabled={creatingConta}
+                                                            className="text-gray-400 hover:text-emerald-700 transition-colors flex items-center gap-1 disabled:opacity-50"
+                                                            title="Gerar Conta a Pagar"
+                                                        >
+                                                            {creatingConta ? <Loader2 className="animate-spin" size={16} /> : <TrendingDown size={16} />}
+                                                        </button>
+                                                        <button
+                                                            onClick={() => void openDevolucao(rec)}
+                                                            className="text-gray-400 hover:text-blue-700 transition-colors flex items-center gap-1"
+                                                            title="Devolver ao fornecedor (ajusta estoque)"
+                                                        >
+                                                            <RotateCcw size={16} />
+                                                            <span className="text-xs">Dev.</span>
+                                                        </button>
+                                                    </>
                                                 ) : null}
                                             </div>
                                         </td>
@@ -298,6 +369,119 @@ export default function RecebimentoListPage() {
                         >
                             {canceling ? <Loader2 className="animate-spin" size={18} /> : null}
                             Cancelar recebimento
+                        </button>
+                    </div>
+                </div>
+            </Modal>
+
+            <Modal
+                isOpen={isDevolucaoOpen}
+                onClose={() => setIsDevolucaoOpen(false)}
+                title="Devolução ao fornecedor"
+                size="4xl"
+            >
+                <div className="p-6 space-y-4">
+                    <div className="text-sm text-gray-700">
+                        Gere uma devolução vinculada ao recebimento e ajuste o estoque de forma auditável.
+                    </div>
+
+                    {depositos.length > 0 ? (
+                        <div className="bg-gray-50 rounded-lg border border-gray-200 p-3">
+                            <label className="block text-xs font-semibold text-gray-600 mb-1">Depósito (saída)</label>
+                            <select
+                                className="w-full p-2 border border-gray-300 rounded-lg text-sm"
+                                value={depositoId ?? ''}
+                                onChange={(e) => setDepositoId(e.target.value || null)}
+                            >
+                                {depositos.map((d) => (
+                                    <option key={d.id} value={d.id}>
+                                        {d.nome}
+                                        {d.is_default ? ' (padrão)' : ''}
+                                    </option>
+                                ))}
+                            </select>
+                            <div className="mt-1 text-xs text-gray-500">Use o depósito onde o recebimento foi lançado (padrão: depósito default).</div>
+                        </div>
+                    ) : (
+                        <div className="text-xs text-gray-500">
+                            Depósitos não configurados ou sem permissão de movimentação. A devolução usará o fluxo legado quando aplicável.
+                        </div>
+                    )}
+
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Motivo (opcional)</label>
+                        <textarea
+                            value={devolucaoMotivo}
+                            onChange={(e) => setDevolucaoMotivo(e.target.value)}
+                            rows={2}
+                            className="w-full rounded-lg border border-gray-200 bg-white/70 p-3 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            placeholder="Ex.: devolução por avaria / divergência / troca..."
+                        />
+                    </div>
+
+                    <div className="rounded-lg border border-gray-200 overflow-hidden">
+                        <div className="bg-gray-50 px-4 py-2 text-xs font-semibold text-gray-600">Itens</div>
+                        <div className="max-h-[50vh] overflow-auto">
+                            <table className="min-w-full text-sm">
+                                <thead className="bg-white sticky top-0 z-10">
+                                    <tr className="text-left text-gray-500 border-b">
+                                        <th className="p-3">Produto</th>
+                                        <th className="p-3">NF-e</th>
+                                        <th className="p-3 text-right">Qtd. recebida</th>
+                                        <th className="p-3 text-right">Qtd. devolver</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y">
+                                    {devolucaoItens.map((it) => {
+                                        const max = Number(it.quantidade_conferida || it.quantidade_xml || 0);
+                                        const current = devolucaoQtd[it.id] ?? 0;
+                                        return (
+                                            <tr key={it.id}>
+                                                <td className="p-3">
+                                                    <div className="font-medium text-gray-800">{it.produtos?.nome ?? it.fiscal_nfe_import_items?.xprod ?? 'Item'}</div>
+                                                    <div className="text-xs text-gray-500">SKU: {it.produtos?.sku ?? '-'}</div>
+                                                </td>
+                                                <td className="p-3 text-xs text-gray-500">
+                                                    {it.fiscal_nfe_import_items?.cprod ?? '-'} / {it.fiscal_nfe_import_items?.ean ?? '-'}
+                                                </td>
+                                                <td className="p-3 text-right text-gray-700">{max}</td>
+                                                <td className="p-3 text-right">
+                                                    <input
+                                                        type="number"
+                                                        min={0}
+                                                        max={max}
+                                                        step="0.01"
+                                                        value={current}
+                                                        onChange={(e) => {
+                                                            const next = Number(e.target.value || 0);
+                                                            setDevolucaoQtd((s) => ({ ...s, [it.id]: Math.max(0, Math.min(next, max)) }));
+                                                        }}
+                                                        className="w-28 p-2 border border-gray-300 rounded-lg text-right"
+                                                    />
+                                                </td>
+                                            </tr>
+                                        );
+                                    })}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <div className="flex justify-end gap-2 pt-2">
+                        <button
+                            onClick={() => setIsDevolucaoOpen(false)}
+                            className="rounded-md border border-gray-300 bg-white py-2 px-4 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50"
+                            disabled={devolvendo}
+                        >
+                            Voltar
+                        </button>
+                        <button
+                            onClick={confirmDevolucao}
+                            disabled={devolvendo}
+                            className="flex items-center gap-2 bg-blue-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-blue-700 disabled:opacity-50"
+                        >
+                            {devolvendo ? <Loader2 className="animate-spin" size={18} /> : null}
+                            Aplicar devolução
                         </button>
                     </div>
                 </div>
