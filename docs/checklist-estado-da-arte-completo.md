@@ -197,7 +197,7 @@ Este é o checklist único (por módulo) para levar o REVO ao nível **top mundi
 - [ ] OS-STA-05 (P1) Comunicação (WhatsApp/email) com templates + log + portal simples do cliente
 
 ### G6) Financeiro
-- [ ] FIN-STA-01 (P0) Conciliação por extrato com matching sugerido + regras e auditoria
+- [x] FIN-STA-01 (P0) Conciliação por extrato com matching sugerido + regras e auditoria
 - [ ] FIN-STA-02 (P1) Centro de custo por lançamento + relatórios gerenciais (DRE simplificada)
 - [ ] FIN-STA-03 (P1) Cobranças: remessa/retorno bancário (quando aplicável) e automações de cobrança
 

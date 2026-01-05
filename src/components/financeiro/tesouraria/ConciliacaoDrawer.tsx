@@ -4,6 +4,7 @@ import { X, Loader2, Search, Link2, Plus } from 'lucide-react';
 import { ExtratoItem, Movimentacao, listMovimentacoes, saveMovimentacao } from '@/services/treasury';
 import { useToast } from '@/contexts/ToastProvider';
 import Input from '@/components/ui/forms/Input';
+import { listConciliacaoRegras, type ConciliacaoRegra } from '@/services/conciliacaoRegras';
 
 interface Props {
   isOpen: boolean;
@@ -20,12 +21,49 @@ export default function ConciliacaoDrawer({ isOpen, onClose, extratoItem, contaC
   const [searchTerm, setSearchTerm] = useState('');
   const [isCreating, setIsCreating] = useState(false);
   const [linkingId, setLinkingId] = useState<string | null>(null);
+  const [rules, setRules] = useState<ConciliacaoRegra[]>([]);
+  const [loadingRules, setLoadingRules] = useState(false);
+  const [creatingFromRuleId, setCreatingFromRuleId] = useState<string | null>(null);
 
   useEffect(() => {
     if (isOpen && extratoItem) {
       fetchSuggestions();
     }
   }, [isOpen, extratoItem]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    if (!contaCorrenteId) return;
+    setLoadingRules(true);
+    void (async () => {
+      try {
+        const r = await listConciliacaoRegras(contaCorrenteId);
+        setRules((r || []).filter((x) => x.ativo));
+      } catch {
+        setRules([]);
+      } finally {
+        setLoadingRules(false);
+      }
+    })();
+  }, [isOpen, contaCorrenteId]);
+
+  const matchedRules = (() => {
+    if (!extratoItem) return [];
+    const desc = String(extratoItem.descricao || '').toLowerCase();
+    const tipo = extratoItem.tipo_lancamento;
+    const valor = Number(extratoItem.valor || 0);
+    return rules
+      .filter((r) => {
+        if (r.tipo_lancamento !== tipo) return false;
+        const mt = String(r.match_text || '').trim().toLowerCase();
+        if (!mt) return false;
+        if (!desc.includes(mt)) return false;
+        if (r.min_valor != null && valor < Number(r.min_valor)) return false;
+        if (r.max_valor != null && valor > Number(r.max_valor)) return false;
+        return true;
+      })
+      .slice(0, 3);
+  })();
 
   const fetchSuggestions = async () => {
     if (!extratoItem) return;
@@ -61,6 +99,33 @@ export default function ConciliacaoDrawer({ isOpen, onClose, extratoItem, contaC
       console.error(e);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleCreateFromRule = async (rule: ConciliacaoRegra) => {
+    if (!extratoItem) return;
+    if (creatingFromRuleId) return;
+    setCreatingFromRuleId(rule.id);
+    try {
+      const newMov = await saveMovimentacao({
+        conta_corrente_id: contaCorrenteId,
+        data_movimento: extratoItem.data_lancamento,
+        tipo_mov: extratoItem.tipo_lancamento === 'credito' ? 'entrada' : 'saida',
+        valor: extratoItem.valor,
+        descricao: rule.descricao_override || extratoItem.descricao,
+        documento_ref: extratoItem.documento_ref,
+        origem_tipo: `conciliacao_regra:${rule.id}`,
+        categoria: rule.categoria,
+        centro_custo: rule.centro_custo,
+        observacoes: rule.observacoes || 'Gerado via regra de conciliação',
+      });
+      await onConciliate(newMov.id);
+      addToast('Movimentação criada e conciliada (regra).', 'success');
+      onClose();
+    } catch (e: any) {
+      addToast(e?.message || 'Erro ao aplicar regra.', 'error');
+    } finally {
+      setCreatingFromRuleId(null);
     }
   };
 
@@ -144,6 +209,32 @@ export default function ConciliacaoDrawer({ isOpen, onClose, extratoItem, contaC
                   Atualizar
                 </button>
             </div>
+
+            {loadingRules ? (
+              <div className="mb-4 text-xs text-gray-500 flex items-center gap-2">
+                <Loader2 className="h-3 w-3 animate-spin" /> Carregando regras…
+              </div>
+            ) : matchedRules.length > 0 ? (
+              <div className="mb-4 p-3 rounded-lg border border-emerald-200 bg-emerald-50">
+                <div className="text-xs font-bold uppercase text-emerald-700 mb-2">Sugestão por regra</div>
+                {matchedRules.map((r) => (
+                  <div key={r.id} className="flex items-center justify-between gap-3 py-1">
+                    <div className="text-xs text-emerald-900">
+                      Contém “{r.match_text}”
+                      {r.categoria ? <span> · Categoria: {r.categoria}</span> : null}
+                      {r.centro_custo ? <span> · Centro: {r.centro_custo}</span> : null}
+                    </div>
+                    <button
+                      onClick={() => void handleCreateFromRule(r)}
+                      disabled={!!linkingId || isCreating || creatingFromRuleId === r.id}
+                      className="text-xs font-semibold text-emerald-700 hover:underline disabled:opacity-60"
+                    >
+                      {creatingFromRuleId === r.id ? 'Aplicando…' : 'Criar e conciliar'}
+                    </button>
+                  </div>
+                ))}
+              </div>
+            ) : null}
 
             {loading ? (
                 <div className="flex justify-center py-8"><Loader2 className="animate-spin text-blue-500" /></div>
