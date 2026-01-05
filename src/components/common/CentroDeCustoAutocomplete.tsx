@@ -20,7 +20,7 @@ export default function CentroDeCustoAutocomplete({ value, initialName, onChange
   const debounced = useDebounce(search, 300);
 
   useEffect(() => {
-    if (initialName && !search && value) {
+    if (initialName && !search) {
       setSearch(initialName);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -78,7 +78,7 @@ export default function CentroDeCustoAutocomplete({ value, initialName, onChange
           disabled={disabled}
           className="w-full rounded-lg border border-gray-300 bg-white py-2 pl-9 pr-9 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:opacity-60"
         />
-        {value ? (
+        {value || search ? (
           <button
             type="button"
             className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
@@ -110,4 +110,3 @@ export default function CentroDeCustoAutocomplete({ value, initialName, onChange
     </div>
   );
 }
-

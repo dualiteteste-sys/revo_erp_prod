@@ -231,8 +231,17 @@ Este é o checklist único (por módulo) para levar o REVO ao nível **top mundi
 
 ### G6) Financeiro
 - [x] FIN-STA-01 (P0) Conciliação por extrato com matching sugerido + regras e auditoria
-- [ ] FIN-STA-02 (P1) Centro de custo por lançamento + relatórios gerenciais (DRE simplificada)
+- [x] FIN-STA-02 (P1) Centro de custo por lançamento + relatórios gerenciais (DRE simplificada)
 - [ ] FIN-STA-03 (P1) Cobranças: remessa/retorno bancário (quando aplicável) e automações de cobrança
+
+**Validar (FIN-STA-02)**
+- Financeiro → Tesouraria → `Nova movimentação`:
+  - Selecionar um `Centro de Custo` (autocomplete) e salvar.
+  - Reabrir a movimentação e confirmar que o centro permanece selecionado.
+- Financeiro → Relatórios:
+  - Ver cards `DRE simplificada` (Receitas/Despesas/Resultado).
+  - Filtrar por `Centro de Custo` e validar que os totais mudam.
+  - Exportar CSV e confirmar bloco `DRE simplificada`.
 
 ### G7) Indústria
 - [ ] IND-STA-01 (P0) Capacidade/PCP e MRP “operável” (não só tela) com sugestões e alertas

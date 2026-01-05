@@ -8,6 +8,7 @@ import Select from '@/components/ui/forms/Select';
 import TextArea from '@/components/ui/forms/TextArea';
 import { useNumericField } from '@/hooks/useNumericField';
 import { Button } from '@/components/ui/button';
+import CentroDeCustoAutocomplete from '@/components/common/CentroDeCustoAutocomplete';
 
 interface Props {
   movimentacao: Movimentacao | null;
@@ -111,13 +112,21 @@ export default function MovimentacaoFormPanel({ movimentacao, contaCorrenteId, o
             placeholder="Ex: Tarifas, Ajustes, Suprimentos"
           />
 
-          <Input 
-            label="Centro de Custo" 
-            name="cc" 
-            value={formData.centro_custo || ''} 
-            onChange={e => handleChange('centro_custo', e.target.value)} 
-            className="sm:col-span-3" 
-          />
+          <div className="sm:col-span-3">
+            <label className="block text-sm font-medium text-gray-700 mb-1">Centro de Custo (opcional)</label>
+            <CentroDeCustoAutocomplete
+              value={formData.centro_de_custo_id ?? null}
+              initialName={formData.centro_custo ?? undefined}
+              onChange={(id, name) => {
+                handleChange('centro_de_custo_id', id);
+                handleChange('centro_custo', name ?? null);
+              }}
+              placeholder="Buscar centro de custo…"
+            />
+            <div className="text-[11px] text-gray-500 mt-1">
+              Usado em relatórios e auditoria. Se vazio, fica “sem centro”.
+            </div>
+          </div>
 
           <Input 
             label="Documento Ref." 
