@@ -190,9 +190,14 @@ Este é o checklist único (por módulo) para levar o REVO ao nível **top mundi
 
 ### G3) Vendas / PDV / Expedição
 - [x] VEN-STA-01 (P0) Regras de preço/desconto com permissão + trilha (quem deu desconto)
-- [ ] VEN-STA-02 (P0) PDV resiliente (offline-lite, retry idempotente, fila local) quando fizer sentido
+- [x] VEN-STA-02 (P0) PDV resiliente (offline-lite + fila local + idempotência server-side)
 - [ ] VEN-STA-03 (P1) Expedição com eventos, rastreio, SLA e relatórios (atrasos/pendências)
 - [ ] VEN-STA-04 (P1) Multi-caixa (PDV) + perfis por caixa + fechamento
+
+**Validar (VEN-STA-02)**
+- Vendas → PDV: finalizar um pedido e confirmar toast “PDV finalizado…”, status `concluido`, e comprovante abre.
+- Simular falha (offline/timeout) ao finalizar: deve mostrar aviso de “pendente”, e aparecer banner “Sincronizar agora”.
+- Voltar online e clicar `Sincronizar agora`: deve concluir o pedido e remover o badge “pendente” (sem duplicar efeitos).
 
 ### G4) Fiscal (NF-e)
 - [ ] NFE-STA-01 (P0) Catálogo de rejeições + “o que fazer” + reprocessos guiados

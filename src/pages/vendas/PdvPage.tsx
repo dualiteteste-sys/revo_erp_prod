@@ -4,7 +4,7 @@ import Modal from '@/components/ui/Modal';
 import { useToast } from '@/contexts/ToastProvider';
 import PedidoVendaFormPanel from '@/components/vendas/PedidoVendaFormPanel';
 import { listContasCorrentes, type ContaCorrente } from '@/services/treasury';
-import { estornarPdv, finalizePdv } from '@/services/vendasMvp';
+import { estornarPdv, finalizePdv, flushPdvFinalizeQueue, getQueuedPdvFinalizeIds, PdvQueuedError } from '@/services/vendasMvp';
 import { supabase } from '@/lib/supabaseClient';
 import { getVendaDetails, type VendaDetails } from '@/services/vendas';
 import CsvExportDialog from '@/components/ui/CsvExportDialog';
@@ -102,6 +102,9 @@ export default function PdvPage() {
   const [finalizingId, setFinalizingId] = useState<string | null>(null);
   const [receiptVenda, setReceiptVenda] = useState<VendaDetails | null>(null);
   const [isReceiptOpen, setIsReceiptOpen] = useState(false);
+  const [queuedIds, setQueuedIds] = useState<Set<string>>(() => getQueuedPdvFinalizeIds());
+
+  const refreshQueued = () => setQueuedIds(getQueuedPdvFinalizeIds());
 
   async function load() {
     setLoading(true);
@@ -133,6 +136,20 @@ export default function PdvPage() {
 
   useEffect(() => {
     void load();
+    refreshQueued();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    const onOnline = async () => {
+      const { ok, failed } = await flushPdvFinalizeQueue();
+      refreshQueued();
+      if (ok > 0) addToast(`Sincronizado: ${ok} PDV(s).`, 'success');
+      if (failed > 0) addToast(`Não foi possível sincronizar ${failed} PDV(s).`, 'warning');
+      if (ok > 0) await load();
+    };
+    window.addEventListener('online', onOnline);
+    return () => window.removeEventListener('online', onOnline);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -186,15 +203,27 @@ export default function PdvPage() {
         // fallback: não bloqueia o fluxo se não conseguir carregar detalhes
       }
       await load();
+      refreshQueued();
     } catch (e: any) {
       if (e instanceof ActionLockedError) {
         addToast('Já estamos finalizando este PDV. Aguarde alguns segundos.', 'info');
+      } else if (e instanceof PdvQueuedError) {
+        addToast('Sem conexão: o PDV ficou pendente e será sincronizado automaticamente.', 'warning');
+        refreshQueued();
       } else {
         addToast(e.message || 'Falha ao finalizar PDV.', 'error');
       }
     } finally {
       setFinalizingId(null);
     }
+  };
+
+  const handleSyncNow = async () => {
+    const { ok, failed } = await flushPdvFinalizeQueue();
+    refreshQueued();
+    if (ok > 0) addToast(`Sincronizado: ${ok} PDV(s).`, 'success');
+    if (failed > 0) addToast(`Não foi possível sincronizar ${failed} PDV(s).`, 'warning');
+    if (ok > 0) await load();
   };
 
   const handleEstornar = async (pedidoId: string) => {
@@ -298,6 +327,22 @@ export default function PdvPage() {
         </button>
       </div>
 
+      {queuedIds.size > 0 ? (
+        <div className="mb-4 flex items-center justify-between rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+          <div>
+            Existem <span className="font-semibold">{queuedIds.size}</span> PDV(s) pendente(s) de sincronização.
+            {!navigator.onLine ? <span className="ml-2 text-amber-700">(offline)</span> : null}
+          </div>
+          <button
+            onClick={() => void handleSyncNow()}
+            disabled={!navigator.onLine}
+            className="px-3 py-2 rounded-lg bg-amber-600 text-white font-semibold hover:bg-amber-700 disabled:opacity-50"
+          >
+            Sincronizar agora
+          </button>
+        </div>
+      ) : null}
+
       <div className="mb-4 flex gap-4 flex-shrink-0">
         <div className="relative flex-grow max-w-sm">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
@@ -367,7 +412,16 @@ export default function PdvPage() {
                   <tr key={r.id} className="hover:bg-gray-50">
                     <td className="px-4 py-3 font-medium text-gray-800">#{r.numero}</td>
                     <td className="px-4 py-3">{r.data_emissao}</td>
-                    <td className="px-4 py-3">{r.status}</td>
+                    <td className="px-4 py-3">
+                      <div className="flex items-center gap-2">
+                        <span>{r.status}</span>
+                        {queuedIds.has(r.id) ? (
+                          <span className="px-2 py-0.5 rounded-full text-xs font-semibold bg-amber-100 text-amber-800">
+                            pendente
+                          </span>
+                        ) : null}
+                      </div>
+                    </td>
                     <td className="px-4 py-3">{formatMoneyBRL(Number(r.total_geral || 0))}</td>
                     <td className="px-4 py-3">
                       <div className="flex justify-end gap-2">
