@@ -62,11 +62,34 @@ Deno.serve(async (req) => {
       .eq("user_id", user.id);
     if (!memberCount || memberCount < 1) return json(corsHeaders, 403, { error: "forbidden" });
 
-    const canAdmin = await isEmpresaAdmin(admin, empresa_id, user.id);
-    if (!canAdmin) return json(corsHeaders, 403, { error: "forbidden", message: "Apenas admin/owner pode vincular cliente Stripe." });
-
     if (!String(stripe_customer_id).startsWith("cus_")) {
       return json(corsHeaders, 400, { error: "invalid_customer_id", message: "stripe_customer_id inválido (esperado cus_*)." });
+    }
+
+    const { data: empresa, error: empErr } = await admin
+      .from("empresas")
+      .select("stripe_customer_id")
+      .eq("id", empresa_id)
+      .maybeSingle();
+    if (empErr || !empresa) return json(corsHeaders, 404, { error: "company_not_found" });
+
+    const current = (empresa as any)?.stripe_customer_id ? String((empresa as any).stripe_customer_id) : "";
+
+    // Segurança/UX:
+    // - Se a empresa ainda não tem customer, qualquer membro pode vincular (reduz fricção do onboarding).
+    // - Se já existe customer vinculado, só admin/owner pode alterar (evita troca indevida).
+    if (current && current !== String(stripe_customer_id)) {
+      const canAdmin = await isEmpresaAdmin(admin, empresa_id, user.id);
+      if (!canAdmin) {
+        return json(corsHeaders, 403, {
+          error: "forbidden",
+          message: "Apenas admin/owner pode alterar o cliente Stripe já vinculado para esta empresa.",
+        });
+      }
+    }
+
+    if (current === String(stripe_customer_id)) {
+      return json(corsHeaders, 200, { linked: true });
     }
 
     const { error: upErr } = await admin
@@ -88,4 +111,3 @@ Deno.serve(async (req) => {
     return json(corsHeaders, 500, { error: "internal_error", detail: String(e) });
   }
 });
-

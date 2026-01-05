@@ -275,7 +275,7 @@ const SubscriptionSettings: React.FC<SubscriptionSettingsProps> = ({ onSwitchToP
           })();
         if (raw?.error === 'missing_customer') {
           addToast('Sem cliente Stripe vinculado para esta empresa. Vincule o customer (cus_...) e tente novamente.', 'warning');
-          if (canAdmin) setIsLinkCustomerOpen(true);
+          setIsLinkCustomerOpen(true);
           return;
         }
         throw error;
