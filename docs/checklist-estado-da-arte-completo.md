@@ -172,11 +172,15 @@ Este é o checklist único (por módulo) para levar o REVO ao nível **top mundi
 
 ### G2) Suprimentos / Estoque
 - [ ] SUP-STA-01 (P0) Multi-estoque/depósitos + transferências + permissões por local
-- [ ] SUP-STA-02 (P0) Inventário cíclico (contagem → divergência → aprovação → ajuste auditável)
+- [x] SUP-STA-02 (P0) Inventário cíclico (contagem → divergência → aprovação → ajuste auditável)
 - [ ] SUP-STA-03 (P1) Devolução ao fornecedor (reversão) vinculada a OC/recebimento
 - [ ] SUP-STA-04 (P1) Landed cost (rateio frete/impostos) com impacto em custo médio/relatórios
 - [ ] SUP-STA-05 (P1) Sugestão de compra (mín/máx + lead time + OCs abertas) “MRP-lite”
 - [ ] SUP-STA-06 (P1) WMS light (leitura barcode/QR na conferência/separação) + checklists
+
+**Validar (SUP-STA-02)**
+- Suprimentos → Estoque → `Inventário cíclico`: criar inventário e inserir contagens.
+- Aprovar inventário e confirmar que o saldo (e o kardex) mudou via ajustes `INV-xxxxxxxx`.
 
 ### G3) Vendas / PDV / Expedição
 - [x] VEN-STA-01 (P0) Regras de preço/desconto com permissão + trilha (quem deu desconto)
