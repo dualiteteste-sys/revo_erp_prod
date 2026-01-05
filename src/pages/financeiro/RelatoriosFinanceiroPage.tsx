@@ -7,8 +7,16 @@ import GlassCard from '@/components/ui/GlassCard';
 import Input from '@/components/ui/forms/Input';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/contexts/ToastProvider';
-import { getFinanceiroRelatoriosResumo, listFinanceiroPorCentroCusto, type FinanceiroPorCentroCustoRow, type FinanceiroRelatoriosResumo } from '@/services/financeiroRelatorios';
+import {
+  getFinanceiroDreSimplificada,
+  getFinanceiroRelatoriosResumo,
+  listFinanceiroPorCentroCusto,
+  type FinanceiroDreSimplificada,
+  type FinanceiroPorCentroCustoRow,
+  type FinanceiroRelatoriosResumo,
+} from '@/services/financeiroRelatorios';
 import { useNavigate } from 'react-router-dom';
+import CentroDeCustoAutocomplete from '@/components/common/CentroDeCustoAutocomplete';
 
 function formatBRL(value: number) {
   return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value || 0);
@@ -55,26 +63,32 @@ export default function RelatoriosFinanceiroPage() {
   const [endDate, setEndDate] = useState<string>('');
   const [data, setData] = useState<FinanceiroRelatoriosResumo | null>(null);
   const [porCentro, setPorCentro] = useState<FinanceiroPorCentroCustoRow[]>([]);
+  const [dre, setDre] = useState<FinanceiroDreSimplificada | null>(null);
+  const [dreCentroId, setDreCentroId] = useState<string | null>(null);
+  const [dreCentroName, setDreCentroName] = useState<string>('');
 
   const fetchData = useCallback(async () => {
     setLoading(true);
     try {
       const start = toDateOrNull(startDate);
       const end = toDateOrNull(endDate);
-      const [result, centros] = await Promise.all([
+      const [result, centros, dreResult] = await Promise.all([
         getFinanceiroRelatoriosResumo({ startDate: start, endDate: end }),
         listFinanceiroPorCentroCusto({ startDate: start, endDate: end }),
+        getFinanceiroDreSimplificada({ startDate: start, endDate: end, centroDeCustoId: dreCentroId }),
       ]);
       setData(result);
       setPorCentro(centros ?? []);
+      setDre(dreResult);
     } catch (e: any) {
       addToast(e?.message || 'Falha ao carregar relatórios do Financeiro.', 'error');
       setData(null);
       setPorCentro([]);
+      setDre(null);
     } finally {
       setLoading(false);
     }
-  }, [addToast, endDate, startDate]);
+  }, [addToast, endDate, startDate, dreCentroId]);
 
   useEffect(() => {
     void fetchData();
@@ -172,6 +186,9 @@ export default function RelatoriosFinanceiroPage() {
       [],
       ['Por centro de custo', 'centro', 'entradas', 'saidas'],
       ...(porCentro ?? []).map((c) => ['centro', c.centro_nome, c.entradas, c.saidas]),
+      [],
+      ['DRE simplificada', 'categoria', 'receitas', 'despesas', 'resultado'],
+      ...(dre?.linhas ?? []).map((l) => ['dre', l.categoria, l.receitas, l.despesas, l.resultado]),
     ];
     const csv = toCsv(rows);
     const filename = `financeiro_relatorios_${data.periodo.inicio}_${data.periodo.fim}.csv`;
@@ -308,6 +325,73 @@ export default function RelatoriosFinanceiroPage() {
                 <div className="text-sm text-gray-600">Sem dados por centro de custo no período.</div>
               ) : (
                 <ReactECharts option={porCentroOption} style={{ height: 340, width: '100%' }} />
+              )}
+            </GlassCard>
+
+            <GlassCard className="p-4 xl:col-span-2">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+                <div>
+                  <div className="text-sm font-semibold text-gray-800">DRE simplificada (gerencial)</div>
+                  <div className="text-xs text-gray-500">
+                    Base: movimentações (Tesouraria) no período por competência/data.
+                  </div>
+                </div>
+                <div className="w-full sm:w-[360px]">
+                  <label className="block text-xs font-medium text-gray-700 mb-1">Filtrar por centro de custo (opcional)</label>
+                  <CentroDeCustoAutocomplete
+                    value={dreCentroId}
+                    initialName={dreCentroName}
+                    onChange={(id, name) => {
+                      setDreCentroId(id);
+                      setDreCentroName(name ?? '');
+                    }}
+                    placeholder="Buscar centro de custo…"
+                  />
+                </div>
+              </div>
+
+              {!dre ? (
+                <div className="text-sm text-gray-600 mt-3">Sem dados de DRE no período.</div>
+              ) : (
+                <>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mt-4">
+                    <div className="rounded-xl border border-gray-200 bg-white/70 p-3">
+                      <div className="text-xs text-gray-500">Receitas</div>
+                      <div className="text-lg font-semibold text-emerald-700">{formatBRL(dre.totais.receitas)}</div>
+                    </div>
+                    <div className="rounded-xl border border-gray-200 bg-white/70 p-3">
+                      <div className="text-xs text-gray-500">Despesas</div>
+                      <div className="text-lg font-semibold text-rose-700">{formatBRL(dre.totais.despesas)}</div>
+                    </div>
+                    <div className="rounded-xl border border-gray-200 bg-white/70 p-3">
+                      <div className="text-xs text-gray-500">Resultado</div>
+                      <div className="text-lg font-semibold text-gray-900">{formatBRL(dre.totais.resultado)}</div>
+                    </div>
+                  </div>
+
+                  <div className="mt-4 overflow-x-auto">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="text-left text-xs text-gray-500 border-b border-gray-200">
+                          <th className="py-2 pr-4">Categoria</th>
+                          <th className="py-2 px-2 text-right">Receitas</th>
+                          <th className="py-2 px-2 text-right">Despesas</th>
+                          <th className="py-2 pl-2 text-right">Resultado</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {dre.linhas.map((l) => (
+                          <tr key={l.categoria} className="border-b border-gray-100">
+                            <td className="py-2 pr-4 text-gray-800">{l.categoria}</td>
+                            <td className="py-2 px-2 text-right text-emerald-700">{formatBRL(l.receitas)}</td>
+                            <td className="py-2 px-2 text-right text-rose-700">{formatBRL(l.despesas)}</td>
+                            <td className="py-2 pl-2 text-right font-medium">{formatBRL(l.resultado)}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </>
               )}
             </GlassCard>
           </div>

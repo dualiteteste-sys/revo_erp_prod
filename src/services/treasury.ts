@@ -46,6 +46,7 @@ export type Movimentacao = {
   origem_id: string | null;
   categoria: string | null;
   centro_custo: string | null;
+  centro_de_custo_id: string | null;
   conciliado: boolean;
   observacoes: string | null;
   created_at: string;
