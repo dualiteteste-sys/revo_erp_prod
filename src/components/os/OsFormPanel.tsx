@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { CheckCircle2, FileText, Layers, Loader2, Save, Paperclip, Plus, Trash2, Send, ThumbsDown, ThumbsUp } from 'lucide-react';
+import { CheckCircle2, FileText, Layers, Loader2, Save, Paperclip, Plus, Trash2, Send, ThumbsDown, ThumbsUp, ClipboardList, RefreshCw } from 'lucide-react';
 import { OrdemServicoDetails, saveOs, deleteOsItem, getOsDetails, OsItemSearchResult, addOsItem, listOsTecnicos, setOsTecnico, type OsTecnicoRow, getOsOrcamento, enviarOrcamento, decidirOrcamento, type OsOrcamentoSummary } from '@/services/os';
-import { getPartnerDetails } from '@/services/partners';
+import { getPartnerDetails, type PartnerDetails } from '@/services/partners';
 import { useToast } from '@/contexts/ToastProvider';
 import Section from '../ui/forms/Section';
 import Input from '../ui/forms/Input';
@@ -23,6 +23,8 @@ import { useHasPermission } from '@/hooks/useHasPermission';
 import { generateOsParcelas, listOsParcelas, type OsParcela } from '@/services/osParcelas';
 import { ActionLockedError, runWithActionLock } from '@/lib/actionLock';
 import OsEquipamentoPanel from '@/components/os/OsEquipamentoPanel';
+import { getOsChecklist, listOsChecklistTemplates, setOsChecklistTemplate, toggleOsChecklistItem, type OsChecklistPayload, type OsChecklistTemplate } from '@/services/osChecklist';
+import { createOsPortalLink, listOsCommsLogs, listOsCommsTemplates, registerOsCommsLog, type OsCommsLog, type OsCommsTemplate } from '@/services/osComms';
 
 interface OsFormPanelProps {
   os: OrdemServicoDetails | null;
@@ -81,6 +83,24 @@ const OsFormPanel: React.FC<OsFormPanelProps> = ({ os, onSaveSuccess, onClose })
   const [orcamentoClienteNome, setOrcamentoClienteNome] = useState('');
   const [orcamentoObservacao, setOrcamentoObservacao] = useState('');
   const [orcamentoDeciding, setOrcamentoDeciding] = useState(false);
+  const [checklist, setChecklist] = useState<OsChecklistPayload | null>(null);
+  const [checklistLoading, setChecklistLoading] = useState(false);
+  const [checklistDialogOpen, setChecklistDialogOpen] = useState(false);
+  const [templates, setTemplates] = useState<OsChecklistTemplate[]>([]);
+  const [templatesLoading, setTemplatesLoading] = useState(false);
+  const [clientDetails, setClientDetails] = useState<PartnerDetails | null>(null);
+  const [commsTemplates, setCommsTemplates] = useState<OsCommsTemplate[]>([]);
+  const [commsLogs, setCommsLogs] = useState<OsCommsLog[]>([]);
+  const [commsLoading, setCommsLoading] = useState(false);
+  const [commsDialogOpen, setCommsDialogOpen] = useState(false);
+  const [commsCanal, setCommsCanal] = useState<'whatsapp' | 'email'>('whatsapp');
+  const [commsTemplateSlug, setCommsTemplateSlug] = useState<string>('');
+  const [commsPreview, setCommsPreview] = useState<string>('');
+  const [commsAssunto, setCommsAssunto] = useState<string>('');
+  const [commsTo, setCommsTo] = useState<string>('');
+  const [portalUrl, setPortalUrl] = useState<string>('');
+  const [portalGenerating, setPortalGenerating] = useState(false);
+  const [commsRegistering, setCommsRegistering] = useState(false);
 
   const canEdit = formData.id ? permUpdate.data : permCreate.data;
   const permLoading = formData.id ? permUpdate.isLoading : permCreate.isLoading;
@@ -104,14 +124,19 @@ const OsFormPanel: React.FC<OsFormPanelProps> = ({ os, onSaveSuccess, onClose })
       setContaVencimento('');
       if (os.cliente_id) {
         getPartnerDetails(os.cliente_id).then(partner => {
-          if (partner) setClientName(partner.nome);
+          if (partner) {
+            setClientName(partner.nome);
+            setClientDetails(partner);
+          }
         });
       } else {
         setClientName('');
+        setClientDetails(null);
       }
     } else {
       setFormData({ status: 'orcamento', desconto_valor: 0, total_itens: 0, total_geral: 0, itens: [] });
       setClientName('');
+      setClientDetails(null);
       setNovoAnexo('');
       setDocs([]);
       setDocFile(null);
@@ -121,6 +146,159 @@ const OsFormPanel: React.FC<OsFormPanelProps> = ({ os, onSaveSuccess, onClose })
       setContaVencimento('');
     }
   }, [os]);
+
+  useEffect(() => {
+    if (formData.cliente_id) {
+      getPartnerDetails(String(formData.cliente_id)).then((partner) => {
+        if (partner) setClientDetails(partner);
+      });
+    } else {
+      setClientDetails(null);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [formData.cliente_id]);
+
+  const loadComms = async (osId: string) => {
+    setCommsLoading(true);
+    try {
+      const [tpls, logs] = await Promise.all([
+        listOsCommsTemplates({ canal: commsCanal, limit: 100 }),
+        listOsCommsLogs(osId, 50),
+      ]);
+      setCommsTemplates(tpls ?? []);
+      setCommsLogs(logs ?? []);
+    } catch {
+      setCommsTemplates([]);
+      setCommsLogs([]);
+    } finally {
+      setCommsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    const osId = formData.id ? String(formData.id) : null;
+    if (!osId) {
+      setCommsLogs([]);
+      setCommsTemplates([]);
+      return;
+    }
+    void loadComms(osId);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [formData.id, commsCanal]);
+
+  const normalizePhone = (raw?: string | null) => {
+    const digits = String(raw ?? '').replace(/\D/g, '');
+    if (!digits) return null;
+    if (digits.startsWith('55')) return digits;
+    return `55${digits}`;
+  };
+
+  const osStatusLabel = (s?: string | null) => {
+    const map: Record<string, string> = {
+      orcamento: 'Orçamento',
+      aberta: 'Aberta',
+      concluida: 'Concluída',
+      cancelada: 'Cancelada',
+    };
+    const key = String(s ?? '').toLowerCase();
+    return map[key] ?? String(s ?? '');
+  };
+
+  const buildPortalUrlFromPath = (path: string) => {
+    try {
+      const base = window.location.origin;
+      return new URL(path, base).toString();
+    } catch {
+      return path;
+    }
+  };
+
+  const interpolateTemplate = (template: string) => {
+    const numero = formData.numero ?? '';
+    const descricao = formData.descricao ?? '';
+    const status = osStatusLabel(String(formData.status ?? ''));
+    const cliente = clientDetails?.nome ?? clientName ?? '';
+    return template
+      .replaceAll('{{os_numero}}', String(numero))
+      .replaceAll('{{os_descricao}}', String(descricao))
+      .replaceAll('{{os_status_label}}', String(status))
+      .replaceAll('{{cliente_nome}}', String(cliente))
+      .replaceAll('{{portal_url}}', portalUrl || '');
+  };
+
+  useEffect(() => {
+    const tpl = commsTemplates.find((t) => t.slug === commsTemplateSlug) || null;
+    if (!tpl) {
+      setCommsPreview('');
+      setCommsAssunto('');
+      return;
+    }
+    setCommsAssunto(interpolateTemplate(tpl.assunto || ''));
+    setCommsPreview(interpolateTemplate(tpl.corpo || ''));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [commsTemplateSlug, portalUrl, formData.numero, formData.descricao, formData.status, clientDetails?.nome, clientName, commsTemplates]);
+
+  const handleGeneratePortalLink = async () => {
+    if (!formData.id) return;
+    setPortalGenerating(true);
+    try {
+      const osId = String(formData.id);
+      const payload = await runWithActionLock(`os:portal_link:${osId}`, async () => {
+        return await createOsPortalLink({ osId, expiresInDays: 30 });
+      });
+      const url = buildPortalUrlFromPath(payload.path);
+      setPortalUrl(url);
+      await navigator.clipboard.writeText(url);
+      addToast('Link do portal copiado.', 'success');
+    } catch (e: any) {
+      if (e instanceof ActionLockedError) {
+        addToast('Já estamos gerando o link. Aguarde alguns segundos.', 'info');
+      } else {
+        addToast(e?.message || 'Erro ao gerar link do portal.', 'error');
+      }
+    } finally {
+      setPortalGenerating(false);
+    }
+  };
+
+  const handleCopyComms = async () => {
+    if (!commsPreview.trim()) return;
+    await navigator.clipboard.writeText(commsPreview);
+    addToast('Mensagem copiada.', 'success');
+  };
+
+  const handleRegisterComms = async () => {
+    if (!formData.id) return;
+    if (!commsPreview.trim()) {
+      addToast('Selecione um template para registrar.', 'warning');
+      return;
+    }
+    setCommsRegistering(true);
+    try {
+      const osId = String(formData.id);
+      await runWithActionLock(`os:comms:register:${osId}`, async () => {
+        await registerOsCommsLog({
+          osId,
+          canal: commsCanal,
+          toValue: commsTo || null,
+          assunto: commsCanal === 'email' ? (commsAssunto.trim() || null) : null,
+          corpo: commsPreview,
+          templateSlug: commsTemplateSlug || null,
+        });
+      });
+      addToast('Envio registrado no log.', 'success');
+      setCommsDialogOpen(false);
+      await loadComms(osId);
+    } catch (e: any) {
+      if (e instanceof ActionLockedError) {
+        addToast('Já estamos registrando este envio. Aguarde alguns segundos.', 'info');
+      } else {
+        addToast(e?.message || 'Erro ao registrar envio.', 'error');
+      }
+    } finally {
+      setCommsRegistering(false);
+    }
+  };
 
   const refreshOrcamento = async (osId: string) => {
     setOrcamentoLoading(true);
@@ -145,6 +323,82 @@ const OsFormPanel: React.FC<OsFormPanelProps> = ({ os, onSaveSuccess, onClose })
     void refreshOrcamento(osId);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [formData.id]);
+
+  const refreshChecklist = async (osId: string) => {
+    setChecklistLoading(true);
+    try {
+      const data = await getOsChecklist(osId);
+      setChecklist(data);
+    } catch {
+      setChecklist(null);
+    } finally {
+      setChecklistLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    const osId = formData.id ? String(formData.id) : null;
+    if (!osId) {
+      setChecklist(null);
+      return;
+    }
+    void refreshChecklist(osId);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [formData.id]);
+
+  const openChecklistTemplates = async () => {
+    setChecklistDialogOpen(true);
+    setTemplatesLoading(true);
+    try {
+      const rows = await listOsChecklistTemplates({ limit: 100 });
+      setTemplates(rows ?? []);
+    } catch {
+      setTemplates([]);
+    } finally {
+      setTemplatesLoading(false);
+    }
+  };
+
+  const handleSelectChecklistTemplate = async (templateSlug: string) => {
+    if (readOnly) return;
+    if (!formData.id) {
+      addToast('Salve a O.S. antes de aplicar um checklist.', 'warning');
+      return;
+    }
+    const osId = String(formData.id);
+    try {
+      await runWithActionLock(`os:checklist:set:${osId}`, async () => {
+        await setOsChecklistTemplate(osId, templateSlug);
+      });
+      addToast('Checklist aplicado.', 'success');
+      setChecklistDialogOpen(false);
+      await refreshChecklist(osId);
+    } catch (e: any) {
+      if (e instanceof ActionLockedError) {
+        addToast('Já estamos aplicando checklist nesta OS. Aguarde alguns segundos.', 'info');
+      } else {
+        addToast(e?.message || 'Erro ao aplicar checklist.', 'error');
+      }
+    }
+  };
+
+  const handleToggleChecklistItem = async (stepId: string, done: boolean) => {
+    if (readOnly) return;
+    if (!formData.id) return;
+    const osId = String(formData.id);
+    try {
+      await runWithActionLock(`os:checklist:toggle:${osId}:${stepId}`, async () => {
+        await toggleOsChecklistItem(osId, stepId, done);
+      });
+      await refreshChecklist(osId);
+    } catch (e: any) {
+      if (e instanceof ActionLockedError) {
+        addToast('Aguarde: já estamos atualizando este checklist.', 'info');
+      } else {
+        addToast(e?.message || 'Erro ao atualizar checklist.', 'error');
+      }
+    }
+  };
 
   useEffect(() => {
     if (!activeEmpresaId) return;
@@ -911,6 +1165,175 @@ const OsFormPanel: React.FC<OsFormPanelProps> = ({ os, onSaveSuccess, onClose })
           ) : null}
         </Section>
 
+        <Section title="Checklist do serviço" description="Passo a passo por tipo de serviço (com progresso e etapas automáticas).">
+          <div className="sm:col-span-6 flex flex-wrap items-center justify-between gap-2">
+            <div className="flex items-center gap-2">
+              <ClipboardList size={18} className="text-gray-600" />
+              <div className="text-sm text-gray-900">
+                <span className="font-semibold">{checklist?.template?.titulo || 'Sem checklist'}</span>
+                {checklist?.template?.descricao ? (
+                  <span className="text-gray-500"> • {checklist.template.descricao}</span>
+                ) : null}
+              </div>
+            </div>
+
+            <div className="flex flex-wrap gap-2 items-center">
+              {checklistLoading ? (
+                <span className="inline-flex items-center gap-2 rounded-full bg-gray-100 px-3 py-1 text-xs font-semibold text-gray-700">
+                  <Loader2 className="animate-spin" size={14} /> Carregando…
+                </span>
+              ) : checklist?.progress ? (
+                <span className="inline-flex items-center rounded-full bg-blue-100 px-3 py-1 text-xs font-semibold text-blue-800">
+                  {checklist.progress.done}/{checklist.progress.total} • {checklist.progress.pct}%
+                </span>
+              ) : null}
+
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => (formData.id ? refreshChecklist(String(formData.id)) : undefined)}
+                disabled={!formData.id || checklistLoading}
+                className="gap-2"
+                title="Atualizar"
+              >
+                <RefreshCw size={18} />
+                Atualizar
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={openChecklistTemplates}
+                disabled={readOnly || !formData.id}
+                className="gap-2"
+              >
+                <ClipboardList size={18} />
+                Selecionar checklist
+              </Button>
+            </div>
+          </div>
+
+          {!formData.id ? (
+            <div className="sm:col-span-6 mt-3 text-sm text-gray-500">
+              Salve a OS para aplicar e acompanhar o checklist.
+            </div>
+          ) : checklist?.items?.length ? (
+            <div className="sm:col-span-6 mt-4 space-y-2">
+              {checklist.items.map((it) => (
+                <label
+                  key={it.step_id}
+                  className={`flex items-start justify-between gap-3 rounded-lg border px-3 py-2 ${
+                    it.done ? 'border-green-200 bg-green-50' : 'border-gray-200 bg-white'
+                  } ${readOnly ? 'opacity-80' : 'hover:bg-gray-50'}`}
+                >
+                  <div className="flex items-start gap-3">
+                    <input
+                      type="checkbox"
+                      checked={!!it.done}
+                      onChange={(e) => handleToggleChecklistItem(it.step_id, e.target.checked)}
+                      disabled={readOnly}
+                      className="mt-1 h-4 w-4"
+                    />
+                    <div className="min-w-0">
+                      <div className="text-sm font-semibold text-gray-900 flex items-center gap-2">
+                        <span className="truncate">{it.titulo}</span>
+                        {it.auto_rule ? (
+                          <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${it.manual_override ? 'bg-amber-100 text-amber-800' : 'bg-gray-100 text-gray-700'}`}>
+                            {it.manual_override ? 'Auto (manual)' : 'Auto'}
+                          </span>
+                        ) : null}
+                      </div>
+                      {it.descricao ? <div className="text-xs text-gray-600 mt-1">{it.descricao}</div> : null}
+                      {it.done_at ? (
+                        <div className="text-xs text-gray-500 mt-1">
+                          Concluído em {new Date(it.done_at).toLocaleString('pt-BR')}
+                        </div>
+                      ) : null}
+                    </div>
+                  </div>
+                  {it.done ? <CheckCircle2 className="text-green-600 mt-1" size={18} /> : null}
+                </label>
+              ))}
+            </div>
+          ) : (
+            <div className="sm:col-span-6 mt-3 text-sm text-gray-500">
+              Nenhum item. Selecione um checklist para começar.
+            </div>
+          )}
+        </Section>
+
+        <Section title="Comunicação" description="Templates + links (WhatsApp/e-mail) + log por OS + portal simples.">
+          <div className="sm:col-span-6 flex flex-wrap items-center justify-between gap-2">
+            <div className="text-sm text-gray-700">
+              <span className="font-semibold">Cliente:</span> {clientDetails?.nome || clientName || '—'}
+              {clientDetails?.telefone ? <span className="text-gray-500"> • Tel: {clientDetails.telefone}</span> : null}
+              {clientDetails?.email ? <span className="text-gray-500"> • E-mail: {clientDetails.email}</span> : null}
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <Button type="button" variant="outline" onClick={handleGeneratePortalLink} disabled={!formData.id || portalGenerating} className="gap-2">
+                {portalGenerating ? <Loader2 className="animate-spin" size={18} /> : <FileText size={18} />}
+                Gerar link do portal
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setCommsDialogOpen(true)}
+                disabled={!formData.id || readOnly}
+                className="gap-2"
+              >
+                <FileText size={18} />
+                Abrir templates
+              </Button>
+            </div>
+          </div>
+
+          {portalUrl ? (
+            <div className="sm:col-span-6 mt-2 text-xs text-gray-600">
+              <span className="font-semibold">Portal:</span> <a className="text-blue-700 hover:underline" href={portalUrl} target="_blank" rel="noreferrer">{portalUrl}</a>
+            </div>
+          ) : null}
+
+          <div className="sm:col-span-6 mt-4 rounded-lg border border-gray-200 overflow-hidden">
+            <div className="bg-gray-50 px-4 py-2 text-xs font-semibold text-gray-600 uppercase flex items-center justify-between">
+              <span>Log de comunicação</span>
+              <Button type="button" variant="ghost" size="sm" onClick={() => (formData.id ? loadComms(String(formData.id)) : undefined)} disabled={!formData.id || commsLoading} className="gap-2">
+                {commsLoading ? <Loader2 className="animate-spin" size={16} /> : <RefreshCw size={16} />}
+                Atualizar
+              </Button>
+            </div>
+            <div className="max-h-[260px] overflow-auto bg-white">
+              {commsLoading ? (
+                <div className="p-6 flex items-center justify-center text-sm text-gray-500">
+                  <Loader2 className="animate-spin mr-2" size={18} />
+                  Carregando…
+                </div>
+              ) : commsLogs.length === 0 ? (
+                <div className="p-4 text-sm text-gray-600">Nenhum registro ainda.</div>
+              ) : (
+                <table className="min-w-full divide-y divide-gray-200">
+                  <thead className="bg-white sticky top-0">
+                    <tr>
+                      <th className="px-4 py-2 text-left text-xs font-semibold text-gray-500 uppercase">Quando</th>
+                      <th className="px-4 py-2 text-left text-xs font-semibold text-gray-500 uppercase">Canal</th>
+                      <th className="px-4 py-2 text-left text-xs font-semibold text-gray-500 uppercase">Direção</th>
+                      <th className="px-4 py-2 text-left text-xs font-semibold text-gray-500 uppercase">Para/De</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-200">
+                    {commsLogs.map((l) => (
+                      <tr key={l.id} className="hover:bg-gray-50">
+                        <td className="px-4 py-2 text-sm text-gray-800">{new Date(l.created_at).toLocaleString('pt-BR')}</td>
+                        <td className="px-4 py-2 text-sm text-gray-700">{l.canal}</td>
+                        <td className="px-4 py-2 text-sm text-gray-700">{l.direction === 'outbound' ? 'Saída' : 'Entrada'}</td>
+                        <td className="px-4 py-2 text-sm text-gray-700">{l.to_value || l.actor_email || '—'}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+            </div>
+          </div>
+        </Section>
+
         <Section title="Observações" description="Detalhes adicionais e anotações internas">
             <TextArea label="Observações" name="observacoes" value={formData.observacoes || ''} onChange={e => handleFormChange('observacoes', e.target.value)} rows={3} className="sm:col-span-3" disabled={readOnly} />
             <TextArea label="Observações Internas" name="observacoes_internas" value={formData.observacoes_internas || ''} onChange={e => handleFormChange('observacoes_internas', e.target.value)} rows={3} className="sm:col-span-3" disabled={readOnly} />
@@ -1167,6 +1590,178 @@ const OsFormPanel: React.FC<OsFormPanelProps> = ({ os, onSaveSuccess, onClose })
               {orcamentoDeciding ? <Loader2 className="animate-spin" size={18} /> : orcamentoDecisao === 'approved' ? <ThumbsUp size={18} /> : <ThumbsDown size={18} />}
               {orcamentoDecisao === 'approved' ? 'Aprovar' : 'Reprovar'}
             </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={checklistDialogOpen} onOpenChange={setChecklistDialogOpen}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Selecionar checklist</DialogTitle>
+            <DialogDescription>
+              Escolha um checklist por tipo de serviço. O sistema cria/atualiza os itens desta OS e mantém o progresso.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="mt-2">
+            {templatesLoading ? (
+              <div className="py-6 flex items-center justify-center text-sm text-gray-500">
+                <Loader2 className="animate-spin mr-2" size={18} />
+                Carregando checklists…
+              </div>
+            ) : templates.length === 0 ? (
+              <div className="text-sm text-gray-500 py-2">Nenhum checklist disponível.</div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                {templates.map((t) => (
+                  <button
+                    key={t.slug}
+                    type="button"
+                    className="text-left rounded-lg border border-gray-200 bg-white hover:bg-gray-50 p-4"
+                    onClick={() => handleSelectChecklistTemplate(t.slug)}
+                    disabled={readOnly}
+                  >
+                    <div className="text-sm font-semibold text-gray-900">{t.titulo}</div>
+                    {t.descricao ? <div className="text-xs text-gray-600 mt-1">{t.descricao}</div> : null}
+                    <div className="text-xs text-gray-500 mt-2">
+                      {Array.isArray((t as any).steps) ? (t as any).steps.length : Array.isArray(t.steps) ? t.steps.length : 0} etapa(s)
+                    </div>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+
+          <div className="mt-6 flex justify-end gap-2">
+            <Button type="button" variant="outline" onClick={() => setChecklistDialogOpen(false)}>
+              Fechar
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={commsDialogOpen}
+        onOpenChange={(open) => {
+          setCommsDialogOpen(open);
+          if (open) {
+            setCommsTemplateSlug('');
+            setCommsPreview('');
+            setCommsAssunto('');
+            setCommsTo('');
+          }
+        }}
+      >
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Templates de comunicação</DialogTitle>
+            <DialogDescription>
+              Gere uma mensagem pronta, copie, abra WhatsApp/e-mail e registre o envio no log (auditável).
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="mt-2 grid grid-cols-1 md:grid-cols-6 gap-3 items-end">
+            <div className="md:col-span-2">
+              <Select label="Canal" name="comms_canal" value={commsCanal} onChange={(e) => setCommsCanal(e.target.value as any)}>
+                <option value="whatsapp">WhatsApp</option>
+                <option value="email">E-mail</option>
+              </Select>
+            </div>
+            <div className="md:col-span-4">
+              <Select
+                label="Template"
+                name="comms_tpl"
+                value={commsTemplateSlug}
+                onChange={(e) => setCommsTemplateSlug(e.target.value)}
+              >
+                <option value="">Selecione…</option>
+                {commsTemplates.map((t) => (
+                  <option key={t.slug} value={t.slug}>
+                    {t.titulo}
+                  </option>
+                ))}
+              </Select>
+            </div>
+          </div>
+
+          <div className="mt-3 grid grid-cols-1 md:grid-cols-6 gap-3 items-end">
+            <Input
+              label={commsCanal === 'email' ? 'E-mail do cliente' : 'Telefone/contato'}
+              name="comms_to"
+              value={commsTo}
+              onChange={(e) => setCommsTo(e.target.value)}
+              placeholder={commsCanal === 'email' ? (clientDetails?.email || '') : (clientDetails?.telefone || '')}
+              className="md:col-span-3"
+            />
+            {commsCanal === 'email' ? (
+              <Input
+                label="Assunto"
+                name="comms_subject"
+                value={commsAssunto}
+                onChange={(e) => setCommsAssunto(e.target.value)}
+                className="md:col-span-3"
+              />
+            ) : (
+              <div className="md:col-span-3" />
+            )}
+          </div>
+
+          <div className="mt-3">
+            <TextArea label="Prévia" name="comms_preview" value={commsPreview} onChange={() => {}} rows={8} disabled />
+            <div className="text-xs text-gray-500 mt-1">
+              Variáveis: <code>{'{{os_numero}}'}</code>, <code>{'{{os_descricao}}'}</code>, <code>{'{{os_status_label}}'}</code>, <code>{'{{cliente_nome}}'}</code>, <code>{'{{portal_url}}'}</code>
+            </div>
+          </div>
+
+          <div className="mt-5 flex flex-wrap items-center justify-between gap-2">
+            <div className="flex flex-wrap gap-2">
+              <Button type="button" variant="outline" onClick={handleCopyComms} disabled={!commsPreview.trim()} className="gap-2">
+                <FileText size={18} />
+                Copiar mensagem
+              </Button>
+              {commsCanal === 'whatsapp' ? (
+                <Button
+                  type="button"
+                  variant="outline"
+                  disabled={!normalizePhone(commsTo || clientDetails?.telefone || clientDetails?.celular || '') || !commsPreview.trim()}
+                  onClick={() => {
+                    const phone = normalizePhone(commsTo || clientDetails?.telefone || clientDetails?.celular || '');
+                    if (!phone) return;
+                    const url = `https://wa.me/${phone}?text=${encodeURIComponent(commsPreview)}`;
+                    window.open(url, '_blank', 'noopener,noreferrer');
+                  }}
+                  className="gap-2"
+                >
+                  <FileText size={18} />
+                  Abrir WhatsApp
+                </Button>
+              ) : (
+                <Button
+                  type="button"
+                  variant="outline"
+                  disabled={!((commsTo || clientDetails?.email || '').trim()) || !commsPreview.trim()}
+                  onClick={() => {
+                    const email = (commsTo || clientDetails?.email || '').trim();
+                    if (!email) return;
+                    const url = `mailto:${encodeURIComponent(email)}?subject=${encodeURIComponent(commsAssunto || '')}&body=${encodeURIComponent(commsPreview)}`;
+                    window.open(url, '_blank', 'noopener,noreferrer');
+                  }}
+                  className="gap-2"
+                >
+                  <FileText size={18} />
+                  Abrir e-mail
+                </Button>
+              )}
+            </div>
+            <div className="flex gap-2">
+              <Button type="button" variant="outline" onClick={() => setCommsDialogOpen(false)} disabled={commsRegistering}>
+                Fechar
+              </Button>
+              <Button type="button" onClick={handleRegisterComms} disabled={commsRegistering || !commsPreview.trim()} className="gap-2">
+                {commsRegistering ? <Loader2 className="animate-spin" size={18} /> : <CheckCircle2 size={18} />}
+                Registrar envio
+              </Button>
+            </div>
           </div>
         </DialogContent>
       </Dialog>
