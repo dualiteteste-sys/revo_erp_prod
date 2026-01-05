@@ -18,6 +18,7 @@ import ConfirmationModal from '@/components/ui/ConfirmationModal';
 import DatePicker from '@/components/ui/DatePicker';
 import Toggle from '@/components/ui/forms/Toggle';
 import { Button } from '@/components/ui/button';
+import PageHelp from '@/components/support/PageHelp';
 
 export default function TesourariaPage() {
   const [activeTab, setActiveTab] = useState<'contas' | 'movimentos' | 'conciliacao' | 'regras'>('contas');
@@ -252,6 +253,21 @@ export default function TesourariaPage() {
             </div>
         </>
       )}
+
+      <PageHelp
+        title="Tesouraria: guia rápido"
+        whatIs="Tesouraria concentra contas, lançamentos e conciliação. O objetivo é ter um caixa confiável (saldo bate) e um extrato com baixa/estorno auditável."
+        steps={[
+          'Crie uma conta corrente e defina a padrão para recebimentos/pagamentos.',
+          'Registre movimentações ou importe extrato e concilie com sugestões.',
+          'Valide no final: saldo e extrato batem; estorno reverte corretamente.',
+        ]}
+        links={[
+          { label: 'Abrir PDV', href: '/app/vendas/pdv', kind: 'internal' },
+          { label: 'Abrir Contas a Pagar', href: '/app/financeiro/pagar', kind: 'internal' },
+          { label: 'Abrir Contas a Receber', href: '/app/financeiro/receber', kind: 'internal' },
+        ]}
+      />
 
       {activeTab === 'movimentos' && (
         <>
