@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { CheckCircle2, FileText, Layers, Loader2, Save, Paperclip, Plus, Trash2 } from 'lucide-react';
-import { OrdemServicoDetails, saveOs, deleteOsItem, getOsDetails, OsItemSearchResult, addOsItem, listOsTecnicos, setOsTecnico, type OsTecnicoRow } from '@/services/os';
+import { CheckCircle2, FileText, Layers, Loader2, Save, Paperclip, Plus, Trash2, Send, ThumbsDown, ThumbsUp } from 'lucide-react';
+import { OrdemServicoDetails, saveOs, deleteOsItem, getOsDetails, OsItemSearchResult, addOsItem, listOsTecnicos, setOsTecnico, type OsTecnicoRow, getOsOrcamento, enviarOrcamento, decidirOrcamento, type OsOrcamentoSummary } from '@/services/os';
 import { getPartnerDetails } from '@/services/partners';
 import { useToast } from '@/contexts/ToastProvider';
 import Section from '../ui/forms/Section';
@@ -71,6 +71,16 @@ const OsFormPanel: React.FC<OsFormPanelProps> = ({ os, onSaveSuccess, onClose })
   const [isGeneratingContasParcelas, setIsGeneratingContasParcelas] = useState(false);
   const [tecnicos, setTecnicos] = useState<OsTecnicoRow[]>([]);
   const [tecnicosLoading, setTecnicosLoading] = useState(false);
+  const [orcamentoSummary, setOrcamentoSummary] = useState<OsOrcamentoSummary | null>(null);
+  const [orcamentoLoading, setOrcamentoLoading] = useState(false);
+  const [orcamentoSendDialogOpen, setOrcamentoSendDialogOpen] = useState(false);
+  const [orcamentoMensagem, setOrcamentoMensagem] = useState('');
+  const [orcamentoSending, setOrcamentoSending] = useState(false);
+  const [orcamentoDecideDialogOpen, setOrcamentoDecideDialogOpen] = useState(false);
+  const [orcamentoDecisao, setOrcamentoDecisao] = useState<'approved' | 'rejected'>('approved');
+  const [orcamentoClienteNome, setOrcamentoClienteNome] = useState('');
+  const [orcamentoObservacao, setOrcamentoObservacao] = useState('');
+  const [orcamentoDeciding, setOrcamentoDeciding] = useState(false);
 
   const canEdit = formData.id ? permUpdate.data : permCreate.data;
   const permLoading = formData.id ? permUpdate.isLoading : permCreate.isLoading;
@@ -111,6 +121,30 @@ const OsFormPanel: React.FC<OsFormPanelProps> = ({ os, onSaveSuccess, onClose })
       setContaVencimento('');
     }
   }, [os]);
+
+  const refreshOrcamento = async (osId: string) => {
+    setOrcamentoLoading(true);
+    try {
+      const data = await getOsOrcamento(osId);
+      setOrcamentoSummary(data);
+      setOrcamentoClienteNome(data.cliente_nome || '');
+      setOrcamentoObservacao(data.observacao || '');
+    } catch (e: any) {
+      setOrcamentoSummary(null);
+    } finally {
+      setOrcamentoLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    const osId = formData.id ? String(formData.id) : null;
+    if (!osId) {
+      setOrcamentoSummary(null);
+      return;
+    }
+    void refreshOrcamento(osId);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [formData.id]);
 
   useEffect(() => {
     if (!activeEmpresaId) return;
@@ -561,6 +595,96 @@ const OsFormPanel: React.FC<OsFormPanelProps> = ({ os, onSaveSuccess, onClose })
     }
   };
 
+  const orcamentoBadge = useMemo(() => {
+    if (orcamentoLoading) {
+      return (
+        <span className="inline-flex items-center gap-2 rounded-full bg-gray-100 px-3 py-1 text-xs font-semibold text-gray-700">
+          <Loader2 className="animate-spin" size={14} /> Carregando…
+        </span>
+      );
+    }
+    if (!orcamentoSummary) return null;
+    const map: Record<string, { label: string; color: string }> = {
+      draft: { label: 'Rascunho', color: 'bg-gray-100 text-gray-800' },
+      sent: { label: 'Enviado', color: 'bg-blue-100 text-blue-800' },
+      approved: { label: 'Aprovado', color: 'bg-green-100 text-green-800' },
+      rejected: { label: 'Reprovado', color: 'bg-rose-100 text-rose-800' },
+    };
+    const cfg = map[orcamentoSummary.orcamento_status] || { label: orcamentoSummary.orcamento_status, color: 'bg-gray-100 text-gray-800' };
+    return <span className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold ${cfg.color}`}>{cfg.label}</span>;
+  }, [orcamentoLoading, orcamentoSummary]);
+
+  const handleEnviarOrcamento = async () => {
+    if (readOnly) {
+      addToast('Você não tem permissão para enviar orçamento.', 'warning');
+      return;
+    }
+    if (!formData.id) {
+      addToast('Salve a O.S. antes de enviar o orçamento.', 'warning');
+      return;
+    }
+    setOrcamentoSending(true);
+    try {
+      const osId = String(formData.id);
+      await runWithActionLock(`os:orcamento:send:${osId}`, async () => {
+        await enviarOrcamento(osId, orcamentoMensagem.trim() ? orcamentoMensagem.trim() : null);
+      });
+      addToast('Orçamento marcado como enviado.', 'success');
+      setOrcamentoSendDialogOpen(false);
+      setOrcamentoMensagem('');
+      await refreshOrcamento(osId);
+    } catch (e: any) {
+      if (e instanceof ActionLockedError) {
+        addToast('Já estamos enviando este orçamento. Aguarde alguns segundos.', 'info');
+      } else {
+        addToast(e?.message || 'Erro ao enviar orçamento.', 'error');
+      }
+    } finally {
+      setOrcamentoSending(false);
+    }
+  };
+
+  const openDecideDialog = (decisao: 'approved' | 'rejected') => {
+    setOrcamentoDecisao(decisao);
+    setOrcamentoDecideDialogOpen(true);
+  };
+
+  const handleDecidirOrcamento = async () => {
+    if (!formData.id) return;
+    if (!permManage.data) {
+      addToast('Você não tem permissão para aprovar/reprovar orçamento.', 'warning');
+      return;
+    }
+    const clienteNome = orcamentoClienteNome.trim();
+    if (!clienteNome) {
+      addToast('Informe o nome do cliente/responsável pelo aceite.', 'warning');
+      return;
+    }
+    setOrcamentoDeciding(true);
+    try {
+      const osId = String(formData.id);
+      await runWithActionLock(`os:orcamento:decide:${osId}`, async () => {
+        await decidirOrcamento({
+          osId,
+          decisao: orcamentoDecisao,
+          clienteNome,
+          observacao: orcamentoObservacao.trim() ? orcamentoObservacao.trim() : null,
+        });
+      });
+      addToast(orcamentoDecisao === 'approved' ? 'Orçamento aprovado.' : 'Orçamento reprovado.', 'success');
+      setOrcamentoDecideDialogOpen(false);
+      await refreshOrcamento(osId);
+    } catch (e: any) {
+      if (e instanceof ActionLockedError) {
+        addToast('Já estamos registrando uma decisão deste orçamento. Aguarde alguns segundos.', 'info');
+      } else {
+        addToast(e?.message || 'Erro ao registrar decisão.', 'error');
+      }
+    } finally {
+      setOrcamentoDeciding(false);
+    }
+  };
+
   return (
     <div className="flex flex-col h-full">
       <div className="flex-grow p-6 overflow-y-auto scrollbar-styled">
@@ -696,6 +820,92 @@ const OsFormPanel: React.FC<OsFormPanelProps> = ({ os, onSaveSuccess, onClose })
                     Gerar Conta a Receber
                   </Button>
                 )}
+              </div>
+            </div>
+          ) : null}
+        </Section>
+
+        <Section title="Orçamento & Aprovação" description="Envio e registro de aceite do cliente (auditável).">
+          <div className="sm:col-span-6 flex flex-wrap items-center justify-between gap-2">
+            <div className="flex items-center gap-2">
+              {orcamentoBadge}
+              {orcamentoSummary?.sent_at ? (
+                <span className="text-xs text-gray-500">
+                  Enviado em {new Date(orcamentoSummary.sent_at).toLocaleString('pt-BR')}
+                </span>
+              ) : null}
+              {orcamentoSummary?.decided_at ? (
+                <span className="text-xs text-gray-500">
+                  Decidido em {new Date(orcamentoSummary.decided_at).toLocaleString('pt-BR')}
+                </span>
+              ) : null}
+            </div>
+
+            <div className="flex flex-wrap gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setOrcamentoSendDialogOpen(true)}
+                disabled={readOnly || !permUpdate.data || !formData.id}
+                className="gap-2"
+                title={!formData.id ? 'Salve a OS antes.' : undefined}
+              >
+                <Send size={18} />
+                Marcar como enviado
+              </Button>
+              <Button
+                type="button"
+                onClick={() => openDecideDialog('approved')}
+                disabled={readOnly || !permManage.data || !formData.id}
+                className="gap-2"
+              >
+                <ThumbsUp size={18} />
+                Aprovar
+              </Button>
+              <Button
+                type="button"
+                variant="danger"
+                onClick={() => openDecideDialog('rejected')}
+                disabled={readOnly || !permManage.data || !formData.id}
+                className="gap-2"
+              >
+                <ThumbsDown size={18} />
+                Reprovar
+              </Button>
+            </div>
+          </div>
+
+          {orcamentoSummary?.cliente_nome ? (
+            <div className="sm:col-span-6 mt-2 text-sm text-gray-700">
+              <span className="font-medium">Aceite por:</span> {orcamentoSummary.cliente_nome}
+              {orcamentoSummary.observacao ? <span className="text-gray-500"> • {orcamentoSummary.observacao}</span> : null}
+            </div>
+          ) : null}
+
+          {orcamentoSummary?.last_event ? (
+            <div className="sm:col-span-6 mt-3 rounded-lg border border-gray-200 bg-gray-50 p-3">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div className="text-xs font-semibold text-gray-700 uppercase">Último evento</div>
+                <div className="text-xs text-gray-500">
+                  {new Date(orcamentoSummary.last_event.created_at).toLocaleString('pt-BR')}
+                  {orcamentoSummary.last_event.actor_email ? ` • ${orcamentoSummary.last_event.actor_email}` : ''}
+                </div>
+              </div>
+              <div className="mt-2 text-sm text-gray-800">
+                <span className="font-medium">
+                  {orcamentoSummary.last_event.tipo === 'sent'
+                    ? 'Enviado'
+                    : orcamentoSummary.last_event.tipo === 'approved'
+                    ? 'Aprovado'
+                    : 'Reprovado'}
+                </span>
+                {orcamentoSummary.last_event.mensagem ? <div className="mt-1 text-gray-700">{orcamentoSummary.last_event.mensagem}</div> : null}
+                {orcamentoSummary.last_event.cliente_nome ? (
+                  <div className="mt-1 text-gray-700">
+                    <span className="font-medium">Cliente:</span> {orcamentoSummary.last_event.cliente_nome}
+                  </div>
+                ) : null}
+                {orcamentoSummary.last_event.observacao ? <div className="mt-1 text-gray-700">{orcamentoSummary.last_event.observacao}</div> : null}
               </div>
             </div>
           ) : null}
@@ -868,6 +1078,94 @@ const OsFormPanel: React.FC<OsFormPanelProps> = ({ os, onSaveSuccess, onClose })
             <Button type="button" onClick={handleCreateConta} disabled={isCreatingConta} className="gap-2">
               {isCreatingConta ? <Loader2 className="animate-spin" size={18} /> : <FileText size={18} />}
               Gerar
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={orcamentoSendDialogOpen}
+        onOpenChange={(open) => {
+          setOrcamentoSendDialogOpen(open);
+          if (open && orcamentoSummary) {
+            setOrcamentoMensagem('');
+          }
+        }}
+      >
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Enviar orçamento</DialogTitle>
+            <DialogDescription>
+              Marca o orçamento como <b>enviado</b> e registra um evento (auditável). Opcionalmente, salve uma mensagem.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="mt-2">
+            <TextArea
+              label="Mensagem (opcional)"
+              name="orcamento_mensagem"
+              value={orcamentoMensagem}
+              onChange={(e) => setOrcamentoMensagem(e.target.value)}
+              rows={4}
+              disabled={orcamentoSending}
+            />
+          </div>
+
+          <div className="mt-6 flex justify-end gap-2">
+            <Button type="button" variant="outline" onClick={() => setOrcamentoSendDialogOpen(false)} disabled={orcamentoSending}>
+              Cancelar
+            </Button>
+            <Button type="button" onClick={handleEnviarOrcamento} disabled={orcamentoSending} className="gap-2">
+              {orcamentoSending ? <Loader2 className="animate-spin" size={18} /> : <Send size={18} />}
+              Marcar como enviado
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={orcamentoDecideDialogOpen} onOpenChange={setOrcamentoDecideDialogOpen}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>{orcamentoDecisao === 'approved' ? 'Aprovar orçamento' : 'Reprovar orçamento'}</DialogTitle>
+            <DialogDescription>
+              Registra a decisão com evidência do aceite (auditável). Exige permissão <b>OS → Gerenciar</b>.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="mt-3 grid grid-cols-1 gap-3">
+            <Input
+              label="Nome do cliente/responsável"
+              name="orcamento_cliente_nome"
+              value={orcamentoClienteNome}
+              onChange={(e) => setOrcamentoClienteNome(e.target.value)}
+              placeholder="Ex.: João da Silva"
+              disabled={orcamentoDeciding}
+              required
+            />
+            <TextArea
+              label="Observação (opcional)"
+              name="orcamento_observacao"
+              value={orcamentoObservacao}
+              onChange={(e) => setOrcamentoObservacao(e.target.value)}
+              rows={4}
+              disabled={orcamentoDeciding}
+              placeholder={orcamentoDecisao === 'approved' ? 'Ex.: Aprovado por WhatsApp.' : 'Ex.: Cliente pediu ajuste no valor.'}
+            />
+          </div>
+
+          <div className="mt-6 flex justify-end gap-2">
+            <Button type="button" variant="outline" onClick={() => setOrcamentoDecideDialogOpen(false)} disabled={orcamentoDeciding}>
+              Cancelar
+            </Button>
+            <Button
+              type="button"
+              variant={orcamentoDecisao === 'approved' ? 'default' : 'danger'}
+              onClick={handleDecidirOrcamento}
+              disabled={orcamentoDeciding}
+              className="gap-2"
+            >
+              {orcamentoDeciding ? <Loader2 className="animate-spin" size={18} /> : orcamentoDecisao === 'approved' ? <ThumbsUp size={18} /> : <ThumbsDown size={18} />}
+              {orcamentoDecisao === 'approved' ? 'Aprovar' : 'Reprovar'}
             </Button>
           </div>
         </DialogContent>
