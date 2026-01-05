@@ -105,7 +105,14 @@ export async function listOs(params: {
     return await callRpc<OrdemServico[]>('list_os_for_current_user_v2', p);
   } catch (e: any) {
     if (e instanceof RpcError && e.status === 404) {
-      return callRpc<OrdemServico[]>('list_os_for_current_user', p);
+      return callRpc<OrdemServico[]>('list_os_for_current_user', {
+        p_search: p.p_search,
+        p_status: p.p_status,
+        p_limit: p.p_limit,
+        p_offset: p.p_offset,
+        p_order_by: p.p_order_by,
+        p_order_dir: p.p_order_dir,
+      });
     }
     throw e;
   }
