@@ -112,7 +112,7 @@ test('OS: lista e abre modal de criação', async ({ page }) => {
 
   await mockAuthAndEmpresa(page);
 
-  await page.route('**/rest/v1/rpc/list_os_for_current_user', async (route) => {
+  await page.route('**/rest/v1/rpc/list_os_for_current_user*', async (route) => {
     await route.fulfill({
       json: [
         {
