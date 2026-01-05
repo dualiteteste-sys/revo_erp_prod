@@ -283,7 +283,7 @@ Este é o checklist único (por módulo) para levar o REVO ao nível **top mundi
 
 ## H) Integrações (plataforma)
 - [x] INT-STA-01 (P0) Rate limit por canal + filas separadas + backoff com jitter
-- [ ] INT-STA-02 (P0) Reprocessamento seguro (dry-run, replay, dead-letter) com trilha por entidade
+- [x] INT-STA-02 (P0) Reprocessamento seguro (dry-run, replay, dead-letter) com trilha por entidade
 - [ ] INT-STA-03 (P1) Versionamento de adaptadores (migração de payloads sem quebrar)
 - [x] INT-STA-04 (P1) Health por conexão (token expirado, webhook parado, atraso de fila)
 
@@ -291,6 +291,15 @@ Este é o checklist único (por módulo) para levar o REVO ao nível **top mundi
 - Simular importação de pedidos com volume (Mercado Livre): deve aplicar `rate limit` e responder com `retry_after_seconds` quando necessário.
 - Em caso de falha: evento/job deve ir para DLQ e aparecer em `Dev → Saúde` com botão de reprocesso.
 - Confirmar que filas são separadas por domínio (NF / marketplaces / financeiro) e que uma fila “ruim” não trava as demais.
+
+**Validar (INT-STA-02)**
+- Dev → Saúde:
+  - Em `Financeiro — DLQ`, clicar `Seed DLQ` (apenas em ambiente dev) para criar 1 item.
+  - Clicar `Dry-run`: deve abrir modal com preview (não altera a DLQ).
+  - Clicar `Reprocessar agora`: item sai da DLQ e contadores atualizam.
+- Repetir o fluxo em `Marketplaces — DLQ`.
+- `NFE.io — webhooks com falha`: usar `Dry-run` e `Reprocessar` quando houver item.
+- Desenvolvedor → Logs: filtrar por evento `ops.dlq.*` e confirmar trilha do `seed`, `dry_run` e `reprocess`.
 
 ---
 

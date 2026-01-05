@@ -6,14 +6,21 @@ import GlassCard from '@/components/ui/GlassCard';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/contexts/ToastProvider';
 import { supabase } from '@/lib/supabaseClient';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import {
   getOpsHealthSummary,
   getBusinessKpisFunnelSummary,
   getProductMetricsSummary,
   listOpsRecentFailures,
+  dryRunEcommerceDlq,
+  dryRunFinanceDlq,
+  dryRunNfeioWebhookEvent,
   reprocessEcommerceDlq,
   reprocessFinanceDlq,
   reprocessNfeioWebhookEvent,
+  seedEcommerceDlq,
+  seedFinanceDlq,
+  type DlqReprocessResult,
   type EcommerceDlqRow,
   type FinanceDlqRow,
   type OpsHealthSummary,
@@ -59,8 +66,14 @@ export default function HealthPage() {
   const [reprocessingId, setReprocessingId] = useState<string | null>(null);
   const [reprocessingFinanceDlqId, setReprocessingFinanceDlqId] = useState<string | null>(null);
   const [reprocessingEcommerceDlqId, setReprocessingEcommerceDlqId] = useState<string | null>(null);
+  const [previewOpen, setPreviewOpen] = useState(false);
+  const [previewTitle, setPreviewTitle] = useState<string>('Dry-run');
+  const [previewDescription, setPreviewDescription] = useState<string>('');
+  const [previewJson, setPreviewJson] = useState<DlqReprocessResult | null>(null);
+  const [previewAction, setPreviewAction] = useState<null | { kind: 'finance' | 'ecommerce' | 'nfeio'; id: string }>(null);
 
   const hasSupabase = !!supabase;
+  const isDev = import.meta.env.DEV;
 
   const fetchAll = useCallback(async () => {
     setLoading(true);
@@ -140,6 +153,32 @@ export default function HealthPage() {
   const canReprocess = !!permManage.data;
   const canSeeEcommerce = !!permEcommerceView.data;
 
+  const openPreview = (
+    title: string,
+    description: string,
+    data: DlqReprocessResult,
+    action: { kind: 'finance' | 'ecommerce' | 'nfeio'; id: string }
+  ) => {
+    setPreviewTitle(title);
+    setPreviewDescription(description);
+    setPreviewJson(data);
+    setPreviewAction(action);
+    setPreviewOpen(true);
+  };
+
+  const handleDryRunNfe = async (id: string) => {
+    if (!canReprocess) {
+      addToast('Sem permissão para reprocessar.', 'warning');
+      return;
+    }
+    try {
+      const res = await dryRunNfeioWebhookEvent(id);
+      openPreview('Dry-run: NFE.io', 'Prévia das mudanças (não altera dados).', res, { kind: 'nfeio', id });
+    } catch (e: any) {
+      addToast(e?.message || 'Falha no dry-run.', 'error');
+    }
+  };
+
   const handleReprocess = async (id: string) => {
     if (!canReprocess) {
       addToast('Sem permissão para reprocessar.', 'warning');
@@ -156,6 +195,19 @@ export default function HealthPage() {
       addToast(e?.message || 'Falha ao reenfileirar evento.', 'error');
     } finally {
       setReprocessingId(null);
+    }
+  };
+
+  const handleDryRunFinanceDlq = async (dlqId: string) => {
+    if (!canReprocess) {
+      addToast('Sem permissão para reprocessar.', 'warning');
+      return;
+    }
+    try {
+      const res = await dryRunFinanceDlq(dlqId);
+      openPreview('Dry-run: Financeiro (DLQ)', 'Prévia do job que seria reenfileirado (não altera dados).', res, { kind: 'finance', id: dlqId });
+    } catch (e: any) {
+      addToast(e?.message || 'Falha no dry-run.', 'error');
     }
   };
 
@@ -178,6 +230,19 @@ export default function HealthPage() {
     }
   };
 
+  const handleDryRunEcommerceDlq = async (dlqId: string) => {
+    if (!canReprocess) {
+      addToast('Sem permissão para reprocessar.', 'warning');
+      return;
+    }
+    try {
+      const res = await dryRunEcommerceDlq(dlqId);
+      openPreview('Dry-run: Marketplaces (DLQ)', 'Prévia do job que seria reenfileirado (não altera dados).', res, { kind: 'ecommerce', id: dlqId });
+    } catch (e: any) {
+      addToast(e?.message || 'Falha no dry-run.', 'error');
+    }
+  };
+
   const handleReprocessEcommerceDlq = async (dlqId: string) => {
     if (!canReprocess) {
       addToast('Sem permissão para reprocessar.', 'warning');
@@ -194,6 +259,54 @@ export default function HealthPage() {
       addToast(e?.message || 'Falha ao reenfileirar job da DLQ.', 'error');
     } finally {
       setReprocessingEcommerceDlqId(null);
+    }
+  };
+
+  const handleSeedFinanceDlq = async () => {
+    if (!canReprocess) {
+      addToast('Sem permissão para criar seed.', 'warning');
+      return;
+    }
+    try {
+      const id = await seedFinanceDlq('test');
+      addToast(`Seed criado na DLQ (financeiro): ${id}`, 'success');
+      await fetchAll();
+    } catch (e: any) {
+      addToast(e?.message || 'Falha ao criar seed.', 'error');
+    }
+  };
+
+  const handleSeedEcommerceDlq = async () => {
+    if (!canReprocess) {
+      addToast('Sem permissão para criar seed.', 'warning');
+      return;
+    }
+    try {
+      const id = await seedEcommerceDlq('meli', 'test');
+      addToast(`Seed criado na DLQ (marketplaces): ${id}`, 'success');
+      await fetchAll();
+    } catch (e: any) {
+      addToast(e?.message || 'Falha ao criar seed.', 'error');
+    }
+  };
+
+  const handleExecutePreviewAction = async () => {
+    if (!previewAction) return;
+    if (!canReprocess) {
+      addToast('Sem permissão para reprocessar.', 'warning');
+      return;
+    }
+    try {
+      if (previewAction.kind === 'finance') {
+        await handleReprocessFinanceDlq(previewAction.id);
+      } else if (previewAction.kind === 'ecommerce') {
+        await handleReprocessEcommerceDlq(previewAction.id);
+      } else {
+        await handleReprocess(previewAction.id);
+      }
+      setPreviewOpen(false);
+    } catch {
+      // handlers já mostram toast
     }
   };
 
@@ -301,6 +414,33 @@ export default function HealthPage() {
 
   return (
     <div className="p-1 flex flex-col gap-4">
+      <Dialog open={previewOpen} onOpenChange={setPreviewOpen}>
+        <DialogContent className="max-w-3xl">
+          <DialogHeader>
+            <DialogTitle>{previewTitle}</DialogTitle>
+            <DialogDescription>{previewDescription}</DialogDescription>
+          </DialogHeader>
+
+          <div className="rounded-xl border border-gray-200 bg-gray-50 p-3">
+            <pre className="text-xs whitespace-pre-wrap break-words text-gray-800">
+              {previewJson ? JSON.stringify(previewJson, null, 2) : '—'}
+            </pre>
+          </div>
+
+          <div className="flex justify-end gap-2">
+            <Button variant="outline" onClick={() => setPreviewOpen(false)}>
+              Fechar
+            </Button>
+            {previewAction ? (
+              <Button onClick={handleExecutePreviewAction} className="gap-2">
+                <RotateCcw size={16} />
+                Reprocessar agora
+              </Button>
+            ) : null}
+          </div>
+        </DialogContent>
+      </Dialog>
+
       <PageHeader
         title="Saúde do sistema"
         description="Falhas recentes, filas, DLQs e sinais de drift operacional."
@@ -476,17 +616,28 @@ export default function HealthPage() {
                           {e.last_error || '—'}
                         </td>
                         <td className="px-3 py-2 text-right">
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            className="gap-2"
-                            onClick={() => void handleReprocess(e.id)}
-                            disabled={!canReprocess || busy}
-                            title={canReprocess ? 'Reenfileirar agora' : 'Sem permissão'}
-                          >
-                            <RotateCcw size={14} />
-                            Reprocessar
-                          </Button>
+                          <div className="flex justify-end gap-2">
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="gap-2"
+                              onClick={() => void handleDryRunNfe(e.id)}
+                              disabled={!canReprocess || busy}
+                            >
+                              Dry-run
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="gap-2"
+                              onClick={() => void handleReprocess(e.id)}
+                              disabled={!canReprocess || busy}
+                              title={canReprocess ? 'Reenfileirar agora' : 'Sem permissão'}
+                            >
+                              <RotateCcw size={14} />
+                              Reprocessar
+                            </Button>
+                          </div>
                         </td>
                       </tr>
                     );
@@ -502,7 +653,14 @@ export default function HealthPage() {
         <GlassCard className="p-4">
           <div className="flex items-center justify-between mb-3">
             <div className="text-lg font-semibold text-gray-900">Financeiro — DLQ</div>
-            <div className="text-xs text-gray-500">{canReprocess ? 'reprocessamento habilitado' : 'sem permissão para reprocessar'}</div>
+            <div className="flex items-center gap-2">
+              {isDev && canReprocess ? (
+                <Button size="sm" variant="outline" onClick={() => void handleSeedFinanceDlq()}>
+                  Seed DLQ
+                </Button>
+              ) : null}
+              <div className="text-xs text-gray-500">{canReprocess ? 'reprocessamento habilitado' : 'sem permissão para reprocessar'}</div>
+            </div>
           </div>
 
           {loading ? (
@@ -531,17 +689,28 @@ export default function HealthPage() {
                           {row.last_error || '—'}
                         </td>
                         <td className="px-3 py-2 text-right">
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            className="gap-2"
-                            onClick={() => void handleReprocessFinanceDlq(row.id)}
-                            disabled={!canReprocess || busy}
-                            title={canReprocess ? 'Reenfileirar agora' : 'Sem permissão'}
-                          >
-                            <RotateCcw size={14} />
-                            Reprocessar
-                          </Button>
+                          <div className="flex justify-end gap-2">
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="gap-2"
+                              onClick={() => void handleDryRunFinanceDlq(row.id)}
+                              disabled={!canReprocess || busy}
+                            >
+                              Dry-run
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="gap-2"
+                              onClick={() => void handleReprocessFinanceDlq(row.id)}
+                              disabled={!canReprocess || busy}
+                              title={canReprocess ? 'Reenfileirar agora' : 'Sem permissão'}
+                            >
+                              <RotateCcw size={14} />
+                              Reprocessar
+                            </Button>
+                          </div>
                         </td>
                       </tr>
                     );
@@ -555,8 +724,15 @@ export default function HealthPage() {
         <GlassCard className="p-4">
           <div className="flex items-center justify-between mb-3">
             <div className="text-lg font-semibold text-gray-900">Marketplaces — DLQ</div>
-            <div className="text-xs text-gray-500">
-              {!canSeeEcommerce ? 'sem permissão ecommerce:view' : canReprocess ? 'reprocessamento habilitado' : 'sem permissão para reprocessar'}
+            <div className="flex items-center gap-2">
+              {isDev && canReprocess && canSeeEcommerce ? (
+                <Button size="sm" variant="outline" onClick={() => void handleSeedEcommerceDlq()}>
+                  Seed DLQ
+                </Button>
+              ) : null}
+              <div className="text-xs text-gray-500">
+                {!canSeeEcommerce ? 'sem permissão ecommerce:view' : canReprocess ? 'reprocessamento habilitado' : 'sem permissão para reprocessar'}
+              </div>
             </div>
           </div>
 
@@ -590,17 +766,28 @@ export default function HealthPage() {
                           {row.last_error || '—'}
                         </td>
                         <td className="px-3 py-2 text-right">
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            className="gap-2"
-                            onClick={() => void handleReprocessEcommerceDlq(row.id)}
-                            disabled={!canReprocess || busy}
-                            title={canReprocess ? 'Reenfileirar agora' : 'Sem permissão'}
-                          >
-                            <RotateCcw size={14} />
-                            Reprocessar
-                          </Button>
+                          <div className="flex justify-end gap-2">
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="gap-2"
+                              onClick={() => void handleDryRunEcommerceDlq(row.id)}
+                              disabled={!canReprocess || busy}
+                            >
+                              Dry-run
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="gap-2"
+                              onClick={() => void handleReprocessEcommerceDlq(row.id)}
+                              disabled={!canReprocess || busy}
+                              title={canReprocess ? 'Reenfileirar agora' : 'Sem permissão'}
+                            >
+                              <RotateCcw size={14} />
+                              Reprocessar
+                            </Button>
+                          </div>
                         </td>
                       </tr>
                     );
