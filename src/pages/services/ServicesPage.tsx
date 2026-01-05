@@ -4,7 +4,7 @@ import * as svc from '@/services/services';
 import ServicesTable from '@/components/services/ServicesTable';
 import ServiceFormPanel from '@/components/services/ServiceFormPanel';
 import { useToast } from '@/contexts/ToastProvider';
-import { Loader2, Search, Wrench, DatabaseBackup, Plus } from 'lucide-react';
+import { FileUp, Loader2, Search, Wrench, DatabaseBackup, Plus } from 'lucide-react';
 import Pagination from '@/components/ui/Pagination';
 import ConfirmationModal from '@/components/ui/ConfirmationModal';
 import Modal from '@/components/ui/Modal';
@@ -19,9 +19,14 @@ import PageShell from '@/components/ui/PageShell';
 import PageCard from '@/components/ui/PageCard';
 import EmptyState from '@/components/ui/EmptyState';
 import { uiMessages } from '@/lib/ui/messages';
+import { useHasPermission } from '@/hooks/useHasPermission';
+import ImportServicesCsvModal from '@/components/services/ImportServicesCsvModal';
 
 export default function ServicesPage() {
   const enableSeed = isSeedEnabled();
+  const permCreate = useHasPermission('servicos', 'create');
+  const permsLoading = permCreate.isLoading;
+  const canCreate = !!permCreate.data;
   const {
     services,
     loading,
@@ -48,6 +53,7 @@ export default function ServicesPage() {
   const [isSeeding, setIsSeeding] = useState(false);
   const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false);
   const [bulkLoading, setBulkLoading] = useState(false);
+  const [isImportOpen, setIsImportOpen] = useState(false);
   const { addToast } = useToast();
 
   const bulk = useBulkSelection(services, (s) => s.id);
@@ -186,13 +192,27 @@ export default function ServicesPage() {
               { key: 'nbs_req', label: 'NBS/IBPT obrigatório', getValue: (r) => (r.nbs_ibpt_required ? 'Sim' : 'Não') },
             ]}
           />
+          <Button
+            variant="secondary"
+            className="gap-2"
+            onClick={() => setIsImportOpen(true)}
+            disabled={permsLoading || !canCreate}
+            title={!canCreate ? 'Sem permissão para importar' : 'Importar serviços por CSV'}
+          >
+            <FileUp size={18} />
+            Importar CSV
+          </Button>
           {enableSeed ? (
             <Button onClick={handleSeedServices} disabled={isSeeding || loading} variant="secondary" className="gap-2">
               {isSeeding ? <Loader2 className="animate-spin" size={18} /> : <DatabaseBackup size={18} />}
               Popular dados
             </Button>
           ) : null}
-          <Button onClick={() => handleOpenForm()}>
+          <Button
+            onClick={() => handleOpenForm()}
+            disabled={permsLoading || !canCreate}
+            title={!canCreate ? 'Sem permissão para criar' : undefined}
+          >
             <Plus size={18} />
             <span className="ml-2">Novo serviço</span>
           </Button>
@@ -319,6 +339,16 @@ export default function ServicesPage() {
           />
         )}
       </Modal>
+
+      <ImportServicesCsvModal
+        isOpen={isImportOpen}
+        onClose={() => setIsImportOpen(false)}
+        importFn={(payload) => svc.createService(payload)}
+        onImported={() => {
+          setIsImportOpen(false);
+          refresh();
+        }}
+      />
       
       <ConfirmationModal
         isOpen={isDeleteModalOpen}

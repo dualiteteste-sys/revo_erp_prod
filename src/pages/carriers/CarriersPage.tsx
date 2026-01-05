@@ -2,7 +2,7 @@ import React, { useMemo, useState } from 'react';
 import { useCarriers } from '../../hooks/useCarriers';
 import { useToast } from '../../contexts/ToastProvider';
 import * as carriersService from '../../services/carriers';
-import { Loader2, PlusCircle, Search, Truck, DatabaseBackup } from 'lucide-react';
+import { FileUp, Loader2, PlusCircle, Search, Truck, DatabaseBackup } from 'lucide-react';
 import Pagination from '../../components/ui/Pagination';
 import ConfirmationModal from '../../components/ui/ConfirmationModal';
 import Modal from '../../components/ui/Modal';
@@ -13,9 +13,14 @@ import { isSeedEnabled } from '@/utils/seed';
 import CsvExportDialog from '@/components/ui/CsvExportDialog';
 import { useBulkSelection } from '@/hooks/useBulkSelection';
 import BulkActionsBar from '@/components/ui/BulkActionsBar';
+import { useHasPermission } from '@/hooks/useHasPermission';
+import ImportCarriersCsvModal from '@/components/carriers/ImportCarriersCsvModal';
 
 const CarriersPage: React.FC = () => {
   const enableSeed = isSeedEnabled();
+  const permCreate = useHasPermission('logistica', 'create');
+  const permsLoading = permCreate.isLoading;
+  const canCreate = !!permCreate.data;
   const {
     carriers,
     loading,
@@ -43,6 +48,7 @@ const CarriersPage: React.FC = () => {
   const [isSeeding, setIsSeeding] = useState(false);
   const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false);
   const [bulkLoading, setBulkLoading] = useState(false);
+  const [isImportOpen, setIsImportOpen] = useState(false);
 
   const bulk = useBulkSelection(carriers, (c) => c.id);
   const selectedCarriers = useMemo(
@@ -169,6 +175,15 @@ const CarriersPage: React.FC = () => {
                 { key: 'padrao', label: 'Padrão para frete', getValue: (r) => (r.padrao_para_frete ? 'Sim' : 'Não') },
               ]}
             />
+            <button
+              onClick={() => setIsImportOpen(true)}
+              disabled={permsLoading || !canCreate}
+              title={!canCreate ? 'Sem permissão para importar' : 'Importar transportadoras por CSV'}
+              className="flex items-center gap-2 bg-gray-100 text-gray-700 font-semibold py-2 px-4 rounded-lg hover:bg-gray-200 transition-colors disabled:opacity-50"
+            >
+              <FileUp size={20} />
+              Importar CSV
+            </button>
             {enableSeed ? (
               <button
                 onClick={handleSeed}
@@ -181,7 +196,9 @@ const CarriersPage: React.FC = () => {
             ) : null}
             <button
               onClick={() => handleOpenForm()}
-              className="flex items-center gap-2 bg-blue-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-blue-700 transition-colors shadow-sm"
+              disabled={permsLoading || !canCreate}
+              title={!canCreate ? 'Sem permissão para criar' : undefined}
+              className="flex items-center gap-2 bg-blue-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-blue-700 transition-colors shadow-sm disabled:opacity-50"
             >
               <PlusCircle size={20} />
               Nova Transportadora
@@ -243,7 +260,9 @@ const CarriersPage: React.FC = () => {
                 ) : null}
                 <button
                     onClick={() => handleOpenForm()}
-                    className="text-blue-600 hover:text-blue-800 font-medium hover:underline flex items-center"
+                    disabled={permsLoading || !canCreate}
+                    title={!canCreate ? 'Sem permissão para criar' : undefined}
+                    className="text-blue-600 hover:text-blue-800 font-medium hover:underline flex items-center disabled:opacity-50"
                 >
                     Cadastrar manualmente
                 </button>
@@ -314,6 +333,16 @@ const CarriersPage: React.FC = () => {
         confirmText="Sim, Excluir"
         isLoading={bulkLoading}
         variant="danger"
+      />
+
+      <ImportCarriersCsvModal
+        isOpen={isImportOpen}
+        onClose={() => setIsImportOpen(false)}
+        importFn={(payload) => carriersService.saveCarrier(payload)}
+        onImported={() => {
+          setIsImportOpen(false);
+          refresh();
+        }}
       />
     </div>
   );
