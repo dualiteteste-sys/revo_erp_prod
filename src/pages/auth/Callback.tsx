@@ -55,10 +55,10 @@ export default function Callback() {
         const { data: pref, error: prefErr } = await supabase
           .from("user_active_empresa")
           .select("empresa_id")
-          .maybeSingle();
+          .limit(1);
 
         if (prefErr) console.warn("[AUTH][CALLBACK][PREF][WARN]", prefErr);
-        console.log("[AUTH][CALLBACK] success", pref);
+        console.log("[AUTH][CALLBACK] success", pref?.[0] ?? null);
 
         if (!cancelled) navigate("/app", { replace: true });
       } catch (e: any) {
