@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useRef, useState, useEffect } from 'react';
 import {
   EstoqueDeposito,
   EstoqueMovimento,
@@ -19,6 +19,7 @@ import { useToast } from '@/contexts/ToastProvider';
 import { useHasPermission } from '@/hooks/useHasPermission';
 import InventarioCiclicoModal from '@/components/suprimentos/InventarioCiclicoModal';
 import PageHelp from '@/components/support/PageHelp';
+import VirtualizedTableBody from '@/components/ui/VirtualizedTableBody';
 
 export default function EstoquePage() {
   const [produtos, setProdutos] = useState<EstoquePosicao[]>([]);
@@ -190,6 +191,7 @@ export default function EstoquePage() {
 
   // Tipos de movimento que somam ao estoque
   const entryTypes = ['entrada', 'ajuste_entrada', 'entrada_beneficiamento', 'transfer_in'];
+  const scrollRef = useRef<HTMLDivElement | null>(null);
 
   return (
     <div className="p-1">
@@ -260,8 +262,8 @@ export default function EstoquePage() {
       </div>
 
       <div className="bg-white rounded-xl shadow overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-gray-200">
+        <div ref={scrollRef} className="overflow-auto max-h-[70vh]">
+          <table className="min-w-full divide-y divide-gray-200 table-fixed">
             <thead className="bg-gray-50">
               <tr>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Produto</th>
@@ -270,10 +272,16 @@ export default function EstoquePage() {
                 <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Ações</th>
               </tr>
             </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
-              {loading ? (
-                <tr><td colSpan={4} className="p-8 text-center"><Loader2 className="animate-spin mx-auto text-blue-500" /></td></tr>
-              ) : produtos.length === 0 ? (
+            {loading ? (
+              <tbody className="bg-white divide-y divide-gray-200">
+                <tr>
+                  <td colSpan={4} className="p-8 text-center">
+                    <Loader2 className="animate-spin mx-auto text-blue-500" />
+                  </td>
+                </tr>
+              </tbody>
+            ) : produtos.length === 0 ? (
+              <tbody className="bg-white divide-y divide-gray-200">
                 <tr>
                   <td colSpan={4} className="p-8 text-center">
                     <div className="text-gray-500">Nenhum produto encontrado.</div>
@@ -291,44 +299,62 @@ export default function EstoquePage() {
                     ) : null}
                   </td>
                 </tr>
-              ) : (
-                produtos.map((prod) => {
+              </tbody>
+            ) : (
+              <VirtualizedTableBody
+                scrollParentRef={scrollRef}
+                rowCount={produtos.length}
+                rowHeight={72}
+                className="bg-white divide-y divide-gray-200"
+                renderRow={(index) => {
+                  const prod = produtos[index];
                   const isHighlighted = highlightProdutoId === prod.produto_id;
                   return (
-                  <tr key={prod.produto_id} className={`transition-colors ${isHighlighted ? 'bg-amber-50/70 ring-1 ring-amber-200' : 'hover:bg-gray-50'}`}>
-                    <td className="px-6 py-4">
-                      <div className="font-medium text-gray-900">{prod.nome}</div>
-                      <div className="text-xs text-gray-500">SKU: {prod.sku || '-'}</div>
-                    </td>
-                    <td className="px-6 py-4">
-                      <span className="text-lg font-bold text-gray-800">{prod.saldo}</span>
-                      <span className="text-xs text-gray-500 ml-1">{prod.unidade}</span>
-                    </td>
-                    <td className="px-6 py-4">
-                      {getStatusBadge(prod.status_estoque)}
-                    </td>
-                    <td className="px-6 py-4 text-right space-x-2">
-                      <button 
-                        onClick={() => handleOpenMovimento(prod)}
-                        className="text-blue-600 hover:bg-blue-50 p-2 rounded-lg disabled:opacity-50 disabled:hover:bg-transparent" 
-                        title={!permsLoading && !canUpdate ? 'Sem permissão para movimentar estoque' : 'Nova Movimentação'}
-                        disabled={permsLoading || !canUpdate}
-                      >
-                        <ArrowRightLeft size={18} />
-                      </button>
-                      <button 
-                        onClick={() => handleOpenKardex(prod)}
-                        className="text-gray-600 hover:bg-gray-100 p-2 rounded-lg" 
-                        title="Histórico (Kardex)"
-                      >
-                        <History size={18} />
-                      </button>
-                    </td>
-                  </tr>
-                );
-                })
-              )}
-            </tbody>
+                    <tr
+                      key={prod.produto_id}
+                      className={`transition-colors ${isHighlighted ? 'bg-amber-50/70 ring-1 ring-amber-200' : 'hover:bg-gray-50'}`}
+                      style={{
+                        position: 'absolute',
+                        top: index * 72,
+                        left: 0,
+                        right: 0,
+                        height: 72,
+                        display: 'table',
+                        width: '100%',
+                        tableLayout: 'fixed',
+                      }}
+                    >
+                      <td className="px-6 py-4">
+                        <div className="font-medium text-gray-900 truncate">{prod.nome}</div>
+                        <div className="text-xs text-gray-500">SKU: {prod.sku || '-'}</div>
+                      </td>
+                      <td className="px-6 py-4">
+                        <span className="text-lg font-bold text-gray-800">{prod.saldo}</span>
+                        <span className="text-xs text-gray-500 ml-1">{prod.unidade}</span>
+                      </td>
+                      <td className="px-6 py-4">{getStatusBadge(prod.status_estoque)}</td>
+                      <td className="px-6 py-4 text-right space-x-2">
+                        <button
+                          onClick={() => handleOpenMovimento(prod)}
+                          className="text-blue-600 hover:bg-blue-50 p-2 rounded-lg disabled:opacity-50 disabled:hover:bg-transparent"
+                          title={!permsLoading && !canUpdate ? 'Sem permissão para movimentar estoque' : 'Nova Movimentação'}
+                          disabled={permsLoading || !canUpdate}
+                        >
+                          <ArrowRightLeft size={18} />
+                        </button>
+                        <button
+                          onClick={() => handleOpenKardex(prod)}
+                          className="text-gray-600 hover:bg-gray-100 p-2 rounded-lg"
+                          title="Histórico (Kardex)"
+                        >
+                          <History size={18} />
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                }}
+              />
+            )}
           </table>
         </div>
       </div>

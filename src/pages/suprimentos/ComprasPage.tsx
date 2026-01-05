@@ -9,8 +9,10 @@ import CompraFormPanel from '@/components/suprimentos/compras/CompraFormPanel';
 import Select from '@/components/ui/forms/Select';
 import CsvExportDialog from '@/components/ui/CsvExportDialog';
 import Pagination from '@/components/ui/Pagination';
+import { useSearchParams } from 'react-router-dom';
 
 export default function ComprasPage() {
+  const [searchParams, setSearchParams] = useSearchParams();
   const [orders, setOrders] = useState<CompraPedido[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -47,6 +49,17 @@ export default function ComprasPage() {
   useEffect(() => {
     fetchOrders();
   }, [debouncedSearch, statusFilter, page]);
+
+  useEffect(() => {
+    const openId = searchParams.get('open');
+    if (!openId) return;
+    setSelectedId(openId);
+    setIsFormOpen(true);
+    const next = new URLSearchParams(searchParams);
+    next.delete('open');
+    setSearchParams(next, { replace: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
     setPage(1);

@@ -78,7 +78,7 @@ Este é o checklist único (por módulo) para levar o REVO ao nível **top mundi
 - [x] LGPD-01 (P0) Inventário de dados pessoais (campos, finalidade, base legal, retenção)
 - [x] LGPD-02 (P0) Export do titular (dados do usuário/empresa) + trilha do que foi exportado
 - [x] LGPD-03 (P0) Retenção/expurgo (política) + execução segura (soft delete onde precisa)
-- [ ] LGPD-04 (P1) Minimização de logs: payload saneado e sem PII sensível
+- [x] LGPD-04 (P1) Minimização de logs: payload saneado e sem PII sensível
 
 ---
 
@@ -105,7 +105,7 @@ Este é o checklist único (por módulo) para levar o REVO ao nível **top mundi
 
 ### D1) Front-end
 - [x] PERF-FE-01 (P0) Budgets (bundle/route) no CI com falha quando estourar
-- [ ] PERF-FE-02 (P1) Virtualização para listas grandes (tabelas críticas)
+- [x] PERF-FE-02 (P1) Virtualização para listas grandes (tabelas críticas)
 - [x] PERF-FE-03 (P0) Padrão de cache/invalidação (React Query) por recurso
 - [ ] PERF-FE-04 (P1) Lighthouse budget (Perf/A11y/Best Practices) para landing + app shell
 
@@ -173,7 +173,7 @@ Este é o checklist único (por módulo) para levar o REVO ao nível **top mundi
 ### G2) Suprimentos / Estoque
 - [x] SUP-STA-01 (P0) Multi-estoque/depósitos + transferências + permissões por local
 - [x] SUP-STA-02 (P0) Inventário cíclico (contagem → divergência → aprovação → ajuste auditável)
-- [ ] SUP-STA-03 (P1) Devolução ao fornecedor (reversão) vinculada a OC/recebimento
+- [x] SUP-STA-03 (P1) Devolução ao fornecedor (reversão) vinculada a OC/recebimento
 - [ ] SUP-STA-04 (P1) Landed cost (rateio frete/impostos) com impacto em custo médio/relatórios
 - [ ] SUP-STA-05 (P1) Sugestão de compra (mín/máx + lead time + OCs abertas) “MRP-lite”
 - [ ] SUP-STA-06 (P1) WMS light (leitura barcode/QR na conferência/separação) + checklists
@@ -187,6 +187,13 @@ Este é o checklist único (por módulo) para levar o REVO ao nível **top mundi
 **Validar (SUP-STA-02)**
 - Suprimentos → Estoque → `Inventário cíclico`: criar inventário e inserir contagens.
 - Aprovar inventário e confirmar que o saldo (e o kardex) mudou via ajustes `INV-xxxxxxxx`.
+
+**Validar (SUP-STA-03)**
+- Suprimentos → Recebimentos: escolher um recebimento `concluido`.
+- Ação `Dev.` (devolver ao fornecedor): selecionar itens/quantidades e aplicar.
+- Suprimentos → Estoque:
+  - validar que o saldo diminuiu no depósito selecionado (ou depósito default).
+  - abrir `Kardex` do produto e confirmar movimento `devolucao_fornecedor` com ref `DEVF-...`.
 
 ### G3) Vendas / PDV / Expedição
 - [x] VEN-STA-01 (P0) Regras de preço/desconto com permissão + trilha (quem deu desconto)
@@ -249,9 +256,14 @@ Este é o checklist único (por módulo) para levar o REVO ao nível **top mundi
   - Exportar CSV e confirmar bloco `DRE simplificada`.
 
 ### G7) Indústria
-- [ ] IND-STA-01 (P0) Capacidade/PCP e MRP “operável” (não só tela) com sugestões e alertas
+- [x] IND-STA-01 (P0) Capacidade/PCP e MRP “operável” (alertas + ações aplicáveis)
 - [ ] IND-STA-02 (P1) Apontamentos com rastreio por lote/qualidade e custos (fase 2)
 - [ ] IND-STA-03 (P1) Dashboards industriais (OEE-lite, filas, WIP, atrasos) com drill-down
+
+**Validar (IND-STA-01)**
+- Indústria → PCP: ver alertas de capacidade/ATP/ruptura e clicar nas CTAs (Gantt/MRP/Estoque).
+- Indústria → PCP: rodar `APS: Sequenciar todos` (preview e aplicar) e/ou `Replan: sobrecarga` (preview + aplicar subset) sem quebrar estados.
+- Indústria → MRP: abrir uma demanda com `necessidade_liquida > 0`, clicar `Criar OC (rascunho)` e confirmar que abre a OC em Suprimentos → Compras.
 
 ### G8) RH & Qualidade
 - [ ] RH-STA-01 (P1) Trilhas e compliance de treinamentos (vencimentos, alertas, evidência)

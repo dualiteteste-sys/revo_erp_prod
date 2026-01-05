@@ -1,4 +1,5 @@
 import * as Sentry from "@sentry/react";
+import { sanitizeLogData } from "@/lib/sanitizeLog";
 
 type LogLevel = "info" | "warn" | "error" | "debug";
 
@@ -22,13 +23,14 @@ class Logger {
             timestamp,
             level,
             message,
-            ...context,
+            ...(sanitizeLogData(context ?? {}) as any),
         };
     }
 
     info(message: string, context?: LogContext) {
+        const safeContext = sanitizeLogData(context ?? {});
         if (this.isDev) {
-            originalConsole.info(`[INFO] ${message}`, context || "");
+            originalConsole.info(`[INFO] ${message}`, safeContext || "");
         }
         // We generally don't send info logs to Sentry to save quota, 
         // unless breadcrumbs are desired.
@@ -36,38 +38,41 @@ class Logger {
             category: "log",
             message,
             level: "info",
-            data: context,
+            data: safeContext,
         });
     }
 
     warn(message: string, context?: LogContext) {
+        const safeContext = sanitizeLogData(context ?? {});
         if (this.isDev) {
-            originalConsole.warn(`[WARN] ${message}`, context || "");
+            originalConsole.warn(`[WARN] ${message}`, safeContext || "");
         }
         Sentry.addBreadcrumb({
             category: "log",
             message,
             level: "warning",
-            data: context,
+            data: safeContext,
         });
     }
 
     error(message: string, error?: any, context?: LogContext) {
+        const safeContext = sanitizeLogData(context ?? {});
         if (this.isDev) {
-            originalConsole.error(`[ERROR] ${message}`, error || "", context || "");
+            originalConsole.error(`[ERROR] ${message}`, error || "", safeContext || "");
         }
 
         Sentry.captureException(error || new Error(message), {
             extra: {
                 message,
-                ...context,
+                ...(safeContext as any),
             },
         });
     }
 
     debug(message: string, context?: LogContext) {
+        const safeContext = sanitizeLogData(context ?? {});
         if (this.isDev) {
-            originalConsole.debug(`[DEBUG] ${message}`, context || "");
+            originalConsole.debug(`[DEBUG] ${message}`, safeContext || "");
         }
     }
 }

@@ -26,6 +26,75 @@ export type Expedicao = {
   updated_at: string;
 };
 
+export type ExpedicaoSlaStats = {
+  abertas: number;
+  overdue: number;
+  enviado: number;
+  entregue: number;
+  cancelado: number;
+};
+
+export type ExpedicaoSlaRow = {
+  expedicao_id: string;
+  pedido_id: string;
+  pedido_numero: number;
+  cliente_nome: string | null;
+  status: ExpedicaoStatus;
+  tracking_code: string | null;
+  data_envio: string | null;
+  data_entrega: string | null;
+  created_at: string;
+  updated_at: string;
+  last_event_at: string | null;
+  events_count: number;
+  sla_deadline_at: string;
+  age_hours: number;
+  overdue: boolean;
+  hours_left: number;
+};
+
+export async function getExpedicaoSlaStats(params?: { slaHours?: number }): Promise<ExpedicaoSlaStats> {
+  const slaHours = params?.slaHours ?? 48;
+  try {
+    const rows = await callRpc<any[]>('vendas_expedicoes_sla_stats', { p_sla_hours: slaHours });
+    const row = Array.isArray(rows) ? rows[0] : null;
+    return {
+      abertas: Number(row?.abertas ?? 0),
+      overdue: Number(row?.overdue ?? 0),
+      enviado: Number(row?.enviado ?? 0),
+      entregue: Number(row?.entregue ?? 0),
+      cancelado: Number(row?.cancelado ?? 0),
+    };
+  } catch (e: any) {
+    if (e instanceof RpcError && e.status === 404) {
+      return { abertas: 0, overdue: 0, enviado: 0, entregue: 0, cancelado: 0 };
+    }
+    throw e;
+  }
+}
+
+export async function listExpedicoesSla(params?: {
+  slaHours?: number;
+  onlyOverdue?: boolean;
+  status?: ExpedicaoStatus[] | null;
+  limit?: number;
+  offset?: number;
+}): Promise<ExpedicaoSlaRow[]> {
+  const slaHours = params?.slaHours ?? 48;
+  try {
+    return await callRpc<ExpedicaoSlaRow[]>('vendas_expedicoes_sla_list', {
+      p_sla_hours: slaHours,
+      p_only_overdue: params?.onlyOverdue ?? false,
+      p_status: params?.status ?? null,
+      p_limit: params?.limit ?? 200,
+      p_offset: params?.offset ?? 0,
+    });
+  } catch (e: any) {
+    if (e instanceof RpcError && e.status === 404) return [];
+    throw e;
+  }
+}
+
 export type ExpedicaoEventoTipo = 'created' | 'status' | 'tracking' | 'observacoes';
 export type ExpedicaoEvento = {
   id: string;

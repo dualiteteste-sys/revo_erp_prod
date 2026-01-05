@@ -1,9 +1,17 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Loader2, PlusCircle, Search, Truck } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, Clock3, Loader2, PlusCircle, Search, Truck } from 'lucide-react';
 import Modal from '@/components/ui/Modal';
 import { useToast } from '@/contexts/ToastProvider';
 import { listVendas, type VendaPedido } from '@/services/vendas';
-import { listExpedicaoEventos, listExpedicoes, upsertExpedicao, type Expedicao, type ExpedicaoEvento, type ExpedicaoStatus } from '@/services/vendasMvp';
+import {
+  getExpedicaoSlaStats,
+  listExpedicaoEventos,
+  listExpedicoesSla,
+  upsertExpedicao,
+  type ExpedicaoEvento,
+  type ExpedicaoSlaRow,
+  type ExpedicaoStatus,
+} from '@/services/vendasMvp';
 import CsvExportDialog from '@/components/ui/CsvExportDialog';
 
 type FormState = {
@@ -28,43 +36,46 @@ export default function ExpedicaoPage() {
   const { addToast } = useToast();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [rows, setRows] = useState<Expedicao[]>([]);
-  const [orders, setOrders] = useState<VendaPedido[]>([]);
+  const [rows, setRows] = useState<ExpedicaoSlaRow[]>([]);
+  const [orders, setOrders] = useState<VendaPedido[]>([]); // usado no modal (seleção de pedido)
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<ExpedicaoStatus | 'all'>('all');
+  const [onlyOverdue, setOnlyOverdue] = useState(false);
+  const [slaHours, setSlaHours] = useState(48);
+  const [stats, setStats] = useState<{ abertas: number; overdue: number; enviado: number; entregue: number; cancelado: number } | null>(null);
   const [selectedExpedicaoId, setSelectedExpedicaoId] = useState<string | null>(null);
   const [eventos, setEventos] = useState<ExpedicaoEvento[]>([]);
 
   const [isOpen, setIsOpen] = useState(false);
   const [form, setForm] = useState<FormState>(emptyForm);
 
-  const orderById = useMemo(() => {
-    const map = new Map<string, VendaPedido>();
-    for (const o of orders) map.set(o.id, o);
-    return map;
-  }, [orders]);
-
   const filteredRows = useMemo(() => {
     const q = search.trim().toLowerCase();
     return rows.filter((r) => {
       if (statusFilter !== 'all' && r.status !== statusFilter) return false;
+      if (onlyOverdue && !r.overdue) return false;
       if (!q) return true;
-      const order = orderById.get(r.pedido_id);
-      const hay = `${order?.numero ?? ''} ${order?.cliente_nome ?? ''} ${r.tracking_code ?? ''}`.toLowerCase();
+      const hay = `${r.pedido_numero ?? ''} ${r.cliente_nome ?? ''} ${r.tracking_code ?? ''}`.toLowerCase();
       return hay.includes(q);
     });
-  }, [rows, search, statusFilter, orderById]);
+  }, [rows, search, statusFilter, onlyOverdue]);
 
   async function load() {
     setLoading(true);
     try {
-      const [exp, ord] = await Promise.all([listExpedicoes(), listVendas({ search: '', status: undefined, limit: 500, offset: 0 })]);
+      const [exp, ord, st] = await Promise.all([
+        listExpedicoesSla({ slaHours, onlyOverdue: false, status: statusFilter === 'all' ? null : [statusFilter], limit: 500, offset: 0 }),
+        listVendas({ search: '', status: undefined, limit: 500, offset: 0 }),
+        getExpedicaoSlaStats({ slaHours }),
+      ]);
       setRows(exp);
       setOrders(ord);
+      setStats(st);
     } catch (e: any) {
       addToast(e.message || 'Falha ao carregar expedições.', 'error');
       setRows([]);
       setOrders([]);
+      setStats(null);
     } finally {
       setLoading(false);
     }
@@ -74,6 +85,10 @@ export default function ExpedicaoPage() {
     void load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+  useEffect(() => {
+    void load();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [slaHours]);
 
   const openNew = () => {
     setForm(emptyForm);
@@ -82,7 +97,7 @@ export default function ExpedicaoPage() {
     setIsOpen(true);
   };
 
-  const openEdit = (row: Expedicao) => {
+  const openEdit = (row: ExpedicaoSlaRow) => {
     setForm({
       pedido_id: row.pedido_id,
       status: row.status,
@@ -91,7 +106,7 @@ export default function ExpedicaoPage() {
       data_entrega: row.data_entrega || '',
       observacoes: row.observacoes || '',
     });
-    setSelectedExpedicaoId(row.id);
+    setSelectedExpedicaoId(row.expedicao_id);
     setIsOpen(true);
   };
 
@@ -171,6 +186,47 @@ export default function ExpedicaoPage() {
         </button>
       </div>
 
+      <div className="grid grid-cols-1 md:grid-cols-5 gap-3 mb-4 flex-shrink-0">
+        <div className="rounded-xl border border-gray-200 bg-white p-3">
+          <div className="text-xs text-gray-500">Abertas</div>
+          <div className="mt-1 text-2xl font-bold text-gray-900 flex items-center gap-2">
+            <Clock3 className="text-blue-600" size={18} />
+            {stats?.abertas ?? '—'}
+          </div>
+        </div>
+        <div className="rounded-xl border border-gray-200 bg-white p-3">
+          <div className="text-xs text-gray-500">Atrasadas (SLA)</div>
+          <div className="mt-1 text-2xl font-bold text-gray-900 flex items-center gap-2">
+            <AlertTriangle className="text-orange-600" size={18} />
+            {stats?.overdue ?? '—'}
+          </div>
+        </div>
+        <div className="rounded-xl border border-gray-200 bg-white p-3">
+          <div className="text-xs text-gray-500">Enviadas</div>
+          <div className="mt-1 text-2xl font-bold text-gray-900">{stats?.enviado ?? '—'}</div>
+        </div>
+        <div className="rounded-xl border border-gray-200 bg-white p-3">
+          <div className="text-xs text-gray-500">Entregues</div>
+          <div className="mt-1 text-2xl font-bold text-gray-900 flex items-center gap-2">
+            <CheckCircle2 className="text-emerald-600" size={18} />
+            {stats?.entregue ?? '—'}
+          </div>
+        </div>
+        <div className="rounded-xl border border-gray-200 bg-white p-3">
+          <div className="text-xs text-gray-500">SLA (horas)</div>
+          <div className="mt-2 flex items-center gap-2">
+            <input
+              type="number"
+              min={1}
+              value={slaHours}
+              onChange={(e) => setSlaHours(Math.max(1, Number(e.target.value || 48)))}
+              className="w-full p-2 border border-gray-300 rounded-lg"
+            />
+          </div>
+          <div className="mt-1 text-[11px] text-gray-500">Calculado a partir de `created_at`.</div>
+        </div>
+      </div>
+
       <div className="mb-4 flex gap-4 flex-shrink-0">
         <div className="relative flex-grow max-w-md">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
@@ -194,17 +250,28 @@ export default function ExpedicaoPage() {
           <option value="entregue">Entregue</option>
           <option value="cancelado">Cancelado</option>
         </select>
+        <label className="flex items-center gap-2 text-sm text-gray-700 select-none">
+          <input
+            type="checkbox"
+            checked={onlyOverdue}
+            onChange={(e) => setOnlyOverdue(e.target.checked)}
+            className="h-4 w-4"
+          />
+          Só atrasadas (SLA)
+        </label>
         <CsvExportDialog
           filename="expedicoes.csv"
           rows={filteredRows}
           disabled={loading}
           columns={[
-            { key: 'pedido', label: 'Pedido', getValue: (r) => orderById.get(r.pedido_id)?.numero ?? '' },
-            { key: 'cliente', label: 'Cliente', getValue: (r) => orderById.get(r.pedido_id)?.cliente_nome ?? '' },
-            { key: 'status', label: 'Status', getValue: (r) => statusLabels[r.status] ?? r.status },
+            { key: 'pedido', label: 'Pedido', getValue: (r) => r.pedido_numero ?? '' },
+            { key: 'cliente', label: 'Cliente', getValue: (r) => r.cliente_nome ?? '' },
+            { key: 'status', label: 'Status', getValue: (r) => statusLabel[r.status] ?? r.status },
             { key: 'tracking', label: 'Tracking', getValue: (r) => r.tracking_code ?? '' },
             { key: 'envio', label: 'Data envio', getValue: (r) => r.data_envio ?? '' },
             { key: 'entrega', label: 'Data entrega', getValue: (r) => r.data_entrega ?? '' },
+            { key: 'overdue', label: 'Atrasada', getValue: (r) => (r.overdue ? 'sim' : 'não') },
+            { key: 'age_hours', label: 'Horas em aberto', getValue: (r) => r.age_hours },
           ]}
         />
       </div>
@@ -242,13 +309,13 @@ export default function ExpedicaoPage() {
               </thead>
               <tbody className="divide-y divide-gray-200">
                 {filteredRows.map((r) => {
-                  const o = orderById.get(r.pedido_id);
                   return (
-                    <tr key={r.id} className="hover:bg-gray-50">
+                    <tr key={r.expedicao_id} className={`hover:bg-gray-50 ${r.overdue ? 'bg-orange-50/40' : ''}`}>
                       <td className="px-4 py-3 font-medium text-gray-800">
-                        {o ? `#${o.numero} — ${o.cliente_nome || ''}` : r.pedido_id}
+                        #{r.pedido_numero} — {r.cliente_nome || ''}
+                        {r.overdue ? <span className="ml-2 text-xs font-semibold text-orange-700">Atrasada</span> : null}
                       </td>
-                      <td className="px-4 py-3">{r.status}</td>
+                      <td className="px-4 py-3">{statusLabel[r.status] ?? r.status}</td>
                       <td className="px-4 py-3">{r.tracking_code || '-'}</td>
                       <td className="px-4 py-3">{r.data_envio || '-'}</td>
                       <td className="px-4 py-3">{r.data_entrega || '-'}</td>
