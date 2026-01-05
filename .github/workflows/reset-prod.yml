@@ -55,8 +55,9 @@ jobs:
           set -euo pipefail
           echo "y" | supabase db push --include-all --db-url "$SUPABASE_DB_URL_PROD"
 
-      - name: Deploy Edge Functions to PROD
+      - name: Deploy Edge Functions to PROD (best effort)
         if: ${{ env.SUPABASE_ACCESS_TOKEN != '' && env.SUPABASE_PROJECT_REF_PROD != '' }}
+        continue-on-error: true
         env:
           SUPABASE_ACCESS_TOKEN: ${{ env.SUPABASE_ACCESS_TOKEN }}
           SUPABASE_PROJECT_REF: ${{ env.SUPABASE_PROJECT_REF_PROD }}
