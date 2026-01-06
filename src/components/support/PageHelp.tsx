@@ -79,7 +79,7 @@ export default function PageHelp(props: PageHelpProps) {
                 <HelpCircle size={18} />
               </div>
               <div className="min-w-0">
-                <div className="text-sm font-semibold text-gray-900 truncate">{title}</div>
+                <div className="text-sm font-semibold text-gray-900 truncate">Guia rápido</div>
                 <div className="text-xs text-gray-600 mt-1">
                   O que é • fluxo ideal • dependências • como preencher perfeito • links úteis.
                 </div>
@@ -92,6 +92,14 @@ export default function PageHelp(props: PageHelpProps) {
 
           {open ? (
             <div className="mt-4 grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4">
+              <div className="lg:col-span-2 xl:col-span-3">
+                <div className="rounded-2xl border border-blue-100 bg-blue-50/60 p-3">
+                  <div className="text-sm font-semibold text-blue-900">{title}</div>
+                  <div className="mt-1 text-xs text-blue-900/70">
+                    Este guia é específico deste módulo e foi feito para reduzir suporte: siga o fluxo ideal e evite os erros comuns.
+                  </div>
+                </div>
+              </div>
               <div className="rounded-2xl border border-gray-100 bg-gray-50 p-3">
                 <div className="flex items-center gap-2 text-sm font-semibold text-gray-900">
                   <ShieldCheck size={16} className="text-slate-700" />
