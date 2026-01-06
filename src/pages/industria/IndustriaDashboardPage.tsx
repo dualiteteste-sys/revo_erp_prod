@@ -14,6 +14,9 @@ export default function IndustriaDashboardPage() {
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [prodOrders, setProdOrders] = useState<OrdemIndustria[]>([]);
+  const [prodLoading, setProdLoading] = useState(false);
+  const [prodError, setProdError] = useState<string | null>(null);
   const [benefOrders, setBenefOrders] = useState<OrdemIndustria[]>([]);
   const [benefLoading, setBenefLoading] = useState(false);
   const [benefError, setBenefError] = useState<string | null>(null);
@@ -49,6 +52,20 @@ export default function IndustriaDashboardPage() {
     }
   }, []);
 
+  const fetchProdOrdens = useCallback(async () => {
+    setProdLoading(true);
+    setProdError(null);
+    try {
+      const data = await listOrdens('', 'industrializacao', '');
+      setProdOrders(data || []);
+    } catch (err: any) {
+      logger.error('[Indústria][Dashboard] Falha ao carregar produção', err);
+      setProdError(err.message || 'Erro ao carregar ordens de produção.');
+    } finally {
+      setProdLoading(false);
+    }
+  }, []);
+
   useEffect(() => {
     fetchStats();
   }, [fetchStats]);
@@ -56,6 +73,10 @@ export default function IndustriaDashboardPage() {
   useEffect(() => {
     fetchBenefOrdens();
   }, [fetchBenefOrdens]);
+
+  useEffect(() => {
+    fetchProdOrdens();
+  }, [fetchProdOrdens]);
 
   // Cálculos seguros com Nullish Coalescing (??) para evitar crash
   const totalProducao = stats?.total_producao ?? 0;
@@ -176,6 +197,23 @@ export default function IndustriaDashboardPage() {
   );
 
   const benefTop = useMemo(() => benefEmAndamento.slice(0, 8), [benefEmAndamento]);
+
+  const ordensAtrasadas = useMemo(() => {
+    const now = new Date();
+    now.setHours(0, 0, 0, 0);
+    const isLate = (o: OrdemIndustria) => {
+      const d = o.data_prevista_entrega ? new Date(`${o.data_prevista_entrega}T00:00:00`) : null;
+      if (!d || Number.isNaN(d.getTime())) return false;
+      return d < now && o.status !== 'concluida' && o.status !== 'cancelada';
+    };
+    const late = [...prodOrders, ...benefOrders].filter(isLate);
+    late.sort((a, b) => {
+      const da = a.data_prevista_entrega || '';
+      const db = b.data_prevista_entrega || '';
+      return da.localeCompare(db);
+    });
+    return late.slice(0, 10);
+  }, [prodOrders, benefOrders]);
 
   const benefSaldoPorCliente = useMemo(() => {
     const map: Record<string, number> = {};
@@ -303,15 +341,84 @@ export default function IndustriaDashboardPage() {
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
           {wipCards.map(card => (
-            <div key={card.key} className="rounded-xl border border-gray-100 bg-white p-4 shadow-sm">
+            <button
+              key={card.key}
+              type="button"
+              onClick={() => {
+                const tipo = card.key === 'em_beneficiamento' ? 'beneficiamento' : 'industrializacao';
+                navigate(`/app/industria/ordens?tipo=${tipo}&status=${encodeURIComponent(card.key)}`);
+              }}
+              className="rounded-xl border border-gray-100 bg-white p-4 shadow-sm text-left hover:bg-gray-50 transition-colors"
+              title="Ver ordens filtradas por status"
+            >
               <div className="flex items-center justify-between">
                 <span className={`px-2 py-1 rounded-full text-[11px] font-semibold ${card.color}`}>{card.label}</span>
                 <Activity className="w-4 h-4 text-gray-400" />
               </div>
               <div className="text-3xl font-bold text-gray-800 mt-2">{card.total}</div>
               <div className="text-xs text-gray-500 mt-1">ordens</div>
-            </div>
+            </button>
           ))}
+        </div>
+      </GlassCard>
+
+      <GlassCard className="p-4">
+        <div className="flex items-start justify-between gap-3 mb-4">
+          <div>
+            <h3 className="text-lg font-semibold text-gray-800">Atrasos (entrega)</h3>
+            <p className="text-sm text-gray-500">Ordens com data prevista menor que hoje (top 10). Clique para abrir a ordem.</p>
+          </div>
+          <div className="flex items-center gap-2">
+            <Button variant="outline" className="h-9" onClick={() => navigate('/app/industria/ordens?tipo=industrializacao')}>
+              Ver OP/OB
+            </Button>
+            <Button variant="outline" className="h-9" onClick={() => navigate('/app/industria/relatorios')}>
+              Relatórios
+            </Button>
+          </div>
+        </div>
+        {(prodLoading || benefLoading) && (
+          <div className="text-xs text-gray-500 mb-3">Atualizando lista…</div>
+        )}
+        {(prodError || benefError) && (
+          <div className="text-xs text-amber-700 mb-3">
+            {prodError || benefError}
+          </div>
+        )}
+        <div className="overflow-x-auto border border-gray-100 rounded-xl">
+          <table className="min-w-full text-sm">
+            <thead className="bg-gray-50">
+              <tr>
+                <th className="px-3 py-2 text-left text-xs font-semibold text-gray-500 uppercase">Tipo</th>
+                <th className="px-3 py-2 text-left text-xs font-semibold text-gray-500 uppercase">Ordem</th>
+                <th className="px-3 py-2 text-left text-xs font-semibold text-gray-500 uppercase">Cliente</th>
+                <th className="px-3 py-2 text-left text-xs font-semibold text-gray-500 uppercase">Prev. entrega</th>
+                <th className="px-3 py-2 text-left text-xs font-semibold text-gray-500 uppercase">Status</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-100">
+              {ordensAtrasadas.map((o) => (
+                <tr
+                  key={o.id}
+                  className="hover:bg-gray-50 cursor-pointer"
+                  onClick={() => navigate(`/app/industria/ordens?tipo=${o.tipo_ordem}&open=${encodeURIComponent(o.id)}`)}
+                >
+                  <td className="px-3 py-2 text-gray-700">{o.tipo_ordem === 'beneficiamento' ? 'OB' : 'OP'}</td>
+                  <td className="px-3 py-2 text-gray-900 font-semibold">{formatOrderNumber(o.numero)}</td>
+                  <td className="px-3 py-2 text-gray-700">{o.cliente_nome || '—'}</td>
+                  <td className="px-3 py-2 text-gray-700">{o.data_prevista_entrega ? new Date(`${o.data_prevista_entrega}T00:00:00`).toLocaleDateString('pt-BR') : '—'}</td>
+                  <td className="px-3 py-2 text-gray-700">{o.status.replace(/_/g, ' ')}</td>
+                </tr>
+              ))}
+              {ordensAtrasadas.length === 0 && (
+                <tr>
+                  <td colSpan={5} className="px-3 py-6 text-center text-gray-500 text-sm">
+                    Nenhum atraso detectado (ou não há datas previstas).
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
         </div>
       </GlassCard>
 
@@ -388,7 +495,12 @@ export default function IndustriaDashboardPage() {
                   const pedidoNumero = o.pedido_numero || '—';
                   const dataEntrada = o.created_at || o.data_prevista_inicio || '';
                   return (
-                    <tr key={o.id} className="hover:bg-gray-50">
+                    <tr
+                      key={o.id}
+                      className="hover:bg-gray-50 cursor-pointer"
+                      onClick={() => navigate(`/app/industria/ordens?tipo=beneficiamento&open=${encodeURIComponent(o.id)}`)}
+                      title="Abrir ordem"
+                    >
                       <td className="px-3 py-2 text-gray-800">{o.quantidade_planejada ?? '—'}</td>
                       <td className="px-3 py-2 text-gray-800">{qtdeCaixas}</td>
                       <td className="px-3 py-2 text-gray-800 font-semibold">{formatOrderNumber(o.numero)}</td>

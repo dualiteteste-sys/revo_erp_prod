@@ -1,10 +1,15 @@
 import React, { useState, useEffect } from 'react';
-import { getCompetencyMatrix, MatrixRow, listCargos, Cargo } from '@/services/rh';
+import { getCompetencyMatrix, MatrixRow, listCargos, Cargo, listPlanosAcaoCompetencias, upsertPlanoAcaoCompetencia, type PlanoAcaoCompetencia } from '@/services/rh';
 import { Loader2, Filter, AlertCircle, TrendingUp, TrendingDown, Minus, Grid } from 'lucide-react';
 import GlassCard from '@/components/ui/GlassCard';
 import Select from '@/components/ui/forms/Select';
 import PageHeader from '@/components/ui/PageHeader';
 import { useToast } from '@/contexts/ToastProvider';
+import Modal from '@/components/ui/Modal';
+import Input from '@/components/ui/forms/Input';
+import TextArea from '@/components/ui/forms/TextArea';
+import { Button } from '@/components/ui/button';
+import { useHasPermission } from '@/hooks/useHasPermission';
 
 export default function MatrizCompetenciasPage() {
   const { addToast } = useToast();
@@ -12,6 +17,25 @@ export default function MatrizCompetenciasPage() {
   const [cargos, setCargos] = useState<Cargo[]>([]);
   const [selectedCargo, setSelectedCargo] = useState<string>('');
   const [loading, setLoading] = useState(true);
+  const [planos, setPlanos] = useState<PlanoAcaoCompetencia[]>([]);
+  const [planModal, setPlanModal] = useState<null | {
+    colaborador_id: string;
+    colaborador_nome: string;
+    cargo_nome: string;
+    competencia_id: string;
+    competencia_nome: string;
+    nivel_atual: number;
+    nivel_requerido: number;
+  }>(null);
+  const [planSaving, setPlanSaving] = useState(false);
+  const [planStatus, setPlanStatus] = useState<PlanoAcaoCompetencia['status']>('aberto');
+  const [planPrioridade, setPlanPrioridade] = useState<number>(2);
+  const [planDueDate, setPlanDueDate] = useState<string>('');
+  const [planResponsavel, setPlanResponsavel] = useState<string>('');
+  const [planNotas, setPlanNotas] = useState<string>('');
+
+  const permManage = useHasPermission('rh', 'manage');
+  const canManage = !permManage.isLoading && !!permManage.data;
 
   useEffect(() => {
     const loadFilters = async () => {
@@ -29,8 +53,12 @@ export default function MatrizCompetenciasPage() {
     const fetchMatrix = async () => {
       setLoading(true);
       try {
-        const data = await getCompetencyMatrix(selectedCargo || undefined);
+        const [data, plans] = await Promise.all([
+          getCompetencyMatrix(selectedCargo || undefined),
+          listPlanosAcaoCompetencias(selectedCargo || undefined),
+        ]);
         setMatrixData(data);
+        setPlanos(plans);
       } catch (error) {
         addToast((error as any)?.message || 'Erro ao carregar matriz de competências.', 'error');
       } finally {
@@ -51,6 +79,14 @@ export default function MatrizCompetenciasPage() {
     });
     return Array.from(comps.values()).sort((a, b) => a.nome.localeCompare(b.nome));
   }, [matrixData]);
+
+  const planosByKey = React.useMemo(() => {
+    const map = new Map<string, PlanoAcaoCompetencia>();
+    for (const p of planos) {
+      map.set(`${p.colaborador_id}:${p.competencia_id}`, p);
+    }
+    return map;
+  }, [planos]);
 
   const renderCell = (row: MatrixRow, compId: string) => {
     const competencias = Array.isArray(row.competencias) ? row.competencias : [];
@@ -82,17 +118,89 @@ export default function MatrizCompetenciasPage() {
         icon = <Minus size={12} className="rotate-90" />;
     }
 
-    return (
+    const isGap = comp.nivel_requerido > 0 && comp.gap < 0;
+    const planKey = `${row.colaborador_id}:${comp.id}`;
+    const existingPlan = planosByKey.get(planKey);
+    const planDot =
+      existingPlan?.status === 'concluido'
+        ? 'bg-emerald-500'
+        : existingPlan?.status === 'em_andamento'
+          ? 'bg-amber-500'
+          : existingPlan?.status === 'cancelado'
+            ? 'bg-gray-400'
+            : existingPlan
+              ? 'bg-red-500'
+              : null;
+
+    const content = (
       <div className={`h-full w-full p-2 flex flex-col items-center justify-center text-xs border-r border-b border-gray-100 ${bgColor} ${textColor}`}>
         <div className="font-bold text-sm flex items-center gap-1">
-            {comp.nivel_atual}
-            {icon}
+          {comp.nivel_atual}
+          {icon}
+          {planDot ? <span className={`ml-1 inline-block w-2 h-2 rounded-full ${planDot}`} title="Plano de ação" /> : null}
         </div>
-        {comp.nivel_requerido > 0 && (
-            <span className="opacity-70 text-[10px]">Meta: {comp.nivel_requerido}</span>
-        )}
+        {comp.nivel_requerido > 0 && <span className="opacity-70 text-[10px]">Meta: {comp.nivel_requerido}</span>}
+        {isGap && <span className="text-[10px] opacity-80 mt-0.5">Ação</span>}
       </div>
     );
+
+    if (!isGap) return content;
+
+    return (
+      <button
+        type="button"
+        className="w-full h-full text-left"
+        onClick={() => {
+          const modal = {
+            colaborador_id: row.colaborador_id,
+            colaborador_nome: row.colaborador_nome,
+            cargo_nome: row.cargo_nome,
+            competencia_id: comp.id,
+            competencia_nome: comp.nome,
+            nivel_atual: comp.nivel_atual,
+            nivel_requerido: comp.nivel_requerido,
+          };
+          setPlanModal(modal);
+          const existing = planosByKey.get(`${row.colaborador_id}:${comp.id}`);
+          setPlanStatus(existing?.status ?? 'aberto');
+          setPlanPrioridade(existing?.prioridade ?? 2);
+          setPlanDueDate(existing?.due_date ?? '');
+          setPlanResponsavel(existing?.responsavel ?? '');
+          setPlanNotas(existing?.notas ?? '');
+        }}
+        title="Abrir plano de ação"
+      >
+        {content}
+      </button>
+    );
+  };
+
+  const handleSavePlano = async () => {
+    if (!planModal) return;
+    if (!canManage) {
+      addToast('Você não tem permissão para criar/editar planos de ação.', 'warning');
+      return;
+    }
+    setPlanSaving(true);
+    try {
+      await upsertPlanoAcaoCompetencia({
+        colaborador_id: planModal.colaborador_id,
+        competencia_id: planModal.competencia_id,
+        status: planStatus,
+        prioridade: planPrioridade,
+        due_date: planDueDate || null,
+        responsavel: planResponsavel || null,
+        notas: planNotas || null,
+      });
+      const plans = await listPlanosAcaoCompetencias(selectedCargo || undefined);
+      setPlanos(plans);
+      addToast('Plano de ação salvo.', 'success');
+      setPlanModal(null);
+    } catch (e: any) {
+      addToast(e?.message || 'Erro ao salvar plano de ação.', 'error');
+    } finally {
+      setPlanSaving(false);
+    }
   };
 
   return (
@@ -179,6 +287,93 @@ export default function MatrizCompetenciasPage() {
           </div>
         </GlassCard>
       )}
+
+      <Modal
+        isOpen={!!planModal}
+        onClose={() => setPlanModal(null)}
+        title="Plano de ação (Gap de competência)"
+        size="2xl"
+      >
+        {planModal ? (
+          <div className="p-6 space-y-4">
+            <div className="rounded-xl border border-gray-200 bg-gray-50 p-4">
+              <div className="text-sm font-semibold text-gray-900">{planModal.colaborador_nome}</div>
+              <div className="text-xs text-gray-600">{planModal.cargo_nome}</div>
+              <div className="mt-3 grid grid-cols-1 md:grid-cols-3 gap-3">
+                <div className="rounded-lg bg-white border border-gray-200 p-3">
+                  <div className="text-[11px] text-gray-500">Competência</div>
+                  <div className="text-sm font-semibold text-gray-900">{planModal.competencia_nome}</div>
+                </div>
+                <div className="rounded-lg bg-white border border-gray-200 p-3">
+                  <div className="text-[11px] text-gray-500">Nível atual</div>
+                  <div className="text-sm font-semibold text-gray-900">{planModal.nivel_atual}</div>
+                </div>
+                <div className="rounded-lg bg-white border border-gray-200 p-3">
+                  <div className="text-[11px] text-gray-500">Meta</div>
+                  <div className="text-sm font-semibold text-gray-900">{planModal.nivel_requerido}</div>
+                </div>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs font-semibold text-gray-700 mb-1">Status</label>
+                <Select value={planStatus} onChange={(e) => setPlanStatus(e.target.value as any)}>
+                  <option value="aberto">Aberto</option>
+                  <option value="em_andamento">Em andamento</option>
+                  <option value="concluido">Concluído</option>
+                  <option value="cancelado">Cancelado</option>
+                </Select>
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-gray-700 mb-1">Prioridade</label>
+                <Select value={String(planPrioridade)} onChange={(e) => setPlanPrioridade(Number(e.target.value))}>
+                  <option value="1">P1 (Alta)</option>
+                  <option value="2">P2 (Média)</option>
+                  <option value="3">P3 (Baixa)</option>
+                </Select>
+              </div>
+              <Input
+                label="Vencimento (opcional)"
+                name="due_date"
+                type="date"
+                value={planDueDate}
+                onChange={(e) => setPlanDueDate(e.target.value)}
+              />
+              <Input
+                label="Responsável (opcional)"
+                name="responsavel"
+                value={planResponsavel}
+                onChange={(e) => setPlanResponsavel(e.target.value)}
+                placeholder="Ex.: RH / Líder do setor"
+              />
+            </div>
+
+            <TextArea
+              label="Notas / Próximo passo"
+              name="notas"
+              value={planNotas}
+              onChange={(e) => setPlanNotas(e.target.value)}
+              rows={4}
+              placeholder="Ex.: agendar treinamento X, realizar avaliação Y, revisar cargo…"
+            />
+
+            <div className="flex justify-end gap-2">
+              <Button variant="outline" onClick={() => setPlanModal(null)}>
+                Cancelar
+              </Button>
+              <Button onClick={handleSavePlano} disabled={planSaving || !canManage}>
+                {planSaving ? 'Salvando…' : 'Salvar'}
+              </Button>
+            </div>
+            {!canManage && (
+              <div className="text-xs text-amber-800">
+                Você precisa de permissão <span className="font-semibold">rh/manage</span> para salvar este plano.
+              </div>
+            )}
+          </div>
+        ) : null}
+      </Modal>
     </div>
   );
 }

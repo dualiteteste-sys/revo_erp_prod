@@ -1,5 +1,5 @@
-import React, { useEffect, useMemo, useState } from 'react';
-import { Activity, AlertTriangle, CheckCircle2, Copy, Download, LifeBuoy, Loader2, Lock, XCircle } from 'lucide-react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { Activity, AlertTriangle, Bell, CheckCircle2, Copy, Download, LifeBuoy, Loader2, Lock, RefreshCw, XCircle } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthProvider';
 import { callRpc } from '@/lib/api';
 import PageHeader from '@/components/ui/PageHeader';
@@ -12,6 +12,8 @@ import { getLastRequestId } from '@/lib/requestId';
 import { sanitizeLogData } from '@/lib/sanitizeLog';
 import { useHasPermission } from '@/hooks/useHasPermission';
 import { getOpsHealthSummary, listOpsRecentFailures } from '@/services/opsHealth';
+import { listSupportNotifications, markAllNotificationsRead, markNotificationsRead, type SupportNotification } from '@/services/supportNotifications';
+import { Switch } from '@/components/ui/switch';
 
 type CheckStatus = 'ok' | 'warn' | 'missing';
 type GuidedCheck = {
@@ -40,6 +42,21 @@ function statusLabel(status: CheckStatus) {
   return 'Faltando';
 }
 
+function notificationBadge(n: SupportNotification) {
+  const base = 'inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium';
+  if (n.severity === 'error') return <span className={`${base} bg-red-100 text-red-800`}>Erro</span>;
+  if (n.severity === 'warn') return <span className={`${base} bg-amber-100 text-amber-900`}>Atenção</span>;
+  return <span className={`${base} bg-sky-100 text-sky-900`}>Info</span>;
+}
+
+function categoryLabel(category: SupportNotification['category']) {
+  if (category === 'financeiro') return 'Financeiro';
+  if (category === 'fiscal') return 'Fiscal';
+  if (category === 'integracao') return 'Integrações';
+  if (category === 'incidente') return 'Incidente';
+  return 'Sistema';
+}
+
 export default function SuportePage() {
   const { session, activeEmpresa } = useAuth();
   const userId = session?.user?.id || '';
@@ -51,7 +68,11 @@ export default function SuportePage() {
   const [ecommerceDiagnostics, setEcommerceDiagnostics] = useState<Record<string, EcommerceConnectionDiagnostics> | null>(null);
   const [ecommerceError, setEcommerceError] = useState<string | null>(null);
   const permOpsManage = useHasPermission('ops', 'manage');
+  const permSupportView = useHasPermission('suporte', 'view');
   const [packing, setPacking] = useState(false);
+  const [notifLoading, setNotifLoading] = useState(false);
+  const [notifOnlyUnread, setNotifOnlyUnread] = useState(true);
+  const [notifications, setNotifications] = useState<SupportNotification[]>([]);
 
   useEffect(() => {
     let mounted = true;
@@ -95,6 +116,27 @@ export default function SuportePage() {
       mounted = false;
     };
   }, []);
+
+  const canViewNotifications = !!permSupportView.data;
+
+  const refreshNotifications = useCallback(async () => {
+    if (!canViewNotifications) return;
+    setNotifLoading(true);
+    try {
+      const list = await listSupportNotifications({ onlyUnread: notifOnlyUnread, limit: 50, offset: 0 });
+      setNotifications(Array.isArray(list) ? list : []);
+    } catch {
+      setNotifications([]);
+    } finally {
+      setNotifLoading(false);
+    }
+  }, [canViewNotifications, notifOnlyUnread]);
+
+  useEffect(() => {
+    void refreshNotifications();
+  }, [refreshNotifications]);
+
+  const unreadCount = useMemo(() => notifications.filter((n) => !n.is_read).length, [notifications]);
 
   const onboardingProgress = useMemo(() => {
     const ok = onboarding?.progress?.ok ?? 0;
@@ -206,6 +248,23 @@ export default function SuportePage() {
       URL.revokeObjectURL(url);
     } finally {
       setPacking(false);
+    }
+  };
+
+  const handleMarkRead = async (ids: string[]) => {
+    if (!ids.length) return;
+    try {
+      await markNotificationsRead(ids);
+    } finally {
+      await refreshNotifications();
+    }
+  };
+
+  const handleMarkAllRead = async () => {
+    try {
+      await markAllNotificationsRead();
+    } finally {
+      await refreshNotifications();
     }
   };
 
@@ -387,6 +446,107 @@ export default function SuportePage() {
             </div>
           </div>
         )}
+
+        <div className="pt-2 border-t border-gray-200">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+            <div className="min-w-0">
+              <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
+                <Bell size={18} className="text-gray-700" />
+                Central de notificações
+              </h2>
+              <p className="text-sm text-gray-600 mt-1">
+                Avisos proativos (DLQ, webhooks falhando, integrações com erro) para reduzir tickets e retrabalho.
+              </p>
+            </div>
+            <div className="flex flex-col sm:flex-row gap-2 sm:items-center">
+              <div className="flex items-center justify-between gap-2 rounded-xl border border-gray-200 bg-white px-3 py-2">
+                <div className="text-xs text-gray-600">Somente não lidas</div>
+                <Switch checked={notifOnlyUnread} onCheckedChange={setNotifOnlyUnread} />
+              </div>
+              <div className="flex gap-2">
+                <Button type="button" variant="secondary" className="gap-2" onClick={() => void refreshNotifications()} disabled={notifLoading || !canViewNotifications}>
+                  {notifLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw size={16} />}
+                  Atualizar
+                </Button>
+                <Button type="button" variant="secondary" className="gap-2" onClick={() => void handleMarkAllRead()} disabled={notifLoading || !canViewNotifications || notifications.length === 0 || unreadCount === 0}>
+                  Marcar tudo como lido
+                </Button>
+              </div>
+            </div>
+          </div>
+
+          {!canViewNotifications ? (
+            <div className="mt-3 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900 flex items-start gap-2">
+              <Lock size={18} className="mt-0.5" />
+              <div>
+                <div className="font-semibold">Sem permissão para ver notificações</div>
+                <div className="text-xs mt-1">
+                  Peça acesso ao papel/permissão <span className="font-mono">suporte:view</span>.
+                </div>
+              </div>
+            </div>
+          ) : notifLoading ? (
+            <div className="mt-3 flex items-center gap-3 text-sm text-gray-600">
+              <Loader2 className="animate-spin" size={18} />
+              Carregando notificações…
+            </div>
+          ) : (
+            <div className="mt-3 space-y-2">
+              <div className="flex items-center justify-between text-xs text-gray-600">
+                <div>
+                  Não lidas: <span className="font-semibold text-gray-900">{unreadCount}</span>
+                </div>
+                <Button asChild size="sm" variant="secondary">
+                  <Link to="/app/desenvolvedor/saude">Abrir painel de saúde</Link>
+                </Button>
+              </div>
+
+              {notifications.length === 0 ? (
+                <div className="rounded-xl border border-gray-100 bg-gray-50 p-4 text-sm text-gray-600">
+                  Nenhuma notificação encontrada.
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+                  {notifications.map((n) => (
+                    <div
+                      key={n.id}
+                      className={`rounded-2xl border p-4 ${n.is_read ? 'border-gray-200 bg-white' : 'border-sky-200 bg-sky-50'}`}
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            {notificationBadge(n)}
+                            <span className="text-[11px] text-gray-600">{categoryLabel(n.category)}</span>
+                            <span className="text-[11px] text-gray-500">
+                              {n.created_at ? new Date(n.created_at).toLocaleString('pt-BR') : '—'}
+                            </span>
+                          </div>
+                          <div className="mt-1 text-sm font-semibold text-gray-900 break-words">{n.title}</div>
+                        </div>
+                        {!n.is_read ? (
+                          <Button size="sm" variant="secondary" className="shrink-0" onClick={() => void handleMarkRead([n.id])}>
+                            Marcar lido
+                          </Button>
+                        ) : null}
+                      </div>
+                      {n.body ? <div className="mt-2 text-sm text-gray-700 whitespace-pre-wrap">{n.body}</div> : null}
+                      {n.source ? (
+                        <div className="mt-2 text-[11px] text-gray-500">
+                          Fonte: <span className="font-mono">{n.source}</span>
+                          {n.entity_type ? (
+                            <>
+                              {' '}• Entidade: <span className="font-mono">{n.entity_type}</span>
+                            </>
+                          ) : null}
+                        </div>
+                      ) : null}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
 
         <div className="pt-2 border-t border-gray-200">
           <h2 className="text-lg font-semibold text-gray-900">Antes de abrir um chamado</h2>

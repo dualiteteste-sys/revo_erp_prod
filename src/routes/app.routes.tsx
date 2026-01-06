@@ -35,6 +35,7 @@ const NfeInputPage = lazyImport(() => import("../pages/tools/NfeInputPage"));
 const XmlTesterPage = lazyImport(() => import('../pages/tools/XmlTesterPage'));
 const LogsPage = lazyImport(() => import("../pages/dev/LogsPage"));
 const HealthPage = lazyImport(() => import("../pages/dev/HealthPage"));
+const SchemaDiagnosticsPage = lazyImport(() => import("../pages/dev/SchemaDiagnosticsPage"));
 const SupabaseDemoPage = lazyImport(() => import("../pages/tools/SupabaseDemoPage"));
 const SettingsPage = lazyImport(() => import("../pages/settings/SettingsPage"));
 
@@ -477,6 +478,14 @@ export const appRoutes: RouteObject[] = [
               element: (
                 <RequirePermission permission={{ domain: "logs", action: "view" }}>
                   <Suspense fallback={<PageLoader />}><LogsPage /></Suspense>
+                </RequirePermission>
+              ),
+            },
+            {
+              path: "desenvolvedor/diagnostico",
+              element: (
+                <RequirePermission permission={{ domain: "ops", action: "view" }}>
+                  <Suspense fallback={<PageLoader />}><SchemaDiagnosticsPage /></Suspense>
                 </RequirePermission>
               ),
             },

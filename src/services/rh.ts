@@ -105,6 +105,54 @@ export type MatrixRow = {
   competencias: MatrixCompetencia[];
 };
 
+export type CargoTreinamentoRequirement = {
+  id: string;
+  treinamento_id: string;
+  treinamento_nome: string;
+  obrigatorio: boolean;
+  validade_meses: number | null;
+};
+
+export type TrainingComplianceItem = {
+  colaborador_id: string;
+  colaborador_nome: string;
+  cargo_nome: string;
+  treinamento_id: string;
+  treinamento_nome: string;
+  participante_status: string;
+  validade_ate: string | null;
+  proxima_reciclagem: string | null;
+  compliance_status: 'ok' | 'due_soon' | 'overdue' | 'missing' | 'pending';
+};
+
+export type TrainingComplianceSummary = {
+  total_required: number;
+  ok: number;
+  due_soon: number;
+  overdue: number;
+  missing: number;
+};
+
+export type TrainingComplianceResponse = {
+  summary: TrainingComplianceSummary;
+  items: TrainingComplianceItem[];
+};
+
+export type PlanoAcaoCompetencia = {
+  id: string;
+  colaborador_id: string;
+  colaborador_nome: string;
+  cargo_nome: string;
+  competencia_id: string;
+  competencia_nome: string;
+  status: 'aberto' | 'em_andamento' | 'concluido' | 'cancelado';
+  prioridade: number;
+  due_date: string | null;
+  responsavel: string | null;
+  notas: string | null;
+  updated_at: string;
+};
+
 // --- Treinamentos Types ---
 
 export type Treinamento = {
@@ -294,6 +342,48 @@ export async function getCompetencyMatrix(cargoId?: string): Promise<MatrixRow[]
     ...row,
     competencias: Array.isArray(row.competencias) ? row.competencias : [],
   }));
+}
+
+export async function listCargoTreinamentos(cargoId: string): Promise<CargoTreinamentoRequirement[]> {
+  return callRpc<CargoTreinamentoRequirement[]>('rh_list_cargo_treinamentos', { p_cargo_id: cargoId });
+}
+
+export async function upsertCargoTreinamento(params: {
+  cargoId: string;
+  treinamentoId: string;
+  obrigatorio: boolean;
+  validadeMeses?: number | null;
+}): Promise<string> {
+  return callRpc<string>('rh_upsert_cargo_treinamento', {
+    p_cargo_id: params.cargoId,
+    p_treinamento_id: params.treinamentoId,
+    p_obrigatorio: params.obrigatorio,
+    p_validade_meses: params.validadeMeses ?? null,
+  });
+}
+
+export async function deleteCargoTreinamento(id: string): Promise<void> {
+  return callRpc('rh_delete_cargo_treinamento', { p_id: id });
+}
+
+export async function getTrainingCompliance(daysAhead = 30): Promise<TrainingComplianceResponse> {
+  return callRpc<TrainingComplianceResponse>('rh_training_compliance_summary', { p_days_ahead: daysAhead });
+}
+
+export async function listPlanosAcaoCompetencias(cargoId?: string): Promise<PlanoAcaoCompetencia[]> {
+  return callRpc<PlanoAcaoCompetencia[]>('rh_list_planos_acao_competencias', { p_cargo_id: cargoId ?? null });
+}
+
+export async function upsertPlanoAcaoCompetencia(payload: {
+  colaborador_id: string;
+  competencia_id: string;
+  status?: PlanoAcaoCompetencia['status'];
+  prioridade?: number;
+  due_date?: string | null;
+  responsavel?: string | null;
+  notas?: string | null;
+}): Promise<string> {
+  return callRpc<string>('rh_upsert_plano_acao_competencia', { p_payload: payload });
 }
 
 // Treinamentos
