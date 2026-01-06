@@ -23,7 +23,6 @@ import PageCard from '@/components/ui/PageCard';
 import EmptyState from '@/components/ui/EmptyState';
 import { uiMessages } from '@/lib/ui/messages';
 import ImportPartnersCsvModal from '@/components/partners/ImportPartnersCsvModal';
-import PageHelp from '@/components/support/PageHelp';
 
 const PartnersPage: React.FC = () => {
   const enableSeed = isSeedEnabled();
@@ -370,19 +369,6 @@ const PartnersPage: React.FC = () => {
 
   return (
     <PageShell header={header} filters={filters} footer={footer}>
-      <PageHelp
-        title="Clientes/Fornecedores: guia rápido"
-        whatIs="Cadastros bem feitos evitam retrabalho em vendas, compras, OS e financeiro. O objetivo aqui é ter uma base limpa (sem duplicidades) e fácil de buscar."
-        steps={[
-          'Clique em “Adicionar” e preencha nome + tipo (cliente/fornecedor/ambos) e documento (CPF/CNPJ).',
-          'Se já tiver base, use “Importar CSV” para criar em lote e padronizar.',
-          'Teste no fluxo real: crie um pedido/OS usando esse cadastro.',
-        ]}
-        links={[
-          { label: 'Abrir Produtos', href: '/app/produtos', kind: 'internal' },
-          { label: 'Abrir Pedidos', href: '/app/vendas/pedidos', kind: 'internal' },
-        ]}
-      />
       <PageCard>
         {loading && partners.length === 0 ? (
           <div className="h-96 flex items-center justify-center">

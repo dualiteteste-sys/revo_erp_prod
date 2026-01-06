@@ -1,5 +1,15 @@
 import React, { useMemo, useState } from 'react';
-import { ChevronDown, ChevronRight, ExternalLink, HelpCircle, LifeBuoy, ShieldCheck } from 'lucide-react';
+import {
+  ChevronDown,
+  ChevronRight,
+  ExternalLink,
+  HelpCircle,
+  LifeBuoy,
+  ShieldCheck,
+  Network,
+  Layers,
+  CheckCircle2,
+} from 'lucide-react';
 import { Link } from 'react-router-dom';
 
 import GlassCard from '@/components/ui/GlassCard';
@@ -16,6 +26,9 @@ type PageHelpProps = {
   title: string;
   whatIs: string;
   steps: string[];
+  connectsWith?: string[];
+  dependsOn?: string[];
+  fillPerfectly?: string[];
   links?: HelpLink[];
   defaultOpen?: boolean;
 };
@@ -25,7 +38,16 @@ function isExternalHref(href: string) {
 }
 
 export default function PageHelp(props: PageHelpProps) {
-  const { title, whatIs, steps, links = [], defaultOpen = false } = props;
+  const {
+    title,
+    whatIs,
+    steps,
+    connectsWith = [],
+    dependsOn = [],
+    fillPerfectly = [],
+    links = [],
+    defaultOpen = false,
+  } = props;
   const [open, setOpen] = useState(defaultOpen);
 
   const permOpsManage = useHasPermission('ops', 'manage');
@@ -40,7 +62,7 @@ export default function PageHelp(props: PageHelpProps) {
   }, [links, canOps]);
 
   return (
-    <div className="mt-4">
+    <div>
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
@@ -56,7 +78,7 @@ export default function PageHelp(props: PageHelpProps) {
               <div className="min-w-0">
                 <div className="text-sm font-semibold text-gray-900 truncate">{title}</div>
                 <div className="text-xs text-gray-600 mt-1">
-                  Guia rápido: o que é, 3 passos e links de diagnóstico.
+                  Guia rápido: como funciona, conexões, dependências e links de diagnóstico.
                 </div>
               </div>
             </div>
@@ -66,7 +88,7 @@ export default function PageHelp(props: PageHelpProps) {
           </div>
 
           {open ? (
-            <div className="mt-4 grid grid-cols-1 lg:grid-cols-3 gap-4">
+            <div className="mt-4 grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4">
               <div className="rounded-2xl border border-gray-100 bg-gray-50 p-3">
                 <div className="flex items-center gap-2 text-sm font-semibold text-gray-900">
                   <ShieldCheck size={16} className="text-slate-700" />
@@ -78,14 +100,77 @@ export default function PageHelp(props: PageHelpProps) {
               <div className="rounded-2xl border border-gray-100 bg-gray-50 p-3">
                 <div className="flex items-center gap-2 text-sm font-semibold text-gray-900">
                   <LifeBuoy size={16} className="text-blue-700" />
-                  Como fazer (3 passos)
+                  Fluxo ideal
                 </div>
                 <ol className="mt-2 space-y-2 text-sm text-gray-700 list-decimal list-inside">
-                  {steps.slice(0, 3).map((s, i) => (
+                  {steps.map((s, i) => (
                     <li key={i}>{s}</li>
                   ))}
                 </ol>
               </div>
+
+              {(connectsWith.length > 0 || dependsOn.length > 0) && (
+                <div className="rounded-2xl border border-gray-100 bg-gray-50 p-3">
+                  <div className="flex items-center gap-2 text-sm font-semibold text-gray-900">
+                    <Network size={16} className="text-indigo-700" />
+                    Conexões e dependências
+                  </div>
+                  {dependsOn.length > 0 ? (
+                    <div className="mt-3">
+                      <div className="flex items-center gap-2 text-xs font-semibold text-gray-700">
+                        <Layers size={14} className="text-slate-600" />
+                        Depende de
+                      </div>
+                      <div className="mt-2 flex flex-wrap gap-2">
+                        {dependsOn.map((d) => (
+                          <span
+                            key={d}
+                            className="inline-flex items-center rounded-full border border-slate-200 bg-white/80 px-2.5 py-1 text-xs text-slate-700"
+                          >
+                            {d}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  ) : null}
+
+                  {connectsWith.length > 0 ? (
+                    <div className={dependsOn.length > 0 ? 'mt-4' : 'mt-3'}>
+                      <div className="flex items-center gap-2 text-xs font-semibold text-gray-700">
+                        <Network size={14} className="text-indigo-700" />
+                        Conecta com
+                      </div>
+                      <div className="mt-2 flex flex-wrap gap-2">
+                        {connectsWith.map((c) => (
+                          <span
+                            key={c}
+                            className="inline-flex items-center rounded-full border border-indigo-100 bg-indigo-50/60 px-2.5 py-1 text-xs text-indigo-900"
+                          >
+                            {c}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  ) : null}
+                </div>
+              )}
+
+              {fillPerfectly.length > 0 ? (
+                <div className="rounded-2xl border border-gray-100 bg-gray-50 p-3">
+                  <div className="flex items-center gap-2 text-sm font-semibold text-gray-900">
+                    <CheckCircle2 size={16} className="text-emerald-700" />
+                    Como preencher perfeito
+                  </div>
+                  <ul className="mt-2 space-y-2 text-sm text-gray-700">
+                    {fillPerfectly.map((t, i) => (
+                      <li key={i} className="flex gap-2">
+                        <span className="mt-0.5 h-2 w-2 rounded-full bg-emerald-500/70 flex-shrink-0" />
+                        <span>{t}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ) : null}
 
               <div className="rounded-2xl border border-gray-100 bg-gray-50 p-3">
                 <div className="text-sm font-semibold text-gray-900">Links úteis</div>
@@ -123,4 +208,3 @@ export default function PageHelp(props: PageHelpProps) {
     </div>
   );
 }
-

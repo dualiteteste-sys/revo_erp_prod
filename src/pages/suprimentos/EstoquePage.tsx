@@ -18,7 +18,6 @@ import { Button } from '@/components/ui/button';
 import { useToast } from '@/contexts/ToastProvider';
 import { useHasPermission } from '@/hooks/useHasPermission';
 import InventarioCiclicoModal from '@/components/suprimentos/InventarioCiclicoModal';
-import PageHelp from '@/components/support/PageHelp';
 import VirtualizedTableBody from '@/components/ui/VirtualizedTableBody';
 
 export default function EstoquePage() {
@@ -358,20 +357,6 @@ export default function EstoquePage() {
           </table>
         </div>
       </div>
-
-      <PageHelp
-        title="Estoque: guia rápido"
-        whatIs="Aqui você controla saldo e movimentações com histórico (kardex). Com depósitos, você enxerga por local e transfere sem planilha paralela."
-        steps={[
-          'Selecione o depósito (se existir) e use a busca para encontrar o produto.',
-          'Clique em “Movimentar” para registrar entrada/saída/ajustes (ou transferência entre depósitos).',
-          'Abra o “Kardex” para validar histórico e exporte CSV quando precisar.',
-        ]}
-        links={[
-          { label: 'Abrir Compras', href: '/app/suprimentos/compras', kind: 'internal' },
-          { label: 'Abrir Recebimentos', href: '/app/suprimentos/recebimentos', kind: 'internal' },
-        ]}
-      />
 
       {selectedProduto && (
         <MovimentoModal 
