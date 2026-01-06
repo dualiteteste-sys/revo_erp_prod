@@ -8,6 +8,13 @@
   textarea {
     @apply text-filled-text;
   }
+
+  :focus-visible {
+    outline: none;
+    box-shadow:
+      0 0 0 3px rgba(59, 130, 246, 0.45),
+      0 0 0 6px rgba(255, 255, 255, 0.6);
+  }
 }
 
 body {

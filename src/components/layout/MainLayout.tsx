@@ -15,6 +15,7 @@ import RoadmapButton from '@/components/roadmap/RoadmapButton';
 import SubscriptionStatusBanner from '@/components/billing/SubscriptionStatusBanner';
 import { PlanIntentCheckoutModal } from '@/components/billing/PlanIntentCheckoutModal';
 import { RoadmapProvider } from '@/contexts/RoadmapProvider';
+import ContextualHelp from '@/components/support/ContextualHelp';
 
 const findActiveHref = (pathname: string): string => {
   for (const group of menuConfig) {
@@ -205,6 +206,7 @@ const MainLayout: React.FC = () => {
                   </div>
                 </div>
                 <main className="flex-1 overflow-y-auto scrollbar-styled pr-2">
+                  <ContextualHelp />
                   <Outlet />
                 </main>
               </SubscriptionGuard>

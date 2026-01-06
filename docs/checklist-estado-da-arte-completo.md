@@ -47,8 +47,8 @@ Este é o checklist único (por módulo) para levar o REVO ao nível **top mundi
 - Forçar erro (desligar rede / provocar 400) e confirmar que existe caminho de recuperação sem alert()/travamento.
 
 ### A3) Acessibilidade (WCAG pragmático)
-- [ ] PLAT-A11Y-01 (P1) Navegação por teclado completa (focus trap, ESC, tab order, atalhos)
-- [ ] PLAT-A11Y-02 (P1) Contraste e foco visível + aria-labels em ícones
+- [x] PLAT-A11Y-01 (P1) Navegação por teclado completa (focus trap, ESC, tab order, atalhos)
+- [x] PLAT-A11Y-02 (P1) Contraste e foco visível + aria-labels em ícones
 - [ ] PLAT-A11Y-03 (P2) Smoke automatizado de A11y (axe) em páginas-chave
 
 ---
@@ -107,7 +107,7 @@ Este é o checklist único (por módulo) para levar o REVO ao nível **top mundi
 - [x] PERF-FE-01 (P0) Budgets (bundle/route) no CI com falha quando estourar
 - [x] PERF-FE-02 (P1) Virtualização para listas grandes (tabelas críticas)
 - [x] PERF-FE-03 (P0) Padrão de cache/invalidação (React Query) por recurso
-- [ ] PERF-FE-04 (P1) Lighthouse budget (Perf/A11y/Best Practices) para landing + app shell
+- [x] PERF-FE-04 (P1) Lighthouse budget (Perf/A11y/Best Practices) para landing + app shell
 
 ### D2) Banco/RPC
 - [x] PERF-DB-01 (P0) EXPLAIN/índices nos top RPCs (vendas, estoque, financeiro, indústria)
@@ -158,7 +158,7 @@ Este é o checklist único (por módulo) para levar o REVO ao nível **top mundi
 - [x] GTM-ONB-03 (P1) Importadores sem dor (clientes/produtos) com preview + validação + rollback
 
 ### F2) Ajuda e diagnóstico
-- [ ] GTM-HELP-01 (P1) Ajuda contextual (tooltips + artigos por página)
+- [x] GTM-HELP-01 (P1) Ajuda contextual (tooltips + artigos por página)
 - [x] GTM-HELP-02 (P0) Diagnóstico “por que não funciona?” com checklist + links (NF/PDV/integrações)
 
 ---
