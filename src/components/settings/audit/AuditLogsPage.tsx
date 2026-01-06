@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { supabase } from '@/lib/supabaseClient';
 import { useAuth } from '@/contexts/AuthProvider';
 import { useToast } from '@/contexts/ToastProvider';
-import { Loader2, RefreshCw, Search } from 'lucide-react';
+import { Loader2, RefreshCw, Search, ShieldCheck } from 'lucide-react';
 import Select from '@/components/ui/forms/Select';
 
 type AuditLogRow = {
@@ -30,6 +30,16 @@ export default function AuditLogsPage() {
   const [rows, setRows] = useState<AuditLogRow[]>([]);
   const [tableFilter, setTableFilter] = useState<string>('');
   const [q, setQ] = useState('');
+  const [preset, setPreset] = useState<'all' | 'admin'>('admin');
+
+  const adminTables = useMemo(() => ([
+    'empresa_unidades',
+    'user_active_unidade',
+    'empresa_usuarios',
+    'roles',
+    'role_permissions',
+    'empresa_entitlements',
+  ]), []);
 
   const tables = useMemo(() => {
     const set = new Set<string>();
@@ -40,6 +50,7 @@ export default function AuditLogsPage() {
   const filtered = useMemo(() => {
     const qLower = q.trim().toLowerCase();
     return rows.filter((r) => {
+      if (preset === 'admin' && !adminTables.includes(r.table_name)) return false;
       if (tableFilter && r.table_name !== tableFilter) return false;
       if (!qLower) return true;
       return (
@@ -49,7 +60,7 @@ export default function AuditLogsPage() {
         r.operation.toLowerCase().includes(qLower)
       );
     });
-  }, [q, rows, tableFilter]);
+  }, [adminTables, preset, q, rows, tableFilter]);
 
   const fetchLogs = async () => {
     if (!activeEmpresa?.id) return;
@@ -98,6 +109,31 @@ export default function AuditLogsPage() {
 
       <div className="grid grid-cols-1 md:grid-cols-6 gap-3 items-end">
         <div className="md:col-span-2">
+          <label className="block text-sm font-medium text-gray-700 mb-1">Preset</label>
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={() => setPreset('admin')}
+              className={`inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-sm font-semibold transition-colors ${
+                preset === 'admin' ? 'border-blue-300 bg-blue-50 text-blue-800' : 'border-gray-200 bg-white text-gray-700 hover:bg-gray-50'
+              }`}
+            >
+              <ShieldCheck size={16} />
+              Admin
+            </button>
+            <button
+              type="button"
+              onClick={() => setPreset('all')}
+              className={`inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-sm font-semibold transition-colors ${
+                preset === 'all' ? 'border-blue-300 bg-blue-50 text-blue-800' : 'border-gray-200 bg-white text-gray-700 hover:bg-gray-50'
+              }`}
+            >
+              Tudo
+            </button>
+          </div>
+          <p className="text-[11px] text-gray-500 mt-1">Admin foca em mudanças de configurações (menos ruído).</p>
+        </div>
+        <div className="md:col-span-2">
           <label className="block text-sm font-medium text-gray-700 mb-1">Tabela</label>
           <Select value={tableFilter} onChange={(e) => setTableFilter(e.target.value)} className="w-full">
             <option value="">Todas</option>
@@ -108,7 +144,7 @@ export default function AuditLogsPage() {
             ))}
           </Select>
         </div>
-        <div className="md:col-span-4">
+        <div className="md:col-span-2">
           <label className="block text-sm font-medium text-gray-700 mb-1">Buscar</label>
           <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
@@ -178,4 +214,3 @@ export default function AuditLogsPage() {
     </div>
   );
 }
-

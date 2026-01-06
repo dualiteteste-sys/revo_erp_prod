@@ -6,6 +6,7 @@ import DataManagementContent from './data-management/DataManagementContent';
 import RolesPage from '@/pages/settings/roles/RolesPage';
 import UsersPage from '@/pages/settings/general/UsersPage';
 import PrivacyLgpdPage from '@/pages/settings/general/PrivacyLgpdPage';
+import UnidadesPage from '@/pages/settings/general/UnidadesPage';
 import NfeEmissaoSettings from '@/components/settings/fiscal/NfeEmissaoSettings';
 import AuditLogsPage from '@/components/settings/audit/AuditLogsPage';
 import OnboardingChecklistPage from '@/components/settings/onboarding/OnboardingChecklistPage';
@@ -21,6 +22,8 @@ const SettingsContent: React.FC<SettingsContentProps> = ({ activeItem }) => {
     switch (activeItem) {
       case 'Empresa':
         return <CompanySettingsForm />;
+      case 'Unidades / Filiais':
+        return <UnidadesPage />;
       case 'Onboarding (Checklist)':
         return <OnboardingChecklistPage />;
       case 'Usuários':
