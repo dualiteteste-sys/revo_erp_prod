@@ -20,6 +20,129 @@ export type HelpEntry = {
 };
 
 export const HELP_CATALOG: HelpEntry[] = [
+  // Dashboard / Configurações / Suporte / DevOps (rotas "raiz")
+  {
+    match: '/app/dashboard',
+    title: 'Guia Rápido do Dashboard',
+    whatIs:
+      'O dashboard é a “central do controle”: ele resume o que está acontecendo agora (vendas, financeiro e pendências) e te leva direto para a ação — sem planilha e sem caça‑clique.',
+    steps: [
+      'Confirme a empresa ativa (canto superior/selector) e o período selecionado.',
+      'Use os KPIs como “alertas”: clique no card que está fora do esperado para abrir a lista correspondente.',
+      'Se for o primeiro uso: abra o Assistente/Roadmap e conclua o mínimo (caixa, centro de custo quando ativo, etc.).',
+      'Quando algo não bater: use “Diagnóstico guiado (Suporte)” e, para perfis ops/dev, “Saúde (Ops)”.',
+    ],
+    dependsOn: ['Empresa ativa'],
+    connectsWith: ['Vendas', 'Financeiro', 'Suprimentos', 'Serviços', 'Indústria', 'Configurações'],
+    fillPerfectly: [
+      'Escolher o período correto (evita “número estranho”).',
+      'Tratar o dashboard como “painel de ação”, não só consulta (clicar e resolver).',
+      'Quando a operação crescer, usar filtros (empresa/unidade/vendedor) para evitar decisões por “achismo”.',
+    ],
+    commonMistakes: [
+      'Comparar meses diferentes sem ajustar período.',
+      'Ignorar pendências e tentar resolver “na mão” em cada módulo.',
+      'Achar que o dashboard está “errado” quando falta cadastrar/registrar eventos (ex.: expedição, conciliação).',
+    ],
+    links: [{ label: 'Abrir Roadmap (Cadastros)', href: '/app/dashboard?roadmap=cadastros', kind: 'internal' }],
+  },
+  {
+    match: '/app/configuracoes',
+    title: 'Guia Rápido de Configurações',
+    whatIs:
+      'Configurações é onde você define a base da operação: dados da empresa, permissões (RBAC), assinatura/plano e integrações. A ideia é habilitar o que precisa sem travar o uso do ERP.',
+    steps: [
+      'Finalize dados da empresa e o onboarding mínimo (para evitar bloqueios).',
+      'Revise papéis e permissões por função (menu, rotas e banco).',
+      'Abra “Minha assinatura” e confirme plano, trial e limites sincronizados.',
+      'Se estiver configurando integrações, valide também em Desenvolvedor → Saúde (DLQ/logs).',
+    ],
+    dependsOn: ['Empresa ativa', 'Permissão: Configurações (view/manage)'],
+    connectsWith: ['Assinatura/Stripe', 'RBAC', 'Onboarding', 'Integrações', 'Logs/Saúde'],
+    fillPerfectly: [
+      'Permissões mínimas por função (evita usuário “ver tudo” ou “não conseguir nada”).',
+      'Concluir o mínimo operacional (conta padrão, centro de custo quando ativo).',
+      'Manter integrações “saudáveis” (DLQ sob controle e reprocesso funcionando).',
+    ],
+    commonMistakes: [
+      'Dar acesso admin para “resolver rápido” e esquecer (vira risco de segurança).',
+      'Configurar plano manualmente e depois estranhar divergência com assinatura.',
+      'Não concluir onboarding e achar que o módulo está com bug (na verdade é gate de setup).',
+    ],
+  },
+  {
+    match: '/app/suporte',
+    title: 'Guia Rápido de Suporte (Diagnóstico guiado)',
+    whatIs:
+      'Este módulo existe para reduzir suporte: ele ajuda a identificar a causa raiz (dados, permissão, integração, fila) e sugere o próximo passo — com links diretos e IDs úteis.',
+    steps: [
+      'Escolha o tipo de problema (ex.: “não aparece no menu”, “falha ao salvar”, “integração parou”).',
+      'Siga o diagnóstico até obter um resultado (ou o ID de request).',
+      'Se for erro operacional (fila/DLQ): abra Desenvolvedor → Saúde e reprocessar com segurança.',
+      'Se precisar chamar suporte interno: cole o ID do request + print do erro (evita ida e volta).',
+    ],
+    dependsOn: ['Usuário autenticado'],
+    connectsWith: ['Desenvolvedor → Logs', 'Desenvolvedor → Saúde', 'Configurações'],
+    fillPerfectly: ['Sempre capturar o ID de request quando houver (debug rápido).', 'Seguir os CTAs (“o que fazer agora”).'],
+    commonMistakes: ['Abrir ticket sem contexto.', 'Repetir ação que falha e duplicar operação (quando não for idempotente).'],
+  },
+  {
+    match: '/app/desenvolvedor/saude',
+    title: 'Guia Rápido de Saúde (Operação)',
+    whatIs:
+      '“Saúde” é o painel da operação: mostra pendências, falhas e DLQs (NF/marketplace/financeiro) e permite reprocessar de forma segura, idempotente e auditável.',
+    steps: [
+      'Confira os contadores por domínio (NF/marketplace/financeiro).',
+      'Abra a lista de DLQ e inspecione o motivo da falha.',
+      'Se disponível: rode “dry-run” para confirmar que o reprocesso não vai duplicar.',
+      'Reprocessar e validar: status/timeline atualiza e os contadores diminuem.',
+    ],
+    dependsOn: ['Permissão: Ops/Desenvolvedor (view/manage)'],
+    connectsWith: ['Logs', 'Integrações', 'Fiscal', 'Financeiro'],
+    fillPerfectly: ['Reprocessar com contexto.', 'Preferir dry-run quando houver.', 'Acompanhar contadores (saúde = 0 pendências críticas).'],
+    commonMistakes: ['Reprocessar em massa sem entender a causa raiz.', 'Tratar DLQ como “lixeira” e ignorar por dias.'],
+  },
+  {
+    match: '/app/desenvolvedor/logs',
+    title: 'Guia Rápido de Logs',
+    whatIs:
+      'Logs e auditoria mostram “quem fez o quê e quando” (por usuário/empresa/entidade) e ajudam a diagnosticar falhas sem depender do console do navegador.',
+    steps: [
+      'Filtre por período e por entidade (ex.: OS, pedido, lançamento).',
+      'Quando houver erro: use o request-id para correlacionar chamadas.',
+      'Se o erro veio de reprocesso, volte para Saúde e veja o item na DLQ/timeline.',
+    ],
+    dependsOn: ['Permissão: Ops/Desenvolvedor (view)'],
+    connectsWith: ['Saúde (DLQ/reprocesso)', 'Diagnóstico (Suporte)'],
+    fillPerfectly: [
+      'Buscar pelo request-id quando disponível.',
+      'Usar filtros por empresa/usuário para evitar “ruído”.',
+      'Não expor PII em logs (LGPD) — manter somente o necessário para diagnóstico.',
+    ],
+    commonMistakes: ['Tentar diagnosticar sem filtros (vira caos).', 'Confundir log de operação com dado de negócio (ex.: “pedido não existe”).'],
+  },
+  {
+    match: '/app/desenvolvedor/diagnostico',
+    title: 'Guia Rápido de Diagnóstico Técnico',
+    whatIs:
+      'Diagnóstico técnico é um “assistente de investigação”: ele reúne verificações de conexão, permissões, banco/Edge Functions e integrações para achar a causa raiz rápido.',
+    steps: ['Escolha o teste/checagem.', 'Execute e observe o resultado.', 'Siga os links sugeridos (logs/saúde/config).'],
+    dependsOn: ['Permissão: Ops/Desenvolvedor (view)'],
+    connectsWith: ['Logs', 'Saúde', 'Configurações'],
+    fillPerfectly: ['Executar com a empresa correta selecionada.', 'Registrar prints/IDs quando necessário.'],
+    commonMistakes: ['Rodar em empresa errada e concluir “não funciona”.'],
+  },
+  {
+    match: '/app/desenvolvedor/supabase-demo',
+    title: 'Guia Rápido (Supabase Demo)',
+    whatIs:
+      'Área auxiliar para validações internas (debug). Ela não faz parte do fluxo do cliente final, mas ajuda em testes e diagnóstico do projeto.',
+    steps: ['Use apenas quando solicitado por suporte/ops.', 'Evite alterar dados “na mão”.', 'Prefira migrations e fluxos oficiais.'],
+    dependsOn: ['Permissão: Ops/Desenvolvedor (manage)'],
+    connectsWith: ['Migrations', 'Logs', 'Saúde'],
+    commonMistakes: ['Ajustar “na mão” e gerar drift.', 'Usar em produção sem necessidade.'],
+  },
+
   // Cadastros (core)
   {
     match: '/app/partners',
@@ -179,6 +302,21 @@ export const HELP_CATALOG: HelpEntry[] = [
     fillPerfectly: ['Validar se o CNPJ é do cadastro correto.', 'Revisar e-mail/telefone manualmente.'],
     commonMistakes: ['Buscar o CNPJ errado e copiar dados para o cliente errado.'],
     roadmapKey: 'cadastros',
+  },
+  {
+    match: '/app/tools/xml-tester',
+    title: 'Guia Rápido de Testador de XML',
+    whatIs:
+      'O testador valida rapidamente um XML (estrutura e campos) antes de usar no fluxo. Ele reduz suporte ao apontar inconsistências e sugerir o que corrigir.',
+    steps: [
+      'Cole/envie o XML.',
+      'Valide e leia os avisos/erros.',
+      'Se estiver OK: prossiga para “Importar XML” (compras/recebimentos) ou para o fluxo fiscal (quando aplicável).',
+    ],
+    dependsOn: ['Conexão com internet'],
+    connectsWith: ['Importar XML (Suprimentos)', 'Fiscal (NF-e)'],
+    fillPerfectly: ['Usar o arquivo original (sem editar tags).', 'Tratar encoding/acentos quando necessário.'],
+    commonMistakes: ['Testar XML “editado na mão” e mascarar o problema.', 'Confundir XML de compra com XML de emissão.'],
   },
 
   {
@@ -449,6 +587,36 @@ export const HELP_CATALOG: HelpEntry[] = [
       'Ajustar no estoque manualmente em vez de fechar o recebimento.',
     ],
     links: [{ label: 'Abrir Compras', href: '/app/suprimentos/compras', kind: 'internal' }],
+    roadmapKey: 'suprimentos',
+  },
+  {
+    match: '/app/nfe-input',
+    title: 'Guia Rápido de Importar XML (Compras/Recebimentos)',
+    whatIs:
+      'Importar XML acelera entrada de notas de compra e reduz erro manual. O objetivo é: transformar o XML em recebimento com vínculo (fornecedor, itens e totais) e manter estoque/financeiro coerentes.',
+    steps: [
+      'Envie o XML e revise o preview (emitente/destinatário, número/série, totais).',
+      'Conferir o fornecedor (criar/selecionar corretamente).',
+      'Revise o mapeamento de itens (SKU/unidade) e ajuste o que não bate.',
+      'Importe e valide o resultado em Recebimentos + Estoque (kardex/saldos).',
+      'Se houver divergência: corrija o cadastro do produto/unidade para evitar repetição do erro.',
+    ],
+    dependsOn: ['Produtos', 'Unidades de medida', 'Permissão: Suprimentos (manage)'],
+    connectsWith: ['Suprimentos → Recebimentos', 'Suprimentos → Estoque', 'Financeiro (custos/A Pagar quando aplicável)'],
+    fillPerfectly: [
+      'Garantir que o item do XML mapeia para o SKU correto no ERP (ou ajustar cadastro).',
+      'Revisar unidade (CX/UN/KG) e conversões (se existirem).',
+      'Conferir número/série para evitar importação duplicada.',
+    ],
+    commonMistakes: [
+      'Importar sem conferir fornecedor e criar duplicado.',
+      'Produtos sem SKU/unidade e o importador “chuta” (vira retrabalho).',
+      'Importar duas vezes o mesmo XML e duplicar entrada (use validações e vínculos).',
+    ],
+    links: [
+      { label: 'Abrir Recebimentos', href: '/app/suprimentos/recebimentos', kind: 'internal' },
+      { label: 'Abrir Produtos', href: '/app/products', kind: 'internal' },
+    ],
     roadmapKey: 'suprimentos',
   },
   {
