@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useSupabase } from '@/providers/SupabaseProvider';
 import { Database } from '../../types/database.types';
 import PricingCard from './PricingCard';
@@ -8,6 +8,25 @@ import { useToast } from '../../contexts/ToastProvider';
 
 type Plan = Database['public']['Tables']['plans']['Row'];
 
+function useElementWidth<T extends HTMLElement>(): [React.RefObject<T>, number] {
+  const ref = useRef<T>(null);
+  const [width, setWidth] = useState(0);
+
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+
+    const ro = new ResizeObserver((entries) => {
+      const next = entries?.[0]?.contentRect?.width ?? 0;
+      setWidth(next);
+    });
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+
+  return [ref, width];
+}
+
 const SubscriptionPlans: React.FC = () => {
   const supabase = useSupabase();
   const [plans, setPlans] = useState<Plan[]>([]);
@@ -16,8 +35,10 @@ const SubscriptionPlans: React.FC = () => {
   const [checkoutLoading, setCheckoutLoading] = useState<string | null>(null);
   const { session, activeEmpresa } = useAuth();
   const { addToast } = useToast();
+  const [containerRef, containerWidth] = useElementWidth<HTMLDivElement>();
+  const isCompact = containerWidth > 0 && containerWidth < 980;
 
-  const monthlyBySlug = React.useMemo(() => {
+  const monthlyBySlug = useMemo(() => {
     const map = new Map<string, number>();
     for (const p of plans) {
       if (p.billing_cycle === 'monthly') map.set(p.slug, p.amount_cents);
@@ -87,17 +108,17 @@ const SubscriptionPlans: React.FC = () => {
   }
 
   return (
-    <div>
-      <div className="text-center mb-12">
-        <h1 className="text-3xl md:text-4xl font-bold text-gray-800">
+    <div ref={containerRef}>
+      <div className={`text-center ${isCompact ? 'mb-6' : 'mb-12'}`}>
+        <h1 className={`${isCompact ? 'text-2xl' : 'text-3xl md:text-4xl'} font-bold text-gray-800`}>
           Escolha o plano que melhor se adapta à sua empresa
         </h1>
-        <p className="mt-4 text-lg text-gray-600 max-w-2xl mx-auto">
+        <p className={`${isCompact ? 'mt-2 text-sm' : 'mt-4 text-lg'} text-gray-600 max-w-2xl mx-auto`}>
           Mude de plano a qualquer momento, sem complicações.
         </p>
       </div>
 
-      <div className="mt-10 flex justify-center items-center">
+      <div className={`${isCompact ? 'mt-6' : 'mt-10'} flex justify-center items-center`}>
         <span className={`text-sm font-medium ${billingCycle === 'monthly' ? 'text-blue-600' : 'text-gray-500'}`}>
           Mensal
         </span>
@@ -119,7 +140,12 @@ const SubscriptionPlans: React.FC = () => {
         )}
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 max-w-7xl mx-auto mt-12">
+      <div
+        className={[
+          'mx-auto mt-8 grid gap-6',
+          isCompact ? 'max-w-3xl grid-cols-1 sm:grid-cols-2' : 'max-w-7xl grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 mt-12',
+        ].join(' ')}
+      >
         {filteredPlans.map((plan, index) => (
           <PricingCard
             key={plan.id}
@@ -127,6 +153,7 @@ const SubscriptionPlans: React.FC = () => {
             onStartTrial={() => handleCheckout(plan)}
             isLoading={checkoutLoading === plan.stripe_price_id}
             index={index}
+            density={isCompact ? 'compact' : 'regular'}
             monthlyAmountCentsForYearly={plan.billing_cycle === 'yearly' ? (monthlyBySlug.get(plan.slug) ?? undefined) : undefined}
           />
         ))}
