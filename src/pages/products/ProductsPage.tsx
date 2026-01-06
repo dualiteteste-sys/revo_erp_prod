@@ -22,7 +22,6 @@ import PageShell from '@/components/ui/PageShell';
 import PageCard from '@/components/ui/PageCard';
 import EmptyState from '@/components/ui/EmptyState';
 import { uiMessages } from '@/lib/ui/messages';
-import PageHelp from '@/components/support/PageHelp';
 
 const ProductsPage: React.FC = () => {
   const enableSeed = isSeedEnabled();
@@ -294,19 +293,6 @@ const ProductsPage: React.FC = () => {
 
   return (
     <PageShell header={header} filters={filters} footer={footer}>
-      <PageHelp
-        title="Produtos: guia rápido"
-        whatIs="Produtos conectam estoque, compras, vendas e fiscal. O objetivo é cadastrar com unidade, SKU e regras mínimas para evitar divergência de saldo e erro em pedidos."
-        steps={[
-          'Clique em “Adicionar” e preencha nome + unidade + (opcional) SKU/código.',
-          'Se já tiver base, use “Importar CSV” para acelerar e padronizar.',
-          'Valide no fluxo: movimente estoque e crie um pedido usando o produto.',
-        ]}
-        links={[
-          { label: 'Abrir Estoque', href: '/app/suprimentos/estoque', kind: 'internal' },
-          { label: 'Abrir Pedidos', href: '/app/vendas/pedidos', kind: 'internal' },
-        ]}
-      />
       <PageCard>
         {loading && products.length === 0 ? (
           <div className="h-96 flex items-center justify-center">

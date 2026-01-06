@@ -40,7 +40,7 @@ export default function PageHelp(props: PageHelpProps) {
   }, [links, canOps]);
 
   return (
-    <div className="mt-4">
+    <div>
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
@@ -123,4 +123,3 @@ export default function PageHelp(props: PageHelpProps) {
     </div>
   );
 }
-

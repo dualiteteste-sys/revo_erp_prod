@@ -11,7 +11,7 @@ export default function ContextualHelp() {
   if (!entry) return null;
 
   return (
-    <div className="print:hidden">
+    <div className="print:hidden mt-2 mb-6">
       <PageHelp
         title={entry.title}
         whatIs={entry.whatIs}

@@ -70,6 +70,21 @@ export const HELP_CATALOG: HelpEntry[] = [
     roadmapKey: 'suprimentos',
   },
   {
+    match: '/app/suprimentos/estoque',
+    title: 'Estoque: guia rápido',
+    whatIs: 'Aqui você controla saldo e movimentações com histórico (kardex). Com depósitos, você enxerga por local e transfere sem planilha paralela.',
+    steps: [
+      'Selecione o depósito (se existir) e use a busca para encontrar o produto.',
+      'Clique em “Movimentar” para registrar entrada/saída/ajustes (ou transferência entre depósitos).',
+      'Abra o “Kardex” para validar histórico e exporte CSV quando precisar.',
+    ],
+    links: [
+      { label: 'Abrir Compras', href: '/app/suprimentos/compras', kind: 'internal' },
+      { label: 'Abrir Recebimentos', href: '/app/suprimentos/recebimentos', kind: 'internal' },
+    ],
+    roadmapKey: 'suprimentos',
+  },
+  {
     match: '/app/financeiro/tesouraria',
     title: 'Tesouraria: guia rápido',
     whatIs: 'Tesouraria consolida saldo e lançamentos. Conta corrente + extrato são a base para conciliação e relatórios.',
@@ -99,9 +114,114 @@ export const HELP_CATALOG: HelpEntry[] = [
   },
 ];
 
-export function findHelpEntry(pathname: string): HelpEntry | null {
-  const matches = HELP_CATALOG.filter((e) => pathname.startsWith(e.match));
-  if (!matches.length) return null;
-  return matches.sort((a, b) => b.match.length - a.match.length)[0] ?? null;
+function buildFallbackEntry(pathname: string): HelpEntry | null {
+  if (!pathname.startsWith('/app/')) return null;
+
+  const segments = pathname.replace(/^\/app\/+/, '').split('/').filter(Boolean);
+  const root = segments[0] ?? '';
+  if (!root) return null;
+
+  const groupByRoot: Record<
+    string,
+    {
+      titlePrefix: string;
+      roadmapKey?: RoadmapGroupKey;
+      whatIs: string;
+      steps: string[];
+      links?: HelpLink[];
+    }
+  > = {
+    dashboard: {
+      titlePrefix: 'Painel: guia rápido',
+      whatIs: 'O painel mostra o que está acontecendo no seu negócio e o que precisa de atenção agora (vendas, financeiro, pendências).',
+      steps: ['Use filtros de período para comparar resultados.', 'Clique nos cards para abrir a lista correspondente.', 'Se algo falhar, use “Diagnóstico guiado” e (Ops) “Saúde”.'],
+    },
+    cadastros: {
+      titlePrefix: 'Cadastros: guia rápido',
+      roadmapKey: 'cadastros',
+      whatIs: 'Cadastros são a base do ERP. Mantendo clientes, produtos e serviços consistentes, o restante (vendas, compras e financeiro) funciona sem retrabalho.',
+      steps: ['Use filtros e busca para evitar duplicar cadastros.', 'Clique em “Novo” e preencha o mínimo necessário.', 'Valide no fluxo: use o cadastro em um pedido/OS/compra.'],
+      links: [{ label: 'Abrir Roadmap (Cadastros)', href: '/app/dashboard?roadmap=cadastros', kind: 'internal' }],
+    },
+    suprimentos: {
+      titlePrefix: 'Suprimentos: guia rápido',
+      roadmapKey: 'suprimentos',
+      whatIs: 'Suprimentos mantém estoque confiável: compras, recebimentos, movimentações e relatórios de reposição.',
+      steps: ['Confira estoque e depósitos (se habilitado).', 'Registre recebimentos e movimentações corretamente.', 'Use relatórios para reposição e pendências.'],
+      links: [{ label: 'Abrir Roadmap (Suprimentos)', href: '/app/dashboard?roadmap=suprimentos', kind: 'internal' }],
+    },
+    vendas: {
+      titlePrefix: 'Vendas: guia rápido',
+      roadmapKey: 'vendas',
+      whatIs: 'Vendas organiza pedidos/PDV e conecta expedição e financeiro com rastreabilidade.',
+      steps: ['Crie um pedido ou venda no PDV e confira total.', 'Avance para expedição (se aplicável).', 'Valide no fim: financeiro e histórico batem.'],
+      links: [{ label: 'Abrir Roadmap (Vendas)', href: '/app/dashboard?roadmap=vendas', kind: 'internal' }],
+    },
+    financeiro: {
+      titlePrefix: 'Financeiro: guia rápido',
+      roadmapKey: 'financeiro',
+      whatIs: 'Financeiro consolida caixa, contas a pagar/receber e relatórios. O objetivo é saldo confiável e auditoria.',
+      steps: ['Defina contas correntes padrão e valide saldo.', 'Registre pagar/receber e concilie com extrato quando possível.', 'Use relatórios por período para fechar.'],
+      links: [{ label: 'Abrir Roadmap (Financeiro)', href: '/app/dashboard?roadmap=financeiro', kind: 'internal' }],
+    },
+    servicos: {
+      titlePrefix: 'Serviços: guia rápido',
+      roadmapKey: 'servicos',
+      whatIs: 'Serviços (OS) organiza atendimento, status, agenda, anexos e histórico, com geração de financeiro quando aplicável.',
+      steps: ['Crie uma OS e avance status.', 'Registre itens/custos e anexos.', 'Gere parcelas e valide auditoria.'],
+      links: [{ label: 'Abrir Roadmap (Serviços)', href: '/app/dashboard?roadmap=servicos', kind: 'internal' }],
+    },
+    industria: {
+      titlePrefix: 'Indústria: guia rápido',
+      roadmapKey: 'industria',
+      whatIs: 'Indústria conecta roteiro/BOM, ordens e execução no chão de fábrica com rastreabilidade e travas de estado.',
+      steps: ['Cadastre CT, Roteiro e BOM.', 'Crie uma OP/OB e aplique roteiro/BOM.', 'Aponte execução e valide consistência de estados.'],
+      links: [{ label: 'Abrir Roadmap (Indústria)', href: '/app/dashboard?roadmap=industria', kind: 'internal' }],
+    },
+    fiscal: {
+      titlePrefix: 'Fiscal: guia rápido',
+      whatIs: 'Fiscal reúne configurações e emissão/consulta de documentos fiscais. O foco é reduzir risco e manter registros rastreáveis.',
+      steps: ['Complete configurações mínimas (emitente e numeração).', 'Crie rascunho e valide dados.', 'Emita/acompanhe status e armazene XML/DANFE.'],
+    },
+    configuracoes: {
+      titlePrefix: 'Configurações: guia rápido',
+      whatIs: 'Aqui você ajusta empresa, permissões, plano e integrações. O objetivo é habilitar o que precisa sem travar o uso do sistema.',
+      steps: ['Complete dados da empresa e onboarding mínimo.', 'Revise papéis e permissões por função.', 'Confira assinatura e limites do plano.'],
+    },
+    desenvolvedor: {
+      titlePrefix: 'Desenvolvedor: guia rápido',
+      whatIs: 'Área para diagnóstico e operação. Use para ver logs/saúde e reprocessar itens com segurança (DLQ).',
+      steps: ['Abra a tela de Saúde para ver pendências e falhas.', 'Use “dry-run” antes de reprocessar quando disponível.', 'Reprocesso deve ser idempotente (sem duplicar).'],
+    },
+    suporte: {
+      titlePrefix: 'Suporte: guia rápido',
+      whatIs: 'Use diagnóstico guiado para resolver problemas comuns sem abrir ticket e registrar o contexto quando precisar de ajuda.',
+      steps: ['Escolha o problema e siga os passos sugeridos.', 'Se necessário, anexe prints e ID de request.', 'Use “Saúde (Ops)” para falhas técnicas e filas.'],
+    },
+  };
+
+  const group = groupByRoot[root];
+  if (!group) {
+    return {
+      match: pathname,
+      title: 'Guia rápido',
+      whatIs: 'Esta área ajuda a concluir tarefas com menos retrabalho.',
+      steps: ['Use filtros e busca para achar o que precisa.', 'Clique em “Novo” para criar ou abra para editar.', 'Valide no fluxo e confirme no histórico/relatórios.'],
+    };
+  }
+
+  return {
+    match: pathname,
+    title: group.titlePrefix,
+    whatIs: group.whatIs,
+    steps: group.steps,
+    links: group.links,
+    roadmapKey: group.roadmapKey,
+  };
 }
 
+export function findHelpEntry(pathname: string): HelpEntry | null {
+  const matches = HELP_CATALOG.filter((e) => pathname.startsWith(e.match));
+  if (matches.length) return matches.sort((a, b) => b.match.length - a.match.length)[0] ?? null;
+  return buildFallbackEntry(pathname);
+}
