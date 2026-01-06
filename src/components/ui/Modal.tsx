@@ -71,6 +71,7 @@ const Modal: React.FC<ModalProps> = ({
   const dialogRef = useRef<HTMLDivElement | null>(null);
   const closeBtnRef = useRef<HTMLButtonElement | null>(null);
   const previouslyFocused = useRef<HTMLElement | null>(null);
+  const titleId = useMemo(() => `modal-title-${Math.random().toString(36).slice(2)}`, []);
 
   const ariaLabel = useMemo(() => (typeof title === 'string' ? title : 'Modal'), [title]);
 
@@ -150,20 +151,23 @@ const Modal: React.FC<ModalProps> = ({
             animate={{ scale: 1, y: 0 }}
             exit={{ scale: 0.95, y: 20 }}
             transition={{ type: 'spring', stiffness: 300, damping: 30 }}
-            className={cn(
-              'w-full max-h-[95vh] flex flex-col relative',
-              sizeClasses[size],
-              containerClassName,
-            )}
+          className={cn(
+            'w-full max-h-[95vh] flex flex-col relative',
+            sizeClasses[size],
+            containerClassName,
+          )}
             onClick={(e) => e.stopPropagation()}
             role="dialog"
             aria-modal="true"
             aria-label={ariaLabel}
+            aria-labelledby={titleId}
             ref={dialogRef}
           >
             <GlassCard className={cn('h-full flex flex-col overflow-hidden', glassClassName)}>
               <header className={cn('flex-shrink-0 px-6 py-5 flex justify-between items-center border-b border-white/20', headerClassName)}>
-                <h2 className={cn('text-lg md:text-xl font-bold text-gray-900', titleClassName)}>{title}</h2>
+                <h2 id={titleId} className={cn('text-lg md:text-xl font-bold text-gray-900', titleClassName)}>
+                  {title}
+                </h2>
                 <button
                   ref={closeBtnRef}
                   onClick={onClose}
