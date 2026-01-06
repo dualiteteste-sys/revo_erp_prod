@@ -339,6 +339,7 @@ const CarriersPage: React.FC = () => {
         isOpen={isImportOpen}
         onClose={() => setIsImportOpen(false)}
         importFn={(payload) => carriersService.saveCarrier(payload)}
+        deleteFn={(id) => carriersService.deleteCarrier(id)}
         onImported={() => {
           setIsImportOpen(false);
           refresh();

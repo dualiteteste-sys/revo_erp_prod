@@ -463,6 +463,7 @@ const PartnersPage: React.FC = () => {
         isOpen={isImportOpen}
         onClose={() => setIsImportOpen(false)}
         importFn={(payload) => partnersService.savePartner(payload)}
+        deleteFn={(id) => partnersService.deletePartner(id)}
         onImported={() => {
           setIsImportOpen(false);
           refresh();
