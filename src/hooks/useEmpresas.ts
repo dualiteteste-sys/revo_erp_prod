@@ -52,18 +52,16 @@ export function useActiveEmpresaId(userId: string | null) {
             const { data, error } = await supabase
                 .from("user_active_empresa")
                 .select("empresa_id")
-                .single();
+                // Evita 406 (Not Acceptable) quando não existe preferência ainda.
+                .limit(1);
 
             if (error) {
-                // PGRST116 = JSON object requested, multiple (or no) rows returned
-                if (error.code === 'PGRST116') return null;
-
                 logger.warn('[QUERY][active_empresa] error', error);
                 return null;
             }
 
             // @ts-ignore - Table types might be missing or generic
-            return data?.empresa_id as string | null;
+            return ((data?.[0] as any)?.empresa_id ?? null) as string | null;
         },
         enabled: !!userId,
     });

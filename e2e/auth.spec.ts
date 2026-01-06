@@ -88,7 +88,7 @@ test('should allow user to log in and view products', async ({ page }) => {
     // Mock User Active Empresa
     await page.route('**/rest/v1/user_active_empresa*', async route => {
         await route.fulfill({
-            json: { empresa_id: 'empresa-1' }
+            json: [{ empresa_id: 'empresa-1' }]
         });
     });
 

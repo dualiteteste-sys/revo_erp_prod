@@ -66,9 +66,8 @@ export const handlers = [
     // Mock Table Selects (e.g. user_active_empresa)
     http.get(`${supabaseUrl}/rest/v1/user_active_empresa`, ({ request }) => {
         console.log('[MSW] GET user_active_empresa', request.url);
-        return HttpResponse.json({
-            empresa_id: 'empresa-1'
-        });
+        // Supabase `select(...).limit(1)` retorna array de rows
+        return HttpResponse.json([{ empresa_id: 'empresa-1' }]);
     }),
 
     http.get(`${supabaseUrl}/rest/v1/empresa_usuarios`, ({ request }) => {
