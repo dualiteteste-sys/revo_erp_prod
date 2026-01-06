@@ -11,6 +11,9 @@ export type HelpEntry = {
   title: string;
   whatIs: string;
   steps: string[];
+  dependsOn?: string[];
+  connectsWith?: string[];
+  fillPerfectly?: string[];
   links?: HelpLink[];
   roadmapKey?: RoadmapGroupKey;
 };
@@ -20,7 +23,19 @@ export const HELP_CATALOG: HelpEntry[] = [
     match: '/app/partners',
     title: 'Clientes e Fornecedores: guia rápido',
     whatIs: 'Aqui você cadastra pessoas (cliente/fornecedor) que serão usadas em vendas, compras, OS e financeiro.',
-    steps: ['Clique em “Novo” e preencha nome + tipo (cliente/fornecedor).', 'Salve e valide se aparece na lista.', 'Use o cadastro em um pedido/OS para confirmar o fluxo.'],
+    steps: [
+      'Clique em “Novo” e defina o tipo (Cliente / Fornecedor / Ambos).',
+      'Preencha os dados mínimos e salve.',
+      'Valide no fluxo: use o cadastro em um Pedido/OS/Compra para confirmar.',
+    ],
+    dependsOn: ['Empresa ativa', 'Permissão: Cadastros (create/update)'],
+    connectsWith: ['Vendas', 'Suprimentos', 'Serviços (OS)', 'Financeiro'],
+    fillPerfectly: [
+      'Nome/Razão social e documento (CPF/CNPJ) sem caracteres estranhos.',
+      'Endereço completo (CEP) para expedição e emissão fiscal (quando aplicável).',
+      'Contato principal (email/telefone) para cobranças e comunicação.',
+      'Classificação correta: fornecedor para compras, cliente para vendas/OS.',
+    ],
     links: [{ label: 'Abrir Roadmap (Cadastros)', href: '/app/dashboard?roadmap=cadastros', kind: 'internal' }],
     roadmapKey: 'cadastros',
   },
@@ -28,7 +43,20 @@ export const HELP_CATALOG: HelpEntry[] = [
     match: '/app/products',
     title: 'Produtos: guia rápido',
     whatIs: 'Produtos alimentam pedidos/PDV, compras, estoque e MRP-lite. O objetivo é manter SKU/unidade e estoque consistentes.',
-    steps: ['Cadastre 1 produto ativo com SKU e unidade.', 'Defina mínimo/máximo e (opcional) lead time.', 'Abra Suprimentos → Relatórios e veja a reposição sugerida.'],
+    steps: [
+      'Cadastre 1 produto ativo com SKU e unidade.',
+      'Defina mínimo/máximo e (opcional) lead time.',
+      'Faça 1 movimentação/recebimento para validar estoque e kardex.',
+      'Abra Suprimentos → Relatórios e confira a reposição sugerida.',
+    ],
+    dependsOn: ['Unidades de medida', 'Permissão: Cadastros (create/update)', 'Depósito (se multi-estoque estiver ativo)'],
+    connectsWith: ['Vendas (Pedidos/PDV)', 'Suprimentos (Estoque/Compras/Recebimentos)', 'Indústria (BOM/MRP)', 'Financeiro (custos)'],
+    fillPerfectly: [
+      'SKU único (evita duplicidade) e unidade correta.',
+      'Status “Ativo” + categoria/grupo (quando existir) para relatórios.',
+      'Mín/Máx e lead time coerentes para sugestão de compra.',
+      'Tributos básicos (quando aplicável) para fiscal/precificação.',
+    ],
     links: [{ label: 'Suprimentos → Relatórios', href: '/app/suprimentos/relatorios', kind: 'internal' }],
     roadmapKey: 'cadastros',
   },
@@ -36,7 +64,20 @@ export const HELP_CATALOG: HelpEntry[] = [
     match: '/app/vendas/pedidos',
     title: 'Pedidos de venda: guia rápido',
     whatIs: 'Pedidos organizam venda no ERP e servem como base para expedição, histórico e financeiro.',
-    steps: ['Crie um pedido com 1 cliente e 1 item.', 'Salve e confira total e status.', 'Se for expedir, avance para Vendas → Expedição.'],
+    steps: [
+      'Crie um pedido com 1 cliente e 1 item.',
+      'Revise preços/descontos e confirme totais.',
+      'Salve e confira status e histórico.',
+      'Se for expedir, avance para Vendas → Expedição e registre tracking.',
+    ],
+    dependsOn: ['Clientes', 'Produtos', 'Permissão: Vendas (create/update)'],
+    connectsWith: ['Expedição', 'Financeiro (A Receber)', 'Fiscal (NF-e quando habilitado)'],
+    fillPerfectly: [
+      'Cliente correto (evita erros de entrega/cobrança).',
+      'Itens com unidade e quantidade coerentes (impacta estoque).',
+      'Descontos com justificativa (quando exigido por permissão).',
+      'Canal (PDV/online) e observações para expedição.',
+    ],
     links: [{ label: 'Abrir Expedição', href: '/app/vendas/expedicao', kind: 'internal' }],
     roadmapKey: 'vendas',
   },
@@ -44,21 +85,51 @@ export const HELP_CATALOG: HelpEntry[] = [
     match: '/app/vendas/pdv',
     title: 'PDV: guia rápido',
     whatIs: 'PDV é venda rápida com baixa de estoque e lançamento no financeiro. O foco aqui é velocidade sem bagunçar o caixa.',
-    steps: ['Selecione uma conta corrente de recebimento.', 'Crie uma venda e finalize.', 'Sem internet: finalize mesmo assim e aguarde a sincronização automática.'],
+    steps: [
+      'Selecione uma conta corrente padrão para recebimentos.',
+      'Adicione itens e confirme quantidades/preços.',
+      'Finalize e confira o comprovante/histórico.',
+      'Sem internet: finalize mesmo assim e aguarde a sincronização automática.',
+    ],
+    dependsOn: ['Conta corrente padrão (recebimentos)', 'Produtos com estoque (se aplicável)', 'Permissão: PDV (create)'],
+    connectsWith: ['Vendas (Pedidos)', 'Financeiro (Tesouraria)', 'Estoque (baixa e kardex)'],
+    fillPerfectly: [
+      'Conta de recebimento correta (evita caixa “furado”).',
+      'Desconto dentro da permissão (auditável).',
+      'Cliente (quando necessário) para histórico e cobranças.',
+    ],
     roadmapKey: 'vendas',
   },
   {
     match: '/app/vendas/expedicao',
     title: 'Expedição: guia rápido',
     whatIs: 'Expedição dá rastreabilidade: status, tracking e SLA por pedido.',
-    steps: ['Abra uma expedição para um pedido.', 'Avance status (Separação → Envio) e registre tracking.', 'Use filtros e “Atrasadas (SLA)” para pendências.'],
+    steps: [
+      'Abra uma expedição para um pedido.',
+      'Avance status (Separação → Envio) e registre tracking.',
+      'Use filtros e “Atrasadas (SLA)” para pendências.',
+    ],
+    dependsOn: ['Pedidos criados', 'Transportadora (quando aplicável)', 'Permissão: Expedição (update)'],
+    connectsWith: ['Pedidos', 'Clientes (endereço)', 'Relatórios de vendas'],
+    fillPerfectly: ['Tracking e transportadora corretos.', 'Status atualizado no momento certo.', 'Anexos/observações quando houver ocorrência.'],
     roadmapKey: 'vendas',
   },
   {
     match: '/app/suprimentos/compras',
     title: 'Ordens de compra: guia rápido',
     whatIs: 'Ordem de compra organiza recebimento e custo. Use rascunho/enviado e acompanhe o que falta receber.',
-    steps: ['Crie uma OC em rascunho com 1 item.', 'Envie/registre recebimento quando chegar.', 'Veja impacto em estoque e custos (quando aplicável).'],
+    steps: [
+      'Crie uma OC em rascunho com 1 fornecedor e 1 item.',
+      'Envie/registre recebimento quando chegar (total ou parcial).',
+      'Veja impacto em estoque e custos (quando aplicável).',
+    ],
+    dependsOn: ['Fornecedores', 'Produtos', 'Permissão: Suprimentos (create/update)'],
+    connectsWith: ['Recebimentos', 'Estoque', 'Financeiro (A Pagar)'],
+    fillPerfectly: [
+      'Fornecedor correto e condições básicas (prazo) quando existir.',
+      'Itens com unidade e quantidades corretas.',
+      'Registrar parcialidades para não “sumir” saldo a receber.',
+    ],
     links: [{ label: 'Abrir Recebimentos', href: '/app/suprimentos/recebimentos', kind: 'internal' }],
     roadmapKey: 'suprimentos',
   },
@@ -66,7 +137,14 @@ export const HELP_CATALOG: HelpEntry[] = [
     match: '/app/suprimentos/relatorios',
     title: 'Relatórios de suprimentos: guia rápido',
     whatIs: 'Aqui você vê valorização/ABC e reposição. O objetivo é comprar o necessário com previsibilidade.',
-    steps: ['Veja “Valorização & ABC” para entender onde está o capital.', 'Use “Baixo estoque / reposição” para urgências.', 'Use “Sugestão de Compra (MRP-lite)” considerando OCs e lead time.'],
+    steps: [
+      'Veja “Valorização & ABC” para entender onde está o capital.',
+      'Use “Baixo estoque / reposição” para urgências.',
+      'Use “Sugestão de Compra (MRP-lite)” considerando OCs e lead time.',
+    ],
+    dependsOn: ['Produtos com mínimo/máximo', 'Movimentações/recebimentos registrados'],
+    connectsWith: ['Compras', 'Estoque', 'Produtos'],
+    fillPerfectly: ['Mín/máx coerentes.', 'Lead time realista.', 'OC aberta registrada (evita sugerir compra duplicada).'],
     roadmapKey: 'suprimentos',
   },
   {
@@ -78,6 +156,9 @@ export const HELP_CATALOG: HelpEntry[] = [
       'Clique em “Movimentar” para registrar entrada/saída/ajustes (ou transferência entre depósitos).',
       'Abra o “Kardex” para validar histórico e exporte CSV quando precisar.',
     ],
+    dependsOn: ['Produtos', 'Depósitos (se multi-estoque estiver ativo)', 'Permissão: Suprimentos (update)'],
+    connectsWith: ['Compras/Recebimentos', 'Vendas/PDV', 'Indústria (consumo e apontamentos)'],
+    fillPerfectly: ['Sempre registrar a referência (pedido/OC/OP) quando existir.', 'Evitar ajustes manuais sem justificativa.', 'Transferências devem sair de um local e entrar em outro (saldo bate).'],
     links: [
       { label: 'Abrir Compras', href: '/app/suprimentos/compras', kind: 'internal' },
       { label: 'Abrir Recebimentos', href: '/app/suprimentos/recebimentos', kind: 'internal' },
@@ -128,6 +209,9 @@ function buildFallbackEntry(pathname: string): HelpEntry | null {
       roadmapKey?: RoadmapGroupKey;
       whatIs: string;
       steps: string[];
+      dependsOn?: string[];
+      connectsWith?: string[];
+      fillPerfectly?: string[];
       links?: HelpLink[];
     }
   > = {
@@ -141,6 +225,9 @@ function buildFallbackEntry(pathname: string): HelpEntry | null {
       roadmapKey: 'cadastros',
       whatIs: 'Cadastros são a base do ERP. Mantendo clientes, produtos e serviços consistentes, o restante (vendas, compras e financeiro) funciona sem retrabalho.',
       steps: ['Use filtros e busca para evitar duplicar cadastros.', 'Clique em “Novo” e preencha o mínimo necessário.', 'Valide no fluxo: use o cadastro em um pedido/OS/compra.'],
+      dependsOn: ['Empresa ativa', 'Permissões do módulo'],
+      connectsWith: ['Vendas', 'Suprimentos', 'Serviços', 'Financeiro'],
+      fillPerfectly: ['Evite duplicidade (busque antes).', 'Preencha o mínimo correto.', 'Valide no fluxo e em relatórios.'],
       links: [{ label: 'Abrir Roadmap (Cadastros)', href: '/app/dashboard?roadmap=cadastros', kind: 'internal' }],
     },
     suprimentos: {
@@ -148,6 +235,9 @@ function buildFallbackEntry(pathname: string): HelpEntry | null {
       roadmapKey: 'suprimentos',
       whatIs: 'Suprimentos mantém estoque confiável: compras, recebimentos, movimentações e relatórios de reposição.',
       steps: ['Confira estoque e depósitos (se habilitado).', 'Registre recebimentos e movimentações corretamente.', 'Use relatórios para reposição e pendências.'],
+      dependsOn: ['Produtos', 'Fornecedores', 'Permissões do módulo'],
+      connectsWith: ['Vendas/PDV', 'Financeiro', 'Indústria'],
+      fillPerfectly: ['Registre referências (OC/recebimento) quando existir.', 'Evite ajustes manuais sem justificativa.', 'Kardex precisa bater com saldo.'],
       links: [{ label: 'Abrir Roadmap (Suprimentos)', href: '/app/dashboard?roadmap=suprimentos', kind: 'internal' }],
     },
     vendas: {
@@ -155,6 +245,9 @@ function buildFallbackEntry(pathname: string): HelpEntry | null {
       roadmapKey: 'vendas',
       whatIs: 'Vendas organiza pedidos/PDV e conecta expedição e financeiro com rastreabilidade.',
       steps: ['Crie um pedido ou venda no PDV e confira total.', 'Avance para expedição (se aplicável).', 'Valide no fim: financeiro e histórico batem.'],
+      dependsOn: ['Clientes', 'Produtos', 'Conta corrente (PDV)'],
+      connectsWith: ['Expedição', 'Financeiro', 'Suprimentos'],
+      fillPerfectly: ['Descontos auditáveis.', 'Endereço/contato corretos.', 'Status e timeline atualizados.'],
       links: [{ label: 'Abrir Roadmap (Vendas)', href: '/app/dashboard?roadmap=vendas', kind: 'internal' }],
     },
     financeiro: {
@@ -162,6 +255,9 @@ function buildFallbackEntry(pathname: string): HelpEntry | null {
       roadmapKey: 'financeiro',
       whatIs: 'Financeiro consolida caixa, contas a pagar/receber e relatórios. O objetivo é saldo confiável e auditoria.',
       steps: ['Defina contas correntes padrão e valide saldo.', 'Registre pagar/receber e concilie com extrato quando possível.', 'Use relatórios por período para fechar.'],
+      dependsOn: ['Contas correntes', 'Permissões do módulo'],
+      connectsWith: ['Vendas/PDV', 'Suprimentos', 'Serviços'],
+      fillPerfectly: ['Data e categoria corretas.', 'Conciliação reduz divergência.', 'Estornos sempre auditáveis.'],
       links: [{ label: 'Abrir Roadmap (Financeiro)', href: '/app/dashboard?roadmap=financeiro', kind: 'internal' }],
     },
     servicos: {
@@ -169,6 +265,9 @@ function buildFallbackEntry(pathname: string): HelpEntry | null {
       roadmapKey: 'servicos',
       whatIs: 'Serviços (OS) organiza atendimento, status, agenda, anexos e histórico, com geração de financeiro quando aplicável.',
       steps: ['Crie uma OS e avance status.', 'Registre itens/custos e anexos.', 'Gere parcelas e valide auditoria.'],
+      dependsOn: ['Clientes', 'Permissões do módulo'],
+      connectsWith: ['Financeiro', 'Cadastros', 'Suprimentos (peças/estoque)'],
+      fillPerfectly: ['Status coerente com agenda.', 'Equipamento/serial (quando aplicável).', 'Anexos e observações em ocorrências.'],
       links: [{ label: 'Abrir Roadmap (Serviços)', href: '/app/dashboard?roadmap=servicos', kind: 'internal' }],
     },
     industria: {
@@ -176,6 +275,9 @@ function buildFallbackEntry(pathname: string): HelpEntry | null {
       roadmapKey: 'industria',
       whatIs: 'Indústria conecta roteiro/BOM, ordens e execução no chão de fábrica com rastreabilidade e travas de estado.',
       steps: ['Cadastre CT, Roteiro e BOM.', 'Crie uma OP/OB e aplique roteiro/BOM.', 'Aponte execução e valide consistência de estados.'],
+      dependsOn: ['Produtos', 'Roteiro + BOM', 'Permissões do módulo'],
+      connectsWith: ['Suprimentos (estoque)', 'Qualidade', 'Relatórios'],
+      fillPerfectly: ['Estados travados (sem pular etapas).', 'Apontamentos com quantidade e motivo.', 'Consumo de materiais rastreável.'],
       links: [{ label: 'Abrir Roadmap (Indústria)', href: '/app/dashboard?roadmap=industria', kind: 'internal' }],
     },
     fiscal: {
@@ -207,6 +309,7 @@ function buildFallbackEntry(pathname: string): HelpEntry | null {
       title: 'Guia rápido',
       whatIs: 'Esta área ajuda a concluir tarefas com menos retrabalho.',
       steps: ['Use filtros e busca para achar o que precisa.', 'Clique em “Novo” para criar ou abra para editar.', 'Valide no fluxo e confirme no histórico/relatórios.'],
+      fillPerfectly: ['Preencha o mínimo correto.', 'Evite duplicidades.', 'Valide no fluxo e no relatório.'],
     };
   }
 
@@ -215,6 +318,9 @@ function buildFallbackEntry(pathname: string): HelpEntry | null {
     title: group.titlePrefix,
     whatIs: group.whatIs,
     steps: group.steps,
+    dependsOn: group.dependsOn,
+    connectsWith: group.connectsWith,
+    fillPerfectly: group.fillPerfectly,
     links: group.links,
     roadmapKey: group.roadmapKey,
   };
