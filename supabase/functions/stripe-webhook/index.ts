@@ -63,6 +63,30 @@ Deno.serve(async (req: Request): Promise<Response> => {
             return new Response("empresa_id não encontrado", { status: 400 });
         }
 
+        // Best-effort: preencher stripe_customer_id no cadastro da empresa (evita "missing_customer" no app).
+        if (customerId) {
+          try {
+            const { data: emp, error: empErr } = await supabaseAdmin
+              .from("empresas")
+              .select("stripe_customer_id")
+              .eq("id", empresaId)
+              .maybeSingle();
+            if (empErr) {
+              console.warn("Webhook: falha ao ler empresa (best-effort)", { empresaId, empErr });
+            } else if (emp && !emp.stripe_customer_id) {
+              const { error: updErr } = await supabaseAdmin
+                .from("empresas")
+                .update({ stripe_customer_id: customerId })
+                .eq("id", empresaId);
+              if (updErr) {
+                console.warn("Webhook: falha ao atualizar stripe_customer_id (best-effort)", { empresaId, customerId, updErr });
+              }
+            }
+          } catch (e) {
+            console.warn("Webhook: erro ao fazer backfill de stripe_customer_id (best-effort)", e);
+          }
+        }
+
         // Mapear plano no catálogo local
         const { data: planRow, error: planErr } = await supabaseAdmin
           .from("plans")

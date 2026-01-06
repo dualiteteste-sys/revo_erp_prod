@@ -84,15 +84,38 @@ Deno.serve(async (req) => {
     }
 
     const customerId = empresa.stripe_customer_id ? String(empresa.stripe_customer_id) : "";
-    if (!customerId) {
+    const stripe = new Stripe(Deno.env.get("STRIPE_SECRET_KEY")!, { apiVersion: "2024-06-20" });
+
+    // Auto-link: tenta encontrar o Customer no Stripe via metadata.empresa_id (evita fricção no app).
+    // Obs: isso só funciona se o Customer/Subscription foi criado por nós (billing-checkout) ou se o metadata foi setado.
+    let effectiveCustomerId = customerId;
+    if (!effectiveCustomerId) {
+      try {
+        const q = `metadata['empresa_id']:'${empresa_id}'`;
+        const found = await stripe.customers.search({ query: q, limit: 1 });
+        const candidate = found.data?.[0];
+        if (candidate?.id) {
+          effectiveCustomerId = candidate.id;
+          const { error: updErr } = await admin
+            .from("empresas")
+            .update({ stripe_customer_id: effectiveCustomerId })
+            .eq("id", empresa_id);
+          if (updErr) {
+            console.warn("billing-sync-subscription: failed to persist stripe_customer_id (best-effort)", updErr);
+          }
+        }
+      } catch (e) {
+        console.warn("billing-sync-subscription: customer auto-link search failed (best-effort)", e);
+      }
+    }
+
+    if (!effectiveCustomerId) {
       // 400 (e não 404) para evitar confusão com "Edge Function não encontrada".
       return json(corsHeaders, 400, { error: "missing_customer", message: "Cliente Stripe não encontrado para esta empresa." });
     }
 
-    const stripe = new Stripe(Deno.env.get("STRIPE_SECRET_KEY")!, { apiVersion: "2024-06-20" });
-
     const listed = await stripe.subscriptions.list({
-      customer: customerId,
+      customer: effectiveCustomerId,
       status: "all",
       limit: 10,
       expand: ["data.items.data.price"],
