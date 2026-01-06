@@ -233,11 +233,17 @@ export default function PdvPage() {
       addToast('Cadastre/seleciona uma conta corrente para receber no PDV.', 'error');
       return;
     }
-    const caixa = caixas.find((c) => c.id === caixaId);
-    if (!caixaId) {
+    // Evita race conditions de state (E2E/user clicando rápido antes do load setar caixaId).
+    const effectiveCaixaId = caixaId || caixas.find((c) => c.sessao_id)?.id || caixas[0]?.id || '';
+    if (!effectiveCaixaId) {
       addToast('Selecione um caixa antes de finalizar.', 'warning');
       return;
     }
+    if (effectiveCaixaId !== caixaId) {
+      setCaixaId(effectiveCaixaId);
+      if (typeof window !== 'undefined') window.localStorage.setItem('pdv:caixaId', effectiveCaixaId);
+    }
+    const caixa = caixas.find((c) => c.id === effectiveCaixaId);
     if (!caixa?.sessao_id) {
       addToast('Caixa fechado. Abra o caixa para finalizar vendas.', 'warning');
       setCaixaMode('open');
@@ -248,7 +254,7 @@ export default function PdvPage() {
     setFinalizingId(pedidoId);
     try {
       await runWithActionLock(lockKey, async () => {
-        await finalizePdv({ pedidoId, contaCorrenteId, estoqueEnabled: true, caixaId });
+        await finalizePdv({ pedidoId, contaCorrenteId, estoqueEnabled: true, caixaId: effectiveCaixaId });
       });
       addToast('PDV finalizado (financeiro + estoque).', 'success');
       try {
