@@ -16,6 +16,7 @@ import ProducaoFormPanel from '@/components/industria/producao/ProducaoFormPanel
 import ProducaoKanbanBoard from '@/components/industria/producao/ProducaoKanbanBoard';
 import { logger } from '@/lib/logger';
 import { roleAtLeast, useEmpresaRole } from '@/hooks/useEmpresaRole';
+import RoadmapButton from '@/components/roadmap/RoadmapButton';
 
 export default function OrdensPage() {
   const { addToast } = useToast();
@@ -241,6 +242,7 @@ export default function OrdensPage() {
           </p>
         </div>
         <div className="flex items-center gap-3">
+            <RoadmapButton contextKey="industria" label="Assistente" title="Abrir assistente da Indústria" />
             <div className="bg-gray-100 p-1 rounded-lg flex">
                 <button 
                     onClick={() => setViewMode('list')}

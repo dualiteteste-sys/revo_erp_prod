@@ -41,7 +41,7 @@ Este é o checklist único (por módulo) para levar o REVO ao nível **top mundi
 - [ ] PLAT-UX-01 (P1) Microinterações consistentes (hover/press/transition) sem flicker/layout shift
 - [x] PLAT-UX-02 (P0) Ações destrutivas com “zero-surpresa”: undo/confirm + explicação clara
 - [x] PLAT-UX-03 (P0) Feedback resiliente: retry, “o que fazer agora”, link para logs/diagnóstico quando falhar
-- [ ] PLAT-UX-04 (P1) Fluxos complexos com assistentes (wizard) por contexto (NF-e, PDV, Indústria, Integrações)
+- [x] PLAT-UX-04 (P1) Fluxos complexos com assistentes (wizard) por contexto (NF-e, PDV, Indústria, Integrações)
 
 **Validar**
 - Forçar erro (desligar rede / provocar 400) e confirmar que existe caminho de recuperação sem alert()/travamento.
@@ -155,7 +155,7 @@ Este é o checklist único (por módulo) para levar o REVO ao nível **top mundi
 ### F1) Primeiro uso guiado (opt-in e sem travar)
 - [x] GTM-ONB-01 (P0) Roadmap por grupo de módulos (opt-in) com checks automáticos e links corretos
 - [x] GTM-ONB-02 (P0) Roadmap por plano: recomendações e “próximo passo” (só mostra o que faz sentido)
-- [ ] GTM-ONB-03 (P1) Importadores sem dor (clientes/produtos) com preview + validação + rollback
+- [x] GTM-ONB-03 (P1) Importadores sem dor (clientes/produtos) com preview + validação + rollback
 
 ### F2) Ajuda e diagnóstico
 - [ ] GTM-HELP-01 (P1) Ajuda contextual (tooltips + artigos por página)
@@ -175,7 +175,7 @@ Este é o checklist único (por módulo) para levar o REVO ao nível **top mundi
 - [x] SUP-STA-02 (P0) Inventário cíclico (contagem → divergência → aprovação → ajuste auditável)
 - [x] SUP-STA-03 (P1) Devolução ao fornecedor (reversão) vinculada a OC/recebimento
 - [ ] SUP-STA-04 (P1) Landed cost (rateio frete/impostos) com impacto em custo médio/relatórios
-- [ ] SUP-STA-05 (P1) Sugestão de compra (mín/máx + lead time + OCs abertas) “MRP-lite”
+- [x] SUP-STA-05 (P1) Sugestão de compra (mín/máx + lead time + OCs abertas) “MRP-lite”
 - [ ] SUP-STA-06 (P1) WMS light (leitura barcode/QR na conferência/separação) + checklists
 
 **Validar (SUP-STA-01)**
@@ -198,7 +198,7 @@ Este é o checklist único (por módulo) para levar o REVO ao nível **top mundi
 ### G3) Vendas / PDV / Expedição
 - [x] VEN-STA-01 (P0) Regras de preço/desconto com permissão + trilha (quem deu desconto)
 - [x] VEN-STA-02 (P0) PDV resiliente (offline-lite + fila local + idempotência server-side)
-- [ ] VEN-STA-03 (P1) Expedição com eventos, rastreio, SLA e relatórios (atrasos/pendências)
+- [x] VEN-STA-03 (P1) Expedição com eventos, rastreio, SLA e relatórios (atrasos/pendências)
 - [ ] VEN-STA-04 (P1) Multi-caixa (PDV) + perfis por caixa + fechamento
 
 **Validar (VEN-STA-02)**
@@ -277,7 +277,7 @@ Este é o checklist único (por módulo) para levar o REVO ao nível **top mundi
 
 ### G10) Assinatura / Billing (Stripe)
 - [x] BILL-STA-01 (P0) Ciclo completo de trial → ativo → inadimplente → bloqueio suave → cancelado
-- [ ] BILL-STA-02 (P0) Webhooks Stripe idempotentes + trilha por evento (reprocessável)
+- [x] BILL-STA-02 (P0) Webhooks Stripe idempotentes + trilha por evento (reprocessável)
 - [ ] BILL-STA-03 (P1) Proration/upgrade/downgrade com comunicação clara + histórico
 - [ ] BILL-STA-04 (P1) “Self-serve” de faturas/boletos/recibos (quando aplicável) e dados fiscais
 

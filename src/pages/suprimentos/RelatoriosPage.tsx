@@ -2,8 +2,10 @@ import React, { useState, useEffect } from 'react';
 import { 
   getRelatorioValorizacao, 
   getRelatorioBaixoEstoque, 
+  getSugestaoCompraMrpLite,
   RelatorioValorizacaoItem, 
-  RelatorioBaixoEstoqueItem 
+  RelatorioBaixoEstoqueItem,
+  SugestaoCompraMrpLiteItem,
 } from '@/services/suprimentos';
 import { Loader2, Search, Download, Printer, TrendingUp, AlertTriangle, BarChart3, CheckCircle } from 'lucide-react';
 import GlassCard from '@/components/ui/GlassCard';
@@ -11,7 +13,7 @@ import { formatCurrency } from '@/lib/utils';
 import { useDebounce } from '@/hooks/useDebounce';
 import ReactECharts from 'echarts-for-react';
 
-type ReportType = 'valorizacao' | 'baixo_estoque';
+type ReportType = 'valorizacao' | 'baixo_estoque' | 'sugestao_compra';
 
 export default function RelatoriosPage() {
   const [activeReport, setActiveReport] = useState<ReportType>('valorizacao');
@@ -21,6 +23,7 @@ export default function RelatoriosPage() {
   
   const [valorizacaoData, setValorizacaoData] = useState<RelatorioValorizacaoItem[]>([]);
   const [baixoEstoqueData, setBaixoEstoqueData] = useState<RelatorioBaixoEstoqueItem[]>([]);
+  const [sugestaoCompraData, setSugestaoCompraData] = useState<SugestaoCompraMrpLiteItem[]>([]);
 
   const fetchData = async () => {
     setLoading(true);
@@ -28,9 +31,12 @@ export default function RelatoriosPage() {
       if (activeReport === 'valorizacao') {
         const data = await getRelatorioValorizacao(debouncedSearch);
         setValorizacaoData(data);
-      } else {
+      } else if (activeReport === 'baixo_estoque') {
         const data = await getRelatorioBaixoEstoque(debouncedSearch);
         setBaixoEstoqueData(data);
+      } else {
+        const data = await getSugestaoCompraMrpLite(debouncedSearch);
+        setSugestaoCompraData(data);
       }
     } catch (e) {
       console.error(e);
@@ -61,7 +67,7 @@ export default function RelatoriosPage() {
       ].join(';'));
       content = [headers.join(';'), ...rows].join('\n');
       filename = 'relatorio_valorizacao.csv';
-    } else {
+    } else if (activeReport === 'baixo_estoque') {
       const headers = ['Produto', 'SKU', 'Unidade', 'Saldo', 'Mínimo', 'Máximo', 'Sugestão Compra', 'Fornecedor'];
       const rows = baixoEstoqueData.map(i => [
         `"${i.nome}"`, i.sku || '', i.unidade, i.saldo, 
@@ -70,6 +76,39 @@ export default function RelatoriosPage() {
       ].join(';'));
       content = [headers.join(';'), ...rows].join('\n');
       filename = 'relatorio_baixo_estoque.csv';
+    } else {
+      const headers = [
+        'Produto',
+        'SKU',
+        'Unidade',
+        'Saldo',
+        'Em OC aberta',
+        'Saldo projetado',
+        'Mínimo',
+        'Máximo',
+        'Sugestão compra',
+        'Lead time (dias)',
+        'Prev. recebimento',
+        'Fornecedor',
+      ];
+      const rows = sugestaoCompraData.map((i) =>
+        [
+          `"${i.nome}"`,
+          i.sku || '',
+          i.unidade,
+          i.saldo,
+          i.qtd_em_oc_aberta,
+          i.saldo_projetado,
+          i.estoque_min ?? 0,
+          i.estoque_max ?? 0,
+          i.sugestao_compra,
+          i.lead_time_dias,
+          i.data_prevista_recebimento ?? '',
+          `"${i.fornecedor_nome || ''}"`,
+        ].join(';')
+      );
+      content = [headers.join(';'), ...rows].join('\n');
+      filename = 'sugestao_compra_mrp_lite.csv';
     }
 
     const blob = new Blob([`\uFEFF${content}`], { type: 'text/csv;charset=utf-8;' });
@@ -149,6 +188,14 @@ export default function RelatoriosPage() {
         >
           <AlertTriangle size={18} /> Baixo Estoque / Reposição
         </button>
+        <button
+          onClick={() => setActiveReport('sugestao_compra')}
+          className={`flex items-center gap-2 px-4 py-3 rounded-xl font-medium transition-all whitespace-nowrap ${
+            activeReport === 'sugestao_compra' ? 'bg-blue-600 text-white shadow-md' : 'bg-white text-gray-600 hover:bg-gray-50'
+          }`}
+        >
+          <AlertTriangle size={18} /> Sugestão de Compra (MRP-lite)
+        </button>
       </div>
 
       <div className="mb-6 print:hidden">
@@ -167,7 +214,11 @@ export default function RelatoriosPage() {
       {/* Header for Print */}
       <div className="hidden print:block mb-6">
         <h2 className="text-2xl font-bold text-gray-900">
-            {activeReport === 'valorizacao' ? 'Relatório de Valorização de Estoque' : 'Relatório de Sugestão de Compras'}
+          {activeReport === 'valorizacao'
+            ? 'Relatório de Valorização de Estoque'
+            : activeReport === 'baixo_estoque'
+              ? 'Relatório de Baixo Estoque / Reposição'
+              : 'Relatório de Sugestão de Compra (MRP-lite)'}
         </h2>
         <p className="text-sm text-gray-500">Gerado em: {new Date().toLocaleString('pt-BR')}</p>
       </div>
@@ -275,6 +326,58 @@ export default function RelatoriosPage() {
                         </tbody>
                     </table>
                 </div>
+            </div>
+          )}
+
+          {activeReport === 'sugestao_compra' && (
+            <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+              <div className="overflow-x-auto">
+                <table className="min-w-full divide-y divide-gray-200 text-sm">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th className="px-4 py-3 text-left font-medium text-gray-500">Produto</th>
+                      <th className="px-4 py-3 text-center font-medium text-gray-500">Saldo</th>
+                      <th className="px-4 py-3 text-center font-medium text-gray-500">Em OC</th>
+                      <th className="px-4 py-3 text-center font-medium text-gray-500">Proj.</th>
+                      <th className="px-4 py-3 text-center font-medium text-gray-500">Mín.</th>
+                      <th className="px-4 py-3 text-center font-medium text-gray-500">Máx.</th>
+                      <th className="px-4 py-3 text-center font-medium text-gray-500 bg-blue-50">Sugestão</th>
+                      <th className="px-4 py-3 text-center font-medium text-gray-500">Lead time</th>
+                      <th className="px-4 py-3 text-left font-medium text-gray-500">Prev. receb.</th>
+                      <th className="px-4 py-3 text-left font-medium text-gray-500">Fornecedor</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-200">
+                    {sugestaoCompraData.map((item) => (
+                      <tr key={item.produto_id} className="hover:bg-gray-50">
+                        <td className="px-4 py-2 font-medium text-gray-900">
+                          {item.nome}
+                          <div className="text-xs text-gray-400">{item.sku}</div>
+                        </td>
+                        <td className="px-4 py-2 text-center text-gray-700">{item.saldo}</td>
+                        <td className="px-4 py-2 text-center text-gray-700">{item.qtd_em_oc_aberta}</td>
+                        <td className="px-4 py-2 text-center font-bold text-gray-900">{item.saldo_projetado}</td>
+                        <td className="px-4 py-2 text-center text-gray-500">{item.estoque_min ?? '-'}</td>
+                        <td className="px-4 py-2 text-center text-gray-500">{item.estoque_max ?? '-'}</td>
+                        <td className="px-4 py-2 text-center bg-blue-50 font-bold text-blue-700">
+                          {Math.ceil(item.sugestao_compra)} {item.unidade}
+                        </td>
+                        <td className="px-4 py-2 text-center text-gray-600">{item.lead_time_dias}d</td>
+                        <td className="px-4 py-2 text-gray-600">{item.data_prevista_recebimento ?? '-'}</td>
+                        <td className="px-4 py-2 text-gray-600">{item.fornecedor_nome || '-'}</td>
+                      </tr>
+                    ))}
+                    {sugestaoCompraData.length === 0 && (
+                      <tr>
+                        <td colSpan={10} className="p-8 text-center text-gray-500">
+                          <CheckCircle className="w-8 h-8 mx-auto mb-2 text-green-500" />
+                          Nenhuma sugestão de compra no momento.
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
             </div>
           )}
         </div>

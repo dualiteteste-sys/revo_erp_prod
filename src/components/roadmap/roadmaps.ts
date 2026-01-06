@@ -454,5 +454,42 @@ export function getRoadmaps(): RoadmapGroup[] {
         },
       ],
     },
+    {
+      key: 'integracoes',
+      title: 'Integrações',
+      subtitle: 'Conecte marketplaces e acompanhe saúde/reprocessamento sem abrir ticket.',
+      steps: [
+        {
+          key: 'integracoes.meli',
+          title: 'Conecte o Mercado Livre',
+          description: 'Autorize e valide a conexão para importar pedidos e sincronizar o que for necessário.',
+          actionLabel: 'Abrir Marketplaces',
+          actionHref: '/app/configuracoes/ecommerce/marketplaces',
+          check: async (supabase) => {
+            const has = await safeTableHasAny(supabase, 'ecommerces', { provider: 'meli', status: 'connected' });
+            return requireKnown(has, 'Não foi possível validar conexão Mercado Livre agora.');
+          },
+        },
+        {
+          key: 'integracoes.shopee',
+          title: 'Conecte a Shopee',
+          description: 'Prepare a conexão para centralizar pedidos e expedições no ERP.',
+          actionLabel: 'Abrir Marketplaces',
+          actionHref: '/app/configuracoes/ecommerce/marketplaces',
+          check: async (supabase) => {
+            const has = await safeTableHasAny(supabase, 'ecommerces', { provider: 'shopee', status: 'connected' });
+            return requireKnown(has, 'Não foi possível validar conexão Shopee agora.');
+          },
+        },
+        {
+          key: 'integracoes.saude',
+          title: 'Verifique o painel de saúde',
+          description: 'Veja contadores e reprocessamento (DLQ) para reduzir suporte e retrabalho.',
+          actionLabel: 'Abrir Saúde (Ops)',
+          actionHref: '/app/dev/health',
+          check: async () => true,
+        },
+      ],
+    },
   ];
 }
