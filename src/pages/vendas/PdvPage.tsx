@@ -374,7 +374,11 @@ export default function PdvPage() {
     iframe.onload = () => {
       try {
         iframe.contentWindow?.focus();
-        iframe.contentWindow?.print();
+        // Headless/e2e runners can hang or block focus when invoking print().
+        // We still render the receipt, but skip the native print dialog.
+        if (!(navigator as any)?.webdriver) {
+          iframe.contentWindow?.print();
+        }
       } finally {
         // evita acumular iframes
         setTimeout(() => iframe.remove(), 1000);
@@ -439,10 +443,10 @@ export default function PdvPage() {
           type="button"
           onClick={() => openCaixaModal((caixas.find((c) => c.id === caixaId)?.sessao_id ? 'close' : 'open'))}
           className="px-3 py-2 rounded-lg bg-slate-900 text-white text-sm font-semibold hover:bg-slate-800 flex items-center gap-2"
-          title="Abrir/fechar caixa"
+          title="Abrir/encerrar caixa"
         >
           {caixas.find((c) => c.id === caixaId)?.sessao_id ? <DoorClosed size={16} /> : <DoorOpen size={16} />}
-          {caixas.find((c) => c.id === caixaId)?.sessao_id ? 'Fechar caixa' : 'Abrir caixa'}
+          {caixas.find((c) => c.id === caixaId)?.sessao_id ? 'Encerrar caixa' : 'Abrir caixa'}
         </button>
         <button onClick={() => load()} className="px-3 py-2 rounded-lg bg-gray-100 hover:bg-gray-200 text-sm">
           Atualizar
@@ -452,7 +456,7 @@ export default function PdvPage() {
       <Modal
         isOpen={isCaixaModalOpen}
         onClose={() => setIsCaixaModalOpen(false)}
-        title={caixaMode === 'open' ? 'Abrir caixa' : 'Fechar caixa'}
+        title={caixaMode === 'open' ? 'Abrir caixa' : 'Encerrar caixa'}
         size="lg"
       >
         <div className="p-6 space-y-4">

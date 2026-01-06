@@ -43,6 +43,7 @@ function statusLabel(status: CheckStatus) {
 export default function SuportePage() {
   const { session, activeEmpresa } = useAuth();
   const userId = session?.user?.id || '';
+  const userEmail = session?.user?.email || '';
   const [loading, setLoading] = useState(true);
   const [onboarding, setOnboarding] = useState<ChecksRpc | null>(null);
   const [pdv, setPdv] = useState<ChecksRpc | null>(null);
