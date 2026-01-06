@@ -59,8 +59,8 @@ export default function ImportProductsCsvModal(props: {
     const errors: string[] = [];
 
     const nome = getFirst(row, ['nome', 'descricao', 'produto', 'name']);
-    const sku = getFirst(row, ['sku', 'codigo', 'codigo_interno', 'code']);
-    const unidade = getFirst(row, ['unidade', 'un', 'unidade_sigla', 'unit']) || 'un';
+    const sku = String(getFirst(row, ['sku', 'codigo', 'codigo_interno', 'code']) || '').trim();
+    const unidade = String(getFirst(row, ['unidade', 'un', 'unidade_sigla', 'unit']) || 'un').trim() || 'un';
     const statusRaw = getFirst(row, ['status', 'ativo', 'active']);
     const precoRaw = getFirst(row, ['preco_venda', 'preco', 'valor', 'price']);
     const ncm = digitsOnly(getFirst(row, ['ncm'])) || null;
@@ -71,10 +71,10 @@ export default function ImportProductsCsvModal(props: {
     const preco = parseMoneyBr(precoRaw);
     if (precoRaw && preco === null) errors.push('preço inválido');
 
-    const status =
-      statusRaw.toLowerCase() === 'inativo' || statusRaw.toLowerCase() === 'false' || statusRaw === '0'
-        ? 'inativo'
-        : 'ativo';
+    if (ncm && ncm.length !== 8) errors.push('ncm deve ter 8 dígitos');
+
+    const statusStr = String(statusRaw || '').toLowerCase();
+    const status = statusStr === 'inativo' || statusStr === 'false' || statusStr === '0' ? 'inativo' : 'ativo';
 
     const controla_estoque = parseBoolPt(getFirst(row, ['controla_estoque', 'estoque', 'stock']));
     const pode_comprar = parseBoolPt(getFirst(row, ['pode_comprar', 'compravel']));

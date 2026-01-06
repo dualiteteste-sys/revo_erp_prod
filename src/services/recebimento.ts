@@ -10,6 +10,11 @@ export type Recebimento = {
     status: RecebimentoStatus;
     classificacao?: 'estoque_proprio' | 'material_cliente' | null;
     cliente_id?: string | null;
+    custo_frete?: number;
+    custo_seguro?: number;
+    custo_impostos?: number;
+    custo_outros?: number;
+    rateio_base?: 'valor' | 'quantidade';
     data_recebimento: string;
     responsavel_id: string | null;
     observacao: string | null;
@@ -200,4 +205,38 @@ export async function updateRecebimentoItemProduct(itemId: string, productId: st
         .eq('id', itemId);
 
     if (error) throw error;
+}
+
+export async function updateRecebimentoCustos(
+    recebimentoId: string,
+    patch: {
+        custo_frete?: number;
+        custo_seguro?: number;
+        custo_impostos?: number;
+        custo_outros?: number;
+        rateio_base?: 'valor' | 'quantidade';
+    }
+): Promise<Recebimento> {
+    const { data, error } = await supabase
+        .from('recebimentos')
+        .update(patch as any)
+        .eq('id', recebimentoId)
+        .select(
+            `
+      *,
+      fiscal_nfe_imports (
+        chave_acesso,
+        emitente_nome,
+        emitente_cnpj,
+        numero,
+        serie,
+        total_nf,
+        pedido_numero
+      )
+    `
+        )
+        .single();
+
+    if (error) throw error;
+    return data as Recebimento;
 }

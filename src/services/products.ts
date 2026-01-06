@@ -2,7 +2,7 @@ import { supabase } from '@/lib/supabaseClient';
 import { callRpc } from '@/lib/api';
 import { Database } from '@/types/database.types';
 import { normalizeProductPayload } from './products.normalize';
-import { validatePackaging } from './products.validate';
+import { validatePackaging, validateProductCore } from './products.validate';
 
 // Type for the product list, now derived from the RPC's return type.
 export type Product = {
@@ -91,7 +91,7 @@ export async function getProductDetails(id: string): Promise<FullProduct | null>
 export async function saveProduct(productData: ProductPayload, empresaId: string): Promise<FullProduct> {
   const normalizedPayload = normalizeProductPayload({ ...productData, empresa_id: empresaId });
   
-  const validationErrors = validatePackaging(normalizedPayload);
+  const validationErrors = [...validateProductCore(normalizedPayload), ...validatePackaging(normalizedPayload)];
   if (validationErrors.length > 0) {
     const error = new Error(`[VALIDATION] ${validationErrors.join(' | ')}`);
     (error as any).code = 'CLIENT_VALIDATION';

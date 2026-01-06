@@ -257,6 +257,25 @@ test('SUP-03: importar XML → criar recebimento → finalizar (happy path)', as
         await route.fulfill({ json: recebimentos });
         return;
       }
+      if (req.method() === 'PATCH') {
+        let body: any = {};
+        try {
+          body = req.postDataJSON();
+        } catch {
+          body = {};
+        }
+        recebimentos = recebimentos.map((r) =>
+          r.id === recebimentoId
+            ? {
+                ...r,
+                ...body,
+                updated_at: new Date().toISOString(),
+              }
+            : r
+        );
+        await route.fulfill({ json: recebimentos[0] });
+        return;
+      }
     }
 
     // RPC: finalizar recebimento
@@ -362,6 +381,14 @@ test('SUP-03: importar XML → criar recebimento → finalizar (happy path)', as
 
   // Conferência (finalização)
   await expect(page.getByText(/Confer[iê]ncia de Recebimento|Detalhes do Recebimento/)).toBeVisible({ timeout: 15000 });
+
+  // Landed cost (SUP-STA-04): salva custos adicionais antes de finalizar
+  await expect(page.getByText('Custo adicional (landed cost)')).toBeVisible({ timeout: 15000 });
+  await page.getByLabel('Frete').fill('10');
+  await page.getByLabel('Impostos').fill('5.5');
+  await page.getByRole('button', { name: 'Salvar custos' }).click();
+  await expect(page.getByText(/Custos adicionais atualizados/)).toBeVisible({ timeout: 15000 });
+
   await page.getByRole('button', { name: 'Finalizar Recebimento' }).click();
   await expect(page.getByText('Recebimento concluído.', { exact: true })).toBeVisible({ timeout: 15000 });
 

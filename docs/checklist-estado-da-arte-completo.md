@@ -127,7 +127,7 @@ Este é o checklist único (por módulo) para levar o REVO ao nível **top mundi
 - [x] RES-06 (P1) Circuit breaker + bulkheads (evitar efeito cascata quando integração cair)
 - [x] RES-07 (P1) Degradação elegante (feature off / fallback) + mensagens “o que fazer agora”
 - [x] RES-08 (P1) Teste de carga mínimo (Top 5 RPCs + 2 fluxos E2E) com budget de latência
-- [ ] RES-09 (P1) Multitenancy-friendly scaling: filas/locks/limites por empresa (não “uma empresa derruba todas”)
+- [x] RES-09 (P1) Multitenancy-friendly scaling: filas/locks/limites por empresa (não “uma empresa derruba todas”)
 
 **Validar**
 - Desligar a integração (simular 500/timeout) e confirmar: retries limitados, DLQ, reprocess, UI não trava.
@@ -141,7 +141,7 @@ Este é o checklist único (por módulo) para levar o REVO ao nível **top mundi
 - [x] QA-CT-01 (P0) Testes de contrato de integrações (golden files payloads reais)
 - [x] QA-VIS-01 (P1) Regressão visual (screenshots) para páginas críticas
 - [x] QA-E2E-01 (P0) Suites E2E por plano (Essencial/Pro/Max/Indústria/Scale) com edge cases
-- [ ] QA-CHAOS-01 (P1) Chaos-lite: timeout/rate-limit/retry/dead-letter/reprocess
+- [x] QA-CHAOS-01 (P1) Chaos-lite: timeout/rate-limit/retry/dead-letter/reprocess
 
 ### E2) Banco e deploy
 - [x] DB-MIG-01 (P0) Idempotência “garantida”: migrations repetíveis (e reversão quando fizer sentido)
@@ -167,14 +167,14 @@ Este é o checklist único (por módulo) para levar o REVO ao nível **top mundi
 
 ### G1) Cadastros
 - [x] CAD-STA-01 (P0) CRUDs com validação forte + import/export (clientes, produtos, serviços, transportadoras)
-- [ ] CAD-STA-02 (P1) Normalização tributária básica (NCM/CFOP/CST/CSOSN) e consistência de unidade/sku
-- [ ] CAD-STA-03 (P1) Dedupe e saneamento (CNPJ/CPF/email/telefone) com alertas de duplicidade
+- [x] CAD-STA-02 (P1) Normalização tributária básica (NCM/CFOP/CST/CSOSN) e consistência de unidade/sku
+- [x] CAD-STA-03 (P1) Dedupe e saneamento (CNPJ/CPF/email/telefone) com alertas de duplicidade
 
 ### G2) Suprimentos / Estoque
 - [x] SUP-STA-01 (P0) Multi-estoque/depósitos + transferências + permissões por local
 - [x] SUP-STA-02 (P0) Inventário cíclico (contagem → divergência → aprovação → ajuste auditável)
 - [x] SUP-STA-03 (P1) Devolução ao fornecedor (reversão) vinculada a OC/recebimento
-- [ ] SUP-STA-04 (P1) Landed cost (rateio frete/impostos) com impacto em custo médio/relatórios
+- [x] SUP-STA-04 (P1) Landed cost (rateio frete/impostos) com impacto em custo médio/relatórios
 - [x] SUP-STA-05 (P1) Sugestão de compra (mín/máx + lead time + OCs abertas) “MRP-lite”
 - [ ] SUP-STA-06 (P1) WMS light (leitura barcode/QR na conferência/separação) + checklists
 
