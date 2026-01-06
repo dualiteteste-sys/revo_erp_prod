@@ -164,6 +164,27 @@ test('RG-04 (Comércio): finalizar PDV gera movimento financeiro + baixa de esto
       return;
     }
 
+    // PDV caixas (novo: multi-caixa). Mantemos um caixa "aberto" para não criar fricção no RG-04.
+    if (url.includes('/rest/v1/rpc/vendas_pdv_ensure_default_caixa')) {
+      await route.fulfill({ json: { ok: true } });
+      return;
+    }
+    if (url.includes('/rest/v1/rpc/vendas_pdv_caixas_list')) {
+      await route.fulfill({
+        json: [
+          {
+            id: 'cx-1',
+            nome: 'Caixa 1',
+            ativo: true,
+            sessao_id: 'sess-1',
+            sessao_status: 'open',
+            opened_at: nowIso,
+          },
+        ],
+      });
+      return;
+    }
+
     // PDV list (REST)
     if (url.includes('/rest/v1/vendas_pedidos')) {
       await route.fulfill({ json: [pdvPedido] });
@@ -307,6 +328,27 @@ test('VEN-STA-02: PDV offline-lite enfileira e sincroniza depois (sem duplicar)'
 
     if (req.method() === 'OPTIONS') {
       await route.fulfill({ status: 204, body: '' });
+      return;
+    }
+
+    // PDV caixas (novo: multi-caixa). Mantemos um caixa "aberto" para não criar fricção no VEN-STA-02.
+    if (url.includes('/rest/v1/rpc/vendas_pdv_ensure_default_caixa')) {
+      await route.fulfill({ json: { ok: true } });
+      return;
+    }
+    if (url.includes('/rest/v1/rpc/vendas_pdv_caixas_list')) {
+      await route.fulfill({
+        json: [
+          {
+            id: 'cx-1',
+            nome: 'Caixa 1',
+            ativo: true,
+            sessao_id: 'sess-1',
+            sessao_status: 'open',
+            opened_at: nowIso,
+          },
+        ],
+      });
       return;
     }
 

@@ -2,6 +2,7 @@ import { test, expect, type Page } from './fixtures';
 
 async function mockAuthAndEmpresa(page: Page, opts?: { role?: 'member' | 'admin' | 'owner' }) {
   const role = opts?.role ?? 'admin';
+  const nowIso = new Date().toISOString();
 
   // Default: devolve vazio para evitar falhas de carregamento nas páginas MVP.
   // Importante: registramos primeiro para permitir que mocks mais específicos (abaixo)
@@ -107,6 +108,25 @@ async function mockAuthAndEmpresa(page: Page, opts?: { role?: 'member' | 'admin'
 
   await page.route('**/rest/v1/rpc/has_permission_for_current_user', async (route) => {
     await route.fulfill({ json: true });
+  });
+
+  // PDV caixas (novo: multi-caixa) — garante que a rota /app/vendas/pdv abre sem depender de seed.
+  await page.route('**/rest/v1/rpc/vendas_pdv_ensure_default_caixa', async (route) => {
+    await route.fulfill({ json: { ok: true } });
+  });
+  await page.route('**/rest/v1/rpc/vendas_pdv_caixas_list', async (route) => {
+    await route.fulfill({
+      json: [
+        {
+          id: 'cx-1',
+          nome: 'Caixa 1',
+          ativo: true,
+          sessao_id: 'sess-1',
+          sessao_status: 'open',
+          opened_at: nowIso,
+        },
+      ],
+    });
   });
 
   await page.route('**/rest/v1/rpc/secure_bootstrap_empresa_for_current_user', async (route) => {
