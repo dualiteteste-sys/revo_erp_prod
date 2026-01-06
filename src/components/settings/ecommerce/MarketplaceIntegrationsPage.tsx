@@ -21,6 +21,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Switch } from '@/components/ui/switch';
 import { listEcommerceProductMappings, upsertEcommerceProductMapping, type EcommerceProductMappingRow } from '@/services/ecommerceCatalog';
 import Input from '@/components/ui/forms/Input';
+import RoadmapButton from '@/components/roadmap/RoadmapButton';
 
 type Provider = 'meli' | 'shopee';
 
@@ -355,10 +356,13 @@ export default function MarketplaceIntegrationsPage() {
         description="Conecte Shopee e Mercado Livre, habilite recursos e acompanhe saúde/retries."
         icon={<Plug className="w-5 h-5" />}
         actions={
-          <Button onClick={() => void fetchAll()} variant="outline" className="gap-2" disabled={loading}>
-            <RefreshCw size={16} />
-            Atualizar
-          </Button>
+          <>
+            <RoadmapButton contextKey="integracoes" label="Assistente" title="Abrir assistente de Integrações" />
+            <Button onClick={() => void fetchAll()} variant="outline" className="gap-2" disabled={loading}>
+              <RefreshCw size={16} />
+              Atualizar
+            </Button>
+          </>
         }
       />
 

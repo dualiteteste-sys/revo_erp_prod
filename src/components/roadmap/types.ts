@@ -7,7 +7,8 @@ export type RoadmapGroupKey =
   | 'financeiro'
   | 'fiscal'
   | 'servicos'
-  | 'industria';
+  | 'industria'
+  | 'integracoes';
 
 export type RoadmapStepStatus = 'done' | 'todo' | 'unknown';
 

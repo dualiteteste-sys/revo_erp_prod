@@ -14,6 +14,7 @@ import { getRoadmaps } from './roadmaps';
 
 type Props = {
   isOpen: boolean;
+  initialKey?: RoadmapGroupKey | null;
   onClose: () => void;
 };
 
@@ -41,13 +42,14 @@ function safeGetRoadmapState(steps: Record<string, unknown> | null | undefined):
     fiscal: true,
     servicos: true,
     industria: true,
+    integracoes: true,
   };
   const active = normalizedActive && (allowed as any)[normalizedActive] ? (normalizedActive as RoadmapGroupKey) : undefined;
   const ack = rm.ack && typeof rm.ack === 'object' ? (rm.ack as Record<string, true>) : undefined;
   return { active, ack };
 }
 
-export default function RoadmapWizardModal({ isOpen, onClose }: Props) {
+export default function RoadmapWizardModal({ isOpen, initialKey, onClose }: Props) {
   const supabase = useSupabase();
   const { activeEmpresa } = useAuth();
   const { addToast } = useToast();
@@ -106,6 +108,14 @@ export default function RoadmapWizardModal({ isOpen, onClose }: Props) {
     },
     [empresaId, supabase]
   );
+
+  useEffect(() => {
+    if (!isOpen) return;
+    if (!initialKey) return;
+    if (!roadmaps.some((r) => r.key === initialKey)) return;
+    setActiveKey(initialKey);
+    void updateState({ active: initialKey });
+  }, [initialKey, isOpen, roadmaps, updateState]);
 
   const refresh = useCallback(async () => {
     if (!empresaId) return;

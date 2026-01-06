@@ -9,6 +9,7 @@ import { useToast } from '@/contexts/ToastProvider';
 import { useEmpresaFeatures } from '@/hooks/useEmpresaFeatures';
 import { Loader2, Receipt, Save, ShieldCheck, Upload, FileKey, Trash2 } from 'lucide-react';
 import { roleAtLeast, useEmpresaRole } from '@/hooks/useEmpresaRole';
+import RoadmapButton from '@/components/roadmap/RoadmapButton';
 
 type AmbienteNfe = 'homologacao' | 'producao';
 
@@ -499,6 +500,7 @@ export default function NfeSettingsPage({ onEmitenteSaved, onNumeracaoSaved }: P
           title="Configurações de NF-e"
           description="Base interna preparada para integração (NFE.io). Emissão pode permanecer desativada até o momento do go-live."
           icon={<Receipt size={20} />}
+          actions={<RoadmapButton contextKey="fiscal" label="Assistente" title="Abrir assistente da NF-e" />}
         />
       </div>
 

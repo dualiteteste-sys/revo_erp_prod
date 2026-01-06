@@ -12,6 +12,7 @@ import { useOnboardingGate } from '@/contexts/OnboardingGateContext';
 import { ActionLockedError, runWithActionLock } from '@/lib/actionLock';
 import { useBillingGate } from '@/hooks/useBillingGate';
 import PageHelp from '@/components/support/PageHelp';
+import RoadmapButton from '@/components/roadmap/RoadmapButton';
 
 type PdvRow = {
   id: string;
@@ -299,13 +300,16 @@ export default function PdvPage() {
           </h1>
           <p className="text-gray-600 text-sm mt-1">Venda rápida: finaliza gerando movimentação (entrada) e baixa de estoque.</p>
         </div>
-        <button
-          onClick={openNew}
-          className="flex items-center gap-2 bg-blue-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-blue-700 transition-colors"
-        >
-          <PlusCircle size={20} />
-          Nova venda
-        </button>
+        <div className="flex items-center gap-2">
+          <RoadmapButton contextKey="vendas" label="Assistente" title="Abrir assistente do PDV" />
+          <button
+            onClick={openNew}
+            className="flex items-center gap-2 bg-blue-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-blue-700 transition-colors"
+          >
+            <PlusCircle size={20} />
+            Nova venda
+          </button>
+        </div>
       </div>
 
       <div className="mb-4 flex items-center gap-3 flex-shrink-0">

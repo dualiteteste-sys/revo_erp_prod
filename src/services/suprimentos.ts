@@ -81,6 +81,22 @@ export type RelatorioBaixoEstoqueItem = {
   fornecedor_nome: string | null;
 };
 
+export type SugestaoCompraMrpLiteItem = {
+  produto_id: string;
+  nome: string;
+  sku: string | null;
+  unidade: string;
+  saldo: number;
+  estoque_min: number | null;
+  estoque_max: number | null;
+  qtd_em_oc_aberta: number;
+  saldo_projetado: number;
+  sugestao_compra: number;
+  lead_time_dias: number;
+  data_prevista_recebimento: string | null;
+  fornecedor_nome: string | null;
+};
+
 export async function listPosicaoEstoque(search?: string, baixoEstoque?: boolean): Promise<EstoquePosicao[]> {
   return callRpc<EstoquePosicao[]>('suprimentos_list_posicao_estoque', {
     p_search: search || null,
@@ -195,6 +211,12 @@ export async function getRelatorioValorizacao(search?: string): Promise<Relatori
 
 export async function getRelatorioBaixoEstoque(search?: string): Promise<RelatorioBaixoEstoqueItem[]> {
   return callRpc<RelatorioBaixoEstoqueItem[]>('suprimentos_relatorio_baixo_estoque', {
+    p_search: search || null,
+  });
+}
+
+export async function getSugestaoCompraMrpLite(search?: string): Promise<SugestaoCompraMrpLiteItem[]> {
+  return callRpc<SugestaoCompraMrpLiteItem[]>('suprimentos_sugestao_compra_mrp_lite', {
     p_search: search || null,
   });
 }
