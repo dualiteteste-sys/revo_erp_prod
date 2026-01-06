@@ -4,6 +4,7 @@ import { buildCorsHeaders } from "../_shared/cors.ts";
 import { nfeioBaseUrl, nfeioFetchJson, type NfeioEnvironment } from "../_shared/nfeio.ts";
 import { rateLimitCheck } from "../_shared/rate_limit.ts";
 import { extractNfeioStatus } from "../_shared/nfeio_payload.ts";
+import { finopsTrackUsage } from "../_shared/finops.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -119,6 +120,7 @@ serve(async (req) => {
 
   for (const ev of pending) {
     const eventId = ev.id as string;
+    let finopsEmpresaId: string | null = null;
 
     // lock row (best-effort: update only if still unlocked)
     const { data: lockRes } = await admin
@@ -153,6 +155,7 @@ serve(async (req) => {
       const tenantId = (empresaId ?? link.empresa_id ?? null) as string | null;
       const cbEmpresaId = tenantId ?? link.empresa_id ?? empresaId ?? null;
       if (!cbEmpresaId) throw new Error("MISSING_EMPRESA_ID");
+      finopsEmpresaId = cbEmpresaId;
 
       // Atualização rápida com o que veio no webhook
       const statusFromWebhook = extractNfeioStatus(payload);
@@ -283,6 +286,7 @@ serve(async (req) => {
       }).eq("id", eventId);
 
       processed++;
+      await finopsTrackUsage({ admin, empresaId: finopsEmpresaId, source: "nfeio", event: "worker_processed", count: 1 });
     } catch (e: any) {
       const attempts = Number(ev.process_attempts ?? 0) + 1;
       const next = new Date(Date.now() + backoffSeconds(attempts) * 1000).toISOString();
@@ -293,6 +297,8 @@ serve(async (req) => {
         locked_at: null,
         locked_by: null,
       }).eq("id", eventId);
+
+      await finopsTrackUsage({ admin, empresaId: finopsEmpresaId, source: "nfeio", event: "worker_failed", count: 1 });
     }
   }
 

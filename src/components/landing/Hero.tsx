@@ -78,7 +78,7 @@ const Hero: React.FC = () => {
               initial={{ opacity: 0, y: 20, filter: "blur(10px)" }}
               animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
               transition={{ duration: 0.6, delay: 0.45 }}
-              className="mt-5 max-w-xl mx-auto lg:mx-0 text-base md:text-lg text-slate-600 leading-relaxed"
+              className="mt-5 max-w-xl mx-auto lg:mx-0 text-base md:text-lg text-slate-700 leading-relaxed"
             >
               Comece a operar em 3 minutos. Cadastros, Vendas, Financeiro, Indústria Forte, Serviços completos e Comércio Simples —
               Primeiro uso guiado, UX moderna e upgrades por necessidade.
@@ -91,7 +91,7 @@ const Hero: React.FC = () => {
             >
               <button
                 onClick={scrollToPricing}
-                className="px-6 py-3 rounded-full bg-blue-600 text-white font-semibold hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-600 transition-colors"
+                className="px-6 py-3 rounded-full bg-blue-700 text-white font-semibold hover:bg-blue-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-700 transition-colors"
               >
                 Começar teste grátis
               </button>
@@ -106,7 +106,7 @@ const Hero: React.FC = () => {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6, delay: 0.85 }}
-              className="mt-8 flex justify-center lg:justify-start items-center gap-4 text-slate-500 flex-wrap"
+              className="mt-8 flex justify-center lg:justify-start items-center gap-4 text-slate-600 flex-wrap"
             >
               <span className="flex items-center gap-1.5"><CheckCircle size={16} className="text-emerald-600" /> Sem cartão</span>
               <span className="flex items-center gap-1.5"><CheckCircle size={16} className="text-emerald-600" /> Onboarding guiado</span>

@@ -32,6 +32,17 @@ __metadata:
   languageName: node
   linkType: hard
 
+"@axe-core/playwright@npm:^4.10.2":
+  version: 4.11.0
+  resolution: "@axe-core/playwright@npm:4.11.0"
+  dependencies:
+    axe-core: "npm:~4.11.0"
+  peerDependencies:
+    playwright-core: ">= 1.0.0"
+  checksum: 10c0/73f93cbe510b2399986aa14e4b07bff79fb757b7205240a6ed59b39f3c252014beeb6e6ce0850c1d392fe1f3f3f04c4e5ff860cbcdeaaf7b6dc1598c3209e539
+  languageName: node
+  linkType: hard
+
 "@babel/code-frame@npm:^7.10.4, @babel/code-frame@npm:^7.27.1":
   version: 7.27.1
   resolution: "@babel/code-frame@npm:7.27.1"
@@ -2742,6 +2753,13 @@ __metadata:
   dependencies:
     possible-typed-array-names: "npm:^1.0.0"
   checksum: 10c0/d07226ef4f87daa01bd0fe80f8f310982e345f372926da2e5296aecc25c41cab440916bbaa4c5e1034b453af3392f67df5961124e4b586df1e99793a1374bdb2
+  languageName: node
+  linkType: hard
+
+"axe-core@npm:~4.11.0":
+  version: 4.11.0
+  resolution: "axe-core@npm:4.11.0"
+  checksum: 10c0/7d7020a568a824c303711858c2fcfe56d001d27e46c0c2ff75dc31b436cfddfd4857a301e70536cc9e64829d25338f7fb782102d23497ebdc66801e9900fc895
   languageName: node
   linkType: hard
 
@@ -5662,7 +5680,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"playwright-core@npm:1.57.0":
+"playwright-core@npm:1.57.0, playwright-core@npm:^1.57.0":
   version: 1.57.0
   resolution: "playwright-core@npm:1.57.0"
   bin:
@@ -7329,6 +7347,7 @@ __metadata:
   version: 0.0.0-use.local
   resolution: "vite-react-typescript-starter@workspace:."
   dependencies:
+    "@axe-core/playwright": "npm:^4.10.2"
     "@eslint/js": "npm:^9.27.0"
     "@faker-js/faker": "npm:^8.4.1"
     "@hello-pangea/dnd": "npm:^16.6.0"
@@ -7371,6 +7390,7 @@ __metadata:
     lucide-react: "npm:^0.511.0"
     msw: "npm:^2.12.3"
     nanoid: "npm:^5.1.0"
+    playwright-core: "npm:^1.57.0"
     postcss: "npm:^8.4.35"
     react: "npm:^18.3.1"
     react-day-picker: "npm:^9.11.1"

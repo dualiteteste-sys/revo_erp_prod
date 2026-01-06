@@ -38,7 +38,7 @@ Este é o checklist único (por módulo) para levar o REVO ao nível **top mundi
 - Navegar em 5 módulos diferentes e confirmar: layout consistente, EmptyState com CTA, botões/inputs com mesmo comportamento.
 
 ### A2) UX “Estado da Arte”
-- [ ] PLAT-UX-01 (P1) Microinterações consistentes (hover/press/transition) sem flicker/layout shift
+- [x] PLAT-UX-01 (P1) Microinterações consistentes (hover/press/transition) sem flicker/layout shift
 - [x] PLAT-UX-02 (P0) Ações destrutivas com “zero-surpresa”: undo/confirm + explicação clara
 - [x] PLAT-UX-03 (P0) Feedback resiliente: retry, “o que fazer agora”, link para logs/diagnóstico quando falhar
 - [x] PLAT-UX-04 (P1) Fluxos complexos com assistentes (wizard) por contexto (NF-e, PDV, Indústria, Integrações)
@@ -49,7 +49,7 @@ Este é o checklist único (por módulo) para levar o REVO ao nível **top mundi
 ### A3) Acessibilidade (WCAG pragmático)
 - [x] PLAT-A11Y-01 (P1) Navegação por teclado completa (focus trap, ESC, tab order, atalhos)
 - [x] PLAT-A11Y-02 (P1) Contraste e foco visível + aria-labels em ícones
-- [ ] PLAT-A11Y-03 (P2) Smoke automatizado de A11y (axe) em páginas-chave
+- [x] PLAT-A11Y-03 (P2) Smoke automatizado de A11y (axe) em páginas-chave
 
 ---
 
@@ -115,7 +115,7 @@ Este é o checklist único (por módulo) para levar o REVO ao nível **top mundi
 - [x] PERF-DB-03 (P1) Rate limit/backoff por canal/ação (integrações, emissão)
 
 ### D3) FinOps (eficiência operacional)
-- [ ] FINOPS-01 (P1) Telemetria de custo: jobs, webhooks, filas (volume) por empresa
+- [x] FINOPS-01 (P1) Telemetria de custo: jobs, webhooks, filas (volume) por empresa
 - [x] FINOPS-02 (P1) Limites por plano com enforcement real e alertas (evitar suporte)
 
 ### D4) Resiliência / Escalabilidade (sem “ERP frágil”)

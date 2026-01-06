@@ -180,6 +180,7 @@ export default function Pricing() {
           </span>
           <button
             onClick={() => setBillingCycle(billingCycle === "monthly" ? "yearly" : "monthly")}
+            aria-label={billingCycle === "yearly" ? "Alternar para mensal" : "Alternar para anual"}
             className={`mx-4 relative inline-flex flex-shrink-0 h-6 w-11 border-2 border-transparent rounded-full cursor-pointer transition-colors ease-in-out duration-200 focus:outline-none ${billingCycle === "yearly" ? "bg-blue-600" : "bg-slate-200"}`}
           >
             <span
@@ -205,11 +206,6 @@ export default function Pricing() {
                 activeSlug === p.slug ? "border-blue-600 ring-1 ring-blue-600/10" : "border-slate-200 hover:border-slate-300",
               ].join(" ")}
               onClick={() => setActiveSlug(p.slug)}
-              role="button"
-              tabIndex={0}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" || e.key === " ") setActiveSlug(p.slug);
-              }}
             >
               <h3 className="text-lg font-semibold text-slate-900">{p.title}</h3>
               {(() => {

@@ -26,7 +26,7 @@ const ErrorAlert: React.FC<ErrorAlertProps> = ({
       {onRetry && (
         <button
           onClick={onRetry}
-          className="inline-flex items-center gap-2 px-5 py-2.5 bg-white border border-red-200 text-red-700 font-medium rounded-lg hover:bg-red-50 hover:border-red-300 transition-all shadow-sm active:scale-95"
+          className="inline-flex items-center gap-2 px-5 py-2.5 bg-white border border-red-200 text-red-700 font-medium rounded-lg hover:bg-red-50 hover:border-red-300 transition-[transform,colors,box-shadow] duration-150 ease-out shadow-sm active:scale-[0.98]"
         >
           <RefreshCw size={16} />
           Tentar Novamente
