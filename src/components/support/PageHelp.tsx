@@ -9,6 +9,7 @@ import {
   Network,
   Layers,
   CheckCircle2,
+  AlertTriangle,
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
@@ -29,6 +30,7 @@ type PageHelpProps = {
   connectsWith?: string[];
   dependsOn?: string[];
   fillPerfectly?: string[];
+  commonMistakes?: string[];
   links?: HelpLink[];
   defaultOpen?: boolean;
 };
@@ -45,6 +47,7 @@ export default function PageHelp(props: PageHelpProps) {
     connectsWith = [],
     dependsOn = [],
     fillPerfectly = [],
+    commonMistakes = [],
     links = [],
     defaultOpen = false,
   } = props;
@@ -78,7 +81,7 @@ export default function PageHelp(props: PageHelpProps) {
               <div className="min-w-0">
                 <div className="text-sm font-semibold text-gray-900 truncate">{title}</div>
                 <div className="text-xs text-gray-600 mt-1">
-                  Guia rápido: como funciona, conexões, dependências e links de diagnóstico.
+                  O que é • fluxo ideal • dependências • como preencher perfeito • links úteis.
                 </div>
               </div>
             </div>
@@ -165,6 +168,23 @@ export default function PageHelp(props: PageHelpProps) {
                     {fillPerfectly.map((t, i) => (
                       <li key={i} className="flex gap-2">
                         <span className="mt-0.5 h-2 w-2 rounded-full bg-emerald-500/70 flex-shrink-0" />
+                        <span>{t}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ) : null}
+
+              {commonMistakes.length > 0 ? (
+                <div className="rounded-2xl border border-gray-100 bg-gray-50 p-3">
+                  <div className="flex items-center gap-2 text-sm font-semibold text-gray-900">
+                    <AlertTriangle size={16} className="text-amber-700" />
+                    Erros comuns (para evitar suporte)
+                  </div>
+                  <ul className="mt-2 space-y-2 text-sm text-gray-700">
+                    {commonMistakes.map((t, i) => (
+                      <li key={i} className="flex gap-2">
+                        <span className="mt-0.5 h-2 w-2 rounded-full bg-amber-500/70 flex-shrink-0" />
                         <span>{t}</span>
                       </li>
                     ))}

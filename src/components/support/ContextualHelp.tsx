@@ -19,6 +19,7 @@ export default function ContextualHelp() {
         dependsOn={entry.dependsOn}
         connectsWith={entry.connectsWith}
         fillPerfectly={entry.fillPerfectly}
+        commonMistakes={entry.commonMistakes}
         links={entry.links}
         defaultOpen={false}
       />
