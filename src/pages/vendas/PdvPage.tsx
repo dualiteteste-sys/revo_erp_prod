@@ -151,6 +151,21 @@ export default function PdvPage() {
           if (typeof window !== 'undefined') window.localStorage.setItem('pdv:caixaId', preferred.id);
         }
       }
+      // MVP friendly: se não há nenhum caixa aberto, abre automaticamente o caixa selecionado (saldo 0).
+      // Isso evita fricção no PDV e mantém os fluxos/E2E do "happy path" estáveis.
+      const selectedAfter = (caixasData || []).find((c) => c.id === (caixaId || '')) || (caixasData || []).find((c) => c.sessao_id) || (caixasData || [])[0];
+      const hasAnyOpen = (caixasData || []).some((c) => !!c.sessao_id);
+      if (selectedAfter && !hasAnyOpen && !selectedAfter.sessao_id) {
+        try {
+          await openPdvCaixa({ caixaId: selectedAfter.id, saldoInicial: 0 });
+          const refreshed = await listPdvCaixas().catch(() => [] as PdvCaixaRow[]);
+          setCaixas(refreshed);
+          setCaixaId(selectedAfter.id);
+          if (typeof window !== 'undefined') window.localStorage.setItem('pdv:caixaId', selectedAfter.id);
+        } catch {
+          // sem permissão/feature: segue com UX manual (modal de abrir caixa ao finalizar)
+        }
+      }
       if (!contaCorrenteId && contaData.length > 0) {
         const padrao = contaData.find((c) => c.padrao_para_recebimentos) || contaData[0];
         setContaCorrenteId(padrao.id);
