@@ -1,0 +1,48 @@
+name: Financeiro Cobranças Automations (prod)
+
+on:
+  schedule:
+    - cron: "0 */6 * * *"
+  workflow_dispatch:
+    inputs:
+      limit:
+        description: "Quantidade máxima de cobranças por execução"
+        required: false
+        default: "500"
+
+concurrency:
+  group: financeiro-cobrancas-worker-prod
+  cancel-in-progress: false
+
+jobs:
+  run-worker:
+    name: Process cobranças automations (PROD)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Install PostgreSQL client (psql)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y postgresql-client
+
+      - name: Run cobranças autotick
+        env:
+          SUPABASE_DB_URL_PROD: ${{ secrets.SUPABASE_DB_URL_PROD }}
+          LIMIT: ${{ inputs.limit }}
+        run: |
+          set -euo pipefail
+
+          if [[ -z "${SUPABASE_DB_URL_PROD:-}" ]]; then
+            echo "::warning::Missing secret SUPABASE_DB_URL_PROD (skipping worker run)"
+            exit 0
+          fi
+
+          limit="${LIMIT:-500}"
+          if ! [[ "$limit" =~ ^[0-9]+$ ]]; then
+            limit="500"
+          fi
+
+          echo "[PROD] Processing cobranças automations (limit=$limit)"
+          psql "$SUPABASE_DB_URL_PROD" -v ON_ERROR_STOP=1 -X -qAt -c "select public.financeiro_cobrancas_bancarias_autotick_admin(${limit});"
+

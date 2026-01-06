@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Activity, AlertTriangle, CheckCircle2, LifeBuoy, Loader2, Lock, XCircle } from 'lucide-react';
+import { Activity, AlertTriangle, CheckCircle2, Copy, Download, LifeBuoy, Loader2, Lock, XCircle } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthProvider';
 import { callRpc } from '@/lib/api';
 import PageHeader from '@/components/ui/PageHeader';
@@ -8,6 +8,10 @@ import PageCard from '@/components/ui/PageCard';
 import { Button } from '@/components/ui/button';
 import { Link } from 'react-router-dom';
 import { getEcommerceConnectionDiagnostics, getEcommerceHealthSummary, type EcommerceConnectionDiagnostics, type EcommerceHealthSummary } from '@/services/ecommerceIntegrations';
+import { getLastRequestId } from '@/lib/requestId';
+import { sanitizeLogData } from '@/lib/sanitizeLog';
+import { useHasPermission } from '@/hooks/useHasPermission';
+import { getOpsHealthSummary, listOpsRecentFailures } from '@/services/opsHealth';
 
 type CheckStatus = 'ok' | 'warn' | 'missing';
 type GuidedCheck = {
@@ -39,13 +43,14 @@ function statusLabel(status: CheckStatus) {
 export default function SuportePage() {
   const { session, activeEmpresa } = useAuth();
   const userId = session?.user?.id || '';
-  const userEmail = (session?.user as any)?.email || '';
   const [loading, setLoading] = useState(true);
   const [onboarding, setOnboarding] = useState<ChecksRpc | null>(null);
   const [pdv, setPdv] = useState<ChecksRpc | null>(null);
   const [ecommerceHealth, setEcommerceHealth] = useState<EcommerceHealthSummary | null>(null);
   const [ecommerceDiagnostics, setEcommerceDiagnostics] = useState<Record<string, EcommerceConnectionDiagnostics> | null>(null);
   const [ecommerceError, setEcommerceError] = useState<string | null>(null);
+  const permOpsManage = useHasPermission('ops', 'manage');
+  const [packing, setPacking] = useState(false);
 
   useEffect(() => {
     let mounted = true;
@@ -127,9 +132,110 @@ export default function SuportePage() {
     />
   );
 
+  const buildSupportPack = async () => {
+    const base = {
+      generated_at: new Date().toISOString(),
+      app: {
+        url: typeof window !== 'undefined' ? window.location.href : null,
+        user_agent: typeof navigator !== 'undefined' ? navigator.userAgent : null,
+      },
+      context: {
+        empresa_id: activeEmpresa?.id ?? null,
+        user_id: userId || null,
+        last_request_id: getLastRequestId(),
+      },
+      checks: {
+        onboarding,
+        pdv,
+        ecommerce: {
+          health: ecommerceHealth,
+          diagnostics: ecommerceDiagnostics,
+          error: ecommerceError,
+        },
+      },
+      ops: {
+        has_access: !!permOpsManage.data,
+        summary: null as any,
+        recent_failures: null as any,
+      },
+    };
+
+    if (permOpsManage.data) {
+      try {
+        const [summary, recent] = await Promise.all([
+          getOpsHealthSummary(),
+          listOpsRecentFailures({ limit: 20 }),
+        ]);
+        base.ops.summary = summary as any;
+        base.ops.recent_failures = recent as any;
+      } catch {
+        // ignore
+      }
+    }
+
+    return sanitizeLogData(base);
+  };
+
+  const handleCopyPack = async () => {
+    if (packing) return;
+    setPacking(true);
+    try {
+      const pack = await buildSupportPack();
+      const text = JSON.stringify(pack, null, 2);
+      await navigator.clipboard.writeText(text);
+    } finally {
+      setPacking(false);
+    }
+  };
+
+  const handleDownloadPack = async () => {
+    if (packing) return;
+    setPacking(true);
+    try {
+      const pack = await buildSupportPack();
+      const text = JSON.stringify(pack, null, 2);
+      const blob = new Blob([text], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `revo-diagnostico-${(activeEmpresa?.id || 'empresa').slice(0, 8)}.json`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    } finally {
+      setPacking(false);
+    }
+  };
+
   return (
     <PageShell header={header}>
       <PageCard className="space-y-6">
+        <div className="rounded-2xl border border-gray-200 bg-white p-4">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="min-w-0">
+              <div className="text-sm font-semibold text-gray-900">Pacote de diagnóstico (anexar no suporte)</div>
+              <div className="text-xs text-gray-600 mt-1">
+                Copie/baixe um JSON com contexto (empresa, checks, integrações e últimos IDs), já saneado (sem PII/segredos).
+              </div>
+              <div className="mt-2 text-[11px] text-gray-500">
+                Empresa: <span className="font-mono">{(activeEmpresa?.id || '—').slice(0, 8)}</span> • Último request:{' '}
+                <span className="font-mono">{(getLastRequestId() || '—').slice(0, 8)}</span>
+              </div>
+            </div>
+            <div className="flex gap-2">
+              <Button type="button" variant="secondary" className="gap-2" onClick={handleCopyPack} disabled={packing}>
+                {packing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Copy size={16} />}
+                Copiar JSON
+              </Button>
+              <Button type="button" variant="secondary" className="gap-2" onClick={handleDownloadPack} disabled={packing}>
+                {packing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download size={16} />}
+                Baixar
+              </Button>
+            </div>
+          </div>
+        </div>
+
         <div>
           <h2 className="text-lg font-semibold text-gray-900">Diagnóstico guiado (NF-e / PDV / Integrações)</h2>
           <p className="text-sm text-gray-600 mt-1">

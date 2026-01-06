@@ -294,6 +294,56 @@ export async function ensurePdvDefaultClienteId(): Promise<string> {
   return id as any;
 }
 
+export type PdvCaixaRow = {
+  id: string;
+  nome: string;
+  ativo: boolean;
+  sessao_id: string | null;
+  sessao_status: string | null;
+  opened_at: string | null;
+};
+
+export async function listPdvCaixas(): Promise<PdvCaixaRow[]> {
+  try {
+    await callRpc('vendas_pdv_ensure_default_caixa', {});
+  } catch {
+    // ignore: perm/feature might be missing in older DBs
+  }
+  try {
+    return await callRpc<PdvCaixaRow[]>('vendas_pdv_caixas_list', {});
+  } catch (e: any) {
+    if (e instanceof RpcError && e.status === 404) return [];
+    throw e;
+  }
+}
+
+export async function openPdvCaixa(params: { caixaId: string; saldoInicial?: number }): Promise<string> {
+  return callRpc<string>('vendas_pdv_caixa_open', {
+    p_caixa_id: params.caixaId,
+    p_saldo_inicial: Number(params.saldoInicial ?? 0),
+  });
+}
+
+export type ClosePdvCaixaResult = {
+  ok: boolean;
+  sessao_id: string;
+  caixa_id: string;
+  saldo_inicial: number;
+  saldo_final: number | null;
+  total_vendas: number;
+  total_estornos: number;
+  opened_at: string;
+  closed_at: string;
+};
+
+export async function closePdvCaixa(params: { caixaId: string; saldoFinal?: number | null; observacoes?: string | null }): Promise<ClosePdvCaixaResult> {
+  return callRpc<ClosePdvCaixaResult>('vendas_pdv_caixa_close', {
+    p_caixa_id: params.caixaId,
+    p_saldo_final: params.saldoFinal ?? null,
+    p_observacoes: params.observacoes ?? null,
+  });
+}
+
 export async function estornarPdv(params: { pedidoId: string; contaCorrenteId: string }): Promise<void> {
   await callRpc('vendas_pdv_estornar', { p_pedido_id: params.pedidoId, p_conta_corrente_id: params.contaCorrenteId });
 }
@@ -306,6 +356,7 @@ export async function finalizePdv(params: {
   pedidoId: string;
   contaCorrenteId: string;
   estoqueEnabled?: boolean;
+  caixaId?: string | null;
 }): Promise<VendaDetails> {
   return traceAction(
     'pdv.finalize',
@@ -315,6 +366,7 @@ export async function finalizePdv(params: {
           p_pedido_id: params.pedidoId,
           p_conta_corrente_id: params.contaCorrenteId,
           p_baixar_estoque: params.estoqueEnabled !== false,
+          p_pdv_caixa_id: params.caixaId ?? null,
         });
         removePdvFinalizeQueue(params.pedidoId);
       } catch (e: any) {
@@ -323,6 +375,7 @@ export async function finalizePdv(params: {
           upsertPdvFinalizeQueue({
             pedidoId: params.pedidoId,
             contaCorrenteId: params.contaCorrenteId,
+            caixaId: params.caixaId ?? null,
             createdAt: now,
             attempts: 0,
             lastError: e.message || null,
@@ -339,6 +392,7 @@ export async function finalizePdv(params: {
       pedido_id: params.pedidoId,
       conta_corrente_id: params.contaCorrenteId,
       estoque_enabled: params.estoqueEnabled !== false,
+      caixa_id: params.caixaId ?? null,
     }
   );
 }
@@ -380,6 +434,7 @@ export async function flushPdvFinalizeQueue(): Promise<{ ok: number; failed: num
           p_pedido_id: it.pedidoId,
           p_conta_corrente_id: it.contaCorrenteId,
           p_baixar_estoque: true,
+          p_pdv_caixa_id: it.caixaId ?? null,
         });
         removePdvFinalizeQueue(it.pedidoId);
         ok += 1;

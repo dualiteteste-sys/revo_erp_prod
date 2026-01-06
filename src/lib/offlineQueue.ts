@@ -23,6 +23,7 @@ function writeJson<T>(key: string, value: T): void {
 export type PdvFinalizeQueuedItem = {
   pedidoId: string;
   contaCorrenteId: string;
+  caixaId?: string | null;
   createdAt: number;
   attempts: number;
   lastError?: string | null;
@@ -56,4 +57,3 @@ export function bumpPdvFinalizeAttempt(pedidoId: string, lastError?: string | nu
   );
   writeJson<StoredValue<PdvFinalizeQueuedItem>>(PDV_FINALIZE_KEY, { version: 1, items: next });
 }
-
