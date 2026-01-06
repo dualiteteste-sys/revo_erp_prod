@@ -14,6 +14,25 @@ export function normalizeProductPayload(input: any) {
 
   const digitsOnly = (v: any) => String(v ?? '').replace(/\D/g, '');
 
+  out.nome = out.nome ? String(out.nome).trim() : out.nome;
+  out.sku = (() => {
+    const v = out.sku != null ? String(out.sku).trim() : '';
+    return v ? v : null;
+  })();
+  out.unidade = (() => {
+    const v = out.unidade != null ? String(out.unidade).trim() : '';
+    return v ? v : null;
+  })();
+
+  out.ncm = (() => {
+    const v = digitsOnly(out.ncm);
+    return v ? v : null;
+  })();
+  out.cest = (() => {
+    const v = digitsOnly(out.cest);
+    return v ? v : null;
+  })();
+
   // campos de embalagem (nomes reais do banco)
   out.tipo_embalagem = out.tipo_embalagem ? String(out.tipo_embalagem).trim() : null;
 

@@ -1,5 +1,6 @@
 import { callRpc } from '@/lib/api';
 import { logger } from '@/lib/logger';
+import { supabase } from '@/lib/supabaseClient';
 import { Database } from '@/types/database.types';
 
 export type PartnerListItem = {
@@ -65,6 +66,74 @@ export type PartnerDetails = Pessoa & {
 };
 
 export type ClientHit = { id: string; label: string; nome: string; doc_unico: string | null };
+
+export type PartnerDuplicateHit = {
+  id: string;
+  nome: string;
+  doc_unico: string | null;
+  email: string | null;
+  telefone: string | null;
+  celular?: string | null;
+};
+
+export async function findPartnerDuplicates(params: {
+  excludeId?: string | null;
+  email?: string | null;
+  telefone?: string | null;
+  celular?: string | null;
+}): Promise<PartnerDuplicateHit[]> {
+  const email = String(params.email || '').trim().toLowerCase();
+  const tel = String(params.telefone || '').replace(/\D/g, '');
+  const cel = String(params.celular || '').replace(/\D/g, '');
+  const excludeId = params.excludeId ? String(params.excludeId) : null;
+
+  const results: PartnerDuplicateHit[] = [];
+  const seen = new Set<string>();
+
+  const pushAll = (rows: any[] | null | undefined) => {
+    for (const r of rows || []) {
+      const id = String(r.id);
+      if (excludeId && id === excludeId) continue;
+      if (seen.has(id)) continue;
+      seen.add(id);
+      results.push({
+        id,
+        nome: String(r.nome || ''),
+        doc_unico: r.doc_unico ? String(r.doc_unico) : null,
+        email: r.email ? String(r.email) : null,
+        telefone: r.telefone ? String(r.telefone) : null,
+        celular: r.celular ? String(r.celular) : null,
+      });
+    }
+  };
+
+  if (email) {
+    const q = supabase
+      .from('pessoas')
+      .select('id,nome,doc_unico,email,telefone,celular')
+      .ilike('email', email)
+      .is('deleted_at', null)
+      .limit(10);
+    if (excludeId) q.neq('id', excludeId);
+    const { data, error } = await q;
+    if (!error) pushAll(data as any[]);
+  }
+
+  const phones = [tel, cel].filter((d) => d && d.length >= 10);
+  for (const phone of phones) {
+    const q = supabase
+      .from('pessoas')
+      .select('id,nome,doc_unico,email,telefone,celular')
+      .or(`telefone.eq.${phone},celular.eq.${phone}`)
+      .is('deleted_at', null)
+      .limit(10);
+    if (excludeId) q.neq('id', excludeId);
+    const { data, error } = await q;
+    if (!error) pushAll(data as any[]);
+  }
+
+  return results;
+}
 
 export async function savePartner(payload: PartnerPayload): Promise<PartnerDetails> {
   logger.debug('[SERVICE][SAVE_PARTNER]', { payload });

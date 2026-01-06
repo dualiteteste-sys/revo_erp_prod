@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Loader2, Save } from 'lucide-react';
-import { savePartner, PartnerPayload, PartnerDetails, EnderecoPayload, ContatoPayload } from '../../services/partners';
+import { savePartner, PartnerPayload, PartnerDetails, EnderecoPayload, ContatoPayload, findPartnerDuplicates } from '../../services/partners';
 import { useToast } from '../../contexts/ToastProvider';
+import { useConfirm } from '@/contexts/ConfirmProvider';
 import IdentificationSection from './form-sections/IdentificationSection';
 import ContactSection from './form-sections/ContactSection';
 import AddressSection from './form-sections/AddressSection';
@@ -22,6 +23,7 @@ type PartnerFormTab = 'identificacao' | 'endereco' | 'contato' | 'financeiro' | 
 
 const PartnerFormPanel: React.FC<PartnerFormPanelProps> = ({ partner, initialValues, onSaveSuccess, onClose }) => {
   const { addToast } = useToast();
+  const { confirm } = useConfirm();
   const [isSaving, setIsSaving] = useState(false);
   const [formData, setFormData] = useState<Partial<PartnerDetails>>({});
   const [activeTab, setActiveTab] = useState<PartnerFormTab>('identificacao');
@@ -113,6 +115,36 @@ const PartnerFormPanel: React.FC<PartnerFormPanelProps> = ({ partner, initialVal
       addToast('Telefone/celular inválido. Use DDD + número (mín. 10 dígitos).', 'error');
       setActiveTab('contato');
       return;
+    }
+
+    // Dedupe (não bloqueia por padrão): alerta caso e-mail/telefone já existam em outro parceiro
+    try {
+      const duplicates = await findPartnerDuplicates({
+        excludeId: (formData as any)?.id || null,
+        email: email || null,
+        telefone: telDigits || null,
+        celular: celDigits || null,
+      });
+      if (duplicates.length > 0) {
+        const list = duplicates
+          .slice(0, 5)
+          .map((d) => `• ${d.nome}${d.doc_unico ? ` (${d.doc_unico})` : ''}`)
+          .join('\n');
+        const ok = await confirm({
+          title: 'Possível duplicidade',
+          description:
+            `Encontramos ${duplicates.length} parceiro(s) com o mesmo e-mail/telefone.\n\n${list}\n\nDeseja salvar mesmo assim?`,
+          confirmText: 'Salvar mesmo assim',
+          cancelText: 'Revisar',
+          variant: 'primary',
+        });
+        if (!ok) {
+          setActiveTab('contato');
+          return;
+        }
+      }
+    } catch {
+      // best-effort: não bloqueia o save
     }
     
     setIsSaving(true);

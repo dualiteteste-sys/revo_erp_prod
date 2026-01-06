@@ -1,6 +1,17 @@
 import React, { useMemo, useRef, useState, useEffect } from 'react';
 import { useLocation, useParams, useNavigate } from 'react-router-dom';
-import { getRecebimento, listRecebimentoItens, conferirItem, finalizarRecebimentoV2, setRecebimentoClassificacao, syncMateriaisClienteFromRecebimento, updateRecebimentoItemProduct, Recebimento, RecebimentoItem } from '@/services/recebimento';
+import {
+    getRecebimento,
+    listRecebimentoItens,
+    conferirItem,
+    finalizarRecebimentoV2,
+    setRecebimentoClassificacao,
+    syncMateriaisClienteFromRecebimento,
+    updateRecebimentoItemProduct,
+    updateRecebimentoCustos,
+    Recebimento,
+    RecebimentoItem,
+} from '@/services/recebimento';
 import { Loader2, ArrowLeft, CheckCircle, AlertTriangle, Save, Layers, RefreshCw, Hammer } from 'lucide-react';
 import { useToast } from '@/contexts/ToastProvider';
 import { useConfirm } from '@/contexts/ConfirmProvider';
@@ -39,6 +50,14 @@ export default function ConferenciaPage() {
     const [gerarObPedido, setGerarObPedido] = useState('');
     const [gerarObSelecionados, setGerarObSelecionados] = useState<Record<string, boolean>>({});
     const [gerarObLoading, setGerarObLoading] = useState(false);
+    const [custos, setCustos] = useState<{
+        custo_frete: number;
+        custo_seguro: number;
+        custo_impostos: number;
+        custo_outros: number;
+        rateio_base: 'valor' | 'quantidade';
+    }>({ custo_frete: 0, custo_seguro: 0, custo_impostos: 0, custo_outros: 0, rateio_base: 'valor' });
+    const [savingCustos, setSavingCustos] = useState(false);
 
     const digitsOnly = (value?: string | null) => (value || '').replace(/\D/g, '');
 
@@ -83,6 +102,13 @@ export default function ConferenciaPage() {
             ]);
             setRecebimento(recData);
             setItens(itensData);
+            setCustos({
+                custo_frete: Number(recData?.custo_frete ?? 0),
+                custo_seguro: Number(recData?.custo_seguro ?? 0),
+                custo_impostos: Number(recData?.custo_impostos ?? 0),
+                custo_outros: Number(recData?.custo_outros ?? 0),
+                rateio_base: (recData?.rateio_base === 'quantidade' ? 'quantidade' : 'valor') as any,
+            });
         } catch (error) {
             console.error(error);
             addToast('Erro ao carregar dados do recebimento.', 'error');
@@ -175,6 +201,40 @@ export default function ConferenciaPage() {
             }
         } finally {
             setFinalizing(false);
+        }
+    };
+
+    const totalAdicional = useMemo(() => {
+        return (custos.custo_frete || 0) + (custos.custo_seguro || 0) + (custos.custo_impostos || 0) + (custos.custo_outros || 0);
+    }, [custos]);
+
+    const handleSaveCustos = async () => {
+        if (!id) return;
+        if (savingCustos) return;
+        if (!recebimento) return;
+        if (recebimento.status === 'concluido' || recebimento.status === 'cancelado') {
+            addToast('Este recebimento já foi finalizado/cancelado. Ajuste os custos antes de finalizar.', 'warning');
+            return;
+        }
+
+        setSavingCustos(true);
+        try {
+            const updated = await runWithActionLock(`recebimento:custos:${id}`, async () => {
+                return await updateRecebimentoCustos(id, {
+                    custo_frete: Number(custos.custo_frete || 0),
+                    custo_seguro: Number(custos.custo_seguro || 0),
+                    custo_impostos: Number(custos.custo_impostos || 0),
+                    custo_outros: Number(custos.custo_outros || 0),
+                    rateio_base: custos.rateio_base,
+                });
+            });
+            setRecebimento(updated);
+            addToast('Custos adicionais atualizados. Eles serão considerados no custo médio ao finalizar.', 'success');
+        } catch (e: any) {
+            console.error(e);
+            addToast(e?.message || 'Erro ao salvar custos.', 'error');
+        } finally {
+            setSavingCustos(false);
         }
     };
 
@@ -514,6 +574,108 @@ export default function ConferenciaPage() {
                     )}
                 </div>
             </div>
+
+            {!isDetailsView && (
+                <div className="mb-6 rounded-2xl border border-white/50 bg-white/70 backdrop-blur-md p-4 shadow-sm">
+                    <div className="flex flex-wrap items-center justify-between gap-3">
+                        <div>
+                            <div className="text-sm font-semibold text-slate-900">Custo adicional (landed cost)</div>
+                            <div className="mt-1 text-xs text-slate-600">
+                                Rateie frete/seguro/impostos/outros para refletir o custo real no estoque e nos relatórios. Ajuste antes de finalizar.
+                            </div>
+                        </div>
+                        <button
+                            type="button"
+                            onClick={handleSaveCustos}
+                            disabled={savingCustos || recebimento.status === 'concluido' || recebimento.status === 'cancelado'}
+                            className={`inline-flex items-center gap-2 rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-800 ${
+                                savingCustos || recebimento.status === 'concluido' || recebimento.status === 'cancelado'
+                                    ? 'opacity-50 cursor-not-allowed'
+                                    : ''
+                            }`}
+                        >
+                            {savingCustos ? <Loader2 className="animate-spin" size={16} /> : <Save size={16} />}
+                            Salvar custos
+                        </button>
+                    </div>
+
+                        <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-6">
+                        <div className="sm:col-span-1">
+                            <label htmlFor="rec-custo-frete" className="block text-xs font-semibold text-slate-700">
+                                Frete
+                            </label>
+                            <input
+                                id="rec-custo-frete"
+                                type="number"
+                                step="0.01"
+                                min="0"
+                                value={custos.custo_frete}
+                                onChange={(e) => setCustos((p) => ({ ...p, custo_frete: Number(e.target.value || 0) }))}
+                                className="mt-1 w-full rounded-lg border border-slate-200 bg-white/80 px-3 py-2 text-sm outline-none focus:border-blue-400"
+                            />
+                        </div>
+                        <div className="sm:col-span-1">
+                            <label htmlFor="rec-custo-seguro" className="block text-xs font-semibold text-slate-700">
+                                Seguro
+                            </label>
+                            <input
+                                id="rec-custo-seguro"
+                                type="number"
+                                step="0.01"
+                                min="0"
+                                value={custos.custo_seguro}
+                                onChange={(e) => setCustos((p) => ({ ...p, custo_seguro: Number(e.target.value || 0) }))}
+                                className="mt-1 w-full rounded-lg border border-slate-200 bg-white/80 px-3 py-2 text-sm outline-none focus:border-blue-400"
+                            />
+                        </div>
+                        <div className="sm:col-span-1">
+                            <label htmlFor="rec-custo-impostos" className="block text-xs font-semibold text-slate-700">
+                                Impostos
+                            </label>
+                            <input
+                                id="rec-custo-impostos"
+                                type="number"
+                                step="0.01"
+                                min="0"
+                                value={custos.custo_impostos}
+                                onChange={(e) => setCustos((p) => ({ ...p, custo_impostos: Number(e.target.value || 0) }))}
+                                className="mt-1 w-full rounded-lg border border-slate-200 bg-white/80 px-3 py-2 text-sm outline-none focus:border-blue-400"
+                            />
+                        </div>
+                        <div className="sm:col-span-1">
+                            <label htmlFor="rec-custo-outros" className="block text-xs font-semibold text-slate-700">
+                                Outros
+                            </label>
+                            <input
+                                id="rec-custo-outros"
+                                type="number"
+                                step="0.01"
+                                min="0"
+                                value={custos.custo_outros}
+                                onChange={(e) => setCustos((p) => ({ ...p, custo_outros: Number(e.target.value || 0) }))}
+                                className="mt-1 w-full rounded-lg border border-slate-200 bg-white/80 px-3 py-2 text-sm outline-none focus:border-blue-400"
+                            />
+                        </div>
+                        <div className="sm:col-span-2">
+                            <label htmlFor="rec-rateio-base" className="block text-xs font-semibold text-slate-700">
+                                Base do rateio
+                            </label>
+                            <select
+                                id="rec-rateio-base"
+                                value={custos.rateio_base}
+                                onChange={(e) => setCustos((p) => ({ ...p, rateio_base: e.target.value === 'quantidade' ? 'quantidade' : 'valor' }))}
+                                className="mt-1 w-full rounded-lg border border-slate-200 bg-white/80 px-3 py-2 text-sm outline-none focus:border-blue-400"
+                            >
+                                <option value="valor">Proporcional ao valor dos itens (recomendado)</option>
+                                <option value="quantidade">Proporcional à quantidade</option>
+                            </select>
+                            <div className="mt-2 text-xs text-slate-600">
+                                Total adicional: <span className="font-semibold">R$ {totalAdicional.toFixed(2)}</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
 
             {isDetailsView && (
                 isConcluido ? (
