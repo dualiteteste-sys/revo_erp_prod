@@ -15,9 +15,11 @@ import {
   dryRunEcommerceDlq,
   dryRunFinanceDlq,
   dryRunNfeioWebhookEvent,
+  dryRunStripeWebhookEvent,
   reprocessEcommerceDlq,
   reprocessFinanceDlq,
   reprocessNfeioWebhookEvent,
+  reprocessStripeWebhookEvent,
   seedEcommerceDlq,
   seedFinanceDlq,
   type DlqReprocessResult,
@@ -36,6 +38,21 @@ type NfeWebhookRow = {
   received_at: string;
   event_type: string | null;
   nfeio_id: string | null;
+  process_attempts: number;
+  next_retry_at: string | null;
+  locked_at: string | null;
+  last_error: string | null;
+};
+
+type StripeWebhookRow = {
+  id: string;
+  received_at: string;
+  event_type: string;
+  stripe_event_id: string;
+  stripe_subscription_id: string | null;
+  stripe_price_id: string | null;
+  plan_slug: string | null;
+  billing_cycle: string | null;
   process_attempts: number;
   next_retry_at: string | null;
   locked_at: string | null;
@@ -63,14 +80,16 @@ export default function HealthPage() {
   const [nfeRows, setNfeRows] = useState<NfeWebhookRow[]>([]);
   const [financeDlqRows, setFinanceDlqRows] = useState<FinanceDlqRow[]>([]);
   const [ecommerceDlqRows, setEcommerceDlqRows] = useState<EcommerceDlqRow[]>([]);
+  const [stripeRows, setStripeRows] = useState<StripeWebhookRow[]>([]);
   const [reprocessingId, setReprocessingId] = useState<string | null>(null);
   const [reprocessingFinanceDlqId, setReprocessingFinanceDlqId] = useState<string | null>(null);
   const [reprocessingEcommerceDlqId, setReprocessingEcommerceDlqId] = useState<string | null>(null);
+  const [reprocessingStripeId, setReprocessingStripeId] = useState<string | null>(null);
   const [previewOpen, setPreviewOpen] = useState(false);
   const [previewTitle, setPreviewTitle] = useState<string>('Dry-run');
   const [previewDescription, setPreviewDescription] = useState<string>('');
   const [previewJson, setPreviewJson] = useState<DlqReprocessResult | null>(null);
-  const [previewAction, setPreviewAction] = useState<null | { kind: 'finance' | 'ecommerce' | 'nfeio'; id: string }>(null);
+  const [previewAction, setPreviewAction] = useState<null | { kind: 'finance' | 'ecommerce' | 'nfeio' | 'stripe'; id: string }>(null);
 
   const hasSupabase = !!supabase;
   const isDev = import.meta.env.DEV;
@@ -96,10 +115,16 @@ export default function HealthPage() {
         setNfeRows([]);
         setFinanceDlqRows([]);
         setEcommerceDlqRows([]);
+        setStripeRows([]);
         return;
       }
 
-      const [{ data: nfeData, error: nfeError }, { data: finDlqData, error: finDlqError }, { data: ecoDlqData, error: ecoDlqError }] =
+      const [
+        { data: nfeData, error: nfeError },
+        { data: finDlqData, error: finDlqError },
+        { data: ecoDlqData, error: ecoDlqError },
+        { data: stripeData, error: stripeError },
+      ] =
         await Promise.all([
           supabase
             .from('fiscal_nfe_webhook_events')
@@ -120,15 +145,26 @@ export default function HealthPage() {
                 .order('failed_at', { ascending: false })
                 .limit(30)
             : Promise.resolve({ data: [], error: null } as any),
+          supabase
+            .from('billing_stripe_webhook_events')
+            .select(
+              'id,received_at,event_type,stripe_event_id,stripe_subscription_id,stripe_price_id,plan_slug,billing_cycle,process_attempts,next_retry_at,locked_at,last_error'
+            )
+            .is('processed_at', null)
+            .not('last_error', 'is', null)
+            .order('received_at', { ascending: false })
+            .limit(30),
         ]);
 
       if (nfeError) throw nfeError;
       if (finDlqError) throw finDlqError;
       if (ecoDlqError) throw ecoDlqError;
+      if (stripeError) throw stripeError;
 
       setNfeRows((nfeData ?? []) as unknown as NfeWebhookRow[]);
       setFinanceDlqRows((finDlqData ?? []) as unknown as FinanceDlqRow[]);
       setEcommerceDlqRows((ecoDlqData ?? []) as unknown as EcommerceDlqRow[]);
+      setStripeRows((stripeData ?? []) as unknown as StripeWebhookRow[]);
     } catch (e: any) {
       const msg = e?.message || 'Falha ao carregar monitor de saúde.';
       addToast(msg, 'error');
@@ -141,6 +177,7 @@ export default function HealthPage() {
       setNfeRows([]);
       setFinanceDlqRows([]);
       setEcommerceDlqRows([]);
+      setStripeRows([]);
     } finally {
       setLoading(false);
     }
@@ -157,7 +194,7 @@ export default function HealthPage() {
     title: string,
     description: string,
     data: DlqReprocessResult,
-    action: { kind: 'finance' | 'ecommerce' | 'nfeio'; id: string }
+    action: { kind: 'finance' | 'ecommerce' | 'nfeio' | 'stripe'; id: string }
   ) => {
     setPreviewTitle(title);
     setPreviewDescription(description);
@@ -179,6 +216,19 @@ export default function HealthPage() {
     }
   };
 
+  const handleDryRunStripe = async (id: string) => {
+    if (!canReprocess) {
+      addToast('Sem permissão para reprocessar.', 'warning');
+      return;
+    }
+    try {
+      const res = await dryRunStripeWebhookEvent(id);
+      openPreview('Dry-run: Stripe', 'Prévia do replay do webhook (não altera dados).', res, { kind: 'stripe', id });
+    } catch (e: any) {
+      addToast(e?.message || 'Falha no dry-run.', 'error');
+    }
+  };
+
   const handleReprocess = async (id: string) => {
     if (!canReprocess) {
       addToast('Sem permissão para reprocessar.', 'warning');
@@ -195,6 +245,24 @@ export default function HealthPage() {
       addToast(e?.message || 'Falha ao reenfileirar evento.', 'error');
     } finally {
       setReprocessingId(null);
+    }
+  };
+
+  const handleReprocessStripe = async (id: string) => {
+    if (!canReprocess) {
+      addToast('Sem permissão para reprocessar.', 'warning');
+      return;
+    }
+    if (reprocessingStripeId) return;
+    setReprocessingStripeId(id);
+    try {
+      await reprocessStripeWebhookEvent(id);
+      addToast('Webhook Stripe reprocessado.', 'success');
+      await fetchAll();
+    } catch (e: any) {
+      addToast(e?.message || 'Falha ao reprocessar webhook Stripe.', 'error');
+    } finally {
+      setReprocessingStripeId(null);
     }
   };
 
@@ -301,6 +369,8 @@ export default function HealthPage() {
         await handleReprocessFinanceDlq(previewAction.id);
       } else if (previewAction.kind === 'ecommerce') {
         await handleReprocessEcommerceDlq(previewAction.id);
+      } else if (previewAction.kind === 'stripe') {
+        await handleReprocessStripe(previewAction.id);
       } else {
         await handleReprocess(previewAction.id);
       }
@@ -348,6 +418,18 @@ export default function HealthPage() {
         value: s?.finance?.failed ?? 0,
         icon: <AlertTriangle className="w-5 h-5 text-rose-600" />,
         hint: 'Jobs com status failed (retriáveis).',
+      },
+      {
+        title: 'Stripe pendentes',
+        value: s?.stripe?.pending ?? 0,
+        icon: <Activity className="w-5 h-5 text-indigo-600" />,
+        hint: 'Eventos prontos para processamento (next_retry_at <= now).',
+      },
+      {
+        title: 'Stripe com falha',
+        value: s?.stripe?.failed ?? 0,
+        icon: <AlertTriangle className="w-5 h-5 text-purple-600" />,
+        hint: 'Eventos sem processed_at e com last_error.',
       },
     ];
   }, [summary]);
@@ -544,7 +626,7 @@ export default function HealthPage() {
         </GlassCard>
       </div>
 
-      <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
         <GlassCard className="p-4">
           <div className="flex items-center justify-between mb-3">
             <div className="text-lg font-semibold text-gray-900">Falhas recentes</div>
@@ -633,6 +715,78 @@ export default function HealthPage() {
                               onClick={() => void handleReprocess(e.id)}
                               disabled={!canReprocess || busy}
                               title={canReprocess ? 'Reenfileirar agora' : 'Sem permissão'}
+                            >
+                              <RotateCcw size={14} />
+                              Reprocessar
+                            </Button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </GlassCard>
+
+        <GlassCard className="p-4">
+          <div className="flex items-center justify-between mb-3">
+            <div className="text-lg font-semibold text-gray-900">Stripe — webhooks com falha</div>
+            <div className="text-xs text-gray-500">{canReprocess ? 'reprocessamento habilitado' : 'sem permissão para reprocessar'}</div>
+          </div>
+
+          {loading ? (
+            <div className="text-sm text-gray-500">Carregando…</div>
+          ) : stripeRows.length === 0 ? (
+            <div className="text-sm text-gray-600">Nenhum webhook em falha.</div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="min-w-full divide-y divide-gray-200">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Quando</th>
+                    <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Evento</th>
+                    <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Tent.</th>
+                    <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Erro</th>
+                    <th className="px-3 py-2" />
+                  </tr>
+                </thead>
+                <tbody className="bg-white divide-y divide-gray-200">
+                  {stripeRows.map((e) => {
+                    const busy = reprocessingStripeId === e.id;
+                    return (
+                      <tr key={e.id} className="hover:bg-gray-50">
+                        <td className="px-3 py-2 text-sm text-gray-600 whitespace-nowrap">{formatDateTimeBR(e.received_at)}</td>
+                        <td className="px-3 py-2 text-sm text-gray-700">
+                          <div className="font-medium">{e.event_type || '—'}</div>
+                          <div className="text-xs text-gray-500">
+                            {e.plan_slug ? `${e.plan_slug} · ` : ''}
+                            {e.billing_cycle || '—'}
+                          </div>
+                        </td>
+                        <td className="px-3 py-2 text-sm text-gray-700 whitespace-nowrap">{e.process_attempts ?? 0}</td>
+                        <td className="px-3 py-2 text-sm text-gray-700 max-w-[360px] truncate" title={e.last_error || ''}>
+                          {e.last_error || '—'}
+                        </td>
+                        <td className="px-3 py-2 text-right">
+                          <div className="flex justify-end gap-2">
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="gap-2"
+                              onClick={() => void handleDryRunStripe(e.id)}
+                              disabled={!canReprocess || busy}
+                            >
+                              Dry-run
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="gap-2"
+                              onClick={() => void handleReprocessStripe(e.id)}
+                              disabled={!canReprocess || busy}
+                              title={canReprocess ? 'Reprocessar agora' : 'Sem permissão'}
                             >
                               <RotateCcw size={14} />
                               Reprocessar

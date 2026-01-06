@@ -11,6 +11,82 @@ const supabaseAdmin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
   auth: { autoRefreshToken: false, persistSession: false },
 });
 
+type StripeWebhookEventRow = {
+  id: string;
+  empresa_id: string | null;
+  stripe_event_id: string;
+  event_type: string;
+  processed_at: string | null;
+  locked_at: string | null;
+  next_retry_at: string | null;
+  process_attempts: number;
+  last_error: string | null;
+};
+
+function toIso(d: Date) {
+  return d.toISOString();
+}
+
+function nextRetryAt(attempts: number, now: Date): string {
+  const min = Math.min(Math.max(5, attempts * 5), 60);
+  return toIso(new Date(now.getTime() + min * 60 * 1000));
+}
+
+async function safeUpdateStripeEvent(id: string, patch: Record<string, unknown>) {
+  try {
+    await supabaseAdmin.from("billing_stripe_webhook_events").update(patch).eq("id", id);
+  } catch (e) {
+    console.warn("stripe-webhook: falha ao atualizar billing_stripe_webhook_events (best-effort)", e);
+  }
+}
+
+async function ensureStripeEventRow(params: {
+  stripeEventId: string;
+  eventType: string;
+  requestId: string | null;
+  livemode: boolean;
+}): Promise<StripeWebhookEventRow> {
+  const now = new Date();
+  const insertPayload = {
+    stripe_event_id: params.stripeEventId,
+    event_type: params.eventType,
+    livemode: params.livemode,
+    received_at: toIso(now),
+    request_id: params.requestId,
+    meta: { livemode: params.livemode },
+  };
+
+  const ins = await supabaseAdmin
+    .from("billing_stripe_webhook_events")
+    .insert(insertPayload)
+    .select(
+      "id,empresa_id,stripe_event_id,event_type,processed_at,locked_at,next_retry_at,process_attempts,last_error",
+    )
+    .maybeSingle();
+
+  if (ins.error) {
+    const msg = String((ins.error as any)?.message || "");
+    // Duplicado: buscar a linha existente.
+    if (msg.includes("duplicate") || msg.includes("already exists") || msg.includes("23505")) {
+      const existing = await supabaseAdmin
+        .from("billing_stripe_webhook_events")
+        .select(
+          "id,empresa_id,stripe_event_id,event_type,processed_at,locked_at,next_retry_at,process_attempts,last_error",
+        )
+        .eq("stripe_event_id", params.stripeEventId)
+        .maybeSingle();
+      if (existing.error || !existing.data) {
+        throw existing.error ?? new Error("Falha ao buscar evento Stripe existente.");
+      }
+      return existing.data as StripeWebhookEventRow;
+    }
+    throw ins.error;
+  }
+
+  if (!ins.data) throw new Error("Falha ao registrar evento Stripe.");
+  return ins.data as StripeWebhookEventRow;
+}
+
 Deno.serve(async (req: Request): Promise<Response> => {
   const sig = req.headers.get("stripe-signature");
   if (!sig) return new Response("Assinatura do Stripe ausente", { status: 400 });
@@ -25,12 +101,54 @@ Deno.serve(async (req: Request): Promise<Response> => {
     return new Response(`Erro no Webhook: ${(err as Error).message}`, { status: 400 });
   }
 
+  const requestId = req.headers.get("x-revo-request-id");
+  let evRow: StripeWebhookEventRow | null = null;
+  try {
+    evRow = await ensureStripeEventRow({
+      stripeEventId: event.id,
+      eventType: event.type,
+      requestId,
+      livemode: !!event.livemode,
+    });
+    if (evRow.processed_at) {
+      return new Response("ok", { status: 200 });
+    }
+  } catch (e) {
+    console.warn("stripe-webhook: falha ao registrar evento (best-effort)", e);
+  }
+
   if (event.type.startsWith("customer.subscription.")) {
     try {
+        const now = new Date();
+        if (evRow?.id) {
+          try {
+            await supabaseAdmin
+              .from("billing_stripe_webhook_events")
+              .update({
+                locked_at: toIso(now),
+                process_attempts: (evRow.process_attempts ?? 0) + 1,
+                last_error: null,
+                next_retry_at: null,
+              })
+              .eq("id", evRow.id);
+          } catch {
+            // best-effort
+          }
+        }
+
         const sub = event.data.object as Stripe.Subscription;
         const price = sub.items?.data?.[0]?.price;
         if (!price?.id || !price.recurring?.interval) {
           console.warn("Webhook ignorado: Informações de preço ausentes na assinatura", sub.id);
+          if (evRow?.id) {
+            await safeUpdateStripeEvent(evRow.id, {
+              stripe_subscription_id: sub.id,
+              stripe_customer_id: sub.customer ? String(sub.customer) : null,
+              last_error: "Informações de preço ausentes na assinatura",
+              locked_at: null,
+              next_retry_at: nextRetryAt((evRow.process_attempts ?? 0) + 1, now),
+            });
+          }
           return new Response("Informações de preço ausentes", { status: 400 });
         }
 
@@ -60,6 +178,20 @@ Deno.serve(async (req: Request): Promise<Response> => {
         }
         if (!empresaId) {
             console.error("Erro no Webhook: empresa_id não encontrado para a assinatura", sub.id);
+            if (evRow?.id) {
+              await safeUpdateStripeEvent(evRow.id, {
+                stripe_subscription_id: sub.id,
+                stripe_customer_id: customerId,
+                stripe_price_id: stripePriceId,
+                billing_cycle: billingCycle,
+                subscription_status: sub.status,
+                current_period_end: sub.current_period_end ? toIso(new Date(sub.current_period_end * 1000)) : null,
+                cancel_at_period_end: !!sub.cancel_at_period_end,
+                last_error: "empresa_id não encontrado",
+                locked_at: null,
+                next_retry_at: nextRetryAt((evRow.process_attempts ?? 0) + 1, now),
+              });
+            }
             return new Response("empresa_id não encontrado", { status: 400 });
         }
 
@@ -96,6 +228,21 @@ Deno.serve(async (req: Request): Promise<Response> => {
           .maybeSingle();
         if (planErr || !planRow?.slug) {
             console.error(`Erro no Webhook: Preço ${stripePriceId} não mapeado em public.plans`);
+            if (evRow?.id) {
+              await safeUpdateStripeEvent(evRow.id, {
+                empresa_id: empresaId,
+                stripe_subscription_id: sub.id,
+                stripe_customer_id: customerId,
+                stripe_price_id: stripePriceId,
+                billing_cycle: billingCycle,
+                subscription_status: sub.status,
+                current_period_end: sub.current_period_end ? toIso(new Date(sub.current_period_end * 1000)) : null,
+                cancel_at_period_end: !!sub.cancel_at_period_end,
+                last_error: "Preço não mapeado em public.plans",
+                locked_at: null,
+                next_retry_at: nextRetryAt((evRow.process_attempts ?? 0) + 1, now),
+              });
+            }
             return new Response("Preço não mapeado em public.plans", { status: 400 });
         }
         const planSlug = planRow.slug as string;
@@ -119,8 +266,37 @@ Deno.serve(async (req: Request): Promise<Response> => {
             console.error("Erro ao chamar a RPC upsert_subscription:", rpcErr);
             throw rpcErr;
         }
+
+        if (evRow?.id) {
+          await safeUpdateStripeEvent(evRow.id, {
+            empresa_id: empresaId,
+            stripe_customer_id: customerId,
+            stripe_subscription_id: sub.id,
+            stripe_price_id: stripePriceId,
+            plan_slug: planSlug,
+            billing_cycle: billingCycle,
+            subscription_status: status,
+            current_period_end: currentPeriodEnd,
+            cancel_at_period_end: event.type === "customer.subscription.deleted" ? true : !!sub.cancel_at_period_end,
+            processed_at: toIso(now),
+            locked_at: null,
+            next_retry_at: null,
+            last_error: null,
+          });
+        }
     } catch (e) {
         console.error("Erro ao processar evento de assinatura:", e);
+        if (evRow?.id) {
+          const now = new Date();
+          const attempts = (evRow.process_attempts ?? 0) + 1;
+          await safeUpdateStripeEvent(evRow.id, {
+            locked_at: null,
+            processed_at: null,
+            next_retry_at: nextRetryAt(attempts, now),
+            last_error: String((e as Error)?.message ?? e),
+            process_attempts: attempts,
+          });
+        }
         return new Response(`Erro interno: ${(e as Error).message}`, { status: 500 });
     }
   }

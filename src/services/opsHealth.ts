@@ -15,6 +15,11 @@ export type OpsHealthSummary = {
     failed: number;
     locked: number;
   };
+  stripe?: {
+    pending: number;
+    failed: number;
+    locked: number;
+  };
 };
 
 export type ProductMetricsSummary = {
@@ -117,6 +122,14 @@ export async function dryRunEcommerceDlq(dlqId: string): Promise<DlqReprocessRes
 
 export async function dryRunNfeioWebhookEvent(id: string): Promise<DlqReprocessResult> {
   return callRpc<DlqReprocessResult>('ops_nfeio_webhook_reprocess_v2', { p_id: id, p_dry_run: true });
+}
+
+export async function reprocessStripeWebhookEvent(id: string): Promise<void> {
+  await callRpc('ops_stripe_webhook_reprocess', { p_id: id });
+}
+
+export async function dryRunStripeWebhookEvent(id: string): Promise<DlqReprocessResult> {
+  return callRpc<DlqReprocessResult>('ops_stripe_webhook_reprocess_v2', { p_id: id, p_dry_run: true });
 }
 
 export async function seedFinanceDlq(jobType?: string): Promise<string> {
