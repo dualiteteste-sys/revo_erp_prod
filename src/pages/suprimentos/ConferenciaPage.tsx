@@ -12,7 +12,7 @@ import {
     Recebimento,
     RecebimentoItem,
 } from '@/services/recebimento';
-import { Loader2, ArrowLeft, CheckCircle, AlertTriangle, Save, Layers, RefreshCw, Hammer } from 'lucide-react';
+import { Loader2, ArrowLeft, CheckCircle, AlertTriangle, Save, Layers, RefreshCw, Hammer, ScanLine } from 'lucide-react';
 import { useToast } from '@/contexts/ToastProvider';
 import { useConfirm } from '@/contexts/ConfirmProvider';
 import { ActionLockedError, runWithActionLock } from '@/lib/actionLock';
@@ -23,6 +23,7 @@ import { searchClients } from '@/services/clients';
 import PartnerFormPanel from '@/components/partners/PartnerFormPanel';
 import { saveOrdem } from '@/services/industria';
 import { ensureMaterialClienteV2 } from '@/services/industriaMateriais';
+import QuickScanModal from '@/components/ui/QuickScanModal';
 
 export default function ConferenciaPage() {
     const { id } = useParams<{ id: string }>();
@@ -58,6 +59,9 @@ export default function ConferenciaPage() {
         rateio_base: 'valor' | 'quantidade';
     }>({ custo_frete: 0, custo_seguro: 0, custo_impostos: 0, custo_outros: 0, rateio_base: 'valor' });
     const [savingCustos, setSavingCustos] = useState(false);
+    const [isScanOpen, setIsScanOpen] = useState(false);
+    const [highlightItemId, setHighlightItemId] = useState<string | null>(null);
+    const rowRefs = useRef<Record<string, HTMLTableRowElement | null>>({});
 
     const digitsOnly = (value?: string | null) => (value || '').replace(/\D/g, '');
 
@@ -117,7 +121,7 @@ export default function ConferenciaPage() {
         }
     };
 
-    const handleConferencia = async (itemId: string, qtd: number) => {
+    const handleConferencia = async (itemId: string, qtd: number, opts?: { silentToast?: boolean }) => {
         setSaving(itemId);
 
         // Optimistic Update: Update UI immediately
@@ -130,13 +134,79 @@ export default function ConferenciaPage() {
 
         try {
             await conferirItem(itemId, qtd);
-            addToast('Quantidade registrada.', 'success');
+            if (!opts?.silentToast) addToast('Quantidade registrada.', 'success');
         } catch (error) {
             // Revert on error
             setItens(previousItens);
             addToast('Erro ao salvar conferência.', 'error');
         } finally {
             setSaving(null);
+        }
+    };
+
+    const focusAndHighlightItem = (itemId: string) => {
+        const el = rowRefs.current[itemId];
+        if (el) {
+            el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+        setHighlightItemId(itemId);
+        window.setTimeout(() => setHighlightItemId((v) => (v === itemId ? null : v)), 1800);
+    };
+
+    const normalizeScan = (value: string) => value.trim();
+    const digitsOnlyScan = (value: string) => value.replace(/\D/g, '');
+
+    const findItemByScan = (raw: string) => {
+        const scan = normalizeScan(raw);
+        const scanUpper = scan.toUpperCase();
+        const scanDigits = digitsOnlyScan(scan);
+
+        const byEan = scanDigits
+            ? itens.find((it) => digitsOnlyScan(it.fiscal_nfe_import_items?.ean || '') === scanDigits)
+            : null;
+        if (byEan) return byEan;
+
+        const byCprod = itens.find((it) => (it.fiscal_nfe_import_items?.cprod || '').toUpperCase() === scanUpper);
+        if (byCprod) return byCprod;
+
+        const bySku = itens.find((it) => (it.produtos?.sku || '').toUpperCase() === scanUpper);
+        if (bySku) return bySku;
+
+        return null;
+    };
+
+    const handleScanResult = async (text: string) => {
+        const item = findItemByScan(text);
+        if (!item) {
+            addToast('Não encontrei este código na lista de itens do recebimento.', 'warning');
+            return;
+        }
+
+        setIsScanOpen(false);
+        focusAndHighlightItem(item.id);
+
+        if (recebimento?.status === 'concluido' || recebimento?.status === 'cancelado') {
+            addToast('Este recebimento está concluído/cancelado. A conferência não pode ser alterada.', 'info');
+            return;
+        }
+
+        const current = Number(item.quantidade_conferida || 0);
+        const target = Math.min(current + 1, Number(item.quantidade_xml || 0));
+        if (target === current) {
+            addToast('Este item já está conferido na quantidade da nota.', 'info');
+            return;
+        }
+
+        try {
+            const promise = handleConferencia(item.id, target, { silentToast: true });
+            lastSavePromiseRef.current = promise;
+            await promise;
+            addToast(
+                `Conferido: ${item.produtos?.nome || item.fiscal_nfe_import_items?.xprod || 'Item'} (${target}/${item.quantidade_xml})`,
+                'success'
+            );
+        } catch {
+            // handleConferencia já mostra toast de erro
         }
     };
 
@@ -697,6 +767,28 @@ export default function ConferenciaPage() {
 
             {showItens && (
                 <div className="bg-white rounded-xl shadow overflow-hidden">
+                    <div className="flex flex-col gap-2 border-b border-gray-100 bg-white/70 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+                        <div className="min-w-0">
+                            <div className="text-sm font-semibold text-gray-900">Conferência rápida (WMS light)</div>
+                            <div className="text-xs text-gray-500">
+                                Escaneie EAN/SKU/Cód. do item para localizar e somar na conferência (sem passar do XML).
+                            </div>
+                        </div>
+                        <button
+                            type="button"
+                            onClick={() => setIsScanOpen(true)}
+                            disabled={!recebimento || recebimento.status === 'concluido' || recebimento.status === 'cancelado'}
+                            className={`inline-flex items-center gap-2 rounded-xl bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-800 ${
+                                !recebimento || recebimento.status === 'concluido' || recebimento.status === 'cancelado'
+                                    ? 'opacity-50 cursor-not-allowed'
+                                    : ''
+                            }`}
+                            title="Escanear um código para localizar e conferir rapidamente"
+                        >
+                            <ScanLine size={16} />
+                            Escanear código
+                        </button>
+                    </div>
                     <table className="min-w-full divide-y divide-gray-200">
                         <thead className="bg-gray-50">
                             <tr>
@@ -710,7 +802,16 @@ export default function ConferenciaPage() {
                         </thead>
                         <tbody className="divide-y divide-gray-200">
                             {itens.map(item => (
-                                <tr key={item.id} className={item.status === 'divergente' && item.quantidade_conferida > 0 ? 'bg-red-50' : ''}>
+                                <tr
+                                    key={item.id}
+                                    ref={(el) => {
+                                        rowRefs.current[item.id] = el;
+                                    }}
+                                    className={[
+                                        item.status === 'divergente' && item.quantidade_conferida > 0 ? 'bg-red-50' : '',
+                                        highlightItemId === item.id ? 'ring-2 ring-blue-400 ring-inset' : '',
+                                    ].join(' ')}
+                                >
                                     <td className="px-6 py-4">
                                         <div className="font-medium text-gray-900">{item.fiscal_nfe_import_items?.xprod}</div>
                                         <div className="text-xs text-gray-500">Cód: {item.fiscal_nfe_import_items?.cprod}</div>
@@ -797,6 +898,15 @@ export default function ConferenciaPage() {
                     </table>
                 </div>
             )}
+
+            <QuickScanModal
+                isOpen={isScanOpen}
+                onClose={() => setIsScanOpen(false)}
+                title="Escanear item do recebimento"
+                helper="Escaneie o EAN/SKU/Código do item. O sistema localiza o item no XML e soma 1 na conferência (até a quantidade da nota)."
+                confirmLabel="Usar"
+                onResult={handleScanResult}
+            />
 
             <Modal
                 isOpen={isGerarObOpen}

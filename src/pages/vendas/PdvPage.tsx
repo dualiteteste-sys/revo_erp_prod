@@ -1,10 +1,20 @@
 import React, { useEffect, useState } from 'react';
-import { Loader2, PlusCircle, Printer, Search, Store } from 'lucide-react';
+import { DoorClosed, DoorOpen, Loader2, PlusCircle, Printer, Search, Store, Wallet } from 'lucide-react';
 import Modal from '@/components/ui/Modal';
 import { useToast } from '@/contexts/ToastProvider';
 import PedidoVendaFormPanel from '@/components/vendas/PedidoVendaFormPanel';
 import { listContasCorrentes, type ContaCorrente } from '@/services/treasury';
-import { estornarPdv, finalizePdv, flushPdvFinalizeQueue, getQueuedPdvFinalizeIds, PdvQueuedError } from '@/services/vendasMvp';
+import {
+  closePdvCaixa,
+  estornarPdv,
+  finalizePdv,
+  flushPdvFinalizeQueue,
+  getQueuedPdvFinalizeIds,
+  listPdvCaixas,
+  openPdvCaixa,
+  type PdvCaixaRow,
+  PdvQueuedError,
+} from '@/services/vendasMvp';
 import { supabase } from '@/lib/supabaseClient';
 import { getVendaDetails, type VendaDetails } from '@/services/vendas';
 import CsvExportDialog from '@/components/ui/CsvExportDialog';
@@ -96,6 +106,14 @@ export default function PdvPage() {
   const [statusFilter, setStatusFilter] = useState<'all' | 'orcamento' | 'concluido' | 'cancelado'>('all');
   const [contas, setContas] = useState<ContaCorrente[]>([]);
   const [contaCorrenteId, setContaCorrenteId] = useState<string>('');
+  const [caixas, setCaixas] = useState<PdvCaixaRow[]>([]);
+  const [caixaId, setCaixaId] = useState<string>(() => (typeof window !== 'undefined' ? window.localStorage.getItem('pdv:caixaId') || '' : ''));
+  const [isCaixaModalOpen, setIsCaixaModalOpen] = useState(false);
+  const [caixaMode, setCaixaMode] = useState<'open' | 'close'>('open');
+  const [saldoInicial, setSaldoInicial] = useState<number>(0);
+  const [saldoFinal, setSaldoFinal] = useState<number>(0);
+  const [caixaObs, setCaixaObs] = useState<string>('');
+  const [caixaBusy, setCaixaBusy] = useState(false);
 
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -109,7 +127,7 @@ export default function PdvPage() {
   async function load() {
     setLoading(true);
     try {
-      const [{ data: contaData }, { data: pdvData, error: pdvError }] = await Promise.all([
+      const [{ data: contaData }, { data: pdvData, error: pdvError }, caixasData] = await Promise.all([
         listContasCorrentes({ page: 1, pageSize: 50, searchTerm: '', ativo: true }),
         sb
           .from('vendas_pedidos')
@@ -117,10 +135,22 @@ export default function PdvPage() {
           .eq('canal', 'pdv')
           .order('updated_at', { ascending: false })
           .limit(200),
+        listPdvCaixas().catch(() => [] as PdvCaixaRow[]),
       ]);
 
       if (pdvError) throw pdvError;
       setContas(contaData);
+      setCaixas(caixasData || []);
+      if (typeof window !== 'undefined') {
+        window.localStorage.setItem('pdv:caixaId', caixaId || '');
+      }
+      if (!caixaId && (caixasData || []).length > 0) {
+        const preferred = (caixasData || []).find((c) => c.sessao_id) || (caixasData || [])[0];
+        if (preferred) {
+          setCaixaId(preferred.id);
+          if (typeof window !== 'undefined') window.localStorage.setItem('pdv:caixaId', preferred.id);
+        }
+      }
       if (!contaCorrenteId && contaData.length > 0) {
         const padrao = contaData.find((c) => c.padrao_para_recebimentos) || contaData[0];
         setContaCorrenteId(padrao.id);
@@ -188,11 +218,22 @@ export default function PdvPage() {
       addToast('Cadastre/seleciona uma conta corrente para receber no PDV.', 'error');
       return;
     }
+    const caixa = caixas.find((c) => c.id === caixaId);
+    if (!caixaId) {
+      addToast('Selecione um caixa antes de finalizar.', 'warning');
+      return;
+    }
+    if (!caixa?.sessao_id) {
+      addToast('Caixa fechado. Abra o caixa para finalizar vendas.', 'warning');
+      setCaixaMode('open');
+      setIsCaixaModalOpen(true);
+      return;
+    }
     const lockKey = `pdv:finalize:${pedidoId}`;
     setFinalizingId(pedidoId);
     try {
       await runWithActionLock(lockKey, async () => {
-        await finalizePdv({ pedidoId, contaCorrenteId, estoqueEnabled: true });
+        await finalizePdv({ pedidoId, contaCorrenteId, estoqueEnabled: true, caixaId });
       });
       addToast('PDV finalizado (financeiro + estoque).', 'success');
       try {
@@ -224,6 +265,38 @@ export default function PdvPage() {
     if (ok > 0) addToast(`Sincronizado: ${ok} PDV(s).`, 'success');
     if (failed > 0) addToast(`Não foi possível sincronizar ${failed} PDV(s).`, 'warning');
     if (ok > 0) await load();
+  };
+
+  const openCaixaModal = (mode: 'open' | 'close') => {
+    setCaixaMode(mode);
+    setSaldoInicial(0);
+    setSaldoFinal(0);
+    setCaixaObs('');
+    setIsCaixaModalOpen(true);
+  };
+
+  const handleConfirmCaixa = async () => {
+    if (!caixaId) {
+      addToast('Selecione um caixa.', 'warning');
+      return;
+    }
+    if (caixaBusy) return;
+    setCaixaBusy(true);
+    try {
+      if (caixaMode === 'open') {
+        await openPdvCaixa({ caixaId, saldoInicial: Number(saldoInicial || 0) });
+        addToast('Caixa aberto.', 'success');
+      } else {
+        const res = await closePdvCaixa({ caixaId, saldoFinal: saldoFinal ? Number(saldoFinal) : null, observacoes: caixaObs || null });
+        addToast(`Caixa fechado. Vendas: ${formatMoneyBRL(res.total_vendas)}.`, 'success');
+      }
+      setIsCaixaModalOpen(false);
+      await load();
+    } catch (e: any) {
+      addToast(e?.message || 'Falha ao atualizar caixa.', 'error');
+    } finally {
+      setCaixaBusy(false);
+    }
   };
 
   const handleEstornar = async (pedidoId: string) => {
@@ -325,10 +398,101 @@ export default function PdvPage() {
             </option>
           ))}
         </select>
+        <label className="text-sm text-gray-700 ml-2">Caixa</label>
+        <select
+          value={caixaId}
+          onChange={(e) => {
+            setCaixaId(e.target.value);
+            if (typeof window !== 'undefined') window.localStorage.setItem('pdv:caixaId', e.target.value);
+          }}
+          className="p-2 border border-gray-300 rounded-lg min-w-[220px]"
+        >
+          <option value="">Selecione…</option>
+          {caixas.map((c) => (
+            <option key={c.id} value={c.id}>
+              {c.nome} {c.sessao_id ? '• aberto' : '• fechado'}
+            </option>
+          ))}
+        </select>
+        <button
+          type="button"
+          onClick={() => openCaixaModal((caixas.find((c) => c.id === caixaId)?.sessao_id ? 'close' : 'open'))}
+          className="px-3 py-2 rounded-lg bg-slate-900 text-white text-sm font-semibold hover:bg-slate-800 flex items-center gap-2"
+          title="Abrir/fechar caixa"
+        >
+          {caixas.find((c) => c.id === caixaId)?.sessao_id ? <DoorClosed size={16} /> : <DoorOpen size={16} />}
+          {caixas.find((c) => c.id === caixaId)?.sessao_id ? 'Fechar caixa' : 'Abrir caixa'}
+        </button>
         <button onClick={() => load()} className="px-3 py-2 rounded-lg bg-gray-100 hover:bg-gray-200 text-sm">
           Atualizar
         </button>
       </div>
+
+      <Modal
+        isOpen={isCaixaModalOpen}
+        onClose={() => setIsCaixaModalOpen(false)}
+        title={caixaMode === 'open' ? 'Abrir caixa' : 'Fechar caixa'}
+        size="lg"
+      >
+        <div className="p-6 space-y-4">
+          <div className="rounded-xl border border-gray-200 bg-white p-4">
+            <div className="text-sm font-semibold text-gray-900 flex items-center gap-2">
+              <Wallet size={18} className="text-blue-600" />
+              {caixaMode === 'open' ? 'Saldo inicial' : 'Saldo final (opcional)'}
+            </div>
+            <div className="mt-3 grid grid-cols-1 md:grid-cols-2 gap-3">
+              {caixaMode === 'open' ? (
+                <div>
+                  <label className="text-xs font-semibold text-gray-700">Saldo inicial</label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    value={saldoInicial}
+                    onChange={(e) => setSaldoInicial(Number(e.target.value || 0))}
+                    className="mt-1 w-full p-3 border border-gray-300 rounded-lg"
+                  />
+                </div>
+              ) : (
+                <>
+                  <div>
+                    <label className="text-xs font-semibold text-gray-700">Saldo final (contado)</label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      value={saldoFinal}
+                      onChange={(e) => setSaldoFinal(Number(e.target.value || 0))}
+                      className="mt-1 w-full p-3 border border-gray-300 rounded-lg"
+                      placeholder="Opcional"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs font-semibold text-gray-700">Observações</label>
+                    <input
+                      value={caixaObs}
+                      onChange={(e) => setCaixaObs(e.target.value)}
+                      className="mt-1 w-full p-3 border border-gray-300 rounded-lg"
+                      placeholder="Ex.: diferença de troco…"
+                    />
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
+
+          <div className="flex justify-end gap-2">
+            <button onClick={() => setIsCaixaModalOpen(false)} className="px-4 py-2 rounded-lg bg-gray-100 hover:bg-gray-200">
+              Cancelar
+            </button>
+            <button
+              onClick={() => void handleConfirmCaixa()}
+              disabled={caixaBusy}
+              className="px-4 py-2 rounded-lg bg-blue-600 text-white font-bold hover:bg-blue-700 disabled:opacity-50"
+            >
+              {caixaBusy ? 'Salvando…' : caixaMode === 'open' ? 'Abrir' : 'Fechar'}
+            </button>
+          </div>
+        </div>
+      </Modal>
 
       {queuedIds.size > 0 ? (
         <div className="mb-4 flex items-center justify-between rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">

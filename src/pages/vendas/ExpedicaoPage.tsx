@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { AlertTriangle, CheckCircle2, Clock3, Loader2, PlusCircle, Search, Truck } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, Clock3, Loader2, PlusCircle, ScanLine, Search, Truck } from 'lucide-react';
 import Modal from '@/components/ui/Modal';
 import { useToast } from '@/contexts/ToastProvider';
 import { listVendas, type VendaPedido } from '@/services/vendas';
@@ -13,6 +13,7 @@ import {
   type ExpedicaoStatus,
 } from '@/services/vendasMvp';
 import CsvExportDialog from '@/components/ui/CsvExportDialog';
+import QuickScanModal from '@/components/ui/QuickScanModal';
 
 type FormState = {
   pedido_id: string;
@@ -48,6 +49,8 @@ export default function ExpedicaoPage() {
 
   const [isOpen, setIsOpen] = useState(false);
   const [form, setForm] = useState<FormState>(emptyForm);
+  const [isScanOpen, setIsScanOpen] = useState(false);
+  const [scanMode, setScanMode] = useState<'search' | 'tracking'>('search');
 
   const filteredRows = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -115,6 +118,38 @@ export default function ExpedicaoPage() {
     setForm(emptyForm);
     setSelectedExpedicaoId(null);
     setEventos([]);
+  };
+
+  const handleOpenScan = (mode: 'search' | 'tracking') => {
+    setScanMode(mode);
+    setIsScanOpen(true);
+  };
+
+  const handleScanResult = (text: string) => {
+    const value = text.trim();
+    if (!value) return;
+    setIsScanOpen(false);
+
+    if (scanMode === 'tracking') {
+      setForm((s) => ({ ...s, tracking_code: value }));
+      addToast('Tracking preenchido a partir do scan.', 'success');
+      return;
+    }
+
+    setSearch(value);
+    const onlyDigits = value.replace(/\D/g, '');
+    const pedidoNumero = onlyDigits ? Number(onlyDigits) : NaN;
+    const found =
+      Number.isFinite(pedidoNumero) && pedidoNumero > 0
+        ? rows.find((r) => Number(r.pedido_numero) === pedidoNumero)
+        : rows.find((r) => (r.tracking_code || '').toLowerCase().includes(value.toLowerCase()));
+
+    if (found) {
+      openEdit(found);
+      addToast(`Expedição encontrada para o pedido #${found.pedido_numero}.`, 'success');
+    } else {
+      addToast('Código escaneado aplicado na busca. Nenhuma expedição encontrada.', 'info');
+    }
   };
 
   useEffect(() => {
@@ -238,6 +273,15 @@ export default function ExpedicaoPage() {
             className="w-full p-2.5 pl-9 border border-gray-300 rounded-xl shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
           />
         </div>
+        <button
+          type="button"
+          onClick={() => handleOpenScan('search')}
+          className="p-2.5 rounded-xl border border-gray-300 bg-white hover:bg-gray-50 flex items-center gap-2"
+          title="Escanear pedido/tracking para filtrar (WMS light)"
+        >
+          <ScanLine size={18} className="text-blue-700" />
+          <span className="text-sm font-semibold text-gray-800 hidden md:inline">Escanear</span>
+        </button>
         <select
           value={statusFilter}
           onChange={(e) => setStatusFilter(e.target.value as any)}
@@ -379,12 +423,22 @@ export default function ExpedicaoPage() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <label className="text-sm text-gray-700">Tracking</label>
-                <input
-                  value={form.tracking_code}
-                  onChange={(e) => setForm((s) => ({ ...s, tracking_code: e.target.value }))}
-                  className="mt-1 w-full p-3 border border-gray-300 rounded-lg"
-                  placeholder="Código de rastreio"
-                />
+                <div className="mt-1 flex gap-2">
+                  <input
+                    value={form.tracking_code}
+                    onChange={(e) => setForm((s) => ({ ...s, tracking_code: e.target.value }))}
+                    className="w-full p-3 border border-gray-300 rounded-lg"
+                    placeholder="Código de rastreio"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => handleOpenScan('tracking')}
+                    className="shrink-0 px-3 rounded-lg border border-gray-300 bg-white hover:bg-gray-50"
+                    title="Escanear tracking"
+                  >
+                    <ScanLine size={18} className="text-blue-700" />
+                  </button>
+                </div>
               </div>
               <div>
                 <label className="text-sm text-gray-700">Status atual</label>
@@ -468,6 +522,19 @@ export default function ExpedicaoPage() {
           </div>
         </div>
       </Modal>
+
+      <QuickScanModal
+        isOpen={isScanOpen}
+        onClose={() => setIsScanOpen(false)}
+        title={scanMode === 'tracking' ? 'Escanear tracking' : 'Escanear pedido/tracking'}
+        helper={
+          scanMode === 'tracking'
+            ? 'Escaneie o código de rastreio. Ele será preenchido no campo Tracking.'
+            : 'Escaneie o número do pedido ou o tracking para filtrar/abrir a expedição.'
+        }
+        confirmLabel="Usar"
+        onResult={handleScanResult}
+      />
     </div>
   );
 }

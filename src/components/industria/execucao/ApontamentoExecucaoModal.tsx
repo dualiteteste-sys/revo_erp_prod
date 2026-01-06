@@ -2,9 +2,13 @@ import React, { useEffect, useMemo, useState } from 'react';
 import Modal from '@/components/ui/Modal';
 import Input from '@/components/ui/forms/Input';
 import TextArea from '@/components/ui/forms/TextArea';
+import Select from '@/components/ui/forms/Select';
+import DecimalInput from '@/components/ui/forms/DecimalInput';
 import { Loader2 } from 'lucide-react';
 import { Operacao, StatusOperacao, apontarExecucao } from '@/services/industriaExecucao';
 import { useToast } from '@/contexts/ToastProvider';
+import { getMotivosRefugo } from '@/services/industriaProducao';
+import QuickScanModal from '@/components/ui/QuickScanModal';
 
 type ApontamentoAction = 'pausar' | 'concluir';
 
@@ -26,7 +30,13 @@ export default function ApontamentoExecucaoModal({
   const [qtdBoas, setQtdBoas] = useState<number>(0);
   const [qtdRefugadas, setQtdRefugadas] = useState<number>(0);
   const [motivoRefugo, setMotivoRefugo] = useState('');
+  const [motivoRefugoId, setMotivoRefugoId] = useState<string>('');
   const [observacoes, setObservacoes] = useState('');
+  const [lote, setLote] = useState('');
+  const [custoUnitario, setCustoUnitario] = useState<number>(0);
+  const [motivos, setMotivos] = useState<Array<{ id: string; nome: string }>>([]);
+  const [loadingMotivos, setLoadingMotivos] = useState(false);
+  const [scanOpen, setScanOpen] = useState(false);
 
   const title = useMemo(() => {
     const base = action === 'pausar' ? 'Apontar parada' : 'Apontar conclusão';
@@ -39,8 +49,21 @@ export default function ApontamentoExecucaoModal({
     setQtdBoas(0);
     setQtdRefugadas(0);
     setMotivoRefugo('');
+    setMotivoRefugoId('');
     setObservacoes('');
+    setLote('');
+    setCustoUnitario(0);
   }, [open]);
+
+  useEffect(() => {
+    if (!open) return;
+    if (action !== 'concluir') return;
+    setLoadingMotivos(true);
+    getMotivosRefugo()
+      .then((rows) => setMotivos((rows || []).map((r) => ({ id: r.id, nome: r.nome }))))
+      .catch(() => setMotivos([]))
+      .finally(() => setLoadingMotivos(false));
+  }, [open, action]);
 
   const handleConfirm = async () => {
     if (!operacao) return;
@@ -53,6 +76,11 @@ export default function ApontamentoExecucaoModal({
         Number.isFinite(qtdRefugadas) ? qtdRefugadas : 0,
         (qtdRefugadas ?? 0) > 0 ? (motivoRefugo || null) : null,
         observacoes || null,
+        {
+          motivoRefugoId: (qtdRefugadas ?? 0) > 0 ? (motivoRefugoId || null) : null,
+          lote: action === 'concluir' ? (lote || null) : null,
+          custoUnitario: action === 'concluir' ? (custoUnitario > 0 ? custoUnitario : null) : null,
+        }
       );
       addToast(action === 'pausar' ? 'Operação pausada.' : 'Operação concluída.', 'success');
       onSuccess();
@@ -69,6 +97,17 @@ export default function ApontamentoExecucaoModal({
 
   return (
     <Modal isOpen={open} onClose={onClose} title={title} size="md">
+      <QuickScanModal
+        open={scanOpen}
+        onClose={() => setScanOpen(false)}
+        title="Escanear lote/etiqueta"
+        description="Use a câmera ou leitor para preencher o lote."
+        onScanned={(value) => {
+          setLote(value);
+          setScanOpen(false);
+        }}
+      />
+
       <div className="p-6 space-y-4">
         {operacao && (
           <div className="bg-slate-50 border border-slate-200 rounded-lg p-3 text-sm text-slate-700">
@@ -96,13 +135,68 @@ export default function ApontamentoExecucaoModal({
           disabled={saving || isLocked}
         />
         {qtdRefugadas > 0 && (
-          <Input
-            label="Motivo do Refugo"
-            name="motivo_refugo"
-            value={motivoRefugo}
-            onChange={(e) => setMotivoRefugo(e.target.value)}
-            disabled={saving || isLocked}
-          />
+          <div className="space-y-3">
+            <Select
+              label="Motivo do refugo (cadastro de Qualidade)"
+              name="motivo_refugo_id"
+              value={motivoRefugoId}
+              onChange={(e) => setMotivoRefugoId(e.target.value)}
+              disabled={saving || isLocked || loadingMotivos}
+            >
+              <option value="">Selecione (opcional)</option>
+              {motivos.map((m) => (
+                <option key={m.id} value={m.id}>
+                  {m.nome}
+                </option>
+              ))}
+            </Select>
+            <Input
+              label="Detalhes do refugo (opcional)"
+              name="motivo_refugo"
+              value={motivoRefugo}
+              onChange={(e) => setMotivoRefugo(e.target.value)}
+              disabled={saving || isLocked}
+              placeholder="Ex.: dano na embalagem, risco, medida fora..."
+            />
+          </div>
+        )}
+
+        {action === 'concluir' && (
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <div className="sm:col-span-2">
+              <div className="flex items-end gap-2">
+                <div className="flex-1">
+                  <Input
+                    label="Lote do produto (opcional)"
+                    name="lote"
+                    value={lote}
+                    onChange={(e) => setLote(e.target.value)}
+                    disabled={saving || isLocked}
+                    placeholder="Ex.: LOTE-2026-001"
+                  />
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setScanOpen(true)}
+                  className="h-[44px] mt-6 px-3 border rounded-lg hover:bg-slate-50 disabled:opacity-50"
+                  disabled={saving || isLocked}
+                >
+                  Escanear
+                </button>
+              </div>
+            </div>
+
+            <DecimalInput
+              label="Custo unitário (opcional)"
+              value={custoUnitario}
+              onChange={setCustoUnitario}
+              disabled={saving || isLocked}
+              placeholder="0,00"
+            />
+            <div className="text-xs text-slate-500 leading-relaxed pt-6">
+              Usa-se para custeio e auditoria (não bloqueia a operação).
+            </div>
+          </div>
         )}
         <TextArea
           label="Observações"

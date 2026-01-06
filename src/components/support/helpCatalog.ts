@@ -106,13 +106,40 @@ export const HELP_CATALOG: HelpEntry[] = [
     whatIs: 'Expedição dá rastreabilidade: status, tracking e SLA por pedido.',
     steps: [
       'Abra uma expedição para um pedido.',
-      'Avance status (Separação → Envio) e registre tracking.',
+      'Na separação: confirme itens e avance o status (Separação → Embalagem → Envio).',
+      'Use “Escanear” para localizar pedido/tracking rápido (WMS light).',
+      'Registre tracking e transportadora (quando aplicável).',
       'Use filtros e “Atrasadas (SLA)” para pendências.',
     ],
     dependsOn: ['Pedidos criados', 'Transportadora (quando aplicável)', 'Permissão: Expedição (update)'],
     connectsWith: ['Pedidos', 'Clientes (endereço)', 'Relatórios de vendas'],
-    fillPerfectly: ['Tracking e transportadora corretos.', 'Status atualizado no momento certo.', 'Anexos/observações quando houver ocorrência.'],
+    fillPerfectly: [
+      'Tracking e transportadora corretos (evita suporte e “cadê meu pedido”).',
+      'Status atualizado no momento certo (SLA e pendências ficam confiáveis).',
+      'Observações quando houver ocorrência (extravio/dano).',
+    ],
     roadmapKey: 'vendas',
+  },
+  {
+    match: '/app/suprimentos/recebimento',
+    title: 'Conferência de recebimento: guia rápido',
+    whatIs:
+      'Conferência é o ponto de controle do estoque: ela garante que o que entrou (XML/nota) bate com o físico, e que custo/saldo ficam confiáveis.',
+    steps: [
+      'Vincule produtos do sistema para itens que vieram só do XML.',
+      'Use “Escanear código” (EAN/SKU/Cód. do item) para localizar o item e somar na conferência (WMS light).',
+      'Resolva divergências (quantidade diferente / item faltando).',
+      'Ajuste custos adicionais (frete/impostos) se necessário e finalize.',
+    ],
+    dependsOn: ['Recebimento criado (XML ou manual)', 'Produtos (para vincular)', 'Permissão: Suprimentos (update)'],
+    connectsWith: ['Estoque (saldo/kardex)', 'Compras (OC)', 'Financeiro (custos)'],
+    fillPerfectly: [
+      'Vincule o produto correto (SKU/unidade) antes de finalizar.',
+      'Conferência não deve “passar do XML” sem motivo (evita saldo errado).',
+      'Se houver frete/impostos, rateie antes de finalizar (custo médio confiável).',
+    ],
+    links: [{ label: 'Abrir Estoque', href: '/app/suprimentos/estoque', kind: 'internal' }],
+    roadmapKey: 'suprimentos',
   },
   {
     match: '/app/suprimentos/compras',

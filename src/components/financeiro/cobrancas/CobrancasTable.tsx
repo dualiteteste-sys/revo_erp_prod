@@ -37,14 +37,22 @@ export default function CobrancasTable({ cobrancas, onEdit, onDelete }: Props) {
         </thead>
         <tbody className="bg-white divide-y divide-gray-200">
           <AnimatePresence>
-            {cobrancas.map((cobranca) => (
+            {cobrancas.map((cobranca) => {
+              const venc = new Date(cobranca.data_vencimento);
+              const isValidDate = !Number.isNaN(venc.getTime());
+              const today = new Date();
+              today.setHours(0, 0, 0, 0);
+              const isFinal = ['liquidada', 'baixada', 'cancelada'].includes(String(cobranca.status));
+              const isOverdue = isValidDate && !isFinal && venc.getTime() < today.getTime();
+
+              return (
               <motion.tr
                 key={cobranca.id}
                 layout
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
-                className="hover:bg-gray-50 transition-colors"
+                className={`hover:bg-gray-50 transition-colors ${isOverdue ? 'bg-orange-50/40' : ''}`}
               >
                 <td className="px-6 py-4">
                   <div className="flex items-center gap-2">
@@ -57,7 +65,14 @@ export default function CobrancasTable({ cobrancas, onEdit, onDelete }: Props) {
                   {cobranca.cliente_nome || '-'}
                 </td>
                 <td className="px-6 py-4 text-sm text-gray-600">
-                  {new Date(cobranca.data_vencimento).toLocaleDateString('pt-BR')}
+                  <div className="flex items-center gap-2">
+                    <span>{isValidDate ? venc.toLocaleDateString('pt-BR') : String(cobranca.data_vencimento || '—')}</span>
+                    {isOverdue ? (
+                      <span className="inline-flex items-center rounded-full border border-orange-200 bg-orange-50 px-2 py-0.5 text-[11px] font-semibold text-orange-800">
+                        Atrasada
+                      </span>
+                    ) : null}
+                  </div>
                 </td>
                 <td className="px-6 py-4 text-sm text-right font-semibold text-gray-800">
                   {formatCurrency(cobranca.valor_atual * 100)}
@@ -78,7 +93,8 @@ export default function CobrancasTable({ cobrancas, onEdit, onDelete }: Props) {
                   </div>
                 </td>
               </motion.tr>
-            ))}
+              );
+            })}
           </AnimatePresence>
           {cobrancas.length === 0 && (
             <tr>

@@ -86,15 +86,23 @@ export async function apontarExecucao(
   qtdBoas?: number,
   qtdRefugadas?: number,
   motivoRefugo?: string,
-  observacoes?: string
+  observacoes?: string,
+  opts?: {
+    motivoRefugoId?: string | null;
+    lote?: string | null;
+    custoUnitario?: number | null;
+  }
 ): Promise<void> {
-  await callRpc('industria_operacao_apontar_execucao', {
+  await callRpc('industria_operacao_apontar_execucao_v2', {
     p_operacao_id: operacaoId,
     p_acao: acao,
     p_qtd_boas: qtdBoas || 0,
     p_qtd_refugadas: qtdRefugadas || 0,
     p_motivo_refugo: motivoRefugo || null,
     p_observacoes: observacoes || null,
+    p_motivo_refugo_id: opts?.motivoRefugoId || null,
+    p_lote: opts?.lote || null,
+    p_custo_unitario: opts?.custoUnitario ?? null,
   });
 }
 

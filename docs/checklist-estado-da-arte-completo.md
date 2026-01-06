@@ -176,7 +176,7 @@ Este é o checklist único (por módulo) para levar o REVO ao nível **top mundi
 - [x] SUP-STA-03 (P1) Devolução ao fornecedor (reversão) vinculada a OC/recebimento
 - [x] SUP-STA-04 (P1) Landed cost (rateio frete/impostos) com impacto em custo médio/relatórios
 - [x] SUP-STA-05 (P1) Sugestão de compra (mín/máx + lead time + OCs abertas) “MRP-lite”
-- [ ] SUP-STA-06 (P1) WMS light (leitura barcode/QR na conferência/separação) + checklists
+- [x] SUP-STA-06 (P1) WMS light (leitura barcode/QR na conferência/separação) + checklists
 
 **Validar (SUP-STA-01)**
 - Suprimentos → Estoque: selecionar um `Depósito` no filtro e confirmar que a lista muda.
@@ -195,16 +195,26 @@ Este é o checklist único (por módulo) para levar o REVO ao nível **top mundi
   - validar que o saldo diminuiu no depósito selecionado (ou depósito default).
   - abrir `Kardex` do produto e confirmar movimento `devolucao_fornecedor` com ref `DEVF-...`.
 
+**Validar (SUP-STA-06)**
+- Suprimentos → Recebimentos → abrir um recebimento e ir em `Conferência`.
+- Clicar em `Escanear código` e ler um `EAN/SKU` existente: deve localizar e destacar o item, e incrementar a conferência (sem passar de `quantidade_xml`).
+- Vendas → Expedição: clicar em `Escanear` e preencher o campo de busca/tracking via leitura.
+
 ### G3) Vendas / PDV / Expedição
 - [x] VEN-STA-01 (P0) Regras de preço/desconto com permissão + trilha (quem deu desconto)
 - [x] VEN-STA-02 (P0) PDV resiliente (offline-lite + fila local + idempotência server-side)
 - [x] VEN-STA-03 (P1) Expedição com eventos, rastreio, SLA e relatórios (atrasos/pendências)
-- [ ] VEN-STA-04 (P1) Multi-caixa (PDV) + perfis por caixa + fechamento
+- [x] VEN-STA-04 (P1) Multi-caixa (PDV) + perfis por caixa + fechamento
 
 **Validar (VEN-STA-02)**
 - Vendas → PDV: finalizar um pedido e confirmar toast “PDV finalizado…”, status `concluido`, e comprovante abre.
 - Simular falha (offline/timeout) ao finalizar: deve mostrar aviso de “pendente”, e aparecer banner “Sincronizar agora”.
 - Voltar online e clicar `Sincronizar agora`: deve concluir o pedido e remover o badge “pendente” (sem duplicar efeitos).
+
+**Validar (VEN-STA-04)**
+- Vendas → PDV: selecionar um `Caixa` (ou `Criar/selecionar caixa`) e clicar `Abrir caixa`.
+- Finalizar uma venda e confirmar que ela salva com o `Caixa` selecionado.
+- Clicar `Fechar caixa`: deve mostrar resumo (vendas/estornos) e bloquear finalização se estiver fechado.
 
 ### G4) Fiscal (NF-e)
 - [ ] NFE-STA-01 (P0) Catálogo de rejeições + “o que fazer” + reprocessos guiados
@@ -244,7 +254,7 @@ Este é o checklist único (por módulo) para levar o REVO ao nível **top mundi
 ### G6) Financeiro
 - [x] FIN-STA-01 (P0) Conciliação por extrato com matching sugerido + regras e auditoria
 - [x] FIN-STA-02 (P1) Centro de custo por lançamento + relatórios gerenciais (DRE simplificada)
-- [ ] FIN-STA-03 (P1) Cobranças: remessa/retorno bancário (quando aplicável) e automações de cobrança
+- [x] FIN-STA-03 (P1) Cobranças: remessa/retorno bancário (quando aplicável) e automações de cobrança
 
 **Validar (FIN-STA-02)**
 - Financeiro → Tesouraria → `Nova movimentação`:
@@ -255,15 +265,25 @@ Este é o checklist único (por módulo) para levar o REVO ao nível **top mundi
   - Filtrar por `Centro de Custo` e validar que os totais mudam.
   - Exportar CSV e confirmar bloco `DRE simplificada`.
 
+**Validar (FIN-STA-03)**
+- Financeiro → Cobranças: criar uma cobrança com vencimento `hoje-1` e outra com vencimento `hoje+3`.
+- Aguardar o worker (GitHub Actions `financeiro-cobrancas-worker-*`) ou rodar manualmente via `workflow_dispatch`.
+- Confirmar que cobranças atrasadas aparecem com badge `Atrasada` e que eventos não duplicam (idempotência).
+
 ### G7) Indústria
 - [x] IND-STA-01 (P0) Capacidade/PCP e MRP “operável” (alertas + ações aplicáveis)
-- [ ] IND-STA-02 (P1) Apontamentos com rastreio por lote/qualidade e custos (fase 2)
+- [x] IND-STA-02 (P1) Apontamentos com rastreio por lote/qualidade e custos (fase 2)
 - [ ] IND-STA-03 (P1) Dashboards industriais (OEE-lite, filas, WIP, atrasos) com drill-down
 
 **Validar (IND-STA-01)**
 - Indústria → PCP: ver alertas de capacidade/ATP/ruptura e clicar nas CTAs (Gantt/MRP/Estoque).
 - Indústria → PCP: rodar `APS: Sequenciar todos` (preview e aplicar) e/ou `Replan: sobrecarga` (preview + aplicar subset) sem quebrar estados.
 - Indústria → MRP: abrir uma demanda com `necessidade_liquida > 0`, clicar `Criar OC (rascunho)` e confirmar que abre a OC em Suprimentos → Compras.
+
+**Validar (IND-STA-02)**
+- Indústria → Execução: abrir uma operação e clicar `Concluir`.
+- Preencher `Lote` (ou `Escanear`) e `Custo unitário` (opcional), e salvar.
+- Conferir no `Kardex` do produto final (Suprimentos → Estoque) que houve uma entrada `entrada_producao` com o lote informado.
 
 ### G8) RH & Qualidade
 - [ ] RH-STA-01 (P1) Trilhas e compliance de treinamentos (vencimentos, alertas, evidência)
@@ -283,13 +303,17 @@ Este é o checklist único (por módulo) para levar o REVO ao nível **top mundi
 
 ### G11) Suporte (reduzir suporte humano)
 - [x] SUPP-STA-01 (P0) Ajuda contextual por página (o que é + 3 passos + links) sem abrir ticket
-- [ ] SUPP-STA-02 (P1) Coleta de diagnóstico (últimas falhas, correlation id) anexável ao suporte
+- [x] SUPP-STA-02 (P1) Coleta de diagnóstico (últimas falhas, correlation id) anexável ao suporte
 - [ ] SUPP-STA-03 (P1) Central de notificações (incidentes, mudanças fiscais, integrações) com histórico
 
 **Validar (SUPP-STA-01)**
 - Abrir páginas core (Clientes, Produtos, Estoque, PDV, Tesouraria): deve existir “Ajuda” colapsável com “O que é”, “3 passos” e links.
 - Clicar em `Diagnóstico guiado (Suporte)` deve abrir `/app/suporte`.
 - Perfis `ops/manage` devem ver também o link `Saúde (Ops)` para `/app/desenvolvedor/saude`.
+
+**Validar (SUPP-STA-02)**
+- Suporte → `Pacote de diagnóstico`: clicar `Copiar JSON` e validar que vem com `empresa_id`, `user_id` e `last_request_id`.
+- Clicar `Baixar` e anexar no ticket/WhatsApp sem conter PII/segredos.
 
 ### G12) Desenvolvedor (Operação interna)
 - [x] DEV-STA-01 (P0) Logs do usuário/empresa com filtros (ação, data, status) e drill-down por entidade
