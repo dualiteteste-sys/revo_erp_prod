@@ -10,6 +10,7 @@ interface PricingCardProps {
   onStartTrial: () => void;
   isLoading: boolean;
   index: number;
+  density?: 'regular' | 'compact';
   monthlyAmountCentsForYearly?: number;
 }
 
@@ -46,6 +47,7 @@ const PricingCard: React.FC<PricingCardProps> = ({
   onStartTrial,
   isLoading,
   index,
+  density = 'regular',
   monthlyAmountCentsForYearly,
 }) => {
   const details = planDetails[plan.slug] ?? {
@@ -61,6 +63,7 @@ const PricingCard: React.FC<PricingCardProps> = ({
     ? Math.round(((monthlyBase * 10) / 12) / 100) * 100
     : Math.round((plan.amount_cents / 12) / 100) * 100;
   const displayCents = isYearly ? yearlyPerMonthCents : plan.amount_cents;
+  const isCompact = density === 'compact';
 
   const cardVariants = {
     initial: { opacity: 0, y: 50 },
@@ -80,9 +83,11 @@ const PricingCard: React.FC<PricingCardProps> = ({
       variants={cardVariants}
       initial="initial"
       animate="animate"
-      className={`relative flex flex-col rounded-3xl p-8 shadow-lg ${
-        isPopular ? 'bg-gray-800 text-white border-2 border-blue-500' : 'bg-white'
-      }`}
+      className={`relative flex flex-col rounded-3xl shadow-lg ${
+        isPopular
+          ? 'bg-gray-800 text-white border-2 border-blue-500'
+          : 'bg-white'
+      } ${isCompact ? 'p-5' : 'p-8'}`}
     >
       {isPopular && (
         <div className="absolute top-0 -translate-y-1/2 left-1/2 -translate-x-1/2">
@@ -92,14 +97,14 @@ const PricingCard: React.FC<PricingCardProps> = ({
         </div>
       )}
       
-      <h3 className="text-xl font-semibold">{plan.name}</h3>
-      <p className={`mt-2 text-sm min-h-[40px] ${isPopular ? 'text-gray-300' : 'text-gray-500'}`}>
+      <h3 className={`${isCompact ? 'text-lg' : 'text-xl'} font-semibold`}>{plan.name}</h3>
+      <p className={`mt-2 text-sm ${isCompact ? 'min-h-[32px]' : 'min-h-[40px]'} ${isPopular ? 'text-gray-300' : 'text-gray-500'}`}>
         {details.description}
       </p>
       
       <div className="mt-4 flex items-baseline gap-1">
         <span className={`text-xl font-semibold ${isPopular ? 'text-gray-300' : 'text-gray-500'}`}>R$</span>
-        <span className={`font-extrabold text-4xl leading-none tracking-tight ${isPopular ? 'text-white' : 'text-gray-900'}`}>
+        <span className={`font-extrabold ${isCompact ? 'text-3xl' : 'text-4xl'} leading-none tracking-tight ${isPopular ? 'text-white' : 'text-gray-900'}`}>
           {new Intl.NumberFormat('pt-BR', { style: 'decimal', minimumFractionDigits: 2 }).format(displayCents / 100)}
         </span>
         <span className={`ml-1 text-base font-medium ${isPopular ? 'text-gray-400' : 'text-gray-500'}`}>
@@ -118,8 +123,8 @@ const PricingCard: React.FC<PricingCardProps> = ({
         </div>
       )}
 
-      <ul className="mt-8 space-y-3 flex-grow">
-        {details.features.map((feature, i) => (
+      <ul className={`${isCompact ? 'mt-6' : 'mt-8'} space-y-3 flex-grow`}>
+        {(isCompact ? details.features.slice(0, 3) : details.features).map((feature, i) => (
           <li key={i} className="flex items-start">
             <div className={`flex-shrink-0 w-6 h-6 rounded-full flex items-center justify-center mr-3 ${isPopular ? 'bg-blue-500/20' : 'bg-blue-100'}`}>
               <Check size={16} className="text-blue-500" />
@@ -129,7 +134,7 @@ const PricingCard: React.FC<PricingCardProps> = ({
         ))}
       </ul>
 
-      <div className="mt-8">
+      <div className={`${isCompact ? 'mt-6' : 'mt-8'}`}>
         <button
           onClick={onStartTrial}
           disabled={isLoading}
