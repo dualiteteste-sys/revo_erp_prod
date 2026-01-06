@@ -6,7 +6,13 @@ import Modal from '@/components/ui/Modal';
 import Input from '@/components/ui/forms/Input';
 import { Button } from '@/components/ui/button';
 import { useHasPermission } from '@/hooks/useHasPermission';
-import { deleteUnidade, listUnidades, setActiveUnidade, upsertUnidade, type Unidade } from '@/services/unidades';
+import {
+  deleteEmpresaUnidade,
+  listEmpresaUnidades,
+  setActiveEmpresaUnidade,
+  upsertEmpresaUnidade,
+  type EmpresaUnidade,
+} from '@/services/unidadesFiliais';
 
 type FormState = {
   id?: string;
@@ -27,7 +33,7 @@ export default function UnidadesPage() {
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [rows, setRows] = useState<Unidade[]>([]);
+  const [rows, setRows] = useState<EmpresaUnidade[]>([]);
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState<FormState>(emptyForm());
   const [activeUnitId, setActiveUnitId] = useState<string | null>(null);
@@ -36,7 +42,7 @@ export default function UnidadesPage() {
     if (!canView) return;
     setLoading(true);
     try {
-      const list = await listUnidades();
+      const list = await listEmpresaUnidades();
       setRows(Array.isArray(list) ? list : []);
     } catch (e: any) {
       addToast(e?.message || 'Falha ao carregar unidades.', 'error');
@@ -63,7 +69,7 @@ export default function UnidadesPage() {
     setOpen(true);
   };
 
-  const openEdit = (u: Unidade) => {
+  const openEdit = (u: EmpresaUnidade) => {
     setForm({
       id: u.id,
       nome: u.nome,
@@ -87,7 +93,7 @@ export default function UnidadesPage() {
 
     setSaving(true);
     try {
-      await upsertUnidade({
+      await upsertEmpresaUnidade({
         id: form.id,
         nome,
         codigo: form.codigo.trim() ? form.codigo.trim() : null,
@@ -111,7 +117,7 @@ export default function UnidadesPage() {
     }
     if (!confirm('Excluir esta unidade?')) return;
     try {
-      await deleteUnidade(id);
+      await deleteEmpresaUnidade(id);
       addToast('Unidade excluída.', 'success');
       await fetchAll();
     } catch (e: any) {
@@ -122,7 +128,7 @@ export default function UnidadesPage() {
   const handleSetActive = async (id: string) => {
     setActiveUnitId(id);
     try {
-      await setActiveUnidade(id);
+      await setActiveEmpresaUnidade(id);
       addToast('Unidade ativa atualizada.', 'success');
     } catch (e: any) {
       addToast(e?.message || 'Erro ao definir unidade ativa.', 'error');
@@ -280,4 +286,3 @@ export default function UnidadesPage() {
     </div>
   );
 }
-
