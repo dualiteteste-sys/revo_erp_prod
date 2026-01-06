@@ -1,5 +1,6 @@
 import Stripe from "stripe";
 import { createClient } from "@supabase/supabase-js";
+import { finopsTrackUsage } from "../_shared/finops.ts";
 
 const STRIPE_SECRET_KEY = Deno.env.get("STRIPE_SECRET_KEY")!;
 const STRIPE_WEBHOOK_SECRET = Deno.env.get("STRIPE_WEBHOOK_SECRET")!;
@@ -194,6 +195,9 @@ Deno.serve(async (req: Request): Promise<Response> => {
             }
             return new Response("empresa_id não encontrado", { status: 400 });
         }
+
+        // FINOPS (best-effort): 1 evento = 1 unidade de custo/volume no canal Stripe.
+        await finopsTrackUsage({ admin: supabaseAdmin as any, empresaId, source: "stripe", event: event.type, count: 1 });
 
         // Best-effort: preencher stripe_customer_id no cadastro da empresa (evita "missing_customer" no app).
         if (customerId) {

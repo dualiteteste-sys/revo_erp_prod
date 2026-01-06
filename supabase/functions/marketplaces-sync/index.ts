@@ -3,6 +3,7 @@ import { createClient } from "@supabase/supabase-js";
 import { buildCorsHeaders } from "../_shared/cors.ts";
 import { sanitizeForLog } from "../_shared/sanitize.ts";
 import { chooseNextPedidoStatus, mapMeliOrderStatus } from "../_shared/meli_mapping.ts";
+import { finopsTrackUsage } from "../_shared/finops.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY")!;
@@ -596,6 +597,11 @@ serve(async (req) => {
     });
 
     await circuitBreakerRecord({ admin, empresaId, domain: "ecommerce", provider, ok: true });
+
+    // FINOPS (best-effort): volume importado e runs do job.
+    await finopsTrackUsage({ admin, empresaId, source: "ecommerce", event: "meli.import_orders", count: imported });
+    await finopsTrackUsage({ admin, empresaId, source: "ecommerce", event: "meli.job_run", count: 1 });
+
     return json(200, { ok: true, provider: "meli", imported, total_items: totalItems, skipped_items: skippedItemsTotal, from: windowFrom, to: windowTo }, cors);
   } catch (e: any) {
     const msg = e?.message || "MELI_IMPORT_FAILED";
@@ -603,6 +609,8 @@ serve(async (req) => {
     if (runId) await admin.from("ecommerce_job_runs").update({ ok: false, finished_at: new Date().toISOString(), error: msg }).eq("id", runId);
     await admin.from("ecommerces").update({ status: "error", last_error: msg }).eq("id", ecommerceId);
     await circuitBreakerRecord({ admin, empresaId, domain: "ecommerce", provider, ok: false, error: msg });
+
+    await finopsTrackUsage({ admin, empresaId, source: "ecommerce", event: "meli.import_failed", count: 1 });
     return json(502, { ok: false, provider: "meli", error: msg }, cors);
   }
 });

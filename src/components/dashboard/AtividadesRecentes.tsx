@@ -13,9 +13,9 @@ const activities = [
 
 const AtividadesRecentes: React.FC = () => {
   return (
-    <GlassCard className="p-6 flex flex-col h-96">
+      <GlassCard className="p-6 flex flex-col h-96">
       <h3 className="text-lg font-semibold text-gray-800 mb-4">Atividades Recentes</h3>
-      <div className="flex-1 overflow-y-auto -mr-3 pr-3 scrollbar-styled">
+      <div className="flex-1 overflow-y-auto -mr-3 pr-3 scrollbar-styled" tabIndex={0} aria-label="Lista de atividades recentes">
         <div className="space-y-3">
           {activities.map((activity, index) => (
             <motion.div
