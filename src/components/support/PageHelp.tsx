@@ -179,7 +179,7 @@ export default function PageHelp(props: PageHelpProps) {
                 <div className="rounded-2xl border border-gray-100 bg-gray-50 p-3">
                   <div className="flex items-center gap-2 text-sm font-semibold text-gray-900">
                     <AlertTriangle size={16} className="text-amber-700" />
-                    Erros comuns (para evitar suporte)
+                    Erros comuns
                   </div>
                   <ul className="mt-2 space-y-2 text-sm text-gray-700">
                     {commonMistakes.map((t, i) => (

@@ -20,6 +20,7 @@ export type HelpEntry = {
 };
 
 export const HELP_CATALOG: HelpEntry[] = [
+  // Cadastros (core)
   {
     match: '/app/partners',
     title: 'Guia Rápido de Clientes e Fornecedores',
@@ -51,6 +52,136 @@ export const HELP_CATALOG: HelpEntry[] = [
     roadmapKey: 'cadastros',
   },
   {
+    match: '/app/cadastros/grupos-produtos',
+    title: 'Guia Rápido de Grupos de Produtos',
+    whatIs:
+      'Grupos organizam catálogo e relatórios (vendas, estoque e indústria). Um bom grupo facilita busca, filtros e visão de margem/ABC sem planilha.',
+    steps: [
+      'Crie um grupo com nome claro (ex.: “Elétricos”, “Revestimentos”, “Peças – Assistência”).',
+      'Use o grupo nos Produtos e valide filtros nas listas/relatórios.',
+      'Se o grupo não for usado: arquive/desative (quando disponível) para não poluir o catálogo.',
+    ],
+    dependsOn: ['Permissão: Cadastros (create/update)'],
+    connectsWith: ['Produtos', 'Relatórios (Suprimentos/Vendas)', 'Indústria (quando aplicável)'],
+    fillPerfectly: [
+      'Nomes “autoexplicativos” (evita grupo duplicado).',
+      'Poucos níveis e sem exagero (ex.: não criar 50 grupos com diferença mínima).',
+      'Padronize o prefixo quando necessário (ex.: “Peças – …”).',
+    ],
+    commonMistakes: ['Criar grupos com nomes parecidos e perder padrão.', 'Deixar grupo vazio e confundir usuários.'],
+    links: [{ label: 'Abrir Produtos', href: '/app/products', kind: 'internal' }],
+    roadmapKey: 'cadastros',
+  },
+  {
+    match: '/app/cadastros/unidades-medida',
+    title: 'Guia Rápido de Unidades de Medida',
+    whatIs:
+      'Unidades de medida definem como você compra, armazena e vende (UN, CX, KG, M). Se a unidade estiver errada, estoque e financeiro “quebram” lá na frente.',
+    steps: [
+      'Cadastre as unidades que realmente usa (UN, CX, KG…).',
+      'Revise se os Produtos usam a unidade correta.',
+      'Valide no fluxo: crie um pedido e uma compra com o mesmo produto e confira quantidades.',
+    ],
+    dependsOn: ['Permissão: Cadastros (manage)'],
+    connectsWith: ['Produtos', 'Compras/Recebimentos', 'Estoque', 'Indústria (BOM)'],
+    fillPerfectly: ['Sigla curta e padrão (UN/CX/KG).', 'Descrição clara.', 'Evite duplicar a mesma unidade com sigla diferente.'],
+    commonMistakes: ['Criar “UN” e “Unidade” duplicadas.', 'Trocar unidade de produto já em uso e gerar divergência.'],
+    links: [{ label: 'Abrir Produtos', href: '/app/products', kind: 'internal' }],
+    roadmapKey: 'cadastros',
+  },
+  {
+    match: '/app/cadastros/embalagens',
+    title: 'Guia Rápido de Embalagens',
+    whatIs:
+      'Embalagens ajudam expedição e logística: define como o item sai (caixa, envelope, pallet) e melhora custo/prazo e padrão de envio.',
+    steps: [
+      'Cadastre as embalagens que você realmente usa (com descrição).',
+      'Use a embalagem no pedido/expedição (quando aplicável).',
+      'Valide no fluxo: separar/embalar um pedido e conferir se fica registrado.',
+    ],
+    dependsOn: ['Permissão: Cadastros (create/update)'],
+    connectsWith: ['Expedição', 'Vendas', 'Produtos'],
+    fillPerfectly: ['Descrição clara (ex.: “Caixa 30x20x10”).', 'Evite duplicidade.', 'Use padrão de nomes para achar rápido.'],
+    commonMistakes: ['Cadastrar embalagens “genéricas” demais e não ajudar na operação.', 'Duplicar embalagens com nomes diferentes.'],
+    roadmapKey: 'cadastros',
+  },
+  {
+    match: '/app/cadastros/vendedores',
+    title: 'Guia Rápido de Vendedores',
+    whatIs:
+      'Vendedores permitem atribuir vendas, calcular comissões e acompanhar desempenho. O objetivo é: rastrear quem vendeu e reduzir disputa/comissão manual.',
+    steps: [
+      'Cadastre vendedores ativos com nome e (se aplicável) percentual de comissão padrão.',
+      'Valide no fluxo: crie um pedido e selecione um vendedor.',
+      'Abra Vendas → Comissões e confira se o vendedor aparece.',
+    ],
+    dependsOn: ['Permissão: Cadastros (create/update)'],
+    connectsWith: ['Pedidos/PDV', 'Comissões', 'Metas de vendas', 'Relatórios'],
+    fillPerfectly: ['Nome consistente (evita duplicidade).', 'Comissão padrão quando existir (reduz ajustes).', 'Desativar quando sair da empresa.'],
+    commonMistakes: ['Criar vendedor duplicado.', 'Comissão padrão errada e precisar corrigir no mês.'],
+    links: [{ label: 'Abrir Comissões', href: '/app/vendas/comissoes', kind: 'internal' }],
+    roadmapKey: 'cadastros',
+  },
+  {
+    match: '/app/carriers',
+    title: 'Guia Rápido de Transportadoras',
+    whatIs:
+      'Transportadoras conectam expedição ao mundo real: rastreio, prazo e padrão de envio. Ajuda a reduzir suporte de entrega e manter histórico.',
+    steps: [
+      'Cadastre as transportadoras usadas (nome/documento/contatos).',
+      'Valide em Expedição: selecione transportadora e informe tracking.',
+      'Use filtros e histórico para ver atrasos e ocorrências.',
+    ],
+    dependsOn: ['Permissão: Cadastros (create/update)'],
+    connectsWith: ['Expedição', 'Pedidos', 'Relatórios de vendas'],
+    fillPerfectly: ['Contato comercial e operacional.', 'Documento correto.', 'Nome padronizado (sem duplicar).'],
+    commonMistakes: ['Cadastrar como “Transportadora X” e “Transp. X” duplicadas.', 'Não registrar tracking e virar suporte.'],
+    links: [{ label: 'Abrir Expedição', href: '/app/vendas/expedicao', kind: 'internal' }],
+    roadmapKey: 'cadastros',
+  },
+  {
+    match: '/app/services',
+    title: 'Guia Rápido de Serviços (Cadastro)',
+    whatIs:
+      'Serviços são itens de OS/contratos/notas. Um cadastro bem feito deixa orçamento e faturamento consistentes e reduz ajuste manual.',
+    steps: [
+      'Cadastre um serviço com descrição clara e preço base.',
+      'Valide em uma OS: adicione o serviço e confira total.',
+      'Se houver impostos/regras básicas, preencha o mínimo necessário (quando aplicável).',
+    ],
+    dependsOn: ['Permissão: Cadastros (create/update)'],
+    connectsWith: ['OS', 'Contratos', 'Notas de serviço', 'Financeiro'],
+    fillPerfectly: ['Nome objetivo (ex.: “Troca de tela”, “Revisão preventiva”).', 'Preço base realista.', 'Categoria/grupo quando existir.'],
+    commonMistakes: ['Criar serviço duplicado com nomes diferentes.', 'Preço base “zero” e virar ajuste sempre.'],
+    links: [{ label: 'Abrir OS', href: '/app/ordens-de-servico', kind: 'internal' }],
+    roadmapKey: 'cadastros',
+  },
+
+  // Ferramentas rápidas
+  {
+    match: '/app/cep-search',
+    title: 'Guia Rápido de Busca por CEP',
+    whatIs: 'Ferramenta para preencher endereço rápido e reduzir erro manual em cadastros e expedição.',
+    steps: ['Digite o CEP.', 'Copie/aplique o endereço no cadastro.', 'Revise número/complemento.'],
+    dependsOn: ['Conexão com internet'],
+    connectsWith: ['Cadastros (clientes/fornecedores)', 'Expedição'],
+    fillPerfectly: ['Sempre revisar número/complemento.', 'Se o CEP não existir, preencher manualmente com cuidado.'],
+    commonMistakes: ['Colar CEP com caracteres.', 'Não conferir bairro/cidade e gerar entrega errada.'],
+    roadmapKey: 'cadastros',
+  },
+  {
+    match: '/app/cnpj-search',
+    title: 'Guia Rápido de Busca por CNPJ',
+    whatIs: 'Ferramenta para preencher dados de empresa rápido e reduzir erro de digitação em razão social/endereço.',
+    steps: ['Digite o CNPJ.', 'Confirme os dados retornados.', 'Revise contato e salve no cadastro.'],
+    dependsOn: ['Conexão com internet'],
+    connectsWith: ['Cadastros (clientes/fornecedores)', 'Fiscal (emitente/destinatário quando aplicável)'],
+    fillPerfectly: ['Validar se o CNPJ é do cadastro correto.', 'Revisar e-mail/telefone manualmente.'],
+    commonMistakes: ['Buscar o CNPJ errado e copiar dados para o cliente errado.'],
+    roadmapKey: 'cadastros',
+  },
+
+  {
     match: '/app/products',
     title: 'Guia Rápido de Produtos',
     whatIs:
@@ -79,6 +210,139 @@ export const HELP_CATALOG: HelpEntry[] = [
     ],
     links: [{ label: 'Suprimentos → Relatórios', href: '/app/suprimentos/relatorios', kind: 'internal' }],
     roadmapKey: 'cadastros',
+  },
+
+  // Vendas (demais módulos)
+  {
+    match: '/app/sales-dashboard',
+    title: 'Guia Rápido do Painel de Vendas',
+    whatIs:
+      'O painel de vendas mostra KPIs e tendências (volume, conversão, ticket, metas). O objetivo é: tomar decisão sem exportar planilha.',
+    steps: [
+      'Selecione período e filtros (canal/vendedor).',
+      'Clique nos KPIs para abrir a lista/relatório correspondente.',
+      'Use metas para acompanhar performance e agir cedo.',
+    ],
+    dependsOn: ['Pedidos/PDV registrados', 'Permissão: Vendas (view)'],
+    connectsWith: ['Pedidos', 'PDV', 'Metas', 'Relatórios'],
+    fillPerfectly: ['Manter canal/vendedor preenchidos nos pedidos.', 'Usar período consistente (mês/semana).'],
+    commonMistakes: ['Esperar KPI sem dados (sem registrar canal/vendedor).'],
+    links: [{ label: 'Abrir Relatórios de Vendas', href: '/app/vendas/relatorios', kind: 'internal' }],
+    roadmapKey: 'vendas',
+  },
+  {
+    match: '/app/vendas/crm',
+    title: 'Guia Rápido de CRM',
+    whatIs:
+      'CRM organiza oportunidades (funil) antes da venda. O objetivo é: previsibilidade e follow-up sem “post-it”.',
+    steps: [
+      'Crie uma oportunidade com cliente e valor estimado.',
+      'Avance etapas do funil (com motivo ao perder).',
+      'Ao ganhar: gere proposta/pedido (quando disponível) para não duplicar trabalho.',
+    ],
+    dependsOn: ['Clientes', 'Permissão: CRM/Vendas (create/update)'],
+    connectsWith: ['Propostas', 'Pedidos', 'Metas (quando aplicável)'],
+    fillPerfectly: ['Próximo passo e data de follow-up.', 'Valor estimado realista.', 'Motivo de perda padronizado (melhora aprendizado).'],
+    commonMistakes: ['Criar oportunidade sem follow-up e “morrer” no funil.', 'Não marcar perdido e inflar pipeline.'],
+    roadmapKey: 'vendas',
+  },
+  {
+    match: '/app/vendas/metas',
+    title: 'Guia Rápido de Metas de Vendas',
+    whatIs:
+      'Metas dão direção: você define objetivo por período e acompanha realização. O objetivo é alinhar time e agir antes de “fechar o mês”.',
+    steps: [
+      'Defina meta por período (mês/semana) e, se aplicável, por vendedor.',
+      'Acompanhe no painel e ajuste estratégia (campanha, mix, comissão).',
+      'Use histórico para ver evolução.',
+    ],
+    dependsOn: ['Vendedores (quando por vendedor)', 'Permissão: Vendas (manage)'],
+    connectsWith: ['Painel de vendas', 'Comissões', 'Relatórios'],
+    fillPerfectly: ['Meta realista e por período fixo.', 'Vendedor correto.', 'Revisar metas em ciclos curtos no início.'],
+    commonMistakes: ['Criar metas sem vendedor/canal e depois não conseguir analisar.'],
+    roadmapKey: 'vendas',
+  },
+  {
+    match: '/app/vendas/propostas',
+    title: 'Guia Rápido de Propostas Comerciais',
+    whatIs:
+      'Propostas estruturam a negociação antes do pedido. O objetivo é: padronizar preço, evitar erro e acelerar fechamento.',
+    steps: [
+      'Crie uma proposta com cliente e itens.',
+      'Revise preços/descontos e valide margens (quando disponível).',
+      'Envie e acompanhe status (enviado/aceito/recusado).',
+      'Ao aceitar: gere pedido para não re-digitar.',
+    ],
+    dependsOn: ['Clientes', 'Produtos/Serviços', 'Permissão: Vendas (create/update)'],
+    connectsWith: ['CRM', 'Pedidos', 'Relatórios de vendas'],
+    fillPerfectly: ['Prazo e condições claros.', 'Itens com unidade/quantidade corretos.', 'Registrar motivo de recusa quando houver.'],
+    commonMistakes: ['Refazer proposta “do zero” em vez de duplicar.', 'Desconto fora de permissão e travar no envio.'],
+    roadmapKey: 'vendas',
+  },
+  {
+    match: '/app/vendas/comissoes',
+    title: 'Guia Rápido de Comissões',
+    whatIs:
+      'Comissões calculam e auditam remuneração variável. O objetivo é: transparência e evitar discussão no fechamento.',
+    steps: [
+      'Garanta vendedor no pedido/PDV e comissão padrão (se usar).',
+      'Abra comissões por período e revise pendências.',
+      'Feche/aprove quando estiver correto (conforme o processo interno).',
+    ],
+    dependsOn: ['Vendedores', 'Pedidos/PDV com vendedor', 'Permissão: Vendas/Financeiro (view)'],
+    connectsWith: ['Pedidos/PDV', 'Metas', 'Relatórios'],
+    fillPerfectly: ['Vendedor sempre preenchido.', 'Política de comissão documentada.', 'Ajustes sempre com motivo.'],
+    commonMistakes: ['Pedido sem vendedor “não entra” na comissão.', 'Comissão padrão errada e retrabalho no mês.'],
+    roadmapKey: 'vendas',
+  },
+  {
+    match: '/app/vendas/automacoes',
+    title: 'Guia Rápido do Painel de Automação (Vendas)',
+    whatIs:
+      'Automação executa rotinas (ex.: lembretes, reprocessos, ações recorrentes) para reduzir trabalho manual. O objetivo é: consistência e menos esquecimento.',
+    steps: [
+      'Crie uma automação com objetivo claro e gatilho simples.',
+      'Use “Validar” antes de ativar.',
+      'Teste em pequena escala e monitore logs/saúde.',
+    ],
+    dependsOn: ['Permissão: Ops/Automação (manage)'],
+    connectsWith: ['Vendas', 'Suporte (logs)', 'Desenvolvedor (Saúde)'],
+    fillPerfectly: ['Um gatilho por automação (evita efeito cascata).', 'Logs ativados e monitoramento.'],
+    commonMistakes: ['Criar automação genérica demais e disparar em massa.', 'Ativar sem validar e gerar ruído.'],
+    roadmapKey: 'vendas',
+  },
+  {
+    match: '/app/vendas/devolucoes',
+    title: 'Guia Rápido de Devolução de Vendas',
+    whatIs:
+      'Devolução desfaz venda de forma rastreável: ajusta estoque/financeiro e mantém histórico. O objetivo é: correção sem “gambiarra”.',
+    steps: [
+      'Selecione o pedido/itens para devolver.',
+      'Defina motivo e quantidades.',
+      'Aplique e confira reflexo (estoque + financeiro, quando aplicável).',
+      'Use histórico para auditoria.',
+    ],
+    dependsOn: ['Pedidos/PDV concluídos', 'Permissão: Vendas (manage)', 'Estoque (se baixa habilitada)'],
+    connectsWith: ['Estoque', 'Financeiro', 'Relatórios de vendas'],
+    fillPerfectly: ['Motivo sempre preenchido.', 'Quantidades corretas.', 'Estorno financeiro alinhado ao processo.'],
+    commonMistakes: ['Ajustar estoque manualmente em vez de devolver.', 'Devolver sem motivo (vira suporte).'],
+    roadmapKey: 'vendas',
+  },
+  {
+    match: '/app/vendas/relatorios',
+    title: 'Guia Rápido de Relatórios de Vendas',
+    whatIs:
+      'Relatórios de vendas ajudam a enxergar faturamento, mix, canais e desempenho. O objetivo é: fechar o período com confiança e agir no que importa.',
+    steps: [
+      'Use filtros de período e canal (PDV/online).',
+      'Confira devoluções para entender faturamento líquido.',
+      'Se houver vendedor: filtre por vendedor e compare com metas.',
+    ],
+    dependsOn: ['Pedidos/PDV registrados', 'Permissão: Vendas (view)'],
+    connectsWith: ['Pedidos/PDV', 'Metas', 'Comissões', 'Expedição'],
+    fillPerfectly: ['Canal/vendedor preenchidos nos pedidos.', 'Devoluções registradas corretamente.'],
+    commonMistakes: ['Relatório “não bate” porque devoluções não foram registradas.', 'Misturar períodos sem padronizar.'],
+    roadmapKey: 'vendas',
   },
   {
     match: '/app/vendas/pedidos',
@@ -185,6 +449,23 @@ export const HELP_CATALOG: HelpEntry[] = [
       'Ajustar no estoque manualmente em vez de fechar o recebimento.',
     ],
     links: [{ label: 'Abrir Compras', href: '/app/suprimentos/compras', kind: 'internal' }],
+    roadmapKey: 'suprimentos',
+  },
+  {
+    match: '/app/suprimentos/recebimento-manual',
+    title: 'Guia Rápido de Recebimento Manual',
+    whatIs:
+      'Recebimento manual serve para entradas sem XML. O objetivo é registrar a entrada com rastreabilidade e refletir corretamente no estoque.',
+    steps: [
+      'Crie o recebimento manual com fornecedor e data.',
+      'Adicione itens e quantidades com unidade correta.',
+      'Faça a conferência e finalize para refletir no estoque.',
+    ],
+    dependsOn: ['Fornecedores', 'Produtos', 'Permissão: Suprimentos (update)'],
+    connectsWith: ['Estoque', 'Compras (quando houver OC)', 'Financeiro (custos)'],
+    fillPerfectly: ['Descrição clara e referência (nota/pedido) quando existir.', 'Unidade correta.', 'Finalizar só depois de revisar.'],
+    commonMistakes: ['Criar manual sem fornecedor e perder histórico.', 'Unidade errada e divergência de saldo.'],
+    links: [{ label: 'Abrir Estoque', href: '/app/suprimentos/estoque', kind: 'internal' }],
     roadmapKey: 'suprimentos',
   },
   {
@@ -498,6 +779,379 @@ export const HELP_CATALOG: HelpEntry[] = [
     connectsWith: ['OS', 'Contratos', 'Financeiro', 'Dashboard'],
     fillPerfectly: ['Manter status e datas corretas nas OS.', 'Registrar aprovações e eventos importantes.'],
     commonMistakes: ['Relatório “não bate” porque status/datas não foram atualizados no fluxo.'],
+    roadmapKey: 'servicos',
+  },
+
+  // Central de relatórios (hub)
+  {
+    match: '/app/relatorios',
+    title: 'Guia Rápido da Central de Relatórios',
+    whatIs:
+      'Centraliza relatórios por área (vendas, suprimentos, financeiro, serviços, indústria). O objetivo é: encontrar rápido e reduzir “onde vejo isso?”.',
+    steps: ['Escolha a área (Vendas/Suprimentos/Financeiro…).', 'Aplique filtros de período.', 'Use os CTAs para ir ao módulo de origem quando precisar detalhar.'],
+    dependsOn: ['Permissão de leitura dos módulos'],
+    connectsWith: ['Vendas', 'Suprimentos', 'Financeiro', 'Serviços', 'Indústria'],
+    fillPerfectly: ['Manter datas/status corretos no fluxo (relatório depende do dado).'],
+    commonMistakes: ['Esperar relatório “mágico” sem registrar o fluxo no módulo de origem.'],
+  },
+
+  // Fiscal (NF-e) — mesmo deixando NF por último, o guia precisa ser específico
+  {
+    match: '/app/fiscal/nfe/configuracoes',
+    title: 'Guia Rápido de Configurações de NF-e',
+    whatIs:
+      'Configurações de NF-e definem emitente, série/numeração e ambiente. O objetivo é evitar rejeição e suporte na hora de emitir.',
+    steps: [
+      'Preencha emitente (dados da empresa) e confirme ambiente (homologação/produção).',
+      'Defina série e numeração (ponto crítico para não duplicar).',
+      'Valide um rascunho antes de emitir (quando a emissão estiver ativa).',
+    ],
+    dependsOn: ['Dados da empresa', 'Permissão: Fiscal (manage)', 'Plano com NF-e (quando habilitado)'],
+    connectsWith: ['Pedidos/PDV', 'Produtos (tributação)', 'Clientes (dados fiscais)', 'Emissões NF-e'],
+    fillPerfectly: ['Série/numeração sem conflito.', 'CNPJ/IE corretos.', 'Ambiente correto (produção ≠ homologação).'],
+    commonMistakes: ['Numeração duplicada.', 'Ambiente errado e “não emite”.', 'Emitente incompleto e rejeição.'],
+    roadmapKey: 'fiscal',
+  },
+  {
+    match: '/app/fiscal/nfe',
+    title: 'Guia Rápido de Emissões de NF-e',
+    whatIs:
+      'Aqui você acompanha emissões e status (rascunho, autorizada, rejeitada). O objetivo é ter trilha e resolver rejeição sem “adivinhar”.',
+    steps: [
+      'Crie/abra um rascunho e revise dados principais.',
+      'Emita e acompanhe o status.',
+      'Se rejeitar: corrija o campo indicado e reemita (sem duplicar).',
+      'Quando disponível: baixe/consulte XML/DANFE.',
+    ],
+    dependsOn: ['Configurações de NF-e', 'Clientes/Produtos com dados fiscais (quando aplicável)'],
+    connectsWith: ['Pedidos/PDV', 'Configurações de NF-e', 'Logs/Timeline'],
+    fillPerfectly: ['Destinatário e itens coerentes.', 'Tributos básicos preenchidos quando necessário.', 'Não editar após autorizada sem fluxo correto.'],
+    commonMistakes: ['Tentar emitir sem configurar emitente/série.', 'Ignorar rejeição e “tentar de novo” sem corrigir.'],
+    roadmapKey: 'fiscal',
+  },
+
+  // Financeiro (centros de custo e cobranças)
+  {
+    match: '/app/financeiro/centros-de-custo',
+    title: 'Guia Rápido de Centros de Custo',
+    whatIs:
+      'Centros de custo organizam despesas/receitas por área (ex.: Comercial, Oficina, Produção). O objetivo é enxergar DRE simplificada e reduzir discussão no fechamento.',
+    steps: [
+      'Crie centros (com nomes claros) e defina padrões quando necessário.',
+      'No lançamento (pagar/receber/tesouraria), preencha centro de custo.',
+      'Abra relatórios por centro e valide se as somas batem.',
+    ],
+    dependsOn: ['Permissão: Financeiro (manage)', 'Lançamentos no financeiro'],
+    connectsWith: ['Tesouraria', 'Contas a pagar/receber', 'Relatórios financeiros'],
+    fillPerfectly: ['Poucos centros (evita confusão).', 'Nome padronizado.', 'Preencher sempre que estiver ativo.'],
+    commonMistakes: ['Criar centros demais e ninguém usa.', 'Não preencher e depois “relatório não funciona”.'],
+    roadmapKey: 'financeiro',
+  },
+  {
+    match: '/app/financeiro/cobrancas',
+    title: 'Guia Rápido de Cobrança Bancária',
+    whatIs:
+      'Cobrança bancária automatiza recebimentos (quando aplicável): remessa/retorno, conciliação e histórico. O objetivo é reduzir trabalho manual e inadimplência.',
+    steps: ['Configure conta e parâmetros (quando aplicável).', 'Gere cobranças e acompanhe status.', 'Importe retorno/conciliação e confirme baixas.'],
+    dependsOn: ['Tesouraria (conta corrente)', 'Permissão: Financeiro (manage)', 'Integração/conta habilitada (quando aplicável)'],
+    connectsWith: ['Contas a receber', 'Extrato/Conciliação', 'Relatórios'],
+    fillPerfectly: ['Dados bancários corretos.', 'Vencimentos e valores coerentes.', 'Conciliação frequente.'],
+    commonMistakes: ['Configurar conta errada.', 'Gerar cobrança sem validar cliente/contato.'],
+    roadmapKey: 'financeiro',
+  },
+
+  // RH & Qualidade (guias específicos)
+  {
+    match: '/app/rh/dashboard',
+    title: 'Guia Rápido do Dashboard de RH',
+    whatIs:
+      'O dashboard de RH mostra indicadores (treinamentos, cargos, compliance). O objetivo é enxergar risco operacional e agir antes de virar incidente.',
+    steps: ['Selecione período/filtros.', 'Clique nos cards para abrir listas.', 'Use alertas de vencimento para priorizar treinamentos.'],
+    dependsOn: ['Colaboradores, cargos e treinamentos cadastrados'],
+    connectsWith: ['Colaboradores', 'Cargos', 'Treinamentos', 'Matriz de competências'],
+    fillPerfectly: ['Manter status e datas de validade corretos.', 'Registrar conclusões com evidência quando aplicável.'],
+    commonMistakes: ['Esperar KPI sem preencher cadastros base.', 'Não atualizar status de treinamento e “parecer errado”.'],
+    roadmapKey: 'servicos',
+  },
+  {
+    match: '/app/rh/colaboradores',
+    title: 'Guia Rápido de Colaboradores',
+    whatIs:
+      'Colaboradores são a base do RH: vínculo com cargos, treinamentos e competências. O objetivo é operar com compliance e menos risco.',
+    steps: ['Cadastre colaborador com dados mínimos.', 'Vincule cargo e (quando necessário) unidade.', 'Atribua treinamentos obrigatórios e acompanhe vencimentos.'],
+    dependsOn: ['Cargos cadastrados', 'Permissão: RH (create/update)'],
+    connectsWith: ['Cargos', 'Treinamentos', 'Competências', 'Matriz'],
+    fillPerfectly: ['Nome/documento corretos.', 'Cargo coerente.', 'Datas de admissão/validade corretas.'],
+    commonMistakes: ['Cadastrar colaborador sem cargo.', 'Não atualizar status e perder rastreio.'],
+    roadmapKey: 'servicos',
+  },
+  {
+    match: '/app/rh/cargos',
+    title: 'Guia Rápido de Cargos e Funções',
+    whatIs:
+      'Cargos definem responsabilidades e servem de base para treinamentos e competências. O objetivo é padronizar exigências e reduzir “cada um faz de um jeito”.',
+    steps: ['Crie cargos com nome claro.', 'Defina treinamentos obrigatórios por cargo.', 'Use a matriz para ver gaps e gerar plano de ação.'],
+    dependsOn: ['Permissão: RH (manage)'],
+    connectsWith: ['Treinamentos', 'Competências', 'Matriz de competências', 'Colaboradores'],
+    fillPerfectly: ['Poucos cargos bem definidos.', 'Treinamentos obrigatórios realistas.', 'Manter histórico de mudanças.'],
+    commonMistakes: ['Criar cargos duplicados.', 'Exigir treinamento demais e ninguém cumpre.'],
+    roadmapKey: 'servicos',
+  },
+  {
+    match: '/app/rh/competencias',
+    title: 'Guia Rápido de Competências',
+    whatIs:
+      'Competências são critérios de habilidade/conhecimento usados na matriz. O objetivo é enxergar gaps e evoluir time com plano claro.',
+    steps: ['Cadastre competências com descrição objetiva.', 'Defina níveis (quando aplicável).', 'Use na matriz para avaliar e criar plano.'],
+    dependsOn: ['Permissão: RH (manage)'],
+    connectsWith: ['Matriz de competências', 'Treinamentos', 'Cargos'],
+    fillPerfectly: ['Descrições específicas (evita subjetividade).', 'Níveis consistentes.', 'Não criar competências redundantes.'],
+    commonMistakes: ['Competência genérica demais (não mede nada).', 'Criar duplicadas com nomes diferentes.'],
+    roadmapKey: 'servicos',
+  },
+  {
+    match: '/app/rh/matriz',
+    title: 'Guia Rápido de Matriz de Competências',
+    whatIs:
+      'A matriz mostra o “gap” entre o necessário e o atual. O objetivo é transformar avaliação em ação (plano) e reduzir risco operacional.',
+    steps: ['Escolha colaborador/cargo.', 'Avalie níveis.', 'Para gaps críticos, crie plano de ação com responsável e prazo.', 'Acompanhe evolução no tempo.'],
+    dependsOn: ['Colaboradores', 'Competências', 'Cargos'],
+    connectsWith: ['Treinamentos', 'Dashboard RH'],
+    fillPerfectly: ['Planos com responsável e prazo.', 'Atualização periódica (mensal).'],
+    commonMistakes: ['Avaliar e nunca criar plano.', 'Não revisar e virar “foto velha”.'],
+    roadmapKey: 'servicos',
+  },
+  {
+    match: '/app/rh/treinamentos',
+    title: 'Guia Rápido de Treinamentos',
+    whatIs:
+      'Treinamentos garantem compliance e segurança. O objetivo é saber o que está vencido/pendente e registrar evidências.',
+    steps: ['Cadastre treinamentos com validade (quando aplicável).', 'Atribua a cargos/colaboradores.', 'Registre conclusão e acompanhe vencimentos.'],
+    dependsOn: ['Cargos/colaboradores', 'Permissão: RH (manage)'],
+    connectsWith: ['Dashboard RH', 'Cargos', 'Colaboradores'],
+    fillPerfectly: ['Validade correta.', 'Evidência anexada quando necessário.', 'Regras claras por cargo.'],
+    commonMistakes: ['Não registrar conclusão e parecer “pendente”.', 'Validade errada e falsos alertas.'],
+    roadmapKey: 'servicos',
+  },
+
+  // Indústria — guias específicos por página (para não ficar tudo igual)
+  {
+    match: '/app/industria/centros-trabalho',
+    title: 'Guia Rápido de Centros de Trabalho',
+    whatIs:
+      'Centros de trabalho representam recursos (máquinas/linhas) usados no roteiro. O objetivo é planejar capacidade e organizar execução.',
+    steps: ['Cadastre centros de trabalho com descrição clara.', 'Defina parâmetros essenciais (quando existirem).', 'Use o centro no roteiro e valide na OP/execução.'],
+    dependsOn: ['Permissão: Indústria (manage)'],
+    connectsWith: ['Roteiros', 'PCP/Capacidade', 'Ordens (OP/OB)'],
+    fillPerfectly: ['Nome consistente (ex.: “Corte”, “Solda”).', 'Não duplicar centros equivalentes.', 'Manter ativo/inativo correto.'],
+    commonMistakes: ['Criar centro duplicado e confundir roteiros.', 'Usar centro genérico para tudo e perder visão.'],
+    roadmapKey: 'industria',
+  },
+  {
+    match: '/app/industria/boms',
+    title: 'Guia Rápido de Ficha Técnica (BOM)',
+    whatIs:
+      'BOM (Ficha Técnica) define materiais e quantidades por produto. O objetivo é consumo rastreável e custo/estoque coerentes.',
+    steps: ['Crie BOM para o produto final.', 'Adicione materiais com quantidades e unidade.', 'Valide criando uma OP e conferindo consumo.'],
+    dependsOn: ['Produtos', 'Permissão: Indústria (manage)'],
+    connectsWith: ['Ordens (OP/OB)', 'MRP', 'Estoque'],
+    fillPerfectly: ['Materiais corretos (SKU).', 'Quantidades realistas.', 'Revisar quando alterar processo.'],
+    commonMistakes: ['BOM desatualizada e faltar material.', 'Unidade errada e consumo incoerente.'],
+    roadmapKey: 'industria',
+  },
+  {
+    match: '/app/industria/roteiros',
+    title: 'Guia Rápido de Roteiros',
+    whatIs:
+      'Roteiro define etapas e ordem de execução. O objetivo é travar estados corretamente e dar previsibilidade de filas/capacidade.',
+    steps: ['Crie etapas com centro de trabalho.', 'Defina sequência e (quando existir) tempo padrão.', 'Aplique o roteiro na OP/OB e valide execução.'],
+    dependsOn: ['Centros de trabalho', 'Permissão: Indústria (manage)'],
+    connectsWith: ['Ordens', 'Execução', 'PCP/Capacidade'],
+    fillPerfectly: ['Etapas na ordem real.', 'Tempos realistas.', 'Não pular etapas na execução.'],
+    commonMistakes: ['Roteiro genérico e execução não reflete a realidade.', 'Etapas fora de ordem e quebrar rastreabilidade.'],
+    roadmapKey: 'industria',
+  },
+  {
+    match: '/app/industria/materiais-cliente',
+    title: 'Guia Rápido de Materiais de Cliente',
+    whatIs:
+      'Materiais de cliente permitem rastrear insumos que não são da sua empresa (beneficiamento). O objetivo é controle e auditoria sem misturar estoque próprio.',
+    steps: ['Cadastre o cliente e o material.', 'Registre entradas/saídas (quando aplicável).', 'Vincule em OP/OB e acompanhe saldo.'],
+    dependsOn: ['Clientes', 'Produtos', 'Permissão: Indústria (manage)'],
+    connectsWith: ['Beneficiamento (OB)', 'Estoque/Controle', 'Relatórios'],
+    fillPerfectly: ['Cliente correto.', 'Material correto e unidade coerente.', 'Registrar saldo sempre que movimentar.'],
+    commonMistakes: ['Misturar material do cliente com estoque próprio.', 'Não vincular e perder rastreio.'],
+    roadmapKey: 'industria',
+  },
+  {
+    match: '/app/industria/operadores',
+    title: 'Guia Rápido de Operadores (Indústria)',
+    whatIs:
+      'Operadores são usuários do chão de fábrica. O objetivo é: apontamento correto, permissões e histórico por pessoa.',
+    steps: ['Cadastre/vincule operadores.', 'Defina permissões/escopo (quando aplicável).', 'Teste no Chão de fábrica e Operador.'],
+    dependsOn: ['Usuários', 'Permissão: Indústria (manage)'],
+    connectsWith: ['Tela do operador', 'Execução', 'Qualidade'],
+    fillPerfectly: ['Nome/identificação claros.', 'Permissões mínimas necessárias.', 'Desativar quando sair.'],
+    commonMistakes: ['Operador com permissão demais.', 'Operador sem vínculo e “não aparece”.'],
+    roadmapKey: 'industria',
+  },
+  {
+    match: '/app/industria/operador',
+    title: 'Guia Rápido da Tela do Operador',
+    whatIs:
+      'Tela do operador é o “modo execução”: apontar etapas, registrar quantidades e ocorrências. O objetivo é velocidade com consistência (sem quebrar estados).',
+    steps: ['Selecione a ordem/etapa.', 'Aponte início/fim ou quantidade conforme o fluxo.', 'Registre ocorrências (parada/refugo) quando houver.', 'Finalize etapa e confira status.'],
+    dependsOn: ['OP/OB criada', 'Roteiro aplicado', 'Permissão: Indústria (execute)'],
+    connectsWith: ['Execução', 'Chão de fábrica', 'Relatórios', 'Qualidade'],
+    fillPerfectly: ['Não pular etapas.', 'Quantidade correta.', 'Motivo em ocorrências.'],
+    commonMistakes: ['Apontar na ordem errada.', 'Finalizar sem registrar ocorrência e perder causa.'],
+    roadmapKey: 'industria',
+  },
+  {
+    match: '/app/industria/chao-de-fabrica',
+    title: 'Guia Rápido do Chão de Fábrica',
+    whatIs:
+      'Chão de fábrica mostra filas, WIP e execução em tempo real. O objetivo é enxergar gargalo e agir sem depender de “grito no corredor”.',
+    steps: ['Use filtros por centro de trabalho.', 'Veja filas e prioridades.', 'Abra a ordem para apontar ou redistribuir (quando permitido).'],
+    dependsOn: ['Ordens e apontamentos', 'Permissão: Indústria (view/execute)'],
+    connectsWith: ['PCP', 'Execução', 'Operador'],
+    fillPerfectly: ['Manter status atualizados.', 'Registrar ocorrências com motivo.'],
+    commonMistakes: ['Executar fora da fila sem registrar e bagunçar WIP.', 'Não atualizar status e painel “parece errado”.'],
+    roadmapKey: 'industria',
+  },
+  {
+    match: '/app/industria/execucao',
+    title: 'Guia Rápido de Execução (Indústria)',
+    whatIs:
+      'Execução consolida apontamentos e entregas por etapa. O objetivo é consistência: o que foi produzido, onde está, e o que falta.',
+    steps: ['Abra uma OP e veja etapas.', 'Registre apontamentos/entregas conforme o processo.', 'Use histórico para auditoria.'],
+    dependsOn: ['OP/OB', 'Roteiro', 'Permissão: Indústria (execute)'],
+    connectsWith: ['Chão de fábrica', 'Relatórios', 'Qualidade'],
+    fillPerfectly: ['Apontar quantidades reais.', 'Registrar motivo em desvios.', 'Respeitar travas de estado.'],
+    commonMistakes: ['“Dar baixa” sem apontar e perder rastreio.', 'Apontar duplicado (clique duplo) — aguarde feedback.'],
+    roadmapKey: 'industria',
+  },
+  {
+    match: '/app/industria/pcp',
+    title: 'Guia Rápido de PCP / Capacidade',
+    whatIs:
+      'PCP ajuda a planejar capacidade e prazos. O objetivo é transformar “achismo” em fila operável e alertas de atraso.',
+    steps: ['Crie demanda/ordens.', 'Rode planejamento/sugestões (quando disponível).', 'Ajuste filas e valide capacidade por centro de trabalho.'],
+    dependsOn: ['Centros de trabalho', 'Roteiros', 'Ordens'],
+    connectsWith: ['MRP', 'Chão de fábrica', 'Relatórios'],
+    fillPerfectly: ['Tempos realistas.', 'Ordem de prioridade clara.', 'Não alterar estado “na mão” sem motivo.'],
+    commonMistakes: ['Planejar sem tempos/roteiro e gerar fila irreal.', 'Ignorar alertas e “atrasar” sem ver.'],
+    roadmapKey: 'industria',
+  },
+  {
+    match: '/app/industria/mrp',
+    title: 'Guia Rápido de MRP',
+    whatIs:
+      'MRP sugere compras/produção com base em BOM, estoque e demanda. O objetivo é reduzir falta de material e urgência.',
+    steps: ['Selecione período/demanda.', 'Gere sugestões.', 'Aplique com cuidado (criar OC/ordens) e valide impacto no estoque.'],
+    dependsOn: ['BOM', 'Estoque confiável', 'Demanda/ordens'],
+    connectsWith: ['Suprimentos (compras)', 'Estoque', 'PCP'],
+    fillPerfectly: ['BOM atualizada.', 'Mín/máx e lead time coerentes.', 'Registrar OCs abertas para não duplicar.'],
+    commonMistakes: ['Rodar MRP com BOM desatualizada.', 'Aplicar sugestão sem revisar e comprar errado.'],
+    roadmapKey: 'industria',
+  },
+  {
+    match: '/app/industria/qualidade/planos',
+    title: 'Guia Rápido de Planos de Qualidade',
+    whatIs:
+      'Planos de qualidade definem critérios mínimos e checkpoints. O objetivo é reduzir retrabalho e rastrear conformidade.',
+    steps: ['Crie plano com checkpoints simples.', 'Aplique em etapas/ordens (quando disponível).', 'Registre resultados e ocorrências.'],
+    dependsOn: ['Permissão: Qualidade (manage)', 'Ordens/etapas'],
+    connectsWith: ['Execução', 'Lotes', 'Relatórios'],
+    fillPerfectly: ['Checkpoints objetivos.', 'Poucos itens críticos.', 'Registro de não conformidade com motivo.'],
+    commonMistakes: ['Plano grande demais e ninguém usa.', 'Checkpoints subjetivos.'],
+    roadmapKey: 'industria',
+  },
+  {
+    match: '/app/industria/qualidade/motivos',
+    title: 'Guia Rápido de Motivos de Qualidade',
+    whatIs:
+      'Motivos padronizam ocorrências (refugo, parada, não conformidade). O objetivo é relatório consistente e ação corretiva.',
+    steps: ['Cadastre motivos com categorias.', 'Use nos apontamentos/qualidade.', 'Analise relatórios para atacar raiz.'],
+    dependsOn: ['Permissão: Qualidade (manage)'],
+    connectsWith: ['Execução', 'Relatórios de indústria', 'Dashboard'],
+    fillPerfectly: ['Nomes curtos e claros.', 'Evitar motivos duplicados.', 'Categoria ajuda análise.'],
+    commonMistakes: ['Motivos genéricos (“erro”) e não ajudam.', 'Duplicar motivo e bagunçar relatório.'],
+    roadmapKey: 'industria',
+  },
+  {
+    match: '/app/industria/qualidade/lotes',
+    title: 'Guia Rápido de Lotes e Bloqueio',
+    whatIs:
+      'Lotes permitem rastrear e bloquear material/produto quando necessário. O objetivo é rastreabilidade e controle sem planilha.',
+    steps: ['Crie lote (quando necessário) e registre entradas.', 'Bloqueie quando houver não conformidade.', 'Libere/baixe com trilha auditável.'],
+    dependsOn: ['Produtos', 'Permissão: Qualidade (manage)'],
+    connectsWith: ['Estoque', 'Execução', 'Relatórios'],
+    fillPerfectly: ['Lote com identificação única.', 'Bloqueio com motivo.', 'Registrar histórico de liberação.'],
+    commonMistakes: ['Bloquear sem motivo e virar suporte.', 'Misturar lote entre produtos.'],
+    roadmapKey: 'industria',
+  },
+  {
+    match: '/app/industria/dashboard',
+    title: 'Guia Rápido do Dashboard Industrial',
+    whatIs:
+      'Dashboard industrial mostra WIP, filas e eficiência. O objetivo é “ver e agir” — abrir o detalhe e corrigir gargalo.',
+    steps: ['Veja KPIs do período.', 'Clique para drill-down (ordens/etapas).', 'Aja: repriorize, replaneje ou corrija apontamento.'],
+    dependsOn: ['Ordens e apontamentos'],
+    connectsWith: ['Chão de fábrica', 'Relatórios', 'PCP'],
+    fillPerfectly: ['Manter status atualizados.', 'Apontamentos com motivo em desvios.'],
+    commonMistakes: ['Usar dashboard sem dados (sem apontar).'],
+    roadmapKey: 'industria',
+  },
+  {
+    match: '/app/industria/relatorios',
+    title: 'Guia Rápido de Relatórios de Indústria',
+    whatIs:
+      'Relatórios industriais mostram WIP, filas, eficiência e qualidade. O objetivo é fechar operação e priorizar melhoria contínua.',
+    steps: ['Selecione período e filtros (centro/ordem).', 'Analise filas e atrasos.', 'Use motivos/qualidade para atacar causas.'],
+    dependsOn: ['Ordens/etapas registradas', 'Permissão: Indústria (view)'],
+    connectsWith: ['Execução', 'Qualidade', 'PCP'],
+    fillPerfectly: ['Registrar motivos.', 'Manter etapas e estados coerentes.'],
+    commonMistakes: ['Relatório “não bate” por falta de apontamento.'],
+    roadmapKey: 'industria',
+  },
+  {
+    match: '/app/industria/automacao',
+    title: 'Guia Rápido de Automação (Indústria)',
+    whatIs:
+      'Automação na indústria ajuda a manter consistência (rotinas e validações). O objetivo é reduzir erro humano e padronizar execução.',
+    steps: ['Revise automações disponíveis.', 'Ative o mínimo necessário.', 'Monitore logs/saúde e ajuste.'],
+    dependsOn: ['Permissão: Ops/Indústria (manage)'],
+    connectsWith: ['Ordens', 'Execução', 'Logs/Saúde'],
+    fillPerfectly: ['Ativar uma por vez.', 'Validar impacto antes.', 'Manter logs úteis.'],
+    commonMistakes: ['Ativar várias automações e não saber qual afetou o fluxo.'],
+    roadmapKey: 'industria',
+  },
+  {
+    match: '/app/industria/status-beneficiamentos',
+    title: 'Guia Rápido de Status de Beneficiamentos',
+    whatIs:
+      'Visão focada em beneficiamentos: status e pendências por ordem. O objetivo é enxergar gargalos rapidamente.',
+    steps: ['Use filtros por status.', 'Abra uma ordem para detalhes.', 'Aja na execução e valide atualização do status.'],
+    dependsOn: ['OB/execução registrada'],
+    connectsWith: ['Ordens', 'Execução', 'Relatórios'],
+    fillPerfectly: ['Atualizar status no fluxo correto.', 'Registrar ocorrências.'],
+    commonMistakes: ['Status “parado” porque execução não foi apontada.'],
+    roadmapKey: 'industria',
+  },
+
+  // OS (rota antiga / listagem)
+  {
+    match: '/app/ordens-de-servico',
+    title: 'Guia Rápido de Ordens de Serviço (Lista)',
+    whatIs:
+      'Esta é a lista central de OS: criação, busca e acompanhamento por status/cliente/técnico. O objetivo é enxergar fila e agir rápido.',
+    steps: ['Use busca e filtros por status.', 'Crie uma OS nova quando chegar o atendimento.', 'Abra a OS para checklist, anexos e eventos.', 'Feche quando concluir para refletir relatórios.'],
+    dependsOn: ['Clientes', 'Permissão: OS (view/create)'],
+    connectsWith: ['OS (detalhe)', 'Financeiro', 'Suprimentos (peças)', 'Relatórios de OS'],
+    fillPerfectly: ['Status sempre atualizado.', 'Técnico atribuído quando possível.', 'Anexos e eventos registrados.'],
+    commonMistakes: ['Deixar OS sem status/técnico e perder controle.', 'Fechar sem evidências (fotos) em casos críticos.'],
+    links: [{ label: 'Abrir Relatórios de OS', href: '/app/servicos/relatorios', kind: 'internal' }],
     roadmapKey: 'servicos',
   },
   {
