@@ -29,3 +29,9 @@ Abaixo está uma lista de todas as funções e seus respectivos endpoints e resp
 - **Endpoint**: `/billing-success-session`
 - **Método**: `GET`
 - **Descrição**: Chamada pela página de sucesso após um checkout. Verifica o status da sessão de checkout e aguarda a confirmação do webhook para retornar os detalhes da assinatura recém-criada.
+
+### 5. `billing-invoices`
+
+- **Endpoint**: `/billing-invoices`
+- **Método**: `POST`
+- **Descrição**: Lista as faturas/recibos do cliente (Stripe) para a empresa atual (self-serve no app).

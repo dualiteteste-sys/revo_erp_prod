@@ -16,6 +16,7 @@ export const settingsMenuConfig: SettingsTab[] = [
     name: 'Geral',
     menu: [
       { name: 'Empresa', icon: Building, href: '/app/configuracoes/geral/empresa' },
+      { name: 'Unidades / Filiais', icon: Building, href: '/app/configuracoes/geral/unidades' },
       { name: 'Onboarding (Checklist)', icon: ListChecks, href: '/app/configuracoes/geral/onboarding' },
       { name: 'Usuários', icon: Users, href: '/app/configuracoes/geral/users' },
       { name: 'Papéis e Permissões', icon: ShieldCheck, href: '/app/configuracoes/geral/papeis' },

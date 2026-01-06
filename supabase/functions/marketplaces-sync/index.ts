@@ -32,6 +32,27 @@ function retryAfterSeconds(nextRetryAt: any): number | null {
   return Math.max(1, Math.ceil((d.getTime() - Date.now()) / 1000));
 }
 
+async function getAdapterVersion(params: {
+  admin: any;
+  empresaId: string;
+  provider: Provider;
+  kind: Action;
+}): Promise<number> {
+  try {
+    const { data } = await params.admin
+      .from("integration_adapter_versions")
+      .select("current_version")
+      .eq("empresa_id", params.empresaId)
+      .eq("provider", params.provider)
+      .eq("kind", params.kind)
+      .maybeSingle();
+    const v = Number((data as any)?.current_version ?? 1);
+    return Number.isFinite(v) && v >= 1 ? v : 1;
+  } catch {
+    return 1;
+  }
+}
+
 async function circuitBreakerShouldAllow(params: {
   admin: any;
   empresaId: string;
@@ -473,6 +494,7 @@ serve(async (req) => {
 
   const windowFrom = since ?? toIsoOrNull(conn.last_sync_at) ?? minusDaysIso(7);
   const windowTo = plusDaysIso(0);
+  const adapterVersion = await getAdapterVersion({ admin, empresaId, provider: "meli", kind: "import_orders" });
 
   // Cria job/run (observabilidade)
   const jobDedupe = `meli_import_orders:${windowFrom.slice(0, 13)}`; // hora
@@ -484,6 +506,7 @@ serve(async (req) => {
       kind: "import_orders",
       dedupe_key: jobDedupe,
       payload: { from: windowFrom, to: windowTo },
+      adapter_version: adapterVersion,
       status: "processing",
       attempts: 1,
       locked_at: new Date().toISOString(),
@@ -499,6 +522,7 @@ serve(async (req) => {
     job_id: jobId,
     provider: "meli",
     kind: "import_orders",
+    adapter_version: adapterVersion,
     meta: { from: windowFrom, to: windowTo },
   }).select("id").single();
   const runId = run?.id ? String(run.id) : null;

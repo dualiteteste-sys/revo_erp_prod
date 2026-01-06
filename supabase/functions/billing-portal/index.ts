@@ -64,16 +64,23 @@ Deno.serve(async (req) => {
     }
     
     const { data: empresa } = await supabase.from("empresas")
-      .select("stripe_customer_id")
+      .select("stripe_customer_id, fantasia, razao_social")
       .eq("id", empresa_id).single();
-    if (!empresa?.stripe_customer_id) {
-      return cors(req, 404, { error: "Cliente Stripe não encontrado para esta empresa." });
-    }
 
     const stripe = new Stripe(Deno.env.get("STRIPE_SECRET_KEY")!, { apiVersion: "2024-06-20" });
+    let customerId = empresa?.stripe_customer_id ? String(empresa.stripe_customer_id) : "";
+    if (!customerId) {
+      const customer = await stripe.customers.create({
+        name: (empresa?.fantasia || empresa?.razao_social || `Empresa ${empresa_id}`).slice(0, 250),
+        metadata: { empresa_id },
+      });
+      customerId = customer.id;
+      await supabase.from("empresas").update({ stripe_customer_id: customerId }).eq("id", empresa_id);
+    }
+
     const session = await stripe.billingPortal.sessions.create({
-      customer: empresa.stripe_customer_id,
-      return_url: `${Deno.env.get("SITE_URL")}/app/settings`
+      customer: customerId,
+      return_url: `${Deno.env.get("SITE_URL")}/app/configuracoes/geral/assinatura`
     });
 
     return cors(req, 200, { url: session.url });

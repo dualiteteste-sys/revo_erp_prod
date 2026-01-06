@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../../../contexts/AuthProvider';
 import { useSubscription } from '../../../contexts/SubscriptionProvider';
-import { Loader2, Sparkles, AlertTriangle, CheckCircle, RefreshCw, ServerOff, CreditCard, PlusCircle } from 'lucide-react';
+import { ExternalLink, FileText, Loader2, Sparkles, AlertTriangle, CheckCircle, RefreshCw, ServerOff, CreditCard, PlusCircle } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { useToast } from '../../../contexts/ToastProvider';
 import { useSupabase } from '@/providers/SupabaseProvider';
@@ -12,6 +12,29 @@ import Modal from '@/components/ui/Modal';
 
 type EmpresaAddon = Database['public']['Tables']['empresa_addons']['Row'];
 type PlanoMvp = 'ambos' | 'servicos' | 'industria';
+type BillingInvoice = {
+  id: string;
+  status: string | null;
+  created: number;
+  amount_due: number | null;
+  amount_paid: number | null;
+  currency: string | null;
+  hosted_invoice_url: string | null;
+  invoice_pdf: string | null;
+  number: string | null;
+};
+type BillingInvoicesResponse = { items?: BillingInvoice[] };
+type StripeWebhookEventRow = {
+  id: string;
+  event_type: string;
+  plan_slug: string | null;
+  billing_cycle: 'monthly' | 'yearly' | null;
+  subscription_status: string | null;
+  current_period_end: string | null;
+  received_at: string;
+  processed_at: string | null;
+  last_error: string | null;
+};
 
 interface SubscriptionSettingsProps {
   onSwitchToPlans: () => void;
@@ -127,6 +150,10 @@ const SubscriptionSettings: React.FC<SubscriptionSettingsProps> = ({ onSwitchToP
   const [isLinkCustomerOpen, setIsLinkCustomerOpen] = useState(false);
   const [stripeCustomerId, setStripeCustomerId] = useState('');
   const [linkingCustomer, setLinkingCustomer] = useState(false);
+  const [loadingInvoices, setLoadingInvoices] = useState(false);
+  const [invoices, setInvoices] = useState<BillingInvoice[]>([]);
+  const [loadingStripeHistory, setLoadingStripeHistory] = useState(false);
+  const [stripeHistory, setStripeHistory] = useState<StripeWebhookEventRow[]>([]);
 
   const fetchAddons = useCallback(async () => {
     if (!activeEmpresa?.id) return;
@@ -217,6 +244,52 @@ const SubscriptionSettings: React.FC<SubscriptionSettingsProps> = ({ onSwitchToP
     fetchFinopsLimitsStatus();
   }, [fetchAddons, fetchEntitlements, fetchCurrentUsersCount, fetchFinopsLimitsStatus]);
 
+  const fetchInvoices = useCallback(async () => {
+    const empresaId = activeEmpresa?.id;
+    if (!empresaId) return;
+    setLoadingInvoices(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('billing-invoices', {
+        headers: { Authorization: `Bearer ${session?.access_token}` },
+        body: { empresa_id: empresaId, limit: 10 },
+      });
+      if (error) throw error;
+      const items = (data as BillingInvoicesResponse | null)?.items ?? [];
+      setInvoices(Array.isArray(items) ? items : []);
+    } catch {
+      setInvoices([]);
+    } finally {
+      setLoadingInvoices(false);
+    }
+  }, [activeEmpresa?.id, session?.access_token, supabase.functions]);
+
+  const fetchStripeHistory = useCallback(async () => {
+    const empresaId = activeEmpresa?.id;
+    if (!empresaId) return;
+    setLoadingStripeHistory(true);
+    try {
+      const { data, error } = await (supabase as any)
+        .from('billing_stripe_webhook_events')
+        .select('id,event_type,plan_slug,billing_cycle,subscription_status,current_period_end,received_at,processed_at,last_error')
+        .eq('empresa_id', empresaId)
+        .order('received_at', { ascending: false })
+        .limit(15);
+      if (error) throw error;
+      setStripeHistory((data || []) as StripeWebhookEventRow[]);
+    } catch {
+      setStripeHistory([]);
+    } finally {
+      setLoadingStripeHistory(false);
+    }
+  }, [activeEmpresa?.id, supabase]);
+
+  useEffect(() => {
+    if (subscription) {
+      void fetchInvoices();
+      void fetchStripeHistory();
+    }
+  }, [fetchInvoices, fetchStripeHistory, subscription]);
+
   const handleManageBilling = async () => {
     if (!activeEmpresa) {
       addToast('Nenhuma empresa ativa selecionada.', 'error');
@@ -240,6 +313,141 @@ const SubscriptionSettings: React.FC<SubscriptionSettingsProps> = ({ onSwitchToP
     } finally {
       setIsPortalLoading(false);
     }
+  };
+
+  const formatMoney = (amountCents: number | null, currency: string | null) => {
+    if (typeof amountCents !== 'number') return '—';
+    const cur = (currency || 'brl').toUpperCase();
+    const value = amountCents / 100;
+    try {
+      return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: cur }).format(value);
+    } catch {
+      return `${cur} ${value.toFixed(2)}`;
+    }
+  };
+
+  const renderBillingHistory = () => {
+    if (!subscription) return null;
+    return (
+      <div className="bg-white/80 rounded-2xl p-6 md:p-8 border border-gray-200 shadow-sm">
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <h2 className="text-xl font-bold text-gray-800">Histórico e Faturas</h2>
+            <p className="text-sm text-gray-600 mt-1">
+              Mudanças de plano e faturas ficam disponíveis no portal. Ao alterar, o Stripe pode calcular proporcional (proration) — confira o preview antes de confirmar.
+            </p>
+          </div>
+          <button
+            onClick={handleManageBilling}
+            disabled={isPortalLoading}
+            className="inline-flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+          >
+            {isPortalLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <ExternalLink className="h-4 w-4" />}
+            Abrir portal
+          </button>
+        </div>
+
+        <div className="mt-6 grid grid-cols-1 lg:grid-cols-2 gap-4">
+          <div className="rounded-xl border border-gray-200 bg-white p-4">
+            <div className="flex items-center justify-between">
+              <div className="font-semibold text-gray-800 flex items-center gap-2">
+                <FileText size={16} />
+                Últimas faturas
+              </div>
+              <button
+                onClick={() => void fetchInvoices()}
+                disabled={loadingInvoices}
+                className="inline-flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+              >
+                {loadingInvoices ? <Loader2 className="h-3 w-3 animate-spin" /> : <RefreshCw size={14} />}
+                Atualizar
+              </button>
+            </div>
+            {loadingInvoices ? (
+              <div className="mt-3 text-sm text-gray-600 flex items-center gap-2">
+                <Loader2 className="h-4 w-4 animate-spin" /> Carregando…
+              </div>
+            ) : invoices.length === 0 ? (
+              <div className="mt-3 text-sm text-gray-600">Sem faturas encontradas (use o portal).</div>
+            ) : (
+              <div className="mt-3 space-y-2">
+                {invoices.map((inv) => (
+                  <div key={inv.id} className="flex items-center justify-between gap-3 rounded-lg border border-gray-100 bg-gray-50 p-3">
+                    <div className="min-w-0">
+                      <div className="text-sm font-semibold text-gray-800 truncate">{inv.number || inv.id.slice(0, 10)}</div>
+                      <div className="text-xs text-gray-600">
+                        {new Date(inv.created * 1000).toLocaleDateString('pt-BR')} • {inv.status || '—'} •{' '}
+                        {formatMoney(inv.amount_due ?? inv.amount_paid, inv.currency)}
+                      </div>
+                    </div>
+                    <div className="flex gap-2 shrink-0">
+                      {inv.hosted_invoice_url ? (
+                        <a
+                          href={inv.hosted_invoice_url}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="inline-flex items-center gap-1 rounded-lg bg-white px-2.5 py-1.5 text-xs font-semibold text-blue-700 hover:underline"
+                        >
+                          Ver <ExternalLink size={14} />
+                        </a>
+                      ) : null}
+                      {inv.invoice_pdf ? (
+                        <a
+                          href={inv.invoice_pdf}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="inline-flex items-center gap-1 rounded-lg bg-white px-2.5 py-1.5 text-xs font-semibold text-blue-700 hover:underline"
+                        >
+                          PDF <ExternalLink size={14} />
+                        </a>
+                      ) : null}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          <div className="rounded-xl border border-gray-200 bg-white p-4">
+            <div className="flex items-center justify-between">
+              <div className="font-semibold text-gray-800">Eventos Stripe (trilha)</div>
+              <button
+                onClick={() => void fetchStripeHistory()}
+                disabled={loadingStripeHistory}
+                className="inline-flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+              >
+                {loadingStripeHistory ? <Loader2 className="h-3 w-3 animate-spin" /> : <RefreshCw size={14} />}
+                Atualizar
+              </button>
+            </div>
+
+            {loadingStripeHistory ? (
+              <div className="mt-3 text-sm text-gray-600 flex items-center gap-2">
+                <Loader2 className="h-4 w-4 animate-spin" /> Carregando…
+              </div>
+            ) : stripeHistory.length === 0 ? (
+              <div className="mt-3 text-sm text-gray-600">Sem eventos registrados ainda.</div>
+            ) : (
+              <div className="mt-3 space-y-2">
+                {stripeHistory.map((e) => (
+                  <div key={e.id} className="rounded-lg border border-gray-100 bg-gray-50 p-3">
+                    <div className="text-sm font-semibold text-gray-800 break-words">{e.event_type}</div>
+                    <div className="text-xs text-gray-600 mt-1">
+                      {e.plan_slug ? `${e.plan_slug}${e.billing_cycle ? `/${e.billing_cycle}` : ''}` : '—'} •{' '}
+                      {e.subscription_status || '—'}
+                    </div>
+                    <div className="text-[11px] text-gray-500 mt-1">
+                      {new Date(e.received_at).toLocaleString('pt-BR')} {e.processed_at ? '• processado' : '• pendente'}
+                    </div>
+                    {e.last_error ? <div className="mt-2 text-xs text-red-700">Erro: {e.last_error}</div> : null}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    );
   };
 
   const handleSyncFromStripe = async () => {
@@ -394,7 +602,17 @@ const SubscriptionSettings: React.FC<SubscriptionSettingsProps> = ({ onSwitchToP
             {isPortalLoading ? <Loader2 className="animate-spin" size={20}/> : <CreditCard size={20} />}
             <span>Gerenciar Pagamento</span>
           </button>
-          <button onClick={onSwitchToPlans} className="w-full md:w-auto bg-blue-600 text-white font-bold py-2 px-5 rounded-lg hover:bg-blue-700 transition-colors">
+          <button
+            onClick={() => {
+              // Para assinaturas existentes: o portal lida com proration e preview de cobrança.
+              if (subscription.status === 'active' || subscription.status === 'trialing') {
+                void handleManageBilling();
+                return;
+              }
+              onSwitchToPlans();
+            }}
+            className="w-full md:w-auto bg-blue-600 text-white font-bold py-2 px-5 rounded-lg hover:bg-blue-700 transition-colors"
+          >
             Alterar Plano Principal
           </button>
         </div>
@@ -648,6 +866,7 @@ const SubscriptionSettings: React.FC<SubscriptionSettingsProps> = ({ onSwitchToP
       </div>
       {renderMainSubscription()}
       {renderAddons()}
+      {renderBillingHistory()}
       {renderEntitlements()}
 
       <Modal

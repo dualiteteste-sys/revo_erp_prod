@@ -311,14 +311,31 @@ Este é o checklist único (por módulo) para levar o REVO ao nível **top mundi
 ### G9) Configurações / Administração
 - [x] ADM-STA-01 (P0) Usuários, papéis e permissões “sem fricção” (scroll ok, busca, presets)
 - [x] ADM-STA-02 (P0) Planos/Limites por empresa com enforcement 3 camadas (UI/Rotas/DB)
-- [ ] ADM-STA-03 (P1) Multiunidade/filiais (quando aplicável): escopo claro + permissões
-- [ ] ADM-STA-04 (P1) Auditoria de mudanças administrativas (quem mudou o quê e quando)
+- [x] ADM-STA-03 (P1) Multiunidade/filiais (quando aplicável): escopo claro + permissões
+- [x] ADM-STA-04 (P1) Auditoria de mudanças administrativas (quem mudou o quê e quando)
+
+**Validar (ADM-STA-03)**
+- Configurações → Geral → `Unidades / Filiais`:
+  - criar 2 unidades, marcar 1 como padrão, e alternar `Usar` (unidade ativa).
+  - desativar uma unidade e confirmar que não dá para selecionar como ativa.
+
+**Validar (ADM-STA-04)**
+- Configurações → Avançado → `Auditoria`:
+  - preset `Admin` deve mostrar mudanças em `empresa_unidades`, `empresa_usuarios`, `roles`, `role_permissions`, `empresa_entitlements`.
+  - executar uma alteração (ex.: criar unidade) e confirmar que aparece no log (INSERT/UPDATE/DELETE) com JSON.
 
 ### G10) Assinatura / Billing (Stripe)
 - [x] BILL-STA-01 (P0) Ciclo completo de trial → ativo → inadimplente → bloqueio suave → cancelado
 - [x] BILL-STA-02 (P0) Webhooks Stripe idempotentes + trilha por evento (reprocessável)
-- [ ] BILL-STA-03 (P1) Proration/upgrade/downgrade com comunicação clara + histórico
-- [ ] BILL-STA-04 (P1) “Self-serve” de faturas/boletos/recibos (quando aplicável) e dados fiscais
+- [x] BILL-STA-03 (P1) Proration/upgrade/downgrade com comunicação clara + histórico
+- [x] BILL-STA-04 (P1) “Self-serve” de faturas/boletos/recibos (quando aplicável) e dados fiscais
+
+**Validar (BILL-STA-03/04)**
+- Configurações → Minha Assinatura:
+  - clicar `Gerenciar Pagamento` e confirmar que abre o Stripe Portal (com preview de cobrança/proration ao trocar).
+  - seção `Histórico e Faturas`:
+    - listar `Últimas faturas` (links para ver/PDF).
+    - listar `Eventos Stripe (trilha)` (event_type + status + erros quando houver).
 
 ### G11) Suporte (reduzir suporte humano)
 - [x] SUPP-STA-01 (P0) Ajuda contextual por página (o que é + 3 passos + links) sem abrir ticket
@@ -355,8 +372,12 @@ Este é o checklist único (por módulo) para levar o REVO ao nível **top mundi
 ## H) Integrações (plataforma)
 - [x] INT-STA-01 (P0) Rate limit por canal + filas separadas + backoff com jitter
 - [x] INT-STA-02 (P0) Reprocessamento seguro (dry-run, replay, dead-letter) com trilha por entidade
-- [ ] INT-STA-03 (P1) Versionamento de adaptadores (migração de payloads sem quebrar)
+- [x] INT-STA-03 (P1) Versionamento de adaptadores (migração de payloads sem quebrar)
 - [x] INT-STA-04 (P1) Health por conexão (token expirado, webhook parado, atraso de fila)
+
+**Validar (INT-STA-03)**
+- Verificar que novos jobs de marketplace registram `adapter_version` no banco (`ecommerce_jobs`/`ecommerce_job_runs`).
+- (Ops) RPC `ops_list_adapter_versions` retorna versões configuradas por `provider/kind`.
 
 **Validar (INT-STA-01)**
 - Simular importação de pedidos com volume (Mercado Livre): deve aplicar `rate limit` e responder com `retry_after_seconds` quando necessário.
