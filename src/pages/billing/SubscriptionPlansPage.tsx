@@ -119,7 +119,8 @@ const SubscriptionPlansPage: React.FC = () => {
         )}
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 max-w-7xl mx-auto mt-12">
+      {/* 4 colunas só em telas bem grandes (evita cards apertados em modais/containers médios) */}
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-8 max-w-7xl mx-auto mt-12">
         {filteredPlans.map((plan, index) => (
           <PricingCard
             key={plan.id}
