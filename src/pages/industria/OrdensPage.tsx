@@ -108,6 +108,19 @@ export default function OrdensPage() {
     );
   }, [searchParams, location.pathname, navigate, tipoOrdem]);
 
+  // Deep-link: /app/industria/ordens?status=<status>
+  useEffect(() => {
+    const status = searchParams.get('status');
+    if (!status) return;
+    setStatusFilter(status);
+    const next = new URLSearchParams(searchParams);
+    next.delete('status');
+    navigate(
+      { pathname: location.pathname, search: next.toString() ? `?${next.toString()}` : '' },
+      { replace: true }
+    );
+  }, [searchParams, location.pathname, navigate]);
+
   // Se o usuário não tem permissão para criar, bloqueia a criação assim que o role estiver disponível.
   useEffect(() => {
     if (!isFormOpen) return;

@@ -273,7 +273,7 @@ Este é o checklist único (por módulo) para levar o REVO ao nível **top mundi
 ### G7) Indústria
 - [x] IND-STA-01 (P0) Capacidade/PCP e MRP “operável” (alertas + ações aplicáveis)
 - [x] IND-STA-02 (P1) Apontamentos com rastreio por lote/qualidade e custos (fase 2)
-- [ ] IND-STA-03 (P1) Dashboards industriais (OEE-lite, filas, WIP, atrasos) com drill-down
+- [x] IND-STA-03 (P1) Dashboards industriais (OEE-lite, filas, WIP, atrasos) com drill-down
 
 **Validar (IND-STA-01)**
 - Indústria → PCP: ver alertas de capacidade/ATP/ruptura e clicar nas CTAs (Gantt/MRP/Estoque).
@@ -285,9 +285,28 @@ Este é o checklist único (por módulo) para levar o REVO ao nível **top mundi
 - Preencher `Lote` (ou `Escanear`) e `Custo unitário` (opcional), e salvar.
 - Conferir no `Kardex` do produto final (Suprimentos → Estoque) que houve uma entrada `entrada_producao` com o lote informado.
 
+**Validar (IND-STA-03)**
+- Indústria → Dashboard:
+  - clicar nos cards de `WIP` e confirmar navegação para `Indústria → Ordens` com filtro aplicado (`status`/`tipo`).
+  - abrir a tabela `Atrasos (entrega)` e clicar em uma linha para abrir a ordem (modal).
+  - na tabela de `Beneficiamento`, clicar em uma linha para abrir a ordem.
+- Indústria → Ordens:
+  - confirmar que URLs do tipo `...?status=<valor>` aplicam o filtro automaticamente.
+
 ### G8) RH & Qualidade
-- [ ] RH-STA-01 (P1) Trilhas e compliance de treinamentos (vencimentos, alertas, evidência)
-- [ ] RH-STA-02 (P1) Matriz de competências utilizável (gap, plano de ação, histórico)
+- [x] RH-STA-01 (P1) Trilhas e compliance de treinamentos (vencimentos, alertas, evidência)
+- [x] RH-STA-02 (P1) Matriz de competências utilizável (gap, plano de ação, histórico)
+
+**Validar (RH-STA-01)**
+- RH → Cargos → abrir um cargo:
+  - aba `Treinamentos`: adicionar um treinamento obrigatório (com validade opcional) e remover.
+- RH → Dashboard:
+  - ver card `Compliance de Treinamentos` e abrir a tela de treinamentos via CTA.
+
+**Validar (RH-STA-02)**
+- RH → Matriz de Competências:
+  - clicar em um “gap” (célula crítica) e abrir `Plano de ação`.
+  - salvar plano (responsável/prazo/descrição/status) e confirmar indicador na célula.
 
 ### G9) Configurações / Administração
 - [x] ADM-STA-01 (P0) Usuários, papéis e permissões “sem fricção” (scroll ok, busca, presets)
@@ -304,7 +323,7 @@ Este é o checklist único (por módulo) para levar o REVO ao nível **top mundi
 ### G11) Suporte (reduzir suporte humano)
 - [x] SUPP-STA-01 (P0) Ajuda contextual por página (o que é + 3 passos + links) sem abrir ticket
 - [x] SUPP-STA-02 (P1) Coleta de diagnóstico (últimas falhas, correlation id) anexável ao suporte
-- [ ] SUPP-STA-03 (P1) Central de notificações (incidentes, mudanças fiscais, integrações) com histórico
+- [x] SUPP-STA-03 (P1) Central de notificações (incidentes, mudanças fiscais, integrações) com histórico
 
 **Validar (SUPP-STA-01)**
 - Abrir páginas core (Clientes, Produtos, Estoque, PDV, Tesouraria): deve existir “Ajuda” colapsável com “O que é”, “3 passos” e links.
@@ -315,10 +334,21 @@ Este é o checklist único (por módulo) para levar o REVO ao nível **top mundi
 - Suporte → `Pacote de diagnóstico`: clicar `Copiar JSON` e validar que vem com `empresa_id`, `user_id` e `last_request_id`.
 - Clicar `Baixar` e anexar no ticket/WhatsApp sem conter PII/segredos.
 
+**Validar (SUPP-STA-03)**
+- Suporte → `Central de notificações`:
+  - alternar `Somente não lidas` e confirmar que lista muda.
+  - clicar `Marcar lido` em 1 item e confirmar que some ao filtrar não lidas.
+  - clicar `Marcar tudo como lido` e confirmar `Não lidas: 0`.
+
 ### G12) Desenvolvedor (Operação interna)
 - [x] DEV-STA-01 (P0) Logs do usuário/empresa com filtros (ação, data, status) e drill-down por entidade
 - [x] DEV-STA-02 (P0) Monitor “Saúde” (filas, DLQ, falhas, webhooks, jobs) com reprocess/dry-run
-- [ ] DEV-STA-03 (P1) Ferramentas de diagnóstico de schema/RPC (drift, migrations pendentes, cache)
+- [x] DEV-STA-03 (P1) Ferramentas de diagnóstico de schema/RPC (drift, migrations pendentes, cache)
+
+**Validar (DEV-STA-03)**
+- Desenvolvedor → `Diagnóstico`:
+  - abrir a página e confirmar que lista RPCs e possíveis alertas.
+  - clicar `Recarregar cache do PostgREST` (perfil `ops/manage`) e confirmar toast/feedback.
 
 ---
 

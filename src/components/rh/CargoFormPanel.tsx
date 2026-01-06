@@ -1,6 +1,18 @@
 import React, { useEffect, useState } from 'react';
 import { Loader2, Save, Plus, Trash2, AlertTriangle } from 'lucide-react';
-import { CargoDetails, CargoPayload, Competencia, listCompetencias, saveCargo } from '@/services/rh';
+import {
+  CargoDetails,
+  CargoPayload,
+  Competencia,
+  CargoTreinamentoRequirement,
+  Treinamento,
+  listCompetencias,
+  listTreinamentos,
+  saveCargo,
+  listCargoTreinamentos,
+  upsertCargoTreinamento,
+  deleteCargoTreinamento,
+} from '@/services/rh';
 import { useToast } from '@/contexts/ToastProvider';
 import Section from '@/components/ui/forms/Section';
 import Input from '@/components/ui/forms/Input';
@@ -24,16 +36,24 @@ const CargoFormPanel: React.FC<CargoFormPanelProps> = ({ cargo, onSaveSuccess, o
   const [formData, setFormData] = useState<CargoPayload>({});
   const [availableCompetencias, setAvailableCompetencias] = useState<Competencia[]>([]);
   const [selectedCompId, setSelectedCompId] = useState<string>('');
-  const [activeTab, setActiveTab] = useState<'dados' | 'competencias' | 'historico'>('dados');
+  const [activeTab, setActiveTab] = useState<'dados' | 'competencias' | 'treinamentos' | 'historico'>('dados');
   const [auditRows, setAuditRows] = useState<AuditLogRow[]>([]);
   const [loadingAudit, setLoadingAudit] = useState(false);
 
   const permCreate = useHasPermission('rh', 'create');
   const permUpdate = useHasPermission('rh', 'update');
-  const permsLoading = permCreate.isLoading || permUpdate.isLoading;
+  const permManage = useHasPermission('rh', 'manage');
+  const permsLoading = permCreate.isLoading || permUpdate.isLoading || permManage.isLoading;
   const isEditing = !!cargo?.id;
   const canSave = isEditing ? permUpdate.data : permCreate.data;
   const readOnly = !permsLoading && !canSave;
+  const canManage = !permsLoading && !!permManage.data;
+
+  const [availableTreinamentos, setAvailableTreinamentos] = useState<Treinamento[]>([]);
+  const [treinamentosReq, setTreinamentosReq] = useState<CargoTreinamentoRequirement[]>([]);
+  const [loadingTreinReq, setLoadingTreinReq] = useState(false);
+  const [selectedTreinamentoId, setSelectedTreinamentoId] = useState<string>('');
+  const [treinValidadeMeses, setTreinValidadeMeses] = useState<string>('');
 
   useEffect(() => {
     const loadCompetencias = async () => {
@@ -45,6 +65,16 @@ const CargoFormPanel: React.FC<CargoFormPanelProps> = ({ cargo, onSaveSuccess, o
       }
     };
     loadCompetencias();
+
+    const loadTreinamentos = async () => {
+      try {
+        const data = await listTreinamentos(undefined, undefined);
+        setAvailableTreinamentos(data);
+      } catch {
+        setAvailableTreinamentos([]);
+      }
+    };
+    loadTreinamentos();
 
     if (cargo) {
       setFormData(cargo);
@@ -72,6 +102,27 @@ const CargoFormPanel: React.FC<CargoFormPanelProps> = ({ cargo, onSaveSuccess, o
       }
     };
     fetchAudit();
+  }, [activeTab, cargo?.id, addToast]);
+
+  useEffect(() => {
+    const fetchReq = async () => {
+      if (activeTab !== 'treinamentos') return;
+      if (!cargo?.id) {
+        setTreinamentosReq([]);
+        return;
+      }
+      setLoadingTreinReq(true);
+      try {
+        const data = await listCargoTreinamentos(cargo.id);
+        setTreinamentosReq(data);
+      } catch (e: any) {
+        addToast(e?.message || 'Erro ao carregar trilha de treinamentos.', 'error');
+        setTreinamentosReq([]);
+      } finally {
+        setLoadingTreinReq(false);
+      }
+    };
+    void fetchReq();
   }, [activeTab, cargo?.id, addToast]);
 
   const handleFormChange = (field: keyof CargoPayload, value: any) => {
@@ -125,6 +176,50 @@ const CargoFormPanel: React.FC<CargoFormPanelProps> = ({ cargo, onSaveSuccess, o
     const newComps = [...(formData.competencias || [])];
     newComps[index] = { ...newComps[index], [field]: value };
     setFormData(prev => ({ ...prev, competencias: newComps }));
+  };
+
+  const handleAddTreinamentoReq = async () => {
+    if (!cargo?.id) {
+      addToast('Salve o cargo antes de definir a trilha de treinamentos.', 'warning');
+      return;
+    }
+    if (!canManage) {
+      addToast('Você não tem permissão para gerenciar trilhas de treinamentos.', 'warning');
+      return;
+    }
+    if (!selectedTreinamentoId) return;
+    const validade = treinValidadeMeses ? Number(treinValidadeMeses) : null;
+    try {
+      await upsertCargoTreinamento({
+        cargoId: cargo.id,
+        treinamentoId: selectedTreinamentoId,
+        obrigatorio: true,
+        validadeMeses: Number.isFinite(validade as number) ? (validade as number) : null,
+      });
+      const data = await listCargoTreinamentos(cargo.id);
+      setTreinamentosReq(data);
+      setSelectedTreinamentoId('');
+      setTreinValidadeMeses('');
+      addToast('Treinamento adicionado à trilha do cargo.', 'success');
+    } catch (e: any) {
+      addToast(e?.message || 'Erro ao salvar trilha de treinamentos.', 'error');
+    }
+  };
+
+  const handleRemoveTreinamentoReq = async (id: string) => {
+    if (!cargo?.id) return;
+    if (!canManage) {
+      addToast('Você não tem permissão para gerenciar trilhas de treinamentos.', 'warning');
+      return;
+    }
+    try {
+      await deleteCargoTreinamento(id);
+      const data = await listCargoTreinamentos(cargo.id);
+      setTreinamentosReq(data);
+      addToast('Treinamento removido da trilha.', 'success');
+    } catch (e: any) {
+      addToast(e?.message || 'Erro ao remover treinamento da trilha.', 'error');
+    }
   };
 
   const handleSave = async () => {
@@ -200,6 +295,15 @@ const CargoFormPanel: React.FC<CargoFormPanelProps> = ({ cargo, onSaveSuccess, o
             className={`py-4 px-1 border-b-2 font-medium text-sm ${activeTab === 'competencias' ? 'border-blue-500 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'}`}
           >
             Competências
+          </Button>
+          <Button
+            onClick={() => setActiveTab('treinamentos')}
+            type="button"
+            variant="ghost"
+            className={`py-4 px-1 border-b-2 font-medium text-sm ${activeTab === 'treinamentos' ? 'border-blue-500 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'}`}
+            disabled={!cargo?.id}
+          >
+            Treinamentos {!cargo?.id ? '(salve primeiro)' : ''}
           </Button>
           <Button
             onClick={() => setActiveTab('historico')}
@@ -357,6 +461,108 @@ const CargoFormPanel: React.FC<CargoFormPanelProps> = ({ cargo, onSaveSuccess, o
             )}
           </div>
         </Section>
+        )}
+
+        {activeTab === 'treinamentos' && (
+          <div className="space-y-6">
+            <div className="rounded-xl border border-blue-200 bg-blue-50 p-4">
+              <div className="flex items-start gap-3">
+                <AlertTriangle className="text-blue-600 mt-0.5" size={20} />
+                <div>
+                  <h4 className="font-semibold text-blue-900">Trilha de treinamentos (compliance)</h4>
+                  <p className="text-sm text-blue-800">
+                    Defina treinamentos obrigatórios para este cargo. Isso alimenta alertas de vencimento e pendências no Dashboard RH.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div className="rounded-2xl border border-gray-200 bg-white p-4">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3 items-end">
+                <div className="md:col-span-2">
+                  <label className="block text-xs font-semibold text-gray-700 mb-1">Treinamento</label>
+                  <Select
+                    value={selectedTreinamentoId}
+                    onChange={(e) => setSelectedTreinamentoId(e.target.value)}
+                    disabled={!cargo?.id || !canManage}
+                  >
+                    <option value="">Selecione…</option>
+                    {availableTreinamentos.map((t) => (
+                      <option key={t.id} value={t.id}>
+                        {t.nome}
+                      </option>
+                    ))}
+                  </Select>
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-gray-700 mb-1">Validade (meses)</label>
+                  <input
+                    value={treinValidadeMeses}
+                    onChange={(e) => setTreinValidadeMeses(e.target.value)}
+                    className="w-full p-3 border border-gray-300 rounded-lg"
+                    inputMode="numeric"
+                    placeholder="Opcional"
+                    disabled={!cargo?.id || !canManage}
+                  />
+                </div>
+              </div>
+              <div className="mt-3 flex justify-end">
+                <Button onClick={handleAddTreinamentoReq} disabled={!cargo?.id || !canManage || !selectedTreinamentoId} className="gap-2">
+                  <Plus size={16} />
+                  Adicionar à trilha
+                </Button>
+              </div>
+              {!canManage && (
+                <div className="mt-3 text-xs text-amber-800">
+                  Você precisa de permissão <span className="font-semibold">rh/manage</span> para alterar a trilha.
+                </div>
+              )}
+            </div>
+
+            {loadingTreinReq ? (
+              <div className="flex justify-center items-center h-24">
+                <Loader2 className="animate-spin text-blue-600 w-8 h-8" />
+              </div>
+            ) : (
+              <div className="overflow-hidden border border-gray-200 rounded-lg bg-white">
+                <table className="min-w-full text-sm">
+                  <thead className="bg-gray-50 text-gray-600">
+                    <tr>
+                      <th className="text-left p-3">Treinamento</th>
+                      <th className="text-left p-3">Validade</th>
+                      <th className="text-right p-3">Ações</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100">
+                    {treinamentosReq.map((r) => (
+                      <tr key={r.id} className="hover:bg-gray-50">
+                        <td className="p-3 font-medium text-gray-800">{r.treinamento_nome}</td>
+                        <td className="p-3 text-gray-600">{r.validade_meses ? `${r.validade_meses} meses` : '—'}</td>
+                        <td className="p-3 text-right">
+                          <Button
+                            variant="ghost"
+                            className="text-red-600 hover:text-red-700"
+                            onClick={() => handleRemoveTreinamentoReq(r.id)}
+                            disabled={!canManage}
+                            title={!canManage ? 'Sem permissão' : undefined}
+                          >
+                            <Trash2 size={16} />
+                          </Button>
+                        </td>
+                      </tr>
+                    ))}
+                    {treinamentosReq.length === 0 && (
+                      <tr>
+                        <td colSpan={3} className="p-6 text-center text-gray-500">
+                          Nenhum treinamento obrigatório definido para este cargo ainda.
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
         )}
 
         {activeTab === 'historico' && (

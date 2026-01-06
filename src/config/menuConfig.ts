@@ -177,6 +177,7 @@ export const menuConfig: MenuItem[] = [
     gradient: 'from-purple-500 to-purple-600',
     children: [
       { name: 'Saúde', icon: Activity, href: '/app/desenvolvedor/saude', permission: { domain: 'ops', action: 'view' } },
+      { name: 'Diagnóstico', icon: FileCode, href: '/app/desenvolvedor/diagnostico', permission: { domain: 'ops', action: 'view' } },
       { name: 'Logs', icon: FileText, href: '/app/desenvolvedor/logs', permission: { domain: 'logs', action: 'view' } },
       { name: 'Supabase Demo', icon: Database, href: '/app/desenvolvedor/supabase-demo' },
     ],

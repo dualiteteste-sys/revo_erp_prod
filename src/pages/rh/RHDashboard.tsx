@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { getDashboardStats, RHDashboardStats, seedRhData } from '@/services/rh';
+import { getDashboardStats, RHDashboardStats, seedRhData, getTrainingCompliance, type TrainingComplianceResponse } from '@/services/rh';
 import { Loader2, Users, Briefcase, AlertTriangle, GraduationCap, TrendingDown, DollarSign, DatabaseBackup } from 'lucide-react';
 import GlassCard from '@/components/ui/GlassCard';
 import ReactECharts from 'echarts-for-react';
@@ -10,10 +10,13 @@ import { Button } from '@/components/ui/button';
 import { RefreshCw } from 'lucide-react';
 import { useHasPermission } from '@/hooks/useHasPermission';
 import { isSeedEnabled } from '@/utils/seed';
+import { useNavigate } from 'react-router-dom';
 
 export default function RHDashboard() {
+  const navigate = useNavigate();
   const enableSeed = isSeedEnabled();
   const [stats, setStats] = useState<RHDashboardStats | null>(null);
+  const [compliance, setCompliance] = useState<TrainingComplianceResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [seeding, setSeeding] = useState(false);
   const { addToast } = useToast();
@@ -24,8 +27,9 @@ export default function RHDashboard() {
   const fetchStats = async () => {
     setLoading(true);
     try {
-      const data = await getDashboardStats();
+      const [data, comp] = await Promise.all([getDashboardStats(), getTrainingCompliance(30)]);
       setStats(data);
+      setCompliance(comp);
     } catch (error) {
       addToast((error as any)?.message || 'Erro ao carregar dashboard RH.', 'error');
     } finally {
@@ -182,6 +186,35 @@ export default function RHDashboard() {
           </div>
           <div className="p-4 bg-white rounded-full shadow-sm">
             <DollarSign size={32} className="text-emerald-500" />
+          </div>
+        </GlassCard>
+
+        <GlassCard className="p-6 flex flex-col justify-between bg-gradient-to-br from-slate-50 to-blue-50 border-blue-100">
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <p className="text-gray-600 font-medium">Compliance de Treinamentos</p>
+              <p className="text-xs text-gray-500 mt-1">Vencimentos e pendências (próximos 30 dias)</p>
+            </div>
+            <Button variant="outline" className="h-9" onClick={() => navigate('/app/rh/treinamentos')}>
+              Ver treinamentos
+            </Button>
+          </div>
+          <div className="mt-4 grid grid-cols-3 gap-3">
+            <div className="rounded-xl border border-gray-200 bg-white p-3">
+              <div className="text-[11px] text-gray-500">OK</div>
+              <div className="text-2xl font-bold text-emerald-700">{compliance?.summary?.ok ?? 0}</div>
+            </div>
+            <div className="rounded-xl border border-gray-200 bg-white p-3">
+              <div className="text-[11px] text-gray-500">Vencendo</div>
+              <div className="text-2xl font-bold text-amber-700">{compliance?.summary?.due_soon ?? 0}</div>
+            </div>
+            <div className="rounded-xl border border-gray-200 bg-white p-3">
+              <div className="text-[11px] text-gray-500">Vencido/Pendente</div>
+              <div className="text-2xl font-bold text-red-700">{(compliance?.summary?.overdue ?? 0) + (compliance?.summary?.missing ?? 0)}</div>
+            </div>
+          </div>
+          <div className="mt-4 text-xs text-gray-600">
+            Dica: defina <span className="font-semibold">trilhas por cargo</span> (Cargos → Treinamentos) para reduzir suporte e padronizar a equipe.
           </div>
         </GlassCard>
 
