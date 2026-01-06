@@ -143,7 +143,9 @@ const SubscriptionPlans: React.FC = () => {
       <div
         className={[
           'mx-auto mt-8 grid gap-6',
-          isCompact ? 'max-w-3xl grid-cols-1 sm:grid-cols-2' : 'max-w-7xl grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 mt-12',
+          // Em modais, o container costuma ter largura "média": 4 colunas fica apertado.
+          // Mantemos 2 colunas até `xl` e só usamos 4 colunas em telas realmente grandes.
+          isCompact ? 'max-w-3xl grid-cols-1 sm:grid-cols-2' : 'max-w-7xl grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-8 mt-12',
         ].join(' ')}
       >
         {filteredPlans.map((plan, index) => (
