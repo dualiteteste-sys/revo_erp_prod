@@ -344,6 +344,7 @@ export default function ServicesPage() {
         isOpen={isImportOpen}
         onClose={() => setIsImportOpen(false)}
         importFn={(payload) => svc.createService(payload)}
+        deleteFn={(id) => svc.deleteService(id)}
         onImported={() => {
           setIsImportOpen(false);
           refresh();

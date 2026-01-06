@@ -384,6 +384,7 @@ const ProductsPage: React.FC = () => {
         isOpen={isImportOpen}
         onClose={() => setIsImportOpen(false)}
         importFn={saveProduct}
+        deleteFn={(id) => productsService.deleteProductById(id)}
         onImported={() => {
           setIsImportOpen(false);
           refreshList();
