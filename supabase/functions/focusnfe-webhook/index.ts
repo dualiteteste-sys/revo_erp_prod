@@ -109,6 +109,8 @@ serve(async (req) => {
             providedSha,
             expectedSha,
             authHeaderPresent: Boolean((req.headers.get("authorization") ?? "").trim()),
+            authHeader: req.headers.get("authorization") ?? null,
+            provided: auth.provided ?? null,
           },
         },
         cors,
