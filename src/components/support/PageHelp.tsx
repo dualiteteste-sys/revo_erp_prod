@@ -96,7 +96,7 @@ export default function PageHelp(props: PageHelpProps) {
                 <div className="rounded-2xl border border-blue-100 bg-blue-50/60 p-3">
                   <div className="text-sm font-semibold text-blue-900">{title}</div>
                   <div className="mt-1 text-xs text-blue-900/70">
-                    Este guia é específico deste módulo e foi feito para reduzir suporte: siga o fluxo ideal e evite os erros comuns.
+                    Esse é seu guia deste módulo. Seguindo o fluxo ideal e observando suas características, você evita os erros mais comuns.
                   </div>
                 </div>
               </div>
