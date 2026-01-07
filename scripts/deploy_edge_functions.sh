@@ -20,6 +20,7 @@ fi
 no_verify_jwt=(
   "stripe-webhook"
   "billing-webhook"
+  "focusnfe-webhook"
 )
 
 is_no_verify() {
@@ -50,4 +51,3 @@ for fn in "${functions[@]}"; do
     supabase functions deploy "$fn" --project-ref "$SUPABASE_PROJECT_REF"
   fi
 done
-
