@@ -67,7 +67,7 @@ export default function NfeSettingsPage({ onEmitenteSaved, onNumeracaoSaved }: P
   const canAdmin = empresaRoleQuery.isFetched && roleAtLeast(empresaRoleQuery.data, 'admin');
 
   const empresaId = activeEmpresa?.id;
-  const webhookUrl = `${(import.meta as any).env?.VITE_SUPABASE_URL}/functions/v1/nfeio-webhook`;
+  const webhookUrl = `${(import.meta as any).env?.VITE_SUPABASE_URL}/functions/v1/focusnfe-webhook`;
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -99,11 +99,18 @@ export default function NfeSettingsPage({ onEmitenteSaved, onNumeracaoSaved }: P
     try {
       const [
         { data: flagRow, error: flagError },
-        { data: cfgRow, error: cfgError },
+        { data: cfgFocusRow, error: cfgFocusError },
+        { data: cfgLegacyRow, error: cfgLegacyError },
         { data: emitRow, error: emitErr },
         { data: numsRows, error: numErr },
       ] = await Promise.all([
         supabase.from('empresa_feature_flags').select('nfe_emissao_enabled').eq('empresa_id', empresaId).maybeSingle(),
+        supabase
+          .from('fiscal_nfe_emissao_configs')
+          .select('id, empresa_id, provider_slug, ambiente, nfeio_company_id, webhook_secret_hint, observacoes')
+          .eq('empresa_id', empresaId)
+          .eq('provider_slug', 'FOCUSNFE')
+          .maybeSingle(),
         supabase
           .from('fiscal_nfe_emissao_configs')
           .select('id, empresa_id, provider_slug, ambiente, nfeio_company_id, webhook_secret_hint, observacoes')
@@ -125,17 +132,19 @@ export default function NfeSettingsPage({ onEmitenteSaved, onNumeracaoSaved }: P
       ]);
 
       if (flagError) throw flagError;
-      if (cfgError) throw cfgError;
+      if (cfgFocusError) throw cfgFocusError;
+      if (cfgLegacyError) throw cfgLegacyError;
       if (emitErr) throw emitErr;
       if (numErr) throw numErr;
 
+      const cfgRow = cfgFocusRow ?? cfgLegacyRow ?? null;
       setNfeEnabled(!!flagRow?.nfe_emissao_enabled);
       setConfig(
         cfgRow
           ? {
               id: cfgRow.id,
               empresa_id: cfgRow.empresa_id,
-              provider_slug: cfgRow.provider_slug ?? 'NFE_IO',
+              provider_slug: 'FOCUSNFE',
               ambiente: (cfgRow.ambiente ?? 'homologacao') as AmbienteNfe,
               nfeio_company_id: cfgRow.nfeio_company_id ?? null,
               webhook_secret_hint: cfgRow.webhook_secret_hint ?? null,
@@ -143,8 +152,8 @@ export default function NfeSettingsPage({ onEmitenteSaved, onNumeracaoSaved }: P
             }
           : {
               empresa_id: empresaId,
-              provider_slug: 'NFE_IO',
-              ambiente: 'homologacao',
+              provider_slug: 'FOCUSNFE',
+              ambiente: ((cfgLegacyRow as any)?.ambiente ?? 'homologacao') as AmbienteNfe,
               nfeio_company_id: null,
               webhook_secret_hint: null,
               observacoes: null,
@@ -260,9 +269,9 @@ export default function NfeSettingsPage({ onEmitenteSaved, onNumeracaoSaved }: P
       const payload = {
         id: config.id,
         empresa_id: empresaId,
-        provider_slug: 'NFE_IO',
+        provider_slug: 'FOCUSNFE',
         ambiente: config.ambiente,
-        nfeio_company_id: config.nfeio_company_id || null,
+        nfeio_company_id: null,
         webhook_secret_hint: config.webhook_secret_hint || null,
         observacoes: config.observacoes || null,
       };
@@ -301,6 +310,10 @@ export default function NfeSettingsPage({ onEmitenteSaved, onNumeracaoSaved }: P
   const handleDisableNumbers = async () => {
     if (!canAdmin) {
       addToast('Sem permissão. Apenas admin/owner.', 'error');
+      return;
+    }
+    if ((config?.provider_slug ?? 'FOCUSNFE') !== 'NFE_IO') {
+      addToast('Inutilização automática ainda não está disponível para o provedor Focus NF-e.', 'warning');
       return;
     }
     const serie = Math.max(1, Math.trunc(Number(disablementSerie) || 1));
@@ -498,7 +511,7 @@ export default function NfeSettingsPage({ onEmitenteSaved, onNumeracaoSaved }: P
       <div className="mb-6">
         <PageHeader
           title="Configurações de NF-e"
-          description="Base interna preparada para integração (NFE.io). Emissão pode permanecer desativada até o momento do go-live."
+          description="Base interna preparada para integração (Focus NF-e). Emissão pode permanecer desativada até o momento do go-live."
           icon={<Receipt size={20} />}
           actions={<RoadmapButton contextKey="fiscal" label="Assistente" title="Abrir assistente da NF-e" />}
         />
@@ -744,42 +757,31 @@ export default function NfeSettingsPage({ onEmitenteSaved, onNumeracaoSaved }: P
             </div>
           </GlassCard>
 
-          <GlassCard className="p-6">
-            <div className="flex items-start justify-between gap-6">
-              <div>
-                <h2 className="text-lg font-bold text-slate-900">Provedor (NFE.io)</h2>
-                <p className="text-sm text-slate-600 mt-1">Sem segredos aqui. Tokens e certificados ficarão em vault/edge function quando ativarmos a emissão.</p>
-              </div>
-              <Button onClick={handleSaveConfig} disabled={saving || !config || !canAdmin}>
-                {saving ? <Loader2 className="animate-spin" size={18} /> : <Save size={18} />}
-                <span className="ml-2">Salvar</span>
-              </Button>
+	          <GlassCard className="p-6">
+	            <div className="flex items-start justify-between gap-6">
+	              <div>
+	                <h2 className="text-lg font-bold text-slate-900">Provedor (Focus NF-e)</h2>
+	                <p className="text-sm text-slate-600 mt-1">
+	                  Sem segredos aqui. Tokens ficam na Focus; o Revo recebe atualizações via webhook (Edge Function).
+	                </p>
+	              </div>
+	              <Button onClick={handleSaveConfig} disabled={saving || !config || !canAdmin}>
+	                {saving ? <Loader2 className="animate-spin" size={18} /> : <Save size={18} />}
+	                <span className="ml-2">Salvar</span>
+	              </Button>
             </div>
 
             <div className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div className="md:col-span-2 rounded-xl border border-slate-200 bg-slate-50 p-4">
-                <p className="text-sm font-semibold text-slate-800">Webhook NFE.io (NFE-06)</p>
-                <p className="text-xs text-slate-600 mt-1">
-                  Use este endpoint no painel da NFE.io. Configure o HMAC com o mesmo valor do secret <span className="font-mono">NFEIO_WEBHOOK_SECRET</span> (Supabase secrets).
-                </p>
-                <div className="mt-2 text-xs text-slate-700 font-mono break-all">{webhookUrl}</div>
-              </div>
-
-              <div className="md:col-span-2">
-                <label className="block text-sm font-semibold text-slate-700 mb-2">NFE.io Company ID (obrigatório para NFE-07)</label>
-                <input
-                  type="text"
-                  value={config?.nfeio_company_id ?? ''}
-                  onChange={(e) =>
-                    setConfig((prev) => (prev ? { ...prev, nfeio_company_id: e.target.value || null } : prev))
-                  }
-                  placeholder="Ex.: 0f2c... (id da empresa no painel/API da NFE.io)"
-                  className="w-full p-3 border border-gray-300 rounded-xl shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                />
-                <p className="text-xs text-slate-500 mt-2">
-                  Esse ID é exigido pelos endpoints de <span className="font-semibold">cancelamento</span>, <span className="font-semibold">CC-e</span>, <span className="font-semibold">inutilização</span> e <span className="font-semibold">DANFE</span>.
-                </p>
-              </div>
+	              <div className="md:col-span-2 rounded-xl border border-slate-200 bg-slate-50 p-4">
+	                <p className="text-sm font-semibold text-slate-800">Webhook Focus NF-e</p>
+	                <p className="text-xs text-slate-600 mt-1">
+	                  Configure no painel da Focus (Webhooks → NF-e) com o header <span className="font-mono">Authorization</span> e valor{' '}
+	                  <span className="font-mono">Bearer {'<SEU_SEGREDO>'}</span>. O segredo deve existir nos Edge Secrets como{' '}
+	                  <span className="font-mono">FOCUSNFE_WEBHOOK_SECRET_HML</span> (homologação) e/ou{' '}
+	                  <span className="font-mono">FOCUSNFE_WEBHOOK_SECRET_PROD</span> (produção).
+	                </p>
+	                <div className="mt-2 text-xs text-slate-700 font-mono break-all">{webhookUrl}</div>
+	              </div>
 
               <div>
                 <label className="block text-sm font-semibold text-slate-700 mb-2">Ambiente</label>
@@ -794,17 +796,17 @@ export default function NfeSettingsPage({ onEmitenteSaved, onNumeracaoSaved }: P
                 <p className="text-xs text-slate-500 mt-2">Recomendado manter em homologação até o go-live.</p>
               </div>
 
-              <div>
-                <label className="block text-sm font-semibold text-slate-700 mb-2">Webhook (dica / identificador)</label>
-                <input
-                  type="text"
-                  value={config?.webhook_secret_hint ?? ''}
-                  onChange={(e) => setConfig((prev) => (prev ? { ...prev, webhook_secret_hint: e.target.value || null } : prev))}
-                  placeholder="Ex.: nfeio-webhook-empresa-01"
-                  className="w-full p-3 border border-gray-300 rounded-xl shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                />
-                <p className="text-xs text-slate-500 mt-2">Apenas referência. O segredo real não deve ser salvo no banco.</p>
-              </div>
+	              <div>
+	                <label className="block text-sm font-semibold text-slate-700 mb-2">Webhook (dica / identificador)</label>
+	                <input
+	                  type="text"
+	                  value={config?.webhook_secret_hint ?? ''}
+	                  onChange={(e) => setConfig((prev) => (prev ? { ...prev, webhook_secret_hint: e.target.value || null } : prev))}
+	                  placeholder="Ex.: focusnfe-webhook-empresa-01"
+	                  className="w-full p-3 border border-gray-300 rounded-xl shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+	                />
+	                <p className="text-xs text-slate-500 mt-2">Apenas referência. O segredo real não deve ser salvo no banco.</p>
+	              </div>
 
               <div className="md:col-span-2">
                 <label className="block text-sm font-semibold text-slate-700 mb-2">Observações</label>
