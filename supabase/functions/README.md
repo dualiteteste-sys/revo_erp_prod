@@ -35,3 +35,9 @@ Abaixo está uma lista de todas as funções e seus respectivos endpoints e resp
 - **Endpoint**: `/billing-invoices`
 - **Método**: `POST`
 - **Descrição**: Lista as faturas/recibos do cliente (Stripe) para a empresa atual (self-serve no app).
+
+### 6. `focusnfe-webhook`
+
+- **Endpoint**: `/focusnfe-webhook`
+- **Método**: `POST` (aceita `GET/HEAD` para validação do endpoint no painel)
+- **Descrição**: Recebe webhooks da Focus NF-e e registra o evento de forma idempotente em `public.fiscal_nfe_webhook_events` (provider=`focusnfe`) para processamento assíncrono/reprocessamento seguro.
