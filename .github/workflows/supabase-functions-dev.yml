@@ -35,6 +35,8 @@ jobs:
           NFEIO_WORKER_SECRET_DEV: ${{ secrets.NFEIO_WORKER_SECRET_DEV }}
           STRIPE_SECRET_KEY_DEV: ${{ secrets.STRIPE_SECRET_KEY_DEV }}
           STRIPE_WEBHOOK_SECRET_DEV: ${{ secrets.STRIPE_WEBHOOK_SECRET_DEV }}
+          FOCUSNFE_WEBHOOK_SECRET_HML: ${{ secrets.FOCUSNFE_WEBHOOK_SECRET_HML }}
+          FOCUSNFE_WEBHOOK_SECRET_PROD: ${{ secrets.FOCUSNFE_WEBHOOK_SECRET_PROD }}
         run: |
           set -euo pipefail
 
@@ -63,6 +65,14 @@ jobs:
           fi
           if [[ -n "${STRIPE_WEBHOOK_SECRET_DEV:-}" ]]; then
             supabase secrets set --project-ref "$PROJECT_REF" STRIPE_WEBHOOK_SECRET="$STRIPE_WEBHOOK_SECRET_DEV"
+          fi
+
+          # Focus NF-e webhook auth (used by focusnfe-webhook)
+          if [[ -n "${FOCUSNFE_WEBHOOK_SECRET_HML:-}" ]]; then
+            supabase secrets set --project-ref "$PROJECT_REF" FOCUSNFE_WEBHOOK_SECRET_HML="$FOCUSNFE_WEBHOOK_SECRET_HML"
+          fi
+          if [[ -n "${FOCUSNFE_WEBHOOK_SECRET_PROD:-}" ]]; then
+            supabase secrets set --project-ref "$PROJECT_REF" FOCUSNFE_WEBHOOK_SECRET_PROD="$FOCUSNFE_WEBHOOK_SECRET_PROD"
           fi
 
           echo "[DEV] Deploying Edge Functions..."
