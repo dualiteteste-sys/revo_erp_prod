@@ -1,6 +1,9 @@
 [functions]
   verify_jwt = true
 
+[functions.focusnfe-webhook]
+  verify_jwt = false
+
 [functions.manual-create-user]
   cors_origins = ["http://localhost:5173"]
   cors_methods = ["POST", "OPTIONS"]
