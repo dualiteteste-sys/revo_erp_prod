@@ -21,7 +21,11 @@ function headersToJson(headers: Headers): Record<string, string> {
 }
 
 function getExpectedSecrets(): string[] {
-  const secrets = [WEBHOOK_SECRET, WEBHOOK_SECRET_HML, WEBHOOK_SECRET_PROD].map((s) => s.trim()).filter(Boolean);
+  // Normaliza também segredos salvos com prefixo "Bearer " (erro comum ao configurar webhooks).
+  const secrets = [WEBHOOK_SECRET, WEBHOOK_SECRET_HML, WEBHOOK_SECRET_PROD]
+    .map((s) => extractBearerToken(s))
+    .map((s) => s.trim())
+    .filter(Boolean);
   return Array.from(new Set(secrets));
 }
 
@@ -110,4 +114,3 @@ serve(async (req) => {
 
   return json(200, { ok: true }, cors);
 });
-
