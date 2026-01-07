@@ -35,13 +35,13 @@ const STATIC_PLANS: Plan[] = [
     title: "Revo Essencial",
     monthlyAmountCents: 14900,
     features: [
-      "Comércio + Serviços (o mínimo redondo)",
+      "Comércio + Serviços (o essencial, sem complicação)",
       "Pedidos + PDV simples (1 caixa)",
-      "OS + Notas de Serviço (MVP)",
+      "OS + Notas de Serviço",
       "Estoque + OC + Recebimentos + Importação XML",
-      "Financeiro básico (caixa, pagar/receber, extrato)",
-      "NF-e: rascunhos + configurações",
-      "Limites para manter suporte leve (2 usuários)",
+      "Financeiro (caixa, pagar/receber, extrato e relatórios)",
+      "NF-e: emissão + eventos (via provedor) + armazenamento",
+      "Limites pensados para manter suporte leve (2 usuários)",
     ],
     highlight: true,
   },
@@ -53,8 +53,8 @@ const STATIC_PLANS: Plan[] = [
       "Tudo do Essencial",
       "Comissões + metas + painel de vendas",
       "Expedição (fluxo completo)",
-      "Automações de vendas (MVP)",
-      "CRM (funil/oportunidades) (MVP)",
+      "Automações de vendas",
+      "CRM (funil/oportunidades)",
       "Relatórios avançados (vendas/financeiro/estoque)",
       "PDV até 3 caixas • até 5 usuários",
     ],
@@ -69,6 +69,7 @@ const STATIC_PLANS: Plan[] = [
       "Relatórios de serviços (OS) mais completos",
       "Centros de custo e visão financeira mais detalhada",
       "Ideal para serviços recorrentes",
+      "Até 10 usuários",
     ],
   },
   {
@@ -77,7 +78,7 @@ const STATIC_PLANS: Plan[] = [
     monthlyAmountCents: 59000,
     features: [
       "Tudo do Pro + pacote completo Indústria",
-      "BOM + roteiros + OP/OB + execução",
+      "Ficha Técnica + roteiros + OP/OB + execução",
       "Tela do operador / chão de fábrica",
       "Qualidade (planos/motivos) + lotes/bloqueio",
       "MRP/PCP/capacidade (progressivo)",
@@ -107,19 +108,19 @@ export default function Pricing() {
   const isAuthenticated = !!session?.user;
   const plans = useMemo(() => STATIC_PLANS, []);
   const [activeSlug, setActiveSlug] = useState<Plan["slug"]>("max");
-  const [billingCycle, setBillingCycle] = useState<"monthly" | "yearly">("yearly");
+  const [billingCycle, setBillingCycle] = useState<"monthly" | "yearly">("monthly");
 
   const compareRows = useMemo<CompareRow[]>(
     () => [
-      { feature: "Usuários incluídos", essencial: "2", pro: "5", max: "5", industria: "10", scale: "Ilimitado" },
+      { feature: "Usuários incluídos", essencial: "2", pro: "5", max: "10", industria: "10", scale: "Ilimitado" },
       { feature: "PDV (caixas)", essencial: "1", pro: "até 3", max: "até 3", industria: "Add-on", scale: "Add-on" },
+      { feature: "Assistente de configuração (primeiro uso guiado)", essencial: "Inclui", pro: "Inclui", max: "Inclui", industria: "Inclui", scale: "Inclui" },
       { feature: "Cadastros (clientes, produtos, serviços, etc.)", essencial: "Inclui", pro: "Inclui", max: "Inclui", industria: "Inclui", scale: "Inclui" },
       { feature: "Vendas (pedidos/orçamentos)", essencial: "Inclui", pro: "Inclui", max: "Inclui", industria: "Inclui", scale: "Inclui" },
       { feature: "Estoque + OC + recebimentos + importação XML", essencial: "Inclui", pro: "Inclui", max: "Inclui", industria: "Inclui", scale: "Inclui" },
       { feature: "Financeiro (caixa, pagar/receber, extrato)", essencial: "Inclui", pro: "Inclui", max: "Inclui", industria: "Inclui", scale: "Inclui" },
-      { feature: "Centros de custo (visão detalhada)", essencial: "Básico", pro: "Inclui", max: "Inclui (forte)", industria: "Inclui", scale: "Inclui" },
-      { feature: "NF-e (config + rascunhos)", essencial: "Inclui", pro: "Inclui", max: "Inclui", industria: "Inclui", scale: "Inclui" },
-      { feature: "Emissão NF-e via provedor (volume)", essencial: "Add-on", pro: "Add-on", max: "Add-on", industria: "Add-on/Inclui", scale: "Inclui (pacotes)" },
+      { feature: "Centros de custo (visão detalhada)", essencial: "Inclui", pro: "Inclui", max: "Inclui (forte)", industria: "Inclui", scale: "Inclui" },
+      { feature: "NF-e (emissão + eventos + armazenamento)", essencial: "Inclui", pro: "Inclui", max: "Inclui", industria: "Inclui", scale: "Inclui" },
       { feature: "CRM (funil/oportunidades)", essencial: "—", pro: "Inclui", max: "Inclui", industria: "Inclui", scale: "Inclui" },
       { feature: "Comissões", essencial: "—", pro: "Inclui", max: "Inclui", industria: "Inclui", scale: "Inclui" },
       { feature: "Expedição (fluxo completo)", essencial: "—", pro: "Inclui", max: "Inclui", industria: "Inclui", scale: "Inclui" },
@@ -128,8 +129,11 @@ export default function Pricing() {
       { feature: "Contratos + cobrança recorrente", essencial: "—", pro: "Add-on", max: "Inclui", industria: "Add-on", scale: "Inclui" },
       { feature: "Indústria (Ficha Técnica/OP/execução)", essencial: "—", pro: "—", max: "—", industria: "Inclui", scale: "Inclui" },
       { feature: "Qualidade + lotes/bloqueio", essencial: "—", pro: "—", max: "—", industria: "Inclui", scale: "Inclui" },
+      { feature: "RH & Qualidade (cadastros e matriz)", essencial: "Inclui", pro: "Inclui", max: "Inclui", industria: "Inclui", scale: "Inclui" },
       { feature: "Multiunidade / governança", essencial: "—", pro: "—", max: "—", industria: "Add-on", scale: "Inclui" },
+      { feature: "Integrações (marketplaces)", essencial: "Inclui", pro: "Inclui", max: "Inclui", industria: "Inclui", scale: "Inclui" },
       { feature: "API/Webhooks e integrações (pacotes)", essencial: "—", pro: "Add-on", max: "Add-on", industria: "Add-on", scale: "Inclui" },
+      { feature: "Auditoria e logs (rastreamento de ações)", essencial: "Inclui", pro: "Inclui", max: "Inclui", industria: "Inclui", scale: "Inclui" },
       { feature: "Suporte prioritário / SLA", essencial: "—", pro: "—", max: "—", industria: "—", scale: "Inclui" },
     ],
     []
@@ -174,7 +178,7 @@ export default function Pricing() {
           </p>
         </header>
 
-        <div className="mt-2 flex justify-center items-center">
+        <div className="mt-6 mb-8 flex justify-center items-center">
           <span className={`text-sm font-medium ${billingCycle === "monthly" ? "text-blue-600" : "text-slate-500"}`}>
             Mensal
           </span>

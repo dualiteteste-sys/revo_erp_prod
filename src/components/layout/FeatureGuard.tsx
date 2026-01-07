@@ -22,12 +22,10 @@ const UpgradeGate: React.FC<{ featureName: string }> = ({ featureName }) => (
         Ative o add-on para ter acesso a esta funcionalidade.
       </p>
       <Link 
-        to="/revo-send"
-        target="_blank"
-        rel="noopener noreferrer"
+        to="/app/configuracoes/geral/assinatura"
         className="inline-block bg-blue-600 text-white font-bold py-2 px-6 rounded-lg hover:bg-blue-700 transition-colors"
       >
-        Ver Planos do REVO Send
+        Gerenciar assinatura
       </Link>
     </div>
   </div>

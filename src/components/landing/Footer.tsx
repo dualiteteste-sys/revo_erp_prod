@@ -11,7 +11,6 @@ const Footer: React.FC = () => {
             <h3 className="text-xs font-semibold tracking-wider uppercase text-slate-500">Produtos</h3>
             <ul className="mt-4 space-y-2">
               <li><Link to="/" className="text-sm text-slate-700 hover:text-slate-900">REVO ERP</Link></li>
-              <li><Link to="/revo-send" className="text-sm text-slate-700 hover:text-slate-900">REVO Send</Link></li>
               <li><Link to="/revo-fluxo" className="text-sm text-slate-700 hover:text-slate-900">REVO Fluxo</Link></li>
             </ul>
           </div>
