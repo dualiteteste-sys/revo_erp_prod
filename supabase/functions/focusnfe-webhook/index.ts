@@ -71,6 +71,25 @@ serve(async (req) => {
   // Focus pode testar o endpoint no cadastro do webhook (GET/HEAD).
   if (req.method === "OPTIONS") return new Response(null, { status: 204, headers: cors });
   if (req.method === "GET" || req.method === "HEAD") {
+    const url = new URL(req.url);
+    if (url.searchParams.get("debug") === "1") {
+      const generic = (Deno.env.get("FOCUSNFE_WEBHOOK_SECRET") ?? "").trim();
+      const hml = (Deno.env.get("FOCUSNFE_WEBHOOK_SECRET_HML") ?? "").trim();
+      const prod = (Deno.env.get("FOCUSNFE_WEBHOOK_SECRET_PROD") ?? "").trim();
+      const hash = async (v: string) => (v ? await sha256Hex(v) : null);
+      return json(
+        200,
+        {
+          ok: true,
+          provider: "focusnfe",
+          debug: {
+            has: { generic: Boolean(generic), hml: Boolean(hml), prod: Boolean(prod) },
+            sha256: { generic: await hash(generic), hml: await hash(hml), prod: await hash(prod) },
+          },
+        },
+        cors,
+      );
+    }
     return json(200, { ok: true, provider: "focusnfe" }, cors);
   }
   if (req.method !== "POST") return json(405, { ok: false, error: "METHOD_NOT_ALLOWED" }, cors);
