@@ -33,7 +33,7 @@ function getExpectedSecrets(): string[] {
 
 function extractBearerToken(value: string): string {
   const v = value.trim();
-  if (/^bearer\\s+/i.test(v)) return v.replace(/^bearer\\s+/i, "").trim();
+  if (/^bearer\s+/i.test(v)) return v.replace(/^bearer\s+/i, "").trim();
   return v;
 }
 
