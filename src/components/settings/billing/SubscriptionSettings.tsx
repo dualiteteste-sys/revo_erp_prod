@@ -649,10 +649,6 @@ const SubscriptionSettings: React.FC<SubscriptionSettingsProps> = ({ onSwitchToP
             ) : (
                 <div className="text-center py-6">
                     <p className="text-gray-500">Nenhum add-on ativo para esta empresa.</p>
-                    <a href="/revo-send" target="_blank" rel="noopener noreferrer" className="mt-4 inline-flex items-center gap-2 text-blue-600 font-semibold hover:underline">
-                        <PlusCircle size={16} />
-                        Conheça o REVO Send
-                    </a>
                 </div>
             )}
         </div>

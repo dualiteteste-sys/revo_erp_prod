@@ -71,7 +71,6 @@ const Header: React.FC<HeaderProps> = ({ onLoginClick }) => {
                       className="absolute top-full mt-2 w-56 rounded-2xl bg-white shadow-xl ring-1 ring-black/5 p-2"
                     >
                       <Link to="/" className="block px-3 py-2 rounded-xl text-sm text-slate-700 hover:bg-slate-50">REVO ERP</Link>
-                      <Link to="/revo-send" className="block px-3 py-2 rounded-xl text-sm text-slate-700 hover:bg-slate-50">REVO Send</Link>
                       <Link to="/revo-fluxo" className="block px-3 py-2 rounded-xl text-sm text-slate-700 hover:bg-slate-50">REVO Fluxo</Link>
                     </motion.div>
                   )}
@@ -129,7 +128,6 @@ const Header: React.FC<HeaderProps> = ({ onLoginClick }) => {
                 <h3 className="text-xs font-semibold text-slate-500 tracking-wide">Produtos</h3>
                 <div className="mt-2 space-y-1">
                   <Link to="/" className="block px-3 py-2 rounded-xl text-base font-medium text-slate-800 hover:bg-slate-50">REVO ERP</Link>
-                  <Link to="/revo-send" className="block px-3 py-2 rounded-xl text-base font-medium text-slate-800 hover:bg-slate-50">REVO Send</Link>
                   <Link to="/revo-fluxo" className="block px-3 py-2 rounded-xl text-base font-medium text-slate-800 hover:bg-slate-50">REVO Fluxo</Link>
                 </div>
               </div>
