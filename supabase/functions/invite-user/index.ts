@@ -26,11 +26,24 @@ function corsHeaders(origin: string | null) {
 const SUPABASE_URL  = Deno.env.get("SUPABASE_URL")!;
 const ANON_KEY      = Deno.env.get("SUPABASE_ANON_KEY")!;
 const SERVICE_KEY   = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-const SITE_URL      = Deno.env.get("SITE_URL") ?? "http://localhost:5173";
+const SITE_URL      = (Deno.env.get("SITE_URL") ?? "").trim();
 
 /* ===== TYPES ===== */
 type InvitePayload = { email?: string; role?: string; empresa_id?: string };
 const asSlug = (s?: string) => (s ?? "").trim().toUpperCase();
+
+function pickSiteUrl(req: Request): string {
+  const origin = (req.headers.get("origin") ?? "").trim();
+  const allowedExact = new Set<string>([
+    "https://erprevo.com",
+    "https://erprevodev.com",
+    "http://localhost:5173",
+  ]);
+
+  const candidate = allowedExact.has(origin) ? origin : SITE_URL;
+  if (allowedExact.has(candidate)) return candidate;
+  return candidate || "http://localhost:5173";
+}
 
 serve(async (req) => {
   const origin = req.headers.get("origin");
@@ -135,7 +148,10 @@ serve(async (req) => {
     }
 
     /* ===== Lógica de envio de e-mail ===== */
-    const redirectTo = `${SITE_URL}/onboarding/accept?empresa_id=${empresaId}`;
+    const siteUrl = pickSiteUrl(req);
+    // Importante: o usuário deve cair na tela de definir senha ao aceitar o convite (estado da arte, sem fricção).
+    // Obs: este path precisa estar permitido em Auth → URL Configuration (Redirect URLs) no Supabase.
+    const redirectTo = `${siteUrl}/auth/update-password?empresa_id=${encodeURIComponent(empresaId)}`;
     let userId: string | null = null;
     let emailSent = false;
 
