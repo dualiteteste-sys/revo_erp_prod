@@ -16,6 +16,7 @@ import SubscriptionStatusBanner from '@/components/billing/SubscriptionStatusBan
 import { PlanIntentCheckoutModal } from '@/components/billing/PlanIntentCheckoutModal';
 import { RoadmapProvider } from '@/contexts/RoadmapProvider';
 import ContextualHelp from '@/components/support/ContextualHelp';
+import PostInviteWelcomeModal from '@/components/onboarding/PostInviteWelcomeModal';
 
 const findActiveHref = (pathname: string): string => {
   for (const group of menuConfig) {
@@ -61,6 +62,7 @@ const MainLayout: React.FC = () => {
   const [isOnboardingWizardOpen, setIsOnboardingWizardOpen] = useState(false);
   const [onboardingAutoOpenPending, setOnboardingAutoOpenPending] = useState(false);
   const [onboardingForceStepKey, setOnboardingForceStepKey] = useState<string | null>(null);
+  const [isPostInviteWelcomeOpen, setIsPostInviteWelcomeOpen] = useState(false);
 
   useEffect(() => {
     setActiveItem(findActiveHref(location.pathname));
@@ -83,6 +85,19 @@ const MainLayout: React.FC = () => {
       return null;
     }
   }, [location.search]);
+
+  // Pós-convite “estado da arte+”: mostra um welcome leve (não bloqueia) com CTA para wizard/assinatura/usuários.
+  useEffect(() => {
+    if (authLoading || !activeEmpresa) return;
+    try {
+      const raw = sessionStorage.getItem('revo:post_auth_welcome');
+      if (!raw) return;
+      sessionStorage.removeItem('revo:post_auth_welcome');
+      setIsPostInviteWelcomeOpen(true);
+    } catch {
+      // ignore
+    }
+  }, [activeEmpresa, authLoading]);
 
   useEffect(() => {
     try {
@@ -119,6 +134,9 @@ const MainLayout: React.FC = () => {
       } else if (settingsParam === 'billing') {
         setSettingsInitialTab('Geral');
         setSettingsInitialItem('Minha Assinatura');
+      } else if (settingsParam === 'users') {
+        setSettingsInitialTab('Geral');
+        setSettingsInitialItem('Usuários');
       }
       navigate(location.pathname, { replace: true });
     }
@@ -179,6 +197,10 @@ const MainLayout: React.FC = () => {
                 setIsOnboardingWizardOpen(false);
                 setOnboardingForceStepKey(null);
               }}
+            />
+            <PostInviteWelcomeModal
+              isOpen={isPostInviteWelcomeOpen}
+              onClose={() => setIsPostInviteWelcomeOpen(false)}
             />
             <PlanIntentCheckoutModal />
             <Sidebar

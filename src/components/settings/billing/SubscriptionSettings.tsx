@@ -144,6 +144,7 @@ const SubscriptionSettings: React.FC<SubscriptionSettingsProps> = ({ onSwitchToP
   const [maxUsers, setMaxUsers] = useState<number>(999);
   const [maxNfeMonthly, setMaxNfeMonthly] = useState<number>(999);
   const [currentUsersCount, setCurrentUsersCount] = useState<number | null>(null);
+  const [pendingUsersCount, setPendingUsersCount] = useState<number | null>(null);
   const [finopsStatus, setFinopsStatus] = useState<FinopsLimitsStatus | null>(null);
   const [loadingFinopsStatus, setLoadingFinopsStatus] = useState(false);
   const [syncingStripe, setSyncingStripe] = useState(false);
@@ -202,6 +203,7 @@ const SubscriptionSettings: React.FC<SubscriptionSettingsProps> = ({ onSwitchToP
     const empresaId = activeEmpresa?.id;
     if (!empresaId) {
       setCurrentUsersCount(null);
+      setPendingUsersCount(null);
       return;
     }
 
@@ -214,8 +216,17 @@ const SubscriptionSettings: React.FC<SubscriptionSettingsProps> = ({ onSwitchToP
 
       if (error) throw error;
       setCurrentUsersCount(typeof count === 'number' ? count : null);
+
+      const { count: pendingCount, error: pendingErr } = await (supabase as any)
+        .from('empresa_usuarios')
+        .select('user_id', { count: 'exact', head: true })
+        .eq('empresa_id', empresaId)
+        .eq('status', 'PENDING');
+      if (pendingErr) throw pendingErr;
+      setPendingUsersCount(typeof pendingCount === 'number' ? pendingCount : null);
     } catch {
       setCurrentUsersCount(null);
+      setPendingUsersCount(null);
     }
   }, [activeEmpresa?.id, supabase]);
 
@@ -702,8 +713,11 @@ const SubscriptionSettings: React.FC<SubscriptionSettingsProps> = ({ onSwitchToP
     const normalizedMaxUsers = Number.isFinite(maxUsers) ? Math.max(1, Math.trunc(maxUsers)) : 999;
     const normalizedMaxNfeMonthly = Number.isFinite(maxNfeMonthly) ? Math.max(0, Math.trunc(maxNfeMonthly)) : 999;
     const currentUsers = currentUsersCount ?? 0;
-    const isOverLimit = currentUsersCount !== null && currentUsers > normalizedMaxUsers;
-    const isAtLimit = currentUsersCount !== null && currentUsers >= normalizedMaxUsers;
+    const pendingUsers = pendingUsersCount ?? 0;
+    const reservedUsers = currentUsers + pendingUsers;
+    const reservedKnown = currentUsersCount !== null && pendingUsersCount !== null;
+    const isOverLimit = reservedKnown && reservedUsers > normalizedMaxUsers;
+    const isAtLimit = reservedKnown && reservedUsers >= normalizedMaxUsers;
     const isSyncedFromBilling = !!subscription;
     const canEditEntitlements = canAdmin && !isSyncedFromBilling;
     const nfeUsed = finopsStatus?.ok ? finopsStatus?.nfe?.used ?? null : null;
@@ -794,10 +808,16 @@ const SubscriptionSettings: React.FC<SubscriptionSettingsProps> = ({ onSwitchToP
           </p>
           <div className="mt-3 flex items-center justify-between rounded-lg border border-gray-200 bg-white/60 px-3 py-2">
             <div className="text-xs text-gray-700">
-              Usuários na empresa: <span className="font-semibold">{currentUsersCount === null ? '—' : currentUsers}</span>
+              Usuários ativos: <span className="font-semibold">{currentUsersCount === null ? '—' : currentUsers}</span>
+              {pendingUsersCount !== null ? (
+                <span className="text-gray-500">
+                  {' '}
+                  • convites pendentes: <span className="font-semibold">{pendingUsers}</span>
+                </span>
+              ) : null}
             </div>
             <div className={`text-xs font-semibold ${isOverLimit ? 'text-red-700' : isAtLimit ? 'text-amber-700' : 'text-gray-600'}`}>
-              {currentUsersCount === null ? 'Sem leitura' : `${currentUsers} / ${normalizedMaxUsers}`}
+              {currentUsersCount === null ? 'Sem leitura' : `${reservedUsers} / ${normalizedMaxUsers}`}
             </div>
           </div>
           {isOverLimit && (

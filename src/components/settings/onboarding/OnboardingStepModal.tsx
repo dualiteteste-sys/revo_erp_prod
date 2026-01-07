@@ -81,7 +81,7 @@ export default function OnboardingStepModal({ isOpen, onClose, empresaId, step, 
     setLoading(true);
     try {
       await setContaCorrentePadrao({ id: selectedConta.id, para, value: true });
-      addToast('Conta padrão definida!', 'success');
+      addToast(`Etapa concluída: ${step.title}.`, 'success');
       await onDone();
       onClose();
     } catch (e: any) {
@@ -98,6 +98,7 @@ export default function OnboardingStepModal({ isOpen, onClose, empresaId, step, 
           conta={null}
           onClose={onClose}
           onSaveSuccess={async () => {
+            addToast(`Etapa concluída: ${step.title}.`, 'success');
             await onDone();
             onClose();
           }}
@@ -176,6 +177,7 @@ export default function OnboardingStepModal({ isOpen, onClose, empresaId, step, 
           centro={null}
           onClose={onClose}
           onSaveSuccess={async (_saved: CentroDeCusto) => {
+            addToast(`Etapa concluída: ${step.title}.`, 'success');
             await onDone();
             onClose();
           }}
@@ -190,6 +192,7 @@ export default function OnboardingStepModal({ isOpen, onClose, empresaId, step, 
         <div className="p-6">
           <CompanySettingsForm
             onSaved={async () => {
+              addToast(`Etapa concluída: ${step.title}.`, 'success');
               await onDone();
               onClose();
             }}
@@ -205,10 +208,12 @@ export default function OnboardingStepModal({ isOpen, onClose, empresaId, step, 
         <div className="p-6">
           <NfeSettingsPage
             onEmitenteSaved={async () => {
+              addToast(`Etapa concluída: ${step.title}.`, 'success');
               await onDone();
               onClose();
             }}
             onNumeracaoSaved={async () => {
+              addToast(`Etapa concluída: ${step.title}.`, 'success');
               await onDone();
               onClose();
             }}

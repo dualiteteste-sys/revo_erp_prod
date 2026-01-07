@@ -83,8 +83,14 @@ export default function UpdatePasswordPage() {
       // Garante que o usuário entra com empresa ativa (evita cair na landing / estado inconsistente).
       await bootstrapEmpresaParaUsuarioAtual();
 
+      try {
+        sessionStorage.setItem('revo:post_auth_welcome', empresaId ? `invite:${empresaId}` : 'invite');
+      } catch {
+        // ignore
+      }
+
       setOkMsg("Senha atualizada com sucesso! Redirecionando para o painel...");
-      setTimeout(() => navigate("/app"), 2000);
+      setTimeout(() => navigate("/app"), 900);
     } catch (e: any) {
       console.error("[AUTH] update/accept error", e);
       setError(e?.message ?? "Falha ao atualizar a senha.");
@@ -99,7 +105,7 @@ export default function UpdatePasswordPage() {
         <Loader2 className="w-12 h-12 animate-spin text-blue-600" />
       </div>
     );
-  }
+}
 
   return (
     <div className="min-h-screen flex items-center justify-center p-4 bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50">
