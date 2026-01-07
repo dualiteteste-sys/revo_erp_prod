@@ -37,16 +37,16 @@ function extractBearerToken(value: string): string {
   return v;
 }
 
-function isAuthorized(req: Request): { ok: boolean; reason?: string } {
+function isAuthorized(req: Request): { ok: boolean; reason?: string; provided?: string; expected?: string[] } {
   const expected = getExpectedSecrets();
-  if (expected.length === 0) return { ok: false, reason: "MISSING_FOCUSNFE_WEBHOOK_SECRET" };
+  if (expected.length === 0) return { ok: false, reason: "MISSING_FOCUSNFE_WEBHOOK_SECRET", expected };
 
   const authHeader = req.headers.get("authorization") || "";
-  if (!authHeader.trim()) return { ok: false, reason: "MISSING_AUTHORIZATION_HEADER" };
+  if (!authHeader.trim()) return { ok: false, reason: "MISSING_AUTHORIZATION_HEADER", expected };
 
   const provided = extractBearerToken(authHeader);
   const ok = expected.some((s) => timingSafeEqual(provided, s));
-  return ok ? { ok: true } : { ok: false, reason: "INVALID_AUTHORIZATION" };
+  return ok ? { ok: true } : { ok: false, reason: "INVALID_AUTHORIZATION", provided, expected };
 }
 
 function extractMeta(payload: any): { eventType: string | null; focusRef: string | null } {
@@ -96,6 +96,24 @@ serve(async (req) => {
 
   const auth = isAuthorized(req);
   if (!auth.ok) {
+    const url = new URL(req.url);
+    if (url.searchParams.get("debug") === "1") {
+      const providedSha = auth.provided ? await sha256Hex(auth.provided) : null;
+      const expectedSha = auth.expected ? await Promise.all(auth.expected.map((s) => sha256Hex(s))) : [];
+      return json(
+        401,
+        {
+          ok: false,
+          error: auth.reason ?? "UNAUTHORIZED",
+          debug: {
+            providedSha,
+            expectedSha,
+            authHeaderPresent: Boolean((req.headers.get("authorization") ?? "").trim()),
+          },
+        },
+        cors,
+      );
+    }
     return json(401, { ok: false, error: auth.reason ?? "UNAUTHORIZED" }, cors);
   }
 
