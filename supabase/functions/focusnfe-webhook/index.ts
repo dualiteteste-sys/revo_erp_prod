@@ -8,10 +8,6 @@ import { sanitizeForLog, sanitizeHeaders } from "../_shared/sanitize.ts";
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
-const WEBHOOK_SECRET_HML = (Deno.env.get("FOCUSNFE_WEBHOOK_SECRET_HML") ?? "").trim();
-const WEBHOOK_SECRET_PROD = (Deno.env.get("FOCUSNFE_WEBHOOK_SECRET_PROD") ?? "").trim();
-const WEBHOOK_SECRET = (Deno.env.get("FOCUSNFE_WEBHOOK_SECRET") ?? "").trim();
-
 function json(status: number, body: unknown, headers: Record<string, string>) {
   return new Response(JSON.stringify(body), { status, headers: { ...headers, "Content-Type": "application/json" } });
 }
@@ -21,6 +17,12 @@ function headersToJson(headers: Headers): Record<string, string> {
 }
 
 function getExpectedSecrets(): string[] {
+  // Lê os secrets em runtime (não em module-load) porque o Supabase Edge pode manter o isolate
+  // "quente" por algum tempo; assim mudanças em secrets passam a valer imediatamente.
+  const WEBHOOK_SECRET = (Deno.env.get("FOCUSNFE_WEBHOOK_SECRET") ?? "").trim();
+  const WEBHOOK_SECRET_HML = (Deno.env.get("FOCUSNFE_WEBHOOK_SECRET_HML") ?? "").trim();
+  const WEBHOOK_SECRET_PROD = (Deno.env.get("FOCUSNFE_WEBHOOK_SECRET_PROD") ?? "").trim();
+
   // Normaliza também segredos salvos com prefixo "Bearer " (erro comum ao configurar webhooks).
   const secrets = [WEBHOOK_SECRET, WEBHOOK_SECRET_HML, WEBHOOK_SECRET_PROD]
     .map((s) => extractBearerToken(s))
