@@ -37,16 +37,16 @@ function extractBearerToken(value: string): string {
   return v;
 }
 
-function isAuthorized(req: Request): { ok: boolean; reason?: string; provided?: string; expected?: string[] } {
+function isAuthorized(req: Request): { ok: boolean; reason?: string } {
   const expected = getExpectedSecrets();
-  if (expected.length === 0) return { ok: false, reason: "MISSING_FOCUSNFE_WEBHOOK_SECRET", expected };
+  if (expected.length === 0) return { ok: false, reason: "MISSING_FOCUSNFE_WEBHOOK_SECRET" };
 
   const authHeader = req.headers.get("authorization") || "";
-  if (!authHeader.trim()) return { ok: false, reason: "MISSING_AUTHORIZATION_HEADER", expected };
+  if (!authHeader.trim()) return { ok: false, reason: "MISSING_AUTHORIZATION_HEADER" };
 
   const provided = extractBearerToken(authHeader);
   const ok = expected.some((s) => timingSafeEqual(provided, s));
-  return ok ? { ok: true } : { ok: false, reason: "INVALID_AUTHORIZATION", provided, expected };
+  return ok ? { ok: true } : { ok: false, reason: "INVALID_AUTHORIZATION" };
 }
 
 function extractMeta(payload: any): { eventType: string | null; focusRef: string | null } {
@@ -71,51 +71,12 @@ serve(async (req) => {
   // Focus pode testar o endpoint no cadastro do webhook (GET/HEAD).
   if (req.method === "OPTIONS") return new Response(null, { status: 204, headers: cors });
   if (req.method === "GET" || req.method === "HEAD") {
-    const url = new URL(req.url);
-    if (url.searchParams.get("debug") === "1") {
-      const generic = (Deno.env.get("FOCUSNFE_WEBHOOK_SECRET") ?? "").trim();
-      const hml = (Deno.env.get("FOCUSNFE_WEBHOOK_SECRET_HML") ?? "").trim();
-      const prod = (Deno.env.get("FOCUSNFE_WEBHOOK_SECRET_PROD") ?? "").trim();
-      const hash = async (v: string) => (v ? await sha256Hex(v) : null);
-      return json(
-        200,
-        {
-          ok: true,
-          provider: "focusnfe",
-          debug: {
-            has: { generic: Boolean(generic), hml: Boolean(hml), prod: Boolean(prod) },
-            sha256: { generic: await hash(generic), hml: await hash(hml), prod: await hash(prod) },
-          },
-        },
-        cors,
-      );
-    }
     return json(200, { ok: true, provider: "focusnfe" }, cors);
   }
   if (req.method !== "POST") return json(405, { ok: false, error: "METHOD_NOT_ALLOWED" }, cors);
 
   const auth = isAuthorized(req);
   if (!auth.ok) {
-    const url = new URL(req.url);
-    if (url.searchParams.get("debug") === "1") {
-      const providedSha = auth.provided ? await sha256Hex(auth.provided) : null;
-      const expectedSha = auth.expected ? await Promise.all(auth.expected.map((s) => sha256Hex(s))) : [];
-      return json(
-        401,
-        {
-          ok: false,
-          error: auth.reason ?? "UNAUTHORIZED",
-          debug: {
-            providedSha,
-            expectedSha,
-            authHeaderPresent: Boolean((req.headers.get("authorization") ?? "").trim()),
-            authHeader: req.headers.get("authorization") ?? null,
-            provided: auth.provided ?? null,
-          },
-        },
-        cors,
-      );
-    }
     return json(401, { ok: false, error: auth.reason ?? "UNAUTHORIZED" }, cors);
   }
 
