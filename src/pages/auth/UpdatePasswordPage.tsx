@@ -6,6 +6,7 @@ import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import Input from "@/components/ui/forms/Input";
 import RevoLogo from "@/components/landing/RevoLogo";
+import { bootstrapEmpresaParaUsuarioAtual } from "@/services/session";
 
 function parseHashTokens(hash: string) {
   const s = new URLSearchParams(hash.startsWith("#") ? hash.slice(1) : hash);
@@ -78,6 +79,9 @@ export default function UpdatePasswordPage() {
           throw rpcErr;
         }
       }
+
+      // Garante que o usuário entra com empresa ativa (evita cair na landing / estado inconsistente).
+      await bootstrapEmpresaParaUsuarioAtual();
 
       setOkMsg("Senha atualizada com sucesso! Redirecionando para o painel...");
       setTimeout(() => navigate("/app"), 2000);

@@ -209,7 +209,8 @@ const SubscriptionSettings: React.FC<SubscriptionSettingsProps> = ({ onSwitchToP
       const { count, error } = await (supabase as any)
         .from('empresa_usuarios')
         .select('user_id', { count: 'exact', head: true })
-        .eq('empresa_id', empresaId);
+        .eq('empresa_id', empresaId)
+        .eq('status', 'ACTIVE');
 
       if (error) throw error;
       setCurrentUsersCount(typeof count === 'number' ? count : null);
