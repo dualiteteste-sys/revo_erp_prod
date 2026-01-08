@@ -55,6 +55,11 @@ export default function AuthConfirmed() {
 
         // 2) Bootstrap da empresa (idempotente)
         await bootstrapEmpresaParaUsuarioAtual();
+        try {
+          localStorage.removeItem('pending_signup_email');
+        } catch {
+          // ignore
+        }
         setStatus('success');
         setMessage('Tudo pronto! Redirecionando...');
         const timer = setTimeout(() => {
