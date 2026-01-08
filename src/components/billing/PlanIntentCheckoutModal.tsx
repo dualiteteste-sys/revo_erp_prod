@@ -11,23 +11,46 @@ import { logger } from "@/lib/logger";
 type PendingPlanSlug = "ESSENCIAL" | "PRO" | "MAX" | "INDUSTRIA" | "SCALE";
 type PendingBillingCycle = "monthly" | "yearly";
 
-function extractEdgeFunctionErrorMessage(error: any): string | null {
-  try {
-    const ctx = error?.context ?? null;
-    const body = ctx?.body ?? null;
-    if (!body) return null;
-    if (typeof body === "string") {
-      try {
-        const parsed = JSON.parse(body);
-        return parsed?.message || parsed?.error || null;
-      } catch {
-        return body;
+async function extractEdgeFunctionErrorMessage(error: any): Promise<string | null> {
+  const ctx = error?.context ?? null;
+  if (!ctx) return null;
+
+  // Supabase FunctionsHttpError: `context` é um Response (fetch).
+  if (typeof Response !== "undefined" && ctx instanceof Response) {
+    try {
+      const res = ctx.clone();
+      const contentType = res.headers.get("content-type") ?? "";
+      if (contentType.includes("application/json")) {
+        const parsed = await res.json().catch(() => null);
+        if (parsed?.message) return String(parsed.message);
+        if (parsed?.error) return String(parsed.error);
       }
+      const text = await res.text().catch(() => "");
+      if (!text) return null;
+      try {
+        const parsed = JSON.parse(text);
+        return parsed?.message || parsed?.error || text;
+      } catch {
+        return text;
+      }
+    } catch {
+      return null;
     }
-    return body?.message || body?.error || null;
-  } catch {
-    return null;
   }
+
+  // Fallback: alguns callers anexaram um body serializado
+  const body = (ctx as any)?.body ?? null;
+  if (!body) return null;
+  if (typeof body === "string") {
+    try {
+      const parsed = JSON.parse(body);
+      return parsed?.message || parsed?.error || body;
+    } catch {
+      return body;
+    }
+  }
+
+  return (body as any)?.message || (body as any)?.error || null;
 }
 
 function readPendingPlanIntent(): { planSlug: PendingPlanSlug; billingCycle: PendingBillingCycle } | null {
@@ -106,7 +129,7 @@ export function PlanIntentCheckoutModal() {
         planSlug: intent.planSlug,
         billingCycle: intent.billingCycle,
       });
-      const msg = extractEdgeFunctionErrorMessage(error) || error?.message || "Erro ao iniciar o checkout.";
+      const msg = (await extractEdgeFunctionErrorMessage(error)) || error?.message || "Erro ao iniciar o checkout.";
       setInlineError(msg);
       addToast(msg, "error");
       setStarting(false);

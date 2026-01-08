@@ -48,6 +48,29 @@ Deno.serve(async (req) => {
       );
     }
 
+    // Stripe key sanity (evita erro silencioso com pk_ ou mismatch test/live).
+    const origin = (req.headers.get("origin") ?? "").trim();
+    if (stripeSecretKey.startsWith("pk_")) {
+      return new Response(
+        JSON.stringify({
+          error: "config_error",
+          message:
+            "STRIPE_SECRET_KEY está configurada com uma Publishable Key (pk_*). Configure uma Secret Key (sk_* ou rk_*).",
+        }),
+        { status: 500, headers: { "Content-Type": "application/json", ...corsHeaders } },
+      );
+    }
+    if (origin === "https://erprevo.com" && stripeSecretKey.startsWith("sk_test_")) {
+      return new Response(
+        JSON.stringify({
+          error: "config_error",
+          message:
+            "Você está em https://erprevo.com mas a STRIPE_SECRET_KEY parece ser de TESTE (sk_test_*). Configure a chave LIVE (sk_live_*) para a produção.",
+        }),
+        { status: 500, headers: { "Content-Type": "application/json", ...corsHeaders } },
+      );
+    }
+
     // 1) Auth
     const authHeader = req.headers.get('Authorization') ?? '';
     const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : '';
@@ -137,25 +160,33 @@ Deno.serve(async (req) => {
 
     let customerId = empresa.stripe_customer_id;
     if (!customerId) {
-      const customer = await stripe.customers.create({
-        name: empresa.fantasia ?? empresa.razao_social ?? undefined,
-        email: user.email ?? undefined,
-        metadata: { empresa_id },
-      });
-      customerId = customer.id;
+      // Primeiro tenta reusar um Customer já existente neste ambiente (evita criar duplicados)
+      // Obs: só funciona se o customer tiver metadata.empresa_id.
+      try {
+        const q = `metadata['empresa_id']:'${empresa_id}'`;
+        const found = await stripe.customers.search({ query: q, limit: 1 });
+        const candidate = found.data?.[0];
+        if (candidate?.id) customerId = candidate.id;
+      } catch {
+        // best-effort
+      }
+
+      if (!customerId) {
+        const customer = await stripe.customers.create({
+          name: empresa.fantasia ?? empresa.razao_social ?? undefined,
+          email: user.email ?? undefined,
+          metadata: { empresa_id },
+        });
+        customerId = customer.id;
+      }
+
+      // Persistência é best-effort: em alguns hardenings, service_role não tem UPDATE em `empresas`.
       const { error: upErr } = await supabaseAdmin
         .from("empresas")
         .update({ stripe_customer_id: customerId })
         .eq("id", empresa_id);
       if (upErr) {
-        console.error("billing-checkout: failed to persist stripe_customer_id", upErr);
-        return new Response(
-          JSON.stringify({
-            error: "company_update_failed",
-            message: "Falha ao salvar o vínculo com o Stripe. Tente novamente.",
-          }),
-          { status: 500, headers: { "Content-Type": "application/json", ...corsHeaders } },
-        );
+        console.warn("billing-checkout: failed to persist stripe_customer_id (best-effort)", upErr);
       }
     } else {
       // Garantir que o customer existe no ambiente atual (ex.: trocou test→prod e o cus_* não existe no novo modo)
@@ -171,7 +202,13 @@ Deno.serve(async (req) => {
             metadata: { empresa_id },
           });
           customerId = customer.id;
-          await supabaseAdmin.from("empresas").update({ stripe_customer_id: customerId }).eq("id", empresa_id);
+          const { error: upErr } = await supabaseAdmin
+            .from("empresas")
+            .update({ stripe_customer_id: customerId })
+            .eq("id", empresa_id);
+          if (upErr) {
+            console.warn("billing-checkout: failed to persist stripe_customer_id after recreate (best-effort)", upErr);
+          }
         }
       }
 
@@ -256,7 +293,8 @@ Deno.serve(async (req) => {
       return new Response(
         JSON.stringify({
           error: "stripe_auth_error",
-          message: "Falha de autenticação com o Stripe. Verifique a STRIPE_SECRET_KEY do ambiente.",
+          message:
+            "Falha de autenticação com o Stripe. Verifique se STRIPE_SECRET_KEY é uma Secret Key válida (sk_* ou rk_*) e corresponde ao ambiente (teste/produção).",
         }),
         { status: 500, headers: { "Content-Type": "application/json", ...corsHeaders } },
       );
