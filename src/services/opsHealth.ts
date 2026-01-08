@@ -120,11 +120,11 @@ export async function dryRunEcommerceDlq(dlqId: string): Promise<DlqReprocessRes
 }
 
 export async function reprocessNfeWebhookEvent(id: string): Promise<void> {
-  await callRpc('ops_nfeio_webhook_reprocess', { p_id: id });
+  await callRpc('ops_nfe_webhook_reprocess', { p_id: id });
 }
 
 export async function dryRunNfeWebhookEvent(id: string): Promise<DlqReprocessResult> {
-  return callRpc<DlqReprocessResult>('ops_nfeio_webhook_reprocess_v2', { p_id: id, p_dry_run: true });
+  return callRpc<DlqReprocessResult>('ops_nfe_webhook_reprocess_v2', { p_id: id, p_dry_run: true });
 }
 
 export async function reprocessStripeWebhookEvent(id: string): Promise<void> {
