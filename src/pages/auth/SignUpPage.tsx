@@ -26,7 +26,21 @@ const SignUpPage: React.FC = () => {
     try {
       // We can pass metadata like name directly if the auth function supports it,
       // otherwise it's handled post-signup via triggers or profile updates.
-      await signUpWithEmail(email, password);
+      const res = await signUpWithEmail(email, password);
+      const identitiesLen = res?.user?.identities?.length ?? null;
+
+      // Supabase pode retornar "sucesso" com identities vazias quando o e-mail já existe
+      // (medida anti-enumeração). Nessa situação, não adianta esperar e-mail de confirmação.
+      if (identitiesLen === 0) {
+        try {
+          localStorage.setItem('pending_signup_email', email.trim().toLowerCase());
+        } catch {
+          // ignore
+        }
+        addToast('Este e-mail já possui uma conta. Faça login ou recupere sua senha.', 'warning');
+        navigate(`/auth/login?email=${encodeURIComponent(email.trim().toLowerCase())}`);
+        return;
+      }
       
       try {
         localStorage.setItem('pending_signup_email', email.trim().toLowerCase());
