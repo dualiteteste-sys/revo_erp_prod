@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Check, ChevronsUpDown, FileText, Folder, Loader2, Search } from 'lucide-react';
 import { Command, CommandGroup, CommandInput, CommandItem, CommandList } from 'cmdk';
-import { Popover, PopoverContent, PopoverTrigger } from '@radix-ui/react-popover';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { useDebounce } from '@/hooks/useDebounce';
 import { fetchNcmByCode, searchNcm } from '@/services/externalApis';
 import { cn } from '@/lib/utils'; // Assuming utils exists, if not I'll use a local helper or inline clsx
@@ -40,11 +40,11 @@ const NcmSearch: React.FC<NcmSearchProps> = ({ value, onChange }) => {
       return;
     }
 
-    const searchNcm = async () => {
+    const doSearch = async () => {
       setLoading(true);
       try {
         const data = await searchNcm(debouncedSearch);
-        setResults(data as NcmResult[]);
+        setResults(Array.isArray(data) ? (data as NcmResult[]) : []);
       } catch (error) {
         console.error("NCM Search Error:", error);
         setResults([]);
@@ -53,7 +53,7 @@ const NcmSearch: React.FC<NcmSearchProps> = ({ value, onChange }) => {
       }
     };
 
-    searchNcm();
+    doSearch();
   }, [debouncedSearch, open]);
 
   // Fetch description for the selected value (auto-fetch logic)
@@ -177,7 +177,7 @@ const NcmSearch: React.FC<NcmSearchProps> = ({ value, onChange }) => {
                           <span className="truncate font-mono text-xs text-gray-500">{item.codigo}</span>
                           <span className="truncate font-medium">{item.descricao}</span>
                         </div>
-                        {isSelectable && value === item.codigo && ( // Simple check, might need formatting check
+                        {isSelectable && (value || '').replace(/\D/g, '') === rawCode && (
                           <Check className="ml-auto h-4 w-4 text-blue-600" />
                         )}
                       </CommandItem>
