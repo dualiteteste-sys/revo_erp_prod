@@ -18,7 +18,6 @@ type NfeConfig = {
   empresa_id: string;
   provider_slug: string;
   ambiente: AmbienteNfe;
-  nfeio_company_id: string | null;
   webhook_secret_hint: string | null;
   observacoes: string | null;
 };
@@ -83,11 +82,6 @@ export default function NfeSettingsPage({ onEmitenteSaved, onNumeracaoSaved }: P
   const [numeracoes, setNumeracoes] = useState<NfeNumeracao[]>([]);
   const [numeracao, setNumeracao] = useState<NfeNumeracao | null>(null);
   const [newSerie, setNewSerie] = useState<string>('');
-  const [disablementSerie, setDisablementSerie] = useState<string>('1');
-  const [disablementStart, setDisablementStart] = useState<string>('');
-  const [disablementEnd, setDisablementEnd] = useState<string>('');
-  const [disablementJust, setDisablementJust] = useState<string>('');
-  const [runningDisablement, setRunningDisablement] = useState(false);
 
   const canShow = useMemo(() => !!empresaId, [empresaId]);
 
@@ -100,22 +94,15 @@ export default function NfeSettingsPage({ onEmitenteSaved, onNumeracaoSaved }: P
       const [
         { data: flagRow, error: flagError },
         { data: cfgFocusRow, error: cfgFocusError },
-        { data: cfgLegacyRow, error: cfgLegacyError },
         { data: emitRow, error: emitErr },
         { data: numsRows, error: numErr },
       ] = await Promise.all([
         supabase.from('empresa_feature_flags').select('nfe_emissao_enabled').eq('empresa_id', empresaId).maybeSingle(),
         supabase
           .from('fiscal_nfe_emissao_configs')
-          .select('id, empresa_id, provider_slug, ambiente, nfeio_company_id, webhook_secret_hint, observacoes')
+          .select('id, empresa_id, provider_slug, ambiente, webhook_secret_hint, observacoes')
           .eq('empresa_id', empresaId)
           .eq('provider_slug', 'FOCUSNFE')
-          .maybeSingle(),
-        supabase
-          .from('fiscal_nfe_emissao_configs')
-          .select('id, empresa_id, provider_slug, ambiente, nfeio_company_id, webhook_secret_hint, observacoes')
-          .eq('empresa_id', empresaId)
-          .eq('provider_slug', 'NFE_IO')
           .maybeSingle(),
         supabase
           .from('fiscal_nfe_emitente')
@@ -133,31 +120,21 @@ export default function NfeSettingsPage({ onEmitenteSaved, onNumeracaoSaved }: P
 
       if (flagError) throw flagError;
       if (cfgFocusError) throw cfgFocusError;
-      if (cfgLegacyError) throw cfgLegacyError;
       if (emitErr) throw emitErr;
       if (numErr) throw numErr;
 
-      const cfgRow = cfgFocusRow ?? cfgLegacyRow ?? null;
       setNfeEnabled(!!flagRow?.nfe_emissao_enabled);
       setConfig(
-        cfgRow
+        cfgFocusRow
           ? {
-              id: cfgRow.id,
-              empresa_id: cfgRow.empresa_id,
+              id: cfgFocusRow.id,
+              empresa_id: cfgFocusRow.empresa_id,
               provider_slug: 'FOCUSNFE',
-              ambiente: (cfgRow.ambiente ?? 'homologacao') as AmbienteNfe,
-              nfeio_company_id: cfgRow.nfeio_company_id ?? null,
-              webhook_secret_hint: cfgRow.webhook_secret_hint ?? null,
-              observacoes: cfgRow.observacoes ?? null,
+              ambiente: (cfgFocusRow.ambiente ?? 'homologacao') as AmbienteNfe,
+              webhook_secret_hint: cfgFocusRow.webhook_secret_hint ?? null,
+              observacoes: cfgFocusRow.observacoes ?? null,
             }
-          : {
-              empresa_id: empresaId,
-              provider_slug: 'FOCUSNFE',
-              ambiente: ((cfgLegacyRow as any)?.ambiente ?? 'homologacao') as AmbienteNfe,
-              nfeio_company_id: null,
-              webhook_secret_hint: null,
-              observacoes: null,
-            }
+          : { empresa_id: empresaId, provider_slug: 'FOCUSNFE', ambiente: 'homologacao', webhook_secret_hint: null, observacoes: null }
       );
 
       setEmitente(
@@ -271,7 +248,6 @@ export default function NfeSettingsPage({ onEmitenteSaved, onNumeracaoSaved }: P
         empresa_id: empresaId,
         provider_slug: 'FOCUSNFE',
         ambiente: config.ambiente,
-        nfeio_company_id: null,
         webhook_secret_hint: config.webhook_secret_hint || null,
         observacoes: config.observacoes || null,
       };
@@ -285,64 +261,6 @@ export default function NfeSettingsPage({ onEmitenteSaved, onNumeracaoSaved }: P
       addToast(e?.message || 'Erro ao salvar configurações do provedor.', 'error');
     } finally {
       setSaving(false);
-    }
-  };
-
-  const edgeErrorMessage = async (error: any): Promise<string> => {
-    let detail: string | undefined = (error as any)?.message;
-    try {
-      const ctx: any = (error as any)?.context;
-      if (ctx && typeof ctx.text === 'function') {
-        const raw = await ctx.text();
-        try {
-          const parsed = JSON.parse(raw);
-          detail = parsed?.detail || parsed?.error || raw;
-        } catch {
-          detail = raw;
-        }
-      }
-    } catch {
-      // ignore
-    }
-    return (detail || 'Falha ao executar.').toString();
-  };
-
-  const handleDisableNumbers = async () => {
-    if (!canAdmin) {
-      addToast('Sem permissão. Apenas admin/owner.', 'error');
-      return;
-    }
-    if ((config?.provider_slug ?? 'FOCUSNFE') !== 'NFE_IO') {
-      addToast('Inutilização automática ainda não está disponível para o provedor Focus NF-e.', 'warning');
-      return;
-    }
-    const serie = Math.max(1, Math.trunc(Number(disablementSerie) || 1));
-    const start = Math.max(1, Math.trunc(Number(disablementStart) || 0));
-    const end = Math.max(start, Math.trunc(Number(disablementEnd) || start));
-    const justificativa = disablementJust.trim();
-    if (!justificativa) {
-      addToast('Informe a justificativa.', 'warning');
-      return;
-    }
-    const ok = window.confirm(`Inutilizar números ${start} até ${end} (série ${serie})?`);
-    if (!ok) return;
-
-    setRunningDisablement(true);
-    try {
-      const { data, error } = await supabase.functions.invoke('nfeio-disablement', {
-        body: { mode: 'numbers', serie, numero_inicial: start, numero_final: end, justificativa },
-      });
-      if (error) throw error;
-      if (!data?.ok) throw new Error(data?.error || 'Falha ao solicitar inutilização.');
-      addToast('Inutilização enfileirada na NFE.io (aguardando processamento).', 'success');
-      setDisablementStart('');
-      setDisablementEnd('');
-      setDisablementJust('');
-    } catch (e: any) {
-      const msg = e?.context ? await edgeErrorMessage(e) : (e?.message || 'Erro ao inutilizar números.');
-      addToast(msg, 'error');
-    } finally {
-      setRunningDisablement(false);
     }
   };
 
@@ -816,60 +734,6 @@ export default function NfeSettingsPage({ onEmitenteSaved, onNumeracaoSaved }: P
                   placeholder="Anotações internas sobre homologação, certificado, responsável, etc."
                   className="w-full min-h-[120px] p-3 border border-gray-300 rounded-xl shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                 />
-              </div>
-
-              <div className="md:col-span-2 rounded-xl border border-slate-200 bg-white/70 p-4">
-                <div className="flex items-start justify-between gap-4">
-                  <div>
-                    <p className="text-sm font-bold text-slate-900">Inutilização de números (NFE-05)</p>
-                    <p className="text-xs text-slate-600 mt-1">
-                      Use quando a numeração ficou com “buraco” e você precisa inutilizar uma faixa (operação assíncrona).
-                    </p>
-                  </div>
-                  <Button onClick={handleDisableNumbers} disabled={!canAdmin || runningDisablement}>
-                    {runningDisablement ? <Loader2 className="animate-spin" size={18} /> : <ShieldCheck size={18} />}
-                    <span className="ml-2">Inutilizar</span>
-                  </Button>
-                </div>
-
-                <div className="mt-4 grid grid-cols-1 md:grid-cols-4 gap-4">
-                  <div>
-                    <label className="block text-xs font-semibold text-slate-700 mb-2">Série</label>
-                    <input
-                      value={disablementSerie}
-                      onChange={(e) => setDisablementSerie(e.target.value)}
-                      className="w-full p-3 border border-gray-300 rounded-xl shadow-sm"
-                      placeholder="1"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-semibold text-slate-700 mb-2">Número inicial</label>
-                    <input
-                      value={disablementStart}
-                      onChange={(e) => setDisablementStart(e.target.value)}
-                      className="w-full p-3 border border-gray-300 rounded-xl shadow-sm"
-                      placeholder="Ex.: 10"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-semibold text-slate-700 mb-2">Número final</label>
-                    <input
-                      value={disablementEnd}
-                      onChange={(e) => setDisablementEnd(e.target.value)}
-                      className="w-full p-3 border border-gray-300 rounded-xl shadow-sm"
-                      placeholder="Ex.: 15"
-                    />
-                  </div>
-                  <div className="md:col-span-4">
-                    <label className="block text-xs font-semibold text-slate-700 mb-2">Justificativa</label>
-                    <input
-                      value={disablementJust}
-                      onChange={(e) => setDisablementJust(e.target.value)}
-                      className="w-full p-3 border border-gray-300 rounded-xl shadow-sm"
-                      placeholder="Ex.: falha técnica, número não utilizado, etc."
-                    />
-                  </div>
-                </div>
               </div>
             </div>
           </GlassCard>

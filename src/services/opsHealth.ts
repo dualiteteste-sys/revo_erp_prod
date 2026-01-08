@@ -5,7 +5,7 @@ export type OpsHealthSummary = {
   to: string;
   app_errors: number;
   db_events: number;
-  nfeio: {
+  nfe_webhooks: {
     pending: number;
     failed: number;
     locked: number;
@@ -82,7 +82,10 @@ export type DlqReprocessResult = {
 };
 
 export async function getOpsHealthSummary(): Promise<OpsHealthSummary> {
-  return callRpc<OpsHealthSummary>('ops_health_summary', { p_window: null });
+  const raw: any = await callRpc<any>('ops_health_summary', { p_window: null });
+  const nfe = (raw?.nfe_webhooks ?? raw?.nfeio ?? { pending: 0, failed: 0, locked: 0 }) as OpsHealthSummary['nfe_webhooks'];
+  const { nfeio, ...rest } = raw ?? {};
+  return { ...(rest as Omit<OpsHealthSummary, 'nfe_webhooks'>), nfe_webhooks: nfe };
 }
 
 export async function getProductMetricsSummary(): Promise<ProductMetricsSummary> {
@@ -98,10 +101,6 @@ export async function listOpsRecentFailures(params?: { from?: string | null; lim
     p_from: params?.from ?? null,
     p_limit: params?.limit ?? 50,
   });
-}
-
-export async function reprocessNfeioWebhookEvent(id: string): Promise<void> {
-  await callRpc('ops_nfeio_webhook_reprocess', { p_id: id });
 }
 
 export async function reprocessFinanceDlq(dlqId: string): Promise<string> {
@@ -120,7 +119,11 @@ export async function dryRunEcommerceDlq(dlqId: string): Promise<DlqReprocessRes
   return callRpc<DlqReprocessResult>('ops_ecommerce_dlq_reprocess_v2', { p_dlq_id: dlqId, p_dry_run: true });
 }
 
-export async function dryRunNfeioWebhookEvent(id: string): Promise<DlqReprocessResult> {
+export async function reprocessNfeWebhookEvent(id: string): Promise<void> {
+  await callRpc('ops_nfeio_webhook_reprocess', { p_id: id });
+}
+
+export async function dryRunNfeWebhookEvent(id: string): Promise<DlqReprocessResult> {
   return callRpc<DlqReprocessResult>('ops_nfeio_webhook_reprocess_v2', { p_id: id, p_dry_run: true });
 }
 

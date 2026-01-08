@@ -96,18 +96,15 @@ Use apenas quando:
 
 **Nunca** trate como operação do dia a dia.
 
-### 5.4 “NFE.io Worker (dev)”
+### 5.4 “Webhook NF-e (Focus NF-e)”
 
 Pense como um “funcionário do balcão” que:
-- pega os eventos que chegaram via webhook (fila)
+- recebe eventos via webhook da Focus
 - atualiza o status da NF-e (autorizada/rejeitada/etc.)
-- baixa XML/DANFE quando disponível
-
-Ele roda automaticamente a cada 5 minutos no `dev` (GitHub Actions).
+- baixa/armazenar XML/DANFE quando disponível (quando a emissão estiver ativa)
 
 Se você ainda não configurou secrets:
-- `NFEIO_WEBHOOK_SECRET_DEV` no GitHub (mesmo valor configurado no painel da NFE.io)
-- Ele também serve como “chave” do worker para processar a fila no DEV (fallback)
+- `FOCUSNFE_WEBHOOK_SECRET_HML` e/ou `FOCUSNFE_WEBHOOK_SECRET_PROD` (Edge secrets)
 
 ## 6) Checklist de operação (o que fazer sempre)
 

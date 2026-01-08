@@ -73,6 +73,5 @@ O que consideramos “hardening mínimo” no Revo:
   - observabilidade (logs)
 
 No Revo:
-- NFE.io worker já existe.
+- Webhook de NF-e (Focus NF-e) configurado.
 - Automações de vendas usam fila e worker via Actions.
-

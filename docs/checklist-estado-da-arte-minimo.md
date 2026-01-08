@@ -82,7 +82,7 @@ Regras:
 ## 4) Fiscal (NF-e)
 - [x] NFE-01 Config fiscal completa (emitente, série/numeração, ambiente, CSC se aplicável)
 - [x] NFE-02 Rascunho + validação local (motor fiscal v1) + preview do XML
-- [x] NFE-03 Emissão via provedor (NFE.io): enviar + consultar status + armazenar XML/DANFE + logs
+- [x] NFE-03 Emissão via provedor (Focus NF-e): enviar + consultar status + armazenar XML/DANFE + logs
 - [x] NFE-04 Webhooks: assinatura/HMAC + fila + retry idempotente + reprocessar manual
 - [x] NFE-05 Eventos: cancelamento + CCe (se aplicável) + inutilização + reimpressão DANFE
 - [x] NFE-06 Observabilidade fiscal: timeline por NF (eventos/tentativas/falhas) + payload saneado

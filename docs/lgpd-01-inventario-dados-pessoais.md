@@ -78,7 +78,7 @@ Objetivo: saber **quais dados pessoais coletamos**, **por que**, **onde guardamo
 
 ## 3) Fluxos externos (terceiros)
 
-### 3.1 NFE.io
+### 3.1 Focus NF-e
 - Dados enviados: informações fiscais da NF-e (podem conter dados pessoais).
 - Segredos: API key + HMAC em secrets do ambiente (GitHub/Supabase), não em tabela.
 - Controles: rotação, least privilege, logs saneados.
@@ -111,4 +111,3 @@ Definir:
 - `LGPD-02`: export do titular (por usuário e por pessoa cadastrada, quando aplicável)
 - `LGPD-03`: retenção/expurgo (jobs programados, com auditoria)
 - `LGPD-04`: minimização/saneamento de logs (sem PII em `app_logs`/DLQs)
-

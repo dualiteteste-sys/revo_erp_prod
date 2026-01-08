@@ -33,7 +33,15 @@ is_no_verify() {
   return 1
 }
 
-mapfile -t functions < <(find "$functions_dir" -mindepth 1 -maxdepth 1 -type d -printf '%f\n' | sort)
+# Only deploy functions that actually have an entrypoint.
+# This prevents empty/legacy folders from being deployed.
+mapfile -t functions < <(
+  for d in "$functions_dir"/*; do
+    [[ -d "$d" ]] || continue
+    [[ -f "$d/index.ts" ]] || continue
+    basename "$d"
+  done | sort
+)
 
 if [[ ${#functions[@]} -eq 0 ]]; then
   echo "No Edge Functions found under $functions_dir" >&2
