@@ -28,6 +28,12 @@ const SignUpPage: React.FC = () => {
       // otherwise it's handled post-signup via triggers or profile updates.
       await signUpWithEmail(email, password);
       
+      try {
+        localStorage.setItem('pending_signup_email', email.trim().toLowerCase());
+      } catch {
+        // ignore
+      }
+
       addToast('Conta criada com sucesso! Verifique seu e-mail.', 'success');
       
       // If there was a plan selected, we might want to persist it in local storage

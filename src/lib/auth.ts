@@ -1,6 +1,17 @@
 import { supabase } from './supabaseClient';
 import { logger } from './logger';
 
+function authSiteUrl(): string {
+  const origin = window.location.origin;
+  const envSite = (import.meta as any)?.env?.VITE_SITE_URL;
+  if (/localhost|127\.0\.0\.1/i.test(origin)) return origin;
+  return envSite || origin;
+}
+
+function emailConfirmRedirect(): string {
+  return `${authSiteUrl()}/auth/confirmed`;
+}
+
 /**
  * Faz signup por e-mail/senha.
  * O e-mail de confirmação será enviado para a URL de produção.
@@ -11,7 +22,7 @@ export async function signUpWithEmail(email: string, password: string) {
     email,
     password,
     options: {
-      emailRedirectTo: `${window.location.origin}/auth/confirmed`,
+      emailRedirectTo: emailConfirmRedirect(),
     },
   });
   if (error) {
@@ -29,7 +40,7 @@ export async function signInWithEmail(email: string) {
   const { data, error } = await supabase.auth.signInWithOtp({
     email,
     options: {
-      emailRedirectTo: `${window.location.origin}/auth/confirmed`,
+      emailRedirectTo: emailConfirmRedirect(),
     },
   });
   if (error) {
@@ -41,12 +52,25 @@ export async function signInWithEmail(email: string) {
 
 export async function sendPasswordResetEmail(email: string) {
   const { error } = await supabase.auth.resetPasswordForEmail(email, {
-    redirectTo: `${window.location.origin}/auth/update-password`,
+    redirectTo: `${authSiteUrl()}/auth/update-password`,
   });
   if (error) {
     logger.error('[AUTH] resetPasswordForEmail error', error);
     throw error;
   }
+}
+
+export async function resendSignupConfirmation(email: string) {
+  const { error } = await supabase.auth.resend({
+    type: 'signup',
+    email,
+    options: { emailRedirectTo: emailConfirmRedirect() },
+  });
+  if (error) {
+    logger.error('[AUTH] resend(signup) error', error);
+    throw error;
+  }
+  return { ok: true as const };
 }
 
 export async function signOut() {
