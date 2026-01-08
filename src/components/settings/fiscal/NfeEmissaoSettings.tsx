@@ -27,6 +27,7 @@ const NfeEmissaoSettings: React.FC = () => {
   const features = useEmpresaFeatures();
   const empresaRoleQuery = useEmpresaRole();
   const canAdmin = empresaRoleQuery.isFetched && roleAtLeast(empresaRoleQuery.data, 'admin');
+  const webhookUrl = `${(import.meta as any).env?.VITE_SUPABASE_URL}/functions/v1/focusnfe-webhook`;
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -46,7 +47,7 @@ const NfeEmissaoSettings: React.FC = () => {
           .from('fiscal_nfe_emissao_configs')
           .select('ambiente, webhook_secret_hint, observacoes')
           .eq('empresa_id', activeEmpresa.id)
-          .eq('provider_slug', 'NFE_IO')
+          .eq('provider_slug', 'FOCUSNFE')
           .maybeSingle();
 
         if (error) throw error;
@@ -107,7 +108,7 @@ const NfeEmissaoSettings: React.FC = () => {
     try {
       const payload = {
         empresa_id: activeEmpresa.id,
-        provider_slug: 'NFE_IO',
+        provider_slug: 'FOCUSNFE',
         ambiente: form.ambiente,
         webhook_secret_hint: form.webhook_secret_hint.trim() || null,
         observacoes: form.observacoes.trim() || null,
@@ -135,7 +136,7 @@ const NfeEmissaoSettings: React.FC = () => {
         <div>
           <h1 className="text-2xl font-bold text-gray-800">NF-e (Emissão)</h1>
           <p className="mt-2 text-gray-600">
-            Base interna para emissão de NF-e (modelo 55). A integração com a NFE.io ficará disponível quando você decidir ativar a emissão.
+            Base interna para emissão de NF-e (modelo 55). A integração é feita via Focus NF-e.
           </p>
         </div>
 
@@ -193,12 +194,12 @@ const NfeEmissaoSettings: React.FC = () => {
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Provedor</label>
             <input
-              value="NFE.io"
+              value="Focus NF-e"
               disabled
               className="w-full p-3 bg-gray-50 border border-gray-200 rounded-lg text-gray-700"
             />
             <p className="mt-2 text-xs text-gray-500">
-              A emissão ficará desativada até você concluir o roadmap e habilitar o recurso.
+              Configure o webhook no painel da Focus para que o Revo receba os eventos de processamento.
             </p>
           </div>
 
@@ -220,18 +221,18 @@ const NfeEmissaoSettings: React.FC = () => {
 
           <div className="md:col-span-2">
             <label className="block text-sm font-medium text-gray-700 mb-1" htmlFor="webhook_secret_hint">
-              Dica da chave de assinatura de webhook (opcional)
+              Webhook (dica / identificador)
             </label>
             <input
               id="webhook_secret_hint"
               value={form.webhook_secret_hint}
               onChange={(e) => setForm((prev) => ({ ...prev, webhook_secret_hint: e.target.value }))}
               disabled={loading}
-              placeholder="Ex.: WEBHOOK-V1 (não cole o segredo aqui)"
+              placeholder="Ex.: focusnfe-webhook-empresa-01"
               className="w-full p-3 bg-white/80 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition shadow-sm"
             />
             <p className="mt-2 text-xs text-gray-500">
-              Segurança: o segredo (32–64 chars) será configurado quando ativarmos a emissão. Aqui salvamos apenas uma dica/identificador.
+              Apenas referência. O segredo real não deve ser salvo no banco. Endpoint: <span className="font-mono">{webhookUrl}</span>
             </p>
           </div>
 
@@ -254,9 +255,9 @@ const NfeEmissaoSettings: React.FC = () => {
         <div className="mt-6 flex items-center justify-between gap-4 border-t border-gray-200 pt-4">
           <div className="text-sm text-gray-600">
             {nfeEnabled ? (
-              <span>Emissão habilitada: integração e credenciais ainda serão configuradas.</span>
+              <span>Emissão habilitada: as autorizações dependem do fluxo configurado na Focus.</span>
             ) : (
-              <span>Emissão desativada por padrão. Quando for a hora, eu te aviso para assinar a NFE.io.</span>
+              <span>Emissão desativada por padrão. Ative quando estiver pronto para iniciar os testes fiscais.</span>
             )}
           </div>
 

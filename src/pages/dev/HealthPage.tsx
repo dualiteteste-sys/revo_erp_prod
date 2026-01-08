@@ -14,11 +14,11 @@ import {
   listOpsRecentFailures,
   dryRunEcommerceDlq,
   dryRunFinanceDlq,
-  dryRunNfeioWebhookEvent,
+  dryRunNfeWebhookEvent,
   dryRunStripeWebhookEvent,
   reprocessEcommerceDlq,
   reprocessFinanceDlq,
-  reprocessNfeioWebhookEvent,
+  reprocessNfeWebhookEvent,
   reprocessStripeWebhookEvent,
   seedEcommerceDlq,
   seedFinanceDlq,
@@ -37,7 +37,7 @@ type NfeWebhookRow = {
   id: string;
   received_at: string;
   event_type: string | null;
-  nfeio_id: string | null;
+  nfeio_id: string | null; // legacy column name; used as provider reference
   process_attempts: number;
   next_retry_at: string | null;
   locked_at: string | null;
@@ -89,7 +89,7 @@ export default function HealthPage() {
   const [previewTitle, setPreviewTitle] = useState<string>('Dry-run');
   const [previewDescription, setPreviewDescription] = useState<string>('');
   const [previewJson, setPreviewJson] = useState<DlqReprocessResult | null>(null);
-  const [previewAction, setPreviewAction] = useState<null | { kind: 'finance' | 'ecommerce' | 'nfeio' | 'stripe'; id: string }>(null);
+  const [previewAction, setPreviewAction] = useState<null | { kind: 'finance' | 'ecommerce' | 'nfe' | 'stripe'; id: string }>(null);
 
   const hasSupabase = !!supabase;
   const isDev = import.meta.env.DEV;
@@ -194,7 +194,7 @@ export default function HealthPage() {
     title: string,
     description: string,
     data: DlqReprocessResult,
-    action: { kind: 'finance' | 'ecommerce' | 'nfeio' | 'stripe'; id: string }
+    action: { kind: 'finance' | 'ecommerce' | 'nfe' | 'stripe'; id: string }
   ) => {
     setPreviewTitle(title);
     setPreviewDescription(description);
@@ -209,8 +209,8 @@ export default function HealthPage() {
       return;
     }
     try {
-      const res = await dryRunNfeioWebhookEvent(id);
-      openPreview('Dry-run: NFE.io', 'Prévia das mudanças (não altera dados).', res, { kind: 'nfeio', id });
+      const res = await dryRunNfeWebhookEvent(id);
+      openPreview('Dry-run: NF-e', 'Prévia das mudanças (não altera dados).', res, { kind: 'nfe', id });
     } catch (e: any) {
       addToast(e?.message || 'Falha no dry-run.', 'error');
     }
@@ -238,7 +238,7 @@ export default function HealthPage() {
 
     setReprocessingId(id);
     try {
-      await reprocessNfeioWebhookEvent(id);
+      await reprocessNfeWebhookEvent(id);
       addToast('Evento reenfileirado para reprocessamento.', 'success');
       await fetchAll();
     } catch (e: any) {
@@ -396,14 +396,14 @@ export default function HealthPage() {
         hint: 'Mudanças em tabelas auditadas (audit_logs).',
       },
       {
-        title: 'NFE.io pendentes',
-        value: s?.nfeio?.pending ?? 0,
+        title: 'NF-e pendentes',
+        value: s?.nfe_webhooks?.pending ?? 0,
         icon: <Activity className="w-5 h-5 text-blue-600" />,
         hint: 'Webhooks prontos para processamento (next_retry_at <= now).',
       },
       {
-        title: 'NFE.io com falha',
-        value: s?.nfeio?.failed ?? 0,
+        title: 'NF-e com falha',
+        value: s?.nfe_webhooks?.failed ?? 0,
         icon: <AlertTriangle className="w-5 h-5 text-red-600" />,
         hint: 'Webhooks sem processed_at e com last_error.',
       },
@@ -663,7 +663,7 @@ export default function HealthPage() {
 
         <GlassCard className="p-4">
           <div className="flex items-center justify-between mb-3">
-            <div className="text-lg font-semibold text-gray-900">NFE.io — webhooks com falha</div>
+            <div className="text-lg font-semibold text-gray-900">NF-e — webhooks com falha</div>
             <div className="text-xs text-gray-500">{canReprocess ? 'reprocessamento habilitado' : 'sem permissão para reprocessar'}</div>
           </div>
 

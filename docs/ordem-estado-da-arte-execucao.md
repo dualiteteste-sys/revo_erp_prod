@@ -115,7 +115,7 @@ Por quê: garante que evoluir integrações não vai quebrar clientes.
 - [ ] SUPP-STA-03: central de notificações (incidentes, integrações, fiscal) com histórico.
 
 ### Wave 9 — “Fiscal (NF-e) — fechar com decisão de provedor”
-Por quê: depende de escolha de provedor (NFE.io vs Focus), mas precisa ficar “sem suporte”.
+Por quê: depende do provedor (Focus NF-e), mas precisa ficar “sem suporte”.
 
 - [ ] NFE-STA-01: catálogo de rejeições + “o que fazer” + reprocessos guiados.
 - [ ] NFE-STA-02: contingência e retomada segura (quando aplicável).
@@ -146,4 +146,3 @@ Considerando o `docs/checklist-estado-da-arte-completo.md` atual, os primeiros 3
 - [ ] QA-CHAOS-01
 - [ ] RES-09
 - [ ] CAD-STA-02
-

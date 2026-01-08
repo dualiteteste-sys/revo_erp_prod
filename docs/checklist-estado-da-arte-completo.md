@@ -70,7 +70,7 @@ Este é o checklist único (por módulo) para levar o REVO ao nível **top mundi
 - [x] SEC-RBAC-03 (P1) Perfis prontos (Owner/Admin/Finance/Ops/Member/Viewer) + auditoria de mudanças
 
 ### B3) Segredos e integrações (segurança operacional)
-- [x] SEC-INT-01 (P0) Rotação de tokens (NFE.io/marketplaces) com procedimento e “health check”
+- [x] SEC-INT-01 (P0) Rotação de tokens (Focus NF-e/marketplaces) com procedimento e “health check”
 - [x] SEC-INT-02 (P0) Revogação (disconnect) consistente + limpeza de secrets
 - [x] SEC-INT-03 (P1) Scopes mínimos por integração (OAuth) e auditoria de acessos
 
@@ -390,7 +390,7 @@ Este é o checklist único (por módulo) para levar o REVO ao nível **top mundi
   - Clicar `Dry-run`: deve abrir modal com preview (não altera a DLQ).
   - Clicar `Reprocessar agora`: item sai da DLQ e contadores atualizam.
 - Repetir o fluxo em `Marketplaces — DLQ`.
-- `NFE.io — webhooks com falha`: usar `Dry-run` e `Reprocessar` quando houver item.
+- `NF-e — webhooks com falha`: usar `Dry-run` e `Reprocessar` quando houver item.
 - Desenvolvedor → Logs: filtrar por evento `ops.dlq.*` e confirmar trilha do `seed`, `dry_run` e `reprocess`.
 
 ---

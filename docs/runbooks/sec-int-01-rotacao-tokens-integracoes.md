@@ -1,4 +1,4 @@
-# SEC-INT-01 — Rotação de tokens (NFE.io + Marketplaces)
+# SEC-INT-01 — Rotação de tokens (Focus NF-e + Marketplaces)
 
 Objetivo: reduzir incidentes por **token expirado**, **segredo vazado** ou **endpoint errado**, com um procedimento simples, repetível e auditável.
 
@@ -41,27 +41,24 @@ O RPC `public.ecommerce_connection_diagnostics(provider)` retorna:
 - `token_expires_soon`: expira em <= 7 dias
 - `token_expires_in_days`: dias restantes (estimativa)
 
-## 4) NFE.io (API key + Webhook secret)
+## 4) Focus NF-e (Webhook secret)
 
 ### 4.1 Onde ficam os segredos
 
 - GitHub → `Settings → Secrets and variables → Actions`
-  - `NFEIO_API_KEY_DEV` / `NFEIO_API_KEY_PROD`
-  - `NFEIO_WEBHOOK_SECRET_DEV` / `NFEIO_WEBHOOK_SECRET_PROD` (HMAC)
+  - `FOCUSNFE_WEBHOOK_SECRET_HML` (homologação)
+  - `FOCUSNFE_WEBHOOK_SECRET_PROD` (produção)
 
 ### 4.2 Rotação segura (passo a passo)
 
-1) Gere o novo token/secret no painel da NFE.io.
-2) Atualize **primeiro em DEV** (se existir).
-3) Rode o fluxo de emissão/consulta (ou webhook de teste).
-4) Só então atualize **PROD**.
+1) Gere um novo segredo no painel da Focus (Webhooks → NF-e).
+2) Atualize **primeiro em homologação** (se estiver usando).
+3) Faça um `curl` no endpoint do webhook para confirmar `200`.
+4) Só então atualize **produção**.
 
 ### 4.3 Como validar
 
-- Emitir uma NF-e em modo “rascunho/enfileirada” e confirmar que:
-  - o pedido é aceito pelo provedor
-  - a fila/processamento atualiza status
-  - os eventos aparecem na timeline/auditoria fiscal
+- Verificar no `Dev → Saúde` se não existem webhooks de NF-e em falha.
 
 ## 5) Checklist rápido (2 minutos)
 
@@ -70,4 +67,3 @@ O RPC `public.ecommerce_connection_diagnostics(provider)` retorna:
 - [ ] `Suporte → Diagnóstico` sem avisos de token expirado
 - [ ] Import/Emissão “de prova” concluído com sucesso
 - [ ] PR/issue registrada com o que foi feito e como validou
-

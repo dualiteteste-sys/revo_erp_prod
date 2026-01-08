@@ -11,7 +11,7 @@ Abra a Issue e veja os números:
 No app, vá em `Dev → Saúde`.
 
 Você deve ver:
-- Contadores (NFE.io, Financeiro, Marketplaces)
+- Contadores (NF-e, Financeiro, Marketplaces)
 - DLQs (financeiro / marketplaces)
 - Lista de falhas recentes
 
@@ -46,4 +46,3 @@ Se o problema for intermitente, deixe um comentário na Issue com:
 - causa raiz
 - fix aplicado (PR + migration)
 - prevenção (ex.: limite, retry, alert threshold)
-

@@ -26,7 +26,7 @@ Objetivo: quando o usuário clicar em **Desconectar**, o sistema deve realmente 
 3) (Opcional) `Dev → Saúde`
    - A fila pendente não deve continuar crescendo para aquele provider
 
-## 2) NFE.io
+## 2) Focus NF-e
 
 Hoje os segredos (API key + HMAC) ficam em secrets do ambiente (GitHub/Supabase), não em tabelas.
 
@@ -34,4 +34,3 @@ Hoje os segredos (API key + HMAC) ficam em secrets do ambiente (GitHub/Supabase)
 - Valide com uma emissão/webhook de teste.
 
 Ver: `docs/runbooks/sec-int-01-rotacao-tokens-integracoes.md`
-
