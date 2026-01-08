@@ -1,5 +1,4 @@
-import { callRpc } from '@/lib/api';
-import { RpcError } from '@/lib/api';
+import { callRpc, isRpcMissingError } from '@/lib/api';
 
 export type EstoquePosicao = {
   produto_id: string;
@@ -109,7 +108,7 @@ export async function listDepositos(params?: { onlyActive?: boolean }): Promise<
     const payload = await callRpc<any>('suprimentos_depositos_list', { p_only_active: params?.onlyActive ?? true });
     return Array.isArray(payload) ? (payload as EstoqueDeposito[]) : [];
   } catch (e: any) {
-    if (e instanceof RpcError && e.status === 404) return [];
+    if (isRpcMissingError(e)) return [];
     throw e;
   }
 }
@@ -126,7 +125,7 @@ export async function listPosicaoEstoqueV2(params: {
       p_deposito_id: params.depositoId ?? null,
     });
   } catch (e: any) {
-    if (e instanceof RpcError && e.status === 404) {
+    if (isRpcMissingError(e)) {
       return listPosicaoEstoque(params.search ?? undefined, params.baixoEstoque ?? false);
     }
     throw e;
@@ -148,7 +147,7 @@ export async function getKardexV2(produtoId: string, params?: { depositoId?: str
       p_limit: params?.limit ?? 50,
     });
   } catch (e: any) {
-    if (e instanceof RpcError && e.status === 404) {
+    if (isRpcMissingError(e)) {
       return getKardex(produtoId, params?.limit ?? 50);
     }
     throw e;
@@ -170,7 +169,7 @@ export async function registrarMovimento(payload: RegistrarMovimentoPayload): Pr
       });
       return;
     } catch (e: any) {
-      if (!(e instanceof RpcError && e.status === 404)) throw e;
+      if (!isRpcMissingError(e)) throw e;
       // fallback v1 abaixo
     }
   }

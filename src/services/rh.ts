@@ -1,4 +1,4 @@
-import { callRpc } from '@/lib/api';
+import { callRpc, isRpcMissingError } from '@/lib/api';
 import { faker } from '@faker-js/faker';
 
 // --- Types ---
@@ -137,6 +137,8 @@ export type TrainingComplianceResponse = {
   summary: TrainingComplianceSummary;
   items: TrainingComplianceItem[];
 };
+
+let rhTrainingComplianceAvailable: boolean | null = null;
 
 export type PlanoAcaoCompetencia = {
   id: string;
@@ -367,7 +369,27 @@ export async function deleteCargoTreinamento(id: string): Promise<void> {
 }
 
 export async function getTrainingCompliance(daysAhead = 30): Promise<TrainingComplianceResponse> {
-  return callRpc<TrainingComplianceResponse>('rh_training_compliance_summary', { p_days_ahead: daysAhead });
+  if (rhTrainingComplianceAvailable === false) {
+    return {
+      summary: { total_required: 0, ok: 0, due_soon: 0, overdue: 0, missing: 0 },
+      items: [],
+    };
+  }
+  try {
+    const data = await callRpc<TrainingComplianceResponse>('rh_training_compliance_summary', { p_days_ahead: daysAhead });
+    rhTrainingComplianceAvailable = true;
+    return data;
+  } catch (err) {
+    // Compat: RH-STA-01/02 pode ainda não estar aplicado em alguns ambientes.
+    if (isRpcMissingError(err)) {
+      rhTrainingComplianceAvailable = false;
+      return {
+        summary: { total_required: 0, ok: 0, due_soon: 0, overdue: 0, missing: 0 },
+        items: [],
+      };
+    }
+    throw err;
+  }
 }
 
 export async function listPlanosAcaoCompetencias(cargoId?: string): Promise<PlanoAcaoCompetencia[]> {
