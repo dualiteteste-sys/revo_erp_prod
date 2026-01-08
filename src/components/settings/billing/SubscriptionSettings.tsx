@@ -178,14 +178,16 @@ const SubscriptionSettings: React.FC<SubscriptionSettingsProps> = ({ onSwitchToP
     setLoadingEntitlements(true);
 
     try {
-      const { data, error } = await (supabase as any)
+      // Evita `.single()`/`.maybeSingle()` para não gerar 406 quando não existir row ainda.
+      const { data: rows, error } = await (supabase as any)
         .from('empresa_entitlements')
         .select('plano_mvp, max_users, max_nfe_monthly')
         .eq('empresa_id', empresaId)
-        .maybeSingle();
+        .limit(1);
 
       if (error) throw error;
 
+      const data = (rows?.[0] ?? null) as any;
       setPlanoMvp((data?.plano_mvp ?? 'ambos') as PlanoMvp);
       setMaxUsers(typeof data?.max_users === 'number' ? data.max_users : 999);
       setMaxNfeMonthly(typeof data?.max_nfe_monthly === 'number' ? data.max_nfe_monthly : 999);
