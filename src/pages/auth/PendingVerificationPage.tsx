@@ -59,7 +59,10 @@ const PendingVerificationPage = () => {
             </p>
           ) : null}
           <p className="text-gray-500 text-sm mt-4">
-            Se não encontrar o e-mail, verifique sua caixa de spam.
+            Se não encontrar o e-mail, verifique spam, promoções e atualizações.
+          </p>
+          <p className="text-gray-500 text-xs mt-2">
+            Dica: e-mails corporativos podem bloquear confirmações. Se possível, teste com Gmail/Outlook para validar a entrega.
           </p>
           <div className="mt-6 flex flex-col gap-3">
             <button
