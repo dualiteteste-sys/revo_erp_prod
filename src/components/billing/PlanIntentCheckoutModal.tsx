@@ -37,30 +37,41 @@ function clearPendingPlanIntent() {
 }
 
 export function PlanIntentCheckoutModal() {
-  const { session, activeEmpresa } = useAuth();
+  const { session, activeEmpresa, activeEmpresaId, refreshEmpresas } = useAuth();
   const { subscription, loadingSubscription, refetchSubscription } = useSubscription();
   const { addToast } = useToast();
 
   const intent = useMemo(() => readPendingPlanIntent(), []);
   const [open, setOpen] = useState(false);
   const [starting, setStarting] = useState(false);
+  const [inlineError, setInlineError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!intent) return;
-    if (!session || !activeEmpresa) return;
+    if (!session || !activeEmpresaId) return;
     if (loadingSubscription) return;
     if (subscription) return; // já tem assinatura
     setOpen(true);
-  }, [intent, session, activeEmpresa, loadingSubscription, subscription]);
+  }, [intent, session, activeEmpresaId, loadingSubscription, subscription]);
 
   const startCheckout = async () => {
-    if (!intent || !session || !activeEmpresa) return;
+    if (!intent || !session) return;
     setStarting(true);
+    setInlineError(null);
     try {
+      let empresaId = activeEmpresa?.id ?? activeEmpresaId ?? null;
+      if (!empresaId) {
+        await refreshEmpresas();
+        empresaId = activeEmpresa?.id ?? activeEmpresaId ?? null;
+      }
+      if (!empresaId) {
+        throw new Error("Não foi possível identificar sua empresa. Tente novamente em alguns segundos.");
+      }
+
       const { data, error } = await supabase.functions.invoke("billing-checkout", {
         headers: { Authorization: `Bearer ${session.access_token}` },
         body: {
-          empresa_id: activeEmpresa.id,
+          empresa_id: empresaId,
           plan_slug: intent.planSlug,
           billing_cycle: intent.billingCycle,
           trial: true,
@@ -76,7 +87,9 @@ export function PlanIntentCheckoutModal() {
         planSlug: intent.planSlug,
         billingCycle: intent.billingCycle,
       });
-      addToast(error?.message || "Erro ao iniciar o checkout.", "error");
+      const msg = error?.message || "Erro ao iniciar o checkout.";
+      setInlineError(msg);
+      addToast(msg, "error");
       setStarting(false);
     }
   };
@@ -112,6 +125,11 @@ export function PlanIntentCheckoutModal() {
               "Iniciar teste grátis (30 dias)"
             )}
           </Button>
+          {inlineError ? (
+            <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+              {inlineError}
+            </div>
+          ) : null}
           <Button variant="ghost" onClick={dismiss} disabled={starting}>
             Agora não
           </Button>
@@ -120,4 +138,3 @@ export function PlanIntentCheckoutModal() {
     </Dialog>
   );
 }
-
