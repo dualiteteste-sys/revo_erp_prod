@@ -8,7 +8,7 @@ import { useSupabase } from '@/providers/SupabaseProvider';
 import { useAuth } from '@/contexts/AuthProvider';
 import { useToast } from '@/contexts/ToastProvider';
 import { useEmpresaFeatures } from '@/hooks/useEmpresaFeatures';
-import { Copy, Loader2, Plus, Receipt, Search, Settings } from 'lucide-react';
+import { Copy, Eye, Loader2, Plus, Receipt, Search, Settings } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import ClientAutocomplete from '@/components/common/ClientAutocomplete';
 import ProductAutocomplete from '@/components/common/ProductAutocomplete';
