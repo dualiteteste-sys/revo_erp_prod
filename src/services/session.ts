@@ -27,7 +27,7 @@ async function applyMarketingPlanEntitlements(empresaId: string) {
   > = {
     essencial: { plano_mvp: "servicos", max_users: 2, max_nfe_monthly: 150 },
     pro: { plano_mvp: "servicos", max_users: 5, max_nfe_monthly: 500 },
-    max: { plano_mvp: "servicos", max_users: 8, max_nfe_monthly: 1200 },
+    max: { plano_mvp: "servicos", max_users: 10, max_nfe_monthly: 1200 },
     industria: { plano_mvp: "industria", max_users: 10, max_nfe_monthly: 300 },
     scale: { plano_mvp: "ambos", max_users: 999, max_nfe_monthly: 5000 },
   };
@@ -50,13 +50,6 @@ async function applyMarketingPlanEntitlements(empresaId: string) {
     logger.info("[PlanIntent] Applied marketing plan entitlements", { empresaId, ...next, cycle: pending.cycle });
   } catch (error) {
     logger.warn("[PlanIntent] Failed to apply marketing plan entitlements", { empresaId, error });
-  } finally {
-    try {
-      localStorage.removeItem("pending_plan_slug");
-      localStorage.removeItem("pending_plan_cycle");
-    } catch {
-      // ignore
-    }
   }
 }
 
@@ -73,7 +66,7 @@ export async function bootstrapEmpresaParaUsuarioAtual(opts?: {
   fantasia?: string | null;
 }): Promise<{ empresa_id: string; status: string }> {
   try {
-    const data = await callRpc<{ empresa_id: string; status: string }[]>("bootstrap_empresa_for_current_user", {
+    const data = await callRpc<{ empresa_id: string; status: string }[]>("secure_bootstrap_empresa_for_current_user", {
       p_razao_social: opts?.razao_social ?? null,
       p_fantasia: opts?.fantasia ?? null,
     });

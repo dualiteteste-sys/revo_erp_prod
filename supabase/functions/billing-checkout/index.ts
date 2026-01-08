@@ -4,6 +4,11 @@ import { buildCorsHeaders } from "../_shared/cors.ts";
 
 type Cycle = 'monthly' | 'yearly';
 
+function requireEnv(name: string): string | null {
+  const v = (Deno.env.get(name) ?? "").trim();
+  return v ? v : null;
+}
+
 function pickSiteUrl(req: Request): string | null {
   const envUrl = (Deno.env.get("SITE_URL") ?? "").trim();
 
@@ -28,6 +33,21 @@ Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
 
   try {
+    const supabaseUrl = requireEnv("SUPABASE_URL");
+    const supabaseAnonKey = requireEnv("SUPABASE_ANON_KEY");
+    const supabaseServiceKey = requireEnv("SUPABASE_SERVICE_ROLE_KEY");
+    const stripeSecretKey = requireEnv("STRIPE_SECRET_KEY");
+    if (!supabaseUrl || !supabaseAnonKey || !supabaseServiceKey || !stripeSecretKey) {
+      return new Response(
+        JSON.stringify({
+          error: "config_error",
+          message:
+            "Configuração incompleta do billing-checkout. Verifique as variáveis SUPABASE_URL, SUPABASE_ANON_KEY, SUPABASE_SERVICE_ROLE_KEY e STRIPE_SECRET_KEY.",
+        }),
+        { status: 500, headers: { "Content-Type": "application/json", ...corsHeaders } },
+      );
+    }
+
     // 1) Auth
     const authHeader = req.headers.get('Authorization') ?? '';
     const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : '';
@@ -38,8 +58,8 @@ Deno.serve(async (req) => {
     }
 
     const supabaseAuth = createClient(
-      Deno.env.get('SUPABASE_URL')!,
-      Deno.env.get('SUPABASE_ANON_KEY')!, // precisa estar nas secrets
+      supabaseUrl,
+      supabaseAnonKey, // precisa estar nas secrets
       { global: { headers: { Authorization: `Bearer ${token}` } } }
     );
     const { data: { user }, error: userErr } = await supabaseAuth.auth.getUser();
@@ -61,8 +81,8 @@ Deno.serve(async (req) => {
 
     // 4) DB & permission
     const supabaseAdmin = createClient(
-      Deno.env.get('SUPABASE_URL')!,
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+      supabaseUrl,
+      supabaseServiceKey
     );
 
     // 4.1) Buscar Price ID no catálogo (fonte de verdade)
@@ -113,7 +133,7 @@ Deno.serve(async (req) => {
     }
 
     // 5) Stripe
-    const stripe = new Stripe(Deno.env.get("STRIPE_SECRET_KEY")!, { apiVersion: "2024-06-20" });
+    const stripe = new Stripe(stripeSecretKey, { apiVersion: "2024-06-20" });
 
     let customerId = empresa.stripe_customer_id;
     if (!customerId) {
@@ -123,10 +143,20 @@ Deno.serve(async (req) => {
         metadata: { empresa_id },
       });
       customerId = customer.id;
-      await supabaseAdmin
+      const { error: upErr } = await supabaseAdmin
         .from("empresas")
         .update({ stripe_customer_id: customerId })
         .eq("id", empresa_id);
+      if (upErr) {
+        console.error("billing-checkout: failed to persist stripe_customer_id", upErr);
+        return new Response(
+          JSON.stringify({
+            error: "company_update_failed",
+            message: "Falha ao salvar o vínculo com o Stripe. Tente novamente.",
+          }),
+          { status: 500, headers: { "Content-Type": "application/json", ...corsHeaders } },
+        );
+      }
     } else {
       // Compat: clientes antigos podem existir sem metadata.empresa_id (webhook depende disso).
       try {
@@ -177,9 +207,38 @@ Deno.serve(async (req) => {
       status: 200, headers: { 'Content-Type': 'application/json', ...corsHeaders }
     });
   } catch (e: any) {
-    console.error('billing-checkout error:', e);
-    return new Response(JSON.stringify({ error: 'internal_server_error', message: e?.message ?? 'error' }), {
-      status: 500, headers: { 'Content-Type': 'application/json', ...corsHeaders },
-    });
+    // Stripe errors are common when key/price mode mismatch (test vs live), or price ID is wrong.
+    const stripeCode = (e as any)?.code ?? (e as any)?.raw?.code ?? null;
+    const stripeType = (e as any)?.type ?? (e as any)?.raw?.type ?? (e as any)?.name ?? null;
+    const stripeMessage = String((e as any)?.message ?? "");
+
+    if (stripeCode === "resource_missing" || /no such price/i.test(stripeMessage)) {
+      console.error("billing-checkout: stripe resource missing", { stripeType, stripeCode, stripeMessage });
+      return new Response(
+        JSON.stringify({
+          error: "stripe_resource_missing",
+          message:
+            "O plano não foi encontrado no Stripe. Verifique se o Price ID do plano está correto e se a chave Stripe (teste/produção) corresponde ao ambiente.",
+        }),
+        { status: 400, headers: { "Content-Type": "application/json", ...corsHeaders } },
+      );
+    }
+
+    if (stripeType === "StripeAuthenticationError") {
+      console.error("billing-checkout: stripe auth error", { stripeType, stripeCode, stripeMessage });
+      return new Response(
+        JSON.stringify({
+          error: "stripe_auth_error",
+          message: "Falha de autenticação com o Stripe. Verifique a STRIPE_SECRET_KEY do ambiente.",
+        }),
+        { status: 500, headers: { "Content-Type": "application/json", ...corsHeaders } },
+      );
+    }
+
+    console.error("billing-checkout error:", e);
+    return new Response(
+      JSON.stringify({ error: "internal_server_error", message: "Falha ao iniciar checkout. Tente novamente." }),
+      { status: 500, headers: { "Content-Type": "application/json", ...corsHeaders } },
+    );
   }
 });
