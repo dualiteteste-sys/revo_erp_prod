@@ -32,6 +32,8 @@ const SITE_URL      = (Deno.env.get("SITE_URL") ?? "").trim();
 type InvitePayload = { email?: string; role?: string; empresa_id?: string };
 const asSlug = (s?: string) => (s ?? "").trim().toUpperCase();
 
+type InviteAction = "invited" | "resent" | "link_only" | "noop";
+
 function pickSiteUrl(req: Request): string {
   const origin = (req.headers.get("origin") ?? "").trim();
   const allowedExact = new Set<string>([
@@ -154,6 +156,8 @@ serve(async (req) => {
     const redirectTo = `${siteUrl}/auth/update-password?empresa_id=${encodeURIComponent(empresaId)}`;
     let userId: string | null = null;
     let emailSent = false;
+    let action: InviteAction = "invited";
+    let actionLink: string | null = null;
 
     // 1) Tenta convite padrão (NOVO usuário) → envia e-mail
     const { data: invitedRes, error: inviteErr } = await svc.auth.admin.inviteUserByEmail(email, {
@@ -163,7 +167,20 @@ serve(async (req) => {
     if (!inviteErr && invitedRes?.user?.id) {
       userId = invitedRes.user.id;
       emailSent = true; // e-mail enviado pelo Auth
+      action = "invited";
       console.log("[MAIL] inviteUserByEmail sent");
+      // Mesmo quando o e-mail é enviado, geramos o link para permitir "copiar convite"
+      // caso o destinatário não receba (spam, rate limit, SMTP, etc.).
+      try {
+        const { data: linkData } = await svc.auth.admin.generateLink({
+          type: "invite",
+          email,
+          options: { redirectTo },
+        });
+        actionLink = (linkData as any)?.properties?.action_link ?? null;
+      } catch {
+        actionLink = null;
+      }
     } else {
       // 2) Usuário provavelmente já existe. Gerar link + disparar e-mail via OTP.
       const { data: linkData, error: linkErr } = await svc.auth.admin.generateLink({
@@ -178,6 +195,7 @@ serve(async (req) => {
         });
       }
       userId = linkData.user.id;
+      actionLink = (linkData as any)?.properties?.action_link ?? null;
 
       // Dispara e-mail (EXISTENTE) usando o servidor de SMTP do projeto
       const { error: otpErr } = await svc.auth.signInWithOtp({
@@ -186,12 +204,14 @@ serve(async (req) => {
       });
       if (otpErr) {
         console.error("[MAIL] signInWithOtp failed", otpErr);
-        // Se não conseguimos enviar e-mail, ainda assim seguimos sem travar,
-        // mas marcaremos ACTIVE (sem exigir aceite).
+        // Se não conseguimos enviar e-mail, ainda assim seguimos sem travar:
+        // retornamos o link para o admin copiar e enviar manualmente.
         emailSent = false;
+        action = "link_only";
       } else {
         console.log("[MAIL] signInWithOtp sent");
         emailSent = true;
+        action = "resent";
       }
     }
 
@@ -208,11 +228,14 @@ serve(async (req) => {
       return new Response(JSON.stringify({
         ok: true,
         action: "noop",
-        data: { email, empresa_id: empresaId, role: roleSlug, status: "ACTIVE" },
+        action_link: null,
+        data: { email, empresa_id: empresaId, role: roleSlug, status: "ACTIVE", action_link: null },
       }), { status: 200, headers: { ...CORS, "Content-Type": "application/json" } });
     }
 
-    const nextStatus: "PENDING" | "ACTIVE" = emailSent ? "PENDING" : "ACTIVE";
+    // Nunca marca ACTIVE sem o usuário ter completado o fluxo.
+    // Se o e-mail não foi enviado, o admin ainda pode copiar o link para concluir.
+    const nextStatus: "PENDING" = "PENDING";
     const { error: upsertErr } = await svcDb.upsert(
       { empresa_id: empresaId!, user_id: userId!, role_id: roleRow.id, status: nextStatus },
       { onConflict: "empresa_id,user_id" },
@@ -226,8 +249,9 @@ serve(async (req) => {
 
     return new Response(JSON.stringify({
       ok: true,
-      action: emailSent ? "invited" : "linked",
-      data: { email, empresa_id: empresaId, role: roleSlug, status: nextStatus },
+      action,
+      action_link: actionLink,
+      data: { email, empresa_id: empresaId, role: roleSlug, status: nextStatus, action_link: actionLink },
     }), { status: 200, headers: { ...CORS, "Content-Type": "application/json" } });
 
   } catch (err) {

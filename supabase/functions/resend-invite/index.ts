@@ -156,8 +156,9 @@ serve(async (req) => {
     const redirectTo = `${siteUrl}/auth/update-password?empresa_id=${encodeURIComponent(empresaId)}`;
 
     // --- Tenta convidar NOVO usuário (envia e-mail)
-    let action: "invited" | "resent" = "resent";
+    let action: "invited" | "resent" | "link_only" = "resent";
     let emailSent = false;
+    let actionLink: string | null = null;
 
     const { data: invitedRes, error: inviteErr } = await svc.auth.admin.inviteUserByEmail(email, {
       redirectTo: redirectTo,
@@ -168,6 +169,16 @@ serve(async (req) => {
       emailSent = true;
       action = "invited";
       console.log("[MAIL] inviteUserByEmail sent");
+      try {
+        const { data: linkData } = await svc.auth.admin.generateLink({
+          type: "invite",
+          email,
+          options: { redirectTo },
+        });
+        actionLink = (linkData as any)?.properties?.action_link ?? null;
+      } catch {
+        actionLink = null;
+      }
     } else {
       // Usuário já existe → envia e-mail com magic link
       const { data: linkData, error: linkErr } = await svc.auth.admin.generateLink({
@@ -182,17 +193,19 @@ serve(async (req) => {
         });
       }
       userId = linkData.user.id;
+      actionLink = (linkData as any)?.properties?.action_link ?? null;
 
       const { error: otpErr } = await svc.auth.signInWithOtp({ email, options: { emailRedirectTo: redirectTo } });
       if (otpErr) {
         console.error("[MAIL] signInWithOtp failed", otpErr);
-        return new Response(JSON.stringify({ ok: false, error: "MAIL_SEND_FAILED" }), {
-          status: 500, headers: { ...CORS, "Content-Type": "application/json" },
-        });
+        // Sem travar: retorna link para admin copiar e enviar manualmente.
+        emailSent = false;
+        action = "link_only";
+      } else {
+        emailSent = true;
+        action = "resent";
+        console.log("[MAIL] signInWithOtp sent");
       }
-      emailSent = true;
-      action = "resent";
-      console.log("[MAIL] signInWithOtp sent");
     }
 
     // --- Garantir que o vínculo existe e fica PENDING
@@ -200,7 +213,7 @@ serve(async (req) => {
     const { data: existing } = await svcDb
       .select("status").eq("empresa_id", empresaId!).eq("user_id", userId!).maybeSingle();
 
-    const nextStatus = emailSent ? "PENDING" : (existing?.status ?? "PENDING");
+    const nextStatus = "PENDING";
     
     if (existing) {
         const { error: updateError } = await svcDb
@@ -213,7 +226,8 @@ serve(async (req) => {
     return new Response(JSON.stringify({
       ok: true,
       action,
-      data: { email, empresa_id: empresaId, status: nextStatus },
+      action_link: actionLink,
+      data: { email, empresa_id: empresaId, status: nextStatus, action_link: actionLink },
     }), { status: 200, headers: { ...CORS, "Content-Type": "application/json" } });
 
   } catch (err) {
