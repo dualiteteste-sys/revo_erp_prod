@@ -10,6 +10,7 @@ export default function AuthConfirmed() {
   const navigate = useNavigate();
   const [status, setStatus] = useState<Status>('authenticating');
   const [message, setMessage] = useState('Confirmando autenticação...');
+  const [errorDetail, setErrorDetail] = useState<string | null>(null);
 
   const { code, token_hash, type, hashTokens } = useMemo(() => {
     const url = new URL(window.location.href);
@@ -28,6 +29,7 @@ export default function AuthConfirmed() {
     const bootstrap = async () => {
       setStatus('bootstrapping');
       setMessage('Preparando seu ambiente...');
+      setErrorDetail(null);
       try {
         // 1) Estabelece a sessão a partir do link de confirmação (hash/code/token_hash)
         if (hashTokens.access_token && hashTokens.refresh_token) {
@@ -54,7 +56,19 @@ export default function AuthConfirmed() {
         }
 
         // 2) Bootstrap da empresa (idempotente)
-        await bootstrapEmpresaParaUsuarioAtual();
+        let ok = false;
+        let lastErr: any = null;
+        for (let attempt = 0; attempt < 3; attempt++) {
+          try {
+            await bootstrapEmpresaParaUsuarioAtual();
+            ok = true;
+            break;
+          } catch (e: any) {
+            lastErr = e;
+            await new Promise((r) => setTimeout(r, 350 + attempt * 250));
+          }
+        }
+        if (!ok) throw lastErr || new Error('Falha ao preparar sua empresa.');
         try {
           localStorage.removeItem('pending_signup_email');
         } catch {
@@ -71,6 +85,8 @@ export default function AuthConfirmed() {
         console.error('[BOOTSTRAP] Error:', err);
         setStatus('error');
         setMessage(err?.message || 'Ocorreu um erro ao configurar seu acesso.');
+        const details = String((err as any)?.details ?? (err as any)?.hint ?? (err as any)?.message ?? '').trim();
+        setErrorDetail(details && details !== message ? details : null);
       }
     };
 
@@ -97,6 +113,23 @@ export default function AuthConfirmed() {
         <div className="flex justify-center mb-4">{icon}</div>
         <h1 className="text-xl font-bold mb-2 text-gray-800">{title}</h1>
         <p className="text-sm text-gray-600">{message}</p>
+        {status === 'error' ? (
+          <div className="mt-5 flex flex-col gap-3">
+            {errorDetail ? <div className="text-xs text-gray-500 break-words">{errorDetail}</div> : null}
+            <button
+              onClick={() => setStatus('authenticating')}
+              className="bg-blue-600 text-white font-semibold py-2 px-4 rounded-lg hover:bg-blue-700"
+            >
+              Tentar novamente
+            </button>
+            <button
+              onClick={() => navigate('/app', { replace: true })}
+              className="bg-white text-gray-800 font-semibold py-2 px-4 rounded-lg border border-gray-200 hover:bg-gray-50"
+            >
+              Continuar para o sistema
+            </button>
+          </div>
+        ) : null}
       </div>
     </div>
   );
