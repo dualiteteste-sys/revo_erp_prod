@@ -4,6 +4,10 @@ import { supabase } from "@/lib/supabaseClient";
 
 type PendingMarketingPlan = "essencial" | "pro" | "max" | "industria" | "scale";
 
+function sleep(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
 function readPendingMarketingPlan(): { slug: PendingMarketingPlan; cycle?: string } | null {
   try {
     const raw = localStorage.getItem("pending_plan_slug");
@@ -66,13 +70,13 @@ export async function bootstrapEmpresaParaUsuarioAtual(opts?: {
   fantasia?: string | null;
 }): Promise<{ empresa_id: string; status: string }> {
   try {
-    const data = await callRpc<{ empresa_id: string; status: string }[]>("secure_bootstrap_empresa_for_current_user", {
+    const data = await callRpc<unknown>("secure_bootstrap_empresa_for_current_user", {
       p_razao_social: opts?.razao_social ?? null,
       p_fantasia: opts?.fantasia ?? null,
     });
 
     // A função retorna table(empresa_id uuid, status text); PostgREST entrega array
-    // MAS se o retorno for apenas um UUID (string), tratamos aqui.
+    // Em alguns ambientes (schema mais novo), ela retorna VOID. Nesse caso, buscamos a empresa ativa após o bootstrap.
 
     // Caso 1: Retorno direto de string (UUID)
     if (typeof data === 'string') {
@@ -82,16 +86,60 @@ export async function bootstrapEmpresaParaUsuarioAtual(opts?: {
 
     // Caso 2: Retorno de array/objeto
     const row = Array.isArray(data) ? data[0] : data;
+    const rowEmpresaId = (row as any)?.empresa_id ?? null;
+    const rowStatus = (row as any)?.status ?? 'unknown';
 
-    if (!row || !row.empresa_id) {
+    // Caso 2.1: Retorno moderno (void/null) → buscar empresa ativa após bootstrap (com retry curto)
+    if (!rowEmpresaId) {
+      for (let attempt = 0; attempt < 5; attempt++) {
+        const { data: activeRows, error: activeErr } = await (supabase as any)
+          .from("user_active_empresa")
+          .select("empresa_id")
+          .limit(1);
+        if (!activeErr) {
+          const empresaId = (activeRows?.[0] as any)?.empresa_id ?? null;
+          if (empresaId) {
+            logger.info("[RPC][bootstrap_empresa_for_current_user] Fetched active empresa after void bootstrap", {
+              empresaId,
+              attempt,
+            });
+            await applyMarketingPlanEntitlements(empresaId);
+            return { empresa_id: empresaId, status: 'unknown' };
+          }
+        }
+
+        // fallback: tenta achar o vínculo mais recente
+        const { data: links, error: linkErr } = await (supabase as any)
+          .from("empresa_usuarios")
+          .select("empresa_id")
+          .order("created_at", { ascending: false })
+          .limit(1);
+        if (!linkErr) {
+          const empresaId = (links?.[0] as any)?.empresa_id ?? null;
+          if (empresaId) {
+            try {
+              await (supabase as any).rpc("set_active_empresa_for_current_user", { p_empresa_id: empresaId });
+            } catch {
+              // best-effort
+            }
+            await applyMarketingPlanEntitlements(empresaId);
+            return { empresa_id: empresaId, status: 'unknown' };
+          }
+        }
+
+        await sleep(250 + attempt * 150);
+      }
+    }
+
+    if (!row || !rowEmpresaId) {
       logger.error("[RPC][bootstrap_empresa_for_current_user] Invalid data returned", null, { data });
-      throw new Error("Falha ao bootstrapar empresa.");
+      throw new Error("Falha ao preparar sua empresa. Tente novamente.");
     }
 
     logger.info("[RPC][bootstrap_empresa_for_current_user] OK", { row });
     // If the user came from landing pricing, apply the chosen plan limits/modules now (best-effort).
-    await applyMarketingPlanEntitlements(row.empresa_id);
-    return { empresa_id: row.empresa_id, status: row.status };
+    await applyMarketingPlanEntitlements(rowEmpresaId);
+    return { empresa_id: rowEmpresaId, status: rowStatus };
   } catch (error) {
     logger.error("[RPC][bootstrap_empresa_for_current_user] Error", error);
     throw error;
