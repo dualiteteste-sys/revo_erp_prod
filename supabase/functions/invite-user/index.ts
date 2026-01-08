@@ -169,18 +169,11 @@ serve(async (req) => {
       emailSent = true; // e-mail enviado pelo Auth
       action = "invited";
       console.log("[MAIL] inviteUserByEmail sent");
-      // Mesmo quando o e-mail é enviado, geramos o link para permitir "copiar convite"
-      // caso o destinatário não receba (spam, rate limit, SMTP, etc.).
-      try {
-        const { data: linkData } = await svc.auth.admin.generateLink({
-          type: "invite",
-          email,
-          options: { redirectTo },
-        });
-        actionLink = (linkData as any)?.properties?.action_link ?? null;
-      } catch {
-        actionLink = null;
-      }
+      // ⚠️ IMPORTANTE:
+      // Não geramos um novo link aqui (admin.generateLink(type=invite)) porque isso pode INVALIDAR
+      // o link do e-mail que acabou de ser enviado (resultando em `otp_expired` ao clicar).
+      // Se precisar de link manual, use o fluxo de "reenviar convite" com link_only.
+      actionLink = null;
     } else {
       // 2) Usuário provavelmente já existe. Gerar link + disparar e-mail via OTP.
       const { data: linkData, error: linkErr } = await svc.auth.admin.generateLink({
