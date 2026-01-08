@@ -158,12 +158,27 @@ Deno.serve(async (req) => {
         );
       }
     } else {
+      // Garantir que o customer existe no ambiente atual (ex.: trocou test→prod e o cus_* não existe no novo modo)
+      try {
+        const c = await stripe.customers.retrieve(customerId);
+        if ((c as any)?.deleted) throw { code: "resource_missing", message: "Customer deleted" };
+      } catch (_e: any) {
+        const code = (_e as any)?.code ?? (_e as any)?.raw?.code ?? null;
+        if (code === "resource_missing") {
+          const customer = await stripe.customers.create({
+            name: empresa.fantasia ?? empresa.razao_social ?? undefined,
+            email: user.email ?? undefined,
+            metadata: { empresa_id },
+          });
+          customerId = customer.id;
+          await supabaseAdmin.from("empresas").update({ stripe_customer_id: customerId }).eq("id", empresa_id);
+        }
+      }
+
       // Compat: clientes antigos podem existir sem metadata.empresa_id (webhook depende disso).
       try {
-        await stripe.customers.update(customerId, {
-          metadata: { empresa_id },
-        });
-      } catch (_e) {
+        await stripe.customers.update(customerId, { metadata: { empresa_id } });
+      } catch {
         // best-effort
       }
     }
@@ -212,13 +227,25 @@ Deno.serve(async (req) => {
     const stripeType = (e as any)?.type ?? (e as any)?.raw?.type ?? (e as any)?.name ?? null;
     const stripeMessage = String((e as any)?.message ?? "");
 
-    if (stripeCode === "resource_missing" || /no such price/i.test(stripeMessage)) {
+    if (stripeType === "StripePermissionError") {
+      console.error("billing-checkout: stripe permission error", { stripeType, stripeCode, stripeMessage });
+      return new Response(
+        JSON.stringify({
+          error: "stripe_permission_error",
+          message:
+            "A chave do Stripe não tem permissão para criar Checkout. Use uma Secret Key (sk_...) com permissões de Billing/Checkout.",
+        }),
+        { status: 500, headers: { "Content-Type": "application/json", ...corsHeaders } },
+      );
+    }
+
+    if (stripeCode === "resource_missing" || /no such price/i.test(stripeMessage) || /no such customer/i.test(stripeMessage)) {
       console.error("billing-checkout: stripe resource missing", { stripeType, stripeCode, stripeMessage });
       return new Response(
         JSON.stringify({
           error: "stripe_resource_missing",
           message:
-            "O plano não foi encontrado no Stripe. Verifique se o Price ID do plano está correto e se a chave Stripe (teste/produção) corresponde ao ambiente.",
+            "Um recurso do Stripe não foi encontrado (plano/cliente). Verifique se o Price ID está correto e se a chave Stripe (teste/produção) corresponde ao ambiente atual.",
         }),
         { status: 400, headers: { "Content-Type": "application/json", ...corsHeaders } },
       );

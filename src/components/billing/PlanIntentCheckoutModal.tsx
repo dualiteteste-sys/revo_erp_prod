@@ -11,6 +11,25 @@ import { logger } from "@/lib/logger";
 type PendingPlanSlug = "ESSENCIAL" | "PRO" | "MAX" | "INDUSTRIA" | "SCALE";
 type PendingBillingCycle = "monthly" | "yearly";
 
+function extractEdgeFunctionErrorMessage(error: any): string | null {
+  try {
+    const ctx = error?.context ?? null;
+    const body = ctx?.body ?? null;
+    if (!body) return null;
+    if (typeof body === "string") {
+      try {
+        const parsed = JSON.parse(body);
+        return parsed?.message || parsed?.error || null;
+      } catch {
+        return body;
+      }
+    }
+    return body?.message || body?.error || null;
+  } catch {
+    return null;
+  }
+}
+
 function readPendingPlanIntent(): { planSlug: PendingPlanSlug; billingCycle: PendingBillingCycle } | null {
   try {
     const rawSlug = (localStorage.getItem("pending_plan_slug") ?? "").trim();
@@ -87,7 +106,7 @@ export function PlanIntentCheckoutModal() {
         planSlug: intent.planSlug,
         billingCycle: intent.billingCycle,
       });
-      const msg = error?.message || "Erro ao iniciar o checkout.";
+      const msg = extractEdgeFunctionErrorMessage(error) || error?.message || "Erro ao iniciar o checkout.";
       setInlineError(msg);
       addToast(msg, "error");
       setStarting(false);
