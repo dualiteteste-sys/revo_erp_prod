@@ -30,30 +30,35 @@ export const SubscriptionProvider = ({ children }: { children: ReactNode }) => {
   const fetchSubscription = useCallback(async (empresaId: string) => {
     setLoadingSubscription(true);
     try {
-      const { data: subData, error: subError } = await supabase
+      // Importante: evitar `.single()`/`.maybeSingle()` aqui para não gerar 406 no PostgREST
+      // quando a empresa ainda não tem assinatura (caso comum no primeiro login).
+      const { data: subRows, error: subError } = await supabase
         .from('subscriptions')
         .select('*')
         .eq('empresa_id', empresaId)
         .order('updated_at', { ascending: false })
-        .limit(1)
-        .maybeSingle();
+        .limit(1);
 
       if (subError) {
         throw subError;
       }
 
-      if (subData && subData.stripe_price_id) {
-        const { data: planData, error: planError } = await supabase
+      const subData = (subRows?.[0] ?? null) as Subscription | null;
+
+      if (subData?.stripe_price_id) {
+        // Também evitar `.single()` para não gerar 406 caso o catálogo esteja incompleto/desatualizado.
+        const { data: planRows, error: planError } = await supabase
           .from('plans')
           .select('*')
           .eq('stripe_price_id', subData.stripe_price_id)
-          .single();
+          .limit(1);
 
         if (planError) {
           console.warn('Plano não encontrado para a assinatura:', planError);
         }
 
-        setSubscription({ ...subData, plan: planData || null });
+        const planData = (planRows?.[0] ?? null) as Plan | null;
+        setSubscription({ ...subData, plan: planData });
 
       } else {
         setSubscription(subData ? { ...subData, plan: null } : null);
