@@ -71,6 +71,6 @@ export const useUpdateUserRole = () => useUserMutation(
 );
 
 export const useResendInvite = () => useUserMutation(
-    (email: string) => usersService.resendInviteClient({ email }),
+    (email: string) => usersService.resendInvite({ email }),
     'Convite reenviado com sucesso.'
 );

@@ -34,6 +34,22 @@ const asSlug = (s?: string) => (s ?? "").trim().toUpperCase();
 
 type InviteAction = "invited" | "resent" | "link_only" | "noop";
 
+async function findUserIdByEmail(svc: any, email: string): Promise<string | null> {
+  const normalized = email.trim().toLowerCase();
+  const perPage = 200;
+  const maxPages = 10; // safety: avoid scanning forever
+
+  for (let page = 1; page <= maxPages; page++) {
+    const { data, error } = await svc.auth.admin.listUsers({ page, perPage });
+    if (error) throw error;
+    const users = (data as any)?.users ?? [];
+    const found = users.find((u: any) => (u?.email ?? "").toLowerCase() === normalized);
+    if (found?.id) return found.id;
+    if (!Array.isArray(users) || users.length < perPage) break;
+  }
+  return null;
+}
+
 function pickSiteUrl(req: Request): string {
   const origin = (req.headers.get("origin") ?? "").trim();
   const allowedExact = new Set<string>([
@@ -175,36 +191,47 @@ serve(async (req) => {
       // Se precisar de link manual, use o fluxo de "reenviar convite" com link_only.
       actionLink = null;
     } else {
-      // 2) Usuário provavelmente já existe. Gerar link + disparar e-mail via OTP.
-      const { data: linkData, error: linkErr } = await svc.auth.admin.generateLink({
-        type: "magiclink",
-        email,
-        options: { redirectTo },
-      });
-      if (linkErr || !linkData?.user?.id) {
-        console.error("[ADMIN] generateLink failed", { inviteErr, linkErr });
-        return new Response(JSON.stringify({ ok: false, error: "ADMIN_LOOKUP_FAILED" }), {
+      // 2) Usuário já existe (ou já foi convidado anteriormente).
+      // IMPORTANTE: não geramos link ANTES de enviar o e-mail, pois isso pode confundir/invalidar tokens.
+      // Primeiro enviamos o e-mail (OTP), e só geramos link se o envio falhar (fallback manual).
+      try {
+        userId = await findUserIdByEmail(svc, email);
+      } catch (e) {
+        console.error("[ADMIN] listUsers failed", e);
+      }
+      if (!userId) {
+        console.error("[ADMIN] user not found after invite error", inviteErr);
+        return new Response(JSON.stringify({ ok: false, error: "USER_LOOKUP_FAILED" }), {
           status: 500, headers: { ...CORS, "Content-Type": "application/json" },
         });
       }
-      userId = linkData.user.id;
-      actionLink = (linkData as any)?.properties?.action_link ?? null;
 
-      // Dispara e-mail (EXISTENTE) usando o servidor de SMTP do projeto
       const { error: otpErr } = await svc.auth.signInWithOtp({
         email,
         options: { emailRedirectTo: redirectTo },
       });
-      if (otpErr) {
-        console.error("[MAIL] signInWithOtp failed", otpErr);
-        // Se não conseguimos enviar e-mail, ainda assim seguimos sem travar:
-        // retornamos o link para o admin copiar e enviar manualmente.
-        emailSent = false;
-        action = "link_only";
-      } else {
+      if (!otpErr) {
         console.log("[MAIL] signInWithOtp sent");
         emailSent = true;
         action = "resent";
+        actionLink = null;
+      } else {
+        console.error("[MAIL] signInWithOtp failed", otpErr);
+        emailSent = false;
+        action = "link_only";
+
+        const { data: linkData, error: linkErr } = await svc.auth.admin.generateLink({
+          type: "magiclink",
+          email,
+          options: { redirectTo },
+        });
+        if (linkErr || !linkData?.user?.id) {
+          console.error("[ADMIN] generateLink failed", { inviteErr, linkErr });
+          return new Response(JSON.stringify({ ok: false, error: "ADMIN_LOOKUP_FAILED" }), {
+            status: 500, headers: { ...CORS, "Content-Type": "application/json" },
+          });
+        }
+        actionLink = (linkData as any)?.properties?.action_link ?? null;
       }
     }
 

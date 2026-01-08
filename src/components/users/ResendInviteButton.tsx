@@ -33,16 +33,16 @@ export default function ResendInviteButton({ userId, email, className }: Props) 
       console.log("[RESEND] ok", res);
 
       const action = res?.action;
-      const link   = res?.data?.link as string | undefined;
+      const link   = (res?.action_link || res?.data?.action_link) as string | undefined;
 
-      if (action === "generated_link" && link) {
+      if (action === "link_only" && link) {
         try {
           await navigator.clipboard.writeText(link);
-          addToast("Convite reenviado via link. A URL foi copiada para sua área de transferência.", "success");
+          addToast("Não foi possível enviar e-mail. O link foi copiado para você enviar ao usuário.", "warning");
         } catch {
-          addToast(`Convite reenviado via link. Copie e envie ao usuário: ${link}`, "info");
+          addToast(`Não foi possível enviar e-mail. Copie e envie ao usuário: ${link}`, "warning");
         }
-      } else if (action === "invited") {
+      } else if (action === "invited" || action === "resent") {
         addToast("Convite reenviado por e-mail com sucesso.", "success");
       } else {
         addToast("A solicitação foi processada.", "success");
