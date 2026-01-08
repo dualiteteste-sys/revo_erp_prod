@@ -2,10 +2,11 @@ module.exports = {
   ci: {
     collect: {
       startServerCommand: 'yarn preview --host 127.0.0.1 --port 4173 --strictPort',
-      startServerReadyPattern: '127\\.0\\.0\\.1:4173',
+      // Vite inclui códigos ANSI no port (ex: ":<bold>4173</bold>"), então não usamos o port no pattern.
+      startServerReadyPattern: '127\\.0\\.0\\.1',
       startServerReadyTimeout: 30000,
       url: ['http://127.0.0.1:4173/', 'http://127.0.0.1:4173/auth/login'],
-      numberOfRuns: 1,
+      numberOfRuns: 2,
       settings: {
         chromeFlags: ['--no-sandbox', '--headless=new'],
       },
