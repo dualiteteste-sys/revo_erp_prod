@@ -8,11 +8,35 @@ import Input from "@/components/ui/forms/Input";
 import RevoLogo from "@/components/landing/RevoLogo";
 import { bootstrapEmpresaParaUsuarioAtual } from "@/services/session";
 
-function parseHashTokens(hash: string) {
+function parseHashParams(hash: string) {
   const s = new URLSearchParams(hash.startsWith("#") ? hash.slice(1) : hash);
-  const access_token = s.get("access_token") ?? undefined;
-  const refresh_token = s.get("refresh_token") ?? undefined;
-  return { access_token, refresh_token };
+  return {
+    access_token: s.get("access_token") ?? undefined,
+    refresh_token: s.get("refresh_token") ?? undefined,
+    error: s.get("error") ?? undefined,
+    error_code: s.get("error_code") ?? undefined,
+    error_description: s.get("error_description") ?? undefined,
+  };
+}
+
+function decodeURIComponentSafe(value: string): string {
+  try {
+    return decodeURIComponent(value);
+  } catch {
+    return value;
+  }
+}
+
+function formatAuthLinkError(params: { error_code?: string; error_description?: string }): string {
+  const description = (params.error_description ?? "").trim();
+  const code = (params.error_code ?? "").trim().toLowerCase();
+
+  if (code === "otp_expired") {
+    return "Este link expirou ou já foi usado. Peça para reenviar o convite e abra o e-mail mais recente.";
+  }
+
+  if (description) return decodeURIComponentSafe(description);
+  return "Não foi possível validar o link. Peça para reenviar o convite e tente novamente.";
 }
 
 export default function UpdatePasswordPage() {
@@ -31,16 +55,69 @@ export default function UpdatePasswordPage() {
   useEffect(() => {
     (async () => {
       try {
-        const { access_token, refresh_token } = parseHashTokens(window.location.hash);
-        if (access_token && refresh_token) {
-          console.log("[AUTH] setSession from hash");
-          const { error } = await supabase.auth.setSession({ access_token, refresh_token });
-          if (error) throw error;
-          history.replaceState(null, "", window.location.pathname + window.location.search);
+        // 0) Se já existe sessão (ex.: reload), podemos seguir.
+        const initial = await supabase.auth.getSession();
+        if (initial?.data?.session) {
+          setSessionReady(true);
+          return;
         }
+
+        const url = new URL(window.location.href);
+        const qs = url.searchParams;
+        const code = qs.get("code") ?? "";
+        const token_hash = qs.get("token_hash") ?? "";
+        const type = (qs.get("type") ?? "").toLowerCase();
+        const hash = parseHashParams(url.hash ?? "");
+
+        // 1) Se o link veio com erro (ex.: expirado), não tenta seguir.
+        if (hash.error) {
+          setSessionReady(false);
+          setError(formatAuthLinkError({ error_code: hash.error_code, error_description: hash.error_description }));
+          return;
+        }
+
+        // 2) Estabelece sessão (hash tokens / PKCE code / token_hash)
+        if (hash.access_token && hash.refresh_token) {
+          console.log("[AUTH] setSession from hash");
+          const { error } = await supabase.auth.setSession({
+            access_token: hash.access_token,
+            refresh_token: hash.refresh_token,
+          });
+          if (error) throw error;
+        } else if (code) {
+          console.log("[AUTH] exchangeCodeForSession");
+          const { error } = await supabase.auth.exchangeCodeForSession(code);
+          if (error) throw error;
+        } else if (token_hash) {
+          const otpType =
+            ["invite", "signup", "magiclink", "recovery"].includes(type)
+              ? (type as "invite" | "signup" | "magiclink" | "recovery")
+              : "invite";
+          console.log("[AUTH] verifyOtp", { otpType });
+          const { error } = await supabase.auth.verifyOtp({ token_hash, type: otpType });
+          if (error) throw error;
+        }
+
+        // 3) Confere se existe sessão mesmo.
+        const after = await supabase.auth.getSession();
+        if (!after?.data?.session) {
+          setSessionReady(false);
+          setError("Auth session missing! Abra o link do e-mail novamente (o link pode ter expirado).");
+          return;
+        }
+
+        // 4) Limpa URL (remove code/hash tokens), mantendo empresa_id.
+        const clean = new URL(window.location.href);
+        clean.searchParams.delete("code");
+        clean.searchParams.delete("token_hash");
+        clean.searchParams.delete("type");
+        clean.hash = "";
+        history.replaceState(null, "", clean.pathname + clean.search);
+
         setSessionReady(true);
       } catch (e: any) {
         console.error("[AUTH] setSession error", e);
+        setSessionReady(false);
         setError(e?.message ?? "Falha ao preparar sessão. O link pode ter expirado.");
       } finally {
         setLoading(false);
