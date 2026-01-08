@@ -11,6 +11,7 @@ import { RefreshCw } from 'lucide-react';
 import { useHasPermission } from '@/hooks/useHasPermission';
 import { isSeedEnabled } from '@/utils/seed';
 import { useNavigate } from 'react-router-dom';
+import ErrorAlert from '@/components/ui/ErrorAlert';
 
 export default function RHDashboard() {
   const navigate = useNavigate();
@@ -19,6 +20,7 @@ export default function RHDashboard() {
   const [compliance, setCompliance] = useState<TrainingComplianceResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [seeding, setSeeding] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const { addToast } = useToast();
 
   const permManage = useHasPermission('rh', 'manage');
@@ -26,12 +28,21 @@ export default function RHDashboard() {
 
   const fetchStats = async () => {
     setLoading(true);
+    setLoadError(null);
     try {
-      const [data, comp] = await Promise.all([getDashboardStats(), getTrainingCompliance(30)]);
-      setStats(data);
-      setCompliance(comp);
-    } catch (error) {
-      addToast((error as any)?.message || 'Erro ao carregar dashboard RH.', 'error');
+      const [statsRes, compRes] = await Promise.allSettled([getDashboardStats(), getTrainingCompliance(30)]);
+
+      if (statsRes.status === 'fulfilled') setStats(statsRes.value);
+      else {
+        setStats(null);
+        const msg = (statsRes.reason as any)?.message || 'Erro ao carregar dashboard RH.';
+        setLoadError(msg);
+        addToast(msg, 'error');
+      }
+
+      // Não derruba a tela se o compliance falhar (fica como "não disponível").
+      if (compRes.status === 'fulfilled') setCompliance(compRes.value);
+      else setCompliance(null);
     } finally {
       setLoading(false);
     }
@@ -58,10 +69,22 @@ export default function RHDashboard() {
     }
   };
 
-  if (loading || !stats) {
+  if (loading) {
     return (
       <div className="flex justify-center h-full items-center">
         <Loader2 className="animate-spin text-blue-600 w-12 h-12" />
+      </div>
+    );
+  }
+
+  if (!stats) {
+    return (
+      <div className="p-6">
+        <ErrorAlert
+          title="Não foi possível carregar o RH"
+          message={loadError || 'Erro ao carregar dashboard RH.'}
+          onRetry={fetchStats}
+        />
       </div>
     );
   }

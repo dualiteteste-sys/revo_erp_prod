@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useAuth } from '../../../contexts/AuthProvider';
 import { useSubscription } from '../../../contexts/SubscriptionProvider';
 import { ExternalLink, FileText, Loader2, Sparkles, AlertTriangle, CheckCircle, RefreshCw, ServerOff, CreditCard, PlusCircle } from 'lucide-react';
@@ -155,14 +155,16 @@ const SubscriptionSettings: React.FC<SubscriptionSettingsProps> = ({ onSwitchToP
   const [invoices, setInvoices] = useState<BillingInvoice[]>([]);
   const [loadingStripeHistory, setLoadingStripeHistory] = useState(false);
   const [stripeHistory, setStripeHistory] = useState<StripeWebhookEventRow[]>([]);
+  const autoFetchedBillingForEmpresa = useRef<string | null>(null);
 
   const fetchAddons = useCallback(async () => {
-    if (!activeEmpresa?.id) return;
+    const empresaId = activeEmpresa?.id;
+    if (!empresaId) return;
     setLoadingAddons(true);
     const { data, error } = await supabase
         .from('empresa_addons')
         .select('*')
-        .eq('empresa_id', activeEmpresa.id);
+        .eq('empresa_id', empresaId);
     
     if (error) {
         addToast('Erro ao buscar add-ons.', 'error');
@@ -170,7 +172,7 @@ const SubscriptionSettings: React.FC<SubscriptionSettingsProps> = ({ onSwitchToP
         setAddons(data);
     }
     setLoadingAddons(false);
-  }, [activeEmpresa, addToast, supabase]);
+  }, [activeEmpresa?.id, addToast, supabase]);
 
   const fetchEntitlements = useCallback(async () => {
     const empresaId = activeEmpresa?.id;
@@ -275,7 +277,7 @@ const SubscriptionSettings: React.FC<SubscriptionSettingsProps> = ({ onSwitchToP
     } finally {
       setLoadingInvoices(false);
     }
-  }, [activeEmpresa?.id, session?.access_token, supabase.functions]);
+  }, [activeEmpresa?.id, session?.access_token, supabase]);
 
   const fetchStripeHistory = useCallback(async () => {
     const empresaId = activeEmpresa?.id;
@@ -298,11 +300,14 @@ const SubscriptionSettings: React.FC<SubscriptionSettingsProps> = ({ onSwitchToP
   }, [activeEmpresa?.id, supabase]);
 
   useEffect(() => {
-    if (subscription) {
-      void fetchInvoices();
-      void fetchStripeHistory();
-    }
-  }, [fetchInvoices, fetchStripeHistory, subscription]);
+    const empresaId = activeEmpresa?.id;
+    if (!empresaId || !subscription) return;
+    // Evita loop por re-render (ex.: refs instáveis / subscription refetch).
+    if (autoFetchedBillingForEmpresa.current === empresaId) return;
+    autoFetchedBillingForEmpresa.current = empresaId;
+    void fetchInvoices();
+    void fetchStripeHistory();
+  }, [activeEmpresa?.id, subscription?.id, fetchInvoices, fetchStripeHistory]);
 
   const handleManageBilling = async () => {
     if (!activeEmpresa) {

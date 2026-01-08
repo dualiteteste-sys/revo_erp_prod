@@ -1,4 +1,4 @@
-import { callRpc } from '@/lib/api';
+import { callRpc, isRpcMissingError } from '@/lib/api';
 
 export type FinanceiroRelatoriosSerie = {
   mes: string; // YYYY-MM
@@ -61,6 +61,8 @@ export type FinanceiroDreSimplificada = {
   linhas: FinanceiroDreLinha[];
 };
 
+let financeiroPorCentroCustoAvailable: boolean | null = null;
+
 export async function getFinanceiroRelatoriosResumo(params: {
   startDate?: Date | null;
   endDate?: Date | null;
@@ -76,10 +78,22 @@ export async function listFinanceiroPorCentroCusto(params: {
   startDate?: Date | null;
   endDate?: Date | null;
 }): Promise<FinanceiroPorCentroCustoRow[]> {
-  return callRpc<FinanceiroPorCentroCustoRow[]>('financeiro_relatorio_por_centro_custo', {
-    p_start_date: params.startDate ? params.startDate.toISOString().slice(0, 10) : null,
-    p_end_date: params.endDate ? params.endDate.toISOString().slice(0, 10) : null,
-  });
+  if (financeiroPorCentroCustoAvailable === false) return [];
+  try {
+    const rows = await callRpc<FinanceiroPorCentroCustoRow[]>('financeiro_relatorio_por_centro_custo', {
+      p_start_date: params.startDate ? params.startDate.toISOString().slice(0, 10) : null,
+      p_end_date: params.endDate ? params.endDate.toISOString().slice(0, 10) : null,
+    });
+    financeiroPorCentroCustoAvailable = true;
+    return rows;
+  } catch (err) {
+    // Ambientes sem FIN-04 aplicado: não derruba a tela inteira.
+    if (isRpcMissingError(err)) {
+      financeiroPorCentroCustoAvailable = false;
+      return [];
+    }
+    throw err;
+  }
 }
 
 export async function getFinanceiroDreSimplificada(params: {

@@ -72,12 +72,23 @@ export default function RelatoriosFinanceiroPage() {
     try {
       const start = toDateOrNull(startDate);
       const end = toDateOrNull(endDate);
-      const [result, centros] = await Promise.all([
+      const [resumoRes, centrosRes] = await Promise.allSettled([
         getFinanceiroRelatoriosResumo({ startDate: start, endDate: end }),
         listFinanceiroPorCentroCusto({ startDate: start, endDate: end }),
       ]);
-      setData(result);
-      setPorCentro(centros ?? []);
+
+      if (resumoRes.status === 'fulfilled') {
+        setData(resumoRes.value);
+      } else {
+        throw resumoRes.reason;
+      }
+
+      if (centrosRes.status === 'fulfilled') {
+        setPorCentro(centrosRes.value ?? []);
+      } else {
+        // Não bloqueia a tela inteira se o relatório por centro falhar.
+        setPorCentro([]);
+      }
       try {
         const dreResult = await getFinanceiroDreSimplificada({ startDate: start, endDate: end, centroDeCustoId: dreCentroId });
         setDre(dreResult);

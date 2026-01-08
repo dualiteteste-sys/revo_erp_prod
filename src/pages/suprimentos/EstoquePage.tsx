@@ -3,8 +3,10 @@ import {
   EstoqueDeposito,
   EstoqueMovimento,
   EstoquePosicao,
+  getKardex,
   getKardexV2,
   listDepositos,
+  listPosicaoEstoque,
   listPosicaoEstoqueV2,
 } from '@/services/suprimentos';
 import { Search, ArrowRightLeft, History, Download, Loader2 } from 'lucide-react';
@@ -40,13 +42,22 @@ export default function EstoquePage() {
   const [loadingKardex, setLoadingKardex] = useState(false);
   const [isInventarioOpen, setIsInventarioOpen] = useState(false);
   const { addToast } = useToast();
-  const permUpdate = useHasPermission('suprimentos', 'update');
-  const canUpdate = !!permUpdate.data;
-  const permsLoading = permUpdate.isLoading;
+  const permViewV2 = useHasPermission('estoque', 'view');
+  const canUseV2 = !permViewV2.isLoading && !!permViewV2.data;
+
+  const permUpdateV2 = useHasPermission('estoque', 'update');
+  const permUpdateLegacy = useHasPermission('suprimentos', 'update');
+  const canUpdate = !!permUpdateV2.data || !!permUpdateLegacy.data;
+  const permsLoading = permUpdateV2.isLoading || permUpdateLegacy.isLoading;
 
   const selectedDeposito = depositos.find((d) => d.id === depositoId) ?? depositos.find((d) => d.is_default) ?? null;
 
   const fetchDepositos = async () => {
+    if (!canUseV2) {
+      setDepositos([]);
+      setDepositoId(null);
+      return;
+    }
     try {
       const deps = await listDepositos({ onlyActive: true });
       setDepositos(deps);
@@ -68,11 +79,13 @@ export default function EstoquePage() {
   const fetchEstoque = async () => {
     setLoading(true);
     try {
-      const data = await listPosicaoEstoqueV2({
-        search: debouncedSearch || null,
-        baixoEstoque: showBaixoEstoque,
-        depositoId,
-      });
+      const data = canUseV2
+        ? await listPosicaoEstoqueV2({
+            search: debouncedSearch || null,
+            baixoEstoque: showBaixoEstoque,
+            depositoId,
+          })
+        : await listPosicaoEstoque(debouncedSearch || undefined, showBaixoEstoque);
       setProdutos(data);
     } catch (error) {
       addToast('Falha ao carregar estoque. Tente novamente.', 'error');
@@ -83,11 +96,11 @@ export default function EstoquePage() {
 
   useEffect(() => {
     fetchDepositos();
-  }, []);
+  }, [canUseV2]);
 
   useEffect(() => {
     fetchEstoque();
-  }, [debouncedSearch, showBaixoEstoque, depositoId]);
+  }, [debouncedSearch, showBaixoEstoque, depositoId, canUseV2]);
 
   useEffect(() => {
     const produto = searchParams.get('produto');
@@ -127,7 +140,9 @@ export default function EstoquePage() {
     setIsKardexOpen(true);
     setLoadingKardex(true);
     try {
-      const data = await getKardexV2(produto.produto_id, { depositoId, limit: 50 });
+      const data = canUseV2
+        ? await getKardexV2(produto.produto_id, { depositoId, limit: 50 })
+        : await getKardex(produto.produto_id, 50);
       setKardexData(data);
     } catch {
       addToast('Falha ao carregar kardex. Tente novamente.', 'error');
