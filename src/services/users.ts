@@ -180,7 +180,31 @@ export async function inviteUser(arg1: any, arg2?: string, arg3?: string): Promi
   return data;
 }
 
-/* ==================== RESEND via cliente (rápido) ==================== */
+/* ==================== RESEND (Edge) ==================== */
+export async function resendInviteEdge(params: { email?: string; user_id?: string; empresa_id?: string }) {
+  console.log("[RESEND] (edge) invoke resend-invite", params);
+  const { data, error } = await supabase.functions.invoke("resend-invite", { body: params });
+  if (error) {
+    let detail: string | undefined = (error as any)?.message;
+    try {
+      const ctx: any = (error as any).context;
+      if (ctx && typeof ctx.text === "function") {
+        const raw = await ctx.text();
+        try {
+          const parsed = JSON.parse(raw);
+          detail = parsed?.detail || parsed?.error || raw;
+        } catch { detail = raw; }
+      }
+    } catch { /* ignore */ }
+    console.error("[RESEND] error", error, detail);
+    throw new Error(detail || (error as any).message || "Falha ao reenviar convite.");
+  }
+  return data;
+}
+
+export const resendInvite = resendInviteEdge;
+
+/* ==================== RESEND via cliente (legado/rápido) ==================== */
 /**
  * Tenta reenviar e-mail (OTP primeiro; se falhar, Reset Password).
  * Sem backoff: retorna rápido para a UI reabilitar os botões.
@@ -215,5 +239,5 @@ export async function resendInviteClient(params: { email: string; empresaId?: st
   throw new Error(err?.message || "Falha ao reenviar convite.");
 }
 
-// Alias compat
-export const resendInvite = resendInviteClient;
+// Alias compat legado
+export const resendInviteLegacy = resendInviteClient;
