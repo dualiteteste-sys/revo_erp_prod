@@ -37,7 +37,8 @@ type NfeWebhookRow = {
   id: string;
   received_at: string;
   event_type: string | null;
-  nfeio_id: string | null; // legacy column name; used as provider reference
+  provider: string | null;
+  nfeio_id: string | null; // coluna legado; usada como referência do provedor
   process_attempts: number;
   next_retry_at: string | null;
   locked_at: string | null;
@@ -128,7 +129,7 @@ export default function HealthPage() {
         await Promise.all([
           supabase
             .from('fiscal_nfe_webhook_events')
-            .select('id,received_at,event_type,nfeio_id,process_attempts,next_retry_at,locked_at,last_error')
+            .select('id,received_at,event_type,provider,nfeio_id,process_attempts,next_retry_at,locked_at,last_error')
             .is('processed_at', null)
             .not('last_error', 'is', null)
             .order('received_at', { ascending: false })
@@ -691,7 +692,10 @@ export default function HealthPage() {
                         <td className="px-3 py-2 text-sm text-gray-600 whitespace-nowrap">{formatDateTimeBR(e.received_at)}</td>
                         <td className="px-3 py-2 text-sm text-gray-700">
                           <div className="font-medium">{e.event_type || '—'}</div>
-                          <div className="text-xs text-gray-500">{e.nfeio_id || '—'}</div>
+                          <div className="text-xs text-gray-500">
+                            {e.provider ? `Provedor: ${e.provider}` : 'Provedor: —'}
+                            {e.nfeio_id ? ` • Ref: ${e.nfeio_id}` : ''}
+                          </div>
                         </td>
                         <td className="px-3 py-2 text-sm text-gray-700 whitespace-nowrap">{e.process_attempts ?? 0}</td>
                         <td className="px-3 py-2 text-sm text-gray-700 max-w-[360px] truncate" title={e.last_error || ''}>
