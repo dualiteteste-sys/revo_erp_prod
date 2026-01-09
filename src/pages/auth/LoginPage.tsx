@@ -26,6 +26,19 @@ const LoginPage: React.FC = () => {
       if (error) throw error;
       
       addToast('Login realizado com sucesso!', 'success');
+      try {
+        const { data } = await supabase.auth.getUser();
+        const meta: any = (data?.user as any)?.user_metadata ?? {};
+        if (meta?.must_change_password) {
+          const pendingEmpresaId = typeof meta.pending_empresa_id === "string" ? meta.pending_empresa_id : null;
+          const qs = pendingEmpresaId ? `?empresa_id=${encodeURIComponent(pendingEmpresaId)}` : "";
+          navigate(`/auth/force-change-password${qs}`, { replace: true });
+          return;
+        }
+      } catch {
+        // best-effort: se falhar, segue fluxo normal
+      }
+
       navigate(from, { replace: true });
     } catch (err: any) {
       console.error('[AUTH][LOGIN][ERROR]', err);

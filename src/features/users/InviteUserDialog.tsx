@@ -1,7 +1,7 @@
 import * as React from "react";
 import { z } from "zod";
 import { Copy, Loader2 } from "lucide-react";
-import { inviteUser } from "@/services/users";
+import { inviteUser, resendInvite } from "@/services/users";
 import { Button } from "@/components/ui/button";
 import Input from "@/components/ui/forms/Input";
 import Select from "@/components/ui/forms/Select";
@@ -22,6 +22,7 @@ export function InviteUserDialog({ onClose, onInviteSent }: Props) {
   const [email, setEmail] = React.useState("");
   const [role, setRole] = React.useState("VIEWER");
   const [loading, setLoading] = React.useState(false);
+  const [linkLoading, setLinkLoading] = React.useState(false);
   const [errors, setErrors] = React.useState<{ email?: string; role?: string }>({});
   const [dialogError, setDialogError] = React.useState<string | null>(null);
   const [inviteResult, setInviteResult] = React.useState<{ action?: string; link?: string } | null>(null);
@@ -113,8 +114,38 @@ export function InviteUserDialog({ onClose, onInviteSent }: Props) {
               </div>
             </div>
           ) : (
-            <div className="bg-amber-50 border border-amber-200 text-amber-950 p-4 rounded-xl text-sm">
-              Link não disponível (tente reenviar o convite).
+            <div className="bg-amber-50 border border-amber-200 text-amber-950 p-4 rounded-xl text-sm space-y-3">
+              <div>
+                Link não disponível automaticamente. Se o e-mail não chegar, gere um link manual para enviar ao usuário.
+              </div>
+              <Button
+                type="button"
+                variant="secondary"
+                disabled={linkLoading}
+                onClick={async () => {
+                  if (linkLoading) return;
+                  setLinkLoading(true);
+                  try {
+                    const res: any = await resendInvite({ email, link_only: true } as any);
+                    const link = (res?.action_link || res?.data?.action_link) as string | undefined;
+                    if (!link) {
+                      addToast("Não foi possível gerar o link agora. Tente reenviar o convite.", "error");
+                      return;
+                    }
+                    setInviteResult((prev) => ({ ...(prev ?? {}), action: "link_only", link }));
+                    addToast(
+                      "Link gerado e pronto para copiar. Use sempre o link mais recente (links antigos podem expirar).",
+                      "success",
+                    );
+                  } catch (e: any) {
+                    addToast(e?.message || "Falha ao gerar link.", "error");
+                  } finally {
+                    setLinkLoading(false);
+                  }
+                }}
+              >
+                {linkLoading ? (<><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Gerando...</>) : "Gerar link (plano B)"}
+              </Button>
             </div>
           )}
 

@@ -1,5 +1,5 @@
 import React from 'react';
-import { MoreHorizontal, UserX, UserCheck, Trash2, Edit, Send } from 'lucide-react';
+import { MoreHorizontal, UserX, UserCheck, Trash2, Edit, Send, Copy } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -8,6 +8,8 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { EmpresaUser } from '../types';
 import { useDeactivateUser, useReactivateUser, useDeleteInvite, useResendInvite } from '../hooks/useUsersQuery';
+import { resendInvite } from '@/services/users';
+import { useToast } from '@/contexts/ToastProvider';
 
 type UserActionsMenuProps = {
   user: EmpresaUser;
@@ -19,12 +21,39 @@ const UserActionsMenu: React.FC<UserActionsMenuProps> = ({ user, onEdit }) => {
   const reactivateUserMutation = useReactivateUser();
   const deleteInviteMutation = useDeleteInvite();
   const resendInviteMutation = useResendInvite();
+  const { addToast } = useToast();
+  const [generatingLink, setGeneratingLink] = React.useState(false);
 
   const isMutating =
     deactivateUserMutation.isPending ||
     reactivateUserMutation.isPending ||
     deleteInviteMutation.isPending ||
-    resendInviteMutation.isPending;
+    resendInviteMutation.isPending ||
+    generatingLink;
+
+  const handleGenerateLink = async () => {
+    if (!user.email) return;
+    if (generatingLink) return;
+    setGeneratingLink(true);
+    try {
+      const res: any = await resendInvite({ email: user.email, link_only: true } as any);
+      const link = (res?.action_link || res?.data?.action_link) as string | undefined;
+      if (!link) {
+        addToast("Não foi possível gerar o link agora. Tente reenviar o convite.", "error");
+        return;
+      }
+      try {
+        await navigator.clipboard.writeText(link);
+        addToast("Link gerado e copiado. Envie ao usuário (use sempre o link mais recente).", "success");
+      } catch {
+        addToast(`Link gerado. Copie e envie ao usuário: ${link}`, "success");
+      }
+    } catch (e: any) {
+      addToast(e?.message || "Falha ao gerar link.", "error");
+    } finally {
+      setGeneratingLink(false);
+    }
+  };
 
   const renderActions = () => {
     switch (user.status) {
@@ -37,6 +66,13 @@ const UserActionsMenu: React.FC<UserActionsMenuProps> = ({ user, onEdit }) => {
             >
               <Send className="mr-2 h-4 w-4" />
               Reenviar Convite
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              onClick={handleGenerateLink}
+              disabled={isMutating || !user.email}
+            >
+              <Copy className="mr-2 h-4 w-4" />
+              Gerar link (copiar)
             </DropdownMenuItem>
             <DropdownMenuItem
               onClick={() => deleteInviteMutation.mutate(user.user_id)}

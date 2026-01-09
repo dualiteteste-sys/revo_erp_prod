@@ -181,7 +181,7 @@ export async function inviteUser(arg1: any, arg2?: string, arg3?: string): Promi
 }
 
 /* ==================== RESEND (Edge) ==================== */
-export async function resendInviteEdge(params: { email?: string; user_id?: string; empresa_id?: string }) {
+export async function resendInviteEdge(params: { email?: string; user_id?: string; empresa_id?: string; link_only?: boolean }) {
   console.log("[RESEND] (edge) invoke resend-invite", params);
   const { data, error } = await supabase.functions.invoke("resend-invite", { body: params });
   if (error) {
@@ -203,6 +203,61 @@ export async function resendInviteEdge(params: { email?: string; user_id?: strin
 }
 
 export const resendInvite = resendInviteEdge;
+
+/* ==================== CREATE (manual) ==================== */
+export async function manualCreateUser(params: {
+  email: string;
+  password: string;
+  role: string;
+  empresa_id?: string;
+}): Promise<
+  | {
+      ok: true;
+      user_id: string;
+      email: string;
+      empresa_id: string;
+      role: string;
+      status: "PENDING" | "ACTIVE" | "INACTIVE" | "SUSPENDED";
+      must_change_password: boolean;
+    }
+  | { ok: false; error: string; detail?: string }
+> {
+  const payload = {
+    email: params.email,
+    password: params.password,
+    role: params.role,
+    ...(params.empresa_id ? { empresa_id: params.empresa_id } : {}),
+  };
+
+  const { data, error } = await supabase.functions.invoke("manual-create-user", { body: payload });
+  if (error) {
+    let parsedBody: any = null;
+    let detail: string | undefined = (error as any)?.message;
+    try {
+      const ctx: any = (error as any).context;
+      if (ctx && typeof ctx.text === "function") {
+        const raw = await ctx.text();
+        try {
+          parsedBody = JSON.parse(raw);
+          detail = parsedBody?.detail || parsedBody?.error || raw;
+        } catch {
+          detail = raw;
+        }
+      }
+    } catch {
+      /* ignore */
+    }
+    console.error("[USERS][MANUAL_CREATE] error", error, detail);
+    if (parsedBody && typeof parsedBody === "object") {
+      const code = typeof parsedBody.error === "string" ? parsedBody.error : "UNEXPECTED_ERROR";
+      const d = typeof parsedBody.detail === "string" ? parsedBody.detail : detail;
+      return { ok: false, error: code, detail: d };
+    }
+    return { ok: false, error: "UNEXPECTED_ERROR", detail };
+  }
+
+  return (data ?? { ok: false, error: "EMPTY_RESPONSE" }) as any;
+}
 
 /* ==================== RESEND via cliente (legado/rápido) ==================== */
 /**

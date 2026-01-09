@@ -41,3 +41,9 @@ Abaixo está uma lista de todas as funções e seus respectivos endpoints e resp
 - **Endpoint**: `/focusnfe-webhook`
 - **Método**: `POST` (aceita `GET/HEAD` para validação do endpoint no painel)
 - **Descrição**: Recebe webhooks da Focus NF-e e registra o evento de forma idempotente em `public.fiscal_nfe_webhook_events` (provider=`focusnfe`) para processamento assíncrono/reprocessamento seguro.
+
+### 7. `manual-create-user`
+
+- **Endpoint**: `/manual-create-user`
+- **Método**: `POST`
+- **Descrição**: Cadastro manual de usuário (admin/owner): cria usuário no Auth com senha temporária, vincula em `empresa_usuarios` como `PENDING` e força troca de senha no primeiro login (`must_change_password=true`).

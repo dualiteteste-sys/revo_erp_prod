@@ -6,6 +6,7 @@ import { EditUserRoleDrawer } from '@/features/users/EditUserRoleDrawer';
 import { Loader2, Users, UserPlus } from 'lucide-react';
 import { useCan } from '@/hooks/useCan';
 import { InviteUserDialog } from '@/features/users/InviteUserDialog';
+import CreateUserManualDialog from '@/features/users/CreateUserManualDialog';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import UsersFilters from '@/features/users/components/UsersFilters';
@@ -44,10 +45,13 @@ export default function UsersPage() {
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-2xl font-bold text-gray-800">Usuários</h1>
         {canManage && (
-          <Button onClick={() => setIsInviteOpen(true)}>
-            <UserPlus className="mr-2 h-4 w-4" />
-            Convidar Usuário
-          </Button>
+          <div className="flex items-center gap-2">
+            <CreateUserManualDialog onCreated={handleDataUpdate} defaultRole="VIEWER" />
+            <Button onClick={() => setIsInviteOpen(true)}>
+              <UserPlus className="mr-2 h-4 w-4" />
+              Convidar Usuário
+            </Button>
+          </div>
         )}
       </div>
 

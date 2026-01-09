@@ -13,6 +13,8 @@ import { useToast } from "@/contexts/ToastProvider";
 type Props = {
   onCreated?: () => void;
   defaultRole?: string;
+  disabled?: boolean;
+  disabledReason?: string;
 };
 
 const schema = z.object({
@@ -24,7 +26,12 @@ const schema = z.object({
   }),
 });
 
-export default function CreateUserManualDialog({ onCreated, defaultRole = "ADMIN" }: Props) {
+export default function CreateUserManualDialog({
+  onCreated,
+  defaultRole = "ADMIN",
+  disabled,
+  disabledReason,
+}: Props) {
   const { addToast } = useToast();
   const [open, setOpen] = React.useState(false);
   const [email, setEmail] = React.useState("");
@@ -74,7 +81,7 @@ export default function CreateUserManualDialog({ onCreated, defaultRole = "ADMIN
   return (
     <Dialog open={open} onOpenChange={(v) => { setOpen(v); if (!v) resetForm(); }}>
       <DialogTrigger asChild>
-        <Button>
+        <Button disabled={disabled} title={disabled ? (disabledReason ?? "Ação indisponível") : undefined}>
           <UserPlus className="mr-2 h-4 w-4" />
           Novo usuário (manual)
         </Button>
@@ -158,6 +165,8 @@ function humanizeError(code?: string) {
     case "AUTH_CREATE_FAILED": return "Falha ao criar usuário no Auth.";
     case "PASSWORD_UPDATE_FAILED": return "Falha ao atualizar senha do usuário.";
     case "LINK_FAILED": return "Falha ao vincular usuário à empresa.";
+    case "USER_ALREADY_EXISTS": return "Já existe um usuário com este e-mail. Use o convite/reenviar convite.";
+    case "UNEXPECTED_ERROR": return "Erro inesperado ao criar usuário (tente novamente).";
     default: return "Falha ao processar sua solicitação.";
   }
 }
