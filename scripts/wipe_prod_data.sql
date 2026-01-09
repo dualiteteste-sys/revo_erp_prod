@@ -88,20 +88,19 @@ end $$;
 
 -- 4) Verificação rápida (somente SELECT)
 select
-  'public.empresas'::text as table,
+  'public.empresas'::text as table_name,
   count(*)::bigint as rows
 from public.empresas
 union all
 select
-  'auth.users'::text as table,
+  'auth.users'::text as table_name,
   count(*)::bigint as rows
 from auth.users
 union all
 select
-  'storage.objects'::text as table,
+  'storage.objects'::text as table_name,
   count(*)::bigint as rows
 from storage.objects
-order by table;
+order by table_name;
 
 commit;
-
