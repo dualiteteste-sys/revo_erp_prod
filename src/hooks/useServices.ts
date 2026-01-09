@@ -15,7 +15,7 @@ export const useServices = () => {
   const [statusFilter, setStatusFilter] = useState<'ativo' | 'inativo' | null>(null);
 
   const [page, setPage] = useState(1);
-  const [pageSize] = useState(15);
+  const [pageSize, setPageSize] = useState(10);
 
   const [sortBy, setSortBy] = useState<{ column: keyof servicesService.Service; ascending: boolean }>({
     column: 'descricao',
@@ -76,6 +76,7 @@ export const useServices = () => {
     statusFilter,
     sortBy,
     setPage,
+    setPageSize,
     setSearchTerm,
     setStatusFilter,
     setSortBy,

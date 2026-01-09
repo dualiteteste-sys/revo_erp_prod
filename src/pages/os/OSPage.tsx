@@ -35,6 +35,7 @@ const OSPage: React.FC = () => {
     sortBy,
     onlyMine,
     setPage,
+    setPageSize,
     setSearchTerm,
     setFilterStatus,
     setSortBy,
@@ -217,7 +218,7 @@ const OSPage: React.FC = () => {
   };
 
   return (
-    <div className="p-1">
+    <div className="p-1 min-h-full flex flex-col">
       <PageHeader
         title="Ordens de Serviço"
         description="Orçamento, execução e agenda de serviços."
@@ -282,7 +283,7 @@ const OSPage: React.FC = () => {
         </Select>
       </div>
 
-      <div className="bg-white rounded-lg shadow overflow-hidden">
+      <div className="bg-white rounded-lg shadow overflow-hidden flex-1 min-h-0">
         {loading && serviceOrders.length === 0 ? (
           <div className="h-96 flex items-center justify-center">
             <Loader2 className="animate-spin text-blue-500" size={32} />
@@ -314,9 +315,20 @@ const OSPage: React.FC = () => {
         )}
       </div>
 
-      {count > pageSize && (
-        <Pagination currentPage={page} totalCount={count} pageSize={pageSize} onPageChange={setPage} />
-      )}
+      {count > 0 ? (
+        <div className="sticky bottom-0 z-20 mt-4 border-t border-gray-100 bg-white/95 backdrop-blur supports-[backdrop-filter]:bg-white/80">
+          <Pagination
+            currentPage={page}
+            totalCount={count}
+            pageSize={pageSize}
+            onPageChange={setPage}
+            onPageSizeChange={(next) => {
+              setPage(1);
+              setPageSize(next);
+            }}
+          />
+        </div>
+      ) : null}
 
       <Modal isOpen={isFormOpen} onClose={handleCloseForm} title={selectedOs ? 'Editar Ordem de Serviço' : 'Nova Ordem de Serviço'}>
         {isFetchingDetails ? (

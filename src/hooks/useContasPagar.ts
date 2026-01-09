@@ -25,7 +25,7 @@ export const useContasPagar = () => {
     const [filterEndDate, setFilterEndDate] = useState<Date | null>(null);
     
     const [page, setPage] = useState(1);
-    const [pageSize] = useState(15);
+    const [pageSize, setPageSize] = useState(10);
 
     const [sortBy, setSortBy] = useState<{ column: string; ascending: boolean }>({
         column: 'data_vencimento',
@@ -87,6 +87,7 @@ export const useContasPagar = () => {
         filterEndDate,
         sortBy,
         setPage,
+        setPageSize,
         setSearchTerm,
         setFilterStatus,
         setFilterStartDate,

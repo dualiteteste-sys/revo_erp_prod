@@ -15,7 +15,7 @@ export const useCarriers = () => {
 
   const [filterStatus, setFilterStatus] = useState<string | null>(null);
   const [page, setPage] = useState(1);
-  const [pageSize] = useState(15);
+  const [pageSize, setPageSize] = useState(10);
 
   const [sortBy, setSortBy] = useState<{ column: keyof carriersService.CarrierListItem; ascending: boolean }>({
     column: 'nome',
@@ -69,6 +69,7 @@ export const useCarriers = () => {
     filterStatus,
     sortBy,
     setPage,
+    setPageSize,
     setSearchTerm,
     setFilterStatus,
     setSortBy,

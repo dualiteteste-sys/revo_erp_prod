@@ -3,7 +3,7 @@ import { UsersFilters as Filters, EmpresaUser, UserRole, UserStatus } from '@/fe
 import { useUsers } from '@/features/users/hooks/useUsersQuery';
 import { UsersTable } from '@/features/users/components/UsersTable';
 import { EditUserRoleDrawer } from '@/features/users/EditUserRoleDrawer';
-import { Loader2, Users, UserPlus } from 'lucide-react';
+import { Users, UserPlus } from 'lucide-react';
 import { useCan } from '@/hooks/useCan';
 import { InviteUserDialog } from '@/features/users/InviteUserDialog';
 import CreateUserManualDialog from '@/features/users/CreateUserManualDialog';
@@ -12,13 +12,14 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import UsersFilters from '@/features/users/components/UsersFilters';
 import Pagination from '@/components/ui/Pagination';
 import { UsersTableSkeleton } from '@/features/users/components/UsersTableSkeleton';
-
-const PAGE_SIZE = 10;
+import PageShell from '@/components/ui/PageShell';
+import PageCard from '@/components/ui/PageCard';
 
 export default function UsersPage() {
   const [filters, setFilters] = useState<Filters>({ q: '', role: [], status: [] });
   const [page, setPage] = useState(1);
-  const { users, count, isLoading, isError, error, refetch } = useUsers(filters, page, PAGE_SIZE);
+  const [pageSize, setPageSize] = useState(10);
+  const { users, count, isLoading, isError, error, refetch } = useUsers(filters, page, pageSize);
 
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [selectedUser, setSelectedUser] = useState<EmpresaUser | null>(null);
@@ -40,47 +41,53 @@ export default function UsersPage() {
     refetch();
   };
 
-  return (
-    <div>
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-2xl font-bold text-gray-800">Usuários</h1>
-        {canManage && (
-          <div className="flex items-center gap-2">
-            <CreateUserManualDialog onCreated={handleDataUpdate} defaultRole="VIEWER" />
-            <Button onClick={() => setIsInviteOpen(true)}>
-              <UserPlus className="mr-2 h-4 w-4" />
-              Convidar Usuário
-            </Button>
-          </div>
-        )}
-      </div>
-
-      <UsersFilters filters={filters} onFilterChange={handleFilterChange} />
-
-      {isLoading ? (
-        <UsersTableSkeleton />
-      ) : isError ? (
-        <div className="text-center text-red-500 p-8">{(error as Error)?.message || 'Erro ao carregar usuários.'}</div>
-      ) : users.length === 0 ? (
-        <div className="text-center p-8 text-gray-500 bg-white rounded-lg shadow">
-          <Users className="mx-auto h-12 w-12 text-gray-400" />
-          <h3 className="mt-2 text-lg font-medium">Nenhum usuário encontrado</h3>
-          <p className="mt-1 text-sm">Tente ajustar os filtros ou convide um novo usuário.</p>
+  const header = (
+    <div className="flex justify-between items-center">
+      <h1 className="text-2xl font-bold text-gray-800">Usuários</h1>
+      {canManage && (
+        <div className="flex items-center gap-2">
+          <CreateUserManualDialog onCreated={handleDataUpdate} defaultRole="VIEWER" />
+          <Button onClick={() => setIsInviteOpen(true)}>
+            <UserPlus className="mr-2 h-4 w-4" />
+            Convidar Usuário
+          </Button>
         </div>
-      ) : (
-        <>
-          <UsersTable
-            rows={users}
-            onEditRole={handleEditRole}
-          />
-          <Pagination
-            currentPage={page}
-            totalCount={count}
-            pageSize={PAGE_SIZE}
-            onPageChange={setPage}
-          />
-        </>
       )}
+    </div>
+  );
+
+  const footer = count > 0 ? (
+    <Pagination
+      currentPage={page}
+      totalCount={count}
+      pageSize={pageSize}
+      onPageChange={setPage}
+      onPageSizeChange={(next) => {
+        setPage(1);
+        setPageSize(next);
+      }}
+    />
+  ) : null;
+
+  return (
+    <PageShell header={header} filters={<UsersFilters filters={filters} onFilterChange={handleFilterChange} />} footer={footer}>
+      <PageCard className="flex flex-col h-full">
+        <div className="flex-1 min-h-0 overflow-auto">
+          {isLoading ? (
+            <UsersTableSkeleton />
+          ) : isError ? (
+            <div className="text-center text-red-500 p-8">{(error as Error)?.message || 'Erro ao carregar usuários.'}</div>
+          ) : users.length === 0 ? (
+            <div className="text-center p-8 text-gray-500 bg-white rounded-lg shadow">
+              <Users className="mx-auto h-12 w-12 text-gray-400" />
+              <h3 className="mt-2 text-lg font-medium">Nenhum usuário encontrado</h3>
+              <p className="mt-1 text-sm">Tente ajustar os filtros ou convide um novo usuário.</p>
+            </div>
+          ) : (
+            <UsersTable rows={users} onEditRole={handleEditRole} />
+          )}
+        </div>
+      </PageCard>
       
       {selectedUser && (
         <EditUserRoleDrawer
@@ -105,6 +112,6 @@ export default function UsersPage() {
             />
         </DialogContent>
       </Dialog>
-    </div>
+    </PageShell>
   );
 }

@@ -82,7 +82,7 @@ Objetivo: garantir que um cliente novo consegue chegar ao **primeiro valor** rá
 
 **Happy path**
 - Criar, editar, listar, buscar.
-- Importar/Exportar (CSV) onde existir.
+- Importar (CSV/XLSX) / Exportar (CSV) onde existir.
 
 **Segurança/permissão**
 - Usuário sem `cadastros.view`: não acessa rota.
@@ -332,4 +332,3 @@ Criar uma rotina semanal:
 - Rodar uma “rodada rápida” (Jornada A) em PROD.
 - Se algo falhar: issue + correção via migration/PR.
 - Atualizar este manual com o aprendizado (um parágrafo por falha recorrente).
-

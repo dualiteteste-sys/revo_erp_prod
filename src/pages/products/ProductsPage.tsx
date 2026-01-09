@@ -44,6 +44,7 @@ const ProductsPage: React.FC = () => {
     filterStatus,
     sortBy,
     setPage,
+    setPageSize,
     setSearchTerm,
     setFilterStatus,
     setSortBy,
@@ -236,10 +237,10 @@ const ProductsPage: React.FC = () => {
             onClick={() => setIsImportOpen(true)}
             variant="secondary"
             className="gap-2"
-            title="Importar produtos por CSV"
+            title="Importar produtos por CSV/XLSX"
           >
             <FileUp size={18} />
-            Importar CSV
+            Importar CSV/XLSX
           </Button>
 
           {enableSeed ? (
@@ -287,8 +288,17 @@ const ProductsPage: React.FC = () => {
     </div>
   );
 
-  const footer = count > pageSize ? (
-    <Pagination currentPage={page} totalCount={count} pageSize={pageSize} onPageChange={setPage} />
+  const footer = count > 0 ? (
+    <Pagination
+      currentPage={page}
+      totalCount={count}
+      pageSize={pageSize}
+      onPageChange={setPage}
+      onPageSizeChange={(next) => {
+        setPage(1);
+        setPageSize(next);
+      }}
+    />
   ) : null;
 
   return (

@@ -20,7 +20,7 @@ export const useExtrato = (initialContaId?: string | null) => {
   const debouncedSearchTerm = useDebounce(searchTerm, 500);
 
   const [page, setPage] = useState(1);
-  const [pageSize] = useState(50);
+  const [pageSize, setPageSize] = useState(50);
 
   const fetchExtrato = useCallback(async () => {
     if (!activeEmpresa) {
@@ -95,6 +95,7 @@ export const useExtrato = (initialContaId?: string | null) => {
     conciliado,
     searchTerm,
     setPage,
+    setPageSize,
     setContaCorrenteId,
     setStartDate,
     setEndDate,

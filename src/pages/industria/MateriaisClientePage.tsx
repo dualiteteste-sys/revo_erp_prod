@@ -28,7 +28,7 @@ export default function MateriaisClientePage() {
   const { addToast } = useToast();
   
   const [page, setPage] = useState(1);
-  const [pageSize] = useState(20);
+  const [pageSize, setPageSize] = useState(10);
   const [totalCount, setTotalCount] = useState(0);
 
   const [isFormOpen, setIsFormOpen] = useState(false);
@@ -64,7 +64,7 @@ export default function MateriaisClientePage() {
 
   useEffect(() => {
     fetchMateriais();
-  }, [debouncedSearch, activeFilter, page]);
+  }, [debouncedSearch, activeFilter, page, pageSize]);
 
   const handleNew = () => {
     setSelectedId(null);
@@ -160,7 +160,7 @@ export default function MateriaisClientePage() {
   };
 
   return (
-    <div className="p-1 h-full flex flex-col">
+    <div className="p-1 min-h-full flex flex-col">
       <div className="flex justify-between items-center mb-6 flex-shrink-0">
         <div>
           <h1 className="text-3xl font-bold text-gray-800 flex items-center gap-2">
@@ -234,16 +234,20 @@ export default function MateriaisClientePage() {
             <div className="flex-grow">
                 <MateriaisTable materiais={materiais} onEdit={handleEdit} onDelete={handleDeleteClick} />
             </div>
-            {totalCount > pageSize && (
-                <div className="border-t p-2">
-                    <Pagination 
-                        currentPage={page} 
-                        totalCount={totalCount} 
-                        pageSize={pageSize} 
-                        onPageChange={setPage} 
-                    />
-                </div>
-            )}
+            {totalCount > 0 ? (
+              <div className="sticky bottom-0 z-20 border-t border-gray-200 bg-white/95 p-2 backdrop-blur supports-[backdrop-filter]:bg-white/80">
+                <Pagination
+                  currentPage={page}
+                  totalCount={totalCount}
+                  pageSize={pageSize}
+                  onPageChange={setPage}
+                  onPageSizeChange={(next) => {
+                    setPage(1);
+                    setPageSize(next);
+                  }}
+                />
+              </div>
+            ) : null}
           </>
         )}
       </div>

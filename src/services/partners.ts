@@ -76,6 +76,33 @@ export type PartnerDuplicateHit = {
   celular?: string | null;
 };
 
+async function trySelectFromFirstTable<T = any>(
+  tableNames: string[],
+  buildQuery: (table: string) => Promise<{ data: T[] | null; error: any }>,
+): Promise<T[]> {
+  for (const table of tableNames) {
+    try {
+      const { data, error } = await buildQuery(table);
+      if (!error) return (data ?? []) as T[];
+    } catch {
+      // ignore and try next table
+    }
+  }
+  return [];
+}
+
+async function fetchPartnerEnderecos(pessoaId: string): Promise<EnderecoPayload[]> {
+  return trySelectFromFirstTable<EnderecoPayload>(['pessoa_enderecos', 'pessoas_enderecos'], (table) =>
+    supabase.from(table as any).select('*').eq('pessoa_id', pessoaId).order('created_at', { ascending: true }),
+  );
+}
+
+async function fetchPartnerContatos(pessoaId: string): Promise<ContatoPayload[]> {
+  return trySelectFromFirstTable<ContatoPayload>(['pessoa_contatos', 'pessoas_contatos'], (table) =>
+    supabase.from(table as any).select('*').eq('pessoa_id', pessoaId).order('created_at', { ascending: true }),
+  );
+}
+
 export async function findPartnerDuplicates(params: {
   excludeId?: string | null;
   email?: string | null;
@@ -164,6 +191,40 @@ export async function savePartner(payload: PartnerPayload): Promise<PartnerDetai
     };
 
     const data = await callRpc<PartnerDetails>('create_update_partner', { p_payload: cleanedPayload });
+
+    const expectedAddress =
+      (cleanedPayload.enderecos || []).some((e: any) =>
+        [e.cep, e.uf, e.cidade, e.logradouro, e.numero, e.bairro, e.complemento].some((v) => v && String(v).trim() !== ''),
+      ) ?? false;
+
+    const createdId = (data as any)?.id ? String((data as any).id) : null;
+    let returnedAddresses = Array.isArray((data as any)?.enderecos) ? (data as any).enderecos : [];
+
+    // Fallback: caso o RPC não esteja retornando corretamente, tenta ler direto da tabela.
+    if (createdId && returnedAddresses.length === 0) {
+      returnedAddresses = await fetchPartnerEnderecos(createdId);
+    }
+
+    if (expectedAddress && returnedAddresses.length === 0) {
+      if (createdId) {
+        try {
+          await callRpc('delete_partner', { p_id: createdId });
+        } catch {
+          // best-effort cleanup
+        }
+      }
+      throw new Error(
+        'Endereço não foi persistido no banco. Isso indica um problema no RPC `create_update_partner`/migrations do Supabase (não é o frontend/preview).',
+      );
+    }
+
+    (data as any).enderecos = returnedAddresses;
+
+    let returnedContatos = Array.isArray((data as any)?.contatos) ? (data as any).contatos : [];
+    if (createdId && returnedContatos.length === 0) {
+      returnedContatos = await fetchPartnerContatos(createdId);
+    }
+    (data as any).contatos = returnedContatos;
     return data;
   } catch (error: any) {
     logger.error('[SERVICE][SAVE_PARTNER][ERROR]', error, { payload });
@@ -245,8 +306,12 @@ export async function getPartnerDetails(id: string): Promise<PartnerDetails | nu
     const data = Array.isArray(rpcResponse) ? rpcResponse[0] : rpcResponse;
 
     if (data) {
-      data.enderecos = data.enderecos || [];
-      data.contatos = data.contatos || [];
+      const rawEnderecos = Array.isArray((data as any).enderecos) ? (data as any).enderecos : [];
+      const rawContatos = Array.isArray((data as any).contatos) ? (data as any).contatos : [];
+
+      // Fallback: se o RPC não vier com relacionamentos (schema/migrations divergentes), busca direto nas tabelas.
+      data.enderecos = rawEnderecos.length > 0 ? rawEnderecos : await fetchPartnerEnderecos(id);
+      data.contatos = rawContatos.length > 0 ? rawContatos : await fetchPartnerContatos(id);
     }
     return data || null;
   } catch (error) {

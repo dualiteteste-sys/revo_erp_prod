@@ -6,6 +6,8 @@ import { ImportarExtratoPayload, seedExtratos } from '@/services/treasury';
 import { useToast } from '@/contexts/ToastProvider';
 import { Button } from '@/components/ui/button';
 import { isSeedEnabled } from '@/utils/seed';
+import { readTabularImportFile, TABULAR_IMPORT_ACCEPT } from '@/lib/tabularImport';
+import { getFirst } from '@/lib/csvImport';
 
 interface Props {
   isOpen: boolean;
@@ -127,6 +129,45 @@ export default function ImportarExtratoModal({ isOpen, onClose, onImport, contaC
     return itens;
   };
 
+  const parseTabularRows = (rows: { line: number; raw: Record<string, string> }[]): ImportarExtratoPayload[] => {
+    const itens: ImportarExtratoPayload[] = [];
+
+    for (let i = 0; i < rows.length; i += 1) {
+      const r = rows[i];
+      const row = r.raw;
+
+      const rawDate = getFirst(row, ['data', 'dt', 'data_lancamento', 'data_movimento', 'dt_posted', 'dtposted']);
+      const rawDescricao = getFirst(row, ['descricao', 'descrição', 'historico', 'hist', 'lancamento', 'lançamento']);
+      const rawValor = getFirst(row, ['valor', 'vl', 'valor_lancamento', 'valor_movimento', 'trnamt', 'amount']);
+      const rawDoc = getFirst(row, ['documento', 'doc', 'documento_ref', 'num_documento', 'fitid', 'id']);
+
+      const dataISO = parseDateToISO(rawDate || '');
+      const descricao = (rawDescricao || '').trim();
+      const valorNum = parseMoney(rawValor || '');
+      const doc = (rawDoc || '').trim() || undefined;
+
+      if (!dataISO || !descricao || valorNum === null) continue;
+
+      const tipo = valorNum >= 0 ? 'credito' : 'debito';
+      const valorAbs = Math.abs(valorNum);
+      if (valorAbs <= 0) continue;
+
+      const raw = `${dataISO}|${descricao}|${valorNum}|${doc ?? ''}`;
+      itens.push({
+        data_lancamento: dataISO,
+        descricao,
+        valor: valorAbs,
+        tipo_lancamento: tipo,
+        documento_ref: doc,
+        identificador_banco: `CSV-${hashString(raw)}-${r.line}`,
+        hash_importacao: hashString(raw),
+        linha_bruta: JSON.stringify(row),
+      });
+    }
+
+    return itens;
+  };
+
   const parseOfxText = (text: string): ImportarExtratoPayload[] => {
     // OFX é "SGML-like". Vamos extrair <STMTTRN> entries e tags principais.
     const blocks = text.split(/<STMTTRN>/i).slice(1);
@@ -186,10 +227,17 @@ export default function ImportarExtratoModal({ isOpen, onClose, onImport, contaC
     try {
         let itens: ImportarExtratoPayload[] = [];
         if (file) {
-          const content = await readFileAsText(file);
           const name = file.name.toLowerCase();
-          if (name.endsWith('.ofx')) itens = parseOfxText(content);
-          else itens = parseCsvText(content);
+          if (name.endsWith('.ofx')) {
+            const content = await readFileAsText(file);
+            itens = parseOfxText(content);
+          } else if (name.endsWith('.xlsx') || name.endsWith('.xls')) {
+            const { rows } = await readTabularImportFile(file);
+            itens = parseTabularRows(rows as any);
+          } else {
+            const content = await readFileAsText(file);
+            itens = parseCsvText(content);
+          }
         } else {
           itens = parseCsvText(csvText);
         }
@@ -242,14 +290,14 @@ export default function ImportarExtratoModal({ isOpen, onClose, onImport, contaC
           <div className="flex items-center justify-between gap-3">
             <div>
               <div className="text-sm font-semibold text-gray-800">Enviar arquivo</div>
-              <div className="text-xs text-gray-500">CSV ou OFX. O conteúdo também pode ser colado abaixo.</div>
+              <div className="text-xs text-gray-500">CSV/XLSX ou OFX. O conteúdo também pode ser colado abaixo.</div>
             </div>
             <label className="inline-flex items-center gap-2 cursor-pointer rounded-md border border-gray-200 bg-white px-3 py-2 text-sm text-gray-700 hover:bg-gray-50">
               <FileUp size={16} />
               Selecionar
               <input
                 type="file"
-                accept=".csv,.txt,.ofx,text/csv,text/plain"
+                accept={`${TABULAR_IMPORT_ACCEPT},.txt,.ofx,text/plain`}
                 className="hidden"
                 onChange={(e) => setFile(e.target.files?.[0] ?? null)}
               />

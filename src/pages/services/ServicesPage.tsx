@@ -38,6 +38,7 @@ export default function ServicesPage() {
     statusFilter,
     sortBy,
     setPage,
+    setPageSize,
     setSearchTerm,
     setStatusFilter,
     setSortBy,
@@ -197,10 +198,10 @@ export default function ServicesPage() {
             className="gap-2"
             onClick={() => setIsImportOpen(true)}
             disabled={permsLoading || !canCreate}
-            title={!canCreate ? 'Sem permissão para importar' : 'Importar serviços por CSV'}
+            title={!canCreate ? 'Sem permissão para importar' : 'Importar serviços por CSV/XLSX'}
           >
             <FileUp size={18} />
-            Importar CSV
+            Importar CSV/XLSX
           </Button>
           {enableSeed ? (
             <Button onClick={handleSeedServices} disabled={isSeeding || loading} variant="secondary" className="gap-2">
@@ -262,8 +263,17 @@ export default function ServicesPage() {
     </div>
   );
 
-  const footer = count > pageSize ? (
-    <Pagination currentPage={page} totalCount={count} pageSize={pageSize} onPageChange={setPage} />
+  const footer = count > 0 ? (
+    <Pagination
+      currentPage={page}
+      totalCount={count}
+      pageSize={pageSize}
+      onPageChange={setPage}
+      onPageSizeChange={(next) => {
+        setPage(1);
+        setPageSize(next);
+      }}
+    />
   ) : null;
 
   return (

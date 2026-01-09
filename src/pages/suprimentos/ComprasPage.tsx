@@ -19,7 +19,7 @@ export default function ComprasPage() {
   const [statusFilter, setStatusFilter] = useState('');
   const debouncedSearch = useDebounce(search, 500);
   const [page, setPage] = useState(1);
-  const [pageSize] = useState(15);
+  const [pageSize, setPageSize] = useState(10);
   const [totalCount, setTotalCount] = useState(0);
 
   const [isFormOpen, setIsFormOpen] = useState(false);
@@ -48,7 +48,7 @@ export default function ComprasPage() {
 
   useEffect(() => {
     fetchOrders();
-  }, [debouncedSearch, statusFilter, page]);
+  }, [debouncedSearch, statusFilter, page, pageSize]);
 
   useEffect(() => {
     const openId = searchParams.get('open');
@@ -86,7 +86,7 @@ export default function ComprasPage() {
   };
 
   return (
-    <div className="p-1">
+    <div className="p-1 min-h-full flex flex-col">
       <div className="flex justify-between items-center mb-6">
         <div>
           <h1 className="text-3xl font-bold text-gray-800">Ordens de Compra</h1>
@@ -139,7 +139,7 @@ export default function ComprasPage() {
         </Select>
       </div>
 
-      <div className="bg-white rounded-lg shadow overflow-hidden min-h-[400px]">
+      <div className="bg-white rounded-lg shadow overflow-hidden min-h-[400px] flex-1 min-h-0">
         {loading ? (
           <div className="flex justify-center h-64 items-center">
             <Loader2 className="animate-spin text-blue-600 w-10 h-10" />
@@ -149,9 +149,18 @@ export default function ComprasPage() {
         )}
       </div>
 
-      {totalCount > pageSize ? (
-        <div className="mt-4">
-          <Pagination currentPage={page} totalCount={totalCount} pageSize={pageSize} onPageChange={setPage} />
+      {totalCount > 0 ? (
+        <div className="sticky bottom-0 z-20 mt-4 border-t border-gray-100 bg-white/95 backdrop-blur supports-[backdrop-filter]:bg-white/80">
+          <Pagination
+            currentPage={page}
+            totalCount={totalCount}
+            pageSize={pageSize}
+            onPageChange={setPage}
+            onPageSizeChange={(next) => {
+              setPage(1);
+              setPageSize(next);
+            }}
+          />
         </div>
       ) : null}
 

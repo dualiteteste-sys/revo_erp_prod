@@ -15,7 +15,7 @@ export const useCentrosDeCusto = () => {
 
     const [filterStatus, setFilterStatus] = useState<string | null>(null);
     const [page, setPage] = useState(1);
-    const [pageSize] = useState(15);
+    const [pageSize, setPageSize] = useState(10);
 
     const [sortBy, setSortBy] = useState<{ column: string; ascending: boolean }>({
         column: 'nome',
@@ -68,6 +68,7 @@ export const useCentrosDeCusto = () => {
         filterStatus,
         sortBy,
         setPage,
+        setPageSize,
         setSearchTerm,
         setFilterStatus,
         setSortBy,
