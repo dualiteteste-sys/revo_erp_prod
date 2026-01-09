@@ -74,16 +74,21 @@ export async function saveVenda(payload: VendaPayload): Promise<VendaDetails> {
 export async function manageVendaItem(
   pedidoId: string,
   itemId: string | null,
-  produtoId: string,
+  produtoId: string | null,
   quantidade: number,
   precoUnitario: number,
   desconto: number,
   action: 'add' | 'update' | 'remove' = 'add'
 ): Promise<void> {
+  const normalizeUuid = (value: string | null | undefined) => {
+    const v = (value ?? '').trim();
+    return v.length > 0 ? v : null;
+  };
+
   await callRpc('vendas_manage_item', {
-    p_pedido_id: pedidoId,
-    p_item_id: itemId,
-    p_produto_id: produtoId,
+    p_pedido_id: normalizeUuid(pedidoId) ?? pedidoId,
+    p_item_id: normalizeUuid(itemId),
+    p_produto_id: normalizeUuid(produtoId),
     p_quantidade: quantidade,
     p_preco_unitario: precoUnitario,
     p_desconto: desconto,
