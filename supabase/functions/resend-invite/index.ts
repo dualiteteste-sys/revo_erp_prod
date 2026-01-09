@@ -13,7 +13,7 @@ function corsHeaders(origin: string | null) {
       "Access-Control-Allow-Origin": "*",
       "Vary": "Origin",
       "Access-Control-Allow-Methods": "POST, OPTIONS",
-      "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+      "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-revo-request-id",
       "Access-Control-Max-Age": "86400",
     };
   }
@@ -21,7 +21,7 @@ function corsHeaders(origin: string | null) {
     "Access-Control-Allow-Origin": origin,
     "Vary": "Origin",
     "Access-Control-Allow-Methods": "POST, OPTIONS",
-    "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+    "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-revo-request-id",
     "Access-Control-Max-Age": "86400",
   };
 }
