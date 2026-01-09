@@ -231,14 +231,15 @@ export async function manualCreateUser(params: {
 
   const { data, error } = await supabase.functions.invoke("manual-create-user", { body: payload });
   if (error) {
+    let parsedBody: any = null;
     let detail: string | undefined = (error as any)?.message;
     try {
       const ctx: any = (error as any).context;
       if (ctx && typeof ctx.text === "function") {
         const raw = await ctx.text();
         try {
-          const parsed = JSON.parse(raw);
-          detail = parsed?.detail || parsed?.error || raw;
+          parsedBody = JSON.parse(raw);
+          detail = parsedBody?.detail || parsedBody?.error || raw;
         } catch {
           detail = raw;
         }
@@ -247,6 +248,11 @@ export async function manualCreateUser(params: {
       /* ignore */
     }
     console.error("[USERS][MANUAL_CREATE] error", error, detail);
+    if (parsedBody && typeof parsedBody === "object") {
+      const code = typeof parsedBody.error === "string" ? parsedBody.error : "UNEXPECTED_ERROR";
+      const d = typeof parsedBody.detail === "string" ? parsedBody.detail : detail;
+      return { ok: false, error: code, detail: d };
+    }
     return { ok: false, error: "UNEXPECTED_ERROR", detail };
   }
 

@@ -52,6 +52,21 @@ async function findUserIdByEmail(svc: any, email: string): Promise<string | null
   return null;
 }
 
+function isRetryableLinkError(err: any): boolean {
+  const code = String(err?.code ?? "");
+  const msg = String(err?.message ?? "").toLowerCase();
+  // Possível race: auth.users ainda não visível no PostgREST no exato ms após createUser → FK 23503
+  if (code === "23503") return true;
+  if (msg.includes("foreign key") || msg.includes("violates foreign key")) return true;
+  // PostgREST pode responder “schema cache”/transient errors; manter conservador.
+  if (msg.includes("timeout") || msg.includes("tempor") || msg.includes("could not") || msg.includes("try again")) return true;
+  return false;
+}
+
+async function sleep(ms: number) {
+  await new Promise((r) => setTimeout(r, ms));
+}
+
 serve(async (req) => {
   const origin = req.headers.get("origin");
   const CORS = corsHeaders(origin);
@@ -196,21 +211,41 @@ serve(async (req) => {
 
     const userId = created.user.id as string;
 
-    const { error: upsertErr } = await svc.from("empresa_usuarios").upsert(
-      {
-        empresa_id: empresaId,
-        user_id: userId,
-        role_id: roleRow.id,
-        status: "PENDING",
-      },
-      { onConflict: "empresa_id,user_id" },
-    );
-    if (upsertErr) {
-      console.error("[DB] upsert empresa_usuarios failed", upsertErr);
-      return new Response(JSON.stringify({ ok: false, error: "LINK_FAILED" }), {
-        status: 500,
-        headers: { ...CORS, "Content-Type": "application/json" },
-      });
+    // Upsert vínculo: robusto contra eventual race do FK (auth.users) logo após createUser.
+    const retries = [0, 120, 350, 800, 1500];
+    let lastErr: any = null;
+    for (let i = 0; i < retries.length; i++) {
+      if (retries[i] > 0) await sleep(retries[i]);
+      const { error: upsertErr } = await svc.from("empresa_usuarios").upsert(
+        {
+          empresa_id: empresaId,
+          user_id: userId,
+          role_id: roleRow.id,
+          status: "PENDING",
+        },
+        { onConflict: "empresa_id,user_id" },
+      );
+      if (!upsertErr) {
+        lastErr = null;
+        break;
+      }
+      lastErr = upsertErr;
+      if (!isRetryableLinkError(upsertErr)) break;
+    }
+
+    if (lastErr) {
+      console.error("[DB] upsert empresa_usuarios failed", lastErr);
+      return new Response(
+        JSON.stringify({
+          ok: false,
+          error: "LINK_FAILED",
+          detail: (lastErr as any)?.message ?? String(lastErr),
+          code: (lastErr as any)?.code ?? null,
+          hint: (lastErr as any)?.hint ?? null,
+          details: (lastErr as any)?.details ?? null,
+        }),
+        { status: 500, headers: { ...CORS, "Content-Type": "application/json" } },
+      );
     }
 
     return new Response(JSON.stringify({
@@ -231,4 +266,3 @@ serve(async (req) => {
     }), { status: 500, headers: { ...corsHeaders(req.headers.get("origin")), "Content-Type": "application/json" } });
   }
 });
-
