@@ -9,14 +9,6 @@ const OnboardingGuard = ({ children }: { children: JSX.Element }) => {
   const [attempt, setAttempt] = React.useState(0);
   const [failed, setFailed] = React.useState(false);
 
-  if (loading) {
-    return (
-      <div className="w-screen h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50">
-        <div className="w-16 h-16 border-4 border-blue-500 border-dashed rounded-full animate-spin"></div>
-      </div>
-    );
-  }
-
   const shouldRecover = !loading && empresas.length === 0 && location.pathname.startsWith('/app');
 
   React.useEffect(() => {
@@ -44,6 +36,14 @@ const OnboardingGuard = ({ children }: { children: JSX.Element }) => {
 
     return () => window.clearTimeout(t);
   }, [shouldRecover, attempt, refreshEmpresas]);
+
+  if (loading) {
+    return (
+      <div className="w-screen h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50">
+        <div className="w-16 h-16 border-4 border-blue-500 border-dashed rounded-full animate-spin"></div>
+      </div>
+    );
+  }
 
   if (shouldRecover) {
     return (
