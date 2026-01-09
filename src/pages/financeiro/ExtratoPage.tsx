@@ -35,6 +35,7 @@ export default function ExtratoPage() {
     tipoLancamento,
     conciliado,
     setPage,
+    setPageSize,
     setContaCorrenteId,
     setSearchTerm,
     setStartDate,
@@ -94,7 +95,7 @@ export default function ExtratoPage() {
   };
 
   return (
-    <div className="p-1">
+    <div className="p-1 min-h-full flex flex-col">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4 print:hidden">
         <div>
           <h1 className="text-3xl font-bold text-gray-800 flex items-center gap-2">
@@ -194,7 +195,7 @@ export default function ExtratoPage() {
 
       {selectedContaId && <ExtratoSummaryCards summary={summary} />}
 
-      <div className="bg-white rounded-lg shadow overflow-hidden print:shadow-none print:border">
+      <div className="bg-white rounded-lg shadow overflow-hidden print:shadow-none print:border flex-1 min-h-0">
         {loading ? (
           <div className="h-96 flex items-center justify-center">
             <Loader2 className="animate-spin text-blue-500" size={32} />
@@ -207,9 +208,20 @@ export default function ExtratoPage() {
       </div>
 
       <div className="print:hidden">
-        {count > pageSize && (
-            <Pagination currentPage={page} totalCount={count} pageSize={pageSize} onPageChange={setPage} />
-        )}
+        {count > 0 ? (
+          <div className="sticky bottom-0 z-20 mt-4 border-t border-gray-100 bg-white/95 backdrop-blur supports-[backdrop-filter]:bg-white/80">
+            <Pagination
+              currentPage={page}
+              totalCount={count}
+              pageSize={pageSize}
+              onPageChange={setPage}
+              onPageSizeChange={(next) => {
+                setPage(1);
+                setPageSize(next);
+              }}
+            />
+          </div>
+        ) : null}
       </div>
     </div>
   );

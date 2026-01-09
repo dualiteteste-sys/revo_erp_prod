@@ -19,7 +19,7 @@ export const usePartners = () => {
   const [filterType, setFilterType] = useState<string | null>(null);
   const [statusFilter, setStatusFilter] = useState<partnersService.PartnerStatusFilter>('active');
   const [page, setPage] = useState(1);
-  const [pageSize] = useState(15);
+  const [pageSize, setPageSize] = useState(10);
   const [sortBy, setSortBy] = useState<{ column: keyof partnersService.PartnerListItem; ascending: boolean }>({
     column: 'nome',
     ascending: true,
@@ -58,6 +58,7 @@ export const usePartners = () => {
     statusFilter,
     sortBy,
     setPage,
+    setPageSize,
     setSearchTerm,
     setFilterType,
     setStatusFilter,

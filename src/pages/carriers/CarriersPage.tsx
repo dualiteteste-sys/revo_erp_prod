@@ -32,6 +32,7 @@ const CarriersPage: React.FC = () => {
     filterStatus,
     sortBy,
     setPage,
+    setPageSize,
     setSearchTerm,
     setFilterStatus,
     setSortBy,
@@ -151,7 +152,7 @@ const CarriersPage: React.FC = () => {
   };
 
   return (
-    <div className="p-1">
+    <div className="p-1 min-h-full flex flex-col">
       <div className="flex justify-between items-center mb-6">
         <div>
             <h1 className="text-3xl font-bold text-gray-800">Transportadoras</h1>
@@ -178,11 +179,11 @@ const CarriersPage: React.FC = () => {
             <button
               onClick={() => setIsImportOpen(true)}
               disabled={permsLoading || !canCreate}
-              title={!canCreate ? 'Sem permissão para importar' : 'Importar transportadoras por CSV'}
+              title={!canCreate ? 'Sem permissão para importar' : 'Importar transportadoras por CSV/XLSX'}
               className="flex items-center gap-2 bg-gray-100 text-gray-700 font-semibold py-2 px-4 rounded-lg hover:bg-gray-200 transition-colors disabled:opacity-50"
             >
               <FileUp size={20} />
-              Importar CSV
+              Importar CSV/XLSX
             </button>
             {enableSeed ? (
               <button
@@ -228,7 +229,7 @@ const CarriersPage: React.FC = () => {
         </Select>
       </div>
 
-      <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+      <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden flex-1 min-h-0">
         {loading && carriers.length === 0 ? (
           <div className="h-96 flex items-center justify-center">
             <Loader2 className="animate-spin text-blue-500" size={32} />
@@ -299,9 +300,20 @@ const CarriersPage: React.FC = () => {
         )}
       </div>
 
-      {count > pageSize && (
-        <Pagination currentPage={page} totalCount={count} pageSize={pageSize} onPageChange={setPage} />
-      )}
+      {count > 0 ? (
+        <div className="sticky bottom-0 z-20 mt-4 border-t border-gray-100 bg-white/95 backdrop-blur supports-[backdrop-filter]:bg-white/80">
+          <Pagination
+            currentPage={page}
+            totalCount={count}
+            pageSize={pageSize}
+            onPageChange={setPage}
+            onPageSizeChange={(next) => {
+              setPage(1);
+              setPageSize(next);
+            }}
+          />
+        </div>
+      ) : null}
 
       <Modal isOpen={isFormOpen} onClose={handleCloseForm} title={selectedCarrier ? 'Editar Transportadora' : 'Nova Transportadora'} size="lg">
         {isFetchingDetails ? (

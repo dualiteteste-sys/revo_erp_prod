@@ -22,6 +22,7 @@ export default function PropostasPage() {
     setSearchTerm,
     setFilterStatus,
     setPage,
+    setPageSize,
     refresh,
   } = useVendas();
   const { addToast } = useToast();
@@ -69,7 +70,7 @@ export default function PropostasPage() {
   };
 
   return (
-    <div className="p-1 h-full flex flex-col">
+    <div className="p-1 min-h-full flex flex-col">
       <div className="flex justify-between items-center mb-6 flex-shrink-0">
         <div>
           <h1 className="text-3xl font-bold text-gray-800 flex items-center gap-2">
@@ -117,11 +118,20 @@ export default function PropostasPage() {
             <PedidosVendasTable orders={orders} onEdit={handleEdit} />
           )}
         </div>
-        {totalCount > pageSize && (
-          <div className="border-t border-gray-200 px-4">
-            <Pagination currentPage={page} totalCount={totalCount} pageSize={pageSize} onPageChange={setPage} />
+        {totalCount > 0 ? (
+          <div className="sticky bottom-0 z-20 border-t border-gray-200 bg-white/95 px-4 backdrop-blur supports-[backdrop-filter]:bg-white/80">
+            <Pagination
+              currentPage={page}
+              totalCount={totalCount}
+              pageSize={pageSize}
+              onPageChange={setPage}
+              onPageSizeChange={(next) => {
+                setPage(1);
+                setPageSize(next);
+              }}
+            />
           </div>
-        )}
+        ) : null}
       </div>
 
       <Modal isOpen={isFormOpen} onClose={handleClose} title={selectedId ? 'Editar Proposta' : 'Nova Proposta'} size="6xl">
@@ -130,4 +140,3 @@ export default function PropostasPage() {
     </div>
   );
 }
-

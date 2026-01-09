@@ -6,6 +6,9 @@ interface PaginationProps {
   totalCount: number;
   pageSize: number;
   onPageChange: (page: number) => void;
+  onPageSizeChange?: (pageSize: number) => void;
+  pageSizeOptions?: number[];
+  className?: string;
 }
 
 const Pagination: React.FC<PaginationProps> = ({
@@ -13,10 +16,13 @@ const Pagination: React.FC<PaginationProps> = ({
   totalCount,
   pageSize,
   onPageChange,
+  onPageSizeChange,
+  pageSizeOptions = [10, 50, 100, 200],
+  className,
 }) => {
   const totalPageCount = Math.ceil(totalCount / pageSize);
 
-  if (totalPageCount <= 1) {
+  if (totalPageCount <= 1 && !onPageSizeChange) {
     return null;
   }
 
@@ -36,11 +42,33 @@ const Pagination: React.FC<PaginationProps> = ({
   const endItem = Math.min(currentPage * pageSize, totalCount);
 
   return (
-    <div className="flex items-center justify-between py-3">
-      <div className="text-sm text-gray-600">
-        Mostrando <span className="font-medium">{startItem}</span> a <span className="font-medium">{endItem}</span> de <span className="font-medium">{totalCount}</span> resultados
+    <div className={`flex flex-col gap-2 py-3 sm:flex-row sm:items-center sm:justify-between ${className ?? ''}`}>
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-2 text-sm text-gray-600">
+        <div>
+          Mostrando <span className="font-medium">{startItem}</span> a <span className="font-medium">{endItem}</span> de{' '}
+          <span className="font-medium">{totalCount}</span> resultados
+        </div>
+
+        {onPageSizeChange ? (
+          <label className="flex items-center gap-2">
+            <span className="text-gray-500">Por página</span>
+            <select
+              className="rounded-md border border-gray-200 bg-white px-2 py-1 text-sm"
+              value={pageSize}
+              onChange={(e) => onPageSizeChange(Number(e.target.value))}
+            >
+              {pageSizeOptions.map((opt) => (
+                <option key={opt} value={opt}>
+                  {opt}
+                </option>
+              ))}
+            </select>
+          </label>
+        ) : null}
       </div>
-      <div className="flex items-center gap-2">
+
+      {totalPageCount > 1 ? (
+        <div className="flex items-center gap-2">
         <button
           onClick={handlePrevious}
           disabled={currentPage === 1}
@@ -60,7 +88,8 @@ const Pagination: React.FC<PaginationProps> = ({
         >
           <ChevronRight className="h-5 w-5" />
         </button>
-      </div>
+        </div>
+      ) : null}
     </div>
   );
 };

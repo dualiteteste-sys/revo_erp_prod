@@ -15,7 +15,7 @@ export const useVendas = () => {
   const [filterStatus, setFilterStatus] = useState<string | null>(null);
   
   const [page, setPage] = useState(1);
-  const [pageSize] = useState(15);
+  const [pageSize, setPageSize] = useState(10);
 
   useEffect(() => {
     setPage(1);
@@ -71,6 +71,7 @@ export const useVendas = () => {
     setSearchTerm,
     setFilterStatus,
     setPage,
+    setPageSize,
     refresh,
   };
 };

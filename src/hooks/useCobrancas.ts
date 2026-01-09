@@ -25,7 +25,7 @@ export const useCobrancas = () => {
   const [endVenc, setEndVenc] = useState<Date | null>(null);
   
   const [page, setPage] = useState(1);
-  const [pageSize] = useState(15);
+  const [pageSize, setPageSize] = useState(10);
 
   const fetchCobrancas = useCallback(async () => {
     if (!activeEmpresa) {
@@ -80,6 +80,7 @@ export const useCobrancas = () => {
     startVenc,
     endVenc,
     setPage,
+    setPageSize,
     setSearchTerm,
     setFilterStatus,
     setStartVenc,

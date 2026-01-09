@@ -43,7 +43,7 @@ Regras:
 
 ## 1) Cadastros (base do ERP)
 - [x] CAD-01 Parceiros (clientes/fornecedores): CRUD + busca + validações (CPF/CNPJ) + endereços
-- [x] CAD-02 Produtos: CRUD + unidade + NCM/tributação básica + import/export CSV
+- [x] CAD-02 Produtos: CRUD + unidade + NCM/tributação básica + import (CSV/XLSX) / export (CSV)
 - [x] CAD-03 Serviços: CRUD + preço + impostos básicos (se aplicável)
 - [x] CAD-04 Transportadoras + embalagens + grupos/unidades: CRUD consistente
 

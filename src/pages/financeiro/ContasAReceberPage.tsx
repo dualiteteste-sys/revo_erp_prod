@@ -34,6 +34,7 @@ const ContasAReceberPage: React.FC = () => {
     filterEndDate,
     sortBy,
     setPage,
+    setPageSize,
     setSearchTerm,
     setFilterStatus,
     setFilterStartDate,
@@ -195,7 +196,7 @@ const ContasAReceberPage: React.FC = () => {
   };
 
   return (
-    <div className="p-1">
+    <div className="p-1 min-h-full flex flex-col">
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-3xl font-bold text-gray-800">Contas a Receber</h1>
         <div className="flex items-center gap-2">
@@ -268,7 +269,7 @@ const ContasAReceberPage: React.FC = () => {
         </div>
       </div>
 
-      <div className="bg-white rounded-lg shadow overflow-hidden">
+      <div className="bg-white rounded-lg shadow overflow-hidden flex-1 min-h-0">
         {loading && contas.length === 0 ? (
           <div className="h-96 flex items-center justify-center">
             <Loader2 className="animate-spin text-blue-500" size={32} />
@@ -295,9 +296,20 @@ const ContasAReceberPage: React.FC = () => {
         )}
       </div>
 
-      {count > pageSize && (
-        <Pagination currentPage={page} totalCount={count} pageSize={pageSize} onPageChange={setPage} />
-      )}
+      {count > 0 ? (
+        <div className="sticky bottom-0 z-20 mt-4 border-t border-gray-100 bg-white/95 backdrop-blur supports-[backdrop-filter]:bg-white/80">
+          <Pagination
+            currentPage={page}
+            totalCount={count}
+            pageSize={pageSize}
+            onPageChange={setPage}
+            onPageSizeChange={(next) => {
+              setPage(1);
+              setPageSize(next);
+            }}
+          />
+        </div>
+      ) : null}
 
       <Modal isOpen={isFormOpen} onClose={handleCloseForm} title={selectedConta ? 'Editar Conta a Receber' : 'Nova Conta a Receber'}>
         {isFetchingDetails ? (

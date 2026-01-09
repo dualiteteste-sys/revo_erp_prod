@@ -46,6 +46,7 @@ const PartnersPage: React.FC = () => {
     statusFilter,
     sortBy,
     setPage,
+    setPageSize,
     setSearchTerm,
     setFilterType,
     setStatusFilter,
@@ -271,10 +272,10 @@ const PartnersPage: React.FC = () => {
           variant="secondary"
           className="gap-2"
           disabled={permsLoading || !canCreate}
-          title={!canCreate ? 'Sem permissão para importar' : 'Importar clientes/fornecedores por CSV'}
+          title={!canCreate ? 'Sem permissão para importar' : 'Importar clientes/fornecedores por CSV/XLSX'}
         >
           <FileUp size={18} />
-          Importar CSV
+          Importar CSV/XLSX
         </Button>
 
         {enableSeed ? (
@@ -363,8 +364,17 @@ const PartnersPage: React.FC = () => {
     </div>
   );
 
-  const footer = count > pageSize ? (
-    <Pagination currentPage={page} totalCount={count} pageSize={pageSize} onPageChange={setPage} />
+  const footer = count > 0 ? (
+    <Pagination
+      currentPage={page}
+      totalCount={count}
+      pageSize={pageSize}
+      onPageChange={setPage}
+      onPageSizeChange={(next) => {
+        setPage(1);
+        setPageSize(next);
+      }}
+    />
   ) : null;
 
   return (

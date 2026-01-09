@@ -29,6 +29,7 @@ export default function PedidosVendasPage() {
     setSearchTerm,
     setFilterStatus,
     setPage,
+    setPageSize,
     refresh,
   } = useVendas();
   const { addToast } = useToast();
@@ -142,8 +143,21 @@ export default function PedidosVendasPage() {
     </div>
   );
 
+  const footer = totalCount > 0 ? (
+    <Pagination
+      currentPage={page}
+      totalCount={totalCount}
+      pageSize={pageSize}
+      onPageChange={setPage}
+      onPageSizeChange={(next) => {
+        setPage(1);
+        setPageSize(next);
+      }}
+    />
+  ) : null;
+
   return (
-    <PageShell header={header} filters={filters}>
+    <PageShell header={header} filters={filters} footer={footer}>
       <PageCard className="flex flex-col h-full">
         <div className="flex-grow overflow-auto">
           {loading ? (
@@ -156,11 +170,6 @@ export default function PedidosVendasPage() {
             <PedidosVendasTable orders={orders} onEdit={handleEdit} />
           )}
         </div>
-        {totalCount > pageSize && (
-          <div className="border-t border-gray-200 px-4">
-            <Pagination currentPage={page} totalCount={totalCount} pageSize={pageSize} onPageChange={setPage} />
-          </div>
-        )}
       </PageCard>
 
       <Modal isOpen={isFormOpen} onClose={handleClose} title={selectedId ? 'Editar Pedido de Venda' : 'Novo Pedido de Venda'} size="6xl">

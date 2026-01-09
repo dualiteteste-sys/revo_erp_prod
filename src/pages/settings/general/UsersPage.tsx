@@ -15,14 +15,15 @@ import Pagination from '@/components/ui/Pagination';
 import { UsersTableSkeleton } from '@/features/users/components/UsersTableSkeleton';
 import { useEmpresaFeatures } from '@/hooks/useEmpresaFeatures';
 import { useSupabase } from '@/providers/SupabaseProvider';
-
-const PAGE_SIZE = 10;
+import PageShell from '@/components/ui/PageShell';
+import PageCard from '@/components/ui/PageCard';
 
 export default function UsersPage() {
   const queryClient = useQueryClient();
   const [filters, setFilters] = useState<Filters>({ q: '', role: [], status: [] });
   const [page, setPage] = useState(1);
-  const { users, count, isLoading, isError, error, refetch } = useUsers(filters, page, PAGE_SIZE);
+  const [pageSize, setPageSize] = useState(10);
+  const { users, count, isLoading, isError, error, refetch } = useUsers(filters, page, pageSize);
   const empresaFeatures = useEmpresaFeatures();
   const supabase = useSupabase();
 
@@ -89,77 +90,85 @@ export default function UsersPage() {
     queryClient.invalidateQueries({ queryKey: ['users', 'count', 'PENDING'] });
   };
 
-  return (
-    <div>
-      <div className="flex justify-between items-center mb-6">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-800">Usuários</h1>
-          {!empresaFeatures.loading && (
-            <div className="mt-1 text-xs text-gray-500">
-              <span className="font-semibold text-gray-700">{activeUsers}</span> ativos •{' '}
-              <span className="font-semibold text-gray-700">{pendingInvites}</span> convites pendentes •{' '}
-              limite: <span className="font-semibold text-gray-700">{reservedSeats}</span> /{' '}
-              <span className="font-semibold text-gray-700">{maxUsers}</span>
-            </div>
-          )}
-        </div>
-        {canManage && (
-          <div className="flex items-center gap-2">
-            <CreateUserManualDialog
-              onCreated={handleDataUpdate}
-              defaultRole="VIEWER"
-              disabled={reachedLimit}
-              disabledReason="Limite de usuários atingido (ativos + convites pendentes)."
-            />
-            <Button
-              onClick={() => setIsInviteOpen(true)}
-              disabled={reachedLimit}
-              title={
-                reachedLimit
-                  ? 'Limite de usuários atingido (ativos + convites pendentes). Ajuste em Configurações → Minha Assinatura.'
-                  : 'Convidar novo usuário'
-              }
-            >
-              <UserPlus className="mr-2 h-4 w-4" />
-              Convidar Usuário
-            </Button>
+  const header = (
+    <div className="flex justify-between items-center">
+      <div>
+        <h1 className="text-2xl font-bold text-gray-800">Usuários</h1>
+        {!empresaFeatures.loading && (
+          <div className="mt-1 text-xs text-gray-500">
+            <span className="font-semibold text-gray-700">{activeUsers}</span> ativos •{' '}
+            <span className="font-semibold text-gray-700">{pendingInvites}</span> convites pendentes • limite:{' '}
+            <span className="font-semibold text-gray-700">{reservedSeats}</span> /{' '}
+            <span className="font-semibold text-gray-700">{maxUsers}</span>
           </div>
         )}
       </div>
-
-      {reachedLimit && (
-        <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
-          Limite de usuários atingido (ativos + convites pendentes). Ajuste o limite em{' '}
-          <span className="font-semibold">Configurações → Minha Assinatura</span>.
+      {canManage && (
+        <div className="flex items-center gap-2">
+          <CreateUserManualDialog
+            onCreated={handleDataUpdate}
+            defaultRole="VIEWER"
+            disabled={reachedLimit}
+            disabledReason="Limite de usuários atingido (ativos + convites pendentes)."
+          />
+          <Button
+            onClick={() => setIsInviteOpen(true)}
+            disabled={reachedLimit}
+            title={
+              reachedLimit
+                ? 'Limite de usuários atingido (ativos + convites pendentes). Ajuste em Configurações → Minha Assinatura.'
+                : 'Convidar novo usuário'
+            }
+          >
+            <UserPlus className="mr-2 h-4 w-4" />
+            Convidar Usuário
+          </Button>
         </div>
       )}
+    </div>
+  );
 
-      <UsersFilters filters={filters} onFilterChange={handleFilterChange} />
+  const footer = count > 0 ? (
+    <Pagination
+      currentPage={page}
+      totalCount={count}
+      pageSize={pageSize}
+      onPageChange={setPage}
+      onPageSizeChange={(next) => {
+        setPage(1);
+        setPageSize(next);
+      }}
+    />
+  ) : null;
 
-      {isLoading ? (
-        <UsersTableSkeleton />
-      ) : isError ? (
-        <div className="text-center text-red-500 p-8">{(error as Error)?.message || 'Erro ao carregar usuários.'}</div>
-      ) : users.length === 0 ? (
-        <div className="text-center p-8 text-gray-500 bg-white rounded-lg shadow">
-          <Users className="mx-auto h-12 w-12 text-gray-400" />
-          <h3 className="mt-2 text-lg font-medium">Nenhum usuário encontrado</h3>
-          <p className="mt-1 text-sm">Tente ajustar os filtros ou convide um novo usuário.</p>
-        </div>
-      ) : (
-        <>
-          <UsersTable
-            rows={users}
-            onEditRole={handleEditRole}
-          />
-          <Pagination
-            currentPage={page}
-            totalCount={count}
-            pageSize={PAGE_SIZE}
-            onPageChange={setPage}
-          />
-        </>
-      )}
+  return (
+    <PageShell header={header} filters={<UsersFilters filters={filters} onFilterChange={handleFilterChange} />} footer={footer}>
+      <div className="flex flex-col gap-4 h-full">
+        {reachedLimit && (
+          <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+            Limite de usuários atingido (ativos + convites pendentes). Ajuste o limite em{' '}
+            <span className="font-semibold">Configurações → Minha Assinatura</span>.
+          </div>
+        )}
+
+        <PageCard className="flex-1 min-h-0 flex flex-col">
+          <div className="flex-1 min-h-0 overflow-auto">
+            {isLoading ? (
+              <UsersTableSkeleton />
+            ) : isError ? (
+              <div className="text-center text-red-500 p-8">{(error as Error)?.message || 'Erro ao carregar usuários.'}</div>
+            ) : users.length === 0 ? (
+              <div className="text-center p-8 text-gray-500 bg-white rounded-lg shadow">
+                <Users className="mx-auto h-12 w-12 text-gray-400" />
+                <h3 className="mt-2 text-lg font-medium">Nenhum usuário encontrado</h3>
+                <p className="mt-1 text-sm">Tente ajustar os filtros ou convide um novo usuário.</p>
+              </div>
+            ) : (
+              <UsersTable rows={users} onEditRole={handleEditRole} />
+            )}
+          </div>
+        </PageCard>
+      </div>
       
       {selectedUser && (
         <EditUserRoleDrawer
@@ -184,6 +193,6 @@ export default function UsersPage() {
             />
         </DialogContent>
       </Dialog>
-    </div>
+    </PageShell>
   );
 }

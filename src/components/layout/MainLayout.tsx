@@ -227,9 +227,15 @@ const MainLayout: React.FC = () => {
                     <RoadmapButton />
                   </div>
                 </div>
-                <main className="flex-1 overflow-y-auto scrollbar-styled pr-2" tabIndex={0} aria-label="Conteúdo principal">
+                <main
+                  className="flex-1 overflow-y-auto scrollbar-styled pr-2 flex flex-col min-h-0"
+                  tabIndex={0}
+                  aria-label="Conteúdo principal"
+                >
                   <ContextualHelp />
-                  <Outlet />
+                  <div className="flex-1 min-h-0">
+                    <Outlet />
+                  </div>
                 </main>
               </SubscriptionGuard>
             </div>

@@ -40,7 +40,7 @@ export default function OsRelatoriosPage() {
   const [rows, setRows] = useState<OsRelatoriosListRow[]>([]);
   const [count, setCount] = useState(0);
   const [page, setPage] = useState(1);
-  const pageSize = 10;
+  const [pageSize, setPageSize] = useState(10);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<string[] | null>(null);
   const [clienteId, setClienteId] = useState<string | null>(null);
@@ -184,7 +184,7 @@ export default function OsRelatoriosPage() {
   }, [porStatus]);
 
   return (
-    <div className="p-1 h-full flex flex-col gap-4">
+    <div className="p-1 min-h-full flex flex-col gap-4">
       <PageHeader
         title="Relatórios de Serviços"
         description="Indicadores das Ordens de Serviço (OS) e faturamento por período."
@@ -488,11 +488,20 @@ export default function OsRelatoriosPage() {
               </table>
             </div>
 
-            {count > pageSize && (
-              <div className="mt-3">
-                <Pagination currentPage={page} totalCount={count} pageSize={pageSize} onPageChange={setPage} />
+            {count > 0 ? (
+              <div className="sticky bottom-0 z-20 mt-3 border-t border-gray-100 bg-white/95 backdrop-blur supports-[backdrop-filter]:bg-white/80">
+                <Pagination
+                  currentPage={page}
+                  totalCount={count}
+                  pageSize={pageSize}
+                  onPageChange={setPage}
+                  onPageSizeChange={(next) => {
+                    setPage(1);
+                    setPageSize(next);
+                  }}
+                />
               </div>
-            )}
+            ) : null}
           </GlassCard>
         </>
       )}

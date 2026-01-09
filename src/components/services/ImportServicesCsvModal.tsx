@@ -7,6 +7,7 @@ import TextArea from '@/components/ui/forms/TextArea';
 import { useToast } from '@/contexts/ToastProvider';
 import type { Service } from '@/services/services';
 import { digitsOnly, getFirst, parseBoolPt, parseCsv, parseMoneyBr, type ParsedCsvRow } from '@/lib/csvImport';
+import { readTabularImportFile, TABULAR_IMPORT_ACCEPT } from '@/lib/tabularImport';
 
 type PreviewRow = {
   line: number;
@@ -30,12 +31,13 @@ export default function ImportServicesCsvModal(props: {
   const { addToast } = useToast();
 
   const [text, setText] = useState('');
+  const [fileRows, setFileRows] = useState<ParsedCsvRow[] | null>(null);
   const [isImporting, setIsImporting] = useState(false);
   const [lastSummary, setLastSummary] = useState<{ ok: number; failed: number } | null>(null);
   const [createdIds, setCreatedIds] = useState<string[]>([]);
   const [rollingBack, setRollingBack] = useState(false);
 
-  const parsed = useMemo(() => parseCsv(text), [text]);
+  const parsed = useMemo(() => fileRows ?? parseCsv(text), [fileRows, text]);
   const preview = useMemo<PreviewRow[]>(() => parsed.map(buildPreviewRow), [parsed]);
   const totals = useMemo(() => {
     const total = preview.length;
@@ -44,8 +46,9 @@ export default function ImportServicesCsvModal(props: {
   }, [preview]);
 
   const handlePickFile = async (file: File) => {
-    const content = await file.text();
-    setText(content);
+    const { text, rows } = await readTabularImportFile(file);
+    setText(text);
+    setFileRows(rows);
   };
 
   function buildPreviewRow(r: ParsedCsvRow): PreviewRow {
@@ -86,7 +89,7 @@ export default function ImportServicesCsvModal(props: {
 
   const handleImport = async () => {
     if (preview.length === 0) {
-      addToast('Cole um CSV válido (com cabeçalho + linhas).', 'warning');
+      addToast('Selecione um arquivo CSV/XLSX válido ou cole um CSV (com cabeçalho + linhas).', 'warning');
       return;
     }
 
@@ -156,7 +159,7 @@ export default function ImportServicesCsvModal(props: {
     <Modal
       isOpen={isOpen}
       onClose={onClose}
-      title="Importar Serviços (CSV)"
+      title="Importar Serviços (CSV/XLSX)"
       size="4xl"
       bodyClassName="p-6 md:p-8"
     >
@@ -171,7 +174,7 @@ export default function ImportServicesCsvModal(props: {
             Selecionar arquivo
             <input
               type="file"
-              accept=".csv,text/csv"
+              accept={TABULAR_IMPORT_ACCEPT}
               className="hidden"
               onChange={(e) => {
                 const file = e.target.files?.[0];
@@ -183,10 +186,13 @@ export default function ImportServicesCsvModal(props: {
         </div>
 
         <TextArea
-          label="CSV"
+          label="CSV (ou XLS/XLSX via upload)"
           name="csv"
           value={text}
-          onChange={(e) => setText(e.target.value)}
+          onChange={(e) => {
+            setText(e.target.value);
+            setFileRows(null);
+          }}
           placeholder={'descricao;codigo;preco_venda;unidade;status;nbs\nMão de obra;SV-001;120,00;H;ativo;101010101'}
           rows={12}
         />
@@ -200,7 +206,7 @@ export default function ImportServicesCsvModal(props: {
             </div>
           </div>
           {preview.length === 0 ? (
-            <div className="mt-2 text-sm text-gray-600">Cole um CSV acima para ver a prévia.</div>
+            <div className="mt-2 text-sm text-gray-600">Cole um CSV acima para ver a prévia (ou envie um XLS/XLSX).</div>
           ) : (
             <div className="mt-3 max-h-[260px] overflow-auto rounded-lg border border-gray-200 bg-white">
               <table className="min-w-full text-sm">

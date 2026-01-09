@@ -16,7 +16,7 @@ export const useOs = () => {
 
   const [filterStatus, setFilterStatus] = useState<Database['public']['Enums']['status_os'] | null>(null);
   const [page, setPage] = useState(1);
-  const [pageSize] = useState(15);
+  const [pageSize, setPageSize] = useState(10);
   const [onlyMine, setOnlyMine] = useState(false);
 
   const [sortBy, setSortBy] = useState<{ column: keyof osService.OrdemServico; ascending: boolean }>({
@@ -92,6 +92,7 @@ export const useOs = () => {
     sortBy,
     onlyMine,
     setPage,
+    setPageSize,
     setSearchTerm,
     setFilterStatus,
     setSortBy,

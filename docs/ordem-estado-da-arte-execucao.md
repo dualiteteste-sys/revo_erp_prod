@@ -63,7 +63,7 @@ Por quê: cadastros ruins viram suporte infinito em vendas, estoque, indústria 
 - [ ] CAD-STA-03: dedupe e saneamento (CPF/CNPJ/email/telefone) com alertas.
 
 **Validar**
-- Importar CSV (preview + validação) e confirmar rollback em erro.
+- Importar (CSV/XLSX) (preview + validação) e confirmar rollback em erro.
 - Evitar duplicidade com sugestões claras.
 
 ### Wave 3 — “Suprimentos premium (menos divergência, mais previsibilidade)”

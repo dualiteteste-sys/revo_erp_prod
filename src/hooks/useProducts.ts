@@ -19,7 +19,7 @@ export const useProducts = () => {
   const debouncedSearchTerm = useDebounce(searchTerm, 500);
   const [filterStatus, setFilterStatus] = useState<'ativo' | 'inativo' | null>(null);
   const [page, setPage] = useState(1);
-  const [pageSize] = useState(10);
+  const [pageSize, setPageSize] = useState(10);
   const [sortBy, setSortBy] = useState<{ column: keyof Product; ascending: boolean }>({
     column: 'nome',
     ascending: true,
@@ -71,6 +71,7 @@ export const useProducts = () => {
     filterStatus,
     sortBy,
     setPage,
+    setPageSize,
     setSearchTerm,
     setFilterStatus,
     setSortBy,
