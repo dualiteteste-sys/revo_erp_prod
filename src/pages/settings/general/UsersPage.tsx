@@ -7,6 +7,7 @@ import { EditUserRoleDrawer } from '@/features/users/EditUserRoleDrawer';
 import { Users, UserPlus } from 'lucide-react';
 import { useCan } from '@/hooks/useCan';
 import { InviteUserDialog } from '@/features/users/InviteUserDialog';
+import CreateUserManualDialog from '@/features/users/CreateUserManualDialog';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import UsersFilters from '@/features/users/components/UsersFilters';
@@ -103,18 +104,26 @@ export default function UsersPage() {
           )}
         </div>
         {canManage && (
-          <Button
-            onClick={() => setIsInviteOpen(true)}
-            disabled={reachedLimit}
-            title={
-              reachedLimit
-                ? 'Limite de usuários atingido (ativos + convites pendentes). Ajuste em Configurações → Minha Assinatura.'
-                : 'Convidar novo usuário'
-            }
-          >
-            <UserPlus className="mr-2 h-4 w-4" />
-            Convidar Usuário
-          </Button>
+          <div className="flex items-center gap-2">
+            <CreateUserManualDialog
+              onCreated={handleDataUpdate}
+              defaultRole="VIEWER"
+              disabled={reachedLimit}
+              disabledReason="Limite de usuários atingido (ativos + convites pendentes)."
+            />
+            <Button
+              onClick={() => setIsInviteOpen(true)}
+              disabled={reachedLimit}
+              title={
+                reachedLimit
+                  ? 'Limite de usuários atingido (ativos + convites pendentes). Ajuste em Configurações → Minha Assinatura.'
+                  : 'Convidar novo usuário'
+              }
+            >
+              <UserPlus className="mr-2 h-4 w-4" />
+              Convidar Usuário
+            </Button>
+          </div>
         )}
       </div>
 

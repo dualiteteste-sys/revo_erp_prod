@@ -49,6 +49,7 @@ export default function UpdatePasswordPage() {
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [updating, setUpdating] = useState(false);
+  const [passwordUpdated, setPasswordUpdated] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [okMsg, setOkMsg] = useState<string | null>(null);
 
@@ -130,22 +131,37 @@ export default function UpdatePasswordPage() {
     setError(null);
     setOkMsg(null);
 
-    if (password.length < 8) {
-      setError("A senha deve ter pelo menos 8 caracteres.");
-      return;
-    }
-    if (password !== confirmPassword) {
-      setError("As senhas não conferem.");
-      return;
+    if (!passwordUpdated) {
+      if (password.length < 8) {
+        setError("A senha deve ter pelo menos 8 caracteres.");
+        return;
+      }
+      if (password !== confirmPassword) {
+        setError("As senhas não conferem.");
+        return;
+      }
     }
 
     setUpdating(true);
     try {
       if (!sessionReady) throw new Error("Sessão não está pronta. Tente acessar o link do e-mail novamente.");
 
-      console.log("[AUTH] updateUser(password)");
-      const { error: upErr } = await supabase.auth.updateUser({ password });
-      if (upErr) throw upErr;
+      if (!passwordUpdated) {
+        console.log("[AUTH] updateUser(password)");
+        const { error: upErr } = await supabase.auth.updateUser({ password });
+        if (upErr) {
+          const msg = String((upErr as any)?.message ?? "");
+          // UX: se o usuário já tentou essa mesma senha em uma tentativa anterior, o Supabase pode exigir "senha diferente".
+          // Nesse caso, consideramos a senha já definida e seguimos para o aceite do convite.
+          if (/different from the old password/i.test(msg)) {
+            setPasswordUpdated(true);
+          } else {
+            throw upErr;
+          }
+        } else {
+          setPasswordUpdated(true);
+        }
+      }
 
       if (empresaId) {
         console.log("[RPC] accept_invite_for_current_user", empresaId);
@@ -153,7 +169,12 @@ export default function UpdatePasswordPage() {
           p_empresa_id: empresaId,
         });
         if (rpcErr && !String(rpcErr.message ?? "").includes("INVITE_NOT_FOUND")) {
-          throw rpcErr;
+          // Importante: a senha já pode ter sido salva. Permitir retry do aceite sem obrigar trocar senha de novo.
+          throw new Error(
+            `Senha salva, mas não foi possível confirmar o convite agora. Tente novamente.\n\nDetalhe: ${
+              (rpcErr as any)?.message ?? "erro desconhecido"
+            }`,
+          );
         }
       }
 
@@ -208,7 +229,7 @@ export default function UpdatePasswordPage() {
                         id="password"
                         type="password"
                         autoFocus
-                        disabled={!sessionReady || updating || !!okMsg}
+                        disabled={!sessionReady || updating || !!okMsg || passwordUpdated}
                         value={password}
                         onChange={(e) => setPassword(e.target.value)}
                         placeholder="Mínimo 8 caracteres"
@@ -217,7 +238,7 @@ export default function UpdatePasswordPage() {
                         label="Confirmar nova senha"
                         id="confirmPassword"
                         type="password"
-                        disabled={!sessionReady || updating || !!okMsg}
+                        disabled={!sessionReady || updating || !!okMsg || passwordUpdated}
                         value={confirmPassword}
                         onChange={(e) => setConfirmPassword(e.target.value)}
                         placeholder="Repita a senha"
@@ -240,7 +261,7 @@ export default function UpdatePasswordPage() {
                         className="w-full"
                     >
                         {updating ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-                        {updating ? "Salvando..." : "Salvar senha e entrar"}
+                        {updating ? "Processando..." : (passwordUpdated ? "Confirmar convite e entrar" : "Salvar senha e entrar")}
                     </Button>
                 </form>
             </div>

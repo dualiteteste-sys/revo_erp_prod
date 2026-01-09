@@ -7,6 +7,7 @@ import PendingVerificationPage from '../pages/auth/PendingVerificationPage';
 import CallbackPage from "@/pages/auth/Callback";
 import UpdatePasswordPage from "../pages/auth/UpdatePasswordPage";
 import ConfirmedPage from "../pages/auth/Confirmed";
+import ForceChangePasswordPage from "../pages/auth/ForceChangePasswordPage";
 import AcceptInvite from "../pages/onboarding/AcceptInvite";
 
 export const authRoutes: RouteObject[] = [
@@ -24,5 +25,6 @@ export const authRoutes: RouteObject[] = [
     { path: "/auth/callback", element: <CallbackPage /> },
     { path: "/auth/confirmed", element: <ConfirmedPage /> },
     { path: "/auth/update-password", element: <UpdatePasswordPage /> },
+    { path: "/auth/force-change-password", element: <ForceChangePasswordPage /> },
     { path: "/onboarding/accept", element: <AcceptInvite /> },
 ];

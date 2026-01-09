@@ -3,7 +3,7 @@ import { Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthProvider';
 
 const ProtectedRoute = ({ children }: { children: JSX.Element }) => {
-  const { session, loading } = useAuth();
+  const { session, loading, mustChangePassword, pendingEmpresaId } = useAuth();
   const location = useLocation();
 
   if (loading) {
@@ -16,6 +16,11 @@ const ProtectedRoute = ({ children }: { children: JSX.Element }) => {
 
   if (!session) {
     return <Navigate to="/auth/login" state={{ from: location }} replace />;
+  }
+
+  if (mustChangePassword) {
+    const qs = pendingEmpresaId ? `?empresa_id=${encodeURIComponent(pendingEmpresaId)}` : "";
+    return <Navigate to={`/auth/force-change-password${qs}`} replace />;
   }
   
   return children;

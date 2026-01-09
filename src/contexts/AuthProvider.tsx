@@ -28,6 +28,8 @@ type AuthContextType = {
   empresas: Empresa[];
   activeEmpresa: Empresa | null;
   activeEmpresaId: string | null;
+  mustChangePassword: boolean;
+  pendingEmpresaId: string | null;
   refreshEmpresas: () => Promise<void>;
   setActiveEmpresa: (empresa: Empresa) => Promise<void>;
   signOut: () => Promise<void>;
@@ -45,6 +47,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const supabase = useSupabase(); // SupabaseClient único da app
   const [session, setSession] = useState<Session>(null);
   const [userId, setUserId] = useState<string | null>(null);
+  const [mustChangePassword, setMustChangePassword] = useState(false);
+  const [pendingEmpresaId, setPendingEmpresaId] = useState<string | null>(null);
   const { data: empresas = [], refetch: refetchEmpresas, isLoading: isLoadingEmpresas } = useEmpresas(userId);
   const { data: activeEmpresaId, refetch: refetchActiveId, isLoading: isLoadingActiveId } = useActiveEmpresaId(userId);
 
@@ -80,6 +84,27 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // console.log("[AUTH] getSession:done", data);
     return data.session ?? null;
   }, [supabase]);
+
+  const refreshUserFlags = useCallback(
+    async (nextUserId: string | null) => {
+      if (!nextUserId) {
+        setMustChangePassword(false);
+        setPendingEmpresaId(null);
+        return;
+      }
+      try {
+        const { data } = await supabase.auth.getUser();
+        const meta: any = (data?.user as any)?.user_metadata ?? {};
+        setMustChangePassword(!!meta.must_change_password);
+        setPendingEmpresaId(typeof meta.pending_empresa_id === "string" ? meta.pending_empresa_id : null);
+      } catch {
+        // best-effort: não bloquear auth por metadata
+        setMustChangePassword(false);
+        setPendingEmpresaId(null);
+      }
+    },
+    [supabase],
+  );
 
   const refreshEmpresas = useCallback(
     async () => {
@@ -135,7 +160,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     (async () => {
       const s = await getSession();
       setSession(s);
-      setUserId(s?.user?.id ?? null);
+      const uid = s?.user?.id ?? null;
+      setUserId(uid);
+      await refreshUserFlags(uid);
       setAuthLoading(false);
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -145,17 +172,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     const { data: sub } = supabase.auth.onAuthStateChange((event, sess) => {
       setSession(sess ?? null);
-      setUserId(sess?.user?.id ?? null);
+      const uid = sess?.user?.id ?? null;
+      setUserId(uid);
+      void refreshUserFlags(uid);
 
       // Reset bootRef on explicit sign out event to be safe
       if (event === 'SIGNED_OUT') {
         bootRef.current = false;
+        setMustChangePassword(false);
+        setPendingEmpresaId(null);
         // setEmpresas([]); // Handled by query key change (userId becomes null)
         // setActiveEmpresaId(null);
       }
     });
     return () => sub.subscription.unsubscribe();
-  }, [supabase]);
+  }, [supabase, refreshUserFlags]);
 
   // Bootstrap + carga de empresas no primeiro login
   useEffect(() => {
@@ -178,11 +209,25 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       empresas,
       activeEmpresa,
       activeEmpresaId: activeEmpresaId ?? null,
+      mustChangePassword,
+      pendingEmpresaId,
       refreshEmpresas,
       setActiveEmpresa,
       signOut,
     }),
-    [session, userId, loading, empresas, activeEmpresa, activeEmpresaId, refreshEmpresas, setActiveEmpresa, signOut]
+    [
+      session,
+      userId,
+      loading,
+      empresas,
+      activeEmpresa,
+      activeEmpresaId,
+      mustChangePassword,
+      pendingEmpresaId,
+      refreshEmpresas,
+      setActiveEmpresa,
+      signOut,
+    ]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

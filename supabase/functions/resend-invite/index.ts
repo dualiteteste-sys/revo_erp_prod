@@ -31,7 +31,7 @@ const ANON_KEY      = Deno.env.get("SUPABASE_ANON_KEY")!;
 const SERVICE_KEY   = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const SITE_URL      = (Deno.env.get("SITE_URL") ?? "").trim();
 
-type Payload = { email?: string; user_id?: string; empresa_id?: string };
+type Payload = { email?: string; user_id?: string; empresa_id?: string; link_only?: boolean };
 
 async function findUserIdByEmail(svc: any, email: string): Promise<string | null> {
   const normalized = email.trim().toLowerCase();
@@ -100,6 +100,7 @@ serve(async (req) => {
     const body = (await req.json().catch(() => ({}))) as Payload;
     const reqEmail = (body.email ?? "").trim().toLowerCase();
     const reqUserId = (body.user_id ?? "").trim();
+    const linkOnly = !!body.link_only;
 
     if (!reqEmail && !reqUserId) {
       return new Response(JSON.stringify({ ok: false, error: "MISSING_TARGET" }), {
@@ -171,10 +172,80 @@ serve(async (req) => {
     // Obs: este path precisa estar permitido em Auth → URL Configuration (Redirect URLs) no Supabase.
     const redirectTo = `${siteUrl}/auth/update-password?empresa_id=${encodeURIComponent(empresaId)}`;
 
-    // --- Tenta convidar NOVO usuário (envia e-mail)
+    // --- Modo "link_only": gera um link manual sem enviar e-mail (plano B)
+    // Nota: gerar link pode invalidar links antigos; UI deve instruir a usar o mais recente.
     let action: "invited" | "resent" | "link_only" = "resent";
     let emailSent = false;
     let actionLink: string | null = null;
+
+    if (linkOnly) {
+      if (!email && !userId) {
+        return new Response(JSON.stringify({ ok: false, error: "MISSING_TARGET" }), {
+          status: 400, headers: { ...CORS, "Content-Type": "application/json" },
+        });
+      }
+
+      if (!email && userId) {
+        const { data: userById, error } = await svc.auth.admin.getUserById(userId);
+        if (error || !userById?.user?.email) {
+          return new Response(JSON.stringify({ ok: false, error: "USER_LOOKUP_FAILED" }), {
+            status: 400, headers: { ...CORS, "Content-Type": "application/json" },
+          });
+        }
+        email = userById.user.email.toLowerCase();
+      }
+
+      if (!userId && email) {
+        try {
+          userId = await findUserIdByEmail(svc, email);
+        } catch (e) {
+          console.error("[ADMIN] listUsers failed", e);
+        }
+      }
+
+      if (!email || !userId) {
+        return new Response(JSON.stringify({ ok: false, error: "USER_LOOKUP_FAILED" }), {
+          status: 404, headers: { ...CORS, "Content-Type": "application/json" },
+        });
+      }
+
+      const { data: linkData, error: linkErr } = await svc.auth.admin.generateLink({
+        type: "magiclink",
+        email,
+        options: { redirectTo },
+      });
+      if (linkErr) {
+        console.error("[ADMIN] generateLink failed", linkErr);
+        return new Response(JSON.stringify({ ok: false, error: "ADMIN_LOOKUP_FAILED" }), {
+          status: 500, headers: { ...CORS, "Content-Type": "application/json" },
+        });
+      }
+
+      action = "link_only";
+      emailSent = false;
+      actionLink = (linkData as any)?.properties?.action_link ?? null;
+
+      // Garantir que o vínculo existe e fica PENDING (plano B normalmente é para convites pendentes)
+      const svcDb = svc.from("empresa_usuarios");
+      const { data: existing } = await svcDb
+        .select("status").eq("empresa_id", empresaId!).eq("user_id", userId).maybeSingle();
+
+      const nextStatus = "PENDING";
+      if (existing) {
+        const { error: updateError } = await svcDb
+          .update({ status: nextStatus })
+          .eq("empresa_id", empresaId!)
+          .eq("user_id", userId);
+        if (updateError) throw updateError;
+      }
+
+      return new Response(JSON.stringify({
+        ok: true,
+        action,
+        action_link: actionLink,
+        data: { email, empresa_id: empresaId, status: nextStatus, action_link: actionLink },
+      }), { status: 200, headers: { ...CORS, "Content-Type": "application/json" } });
+    }
 
     const { data: invitedRes, error: inviteErr } = await svc.auth.admin.inviteUserByEmail(email, {
       redirectTo: redirectTo,
