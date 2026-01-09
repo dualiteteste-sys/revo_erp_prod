@@ -75,9 +75,10 @@ end;
 $$;
 
 revoke all on function public.financeiro_centros_custos_ensure_defaults from public;
-grant execute on function public.financeiro_centros_custos_ensure_defaults to authenticated, service_role;
+grant execute on function public.financeiro_centros_custos_ensure_defaults() to service_role;
 
 -- 3) RPC: list (validação do filtro)
+drop function if exists public.financeiro_centros_custos_list(text, text, boolean, int, int);
 create or replace function public.financeiro_centros_custos_list(
   p_search text   default null,
   p_tipo   text   default null,   -- 'receita' | 'custo_fixo' | 'custo_variavel' | 'investimento'
@@ -106,6 +107,7 @@ declare
   v_empresa uuid := public.current_empresa_id();
 begin
   perform public.financeiro_centros_custos_ensure_defaults();
+  perform public.require_permission_for_current_user('centros_de_custo','view');
 
   if p_tipo is not null and p_tipo not in ('receita','custo_fixo','custo_variavel','investimento') then
     raise exception 'Tipo de centro de custo inválido.';
@@ -143,8 +145,8 @@ begin
 end;
 $$;
 
-revoke all on function public.financeiro_centros_custos_list from public;
-grant execute on function public.financeiro_centros_custos_list to authenticated, service_role;
+revoke all on function public.financeiro_centros_custos_list(text, text, boolean, int, int) from public;
+grant execute on function public.financeiro_centros_custos_list(text, text, boolean, int, int) to authenticated, service_role;
 
 -- 4) RPC: upsert (validação + default)
 create or replace function public.financeiro_centros_custos_upsert(
@@ -165,6 +167,7 @@ declare
   v_parent_tipo text;
 begin
   perform public.financeiro_centros_custos_ensure_defaults();
+  perform public.require_permission_for_current_user('centros_de_custo', case when (p_payload->>'id') is null then 'create' else 'update' end);
 
   if p_payload->>'nome' is null or trim(p_payload->>'nome') = '' then
     raise exception 'Nome do centro de custo é obrigatório.';
@@ -172,6 +175,10 @@ begin
 
   v_parent := (p_payload->>'parent_id')::uuid;
   v_tipo   := coalesce(p_payload->>'tipo', 'custo_fixo');
+
+  if v_empresa is null then
+    raise exception '[RPC][FIN_CCUSTOS] empresa_id inválido' using errcode='42501';
+  end if;
 
   -- Criar novos itens sempre exige parent_id (evita múltiplas raízes e confusão pai/filho)
   if v_parent is null and (p_payload->>'id') is null then
@@ -278,7 +285,7 @@ end;
 $$;
 
 revoke all on function public.financeiro_centros_custos_upsert from public;
-grant execute on function public.financeiro_centros_custos_upsert to authenticated, service_role;
+grant execute on function public.financeiro_centros_custos_upsert(jsonb) to authenticated, service_role;
 
 -- 4.1) Get (override: garante defaults e expõe flag de raiz do sistema)
 create or replace function public.financeiro_centros_custos_get(
@@ -295,6 +302,7 @@ declare
   v_has_children boolean;
 begin
   perform public.financeiro_centros_custos_ensure_defaults();
+  perform public.require_permission_for_current_user('centros_de_custo','view');
 
   select exists (
     select 1
@@ -323,8 +331,8 @@ begin
 end;
 $$;
 
-revoke all on function public.financeiro_centros_custos_get from public;
-grant execute on function public.financeiro_centros_custos_get to authenticated, service_role;
+revoke all on function public.financeiro_centros_custos_get(uuid) from public;
+grant execute on function public.financeiro_centros_custos_get(uuid) to authenticated, service_role;
 
 -- 4.2) Delete (override: protege raízes do sistema)
 create or replace function public.financeiro_centros_custos_delete(
@@ -340,6 +348,7 @@ declare
   v_has_children boolean;
 begin
   perform public.financeiro_centros_custos_ensure_defaults();
+  perform public.require_permission_for_current_user('centros_de_custo','delete');
 
   if exists (
     select 1
@@ -375,5 +384,5 @@ begin
 end;
 $$;
 
-revoke all on function public.financeiro_centros_custos_delete from public;
-grant execute on function public.financeiro_centros_custos_delete to authenticated, service_role;
+revoke all on function public.financeiro_centros_custos_delete(uuid) from public;
+grant execute on function public.financeiro_centros_custos_delete(uuid) to authenticated, service_role;
