@@ -316,7 +316,7 @@ test('Serviços > Contratos: gerar agenda de faturamento (MVP2) sem erros', asyn
   await expect(page.getByText('Contrato E2E')).toBeVisible();
 
   await page.getByRole('button', { name: 'Editar' }).click();
-  await expect(page.getByRole('heading', { name: 'Contrato (MVP)' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Contrato', exact: true })).toBeVisible();
 
   const gerarAgenda = page.getByRole('button', { name: 'Gerar agenda (12 meses)' });
   await expect(gerarAgenda).toBeEnabled();
