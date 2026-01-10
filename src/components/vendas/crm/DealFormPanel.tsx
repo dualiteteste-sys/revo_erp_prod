@@ -267,11 +267,13 @@ export default function DealFormPanel({ deal, funilId, etapaId, onSaveSuccess, o
             />
           </div>
 
-          <Input 
-            label="Valor Estimado (R$)" 
-            name="valor" 
+          <Input
+            label="Valor Estimado"
+            name="valor"
+            startAdornment="R$"
+            inputMode="numeric"
             {...valorProps}
-            className="sm:col-span-2" 
+            className="sm:col-span-2"
           />
 
           <Select 

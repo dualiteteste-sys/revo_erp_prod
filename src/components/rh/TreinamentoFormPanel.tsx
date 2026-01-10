@@ -612,15 +612,19 @@ const TreinamentoFormPanel: React.FC<TreinamentoFormPanelProps> = ({ treinamento
               disabled={readOnly}
             />
             <Input 
-              label="Custo Estimado (R$)" 
+              label="Custo Estimado" 
               name="custo_estimado" 
+              startAdornment="R$"
+              inputMode="numeric"
               {...custoEstimadoProps}
               className="sm:col-span-2" 
               disabled={readOnly}
             />
             <Input 
-              label="Custo Real (R$)" 
+              label="Custo Real" 
               name="custo_real" 
+              startAdornment="R$"
+              inputMode="numeric"
               {...custoRealProps}
               className="sm:col-span-2" 
               disabled={readOnly}

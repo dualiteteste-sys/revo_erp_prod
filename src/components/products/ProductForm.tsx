@@ -110,16 +110,20 @@ const ProductForm: React.FC<ProductFormProps> = ({ product, onSave, onCancel, is
         </div>
 
         <div>
-          <label htmlFor="price" className="block text-sm font-medium text-gray-700">Preço (R$)</label>
-          <input
-            type="text"
-            name="price"
-            id="price"
-            value={price}
-            onChange={handlePriceChange}
-            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm p-3"
-            placeholder="0,00"
-          />
+          <label htmlFor="price" className="block text-sm font-medium text-gray-700">Preço</label>
+          <div className="relative mt-1">
+            <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-sm text-gray-500 pointer-events-none">R$</span>
+            <input
+              type="text"
+              inputMode="numeric"
+              name="price"
+              id="price"
+              value={price}
+              onChange={handlePriceChange}
+              className="block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm p-3 pl-10"
+              placeholder="0,00"
+            />
+          </div>
         </div>
 
         <div>

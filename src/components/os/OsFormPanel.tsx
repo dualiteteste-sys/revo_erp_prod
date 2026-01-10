@@ -1020,8 +1020,8 @@ const OsFormPanel: React.FC<OsFormPanelProps> = ({ os, onSaveSuccess, onClose })
         <OsFormItems items={formData.itens || []} onRemoveItem={handleRemoveItem} onAddItem={handleAddItem} isAddingItem={isAddingItem} readOnly={readOnly} />
 
         <Section title="Custos" description="Controle básico de custos para cálculo de margem e relatórios.">
-          <Input label="Custo Estimado (R$)" name="custo_estimado" {...custoEstimadoProps} className="sm:col-span-3" disabled={readOnly} />
-          <Input label="Custo Real (R$)" name="custo_real" {...custoRealProps} className="sm:col-span-3" disabled={readOnly} />
+          <Input label="Custo Estimado" name="custo_estimado" startAdornment="R$" inputMode="numeric" {...custoEstimadoProps} className="sm:col-span-3" disabled={readOnly} />
+          <Input label="Custo Real" name="custo_real" startAdornment="R$" inputMode="numeric" {...custoRealProps} className="sm:col-span-3" disabled={readOnly} />
         </Section>
 
         <Section title="Financeiro" description="Valores e condições de pagamento">
@@ -1029,7 +1029,7 @@ const OsFormPanel: React.FC<OsFormPanelProps> = ({ os, onSaveSuccess, onClose })
             <label className="block text-sm font-medium text-gray-700 mb-1">Total dos Itens</label>
             <div className="p-3 bg-gray-100 rounded-lg text-right font-semibold">{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(formData.total_itens || 0)}</div>
           </div>
-          <Input label="Desconto (R$)" name="desconto_valor" {...descontoProps} className="sm:col-span-2" disabled={readOnly} />
+          <Input label="Desconto" name="desconto_valor" startAdornment="R$" inputMode="numeric" {...descontoProps} className="sm:col-span-2" disabled={readOnly} />
           <div className="sm:col-span-2">
             <label className="block text-sm font-medium text-gray-700 mb-1">Total Geral</label>
             <div className="p-3 bg-blue-100 text-blue-800 rounded-lg text-right font-bold text-lg">{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(formData.total_geral || 0)}</div>

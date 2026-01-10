@@ -87,10 +87,11 @@ const DadosGeraisTab: React.FC<DadosGeraisTabProps> = ({ data, onChange, errors,
           label="Preço de Venda"
           name="preco_venda"
           type="text"
+          inputMode="numeric"
           {...precoVendaProps}
           className="sm:col-span-2"
           placeholder="0,00"
-          endAdornment="R$"
+          startAdornment="R$"
         />
         <div className="sm:col-span-2" />
         <Input

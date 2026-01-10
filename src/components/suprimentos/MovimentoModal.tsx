@@ -124,8 +124,10 @@ const MovimentoModal: React.FC<MovimentoModalProps> = ({ isOpen, onClose, produt
 
         {['entrada', 'ajuste_entrada'].includes(tipo) && (
             <Input 
-                label="Custo Unitário (R$)" 
+                label="Custo Unitário" 
                 name="custo" 
+                startAdornment="R$"
+                inputMode="numeric"
                 {...custoProps} 
                 placeholder="0,00"
             />

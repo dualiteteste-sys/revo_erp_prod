@@ -108,7 +108,7 @@ const ContasPagarFormPanel: React.FC<ContasPagarFormPanelProps> = ({ conta, onSa
             />
           </div>
           
-          <Input label="Valor Total (R$)" name="valor_total" {...valorTotalProps} required className="sm:col-span-3" />
+          <Input label="Valor Total" name="valor_total" startAdornment="R$" inputMode="numeric" {...valorTotalProps} required className="sm:col-span-3" />
           
           <Input label="Data de Emissão" name="data_emissao" type="date" value={formData.data_emissao?.split('T')[0] || ''} onChange={e => handleFormChange('data_emissao', e.target.value)} className="sm:col-span-2" />
           <Input label="Data de Vencimento" name="data_vencimento" type="date" value={formData.data_vencimento?.split('T')[0] || ''} onChange={e => handleFormChange('data_vencimento', e.target.value)} required className="sm:col-span-2" />
@@ -132,12 +132,12 @@ const ContasPagarFormPanel: React.FC<ContasPagarFormPanelProps> = ({ conta, onSa
             Para registrar pagamento (e manter a Tesouraria/caixa consistente), use a ação <span className="font-medium">Registrar pagamento</span> na listagem.
           </div>
           <Input label="Data de Pagamento" name="data_pagamento" type="date" value={formData.data_pagamento?.split('T')[0] || ''} disabled className="sm:col-span-2" />
-          <Input label="Valor Pago (R$)" name="valor_pago" {...valorPagoProps} disabled className="sm:col-span-2" />
+          <Input label="Valor Pago" name="valor_pago" startAdornment="R$" inputMode="numeric" {...valorPagoProps} disabled className="sm:col-span-2" />
           <div className="sm:col-span-2"></div>
 
-          <Input label="Multa (R$)" name="multa" {...multaProps} className="sm:col-span-2" />
-          <Input label="Juros (R$)" name="juros" {...jurosProps} className="sm:col-span-2" />
-          <Input label="Desconto (R$)" name="desconto" {...descontoProps} className="sm:col-span-2" />
+          <Input label="Multa" name="multa" startAdornment="R$" inputMode="numeric" {...multaProps} className="sm:col-span-2" />
+          <Input label="Juros" name="juros" startAdornment="R$" inputMode="numeric" {...jurosProps} className="sm:col-span-2" />
+          <Input label="Desconto" name="desconto" startAdornment="R$" inputMode="numeric" {...descontoProps} className="sm:col-span-2" />
 
           <Input label="Forma de Pagamento" name="forma_pagamento" value={formData.forma_pagamento || ''} onChange={e => handleFormChange('forma_pagamento', e.target.value)} className="sm:col-span-3" placeholder="Ex: Boleto, Pix" />
           <Input label="Categoria" name="categoria" value={formData.categoria || ''} onChange={e => handleFormChange('categoria', e.target.value)} className="sm:col-span-3" />

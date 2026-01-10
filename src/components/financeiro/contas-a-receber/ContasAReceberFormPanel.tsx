@@ -87,7 +87,7 @@ const ContasAReceberFormPanel: React.FC<ContasAReceberFormPanelProps> = ({ conta
               placeholder="Buscar cliente..."
             />
           </div>
-          <Input label="Valor (R$)" name="valor" {...valorProps} required className="sm:col-span-3" />
+          <Input label="Valor" name="valor" startAdornment="R$" inputMode="numeric" {...valorProps} required className="sm:col-span-3" />
           <Input label="Data de Vencimento" name="data_vencimento" type="date" value={formData.data_vencimento?.split('T')[0] || ''} onChange={e => handleFormChange('data_vencimento', e.target.value)} required className="sm:col-span-3" />
           <Select
             label="Status"
@@ -122,7 +122,7 @@ const ContasAReceberFormPanel: React.FC<ContasAReceberFormPanelProps> = ({ conta
             Para registrar recebimento (e manter a Tesouraria/caixa consistente), use a ação <span className="font-medium">Registrar recebimento</span> na listagem.
           </div>
           <Input label="Data de Recebimento" name="data_pagamento" type="date" value={formData.data_pagamento?.split('T')[0] || ''} disabled className="sm:col-span-3" />
-          <Input label="Valor Recebido" name="valor_pago" type="number" step="0.01" value={formData.valor_pago || ''} disabled className="sm:col-span-3" />
+          <Input label="Valor Recebido" name="valor_pago" startAdornment="R$" inputMode="numeric" value={new Intl.NumberFormat('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(formData.valor_pago || 0)} disabled className="sm:col-span-3" />
           <TextArea label="Observações" name="observacoes" value={formData.observacoes || ''} onChange={e => handleFormChange('observacoes', e.target.value)} rows={3} className="sm:col-span-6" />
         </Section>
       </div>

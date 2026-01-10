@@ -28,8 +28,9 @@ const FinancialSection: React.FC<FinancialSectionProps> = ({ data, onChange }) =
               label="Limite de Crédito"
               name="limite_credito"
               type="text"
+              inputMode="numeric"
               {...limiteCreditoProps}
-              endAdornment="R$"
+              startAdornment="R$"
               placeholder="0,00"
             />
             <Input

@@ -185,11 +185,13 @@ export default function CobrancaFormPanel({ cobranca, onSaveSuccess, onClose }: 
             required
             disabled={isLocked}
           />
-          <Input 
-            label="Valor (R$)" 
-            name="valor" 
+          <Input
+            label="Valor"
+            name="valor"
+            startAdornment="R$"
+            inputMode="numeric"
             {...valorOriginalProps}
-            className="sm:col-span-2" 
+            className="sm:col-span-2"
             required
             disabled={isLocked}
           />
