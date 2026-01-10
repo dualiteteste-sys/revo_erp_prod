@@ -26,6 +26,12 @@ import {
   type ServicosContratoDocumento,
   type ServicosContratoTemplate,
 } from '@/services/servicosContratosDocs';
+import {
+  deleteContratoItem,
+  listItensByContratoId,
+  upsertContratoItem,
+  type ServicosContratoItem,
+} from '@/services/servicosContratosItens';
 
 type FormState = {
   id: string | null;
@@ -43,6 +49,7 @@ type BillingRuleRow = ServicosContratoBillingRule;
 type BillingScheduleRow = ServicosContratoBillingSchedule;
 type DocumentoRow = ServicosContratoDocumento;
 type TemplateRow = ServicosContratoTemplate;
+type ItemRow = ServicosContratoItem;
 
 const emptyForm: FormState = {
   id: null,
@@ -84,6 +91,26 @@ export default function ContratosPage() {
   const [docExpiresDays, setDocExpiresDays] = useState(30);
   const [lastPortalLink, setLastPortalLink] = useState<string | null>(null);
   const [docActionLoading, setDocActionLoading] = useState(false);
+  const [itensLoading, setItensLoading] = useState(false);
+  const [itensActionLoading, setItensActionLoading] = useState(false);
+  const [itens, setItens] = useState<ItemRow[]>([]);
+  const [itemForm, setItemForm] = useState<{
+    id: string | null;
+    titulo: string;
+    descricao: string;
+    quantidade: string;
+    unidade: string;
+    valor_unitario: string;
+    recorrente: boolean;
+  }>({
+    id: null,
+    titulo: '',
+    descricao: '',
+    quantidade: '1',
+    unidade: '',
+    valor_unitario: '0',
+    recorrente: true,
+  });
 
   const clientById = useMemo(() => {
     const m = new Map<string, PartnerListItem>();
@@ -156,6 +183,18 @@ export default function ContratosPage() {
     setDocuments([]);
     setDocExpiresDays(30);
     setLastPortalLink(null);
+    setItens([]);
+    setItensLoading(false);
+    setItensActionLoading(false);
+    setItemForm({
+      id: null,
+      titulo: '',
+      descricao: '',
+      quantidade: '1',
+      unidade: '',
+      valor_unitario: '0',
+      recorrente: true,
+    });
     setIsOpen(true);
   };
 
@@ -181,9 +220,20 @@ export default function ContratosPage() {
     setSelectedTemplateId('');
     setDocuments([]);
     setLastPortalLink(null);
+    setItens([]);
+    setItemForm({
+      id: null,
+      titulo: '',
+      descricao: '',
+      quantidade: '1',
+      unidade: '',
+      valor_unitario: '0',
+      recorrente: true,
+    });
     setIsOpen(true);
     void loadBilling(row);
     void loadDocsAndTemplates(row.id);
+    void loadItens(row.id);
   };
 
   const close = () => {
@@ -201,6 +251,18 @@ export default function ContratosPage() {
     setDocuments([]);
     setDocExpiresDays(30);
     setLastPortalLink(null);
+    setItens([]);
+    setItensLoading(false);
+    setItensActionLoading(false);
+    setItemForm({
+      id: null,
+      titulo: '',
+      descricao: '',
+      quantidade: '1',
+      unidade: '',
+      valor_unitario: '0',
+      recorrente: true,
+    });
   };
 
   const canUseBilling = useMemo(() => {
@@ -263,6 +325,114 @@ export default function ContratosPage() {
       setTemplatesLoading(false);
       setDocumentsLoading(false);
     }
+  };
+
+  const loadItens = async (contratoId: string) => {
+    setItensLoading(true);
+    try {
+      const rows = await listItensByContratoId(contratoId);
+      setItens(rows);
+    } catch (e: any) {
+      addToast(e?.message || 'Falha ao carregar itens do contrato.', 'error');
+      setItens([]);
+    } finally {
+      setItensLoading(false);
+    }
+  };
+
+  const startAddItem = () => {
+    setItemForm({
+      id: null,
+      titulo: '',
+      descricao: '',
+      quantidade: '1',
+      unidade: '',
+      valor_unitario: '0',
+      recorrente: true,
+    });
+  };
+
+  const startEditItem = (it: ItemRow) => {
+    setItemForm({
+      id: it.id,
+      titulo: it.titulo || '',
+      descricao: it.descricao || '',
+      quantidade: String(it.quantidade ?? 0),
+      unidade: it.unidade || '',
+      valor_unitario: String(it.valor_unitario ?? 0),
+      recorrente: it.recorrente !== false,
+    });
+  };
+
+  const saveItem = async () => {
+    if (!form.id) return;
+    const titulo = itemForm.titulo.trim();
+    if (!titulo) {
+      addToast('Informe o título do item.', 'error');
+      return;
+    }
+    const qtd = Number(itemForm.quantidade || 0);
+    const valor = Number(itemForm.valor_unitario || 0);
+    if (!Number.isFinite(qtd) || qtd < 0) {
+      addToast('Quantidade inválida.', 'error');
+      return;
+    }
+    if (!Number.isFinite(valor) || valor < 0) {
+      addToast('Valor unitário inválido.', 'error');
+      return;
+    }
+
+    setItensActionLoading(true);
+    try {
+      const maxPos = itens.reduce((acc, x) => Math.max(acc, Number(x.pos ?? 0)), 0);
+      const payload: any = {
+        id: itemForm.id || undefined,
+        contrato_id: form.id,
+        pos: itemForm.id ? undefined : maxPos + 1,
+        titulo,
+        descricao: itemForm.descricao.trim() || null,
+        quantidade: qtd,
+        unidade: itemForm.unidade.trim() || null,
+        valor_unitario: valor,
+        recorrente: itemForm.recorrente,
+      };
+      await upsertContratoItem(payload);
+      addToast('Item salvo.', 'success');
+      startAddItem();
+      await loadItens(form.id);
+    } catch (e: any) {
+      addToast(e?.message || 'Falha ao salvar item.', 'error');
+    } finally {
+      setItensActionLoading(false);
+    }
+  };
+
+  const removeItem = async (it: ItemRow) => {
+    if (!form.id) return;
+    const ok = window.confirm(`Remover o item “${it.titulo}”?`);
+    if (!ok) return;
+    setItensActionLoading(true);
+    try {
+      await deleteContratoItem(it.id);
+      addToast('Item removido.', 'success');
+      if (itemForm.id === it.id) startAddItem();
+      await loadItens(form.id);
+    } catch (e: any) {
+      addToast(e?.message || 'Falha ao remover item.', 'error');
+    } finally {
+      setItensActionLoading(false);
+    }
+  };
+
+  const recurringTotal = useMemo(() => {
+    return itens
+      .filter((x) => x.recorrente !== false)
+      .reduce((acc, x) => acc + Number(x.quantidade || 0) * Number(x.valor_unitario || 0), 0);
+  }, [itens]);
+
+  const applyRecurringTotalToMensal = () => {
+    setForm((s) => ({ ...s, valor_mensal: String(recurringTotal.toFixed(2)) }));
+    addToast('Valor mensal preenchido pelo somatório recorrente.', 'success');
   };
 
   const generateDocumento = async () => {
@@ -855,6 +1025,182 @@ export default function ContratosPage() {
                               <td className="px-3 py-2">{s.descricao ? String(s.descricao) : '-'}</td>
                               <td className="px-3 py-2">{Number(s.valor || 0).toFixed(2)}</td>
                               <td className="px-3 py-2">{s.status}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </div>
+              </>
+            )}
+          </div>
+
+          <div className="rounded-xl border border-gray-200 bg-gray-50 p-4">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <div className="text-sm font-semibold text-gray-900">Escopo do contrato (itens)</div>
+                <div className="text-xs text-gray-600">
+                  Itens do serviço contratados (informativo). Você pode usar o somatório recorrente para preencher o valor mensal.
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => (form.id ? loadItens(form.id) : null)}
+                disabled={!form.id || itensLoading || itensActionLoading}
+                className="rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm hover:bg-gray-50 disabled:opacity-50"
+              >
+                Atualizar
+              </button>
+            </div>
+
+            {!form.id ? (
+              <div className="mt-3 text-sm text-gray-700">Salve o contrato para cadastrar itens.</div>
+            ) : itensLoading ? (
+              <div className="mt-4 flex items-center gap-2 text-sm text-gray-600">
+                <Loader2 className="h-4 w-4 animate-spin" /> Carregando itens…
+              </div>
+            ) : (
+              <>
+                <div className="mt-4 grid grid-cols-1 md:grid-cols-12 gap-2">
+                  <div className="md:col-span-4">
+                    <div className="text-[11px] text-gray-600">Título</div>
+                    <input
+                      value={itemForm.titulo}
+                      onChange={(e) => setItemForm((s) => ({ ...s, titulo: e.target.value }))}
+                      className="mt-1 w-full rounded-lg border border-gray-200 bg-white p-2 text-sm"
+                      disabled={itensActionLoading}
+                    />
+                  </div>
+                  <div className="md:col-span-4">
+                    <div className="text-[11px] text-gray-600">Descrição (opcional)</div>
+                    <input
+                      value={itemForm.descricao}
+                      onChange={(e) => setItemForm((s) => ({ ...s, descricao: e.target.value }))}
+                      className="mt-1 w-full rounded-lg border border-gray-200 bg-white p-2 text-sm"
+                      disabled={itensActionLoading}
+                    />
+                  </div>
+                  <div className="md:col-span-1">
+                    <div className="text-[11px] text-gray-600">Qtd</div>
+                    <input
+                      inputMode="decimal"
+                      value={itemForm.quantidade}
+                      onChange={(e) => setItemForm((s) => ({ ...s, quantidade: e.target.value }))}
+                      className="mt-1 w-full rounded-lg border border-gray-200 bg-white p-2 text-sm"
+                      disabled={itensActionLoading}
+                    />
+                  </div>
+                  <div className="md:col-span-1">
+                    <div className="text-[11px] text-gray-600">Unid.</div>
+                    <input
+                      value={itemForm.unidade}
+                      onChange={(e) => setItemForm((s) => ({ ...s, unidade: e.target.value }))}
+                      className="mt-1 w-full rounded-lg border border-gray-200 bg-white p-2 text-sm"
+                      disabled={itensActionLoading}
+                    />
+                  </div>
+                  <div className="md:col-span-2">
+                    <div className="text-[11px] text-gray-600">Valor unit.</div>
+                    <input
+                      inputMode="decimal"
+                      value={itemForm.valor_unitario}
+                      onChange={(e) => setItemForm((s) => ({ ...s, valor_unitario: e.target.value }))}
+                      className="mt-1 w-full rounded-lg border border-gray-200 bg-white p-2 text-sm"
+                      disabled={itensActionLoading}
+                    />
+                  </div>
+                </div>
+
+                <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
+                  <label className="flex items-center gap-2 text-sm text-gray-700">
+                    <input
+                      type="checkbox"
+                      checked={itemForm.recorrente}
+                      onChange={(e) => setItemForm((s) => ({ ...s, recorrente: e.target.checked }))}
+                      disabled={itensActionLoading}
+                    />
+                    Recorrente (entra no somatório mensal)
+                  </label>
+
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={saveItem}
+                      disabled={!form.id || itensActionLoading}
+                      className="rounded-lg bg-white px-3 py-2 text-sm font-semibold text-gray-800 shadow-sm ring-1 ring-gray-200 hover:bg-gray-50 disabled:opacity-50"
+                    >
+                      {itemForm.id ? 'Salvar alterações' : 'Adicionar item'}
+                    </button>
+                    {itemForm.id ? (
+                      <button
+                        type="button"
+                        onClick={startAddItem}
+                        disabled={itensActionLoading}
+                        className="rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm hover:bg-gray-50 disabled:opacity-50"
+                      >
+                        Cancelar
+                      </button>
+                    ) : null}
+                    <button
+                      type="button"
+                      onClick={applyRecurringTotalToMensal}
+                      disabled={!form.id || itensActionLoading}
+                      className="rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm hover:bg-gray-50 disabled:opacity-50"
+                    >
+                      Aplicar soma recorrente (R$ {recurringTotal.toFixed(2)})
+                    </button>
+                  </div>
+                </div>
+
+                <div className="mt-4">
+                  <div className="text-xs font-semibold text-gray-700 mb-2">Itens cadastrados</div>
+                  {itens.length === 0 ? (
+                    <div className="text-sm text-gray-600">Nenhum item cadastrado ainda.</div>
+                  ) : (
+                    <div className="overflow-auto rounded-lg border border-gray-200 bg-white">
+                      <table className="min-w-full text-xs">
+                        <thead className="bg-gray-50">
+                          <tr className="text-left text-gray-600">
+                            <th className="px-3 py-2">Título</th>
+                            <th className="px-3 py-2">Qtd</th>
+                            <th className="px-3 py-2">Unid.</th>
+                            <th className="px-3 py-2">Valor unit.</th>
+                            <th className="px-3 py-2">Recorrente</th>
+                            <th className="px-3 py-2 text-right">Ações</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-gray-100">
+                          {itens.map((it) => (
+                            <tr key={it.id}>
+                              <td className="px-3 py-2">
+                                <div className="font-medium text-gray-900">{it.titulo}</div>
+                                {it.descricao ? <div className="text-[11px] text-gray-600">{it.descricao}</div> : null}
+                              </td>
+                              <td className="px-3 py-2">{Number(it.quantidade || 0).toFixed(2)}</td>
+                              <td className="px-3 py-2">{it.unidade || '—'}</td>
+                              <td className="px-3 py-2">{Number(it.valor_unitario || 0).toFixed(2)}</td>
+                              <td className="px-3 py-2">{it.recorrente ? 'sim' : 'não'}</td>
+                              <td className="px-3 py-2">
+                                <div className="flex justify-end gap-2">
+                                  <button
+                                    type="button"
+                                    onClick={() => startEditItem(it)}
+                                    disabled={itensActionLoading}
+                                    className="rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs hover:bg-gray-50 disabled:opacity-50"
+                                  >
+                                    Editar
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => removeItem(it)}
+                                    disabled={itensActionLoading}
+                                    className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-1.5 text-xs text-rose-800 hover:bg-rose-100 disabled:opacity-50"
+                                  >
+                                    Remover
+                                  </button>
+                                </div>
+                              </td>
                             </tr>
                           ))}
                         </tbody>
