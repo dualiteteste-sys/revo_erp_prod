@@ -9,6 +9,7 @@ import { listAllCentrosDeCusto, type CentroDeCustoListItem } from '@/services/ce
 import { deleteContrato, listContratos, upsertContrato, type ServicoContrato, type ServicoContratoStatus } from '@/services/servicosMvp';
 import { getService } from '@/services/services';
 import { useNumericField } from '@/hooks/useNumericField';
+import Input from '@/components/ui/forms/Input';
 import {
   addAvulso,
   cancelFutureBilling,
@@ -999,11 +1000,12 @@ export default function ContratosPage() {
           </div>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div>
-              <label className="text-sm text-gray-700">Valor mensal</label>
-              <input
+              <Input
+                label="Valor mensal"
+                name="valor_mensal"
                 inputMode="numeric"
+                startAdornment="R$"
                 {...valorMensalProps}
-                className="mt-1 w-full p-3 border border-gray-300 rounded-lg"
                 disabled={saving}
               />
             </div>
@@ -1130,11 +1132,13 @@ export default function ContratosPage() {
                     </select>
                   </div>
                   <div>
-                    <label className="text-xs text-gray-600">Valor mensal</label>
-                    <input
+                    <Input
+                      label="Valor mensal"
+                      name="billing_valor_mensal"
+                      size="sm"
                       inputMode="numeric"
+                      startAdornment="R$"
                       {...billingValorMensalProps}
-                      className="mt-1 w-full rounded-lg border border-gray-200 bg-white p-2 text-sm"
                       disabled={billingActionLoading}
                     />
                   </div>
@@ -1249,11 +1253,13 @@ export default function ContratosPage() {
                       />
                     </div>
                     <div>
-                      <div className="text-[11px] text-gray-600">Valor</div>
-                      <input
+                      <Input
+                        label="Valor"
+                        name="avulso_valor"
+                        size="sm"
                         inputMode="numeric"
+                        startAdornment="R$"
                         {...avulsoValorProps}
-                        className="mt-1 w-full rounded-lg border border-gray-200 bg-white p-2 text-sm"
                         disabled={billingActionLoading}
                       />
                     </div>
@@ -1381,11 +1387,13 @@ export default function ContratosPage() {
                     />
                   </div>
                   <div className="md:col-span-2">
-                    <div className="text-[11px] text-gray-600">Valor unit.</div>
-                    <input
+                    <Input
+                      label="Valor unit."
+                      name="item_valor_unitario"
+                      size="sm"
                       inputMode="numeric"
+                      startAdornment="R$"
                       {...itemValorUnitarioProps}
-                      className="mt-1 w-full rounded-lg border border-gray-200 bg-white p-2 text-sm"
                       disabled={itensActionLoading}
                     />
                   </div>

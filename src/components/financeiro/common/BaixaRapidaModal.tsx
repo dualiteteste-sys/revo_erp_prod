@@ -105,8 +105,10 @@ export default function BaixaRapidaModal({
           />
 
           <Input
-            label="Valor (R$)"
+            label="Valor"
             name="baixa_valor"
+            startAdornment="R$"
+            inputMode="numeric"
             {...valorProps}
             className="md:col-span-2"
           />
@@ -155,4 +157,3 @@ export default function BaixaRapidaModal({
     </Modal>
   );
 }
-

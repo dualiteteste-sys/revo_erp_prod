@@ -723,24 +723,38 @@ export default function PedidoVendaFormPanel({ vendaId, onSaveSuccess, onClose, 
                       />
                     </td>
                     <td className="px-3 py-2">
-                      <input 
-                        type="number" 
-                        value={item.preco_unitario} 
-                        onChange={e => handleUpdateItem(item.id, 'preco', parseFloat(e.target.value))}
-                        disabled={isLocked}
-                        className="w-full text-right p-1 border rounded text-sm"
-                        step="0.01"
-                      />
+                      <div className="relative">
+                        <span className="absolute inset-y-0 left-0 flex items-center pl-2 text-xs text-gray-500">R$</span>
+                        <input
+                          type="text"
+                          inputMode="numeric"
+                          value={new Intl.NumberFormat('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(item.preco_unitario || 0)}
+                          onChange={(e) => {
+                            const digits = e.target.value.replace(/\D/g, '');
+                            const numberValue = digits ? parseInt(digits, 10) / 100 : 0;
+                            handleUpdateItem(item.id, 'preco', numberValue);
+                          }}
+                          disabled={isLocked}
+                          className="w-full text-right p-1 border rounded text-sm pl-8"
+                        />
+                      </div>
                     </td>
                     <td className="px-3 py-2">
-                      <input 
-                        type="number" 
-                        value={item.desconto} 
-                        onChange={e => handleUpdateItem(item.id, 'desconto', parseFloat(e.target.value))}
-                        disabled={isLocked || !canDiscount}
-                        className="w-full text-right p-1 border rounded text-sm"
-                        step="0.01"
-                      />
+                      <div className="relative">
+                        <span className="absolute inset-y-0 left-0 flex items-center pl-2 text-xs text-gray-500">R$</span>
+                        <input
+                          type="text"
+                          inputMode="numeric"
+                          value={new Intl.NumberFormat('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(item.desconto || 0)}
+                          onChange={(e) => {
+                            const digits = e.target.value.replace(/\D/g, '');
+                            const numberValue = digits ? parseInt(digits, 10) / 100 : 0;
+                            handleUpdateItem(item.id, 'desconto', numberValue);
+                          }}
+                          disabled={isLocked || !canDiscount}
+                          className="w-full text-right p-1 border rounded text-sm pl-8"
+                        />
+                      </div>
                     </td>
                     <td className="px-3 py-2 text-right text-sm font-semibold">
                       {formatMoneyBRL(item.total)}
@@ -772,9 +786,9 @@ export default function PedidoVendaFormPanel({ vendaId, onSaveSuccess, onClose, 
               {formatMoneyBRL(subtotal)}
             </div>
           </div>
-          <Input label="Frete (R$)" name="frete" {...freteProps} disabled={isLocked} className="sm:col-span-2" />
+          <Input label="Frete" name="frete" startAdornment="R$" inputMode="numeric" {...freteProps} disabled={isLocked} className="sm:col-span-2" />
           <div className="sm:col-span-2">
-            <Input label="Desconto Extra (R$)" name="desconto" {...descontoProps} disabled={isLocked || !canDiscount} />
+            <Input label="Desconto Extra" name="desconto" startAdornment="R$" inputMode="numeric" {...descontoProps} disabled={isLocked || !canDiscount} />
             {!canDiscount ? (
               <div className="mt-1 text-xs text-amber-700 flex items-center gap-1">
                 <ShieldAlert size={14} /> Sem permissão para desconto

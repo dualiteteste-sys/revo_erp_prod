@@ -152,6 +152,7 @@ const ServiceFormPanel: React.FC<ServiceFormPanelProps> = ({ service, onSaveSucc
                   {...precoVendaProps}
                   placeholder="0,00"
                   startAdornment="R$"
+                  inputMode="numeric"
                 />
               </div>
 

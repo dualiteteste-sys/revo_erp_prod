@@ -78,11 +78,13 @@ export default function MovimentacaoFormPanel({ movimentacao, contaCorrenteId, o
             </Select>
           </div>
           
-          <Input 
-            label="Valor (R$)" 
-            name="valor" 
+          <Input
+            label="Valor"
+            name="valor"
+            startAdornment="R$"
+            inputMode="numeric"
             {...valorProps}
-            className="sm:col-span-2" 
+            className="sm:col-span-2"
           />
 
           <Input 

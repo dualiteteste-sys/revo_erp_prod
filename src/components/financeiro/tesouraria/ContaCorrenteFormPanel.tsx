@@ -100,8 +100,10 @@ export default function ContaCorrenteFormPanel({ conta, onSaveSuccess, onClose }
 
         <Section title="Financeiro" description="Saldos e limites.">
             <Input 
-                label="Saldo Inicial (R$)" 
+                label="Saldo Inicial" 
                 name="saldo_ini" 
+                startAdornment="R$"
+                inputMode="numeric"
                 {...saldoInicialProps}
                 className="sm:col-span-2" 
             />
@@ -114,8 +116,10 @@ export default function ContaCorrenteFormPanel({ conta, onSaveSuccess, onClose }
                 className="sm:col-span-2" 
             />
             <Input 
-                label="Limite de Crédito (R$)" 
+                label="Limite de Crédito" 
                 name="limite" 
+                startAdornment="R$"
+                inputMode="numeric"
                 {...limiteCreditoProps}
                 className="sm:col-span-2" 
             />

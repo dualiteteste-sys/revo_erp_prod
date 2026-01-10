@@ -408,14 +408,21 @@ export default function CompraFormPanel({ compraId, onSaveSuccess, onClose }: Pr
                       />
                     </td>
                     <td className="px-3 py-2">
-                      <input 
-                        type="number" 
-                        value={item.preco_unitario} 
-                        onChange={e => handleUpdateItem(item.id, 'preco', parseFloat(e.target.value))}
-                        disabled={isLocked}
-                        className="w-full text-right p-1 border rounded"
-                        step="0.01"
-                      />
+                      <div className="relative">
+                        <span className="absolute inset-y-0 left-0 flex items-center pl-2 text-xs text-gray-500">R$</span>
+                        <input
+                          type="text"
+                          inputMode="numeric"
+                          value={new Intl.NumberFormat('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(item.preco_unitario || 0)}
+                          onChange={(e) => {
+                            const digits = e.target.value.replace(/\D/g, '');
+                            const numberValue = digits ? parseInt(digits, 10) / 100 : 0;
+                            handleUpdateItem(item.id, 'preco', numberValue);
+                          }}
+                          disabled={isLocked}
+                          className="w-full text-right p-1 border rounded pl-8"
+                        />
+                      </div>
                     </td>
                     <td className="px-3 py-2 text-right text-sm font-semibold">
                       {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(item.total)}
@@ -444,8 +451,8 @@ export default function CompraFormPanel({ compraId, onSaveSuccess, onClose }: Pr
               {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(totalItens)}
             </div>
           </div>
-          <Input label="Frete (R$)" name="frete" {...freteProps} disabled={isLocked} className="sm:col-span-2" />
-          <Input label="Desconto (R$)" name="desconto" {...descontoProps} disabled={isLocked} className="sm:col-span-2" />
+          <Input label="Frete" name="frete" startAdornment="R$" inputMode="numeric" {...freteProps} disabled={isLocked} className="sm:col-span-2" />
+          <Input label="Desconto" name="desconto" startAdornment="R$" inputMode="numeric" {...descontoProps} disabled={isLocked} className="sm:col-span-2" />
           
           <div className="sm:col-span-6 flex justify-end mt-2">
             <div className="text-xl font-bold text-blue-800">

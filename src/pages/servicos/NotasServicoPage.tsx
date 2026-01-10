@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { Loader2, PlusCircle, Receipt } from 'lucide-react';
 import Modal from '@/components/ui/Modal';
 import { useToast } from '@/contexts/ToastProvider';
+import Input from '@/components/ui/forms/Input';
 import {
   deleteNotaServico,
   listNotasServico,
@@ -11,17 +12,18 @@ import {
   listContratos,
   type ServicoContrato,
 } from '@/services/servicosMvp';
+import { useNumericField } from '@/hooks/useNumericField';
 
 type FormState = {
   id: string | null;
   contrato_id: string;
   competencia: string;
   descricao: string;
-  valor: string;
+  valor: number | null;
   status: NotaServicoStatus;
 };
 
-const emptyForm: FormState = { id: null, contrato_id: '', competencia: '', descricao: '', valor: '0', status: 'rascunho' };
+const emptyForm: FormState = { id: null, contrato_id: '', competencia: '', descricao: '', valor: 0, status: 'rascunho' };
 
 export default function NotasServicoPage() {
   const { addToast } = useToast();
@@ -32,6 +34,7 @@ export default function NotasServicoPage() {
   const [contratos, setContratos] = useState<ServicoContrato[]>([]);
   const [isOpen, setIsOpen] = useState(false);
   const [form, setForm] = useState<FormState>(emptyForm);
+  const valorProps = useNumericField(form.valor, (value) => setForm((s) => ({ ...s, valor: value })));
 
   const contratoById = useMemo(() => {
     const m = new Map<string, ServicoContrato>();
@@ -70,7 +73,7 @@ export default function NotasServicoPage() {
       contrato_id: row.contrato_id || '',
       competencia: row.competencia || '',
       descricao: row.descricao || '',
-      valor: String(row.valor ?? 0),
+      valor: row.valor ?? 0,
       status: row.status,
     });
     setIsOpen(true);
@@ -86,7 +89,7 @@ export default function NotasServicoPage() {
       addToast('Informe a descrição.', 'error');
       return;
     }
-    const valor = Number(form.valor || 0);
+    const valor = Number(form.valor ?? 0);
     if (Number.isNaN(valor) || valor < 0) {
       addToast('Valor inválido.', 'error');
       return;
@@ -233,13 +236,7 @@ export default function NotasServicoPage() {
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <label className="text-sm text-gray-700">Valor</label>
-              <input
-                inputMode="decimal"
-                value={form.valor}
-                onChange={(e) => setForm((s) => ({ ...s, valor: e.target.value }))}
-                className="mt-1 w-full p-3 border border-gray-300 rounded-lg"
-              />
+              <Input label="Valor" name="valor" inputMode="numeric" startAdornment="R$" {...valorProps} disabled={saving} />
             </div>
             <div>
               <label className="text-sm text-gray-700">Status</label>

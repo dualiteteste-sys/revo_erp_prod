@@ -24,10 +24,13 @@ const OthersTab: React.FC<OthersTabProps> = ({ data, onChange }) => {
         description="Informações para gestão de vendas e custos."
       >
         <Input
-          label="Preço de Custo (R$)"
+          label="Preço de Custo"
           name="preco_custo"
           type="text"
+          inputMode="numeric"
           {...precoCustoProps}
+          startAdornment="R$"
+          placeholder="0,00"
         />
         <Input
           label="Markup (%)"
@@ -90,10 +93,13 @@ const OthersTab: React.FC<OthersTabProps> = ({ data, onChange }) => {
           onChange={(e) => onChange('codigo_enquadramento_ipi', e.target.value)}
         />
         <Input
-          label="Valor Fixo de IPI (R$)"
+          label="Valor Fixo de IPI"
           name="valor_ipi_fixo"
           type="text"
+          inputMode="numeric"
           {...valorIpiFixoProps}
+          startAdornment="R$"
+          placeholder="0,00"
         />
         <Input
           label="Cód. Enq. Legal IPI"

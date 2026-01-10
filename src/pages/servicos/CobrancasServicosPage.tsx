@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { Banknote, Loader2, PlusCircle } from 'lucide-react';
 import Modal from '@/components/ui/Modal';
 import { useToast } from '@/contexts/ToastProvider';
+import Input from '@/components/ui/forms/Input';
 import { getPartners, type PartnerListItem } from '@/services/partners';
 import {
   deleteCobrancaServico,
@@ -13,17 +14,18 @@ import {
   type CobrancaStatus,
   type NotaServico,
 } from '@/services/servicosMvp';
+import { useNumericField } from '@/hooks/useNumericField';
 
 type FormState = {
   id: string | null;
   nota_id: string;
   cliente_id: string;
   data_vencimento: string;
-  valor: string;
+  valor: number | null;
   status: CobrancaStatus;
 };
 
-const emptyForm: FormState = { id: null, nota_id: '', cliente_id: '', data_vencimento: '', valor: '0', status: 'pendente' };
+const emptyForm: FormState = { id: null, nota_id: '', cliente_id: '', data_vencimento: '', valor: 0, status: 'pendente' };
 
 export default function CobrancasServicosPage() {
   const { addToast } = useToast();
@@ -38,6 +40,7 @@ export default function CobrancasServicosPage() {
 
   const [isOpen, setIsOpen] = useState(false);
   const [form, setForm] = useState<FormState>(emptyForm);
+  const valorProps = useNumericField(form.valor, (value) => setForm((s) => ({ ...s, valor: value })));
 
   const notaById = useMemo(() => {
     const m = new Map<string, NotaServico>();
@@ -94,7 +97,7 @@ export default function CobrancasServicosPage() {
       nota_id: row.nota_id || '',
       cliente_id: row.cliente_id || '',
       data_vencimento: row.data_vencimento || '',
-      valor: String(row.valor ?? 0),
+      valor: row.valor ?? 0,
       status: row.status,
     });
     setIsOpen(true);
@@ -106,7 +109,7 @@ export default function CobrancasServicosPage() {
   };
 
   const save = async () => {
-    const valor = Number(form.valor || 0);
+    const valor = Number(form.valor ?? 0);
     if (Number.isNaN(valor) || valor <= 0) {
       addToast('Valor inválido (deve ser > 0).', 'error');
       return;
@@ -299,13 +302,7 @@ export default function CobrancasServicosPage() {
               />
             </div>
             <div>
-              <label className="text-sm text-gray-700">Valor</label>
-              <input
-                inputMode="decimal"
-                value={form.valor}
-                onChange={(e) => setForm((s) => ({ ...s, valor: e.target.value }))}
-                className="mt-1 w-full p-3 border border-gray-300 rounded-lg"
-              />
+              <Input label="Valor" name="valor" startAdornment="R$" inputMode="numeric" {...valorProps} disabled={saving} />
             </div>
           </div>
           <div>

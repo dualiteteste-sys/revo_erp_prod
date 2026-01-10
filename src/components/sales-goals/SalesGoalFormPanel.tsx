@@ -99,7 +99,7 @@ const SalesGoalFormPanel: React.FC<SalesGoalFormPanelProps> = ({ goal, onSaveSuc
             className="sm:col-span-3"
           />
           <div className="sm:col-span-3">
-            <Input label="Valor da Meta (R$)" name="valor_meta" {...valorMetaProps} required />
+            <Input label="Valor da Meta" name="valor_meta" startAdornment="R$" inputMode="numeric" {...valorMetaProps} required />
           </div>
         </Section>
       </div>
