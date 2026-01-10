@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { FileText, Loader2, PlusCircle } from 'lucide-react';
 import Modal from '@/components/ui/Modal';
 import { useToast } from '@/contexts/ToastProvider';
+import ClientAutocomplete from '@/components/common/ClientAutocomplete';
 import { getPartners, type PartnerListItem } from '@/services/partners';
 import { listAllCentrosDeCusto, type CentroDeCustoListItem } from '@/services/centrosDeCusto';
 import { deleteContrato, listContratos, upsertContrato, type ServicoContrato, type ServicoContratoStatus } from '@/services/servicosMvp';
@@ -86,6 +87,7 @@ export default function ContratosPage() {
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [rows, setRows] = useState<ServicoContrato[]>([]);
   const [clients, setClients] = useState<PartnerListItem[]>([]);
+  const [selectedClientName, setSelectedClientName] = useState('');
   const [isOpen, setIsOpen] = useState(false);
   const [form, setForm] = useState<FormState>(emptyForm);
   const [originalStatus, setOriginalStatus] = useState<ServicoContratoStatus>('ativo');
@@ -227,6 +229,7 @@ export default function ContratosPage() {
       valor_unitario: '0',
       recorrente: true,
     });
+    setSelectedClientName('');
     setIsOpen(true);
   };
 
@@ -242,6 +245,7 @@ export default function ContratosPage() {
       data_fim: row.data_fim || '',
       observacoes: row.observacoes || '',
     });
+    setSelectedClientName(row.cliente_id ? clientById.get(row.cliente_id)?.nome || '' : '');
     setOriginalStatus(row.status);
     setBillingRule(null);
     setSchedule([]);
@@ -295,6 +299,7 @@ export default function ContratosPage() {
       valor_unitario: '0',
       recorrente: true,
     });
+    setSelectedClientName('');
     setTemplatesAdminOpen(false);
     setTemplatesAdminRows([]);
     setTemplateForm({ id: null, slug: '', titulo: '', corpo: '', active: true });
@@ -874,23 +879,24 @@ export default function ContratosPage() {
         )}
       </div>
 
-      <Modal isOpen={isOpen} onClose={close} title="Contrato (MVP)" size="4xl" bodyClassName="p-6 md:p-8">
+      <Modal isOpen={isOpen} onClose={close} title="Contrato" size="4xl" bodyClassName="p-6 md:p-8">
         <div className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <label className="text-sm text-gray-700">Cliente</label>
-              <select
-                value={form.cliente_id}
-                onChange={(e) => setForm((s) => ({ ...s, cliente_id: e.target.value }))}
-                className="mt-1 w-full p-3 border border-gray-300 rounded-lg"
-              >
-                <option value="">(opcional)</option>
-                {clients.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.nome}
-                  </option>
-                ))}
-              </select>
+              <div className="mt-1">
+                <ClientAutocomplete
+                  value={form.cliente_id || null}
+                  initialName={selectedClientName || (form.cliente_id ? clientById.get(form.cliente_id)?.nome || undefined : undefined)}
+                  placeholder="Digite para buscar..."
+                  onChange={(id, name) => {
+                    setForm((s) => ({ ...s, cliente_id: id ?? '' }));
+                    setSelectedClientName(name || '');
+                  }}
+                  disabled={saving}
+                />
+                <div className="mt-1 text-[11px] text-gray-500">Opcional. Digite 2+ caracteres para buscar.</div>
+              </div>
             </div>
             <div>
               <label className="text-sm text-gray-700">Número</label>
