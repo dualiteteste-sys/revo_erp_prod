@@ -32,6 +32,11 @@ import {
   upsertContratoItem,
   type ServicosContratoItem,
 } from '@/services/servicosContratosItens';
+import {
+  deleteContratoTemplateAdmin,
+  listContratoTemplatesAdmin,
+  upsertContratoTemplateAdmin,
+} from '@/services/servicosContratosTemplatesAdmin';
 
 type FormState = {
   id: string | null;
@@ -62,6 +67,17 @@ const emptyForm: FormState = {
   data_fim: '',
   observacoes: '',
 };
+
+function slugify(input: string): string {
+  return String(input || '')
+    .trim()
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9]+/g, '_')
+    .replace(/^_+|_+$/g, '')
+    .slice(0, 60);
+}
 
 export default function ContratosPage() {
   const { addToast } = useToast();
@@ -110,6 +126,22 @@ export default function ContratosPage() {
     unidade: '',
     valor_unitario: '0',
     recorrente: true,
+  });
+  const [templatesAdminOpen, setTemplatesAdminOpen] = useState(false);
+  const [templatesAdminLoading, setTemplatesAdminLoading] = useState(false);
+  const [templatesAdminRows, setTemplatesAdminRows] = useState<TemplateRow[]>([]);
+  const [templateForm, setTemplateForm] = useState<{
+    id: string | null;
+    slug: string;
+    titulo: string;
+    corpo: string;
+    active: boolean;
+  }>({
+    id: null,
+    slug: '',
+    titulo: '',
+    corpo: '',
+    active: true,
   });
 
   const clientById = useMemo(() => {
@@ -263,6 +295,9 @@ export default function ContratosPage() {
       valor_unitario: '0',
       recorrente: true,
     });
+    setTemplatesAdminOpen(false);
+    setTemplatesAdminRows([]);
+    setTemplateForm({ id: null, slug: '', titulo: '', corpo: '', active: true });
   };
 
   const canUseBilling = useMemo(() => {
@@ -433,6 +468,97 @@ export default function ContratosPage() {
   const applyRecurringTotalToMensal = () => {
     setForm((s) => ({ ...s, valor_mensal: String(recurringTotal.toFixed(2)) }));
     addToast('Valor mensal preenchido pelo somatório recorrente.', 'success');
+  };
+
+  const openTemplatesAdmin = async () => {
+    setTemplatesAdminOpen(true);
+    setTemplatesAdminLoading(true);
+    try {
+      // garante defaults idempotentes (RPC) antes do CRUD direto na tabela
+      await listContratoTemplates({ activeOnly: false });
+      const all = await listContratoTemplatesAdmin({ includeInactive: true });
+      setTemplatesAdminRows(all as any);
+      if (all.length > 0) {
+        const t = all[0] as any;
+        setTemplateForm({ id: t.id, slug: t.slug, titulo: t.titulo, corpo: t.corpo, active: t.active !== false });
+      } else {
+        setTemplateForm({ id: null, slug: '', titulo: '', corpo: '', active: true });
+      }
+    } catch (e: any) {
+      addToast(e?.message || 'Falha ao carregar templates.', 'error');
+      setTemplatesAdminRows([]);
+      setTemplateForm({ id: null, slug: '', titulo: '', corpo: '', active: true });
+    } finally {
+      setTemplatesAdminLoading(false);
+    }
+  };
+
+  const selectTemplateForEdit = (t: TemplateRow) => {
+    setTemplateForm({ id: t.id, slug: t.slug || '', titulo: t.titulo || '', corpo: t.corpo || '', active: t.active !== false });
+  };
+
+  const newTemplate = () => {
+    setTemplateForm({ id: null, slug: '', titulo: '', corpo: '', active: true });
+  };
+
+  const saveTemplate = async () => {
+    const titulo = templateForm.titulo.trim();
+    const slug = slugify(templateForm.slug || titulo);
+    const corpo = templateForm.corpo ?? '';
+    if (!titulo) {
+      addToast('Informe o título do template.', 'error');
+      return;
+    }
+    if (!slug) {
+      addToast('Slug inválido.', 'error');
+      return;
+    }
+    if (!corpo.trim()) {
+      addToast('Informe o corpo do template.', 'error');
+      return;
+    }
+
+    setTemplatesAdminLoading(true);
+    try {
+      await upsertContratoTemplateAdmin({
+        id: templateForm.id || undefined,
+        slug,
+        titulo,
+        corpo,
+        active: templateForm.active,
+      } as any);
+      addToast('Template salvo.', 'success');
+      const all = await listContratoTemplatesAdmin({ includeInactive: true });
+      setTemplatesAdminRows(all as any);
+      const saved = all.find((x: any) => x.slug === slug) ?? null;
+      if (saved) selectTemplateForEdit(saved as any);
+      if (form.id) await loadDocsAndTemplates(form.id);
+    } catch (e: any) {
+      addToast(e?.message || 'Falha ao salvar template.', 'error');
+    } finally {
+      setTemplatesAdminLoading(false);
+    }
+  };
+
+  const removeTemplate = async () => {
+    if (!templateForm.id) return;
+    const t = templatesAdminRows.find((x) => x.id === templateForm.id) || null;
+    const ok = window.confirm(`Remover o template “${t?.titulo || templateForm.slug}”?`);
+    if (!ok) return;
+    setTemplatesAdminLoading(true);
+    try {
+      await deleteContratoTemplateAdmin(templateForm.id);
+      addToast('Template removido.', 'success');
+      const all = await listContratoTemplatesAdmin({ includeInactive: true });
+      setTemplatesAdminRows(all as any);
+      if (all.length > 0) selectTemplateForEdit(all[0] as any);
+      else newTemplate();
+      if (form.id) await loadDocsAndTemplates(form.id);
+    } catch (e: any) {
+      addToast(e?.message || 'Falha ao remover template.', 'error');
+    } finally {
+      setTemplatesAdminLoading(false);
+    }
   };
 
   const generateDocumento = async () => {
@@ -1220,14 +1346,24 @@ export default function ContratosPage() {
                   Gere um link público (token) para o cliente visualizar o contrato e registrar o aceite. O token só é exibido uma vez.
                 </div>
               </div>
-              <button
-                type="button"
-                onClick={() => (form.id ? loadDocsAndTemplates(form.id) : null)}
-                disabled={!form.id || templatesLoading || documentsLoading || docActionLoading}
-                className="rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm hover:bg-gray-50 disabled:opacity-50"
-              >
-                Atualizar
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={openTemplatesAdmin}
+                  disabled={templatesAdminLoading}
+                  className="rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm hover:bg-gray-50 disabled:opacity-50"
+                >
+                  Templates
+                </button>
+                <button
+                  type="button"
+                  onClick={() => (form.id ? loadDocsAndTemplates(form.id) : null)}
+                  disabled={!form.id || templatesLoading || documentsLoading || docActionLoading}
+                  className="rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm hover:bg-gray-50 disabled:opacity-50"
+                >
+                  Atualizar
+                </button>
+              </div>
             </div>
 
             {!form.id ? (
@@ -1404,6 +1540,138 @@ export default function ContratosPage() {
               {saving ? 'Salvando…' : 'Salvar'}
             </button>
           </div>
+        </div>
+      </Modal>
+
+      <Modal
+        isOpen={templatesAdminOpen}
+        onClose={() => setTemplatesAdminOpen(false)}
+        title="Templates de contrato"
+        size="4xl"
+        bodyClassName="p-6 md:p-8"
+      >
+        <div className="space-y-4">
+          <div className="text-xs text-gray-600">
+            Variáveis suportadas: <span className="font-mono">{'{{empresa_nome}}'}</span>, <span className="font-mono">{'{{cliente_nome}}'}</span>,{' '}
+            <span className="font-mono">{'{{cliente_email}}'}</span>, <span className="font-mono">{'{{contrato_descricao}}'}</span>,{' '}
+            <span className="font-mono">{'{{contrato_numero}}'}</span>, <span className="font-mono">{'{{valor_mensal}}'}</span>,{' '}
+            <span className="font-mono">{'{{data_inicio}}'}</span>, <span className="font-mono">{'{{data_fim}}'}</span>,{' '}
+            <span className="font-mono">{'{{data_hoje}}'}</span>.
+          </div>
+
+          {templatesAdminLoading ? (
+            <div className="flex items-center gap-2 text-sm text-gray-600">
+              <Loader2 className="h-4 w-4 animate-spin" /> Carregando…
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-6 gap-4">
+              <div className="md:col-span-2 rounded-xl border border-gray-200 bg-white p-3">
+                <div className="flex items-center justify-between gap-2">
+                  <div className="text-sm font-semibold text-gray-900">Lista</div>
+                  <button
+                    type="button"
+                    onClick={newTemplate}
+                    className="rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs hover:bg-gray-50"
+                  >
+                    Novo
+                  </button>
+                </div>
+                <div className="mt-3 space-y-2 max-h-[420px] overflow-auto">
+                  {templatesAdminRows.length === 0 ? (
+                    <div className="text-sm text-gray-600">Nenhum template encontrado.</div>
+                  ) : (
+                    templatesAdminRows.map((t) => (
+                      <button
+                        type="button"
+                        key={t.id}
+                        onClick={() => selectTemplateForEdit(t)}
+                        className={`w-full text-left rounded-lg border px-3 py-2 ${
+                          templateForm.id === t.id ? 'border-blue-200 bg-blue-50' : 'border-gray-200 bg-white hover:bg-gray-50'
+                        }`}
+                      >
+                        <div className="text-sm font-semibold text-gray-900">{t.titulo}</div>
+                        <div className="text-[11px] text-gray-600">
+                          <span className="font-mono">{t.slug}</span> • {t.active ? 'ativo' : 'inativo'}
+                        </div>
+                      </button>
+                    ))
+                  )}
+                </div>
+              </div>
+
+              <div className="md:col-span-4 rounded-xl border border-gray-200 bg-white p-4">
+                <div className="grid grid-cols-1 md:grid-cols-6 gap-3">
+                  <div className="md:col-span-3">
+                    <div className="text-xs text-gray-600">Título</div>
+                    <input
+                      value={templateForm.titulo}
+                      onChange={(e) => {
+                        const nextTitulo = e.target.value;
+                        setTemplateForm((s) => ({ ...s, titulo: nextTitulo, slug: s.slug ? s.slug : slugify(nextTitulo) }));
+                      }}
+                      className="mt-1 w-full rounded-lg border border-gray-200 bg-white p-2 text-sm"
+                      disabled={templatesAdminLoading}
+                    />
+                  </div>
+                  <div className="md:col-span-2">
+                    <div className="text-xs text-gray-600">Slug</div>
+                    <input
+                      value={templateForm.slug}
+                      onChange={(e) => setTemplateForm((s) => ({ ...s, slug: slugify(e.target.value) }))}
+                      className="mt-1 w-full rounded-lg border border-gray-200 bg-white p-2 text-sm font-mono"
+                      disabled={templatesAdminLoading}
+                    />
+                  </div>
+                  <div className="md:col-span-1 flex items-end">
+                    <label className="flex items-center gap-2 text-sm text-gray-700">
+                      <input
+                        type="checkbox"
+                        checked={templateForm.active}
+                        onChange={(e) => setTemplateForm((s) => ({ ...s, active: e.target.checked }))}
+                        disabled={templatesAdminLoading}
+                      />
+                      Ativo
+                    </label>
+                  </div>
+                </div>
+
+                <div className="mt-3">
+                  <div className="text-xs text-gray-600">Corpo</div>
+                  <textarea
+                    value={templateForm.corpo}
+                    onChange={(e) => setTemplateForm((s) => ({ ...s, corpo: e.target.value }))}
+                    rows={14}
+                    className="mt-1 w-full rounded-lg border border-gray-200 bg-white p-2 text-sm font-mono"
+                    disabled={templatesAdminLoading}
+                  />
+                </div>
+
+                <div className="mt-3 flex items-center justify-between">
+                  <div className="text-xs text-gray-500">{templateForm.id ? 'Editando existente' : 'Novo template'}</div>
+                  <div className="flex items-center gap-2">
+                    {templateForm.id ? (
+                      <button
+                        type="button"
+                        onClick={removeTemplate}
+                        disabled={templatesAdminLoading}
+                        className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-800 hover:bg-rose-100 disabled:opacity-50"
+                      >
+                        Remover
+                      </button>
+                    ) : null}
+                    <button
+                      type="button"
+                      onClick={saveTemplate}
+                      disabled={templatesAdminLoading}
+                      className="rounded-lg bg-blue-600 px-3 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-50"
+                    >
+                      Salvar
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       </Modal>
     </div>
