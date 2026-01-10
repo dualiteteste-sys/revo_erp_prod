@@ -1,7 +1,7 @@
 import { callRpc } from '@/lib/api';
 import { faker } from '@faker-js/faker';
 
-export type TipoCentroCusto = 'receita' | 'despesa' | 'investimento' | 'outro';
+export type TipoCentroCusto = 'receita' | 'custo_fixo' | 'custo_variavel' | 'investimento';
 
 export type CentroDeCusto = {
     id: string;
@@ -19,6 +19,7 @@ export type CentroDeCusto = {
     // Campos virtuais retornados pelo GET details
     parent_nome?: string;
     has_children?: boolean;
+    is_system_root?: boolean;
 };
 
 export type CentroDeCustoPayload = Partial<Omit<CentroDeCusto, 'id' | 'empresa_id' | 'created_at' | 'updated_at' | 'parent_nome' | 'has_children'>> & {
@@ -35,6 +36,7 @@ export type CentroDeCustoListItem = {
     ordem: number;
     ativo: boolean;
     observacoes: string | null;
+    is_system_root?: boolean;
     total_count: number;
 };
 
@@ -43,6 +45,7 @@ export async function listCentrosDeCusto(options: {
     pageSize: number;
     searchTerm: string;
     status: string | null; // 'ativo' | 'inativo' | null from UI filter
+    tipo?: TipoCentroCusto | null;
     sortBy?: { column: string; ascending: boolean };
 }): Promise<{ data: CentroDeCustoListItem[]; count: number }> {
     const { page, pageSize, searchTerm, status } = options;
@@ -59,7 +62,7 @@ export async function listCentrosDeCusto(options: {
             p_offset: offset,
             p_search: searchTerm || null,
             p_ativo: ativo,
-            p_tipo: null, 
+            p_tipo: options.tipo ?? null,
         });
 
         if (!data || data.length === 0) {
@@ -72,6 +75,24 @@ export async function listCentrosDeCusto(options: {
         console.error('[SERVICE][LIST_CENTROS_DE_CUSTO]', error);
         throw new Error('Não foi possível listar os centros de custo.');
     }
+}
+
+export async function listAllCentrosDeCusto(params?: { status?: 'ativo' | 'inativo' | null; tipo?: TipoCentroCusto | null }): Promise<CentroDeCustoListItem[]> {
+  const status = params?.status ?? null;
+  const tipo = params?.tipo ?? null;
+  const pageSize = 200;
+  const out: CentroDeCustoListItem[] = [];
+
+  let page = 1;
+  let total = 0;
+  do {
+    const { data, count } = await listCentrosDeCusto({ page, pageSize, searchTerm: '', status, tipo });
+    out.push(...data);
+    total = count;
+    page += 1;
+  } while (out.length < total);
+
+  return out;
 }
 
 export async function getCentroDeCustoDetails(id: string): Promise<CentroDeCusto> {
@@ -123,11 +144,36 @@ export async function searchCentrosDeCusto(query: string): Promise<CentroDeCusto
 }
 
 export async function seedCentrosDeCusto(): Promise<void> {
-  const promises = Array.from({ length: 5 }).map(() => {
+  const existing = await listAllCentrosDeCusto({ status: 'ativo' });
+  const byCode = new Map<string, CentroDeCustoListItem>();
+  for (const r of existing) {
+    const c = String(r.codigo ?? '').trim();
+    if (!c) continue;
+    byCode.set(c, r);
+  }
+
+  const roots = ['1', '2', '3', '4'].map((c) => byCode.get(c)).filter(Boolean) as CentroDeCustoListItem[];
+  if (roots.length !== 4) throw new Error('Raízes padrão (1/2/3/4) não encontradas.');
+
+  const usedCodes = new Set(existing.map((r) => String(r.codigo ?? '').trim()).filter(Boolean));
+  const makeCode = (rootCode: string) => {
+    for (let i = 0; i < 20; i += 1) {
+      const code = `${rootCode}.${faker.string.numeric(2)}.${faker.string.numeric(2)}`;
+      if (!usedCodes.has(code)) return code;
+    }
+    return `${rootCode}.${Date.now()}`;
+  };
+
+  const promises = Array.from({ length: 5 }).map(async () => {
+    const root = faker.helpers.arrayElement(roots);
+    const rootCode = String(root.codigo ?? '').trim() || '3';
+    const codigo = makeCode(rootCode);
+    usedCodes.add(codigo);
+
     const payload: CentroDeCustoPayload = {
+      parent_id: root.id,
       nome: faker.commerce.department(),
-      codigo: faker.string.numeric(3),
-      tipo: faker.helpers.arrayElement(['receita', 'despesa', 'investimento']),
+      codigo,
       ativo: true,
       observacoes: faker.lorem.sentence(),
     };

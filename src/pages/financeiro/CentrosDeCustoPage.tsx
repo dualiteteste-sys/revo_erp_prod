@@ -1,37 +1,28 @@
-import React, { useState } from 'react';
-import { useCentrosDeCusto } from '@/hooks/useCentrosDeCusto';
+import React, { useEffect, useMemo, useState } from 'react';
+import { useAuth } from '@/contexts/AuthProvider';
 import { useToast } from '@/contexts/ToastProvider';
 import * as centrosDeCustoService from '@/services/centrosDeCusto';
-import { Loader2, PlusCircle, Search, Landmark, DatabaseBackup } from 'lucide-react';
-import Pagination from '@/components/ui/Pagination';
+import { ClipboardPaste, Loader2, PlusCircle, Search, Landmark, DatabaseBackup } from 'lucide-react';
 import ConfirmationModal from '@/components/ui/ConfirmationModal';
 import Modal from '@/components/ui/Modal';
-import CentrosDeCustoTable from '@/components/financeiro/centros-de-custo/CentrosDeCustoTable';
 import CentrosDeCustoFormPanel from '@/components/financeiro/centros-de-custo/CentrosDeCustoFormPanel';
+import CentrosDeCustoTreeTable from '@/components/financeiro/centros-de-custo/CentrosDeCustoTreeTable';
 import Select from '@/components/ui/forms/Select';
 import { Button } from '@/components/ui/button';
 import { isSeedEnabled } from '@/utils/seed';
+import CentrosDeCustoBulkCreateModal from '@/components/financeiro/centros-de-custo/CentrosDeCustoBulkCreateModal';
 
 const CentrosDeCustoPage: React.FC = () => {
   const enableSeed = isSeedEnabled();
-  const {
-    centros,
-    loading,
-    error,
-    count,
-    page,
-    pageSize,
-    searchTerm,
-    filterStatus,
-    sortBy,
-    setPage,
-    setPageSize,
-    setSearchTerm,
-    setFilterStatus,
-    setSortBy,
-    refresh,
-  } = useCentrosDeCusto();
+  const { activeEmpresa } = useAuth();
   const { addToast } = useToast();
+
+  const [allCentros, setAllCentros] = useState<centrosDeCustoService.CentroDeCustoListItem[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [filterStatus, setFilterStatus] = useState<string | null>(null);
+  const [filterTipo, setFilterTipo] = useState<centrosDeCustoService.TipoCentroCusto | null>(null);
 
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [selectedCentro, setSelectedCentro] = useState<centrosDeCustoService.CentroDeCusto | null>(null);
@@ -40,6 +31,81 @@ const CentrosDeCustoPage: React.FC = () => {
   const [isDeleting, setIsDeleting] = useState(false);
   const [isFetchingDetails, setIsFetchingDetails] = useState(false);
   const [isSeeding, setIsSeeding] = useState(false);
+  const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
+  const [isBulkOpen, setIsBulkOpen] = useState(false);
+
+  const refresh = async () => {
+    if (!activeEmpresa) {
+      setAllCentros([]);
+      return;
+    }
+    setLoading(true);
+    setError(null);
+    try {
+      const rows = await centrosDeCustoService.listAllCentrosDeCusto({
+        status: (filterStatus as any) ?? null,
+        tipo: filterTipo ?? null,
+      });
+      setAllCentros(rows);
+    } catch (e: any) {
+      setAllCentros([]);
+      setError(e?.message || 'Não foi possível carregar centros de custo.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    void refresh();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeEmpresa, filterStatus, filterTipo]);
+
+  const normalizedSearch = useMemo(() => searchTerm.trim().toLowerCase(), [searchTerm]);
+  const centros = useMemo(() => {
+    if (!normalizedSearch) return allCentros;
+
+    const byId = new Map(allCentros.map((r) => [r.id, r]));
+    const keep = new Set<string>();
+
+    const matches = allCentros.filter((r) => {
+      const hay = `${r.codigo ?? ''} ${r.nome ?? ''}`.toLowerCase();
+      return hay.includes(normalizedSearch);
+    });
+    for (const m of matches) {
+      keep.add(m.id);
+      let cur = m.parent_id;
+      while (cur) {
+        if (keep.has(cur)) break;
+        keep.add(cur);
+        cur = byId.get(cur)?.parent_id ?? null;
+      }
+    }
+
+    // sempre inclui raízes (1..4), se existirem
+    for (const r of allCentros) {
+      if (r.parent_id === null && ['1', '2', '3', '4'].includes(String(r.codigo ?? ''))) keep.add(r.id);
+    }
+
+    return allCentros.filter((r) => keep.has(r.id));
+  }, [allCentros, normalizedSearch]);
+
+  const allIdsWithChildren = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const c of centros) {
+      if (!c.parent_id) continue;
+      map.set(c.parent_id, (map.get(c.parent_id) ?? 0) + 1);
+    }
+    return new Set([...map.entries()].filter(([, n]) => n > 0).map(([id]) => id));
+  }, [centros]);
+
+  useEffect(() => {
+    if (centros.length === 0) return;
+    setExpandedIds((prev) => {
+      if (prev.size > 0) return prev;
+      const roots = centros.filter((c) => !c.parent_id).map((c) => c.id);
+      return new Set(roots);
+    });
+  }, [centros]);
 
   const handleOpenForm = async (centro: centrosDeCustoService.CentroDeCustoListItem | null = null) => {
     if (centro?.id) {
@@ -67,7 +133,7 @@ const CentrosDeCustoPage: React.FC = () => {
   };
 
   const handleSaveSuccess = () => {
-    refresh();
+    void refresh();
     handleCloseForm();
   };
 
@@ -87,7 +153,7 @@ const CentrosDeCustoPage: React.FC = () => {
     try {
       await centrosDeCustoService.deleteCentroDeCusto(centroToDelete.id);
       addToast('Centro de Custo excluído com sucesso!', 'success');
-      refresh();
+      await refresh();
       handleCloseDeleteModal();
     } catch (e: any) {
       addToast(e.message || 'Erro ao excluir.', 'error');
@@ -96,19 +162,12 @@ const CentrosDeCustoPage: React.FC = () => {
     }
   };
 
-  const handleSort = (column: string) => {
-    setSortBy(prev => ({
-      column,
-      ascending: prev.column === column ? !prev.ascending : true,
-    }));
-  };
-
   const handleSeed = async () => {
     setIsSeeding(true);
     try {
       await centrosDeCustoService.seedCentrosDeCusto();
       addToast('5 Centros de Custo criados com sucesso!', 'success');
-      refresh();
+      await refresh();
     } catch (e: any) {
       addToast(e.message || 'Erro ao popular dados.', 'error');
     } finally {
@@ -127,6 +186,10 @@ const CentrosDeCustoPage: React.FC = () => {
               Popular Dados
             </Button>
           ) : null}
+          <Button onClick={() => setIsBulkOpen(true)} disabled={loading} variant="outline" className="gap-2">
+            <ClipboardPaste size={20} />
+            Criar em lote
+          </Button>
           <Button onClick={() => handleOpenForm()} className="gap-2">
             <PlusCircle size={20} />
             Novo Centro de Custo
@@ -154,6 +217,17 @@ const CentrosDeCustoPage: React.FC = () => {
           <option value="ativo">Ativo</option>
           <option value="inativo">Inativo</option>
         </Select>
+        <Select
+          value={filterTipo || ''}
+          onChange={(e) => setFilterTipo((e.target.value as any) || null)}
+          className="min-w-[220px]"
+        >
+          <option value="">Todas as categorias</option>
+          <option value="receita">Receitas</option>
+          <option value="custo_variavel">Custos Variáveis</option>
+          <option value="custo_fixo">Custos Fixos</option>
+          <option value="investimento">Investimentos</option>
+        </Select>
       </div>
 
       <div className="bg-white rounded-lg shadow overflow-hidden flex-1 min-h-0">
@@ -170,24 +244,24 @@ const CentrosDeCustoPage: React.FC = () => {
             {searchTerm && <p className="text-sm">Tente ajustar sua busca.</p>}
           </div>
         ) : (
-          <CentrosDeCustoTable centros={centros} onEdit={handleOpenForm} onDelete={handleOpenDeleteModal} sortBy={sortBy} onSort={handleSort} />
+          <CentrosDeCustoTreeTable
+            centros={centros}
+            expandedIds={expandedIds}
+            onToggleExpand={(id) => {
+              setExpandedIds((prev) => {
+                const next = new Set(prev);
+                if (next.has(id)) next.delete(id);
+                else next.add(id);
+                return next;
+              });
+            }}
+            onExpandAll={() => setExpandedIds(new Set([...allIdsWithChildren]))}
+            onCollapseAll={() => setExpandedIds(new Set(centros.filter((c) => !c.parent_id).map((c) => c.id)))}
+            onEdit={handleOpenForm}
+            onDelete={handleOpenDeleteModal}
+          />
         )}
       </div>
-
-      {count > 0 ? (
-        <div className="sticky bottom-0 z-20 mt-4 border-t border-gray-100 bg-white/95 backdrop-blur supports-[backdrop-filter]:bg-white/80">
-          <Pagination
-            currentPage={page}
-            totalCount={count}
-            pageSize={pageSize}
-            onPageChange={setPage}
-            onPageSizeChange={(next) => {
-              setPage(1);
-              setPageSize(next);
-            }}
-          />
-        </div>
-      ) : null}
 
       <Modal isOpen={isFormOpen} onClose={handleCloseForm} title={selectedCentro ? 'Editar Centro de Custo' : 'Novo Centro de Custo'}>
         {isFetchingDetails ? (
@@ -198,6 +272,15 @@ const CentrosDeCustoPage: React.FC = () => {
           <CentrosDeCustoFormPanel centro={selectedCentro} onSaveSuccess={handleSaveSuccess} onClose={handleCloseForm} />
         )}
       </Modal>
+
+      <CentrosDeCustoBulkCreateModal
+        isOpen={isBulkOpen}
+        onClose={() => setIsBulkOpen(false)}
+        onCreated={() => {
+          setIsBulkOpen(false);
+          void refresh();
+        }}
+      />
 
       <ConfirmationModal
         isOpen={isDeleteModalOpen}

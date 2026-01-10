@@ -75,9 +75,9 @@ export default function PedidoVendaFormPanel({ vendaId, onSaveSuccess, onClose, 
   const [loadingDiscountAudit, setLoadingDiscountAudit] = useState(false);
 
   useEffect(() => {
-    if (vendaId) {
-      loadDetails();
-    }
+    if (!vendaId) return;
+    void loadDetails({ id: vendaId, closeOnError: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [vendaId]);
 
   useEffect(() => {
@@ -111,9 +111,15 @@ export default function PedidoVendaFormPanel({ vendaId, onSaveSuccess, onClose, 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mode, canFinalizePdv, formData.id, formData.status, isSaving, addingSku]);
 
-  const loadDetails = async () => {
+  const loadDetails = async (params?: { id?: string | null; closeOnError?: boolean; silent?: boolean }) => {
+    const targetId = params?.id ?? vendaId ?? formData.id ?? null;
+    if (!targetId) return;
+
     try {
-      const data = await getVendaDetails(vendaId!);
+      if (!params?.silent) setLoading(true);
+
+      const data = await getVendaDetails(targetId);
+      if (!data) throw new Error('Pedido não encontrado.');
       setFormData(data);
 
       const canal = (data as any)?.canal;
@@ -133,9 +139,9 @@ export default function PedidoVendaFormPanel({ vendaId, onSaveSuccess, onClose, 
     } catch (e) {
       console.error(e);
       addToast('Erro ao carregar pedido.', 'error');
-      onClose();
+      if (params?.closeOnError) onClose();
     } finally {
-      setLoading(false);
+      if (!params?.silent) setLoading(false);
     }
   };
 
@@ -307,7 +313,7 @@ export default function PedidoVendaFormPanel({ vendaId, onSaveSuccess, onClose, 
 
     try {
       await manageVendaItem(currentId!, null, item.id, 1, item.preco_venda || 0, 0, 'add');
-      await loadDetails();
+      await loadDetails({ id: currentId, silent: true });
       addToast('Item adicionado.', 'success');
     } catch (e: any) {
       addToast(e.message, 'error');
@@ -360,10 +366,10 @@ export default function PedidoVendaFormPanel({ vendaId, onSaveSuccess, onClose, 
     }
   };
 
-  const handleRemoveItem = async (itemId: string) => {
+  const handleRemoveItem = async (itemId: string, produtoId?: string | null) => {
     try {
-      await manageVendaItem(formData.id!, itemId, '', 0, 0, 0, 'remove');
-      await loadDetails();
+      await manageVendaItem(formData.id!, itemId, produtoId ?? null, 0, 0, 0, 'remove');
+      await loadDetails({ id: formData.id, silent: true });
       addToast('Item removido.', 'success');
     } catch (e: any) {
       addToast(e.message, 'error');
@@ -443,26 +449,55 @@ export default function PedidoVendaFormPanel({ vendaId, onSaveSuccess, onClose, 
     }
   };
 
-  const handleCancel = async () => {
-    const ok = await confirm({
-      title: 'Cancelar pedido',
-      description: 'Cancelar este pedido? Essa ação pode ser revertida apenas reabrindo um novo pedido.',
-      confirmText: 'Cancelar pedido',
-      cancelText: 'Voltar',
-      variant: 'danger',
-    });
-    if (!ok) return;
-    setIsSaving(true);
-    try {
-      await saveVenda({ id: formData.id!, status: 'cancelado' });
-      addToast('Pedido cancelado.', 'success');
-      onSaveSuccess();
-    } catch (e: any) {
-      addToast(e.message, 'error');
-    } finally {
-      setIsSaving(false);
-    }
-  };
+	  const handleCancel = async () => {
+	    const ok = await confirm({
+	      title: 'Cancelar pedido',
+	      description: 'Cancelar este pedido? Essa ação pode ser revertida apenas reabrindo um novo pedido.',
+	      confirmText: 'Cancelar pedido',
+	      cancelText: 'Voltar',
+	      variant: 'danger',
+	    });
+	    if (!ok) return;
+	    setIsSaving(true);
+	    try {
+	      if (!formData.id) {
+	        addToast('Pedido inválido.', 'error');
+	        return;
+	      }
+
+	      let clienteId = formData.cliente_id ?? null;
+	      if (!clienteId) {
+	        const details = await getVendaDetails(formData.id);
+	        clienteId = details?.cliente_id ?? null;
+	      }
+	      if (!clienteId) {
+	        addToast('Cliente é obrigatório para cancelar o pedido.', 'error');
+	        return;
+	      }
+
+	      const payload: VendaPayload = {
+	        id: formData.id,
+	        cliente_id: clienteId,
+	        status: 'cancelado',
+	        data_emissao: formData.data_emissao ?? new Date().toISOString().split('T')[0],
+	        data_entrega: formData.data_entrega ?? null,
+	        frete: toMoney(formData.frete),
+	        desconto: toMoney(formData.desconto),
+	        condicao_pagamento: formData.condicao_pagamento ?? null,
+	        observacoes: formData.observacoes ?? null,
+	        vendedor_id: formData.vendedor_id ?? null,
+	        comissao_percent: Math.max(0, Math.min(100, Number(formData.comissao_percent ?? 0) || 0)),
+	      };
+
+	      await saveVenda(payload);
+	      addToast('Pedido cancelado.', 'success');
+	      onSaveSuccess();
+	    } catch (e: any) {
+	      addToast(e.message, 'error');
+	    } finally {
+	      setIsSaving(false);
+	    }
+	  };
 
   const isLocked = formData.status !== 'orcamento';
   const isMarketplaceOrder = (formData as any)?.canal === 'marketplace';
@@ -712,7 +747,10 @@ export default function PedidoVendaFormPanel({ vendaId, onSaveSuccess, onClose, 
                     </td>
                     {!isLocked && (
                       <td className="px-3 py-2 text-center">
-                        <button onClick={() => handleRemoveItem(item.id)} className="text-red-500 hover:text-red-700 p-1 rounded hover:bg-red-50">
+                        <button
+                          onClick={() => handleRemoveItem(item.id, item.produto_id)}
+                          className="text-red-500 hover:text-red-700 p-1 rounded hover:bg-red-50"
+                        >
                           <Trash2 size={16} />
                         </button>
                       </td>
