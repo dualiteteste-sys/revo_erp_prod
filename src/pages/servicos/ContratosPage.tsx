@@ -4,6 +4,7 @@ import Modal from '@/components/ui/Modal';
 import { useToast } from '@/contexts/ToastProvider';
 import ClientAutocomplete from '@/components/common/ClientAutocomplete';
 import ServiceAutocomplete from '@/components/common/ServiceAutocomplete';
+import UnidadeMedidaSelect from '@/components/common/UnidadeMedidaSelect';
 import { getPartners, type PartnerListItem } from '@/services/partners';
 import { listAllCentrosDeCusto, type CentroDeCustoListItem } from '@/services/centrosDeCusto';
 import { deleteContrato, listContratos, upsertContrato, type ServicoContrato, type ServicoContratoStatus } from '@/services/servicosMvp';
@@ -483,7 +484,7 @@ export default function ContratosPage() {
         titulo,
         descricao: itemForm.descricao.trim() || null,
         quantidade: qtd,
-        unidade: itemForm.unidade.trim() || null,
+        unidade: itemForm.unidade.trim() ? itemForm.unidade.trim().toUpperCase() : null,
         valor_unitario: valor,
         recorrente: itemForm.recorrente,
       };
@@ -1379,11 +1380,15 @@ export default function ContratosPage() {
                   </div>
                   <div className="md:col-span-1">
                     <div className="text-[11px] text-gray-600">Unid.</div>
-                    <input
+                    <UnidadeMedidaSelect
+                      label={null}
+                      name="item_unidade"
+                      uiSize="sm"
+                      className="mt-1"
                       value={itemForm.unidade}
-                      onChange={(e) => setItemForm((s) => ({ ...s, unidade: e.target.value }))}
-                      className="mt-1 w-full rounded-lg border border-gray-200 bg-white p-2 text-sm"
+                      onChange={(sigla) => setItemForm((s) => ({ ...s, unidade: sigla || '' }))}
                       disabled={itensActionLoading}
+                      placeholder="—"
                     />
                   </div>
                   <div className="md:col-span-2">

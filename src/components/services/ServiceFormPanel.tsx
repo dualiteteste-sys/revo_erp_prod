@@ -7,6 +7,7 @@ import Select from '../ui/forms/Select';
 import TextArea from '../ui/forms/TextArea';
 import { useNumericField } from '@/hooks/useNumericField';
 import { Button } from '@/components/ui/button';
+import UnidadeMedidaSelect from '@/components/common/UnidadeMedidaSelect';
 
 interface ServiceFormPanelProps {
   service: Partial<Service> | null;
@@ -69,7 +70,7 @@ const ServiceFormPanel: React.FC<ServiceFormPanelProps> = ({ service, onSaveSucc
         ...formData,
         descricao: String(formData.descricao).trim(),
         codigo: formData.codigo ? String(formData.codigo).trim() : null,
-        unidade: formData.unidade ? String(formData.unidade).trim() : null,
+        unidade: formData.unidade ? String(formData.unidade).trim().toUpperCase() : null,
         nbs: nbs ? nbs.replace(/\D/g, '') : null,
       };
       let savedService: Service;
@@ -157,12 +158,12 @@ const ServiceFormPanel: React.FC<ServiceFormPanelProps> = ({ service, onSaveSucc
               </div>
 
               <div>
-                <Input
-                  label="Unidade"
+                <UnidadeMedidaSelect
+                  label="Unidade (opcional)"
                   name="unidade"
                   value={formData.unidade || ''}
-                  onChange={e => handleFormChange('unidade', e.target.value)}
-                  placeholder="Ex.: H, UN, PÇ..."
+                  onChange={(sigla) => handleFormChange('unidade', sigla)}
+                  placeholder="Selecione..."
                 />
               </div>
             </>
