@@ -1136,7 +1136,7 @@ export default function ContratosPage() {
                     <Input
                       label="Valor mensal"
                       name="billing_valor_mensal"
-                      uiSize="sm"
+                      size="sm"
                       inputMode="numeric"
                       startAdornment="R$"
                       {...billingValorMensalProps}
@@ -1257,7 +1257,7 @@ export default function ContratosPage() {
                       <Input
                         label="Valor"
                         name="avulso_valor"
-                        uiSize="sm"
+                        size="sm"
                         inputMode="numeric"
                         startAdornment="R$"
                         {...avulsoValorProps}
@@ -1395,7 +1395,7 @@ export default function ContratosPage() {
                     <Input
                       label="Valor unit."
                       name="item_valor_unitario"
-                      uiSize="sm"
+                      size="sm"
                       inputMode="numeric"
                       startAdornment="R$"
                       {...itemValorUnitarioProps}
