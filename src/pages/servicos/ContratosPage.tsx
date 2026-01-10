@@ -4,7 +4,16 @@ import Modal from '@/components/ui/Modal';
 import { useToast } from '@/contexts/ToastProvider';
 import { getPartners, type PartnerListItem } from '@/services/partners';
 import { deleteContrato, listContratos, upsertContrato, type ServicoContrato, type ServicoContratoStatus } from '@/services/servicosMvp';
-import { supabase } from '@/lib/supabaseClient';
+import {
+  generateReceivables as rpcGenerateReceivables,
+  generateSchedule as rpcGenerateSchedule,
+  getBillingRuleByContratoId,
+  listScheduleByContratoId,
+  type BillingRuleTipo,
+  type ServicosContratoBillingRule,
+  type ServicosContratoBillingSchedule,
+  upsertBillingRule,
+} from '@/services/servicosContratosBilling';
 
 type FormState = {
   id: string | null;
@@ -18,29 +27,8 @@ type FormState = {
   observacoes: string;
 };
 
-type BillingRuleTipo = 'mensal' | 'avulso';
-type BillingRuleRow = {
-  id: string;
-  contrato_id: string;
-  tipo: BillingRuleTipo;
-  ativo: boolean;
-  valor_mensal: number;
-  dia_vencimento: number;
-  primeira_competencia: string; // date
-  centro_de_custo_id: string | null;
-};
-
-type BillingScheduleRow = {
-  id: string;
-  contrato_id: string;
-  kind: BillingRuleTipo;
-  competencia: string | null;
-  data_vencimento: string;
-  valor: number;
-  status: 'previsto' | 'gerado' | 'cancelado';
-  conta_a_receber_id: string | null;
-  cobranca_id: string | null;
-};
+type BillingRuleRow = ServicosContratoBillingRule;
+type BillingScheduleRow = ServicosContratoBillingSchedule;
 
 const emptyForm: FormState = {
   id: null,
@@ -146,12 +134,7 @@ export default function ContratosPage() {
   const loadBilling = async (row: Pick<ServicoContrato, 'id' | 'valor_mensal' | 'data_inicio'>) => {
     setBillingLoading(true);
     try {
-      const { data: rule, error: ruleError } = await (supabase as any)
-        .from('servicos_contratos_billing_rules')
-        .select('*')
-        .eq('contrato_id', row.id)
-        .maybeSingle();
-      if (ruleError) throw ruleError;
+      const rule = await getBillingRuleByContratoId(row.id);
 
       if (rule) {
         setBillingRule(rule as BillingRuleRow);
@@ -170,14 +153,7 @@ export default function ContratosPage() {
         });
       }
 
-      const { data: sch, error: schError } = await (supabase as any)
-        .from('servicos_contratos_billing_schedule')
-        .select('*')
-        .eq('contrato_id', row.id)
-        .order('data_vencimento', { ascending: true })
-        .limit(24);
-      if (schError) throw schError;
-
+      const sch = await listScheduleByContratoId(row.id, 24);
       setSchedule((sch ?? []) as BillingScheduleRow[]);
     } catch (e: any) {
       addToast(e?.message || 'Falha ao carregar faturamento do contrato.', 'error');
@@ -222,13 +198,8 @@ export default function ContratosPage() {
         primeira_competencia: comp,
         centro_de_custo_id: billingRule.centro_de_custo_id || null,
       };
-      const { data, error } = await (supabase as any)
-        .from('servicos_contratos_billing_rules')
-        .upsert(payload, { onConflict: 'empresa_id,contrato_id' })
-        .select()
-        .single();
-      if (error) throw error;
-      setBillingRule(data as BillingRuleRow);
+      const savedRule = await upsertBillingRule(payload);
+      setBillingRule(savedRule as BillingRuleRow);
       addToast('Regra de faturamento salva.', 'success');
     } catch (e: any) {
       addToast(e?.message || 'Falha ao salvar regra de faturamento.', 'error');
@@ -241,12 +212,8 @@ export default function ContratosPage() {
     if (!form.id) return;
     setBillingActionLoading(true);
     try {
-      const { data, error } = await (supabase as any).rpc('servicos_contratos_billing_generate_schedule', {
-        p_contrato_id: form.id,
-        p_months_ahead: 12,
-      });
-      if (error) throw error;
-      addToast(`Agenda atualizada. Inseridos: ${data?.inserted ?? 0}`, 'success');
+      const res = await rpcGenerateSchedule({ contratoId: form.id, monthsAhead: 12 });
+      addToast(`Agenda atualizada. Inseridos: ${res.inserted}`, 'success');
       await loadBilling({ id: form.id, valor_mensal: Number(form.valor_mensal ?? 0), data_inicio: form.data_inicio || null });
     } catch (e: any) {
       addToast(e?.message || 'Falha ao gerar agenda.', 'error');
@@ -259,12 +226,8 @@ export default function ContratosPage() {
     if (!form.id) return;
     setBillingActionLoading(true);
     try {
-      const { data, error } = await (supabase as any).rpc('servicos_contratos_billing_generate_receivables', {
-        p_contrato_id: form.id,
-        p_until: new Date().toISOString().slice(0, 10),
-      });
-      if (error) throw error;
-      addToast(`Títulos gerados: ${data?.created ?? 0}`, 'success');
+      const res = await rpcGenerateReceivables({ contratoId: form.id, until: new Date().toISOString().slice(0, 10) });
+      addToast(`Títulos gerados: ${res.created}`, 'success');
       await loadBilling({ id: form.id, valor_mensal: Number(form.valor_mensal ?? 0), data_inicio: form.data_inicio || null });
     } catch (e: any) {
       addToast(e?.message || 'Falha ao gerar contas a receber.', 'error');
