@@ -1,6 +1,10 @@
-import React from 'react';
+import React, { useMemo, useState } from 'react';
 import { Movimentacao } from '@/services/treasury';
 import { Edit, Trash2, ArrowUpRight, ArrowDownLeft, CheckCircle, Circle } from 'lucide-react';
+import ResizableSortableTh, { type SortState } from '@/components/ui/table/ResizableSortableTh';
+import TableColGroup from '@/components/ui/table/TableColGroup';
+import { useTableColumnWidths, type TableColumnWidthDef } from '@/components/ui/table/useTableColumnWidths';
+import { sortRows, toggleSort } from '@/components/ui/table/sortUtils';
 
 interface Props {
   movimentacoes: Movimentacao[];
@@ -9,22 +13,97 @@ interface Props {
 }
 
 export default function MovimentacoesTable({ movimentacoes, onEdit, onDelete }: Props) {
+  const columns: TableColumnWidthDef[] = [
+    { id: 'data', defaultWidth: 160, minWidth: 140 },
+    { id: 'descricao', defaultWidth: 520, minWidth: 240 },
+    { id: 'entrada', defaultWidth: 150, minWidth: 130 },
+    { id: 'saida', defaultWidth: 150, minWidth: 130 },
+    { id: 'saldo', defaultWidth: 150, minWidth: 130 },
+    { id: 'conciliado', defaultWidth: 110, minWidth: 90 },
+    { id: 'acoes', defaultWidth: 120, minWidth: 90, maxWidth: 180 },
+  ];
+  const { widths, startResize } = useTableColumnWidths({ tableId: 'financeiro:tesouraria:movs', columns });
+
+  const [sort, setSort] = useState<SortState<string>>({ column: 'data', direction: 'desc' });
+  const sortedMovs = useMemo(() => {
+    return sortRows(
+      movimentacoes,
+      sort as any,
+      [
+        { id: 'data', type: 'date', getValue: (m) => m.data_movimento },
+        { id: 'descricao', type: 'string', getValue: (m) => m.descricao ?? '' },
+        { id: 'entrada', type: 'number', getValue: (m) => m.valor_entrada ?? 0 },
+        { id: 'saida', type: 'number', getValue: (m) => m.valor_saida ?? 0 },
+        { id: 'saldo', type: 'number', getValue: (m) => m.saldo_acumulado ?? 0 },
+        { id: 'conciliado', type: 'boolean', getValue: (m) => Boolean(m.conciliado) },
+      ] as const
+    );
+  }, [movimentacoes, sort]);
+
   return (
     <div className="overflow-x-auto">
       <table className="min-w-full divide-y divide-gray-200">
+        <TableColGroup columns={columns} widths={widths} />
         <thead className="bg-gray-50">
           <tr>
-            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Data</th>
-            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Descrição</th>
-            <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Entrada</th>
-            <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Saída</th>
-            <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Saldo</th>
-            <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase">Conc.</th>
-            <th className="px-6 py-3"></th>
+            <ResizableSortableTh
+              columnId="data"
+              label="Data"
+              sort={sort as any}
+              onSort={(col) => setSort((prev) => toggleSort(prev as any, col))}
+              onResizeStart={startResize as any}
+            />
+            <ResizableSortableTh
+              columnId="descricao"
+              label="Descrição"
+              sort={sort as any}
+              onSort={(col) => setSort((prev) => toggleSort(prev as any, col))}
+              onResizeStart={startResize as any}
+            />
+            <ResizableSortableTh
+              columnId="entrada"
+              label="Entrada"
+              align="right"
+              sort={sort as any}
+              onSort={(col) => setSort((prev) => toggleSort(prev as any, col))}
+              onResizeStart={startResize as any}
+            />
+            <ResizableSortableTh
+              columnId="saida"
+              label="Saída"
+              align="right"
+              sort={sort as any}
+              onSort={(col) => setSort((prev) => toggleSort(prev as any, col))}
+              onResizeStart={startResize as any}
+            />
+            <ResizableSortableTh
+              columnId="saldo"
+              label="Saldo"
+              align="right"
+              sort={sort as any}
+              onSort={(col) => setSort((prev) => toggleSort(prev as any, col))}
+              onResizeStart={startResize as any}
+            />
+            <ResizableSortableTh
+              columnId="conciliado"
+              label="Conc."
+              align="center"
+              sort={sort as any}
+              onSort={(col) => setSort((prev) => toggleSort(prev as any, col))}
+              onResizeStart={startResize as any}
+            />
+            <ResizableSortableTh
+              columnId="acoes"
+              label="Ações"
+              align="right"
+              sortable={false}
+              resizable
+              onResizeStart={startResize as any}
+            />
           </tr>
         </thead>
         <tbody className="bg-white divide-y divide-gray-200">
-          {movimentacoes.map(mov => (
+          {sortedMovs.map(mov => (
             <tr key={mov.id} className="hover:bg-gray-50">
               <td className="px-6 py-4 text-sm text-gray-900 whitespace-nowrap">
                 {new Date(mov.data_movimento).toLocaleDateString('pt-BR')}
@@ -60,13 +139,13 @@ export default function MovimentacoesTable({ movimentacoes, onEdit, onDelete }: 
                     </button>
                     <button onClick={() => onDelete(mov)} className="text-red-600 hover:text-red-800 p-1">
                         <Trash2 size={16} />
-                    </button>
+                  </button>
                     </div>
                 )}
               </td>
             </tr>
           ))}
-          {movimentacoes.length === 0 && (
+          {sortedMovs.length === 0 && (
             <tr>
               <td colSpan={7} className="px-6 py-12 text-center text-gray-500">Nenhuma movimentação no período.</td>
             </tr>

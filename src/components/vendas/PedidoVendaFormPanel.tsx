@@ -15,6 +15,10 @@ import { ensurePdvDefaultClienteId } from '@/services/vendasMvp';
 import { listVendedores, type Vendedor } from '@/services/vendedores';
 import { listMarketplaceOrderTimeline, type MarketplaceTimelineEvent } from '@/services/ecommerceOrders';
 import { listAuditLogsForTables, type AuditLogRow } from '@/services/auditLogs';
+import ResizableSortableTh, { type SortState } from '@/components/ui/table/ResizableSortableTh';
+import TableColGroup from '@/components/ui/table/TableColGroup';
+import { useTableColumnWidths, type TableColumnWidthDef } from '@/components/ui/table/useTableColumnWidths';
+import { sortRows, toggleSort } from '@/components/ui/table/sortUtils';
 
 interface Props {
   vendaId: string | null;
@@ -73,6 +77,78 @@ export default function PedidoVendaFormPanel({ vendaId, onSaveSuccess, onClose, 
   const [loadingMarketplaceTimeline, setLoadingMarketplaceTimeline] = useState(false);
   const [discountAudit, setDiscountAudit] = useState<DiscountAuditRow[]>([]);
   const [loadingDiscountAudit, setLoadingDiscountAudit] = useState(false);
+  const [marketplaceTimelineSort, setMarketplaceTimelineSort] = useState<SortState<string>>({
+    column: 'quando',
+    direction: 'desc',
+  });
+  const [discountAuditSort, setDiscountAuditSort] = useState<SortState<string>>({
+    column: 'quando',
+    direction: 'desc',
+  });
+
+  const marketplaceTimelineColumns: TableColumnWidthDef[] = [
+    { id: 'quando', defaultWidth: 220, minWidth: 200 },
+    { id: 'tipo', defaultWidth: 220, minWidth: 160 },
+    { id: 'mensagem', defaultWidth: 640, minWidth: 260 },
+  ];
+  const { widths: marketplaceTimelineWidths, startResize: startMarketplaceTimelineResize } = useTableColumnWidths({
+    tableId: 'vendas:pedido:marketplace-timeline',
+    columns: marketplaceTimelineColumns,
+  });
+  const sortedMarketplaceTimeline = useMemo(() => {
+    return sortRows(
+      marketplaceTimeline,
+      marketplaceTimelineSort as any,
+      [
+        { id: 'quando', type: 'date', getValue: (r) => r.occurred_at },
+        { id: 'tipo', type: 'string', getValue: (r) => r.kind ?? '' },
+        { id: 'mensagem', type: 'string', getValue: (r) => r.message ?? '' },
+      ] as const
+    );
+  }, [marketplaceTimeline, marketplaceTimelineSort]);
+
+  const itensTableColumns = useMemo<TableColumnWidthDef[]>(() => {
+    const cols: TableColumnWidthDef[] = [
+      { id: 'produto', defaultWidth: 520, minWidth: 260 },
+      { id: 'qtd', defaultWidth: 120, minWidth: 90 },
+      { id: 'preco_unit', defaultWidth: 160, minWidth: 120 },
+      { id: 'desc', defaultWidth: 140, minWidth: 120 },
+      { id: 'total', defaultWidth: 160, minWidth: 120 },
+    ];
+    if (!isLocked) cols.push({ id: 'acoes', defaultWidth: 56, minWidth: 44 });
+    return cols;
+  }, [isLocked]);
+  const { widths: itensTableWidths, startResize: startItensResize } = useTableColumnWidths({
+    tableId: 'vendas:pedido:itens',
+    columns: itensTableColumns,
+  });
+
+  const discountAuditColumns: TableColumnWidthDef[] = [
+    { id: 'quando', defaultWidth: 220, minWidth: 200 },
+    { id: 'onde', defaultWidth: 220, minWidth: 160 },
+    { id: 'campo', defaultWidth: 160, minWidth: 120 },
+    { id: 'de', defaultWidth: 140, minWidth: 120 },
+    { id: 'para', defaultWidth: 140, minWidth: 120 },
+    { id: 'quem', defaultWidth: 160, minWidth: 120 },
+  ];
+  const { widths: discountAuditWidths, startResize: startDiscountAuditResize } = useTableColumnWidths({
+    tableId: 'vendas:pedido:discount-audit',
+    columns: discountAuditColumns,
+  });
+  const sortedDiscountAudit = useMemo(() => {
+    return sortRows(
+      discountAudit,
+      discountAuditSort as any,
+      [
+        { id: 'quando', type: 'date', getValue: (r) => r.changedAt },
+        { id: 'onde', type: 'string', getValue: (r) => (r.scope === 'pedido' ? 'Pedido' : r.itemLabel || 'Item') },
+        { id: 'campo', type: 'string', getValue: (r) => (r.field === 'preco_unitario' ? 'Preço unit.' : 'Desconto') },
+        { id: 'de', type: 'number', getValue: (r) => r.from },
+        { id: 'para', type: 'number', getValue: (r) => r.to },
+        { id: 'quem', type: 'string', getValue: (r) => r.changedBy ?? '' },
+      ] as const
+    );
+  }, [discountAudit, discountAuditSort]);
 
   useEffect(() => {
     if (!vendaId) return;
@@ -590,16 +666,38 @@ export default function PedidoVendaFormPanel({ vendaId, onSaveSuccess, onClose, 
               <div className="text-sm text-gray-600">Sem eventos registrados para este pedido.</div>
             ) : (
               <div className="overflow-x-auto border rounded-lg bg-white">
-                <table className="min-w-full divide-y divide-gray-200">
+                <table className="min-w-full divide-y divide-gray-200 table-fixed">
+                  <TableColGroup columns={marketplaceTimelineColumns} widths={marketplaceTimelineWidths} />
                   <thead className="bg-gray-50">
                     <tr>
-                      <th className="px-3 py-2 text-left text-xs font-medium text-gray-500">Quando</th>
-                      <th className="px-3 py-2 text-left text-xs font-medium text-gray-500">Tipo</th>
-                      <th className="px-3 py-2 text-left text-xs font-medium text-gray-500">Mensagem</th>
+                      <ResizableSortableTh
+                        columnId="quando"
+                        label="Quando"
+                        className="px-3 py-2 text-left text-xs font-medium text-gray-500"
+                        sort={marketplaceTimelineSort as any}
+                        onSort={(col) => setMarketplaceTimelineSort((prev) => toggleSort(prev as any, col))}
+                        onResizeStart={startMarketplaceTimelineResize}
+                      />
+                      <ResizableSortableTh
+                        columnId="tipo"
+                        label="Tipo"
+                        className="px-3 py-2 text-left text-xs font-medium text-gray-500"
+                        sort={marketplaceTimelineSort as any}
+                        onSort={(col) => setMarketplaceTimelineSort((prev) => toggleSort(prev as any, col))}
+                        onResizeStart={startMarketplaceTimelineResize}
+                      />
+                      <ResizableSortableTh
+                        columnId="mensagem"
+                        label="Mensagem"
+                        className="px-3 py-2 text-left text-xs font-medium text-gray-500"
+                        sort={marketplaceTimelineSort as any}
+                        onSort={(col) => setMarketplaceTimelineSort((prev) => toggleSort(prev as any, col))}
+                        onResizeStart={startMarketplaceTimelineResize}
+                      />
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-200">
-                    {marketplaceTimeline.map((e, idx) => (
+                    {sortedMarketplaceTimeline.map((e, idx) => (
                       <tr key={`${e.kind}-${e.occurred_at}-${idx}`} className="hover:bg-gray-50">
                         <td className="px-3 py-2 text-sm text-gray-600 whitespace-nowrap">{new Date(e.occurred_at).toLocaleString('pt-BR')}</td>
                         <td className="px-3 py-2 text-sm text-gray-700 whitespace-nowrap">{e.kind}</td>
@@ -714,15 +812,64 @@ export default function PedidoVendaFormPanel({ vendaId, onSaveSuccess, onClose, 
           )}
           
           <div className="sm:col-span-6 overflow-x-auto border rounded-lg">
-            <table className="min-w-full divide-y divide-gray-200">
+            <table className="min-w-full divide-y divide-gray-200 table-fixed">
+              <TableColGroup columns={itensTableColumns} widths={itensTableWidths} />
               <thead className="bg-gray-50">
                 <tr>
-                  <th className="px-3 py-2 text-left text-xs font-medium text-gray-500">Produto</th>
-                  <th className="px-3 py-2 text-right text-xs font-medium text-gray-500 w-24">Qtd</th>
-                  <th className="px-3 py-2 text-right text-xs font-medium text-gray-500 w-32">Preço Unit.</th>
-                  <th className="px-3 py-2 text-right text-xs font-medium text-gray-500 w-24">Desc.</th>
-                  <th className="px-3 py-2 text-right text-xs font-medium text-gray-500 w-32">Total</th>
-                  {!isLocked && <th className="px-3 py-2 w-10"></th>}
+                  <ResizableSortableTh
+                    columnId="produto"
+                    label="Produto"
+                    className="px-3 py-2 text-left text-xs font-medium text-gray-500"
+                    sortable={false}
+                    resizable
+                    onResizeStart={startItensResize}
+                  />
+                  <ResizableSortableTh
+                    columnId="qtd"
+                    label="Qtd"
+                    align="right"
+                    className="px-3 py-2 text-xs font-medium text-gray-500"
+                    sortable={false}
+                    resizable
+                    onResizeStart={startItensResize}
+                  />
+                  <ResizableSortableTh
+                    columnId="preco_unit"
+                    label="Preço Unit."
+                    align="right"
+                    className="px-3 py-2 text-xs font-medium text-gray-500"
+                    sortable={false}
+                    resizable
+                    onResizeStart={startItensResize}
+                  />
+                  <ResizableSortableTh
+                    columnId="desc"
+                    label="Desc."
+                    align="right"
+                    className="px-3 py-2 text-xs font-medium text-gray-500"
+                    sortable={false}
+                    resizable
+                    onResizeStart={startItensResize}
+                  />
+                  <ResizableSortableTh
+                    columnId="total"
+                    label="Total"
+                    align="right"
+                    className="px-3 py-2 text-xs font-medium text-gray-500"
+                    sortable={false}
+                    resizable
+                    onResizeStart={startItensResize}
+                  />
+                  {!isLocked ? (
+                    <ResizableSortableTh
+                      columnId="acoes"
+                      label=""
+                      className="px-3 py-2"
+                      sortable={false}
+                      resizable
+                      onResizeStart={startItensResize}
+                    />
+                  ) : null}
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200 bg-white">
@@ -846,19 +993,64 @@ export default function PedidoVendaFormPanel({ vendaId, onSaveSuccess, onClose, 
             <div className="text-sm text-gray-600">Sem alterações registradas para preço/desconto.</div>
           ) : (
             <div className="overflow-x-auto border rounded-lg bg-white">
-              <table className="min-w-full divide-y divide-gray-200">
+              <table className="min-w-full divide-y divide-gray-200 table-fixed">
+                <TableColGroup columns={discountAuditColumns} widths={discountAuditWidths} />
                 <thead className="bg-gray-50">
                   <tr>
-                    <th className="px-3 py-2 text-left text-xs font-medium text-gray-500">Quando</th>
-                    <th className="px-3 py-2 text-left text-xs font-medium text-gray-500">Onde</th>
-                    <th className="px-3 py-2 text-left text-xs font-medium text-gray-500">Campo</th>
-                    <th className="px-3 py-2 text-right text-xs font-medium text-gray-500">De</th>
-                    <th className="px-3 py-2 text-right text-xs font-medium text-gray-500">Para</th>
-                    <th className="px-3 py-2 text-left text-xs font-medium text-gray-500">Quem</th>
+                    <ResizableSortableTh
+                      columnId="quando"
+                      label="Quando"
+                      className="px-3 py-2 text-left text-xs font-medium text-gray-500"
+                      sort={discountAuditSort as any}
+                      onSort={(col) => setDiscountAuditSort((prev) => toggleSort(prev as any, col))}
+                      onResizeStart={startDiscountAuditResize}
+                    />
+                    <ResizableSortableTh
+                      columnId="onde"
+                      label="Onde"
+                      className="px-3 py-2 text-left text-xs font-medium text-gray-500"
+                      sort={discountAuditSort as any}
+                      onSort={(col) => setDiscountAuditSort((prev) => toggleSort(prev as any, col))}
+                      onResizeStart={startDiscountAuditResize}
+                    />
+                    <ResizableSortableTh
+                      columnId="campo"
+                      label="Campo"
+                      className="px-3 py-2 text-left text-xs font-medium text-gray-500"
+                      sort={discountAuditSort as any}
+                      onSort={(col) => setDiscountAuditSort((prev) => toggleSort(prev as any, col))}
+                      onResizeStart={startDiscountAuditResize}
+                    />
+                    <ResizableSortableTh
+                      columnId="de"
+                      label="De"
+                      align="right"
+                      className="px-3 py-2 text-xs font-medium text-gray-500"
+                      sort={discountAuditSort as any}
+                      onSort={(col) => setDiscountAuditSort((prev) => toggleSort(prev as any, col))}
+                      onResizeStart={startDiscountAuditResize}
+                    />
+                    <ResizableSortableTh
+                      columnId="para"
+                      label="Para"
+                      align="right"
+                      className="px-3 py-2 text-xs font-medium text-gray-500"
+                      sort={discountAuditSort as any}
+                      onSort={(col) => setDiscountAuditSort((prev) => toggleSort(prev as any, col))}
+                      onResizeStart={startDiscountAuditResize}
+                    />
+                    <ResizableSortableTh
+                      columnId="quem"
+                      label="Quem"
+                      className="px-3 py-2 text-left text-xs font-medium text-gray-500"
+                      sort={discountAuditSort as any}
+                      onSort={(col) => setDiscountAuditSort((prev) => toggleSort(prev as any, col))}
+                      onResizeStart={startDiscountAuditResize}
+                    />
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-200">
-                  {discountAudit.map((e, idx) => (
+                  {sortedDiscountAudit.map((e, idx) => (
                     <tr key={`${e.changedAt}-${e.field}-${idx}`} className="hover:bg-gray-50">
                       <td className="px-3 py-2 text-sm text-gray-600 whitespace-nowrap">
                         {new Date(e.changedAt).toLocaleString('pt-BR')}

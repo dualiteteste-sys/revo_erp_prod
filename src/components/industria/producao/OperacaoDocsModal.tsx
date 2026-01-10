@@ -8,6 +8,10 @@ import { createOperacaoDocSignedUrl, deleteOperacaoDoc, listOperacaoDocs, upload
 import { Button } from '@/components/ui/button';
 import { Loader2, Paperclip, Download, Trash2 } from 'lucide-react';
 import { useConfirm } from '@/contexts/ConfirmProvider';
+import ResizableSortableTh, { type SortState } from '@/components/ui/table/ResizableSortableTh';
+import TableColGroup from '@/components/ui/table/TableColGroup';
+import { useTableColumnWidths, type TableColumnWidthDef } from '@/components/ui/table/useTableColumnWidths';
+import { sortRows, toggleSort } from '@/components/ui/table/sortUtils';
 
 export default function OperacaoDocsModal({
   operacaoId,
@@ -27,6 +31,29 @@ export default function OperacaoDocsModal({
   const [titulo, setTitulo] = useState('');
   const [descricao, setDescricao] = useState('');
   const [file, setFile] = useState<File | null>(null);
+  const [docsSort, setDocsSort] = useState<SortState<string>>({ column: 'criado', direction: 'desc' });
+
+  const docsColumns: TableColumnWidthDef[] = [
+    { id: 'titulo', defaultWidth: 520, minWidth: 220 },
+    { id: 'versao', defaultWidth: 140, minWidth: 120 },
+    { id: 'criado', defaultWidth: 220, minWidth: 200 },
+    { id: 'acoes', defaultWidth: 220, minWidth: 180 },
+  ];
+  const { widths: docsWidths, startResize: startDocsResize } = useTableColumnWidths({
+    tableId: 'industria:producao:operacao-docs',
+    columns: docsColumns,
+  });
+  const sortedDocs = useMemo(() => {
+    return sortRows(
+      docs,
+      docsSort as any,
+      [
+        { id: 'titulo', type: 'string', getValue: (d) => d.titulo ?? '' },
+        { id: 'versao', type: 'number', getValue: (d) => d.versao ?? 0 },
+        { id: 'criado', type: 'date', getValue: (d) => d.created_at },
+      ] as const
+    );
+  }, [docs, docsSort]);
 
   const canSubmit = useMemo(() => !!activeEmpresaId && !!operacaoId && !!titulo.trim() && !!file, [activeEmpresaId, operacaoId, titulo, file]);
 
@@ -134,13 +161,43 @@ export default function OperacaoDocsModal({
           </div>
 
           <div className="border rounded-2xl overflow-hidden">
-            <table className="min-w-full text-sm">
+            <table className="min-w-full text-sm table-fixed">
+              <TableColGroup columns={docsColumns} widths={docsWidths} />
               <thead className="bg-gray-50 text-gray-600">
                 <tr>
-                  <th className="px-4 py-2 text-left">Título</th>
-                  <th className="px-4 py-2 text-left">Versão</th>
-                  <th className="px-4 py-2 text-left">Criado</th>
-                  <th className="px-4 py-2 text-right">Ações</th>
+                  <ResizableSortableTh
+                    columnId="titulo"
+                    label="Título"
+                    className="px-4 py-2 text-left"
+                    sort={docsSort as any}
+                    onSort={(col) => setDocsSort((prev) => toggleSort(prev as any, col))}
+                    onResizeStart={startDocsResize}
+                  />
+                  <ResizableSortableTh
+                    columnId="versao"
+                    label="Versão"
+                    className="px-4 py-2 text-left"
+                    sort={docsSort as any}
+                    onSort={(col) => setDocsSort((prev) => toggleSort(prev as any, col))}
+                    onResizeStart={startDocsResize}
+                  />
+                  <ResizableSortableTh
+                    columnId="criado"
+                    label="Criado"
+                    className="px-4 py-2 text-left"
+                    sort={docsSort as any}
+                    onSort={(col) => setDocsSort((prev) => toggleSort(prev as any, col))}
+                    onResizeStart={startDocsResize}
+                  />
+                  <ResizableSortableTh
+                    columnId="acoes"
+                    label="Ações"
+                    align="right"
+                    className="px-4 py-2"
+                    sortable={false}
+                    resizable
+                    onResizeStart={startDocsResize}
+                  />
                 </tr>
               </thead>
               <tbody>
@@ -159,7 +216,7 @@ export default function OperacaoDocsModal({
                     </td>
                   </tr>
                 )}
-                {!loading && docs.map((d) => (
+                {!loading && sortedDocs.map((d) => (
                   <tr key={d.id} className="border-t">
                     <td className="px-4 py-2">
                       <div className="font-semibold text-gray-900">{d.titulo}</div>

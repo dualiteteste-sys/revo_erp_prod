@@ -3,6 +3,10 @@ import { Download, Loader2, Percent, Search } from 'lucide-react';
 import { useToast } from '@/contexts/ToastProvider';
 import { supabase } from '@/lib/supabaseClient';
 import { listVendedores, type Vendedor } from '@/services/vendedores';
+import ResizableSortableTh, { type SortState } from '@/components/ui/table/ResizableSortableTh';
+import TableColGroup from '@/components/ui/table/TableColGroup';
+import { useTableColumnWidths, type TableColumnWidthDef } from '@/components/ui/table/useTableColumnWidths';
+import { sortRows, toggleSort } from '@/components/ui/table/sortUtils';
 
 type VendaComissaoRow = {
   id: string;
@@ -44,6 +48,26 @@ export default function ComissoesPage() {
   const [statusFilter, setStatusFilter] = useState<'all' | 'orcamento' | 'aprovado' | 'concluido' | 'cancelado'>('all');
   const [startDate, setStartDate] = useState<string>('');
   const [endDate, setEndDate] = useState<string>('');
+  const [resumoSort, setResumoSort] = useState<SortState<string>>({ column: 'total_comissao', direction: 'desc' });
+  const [detailsSort, setDetailsSort] = useState<SortState<string>>({ column: 'data', direction: 'desc' });
+
+  const resumoColumns: TableColumnWidthDef[] = [
+    { id: 'vendedor', defaultWidth: 320, minWidth: 220 },
+    { id: 'pedidos', defaultWidth: 140, minWidth: 120 },
+    { id: 'total_vendas', defaultWidth: 180, minWidth: 160 },
+    { id: 'total_comissao', defaultWidth: 180, minWidth: 160 },
+  ];
+  const detailsColumns: TableColumnWidthDef[] = [
+    { id: 'pedido', defaultWidth: 120, minWidth: 100 },
+    { id: 'data', defaultWidth: 150, minWidth: 140 },
+    { id: 'vendedor', defaultWidth: 260, minWidth: 200 },
+    { id: 'status', defaultWidth: 140, minWidth: 120 },
+    { id: 'percent', defaultWidth: 110, minWidth: 100 },
+    { id: 'total', defaultWidth: 160, minWidth: 140 },
+    { id: 'comissao', defaultWidth: 160, minWidth: 140 },
+  ];
+  const { widths: resumoWidths, startResize: startResizeResumo } = useTableColumnWidths({ tableId: 'vendas:comissoes:resumo', columns: resumoColumns });
+  const { widths: detailsWidths, startResize: startResizeDetails } = useTableColumnWidths({ tableId: 'vendas:comissoes:detalhes', columns: detailsColumns });
 
   async function load() {
     setLoading(true);
@@ -111,6 +135,39 @@ export default function ComissoesPage() {
     }
     return Array.from(map.values()).sort((a, b) => b.totalComissao - a.totalComissao);
   }, [filteredRows, vendedorById]);
+
+  const sortedResumo = useMemo(() => {
+    return sortRows(
+      resumo,
+      resumoSort as any,
+      [
+        { id: 'vendedor', type: 'string', getValue: (r) => r.vendedor.nome ?? '' },
+        { id: 'pedidos', type: 'number', getValue: (r) => r.pedidos ?? 0 },
+        { id: 'total_vendas', type: 'number', getValue: (r) => r.totalVendas ?? 0 },
+        { id: 'total_comissao', type: 'number', getValue: (r) => r.totalComissao ?? 0 },
+      ] as const
+    );
+  }, [resumo, resumoSort]);
+
+  const sortedDetails = useMemo(() => {
+    return sortRows(
+      filteredRows,
+      detailsSort as any,
+      [
+        { id: 'pedido', type: 'number', getValue: (r) => r.numero ?? 0 },
+        { id: 'data', type: 'date', getValue: (r) => r.data_emissao ?? null },
+        { id: 'vendedor', type: 'string', getValue: (r) => (r.vendedor_id ? (vendedorById.get(r.vendedor_id)?.nome ?? '') : '') },
+        { id: 'status', type: 'string', getValue: (r) => r.status ?? '' },
+        { id: 'percent', type: 'number', getValue: (r) => r.comissao_percent ?? 0 },
+        { id: 'total', type: 'number', getValue: (r) => r.total_geral ?? 0 },
+        {
+          id: 'comissao',
+          type: 'number',
+          getValue: (r) => Number(r.total_geral || 0) * (Number(r.comissao_percent || 0) / 100),
+        },
+      ] as const
+    );
+  }, [detailsSort, filteredRows, vendedorById]);
 
   return (
     <div className="p-1 h-full flex flex-col">
@@ -209,16 +266,45 @@ export default function ComissoesPage() {
         ) : (
           <div className="overflow-auto">
             <table className="min-w-full text-sm">
+              <TableColGroup columns={resumoColumns} widths={resumoWidths} />
               <thead className="bg-gray-50">
                 <tr className="text-left text-gray-600">
-                  <th className="px-4 py-3">Vendedor</th>
-                  <th className="px-4 py-3">Pedidos</th>
-                  <th className="px-4 py-3">Total em vendas</th>
-                  <th className="px-4 py-3">Total comissão</th>
+                  <ResizableSortableTh
+                    columnId="vendedor"
+                    label="Vendedor"
+                    className="px-4 py-3 normal-case tracking-normal"
+                    sort={resumoSort as any}
+                    onSort={(col) => setResumoSort((prev) => toggleSort(prev as any, col))}
+                    onResizeStart={startResizeResumo as any}
+                  />
+                  <ResizableSortableTh
+                    columnId="pedidos"
+                    label="Pedidos"
+                    className="px-4 py-3 normal-case tracking-normal"
+                    sort={resumoSort as any}
+                    onSort={(col) => setResumoSort((prev) => toggleSort(prev as any, col))}
+                    onResizeStart={startResizeResumo as any}
+                  />
+                  <ResizableSortableTh
+                    columnId="total_vendas"
+                    label="Total em vendas"
+                    className="px-4 py-3 normal-case tracking-normal"
+                    sort={resumoSort as any}
+                    onSort={(col) => setResumoSort((prev) => toggleSort(prev as any, col))}
+                    onResizeStart={startResizeResumo as any}
+                  />
+                  <ResizableSortableTh
+                    columnId="total_comissao"
+                    label="Total comissão"
+                    className="px-4 py-3 normal-case tracking-normal"
+                    sort={resumoSort as any}
+                    onSort={(col) => setResumoSort((prev) => toggleSort(prev as any, col))}
+                    onResizeStart={startResizeResumo as any}
+                  />
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200">
-                {resumo.map((r) => (
+                {sortedResumo.map((r) => (
                   <tr key={r.vendedor.id} className="hover:bg-gray-50">
                     <td className="px-4 py-3 font-medium text-gray-800">{r.vendedor.nome}</td>
                     <td className="px-4 py-3">{r.pedidos}</td>
@@ -264,19 +350,72 @@ export default function ComissoesPage() {
         ) : (
           <div className="overflow-auto">
             <table className="min-w-full text-sm">
+              <TableColGroup columns={detailsColumns} widths={detailsWidths} />
               <thead className="bg-gray-50">
                 <tr className="text-left text-gray-600">
-                  <th className="px-4 py-3">Pedido</th>
-                  <th className="px-4 py-3">Data</th>
-                  <th className="px-4 py-3">Vendedor</th>
-                  <th className="px-4 py-3">Status</th>
-                  <th className="px-4 py-3 text-right">%</th>
-                  <th className="px-4 py-3 text-right">Total</th>
-                  <th className="px-4 py-3 text-right">Comissão</th>
+                  <ResizableSortableTh
+                    columnId="pedido"
+                    label="Pedido"
+                    className="px-4 py-3 normal-case tracking-normal"
+                    sort={detailsSort as any}
+                    onSort={(col) => setDetailsSort((prev) => toggleSort(prev as any, col))}
+                    onResizeStart={startResizeDetails as any}
+                  />
+                  <ResizableSortableTh
+                    columnId="data"
+                    label="Data"
+                    className="px-4 py-3 normal-case tracking-normal"
+                    sort={detailsSort as any}
+                    onSort={(col) => setDetailsSort((prev) => toggleSort(prev as any, col))}
+                    onResizeStart={startResizeDetails as any}
+                  />
+                  <ResizableSortableTh
+                    columnId="vendedor"
+                    label="Vendedor"
+                    className="px-4 py-3 normal-case tracking-normal"
+                    sort={detailsSort as any}
+                    onSort={(col) => setDetailsSort((prev) => toggleSort(prev as any, col))}
+                    onResizeStart={startResizeDetails as any}
+                  />
+                  <ResizableSortableTh
+                    columnId="status"
+                    label="Status"
+                    className="px-4 py-3 normal-case tracking-normal"
+                    sort={detailsSort as any}
+                    onSort={(col) => setDetailsSort((prev) => toggleSort(prev as any, col))}
+                    onResizeStart={startResizeDetails as any}
+                  />
+                  <ResizableSortableTh
+                    columnId="percent"
+                    label="%"
+                    align="right"
+                    className="px-4 py-3 normal-case tracking-normal"
+                    sort={detailsSort as any}
+                    onSort={(col) => setDetailsSort((prev) => toggleSort(prev as any, col))}
+                    onResizeStart={startResizeDetails as any}
+                  />
+                  <ResizableSortableTh
+                    columnId="total"
+                    label="Total"
+                    align="right"
+                    className="px-4 py-3 normal-case tracking-normal"
+                    sort={detailsSort as any}
+                    onSort={(col) => setDetailsSort((prev) => toggleSort(prev as any, col))}
+                    onResizeStart={startResizeDetails as any}
+                  />
+                  <ResizableSortableTh
+                    columnId="comissao"
+                    label="Comissão"
+                    align="right"
+                    className="px-4 py-3 normal-case tracking-normal"
+                    sort={detailsSort as any}
+                    onSort={(col) => setDetailsSort((prev) => toggleSort(prev as any, col))}
+                    onResizeStart={startResizeDetails as any}
+                  />
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200">
-                {filteredRows.slice(0, 300).map((r) => {
+                {sortedDetails.slice(0, 300).map((r) => {
                   const vendedorNome = r.vendedor_id ? (vendedorById.get(r.vendedor_id)?.nome || '') : '';
                   const total = Number(r.total_geral || 0);
                   const pct = Number(r.comissao_percent || 0);

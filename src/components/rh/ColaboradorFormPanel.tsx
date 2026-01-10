@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Loader2, Save, AlertCircle, TrendingUp, TrendingDown, Minus, PlusCircle, GraduationCap, Paperclip, Download, Trash2, CalendarPlus } from 'lucide-react';
 import {
   ColaboradorDetails,
@@ -28,6 +28,10 @@ import { listAuditLogsForTables, type AuditLogRow } from '@/services/auditLogs';
 import { useConfirm } from '@/contexts/ConfirmProvider';
 import { createRhDocSignedUrl, deleteRhDoc, listRhDocs, uploadRhDoc, type RhDoc } from '@/services/rhDocs';
 import { useHasPermission } from '@/hooks/useHasPermission';
+import ResizableSortableTh, { type SortState } from '@/components/ui/table/ResizableSortableTh';
+import TableColGroup from '@/components/ui/table/TableColGroup';
+import { useTableColumnWidths, type TableColumnWidthDef } from '@/components/ui/table/useTableColumnWidths';
+import { sortRows, toggleSort } from '@/components/ui/table/sortUtils';
 
 interface ColaboradorFormPanelProps {
   colaborador: ColaboradorDetails | null;
@@ -78,6 +82,106 @@ const ColaboradorFormPanel: React.FC<ColaboradorFormPanelProps> = ({ colaborador
   const canUpdate = !permsLoading && permUpdate.data;
   const canUploadDoc = !permsLoading && permUpdate.data;
   const canDeleteDoc = !permsLoading && permDelete.data;
+  const [afastSort, setAfastSort] = useState<SortState<string>>({ column: 'periodo', direction: 'desc' });
+  const [docsSort, setDocsSort] = useState<SortState<string>>({ column: 'criado', direction: 'desc' });
+  const [treinSort, setTreinSort] = useState<SortState<string>>({ column: 'data', direction: 'desc' });
+  const [auditSort, setAuditSort] = useState<SortState<string>>({ column: 'quando', direction: 'desc' });
+
+  const afastColumns: TableColumnWidthDef[] = [
+    { id: 'tipo', defaultWidth: 160, minWidth: 140 },
+    { id: 'periodo', defaultWidth: 260, minWidth: 200 },
+    { id: 'motivo', defaultWidth: 520, minWidth: 220 },
+    { id: 'acoes', defaultWidth: 160, minWidth: 140 },
+  ];
+  const { widths: afastWidths, startResize: startAfastResize } = useTableColumnWidths({
+    tableId: 'rh:colaborador:afastamentos',
+    columns: afastColumns,
+  });
+  const sortedAfastamentos = useMemo(() => {
+    return sortRows(
+      afastamentos,
+      afastSort as any,
+      [
+        { id: 'tipo', type: 'string', getValue: (a) => a.tipo ?? '' },
+        { id: 'periodo', type: 'date', getValue: (a) => a.data_inicio },
+        { id: 'motivo', type: 'string', getValue: (a) => a.motivo ?? '' },
+      ] as const
+    );
+  }, [afastamentos, afastSort]);
+
+  const docsColumns: TableColumnWidthDef[] = [
+    { id: 'titulo', defaultWidth: 520, minWidth: 220 },
+    { id: 'versao', defaultWidth: 140, minWidth: 120 },
+    { id: 'criado', defaultWidth: 220, minWidth: 200 },
+    { id: 'acoes', defaultWidth: 220, minWidth: 180 },
+  ];
+  const { widths: docsWidths, startResize: startDocsResize } = useTableColumnWidths({
+    tableId: 'rh:colaborador:docs',
+    columns: docsColumns,
+  });
+  const sortedDocs = useMemo(() => {
+    return sortRows(
+      docs,
+      docsSort as any,
+      [
+        { id: 'titulo', type: 'string', getValue: (d) => d.titulo ?? '' },
+        { id: 'versao', type: 'number', getValue: (d) => d.versao ?? 0 },
+        { id: 'criado', type: 'date', getValue: (d) => d.created_at },
+      ] as const
+    );
+  }, [docs, docsSort]);
+
+  const treinColumns: TableColumnWidthDef[] = [
+    { id: 'treinamento', defaultWidth: 320, minWidth: 220 },
+    { id: 'status', defaultWidth: 160, minWidth: 140 },
+    { id: 'participacao', defaultWidth: 180, minWidth: 160 },
+    { id: 'data', defaultWidth: 140, minWidth: 120 },
+    { id: 'eficacia', defaultWidth: 140, minWidth: 120 },
+    { id: 'validade', defaultWidth: 140, minWidth: 120 },
+    { id: 'reciclagem', defaultWidth: 160, minWidth: 140 },
+  ];
+  const { widths: treinWidths, startResize: startTreinResize } = useTableColumnWidths({
+    tableId: 'rh:colaborador:treinamentos',
+    columns: treinColumns,
+  });
+  const sortedTreinamentos = useMemo(() => {
+    return sortRows(
+      treinamentos,
+      treinSort as any,
+      [
+        { id: 'treinamento', type: 'string', getValue: (t) => t.treinamento_nome ?? '' },
+        { id: 'status', type: 'string', getValue: (t) => t.treinamento_status ?? '' },
+        { id: 'participacao', type: 'string', getValue: (t) => t.participante_status ?? '' },
+        { id: 'data', type: 'date', getValue: (t) => t.data_inicio ?? null },
+        { id: 'eficacia', type: 'boolean', getValue: (t) => Boolean(t.eficacia_avaliada) },
+        { id: 'validade', type: 'date', getValue: (t) => t.validade_ate ?? null },
+        { id: 'reciclagem', type: 'date', getValue: (t) => t.proxima_reciclagem ?? null },
+      ] as const
+    );
+  }, [treinamentos, treinSort]);
+
+  const auditColumns: TableColumnWidthDef[] = [
+    { id: 'quando', defaultWidth: 220, minWidth: 200 },
+    { id: 'acao', defaultWidth: 140, minWidth: 120 },
+    { id: 'tabela', defaultWidth: 220, minWidth: 160 },
+    { id: 'detalhes', defaultWidth: 520, minWidth: 220 },
+  ];
+  const { widths: auditWidths, startResize: startAuditResize } = useTableColumnWidths({
+    tableId: 'rh:colaborador:audit',
+    columns: auditColumns,
+  });
+  const sortedAuditRows = useMemo(() => {
+    return sortRows(
+      auditRows,
+      auditSort as any,
+      [
+        { id: 'quando', type: 'date', getValue: (r) => r.changed_at },
+        { id: 'acao', type: 'string', getValue: (r) => r.operation ?? '' },
+        { id: 'tabela', type: 'string', getValue: (r) => r.table_name ?? '' },
+        { id: 'detalhes', type: 'string', getValue: (r) => formatChangedFields(r) || '' },
+      ] as const
+    );
+  }, [auditRows, auditSort]);
 
   useEffect(() => {
     const loadData = async () => {
@@ -683,13 +787,43 @@ const ColaboradorFormPanel: React.FC<ColaboradorFormPanelProps> = ({ colaborador
             </div>
 
             <div className="border rounded-2xl overflow-hidden bg-white">
-              <table className="min-w-full text-sm">
+              <table className="min-w-full text-sm table-fixed">
+                <TableColGroup columns={afastColumns} widths={afastWidths} />
                 <thead className="bg-gray-50 text-gray-600">
                   <tr>
-                    <th className="px-4 py-2 text-left">Tipo</th>
-                    <th className="px-4 py-2 text-left">Período</th>
-                    <th className="px-4 py-2 text-left">Motivo</th>
-                    <th className="px-4 py-2 text-right">Ações</th>
+                    <ResizableSortableTh
+                      columnId="tipo"
+                      label="Tipo"
+                      className="px-4 py-2 text-left"
+                      sort={afastSort as any}
+                      onSort={(col) => setAfastSort((prev) => toggleSort(prev as any, col))}
+                      onResizeStart={startAfastResize}
+                    />
+                    <ResizableSortableTh
+                      columnId="periodo"
+                      label="Período"
+                      className="px-4 py-2 text-left"
+                      sort={afastSort as any}
+                      onSort={(col) => setAfastSort((prev) => toggleSort(prev as any, col))}
+                      onResizeStart={startAfastResize}
+                    />
+                    <ResizableSortableTh
+                      columnId="motivo"
+                      label="Motivo"
+                      className="px-4 py-2 text-left"
+                      sort={afastSort as any}
+                      onSort={(col) => setAfastSort((prev) => toggleSort(prev as any, col))}
+                      onResizeStart={startAfastResize}
+                    />
+                    <ResizableSortableTh
+                      columnId="acoes"
+                      label="Ações"
+                      align="right"
+                      className="px-4 py-2"
+                      sortable={false}
+                      resizable
+                      onResizeStart={startAfastResize}
+                    />
                   </tr>
                 </thead>
                 <tbody>
@@ -707,7 +841,7 @@ const ColaboradorFormPanel: React.FC<ColaboradorFormPanelProps> = ({ colaborador
                     </tr>
                   )}
                   {!loadingAfastamentos &&
-                    afastamentos.map((a) => {
+                    sortedAfastamentos.map((a) => {
                       const aberto = !a.data_fim;
                       return (
                         <tr key={a.id} className="border-t">
@@ -774,13 +908,43 @@ const ColaboradorFormPanel: React.FC<ColaboradorFormPanelProps> = ({ colaborador
             </div>
 
             <div className="border rounded-2xl overflow-hidden bg-white">
-              <table className="min-w-full text-sm">
+              <table className="min-w-full text-sm table-fixed">
+                <TableColGroup columns={docsColumns} widths={docsWidths} />
                 <thead className="bg-gray-50 text-gray-600">
                   <tr>
-                    <th className="px-4 py-2 text-left">Título</th>
-                    <th className="px-4 py-2 text-left">Versão</th>
-                    <th className="px-4 py-2 text-left">Criado</th>
-                    <th className="px-4 py-2 text-right">Ações</th>
+                    <ResizableSortableTh
+                      columnId="titulo"
+                      label="Título"
+                      className="px-4 py-2 text-left"
+                      sort={docsSort as any}
+                      onSort={(col) => setDocsSort((prev) => toggleSort(prev as any, col))}
+                      onResizeStart={startDocsResize}
+                    />
+                    <ResizableSortableTh
+                      columnId="versao"
+                      label="Versão"
+                      className="px-4 py-2 text-left"
+                      sort={docsSort as any}
+                      onSort={(col) => setDocsSort((prev) => toggleSort(prev as any, col))}
+                      onResizeStart={startDocsResize}
+                    />
+                    <ResizableSortableTh
+                      columnId="criado"
+                      label="Criado"
+                      className="px-4 py-2 text-left"
+                      sort={docsSort as any}
+                      onSort={(col) => setDocsSort((prev) => toggleSort(prev as any, col))}
+                      onResizeStart={startDocsResize}
+                    />
+                    <ResizableSortableTh
+                      columnId="acoes"
+                      label="Ações"
+                      align="right"
+                      className="px-4 py-2"
+                      sortable={false}
+                      resizable
+                      onResizeStart={startDocsResize}
+                    />
                   </tr>
                 </thead>
                 <tbody>
@@ -798,7 +962,7 @@ const ColaboradorFormPanel: React.FC<ColaboradorFormPanelProps> = ({ colaborador
                     </tr>
                   )}
                   {!loadingDocs &&
-                    docs.map((d) => (
+                    sortedDocs.map((d) => (
                       <tr key={d.id} className="border-t">
                         <td className="px-4 py-2">
                           <div className="font-semibold text-gray-900">{d.titulo}</div>
@@ -957,20 +1121,70 @@ const ColaboradorFormPanel: React.FC<ColaboradorFormPanelProps> = ({ colaborador
               </div>
             ) : (
               <div className="overflow-hidden border border-gray-200 rounded-lg bg-white">
-                <table className="min-w-full text-sm">
+                <table className="min-w-full text-sm table-fixed">
+                  <TableColGroup columns={treinColumns} widths={treinWidths} />
                   <thead className="bg-gray-50 text-gray-600">
                     <tr>
-                      <th className="text-left p-3">Treinamento</th>
-                      <th className="text-left p-3">Status</th>
-                      <th className="text-left p-3">Participação</th>
-                      <th className="text-left p-3">Data</th>
-                      <th className="text-left p-3">Eficácia</th>
-                      <th className="text-left p-3">Validade</th>
-                      <th className="text-left p-3">Reciclagem</th>
+                      <ResizableSortableTh
+                        columnId="treinamento"
+                        label="Treinamento"
+                        className="text-left p-3"
+                        sort={treinSort as any}
+                        onSort={(col) => setTreinSort((prev) => toggleSort(prev as any, col))}
+                        onResizeStart={startTreinResize}
+                      />
+                      <ResizableSortableTh
+                        columnId="status"
+                        label="Status"
+                        className="text-left p-3"
+                        sort={treinSort as any}
+                        onSort={(col) => setTreinSort((prev) => toggleSort(prev as any, col))}
+                        onResizeStart={startTreinResize}
+                      />
+                      <ResizableSortableTh
+                        columnId="participacao"
+                        label="Participação"
+                        className="text-left p-3"
+                        sort={treinSort as any}
+                        onSort={(col) => setTreinSort((prev) => toggleSort(prev as any, col))}
+                        onResizeStart={startTreinResize}
+                      />
+                      <ResizableSortableTh
+                        columnId="data"
+                        label="Data"
+                        className="text-left p-3"
+                        sort={treinSort as any}
+                        onSort={(col) => setTreinSort((prev) => toggleSort(prev as any, col))}
+                        onResizeStart={startTreinResize}
+                      />
+                      <ResizableSortableTh
+                        columnId="eficacia"
+                        label="Eficácia"
+                        className="text-left p-3"
+                        sort={treinSort as any}
+                        onSort={(col) => setTreinSort((prev) => toggleSort(prev as any, col))}
+                        onResizeStart={startTreinResize}
+                      />
+                      <ResizableSortableTh
+                        columnId="validade"
+                        label="Validade"
+                        className="text-left p-3"
+                        sort={treinSort as any}
+                        onSort={(col) => setTreinSort((prev) => toggleSort(prev as any, col))}
+                        onResizeStart={startTreinResize}
+                      />
+                      <ResizableSortableTh
+                        columnId="reciclagem"
+                        label="Reciclagem"
+                        className="text-left p-3"
+                        sort={treinSort as any}
+                        onSort={(col) => setTreinSort((prev) => toggleSort(prev as any, col))}
+                        onResizeStart={startTreinResize}
+                      />
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-100">
-                    {treinamentos.map((t) => (
+                    {sortedTreinamentos.map((t) => (
                       <tr key={t.treinamento_id} className="hover:bg-gray-50">
                         <td className="p-3 font-medium text-gray-800">{t.treinamento_nome}</td>
                         <td className="p-3 text-gray-600 capitalize">{t.treinamento_status?.replace(/_/g, ' ')}</td>
@@ -1035,17 +1249,46 @@ const ColaboradorFormPanel: React.FC<ColaboradorFormPanelProps> = ({ colaborador
               </div>
             ) : (
               <div className="overflow-hidden border border-gray-200 rounded-lg bg-white">
-                <table className="min-w-full text-sm">
+                <table className="min-w-full text-sm table-fixed">
+                  <TableColGroup columns={auditColumns} widths={auditWidths} />
                   <thead className="bg-gray-50 text-gray-600">
                     <tr>
-                      <th className="text-left p-3">Quando</th>
-                      <th className="text-left p-3">Ação</th>
-                      <th className="text-left p-3">Tabela</th>
-                      <th className="text-left p-3">Detalhes</th>
+                      <ResizableSortableTh
+                        columnId="quando"
+                        label="Quando"
+                        className="text-left p-3"
+                        sort={auditSort as any}
+                        onSort={(col) => setAuditSort((prev) => toggleSort(prev as any, col))}
+                        onResizeStart={startAuditResize}
+                      />
+                      <ResizableSortableTh
+                        columnId="acao"
+                        label="Ação"
+                        className="text-left p-3"
+                        sort={auditSort as any}
+                        onSort={(col) => setAuditSort((prev) => toggleSort(prev as any, col))}
+                        onResizeStart={startAuditResize}
+                      />
+                      <ResizableSortableTh
+                        columnId="tabela"
+                        label="Tabela"
+                        className="text-left p-3"
+                        sort={auditSort as any}
+                        onSort={(col) => setAuditSort((prev) => toggleSort(prev as any, col))}
+                        onResizeStart={startAuditResize}
+                      />
+                      <ResizableSortableTh
+                        columnId="detalhes"
+                        label="Detalhes"
+                        className="text-left p-3"
+                        sort={auditSort as any}
+                        onSort={(col) => setAuditSort((prev) => toggleSort(prev as any, col))}
+                        onResizeStart={startAuditResize}
+                      />
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-100">
-                    {auditRows.map((r) => (
+                    {sortedAuditRows.map((r) => (
                       <tr key={r.id} className="hover:bg-gray-50">
                         <td className="p-3 text-gray-600">
                           {new Date(r.changed_at).toLocaleString('pt-BR')}

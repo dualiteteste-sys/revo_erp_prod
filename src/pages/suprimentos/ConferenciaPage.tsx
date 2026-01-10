@@ -24,6 +24,10 @@ import PartnerFormPanel from '@/components/partners/PartnerFormPanel';
 import { saveOrdem } from '@/services/industria';
 import { ensureMaterialClienteV2 } from '@/services/industriaMateriais';
 import QuickScanModal from '@/components/ui/QuickScanModal';
+import ResizableSortableTh, { type SortState } from '@/components/ui/table/ResizableSortableTh';
+import TableColGroup from '@/components/ui/table/TableColGroup';
+import { useTableColumnWidths, type TableColumnWidthDef } from '@/components/ui/table/useTableColumnWidths';
+import { sortRows, toggleSort } from '@/components/ui/table/sortUtils';
 
 export default function ConferenciaPage() {
     const { id } = useParams<{ id: string }>();
@@ -62,6 +66,25 @@ export default function ConferenciaPage() {
     const [isScanOpen, setIsScanOpen] = useState(false);
     const [highlightItemId, setHighlightItemId] = useState<string | null>(null);
     const rowRefs = useRef<Record<string, HTMLTableRowElement | null>>({});
+    const [sort, setSort] = useState<SortState<string>>({ column: 'produto_xml', direction: 'asc' });
+    const [obSort, setObSort] = useState<SortState<string>>({ column: 'produto_xml', direction: 'asc' });
+
+    const itensColumns: TableColumnWidthDef[] = [
+        { id: 'produto_xml', defaultWidth: 380, minWidth: 240 },
+        { id: 'produto_sistema', defaultWidth: 420, minWidth: 240 },
+        { id: 'qtd_nota', defaultWidth: 140, minWidth: 120 },
+        { id: 'qtd_conferida', defaultWidth: 160, minWidth: 140 },
+        { id: 'status', defaultWidth: 160, minWidth: 140 },
+        { id: 'acoes', defaultWidth: 220, minWidth: 180 },
+    ];
+    const gerarObColumns: TableColumnWidthDef[] = [
+        { id: 'gerar', defaultWidth: 90, minWidth: 80 },
+        { id: 'produto_xml', defaultWidth: 360, minWidth: 220 },
+        { id: 'produto_sistema', defaultWidth: 360, minWidth: 220 },
+        { id: 'qtd', defaultWidth: 160, minWidth: 140 },
+    ];
+    const { widths: itensWidths, startResize: startResizeItens } = useTableColumnWidths({ tableId: 'suprimentos:conferencia:itens', columns: itensColumns });
+    const { widths: gerarObWidths, startResize: startResizeGerarOb } = useTableColumnWidths({ tableId: 'suprimentos:conferencia:gerar-ob', columns: gerarObColumns });
 
     const digitsOnly = (value?: string | null) => (value || '').replace(/\D/g, '');
 
@@ -84,6 +107,37 @@ export default function ConferenciaPage() {
             doc_unico: clienteXmlSugestao.doc || null,
         };
     }, [clienteXmlSugestao]);
+
+    const sortedItens = useMemo(() => {
+        return sortRows(
+            itens,
+            sort as any,
+            [
+                { id: 'produto_xml', type: 'string', getValue: (i) => i.fiscal_nfe_import_items?.xprod ?? '' },
+                { id: 'produto_sistema', type: 'string', getValue: (i) => i.produtos?.nome ?? '' },
+                { id: 'qtd_nota', type: 'number', getValue: (i) => Number(i.quantidade_xml ?? 0) },
+                { id: 'qtd_conferida', type: 'number', getValue: (i) => Number(i.quantidade_conferida ?? 0) },
+                { id: 'status', type: 'string', getValue: (i) => String(i.status ?? '') },
+            ] as const
+        );
+    }, [itens, sort]);
+
+    const sortedGerarObItens = useMemo(() => {
+        const base = itens.map((it) => {
+            const qty = (it.quantidade_conferida && it.quantidade_conferida > 0) ? it.quantidade_conferida : it.quantidade_xml;
+            const disabled = !it.produto_id;
+            return { it, qty, disabled };
+        });
+        return sortRows(
+            base,
+            obSort as any,
+            [
+                { id: 'produto_xml', type: 'string', getValue: (r) => r.it.fiscal_nfe_import_items?.xprod ?? '' },
+                { id: 'produto_sistema', type: 'string', getValue: (r) => r.it.produtos?.nome ?? '' },
+                { id: 'qtd', type: 'number', getValue: (r) => Number(r.qty ?? 0) },
+            ] as const
+        );
+    }, [itens, obSort]);
 
     useEffect(() => {
         if (id) loadData(id);
@@ -790,18 +844,19 @@ export default function ConferenciaPage() {
                         </button>
                     </div>
                     <table className="min-w-full divide-y divide-gray-200">
+                        <TableColGroup columns={itensColumns} widths={itensWidths} />
                         <thead className="bg-gray-50">
                             <tr>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Produto (XML)</th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Produto (Sistema)</th>
-                                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Qtd. Nota</th>
-                                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Qtd. Conferida</th>
-                                <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase">Status</th>
-                                <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase">Ações</th>
+                                <ResizableSortableTh columnId="produto_xml" label="Produto (XML)" sort={sort as any} onSort={(col) => setSort((prev) => toggleSort(prev as any, col))} onResizeStart={startResizeItens as any} />
+                                <ResizableSortableTh columnId="produto_sistema" label="Produto (Sistema)" sort={sort as any} onSort={(col) => setSort((prev) => toggleSort(prev as any, col))} onResizeStart={startResizeItens as any} />
+                                <ResizableSortableTh columnId="qtd_nota" label="Qtd. Nota" align="right" sort={sort as any} onSort={(col) => setSort((prev) => toggleSort(prev as any, col))} onResizeStart={startResizeItens as any} />
+                                <ResizableSortableTh columnId="qtd_conferida" label="Qtd. Conferida" align="right" sort={sort as any} onSort={(col) => setSort((prev) => toggleSort(prev as any, col))} onResizeStart={startResizeItens as any} />
+                                <ResizableSortableTh columnId="status" label="Status" align="center" sort={sort as any} onSort={(col) => setSort((prev) => toggleSort(prev as any, col))} onResizeStart={startResizeItens as any} />
+                                <ResizableSortableTh columnId="acoes" label="Ações" align="center" sortable={false} resizable onResizeStart={startResizeItens as any} />
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-gray-200">
-                            {itens.map(item => (
+                            {sortedItens.map(item => (
                                 <tr
                                     key={item.id}
                                     ref={(el) => {
@@ -939,18 +994,46 @@ export default function ConferenciaPage() {
                         <div className="px-4 py-3 bg-gray-50 text-xs font-semibold text-gray-600 uppercase">Itens</div>
                         <div className="max-h-[55vh] overflow-auto">
                             <table className="min-w-full divide-y divide-gray-200">
+                                <TableColGroup columns={gerarObColumns} widths={gerarObWidths} />
                                 <thead className="bg-white sticky top-0">
                                     <tr>
-                                        <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Gerar</th>
-                                        <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Produto (XML)</th>
-                                        <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Produto (Sistema)</th>
-                                        <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500 uppercase">Qtd (conf.)</th>
+                                        <ResizableSortableTh
+                                            columnId="gerar"
+                                            label="Gerar"
+                                            className="px-4 py-3 text-xs font-semibold"
+                                            sortable={false}
+                                            resizable
+                                            onResizeStart={startResizeGerarOb as any}
+                                        />
+                                        <ResizableSortableTh
+                                            columnId="produto_xml"
+                                            label="Produto (XML)"
+                                            className="px-4 py-3 text-xs font-semibold"
+                                            sort={obSort as any}
+                                            onSort={(col) => setObSort((prev) => toggleSort(prev as any, col))}
+                                            onResizeStart={startResizeGerarOb as any}
+                                        />
+                                        <ResizableSortableTh
+                                            columnId="produto_sistema"
+                                            label="Produto (Sistema)"
+                                            className="px-4 py-3 text-xs font-semibold"
+                                            sort={obSort as any}
+                                            onSort={(col) => setObSort((prev) => toggleSort(prev as any, col))}
+                                            onResizeStart={startResizeGerarOb as any}
+                                        />
+                                        <ResizableSortableTh
+                                            columnId="qtd"
+                                            label="Qtd (conf.)"
+                                            align="right"
+                                            className="px-4 py-3 text-xs font-semibold"
+                                            sort={obSort as any}
+                                            onSort={(col) => setObSort((prev) => toggleSort(prev as any, col))}
+                                            onResizeStart={startResizeGerarOb as any}
+                                        />
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-gray-200 bg-white">
-                                    {itens.map((it) => {
-                                        const qty = (it.quantidade_conferida && it.quantidade_conferida > 0) ? it.quantidade_conferida : it.quantidade_xml;
-                                        const disabled = !it.produto_id;
+                                    {sortedGerarObItens.map(({ it, qty, disabled }) => {
                                         return (
                                             <tr key={it.id} className={disabled ? 'bg-gray-50' : ''}>
                                                 <td className="px-4 py-3">

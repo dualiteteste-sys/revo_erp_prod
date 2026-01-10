@@ -7,6 +7,9 @@ import Select from '@/components/ui/forms/Select';
 import { useDebounce } from '@/hooks/useDebounce';
 import { formatOrderNumber } from '@/lib/utils';
 import { useNavigate } from 'react-router-dom';
+import TableColGroup from '@/components/ui/table/TableColGroup';
+import ResizableSortableTh, { type SortState } from '@/components/ui/table/ResizableSortableTh';
+import { useTableColumnWidths, type TableColumnWidthDef } from '@/components/ui/table/useTableColumnWidths';
 
 type SortKey = 'saldo' | 'numero' | 'cliente' | 'produto';
 type SortDir = 'asc' | 'desc';
@@ -69,6 +72,20 @@ export default function StatusBeneficiamentosPage() {
   const [orders, setOrders] = useState<OrdemIndustria[]>([]);
   const [sortKey, setSortKey] = useState<SortKey>('saldo');
   const [sortDir, setSortDir] = useState<SortDir>('desc');
+  const columns: TableColumnWidthDef[] = [
+    { id: 'produto', defaultWidth: 320, minWidth: 220 },
+    { id: 'caixas', defaultWidth: 140, minWidth: 120 },
+    { id: 'numero', defaultWidth: 120, minWidth: 110 },
+    { id: 'cliente', defaultWidth: 240, minWidth: 200 },
+    { id: 'nfCliente', defaultWidth: 160, minWidth: 140 },
+    { id: 'nf', defaultWidth: 120, minWidth: 110 },
+    { id: 'pedido', defaultWidth: 140, minWidth: 120 },
+    { id: 'entregue', defaultWidth: 160, minWidth: 140 },
+    { id: 'saldo', defaultWidth: 170, minWidth: 150 },
+    { id: 'status', defaultWidth: 160, minWidth: 140 },
+    { id: 'acao', defaultWidth: 140, minWidth: 120, resizable: false },
+  ];
+  const { widths, startResize } = useTableColumnWidths({ tableId: 'industria:status-beneficiamentos', columns });
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -214,20 +231,21 @@ export default function StatusBeneficiamentosPage() {
 
       <GlassCard className="p-0 overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="min-w-full text-sm">
+          <table className="min-w-full text-sm table-fixed">
+            <TableColGroup columns={columns} widths={widths} />
             <thead className="bg-gray-50 sticky top-0 z-10">
               <tr>
-                <Th onClick={() => toggleSort('produto')} active={sortKey === 'produto'} dir={sortDir}>Item</Th>
-                <Th>Qtde. Caixas</Th>
-                <Th onClick={() => toggleSort('numero')} active={sortKey === 'numero'} dir={sortDir}>OB</Th>
-                <Th onClick={() => toggleSort('cliente')} active={sortKey === 'cliente'} dir={sortDir}>Cliente</Th>
-                <Th className="text-right">Qtde. NF Cliente</Th>
-                <Th>NF</Th>
-                <Th>Pedido</Th>
-                <Th className="text-right">Qtde. Entregue</Th>
-                <Th onClick={() => toggleSort('saldo')} active={sortKey === 'saldo'} dir={sortDir} className="text-right">Saldo a Entregar</Th>
-                <Th>Status</Th>
-                <Th className="text-right">Ação</Th>
+                <Th columnId="produto" onClick={() => toggleSort('produto')} active={sortKey === 'produto'} dir={sortDir} onResizeStart={startResize}>Item</Th>
+                <Th columnId="caixas" onResizeStart={startResize}>Qtde. Caixas</Th>
+                <Th columnId="numero" onClick={() => toggleSort('numero')} active={sortKey === 'numero'} dir={sortDir} onResizeStart={startResize}>OB</Th>
+                <Th columnId="cliente" onClick={() => toggleSort('cliente')} active={sortKey === 'cliente'} dir={sortDir} onResizeStart={startResize}>Cliente</Th>
+                <Th columnId="nfCliente" align="right" onResizeStart={startResize}>Qtde. NF Cliente</Th>
+                <Th columnId="nf" onResizeStart={startResize}>NF</Th>
+                <Th columnId="pedido" onResizeStart={startResize}>Pedido</Th>
+                <Th columnId="entregue" align="right" onResizeStart={startResize}>Qtde. Entregue</Th>
+                <Th columnId="saldo" onClick={() => toggleSort('saldo')} active={sortKey === 'saldo'} dir={sortDir} align="right" onResizeStart={startResize}>Saldo a Entregar</Th>
+                <Th columnId="status" onResizeStart={startResize}>Status</Th>
+                <Th columnId="acao" align="right" onResizeStart={startResize}>Ação</Th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100 bg-white">
@@ -288,32 +306,44 @@ export default function StatusBeneficiamentosPage() {
 }
 
 function Th({
+  columnId,
   children,
   onClick,
   active,
   dir,
   className,
+  align,
+  onResizeStart,
 }: {
+  columnId: string;
   children: React.ReactNode;
   onClick?: () => void;
   active?: boolean;
   dir?: SortDir;
   className?: string;
+  align?: 'left' | 'right' | 'center';
+  onResizeStart?: (columnId: string, startX: number) => void;
 }) {
+  const sort: SortState<string> = active ? { column: columnId, direction: dir === 'asc' ? 'asc' : 'desc' } : null;
   return (
-    <th
-      onClick={onClick}
+    <ResizableSortableTh
+      columnId={columnId}
+      label={
+        <>
+          {children}
+          {active ? <span className="ml-1 text-[10px]">{dir === 'asc' ? '▲' : '▼'}</span> : null}
+        </>
+      }
+      sortable={!!onClick}
+      sort={sort}
+      onSort={() => onClick?.()}
+      align={align}
+      onResizeStart={onResizeStart}
       className={[
         'px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase',
-        onClick ? 'cursor-pointer select-none hover:text-gray-700' : '',
-        active ? 'text-gray-700' : '',
         className || '',
       ].join(' ')}
-      title={onClick ? `Ordenar (${dir === 'asc' ? 'crescente' : 'decrescente'})` : undefined}
-    >
-      {children}
-      {active ? <span className="ml-1 text-[10px]">{dir === 'asc' ? '▲' : '▼'}</span> : null}
-    </th>
+    />
   );
 }
 

@@ -7,6 +7,10 @@ import PageCard from '@/components/ui/PageCard';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/contexts/ToastProvider';
 import { getDevSchemaDiagnostics, reloadPostgrestSchemaCache, type DevSchemaDiagnostics } from '@/services/devSchema';
+import ResizableSortableTh, { type SortState } from '@/components/ui/table/ResizableSortableTh';
+import TableColGroup from '@/components/ui/table/TableColGroup';
+import { useTableColumnWidths, type TableColumnWidthDef } from '@/components/ui/table/useTableColumnWidths';
+import { sortRows, toggleSort } from '@/components/ui/table/sortUtils';
 
 function downloadJson(filename: string, data: unknown) {
   const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
@@ -24,6 +28,38 @@ export default function SchemaDiagnosticsPage() {
   const [reloading, setReloading] = useState(false);
   const [data, setData] = useState<DevSchemaDiagnostics | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [sortMigrations, setSortMigrations] = useState<SortState<'version'>>({ column: 'version', direction: 'desc' });
+  const [sortOverloads, setSortOverloads] = useState<SortState<'func' | 'count'>>({ column: 'count', direction: 'desc' });
+
+  const migrationsColumns: TableColumnWidthDef[] = [{ id: 'version', defaultWidth: 520, minWidth: 260 }];
+  const { widths: migrationsWidths, startResize: startMigrationsResize } = useTableColumnWidths({
+    tableId: 'dev:schema-diagnostics:migrations',
+    columns: migrationsColumns,
+  });
+
+  const overloadColumns: TableColumnWidthDef[] = [
+    { id: 'func', defaultWidth: 420, minWidth: 220 },
+    { id: 'count', defaultWidth: 160, minWidth: 120 },
+  ];
+  const { widths: overloadWidths, startResize: startOverloadsResize } = useTableColumnWidths({
+    tableId: 'dev:schema-diagnostics:overloads',
+    columns: overloadColumns,
+  });
+
+  const sortedMigrations = sortRows(
+    data?.migrations ?? [],
+    sortMigrations as any,
+    [{ id: 'version', type: 'string', getValue: (m: any) => m.version ?? '' }] as const
+  );
+
+  const sortedOverloads = sortRows(
+    data?.overloaded_public ?? [],
+    sortOverloads as any,
+    [
+      { id: 'func', type: 'string', getValue: (o: any) => o.proname ?? '' },
+      { id: 'count', type: 'number', getValue: (o: any) => o.overloads ?? 0 },
+    ] as const
+  );
 
   const load = async () => {
     setLoading(true);
@@ -135,19 +171,27 @@ export default function SchemaDiagnosticsPage() {
             <div className="rounded-xl border border-gray-200 bg-white overflow-hidden">
               <div className="px-4 py-3 border-b border-gray-200 text-sm font-semibold text-gray-900">Migrations aplicadas (últimas)</div>
               <div className="max-h-[320px] overflow-auto">
-                <table className="min-w-full text-sm">
+                <table className="min-w-full text-sm table-fixed">
+                  <TableColGroup columns={migrationsColumns} widths={migrationsWidths} />
                   <thead className="bg-gray-50 text-gray-600 sticky top-0">
                     <tr>
-                      <th className="text-left p-3">version</th>
+                      <ResizableSortableTh
+                        columnId="version"
+                        label="version"
+                        sort={sortMigrations}
+                        onSort={(col) => setSortMigrations((prev) => toggleSort(prev as any, col))}
+                        onResizeStart={startMigrationsResize}
+                        className="text-left p-3"
+                      />
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-100">
-                    {(data.migrations ?? []).map((m) => (
+                    {sortedMigrations.map((m) => (
                       <tr key={m.version} className="hover:bg-gray-50">
                         <td className="p-3 font-mono text-gray-900">{m.version}</td>
                       </tr>
                     ))}
-                    {(data.migrations ?? []).length === 0 && (
+                    {sortedMigrations.length === 0 && (
                       <tr>
                         <td className="p-6 text-center text-gray-500">Sem dados.</td>
                       </tr>
@@ -160,21 +204,36 @@ export default function SchemaDiagnosticsPage() {
             <div className="rounded-xl border border-gray-200 bg-white overflow-hidden">
               <div className="px-4 py-3 border-b border-gray-200 text-sm font-semibold text-gray-900">Overloads (public)</div>
               <div className="max-h-[260px] overflow-auto">
-                <table className="min-w-full text-sm">
+                <table className="min-w-full text-sm table-fixed">
+                  <TableColGroup columns={overloadColumns} widths={overloadWidths} />
                   <thead className="bg-gray-50 text-gray-600 sticky top-0">
                     <tr>
-                      <th className="text-left p-3">função</th>
-                      <th className="text-left p-3">quantidade</th>
+                      <ResizableSortableTh
+                        columnId="func"
+                        label="função"
+                        sort={sortOverloads}
+                        onSort={(col) => setSortOverloads((prev) => toggleSort(prev as any, col))}
+                        onResizeStart={startOverloadsResize}
+                        className="text-left p-3"
+                      />
+                      <ResizableSortableTh
+                        columnId="count"
+                        label="quantidade"
+                        sort={sortOverloads}
+                        onSort={(col) => setSortOverloads((prev) => toggleSort(prev as any, col))}
+                        onResizeStart={startOverloadsResize}
+                        className="text-left p-3"
+                      />
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-100">
-                    {(data.overloaded_public ?? []).map((o) => (
+                    {sortedOverloads.map((o) => (
                       <tr key={o.proname} className="hover:bg-gray-50">
                         <td className="p-3 font-mono text-gray-900">{o.proname}</td>
                         <td className="p-3 text-gray-700">{o.overloads}</td>
                       </tr>
                     ))}
-                    {(data.overloaded_public ?? []).length === 0 && (
+                    {sortedOverloads.length === 0 && (
                       <tr>
                         <td colSpan={2} className="p-6 text-center text-gray-500">
                           Nenhum overload detectado.
@@ -191,4 +250,3 @@ export default function SchemaDiagnosticsPage() {
     </PageShell>
   );
 }
-

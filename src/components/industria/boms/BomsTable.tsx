@@ -1,6 +1,10 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { BomListItem } from '@/services/industriaBom';
 import { Edit, CheckCircle, XCircle, Package, Copy, Trash2, MoreHorizontal } from 'lucide-react';
+import ResizableSortableTh, { type SortState } from '@/components/ui/table/ResizableSortableTh';
+import TableColGroup from '@/components/ui/table/TableColGroup';
+import { useTableColumnWidths, type TableColumnWidthDef } from '@/components/ui/table/useTableColumnWidths';
+import { sortRows, toggleSort } from '@/components/ui/table/sortUtils';
 
 interface Props {
   boms: BomListItem[];
@@ -18,21 +22,86 @@ const tipoMeta = (tipo?: string | null) => {
 export default function BomsTable({ boms, onEdit, onClone, onDelete }: Props) {
   const [menuId, setMenuId] = useState<string | null>(null);
 
+  const columns: TableColumnWidthDef[] = [
+    { id: 'produto', defaultWidth: 360, minWidth: 220 },
+    { id: 'codigo_versao', defaultWidth: 220, minWidth: 180 },
+    { id: 'tipo', defaultWidth: 160, minWidth: 140 },
+    { id: 'padrao', defaultWidth: 120, minWidth: 100 },
+    { id: 'status', defaultWidth: 140, minWidth: 120 },
+    { id: 'acoes', defaultWidth: 160, minWidth: 140 },
+  ];
+  const { widths, startResize } = useTableColumnWidths({ tableId: 'industria:boms', columns });
+
+  const [sort, setSort] = useState<SortState<string>>({ column: 'produto', direction: 'asc' });
+  const sortedBoms = useMemo(() => {
+    return sortRows(
+      boms,
+      sort as any,
+      [
+        { id: 'produto', type: 'string', getValue: (b) => b.produto_nome ?? '' },
+        { id: 'codigo_versao', type: 'string', getValue: (b) => `${b.codigo ?? ''} v${b.versao ?? ''}` },
+        { id: 'tipo', type: 'string', getValue: (b) => tipoMeta(b.tipo_bom).label },
+        { id: 'padrao', type: 'boolean', getValue: (b) => Boolean(b.padrao_para_producao || b.padrao_para_beneficiamento) },
+        { id: 'status', type: 'boolean', getValue: (b) => Boolean(b.ativo) },
+      ] as const
+    );
+  }, [boms, sort]);
+
   return (
     <div className="overflow-x-auto overflow-y-visible">
       <table className="min-w-full divide-y divide-gray-200">
+        <TableColGroup columns={columns} widths={widths} />
         <thead className="bg-gray-50">
           <tr>
-            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Produto</th>
-            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Código / Versão</th>
-            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Tipo</th>
-            <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase">Padrão</th>
-            <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase">Status</th>
-            <th className="px-6 py-3"></th>
+            <ResizableSortableTh
+              columnId="produto"
+              label="Produto"
+              sort={sort as any}
+              onSort={(col) => setSort((prev) => toggleSort(prev as any, col))}
+              onResizeStart={startResize as any}
+            />
+            <ResizableSortableTh
+              columnId="codigo_versao"
+              label="Código / Versão"
+              sort={sort as any}
+              onSort={(col) => setSort((prev) => toggleSort(prev as any, col))}
+              onResizeStart={startResize as any}
+            />
+            <ResizableSortableTh
+              columnId="tipo"
+              label="Tipo"
+              sort={sort as any}
+              onSort={(col) => setSort((prev) => toggleSort(prev as any, col))}
+              onResizeStart={startResize as any}
+            />
+            <ResizableSortableTh
+              columnId="padrao"
+              label="Padrão"
+              align="center"
+              sort={sort as any}
+              onSort={(col) => setSort((prev) => toggleSort(prev as any, col))}
+              onResizeStart={startResize as any}
+            />
+            <ResizableSortableTh
+              columnId="status"
+              label="Status"
+              align="center"
+              sort={sort as any}
+              onSort={(col) => setSort((prev) => toggleSort(prev as any, col))}
+              onResizeStart={startResize as any}
+            />
+            <ResizableSortableTh
+              columnId="acoes"
+              label="Ações"
+              align="right"
+              sortable={false}
+              resizable
+              onResizeStart={startResize as any}
+            />
           </tr>
         </thead>
         <tbody className="bg-white divide-y divide-gray-200">
-          {boms.map(bom => (
+          {sortedBoms.map(bom => (
             <tr key={bom.id} className="hover:bg-gray-50 transition-colors">
               <td className="px-6 py-4">
                 <div className="flex items-center gap-2">
@@ -126,7 +195,7 @@ export default function BomsTable({ boms, onEdit, onClone, onDelete }: Props) {
               </td>
             </tr>
           ))}
-          {boms.length === 0 && (
+          {sortedBoms.length === 0 && (
             <tr>
               <td colSpan={6} className="px-6 py-12 text-center text-gray-500">Nenhuma ficha técnica encontrada.</td>
             </tr>

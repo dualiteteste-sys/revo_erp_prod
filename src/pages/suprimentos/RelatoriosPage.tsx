@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import { 
   getRelatorioValorizacao, 
   getRelatorioBaixoEstoque, 
@@ -12,6 +12,10 @@ import GlassCard from '@/components/ui/GlassCard';
 import { formatCurrency } from '@/lib/utils';
 import { useDebounce } from '@/hooks/useDebounce';
 import ReactECharts from 'echarts-for-react';
+import ResizableSortableTh, { type SortState } from '@/components/ui/table/ResizableSortableTh';
+import TableColGroup from '@/components/ui/table/TableColGroup';
+import { useTableColumnWidths, type TableColumnWidthDef } from '@/components/ui/table/useTableColumnWidths';
+import { sortRows, toggleSort } from '@/components/ui/table/sortUtils';
 
 type ReportType = 'valorizacao' | 'baixo_estoque' | 'sugestao_compra';
 
@@ -24,6 +28,43 @@ export default function RelatoriosPage() {
   const [valorizacaoData, setValorizacaoData] = useState<RelatorioValorizacaoItem[]>([]);
   const [baixoEstoqueData, setBaixoEstoqueData] = useState<RelatorioBaixoEstoqueItem[]>([]);
   const [sugestaoCompraData, setSugestaoCompraData] = useState<SugestaoCompraMrpLiteItem[]>([]);
+  const [valSort, setValSort] = useState<SortState<string>>({ column: 'total', direction: 'desc' });
+  const [baixoSort, setBaixoSort] = useState<SortState<string>>({ column: 'saldo', direction: 'asc' });
+  const [sugSort, setSugSort] = useState<SortState<string>>({ column: 'sugestao', direction: 'desc' });
+
+  const valColumns: TableColumnWidthDef[] = [
+    { id: 'produto', defaultWidth: 360, minWidth: 220 },
+    { id: 'sku', defaultWidth: 140, minWidth: 120 },
+    { id: 'unidade', defaultWidth: 90, minWidth: 80 },
+    { id: 'saldo', defaultWidth: 120, minWidth: 100 },
+    { id: 'custo_medio', defaultWidth: 160, minWidth: 140 },
+    { id: 'total', defaultWidth: 160, minWidth: 140 },
+    { id: 'classe', defaultWidth: 120, minWidth: 100 },
+  ];
+  const baixoColumns: TableColumnWidthDef[] = [
+    { id: 'produto', defaultWidth: 360, minWidth: 220 },
+    { id: 'saldo', defaultWidth: 140, minWidth: 120 },
+    { id: 'min', defaultWidth: 120, minWidth: 100 },
+    { id: 'max', defaultWidth: 120, minWidth: 100 },
+    { id: 'sugestao', defaultWidth: 160, minWidth: 140 },
+    { id: 'fornecedor', defaultWidth: 260, minWidth: 180 },
+  ];
+  const sugColumns: TableColumnWidthDef[] = [
+    { id: 'produto', defaultWidth: 360, minWidth: 220 },
+    { id: 'saldo', defaultWidth: 120, minWidth: 100 },
+    { id: 'em_oc', defaultWidth: 120, minWidth: 100 },
+    { id: 'projetado', defaultWidth: 120, minWidth: 100 },
+    { id: 'min', defaultWidth: 120, minWidth: 100 },
+    { id: 'max', defaultWidth: 120, minWidth: 100 },
+    { id: 'sugestao', defaultWidth: 160, minWidth: 140 },
+    { id: 'lead_time', defaultWidth: 120, minWidth: 100 },
+    { id: 'prev_receb', defaultWidth: 160, minWidth: 140 },
+    { id: 'fornecedor', defaultWidth: 240, minWidth: 180 },
+  ];
+
+  const { widths: valWidths, startResize: startResizeVal } = useTableColumnWidths({ tableId: 'suprimentos:relatorios:valorizacao', columns: valColumns });
+  const { widths: baixoWidths, startResize: startResizeBaixo } = useTableColumnWidths({ tableId: 'suprimentos:relatorios:baixo-estoque', columns: baixoColumns });
+  const { widths: sugWidths, startResize: startResizeSug } = useTableColumnWidths({ tableId: 'suprimentos:relatorios:sugestao-compra', columns: sugColumns });
 
   const fetchData = async () => {
     setLoading(true);
@@ -52,6 +93,56 @@ export default function RelatoriosPage() {
   const handlePrint = () => {
     window.print();
   };
+
+  const sortedValorizacao = useMemo(() => {
+    return sortRows(
+      valorizacaoData,
+      valSort as any,
+      [
+        { id: 'produto', type: 'string', getValue: (i) => i.nome ?? '' },
+        { id: 'sku', type: 'string', getValue: (i) => i.sku ?? '' },
+        { id: 'unidade', type: 'string', getValue: (i) => i.unidade ?? '' },
+        { id: 'saldo', type: 'number', getValue: (i) => i.saldo ?? 0 },
+        { id: 'custo_medio', type: 'number', getValue: (i) => i.custo_medio ?? 0 },
+        { id: 'total', type: 'number', getValue: (i) => i.valor_total ?? 0 },
+        { id: 'classe', type: 'string', getValue: (i) => i.classe ?? '' },
+      ] as const
+    );
+  }, [valorizacaoData, valSort]);
+
+  const sortedBaixoEstoque = useMemo(() => {
+    return sortRows(
+      baixoEstoqueData,
+      baixoSort as any,
+      [
+        { id: 'produto', type: 'string', getValue: (i) => i.nome ?? '' },
+        { id: 'saldo', type: 'number', getValue: (i) => i.saldo ?? 0 },
+        { id: 'min', type: 'number', getValue: (i) => i.estoque_min ?? 0 },
+        { id: 'max', type: 'number', getValue: (i) => i.estoque_max ?? 0 },
+        { id: 'sugestao', type: 'number', getValue: (i) => i.sugestao_compra ?? 0 },
+        { id: 'fornecedor', type: 'string', getValue: (i) => i.fornecedor_nome ?? '' },
+      ] as const
+    );
+  }, [baixoEstoqueData, baixoSort]);
+
+  const sortedSugestaoCompra = useMemo(() => {
+    return sortRows(
+      sugestaoCompraData,
+      sugSort as any,
+      [
+        { id: 'produto', type: 'string', getValue: (i) => i.nome ?? '' },
+        { id: 'saldo', type: 'number', getValue: (i) => i.saldo ?? 0 },
+        { id: 'em_oc', type: 'number', getValue: (i) => i.qtd_em_oc_aberta ?? 0 },
+        { id: 'projetado', type: 'number', getValue: (i) => i.saldo_projetado ?? 0 },
+        { id: 'min', type: 'number', getValue: (i) => i.estoque_min ?? 0 },
+        { id: 'max', type: 'number', getValue: (i) => i.estoque_max ?? 0 },
+        { id: 'sugestao', type: 'number', getValue: (i) => i.sugestao_compra ?? 0 },
+        { id: 'lead_time', type: 'number', getValue: (i) => i.lead_time_dias ?? 0 },
+        { id: 'prev_receb', type: 'date', getValue: (i) => i.data_prevista_recebimento ?? null },
+        { id: 'fornecedor', type: 'string', getValue: (i) => i.fornecedor_nome ?? '' },
+      ] as const
+    );
+  }, [sugSort, sugestaoCompraData]);
 
   const handleExport = () => {
     let content = '';
@@ -247,19 +338,20 @@ export default function RelatoriosPage() {
                 <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
                     <div className="overflow-x-auto">
                         <table className="min-w-full divide-y divide-gray-200 text-sm">
+                            <TableColGroup columns={valColumns} widths={valWidths} />
                             <thead className="bg-gray-50">
                                 <tr>
-                                    <th className="px-4 py-3 text-left font-medium text-gray-500">Produto</th>
-                                    <th className="px-4 py-3 text-left font-medium text-gray-500">SKU</th>
-                                    <th className="px-4 py-3 text-center font-medium text-gray-500">Un.</th>
-                                    <th className="px-4 py-3 text-right font-medium text-gray-500">Saldo</th>
-                                    <th className="px-4 py-3 text-right font-medium text-gray-500">Custo Médio</th>
-                                    <th className="px-4 py-3 text-right font-medium text-gray-500">Total</th>
-                                    <th className="px-4 py-3 text-center font-medium text-gray-500">Classe ABC</th>
+                                    <ResizableSortableTh columnId="produto" label="Produto" className="px-4 py-3 font-medium text-gray-500 normal-case tracking-normal" sort={valSort as any} onSort={(col) => setValSort((prev) => toggleSort(prev as any, col))} onResizeStart={startResizeVal as any} />
+                                    <ResizableSortableTh columnId="sku" label="SKU" className="px-4 py-3 font-medium text-gray-500 normal-case tracking-normal" sort={valSort as any} onSort={(col) => setValSort((prev) => toggleSort(prev as any, col))} onResizeStart={startResizeVal as any} />
+                                    <ResizableSortableTh columnId="unidade" label="Un." align="center" className="px-4 py-3 font-medium text-gray-500 normal-case tracking-normal" sort={valSort as any} onSort={(col) => setValSort((prev) => toggleSort(prev as any, col))} onResizeStart={startResizeVal as any} />
+                                    <ResizableSortableTh columnId="saldo" label="Saldo" align="right" className="px-4 py-3 font-medium text-gray-500 normal-case tracking-normal" sort={valSort as any} onSort={(col) => setValSort((prev) => toggleSort(prev as any, col))} onResizeStart={startResizeVal as any} />
+                                    <ResizableSortableTh columnId="custo_medio" label="Custo Médio" align="right" className="px-4 py-3 font-medium text-gray-500 normal-case tracking-normal" sort={valSort as any} onSort={(col) => setValSort((prev) => toggleSort(prev as any, col))} onResizeStart={startResizeVal as any} />
+                                    <ResizableSortableTh columnId="total" label="Total" align="right" className="px-4 py-3 font-medium text-gray-500 normal-case tracking-normal" sort={valSort as any} onSort={(col) => setValSort((prev) => toggleSort(prev as any, col))} onResizeStart={startResizeVal as any} />
+                                    <ResizableSortableTh columnId="classe" label="Classe ABC" align="center" className="px-4 py-3 font-medium text-gray-500 normal-case tracking-normal" sort={valSort as any} onSort={(col) => setValSort((prev) => toggleSort(prev as any, col))} onResizeStart={startResizeVal as any} />
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-gray-200">
-                                {valorizacaoData.map((item) => (
+                                {sortedValorizacao.map((item) => (
                                     <tr key={item.produto_id} className="hover:bg-gray-50">
                                         <td className="px-4 py-2 font-medium text-gray-900">{item.nome}</td>
                                         <td className="px-4 py-2 text-gray-500">{item.sku || '-'}</td>
@@ -289,18 +381,19 @@ export default function RelatoriosPage() {
             <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
                 <div className="overflow-x-auto">
                     <table className="min-w-full divide-y divide-gray-200 text-sm">
+                        <TableColGroup columns={baixoColumns} widths={baixoWidths} />
                         <thead className="bg-gray-50">
                             <tr>
-                                <th className="px-4 py-3 text-left font-medium text-gray-500">Produto</th>
-                                <th className="px-4 py-3 text-center font-medium text-gray-500">Saldo Atual</th>
-                                <th className="px-4 py-3 text-center font-medium text-gray-500">Mínimo</th>
-                                <th className="px-4 py-3 text-center font-medium text-gray-500">Máximo</th>
-                                <th className="px-4 py-3 text-center font-medium text-gray-500 bg-blue-50">Sugestão Compra</th>
-                                <th className="px-4 py-3 text-left font-medium text-gray-500">Fornecedor Principal</th>
+                                <ResizableSortableTh columnId="produto" label="Produto" className="px-4 py-3 font-medium text-gray-500 normal-case tracking-normal" sort={baixoSort as any} onSort={(col) => setBaixoSort((prev) => toggleSort(prev as any, col))} onResizeStart={startResizeBaixo as any} />
+                                <ResizableSortableTh columnId="saldo" label="Saldo Atual" align="center" className="px-4 py-3 font-medium text-gray-500 normal-case tracking-normal" sort={baixoSort as any} onSort={(col) => setBaixoSort((prev) => toggleSort(prev as any, col))} onResizeStart={startResizeBaixo as any} />
+                                <ResizableSortableTh columnId="min" label="Mínimo" align="center" className="px-4 py-3 font-medium text-gray-500 normal-case tracking-normal" sort={baixoSort as any} onSort={(col) => setBaixoSort((prev) => toggleSort(prev as any, col))} onResizeStart={startResizeBaixo as any} />
+                                <ResizableSortableTh columnId="max" label="Máximo" align="center" className="px-4 py-3 font-medium text-gray-500 normal-case tracking-normal" sort={baixoSort as any} onSort={(col) => setBaixoSort((prev) => toggleSort(prev as any, col))} onResizeStart={startResizeBaixo as any} />
+                                <ResizableSortableTh columnId="sugestao" label="Sugestão Compra" align="center" className="px-4 py-3 font-medium text-gray-500 bg-blue-50 normal-case tracking-normal" sort={baixoSort as any} onSort={(col) => setBaixoSort((prev) => toggleSort(prev as any, col))} onResizeStart={startResizeBaixo as any} />
+                                <ResizableSortableTh columnId="fornecedor" label="Fornecedor Principal" className="px-4 py-3 font-medium text-gray-500 normal-case tracking-normal" sort={baixoSort as any} onSort={(col) => setBaixoSort((prev) => toggleSort(prev as any, col))} onResizeStart={startResizeBaixo as any} />
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-gray-200">
-                            {baixoEstoqueData.map((item) => (
+                            {sortedBaixoEstoque.map((item) => (
                                 <tr key={item.produto_id} className="hover:bg-gray-50">
                                     <td className="px-4 py-2 font-medium text-gray-900">
                                         {item.nome}
@@ -333,22 +426,23 @@ export default function RelatoriosPage() {
             <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
               <div className="overflow-x-auto">
                 <table className="min-w-full divide-y divide-gray-200 text-sm">
+                  <TableColGroup columns={sugColumns} widths={sugWidths} />
                   <thead className="bg-gray-50">
                     <tr>
-                      <th className="px-4 py-3 text-left font-medium text-gray-500">Produto</th>
-                      <th className="px-4 py-3 text-center font-medium text-gray-500">Saldo</th>
-                      <th className="px-4 py-3 text-center font-medium text-gray-500">Em OC</th>
-                      <th className="px-4 py-3 text-center font-medium text-gray-500">Proj.</th>
-                      <th className="px-4 py-3 text-center font-medium text-gray-500">Mín.</th>
-                      <th className="px-4 py-3 text-center font-medium text-gray-500">Máx.</th>
-                      <th className="px-4 py-3 text-center font-medium text-gray-500 bg-blue-50">Sugestão</th>
-                      <th className="px-4 py-3 text-center font-medium text-gray-500">Lead time</th>
-                      <th className="px-4 py-3 text-left font-medium text-gray-500">Prev. receb.</th>
-                      <th className="px-4 py-3 text-left font-medium text-gray-500">Fornecedor</th>
+                      <ResizableSortableTh columnId="produto" label="Produto" className="px-4 py-3 font-medium text-gray-500 normal-case tracking-normal" sort={sugSort as any} onSort={(col) => setSugSort((prev) => toggleSort(prev as any, col))} onResizeStart={startResizeSug as any} />
+                      <ResizableSortableTh columnId="saldo" label="Saldo" align="center" className="px-4 py-3 font-medium text-gray-500 normal-case tracking-normal" sort={sugSort as any} onSort={(col) => setSugSort((prev) => toggleSort(prev as any, col))} onResizeStart={startResizeSug as any} />
+                      <ResizableSortableTh columnId="em_oc" label="Em OC" align="center" className="px-4 py-3 font-medium text-gray-500 normal-case tracking-normal" sort={sugSort as any} onSort={(col) => setSugSort((prev) => toggleSort(prev as any, col))} onResizeStart={startResizeSug as any} />
+                      <ResizableSortableTh columnId="projetado" label="Proj." align="center" className="px-4 py-3 font-medium text-gray-500 normal-case tracking-normal" sort={sugSort as any} onSort={(col) => setSugSort((prev) => toggleSort(prev as any, col))} onResizeStart={startResizeSug as any} />
+                      <ResizableSortableTh columnId="min" label="Mín." align="center" className="px-4 py-3 font-medium text-gray-500 normal-case tracking-normal" sort={sugSort as any} onSort={(col) => setSugSort((prev) => toggleSort(prev as any, col))} onResizeStart={startResizeSug as any} />
+                      <ResizableSortableTh columnId="max" label="Máx." align="center" className="px-4 py-3 font-medium text-gray-500 normal-case tracking-normal" sort={sugSort as any} onSort={(col) => setSugSort((prev) => toggleSort(prev as any, col))} onResizeStart={startResizeSug as any} />
+                      <ResizableSortableTh columnId="sugestao" label="Sugestão" align="center" className="px-4 py-3 font-medium text-gray-500 bg-blue-50 normal-case tracking-normal" sort={sugSort as any} onSort={(col) => setSugSort((prev) => toggleSort(prev as any, col))} onResizeStart={startResizeSug as any} />
+                      <ResizableSortableTh columnId="lead_time" label="Lead time" align="center" className="px-4 py-3 font-medium text-gray-500 normal-case tracking-normal" sort={sugSort as any} onSort={(col) => setSugSort((prev) => toggleSort(prev as any, col))} onResizeStart={startResizeSug as any} />
+                      <ResizableSortableTh columnId="prev_receb" label="Prev. receb." className="px-4 py-3 font-medium text-gray-500 normal-case tracking-normal" sort={sugSort as any} onSort={(col) => setSugSort((prev) => toggleSort(prev as any, col))} onResizeStart={startResizeSug as any} />
+                      <ResizableSortableTh columnId="fornecedor" label="Fornecedor" className="px-4 py-3 font-medium text-gray-500 normal-case tracking-normal" sort={sugSort as any} onSort={(col) => setSugSort((prev) => toggleSort(prev as any, col))} onResizeStart={startResizeSug as any} />
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-200">
-                    {sugestaoCompraData.map((item) => (
+                    {sortedSugestaoCompra.map((item) => (
                       <tr key={item.produto_id} className="hover:bg-gray-50">
                         <td className="px-4 py-2 font-medium text-gray-900">
                           {item.nome}

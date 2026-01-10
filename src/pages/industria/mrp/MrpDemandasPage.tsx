@@ -25,6 +25,10 @@ import { Button } from '@/components/ui/button';
 import TextArea from '@/components/ui/forms/TextArea';
 import { useSearchParams } from 'react-router-dom';
 import { useNavigate } from 'react-router-dom';
+import ResizableSortableTh, { type SortState } from '@/components/ui/table/ResizableSortableTh';
+import TableColGroup from '@/components/ui/table/TableColGroup';
+import { useTableColumnWidths, type TableColumnWidthDef } from '@/components/ui/table/useTableColumnWidths';
+import { sortRows, toggleSort } from '@/components/ui/table/sortUtils';
 
 type ParamModalState = {
   open: boolean;
@@ -77,6 +81,43 @@ export default function MrpDemandasPage() {
     const produtoId = searchParams.get('produtoId');
     const produtoNome = searchParams.get('produtoNome') || undefined;
     return produtoId ? { id: produtoId, nome: produtoNome } : null;
+  });
+  const [paramSort, setParamSort] = useState<SortState<'produto' | 'lead' | 'loteMin' | 'multiplo' | 'seg' | 'picking'>>({
+    column: 'produto',
+    direction: 'asc',
+  });
+  const [demSort, setDemSort] = useState<SortState<'produto' | 'op' | 'planRes' | 'necessidade' | 'dataNec' | 'status' | 'ultima'>>({
+    column: 'necessidade',
+    direction: 'desc',
+  });
+
+  const paramColumns: TableColumnWidthDef[] = [
+    { id: 'produto', defaultWidth: 320, minWidth: 220 },
+    { id: 'lead', defaultWidth: 140, minWidth: 120 },
+    { id: 'loteMin', defaultWidth: 120, minWidth: 110 },
+    { id: 'multiplo', defaultWidth: 120, minWidth: 110 },
+    { id: 'seg', defaultWidth: 140, minWidth: 120 },
+    { id: 'picking', defaultWidth: 120, minWidth: 110 },
+    { id: 'acoes', defaultWidth: 120, minWidth: 110, resizable: false },
+  ];
+  const { widths: paramWidths, startResize: startParamResize } = useTableColumnWidths({
+    tableId: 'industria:mrp:parametros',
+    columns: paramColumns,
+  });
+
+  const demandaColumns: TableColumnWidthDef[] = [
+    { id: 'produto', defaultWidth: 320, minWidth: 220 },
+    { id: 'op', defaultWidth: 200, minWidth: 170 },
+    { id: 'planRes', defaultWidth: 220, minWidth: 180 },
+    { id: 'necessidade', defaultWidth: 180, minWidth: 150 },
+    { id: 'dataNec', defaultWidth: 180, minWidth: 150 },
+    { id: 'status', defaultWidth: 150, minWidth: 130 },
+    { id: 'ultima', defaultWidth: 240, minWidth: 200 },
+    { id: 'acoes', defaultWidth: 180, minWidth: 160, resizable: false },
+  ];
+  const { widths: demandaWidths, startResize: startDemandaResize } = useTableColumnWidths({
+    tableId: 'industria:mrp:demandas',
+    columns: demandaColumns,
   });
 
   const loadParametros = async () => {
@@ -220,6 +261,37 @@ export default function MrpDemandasPage() {
       p.produto_nome.toLowerCase().includes(searchLower)
     );
   }, [parametros, searchParametro]);
+
+  const parametrosSorted = useMemo(() => {
+    return sortRows(
+      parametrosFiltrados,
+      paramSort as any,
+      [
+        { id: 'produto', type: 'string', getValue: (p: MrpParametro) => p.produto_nome ?? '' },
+        { id: 'lead', type: 'number', getValue: (p: MrpParametro) => p.lead_time_dias ?? 0 },
+        { id: 'loteMin', type: 'number', getValue: (p: MrpParametro) => p.lote_minimo ?? 0 },
+        { id: 'multiplo', type: 'number', getValue: (p: MrpParametro) => p.multiplo_compra ?? 0 },
+        { id: 'seg', type: 'number', getValue: (p: MrpParametro) => p.estoque_seguranca ?? 0 },
+        { id: 'picking', type: 'string', getValue: (p: MrpParametro) => p.politica_picking ?? '' },
+      ] as const
+    );
+  }, [parametrosFiltrados, paramSort]);
+
+  const demandasSorted = useMemo(() => {
+    return sortRows(
+      demandas,
+      demSort as any,
+      [
+        { id: 'produto', type: 'string', getValue: (d: MrpDemanda) => d.produto_nome ?? '' },
+        { id: 'op', type: 'string', getValue: (d: MrpDemanda) => String(d.ordem_numero ?? d.componente_id ?? '') },
+        { id: 'planRes', type: 'number', getValue: (d: MrpDemanda) => d.quantidade_planejada ?? 0 },
+        { id: 'necessidade', type: 'number', getValue: (d: MrpDemanda) => d.necessidade_liquida ?? 0 },
+        { id: 'dataNec', type: 'date', getValue: (d: MrpDemanda) => d.data_necessidade ?? '' },
+        { id: 'status', type: 'string', getValue: (d: MrpDemanda) => d.status ?? '' },
+        { id: 'ultima', type: 'date', getValue: (d: MrpDemanda) => d.ultima_acao_data ?? '' },
+      ] as const
+    );
+  }, [demSort, demandas]);
 
   const handleReprocessar = async (ordemId?: string | null) => {
     if (!ordemId) {
@@ -373,20 +445,21 @@ export default function MrpDemandasPage() {
           </div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="min-w-full text-sm">
+            <table className="min-w-full text-sm table-fixed">
+              <TableColGroup columns={paramColumns} widths={paramWidths} />
               <thead className="bg-gray-50 text-gray-500">
                 <tr>
-                  <th className="px-4 py-2 text-left font-semibold">Produto</th>
-                  <th className="px-4 py-2 text-left font-semibold">Lead Time (dias)</th>
-                  <th className="px-4 py-2 text-left font-semibold">Lote Mín.</th>
-                  <th className="px-4 py-2 text-left font-semibold">Múltiplo</th>
-                  <th className="px-4 py-2 text-left font-semibold">Estoque Seg.</th>
-                  <th className="px-4 py-2 text-left font-semibold">Picking</th>
-                  <th className="px-4 py-2 text-center font-semibold">Ações</th>
+                  <ResizableSortableTh columnId="produto" label="Produto" sort={paramSort} onSort={(col) => setParamSort((prev) => toggleSort(prev as any, col))} onResizeStart={startParamResize} className="px-4 py-2 normal-case tracking-normal" />
+                  <ResizableSortableTh columnId="lead" label="Lead Time (dias)" sort={paramSort} onSort={(col) => setParamSort((prev) => toggleSort(prev as any, col))} onResizeStart={startParamResize} className="px-4 py-2 normal-case tracking-normal" />
+                  <ResizableSortableTh columnId="loteMin" label="Lote Mín." sort={paramSort} onSort={(col) => setParamSort((prev) => toggleSort(prev as any, col))} onResizeStart={startParamResize} className="px-4 py-2 normal-case tracking-normal" />
+                  <ResizableSortableTh columnId="multiplo" label="Múltiplo" sort={paramSort} onSort={(col) => setParamSort((prev) => toggleSort(prev as any, col))} onResizeStart={startParamResize} className="px-4 py-2 normal-case tracking-normal" />
+                  <ResizableSortableTh columnId="seg" label="Estoque Seg." sort={paramSort} onSort={(col) => setParamSort((prev) => toggleSort(prev as any, col))} onResizeStart={startParamResize} className="px-4 py-2 normal-case tracking-normal" />
+                  <ResizableSortableTh columnId="picking" label="Picking" sort={paramSort} onSort={(col) => setParamSort((prev) => toggleSort(prev as any, col))} onResizeStart={startParamResize} className="px-4 py-2 normal-case tracking-normal" />
+                  <ResizableSortableTh columnId="acoes" label="Ações" sortable={false} sort={paramSort} onResizeStart={startParamResize} align="center" className="px-4 py-2 normal-case tracking-normal" />
                 </tr>
               </thead>
               <tbody>
-                {parametrosFiltrados.map((param) => (
+                {parametrosSorted.map((param) => (
                   <tr key={param.id} className="border-t">
                     <td className="px-4 py-2">
                       <div className="font-medium text-gray-800">{param.produto_nome}</div>
@@ -408,7 +481,7 @@ export default function MrpDemandasPage() {
                     </td>
                   </tr>
                 ))}
-                {parametrosFiltrados.length === 0 && (
+                {parametrosSorted.length === 0 && (
                   <tr>
                     <td colSpan={7} className="text-center text-gray-500 py-6">Nenhum parâmetro cadastrado.</td>
                   </tr>
@@ -449,21 +522,22 @@ export default function MrpDemandasPage() {
           </div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="min-w-full text-sm">
+            <table className="min-w-full text-sm table-fixed">
+              <TableColGroup columns={demandaColumns} widths={demandaWidths} />
               <thead className="bg-gray-50 text-gray-500">
                 <tr>
-                  <th className="px-4 py-2 text-left font-semibold">Produto</th>
-                  <th className="px-4 py-2 text-left font-semibold">OP / Componente</th>
-                  <th className="px-4 py-2 text-left font-semibold">Planejado x Reservado</th>
-                  <th className="px-4 py-2 text-left font-semibold">Necessidade Líquida</th>
-                  <th className="px-4 py-2 text-left font-semibold">Data Necessidade</th>
-                  <th className="px-4 py-2 text-center font-semibold">Status</th>
-                  <th className="px-4 py-2 text-left font-semibold">Última ação</th>
-                  <th className="px-4 py-2 text-center font-semibold">Ações</th>
+                  <ResizableSortableTh columnId="produto" label="Produto" sort={demSort} onSort={(col) => setDemSort((prev) => toggleSort(prev as any, col))} onResizeStart={startDemandaResize} className="px-4 py-2 normal-case tracking-normal" />
+                  <ResizableSortableTh columnId="op" label="OP / Componente" sort={demSort} onSort={(col) => setDemSort((prev) => toggleSort(prev as any, col))} onResizeStart={startDemandaResize} className="px-4 py-2 normal-case tracking-normal" />
+                  <ResizableSortableTh columnId="planRes" label="Planejado x Reservado" sort={demSort} onSort={(col) => setDemSort((prev) => toggleSort(prev as any, col))} onResizeStart={startDemandaResize} className="px-4 py-2 normal-case tracking-normal" />
+                  <ResizableSortableTh columnId="necessidade" label="Necessidade Líquida" sort={demSort} onSort={(col) => setDemSort((prev) => toggleSort(prev as any, col))} onResizeStart={startDemandaResize} className="px-4 py-2 normal-case tracking-normal" />
+                  <ResizableSortableTh columnId="dataNec" label="Data Necessidade" sort={demSort} onSort={(col) => setDemSort((prev) => toggleSort(prev as any, col))} onResizeStart={startDemandaResize} className="px-4 py-2 normal-case tracking-normal" />
+                  <ResizableSortableTh columnId="status" label="Status" sort={demSort} onSort={(col) => setDemSort((prev) => toggleSort(prev as any, col))} onResizeStart={startDemandaResize} align="center" className="px-4 py-2 normal-case tracking-normal" />
+                  <ResizableSortableTh columnId="ultima" label="Última ação" sort={demSort} onSort={(col) => setDemSort((prev) => toggleSort(prev as any, col))} onResizeStart={startDemandaResize} className="px-4 py-2 normal-case tracking-normal" />
+                  <ResizableSortableTh columnId="acoes" label="Ações" sortable={false} sort={demSort} onResizeStart={startDemandaResize} align="center" className="px-4 py-2 normal-case tracking-normal" />
                 </tr>
               </thead>
               <tbody>
-                {demandas.map((demanda) => (
+                {demandasSorted.map((demanda) => (
                   <tr key={demanda.id} className="border-t">
                     <td className="px-4 py-2">
                       <div className="font-medium text-gray-800">{demanda.produto_nome}</div>

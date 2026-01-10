@@ -9,6 +9,10 @@ import { QualidadeMotivo } from '@/services/industriaProducao';
 import { useConfirm } from '@/contexts/ConfirmProvider';
 import { Button } from '@/components/ui/button';
 import PageHeader from '@/components/ui/PageHeader';
+import ResizableSortableTh, { type SortState } from '@/components/ui/table/ResizableSortableTh';
+import TableColGroup from '@/components/ui/table/TableColGroup';
+import { useTableColumnWidths, type TableColumnWidthDef } from '@/components/ui/table/useTableColumnWidths';
+import { sortRows, toggleSort } from '@/components/ui/table/sortUtils';
 
 export default function MotivosRefugoPage() {
     const [motivos, setMotivos] = useState<QualidadeMotivo[]>([]);
@@ -16,6 +20,24 @@ export default function MotivosRefugoPage() {
     const [isModalOpen, setIsModalOpen] = useState(false);
     const { addToast } = useToast();
     const { confirm } = useConfirm();
+    const [sort, setSort] = useState<SortState<'codigo' | 'descricao' | 'tipo'>>({ column: 'codigo', direction: 'asc' });
+
+    const columns: TableColumnWidthDef[] = [
+        { id: 'codigo', defaultWidth: 160, minWidth: 120 },
+        { id: 'descricao', defaultWidth: 520, minWidth: 240 },
+        { id: 'tipo', defaultWidth: 160, minWidth: 140 },
+        { id: 'acoes', defaultWidth: 120, minWidth: 110, resizable: false },
+    ];
+    const { widths, startResize } = useTableColumnWidths({ tableId: 'industria:qualidade:motivos', columns });
+    const motivosSorted = sortRows(
+        motivos,
+        sort as any,
+        [
+            { id: 'codigo', type: 'string', getValue: (m: QualidadeMotivo) => m.codigo ?? '' },
+            { id: 'descricao', type: 'string', getValue: (m: QualidadeMotivo) => m.descricao ?? '' },
+            { id: 'tipo', type: 'string', getValue: (m: QualidadeMotivo) => m.tipo ?? '' },
+        ] as const
+    );
 
     // Form State
     const [formData, setFormData] = useState({
@@ -91,13 +113,43 @@ export default function MotivosRefugoPage() {
             />
 
             <div className="bg-white rounded shadow overflow-hidden">
-                <table className="min-w-full divide-y divide-gray-200">
+                <table className="min-w-full divide-y divide-gray-200 table-fixed">
+                    <TableColGroup columns={columns} widths={widths} />
                     <thead className="bg-gray-50">
                         <tr>
-                            <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Código</th>
-                            <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Descrição</th>
-                            <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Tipo</th>
-                            <th className="px-6 py-3 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider">Ações</th>
+                            <ResizableSortableTh
+                                columnId="codigo"
+                                label="Código"
+                                sort={sort}
+                                onSort={(col) => setSort((prev) => toggleSort(prev as any, col))}
+                                onResizeStart={startResize}
+                                className="px-6 py-3"
+                            />
+                            <ResizableSortableTh
+                                columnId="descricao"
+                                label="Descrição"
+                                sort={sort}
+                                onSort={(col) => setSort((prev) => toggleSort(prev as any, col))}
+                                onResizeStart={startResize}
+                                className="px-6 py-3"
+                            />
+                            <ResizableSortableTh
+                                columnId="tipo"
+                                label="Tipo"
+                                sort={sort}
+                                onSort={(col) => setSort((prev) => toggleSort(prev as any, col))}
+                                onResizeStart={startResize}
+                                className="px-6 py-3"
+                            />
+                            <ResizableSortableTh
+                                columnId="acoes"
+                                label="Ações"
+                                sortable={false}
+                                sort={sort}
+                                onResizeStart={startResize}
+                                align="right"
+                                className="px-6 py-3"
+                            />
                         </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-200 bg-white">
@@ -110,7 +162,7 @@ export default function MotivosRefugoPage() {
                                 </td>
                             </tr>
                         )}
-                        {motivos.map((m) => (
+                        {motivosSorted.map((m) => (
                             <tr key={m.id} className="hover:bg-gray-50 transition-colors">
                                 <td className="px-6 py-4 font-mono text-sm text-gray-700 font-medium">{m.codigo}</td>
                                 <td className="px-6 py-4 text-sm text-gray-600">{m.descricao}</td>

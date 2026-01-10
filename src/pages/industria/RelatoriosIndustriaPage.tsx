@@ -8,6 +8,10 @@ import PageHeader from '@/components/ui/PageHeader';
 import Input from '@/components/ui/forms/Input';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/contexts/ToastProvider';
+import ResizableSortableTh, { type SortState } from '@/components/ui/table/ResizableSortableTh';
+import TableColGroup from '@/components/ui/table/TableColGroup';
+import { useTableColumnWidths, type TableColumnWidthDef } from '@/components/ui/table/useTableColumnWidths';
+import { sortRows, toggleSort } from '@/components/ui/table/sortUtils';
 import {
   getIndustriaWipKpis,
   getQualidadeKpis,
@@ -55,6 +59,24 @@ export default function RelatoriosIndustriaPage() {
   const { addToast } = useToast();
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
+  const [sortBaixoEstoque, setSortBaixoEstoque] = useState<SortState<'produto' | 'sku' | 'saldo' | 'min' | 'max' | 'sug' | 'fornecedor'>>({
+    column: 'sug',
+    direction: 'desc',
+  });
+
+  const baixoEstoqueColumns: TableColumnWidthDef[] = [
+    { id: 'produto', defaultWidth: 360, minWidth: 220 },
+    { id: 'sku', defaultWidth: 160, minWidth: 120 },
+    { id: 'saldo', defaultWidth: 140, minWidth: 120 },
+    { id: 'min', defaultWidth: 120, minWidth: 110 },
+    { id: 'max', defaultWidth: 120, minWidth: 110 },
+    { id: 'sug', defaultWidth: 150, minWidth: 130 },
+    { id: 'fornecedor', defaultWidth: 240, minWidth: 180 },
+  ];
+  const { widths: baixoEstoqueWidths, startResize: startBaixoEstoqueResize } = useTableColumnWidths({
+    tableId: 'industria:relatorios:baixo-estoque',
+    columns: baixoEstoqueColumns,
+  });
 
   const [startDate, setStartDate] = useState<string>(() => {
     const d = new Date();
@@ -194,6 +216,22 @@ export default function RelatoriosIndustriaPage() {
       .sort((a, b) => (b.sugestao_compra || 0) - (a.sugestao_compra || 0))
       .slice(0, 20);
   }, [baixoEstoque]);
+
+  const baixoEstoqueSorted = useMemo(() => {
+    return sortRows(
+      baixoEstoqueTop,
+      sortBaixoEstoque as any,
+      [
+        { id: 'produto', type: 'string', getValue: (i: RelatorioBaixoEstoqueItem) => i.nome ?? '' },
+        { id: 'sku', type: 'string', getValue: (i: RelatorioBaixoEstoqueItem) => i.sku ?? '' },
+        { id: 'saldo', type: 'number', getValue: (i: RelatorioBaixoEstoqueItem) => i.saldo ?? 0 },
+        { id: 'min', type: 'number', getValue: (i: RelatorioBaixoEstoqueItem) => i.estoque_min ?? 0 },
+        { id: 'max', type: 'number', getValue: (i: RelatorioBaixoEstoqueItem) => i.estoque_max ?? 0 },
+        { id: 'sug', type: 'number', getValue: (i: RelatorioBaixoEstoqueItem) => i.sugestao_compra ?? 0 },
+        { id: 'fornecedor', type: 'string', getValue: (i: RelatorioBaixoEstoqueItem) => i.fornecedor_nome ?? '' },
+      ] as const
+    );
+  }, [baixoEstoqueTop, sortBaixoEstoque]);
 
   return (
     <div className="p-2 space-y-6">
@@ -391,16 +429,70 @@ export default function RelatoriosIndustriaPage() {
               </div>
 
               <div className="overflow-x-auto rounded-xl border border-gray-200 bg-white">
-                <table className="min-w-full text-sm">
+                <table className="min-w-full text-sm table-fixed">
+                  <TableColGroup columns={baixoEstoqueColumns} widths={baixoEstoqueWidths} />
                   <thead className="bg-gray-50">
                     <tr>
-                      <th className="px-4 py-3 text-left font-medium text-gray-500">Produto</th>
-                      <th className="px-4 py-3 text-left font-medium text-gray-500">SKU</th>
-                      <th className="px-4 py-3 text-right font-medium text-gray-500">Saldo</th>
-                      <th className="px-4 py-3 text-right font-medium text-gray-500">Mín.</th>
-                      <th className="px-4 py-3 text-right font-medium text-gray-500">Máx.</th>
-                      <th className="px-4 py-3 text-right font-medium text-gray-500">Sug. compra</th>
-                      <th className="px-4 py-3 text-left font-medium text-gray-500">Fornecedor</th>
+                      <ResizableSortableTh
+                        columnId="produto"
+                        label="Produto"
+                        sort={sortBaixoEstoque}
+                        onSort={(col) => setSortBaixoEstoque((prev) => toggleSort(prev as any, col))}
+                        onResizeStart={startBaixoEstoqueResize}
+                        className="px-4 py-3 normal-case tracking-normal"
+                      />
+                      <ResizableSortableTh
+                        columnId="sku"
+                        label="SKU"
+                        sort={sortBaixoEstoque}
+                        onSort={(col) => setSortBaixoEstoque((prev) => toggleSort(prev as any, col))}
+                        onResizeStart={startBaixoEstoqueResize}
+                        className="px-4 py-3 normal-case tracking-normal"
+                      />
+                      <ResizableSortableTh
+                        columnId="saldo"
+                        label="Saldo"
+                        sort={sortBaixoEstoque}
+                        onSort={(col) => setSortBaixoEstoque((prev) => toggleSort(prev as any, col))}
+                        onResizeStart={startBaixoEstoqueResize}
+                        align="right"
+                        className="px-4 py-3 normal-case tracking-normal"
+                      />
+                      <ResizableSortableTh
+                        columnId="min"
+                        label="Mín."
+                        sort={sortBaixoEstoque}
+                        onSort={(col) => setSortBaixoEstoque((prev) => toggleSort(prev as any, col))}
+                        onResizeStart={startBaixoEstoqueResize}
+                        align="right"
+                        className="px-4 py-3 normal-case tracking-normal"
+                      />
+                      <ResizableSortableTh
+                        columnId="max"
+                        label="Máx."
+                        sort={sortBaixoEstoque}
+                        onSort={(col) => setSortBaixoEstoque((prev) => toggleSort(prev as any, col))}
+                        onResizeStart={startBaixoEstoqueResize}
+                        align="right"
+                        className="px-4 py-3 normal-case tracking-normal"
+                      />
+                      <ResizableSortableTh
+                        columnId="sug"
+                        label="Sug. compra"
+                        sort={sortBaixoEstoque}
+                        onSort={(col) => setSortBaixoEstoque((prev) => toggleSort(prev as any, col))}
+                        onResizeStart={startBaixoEstoqueResize}
+                        align="right"
+                        className="px-4 py-3 normal-case tracking-normal"
+                      />
+                      <ResizableSortableTh
+                        columnId="fornecedor"
+                        label="Fornecedor"
+                        sort={sortBaixoEstoque}
+                        onSort={(col) => setSortBaixoEstoque((prev) => toggleSort(prev as any, col))}
+                        onResizeStart={startBaixoEstoqueResize}
+                        className="px-4 py-3 normal-case tracking-normal"
+                      />
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-200">
@@ -411,7 +503,7 @@ export default function RelatoriosIndustriaPage() {
                         </td>
                       </tr>
                     ) : (
-                      baixoEstoqueTop.map((item) => (
+                      baixoEstoqueSorted.map((item) => (
                         <tr key={item.produto_id} className="hover:bg-gray-50">
                           <td className="px-4 py-2 font-medium text-gray-900">{item.nome}</td>
                           <td className="px-4 py-2 text-gray-500">{item.sku || '—'}</td>

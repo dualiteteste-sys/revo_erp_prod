@@ -12,6 +12,10 @@ import Pagination from '@/components/ui/Pagination';
 import SearchField from '@/components/ui/forms/SearchField';
 import { useNavigate } from 'react-router-dom';
 import ClientAutocomplete from '@/components/common/ClientAutocomplete';
+import ResizableSortableTh, { type SortState } from '@/components/ui/table/ResizableSortableTh';
+import TableColGroup from '@/components/ui/table/TableColGroup';
+import { useTableColumnWidths, type TableColumnWidthDef } from '@/components/ui/table/useTableColumnWidths';
+import { sortRows, toggleSort } from '@/components/ui/table/sortUtils';
 
 function formatBRL(value: number) {
   return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value || 0);
@@ -45,6 +49,34 @@ export default function OsRelatoriosPage() {
   const [statusFilter, setStatusFilter] = useState<string[] | null>(null);
   const [clienteId, setClienteId] = useState<string | null>(null);
   const [clienteNome, setClienteNome] = useState<string>('');
+  const [topSort, setTopSort] = useState<SortState<'cliente' | 'os' | 'faturamento' | 'custo'>>({ column: 'faturamento', direction: 'desc' });
+  const [listSort, setListSort] = useState<SortState<'os' | 'cliente' | 'status' | 'data' | 'total' | 'custo' | 'margem'> | null>(null);
+
+  const topColumns: TableColumnWidthDef[] = [
+    { id: 'cliente', defaultWidth: 360, minWidth: 220 },
+    { id: 'os', defaultWidth: 120, minWidth: 100 },
+    { id: 'faturamento', defaultWidth: 180, minWidth: 140 },
+    { id: 'custo', defaultWidth: 180, minWidth: 140 },
+  ];
+  const { widths: topWidths, startResize: startTopResize } = useTableColumnWidths({
+    tableId: 'os:relatorios:top-clientes',
+    columns: topColumns,
+  });
+
+  const listColumns: TableColumnWidthDef[] = [
+    { id: 'os', defaultWidth: 120, minWidth: 110 },
+    { id: 'cliente', defaultWidth: 320, minWidth: 220 },
+    { id: 'status', defaultWidth: 160, minWidth: 140 },
+    { id: 'data', defaultWidth: 140, minWidth: 120 },
+    { id: 'total', defaultWidth: 160, minWidth: 140 },
+    { id: 'custo', defaultWidth: 160, minWidth: 140 },
+    { id: 'margem', defaultWidth: 160, minWidth: 140 },
+    { id: 'acao', defaultWidth: 140, minWidth: 120 },
+  ];
+  const { widths: listWidths, startResize: startListResize } = useTableColumnWidths({
+    tableId: 'os:relatorios:list',
+    columns: listColumns,
+  });
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -86,6 +118,30 @@ export default function OsRelatoriosPage() {
   const porStatus = data?.por_status ?? [];
   const topClientes = data?.top_clientes ?? [];
   const mensal = data?.faturamento_mensal ?? [];
+  const topClientesSorted = sortRows(
+    topClientes,
+    topSort as any,
+    [
+      { id: 'cliente', type: 'string', getValue: (c: any) => c.cliente_nome ?? '' },
+      { id: 'os', type: 'number', getValue: (c: any) => c.qtd ?? 0 },
+      { id: 'faturamento', type: 'number', getValue: (c: any) => c.faturamento ?? 0 },
+      { id: 'custo', type: 'number', getValue: (c: any) => c.custo ?? 0 },
+    ] as const
+  );
+
+  const listSorted = sortRows(
+    rows,
+    listSort as any,
+    [
+      { id: 'os', type: 'number', getValue: (r: OsRelatoriosListRow) => r.numero ?? 0 },
+      { id: 'cliente', type: 'string', getValue: (r: OsRelatoriosListRow) => r.cliente_nome ?? '' },
+      { id: 'status', type: 'string', getValue: (r: OsRelatoriosListRow) => STATUS_LABEL[r.status] || r.status },
+      { id: 'data', type: 'date', getValue: (r: OsRelatoriosListRow) => r.data_ref ?? '' },
+      { id: 'total', type: 'number', getValue: (r: OsRelatoriosListRow) => r.total_geral ?? 0 },
+      { id: 'custo', type: 'number', getValue: (r: OsRelatoriosListRow) => r.custo_real ?? 0 },
+      { id: 'margem', type: 'number', getValue: (r: OsRelatoriosListRow) => r.margem ?? 0 },
+    ] as const
+  );
 
   const statusOption = useMemo(() => {
     return {
@@ -382,13 +438,45 @@ export default function OsRelatoriosPage() {
           <GlassCard className="p-4">
             <div className="text-sm font-semibold text-gray-800 mb-3">Top clientes (por faturamento no período)</div>
             <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-gray-200 text-sm">
+              <table className="min-w-full divide-y divide-gray-200 text-sm table-fixed">
+                <TableColGroup columns={topColumns} widths={topWidths} />
                 <thead className="bg-gray-50">
                   <tr>
-                    <th className="px-4 py-3 text-left font-medium text-gray-500">Cliente</th>
-                    <th className="px-4 py-3 text-center font-medium text-gray-500">OS</th>
-                    <th className="px-4 py-3 text-right font-medium text-gray-500">Faturamento</th>
-                    <th className="px-4 py-3 text-right font-medium text-gray-500">Custo</th>
+                    <ResizableSortableTh
+                      columnId="cliente"
+                      label="Cliente"
+                      sort={topSort}
+                      onSort={(col) => setTopSort((prev) => toggleSort(prev as any, col))}
+                      onResizeStart={startTopResize}
+                      className="px-4 py-3 normal-case tracking-normal"
+                    />
+                    <ResizableSortableTh
+                      columnId="os"
+                      label="OS"
+                      sort={topSort}
+                      onSort={(col) => setTopSort((prev) => toggleSort(prev as any, col))}
+                      onResizeStart={startTopResize}
+                      align="center"
+                      className="px-4 py-3 normal-case tracking-normal"
+                    />
+                    <ResizableSortableTh
+                      columnId="faturamento"
+                      label="Faturamento"
+                      sort={topSort}
+                      onSort={(col) => setTopSort((prev) => toggleSort(prev as any, col))}
+                      onResizeStart={startTopResize}
+                      align="right"
+                      className="px-4 py-3 normal-case tracking-normal"
+                    />
+                    <ResizableSortableTh
+                      columnId="custo"
+                      label="Custo"
+                      sort={topSort}
+                      onSort={(col) => setTopSort((prev) => toggleSort(prev as any, col))}
+                      onResizeStart={startTopResize}
+                      align="right"
+                      className="px-4 py-3 normal-case tracking-normal"
+                    />
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-200">
@@ -399,7 +487,7 @@ export default function OsRelatoriosPage() {
                       </td>
                     </tr>
                   ) : (
-                    topClientes.map((c) => (
+                    topClientesSorted.map((c) => (
                       <tr
                         key={c.cliente_id || c.cliente_nome || Math.random()}
                         className="hover:bg-gray-50 cursor-pointer"
@@ -428,17 +516,78 @@ export default function OsRelatoriosPage() {
               <div className="text-xs text-gray-500">Clique em uma linha para abrir a OS.</div>
             </div>
             <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-gray-200 text-sm">
+              <table className="min-w-full divide-y divide-gray-200 text-sm table-fixed">
+                <TableColGroup columns={listColumns} widths={listWidths} />
                 <thead className="bg-gray-50">
                   <tr>
-                    <th className="px-4 py-3 text-left font-medium text-gray-500">OS</th>
-                    <th className="px-4 py-3 text-left font-medium text-gray-500">Cliente</th>
-                    <th className="px-4 py-3 text-left font-medium text-gray-500">Status</th>
-                    <th className="px-4 py-3 text-left font-medium text-gray-500">Data</th>
-                    <th className="px-4 py-3 text-right font-medium text-gray-500">Total</th>
-                    <th className="px-4 py-3 text-right font-medium text-gray-500">Custo</th>
-                    <th className="px-4 py-3 text-right font-medium text-gray-500">Margem</th>
-                    <th className="px-4 py-3 text-right font-medium text-gray-500">Ação</th>
+                    <ResizableSortableTh
+                      columnId="os"
+                      label="OS"
+                      sort={listSort}
+                      onSort={(col) => setListSort((prev) => toggleSort(prev as any, col))}
+                      onResizeStart={startListResize}
+                      className="px-4 py-3 normal-case tracking-normal"
+                    />
+                    <ResizableSortableTh
+                      columnId="cliente"
+                      label="Cliente"
+                      sort={listSort}
+                      onSort={(col) => setListSort((prev) => toggleSort(prev as any, col))}
+                      onResizeStart={startListResize}
+                      className="px-4 py-3 normal-case tracking-normal"
+                    />
+                    <ResizableSortableTh
+                      columnId="status"
+                      label="Status"
+                      sort={listSort}
+                      onSort={(col) => setListSort((prev) => toggleSort(prev as any, col))}
+                      onResizeStart={startListResize}
+                      className="px-4 py-3 normal-case tracking-normal"
+                    />
+                    <ResizableSortableTh
+                      columnId="data"
+                      label="Data"
+                      sort={listSort}
+                      onSort={(col) => setListSort((prev) => toggleSort(prev as any, col))}
+                      onResizeStart={startListResize}
+                      className="px-4 py-3 normal-case tracking-normal"
+                    />
+                    <ResizableSortableTh
+                      columnId="total"
+                      label="Total"
+                      sort={listSort}
+                      onSort={(col) => setListSort((prev) => toggleSort(prev as any, col))}
+                      onResizeStart={startListResize}
+                      align="right"
+                      className="px-4 py-3 normal-case tracking-normal"
+                    />
+                    <ResizableSortableTh
+                      columnId="custo"
+                      label="Custo"
+                      sort={listSort}
+                      onSort={(col) => setListSort((prev) => toggleSort(prev as any, col))}
+                      onResizeStart={startListResize}
+                      align="right"
+                      className="px-4 py-3 normal-case tracking-normal"
+                    />
+                    <ResizableSortableTh
+                      columnId="margem"
+                      label="Margem"
+                      sort={listSort}
+                      onSort={(col) => setListSort((prev) => toggleSort(prev as any, col))}
+                      onResizeStart={startListResize}
+                      align="right"
+                      className="px-4 py-3 normal-case tracking-normal"
+                    />
+                    <ResizableSortableTh
+                      columnId="acao"
+                      label="Ação"
+                      sortable={false}
+                      sort={listSort}
+                      onResizeStart={startListResize}
+                      align="right"
+                      className="px-4 py-3 normal-case tracking-normal"
+                    />
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-200">
@@ -449,7 +598,7 @@ export default function OsRelatoriosPage() {
                       </td>
                     </tr>
                   ) : (
-                    rows.map((r) => (
+                    listSorted.map((r) => (
                       <tr
                         key={r.id}
                         className="hover:bg-gray-50"

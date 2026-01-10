@@ -1,8 +1,11 @@
 import React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { CarrierListItem } from '../../services/carriers';
-import { Edit, Trash2, ArrowUpDown, Truck, MapPin, Clock, Star } from 'lucide-react';
+import { Edit, Trash2, Truck, MapPin, Clock, Star } from 'lucide-react';
 import { cnpjMask, cpfMask } from '../../lib/masks';
+import ResizableSortableTh, { type SortState } from '@/components/ui/table/ResizableSortableTh';
+import TableColGroup from '@/components/ui/table/TableColGroup';
+import { useTableColumnWidths, type TableColumnWidthDef } from '@/components/ui/table/useTableColumnWidths';
 
 interface CarriersTableProps {
   carriers: CarrierListItem[];
@@ -17,28 +20,6 @@ interface CarriersTableProps {
   onToggleSelectAll?: () => void;
 }
 
-const SortableHeader: React.FC<{
-  column: keyof CarrierListItem;
-  label: string;
-  sortBy: { column: keyof CarrierListItem; ascending: boolean };
-  onSort: (column: keyof CarrierListItem) => void;
-  className?: string;
-}> = ({ column, label, sortBy, onSort, className }) => {
-  const isSorted = sortBy.column === column;
-  return (
-    <th
-      scope="col"
-      className={`px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 transition-colors ${className}`}
-      onClick={() => onSort(column)}
-    >
-      <div className="flex items-center gap-2">
-        {label}
-        {isSorted && <ArrowUpDown size={14} className={`text-blue-500 ${sortBy.ascending ? '' : 'rotate-180'}`} />}
-      </div>
-    </th>
-  );
-};
-
 const CarriersTable: React.FC<CarriersTableProps> = ({
   carriers,
   onEdit,
@@ -51,6 +32,18 @@ const CarriersTable: React.FC<CarriersTableProps> = ({
   onToggleSelect,
   onToggleSelectAll,
 }) => {
+  const columns: TableColumnWidthDef[] = [
+    ...(onToggleSelect ? [{ id: 'select', defaultWidth: 56, minWidth: 56, maxWidth: 56, resizable: false }] : []),
+    { id: 'nome', defaultWidth: 340, minWidth: 220 },
+    { id: 'documento', defaultWidth: 200, minWidth: 170 },
+    { id: 'cidade', defaultWidth: 190, minWidth: 160 },
+    { id: 'modal_principal', defaultWidth: 240, minWidth: 200 },
+    { id: 'ativo', defaultWidth: 140, minWidth: 120 },
+    { id: 'acoes', defaultWidth: 160, minWidth: 140 },
+  ];
+  const { widths, startResize } = useTableColumnWidths({ tableId: 'carriers:list', columns });
+  const sort: SortState<string> = sortBy ? { column: sortBy.column, direction: sortBy.ascending ? 'asc' : 'desc' } : null;
+
   const formatDocument = (doc: string | null) => {
     if (!doc) return '-';
     if (doc.length <= 11) return cpfMask(doc);
@@ -59,7 +52,8 @@ const CarriersTable: React.FC<CarriersTableProps> = ({
 
   return (
     <div className="overflow-x-auto">
-      <table className="min-w-full divide-y divide-gray-200">
+      <table className="min-w-[1100px] w-full divide-y divide-gray-200 table-fixed">
+        <TableColGroup columns={columns} widths={widths} />
         <thead className="bg-gray-50">
           <tr>
             {onToggleSelect ? (
@@ -76,12 +70,19 @@ const CarriersTable: React.FC<CarriersTableProps> = ({
                 />
               </th>
             ) : null}
-            <SortableHeader column="nome" label="Nome" sortBy={sortBy} onSort={onSort} />
-            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Documento</th>
-            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Localização</th>
-            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Logística</th>
-            <SortableHeader column="ativo" label="Status" sortBy={sortBy} onSort={onSort} />
-            <th scope="col" className="relative px-6 py-3"><span className="sr-only">Ações</span></th>
+            <ResizableSortableTh columnId="nome" label="Nome" sort={sort} onSort={onSort as any} onResizeStart={startResize} />
+            <ResizableSortableTh columnId="documento" label="Documento" sort={sort} onSort={onSort as any} onResizeStart={startResize} />
+            <ResizableSortableTh columnId="cidade" label="Localização" sort={sort} onSort={onSort as any} onResizeStart={startResize} />
+            <ResizableSortableTh columnId="modal_principal" label="Logística" sort={sort} onSort={onSort as any} onResizeStart={startResize} />
+            <ResizableSortableTh columnId="ativo" label="Status" sort={sort} onSort={onSort as any} onResizeStart={startResize} />
+            <ResizableSortableTh
+              columnId="acoes"
+              label={<span className="sr-only">Ações</span>}
+              sortable={false}
+              onResizeStart={startResize}
+              align="right"
+              className="px-6"
+            />
           </tr>
         </thead>
         <motion.tbody layout className="bg-white divide-y divide-gray-200">

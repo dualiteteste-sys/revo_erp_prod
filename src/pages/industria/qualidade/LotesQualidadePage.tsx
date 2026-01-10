@@ -14,6 +14,10 @@ import TextArea from '@/components/ui/forms/TextArea';
 import Select from '@/components/ui/forms/Select';
 import PageHeader from '@/components/ui/PageHeader';
 import SearchField from '@/components/ui/forms/SearchField';
+import ResizableSortableTh, { type SortState } from '@/components/ui/table/ResizableSortableTh';
+import TableColGroup from '@/components/ui/table/TableColGroup';
+import { useTableColumnWidths, type TableColumnWidthDef } from '@/components/ui/table/useTableColumnWidths';
+import { sortRows, toggleSort } from '@/components/ui/table/sortUtils';
 
 const statusLabels: Record<StatusQualidade, string> = {
   aprovado: 'Aprovado',
@@ -45,6 +49,47 @@ export default function LotesQualidadePage() {
   const [novoStatus, setNovoStatus] = useState<StatusQualidade>('aprovado');
   const [observacoes, setObservacoes] = useState('');
   const [saving, setSaving] = useState(false);
+  const [sort, setSort] = useState<SortState<'lote' | 'produto' | 'validade' | 'saldo' | 'status' | 'ultima'>>({
+    column: 'status',
+    direction: 'asc',
+  });
+
+  const columns: TableColumnWidthDef[] = [
+    { id: 'lote', defaultWidth: 220, minWidth: 180 },
+    { id: 'produto', defaultWidth: 360, minWidth: 240 },
+    { id: 'validade', defaultWidth: 140, minWidth: 120 },
+    { id: 'saldo', defaultWidth: 140, minWidth: 120 },
+    { id: 'status', defaultWidth: 160, minWidth: 140 },
+    { id: 'ultima', defaultWidth: 280, minWidth: 220 },
+    { id: 'acoes', defaultWidth: 140, minWidth: 120, resizable: false },
+  ];
+  const { widths, startResize } = useTableColumnWidths({ tableId: 'industria:qualidade:lotes', columns });
+
+  const lotesSorted = useMemo(() => {
+    const orderStatus: Record<StatusQualidade, number> = {
+      bloqueado: 0,
+      em_analise: 1,
+      reprovado: 2,
+      aprovado: 3,
+    };
+    return sortRows(
+      lotes,
+      sort as any,
+      [
+        { id: 'lote', type: 'string', getValue: (l: QualidadeLote) => l.lote ?? '' },
+        { id: 'produto', type: 'string', getValue: (l: QualidadeLote) => l.produto_nome ?? '' },
+        { id: 'validade', type: 'date', getValue: (l: QualidadeLote) => l.validade ?? '' },
+        { id: 'saldo', type: 'number', getValue: (l: QualidadeLote) => Number(l.saldo || 0) },
+        {
+          id: 'status',
+          type: 'custom',
+          getValue: (l: QualidadeLote) => orderStatus[l.status_qa],
+          compare: (a, b) => Number(a) - Number(b),
+        },
+        { id: 'ultima', type: 'date', getValue: (l: QualidadeLote) => l.ultima_inspecao_data ?? '' },
+      ] as const
+    );
+  }, [lotes, sort]);
 
   const loadLotes = async () => {
     setLoading(true);
@@ -183,20 +228,71 @@ export default function LotesQualidadePage() {
           </div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="min-w-full text-sm">
+            <table className="min-w-full text-sm table-fixed">
+              <TableColGroup columns={columns} widths={widths} />
               <thead className="bg-gray-50 text-gray-500">
                 <tr>
-                  <th className="px-4 py-2 text-left">Lote</th>
-                  <th className="px-4 py-2 text-left">Produto</th>
-                  <th className="px-4 py-2 text-left">Validade</th>
-                  <th className="px-4 py-2 text-left">Saldo</th>
-                  <th className="px-4 py-2 text-left">Status</th>
-                  <th className="px-4 py-2 text-left">Última inspeção</th>
-                  <th className="px-4 py-2 text-center">Ações</th>
+                  <ResizableSortableTh
+                    columnId="lote"
+                    label="Lote"
+                    sort={sort}
+                    onSort={(col) => setSort((prev) => toggleSort(prev as any, col))}
+                    onResizeStart={startResize}
+                    className="px-4 py-2 normal-case tracking-normal"
+                  />
+                  <ResizableSortableTh
+                    columnId="produto"
+                    label="Produto"
+                    sort={sort}
+                    onSort={(col) => setSort((prev) => toggleSort(prev as any, col))}
+                    onResizeStart={startResize}
+                    className="px-4 py-2 normal-case tracking-normal"
+                  />
+                  <ResizableSortableTh
+                    columnId="validade"
+                    label="Validade"
+                    sort={sort}
+                    onSort={(col) => setSort((prev) => toggleSort(prev as any, col))}
+                    onResizeStart={startResize}
+                    className="px-4 py-2 normal-case tracking-normal"
+                  />
+                  <ResizableSortableTh
+                    columnId="saldo"
+                    label="Saldo"
+                    sort={sort}
+                    onSort={(col) => setSort((prev) => toggleSort(prev as any, col))}
+                    onResizeStart={startResize}
+                    className="px-4 py-2 normal-case tracking-normal"
+                  />
+                  <ResizableSortableTh
+                    columnId="status"
+                    label="Status"
+                    sort={sort}
+                    onSort={(col) => setSort((prev) => toggleSort(prev as any, col))}
+                    onResizeStart={startResize}
+                    className="px-4 py-2 normal-case tracking-normal"
+                  />
+                  <ResizableSortableTh
+                    columnId="ultima"
+                    label="Última inspeção"
+                    sort={sort}
+                    onSort={(col) => setSort((prev) => toggleSort(prev as any, col))}
+                    onResizeStart={startResize}
+                    className="px-4 py-2 normal-case tracking-normal"
+                  />
+                  <ResizableSortableTh
+                    columnId="acoes"
+                    label="Ações"
+                    sortable={false}
+                    sort={sort}
+                    onResizeStart={startResize}
+                    align="center"
+                    className="px-4 py-2 normal-case tracking-normal"
+                  />
                 </tr>
               </thead>
               <tbody>
-                {lotes.map(lote => (
+                {lotesSorted.map(lote => (
                   <tr key={lote.id} className="border-t">
                     <td className="px-4 py-3">
                       <div className="font-semibold text-gray-900">{lote.lote}</div>

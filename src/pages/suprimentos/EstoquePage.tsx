@@ -21,6 +21,9 @@ import { useToast } from '@/contexts/ToastProvider';
 import { useHasPermission } from '@/hooks/useHasPermission';
 import InventarioCiclicoModal from '@/components/suprimentos/InventarioCiclicoModal';
 import VirtualizedTableBody from '@/components/ui/VirtualizedTableBody';
+import ResizableSortableTh, { type SortState } from '@/components/ui/table/ResizableSortableTh';
+import TableColGroup from '@/components/ui/table/TableColGroup';
+import { useTableColumnWidths, type TableColumnWidthDef } from '@/components/ui/table/useTableColumnWidths';
 
 export default function EstoquePage() {
   const [produtos, setProdutos] = useState<EstoquePosicao[]>([]);
@@ -51,6 +54,7 @@ export default function EstoquePage() {
   const permsLoading = permUpdateV2.isLoading || permUpdateLegacy.isLoading;
 
   const selectedDeposito = depositos.find((d) => d.id === depositoId) ?? depositos.find((d) => d.is_default) ?? null;
+  const [sort, setSort] = useState<SortState<string>>({ column: 'nome', direction: 'asc' });
 
   const fetchDepositos = async () => {
     if (!canUseV2) {
@@ -206,6 +210,48 @@ export default function EstoquePage() {
   // Tipos de movimento que somam ao estoque
   const entryTypes = ['entrada', 'ajuste_entrada', 'entrada_beneficiamento', 'transfer_in'];
   const scrollRef = useRef<HTMLDivElement | null>(null);
+  const columns: TableColumnWidthDef[] = [
+    { id: 'produto', defaultWidth: 0, minWidth: 320 },
+    { id: 'saldo', defaultWidth: 180, minWidth: 160 },
+    { id: 'status', defaultWidth: 160, minWidth: 140 },
+    { id: 'acoes', defaultWidth: 140, minWidth: 120 },
+  ];
+  const { widths, startResize } = useTableColumnWidths({ tableId: 'suprimentos:estoque', columns });
+
+  const statusOrder: Record<string, number> = { zerado: 0, baixo: 1, ok: 2 };
+
+  const sortedProdutos = React.useMemo(() => {
+    const dir = sort?.direction === 'desc' ? -1 : 1;
+    const col = sort?.column || 'nome';
+    const rows = [...produtos];
+
+    rows.sort((a, b) => {
+      if (col === 'saldo') {
+        return dir * (Number(a.saldo || 0) - Number(b.saldo || 0));
+      }
+      if (col === 'status') {
+        const av = statusOrder[a.status_estoque] ?? 999;
+        const bv = statusOrder[b.status_estoque] ?? 999;
+        return dir * (av - bv);
+      }
+      // produto: usa nome como primário e sku como secundário
+      const an = String(a.nome || '').toLocaleLowerCase();
+      const bn = String(b.nome || '').toLocaleLowerCase();
+      if (an !== bn) return dir * an.localeCompare(bn, 'pt-BR');
+      const as = String(a.sku || '').toLocaleLowerCase();
+      const bs = String(b.sku || '').toLocaleLowerCase();
+      return dir * as.localeCompare(bs, 'pt-BR');
+    });
+
+    return rows;
+  }, [produtos, sort]);
+
+  const handleSort = (column: string) => {
+    setSort((prev) => {
+      if (!prev || prev.column !== column) return { column, direction: 'asc' };
+      return { column, direction: prev.direction === 'asc' ? 'desc' : 'asc' };
+    });
+  };
 
   return (
     <div className="p-4">
@@ -278,18 +324,38 @@ export default function EstoquePage() {
       <div className="bg-white rounded-xl shadow overflow-hidden">
         <div ref={scrollRef} className="overflow-auto max-h-[70vh]">
           <table className="min-w-[960px] w-full divide-y divide-gray-200 table-fixed">
-            <colgroup>
-              <col />
-              <col style={{ width: 180 }} />
-              <col style={{ width: 160 }} />
-              <col style={{ width: 140 }} />
-            </colgroup>
+            <TableColGroup columns={columns} widths={widths} />
             <thead className="bg-gray-50">
               <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">Produto</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">Saldo</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">Status</th>
-                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">Ações</th>
+                <ResizableSortableTh
+                  columnId="produto"
+                  label="Produto"
+                  sort={sort}
+                  onSort={() => handleSort('produto')}
+                  onResizeStart={startResize}
+                />
+                <ResizableSortableTh
+                  columnId="saldo"
+                  label="Saldo"
+                  sort={sort}
+                  onSort={() => handleSort('saldo')}
+                  onResizeStart={startResize}
+                />
+                <ResizableSortableTh
+                  columnId="status"
+                  label="Status"
+                  sort={sort}
+                  onSort={() => handleSort('status')}
+                  onResizeStart={startResize}
+                />
+                <ResizableSortableTh
+                  columnId="acoes"
+                  label={<span className="sr-only">Ações</span>}
+                  sortable={false}
+                  onResizeStart={startResize}
+                  align="right"
+                  className="px-6"
+                />
               </tr>
             </thead>
             {loading ? (
@@ -323,11 +389,11 @@ export default function EstoquePage() {
             ) : (
               <VirtualizedTableBody
                 scrollParentRef={scrollRef}
-                rowCount={produtos.length}
+                rowCount={sortedProdutos.length}
                 rowHeight={72}
                 className="bg-white divide-y divide-gray-200"
                 renderRow={(index) => {
-                  const prod = produtos[index];
+                  const prod = sortedProdutos[index];
                   const isHighlighted = highlightProdutoId === prod.produto_id;
                   return (
                     <tr

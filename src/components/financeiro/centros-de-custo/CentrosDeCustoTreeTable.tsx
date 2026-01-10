@@ -1,7 +1,10 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ChevronDown, ChevronRight, Edit, Folder, FolderOpen, Trash2 } from 'lucide-react';
 import type { CentroDeCustoListItem, TipoCentroCusto } from '@/services/centrosDeCusto';
+import ResizableSortableTh, { type SortState } from '@/components/ui/table/ResizableSortableTh';
+import TableColGroup from '@/components/ui/table/TableColGroup';
+import { useTableColumnWidths, type TableColumnWidthDef } from '@/components/ui/table/useTableColumnWidths';
 
 interface CentrosDeCustoTreeTableProps {
   centros: CentroDeCustoListItem[];
@@ -44,6 +47,19 @@ function compareCodigo(a: string | null, b: string | null): number {
 export default function CentrosDeCustoTreeTable(props: CentrosDeCustoTreeTableProps) {
   const { centros, expandedIds, onToggleExpand, onExpandAll, onCollapseAll, onEdit, onDelete } = props;
 
+  const columns: TableColumnWidthDef[] = [
+    { id: 'codigo_nome', defaultWidth: 620, minWidth: 280 },
+    { id: 'categoria', defaultWidth: 220, minWidth: 170 },
+    { id: 'status', defaultWidth: 140, minWidth: 120 },
+    { id: 'acoes', defaultWidth: 120, minWidth: 90, maxWidth: 180 },
+  ];
+  const { widths, startResize } = useTableColumnWidths({ tableId: 'financeiro:centros-de-custo', columns });
+
+  const [sort, setSort] = useState<SortState<'codigo_nome' | 'categoria' | 'status'>>({
+    column: 'codigo_nome',
+    direction: 'asc',
+  });
+
   const { ordered, hasChildren } = useMemo(() => {
     const byId = new Map<string, CentroDeCustoListItem>();
     const children = new Map<string, CentroDeCustoListItem[]>();
@@ -57,21 +73,33 @@ export default function CentrosDeCustoTreeTable(props: CentrosDeCustoTreeTablePr
       children.set(c.parent_id, arr);
     }
 
+    const compareRows = (a: CentroDeCustoListItem, b: CentroDeCustoListItem) => {
+      if (sort.column === 'categoria') {
+        const ta = TIPO_LABEL[a.tipo] ?? String(a.tipo ?? '');
+        const tb = TIPO_LABEL[b.tipo] ?? String(b.tipo ?? '');
+        const base = ta.localeCompare(tb, 'pt-BR', { sensitivity: 'base' });
+        return sort.direction === 'asc' ? base : -base;
+      }
+
+      if (sort.column === 'status') {
+        const base = Number(Boolean(a.ativo)) - Number(Boolean(b.ativo));
+        return sort.direction === 'asc' ? base : -base;
+      }
+
+      // codigo_nome (default)
+      const cc = compareCodigo(a.codigo, b.codigo);
+      if (cc !== 0) return sort.direction === 'asc' ? cc : -cc;
+      const nn = String(a.nome ?? '').localeCompare(String(b.nome ?? ''), 'pt-BR', { numeric: true, sensitivity: 'base' });
+      return sort.direction === 'asc' ? nn : -nn;
+    };
+
     for (const arr of children.values()) {
-      arr.sort((a, b) => {
-        const cc = compareCodigo(a.codigo, b.codigo);
-        if (cc !== 0) return cc;
-        return String(a.nome ?? '').localeCompare(String(b.nome ?? ''));
-      });
+      arr.sort(compareRows);
     }
 
     const roots = centros
       .filter((c) => !c.parent_id)
-      .sort((a, b) => {
-        const cc = compareCodigo(a.codigo, b.codigo);
-        if (cc !== 0) return cc;
-        return String(a.nome ?? '').localeCompare(String(b.nome ?? ''));
-      });
+      .sort(compareRows);
 
     const out: CentroDeCustoListItem[] = [];
     const hasKids = (id: string) => (children.get(id)?.length ?? 0) > 0;
@@ -86,7 +114,7 @@ export default function CentrosDeCustoTreeTable(props: CentrosDeCustoTreeTablePr
     for (const r of roots) walk(r);
 
     return { ordered: out, hasChildren: hasKids };
-  }, [centros, expandedIds]);
+  }, [centros, expandedIds, sort]);
 
   return (
     <div className="overflow-x-auto">
@@ -111,20 +139,54 @@ export default function CentrosDeCustoTreeTable(props: CentrosDeCustoTreeTablePr
       </div>
 
       <table className="min-w-full divide-y divide-gray-200">
+        <TableColGroup columns={columns} widths={widths} />
         <thead className="bg-gray-50">
           <tr>
-            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-              Código / Nome
-            </th>
-            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-              Categoria
-            </th>
-            <th scope="col" className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
-              Status
-            </th>
-            <th scope="col" className="relative px-6 py-3">
-              <span className="sr-only">Ações</span>
-            </th>
+            <ResizableSortableTh
+              columnId="codigo_nome"
+              label="Código / Nome"
+              sort={sort as any}
+              onSort={(columnId) =>
+                setSort((prev) => {
+                  if (!prev || prev.column !== columnId) return { column: columnId, direction: 'asc' };
+                  return { column: columnId, direction: prev.direction === 'asc' ? 'desc' : 'asc' };
+                })
+              }
+              onResizeStart={startResize as any}
+            />
+            <ResizableSortableTh
+              columnId="categoria"
+              label="Categoria"
+              sort={sort as any}
+              onSort={(columnId) =>
+                setSort((prev) => {
+                  if (!prev || prev.column !== columnId) return { column: columnId, direction: 'asc' };
+                  return { column: columnId, direction: prev.direction === 'asc' ? 'desc' : 'asc' };
+                })
+              }
+              onResizeStart={startResize as any}
+            />
+            <ResizableSortableTh
+              columnId="status"
+              label="Status"
+              align="center"
+              sort={sort as any}
+              onSort={(columnId) =>
+                setSort((prev) => {
+                  if (!prev || prev.column !== columnId) return { column: columnId, direction: 'asc' };
+                  return { column: columnId, direction: prev.direction === 'asc' ? 'desc' : 'asc' };
+                })
+              }
+              onResizeStart={startResize as any}
+            />
+            <ResizableSortableTh
+              columnId="acoes"
+              label="Ações"
+              align="right"
+              sortable={false}
+              resizable
+              onResizeStart={startResize as any}
+            />
           </tr>
         </thead>
         <motion.tbody layout className="bg-white divide-y divide-gray-200">
@@ -213,4 +275,3 @@ export default function CentrosDeCustoTreeTable(props: CentrosDeCustoTreeTablePr
     </div>
   );
 }
-

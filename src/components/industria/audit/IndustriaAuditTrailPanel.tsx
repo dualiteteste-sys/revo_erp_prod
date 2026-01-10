@@ -6,6 +6,10 @@ import { listAuditLogsForTables, type AuditLogRow } from '@/services/auditLogs';
 import { Copy, RefreshCcw, Search } from 'lucide-react';
 import { supabase } from '@/lib/supabaseClient';
 import { logger } from '@/lib/logger';
+import ResizableSortableTh, { type SortState } from '@/components/ui/table/ResizableSortableTh';
+import TableColGroup from '@/components/ui/table/TableColGroup';
+import { useTableColumnWidths, type TableColumnWidthDef } from '@/components/ui/table/useTableColumnWidths';
+import { sortRows, toggleSort } from '@/components/ui/table/sortUtils';
 
 type Props = {
   ordemId: string;
@@ -217,6 +221,20 @@ export default function IndustriaAuditTrailPanel({ ordemId, tables, entityLabels
   const [userNames, setUserNames] = useState<Record<string, string>>({});
   const [query, setQuery] = useState('');
   const [selected, setSelected] = useState<AuditLogRow | null>(null);
+  const [sort, setSort] = useState<SortState<'when' | 'entity' | 'op' | 'user' | 'changes'>>({ column: 'when', direction: 'desc' });
+
+  const columns: TableColumnWidthDef[] = [
+    { id: 'when', defaultWidth: 190, minWidth: 170 },
+    { id: 'entity', defaultWidth: 200, minWidth: 160 },
+    { id: 'op', defaultWidth: 150, minWidth: 130 },
+    { id: 'user', defaultWidth: 200, minWidth: 160 },
+    { id: 'changes', defaultWidth: 520, minWidth: 320 },
+    { id: 'action', defaultWidth: 120, minWidth: 110, resizable: false },
+  ];
+  const { widths, startResize } = useTableColumnWidths({
+    tableId: `industria:audit:trail:${ordemId}`,
+    columns,
+  });
 
   const labels = useMemo(() => ({ ...defaultEntityLabels, ...(entityLabels || {}) }), [entityLabels]);
 
@@ -298,6 +316,28 @@ export default function IndustriaAuditTrailPanel({ ordemId, tables, entityLabels
     });
   }, [rows, ordemId, query]);
 
+  const sortedRows = useMemo(() => {
+    const resolveUser = (r: AuditLogRow) => {
+      return r.changed_by
+        ? (userId && r.changed_by === userId ? 'Você' : (userNames[r.changed_by] || r.changed_by))
+        : 'Sistema';
+    };
+    const resolveEntity = (r: AuditLogRow) => labels[r.table_name] || r.table_name;
+    const resolveChanges = (r: AuditLogRow) => buildHumanSummary(r, labels, 2).text;
+
+    return sortRows(
+      filteredRows,
+      sort as any,
+      [
+        { id: 'when', type: 'date', getValue: (r: AuditLogRow) => r.changed_at ?? '' },
+        { id: 'entity', type: 'string', getValue: resolveEntity },
+        { id: 'op', type: 'string', getValue: (r: AuditLogRow) => labelOperation(r.operation) },
+        { id: 'user', type: 'string', getValue: resolveUser },
+        { id: 'changes', type: 'string', getValue: resolveChanges },
+      ] as const
+    );
+  }, [filteredRows, labels, sort, userId, userNames]);
+
   const copyToClipboard = (text: string) => {
     navigator.clipboard.writeText(text).then(
       () => addToast('Copiado para a área de transferência!', 'success'),
@@ -373,15 +413,59 @@ export default function IndustriaAuditTrailPanel({ ordemId, tables, entityLabels
       </div>
 
       <div className="overflow-x-auto rounded-xl border border-gray-200 bg-white">
-        <table className="min-w-full divide-y divide-gray-200">
+        <table className="min-w-full divide-y divide-gray-200 table-fixed">
+          <TableColGroup columns={columns} widths={widths} />
           <thead className="bg-gray-50">
             <tr>
-              <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-600">Data/Hora</th>
-              <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-600">Entidade</th>
-              <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-600">Operação</th>
-              <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-600">Usuário</th>
-              <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-600">Alterações</th>
-              <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wider text-gray-600">Ação</th>
+              <ResizableSortableTh
+                columnId="when"
+                label="Data/Hora"
+                sort={sort}
+                onSort={(col) => setSort((prev) => toggleSort(prev as any, col))}
+                onResizeStart={startResize}
+                className="px-4 py-3"
+              />
+              <ResizableSortableTh
+                columnId="entity"
+                label="Entidade"
+                sort={sort}
+                onSort={(col) => setSort((prev) => toggleSort(prev as any, col))}
+                onResizeStart={startResize}
+                className="px-4 py-3"
+              />
+              <ResizableSortableTh
+                columnId="op"
+                label="Operação"
+                sort={sort}
+                onSort={(col) => setSort((prev) => toggleSort(prev as any, col))}
+                onResizeStart={startResize}
+                className="px-4 py-3"
+              />
+              <ResizableSortableTh
+                columnId="user"
+                label="Usuário"
+                sort={sort}
+                onSort={(col) => setSort((prev) => toggleSort(prev as any, col))}
+                onResizeStart={startResize}
+                className="px-4 py-3"
+              />
+              <ResizableSortableTh
+                columnId="changes"
+                label="Alterações"
+                sort={sort}
+                onSort={(col) => setSort((prev) => toggleSort(prev as any, col))}
+                onResizeStart={startResize}
+                className="px-4 py-3"
+              />
+              <ResizableSortableTh
+                columnId="action"
+                label="Ação"
+                sortable={false}
+                sort={sort}
+                onResizeStart={startResize}
+                align="right"
+                className="px-4 py-3"
+              />
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100">
@@ -393,7 +477,7 @@ export default function IndustriaAuditTrailPanel({ ordemId, tables, entityLabels
               </tr>
             )}
 
-            {!loading && filteredRows.length === 0 && (
+            {!loading && sortedRows.length === 0 && (
               <tr>
                 <td colSpan={6} className="px-4 py-8 text-center text-sm text-gray-500">
                   Nenhum evento encontrado.
@@ -401,7 +485,7 @@ export default function IndustriaAuditTrailPanel({ ordemId, tables, entityLabels
               </tr>
             )}
 
-            {!loading && filteredRows.map((r) => {
+            {!loading && sortedRows.map((r) => {
               const diff = buildDiff(r.old_data, r.new_data);
               const keys = Object.keys(diff).map((k) => labelChangedField(r.table_name, k));
               const userLabel = r.changed_by

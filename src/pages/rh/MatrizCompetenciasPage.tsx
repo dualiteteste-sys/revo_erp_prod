@@ -10,6 +10,9 @@ import Input from '@/components/ui/forms/Input';
 import TextArea from '@/components/ui/forms/TextArea';
 import { Button } from '@/components/ui/button';
 import { useHasPermission } from '@/hooks/useHasPermission';
+import ResizableSortableTh from '@/components/ui/table/ResizableSortableTh';
+import TableColGroup from '@/components/ui/table/TableColGroup';
+import { useTableColumnWidths, type TableColumnWidthDef } from '@/components/ui/table/useTableColumnWidths';
 
 export default function MatrizCompetenciasPage() {
   const { addToast } = useToast();
@@ -87,6 +90,18 @@ export default function MatrizCompetenciasPage() {
     }
     return map;
   }, [planos]);
+
+  const matrixColumns: TableColumnWidthDef[] = React.useMemo(() => {
+    return [
+      { id: 'colaborador', defaultWidth: 260, minWidth: 200 },
+      ...allCompetencies.map((c) => ({ id: c.id, defaultWidth: 140, minWidth: 110, maxWidth: 420 })),
+    ];
+  }, [allCompetencies]);
+
+  const { widths: matrixWidths, startResize: startMatrixResize } = useTableColumnWidths({
+    tableId: `rh:matriz-competencias:${selectedCargo || 'all'}`,
+    columns: matrixColumns,
+  });
 
   const renderCell = (row: MatrixRow, compId: string) => {
     const competencias = Array.isArray(row.competencias) ? row.competencias : [];
@@ -239,17 +254,32 @@ export default function MatrizCompetenciasPage() {
       ) : (
         <GlassCard className="flex-grow overflow-hidden flex flex-col p-0">
           <div className="overflow-auto scrollbar-styled flex-grow">
-            <table className="min-w-full border-collapse">
+            <table className="min-w-full border-collapse table-fixed">
+              <TableColGroup columns={matrixColumns} widths={matrixWidths} />
               <thead className="bg-gray-50 sticky top-0 z-10 shadow-sm">
                 <tr>
-                  <th className="p-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider border-b border-gray-200 min-w-[200px] sticky left-0 bg-gray-50 z-20">
-                    Colaborador / Cargo
-                  </th>
-                  {allCompetencies.map(comp => (
-                    <th key={comp.id} className="p-2 text-center text-xs font-medium text-gray-500 uppercase tracking-wider border-b border-r border-gray-200 min-w-[100px]">
-                      <div className="line-clamp-2" title={comp.nome}>{comp.nome}</div>
-                      <span className="text-[10px] text-gray-400 font-normal capitalize">{comp.tipo}</span>
-                    </th>
+                  <ResizableSortableTh
+                    columnId="colaborador"
+                    label="Colaborador / Cargo"
+                    sortable={false}
+                    onResizeStart={startMatrixResize}
+                    className="p-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider border-b border-gray-200 sticky left-0 bg-gray-50 z-20"
+                  />
+                  {allCompetencies.map((comp) => (
+                    <ResizableSortableTh
+                      key={comp.id}
+                      columnId={comp.id}
+                      label={
+                        <div className="text-center">
+                          <div className="line-clamp-2" title={comp.nome}>{comp.nome}</div>
+                          <span className="text-[10px] text-gray-400 font-normal capitalize">{comp.tipo}</span>
+                        </div>
+                      }
+                      sortable={false}
+                      onResizeStart={startMatrixResize}
+                      align="center"
+                      className="p-2 text-center text-xs font-medium text-gray-500 uppercase tracking-wider border-b border-r border-gray-200"
+                    />
                   ))}
                 </tr>
               </thead>

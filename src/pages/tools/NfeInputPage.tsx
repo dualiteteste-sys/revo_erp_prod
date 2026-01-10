@@ -6,6 +6,10 @@ import { FileUp, Loader2, AlertTriangle, CheckCircle, Save, Link as LinkIcon, Ar
 import GlassCard from '@/components/ui/GlassCard';
 import { useToast } from '@/contexts/ToastProvider';
 import { useNavigate } from 'react-router-dom';
+import ResizableSortableTh, { type SortState } from '@/components/ui/table/ResizableSortableTh';
+import TableColGroup from '@/components/ui/table/TableColGroup';
+import { useTableColumnWidths, type TableColumnWidthDef } from '@/components/ui/table/useTableColumnWidths';
+import { sortRows, toggleSort } from '@/components/ui/table/sortUtils';
 import {
   registerNfeImport,
   previewBeneficiamento,
@@ -63,6 +67,31 @@ export default function NfeInputPage({ embedded, onRecebimentoReady, autoFinaliz
   const [manualMatches, setManualMatches] = useState<Record<string, { id: string, name: string }>>({}); // item_id -> { id, name }
   const [creatingObItemId, setCreatingObItemId] = useState<string | null>(null);
   const [conferidas, setConferidas] = useState<Record<string, number>>({}); // item_id (fiscal) -> quantidade conferida
+  const [matchSort, setMatchSort] = useState<SortState<'item' | 'qty' | 'vinculo' | 'status'>>({ column: 'status', direction: 'asc' });
+  const [confSort, setConfSort] = useState<SortState<'item' | 'qtyXml' | 'qtyConf' | 'status'>>({ column: 'item', direction: 'asc' });
+
+  const matchColumns: TableColumnWidthDef[] = [
+    { id: 'item', defaultWidth: 360, minWidth: 260 },
+    { id: 'qty', defaultWidth: 130, minWidth: 110 },
+    { id: 'vinculo', defaultWidth: 640, minWidth: 420 },
+    { id: 'status', defaultWidth: 160, minWidth: 140 },
+    { id: 'acao', defaultWidth: 170, minWidth: 150, resizable: false },
+  ];
+  const { widths: matchWidths, startResize: startMatchResize } = useTableColumnWidths({
+    tableId: 'tools:nfe-input:matching',
+    columns: matchColumns,
+  });
+
+  const confColumns: TableColumnWidthDef[] = [
+    { id: 'item', defaultWidth: 420, minWidth: 260 },
+    { id: 'qtyXml', defaultWidth: 150, minWidth: 130 },
+    { id: 'qtyConf', defaultWidth: 170, minWidth: 150 },
+    { id: 'status', defaultWidth: 160, minWidth: 140 },
+  ];
+  const { widths: confWidths, startResize: startConfResize } = useTableColumnWidths({
+    tableId: 'tools:nfe-input:conferencia',
+    columns: confColumns,
+  });
 
   const digitsOnly = (value?: string | null) => (value || '').replace(/\D/g, '');
   const formatQty = (value?: number | string | null) => {
@@ -93,6 +122,41 @@ export default function NfeInputPage({ embedded, onRecebimentoReady, autoFinaliz
       return next;
     });
   }, [previewData]);
+
+  const matchingSorted = React.useMemo(() => {
+    const itens = previewData?.itens ?? [];
+    return sortRows(
+      itens,
+      matchSort as any,
+      [
+        { id: 'item', type: 'string', getValue: (it: any) => it.xprod ?? '' },
+        { id: 'qty', type: 'number', getValue: (it: any) => typeof it.qcom === 'number' ? it.qcom : Number(it.qcom) },
+        { id: 'vinculo', type: 'string', getValue: (it: any) => String(it.match_produto_id || manualMatches[it.item_id]?.name || '') },
+        { id: 'status', type: 'custom', getValue: (it: any) => (!!it.match_produto_id || !!manualMatches[it.item_id]) ? 1 : 0, compare: (a, b) => Number(a) - Number(b) },
+      ] as const
+    );
+  }, [manualMatches, matchSort, previewData?.itens]);
+
+  const conferenciaSorted = React.useMemo(() => {
+    const itens = previewData?.itens ?? [];
+    return sortRows(
+      itens,
+      confSort as any,
+      [
+        { id: 'item', type: 'string', getValue: (it: any) => it.xprod ?? '' },
+        { id: 'qtyXml', type: 'number', getValue: (it: any) => typeof it.qcom === 'number' ? it.qcom : Number(it.qcom) },
+        { id: 'qtyConf', type: 'number', getValue: (it: any) => conferidas[it.item_id] ?? NaN },
+        { id: 'status', type: 'custom', getValue: (it: any) => {
+          const qty = conferidas[it.item_id];
+          const qtyNumber = typeof qty === 'number' && !Number.isNaN(qty) ? qty : NaN;
+          const tol = 1e-6;
+          const ok = typeof qtyNumber === 'number' && !Number.isNaN(qtyNumber) && Math.abs(qtyNumber - it.qcom) <= tol;
+          const diverge = typeof qtyNumber === 'number' && !Number.isNaN(qtyNumber) && Math.abs(qtyNumber - it.qcom) > tol;
+          return ok ? 2 : diverge ? 1 : 0;
+        }, compare: (a, b) => Number(a) - Number(b) },
+      ] as const
+    );
+  }, [confSort, conferidas, previewData?.itens]);
 
   const resolveClienteFromCnpj = async (cnpj?: string | null): Promise<{ id: string; nome: string; doc: string } | null> => {
     const doc = digitsOnly(cnpj);
@@ -582,18 +646,57 @@ export default function NfeInputPage({ embedded, onRecebimentoReady, autoFinaliz
             </div>
 
             <div className="overflow-x-auto border rounded-lg">
-              <table className="min-w-full divide-y divide-gray-200">
+              <table className="min-w-full divide-y divide-gray-200 table-fixed">
+                <TableColGroup columns={matchColumns} widths={matchWidths} />
                 <thead className="bg-gray-50">
                   <tr>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Item (XML)</th>
-                    <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">Qtd.</th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase w-[40rem]">Vínculo no Sistema</th>
-                    <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">Status</th>
-                    <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">Ação</th>
+                    <ResizableSortableTh
+                      columnId="item"
+                      label="Item (XML)"
+                      sort={matchSort}
+                      onSort={(col) => setMatchSort((prev) => toggleSort(prev as any, col))}
+                      onResizeStart={startMatchResize}
+                      className="px-4 py-3"
+                    />
+                    <ResizableSortableTh
+                      columnId="qty"
+                      label="Qtd."
+                      sort={matchSort}
+                      onSort={(col) => setMatchSort((prev) => toggleSort(prev as any, col))}
+                      onResizeStart={startMatchResize}
+                      align="center"
+                      className="px-4 py-3"
+                    />
+                    <ResizableSortableTh
+                      columnId="vinculo"
+                      label="Vínculo no Sistema"
+                      sort={matchSort}
+                      onSort={(col) => setMatchSort((prev) => toggleSort(prev as any, col))}
+                      onResizeStart={startMatchResize}
+                      className="px-4 py-3"
+                    />
+                    <ResizableSortableTh
+                      columnId="status"
+                      label="Status"
+                      sort={matchSort}
+                      onSort={(col) => setMatchSort((prev) => toggleSort(prev as any, col))}
+                      onResizeStart={startMatchResize}
+                      align="center"
+                      className="px-4 py-3"
+                    />
+                    <ResizableSortableTh
+                      columnId="acao"
+                      label="Ação"
+                      sortable={false}
+                      sort={matchSort}
+                      onResizeStart={startMatchResize}
+                      align="center"
+                      className="px-4 py-3"
+                    />
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
-                  {previewData.itens.map((item) => {
+                  {matchingSorted.map((item) => {
                     const isMatched = !!item.match_produto_id || !!manualMatches[item.item_id];
                     return (
                       <tr key={item.item_id} className={isMatched ? 'bg-green-50/30' : 'bg-red-50/30'}>
@@ -703,17 +806,49 @@ export default function NfeInputPage({ embedded, onRecebimentoReady, autoFinaliz
             </div>
 
             <div className="overflow-x-auto border rounded-lg">
-              <table className="min-w-full divide-y divide-gray-200">
+              <table className="min-w-full divide-y divide-gray-200 table-fixed">
+                <TableColGroup columns={confColumns} widths={confWidths} />
                 <thead className="bg-gray-50">
                   <tr>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Item (XML)</th>
-                    <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">Qtd. XML</th>
-                    <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">Qtd. Conferida</th>
-                    <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">Status</th>
+                    <ResizableSortableTh
+                      columnId="item"
+                      label="Item (XML)"
+                      sort={confSort}
+                      onSort={(col) => setConfSort((prev) => toggleSort(prev as any, col))}
+                      onResizeStart={startConfResize}
+                      className="px-4 py-3"
+                    />
+                    <ResizableSortableTh
+                      columnId="qtyXml"
+                      label="Qtd. XML"
+                      sort={confSort}
+                      onSort={(col) => setConfSort((prev) => toggleSort(prev as any, col))}
+                      onResizeStart={startConfResize}
+                      align="center"
+                      className="px-4 py-3"
+                    />
+                    <ResizableSortableTh
+                      columnId="qtyConf"
+                      label="Qtd. Conferida"
+                      sort={confSort}
+                      onSort={(col) => setConfSort((prev) => toggleSort(prev as any, col))}
+                      onResizeStart={startConfResize}
+                      align="center"
+                      className="px-4 py-3"
+                    />
+                    <ResizableSortableTh
+                      columnId="status"
+                      label="Status"
+                      sort={confSort}
+                      onSort={(col) => setConfSort((prev) => toggleSort(prev as any, col))}
+                      onResizeStart={startConfResize}
+                      align="center"
+                      className="px-4 py-3"
+                    />
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
-                  {previewData.itens.map((item) => {
+                  {conferenciaSorted.map((item) => {
                     const qty = conferidas[item.item_id];
                     const qtyNumber = typeof qty === 'number' && !Number.isNaN(qty) ? qty : NaN;
                     const tol = 1e-6;

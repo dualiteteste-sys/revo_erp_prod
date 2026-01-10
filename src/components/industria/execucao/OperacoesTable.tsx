@@ -1,7 +1,11 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { Operacao } from '@/services/industriaExecucao';
 import { Package, User, Calendar, Clock, FileText, PauseCircle, PlayCircle, CheckCircle2, MoreHorizontal } from 'lucide-react';
 import { formatOrderNumber } from '@/lib/utils';
+import ResizableSortableTh, { type SortState } from '@/components/ui/table/ResizableSortableTh';
+import TableColGroup from '@/components/ui/table/TableColGroup';
+import { useTableColumnWidths, type TableColumnWidthDef } from '@/components/ui/table/useTableColumnWidths';
+import { sortRows, toggleSort } from '@/components/ui/table/sortUtils';
 
 interface Props {
   operacoes: Operacao[];
@@ -35,22 +39,94 @@ const STATUS_OPTIONS: Array<{ value: Operacao['status']; label: string }> = [
 export default function OperacoesTable({ operacoes, onUpdateStatus, onOpenDocs, onStart, onPause, onConclude }: Props) {
   const [menuId, setMenuId] = useState<string | null>(null);
 
+  const columns: TableColumnWidthDef[] = [
+    { id: 'ordem', defaultWidth: 140, minWidth: 120 },
+    { id: 'produto', defaultWidth: 360, minWidth: 240 },
+    { id: 'centro', defaultWidth: 260, minWidth: 200 },
+    { id: 'status', defaultWidth: 280, minWidth: 240 },
+    { id: 'previsao', defaultWidth: 200, minWidth: 170 },
+    { id: 'percentual', defaultWidth: 140, minWidth: 120 },
+    { id: 'acoes', defaultWidth: 140, minWidth: 120 },
+  ];
+  const { widths, startResize } = useTableColumnWidths({ tableId: 'industria:execucao:operacoes', columns });
+
+  const [sort, setSort] = useState<SortState<string>>({ column: 'previsao', direction: 'asc' });
+  const sortedOperacoes = useMemo(() => {
+    return sortRows(
+      operacoes,
+      sort as any,
+      [
+        { id: 'ordem', type: 'number', getValue: (o) => o.ordem_numero ?? 0 },
+        { id: 'produto', type: 'string', getValue: (o) => `${o.produto_nome ?? ''} ${o.cliente_nome ?? ''}` },
+        { id: 'centro', type: 'string', getValue: (o) => o.centro_trabalho_nome ?? '' },
+        { id: 'status', type: 'string', getValue: (o) => String(o.status ?? '') },
+        { id: 'previsao', type: 'date', getValue: (o) => o.data_prevista_inicio ?? null },
+        { id: 'percentual', type: 'number', getValue: (o) => o.percentual_concluido ?? 0 },
+      ] as const
+    );
+  }, [operacoes, sort]);
+
   return (
     <div className="overflow-x-auto overflow-y-visible">
       <table className="min-w-full divide-y divide-gray-200">
+        <TableColGroup columns={columns} widths={widths} />
         <thead className="bg-gray-50">
           <tr>
-            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Ordem</th>
-            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Produto</th>
-            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Centro de Trabalho</th>
-            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
-            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Previsão</th>
-            <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase">%</th>
-            <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Ações</th>
+            <ResizableSortableTh
+              columnId="ordem"
+              label="Ordem"
+              sort={sort as any}
+              onSort={(col) => setSort((prev) => toggleSort(prev as any, col))}
+              onResizeStart={startResize as any}
+            />
+            <ResizableSortableTh
+              columnId="produto"
+              label="Produto"
+              sort={sort as any}
+              onSort={(col) => setSort((prev) => toggleSort(prev as any, col))}
+              onResizeStart={startResize as any}
+            />
+            <ResizableSortableTh
+              columnId="centro"
+              label="Centro de Trabalho"
+              sort={sort as any}
+              onSort={(col) => setSort((prev) => toggleSort(prev as any, col))}
+              onResizeStart={startResize as any}
+            />
+            <ResizableSortableTh
+              columnId="status"
+              label="Status"
+              sort={sort as any}
+              onSort={(col) => setSort((prev) => toggleSort(prev as any, col))}
+              onResizeStart={startResize as any}
+            />
+            <ResizableSortableTh
+              columnId="previsao"
+              label="Previsão"
+              sort={sort as any}
+              onSort={(col) => setSort((prev) => toggleSort(prev as any, col))}
+              onResizeStart={startResize as any}
+            />
+            <ResizableSortableTh
+              columnId="percentual"
+              label="%"
+              align="center"
+              sort={sort as any}
+              onSort={(col) => setSort((prev) => toggleSort(prev as any, col))}
+              onResizeStart={startResize as any}
+            />
+            <ResizableSortableTh
+              columnId="acoes"
+              label="Ações"
+              align="right"
+              sortable={false}
+              resizable
+              onResizeStart={startResize as any}
+            />
           </tr>
         </thead>
         <tbody className="bg-white divide-y divide-gray-200">
-          {operacoes.map(op => (
+          {sortedOperacoes.map(op => (
             <tr key={op.id} className="hover:bg-gray-50 transition-colors">
               <td className="px-6 py-4">
                 <div className="font-bold text-gray-900">{formatOrderNumber(op.ordem_numero)}</div>
@@ -173,7 +249,7 @@ export default function OperacoesTable({ operacoes, onUpdateStatus, onOpenDocs, 
               </td>
             </tr>
           ))}
-          {operacoes.length === 0 && (
+          {sortedOperacoes.length === 0 && (
             <tr>
               <td colSpan={7} className="px-6 py-12 text-center text-gray-500">Nenhuma operação encontrada.</td>
             </tr>

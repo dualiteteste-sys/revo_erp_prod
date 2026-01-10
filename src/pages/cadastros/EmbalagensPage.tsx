@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Plus, Search, Package, Edit2, Trash2, Box, FileText, Circle } from 'lucide-react';
 import GlassCard from '../../components/ui/GlassCard';
 import Input from '../../components/ui/forms/Input';
@@ -9,6 +9,10 @@ import { useToast } from '../../contexts/ToastProvider';
 import { tipo_embalagem } from '../../types/database.types';
 import { useConfirm } from '@/contexts/ConfirmProvider';
 import CsvExportDialog from '@/components/ui/CsvExportDialog';
+import ResizableSortableTh, { type SortState } from '@/components/ui/table/ResizableSortableTh';
+import TableColGroup from '@/components/ui/table/TableColGroup';
+import { useTableColumnWidths, type TableColumnWidthDef } from '@/components/ui/table/useTableColumnWidths';
+import { sortRows, toggleSort } from '@/components/ui/table/sortUtils';
 
 const EmbalagensPage: React.FC = () => {
     const [embalagens, setEmbalagens] = useState<Embalagem[]>([]);
@@ -16,6 +20,7 @@ const EmbalagensPage: React.FC = () => {
     const [isLoading, setIsLoading] = useState(true);
     const [isFormOpen, setIsFormOpen] = useState(false);
     const [selectedEmbalagem, setSelectedEmbalagem] = useState<Embalagem | null>(null);
+    const [sort, setSort] = useState<SortState<string>>({ column: 'nome', direction: 'asc' });
     const { addToast } = useToast();
     const { confirm } = useConfirm();
 
@@ -100,6 +105,30 @@ const EmbalagensPage: React.FC = () => {
         return dims.join(' x ');
     };
 
+    const columns: TableColumnWidthDef[] = [
+        { id: 'tipo', defaultWidth: 120, minWidth: 90 },
+        { id: 'nome', defaultWidth: 360, minWidth: 220 },
+        { id: 'dimensoes', defaultWidth: 260, minWidth: 200 },
+        { id: 'origem', defaultWidth: 160, minWidth: 140 },
+        { id: 'status', defaultWidth: 120, minWidth: 100 },
+        { id: 'acoes', defaultWidth: 140, minWidth: 120 },
+    ];
+    const { widths, startResize } = useTableColumnWidths({ tableId: 'cadastros:embalagens', columns });
+
+    const sortedEmbalagens = useMemo(() => {
+        return sortRows(
+            embalagens,
+            sort as any,
+            [
+                { id: 'tipo', type: 'string', getValue: (e) => String(e.tipo ?? '') },
+                { id: 'nome', type: 'string', getValue: (e) => e.nome ?? '' },
+                { id: 'dimensoes', type: 'string', getValue: (e) => getDimensionsString(e) },
+                { id: 'origem', type: 'string', getValue: (e) => (e.empresa_id ? 'Próprio' : 'Sistema') },
+                { id: 'status', type: 'boolean', getValue: (e) => Boolean(e.ativo) },
+            ] as const
+        );
+    }, [embalagens, sort]);
+
     return (
         <div className="p-6 h-full flex flex-col">
             <div className="flex justify-between items-center mb-6">
@@ -150,14 +179,58 @@ const EmbalagensPage: React.FC = () => {
                 <GlassCard className="overflow-hidden flex-grow flex flex-col">
                     <div className="overflow-x-auto flex-grow h-0">
                         <table className="w-full text-sm text-left relative">
+                            <TableColGroup columns={columns} widths={widths} />
                             <thead className="bg-gray-50 text-gray-700 font-medium border-b sticky top-0 z-10">
                                 <tr>
-                                    <th className="px-6 py-4 bg-gray-50">Tipo</th>
-                                    <th className="px-6 py-4 bg-gray-50">Nome</th>
-                                    <th className="px-6 py-4 bg-gray-50">Dimensões</th>
-                                    <th className="px-6 py-4 bg-gray-50">Origem</th>
-                                    <th className="px-6 py-4 bg-gray-50">Status</th>
-                                    <th className="px-6 py-4 text-right bg-gray-50">Ações</th>
+                                    <ResizableSortableTh
+                                        columnId="tipo"
+                                        label="Tipo"
+                                        className="px-6 py-4 bg-gray-50 normal-case tracking-normal"
+                                        sort={sort as any}
+                                        onSort={(col) => setSort((prev) => toggleSort(prev as any, col))}
+                                        onResizeStart={startResize as any}
+                                    />
+                                    <ResizableSortableTh
+                                        columnId="nome"
+                                        label="Nome"
+                                        className="px-6 py-4 bg-gray-50 normal-case tracking-normal"
+                                        sort={sort as any}
+                                        onSort={(col) => setSort((prev) => toggleSort(prev as any, col))}
+                                        onResizeStart={startResize as any}
+                                    />
+                                    <ResizableSortableTh
+                                        columnId="dimensoes"
+                                        label="Dimensões"
+                                        className="px-6 py-4 bg-gray-50 normal-case tracking-normal"
+                                        sort={sort as any}
+                                        onSort={(col) => setSort((prev) => toggleSort(prev as any, col))}
+                                        onResizeStart={startResize as any}
+                                    />
+                                    <ResizableSortableTh
+                                        columnId="origem"
+                                        label="Origem"
+                                        className="px-6 py-4 bg-gray-50 normal-case tracking-normal"
+                                        sort={sort as any}
+                                        onSort={(col) => setSort((prev) => toggleSort(prev as any, col))}
+                                        onResizeStart={startResize as any}
+                                    />
+                                    <ResizableSortableTh
+                                        columnId="status"
+                                        label="Status"
+                                        className="px-6 py-4 bg-gray-50 normal-case tracking-normal"
+                                        sort={sort as any}
+                                        onSort={(col) => setSort((prev) => toggleSort(prev as any, col))}
+                                        onResizeStart={startResize as any}
+                                    />
+                                    <ResizableSortableTh
+                                        columnId="acoes"
+                                        label="Ações"
+                                        align="right"
+                                        className="px-6 py-4 bg-gray-50 normal-case tracking-normal"
+                                        sortable={false}
+                                        resizable
+                                        onResizeStart={startResize as any}
+                                    />
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-gray-100">
@@ -174,7 +247,7 @@ const EmbalagensPage: React.FC = () => {
                                         </td>
                                     </tr>
                                 ) : (
-                                    embalagens.map((emb) => (
+                                    sortedEmbalagens.map((emb) => (
                                         <tr key={emb.id} className="hover:bg-gray-50/50 transition-colors">
                                             <td className="px-6 py-4">
                                                 <div className="flex items-center gap-2" title={emb.tipo}>

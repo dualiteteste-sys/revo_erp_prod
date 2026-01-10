@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { OrdemIndustria } from '@/services/industria';
 import { Copy, Edit, Eye, Calendar, User, Package, MoreHorizontal, Trash2 } from 'lucide-react';
 import { formatOrderNumber } from '@/lib/utils';
@@ -6,6 +6,10 @@ import { useToast } from '@/contexts/ToastProvider';
 import { useConfirm } from '@/contexts/ConfirmProvider';
 import { deleteOrdemProducao } from '@/services/industriaProducao';
 import { deleteOrdemBeneficiamento } from '@/services/industria';
+import ResizableSortableTh, { type SortState } from '@/components/ui/table/ResizableSortableTh';
+import TableColGroup from '@/components/ui/table/TableColGroup';
+import { useTableColumnWidths, type TableColumnWidthDef } from '@/components/ui/table/useTableColumnWidths';
+import { sortRows, toggleSort } from '@/components/ui/table/sortUtils';
 
 interface Props {
   orders: OrdemIndustria[];
@@ -33,6 +37,35 @@ export default function OrdensTable({ orders, onEdit, onClone, onChanged }: Prop
   const { addToast } = useToast();
   const { confirm } = useConfirm();
   const [menuId, setMenuId] = useState<string | null>(null);
+
+  const columns: TableColumnWidthDef[] = [
+    { id: 'numero', defaultWidth: 140, minWidth: 110 },
+    { id: 'produto', defaultWidth: 360, minWidth: 220 },
+    { id: 'cliente', defaultWidth: 260, minWidth: 200 },
+    { id: 'qtd', defaultWidth: 130, minWidth: 120 },
+    { id: 'entregue', defaultWidth: 120, minWidth: 110 },
+    { id: 'previsao', defaultWidth: 170, minWidth: 150 },
+    { id: 'status', defaultWidth: 180, minWidth: 160 },
+    { id: 'acoes', defaultWidth: 140, minWidth: 120 },
+  ];
+  const { widths, startResize } = useTableColumnWidths({ tableId: 'industria:ordens', columns });
+
+  const [sort, setSort] = useState<SortState<string>>({ column: 'numero', direction: 'desc' });
+  const sortedOrders = useMemo(() => {
+    return sortRows(
+      orders,
+      sort as any,
+      [
+        { id: 'numero', type: 'number', getValue: (o) => o.numero ?? 0 },
+        { id: 'produto', type: 'string', getValue: (o) => o.produto_nome ?? '' },
+        { id: 'cliente', type: 'string', getValue: (o) => o.cliente_nome ?? '' },
+        { id: 'qtd', type: 'number', getValue: (o) => o.quantidade_planejada ?? 0 },
+        { id: 'entregue', type: 'number', getValue: (o) => o.total_entregue ?? 0 },
+        { id: 'previsao', type: 'date', getValue: (o) => o.data_prevista_entrega ?? null },
+        { id: 'status', type: 'string', getValue: (o) => formatStatus(String(o.status ?? '')) },
+      ] as const
+    );
+  }, [orders, sort]);
 
   const handleClone = async (order: OrdemIndustria) => {
     setMenuId(null);
@@ -85,20 +118,72 @@ export default function OrdensTable({ orders, onEdit, onClone, onChanged }: Prop
   return (
     <div className="overflow-x-auto overflow-y-visible">
       <table className="min-w-full divide-y divide-gray-200">
+        <TableColGroup columns={columns} widths={widths} />
         <thead className="bg-gray-50">
           <tr>
-            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Número</th>
-            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Produto</th>
-            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Cliente</th>
-            <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase">Qtd. Plan.</th>
-            <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase">Entregue</th>
-            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Previsão</th>
-            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
-            <th className="px-6 py-3"></th>
+            <ResizableSortableTh
+              columnId="numero"
+              label="Número"
+              sort={sort as any}
+              onSort={(col) => setSort((prev) => toggleSort(prev as any, col))}
+              onResizeStart={startResize as any}
+            />
+            <ResizableSortableTh
+              columnId="produto"
+              label="Produto"
+              sort={sort as any}
+              onSort={(col) => setSort((prev) => toggleSort(prev as any, col))}
+              onResizeStart={startResize as any}
+            />
+            <ResizableSortableTh
+              columnId="cliente"
+              label="Cliente"
+              sort={sort as any}
+              onSort={(col) => setSort((prev) => toggleSort(prev as any, col))}
+              onResizeStart={startResize as any}
+            />
+            <ResizableSortableTh
+              columnId="qtd"
+              label="Qtd. Plan."
+              align="center"
+              sort={sort as any}
+              onSort={(col) => setSort((prev) => toggleSort(prev as any, col))}
+              onResizeStart={startResize as any}
+            />
+            <ResizableSortableTh
+              columnId="entregue"
+              label="Entregue"
+              align="center"
+              sort={sort as any}
+              onSort={(col) => setSort((prev) => toggleSort(prev as any, col))}
+              onResizeStart={startResize as any}
+            />
+            <ResizableSortableTh
+              columnId="previsao"
+              label="Previsão"
+              sort={sort as any}
+              onSort={(col) => setSort((prev) => toggleSort(prev as any, col))}
+              onResizeStart={startResize as any}
+            />
+            <ResizableSortableTh
+              columnId="status"
+              label="Status"
+              sort={sort as any}
+              onSort={(col) => setSort((prev) => toggleSort(prev as any, col))}
+              onResizeStart={startResize as any}
+            />
+            <ResizableSortableTh
+              columnId="acoes"
+              label="Ações"
+              align="right"
+              sortable={false}
+              resizable
+              onResizeStart={startResize as any}
+            />
           </tr>
         </thead>
         <tbody className="bg-white divide-y divide-gray-200">
-          {orders.map(order => (
+          {sortedOrders.map(order => (
             <tr key={order.id} className="hover:bg-gray-50 transition-colors">
               <td className="px-6 py-4 text-sm font-medium text-gray-900">{formatOrderNumber(order.numero)}</td>
               <td className="px-6 py-4">
@@ -181,7 +266,7 @@ export default function OrdensTable({ orders, onEdit, onClone, onChanged }: Prop
               </td>
             </tr>
           ))}
-          {orders.length === 0 && (
+          {sortedOrders.length === 0 && (
             <tr>
               <td colSpan={8} className="px-6 py-12 text-center text-gray-500">Nenhuma ordem de produção encontrada.</td>
             </tr>

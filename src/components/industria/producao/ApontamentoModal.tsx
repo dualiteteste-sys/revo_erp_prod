@@ -17,6 +17,10 @@ import NovoMotivoModal from '../qualidade/NovoMotivoModal';
 import { Plus, Trash2, AlertTriangle } from 'lucide-react';
 import { logger } from '@/lib/logger';
 import { useConfirm } from '@/contexts/ConfirmProvider';
+import ResizableSortableTh, { type SortState } from '@/components/ui/table/ResizableSortableTh';
+import TableColGroup from '@/components/ui/table/TableColGroup';
+import { useTableColumnWidths, type TableColumnWidthDef } from '@/components/ui/table/useTableColumnWidths';
+import { sortRows, toggleSort } from '@/components/ui/table/sortUtils';
 
 interface Props {
     isOpen: boolean;
@@ -38,6 +42,33 @@ export default function ApontamentoModal({ isOpen, onClose, operacao, onSuccess 
     const [isNewMotivoOpen, setIsNewMotivoOpen] = useState(false);
     const [apontamentos, setApontamentos] = useState<any[]>([]);
     const [apontamentosLoading, setApontamentosLoading] = useState(false);
+    const [apontamentosSort, setApontamentosSort] = useState<SortState<string>>({ column: 'data', direction: 'desc' });
+
+    const apontamentosColumns: TableColumnWidthDef[] = [
+        { id: 'data', defaultWidth: 220, minWidth: 200 },
+        { id: 'boas', defaultWidth: 120, minWidth: 90 },
+        { id: 'refugo', defaultWidth: 120, minWidth: 90 },
+        { id: 'motivo', defaultWidth: 220, minWidth: 160 },
+        { id: 'obs', defaultWidth: 420, minWidth: 160 },
+        { id: 'acoes', defaultWidth: 120, minWidth: 100 },
+    ];
+    const { widths: apontamentosWidths, startResize: startApontamentosResize } = useTableColumnWidths({
+        tableId: 'industria:producao:apontamentos',
+        columns: apontamentosColumns,
+    });
+    const sortedApontamentos = useMemo(() => {
+        return sortRows(
+            apontamentos,
+            apontamentosSort as any,
+            [
+                { id: 'data', type: 'date', getValue: (r) => r.created_at },
+                { id: 'boas', type: 'number', getValue: (r) => r.quantidade_boa ?? r.quantidade_produzida ?? 0 },
+                { id: 'refugo', type: 'number', getValue: (r) => r.quantidade_refugo ?? 0 },
+                { id: 'motivo', type: 'string', getValue: (r) => r.motivo_refugo ?? '' },
+                { id: 'obs', type: 'string', getValue: (r) => r.observacoes ?? '' },
+            ] as const
+        );
+    }, [apontamentos, apontamentosSort]);
 
     const saldoRestante = useMemo(() => {
         const max = operacao.quantidade_planejada ?? 0;
@@ -252,15 +283,61 @@ export default function ApontamentoModal({ isOpen, onClose, operacao, onSuccess 
                         )}
                     </div>
                     <div className="max-h-64 overflow-y-auto border border-gray-200 rounded-lg">
-                        <table className="min-w-full text-sm">
+                        <table className="min-w-full text-sm table-fixed">
+                            <TableColGroup columns={apontamentosColumns} widths={apontamentosWidths} />
                             <thead className="bg-gray-50 text-gray-500 text-xs uppercase">
                                 <tr>
-                                    <th className="px-3 py-2 text-left">Data</th>
-                                    <th className="px-3 py-2 text-right">Boas</th>
-                                    <th className="px-3 py-2 text-right">Refugo</th>
-                                    <th className="px-3 py-2 text-left">Motivo</th>
-                                    <th className="px-3 py-2 text-left">Obs</th>
-                                    <th className="px-3 py-2 text-center">Ações</th>
+                                    <ResizableSortableTh
+                                        columnId="data"
+                                        label="Data"
+                                        className="px-3 py-2 text-left"
+                                        sort={apontamentosSort as any}
+                                        onSort={(col) => setApontamentosSort((prev) => toggleSort(prev as any, col))}
+                                        onResizeStart={startApontamentosResize}
+                                    />
+                                    <ResizableSortableTh
+                                        columnId="boas"
+                                        label="Boas"
+                                        align="right"
+                                        className="px-3 py-2"
+                                        sort={apontamentosSort as any}
+                                        onSort={(col) => setApontamentosSort((prev) => toggleSort(prev as any, col))}
+                                        onResizeStart={startApontamentosResize}
+                                    />
+                                    <ResizableSortableTh
+                                        columnId="refugo"
+                                        label="Refugo"
+                                        align="right"
+                                        className="px-3 py-2"
+                                        sort={apontamentosSort as any}
+                                        onSort={(col) => setApontamentosSort((prev) => toggleSort(prev as any, col))}
+                                        onResizeStart={startApontamentosResize}
+                                    />
+                                    <ResizableSortableTh
+                                        columnId="motivo"
+                                        label="Motivo"
+                                        className="px-3 py-2 text-left"
+                                        sort={apontamentosSort as any}
+                                        onSort={(col) => setApontamentosSort((prev) => toggleSort(prev as any, col))}
+                                        onResizeStart={startApontamentosResize}
+                                    />
+                                    <ResizableSortableTh
+                                        columnId="obs"
+                                        label="Obs"
+                                        className="px-3 py-2 text-left"
+                                        sort={apontamentosSort as any}
+                                        onSort={(col) => setApontamentosSort((prev) => toggleSort(prev as any, col))}
+                                        onResizeStart={startApontamentosResize}
+                                    />
+                                    <ResizableSortableTh
+                                        columnId="acoes"
+                                        label="Ações"
+                                        align="center"
+                                        className="px-3 py-2"
+                                        sortable={false}
+                                        resizable
+                                        onResizeStart={startApontamentosResize}
+                                    />
                                 </tr>
                             </thead>
                             <tbody>
@@ -270,7 +347,7 @@ export default function ApontamentoModal({ isOpen, onClose, operacao, onSuccess 
                                 {!apontamentosLoading && apontamentos.length === 0 && (
                                     <tr><td colSpan={6} className="text-center p-4 text-gray-400">Nenhum apontamento registrado.</td></tr>
                                 )}
-                                {apontamentos.map(item => (
+                                {sortedApontamentos.map(item => (
                                     <tr key={item.id} className="border-t text-gray-700">
                                         <td className="px-3 py-2">{new Date(item.created_at).toLocaleString()}</td>
                                         <td className="px-3 py-2 text-right">{item.quantidade_boa || item.quantidade_produzida || 0}</td>

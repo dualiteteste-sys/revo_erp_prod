@@ -3,6 +3,10 @@ import { Banknote, Loader2, PlusCircle } from 'lucide-react';
 import Modal from '@/components/ui/Modal';
 import { useToast } from '@/contexts/ToastProvider';
 import Input from '@/components/ui/forms/Input';
+import ResizableSortableTh, { type SortState } from '@/components/ui/table/ResizableSortableTh';
+import TableColGroup from '@/components/ui/table/TableColGroup';
+import { useTableColumnWidths, type TableColumnWidthDef } from '@/components/ui/table/useTableColumnWidths';
+import { sortRows, toggleSort } from '@/components/ui/table/sortUtils';
 import { getPartners, type PartnerListItem } from '@/services/partners';
 import {
   deleteCobrancaServico,
@@ -37,6 +41,7 @@ export default function CobrancasServicosPage() {
   const [rows, setRows] = useState<CobrancaServico[]>([]);
   const [notas, setNotas] = useState<NotaServico[]>([]);
   const [clients, setClients] = useState<PartnerListItem[]>([]);
+  const [sort, setSort] = useState<SortState<string>>({ column: 'vencimento', direction: 'desc' });
 
   const [isOpen, setIsOpen] = useState(false);
   const [form, setForm] = useState<FormState>(emptyForm);
@@ -53,6 +58,32 @@ export default function CobrancasServicosPage() {
     for (const c of clients) m.set(c.id, c);
     return m;
   }, [clients]);
+
+  const columns: TableColumnWidthDef[] = [
+    { id: 'vencimento', defaultWidth: 150, minWidth: 140 },
+    { id: 'cliente', defaultWidth: 240, minWidth: 200 },
+    { id: 'nota', defaultWidth: 280, minWidth: 220 },
+    { id: 'valor', defaultWidth: 140, minWidth: 120 },
+    { id: 'status', defaultWidth: 140, minWidth: 120 },
+    { id: 'conta', defaultWidth: 160, minWidth: 140 },
+    { id: 'acoes', defaultWidth: 280, minWidth: 240 },
+  ];
+  const { widths, startResize } = useTableColumnWidths({ tableId: 'servicos:cobrancas', columns });
+
+  const sortedRows = useMemo(() => {
+    return sortRows(
+      rows,
+      sort as any,
+      [
+        { id: 'vencimento', type: 'date', getValue: (r) => r.data_vencimento ?? null },
+        { id: 'cliente', type: 'string', getValue: (r) => (r.cliente_id ? clientById.get(r.cliente_id)?.nome ?? '' : '') },
+        { id: 'nota', type: 'string', getValue: (r) => (r.nota_id ? notaById.get(r.nota_id)?.descricao ?? '' : '') },
+        { id: 'valor', type: 'number', getValue: (r) => r.valor ?? 0 },
+        { id: 'status', type: 'string', getValue: (r) => r.status ?? '' },
+        { id: 'conta', type: 'boolean', getValue: (r) => Boolean(r.conta_a_receber_id) },
+      ] as const
+    );
+  }, [clientById, notaById, rows, sort]);
 
   async function load() {
     setLoading(true);
@@ -204,19 +235,20 @@ export default function CobrancasServicosPage() {
         ) : (
           <div className="overflow-auto">
             <table className="min-w-full text-sm">
+              <TableColGroup columns={columns} widths={widths} />
               <thead className="bg-gray-50">
                 <tr className="text-left text-gray-600">
-                  <th className="px-4 py-3">Vencimento</th>
-                  <th className="px-4 py-3">Cliente</th>
-                  <th className="px-4 py-3">Nota</th>
-                  <th className="px-4 py-3">Valor</th>
-                  <th className="px-4 py-3">Status</th>
-                  <th className="px-4 py-3">Conta a receber</th>
-                  <th className="px-4 py-3 text-right">Ações</th>
+                  <ResizableSortableTh columnId="vencimento" label="Vencimento" className="px-4 py-3 normal-case tracking-normal" sort={sort as any} onSort={(col) => setSort((prev) => toggleSort(prev as any, col))} onResizeStart={startResize as any} />
+                  <ResizableSortableTh columnId="cliente" label="Cliente" className="px-4 py-3 normal-case tracking-normal" sort={sort as any} onSort={(col) => setSort((prev) => toggleSort(prev as any, col))} onResizeStart={startResize as any} />
+                  <ResizableSortableTh columnId="nota" label="Nota" className="px-4 py-3 normal-case tracking-normal" sort={sort as any} onSort={(col) => setSort((prev) => toggleSort(prev as any, col))} onResizeStart={startResize as any} />
+                  <ResizableSortableTh columnId="valor" label="Valor" className="px-4 py-3 normal-case tracking-normal" sort={sort as any} onSort={(col) => setSort((prev) => toggleSort(prev as any, col))} onResizeStart={startResize as any} />
+                  <ResizableSortableTh columnId="status" label="Status" className="px-4 py-3 normal-case tracking-normal" sort={sort as any} onSort={(col) => setSort((prev) => toggleSort(prev as any, col))} onResizeStart={startResize as any} />
+                  <ResizableSortableTh columnId="conta" label="Conta a receber" className="px-4 py-3 normal-case tracking-normal" sort={sort as any} onSort={(col) => setSort((prev) => toggleSort(prev as any, col))} onResizeStart={startResize as any} />
+                  <ResizableSortableTh columnId="acoes" label="Ações" align="right" className="px-4 py-3 normal-case tracking-normal" sortable={false} resizable onResizeStart={startResize as any} />
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200">
-                {rows.map((r) => {
+                {sortedRows.map((r) => {
                   const c = r.cliente_id ? clientById.get(r.cliente_id) : null;
                   const n = r.nota_id ? notaById.get(r.nota_id) : null;
                   return (

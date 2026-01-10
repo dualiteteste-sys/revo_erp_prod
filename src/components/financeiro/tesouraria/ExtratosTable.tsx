@@ -1,6 +1,10 @@
-import React from 'react';
+import React, { useMemo, useState } from 'react';
 import { ExtratoItem } from '@/services/treasury';
 import { Link2, Unlink, AlertCircle, Loader2 } from 'lucide-react';
+import ResizableSortableTh, { type SortState } from '@/components/ui/table/ResizableSortableTh';
+import TableColGroup from '@/components/ui/table/TableColGroup';
+import { useTableColumnWidths, type TableColumnWidthDef } from '@/components/ui/table/useTableColumnWidths';
+import { sortRows, toggleSort } from '@/components/ui/table/sortUtils';
 
 interface Props {
   extratos: ExtratoItem[];
@@ -10,20 +14,81 @@ interface Props {
 }
 
 export default function ExtratosTable({ extratos, onConciliate, onUnconciliate, busyExtratoId }: Props) {
+  const columns: TableColumnWidthDef[] = [
+    { id: 'data', defaultWidth: 160, minWidth: 140 },
+    { id: 'descricao', defaultWidth: 420, minWidth: 220 },
+    { id: 'valor', defaultWidth: 160, minWidth: 140 },
+    { id: 'vinculo', defaultWidth: 420, minWidth: 240 },
+    { id: 'acoes', defaultWidth: 180, minWidth: 160 },
+  ];
+  const { widths, startResize } = useTableColumnWidths({ tableId: 'financeiro:tesouraria:extratos', columns });
+
+  const [sort, setSort] = useState<SortState<string>>({ column: 'data', direction: 'desc' });
+  const sortedExtratos = useMemo(() => {
+    return sortRows(
+      extratos,
+      sort as any,
+      [
+        { id: 'data', type: 'date', getValue: (e) => e.data_lancamento },
+        { id: 'descricao', type: 'string', getValue: (e) => e.descricao ?? '' },
+        { id: 'valor', type: 'number', getValue: (e) => e.valor ?? 0 },
+        {
+          id: 'vinculo',
+          type: 'custom',
+          getValue: (e) => (e.conciliado ? `1:${e.movimentacao_descricao ?? ''}` : `0:${e.descricao ?? ''}`),
+          compare: (a, b) => String(a ?? '').localeCompare(String(b ?? ''), 'pt-BR', { numeric: true, sensitivity: 'base' }),
+        },
+      ] as const
+    );
+  }, [extratos, sort]);
+
   return (
     <div className="overflow-x-auto">
       <table className="min-w-full divide-y divide-gray-200">
+        <TableColGroup columns={columns} widths={widths} />
         <thead className="bg-gray-50">
           <tr>
-            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Data</th>
-            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Descrição</th>
-            <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Valor</th>
-            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Vínculo (Movimentação)</th>
-            <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase">Ações</th>
+            <ResizableSortableTh
+              columnId="data"
+              label="Data"
+              sort={sort as any}
+              onSort={(col) => setSort((prev) => toggleSort(prev as any, col))}
+              onResizeStart={startResize as any}
+            />
+            <ResizableSortableTh
+              columnId="descricao"
+              label="Descrição"
+              sort={sort as any}
+              onSort={(col) => setSort((prev) => toggleSort(prev as any, col))}
+              onResizeStart={startResize as any}
+            />
+            <ResizableSortableTh
+              columnId="valor"
+              label="Valor"
+              align="right"
+              sort={sort as any}
+              onSort={(col) => setSort((prev) => toggleSort(prev as any, col))}
+              onResizeStart={startResize as any}
+            />
+            <ResizableSortableTh
+              columnId="vinculo"
+              label="Vínculo (Movimentação)"
+              sort={sort as any}
+              onSort={(col) => setSort((prev) => toggleSort(prev as any, col))}
+              onResizeStart={startResize as any}
+            />
+            <ResizableSortableTh
+              columnId="acoes"
+              label="Ações"
+              align="center"
+              sortable={false}
+              resizable
+              onResizeStart={startResize as any}
+            />
           </tr>
         </thead>
         <tbody className="bg-white divide-y divide-gray-200">
-          {extratos.map(item => (
+          {sortedExtratos.map(item => (
             (() => {
               const isBusy = !!busyExtratoId && busyExtratoId === item.id;
               return (
@@ -77,7 +142,7 @@ export default function ExtratosTable({ extratos, onConciliate, onUnconciliate, 
               );
             })()
           ))}
-          {extratos.length === 0 && (
+          {sortedExtratos.length === 0 && (
             <tr>
               <td colSpan={5} className="px-6 py-12 text-center text-gray-500">
                 <AlertCircle className="mx-auto mb-2 h-8 w-8 text-gray-300" />

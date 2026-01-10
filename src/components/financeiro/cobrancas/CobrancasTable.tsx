@@ -1,8 +1,12 @@
-import React from 'react';
+import React, { useMemo, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { CobrancaBancaria } from '@/services/cobrancas';
 import { Edit, Trash2, FileText, Barcode } from 'lucide-react';
 import { formatCurrency } from '@/lib/utils';
+import ResizableSortableTh, { type SortState } from '@/components/ui/table/ResizableSortableTh';
+import TableColGroup from '@/components/ui/table/TableColGroup';
+import { useTableColumnWidths, type TableColumnWidthDef } from '@/components/ui/table/useTableColumnWidths';
+import { sortRows, toggleSort } from '@/components/ui/table/sortUtils';
 
 interface Props {
   cobrancas: CobrancaBancaria[];
@@ -22,22 +26,87 @@ const statusConfig: Record<string, { label: string; color: string }> = {
 };
 
 export default function CobrancasTable({ cobrancas, onEdit, onDelete }: Props) {
+  const columns: TableColumnWidthDef[] = [
+    { id: 'documento', defaultWidth: 320, minWidth: 220 },
+    { id: 'cliente', defaultWidth: 320, minWidth: 220 },
+    { id: 'vencimento', defaultWidth: 180, minWidth: 160 },
+    { id: 'valor', defaultWidth: 160, minWidth: 140 },
+    { id: 'status', defaultWidth: 160, minWidth: 140 },
+    { id: 'acoes', defaultWidth: 120, minWidth: 90, maxWidth: 180 },
+  ];
+  const { widths, startResize } = useTableColumnWidths({ tableId: 'financeiro:cobrancas', columns });
+
+  const [sort, setSort] = useState<SortState<string>>({ column: 'vencimento', direction: 'desc' });
+  const sortedCobrancas = useMemo(() => {
+    return sortRows(
+      cobrancas,
+      sort as any,
+      [
+        { id: 'documento', type: 'string', getValue: (c) => `${c.documento_ref ?? ''} ${c.descricao ?? ''}` },
+        { id: 'cliente', type: 'string', getValue: (c) => c.cliente_nome ?? '' },
+        { id: 'vencimento', type: 'date', getValue: (c) => c.data_vencimento },
+        { id: 'valor', type: 'number', getValue: (c) => c.valor_atual ?? 0 },
+        { id: 'status', type: 'string', getValue: (c) => statusConfig[c.status]?.label ?? String(c.status ?? '') },
+      ] as const
+    );
+  }, [cobrancas, sort]);
+
   return (
     <div className="overflow-x-auto">
       <table className="min-w-full divide-y divide-gray-200">
+        <TableColGroup columns={columns} widths={widths} />
         <thead className="bg-gray-50">
           <tr>
-            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Documento / Ref</th>
-            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Cliente</th>
-            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Vencimento</th>
-            <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Valor</th>
-            <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase">Status</th>
-            <th className="px-6 py-3"></th>
+            <ResizableSortableTh
+              columnId="documento"
+              label="Documento / Ref"
+              sort={sort as any}
+              onSort={(col) => setSort((prev) => toggleSort(prev as any, col))}
+              onResizeStart={startResize as any}
+            />
+            <ResizableSortableTh
+              columnId="cliente"
+              label="Cliente"
+              sort={sort as any}
+              onSort={(col) => setSort((prev) => toggleSort(prev as any, col))}
+              onResizeStart={startResize as any}
+            />
+            <ResizableSortableTh
+              columnId="vencimento"
+              label="Vencimento"
+              sort={sort as any}
+              onSort={(col) => setSort((prev) => toggleSort(prev as any, col))}
+              onResizeStart={startResize as any}
+            />
+            <ResizableSortableTh
+              columnId="valor"
+              label="Valor"
+              align="right"
+              sort={sort as any}
+              onSort={(col) => setSort((prev) => toggleSort(prev as any, col))}
+              onResizeStart={startResize as any}
+            />
+            <ResizableSortableTh
+              columnId="status"
+              label="Status"
+              align="center"
+              sort={sort as any}
+              onSort={(col) => setSort((prev) => toggleSort(prev as any, col))}
+              onResizeStart={startResize as any}
+            />
+            <ResizableSortableTh
+              columnId="acoes"
+              label="Ações"
+              align="right"
+              sortable={false}
+              resizable
+              onResizeStart={startResize as any}
+            />
           </tr>
         </thead>
         <tbody className="bg-white divide-y divide-gray-200">
           <AnimatePresence>
-            {cobrancas.map((cobranca) => {
+            {sortedCobrancas.map((cobranca) => {
               const venc = new Date(cobranca.data_vencimento);
               const isValidDate = !Number.isNaN(venc.getTime());
               const today = new Date();
@@ -96,7 +165,7 @@ export default function CobrancasTable({ cobrancas, onEdit, onDelete }: Props) {
               );
             })}
           </AnimatePresence>
-          {cobrancas.length === 0 && (
+          {sortedCobrancas.length === 0 && (
             <tr>
               <td colSpan={6} className="px-6 py-12 text-center text-gray-500">Nenhuma cobrança encontrada.</td>
             </tr>

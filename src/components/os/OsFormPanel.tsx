@@ -25,6 +25,10 @@ import { ActionLockedError, runWithActionLock } from '@/lib/actionLock';
 import OsEquipamentoPanel from '@/components/os/OsEquipamentoPanel';
 import { getOsChecklist, listOsChecklistTemplates, setOsChecklistTemplate, toggleOsChecklistItem, type OsChecklistPayload, type OsChecklistTemplate } from '@/services/osChecklist';
 import { createOsPortalLink, listOsCommsLogs, listOsCommsTemplates, registerOsCommsLog, type OsCommsLog, type OsCommsTemplate } from '@/services/osComms';
+import ResizableSortableTh, { type SortState } from '@/components/ui/table/ResizableSortableTh';
+import TableColGroup from '@/components/ui/table/TableColGroup';
+import { useTableColumnWidths, type TableColumnWidthDef } from '@/components/ui/table/useTableColumnWidths';
+import { sortRows, toggleSort } from '@/components/ui/table/sortUtils';
 
 interface OsFormPanelProps {
   os: OrdemServicoDetails | null;
@@ -101,6 +105,54 @@ const OsFormPanel: React.FC<OsFormPanelProps> = ({ os, onSaveSuccess, onClose })
   const [portalUrl, setPortalUrl] = useState<string>('');
   const [portalGenerating, setPortalGenerating] = useState(false);
   const [commsRegistering, setCommsRegistering] = useState(false);
+  const [commsSort, setCommsSort] = useState<SortState<string>>({ column: 'quando', direction: 'desc' });
+  const [parcelasSort, setParcelasSort] = useState<SortState<string>>({ column: 'numero', direction: 'asc' });
+
+  const commsColumns: TableColumnWidthDef[] = [
+    { id: 'quando', defaultWidth: 220, minWidth: 200 },
+    { id: 'canal', defaultWidth: 140, minWidth: 120 },
+    { id: 'direcao', defaultWidth: 160, minWidth: 140 },
+    { id: 'para_de', defaultWidth: 360, minWidth: 180 },
+  ];
+  const { widths: commsWidths, startResize: startCommsResize } = useTableColumnWidths({
+    tableId: 'os:comunicacao:logs',
+    columns: commsColumns,
+  });
+  const sortedCommsLogs = useMemo(() => {
+    return sortRows(
+      commsLogs,
+      commsSort as any,
+      [
+        { id: 'quando', type: 'date', getValue: (l) => l.created_at },
+        { id: 'canal', type: 'string', getValue: (l) => l.canal ?? '' },
+        { id: 'direcao', type: 'string', getValue: (l) => (l.direction === 'outbound' ? 'Saída' : 'Entrada') },
+        { id: 'para_de', type: 'string', getValue: (l) => l.to_value ?? l.actor_email ?? '' },
+      ] as const
+    );
+  }, [commsLogs, commsSort]);
+
+  const parcelasColumns: TableColumnWidthDef[] = [
+    { id: 'numero', defaultWidth: 80, minWidth: 64 },
+    { id: 'vencimento', defaultWidth: 200, minWidth: 180 },
+    { id: 'valor', defaultWidth: 160, minWidth: 140 },
+    { id: 'status', defaultWidth: 160, minWidth: 140 },
+  ];
+  const { widths: parcelasWidths, startResize: startParcelasResize } = useTableColumnWidths({
+    tableId: 'os:parcelas',
+    columns: parcelasColumns,
+  });
+  const sortedParcelas = useMemo(() => {
+    return sortRows(
+      parcelas,
+      parcelasSort as any,
+      [
+        { id: 'numero', type: 'number', getValue: (p) => p.numero_parcela ?? 0 },
+        { id: 'vencimento', type: 'date', getValue: (p) => p.vencimento },
+        { id: 'valor', type: 'number', getValue: (p) => Number(p.valor || 0) },
+        { id: 'status', type: 'string', getValue: (p) => p.status ?? '' },
+      ] as const
+    );
+  }, [parcelas, parcelasSort]);
 
   const canEdit = formData.id ? permUpdate.data : permCreate.data;
   const permLoading = formData.id ? permUpdate.isLoading : permCreate.isLoading;
@@ -1309,17 +1361,46 @@ const OsFormPanel: React.FC<OsFormPanelProps> = ({ os, onSaveSuccess, onClose })
               ) : commsLogs.length === 0 ? (
                 <div className="p-4 text-sm text-gray-600">Nenhum registro ainda.</div>
               ) : (
-                <table className="min-w-full divide-y divide-gray-200">
+                <table className="min-w-full divide-y divide-gray-200 table-fixed">
+                  <TableColGroup columns={commsColumns} widths={commsWidths} />
                   <thead className="bg-white sticky top-0">
                     <tr>
-                      <th className="px-4 py-2 text-left text-xs font-semibold text-gray-500 uppercase">Quando</th>
-                      <th className="px-4 py-2 text-left text-xs font-semibold text-gray-500 uppercase">Canal</th>
-                      <th className="px-4 py-2 text-left text-xs font-semibold text-gray-500 uppercase">Direção</th>
-                      <th className="px-4 py-2 text-left text-xs font-semibold text-gray-500 uppercase">Para/De</th>
+                      <ResizableSortableTh
+                        columnId="quando"
+                        label="Quando"
+                        className="px-4 py-2 text-left text-xs font-semibold text-gray-500 uppercase"
+                        sort={commsSort as any}
+                        onSort={(col) => setCommsSort((prev) => toggleSort(prev as any, col))}
+                        onResizeStart={startCommsResize}
+                      />
+                      <ResizableSortableTh
+                        columnId="canal"
+                        label="Canal"
+                        className="px-4 py-2 text-left text-xs font-semibold text-gray-500 uppercase"
+                        sort={commsSort as any}
+                        onSort={(col) => setCommsSort((prev) => toggleSort(prev as any, col))}
+                        onResizeStart={startCommsResize}
+                      />
+                      <ResizableSortableTh
+                        columnId="direcao"
+                        label="Direção"
+                        className="px-4 py-2 text-left text-xs font-semibold text-gray-500 uppercase"
+                        sort={commsSort as any}
+                        onSort={(col) => setCommsSort((prev) => toggleSort(prev as any, col))}
+                        onResizeStart={startCommsResize}
+                      />
+                      <ResizableSortableTh
+                        columnId="para_de"
+                        label="Para/De"
+                        className="px-4 py-2 text-left text-xs font-semibold text-gray-500 uppercase"
+                        sort={commsSort as any}
+                        onSort={(col) => setCommsSort((prev) => toggleSort(prev as any, col))}
+                        onResizeStart={startCommsResize}
+                      />
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-200">
-                    {commsLogs.map((l) => (
+                    {sortedCommsLogs.map((l) => (
                       <tr key={l.id} className="hover:bg-gray-50">
                         <td className="px-4 py-2 text-sm text-gray-800">{new Date(l.created_at).toLocaleString('pt-BR')}</td>
                         <td className="px-4 py-2 text-sm text-gray-700">{l.canal}</td>
@@ -1824,17 +1905,47 @@ const OsFormPanel: React.FC<OsFormPanelProps> = ({ os, onSaveSuccess, onClose })
                   Nenhuma parcela gerada ainda. Use “Gerar parcelas” acima.
                 </div>
               ) : (
-                <table className="min-w-full divide-y divide-gray-200">
+                <table className="min-w-full divide-y divide-gray-200 table-fixed">
+                  <TableColGroup columns={parcelasColumns} widths={parcelasWidths} />
                   <thead className="bg-white sticky top-0">
                     <tr>
-                      <th className="px-4 py-2 text-left text-xs font-semibold text-gray-500 uppercase">#</th>
-                      <th className="px-4 py-2 text-left text-xs font-semibold text-gray-500 uppercase">Vencimento</th>
-                      <th className="px-4 py-2 text-right text-xs font-semibold text-gray-500 uppercase">Valor</th>
-                      <th className="px-4 py-2 text-left text-xs font-semibold text-gray-500 uppercase">Status</th>
+                      <ResizableSortableTh
+                        columnId="numero"
+                        label="#"
+                        className="px-4 py-2 text-left text-xs font-semibold text-gray-500 uppercase"
+                        sort={parcelasSort as any}
+                        onSort={(col) => setParcelasSort((prev) => toggleSort(prev as any, col))}
+                        onResizeStart={startParcelasResize}
+                      />
+                      <ResizableSortableTh
+                        columnId="vencimento"
+                        label="Vencimento"
+                        className="px-4 py-2 text-left text-xs font-semibold text-gray-500 uppercase"
+                        sort={parcelasSort as any}
+                        onSort={(col) => setParcelasSort((prev) => toggleSort(prev as any, col))}
+                        onResizeStart={startParcelasResize}
+                      />
+                      <ResizableSortableTh
+                        columnId="valor"
+                        label="Valor"
+                        align="right"
+                        className="px-4 py-2 text-xs font-semibold text-gray-500 uppercase"
+                        sort={parcelasSort as any}
+                        onSort={(col) => setParcelasSort((prev) => toggleSort(prev as any, col))}
+                        onResizeStart={startParcelasResize}
+                      />
+                      <ResizableSortableTh
+                        columnId="status"
+                        label="Status"
+                        className="px-4 py-2 text-left text-xs font-semibold text-gray-500 uppercase"
+                        sort={parcelasSort as any}
+                        onSort={(col) => setParcelasSort((prev) => toggleSort(prev as any, col))}
+                        onResizeStart={startParcelasResize}
+                      />
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-200">
-                    {parcelas.map((p) => (
+                    {sortedParcelas.map((p) => (
                       <tr key={p.id} className="hover:bg-gray-50">
                         <td className="px-4 py-2 text-sm text-gray-800">{p.numero_parcela}</td>
                         <td className="px-4 py-2 text-sm text-gray-800">

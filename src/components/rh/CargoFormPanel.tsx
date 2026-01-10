@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Loader2, Save, Plus, Trash2, AlertTriangle } from 'lucide-react';
 import {
   CargoDetails,
@@ -23,6 +23,10 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Button } from '@/components/ui/button';
 import { listAuditLogsForTables, type AuditLogRow } from '@/services/auditLogs';
 import { useHasPermission } from '@/hooks/useHasPermission';
+import ResizableSortableTh, { type SortState } from '@/components/ui/table/ResizableSortableTh';
+import TableColGroup from '@/components/ui/table/TableColGroup';
+import { useTableColumnWidths, type TableColumnWidthDef } from '@/components/ui/table/useTableColumnWidths';
+import { sortRows, toggleSort } from '@/components/ui/table/sortUtils';
 
 interface CargoFormPanelProps {
   cargo: CargoDetails | null;
@@ -38,6 +42,51 @@ const CargoFormPanel: React.FC<CargoFormPanelProps> = ({ cargo, onSaveSuccess, o
   const [selectedCompId, setSelectedCompId] = useState<string>('');
   const [activeTab, setActiveTab] = useState<'dados' | 'competencias' | 'treinamentos' | 'historico'>('dados');
   const [auditRows, setAuditRows] = useState<AuditLogRow[]>([]);
+  const [treinReqSort, setTreinReqSort] = useState<SortState<string>>({ column: 'treinamento', direction: 'asc' });
+  const [auditSort, setAuditSort] = useState<SortState<string>>({ column: 'quando', direction: 'desc' });
+
+  const treinReqColumns: TableColumnWidthDef[] = [
+    { id: 'treinamento', defaultWidth: 520, minWidth: 220 },
+    { id: 'validade', defaultWidth: 180, minWidth: 140 },
+    { id: 'acoes', defaultWidth: 120, minWidth: 100 },
+  ];
+  const { widths: treinReqWidths, startResize: startTreinReqResize } = useTableColumnWidths({
+    tableId: 'rh:cargo:treinamentos-requirements',
+    columns: treinReqColumns,
+  });
+  const sortedTreinamentosReq = useMemo(() => {
+    return sortRows(
+      treinamentosReq,
+      treinReqSort as any,
+      [
+        { id: 'treinamento', type: 'string', getValue: (r) => r.treinamento_nome ?? '' },
+        { id: 'validade', type: 'number', getValue: (r) => r.validade_meses ?? 0 },
+      ] as const
+    );
+  }, [treinamentosReq, treinReqSort]);
+
+  const auditColumns: TableColumnWidthDef[] = [
+    { id: 'quando', defaultWidth: 220, minWidth: 200 },
+    { id: 'acao', defaultWidth: 140, minWidth: 120 },
+    { id: 'tabela', defaultWidth: 220, minWidth: 160 },
+    { id: 'detalhes', defaultWidth: 520, minWidth: 220 },
+  ];
+  const { widths: auditWidths, startResize: startAuditResize } = useTableColumnWidths({
+    tableId: 'rh:cargo:audit',
+    columns: auditColumns,
+  });
+  const sortedAuditRows = useMemo(() => {
+    return sortRows(
+      auditRows,
+      auditSort as any,
+      [
+        { id: 'quando', type: 'date', getValue: (r) => r.changed_at },
+        { id: 'acao', type: 'string', getValue: (r) => r.operation ?? '' },
+        { id: 'tabela', type: 'string', getValue: (r) => r.table_name ?? '' },
+        { id: 'detalhes', type: 'string', getValue: (r) => formatChangedFields(r) || '' },
+      ] as const
+    );
+  }, [auditRows, auditSort]);
   const [loadingAudit, setLoadingAudit] = useState(false);
 
   const permCreate = useHasPermission('rh', 'create');
@@ -525,16 +574,39 @@ const CargoFormPanel: React.FC<CargoFormPanelProps> = ({ cargo, onSaveSuccess, o
               </div>
             ) : (
               <div className="overflow-hidden border border-gray-200 rounded-lg bg-white">
-                <table className="min-w-full text-sm">
+                <table className="min-w-full text-sm table-fixed">
+                  <TableColGroup columns={treinReqColumns} widths={treinReqWidths} />
                   <thead className="bg-gray-50 text-gray-600">
                     <tr>
-                      <th className="text-left p-3">Treinamento</th>
-                      <th className="text-left p-3">Validade</th>
-                      <th className="text-right p-3">Ações</th>
+                      <ResizableSortableTh
+                        columnId="treinamento"
+                        label="Treinamento"
+                        className="text-left p-3"
+                        sort={treinReqSort as any}
+                        onSort={(col) => setTreinReqSort((prev) => toggleSort(prev as any, col))}
+                        onResizeStart={startTreinReqResize}
+                      />
+                      <ResizableSortableTh
+                        columnId="validade"
+                        label="Validade"
+                        className="text-left p-3"
+                        sort={treinReqSort as any}
+                        onSort={(col) => setTreinReqSort((prev) => toggleSort(prev as any, col))}
+                        onResizeStart={startTreinReqResize}
+                      />
+                      <ResizableSortableTh
+                        columnId="acoes"
+                        label="Ações"
+                        align="right"
+                        className="p-3"
+                        sortable={false}
+                        resizable
+                        onResizeStart={startTreinReqResize}
+                      />
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-100">
-                    {treinamentosReq.map((r) => (
+                    {sortedTreinamentosReq.map((r) => (
                       <tr key={r.id} className="hover:bg-gray-50">
                         <td className="p-3 font-medium text-gray-800">{r.treinamento_nome}</td>
                         <td className="p-3 text-gray-600">{r.validade_meses ? `${r.validade_meses} meses` : '—'}</td>
@@ -584,17 +656,46 @@ const CargoFormPanel: React.FC<CargoFormPanelProps> = ({ cargo, onSaveSuccess, o
               </div>
             ) : (
               <div className="overflow-hidden border border-gray-200 rounded-lg bg-white">
-                <table className="min-w-full text-sm">
+                <table className="min-w-full text-sm table-fixed">
+                  <TableColGroup columns={auditColumns} widths={auditWidths} />
                   <thead className="bg-gray-50 text-gray-600">
                     <tr>
-                      <th className="text-left p-3">Quando</th>
-                      <th className="text-left p-3">Ação</th>
-                      <th className="text-left p-3">Tabela</th>
-                      <th className="text-left p-3">Detalhes</th>
+                      <ResizableSortableTh
+                        columnId="quando"
+                        label="Quando"
+                        className="text-left p-3"
+                        sort={auditSort as any}
+                        onSort={(col) => setAuditSort((prev) => toggleSort(prev as any, col))}
+                        onResizeStart={startAuditResize}
+                      />
+                      <ResizableSortableTh
+                        columnId="acao"
+                        label="Ação"
+                        className="text-left p-3"
+                        sort={auditSort as any}
+                        onSort={(col) => setAuditSort((prev) => toggleSort(prev as any, col))}
+                        onResizeStart={startAuditResize}
+                      />
+                      <ResizableSortableTh
+                        columnId="tabela"
+                        label="Tabela"
+                        className="text-left p-3"
+                        sort={auditSort as any}
+                        onSort={(col) => setAuditSort((prev) => toggleSort(prev as any, col))}
+                        onResizeStart={startAuditResize}
+                      />
+                      <ResizableSortableTh
+                        columnId="detalhes"
+                        label="Detalhes"
+                        className="text-left p-3"
+                        sort={auditSort as any}
+                        onSort={(col) => setAuditSort((prev) => toggleSort(prev as any, col))}
+                        onResizeStart={startAuditResize}
+                      />
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-100">
-                    {auditRows.map((r) => (
+                    {sortedAuditRows.map((r) => (
                       <tr key={r.id} className="hover:bg-gray-50">
                         <td className="p-3 text-gray-600">{new Date(r.changed_at).toLocaleString('pt-BR')}</td>
                         <td className="p-3">

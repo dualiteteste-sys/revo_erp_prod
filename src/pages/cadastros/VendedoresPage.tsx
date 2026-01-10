@@ -3,6 +3,10 @@ import { Loader2, PlusCircle, Search, UserSquare } from 'lucide-react';
 import Modal from '@/components/ui/Modal';
 import { useToast } from '@/contexts/ToastProvider';
 import * as vendedoresService from '@/services/vendedores';
+import ResizableSortableTh, { type SortState } from '@/components/ui/table/ResizableSortableTh';
+import TableColGroup from '@/components/ui/table/TableColGroup';
+import { useTableColumnWidths, type TableColumnWidthDef } from '@/components/ui/table/useTableColumnWidths';
+import { sortRows, toggleSort } from '@/components/ui/table/sortUtils';
 
 type FormState = {
   id: string | null;
@@ -32,6 +36,17 @@ export default function VendedoresPage() {
   const [ativoOnly, setAtivoOnly] = useState(false);
   const [isOpen, setIsOpen] = useState(false);
   const [form, setForm] = useState<FormState>(emptyForm);
+  const [sort, setSort] = useState<SortState<string>>({ column: 'nome', direction: 'asc' });
+
+  const columns: TableColumnWidthDef[] = [
+    { id: 'nome', defaultWidth: 260, minWidth: 200 },
+    { id: 'email', defaultWidth: 260, minWidth: 200 },
+    { id: 'telefone', defaultWidth: 200, minWidth: 160 },
+    { id: 'comissao', defaultWidth: 160, minWidth: 140 },
+    { id: 'ativo', defaultWidth: 120, minWidth: 100 },
+    { id: 'acoes', defaultWidth: 220, minWidth: 200 },
+  ];
+  const { widths, startResize } = useTableColumnWidths({ tableId: 'cadastros:vendedores', columns });
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -41,6 +56,20 @@ export default function VendedoresPage() {
       return r.nome.toLowerCase().includes(q) || (r.email || '').toLowerCase().includes(q);
     });
   }, [rows, search, ativoOnly]);
+
+  const sorted = useMemo(() => {
+    return sortRows(
+      filtered,
+      sort as any,
+      [
+        { id: 'nome', type: 'string', getValue: (r) => r.nome ?? '' },
+        { id: 'email', type: 'string', getValue: (r) => r.email ?? '' },
+        { id: 'telefone', type: 'string', getValue: (r) => r.telefone ?? '' },
+        { id: 'comissao', type: 'number', getValue: (r) => r.comissao_percent ?? 0 },
+        { id: 'ativo', type: 'boolean', getValue: (r) => Boolean(r.ativo) },
+      ] as const
+    );
+  }, [filtered, sort]);
 
   async function load() {
     setLoading(true);
@@ -181,18 +210,19 @@ export default function VendedoresPage() {
         ) : (
           <div className="overflow-auto">
             <table className="min-w-full text-sm">
+              <TableColGroup columns={columns} widths={widths} />
               <thead className="bg-gray-50">
                 <tr className="text-left text-gray-600">
-                  <th className="px-4 py-3">Nome</th>
-                  <th className="px-4 py-3">Email</th>
-                  <th className="px-4 py-3">Telefone</th>
-                  <th className="px-4 py-3">Comissão (%)</th>
-                  <th className="px-4 py-3">Ativo</th>
-                  <th className="px-4 py-3 text-right">Ações</th>
+                  <ResizableSortableTh columnId="nome" label="Nome" className="px-4 py-3 normal-case tracking-normal" sort={sort as any} onSort={(col) => setSort((prev) => toggleSort(prev as any, col))} onResizeStart={startResize as any} />
+                  <ResizableSortableTh columnId="email" label="Email" className="px-4 py-3 normal-case tracking-normal" sort={sort as any} onSort={(col) => setSort((prev) => toggleSort(prev as any, col))} onResizeStart={startResize as any} />
+                  <ResizableSortableTh columnId="telefone" label="Telefone" className="px-4 py-3 normal-case tracking-normal" sort={sort as any} onSort={(col) => setSort((prev) => toggleSort(prev as any, col))} onResizeStart={startResize as any} />
+                  <ResizableSortableTh columnId="comissao" label="Comissão (%)" className="px-4 py-3 normal-case tracking-normal" sort={sort as any} onSort={(col) => setSort((prev) => toggleSort(prev as any, col))} onResizeStart={startResize as any} />
+                  <ResizableSortableTh columnId="ativo" label="Ativo" className="px-4 py-3 normal-case tracking-normal" sort={sort as any} onSort={(col) => setSort((prev) => toggleSort(prev as any, col))} onResizeStart={startResize as any} />
+                  <ResizableSortableTh columnId="acoes" label="Ações" align="right" className="px-4 py-3 normal-case tracking-normal" sortable={false} resizable onResizeStart={startResize as any} />
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200">
-                {filtered.map((r) => (
+                {sorted.map((r) => (
                   <tr key={r.id} className="hover:bg-gray-50">
                     <td className="px-4 py-3 font-medium text-gray-800">{r.nome}</td>
                     <td className="px-4 py-3">{r.email || '-'}</td>

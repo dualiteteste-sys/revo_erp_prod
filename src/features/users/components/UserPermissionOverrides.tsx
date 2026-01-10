@@ -4,6 +4,9 @@ import { Loader2, ShieldCheck, ShieldX, MinusCircle } from 'lucide-react';
 import { supabase } from '@/lib/supabaseClient';
 import { useAuth } from '@/contexts/AuthProvider';
 import { useToast } from '@/contexts/ToastProvider';
+import ResizableSortableTh from '@/components/ui/table/ResizableSortableTh';
+import TableColGroup from '@/components/ui/table/TableColGroup';
+import { useTableColumnWidths, type TableColumnWidthDef } from '@/components/ui/table/useTableColumnWidths';
 
 type PermissionRow = {
   id: string;
@@ -33,6 +36,11 @@ export default function UserPermissionOverrides({ userId }: { userId: string }) 
   const { addToast } = useToast();
   const empresaId = activeEmpresa?.id;
   const [savingKey, setSavingKey] = useState<string | null>(null);
+  const columns: TableColumnWidthDef[] = [
+    { id: 'module', defaultWidth: 240, minWidth: 200 },
+    ...ACTIONS.map((a) => ({ id: a, defaultWidth: 120, minWidth: 110, maxWidth: 240 })),
+  ];
+  const { widths, startResize } = useTableColumnWidths({ tableId: `users:permission-overrides:${userId}`, columns });
 
   const permissionsQuery = useQuery({
     queryKey: ['rbac', 'permissions'],
@@ -161,14 +169,29 @@ export default function UserPermissionOverrides({ userId }: { userId: string }) 
       </div>
 
       <div className="overflow-auto border border-gray-200 rounded-lg">
-        <table className="min-w-[820px] w-full text-sm">
+        <table className="min-w-[820px] w-full text-sm table-fixed">
+          <TableColGroup columns={columns} widths={widths} />
           <thead className="bg-gray-50 text-gray-600">
             <tr>
-              <th className="text-left p-3 min-w-[220px]">Módulo</th>
+              <ResizableSortableTh
+                columnId="module"
+                label="Módulo"
+                sortable={false}
+                resizable
+                onResizeStart={startResize}
+                className="text-left p-3"
+              />
               {ACTIONS.map((a) => (
-                <th key={a} className="text-center p-3 min-w-[110px]">
-                  {ACTION_LABEL[a]}
-                </th>
+                <ResizableSortableTh
+                  key={a}
+                  columnId={a}
+                  label={ACTION_LABEL[a]}
+                  sortable={false}
+                  resizable
+                  onResizeStart={startResize}
+                  align="center"
+                  className="text-center p-3"
+                />
               ))}
             </tr>
           </thead>
