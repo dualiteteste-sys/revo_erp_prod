@@ -3,6 +3,7 @@ import { FileText, Loader2, PlusCircle } from 'lucide-react';
 import Modal from '@/components/ui/Modal';
 import { useToast } from '@/contexts/ToastProvider';
 import { getPartners, type PartnerListItem } from '@/services/partners';
+import { listAllCentrosDeCusto, type CentroDeCustoListItem } from '@/services/centrosDeCusto';
 import { deleteContrato, listContratos, upsertContrato, type ServicoContrato, type ServicoContratoStatus } from '@/services/servicosMvp';
 import {
   generateReceivables as rpcGenerateReceivables,
@@ -56,6 +57,8 @@ export default function ContratosPage() {
   const [billingRule, setBillingRule] = useState<BillingRuleRow | null>(null);
   const [schedule, setSchedule] = useState<BillingScheduleRow[]>([]);
   const [billingUntil, setBillingUntil] = useState(() => new Date().toISOString().slice(0, 10));
+  const [centrosDeCustoLoading, setCentrosDeCustoLoading] = useState(false);
+  const [centrosDeCusto, setCentrosDeCusto] = useState<CentroDeCustoListItem[]>([]);
 
   const clientById = useMemo(() => {
     const m = new Map<string, PartnerListItem>();
@@ -91,6 +94,27 @@ export default function ContratosPage() {
   useEffect(() => {
     void load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    let canceled = false;
+
+    const loadCentros = async () => {
+      setCentrosDeCustoLoading(true);
+      try {
+        const rows = await listAllCentrosDeCusto({ status: 'ativo' });
+        if (!canceled) setCentrosDeCusto(rows);
+      } catch {
+        if (!canceled) setCentrosDeCusto([]);
+      } finally {
+        if (!canceled) setCentrosDeCustoLoading(false);
+      }
+    };
+
+    void loadCentros();
+    return () => {
+      canceled = true;
+    };
   }, []);
 
   const openNew = () => {
@@ -492,6 +516,26 @@ export default function ContratosPage() {
                       className="mt-1 w-full rounded-lg border border-gray-200 bg-white p-2 text-sm"
                       disabled={billingActionLoading}
                     />
+                  </div>
+                  <div className="md:col-span-2">
+                    <label className="text-xs text-gray-600">Centro de custo (recomendado)</label>
+                    <select
+                      value={billingRule?.centro_de_custo_id || ''}
+                      onChange={(e) => setBillingRule((r) => (r ? { ...r, centro_de_custo_id: e.target.value || null } : r))}
+                      className="mt-1 w-full rounded-lg border border-gray-200 bg-white p-2 text-sm"
+                      disabled={billingActionLoading || centrosDeCustoLoading}
+                    >
+                      <option value="">{centrosDeCustoLoading ? 'Carregando…' : '(sem centro de custo)'}</option>
+                      {centrosDeCusto.map((cc) => {
+                        const code = cc.codigo ? `${cc.codigo} ` : '';
+                        return (
+                          <option key={cc.id} value={cc.id}>
+                            {code}
+                            {cc.nome} ({cc.tipo})
+                          </option>
+                        );
+                      })}
+                    </select>
                   </div>
                 </div>
 
