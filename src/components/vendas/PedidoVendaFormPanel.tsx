@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { CheckCircle, Loader2, Save, ShieldAlert, Trash2, Ban, PackageCheck, ScanBarcode } from 'lucide-react';
-import { VendaDetails, VendaPayload, saveVenda, manageVendaItem, getVendaDetails, aprovarVenda, concluirVendaPedido } from '@/services/vendas';
+import { VendaDetails, VendaPayload, saveVenda, manageVendaItem, fetchVendaDetails, getVendaDetails, aprovarVenda, concluirVendaPedido } from '@/services/vendas';
 import { useToast } from '@/contexts/ToastProvider';
 import { useConfirm } from '@/contexts/ConfirmProvider';
 import Section from '@/components/ui/forms/Section';
@@ -113,13 +113,17 @@ export default function PedidoVendaFormPanel({ vendaId, onSaveSuccess, onClose, 
 
   const loadDetails = async (params?: { id?: string | null; closeOnError?: boolean; silent?: boolean }) => {
     const targetId = params?.id ?? vendaId ?? formData.id ?? null;
-    if (!targetId) return;
+    if (!targetId) return false;
 
     try {
       if (!params?.silent) setLoading(true);
 
-      const data = await getVendaDetails(targetId);
-      if (!data) throw new Error('Pedido não encontrado.');
+      const data = await fetchVendaDetails(targetId);
+      if (!data) {
+        addToast('Pedido não encontrado (ou sem acesso).', 'error');
+        if (params?.closeOnError) onClose();
+        return false;
+      }
       setFormData(data);
 
       const canal = (data as any)?.canal;
@@ -140,9 +144,11 @@ export default function PedidoVendaFormPanel({ vendaId, onSaveSuccess, onClose, 
       console.error(e);
       addToast('Erro ao carregar pedido.', 'error');
       if (params?.closeOnError) onClose();
+      return false;
     } finally {
       if (!params?.silent) setLoading(false);
     }
+    return true;
   };
 
   const buildDiscountAudit = (rows: AuditLogRow[], pedidoId: string, items: any[]): DiscountAuditRow[] => {
@@ -313,7 +319,25 @@ export default function PedidoVendaFormPanel({ vendaId, onSaveSuccess, onClose, 
 
     try {
       await manageVendaItem(currentId!, null, item.id, 1, item.preco_venda || 0, 0, 'add');
-      await loadDetails({ id: currentId, silent: true });
+      const refreshed = await loadDetails({ id: currentId, silent: true });
+      if (!refreshed) {
+        const preco = toMoney(item.preco_venda || 0);
+        const optimisticItem: any = {
+          id: `tmp-${Date.now()}`,
+          pedido_id: currentId,
+          produto_id: item.id,
+          produto_nome: item.descricao || item.nome || 'Produto',
+          quantidade: 1,
+          preco_unitario: preco,
+          desconto: 0,
+          total: preco,
+        };
+        setFormData((prev) => ({
+          ...(prev || {}),
+          id: currentId,
+          itens: [...(prev.itens || []), optimisticItem],
+        }));
+      }
       addToast('Item adicionado.', 'success');
     } catch (e: any) {
       addToast(e.message, 'error');
@@ -467,8 +491,12 @@ export default function PedidoVendaFormPanel({ vendaId, onSaveSuccess, onClose, 
 
 	      let clienteId = formData.cliente_id ?? null;
 	      if (!clienteId) {
-	        const details = await getVendaDetails(formData.id);
-	        clienteId = details?.cliente_id ?? null;
+	        try {
+	          const details = await getVendaDetails(formData.id);
+	          clienteId = details?.cliente_id ?? null;
+	        } catch {
+	          clienteId = null;
+	        }
 	      }
 	      if (!clienteId) {
 	        addToast('Cliente é obrigatório para cancelar o pedido.', 'error');

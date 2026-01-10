@@ -208,7 +208,7 @@ export default function EstoquePage() {
   const scrollRef = useRef<HTMLDivElement | null>(null);
 
   return (
-    <div className="p-1">
+    <div className="p-4">
       <div className="flex flex-col md:flex-row justify-between items-center mb-6 gap-4">
         <div>
           <h1 className="text-3xl font-bold text-gray-800">Controle de Estoque</h1>
@@ -277,13 +277,19 @@ export default function EstoquePage() {
 
       <div className="bg-white rounded-xl shadow overflow-hidden">
         <div ref={scrollRef} className="overflow-auto max-h-[70vh]">
-          <table className="min-w-full divide-y divide-gray-200 table-fixed">
+          <table className="min-w-[960px] w-full divide-y divide-gray-200 table-fixed">
+            <colgroup>
+              <col />
+              <col style={{ width: 180 }} />
+              <col style={{ width: 160 }} />
+              <col style={{ width: 140 }} />
+            </colgroup>
             <thead className="bg-gray-50">
               <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Produto</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Saldo</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Ações</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">Produto</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">Saldo</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">Status</th>
+                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">Ações</th>
               </tr>
             </thead>
             {loading ? (
@@ -339,7 +345,7 @@ export default function EstoquePage() {
                       }}
                     >
                       <td className="px-6 py-4">
-                        <div className="font-medium text-gray-900 truncate">{prod.nome}</div>
+                        <div className="font-medium text-gray-900 truncate" title={prod.nome}>{prod.nome}</div>
                         <div className="text-xs text-gray-500">SKU: {prod.sku || '-'}</div>
                       </td>
                       <td className="px-6 py-4">
