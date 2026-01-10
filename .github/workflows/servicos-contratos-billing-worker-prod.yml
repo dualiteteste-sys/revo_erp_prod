@@ -1,4 +1,4 @@
-name: Serviços Contratos Billing Worker (dev)
+name: Serviços Contratos Billing Worker (prod)
 
 on:
   schedule:
@@ -18,17 +18,17 @@ on:
         required: false
         default: "500"
       until:
-        description: "Gerar títulos até esta data (YYYY-MM-DD). Vazio = hoje"
+        description: "Gerar títulos até esta data (YYYY-MM-DD). Vazio = auto (+45d)"
         required: false
         default: ""
 
 concurrency:
-  group: servicos-contratos-billing-worker-dev
+  group: servicos-contratos-billing-worker-prod
   cancel-in-progress: false
 
 jobs:
   run-worker:
-    name: Process contratos billing (DEV)
+    name: Process contratos billing (PROD)
     runs-on: ubuntu-latest
     timeout-minutes: 10
 
@@ -40,7 +40,7 @@ jobs:
 
       - name: Run billing worker tick (admin)
         env:
-          SUPABASE_DB_URL_DEV: ${{ secrets.SUPABASE_DB_URL_DEV }}
+          SUPABASE_DB_URL_PROD: ${{ secrets.SUPABASE_DB_URL_PROD }}
           CONTRACTS_LIMIT: ${{ inputs.contracts_limit }}
           MONTHS_AHEAD: ${{ inputs.months_ahead }}
           RECEIVABLES_LIMIT: ${{ inputs.receivables_limit }}
@@ -48,8 +48,8 @@ jobs:
         run: |
           set -euo pipefail
 
-          if [[ -z "${SUPABASE_DB_URL_DEV:-}" ]]; then
-            echo "::warning::Missing secret SUPABASE_DB_URL_DEV (skipping worker run)"
+          if [[ -z "${SUPABASE_DB_URL_PROD:-}" ]]; then
+            echo "::warning::Missing secret SUPABASE_DB_URL_PROD (skipping worker run)"
             exit 0
           fi
 
@@ -67,6 +67,6 @@ jobs:
             until_sql="'${until_input}'::date"
           fi
 
-          echo "[DEV] contratos billing worker tick (contracts_limit=$contracts_limit months_ahead=$months_ahead receivables_limit=$receivables_limit until=${until_input:-auto:+45d})"
-          psql "$SUPABASE_DB_URL_DEV" -v ON_ERROR_STOP=1 -X -qAt -c "select public.servicos_contratos_billing_worker_tick_admin(${contracts_limit}, ${months_ahead}, ${receivables_limit}, ${until_sql});"
+          echo "[PROD] contratos billing worker tick (contracts_limit=$contracts_limit months_ahead=$months_ahead receivables_limit=$receivables_limit until=${until_input:-auto:+45d})"
+          psql "$SUPABASE_DB_URL_PROD" -v ON_ERROR_STOP=1 -X -qAt -c "select public.servicos_contratos_billing_worker_tick_admin(${contracts_limit}, ${months_ahead}, ${receivables_limit}, ${until_sql});"
 
