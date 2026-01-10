@@ -32,6 +32,7 @@ export type ServicosContratoBillingSchedule = {
   status: BillingScheduleStatus;
   conta_a_receber_id: string | null;
   cobranca_id: string | null;
+  descricao?: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -123,4 +124,31 @@ export async function cancelFutureBilling(params: {
     receivablesCancelled: Number(data?.receivables_cancelled ?? 0),
     cobrancasCancelled: Number(data?.cobrancas_cancelled ?? 0),
   };
+}
+
+export async function addAvulso(params: {
+  contratoId: string;
+  dataVencimento: string;
+  valor: number;
+  descricao?: string | null;
+}): Promise<ServicosContratoBillingSchedule> {
+  const { contratoId, dataVencimento, valor, descricao = null } = params;
+  const { data, error } = await sb.rpc('servicos_contratos_billing_add_avulso', {
+    p_contrato_id: contratoId,
+    p_data_vencimento: dataVencimento,
+    p_valor: valor,
+    p_descricao: descricao,
+  });
+  if (error) throw error;
+  return data as any;
+}
+
+export async function recalcMensalFuture(params: { contratoId: string; from?: string | null }): Promise<{ updated: number; reason?: string }> {
+  const { contratoId, from = null } = params;
+  const { data, error } = await sb.rpc('servicos_contratos_billing_recalc_mensal_future', {
+    p_contrato_id: contratoId,
+    p_from: from,
+  });
+  if (error) throw error;
+  return { updated: Number(data?.updated ?? 0), reason: data?.reason ?? undefined };
 }

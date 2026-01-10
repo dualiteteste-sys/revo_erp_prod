@@ -6,11 +6,13 @@ import { getPartners, type PartnerListItem } from '@/services/partners';
 import { listAllCentrosDeCusto, type CentroDeCustoListItem } from '@/services/centrosDeCusto';
 import { deleteContrato, listContratos, upsertContrato, type ServicoContrato, type ServicoContratoStatus } from '@/services/servicosMvp';
 import {
+  addAvulso,
   cancelFutureBilling,
   generateReceivables as rpcGenerateReceivables,
   generateSchedule as rpcGenerateSchedule,
   getBillingRuleByContratoId,
   listScheduleByContratoId,
+  recalcMensalFuture,
   type BillingRuleTipo,
   type ServicosContratoBillingRule,
   type ServicosContratoBillingSchedule,
@@ -61,6 +63,9 @@ export default function ContratosPage() {
   const [billingUntil, setBillingUntil] = useState(() => new Date().toISOString().slice(0, 10));
   const [centrosDeCustoLoading, setCentrosDeCustoLoading] = useState(false);
   const [centrosDeCusto, setCentrosDeCusto] = useState<CentroDeCustoListItem[]>([]);
+  const [avulsoVencimento, setAvulsoVencimento] = useState(() => new Date().toISOString().slice(0, 10));
+  const [avulsoValor, setAvulsoValor] = useState('0');
+  const [avulsoDescricao, setAvulsoDescricao] = useState('');
 
   const clientById = useMemo(() => {
     const m = new Map<string, PartnerListItem>();
@@ -125,6 +130,9 @@ export default function ContratosPage() {
     setBillingRule(null);
     setSchedule([]);
     setBillingUntil(new Date().toISOString().slice(0, 10));
+    setAvulsoVencimento(new Date().toISOString().slice(0, 10));
+    setAvulsoValor('0');
+    setAvulsoDescricao('');
     setIsOpen(true);
   };
 
@@ -144,6 +152,9 @@ export default function ContratosPage() {
     setBillingRule(null);
     setSchedule([]);
     setBillingUntil(new Date().toISOString().slice(0, 10));
+    setAvulsoVencimento(new Date().toISOString().slice(0, 10));
+    setAvulsoValor('0');
+    setAvulsoDescricao('');
     setIsOpen(true);
     void loadBilling(row);
   };
@@ -155,6 +166,9 @@ export default function ContratosPage() {
     setBillingRule(null);
     setSchedule([]);
     setBillingUntil(new Date().toISOString().slice(0, 10));
+    setAvulsoVencimento(new Date().toISOString().slice(0, 10));
+    setAvulsoValor('0');
+    setAvulsoDescricao('');
   };
 
   const canUseBilling = useMemo(() => {
@@ -266,6 +280,55 @@ export default function ContratosPage() {
       await loadBilling({ id: form.id, valor_mensal: Number(form.valor_mensal ?? 0), data_inicio: form.data_inicio || null });
     } catch (e: any) {
       addToast(e?.message || 'Falha ao gerar contas a receber.', 'error');
+    } finally {
+      setBillingActionLoading(false);
+    }
+  };
+
+  const addAvulsoItem = async () => {
+    if (!form.id) return;
+    const valor = Number(avulsoValor || 0);
+    if (!avulsoVencimento) {
+      addToast('Informe o vencimento do avulso.', 'error');
+      return;
+    }
+    if (!Number.isFinite(valor) || valor < 0) {
+      addToast('Valor do avulso inválido.', 'error');
+      return;
+    }
+
+    setBillingActionLoading(true);
+    try {
+      await addAvulso({
+        contratoId: form.id,
+        dataVencimento: avulsoVencimento,
+        valor,
+        descricao: avulsoDescricao.trim() || null,
+      });
+      addToast('Item avulso adicionado ao schedule.', 'success');
+      setAvulsoValor('0');
+      setAvulsoDescricao('');
+      await loadBilling({ id: form.id, valor_mensal: Number(form.valor_mensal ?? 0), data_inicio: form.data_inicio || null });
+    } catch (e: any) {
+      addToast(e?.message || 'Falha ao adicionar item avulso.', 'error');
+    } finally {
+      setBillingActionLoading(false);
+    }
+  };
+
+  const recalcFuture = async () => {
+    if (!form.id) return;
+    setBillingActionLoading(true);
+    try {
+      const res = await recalcMensalFuture({ contratoId: form.id, from: new Date().toISOString().slice(0, 10) });
+      if (res.reason === 'nao_mensal') {
+        addToast('Recalcular futuro aplica-se apenas a regras mensais.', 'warn');
+      } else {
+        addToast(`Agenda mensal recalculada. Atualizados: ${res.updated}`, 'success');
+      }
+      await loadBilling({ id: form.id, valor_mensal: Number(form.valor_mensal ?? 0), data_inicio: form.data_inicio || null });
+    } catch (e: any) {
+      addToast(e?.message || 'Falha ao recalcular agenda futura.', 'error');
     } finally {
       setBillingActionLoading(false);
     }
@@ -582,6 +645,15 @@ export default function ContratosPage() {
                   >
                     Gerar agenda (12 meses)
                   </button>
+                  <button
+                    type="button"
+                    onClick={recalcFuture}
+                    disabled={!billingRule || billingActionLoading || !form.id}
+                    className="rounded-lg bg-slate-600 px-3 py-2 text-sm font-semibold text-white hover:bg-slate-700 disabled:opacity-50"
+                    title="Recalcula valor/vencimento das linhas futuras (mensal, previsto, sem título) usando a regra atual."
+                  >
+                    Recalcular futuro
+                  </button>
                   <div className="flex items-end gap-2">
                     <div>
                       <div className="text-[11px] text-gray-600">Gerar títulos até</div>
@@ -609,6 +681,51 @@ export default function ContratosPage() {
                   </div>
                 </div>
 
+                <div className="mt-4 rounded-lg border border-gray-200 bg-white p-3">
+                  <div className="text-xs font-semibold text-gray-700">Lançamento avulso</div>
+                  <div className="mt-2 grid grid-cols-1 md:grid-cols-4 gap-2">
+                    <div>
+                      <div className="text-[11px] text-gray-600">Vencimento</div>
+                      <input
+                        type="date"
+                        value={avulsoVencimento}
+                        onChange={(e) => setAvulsoVencimento(e.target.value)}
+                        className="mt-1 w-full rounded-lg border border-gray-200 bg-white p-2 text-sm"
+                        disabled={billingActionLoading}
+                      />
+                    </div>
+                    <div>
+                      <div className="text-[11px] text-gray-600">Valor</div>
+                      <input
+                        inputMode="decimal"
+                        value={avulsoValor}
+                        onChange={(e) => setAvulsoValor(e.target.value)}
+                        className="mt-1 w-full rounded-lg border border-gray-200 bg-white p-2 text-sm"
+                        disabled={billingActionLoading}
+                      />
+                    </div>
+                    <div className="md:col-span-2">
+                      <div className="text-[11px] text-gray-600">Descrição (opcional)</div>
+                      <input
+                        value={avulsoDescricao}
+                        onChange={(e) => setAvulsoDescricao(e.target.value)}
+                        className="mt-1 w-full rounded-lg border border-gray-200 bg-white p-2 text-sm"
+                        disabled={billingActionLoading}
+                      />
+                    </div>
+                  </div>
+                  <div className="mt-2">
+                    <button
+                      type="button"
+                      onClick={addAvulsoItem}
+                      disabled={!form.id || billingActionLoading}
+                      className="rounded-lg bg-white px-3 py-2 text-sm font-semibold text-gray-800 shadow-sm ring-1 ring-gray-200 hover:bg-gray-50 disabled:opacity-50"
+                    >
+                      Adicionar avulso
+                    </button>
+                  </div>
+                </div>
+
                 <div className="mt-4">
                   <div className="text-xs font-semibold text-gray-700 mb-2">Preview da agenda (próximos 24)</div>
                   {schedule.length === 0 ? (
@@ -618,8 +735,10 @@ export default function ContratosPage() {
                       <table className="min-w-full text-xs">
                         <thead className="bg-gray-50">
                           <tr className="text-left text-gray-600">
+                            <th className="px-3 py-2">Tipo</th>
                             <th className="px-3 py-2">Competência</th>
                             <th className="px-3 py-2">Vencimento</th>
+                            <th className="px-3 py-2">Descrição</th>
                             <th className="px-3 py-2">Valor</th>
                             <th className="px-3 py-2">Status</th>
                           </tr>
@@ -627,8 +746,10 @@ export default function ContratosPage() {
                         <tbody className="divide-y divide-gray-100">
                           {schedule.map((s) => (
                             <tr key={s.id}>
+                              <td className="px-3 py-2">{s.kind}</td>
                               <td className="px-3 py-2">{s.competencia ? s.competencia.slice(0, 7) : '-'}</td>
                               <td className="px-3 py-2">{s.data_vencimento}</td>
+                              <td className="px-3 py-2">{s.descricao ? String(s.descricao) : '-'}</td>
                               <td className="px-3 py-2">{Number(s.valor || 0).toFixed(2)}</td>
                               <td className="px-3 py-2">{s.status}</td>
                             </tr>
