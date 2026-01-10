@@ -110,4 +110,32 @@ describe('servicosContratosBilling service', () => {
     });
     expect(res).toEqual({ scheduleCancelled: 10, receivablesCancelled: 2, cobrancasCancelled: 2 });
   });
+
+  it('addAvulso chama RPC com params corretos', async () => {
+    rpcMock.mockResolvedValueOnce({ data: { id: 'sch-1', kind: 'avulso' }, error: null });
+    const { addAvulso } = await import('./servicosContratosBilling');
+
+    const res = await addAvulso({ contratoId: 'ctr-1', dataVencimento: '2026-02-10', valor: 99.9, descricao: 'Setup' });
+
+    expect(rpcMock).toHaveBeenCalledWith('servicos_contratos_billing_add_avulso', {
+      p_contrato_id: 'ctr-1',
+      p_data_vencimento: '2026-02-10',
+      p_valor: 99.9,
+      p_descricao: 'Setup',
+    });
+    expect(res).toEqual({ id: 'sch-1', kind: 'avulso' });
+  });
+
+  it('recalcMensalFuture chama RPC com params corretos', async () => {
+    rpcMock.mockResolvedValueOnce({ data: { ok: true, updated: 5 }, error: null });
+    const { recalcMensalFuture } = await import('./servicosContratosBilling');
+
+    const res = await recalcMensalFuture({ contratoId: 'ctr-1', from: '2026-01-01' });
+
+    expect(rpcMock).toHaveBeenCalledWith('servicos_contratos_billing_recalc_mensal_future', {
+      p_contrato_id: 'ctr-1',
+      p_from: '2026-01-01',
+    });
+    expect(res).toEqual({ updated: 5, reason: undefined });
+  });
 });
