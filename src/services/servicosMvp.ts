@@ -8,12 +8,14 @@ export type ServicoContrato = {
   id: string;
   empresa_id: string;
   cliente_id: string | null;
+  servico_id?: string | null;
   numero: string | null;
   descricao: string;
   valor_mensal: number;
   status: ServicoContratoStatus;
   data_inicio: string | null;
   data_fim: string | null;
+  fidelidade_meses?: number | null;
   observacoes: string | null;
   created_at: string;
   updated_at: string;

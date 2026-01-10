@@ -71,9 +71,14 @@ const Modal: React.FC<ModalProps> = ({
   const dialogRef = useRef<HTMLDivElement | null>(null);
   const closeBtnRef = useRef<HTMLButtonElement | null>(null);
   const previouslyFocused = useRef<HTMLElement | null>(null);
+  const onCloseRef = useRef(onClose);
   const titleId = useMemo(() => `modal-title-${Math.random().toString(36).slice(2)}`, []);
 
   const ariaLabel = useMemo(() => (typeof title === 'string' ? title : 'Modal'), [title]);
+
+  useEffect(() => {
+    onCloseRef.current = onClose;
+  }, [onClose]);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -93,7 +98,7 @@ const Modal: React.FC<ModalProps> = ({
 
       if (e.key === 'Escape') {
         e.preventDefault();
-        onClose();
+        onCloseRef.current();
         return;
       }
 
@@ -126,7 +131,7 @@ const Modal: React.FC<ModalProps> = ({
       previouslyFocused.current?.focus?.();
       previouslyFocused.current = null;
     };
-  }, [isOpen, onClose]);
+  }, [isOpen]);
 
   return (
     <AnimatePresence>
@@ -143,7 +148,7 @@ const Modal: React.FC<ModalProps> = ({
           )}
           onMouseDown={(e) => {
             // clique no backdrop fecha (sem fechar ao clicar dentro do modal)
-            if (e.target === overlayRef.current) onClose();
+            if (e.target === overlayRef.current) onCloseRef.current();
           }}
         >
           <motion.div
@@ -170,7 +175,7 @@ const Modal: React.FC<ModalProps> = ({
                 </h2>
                 <button
                   ref={closeBtnRef}
-                  onClick={onClose}
+                  onClick={() => onCloseRef.current()}
                   className="text-gray-600 hover:text-gray-900 z-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 rounded-full p-2 hover:bg-white/40 active:bg-white/50 transition"
                   aria-label="Fechar modal"
                 >

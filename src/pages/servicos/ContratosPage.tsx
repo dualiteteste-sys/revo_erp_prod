@@ -3,9 +3,12 @@ import { FileText, Loader2, PlusCircle } from 'lucide-react';
 import Modal from '@/components/ui/Modal';
 import { useToast } from '@/contexts/ToastProvider';
 import ClientAutocomplete from '@/components/common/ClientAutocomplete';
+import ServiceAutocomplete from '@/components/common/ServiceAutocomplete';
 import { getPartners, type PartnerListItem } from '@/services/partners';
 import { listAllCentrosDeCusto, type CentroDeCustoListItem } from '@/services/centrosDeCusto';
 import { deleteContrato, listContratos, upsertContrato, type ServicoContrato, type ServicoContratoStatus } from '@/services/servicosMvp';
+import { getService } from '@/services/services';
+import { useNumericField } from '@/hooks/useNumericField';
 import {
   addAvulso,
   cancelFutureBilling,
@@ -42,12 +45,14 @@ import {
 type FormState = {
   id: string | null;
   cliente_id: string;
+  servico_id: string;
   numero: string;
   descricao: string;
-  valor_mensal: string;
+  valor_mensal: number | null;
   status: ServicoContratoStatus;
   data_inicio: string;
   data_fim: string;
+  fidelidade_meses: number | null;
   observacoes: string;
 };
 
@@ -60,12 +65,14 @@ type ItemRow = ServicosContratoItem;
 const emptyForm: FormState = {
   id: null,
   cliente_id: '',
+  servico_id: '',
   numero: '',
   descricao: '',
-  valor_mensal: '0',
+  valor_mensal: 0,
   status: 'ativo',
   data_inicio: '',
   data_fim: '',
+  fidelidade_meses: null,
   observacoes: '',
 };
 
@@ -80,6 +87,15 @@ function slugify(input: string): string {
     .slice(0, 60);
 }
 
+function addMonthsToIsoDate(dateIso: string, months: number): string | null {
+  if (!dateIso) return null;
+  const d = new Date(dateIso);
+  if (Number.isNaN(d.getTime())) return null;
+  const next = new Date(d);
+  next.setMonth(next.getMonth() + months);
+  return next.toISOString().slice(0, 10);
+}
+
 export default function ContratosPage() {
   const { addToast } = useToast();
   const [loading, setLoading] = useState(true);
@@ -88,9 +104,11 @@ export default function ContratosPage() {
   const [rows, setRows] = useState<ServicoContrato[]>([]);
   const [clients, setClients] = useState<PartnerListItem[]>([]);
   const [selectedClientName, setSelectedClientName] = useState('');
+  const [selectedServiceName, setSelectedServiceName] = useState('');
   const [isOpen, setIsOpen] = useState(false);
   const [form, setForm] = useState<FormState>(emptyForm);
   const [originalStatus, setOriginalStatus] = useState<ServicoContratoStatus>('ativo');
+  const [lastDataFim, setLastDataFim] = useState('');
   const [billingLoading, setBillingLoading] = useState(false);
   const [billingActionLoading, setBillingActionLoading] = useState(false);
   const [billingRule, setBillingRule] = useState<BillingRuleRow | null>(null);
@@ -99,7 +117,7 @@ export default function ContratosPage() {
   const [centrosDeCustoLoading, setCentrosDeCustoLoading] = useState(false);
   const [centrosDeCusto, setCentrosDeCusto] = useState<CentroDeCustoListItem[]>([]);
   const [avulsoVencimento, setAvulsoVencimento] = useState(() => new Date().toISOString().slice(0, 10));
-  const [avulsoValor, setAvulsoValor] = useState('0');
+  const [avulsoValor, setAvulsoValor] = useState<number | null>(0);
   const [avulsoDescricao, setAvulsoDescricao] = useState('');
   const [templatesLoading, setTemplatesLoading] = useState(false);
   const [templates, setTemplates] = useState<TemplateRow[]>([]);
@@ -118,7 +136,7 @@ export default function ContratosPage() {
     descricao: string;
     quantidade: string;
     unidade: string;
-    valor_unitario: string;
+    valor_unitario: number | null;
     recorrente: boolean;
   }>({
     id: null,
@@ -126,7 +144,7 @@ export default function ContratosPage() {
     descricao: '',
     quantidade: '1',
     unidade: '',
-    valor_unitario: '0',
+    valor_unitario: 0,
     recorrente: true,
   });
   const [templatesAdminOpen, setTemplatesAdminOpen] = useState(false);
@@ -206,11 +224,12 @@ export default function ContratosPage() {
   const openNew = () => {
     setForm(emptyForm);
     setOriginalStatus('ativo');
+    setLastDataFim('');
     setBillingRule(null);
     setSchedule([]);
     setBillingUntil(new Date().toISOString().slice(0, 10));
     setAvulsoVencimento(new Date().toISOString().slice(0, 10));
-    setAvulsoValor('0');
+    setAvulsoValor(0);
     setAvulsoDescricao('');
     setTemplates([]);
     setSelectedTemplateId('');
@@ -226,10 +245,11 @@ export default function ContratosPage() {
       descricao: '',
       quantidade: '1',
       unidade: '',
-      valor_unitario: '0',
+      valor_unitario: 0,
       recorrente: true,
     });
     setSelectedClientName('');
+    setSelectedServiceName('');
     setIsOpen(true);
   };
 
@@ -237,21 +257,25 @@ export default function ContratosPage() {
     setForm({
       id: row.id,
       cliente_id: row.cliente_id || '',
+      servico_id: (row as any).servico_id || '',
       numero: row.numero || '',
       descricao: row.descricao || '',
-      valor_mensal: String(row.valor_mensal ?? 0),
+      valor_mensal: row.valor_mensal ?? 0,
       status: row.status,
       data_inicio: row.data_inicio || '',
       data_fim: row.data_fim || '',
+      fidelidade_meses: (row as any).fidelidade_meses ?? null,
       observacoes: row.observacoes || '',
     });
     setSelectedClientName(row.cliente_id ? clientById.get(row.cliente_id)?.nome || '' : '');
+    setSelectedServiceName('');
+    setLastDataFim(row.data_fim || '');
     setOriginalStatus(row.status);
     setBillingRule(null);
     setSchedule([]);
     setBillingUntil(new Date().toISOString().slice(0, 10));
     setAvulsoVencimento(new Date().toISOString().slice(0, 10));
-    setAvulsoValor('0');
+    setAvulsoValor(0);
     setAvulsoDescricao('');
     setSelectedTemplateId('');
     setDocuments([]);
@@ -263,10 +287,20 @@ export default function ContratosPage() {
       descricao: '',
       quantidade: '1',
       unidade: '',
-      valor_unitario: '0',
+      valor_unitario: 0,
       recorrente: true,
     });
     setIsOpen(true);
+    if ((row as any).servico_id) {
+      void (async () => {
+        try {
+          const s = await getService((row as any).servico_id);
+          setSelectedServiceName(s?.descricao || '');
+        } catch {
+          setSelectedServiceName('');
+        }
+      })();
+    }
     void loadBilling(row);
     void loadDocsAndTemplates(row.id);
     void loadItens(row.id);
@@ -276,11 +310,12 @@ export default function ContratosPage() {
     setIsOpen(false);
     setForm(emptyForm);
     setOriginalStatus('ativo');
+    setLastDataFim('');
     setBillingRule(null);
     setSchedule([]);
     setBillingUntil(new Date().toISOString().slice(0, 10));
     setAvulsoVencimento(new Date().toISOString().slice(0, 10));
-    setAvulsoValor('0');
+    setAvulsoValor(0);
     setAvulsoDescricao('');
     setTemplates([]);
     setSelectedTemplateId('');
@@ -296,10 +331,11 @@ export default function ContratosPage() {
       descricao: '',
       quantidade: '1',
       unidade: '',
-      valor_unitario: '0',
+      valor_unitario: 0,
       recorrente: true,
     });
     setSelectedClientName('');
+    setSelectedServiceName('');
     setTemplatesAdminOpen(false);
     setTemplatesAdminRows([]);
     setTemplateForm({ id: null, slug: '', titulo: '', corpo: '', active: true });
@@ -311,6 +347,20 @@ export default function ContratosPage() {
     if (!form.cliente_id) return false;
     return true;
   }, [form.id, form.status, form.cliente_id]);
+
+  const valorMensalProps = useNumericField(form.valor_mensal, (value) => {
+    setForm((s) => ({ ...s, valor_mensal: value }));
+  });
+
+  const billingValorMensalProps = useNumericField(billingRule?.valor_mensal ?? null, (value) => {
+    setBillingRule((r) => (r ? { ...r, valor_mensal: value ?? 0 } : r));
+  });
+
+  const avulsoValorProps = useNumericField(avulsoValor, setAvulsoValor);
+
+  const itemValorUnitarioProps = useNumericField(itemForm.valor_unitario, (value) => {
+    setItemForm((s) => ({ ...s, valor_unitario: value }));
+  });
 
   const loadBilling = async (row: Pick<ServicoContrato, 'id' | 'valor_mensal' | 'data_inicio'>) => {
     setBillingLoading(true);
@@ -387,7 +437,7 @@ export default function ContratosPage() {
       descricao: '',
       quantidade: '1',
       unidade: '',
-      valor_unitario: '0',
+      valor_unitario: 0,
       recorrente: true,
     });
   };
@@ -399,7 +449,7 @@ export default function ContratosPage() {
       descricao: it.descricao || '',
       quantidade: String(it.quantidade ?? 0),
       unidade: it.unidade || '',
-      valor_unitario: String(it.valor_unitario ?? 0),
+      valor_unitario: it.valor_unitario ?? 0,
       recorrente: it.recorrente !== false,
     });
   };
@@ -412,7 +462,7 @@ export default function ContratosPage() {
       return;
     }
     const qtd = Number(itemForm.quantidade || 0);
-    const valor = Number(itemForm.valor_unitario || 0);
+    const valor = Number(itemForm.valor_unitario ?? 0);
     if (!Number.isFinite(qtd) || qtd < 0) {
       addToast('Quantidade inválida.', 'error');
       return;
@@ -471,7 +521,7 @@ export default function ContratosPage() {
   }, [itens]);
 
   const applyRecurringTotalToMensal = () => {
-    setForm((s) => ({ ...s, valor_mensal: String(recurringTotal.toFixed(2)) }));
+    setForm((s) => ({ ...s, valor_mensal: recurringTotal }));
     addToast('Valor mensal preenchido pelo somatório recorrente.', 'success');
   };
 
@@ -618,7 +668,7 @@ export default function ContratosPage() {
   const saveBillingRule = async () => {
     if (!form.id || !billingRule) return;
     if (billingRule.tipo !== 'mensal') {
-      addToast('Neste MVP2, apenas regra mensal está habilitada.', 'warn');
+      addToast('Por enquanto, apenas regra mensal está habilitada.', 'warn');
       return;
     }
 
@@ -691,7 +741,7 @@ export default function ContratosPage() {
 
   const addAvulsoItem = async () => {
     if (!form.id) return;
-    const valor = Number(avulsoValor || 0);
+    const valor = Number(avulsoValor ?? 0);
     if (!avulsoVencimento) {
       addToast('Informe o vencimento do avulso.', 'error');
       return;
@@ -710,7 +760,7 @@ export default function ContratosPage() {
         descricao: avulsoDescricao.trim() || null,
       });
       addToast('Item avulso adicionado ao schedule.', 'success');
-      setAvulsoValor('0');
+      setAvulsoValor(0);
       setAvulsoDescricao('');
       await loadBilling({ id: form.id, valor_mensal: Number(form.valor_mensal ?? 0), data_inicio: form.data_inicio || null });
     } catch (e: any) {
@@ -743,7 +793,7 @@ export default function ContratosPage() {
       addToast('Informe a descrição do contrato.', 'error');
       return;
     }
-    const valor = Number(form.valor_mensal || 0);
+    const valor = Number(form.valor_mensal ?? 0);
     if (Number.isNaN(valor) || valor < 0) {
       addToast('Valor mensal inválido.', 'error');
       return;
@@ -753,12 +803,14 @@ export default function ContratosPage() {
       const saved = await upsertContrato({
         id: form.id || undefined,
         cliente_id: form.cliente_id || null,
+        servico_id: form.servico_id || null,
         numero: form.numero.trim() || null,
         descricao: form.descricao.trim(),
         valor_mensal: valor,
         status: form.status,
         data_inicio: form.data_inicio || null,
         data_fim: form.data_fim || null,
+        fidelidade_meses: form.fidelidade_meses ?? null,
         observacoes: form.observacoes.trim() || null,
       } as any);
 
@@ -917,13 +969,20 @@ export default function ContratosPage() {
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <label className="text-sm text-gray-700">Valor mensal</label>
-              <input
-                inputMode="decimal"
-                value={form.valor_mensal}
-                onChange={(e) => setForm((s) => ({ ...s, valor_mensal: e.target.value }))}
-                className="mt-1 w-full p-3 border border-gray-300 rounded-lg"
-              />
+              <label className="text-sm text-gray-700">Serviço (opcional)</label>
+              <div className="mt-1">
+                <ServiceAutocomplete
+                  value={form.servico_id || null}
+                  initialName={selectedServiceName || undefined}
+                  placeholder="Digite para buscar..."
+                  onChange={(id, service) => {
+                    setForm((s) => ({ ...s, servico_id: id ?? '' }));
+                    setSelectedServiceName(service?.descricao || '');
+                  }}
+                  disabled={saving}
+                />
+                <div className="mt-1 text-[11px] text-gray-500">Opcional. Use para relatórios/comissões futuras.</div>
+              </div>
             </div>
             <div>
               <label className="text-sm text-gray-700">Status</label>
@@ -938,10 +997,101 @@ export default function ContratosPage() {
               </select>
             </div>
           </div>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div>
+              <label className="text-sm text-gray-700">Valor mensal</label>
+              <input
+                inputMode="numeric"
+                {...valorMensalProps}
+                className="mt-1 w-full p-3 border border-gray-300 rounded-lg"
+                disabled={saving}
+              />
+            </div>
+            <div>
+              <label className="text-sm text-gray-700">Fidelidade (meses)</label>
+              <input
+                type="number"
+                min={0}
+                step={1}
+                value={form.fidelidade_meses ?? ''}
+                onChange={(e) => {
+                  const raw = e.target.value;
+                  const n = raw === '' ? null : Number(raw);
+                  setForm((s) => ({ ...s, fidelidade_meses: Number.isFinite(n as number) ? (n as number) : null }));
+                }}
+                className="mt-1 w-full p-3 border border-gray-300 rounded-lg"
+                disabled={saving}
+              />
+              {form.fidelidade_meses && form.data_inicio ? (
+                <div className="mt-1 text-[11px] text-gray-500">
+                  Fidelidade até: {addMonthsToIsoDate(form.data_inicio, form.fidelidade_meses) || '—'}
+                </div>
+              ) : (
+                <div className="mt-1 text-[11px] text-gray-500">Opcional. Ex.: 12 = fidelidade de 12 meses.</div>
+              )}
+            </div>
+            <div className="flex items-end">
+              <div className="text-xs text-gray-500">
+                Dica: você pode preencher o valor mensal pelo somatório dos itens recorrentes na seção “Escopo”.
+              </div>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="text-sm text-gray-700">Início</label>
+              <input
+                type="date"
+                value={form.data_inicio}
+                onChange={(e) => setForm((s) => ({ ...s, data_inicio: e.target.value }))}
+                className="mt-1 w-full p-3 border border-gray-300 rounded-lg"
+                disabled={saving}
+              />
+            </div>
+            <div>
+              <label className="text-sm text-gray-700">Fim</label>
+              <label className="mt-2 flex items-center gap-2 text-xs text-gray-600">
+                <input
+                  type="checkbox"
+                  checked={!form.data_fim}
+                  onChange={(e) => {
+                    const indeterminate = e.target.checked;
+                    if (indeterminate) {
+                      setLastDataFim(form.data_fim || '');
+                      setForm((s) => ({ ...s, data_fim: '' }));
+                      return;
+                    }
+
+                    const restore = lastDataFim || new Date().toISOString().slice(0, 10);
+                    setForm((s) => ({ ...s, data_fim: restore }));
+                  }}
+                  disabled={saving}
+                />
+                Sem data de fim (renovação automática)
+              </label>
+              <input
+                type="date"
+                value={form.data_fim}
+                onChange={(e) => setForm((s) => ({ ...s, data_fim: e.target.value }))}
+                className="mt-1 w-full p-3 border border-gray-300 rounded-lg"
+                disabled={saving || !form.data_fim}
+              />
+            </div>
+          </div>
+          <div>
+            <label className="text-sm text-gray-700">Observações</label>
+            <textarea
+              value={form.observacoes}
+              onChange={(e) => setForm((s) => ({ ...s, observacoes: e.target.value }))}
+              className="mt-1 w-full p-3 border border-gray-300 rounded-lg"
+              rows={3}
+              disabled={saving}
+            />
+          </div>
           <div className="rounded-xl border border-gray-200 bg-gray-50 p-4">
             <div className="flex items-start justify-between gap-4">
               <div>
-                <div className="text-sm font-semibold text-gray-900">Faturamento (MVP2)</div>
+                <div className="text-sm font-semibold text-gray-900">Faturamento</div>
                 <div className="text-xs text-gray-600">
                   Configure a regra e gere a agenda. Depois, gere os títulos (Contas a Receber) automaticamente a partir do schedule.
                 </div>
@@ -982,9 +1132,8 @@ export default function ContratosPage() {
                   <div>
                     <label className="text-xs text-gray-600">Valor mensal</label>
                     <input
-                      inputMode="decimal"
-                      value={String(billingRule?.valor_mensal ?? '')}
-                      onChange={(e) => setBillingRule((r) => (r ? { ...r, valor_mensal: Number(e.target.value || 0) } : r))}
+                      inputMode="numeric"
+                      {...billingValorMensalProps}
                       className="mt-1 w-full rounded-lg border border-gray-200 bg-white p-2 text-sm"
                       disabled={billingActionLoading}
                     />
@@ -1102,9 +1251,8 @@ export default function ContratosPage() {
                     <div>
                       <div className="text-[11px] text-gray-600">Valor</div>
                       <input
-                        inputMode="decimal"
-                        value={avulsoValor}
-                        onChange={(e) => setAvulsoValor(e.target.value)}
+                        inputMode="numeric"
+                        {...avulsoValorProps}
                         className="mt-1 w-full rounded-lg border border-gray-200 bg-white p-2 text-sm"
                         disabled={billingActionLoading}
                       />
@@ -1235,9 +1383,8 @@ export default function ContratosPage() {
                   <div className="md:col-span-2">
                     <div className="text-[11px] text-gray-600">Valor unit.</div>
                     <input
-                      inputMode="decimal"
-                      value={itemForm.valor_unitario}
-                      onChange={(e) => setItemForm((s) => ({ ...s, valor_unitario: e.target.value }))}
+                      inputMode="numeric"
+                      {...itemValorUnitarioProps}
                       className="mt-1 w-full rounded-lg border border-gray-200 bg-white p-2 text-sm"
                       disabled={itensActionLoading}
                     />
@@ -1505,35 +1652,6 @@ export default function ContratosPage() {
             )}
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label className="text-sm text-gray-700">Início</label>
-              <input
-                type="date"
-                value={form.data_inicio}
-                onChange={(e) => setForm((s) => ({ ...s, data_inicio: e.target.value }))}
-                className="mt-1 w-full p-3 border border-gray-300 rounded-lg"
-              />
-            </div>
-            <div>
-              <label className="text-sm text-gray-700">Fim</label>
-              <input
-                type="date"
-                value={form.data_fim}
-                onChange={(e) => setForm((s) => ({ ...s, data_fim: e.target.value }))}
-                className="mt-1 w-full p-3 border border-gray-300 rounded-lg"
-              />
-            </div>
-          </div>
-          <div>
-            <label className="text-sm text-gray-700">Observações</label>
-            <textarea
-              value={form.observacoes}
-              onChange={(e) => setForm((s) => ({ ...s, observacoes: e.target.value }))}
-              className="mt-1 w-full p-3 border border-gray-300 rounded-lg"
-              rows={3}
-            />
-          </div>
           <div className="flex justify-end gap-2 pt-2">
             <button onClick={close} className="px-4 py-2 rounded-lg bg-gray-100 hover:bg-gray-200">
               Cancelar
