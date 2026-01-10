@@ -1,0 +1,72 @@
+name: Serviços Contratos Billing Worker (dev)
+
+on:
+  schedule:
+    - cron: "15 3 * * *"
+  workflow_dispatch:
+    inputs:
+      contracts_limit:
+        description: "Quantidade máxima de contratos ativos para garantir agenda"
+        required: false
+        default: "200"
+      months_ahead:
+        description: "Meses a gerar na agenda (1..36)"
+        required: false
+        default: "12"
+      receivables_limit:
+        description: "Quantidade máxima de títulos por execução"
+        required: false
+        default: "500"
+      until:
+        description: "Gerar títulos até esta data (YYYY-MM-DD). Vazio = hoje"
+        required: false
+        default: ""
+
+concurrency:
+  group: servicos-contratos-billing-worker-dev
+  cancel-in-progress: false
+
+jobs:
+  run-worker:
+    name: Process contratos billing (DEV)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Install PostgreSQL client (psql)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y postgresql-client
+
+      - name: Run billing worker tick (admin)
+        env:
+          SUPABASE_DB_URL_DEV: ${{ secrets.SUPABASE_DB_URL_DEV }}
+          CONTRACTS_LIMIT: ${{ inputs.contracts_limit }}
+          MONTHS_AHEAD: ${{ inputs.months_ahead }}
+          RECEIVABLES_LIMIT: ${{ inputs.receivables_limit }}
+          UNTIL: ${{ inputs.until }}
+        run: |
+          set -euo pipefail
+
+          if [[ -z "${SUPABASE_DB_URL_DEV:-}" ]]; then
+            echo "::warning::Missing secret SUPABASE_DB_URL_DEV (skipping worker run)"
+            exit 0
+          fi
+
+          contracts_limit="${CONTRACTS_LIMIT:-200}"
+          months_ahead="${MONTHS_AHEAD:-12}"
+          receivables_limit="${RECEIVABLES_LIMIT:-500}"
+
+          if ! [[ "$contracts_limit" =~ ^[0-9]+$ ]]; then contracts_limit="200"; fi
+          if ! [[ "$months_ahead" =~ ^[0-9]+$ ]]; then months_ahead="12"; fi
+          if ! [[ "$receivables_limit" =~ ^[0-9]+$ ]]; then receivables_limit="500"; fi
+
+          until_input="${UNTIL:-}"
+          until_sql="null"
+          if [[ -n "$until_input" ]]; then
+            until_sql="'${until_input}'::date"
+          fi
+
+          echo "[DEV] contratos billing worker tick (contracts_limit=$contracts_limit months_ahead=$months_ahead receivables_limit=$receivables_limit until=$until_input)"
+          psql "$SUPABASE_DB_URL_DEV" -v ON_ERROR_STOP=1 -X -qAt -c "select public.servicos_contratos_billing_worker_tick_admin(${contracts_limit}, ${months_ahead}, ${receivables_limit}, ${until_sql});"
+

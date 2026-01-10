@@ -4,6 +4,16 @@ import Modal from '@/components/ui/Modal';
 import { useToast } from '@/contexts/ToastProvider';
 import { getPartners, type PartnerListItem } from '@/services/partners';
 import { deleteContrato, listContratos, upsertContrato, type ServicoContrato, type ServicoContratoStatus } from '@/services/servicosMvp';
+import {
+  generateReceivables as rpcGenerateReceivables,
+  generateSchedule as rpcGenerateSchedule,
+  getBillingRuleByContratoId,
+  listScheduleByContratoId,
+  type BillingRuleTipo,
+  type ServicosContratoBillingRule,
+  type ServicosContratoBillingSchedule,
+  upsertBillingRule,
+} from '@/services/servicosContratosBilling';
 
 type FormState = {
   id: string | null;
@@ -16,6 +26,9 @@ type FormState = {
   data_fim: string;
   observacoes: string;
 };
+
+type BillingRuleRow = ServicosContratoBillingRule;
+type BillingScheduleRow = ServicosContratoBillingSchedule;
 
 const emptyForm: FormState = {
   id: null,
@@ -38,6 +51,10 @@ export default function ContratosPage() {
   const [clients, setClients] = useState<PartnerListItem[]>([]);
   const [isOpen, setIsOpen] = useState(false);
   const [form, setForm] = useState<FormState>(emptyForm);
+  const [billingLoading, setBillingLoading] = useState(false);
+  const [billingActionLoading, setBillingActionLoading] = useState(false);
+  const [billingRule, setBillingRule] = useState<BillingRuleRow | null>(null);
+  const [schedule, setSchedule] = useState<BillingScheduleRow[]>([]);
 
   const clientById = useMemo(() => {
     const m = new Map<string, PartnerListItem>();
@@ -77,6 +94,8 @@ export default function ContratosPage() {
 
   const openNew = () => {
     setForm(emptyForm);
+    setBillingRule(null);
+    setSchedule([]);
     setIsOpen(true);
   };
 
@@ -92,12 +111,129 @@ export default function ContratosPage() {
       data_fim: row.data_fim || '',
       observacoes: row.observacoes || '',
     });
+    setBillingRule(null);
+    setSchedule([]);
     setIsOpen(true);
+    void loadBilling(row);
   };
 
   const close = () => {
     setIsOpen(false);
     setForm(emptyForm);
+    setBillingRule(null);
+    setSchedule([]);
+  };
+
+  const canUseBilling = useMemo(() => {
+    if (!form.id) return false;
+    if (form.status !== 'ativo') return false;
+    if (!form.cliente_id) return false;
+    return true;
+  }, [form.id, form.status, form.cliente_id]);
+
+  const loadBilling = async (row: Pick<ServicoContrato, 'id' | 'valor_mensal' | 'data_inicio'>) => {
+    setBillingLoading(true);
+    try {
+      const rule = await getBillingRuleByContratoId(row.id);
+
+      if (rule) {
+        setBillingRule(rule as BillingRuleRow);
+      } else {
+        const start = row.data_inicio ? String(row.data_inicio) : '';
+        const first = start ? `${start.slice(0, 7)}-01` : `${new Date().toISOString().slice(0, 7)}-01`;
+        setBillingRule({
+          id: '',
+          contrato_id: row.id,
+          tipo: 'mensal',
+          ativo: true,
+          valor_mensal: Number(row.valor_mensal ?? 0),
+          dia_vencimento: 5,
+          primeira_competencia: first,
+          centro_de_custo_id: null,
+        });
+      }
+
+      const sch = await listScheduleByContratoId(row.id, 24);
+      setSchedule((sch ?? []) as BillingScheduleRow[]);
+    } catch (e: any) {
+      addToast(e?.message || 'Falha ao carregar faturamento do contrato.', 'error');
+      setBillingRule(null);
+      setSchedule([]);
+    } finally {
+      setBillingLoading(false);
+    }
+  };
+
+  const saveBillingRule = async () => {
+    if (!form.id || !billingRule) return;
+    if (billingRule.tipo !== 'mensal') {
+      addToast('Neste MVP2, apenas regra mensal está habilitada.', 'warn');
+      return;
+    }
+
+    const valor = Number(billingRule.valor_mensal ?? 0);
+    if (Number.isNaN(valor) || valor < 0) {
+      addToast('Valor mensal inválido.', 'error');
+      return;
+    }
+    const dia = Number(billingRule.dia_vencimento ?? 5);
+    if (!Number.isFinite(dia) || dia < 1 || dia > 28) {
+      addToast('Dia de vencimento inválido (1..28).', 'error');
+      return;
+    }
+    const comp = String(billingRule.primeira_competencia ?? '').trim();
+    if (!comp) {
+      addToast('Informe a primeira competência.', 'error');
+      return;
+    }
+
+    setBillingActionLoading(true);
+    try {
+      const payload = {
+        contrato_id: form.id,
+        tipo: 'mensal',
+        ativo: billingRule.ativo !== false,
+        valor_mensal: valor,
+        dia_vencimento: dia,
+        primeira_competencia: comp,
+        centro_de_custo_id: billingRule.centro_de_custo_id || null,
+      };
+      const savedRule = await upsertBillingRule(payload);
+      setBillingRule(savedRule as BillingRuleRow);
+      addToast('Regra de faturamento salva.', 'success');
+    } catch (e: any) {
+      addToast(e?.message || 'Falha ao salvar regra de faturamento.', 'error');
+    } finally {
+      setBillingActionLoading(false);
+    }
+  };
+
+  const generateSchedule = async () => {
+    if (!form.id) return;
+    setBillingActionLoading(true);
+    try {
+      const res = await rpcGenerateSchedule({ contratoId: form.id, monthsAhead: 12 });
+      addToast(`Agenda atualizada. Inseridos: ${res.inserted}`, 'success');
+      await loadBilling({ id: form.id, valor_mensal: Number(form.valor_mensal ?? 0), data_inicio: form.data_inicio || null });
+    } catch (e: any) {
+      addToast(e?.message || 'Falha ao gerar agenda.', 'error');
+    } finally {
+      setBillingActionLoading(false);
+    }
+  };
+
+  const generateReceivables = async () => {
+    if (!form.id) return;
+    setBillingActionLoading(true);
+    try {
+      const res = await rpcGenerateReceivables({ contratoId: form.id, until: new Date().toISOString().slice(0, 10) });
+      addToast(`Títulos gerados: ${res.created}`, 'success');
+      await loadBilling({ id: form.id, valor_mensal: Number(form.valor_mensal ?? 0), data_inicio: form.data_inicio || null });
+    } catch (e: any) {
+      addToast(e?.message || 'Falha ao gerar contas a receber.', 'error');
+    } finally {
+      setBillingActionLoading(false);
+    }
   };
 
   const save = async () => {
@@ -112,7 +248,7 @@ export default function ContratosPage() {
     }
     setSaving(true);
     try {
-      await upsertContrato({
+      const saved = await upsertContrato({
         id: form.id || undefined,
         cliente_id: form.cliente_id || null,
         numero: form.numero.trim() || null,
@@ -124,8 +260,13 @@ export default function ContratosPage() {
         observacoes: form.observacoes.trim() || null,
       } as any);
       addToast('Contrato salvo.', 'success');
-      close();
       await load();
+      if (form.id) {
+        close();
+      } else {
+        setForm((prev) => ({ ...prev, id: saved.id }));
+        await loadBilling(saved);
+      }
     } catch (e: any) {
       addToast(e.message || 'Falha ao salvar contrato.', 'error');
     } finally {
@@ -272,6 +413,145 @@ export default function ContratosPage() {
                 <option value="cancelado">Cancelado</option>
               </select>
             </div>
+          </div>
+          <div className="rounded-xl border border-gray-200 bg-gray-50 p-4">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <div className="text-sm font-semibold text-gray-900">Faturamento (MVP2)</div>
+                <div className="text-xs text-gray-600">
+                  Configure a regra e gere a agenda. Depois, gere os títulos (Contas a Receber) automaticamente a partir do schedule.
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() =>
+                  form.id ? loadBilling({ id: form.id, valor_mensal: Number(form.valor_mensal ?? 0), data_inicio: form.data_inicio || null }) : null
+                }
+                disabled={!form.id || billingLoading || billingActionLoading}
+                className="rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm hover:bg-gray-50 disabled:opacity-50"
+              >
+                Atualizar
+              </button>
+            </div>
+
+            {!form.id ? (
+              <div className="mt-3 text-sm text-gray-700">Salve o contrato para configurar faturamento e ver o preview.</div>
+            ) : billingLoading ? (
+              <div className="mt-4 flex items-center gap-2 text-sm text-gray-600">
+                <Loader2 className="h-4 w-4 animate-spin" /> Carregando faturamento…
+              </div>
+            ) : (
+              <>
+                <div className="mt-4 grid grid-cols-1 md:grid-cols-4 gap-3">
+                  <div>
+                    <label className="text-xs text-gray-600">Tipo</label>
+                    <select
+                      value={billingRule?.tipo || 'mensal'}
+                      onChange={(e) => setBillingRule((r) => (r ? { ...r, tipo: e.target.value as BillingRuleTipo } : r))}
+                      className="mt-1 w-full rounded-lg border border-gray-200 bg-white p-2 text-sm"
+                      disabled
+                    >
+                      <option value="mensal">Mensal</option>
+                      <option value="avulso">Avulso</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="text-xs text-gray-600">Valor mensal</label>
+                    <input
+                      inputMode="decimal"
+                      value={String(billingRule?.valor_mensal ?? '')}
+                      onChange={(e) => setBillingRule((r) => (r ? { ...r, valor_mensal: Number(e.target.value || 0) } : r))}
+                      className="mt-1 w-full rounded-lg border border-gray-200 bg-white p-2 text-sm"
+                      disabled={billingActionLoading}
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs text-gray-600">Dia de vencimento</label>
+                    <input
+                      type="number"
+                      min={1}
+                      max={28}
+                      value={String(billingRule?.dia_vencimento ?? 5)}
+                      onChange={(e) => setBillingRule((r) => (r ? { ...r, dia_vencimento: Number(e.target.value || 5) } : r))}
+                      className="mt-1 w-full rounded-lg border border-gray-200 bg-white p-2 text-sm"
+                      disabled={billingActionLoading}
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs text-gray-600">Primeira competência</label>
+                    <input
+                      type="date"
+                      value={billingRule?.primeira_competencia || ''}
+                      onChange={(e) => setBillingRule((r) => (r ? { ...r, primeira_competencia: e.target.value } : r))}
+                      className="mt-1 w-full rounded-lg border border-gray-200 bg-white p-2 text-sm"
+                      disabled={billingActionLoading}
+                    />
+                  </div>
+                </div>
+
+                <div className="mt-3 flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    onClick={saveBillingRule}
+                    disabled={!billingRule || billingActionLoading}
+                    className="rounded-lg bg-white px-3 py-2 text-sm font-semibold text-gray-800 shadow-sm ring-1 ring-gray-200 hover:bg-gray-50 disabled:opacity-50"
+                  >
+                    Salvar regra
+                  </button>
+                  <button
+                    type="button"
+                    onClick={generateSchedule}
+                    disabled={!billingRule || billingActionLoading || !form.id}
+                    className="rounded-lg bg-blue-600 px-3 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-50"
+                  >
+                    Gerar agenda (12 meses)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={generateReceivables}
+                    disabled={!canUseBilling || billingActionLoading}
+                    className="rounded-lg bg-emerald-600 px-3 py-2 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-50"
+                    title={!canUseBilling ? 'Requer contrato ativo com cliente selecionado.' : undefined}
+                  >
+                    Gerar títulos (até hoje)
+                  </button>
+                  <div className="text-xs text-gray-600 flex items-center">
+                    {!form.cliente_id ? 'Dica: selecione um cliente para gerar títulos.' : null}
+                    {form.status !== 'ativo' ? ' Dica: contrato precisa estar ativo.' : null}
+                  </div>
+                </div>
+
+                <div className="mt-4">
+                  <div className="text-xs font-semibold text-gray-700 mb-2">Preview da agenda (próximos 24)</div>
+                  {schedule.length === 0 ? (
+                    <div className="text-sm text-gray-600">Sem linhas no schedule ainda. Clique em “Gerar agenda”.</div>
+                  ) : (
+                    <div className="overflow-auto rounded-lg border border-gray-200 bg-white">
+                      <table className="min-w-full text-xs">
+                        <thead className="bg-gray-50">
+                          <tr className="text-left text-gray-600">
+                            <th className="px-3 py-2">Competência</th>
+                            <th className="px-3 py-2">Vencimento</th>
+                            <th className="px-3 py-2">Valor</th>
+                            <th className="px-3 py-2">Status</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-gray-100">
+                          {schedule.map((s) => (
+                            <tr key={s.id}>
+                              <td className="px-3 py-2">{s.competencia ? s.competencia.slice(0, 7) : '-'}</td>
+                              <td className="px-3 py-2">{s.data_vencimento}</td>
+                              <td className="px-3 py-2">{Number(s.valor || 0).toFixed(2)}</td>
+                              <td className="px-3 py-2">{s.status}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </div>
+              </>
+            )}
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>

@@ -188,3 +188,138 @@ test('Serviços: listar e criar sem erros de console', async ({ page }) => {
   await page.getByRole('button', { name: 'Salvar' }).click();
   await expect(page.getByRole('heading', { name: 'Novo Serviço' })).toBeHidden();
 });
+
+test('Serviços > Contratos: gerar agenda de faturamento (MVP2) sem erros', async ({ page }) => {
+  // Fallback: evita chamadas não mapeadas ao Supabase real.
+  await page.route('**/rest/v1/**', async (route) => {
+    if (route.request().method() === 'OPTIONS') {
+      await route.fulfill({ status: 204, body: '' });
+      return;
+    }
+    await route.fulfill({ json: [] });
+  });
+
+  await mockAuthAndEmpresa(page);
+
+  // Partners (clientes) usados no select.
+  await page.route('**/rest/v1/rpc/count_partners_v2', async (route) => {
+    await route.fulfill({ json: 1 });
+  });
+  await page.route('**/rest/v1/rpc/list_partners_v2', async (route) => {
+    await route.fulfill({
+      json: [
+        {
+          id: 'cli-1',
+          nome: 'Cliente E2E',
+          tipo: 'cliente',
+          doc_unico: null,
+          email: null,
+          telefone: null,
+          deleted_at: null,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        },
+      ],
+    });
+  });
+
+  // Lista de contratos
+  await page.route('**/rest/v1/servicos_contratos*', async (route) => {
+    await route.fulfill({
+      json: [
+        {
+          id: 'ctr-1',
+          empresa_id: 'empresa-1',
+          cliente_id: 'cli-1',
+          numero: 'C-001',
+          descricao: 'Contrato E2E',
+          valor_mensal: 150,
+          status: 'ativo',
+          data_inicio: '2026-01-01',
+          data_fim: null,
+          observacoes: null,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        },
+      ],
+    });
+  });
+
+  // Billing rule (sempre retorna uma regra para evitar comportamento de maybeSingle com 0 rows).
+  await page.route('**/rest/v1/servicos_contratos_billing_rules*', async (route) => {
+    const req = route.request();
+    if (req.method() === 'OPTIONS') {
+      await route.fulfill({ status: 204, body: '' });
+      return;
+    }
+    await route.fulfill({
+      json: {
+        id: 'rule-1',
+        empresa_id: 'empresa-1',
+        contrato_id: 'ctr-1',
+        tipo: 'mensal',
+        ativo: true,
+        valor_mensal: 150,
+        dia_vencimento: 5,
+        primeira_competencia: '2026-01-01',
+        centro_de_custo_id: null,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      },
+    });
+  });
+
+  let scheduleGenerated = false;
+  await page.route('**/rest/v1/servicos_contratos_billing_schedule*', async (route) => {
+    if (route.request().method() === 'OPTIONS') {
+      await route.fulfill({ status: 204, body: '' });
+      return;
+    }
+    if (!scheduleGenerated) {
+      await route.fulfill({ json: [] });
+      return;
+    }
+    await route.fulfill({
+      json: [
+        {
+          id: 'sch-1',
+          empresa_id: 'empresa-1',
+          contrato_id: 'ctr-1',
+          rule_id: 'rule-1',
+          kind: 'mensal',
+          competencia: '2026-01-01',
+          data_vencimento: '2026-01-05',
+          valor: 150,
+          status: 'previsto',
+          conta_a_receber_id: null,
+          cobranca_id: null,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        },
+      ],
+    });
+  });
+
+  await page.route('**/rest/v1/rpc/servicos_contratos_billing_generate_schedule', async (route) => {
+    scheduleGenerated = true;
+    await route.fulfill({ json: { ok: true, inserted: 12, tipo: 'mensal', months_ahead: 12 } });
+  });
+
+  await page.goto('/auth/login');
+  await page.getByPlaceholder('seu@email.com').fill('test@example.com');
+  await page.getByLabel('Senha').fill('password123');
+  await page.getByRole('button', { name: 'Entrar' }).click();
+  await expect(page).toHaveURL(/\/app\//);
+
+  await page.goto('/app/servicos/contratos');
+  await expect(page.getByRole('heading', { name: 'Contratos (Serviços)' })).toBeVisible();
+  await expect(page.getByText('Contrato E2E')).toBeVisible();
+
+  await page.getByRole('button', { name: 'Editar' }).click();
+  await expect(page.getByRole('heading', { name: 'Contrato (MVP)' })).toBeVisible();
+
+  const gerarAgenda = page.getByRole('button', { name: 'Gerar agenda (12 meses)' });
+  await expect(gerarAgenda).toBeEnabled();
+  await gerarAgenda.click();
+  await expect(page.getByRole('cell', { name: '2026-01', exact: true })).toBeVisible();
+});
