@@ -13,16 +13,17 @@
     - Atualiza CHECK constraint, default e validações nos RPCs
 */
 
--- 1) Migração de dados legados
+-- 1) Remover CHECK antigo antes de alterar valores (evita violação durante UPDATE)
+alter table public.financeiro_centros_custos
+  drop constraint if exists financeiro_centros_custos_tipo_check;
+
+-- 2) Migração de dados legados
 update public.financeiro_centros_custos
 set tipo = 'custo_fixo'
 where tipo is null
    or tipo in ('despesa', 'outro');
 
--- 2) Constraint + default
-alter table public.financeiro_centros_custos
-  drop constraint if exists financeiro_centros_custos_tipo_check;
-
+-- 3) Constraint + default (novo padrão)
 alter table public.financeiro_centros_custos
   alter column tipo set default 'custo_fixo';
 
