@@ -9,6 +9,7 @@ import Section from '@/components/ui/forms/Section';
 import Input from '@/components/ui/forms/Input';
 import ClientAutocomplete from '@/components/common/ClientAutocomplete';
 import ItemAutocomplete from '@/components/os/ItemAutocomplete';
+import UnidadeMedidaSelect from '@/components/common/UnidadeMedidaSelect';
 import { OsItemSearchResult } from '@/services/os';
 
 type ManualItem = {
@@ -249,10 +250,14 @@ export default function RecebimentoManualPage() {
                   </div>
                   <div className="md:col-span-1">
                     <label className="block text-xs font-medium text-gray-500 mb-1">Un.</label>
-                    <input 
-                      className="w-full p-2 border rounded-md text-sm"
+                    <UnidadeMedidaSelect
+                      label={null}
+                      name={`unidade_${item.id}`}
+                      uiSize="sm"
                       value={item.unidade}
-                      onChange={e => handleUpdateItem(item.id, 'unidade', e.target.value)}
+                      onChange={(sigla) => handleUpdateItem(item.id, 'unidade', sigla || '')}
+                      className="w-full"
+                      placeholder="Selecione..."
                     />
                   </div>
                   <div className="md:col-span-2">

@@ -9,6 +9,7 @@ import Select from '@/components/ui/forms/Select';
 import TextArea from '@/components/ui/forms/TextArea';
 import ClientAutocomplete from '@/components/common/ClientAutocomplete';
 import ItemAutocomplete from '@/components/os/ItemAutocomplete';
+import UnidadeMedidaSelect from '@/components/common/UnidadeMedidaSelect';
 import MaterialClienteAutocomplete from '@/components/industria/materiais/MaterialClienteAutocomplete';
 import OrdemFormItems from './OrdemFormItems';
 import OrdemEntregas from './OrdemEntregas';
@@ -119,7 +120,7 @@ export default function OrdemFormPanel({
         next.quantidade_planejada = initialPrefill.quantidade;
       }
       if (initialPrefill.unidade && (!next.unidade || next.unidade === 'un')) {
-        next.unidade = initialPrefill.unidade;
+        next.unidade = String(initialPrefill.unidade).trim().toUpperCase();
       }
       if (initialPrefill.documentoRef && !next.documento_ref) {
         next.documento_ref = initialPrefill.documentoRef;
@@ -138,9 +139,9 @@ export default function OrdemFormPanel({
         }
       }
       if (initialPrefill.origemUnidadeXml && !next.origem_unidade_xml) {
-        next.origem_unidade_xml = initialPrefill.origemUnidadeXml;
+        next.origem_unidade_xml = String(initialPrefill.origemUnidadeXml).trim().toUpperCase();
         if (!next.unidade || next.unidade === 'un') {
-          next.unidade = initialPrefill.origemUnidadeXml;
+          next.unidade = String(initialPrefill.origemUnidadeXml).trim().toUpperCase();
         }
       }
 
@@ -247,7 +248,7 @@ export default function OrdemFormPanel({
         tipo_ordem: formData.tipo_ordem,
         produto_final_id: formData.produto_final_id,
         quantidade_planejada: formData.quantidade_planejada,
-        unidade: formData.unidade,
+        unidade: formData.unidade ? String(formData.unidade).trim().toUpperCase() : null,
         cliente_id: formData.cliente_id,
         usa_material_cliente: usaMaterialCliente,
         material_cliente_id: materialClienteId,
@@ -745,11 +746,11 @@ export default function OrdemFormPanel({
                 )}
               </div>
               <div className="sm:col-span-1">
-                <Input
+                <UnidadeMedidaSelect
                   label="Unidade"
                   name="unidade"
                   value={formData.unidade || ''}
-                  onChange={e => handleHeaderChange('unidade', e.target.value)}
+                  onChange={(sigla) => handleHeaderChange('unidade', sigla)}
                   disabled={isHeaderLocked || hasOrigemNfe}
                 />
               </div>
@@ -818,10 +819,10 @@ export default function OrdemFormPanel({
                       handleHeaderChange('material_cliente_id', m.id);
                       handleHeaderChange('material_cliente_nome', m.nome_cliente);
                       handleHeaderChange('material_cliente_codigo', m.codigo_cliente);
-                      handleHeaderChange('material_cliente_unidade', m.unidade);
+                      handleHeaderChange('material_cliente_unidade', m.unidade ? String(m.unidade).trim().toUpperCase() : null);
                       handleHeaderChange('produto_final_id', m.produto_id);
                       handleHeaderChange('produto_nome', m.produto_nome);
-                      if (m.unidade) handleHeaderChange('unidade', m.unidade);
+                      if (m.unidade) handleHeaderChange('unidade', String(m.unidade).trim().toUpperCase());
                     }}
                   />
                   <p className="text-xs text-gray-500">
@@ -1217,10 +1218,10 @@ export default function OrdemFormPanel({
               handleHeaderChange('material_cliente_id', m.id);
               handleHeaderChange('material_cliente_nome', m.nome_cliente);
               handleHeaderChange('material_cliente_codigo', m.codigo_cliente);
-              handleHeaderChange('material_cliente_unidade', m.unidade);
+              handleHeaderChange('material_cliente_unidade', m.unidade ? String(m.unidade).trim().toUpperCase() : null);
               handleHeaderChange('produto_final_id', m.produto_id);
               handleHeaderChange('produto_nome', m.produto_nome);
-              if (m.unidade) handleHeaderChange('unidade', m.unidade);
+              if (m.unidade) handleHeaderChange('unidade', String(m.unidade).trim().toUpperCase());
 
               addToast(`Material do cliente atualizado via XML (rec.: ${recebimentoId}).`, 'success');
             } catch (e) {

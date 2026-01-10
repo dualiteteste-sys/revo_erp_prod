@@ -12,6 +12,7 @@ import { Copy, Eye, Loader2, Plus, Receipt, Search, Settings } from 'lucide-reac
 import { Link } from 'react-router-dom';
 import ClientAutocomplete from '@/components/common/ClientAutocomplete';
 import ProductAutocomplete from '@/components/common/ProductAutocomplete';
+import UnidadeMedidaSelect from '@/components/common/UnidadeMedidaSelect';
 
 type AmbienteNfe = 'homologacao' | 'producao';
 
@@ -880,10 +881,12 @@ export default function NfeEmissoesPage() {
                             />
                           </td>
                           <td className="p-3">
-                            <input
+                            <UnidadeMedidaSelect
+                              label={null}
+                              name={`unidade_${it.id}`}
+                              uiSize="sm"
                               value={it.unidade}
-                              onChange={(e) => updateItem(it.id, { unidade: e.target.value })}
-                              className="w-full border border-gray-200 rounded-lg px-3 py-2"
+                              onChange={(sigla) => updateItem(it.id, { unidade: sigla || '' })}
                             />
                           </td>
                           <td className="p-3">

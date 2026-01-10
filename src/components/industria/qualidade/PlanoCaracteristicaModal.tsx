@@ -4,6 +4,7 @@ import Input from '@/components/ui/forms/Input';
 import { Button } from '@/components/ui/button';
 import { PlanoCaracteristica, PlanoCaracteristicaPayload, upsertPlanoCaracteristica } from '@/services/industriaProducao';
 import { useToast } from '@/contexts/ToastProvider';
+import UnidadeMedidaSelect from '@/components/common/UnidadeMedidaSelect';
 
 interface Props {
   isOpen: boolean;
@@ -68,7 +69,7 @@ export default function PlanoCaracteristicaModal({ isOpen, onClose, planoId, car
         descricao: form.descricao.trim(),
         tolerancia_min: form.tolerancia_min ? Number(form.tolerancia_min) : null,
         tolerancia_max: form.tolerancia_max ? Number(form.tolerancia_max) : null,
-        unidade: form.unidade || null,
+        unidade: form.unidade ? form.unidade.trim().toUpperCase() : null,
         instrumento: form.instrumento || null
       };
 
@@ -118,11 +119,12 @@ export default function PlanoCaracteristicaModal({ isOpen, onClose, planoId, car
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <Input
-            label="Unidade"
+          <UnidadeMedidaSelect
+            label="Unidade (opcional)"
+            name="unidade"
             value={form.unidade}
-            onChange={(e) => handleChange('unidade', e.target.value)}
-            placeholder="mm, g, °C..."
+            onChange={(sigla) => handleChange('unidade', sigla || '')}
+            placeholder="Selecione..."
           />
           <Input
             label="Instrumento"
