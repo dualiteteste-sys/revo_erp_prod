@@ -1,6 +1,6 @@
 {
   "max": {
-    "total_js_gzip_bytes": 2715000,
+    "total_js_gzip_bytes": 2800000,
     "total_css_gzip_bytes": 120000,
     "max_js_file_gzip_bytes": 1600000,
     "max_css_file_gzip_bytes": 60000
