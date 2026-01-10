@@ -6,6 +6,7 @@ import { getPartners, type PartnerListItem } from '@/services/partners';
 import { listAllCentrosDeCusto, type CentroDeCustoListItem } from '@/services/centrosDeCusto';
 import { deleteContrato, listContratos, upsertContrato, type ServicoContrato, type ServicoContratoStatus } from '@/services/servicosMvp';
 import {
+  cancelFutureBilling,
   generateReceivables as rpcGenerateReceivables,
   generateSchedule as rpcGenerateSchedule,
   getBillingRuleByContratoId,
@@ -52,6 +53,7 @@ export default function ContratosPage() {
   const [clients, setClients] = useState<PartnerListItem[]>([]);
   const [isOpen, setIsOpen] = useState(false);
   const [form, setForm] = useState<FormState>(emptyForm);
+  const [originalStatus, setOriginalStatus] = useState<ServicoContratoStatus>('ativo');
   const [billingLoading, setBillingLoading] = useState(false);
   const [billingActionLoading, setBillingActionLoading] = useState(false);
   const [billingRule, setBillingRule] = useState<BillingRuleRow | null>(null);
@@ -119,6 +121,7 @@ export default function ContratosPage() {
 
   const openNew = () => {
     setForm(emptyForm);
+    setOriginalStatus('ativo');
     setBillingRule(null);
     setSchedule([]);
     setBillingUntil(new Date().toISOString().slice(0, 10));
@@ -137,6 +140,7 @@ export default function ContratosPage() {
       data_fim: row.data_fim || '',
       observacoes: row.observacoes || '',
     });
+    setOriginalStatus(row.status);
     setBillingRule(null);
     setSchedule([]);
     setBillingUntil(new Date().toISOString().slice(0, 10));
@@ -147,6 +151,7 @@ export default function ContratosPage() {
   const close = () => {
     setIsOpen(false);
     setForm(emptyForm);
+    setOriginalStatus('ativo');
     setBillingRule(null);
     setSchedule([]);
     setBillingUntil(new Date().toISOString().slice(0, 10));
@@ -289,6 +294,27 @@ export default function ContratosPage() {
         data_fim: form.data_fim || null,
         observacoes: form.observacoes.trim() || null,
       } as any);
+
+      // Se o contrato deixou de ser ativo, cancela agenda futura (e opcionalmente títulos futuros).
+      if (originalStatus !== form.status && form.status !== 'ativo' && saved?.id) {
+        try {
+          const res = await cancelFutureBilling({
+            contratoId: saved.id,
+            cancelReceivables: form.status === 'cancelado',
+            reason: form.status === 'cancelado' ? 'Contrato cancelado' : 'Contrato suspenso',
+          });
+          if (res.scheduleCancelled > 0 || res.receivablesCancelled > 0) {
+            const msg =
+              form.status === 'cancelado'
+                ? `Cancelados: ${res.scheduleCancelled} agendas, ${res.receivablesCancelled} títulos.`
+                : `Canceladas: ${res.scheduleCancelled} agendas futuras.`;
+            addToast(msg, 'success');
+          }
+        } catch (e: any) {
+          addToast(e?.message || 'Contrato salvo, mas falhou ao cancelar agenda/títulos futuros.', 'warn');
+        }
+      }
+
       addToast('Contrato salvo.', 'success');
       await load();
       if (form.id) {

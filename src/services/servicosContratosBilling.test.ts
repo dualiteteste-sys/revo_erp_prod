@@ -93,4 +93,21 @@ describe('servicosContratosBilling service', () => {
     expect(qb.upsert).toHaveBeenCalledWith(payload, { onConflict: 'empresa_id,contrato_id' });
     expect(res).toEqual({ id: 'rule-1' });
   });
+
+  it('cancelFutureBilling chama RPC com params corretos', async () => {
+    rpcMock.mockResolvedValueOnce({
+      data: { schedule_cancelled: 10, receivables_cancelled: 2, cobrancas_cancelled: 2 },
+      error: null,
+    });
+    const { cancelFutureBilling } = await import('./servicosContratosBilling');
+
+    const res = await cancelFutureBilling({ contratoId: 'ctr-1', cancelReceivables: true, reason: 'Contrato cancelado' });
+
+    expect(rpcMock).toHaveBeenCalledWith('servicos_contratos_billing_cancel_future', {
+      p_contrato_id: 'ctr-1',
+      p_cancel_receivables: true,
+      p_reason: 'Contrato cancelado',
+    });
+    expect(res).toEqual({ scheduleCancelled: 10, receivablesCancelled: 2, cobrancasCancelled: 2 });
+  });
 });

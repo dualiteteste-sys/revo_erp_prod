@@ -105,3 +105,22 @@ export async function generateReceivables(params: {
     monthsAhead: data?.months_ahead != null ? Number(data.months_ahead) : undefined,
   };
 }
+
+export async function cancelFutureBilling(params: {
+  contratoId: string;
+  cancelReceivables?: boolean;
+  reason?: string | null;
+}): Promise<{ scheduleCancelled: number; receivablesCancelled: number; cobrancasCancelled: number }> {
+  const { contratoId, cancelReceivables = false, reason = null } = params;
+  const { data, error } = await sb.rpc('servicos_contratos_billing_cancel_future', {
+    p_contrato_id: contratoId,
+    p_cancel_receivables: cancelReceivables,
+    p_reason: reason,
+  });
+  if (error) throw error;
+  return {
+    scheduleCancelled: Number(data?.schedule_cancelled ?? 0),
+    receivablesCancelled: Number(data?.receivables_cancelled ?? 0),
+    cobrancasCancelled: Number(data?.cobrancas_cancelled ?? 0),
+  };
+}
