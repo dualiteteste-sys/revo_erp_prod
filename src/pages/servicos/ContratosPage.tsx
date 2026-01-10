@@ -18,6 +18,14 @@ import {
   type ServicosContratoBillingSchedule,
   upsertBillingRule,
 } from '@/services/servicosContratosBilling';
+import {
+  createContratoDocumento,
+  listContratoDocumentos,
+  listContratoTemplates,
+  revokeContratoDocumento,
+  type ServicosContratoDocumento,
+  type ServicosContratoTemplate,
+} from '@/services/servicosContratosDocs';
 
 type FormState = {
   id: string | null;
@@ -33,6 +41,8 @@ type FormState = {
 
 type BillingRuleRow = ServicosContratoBillingRule;
 type BillingScheduleRow = ServicosContratoBillingSchedule;
+type DocumentoRow = ServicosContratoDocumento;
+type TemplateRow = ServicosContratoTemplate;
 
 const emptyForm: FormState = {
   id: null,
@@ -66,6 +76,14 @@ export default function ContratosPage() {
   const [avulsoVencimento, setAvulsoVencimento] = useState(() => new Date().toISOString().slice(0, 10));
   const [avulsoValor, setAvulsoValor] = useState('0');
   const [avulsoDescricao, setAvulsoDescricao] = useState('');
+  const [templatesLoading, setTemplatesLoading] = useState(false);
+  const [templates, setTemplates] = useState<TemplateRow[]>([]);
+  const [selectedTemplateId, setSelectedTemplateId] = useState('');
+  const [documentsLoading, setDocumentsLoading] = useState(false);
+  const [documents, setDocuments] = useState<DocumentoRow[]>([]);
+  const [docExpiresDays, setDocExpiresDays] = useState(30);
+  const [lastPortalLink, setLastPortalLink] = useState<string | null>(null);
+  const [docActionLoading, setDocActionLoading] = useState(false);
 
   const clientById = useMemo(() => {
     const m = new Map<string, PartnerListItem>();
@@ -133,6 +151,11 @@ export default function ContratosPage() {
     setAvulsoVencimento(new Date().toISOString().slice(0, 10));
     setAvulsoValor('0');
     setAvulsoDescricao('');
+    setTemplates([]);
+    setSelectedTemplateId('');
+    setDocuments([]);
+    setDocExpiresDays(30);
+    setLastPortalLink(null);
     setIsOpen(true);
   };
 
@@ -155,8 +178,12 @@ export default function ContratosPage() {
     setAvulsoVencimento(new Date().toISOString().slice(0, 10));
     setAvulsoValor('0');
     setAvulsoDescricao('');
+    setSelectedTemplateId('');
+    setDocuments([]);
+    setLastPortalLink(null);
     setIsOpen(true);
     void loadBilling(row);
+    void loadDocsAndTemplates(row.id);
   };
 
   const close = () => {
@@ -169,6 +196,11 @@ export default function ContratosPage() {
     setAvulsoVencimento(new Date().toISOString().slice(0, 10));
     setAvulsoValor('0');
     setAvulsoDescricao('');
+    setTemplates([]);
+    setSelectedTemplateId('');
+    setDocuments([]);
+    setDocExpiresDays(30);
+    setLastPortalLink(null);
   };
 
   const canUseBilling = useMemo(() => {
@@ -208,6 +240,77 @@ export default function ContratosPage() {
       setSchedule([]);
     } finally {
       setBillingLoading(false);
+    }
+  };
+
+  const loadDocsAndTemplates = async (contratoId: string) => {
+    setTemplatesLoading(true);
+    setDocumentsLoading(true);
+    try {
+      const [tpl, docs] = await Promise.all([
+        listContratoTemplates({ activeOnly: true }),
+        listContratoDocumentos({ contratoId, limit: 20 }),
+      ]);
+      setTemplates(tpl);
+      if (tpl.length > 0) setSelectedTemplateId(tpl[0]!.id);
+      setDocuments(docs);
+    } catch (e: any) {
+      addToast(e?.message || 'Falha ao carregar documentos/templates do contrato.', 'error');
+      setTemplates([]);
+      setSelectedTemplateId('');
+      setDocuments([]);
+    } finally {
+      setTemplatesLoading(false);
+      setDocumentsLoading(false);
+    }
+  };
+
+  const generateDocumento = async () => {
+    if (!form.id) return;
+    if (!selectedTemplateId) {
+      addToast('Selecione um template de contrato.', 'error');
+      return;
+    }
+    const days = Number(docExpiresDays || 30);
+    if (!Number.isFinite(days) || days < 1 || days > 365) {
+      addToast('Validade do link inválida (1..365).', 'error');
+      return;
+    }
+    setDocActionLoading(true);
+    try {
+      const res = await createContratoDocumento({ contratoId: form.id, templateId: selectedTemplateId, expiresInDays: days });
+      const link = `${window.location.origin}${res.path}`;
+      setLastPortalLink(link);
+      addToast('Link do contrato gerado.', 'success');
+      await loadDocsAndTemplates(form.id);
+    } catch (e: any) {
+      addToast(e?.message || 'Falha ao gerar link do contrato.', 'error');
+    } finally {
+      setDocActionLoading(false);
+    }
+  };
+
+  const revokeDocumento = async (docId: string) => {
+    if (!form.id) return;
+    setDocActionLoading(true);
+    try {
+      await revokeContratoDocumento({ docId });
+      addToast('Link revogado.', 'success');
+      await loadDocsAndTemplates(form.id);
+    } catch (e: any) {
+      addToast(e?.message || 'Falha ao revogar link.', 'error');
+    } finally {
+      setDocActionLoading(false);
+    }
+  };
+
+  const copyLastLink = async () => {
+    if (!lastPortalLink) return;
+    try {
+      await navigator.clipboard.writeText(lastPortalLink);
+      addToast('Link copiado.', 'success');
+    } catch {
+      addToast('Não foi possível copiar automaticamente. Selecione e copie manualmente.', 'warn');
     }
   };
 
@@ -762,6 +865,158 @@ export default function ContratosPage() {
               </>
             )}
           </div>
+
+          <div className="rounded-xl border border-gray-200 bg-gray-50 p-4">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <div className="text-sm font-semibold text-gray-900">Documento + Aceite (Portal)</div>
+                <div className="text-xs text-gray-600">
+                  Gere um link público (token) para o cliente visualizar o contrato e registrar o aceite. O token só é exibido uma vez.
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => (form.id ? loadDocsAndTemplates(form.id) : null)}
+                disabled={!form.id || templatesLoading || documentsLoading || docActionLoading}
+                className="rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm hover:bg-gray-50 disabled:opacity-50"
+              >
+                Atualizar
+              </button>
+            </div>
+
+            {!form.id ? (
+              <div className="mt-3 text-sm text-gray-700">Salve o contrato para gerar o link de aceite.</div>
+            ) : templatesLoading || documentsLoading ? (
+              <div className="mt-4 flex items-center gap-2 text-sm text-gray-600">
+                <Loader2 className="h-4 w-4 animate-spin" /> Carregando…
+              </div>
+            ) : (
+              <>
+                <div className="mt-4 grid grid-cols-1 md:grid-cols-6 gap-3">
+                  <div className="md:col-span-4">
+                    <label className="text-xs text-gray-600">Template</label>
+                    <select
+                      value={selectedTemplateId}
+                      onChange={(e) => setSelectedTemplateId(e.target.value)}
+                      className="mt-1 w-full rounded-lg border border-gray-200 bg-white p-2 text-sm"
+                      disabled={docActionLoading}
+                    >
+                      {templates.length === 0 ? <option value="">Nenhum template encontrado.</option> : null}
+                      {templates.map((t) => (
+                        <option key={t.id} value={t.id}>
+                          {t.titulo}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="md:col-span-2">
+                    <label className="text-xs text-gray-600">Validade (dias)</label>
+                    <input
+                      type="number"
+                      min={1}
+                      max={365}
+                      value={String(docExpiresDays)}
+                      onChange={(e) => setDocExpiresDays(Number(e.target.value || 30))}
+                      className="mt-1 w-full rounded-lg border border-gray-200 bg-white p-2 text-sm"
+                      disabled={docActionLoading}
+                    />
+                  </div>
+                </div>
+
+                <div className="mt-3 flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={generateDocumento}
+                    disabled={!selectedTemplateId || docActionLoading}
+                    className="rounded-lg bg-white px-3 py-2 text-sm font-semibold text-gray-800 shadow-sm ring-1 ring-gray-200 hover:bg-gray-50 disabled:opacity-50"
+                  >
+                    Gerar link
+                  </button>
+                  {lastPortalLink ? (
+                    <>
+                      <input
+                        readOnly
+                        value={lastPortalLink}
+                        className="flex-1 rounded-lg border border-gray-200 bg-white p-2 text-xs"
+                        onFocus={(e) => e.currentTarget.select()}
+                      />
+                      <button
+                        type="button"
+                        onClick={copyLastLink}
+                        className="rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm hover:bg-gray-50"
+                      >
+                        Copiar
+                      </button>
+                    </>
+                  ) : null}
+                </div>
+
+                <div className="mt-4">
+                  <div className="text-xs font-semibold text-gray-700 mb-2">Histórico de links (últimos 20)</div>
+                  {documents.length === 0 ? (
+                    <div className="text-sm text-gray-600">Nenhum link gerado ainda.</div>
+                  ) : (
+                    <div className="overflow-auto rounded-lg border border-gray-200 bg-white">
+                      <table className="min-w-full text-xs">
+                        <thead className="bg-gray-50">
+                          <tr className="text-left text-gray-600">
+                            <th className="px-3 py-2">Criado em</th>
+                            <th className="px-3 py-2">Validade</th>
+                            <th className="px-3 py-2">Status</th>
+                            <th className="px-3 py-2">Aceite</th>
+                            <th className="px-3 py-2 text-right">Ações</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-gray-100">
+                          {documents.map((d) => {
+                            const status = d.revoked_at
+                              ? 'revogado'
+                              : d.accepted_at
+                                ? 'aceito'
+                                : d.expires_at && new Date(d.expires_at) < new Date()
+                                  ? 'expirado'
+                                  : 'ativo';
+                            return (
+                              <tr key={d.id}>
+                                <td className="px-3 py-2">{new Date(d.created_at).toLocaleString('pt-BR')}</td>
+                                <td className="px-3 py-2">
+                                  {d.expires_at ? new Date(d.expires_at).toLocaleDateString('pt-BR') : '—'}
+                                </td>
+                                <td className="px-3 py-2">{status}</td>
+                                <td className="px-3 py-2">
+                                  {d.accepted_at ? (
+                                    <>
+                                      {d.accepted_nome || '—'} • {d.accepted_email || '—'} •{' '}
+                                      {new Date(d.accepted_at).toLocaleString('pt-BR')}
+                                    </>
+                                  ) : (
+                                    '—'
+                                  )}
+                                </td>
+                                <td className="px-3 py-2">
+                                  <div className="flex justify-end">
+                                    <button
+                                      type="button"
+                                      onClick={() => revokeDocumento(d.id)}
+                                      disabled={docActionLoading || Boolean(d.revoked_at) || Boolean(d.accepted_at)}
+                                      className="rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs hover:bg-gray-50 disabled:opacity-50"
+                                    >
+                                      Revogar
+                                    </button>
+                                  </div>
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </div>
+              </>
+            )}
+          </div>
+
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <label className="text-sm text-gray-700">Início</label>
