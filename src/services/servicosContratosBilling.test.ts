@@ -48,16 +48,19 @@ describe('servicosContratosBilling service', () => {
   });
 
   it('generateReceivables chama RPC com params corretos', async () => {
-    rpcMock.mockResolvedValueOnce({ data: { created: 3 }, error: null });
+    rpcMock.mockResolvedValueOnce({ data: { created: 3, months_ahead: 12 }, error: null });
     const { generateReceivables } = await import('./servicosContratosBilling');
 
     const res = await generateReceivables({ contratoId: 'ctr-1', until: '2026-01-10' });
 
-    expect(rpcMock).toHaveBeenCalledWith('servicos_contratos_billing_generate_receivables', {
-      p_contrato_id: 'ctr-1',
-      p_until: '2026-01-10',
-    });
-    expect(res).toEqual({ created: 3, reason: undefined });
+    expect(rpcMock).toHaveBeenCalledWith(
+      'servicos_contratos_billing_generate_receivables',
+      expect.objectContaining({
+        p_contrato_id: 'ctr-1',
+        p_until: '2026-01-10',
+      }),
+    );
+    expect(res).toEqual({ created: 3, reason: undefined, monthsAhead: 12 });
   });
 
   it('getBillingRuleByContratoId retorna null quando data é null', async () => {
@@ -91,4 +94,3 @@ describe('servicosContratosBilling service', () => {
     expect(res).toEqual({ id: 'rule-1' });
   });
 });
-

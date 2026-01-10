@@ -55,6 +55,7 @@ export default function ContratosPage() {
   const [billingActionLoading, setBillingActionLoading] = useState(false);
   const [billingRule, setBillingRule] = useState<BillingRuleRow | null>(null);
   const [schedule, setSchedule] = useState<BillingScheduleRow[]>([]);
+  const [billingUntil, setBillingUntil] = useState(() => new Date().toISOString().slice(0, 10));
 
   const clientById = useMemo(() => {
     const m = new Map<string, PartnerListItem>();
@@ -96,6 +97,7 @@ export default function ContratosPage() {
     setForm(emptyForm);
     setBillingRule(null);
     setSchedule([]);
+    setBillingUntil(new Date().toISOString().slice(0, 10));
     setIsOpen(true);
   };
 
@@ -113,6 +115,7 @@ export default function ContratosPage() {
     });
     setBillingRule(null);
     setSchedule([]);
+    setBillingUntil(new Date().toISOString().slice(0, 10));
     setIsOpen(true);
     void loadBilling(row);
   };
@@ -122,6 +125,7 @@ export default function ContratosPage() {
     setForm(emptyForm);
     setBillingRule(null);
     setSchedule([]);
+    setBillingUntil(new Date().toISOString().slice(0, 10));
   };
 
   const canUseBilling = useMemo(() => {
@@ -226,8 +230,10 @@ export default function ContratosPage() {
     if (!form.id) return;
     setBillingActionLoading(true);
     try {
-      const res = await rpcGenerateReceivables({ contratoId: form.id, until: new Date().toISOString().slice(0, 10) });
-      addToast(`Títulos gerados: ${res.created}`, 'success');
+      const until = String(billingUntil || new Date().toISOString().slice(0, 10));
+      const res = await rpcGenerateReceivables({ contratoId: form.id, until });
+      const meta = res.monthsAhead ? ` (agenda ${res.monthsAhead}m)` : '';
+      addToast(`Títulos gerados: ${res.created}${meta}`, 'success');
       await loadBilling({ id: form.id, valor_mensal: Number(form.valor_mensal ?? 0), data_inicio: form.data_inicio || null });
     } catch (e: any) {
       addToast(e?.message || 'Falha ao gerar contas a receber.', 'error');
@@ -506,6 +512,18 @@ export default function ContratosPage() {
                   >
                     Gerar agenda (12 meses)
                   </button>
+                  <div className="flex items-end gap-2">
+                    <div>
+                      <div className="text-[11px] text-gray-600">Gerar títulos até</div>
+                      <input
+                        type="date"
+                        value={billingUntil}
+                        onChange={(e) => setBillingUntil(e.target.value)}
+                        className="mt-1 h-9 rounded-lg border border-gray-200 bg-white px-2 text-sm"
+                        disabled={billingActionLoading}
+                      />
+                    </div>
+                  </div>
                   <button
                     type="button"
                     onClick={generateReceivables}
@@ -513,7 +531,7 @@ export default function ContratosPage() {
                     className="rounded-lg bg-emerald-600 px-3 py-2 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-50"
                     title={!canUseBilling ? 'Requer contrato ativo com cliente selecionado.' : undefined}
                   >
-                    Gerar títulos (até hoje)
+                    Gerar títulos
                   </button>
                   <div className="text-xs text-gray-600 flex items-center">
                     {!form.cliente_id ? 'Dica: selecione um cliente para gerar títulos.' : null}

@@ -85,13 +85,23 @@ export async function generateSchedule(params: { contratoId: string; monthsAhead
   return { inserted: Number(data?.inserted ?? 0) };
 }
 
-export async function generateReceivables(params: { contratoId: string; until: string }): Promise<{ created: number; reason?: string }> {
-  const { contratoId, until } = params;
-  const { data, error } = await sb.rpc('servicos_contratos_billing_generate_receivables', {
+export async function generateReceivables(params: {
+  contratoId: string;
+  until: string;
+  monthsAhead?: number | null;
+}): Promise<{ created: number; reason?: string; monthsAhead?: number }> {
+  const { contratoId, until, monthsAhead } = params;
+  const args: any = {
     p_contrato_id: contratoId,
     p_until: until,
-  });
-  if (error) throw error;
-  return { created: Number(data?.created ?? 0), reason: data?.reason ?? undefined };
-}
+  };
+  if (monthsAhead != null) args.p_months_ahead = monthsAhead;
 
+  const { data, error } = await sb.rpc('servicos_contratos_billing_generate_receivables', args);
+  if (error) throw error;
+  return {
+    created: Number(data?.created ?? 0),
+    reason: data?.reason ?? undefined,
+    monthsAhead: data?.months_ahead != null ? Number(data.months_ahead) : undefined,
+  };
+}
