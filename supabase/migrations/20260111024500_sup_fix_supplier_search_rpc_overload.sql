@@ -5,16 +5,17 @@
 -- PostgREST can't pick the "best candidate" when defaults allow both.
 
 drop function if exists public.search_suppliers_for_current_user(text);
+drop function if exists public.search_suppliers_for_current_user(text, integer);
 
-create or replace function public.search_suppliers_for_current_user(
+create function public.search_suppliers_for_current_user(
   p_search text,
   p_limit integer default 20
 )
 returns table (
   id uuid,
-  label text,
   nome text,
-  doc_unico text
+  doc_unico text,
+  label text
 )
 language plpgsql
 security definer
@@ -27,9 +28,9 @@ begin
   return query
   select
     p.id,
-    p.nome as label,
     p.nome,
-    p.doc_unico
+    p.doc_unico,
+    (p.nome || coalesce(' (' || p.doc_unico || ')', '')) as label
   from public.pessoas p
   where p.empresa_id = v_emp
     and p.tipo in ('fornecedor'::public.pessoa_tipo, 'ambos'::public.pessoa_tipo)
@@ -48,4 +49,3 @@ revoke all on function public.search_suppliers_for_current_user(text, integer) f
 grant execute on function public.search_suppliers_for_current_user(text, integer) to authenticated, service_role;
 
 select pg_notify('pgrst', 'reload schema');
-
