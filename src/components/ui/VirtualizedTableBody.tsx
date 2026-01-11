@@ -51,6 +51,8 @@ export default function VirtualizedTableBody(props: {
       style={{
         position: 'relative',
         display: 'block',
+        width: '100%',
+        minWidth: '100%',
         height: props.rowCount * props.rowHeight,
       }}
     >
@@ -58,4 +60,3 @@ export default function VirtualizedTableBody(props: {
     </tbody>
   );
 }
-
