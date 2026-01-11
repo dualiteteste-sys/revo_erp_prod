@@ -4,6 +4,7 @@ export default function VirtualizedTableBody(props: {
   scrollParentRef: React.RefObject<HTMLElement>;
   rowCount: number;
   rowHeight: number;
+  colSpan: number;
   overscan?: number;
   renderRow: (index: number) => React.ReactNode;
   className?: string;
@@ -46,16 +47,21 @@ export default function VirtualizedTableBody(props: {
   }, [startIndex, endIndex, props]);
 
   return (
-    <tbody
-      className={props.className}
-      style={{
-        position: 'relative',
-        display: 'block',
-        height: props.rowCount * props.rowHeight,
-      }}
-    >
+    <tbody className={props.className}>
+      {startIndex > 0 ? (
+        <tr aria-hidden="true">
+          <td colSpan={props.colSpan} style={{ height: startIndex * props.rowHeight, padding: 0, border: 0 }} />
+        </tr>
+      ) : null}
       {items}
+      {endIndex < props.rowCount - 1 ? (
+        <tr aria-hidden="true">
+          <td
+            colSpan={props.colSpan}
+            style={{ height: (props.rowCount - endIndex - 1) * props.rowHeight, padding: 0, border: 0 }}
+          />
+        </tr>
+      ) : null}
     </tbody>
   );
 }
-

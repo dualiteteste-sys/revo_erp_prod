@@ -391,6 +391,7 @@ export default function EstoquePage() {
                 scrollParentRef={scrollRef}
                 rowCount={sortedProdutos.length}
                 rowHeight={72}
+                colSpan={4}
                 className="bg-white divide-y divide-gray-200"
                 renderRow={(index) => {
                   const prod = sortedProdutos[index];
@@ -398,17 +399,7 @@ export default function EstoquePage() {
                   return (
                     <tr
                       key={prod.produto_id}
-                      className={`transition-colors ${isHighlighted ? 'bg-amber-50/70 ring-1 ring-amber-200' : 'hover:bg-gray-50'}`}
-                      style={{
-                        position: 'absolute',
-                        top: index * 72,
-                        left: 0,
-                        right: 0,
-                        height: 72,
-                        display: 'table',
-                        width: '100%',
-                        tableLayout: 'fixed',
-                      }}
+                      className={`h-[72px] transition-colors ${isHighlighted ? 'bg-amber-50/70 ring-1 ring-amber-200' : 'hover:bg-gray-50'}`}
                     >
                       <td className="px-6 py-4">
                         <div className="font-medium text-gray-900 truncate" title={prod.nome}>{prod.nome}</div>

@@ -104,7 +104,7 @@ export async function receberCompra(id: string): Promise<void> {
 export type SupplierHit = { id: string; label: string; nome: string; doc_unico: string | null };
 
 export async function searchSuppliers(q: string): Promise<SupplierHit[]> {
-  return callRpc<SupplierHit[]>('search_suppliers_for_current_user', { p_search: q });
+  return callRpc<SupplierHit[]>('search_suppliers_for_current_user', { p_search: q, p_limit: 20 });
 }
 
 // Cache simples de capacidade (evita spam de 400/404 quando a DB está em versão antiga).
