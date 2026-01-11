@@ -247,23 +247,23 @@ const ContasPagarPage: React.FC = () => {
               <option value="cancelada">Cancelada</option>
             </Select>
 
-            <div className="flex items-center gap-2">
-                <DatePicker 
-                    label="" 
-                    value={filterStartDate} 
-                    onChange={setFilterStartDate} 
-                    className="w-[160px]"
-                />
-                <span className="text-gray-500">até</span>
-                <DatePicker 
-                    label="" 
-                    value={filterEndDate} 
-                    onChange={setFilterEndDate} 
-                    className="w-[160px]"
-                />
-                {(filterStartDate || filterEndDate) && (
-                    <button 
-                        onClick={clearDateFilters}
+	            <div className="flex items-center gap-3">
+	                <DatePicker 
+	                    label="" 
+	                    value={filterStartDate} 
+	                    onChange={setFilterStartDate} 
+	                    className="w-[200px]"
+	                />
+	                <span className="text-gray-500 whitespace-nowrap px-1">até</span>
+	                <DatePicker 
+	                    label="" 
+	                    value={filterEndDate} 
+	                    onChange={setFilterEndDate} 
+	                    className="w-[200px]"
+	                />
+	                {(filterStartDate || filterEndDate) && (
+	                    <button 
+	                        onClick={clearDateFilters}
                         className="p-2 text-gray-500 hover:text-red-500 hover:bg-red-50 rounded-full transition-colors"
                         title="Limpar datas"
                     >
