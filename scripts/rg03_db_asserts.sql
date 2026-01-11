@@ -342,6 +342,33 @@ begin
     RAISE EXCEPTION 'SEC-02/RG-03: existem RPCs SECURITY DEFINER usadas pelo app sem guard de permissão.';
   END IF;
 
+  -- 9.1) SVC-CT-01: evita bug de assignment de composite via SELECT INTO (causa 400 e console sujo)
+  -- Em PL/pgSQL, `SELECT func() INTO v_composite;` com select-list de 1 coluna
+  -- tenta atribuir ao *primeiro campo* do composite, gerando cast inválido para uuid.
+  IF to_regprocedure('public.servicos_contratos_billing_generate_schedule(uuid, integer)') IS NOT NULL THEN
+    IF pg_get_functiondef('public.servicos_contratos_billing_generate_schedule(uuid, integer)'::regprocedure) ILIKE '%select%servicos_contratos_billing_ensure_rule%into v_rule%' THEN
+      RAISE EXCEPTION 'RG-03/SVC-CT-01: public.servicos_contratos_billing_generate_schedule ainda usa SELECT ... INTO v_rule (use :=).';
+    END IF;
+  END IF;
+
+  IF to_regprocedure('public.servicos_contratos_billing_generate_receivables(uuid, date, integer)') IS NOT NULL THEN
+    IF pg_get_functiondef('public.servicos_contratos_billing_generate_receivables(uuid, date, integer)'::regprocedure) ILIKE '%select%servicos_contratos_billing_ensure_rule%into v_rule%' THEN
+      RAISE EXCEPTION 'RG-03/SVC-CT-01: public.servicos_contratos_billing_generate_receivables ainda usa SELECT ... INTO v_rule (use :=).';
+    END IF;
+  END IF;
+
+  IF to_regprocedure('public.servicos_contratos_billing_add_avulso(uuid, date, numeric, text)') IS NOT NULL THEN
+    IF pg_get_functiondef('public.servicos_contratos_billing_add_avulso(uuid, date, numeric, text)'::regprocedure) ILIKE '%select%servicos_contratos_billing_ensure_rule%into v_rule%' THEN
+      RAISE EXCEPTION 'RG-03/SVC-CT-01: public.servicos_contratos_billing_add_avulso ainda usa SELECT ... INTO v_rule (use :=).';
+    END IF;
+  END IF;
+
+  IF to_regprocedure('public.servicos_contratos_billing_recalc_mensal_future(uuid, date)') IS NOT NULL THEN
+    IF pg_get_functiondef('public.servicos_contratos_billing_recalc_mensal_future(uuid, date)'::regprocedure) ILIKE '%select%servicos_contratos_billing_ensure_rule%into v_rule%' THEN
+      RAISE EXCEPTION 'RG-03/SVC-CT-01: public.servicos_contratos_billing_recalc_mensal_future ainda usa SELECT ... INTO v_rule (use :=).';
+    END IF;
+  END IF;
+
   -- 10) SEC-MT-04: isolamento multi-tenant (A não pode ver B)
   IF to_regclass('public.empresas') IS NOT NULL
      AND to_regclass('public.empresa_usuarios') IS NOT NULL
