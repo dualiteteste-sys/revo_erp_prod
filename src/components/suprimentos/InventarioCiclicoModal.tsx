@@ -13,6 +13,10 @@ import {
   listInventariosCiclicos,
   setInventarioCiclicoCount,
 } from '@/services/inventarioCiclico';
+import ResizableSortableTh, { type SortState } from '@/components/ui/table/ResizableSortableTh';
+import TableColGroup from '@/components/ui/table/TableColGroup';
+import { useTableColumnWidths, type TableColumnWidthDef } from '@/components/ui/table/useTableColumnWidths';
+import { sortRows, toggleSort } from '@/components/ui/table/sortUtils';
 
 type Props = {
   isOpen: boolean;
@@ -55,6 +59,63 @@ export default function InventarioCiclicoModal({
   const [draftCounts, setDraftCounts] = useState<Record<string, string>>({});
   const [busyProdutoId, setBusyProdutoId] = useState<string | null>(null);
   const [approving, setApproving] = useState(false);
+  const [inventariosSort, setInventariosSort] = useState<SortState<string>>({ column: 'criado', direction: 'desc' });
+  const [itensSort, setItensSort] = useState<SortState<string>>({ column: 'produto', direction: 'asc' });
+
+  const inventariosColumns: TableColumnWidthDef[] = [
+    { id: 'nome', defaultWidth: 320, minWidth: 220 },
+    { id: 'status', defaultWidth: 160, minWidth: 140 },
+    { id: 'itens', defaultWidth: 100, minWidth: 90 },
+    { id: 'contados', defaultWidth: 120, minWidth: 100 },
+    { id: 'divergencias', defaultWidth: 140, minWidth: 120 },
+    { id: 'criado', defaultWidth: 140, minWidth: 120 },
+  ];
+  const { widths: inventariosWidths, startResize: startInventariosResize } = useTableColumnWidths({
+    tableId: 'suprimentos:inventario-ciclico:inventarios',
+    columns: inventariosColumns,
+  });
+  const sortedInventarios = useMemo(() => {
+    return sortRows(
+      list,
+      inventariosSort as any,
+      [
+        { id: 'nome', type: 'string', getValue: (r) => r.nome ?? '' },
+        { id: 'status', type: 'string', getValue: (r) => r.status ?? '' },
+        { id: 'itens', type: 'number', getValue: (r) => r.itens_total ?? 0 },
+        { id: 'contados', type: 'number', getValue: (r) => r.itens_contados ?? 0 },
+        { id: 'divergencias', type: 'number', getValue: (r) => r.divergencias ?? 0 },
+        { id: 'criado', type: 'date', getValue: (r) => r.created_at },
+      ] as const
+    );
+  }, [list, inventariosSort]);
+
+  const itensColumns: TableColumnWidthDef[] = [
+    { id: 'produto', defaultWidth: 360, minWidth: 220 },
+    { id: 'sku', defaultWidth: 160, minWidth: 120 },
+    { id: 'saldo', defaultWidth: 120, minWidth: 100 },
+    { id: 'contagem', defaultWidth: 160, minWidth: 140 },
+    { id: 'divergencia', defaultWidth: 140, minWidth: 120 },
+    { id: 'status', defaultWidth: 160, minWidth: 140 },
+  ];
+  const { widths: itensWidths, startResize: startItensResize } = useTableColumnWidths({
+    tableId: 'suprimentos:inventario-ciclico:itens',
+    columns: itensColumns,
+  });
+  const sortedItens = useMemo(() => {
+    const items = detail?.items ?? [];
+    return sortRows(
+      items,
+      itensSort as any,
+      [
+        { id: 'produto', type: 'string', getValue: (r) => r.produto_nome ?? '' },
+        { id: 'sku', type: 'string', getValue: (r) => r.sku ?? '' },
+        { id: 'saldo', type: 'number', getValue: (r) => Number(r.saldo_sistema ?? 0) },
+        { id: 'contagem', type: 'number', getValue: (r) => (r.quantidade_contada == null ? Number.NEGATIVE_INFINITY : Number(r.quantidade_contada)) },
+        { id: 'divergencia', type: 'number', getValue: (r) => Number(r.divergencia ?? 0) },
+        { id: 'status', type: 'string', getValue: (r) => r.status ?? '' },
+      ] as const
+    );
+  }, [detail, itensSort]);
 
   const produtoIdsCountLabel = useMemo(() => produtoIdsParaNovoInventario.length, [produtoIdsParaNovoInventario.length]);
 
@@ -307,15 +368,62 @@ export default function InventarioCiclicoModal({
                 {loadingList ? <Loader2 className="animate-spin text-blue-500" size={18} /> : null}
               </div>
               <div className="overflow-x-auto">
-                <table className="min-w-full text-sm">
+                <table className="min-w-full text-sm table-fixed">
+                  <TableColGroup columns={inventariosColumns} widths={inventariosWidths} />
                   <thead className="bg-gray-50 text-gray-600">
                     <tr>
-                      <th className="p-3 text-left">Nome</th>
-                      <th className="p-3 text-left">Status</th>
-                      <th className="p-3 text-right">Itens</th>
-                      <th className="p-3 text-right">Contados</th>
-                      <th className="p-3 text-right">Divergências</th>
-                      <th className="p-3 text-right">Criado</th>
+                      <ResizableSortableTh
+                        columnId="nome"
+                        label="Nome"
+                        className="p-3 text-left"
+                        sort={inventariosSort as any}
+                        onSort={(col) => setInventariosSort((prev) => toggleSort(prev as any, col))}
+                        onResizeStart={startInventariosResize}
+                      />
+                      <ResizableSortableTh
+                        columnId="status"
+                        label="Status"
+                        className="p-3 text-left"
+                        sort={inventariosSort as any}
+                        onSort={(col) => setInventariosSort((prev) => toggleSort(prev as any, col))}
+                        onResizeStart={startInventariosResize}
+                      />
+                      <ResizableSortableTh
+                        columnId="itens"
+                        label="Itens"
+                        align="right"
+                        className="p-3"
+                        sort={inventariosSort as any}
+                        onSort={(col) => setInventariosSort((prev) => toggleSort(prev as any, col))}
+                        onResizeStart={startInventariosResize}
+                      />
+                      <ResizableSortableTh
+                        columnId="contados"
+                        label="Contados"
+                        align="right"
+                        className="p-3"
+                        sort={inventariosSort as any}
+                        onSort={(col) => setInventariosSort((prev) => toggleSort(prev as any, col))}
+                        onResizeStart={startInventariosResize}
+                      />
+                      <ResizableSortableTh
+                        columnId="divergencias"
+                        label="Divergências"
+                        align="right"
+                        className="p-3"
+                        sort={inventariosSort as any}
+                        onSort={(col) => setInventariosSort((prev) => toggleSort(prev as any, col))}
+                        onResizeStart={startInventariosResize}
+                      />
+                      <ResizableSortableTh
+                        columnId="criado"
+                        label="Criado"
+                        align="right"
+                        className="p-3"
+                        sort={inventariosSort as any}
+                        onSort={(col) => setInventariosSort((prev) => toggleSort(prev as any, col))}
+                        onResizeStart={startInventariosResize}
+                      />
                     </tr>
                   </thead>
                   <tbody className="divide-y">
@@ -326,7 +434,7 @@ export default function InventarioCiclicoModal({
                         </td>
                       </tr>
                     ) : (
-                      list.map((row) => (
+                      sortedInventarios.map((row) => (
                         <tr
                           key={row.id}
                           className={`cursor-pointer hover:bg-gray-50 ${selectedId === row.id ? 'bg-blue-50/40' : ''}`}
@@ -419,19 +527,65 @@ export default function InventarioCiclicoModal({
                     </div>
                   </div>
                   <div className="overflow-x-auto">
-                    <table className="min-w-full text-sm">
+                    <table className="min-w-full text-sm table-fixed">
+                      <TableColGroup columns={itensColumns} widths={itensWidths} />
                       <thead className="bg-gray-50 text-gray-600">
                         <tr>
-                          <th className="p-3 text-left">Produto</th>
-                          <th className="p-3 text-left">SKU</th>
-                          <th className="p-3 text-right">Saldo</th>
-                          <th className="p-3 text-right">Contagem</th>
-                          <th className="p-3 text-right">Divergência</th>
-                          <th className="p-3 text-left">Status</th>
+                          <ResizableSortableTh
+                            columnId="produto"
+                            label="Produto"
+                            className="p-3 text-left"
+                            sort={itensSort as any}
+                            onSort={(col) => setItensSort((prev) => toggleSort(prev as any, col))}
+                            onResizeStart={startItensResize}
+                          />
+                          <ResizableSortableTh
+                            columnId="sku"
+                            label="SKU"
+                            className="p-3 text-left"
+                            sort={itensSort as any}
+                            onSort={(col) => setItensSort((prev) => toggleSort(prev as any, col))}
+                            onResizeStart={startItensResize}
+                          />
+                          <ResizableSortableTh
+                            columnId="saldo"
+                            label="Saldo"
+                            align="right"
+                            className="p-3"
+                            sort={itensSort as any}
+                            onSort={(col) => setItensSort((prev) => toggleSort(prev as any, col))}
+                            onResizeStart={startItensResize}
+                          />
+                          <ResizableSortableTh
+                            columnId="contagem"
+                            label="Contagem"
+                            align="right"
+                            className="p-3"
+                            sort={itensSort as any}
+                            onSort={(col) => setItensSort((prev) => toggleSort(prev as any, col))}
+                            onResizeStart={startItensResize}
+                          />
+                          <ResizableSortableTh
+                            columnId="divergencia"
+                            label="Divergência"
+                            align="right"
+                            className="p-3"
+                            sort={itensSort as any}
+                            onSort={(col) => setItensSort((prev) => toggleSort(prev as any, col))}
+                            onResizeStart={startItensResize}
+                          />
+                          <ResizableSortableTh
+                            columnId="status"
+                            label="Status"
+                            className="p-3 text-left"
+                            sort={itensSort as any}
+                            onSort={(col) => setItensSort((prev) => toggleSort(prev as any, col))}
+                            onResizeStart={startItensResize}
+                          />
                         </tr>
                       </thead>
                       <tbody className="divide-y">
-                        {detail.items.map((it) => {
+                        {sortedItens.map((it) => {
                           const inputValue = draftCounts[it.produto_id] ?? '';
                           const busy = busyProdutoId === it.produto_id;
                           const diver = Number(it.divergencia ?? 0);
@@ -484,4 +638,3 @@ export default function InventarioCiclicoModal({
     </Modal>
   );
 }
-

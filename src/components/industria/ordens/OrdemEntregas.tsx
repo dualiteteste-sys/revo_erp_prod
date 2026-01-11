@@ -6,6 +6,9 @@ import { motion, AnimatePresence } from 'framer-motion';
 import Input from '@/components/ui/forms/Input';
 import Select from '@/components/ui/forms/Select';
 import { formatOrderNumber } from '@/lib/utils';
+import ResizableSortableTh from '@/components/ui/table/ResizableSortableTh';
+import TableColGroup from '@/components/ui/table/TableColGroup';
+import { useTableColumnWidths, type TableColumnWidthDef } from '@/components/ui/table/useTableColumnWidths';
 
 interface OrdemEntregasProps {
   entregas: OrdemEntrega[];
@@ -42,6 +45,18 @@ const OrdemEntregas: React.FC<OrdemEntregasProps> = ({
 
   const saldoRestante = Math.max(0, maxQuantity - totalEntregue);
   const tableRef = useRef<HTMLDivElement | null>(null);
+  const columns: TableColumnWidthDef[] = [
+    { id: 'data', defaultWidth: 160, minWidth: 140 },
+    { id: 'qtd', defaultWidth: 140, minWidth: 120 },
+    ...(showBillingStatus ? [{ id: 'status', defaultWidth: 170, minWidth: 150 }] : []),
+    { id: 'doc', defaultWidth: 200, minWidth: 160 },
+    { id: 'obs', defaultWidth: 360, minWidth: 220 },
+    ...(!readOnly ? [{ id: 'acoes', defaultWidth: 80, minWidth: 70, resizable: false }] : []),
+  ];
+  const { widths, startResize } = useTableColumnWidths({
+    tableId: `industria:ordem:entregas:${showBillingStatus ? 'billing' : 'simple'}:${readOnly ? 'ro' : 'rw'}`,
+    columns,
+  });
 
   useEffect(() => {
     if (!highlightEntregaId) return;
@@ -199,15 +214,18 @@ const OrdemEntregas: React.FC<OrdemEntregasProps> = ({
 
             {/* Tabela de Entregas */}
             <div ref={tableRef} className="border border-gray-200 rounded-xl overflow-hidden bg-white shadow-sm">
-                <table className="min-w-full divide-y divide-gray-200">
+                <table className="min-w-full divide-y divide-gray-200 table-fixed">
+                    <TableColGroup columns={columns} widths={widths} />
                     <thead className="bg-gray-50">
                         <tr>
-                            <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Data</th>
-                            <th scope="col" className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Quantidade</th>
-                            {showBillingStatus && <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status Fat.</th>}
-                            <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Documento</th>
-                            <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Obs.</th>
-                            {!readOnly && <th scope="col" className="px-4 py-3 text-right w-16"></th>}
+                            <ResizableSortableTh columnId="data" label="Data" sortable={false} onResizeStart={startResize} className="px-4 py-3" />
+                            <ResizableSortableTh columnId="qtd" label="Quantidade" sortable={false} onResizeStart={startResize} align="right" className="px-4 py-3" />
+                            {showBillingStatus && (
+                              <ResizableSortableTh columnId="status" label="Status Fat." sortable={false} onResizeStart={startResize} className="px-4 py-3" />
+                            )}
+                            <ResizableSortableTh columnId="doc" label="Documento" sortable={false} onResizeStart={startResize} className="px-4 py-3" />
+                            <ResizableSortableTh columnId="obs" label="Obs." sortable={false} onResizeStart={startResize} className="px-4 py-3" />
+                            {!readOnly && <ResizableSortableTh columnId="acoes" label="" sortable={false} onResizeStart={startResize} className="px-4 py-3" />}
                         </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-200 bg-white">

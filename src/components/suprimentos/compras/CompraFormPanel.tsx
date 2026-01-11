@@ -15,6 +15,9 @@ import Modal from '@/components/ui/Modal';
 import { getRelatorioBaixoEstoque, type RelatorioBaixoEstoqueItem } from '@/services/suprimentos';
 import { listMrpDemandas, type MrpDemanda } from '@/services/industriaProducao';
 import { createContaPagarFromCompra, getContaPagarFromCompra } from '@/services/financeiro';
+import ResizableSortableTh from '@/components/ui/table/ResizableSortableTh';
+import TableColGroup from '@/components/ui/table/TableColGroup';
+import { useTableColumnWidths, type TableColumnWidthDef } from '@/components/ui/table/useTableColumnWidths';
 
 interface Props {
   compraId: string | null;
@@ -39,6 +42,32 @@ export default function CompraFormPanel({ compraId, onSaveSuccess, onClose }: Pr
 
   const freteProps = useNumericField(formData.frete, (v) => handleHeaderChange('frete', v));
   const descontoProps = useNumericField(formData.desconto, (v) => handleHeaderChange('desconto', v));
+
+  const itensTableColumns = useMemo<TableColumnWidthDef[]>(() => {
+    const cols: TableColumnWidthDef[] = [
+      { id: 'produto', defaultWidth: 420, minWidth: 260 },
+      { id: 'qtd', defaultWidth: 120, minWidth: 90 },
+      { id: 'preco_unit', defaultWidth: 160, minWidth: 120 },
+      { id: 'total', defaultWidth: 160, minWidth: 120 },
+    ];
+    if (!isLocked) cols.push({ id: 'acoes', defaultWidth: 56, minWidth: 44 });
+    return cols;
+  }, [isLocked]);
+  const { widths: itensTableWidths, startResize: startItensResize } = useTableColumnWidths({
+    tableId: 'suprimentos:compras:itens',
+    columns: itensTableColumns,
+  });
+
+  const sugestoesTableColumns: TableColumnWidthDef[] = [
+    { id: 'sel', defaultWidth: 56, minWidth: 44 },
+    { id: 'item', defaultWidth: 520, minWidth: 260 },
+    { id: 'qtd', defaultWidth: 160, minWidth: 120 },
+    { id: 'preco', defaultWidth: 180, minWidth: 140 },
+  ];
+  const { widths: sugestoesTableWidths, startResize: startSugestoesResize } = useTableColumnWidths({
+    tableId: 'suprimentos:compras:sugestoes',
+    columns: sugestoesTableColumns,
+  });
 
   useEffect(() => {
     if (compraId) {
@@ -379,14 +408,55 @@ export default function CompraFormPanel({ compraId, onSaveSuccess, onClose }: Pr
           )}
           
           <div className="sm:col-span-6 overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200">
+            <table className="min-w-full divide-y divide-gray-200 table-fixed">
+              <TableColGroup columns={itensTableColumns} widths={itensTableWidths} />
               <thead className="bg-gray-50">
                 <tr>
-                  <th className="px-3 py-2 text-left text-xs font-medium text-gray-500">Produto</th>
-                  <th className="px-3 py-2 text-right text-xs font-medium text-gray-500 w-24">Qtd</th>
-                  <th className="px-3 py-2 text-right text-xs font-medium text-gray-500 w-32">Preço Unit.</th>
-                  <th className="px-3 py-2 text-right text-xs font-medium text-gray-500 w-32">Total</th>
-                  {!isLocked && <th className="px-3 py-2 w-10"></th>}
+                  <ResizableSortableTh
+                    columnId="produto"
+                    label="Produto"
+                    className="px-3 py-2 text-xs font-medium text-gray-500"
+                    sortable={false}
+                    resizable
+                    onResizeStart={startItensResize}
+                  />
+                  <ResizableSortableTh
+                    columnId="qtd"
+                    label="Qtd"
+                    align="right"
+                    className="px-3 py-2 text-xs font-medium text-gray-500"
+                    sortable={false}
+                    resizable
+                    onResizeStart={startItensResize}
+                  />
+                  <ResizableSortableTh
+                    columnId="preco_unit"
+                    label="Preço Unit."
+                    align="right"
+                    className="px-3 py-2 text-xs font-medium text-gray-500"
+                    sortable={false}
+                    resizable
+                    onResizeStart={startItensResize}
+                  />
+                  <ResizableSortableTh
+                    columnId="total"
+                    label="Total"
+                    align="right"
+                    className="px-3 py-2 text-xs font-medium text-gray-500"
+                    sortable={false}
+                    resizable
+                    onResizeStart={startItensResize}
+                  />
+                  {!isLocked ? (
+                    <ResizableSortableTh
+                      columnId="acoes"
+                      label=""
+                      className="px-3 py-2"
+                      sortable={false}
+                      resizable
+                      onResizeStart={startItensResize}
+                    />
+                  ) : null}
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200">
@@ -579,13 +649,44 @@ export default function CompraFormPanel({ compraId, onSaveSuccess, onClose }: Pr
                 <Loader2 className="animate-spin text-blue-600 w-10 h-10" />
               </div>
             ) : (
-              <table className="min-w-full divide-y divide-gray-200 text-sm">
+              <table className="min-w-full divide-y divide-gray-200 text-sm table-fixed">
+                <TableColGroup columns={sugestoesTableColumns} widths={sugestoesTableWidths} />
                 <thead className="bg-gray-50 sticky top-0">
                   <tr>
-                    <th className="px-4 py-3 text-left font-medium text-gray-500 w-10"></th>
-                    <th className="px-4 py-3 text-left font-medium text-gray-500">Item</th>
-                    <th className="px-4 py-3 text-right font-medium text-gray-500 w-32">Qtd.</th>
-                    <th className="px-4 py-3 text-right font-medium text-gray-500 w-36">Preço (R$)</th>
+                    <ResizableSortableTh
+                      columnId="sel"
+                      label=""
+                      className="px-4 py-3 font-medium text-gray-500"
+                      sortable={false}
+                      resizable
+                      onResizeStart={startSugestoesResize}
+                    />
+                    <ResizableSortableTh
+                      columnId="item"
+                      label="Item"
+                      className="px-4 py-3 text-left font-medium text-gray-500"
+                      sortable={false}
+                      resizable
+                      onResizeStart={startSugestoesResize}
+                    />
+                    <ResizableSortableTh
+                      columnId="qtd"
+                      label="Qtd."
+                      align="right"
+                      className="px-4 py-3 font-medium text-gray-500"
+                      sortable={false}
+                      resizable
+                      onResizeStart={startSugestoesResize}
+                    />
+                    <ResizableSortableTh
+                      columnId="preco"
+                      label="Preço (R$)"
+                      align="right"
+                      className="px-4 py-3 font-medium text-gray-500"
+                      sortable={false}
+                      resizable
+                      onResizeStart={startSugestoesResize}
+                    />
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-200">

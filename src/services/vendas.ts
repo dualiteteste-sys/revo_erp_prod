@@ -46,6 +46,27 @@ export type VendaDetails = VendaPedido & {
 
 export type VendaPayload = Partial<Omit<VendaPedido, 'numero' | 'total_produtos' | 'total_geral' | 'cliente_nome'>>;
 
+function normalizeVendaDetails(raw: any): VendaDetails | null {
+  if (!raw) return null;
+
+  // Older DBs returned { pedido, itens }.
+  if (raw?.pedido && typeof raw.pedido === 'object') {
+    const pedido = raw.pedido;
+    const itens = Array.isArray(raw.itens) ? raw.itens : Array.isArray(pedido.itens) ? pedido.itens : [];
+    return { ...(pedido as any), itens } as VendaDetails;
+  }
+
+  // Newer DBs return a flat header object with itens.
+  const itens = Array.isArray(raw.itens) ? raw.itens : [];
+  return { ...(raw as any), itens } as VendaDetails;
+}
+
+// For UI flows that can tolerate "not found" without crashing.
+export async function fetchVendaDetails(id: string): Promise<VendaDetails | null> {
+  const raw = await callRpc<any>('vendas_get_pedido_details', { p_id: id });
+  return normalizeVendaDetails(raw);
+}
+
 /**
  * Lista pedidos de venda.
  */
@@ -64,11 +85,16 @@ export async function listVendas(params: {
 }
 
 export async function getVendaDetails(id: string): Promise<VendaDetails> {
-  return callRpc<VendaDetails>('vendas_get_pedido_details', { p_id: id });
+  const data = await fetchVendaDetails(id);
+  if (!data) throw new Error('Pedido não encontrado.');
+  return data;
 }
 
 export async function saveVenda(payload: VendaPayload): Promise<VendaDetails> {
-  return callRpc<VendaDetails>('vendas_upsert_pedido', { p_payload: payload });
+  const raw = await callRpc<any>('vendas_upsert_pedido', { p_payload: payload });
+  const normalized = normalizeVendaDetails(raw);
+  if (!normalized) throw new Error('Não foi possível salvar o pedido (resposta vazia).');
+  return normalized;
 }
 
 export async function manageVendaItem(

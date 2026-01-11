@@ -1,9 +1,12 @@
 // src/components/services/ServicesTable.tsx
 import React from 'react';
-import { Edit, Trash2, Copy, ArrowUpDown } from 'lucide-react';
+import { Edit, Trash2, Copy } from 'lucide-react';
 import { Service } from '@/services/services';
 import { Button } from '@/components/ui/button';
 import { formatCurrency } from '@/lib/utils';
+import ResizableSortableTh, { type SortState } from '@/components/ui/table/ResizableSortableTh';
+import TableColGroup from '@/components/ui/table/TableColGroup';
+import { useTableColumnWidths, type TableColumnWidthDef } from '@/components/ui/table/useTableColumnWidths';
 
 type Props = {
   services: Service[];
@@ -19,27 +22,6 @@ type Props = {
   onToggleSelectAll?: () => void;
 };
 
-const SortableHeader: React.FC<{
-  column: keyof Service;
-  label: string;
-  sortBy: { column: keyof Service; ascending: boolean };
-  onSort: (column: keyof Service) => void;
-}> = ({ column, label, sortBy, onSort }) => {
-  const isSorted = sortBy.column === column;
-  return (
-    <th
-      scope="col"
-      className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
-      onClick={() => onSort(column)}
-    >
-      <div className="flex items-center gap-2">
-        {label}
-        {isSorted && <ArrowUpDown size={14} className={sortBy.ascending ? '' : 'rotate-180'} />}
-      </div>
-    </th>
-  );
-};
-
 export default function ServicesTable({
   services,
   onEdit,
@@ -53,9 +35,22 @@ export default function ServicesTable({
   onToggleSelect,
   onToggleSelectAll,
 }: Props) {
+  const columns: TableColumnWidthDef[] = [
+    ...(onToggleSelect ? [{ id: 'select', defaultWidth: 56, minWidth: 56, maxWidth: 56, resizable: false }] : []),
+    { id: 'descricao', defaultWidth: 360, minWidth: 220 },
+    { id: 'codigo', defaultWidth: 160, minWidth: 120 },
+    { id: 'preco_venda', defaultWidth: 160, minWidth: 140 },
+    { id: 'unidade', defaultWidth: 130, minWidth: 110 },
+    { id: 'status', defaultWidth: 140, minWidth: 120 },
+    { id: 'acoes', defaultWidth: 180, minWidth: 140 },
+  ];
+  const { widths, startResize } = useTableColumnWidths({ tableId: 'services:list', columns });
+  const sort: SortState<string> = sortBy ? { column: sortBy.column, direction: sortBy.ascending ? 'asc' : 'desc' } : null;
+
   return (
     <div className="overflow-x-auto">
-      <table className="min-w-full divide-y divide-gray-200">
+      <table className="min-w-[980px] w-full divide-y divide-gray-200 table-fixed">
+        <TableColGroup columns={columns} widths={widths} />
         <thead className="bg-gray-50">
           <tr>
             {onToggleSelect ? (
@@ -72,12 +67,19 @@ export default function ServicesTable({
                 />
               </th>
             ) : null}
-            <SortableHeader column="descricao" label="Descrição" sortBy={sortBy} onSort={onSort} />
-            <SortableHeader column="codigo" label="Código" sortBy={sortBy} onSort={onSort} />
-            <SortableHeader column="preco_venda" label="Preço" sortBy={sortBy} onSort={onSort} />
-            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Unidade</th>
-            <SortableHeader column="status" label="Status" sortBy={sortBy} onSort={onSort} />
-            <th className="px-6 py-3" />
+            <ResizableSortableTh columnId="descricao" label="Descrição" sort={sort} onSort={onSort as any} onResizeStart={startResize} />
+            <ResizableSortableTh columnId="codigo" label="Código" sort={sort} onSort={onSort as any} onResizeStart={startResize} />
+            <ResizableSortableTh columnId="preco_venda" label="Preço" sort={sort} onSort={onSort as any} onResizeStart={startResize} />
+            <ResizableSortableTh columnId="unidade" label="Unidade" sort={sort} onSort={onSort as any} onResizeStart={startResize} />
+            <ResizableSortableTh columnId="status" label="Status" sort={sort} onSort={onSort as any} onResizeStart={startResize} />
+            <ResizableSortableTh
+              columnId="acoes"
+              label={<span className="sr-only">Ações</span>}
+              sortable={false}
+              onResizeStart={startResize}
+              align="right"
+              className="px-6"
+            />
           </tr>
         </thead>
         <tbody className="bg-white divide-y divide-gray-200">

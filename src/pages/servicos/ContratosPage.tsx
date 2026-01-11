@@ -5,6 +5,10 @@ import { useToast } from '@/contexts/ToastProvider';
 import ClientAutocomplete from '@/components/common/ClientAutocomplete';
 import ServiceAutocomplete from '@/components/common/ServiceAutocomplete';
 import UnidadeMedidaSelect from '@/components/common/UnidadeMedidaSelect';
+import ResizableSortableTh, { type SortState } from '@/components/ui/table/ResizableSortableTh';
+import TableColGroup from '@/components/ui/table/TableColGroup';
+import { useTableColumnWidths, type TableColumnWidthDef } from '@/components/ui/table/useTableColumnWidths';
+import { sortRows, toggleSort } from '@/components/ui/table/sortUtils';
 import { getPartners, type PartnerListItem } from '@/services/partners';
 import { listAllCentrosDeCusto, type CentroDeCustoListItem } from '@/services/centrosDeCusto';
 import { deleteContrato, listContratos, upsertContrato, type ServicoContrato, type ServicoContratoStatus } from '@/services/servicosMvp';
@@ -165,12 +169,117 @@ export default function ContratosPage() {
     corpo: '',
     active: true,
   });
+  const [listSort, setListSort] = useState<SortState<string>>({ column: 'cliente', direction: 'asc' });
+  const [scheduleSort, setScheduleSort] = useState<SortState<string>>({ column: 'vencimento', direction: 'asc' });
+  const [itensSort, setItensSort] = useState<SortState<string>>({ column: 'titulo', direction: 'asc' });
+  const [docsSort, setDocsSort] = useState<SortState<string>>({ column: 'criado_em', direction: 'desc' });
+
+  const listColumns: TableColumnWidthDef[] = [
+    { id: 'cliente', defaultWidth: 240, minWidth: 200 },
+    { id: 'descricao', defaultWidth: 420, minWidth: 240 },
+    { id: 'valor_mensal', defaultWidth: 150, minWidth: 130 },
+    { id: 'status', defaultWidth: 140, minWidth: 120 },
+    { id: 'acoes', defaultWidth: 220, minWidth: 200 },
+  ];
+  const scheduleColumns: TableColumnWidthDef[] = [
+    { id: 'tipo', defaultWidth: 120, minWidth: 100 },
+    { id: 'competencia', defaultWidth: 140, minWidth: 120 },
+    { id: 'vencimento', defaultWidth: 140, minWidth: 120 },
+    { id: 'descricao', defaultWidth: 320, minWidth: 200 },
+    { id: 'valor', defaultWidth: 140, minWidth: 120 },
+    { id: 'status', defaultWidth: 120, minWidth: 100 },
+  ];
+  const itensColumns: TableColumnWidthDef[] = [
+    { id: 'titulo', defaultWidth: 320, minWidth: 200 },
+    { id: 'qtd', defaultWidth: 90, minWidth: 80 },
+    { id: 'unid', defaultWidth: 90, minWidth: 80 },
+    { id: 'valor_unit', defaultWidth: 140, minWidth: 120 },
+    { id: 'recorrente', defaultWidth: 120, minWidth: 100 },
+    { id: 'acoes', defaultWidth: 200, minWidth: 180 },
+  ];
+  const docsColumns: TableColumnWidthDef[] = [
+    { id: 'criado_em', defaultWidth: 220, minWidth: 180 },
+    { id: 'validade', defaultWidth: 140, minWidth: 120 },
+    { id: 'status', defaultWidth: 120, minWidth: 100 },
+    { id: 'aceite', defaultWidth: 420, minWidth: 220 },
+    { id: 'acoes', defaultWidth: 160, minWidth: 140 },
+  ];
+
+  const { widths: listWidths, startResize: startResizeList } = useTableColumnWidths({ tableId: 'servicos:contratos', columns: listColumns });
+  const { widths: scheduleWidths, startResize: startResizeSchedule } = useTableColumnWidths({ tableId: 'servicos:contratos:schedule', columns: scheduleColumns });
+  const { widths: itensWidths, startResize: startResizeItens } = useTableColumnWidths({ tableId: 'servicos:contratos:itens', columns: itensColumns });
+  const { widths: docsWidths, startResize: startResizeDocs } = useTableColumnWidths({ tableId: 'servicos:contratos:docs', columns: docsColumns });
 
   const clientById = useMemo(() => {
     const m = new Map<string, PartnerListItem>();
     for (const c of clients) m.set(c.id, c);
     return m;
   }, [clients]);
+
+  const sortedContratos = useMemo(() => {
+    return sortRows(
+      rows,
+      listSort as any,
+      [
+        { id: 'cliente', type: 'string', getValue: (r) => (r.cliente_id ? clientById.get(r.cliente_id)?.nome ?? '' : '') },
+        { id: 'descricao', type: 'string', getValue: (r) => r.descricao ?? '' },
+        { id: 'valor_mensal', type: 'number', getValue: (r) => Number(r.valor_mensal ?? 0) },
+        { id: 'status', type: 'string', getValue: (r) => r.status ?? '' },
+      ] as const
+    );
+  }, [clientById, listSort, rows]);
+
+  const sortedSchedule = useMemo(() => {
+    return sortRows(
+      schedule,
+      scheduleSort as any,
+      [
+        { id: 'tipo', type: 'string', getValue: (s) => String((s as any).kind ?? '') },
+        { id: 'competencia', type: 'string', getValue: (s) => String((s as any).competencia ?? '') },
+        { id: 'vencimento', type: 'date', getValue: (s) => (s as any).data_vencimento ?? null },
+        { id: 'descricao', type: 'string', getValue: (s) => String((s as any).descricao ?? '') },
+        { id: 'valor', type: 'number', getValue: (s) => Number((s as any).valor ?? 0) },
+        { id: 'status', type: 'string', getValue: (s) => String((s as any).status ?? '') },
+      ] as const
+    );
+  }, [schedule, scheduleSort]);
+
+  const sortedItens = useMemo(() => {
+    return sortRows(
+      itens,
+      itensSort as any,
+      [
+        { id: 'titulo', type: 'string', getValue: (i) => i.titulo ?? '' },
+        { id: 'qtd', type: 'number', getValue: (i) => Number(i.quantidade ?? 0) },
+        { id: 'unid', type: 'string', getValue: (i) => i.unidade ?? '' },
+        { id: 'valor_unit', type: 'number', getValue: (i) => Number(i.valor_unitario ?? 0) },
+        { id: 'recorrente', type: 'boolean', getValue: (i) => Boolean(i.recorrente) },
+      ] as const
+    );
+  }, [itens, itensSort]);
+
+  const sortedDocs = useMemo(() => {
+    const base = documents.map((d) => {
+      const status = d.revoked_at
+        ? 'revogado'
+        : d.accepted_at
+          ? 'aceito'
+          : d.expires_at && new Date(d.expires_at) < new Date()
+            ? 'expirado'
+            : 'ativo';
+      return { d, status };
+    });
+    return sortRows(
+      base,
+      docsSort as any,
+      [
+        { id: 'criado_em', type: 'date', getValue: (r) => r.d.created_at ?? null },
+        { id: 'validade', type: 'date', getValue: (r) => r.d.expires_at ?? null },
+        { id: 'status', type: 'string', getValue: (r) => r.status },
+        { id: 'aceite', type: 'date', getValue: (r) => r.d.accepted_at ?? null },
+      ] as const
+    );
+  }, [documents, docsSort]);
 
   async function load() {
     setLoading(true);
@@ -892,17 +1001,18 @@ export default function ContratosPage() {
         ) : (
           <div className="overflow-auto">
             <table className="min-w-full text-sm">
+              <TableColGroup columns={listColumns} widths={listWidths} />
               <thead className="bg-gray-50">
                 <tr className="text-left text-gray-600">
-                  <th className="px-4 py-3">Cliente</th>
-                  <th className="px-4 py-3">Descrição</th>
-                  <th className="px-4 py-3">Valor mensal</th>
-                  <th className="px-4 py-3">Status</th>
-                  <th className="px-4 py-3 text-right">Ações</th>
+                  <ResizableSortableTh columnId="cliente" label="Cliente" className="px-4 py-3 normal-case tracking-normal" sort={listSort as any} onSort={(col) => setListSort((prev) => toggleSort(prev as any, col))} onResizeStart={startResizeList as any} />
+                  <ResizableSortableTh columnId="descricao" label="Descrição" className="px-4 py-3 normal-case tracking-normal" sort={listSort as any} onSort={(col) => setListSort((prev) => toggleSort(prev as any, col))} onResizeStart={startResizeList as any} />
+                  <ResizableSortableTh columnId="valor_mensal" label="Valor mensal" className="px-4 py-3 normal-case tracking-normal" sort={listSort as any} onSort={(col) => setListSort((prev) => toggleSort(prev as any, col))} onResizeStart={startResizeList as any} />
+                  <ResizableSortableTh columnId="status" label="Status" className="px-4 py-3 normal-case tracking-normal" sort={listSort as any} onSort={(col) => setListSort((prev) => toggleSort(prev as any, col))} onResizeStart={startResizeList as any} />
+                  <ResizableSortableTh columnId="acoes" label="Ações" align="right" className="px-4 py-3 normal-case tracking-normal" sortable={false} resizable onResizeStart={startResizeList as any} />
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200">
-                {rows.map((r) => {
+                {sortedContratos.map((r) => {
                   const c = r.cliente_id ? clientById.get(r.cliente_id) : null;
                   return (
                     <tr key={r.id} className="hover:bg-gray-50">
@@ -1293,18 +1403,19 @@ export default function ContratosPage() {
                   ) : (
                     <div className="overflow-auto rounded-lg border border-gray-200 bg-white">
                       <table className="min-w-full text-xs">
+                        <TableColGroup columns={scheduleColumns} widths={scheduleWidths} />
                         <thead className="bg-gray-50">
                           <tr className="text-left text-gray-600">
-                            <th className="px-3 py-2">Tipo</th>
-                            <th className="px-3 py-2">Competência</th>
-                            <th className="px-3 py-2">Vencimento</th>
-                            <th className="px-3 py-2">Descrição</th>
-                            <th className="px-3 py-2">Valor</th>
-                            <th className="px-3 py-2">Status</th>
+                            <ResizableSortableTh columnId="tipo" label="Tipo" className="px-3 py-2 normal-case tracking-normal" sort={scheduleSort as any} onSort={(col) => setScheduleSort((prev) => toggleSort(prev as any, col))} onResizeStart={startResizeSchedule as any} />
+                            <ResizableSortableTh columnId="competencia" label="Competência" className="px-3 py-2 normal-case tracking-normal" sort={scheduleSort as any} onSort={(col) => setScheduleSort((prev) => toggleSort(prev as any, col))} onResizeStart={startResizeSchedule as any} />
+                            <ResizableSortableTh columnId="vencimento" label="Vencimento" className="px-3 py-2 normal-case tracking-normal" sort={scheduleSort as any} onSort={(col) => setScheduleSort((prev) => toggleSort(prev as any, col))} onResizeStart={startResizeSchedule as any} />
+                            <ResizableSortableTh columnId="descricao" label="Descrição" className="px-3 py-2 normal-case tracking-normal" sort={scheduleSort as any} onSort={(col) => setScheduleSort((prev) => toggleSort(prev as any, col))} onResizeStart={startResizeSchedule as any} />
+                            <ResizableSortableTh columnId="valor" label="Valor" className="px-3 py-2 normal-case tracking-normal" sort={scheduleSort as any} onSort={(col) => setScheduleSort((prev) => toggleSort(prev as any, col))} onResizeStart={startResizeSchedule as any} />
+                            <ResizableSortableTh columnId="status" label="Status" className="px-3 py-2 normal-case tracking-normal" sort={scheduleSort as any} onSort={(col) => setScheduleSort((prev) => toggleSort(prev as any, col))} onResizeStart={startResizeSchedule as any} />
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-gray-100">
-                          {schedule.map((s) => (
+                          {sortedSchedule.map((s) => (
                             <tr key={s.id}>
                               <td className="px-3 py-2">{s.kind}</td>
                               <td className="px-3 py-2">{s.competencia ? s.competencia.slice(0, 7) : '-'}</td>
@@ -1452,18 +1563,19 @@ export default function ContratosPage() {
                   ) : (
                     <div className="overflow-auto rounded-lg border border-gray-200 bg-white">
                       <table className="min-w-full text-xs">
+                        <TableColGroup columns={itensColumns} widths={itensWidths} />
                         <thead className="bg-gray-50">
                           <tr className="text-left text-gray-600">
-                            <th className="px-3 py-2">Título</th>
-                            <th className="px-3 py-2">Qtd</th>
-                            <th className="px-3 py-2">Unid.</th>
-                            <th className="px-3 py-2">Valor unit.</th>
-                            <th className="px-3 py-2">Recorrente</th>
-                            <th className="px-3 py-2 text-right">Ações</th>
+                            <ResizableSortableTh columnId="titulo" label="Título" className="px-3 py-2 normal-case tracking-normal" sort={itensSort as any} onSort={(col) => setItensSort((prev) => toggleSort(prev as any, col))} onResizeStart={startResizeItens as any} />
+                            <ResizableSortableTh columnId="qtd" label="Qtd" className="px-3 py-2 normal-case tracking-normal" sort={itensSort as any} onSort={(col) => setItensSort((prev) => toggleSort(prev as any, col))} onResizeStart={startResizeItens as any} />
+                            <ResizableSortableTh columnId="unid" label="Unid." className="px-3 py-2 normal-case tracking-normal" sort={itensSort as any} onSort={(col) => setItensSort((prev) => toggleSort(prev as any, col))} onResizeStart={startResizeItens as any} />
+                            <ResizableSortableTh columnId="valor_unit" label="Valor unit." className="px-3 py-2 normal-case tracking-normal" sort={itensSort as any} onSort={(col) => setItensSort((prev) => toggleSort(prev as any, col))} onResizeStart={startResizeItens as any} />
+                            <ResizableSortableTh columnId="recorrente" label="Recorrente" className="px-3 py-2 normal-case tracking-normal" sort={itensSort as any} onSort={(col) => setItensSort((prev) => toggleSort(prev as any, col))} onResizeStart={startResizeItens as any} />
+                            <ResizableSortableTh columnId="acoes" label="Ações" align="right" className="px-3 py-2 normal-case tracking-normal" sortable={false} resizable onResizeStart={startResizeItens as any} />
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-gray-100">
-                          {itens.map((it) => (
+                          {sortedItens.map((it) => (
                             <tr key={it.id}>
                               <td className="px-3 py-2">
                                 <div className="font-medium text-gray-900">{it.titulo}</div>
@@ -1606,24 +1718,18 @@ export default function ContratosPage() {
                   ) : (
                     <div className="overflow-auto rounded-lg border border-gray-200 bg-white">
                       <table className="min-w-full text-xs">
+                        <TableColGroup columns={docsColumns} widths={docsWidths} />
                         <thead className="bg-gray-50">
                           <tr className="text-left text-gray-600">
-                            <th className="px-3 py-2">Criado em</th>
-                            <th className="px-3 py-2">Validade</th>
-                            <th className="px-3 py-2">Status</th>
-                            <th className="px-3 py-2">Aceite</th>
-                            <th className="px-3 py-2 text-right">Ações</th>
+                            <ResizableSortableTh columnId="criado_em" label="Criado em" className="px-3 py-2 normal-case tracking-normal" sort={docsSort as any} onSort={(col) => setDocsSort((prev) => toggleSort(prev as any, col))} onResizeStart={startResizeDocs as any} />
+                            <ResizableSortableTh columnId="validade" label="Validade" className="px-3 py-2 normal-case tracking-normal" sort={docsSort as any} onSort={(col) => setDocsSort((prev) => toggleSort(prev as any, col))} onResizeStart={startResizeDocs as any} />
+                            <ResizableSortableTh columnId="status" label="Status" className="px-3 py-2 normal-case tracking-normal" sort={docsSort as any} onSort={(col) => setDocsSort((prev) => toggleSort(prev as any, col))} onResizeStart={startResizeDocs as any} />
+                            <ResizableSortableTh columnId="aceite" label="Aceite" className="px-3 py-2 normal-case tracking-normal" sort={docsSort as any} onSort={(col) => setDocsSort((prev) => toggleSort(prev as any, col))} onResizeStart={startResizeDocs as any} />
+                            <ResizableSortableTh columnId="acoes" label="Ações" align="right" className="px-3 py-2 normal-case tracking-normal" sortable={false} resizable onResizeStart={startResizeDocs as any} />
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-gray-100">
-                          {documents.map((d) => {
-                            const status = d.revoked_at
-                              ? 'revogado'
-                              : d.accepted_at
-                                ? 'aceito'
-                                : d.expires_at && new Date(d.expires_at) < new Date()
-                                  ? 'expirado'
-                                  : 'ativo';
+                          {sortedDocs.map(({ d, status }) => {
                             return (
                               <tr key={d.id}>
                                 <td className="px-3 py-2">{new Date(d.created_at).toLocaleString('pt-BR')}</td>

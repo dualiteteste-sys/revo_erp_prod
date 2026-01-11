@@ -1,9 +1,12 @@
 import React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { PartnerListItem } from '../../services/partners';
-import { Edit, Trash2, ArrowUpDown, RotateCcw } from 'lucide-react';
+import { Edit, Trash2, RotateCcw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { documentMask } from '@/lib/masks';
+import ResizableSortableTh, { type SortState } from '@/components/ui/table/ResizableSortableTh';
+import TableColGroup from '@/components/ui/table/TableColGroup';
+import { useTableColumnWidths, type TableColumnWidthDef } from '@/components/ui/table/useTableColumnWidths';
 
 interface PartnersTableProps {
   partners: PartnerListItem[];
@@ -25,28 +28,6 @@ const tipoLabels: { [key: string]: string } = {
   ambos: 'Ambos',
 };
 
-const SortableHeader: React.FC<{
-  column: keyof PartnerListItem;
-  label: string;
-  sortBy: { column: keyof PartnerListItem; ascending: boolean };
-  onSort: (column: keyof PartnerListItem) => void;
-  className?: string;
-}> = ({ column, label, sortBy, onSort, className }) => {
-  const isSorted = sortBy.column === column;
-  return (
-    <th
-      scope="col"
-      className={`px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 ${className}`}
-      onClick={() => onSort(column)}
-    >
-      <div className="flex items-center gap-2">
-        {label}
-        {isSorted && <ArrowUpDown size={14} className={sortBy.ascending ? '' : 'rotate-180'} />}
-      </div>
-    </th>
-  );
-};
-
 const PartnersTable: React.FC<PartnersTableProps> = ({
   partners,
   onEdit,
@@ -60,9 +41,21 @@ const PartnersTable: React.FC<PartnersTableProps> = ({
   onToggleSelect,
   onToggleSelectAll,
 }) => {
+  const columns: TableColumnWidthDef[] = [
+    ...(onToggleSelect ? [{ id: 'select', defaultWidth: 56, minWidth: 56, maxWidth: 56, resizable: false }] : []),
+    { id: 'nome', defaultWidth: 360, minWidth: 220 },
+    { id: 'tipo', defaultWidth: 160, minWidth: 140 },
+    { id: 'doc_unico', defaultWidth: 180, minWidth: 160 },
+    { id: 'deleted_at', defaultWidth: 140, minWidth: 120 },
+    { id: 'acoes', defaultWidth: 170, minWidth: 140 },
+  ];
+  const { widths, startResize } = useTableColumnWidths({ tableId: 'partners:list', columns });
+  const sort: SortState<string> = sortBy ? { column: sortBy.column, direction: sortBy.ascending ? 'asc' : 'desc' } : null;
+
   return (
     <div className="overflow-x-auto">
-      <table className="min-w-full divide-y divide-gray-200">
+      <table className="min-w-[980px] w-full divide-y divide-gray-200 table-fixed">
+        <TableColGroup columns={columns} widths={widths} />
         <thead className="bg-gray-50">
           <tr>
             {onToggleSelect ? (
@@ -79,11 +72,18 @@ const PartnersTable: React.FC<PartnersTableProps> = ({
                 />
               </th>
             ) : null}
-            <SortableHeader column="nome" label="Nome" sortBy={sortBy} onSort={onSort} />
-            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Tipo</th>
-            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Documento</th>
-            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-            <th scope="col" className="relative px-6 py-3"><span className="sr-only">Ações</span></th>
+            <ResizableSortableTh columnId="nome" label="Nome" sort={sort} onSort={onSort as any} onResizeStart={startResize} />
+            <ResizableSortableTh columnId="tipo" label="Tipo" sort={sort} onSort={onSort as any} onResizeStart={startResize} />
+            <ResizableSortableTh columnId="doc_unico" label="Documento" sort={sort} onSort={onSort as any} onResizeStart={startResize} />
+            <ResizableSortableTh columnId="deleted_at" label="Status" sort={sort} onSort={onSort as any} onResizeStart={startResize} />
+            <ResizableSortableTh
+              columnId="acoes"
+              label={<span className="sr-only">Ações</span>}
+              sortable={false}
+              onResizeStart={startResize}
+              align="right"
+              className="px-6"
+            />
           </tr>
         </thead>
         <motion.tbody layout className="bg-white divide-y divide-gray-200">

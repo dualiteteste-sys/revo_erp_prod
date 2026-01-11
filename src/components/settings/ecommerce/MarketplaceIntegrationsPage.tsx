@@ -22,6 +22,10 @@ import { Switch } from '@/components/ui/switch';
 import { listEcommerceProductMappings, upsertEcommerceProductMapping, type EcommerceProductMappingRow } from '@/services/ecommerceCatalog';
 import Input from '@/components/ui/forms/Input';
 import RoadmapButton from '@/components/roadmap/RoadmapButton';
+import ResizableSortableTh, { type SortState } from '@/components/ui/table/ResizableSortableTh';
+import TableColGroup from '@/components/ui/table/TableColGroup';
+import { useTableColumnWidths, type TableColumnWidthDef } from '@/components/ui/table/useTableColumnWidths';
+import { sortRows, toggleSort } from '@/components/ui/table/sortUtils';
 
 type Provider = 'meli' | 'shopee';
 
@@ -69,6 +73,30 @@ export default function MarketplaceIntegrationsPage() {
   const [mappingsQuery, setMappingsQuery] = useState('');
   const [mappings, setMappings] = useState<EcommerceProductMappingRow[]>([]);
   const [savingMapId, setSavingMapId] = useState<string | null>(null);
+  const [mappingsSort, setMappingsSort] = useState<SortState<'produto' | 'sku' | 'anuncio'>>({ column: 'produto', direction: 'asc' });
+
+  const mappingsColumns: TableColumnWidthDef[] = [
+    { id: 'produto', defaultWidth: 320, minWidth: 220 },
+    { id: 'sku', defaultWidth: 160, minWidth: 120 },
+    { id: 'anuncio', defaultWidth: 360, minWidth: 220 },
+    { id: 'acoes', defaultWidth: 140, minWidth: 120, resizable: false },
+  ];
+  const { widths: mappingsWidths, startResize: startMappingsResize } = useTableColumnWidths({
+    tableId: 'settings:ecommerce:mappings',
+    columns: mappingsColumns,
+  });
+
+  const mappingsSorted = useMemo(() => {
+    return sortRows(
+      mappings,
+      mappingsSort as any,
+      [
+        { id: 'produto', type: 'string', getValue: (r: EcommerceProductMappingRow) => r.produto_nome ?? '' },
+        { id: 'sku', type: 'string', getValue: (r: EcommerceProductMappingRow) => r.produto_sku ?? '' },
+        { id: 'anuncio', type: 'string', getValue: (r: EcommerceProductMappingRow) => r.anuncio_identificador ?? '' },
+      ] as const
+    );
+  }, [mappings, mappingsSort]);
 
   const canView = !!permView.data;
   const canManage = !!permManage.data;
@@ -677,17 +705,47 @@ export default function MarketplaceIntegrationsPage() {
               <div className="text-sm text-gray-600">Nenhum produto encontrado.</div>
             ) : (
               <div className="overflow-x-auto border rounded-xl bg-white">
-                <table className="min-w-full divide-y divide-gray-200">
+                <table className="min-w-full divide-y divide-gray-200 table-fixed">
+                  <TableColGroup columns={mappingsColumns} widths={mappingsWidths} />
                   <thead className="bg-gray-50">
                     <tr>
-                      <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Produto</th>
-                      <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">SKU</th>
-                      <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">ID anúncio no canal</th>
-                      <th className="px-3 py-2" />
+                      <ResizableSortableTh
+                        columnId="produto"
+                        label="Produto"
+                        sort={mappingsSort}
+                        onSort={(col) => setMappingsSort((prev) => toggleSort(prev as any, col))}
+                        onResizeStart={startMappingsResize}
+                        className="px-3 py-2"
+                      />
+                      <ResizableSortableTh
+                        columnId="sku"
+                        label="SKU"
+                        sort={mappingsSort}
+                        onSort={(col) => setMappingsSort((prev) => toggleSort(prev as any, col))}
+                        onResizeStart={startMappingsResize}
+                        className="px-3 py-2"
+                      />
+                      <ResizableSortableTh
+                        columnId="anuncio"
+                        label="ID anúncio no canal"
+                        sort={mappingsSort}
+                        onSort={(col) => setMappingsSort((prev) => toggleSort(prev as any, col))}
+                        onResizeStart={startMappingsResize}
+                        className="px-3 py-2"
+                      />
+                      <ResizableSortableTh
+                        columnId="acoes"
+                        label={<span className="sr-only">Ações</span>}
+                        sortable={false}
+                        sort={mappingsSort}
+                        onResizeStart={startMappingsResize}
+                        align="right"
+                        className="px-3 py-2"
+                      />
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-200">
-                    {mappings.map((row) => {
+                    {mappingsSorted.map((row) => {
                       const busy = savingMapId === row.produto_id;
                       return (
                         <MappingRow

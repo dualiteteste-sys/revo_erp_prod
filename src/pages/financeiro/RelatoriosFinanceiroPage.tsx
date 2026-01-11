@@ -7,6 +7,10 @@ import GlassCard from '@/components/ui/GlassCard';
 import Input from '@/components/ui/forms/Input';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/contexts/ToastProvider';
+import ResizableSortableTh, { type SortState } from '@/components/ui/table/ResizableSortableTh';
+import TableColGroup from '@/components/ui/table/TableColGroup';
+import { useTableColumnWidths, type TableColumnWidthDef } from '@/components/ui/table/useTableColumnWidths';
+import { sortRows, toggleSort } from '@/components/ui/table/sortUtils';
 import {
   getFinanceiroDreSimplificada,
   getFinanceiroRelatoriosResumo,
@@ -66,6 +70,18 @@ export default function RelatoriosFinanceiroPage() {
   const [dre, setDre] = useState<FinanceiroDreSimplificada | null>(null);
   const [dreCentroId, setDreCentroId] = useState<string | null>(null);
   const [dreCentroName, setDreCentroName] = useState<string>('');
+  const [dreSort, setDreSort] = useState<SortState<'categoria' | 'receitas' | 'despesas' | 'resultado'> | null>(null);
+
+  const dreColumns: TableColumnWidthDef[] = [
+    { id: 'categoria', defaultWidth: 360, minWidth: 220 },
+    { id: 'receitas', defaultWidth: 180, minWidth: 140 },
+    { id: 'despesas', defaultWidth: 180, minWidth: 140 },
+    { id: 'resultado', defaultWidth: 180, minWidth: 140 },
+  ];
+  const { widths: dreWidths, startResize: startDreResize } = useTableColumnWidths({
+    tableId: 'financeiro:relatorios:dre',
+    columns: dreColumns,
+  });
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -385,17 +401,58 @@ export default function RelatoriosFinanceiroPage() {
                   </div>
 
                   <div className="mt-4 overflow-x-auto">
-                    <table className="w-full text-sm">
+                    <table className="w-full text-sm table-fixed">
+                      <TableColGroup columns={dreColumns} widths={dreWidths} />
                       <thead>
                         <tr className="text-left text-xs text-gray-500 border-b border-gray-200">
-                          <th className="py-2 pr-4">Categoria</th>
-                          <th className="py-2 px-2 text-right">Receitas</th>
-                          <th className="py-2 px-2 text-right">Despesas</th>
-                          <th className="py-2 pl-2 text-right">Resultado</th>
+                          <ResizableSortableTh
+                            columnId="categoria"
+                            label="Categoria"
+                            sort={dreSort}
+                            onSort={(col) => setDreSort((prev) => toggleSort(prev as any, col))}
+                            onResizeStart={startDreResize}
+                            className="py-2 pr-4 normal-case tracking-normal"
+                          />
+                          <ResizableSortableTh
+                            columnId="receitas"
+                            label="Receitas"
+                            sort={dreSort}
+                            onSort={(col) => setDreSort((prev) => toggleSort(prev as any, col))}
+                            onResizeStart={startDreResize}
+                            align="right"
+                            className="py-2 px-2 normal-case tracking-normal"
+                          />
+                          <ResizableSortableTh
+                            columnId="despesas"
+                            label="Despesas"
+                            sort={dreSort}
+                            onSort={(col) => setDreSort((prev) => toggleSort(prev as any, col))}
+                            onResizeStart={startDreResize}
+                            align="right"
+                            className="py-2 px-2 normal-case tracking-normal"
+                          />
+                          <ResizableSortableTh
+                            columnId="resultado"
+                            label="Resultado"
+                            sort={dreSort}
+                            onSort={(col) => setDreSort((prev) => toggleSort(prev as any, col))}
+                            onResizeStart={startDreResize}
+                            align="right"
+                            className="py-2 pl-2 normal-case tracking-normal"
+                          />
                         </tr>
                       </thead>
                       <tbody>
-                        {dre.linhas.map((l) => (
+                        {sortRows(
+                          dre.linhas,
+                          dreSort as any,
+                          [
+                            { id: 'categoria', type: 'string', getValue: (l: any) => l.categoria ?? '' },
+                            { id: 'receitas', type: 'number', getValue: (l: any) => l.receitas ?? 0 },
+                            { id: 'despesas', type: 'number', getValue: (l: any) => l.despesas ?? 0 },
+                            { id: 'resultado', type: 'number', getValue: (l: any) => l.resultado ?? 0 },
+                          ] as const
+                        ).map((l) => (
                           <tr key={l.categoria} className="border-b border-gray-100">
                             <td className="py-2 pr-4 text-gray-800">{l.categoria}</td>
                             <td className="py-2 px-2 text-right text-emerald-700">{formatBRL(l.receitas)}</td>

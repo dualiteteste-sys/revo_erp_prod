@@ -1,7 +1,10 @@
 import React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { SalesGoal } from '@/services/salesGoals';
-import { Edit, Trash2, ArrowUpDown, AlertTriangle } from 'lucide-react';
+import { Edit, Trash2, AlertTriangle } from 'lucide-react';
+import ResizableSortableTh, { type SortState } from '@/components/ui/table/ResizableSortableTh';
+import TableColGroup from '@/components/ui/table/TableColGroup';
+import { useTableColumnWidths, type TableColumnWidthDef } from '@/components/ui/table/useTableColumnWidths';
 
 interface SalesGoalsTableProps {
   goals: SalesGoal[];
@@ -16,28 +19,6 @@ const statusConfig: Record<SalesGoal['status'], { label: string; color: string }
   em_andamento: { label: 'Em Andamento', color: 'bg-blue-100 text-blue-800' },
   concluida: { label: 'Concluída', color: 'bg-green-100 text-green-800' },
   cancelada: { label: 'Cancelada', color: 'bg-red-100 text-red-800' },
-};
-
-const SortableHeader: React.FC<{
-  column: string;
-  label: string;
-  sortBy: { column: string; ascending: boolean };
-  onSort: (column: string) => void;
-  className?: string;
-}> = ({ column, label, sortBy, onSort, className }) => {
-  const isSorted = sortBy.column === column;
-  return (
-    <th
-      scope="col"
-      className={`px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 ${className}`}
-      onClick={() => onSort(column)}
-    >
-      <div className="flex items-center gap-2">
-        {label}
-        {isSorted && <ArrowUpDown size={14} className={sortBy.ascending ? '' : 'rotate-180'} />}
-      </div>
-    </th>
-  );
 };
 
 const ProgressBar: React.FC<{ value: number }> = ({ value }) => {
@@ -56,25 +37,44 @@ const ProgressBar: React.FC<{ value: number }> = ({ value }) => {
 };
 
 const SalesGoalsTable: React.FC<SalesGoalsTableProps> = ({ goals, onEdit, onDelete, sortBy, onSort }) => {
+  const columns: TableColumnWidthDef[] = [
+    { id: 'vendedor_nome', defaultWidth: 240, minWidth: 200 },
+    { id: 'data_inicio', defaultWidth: 220, minWidth: 200 },
+    { id: 'valor_meta', defaultWidth: 160, minWidth: 140 },
+    { id: 'valor_realizado', defaultWidth: 160, minWidth: 140 },
+    { id: 'atingimento', defaultWidth: 260, minWidth: 220 },
+    { id: 'alerta', defaultWidth: 150, minWidth: 130 },
+    { id: 'status', defaultWidth: 140, minWidth: 120 },
+    { id: 'acoes', defaultWidth: 140, minWidth: 120 },
+  ];
+  const { widths, startResize } = useTableColumnWidths({ tableId: 'sales:goals', columns });
+  const sort: SortState<string> = sortBy ? { column: sortBy.column, direction: sortBy.ascending ? 'asc' : 'desc' } : null;
+
   const formatCurrency = (value: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value);
   const formatDate = (date: string) => new Date(date).toLocaleDateString('pt-BR');
   const daysUntil = (date: string) => Math.ceil((new Date(date).getTime() - Date.now()) / (1000 * 60 * 60 * 24));
 
   return (
     <div className="overflow-x-auto">
-      <table className="min-w-full divide-y divide-gray-200">
+      <table className="min-w-[1200px] w-full divide-y divide-gray-200 table-fixed">
+        <TableColGroup columns={columns} widths={widths} />
         <thead className="bg-gray-50">
           <tr>
-            <SortableHeader column="vendedor_nome" label="Vendedor" sortBy={sortBy} onSort={onSort} />
-            <SortableHeader column="data_inicio" label="Período" sortBy={sortBy} onSort={onSort} />
-            <SortableHeader column="valor_meta" label="Meta" sortBy={sortBy} onSort={onSort} />
-            <SortableHeader column="valor_realizado" label="Realizado" sortBy={sortBy} onSort={onSort} />
-            <SortableHeader column="atingimento" label="Atingimento" sortBy={sortBy} onSort={onSort} className="w-48" />
-            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-              Alerta
-            </th>
-            <SortableHeader column="status" label="Status" sortBy={sortBy} onSort={onSort} />
-            <th scope="col" className="relative px-6 py-3"><span className="sr-only">Ações</span></th>
+            <ResizableSortableTh columnId="vendedor_nome" label="Vendedor" sort={sort} onSort={onSort} onResizeStart={startResize} />
+            <ResizableSortableTh columnId="data_inicio" label="Período" sort={sort} onSort={onSort} onResizeStart={startResize} />
+            <ResizableSortableTh columnId="valor_meta" label="Meta" sort={sort} onSort={onSort} onResizeStart={startResize} align="right" />
+            <ResizableSortableTh columnId="valor_realizado" label="Realizado" sort={sort} onSort={onSort} onResizeStart={startResize} align="right" />
+            <ResizableSortableTh columnId="atingimento" label="Atingimento" sort={sort} onSort={onSort} onResizeStart={startResize} />
+            <ResizableSortableTh columnId="alerta" label="Alerta" sortable={false} onResizeStart={startResize} />
+            <ResizableSortableTh columnId="status" label="Status" sort={sort} onSort={onSort} onResizeStart={startResize} />
+            <ResizableSortableTh
+              columnId="acoes"
+              label={<span className="sr-only">Ações</span>}
+              sortable={false}
+              onResizeStart={startResize}
+              align="right"
+              className="px-6"
+            />
           </tr>
         </thead>
         <motion.tbody layout className="bg-white divide-y divide-gray-200">

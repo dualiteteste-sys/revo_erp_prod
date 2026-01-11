@@ -1,7 +1,11 @@
-import React from 'react';
+import React, { useMemo, useState } from 'react';
 import { ContaCorrente } from '@/services/treasury';
 import { Edit, Trash2, Wallet, Landmark, CreditCard, ArrowDownToLine, ArrowUpFromLine } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import ResizableSortableTh, { type SortState } from '@/components/ui/table/ResizableSortableTh';
+import TableColGroup from '@/components/ui/table/TableColGroup';
+import { useTableColumnWidths, type TableColumnWidthDef } from '@/components/ui/table/useTableColumnWidths';
+import { sortRows, toggleSort } from '@/components/ui/table/sortUtils';
 
 interface Props {
   contas: ContaCorrente[];
@@ -18,22 +22,96 @@ const getIcon = (tipo: string) => {
   }
 };
 
-export default function ContasCorrentesTable({ contas, onEdit, onDelete }: Props) {
+export default function ContasCorrentesTable({ contas, onEdit, onDelete, onSetPadrao }: Props) {
+  const columns: TableColumnWidthDef[] = [
+    { id: 'nome_banco', defaultWidth: 420, minWidth: 220 },
+    { id: 'agencia_conta', defaultWidth: 320, minWidth: 200 },
+    { id: 'padroes', defaultWidth: 320, minWidth: 240 },
+    { id: 'saldo_atual', defaultWidth: 180, minWidth: 160 },
+    { id: 'ativo', defaultWidth: 140, minWidth: 120 },
+    { id: 'acoes', defaultWidth: 120, minWidth: 90, maxWidth: 180 },
+  ];
+  const { widths, startResize } = useTableColumnWidths({ tableId: 'financeiro:tesouraria:contas', columns });
+
+  const [sort, setSort] = useState<SortState<string>>({ column: 'nome_banco', direction: 'asc' });
+  const sortedContas = useMemo(() => {
+    return sortRows(
+      contas,
+      sort as any,
+      [
+        { id: 'nome_banco', type: 'string', getValue: (c) => c.nome ?? '' },
+        {
+          id: 'agencia_conta',
+          type: 'string',
+          getValue: (c) =>
+            c.tipo_conta === 'caixa' ? '' : `Ag ${c.agencia ?? ''} CC ${c.conta ?? ''}-${c.digito ?? ''} ${c.banco_nome ?? ''}`,
+        },
+        {
+          id: 'padroes',
+          type: 'number',
+          getValue: (c) => Number(Boolean(c.padrao_para_recebimentos)) + Number(Boolean(c.padrao_para_pagamentos)),
+        },
+        { id: 'saldo_atual', type: 'number', getValue: (c) => c.saldo_atual ?? 0 },
+        { id: 'ativo', type: 'boolean', getValue: (c) => Boolean(c.ativo) },
+      ] as const
+    );
+  }, [contas, sort]);
+
   return (
     <div className="overflow-x-auto">
       <table className="min-w-full divide-y divide-gray-200">
+        <TableColGroup columns={columns} widths={widths} />
         <thead className="bg-gray-50">
           <tr>
-            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Nome / Banco</th>
-            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Agência / Conta</th>
-            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Padrões</th>
-            <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Saldo Atual</th>
-            <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase">Status</th>
-            <th className="px-6 py-3"></th>
+            <ResizableSortableTh
+              columnId="nome_banco"
+              label="Nome / Banco"
+              sort={sort as any}
+              onSort={(col) => setSort((prev) => toggleSort(prev as any, col))}
+              onResizeStart={startResize as any}
+            />
+            <ResizableSortableTh
+              columnId="agencia_conta"
+              label="Agência / Conta"
+              sort={sort as any}
+              onSort={(col) => setSort((prev) => toggleSort(prev as any, col))}
+              onResizeStart={startResize as any}
+            />
+            <ResizableSortableTh
+              columnId="padroes"
+              label="Padrões"
+              sort={sort as any}
+              onSort={(col) => setSort((prev) => toggleSort(prev as any, col))}
+              onResizeStart={startResize as any}
+            />
+            <ResizableSortableTh
+              columnId="saldo_atual"
+              label="Saldo Atual"
+              align="right"
+              sort={sort as any}
+              onSort={(col) => setSort((prev) => toggleSort(prev as any, col))}
+              onResizeStart={startResize as any}
+            />
+            <ResizableSortableTh
+              columnId="ativo"
+              label="Status"
+              align="center"
+              sort={sort as any}
+              onSort={(col) => setSort((prev) => toggleSort(prev as any, col))}
+              onResizeStart={startResize as any}
+            />
+            <ResizableSortableTh
+              columnId="acoes"
+              label="Ações"
+              align="right"
+              sortable={false}
+              resizable
+              onResizeStart={startResize as any}
+            />
           </tr>
         </thead>
         <tbody className="bg-white divide-y divide-gray-200">
-          {contas.map(conta => (
+          {sortedContas.map(conta => (
             <tr key={conta.id} className="hover:bg-gray-50">
               <td className="px-6 py-4">
                 <div className="flex items-center gap-3">
@@ -116,7 +194,7 @@ export default function ContasCorrentesTable({ contas, onEdit, onDelete }: Props
               </td>
             </tr>
           ))}
-          {contas.length === 0 && (
+          {sortedContas.length === 0 && (
             <tr>
               <td colSpan={6} className="px-6 py-12 text-center text-gray-500">Nenhuma conta cadastrada.</td>
             </tr>

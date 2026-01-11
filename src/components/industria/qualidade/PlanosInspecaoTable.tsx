@@ -1,6 +1,10 @@
-import React from 'react';
+import React, { useMemo, useState } from 'react';
 import { PlanoInspecao } from '@/services/industriaProducao';
 import { ClipboardCheck, Shield } from 'lucide-react';
+import ResizableSortableTh, { type SortState } from '@/components/ui/table/ResizableSortableTh';
+import TableColGroup from '@/components/ui/table/TableColGroup';
+import { useTableColumnWidths, type TableColumnWidthDef } from '@/components/ui/table/useTableColumnWidths';
+import { sortRows, toggleSort } from '@/components/ui/table/sortUtils';
 
 interface Props {
   planos: PlanoInspecao[];
@@ -9,6 +13,40 @@ interface Props {
 }
 
 export default function PlanosInspecaoTable({ planos, onEdit, onDelete }: Props) {
+  const columns: TableColumnWidthDef[] = [
+    { id: 'plano', defaultWidth: 300, minWidth: 220 },
+    { id: 'produto', defaultWidth: 320, minWidth: 220 },
+    { id: 'aplicacao', defaultWidth: 320, minWidth: 220 },
+    { id: 'caracteristicas', defaultWidth: 160, minWidth: 140 },
+    { id: 'status', defaultWidth: 140, minWidth: 120 },
+    { id: 'acoes', defaultWidth: 180, minWidth: 160 },
+  ];
+  const { widths, startResize } = useTableColumnWidths({ tableId: 'industria:qualidade:planos-inspecao', columns });
+
+  const [sort, setSort] = useState<SortState<string>>({ column: 'plano', direction: 'asc' });
+  const sortedPlanos = useMemo(() => {
+    return sortRows(
+      planos,
+      sort as any,
+      [
+        { id: 'plano', type: 'string', getValue: (p) => p.nome ?? '' },
+        { id: 'produto', type: 'string', getValue: (p) => p.produto_nome ?? '' },
+        {
+          id: 'aplicacao',
+          type: 'string',
+          getValue: (p) =>
+            p.roteiro_etapa_id
+              ? `Etapa ${p.etapa_sequencia ?? ''} ${p.etapa_nome ?? ''}`
+              : p.roteiro_id
+                ? `Roteiro ${p.roteiro_nome ?? p.roteiro_id ?? ''}`
+                : 'Todas as etapas',
+        },
+        { id: 'caracteristicas', type: 'number', getValue: (p) => p.total_caracteristicas ?? 0 },
+        { id: 'status', type: 'boolean', getValue: (p) => Boolean(p.ativo) },
+      ] as const
+    );
+  }, [planos, sort]);
+
   if (planos.length === 0) {
     return (
       <div className="border border-dashed border-gray-300 rounded-lg p-12 text-center text-gray-500">
@@ -24,18 +62,64 @@ export default function PlanosInspecaoTable({ planos, onEdit, onDelete }: Props)
   return (
     <div className="overflow-x-auto overflow-y-visible border rounded-lg">
       <table className="min-w-full divide-y divide-gray-200">
+        <TableColGroup columns={columns} widths={widths} />
         <thead className="bg-gray-50">
           <tr>
-            <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Plano</th>
-            <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Produto</th>
-            <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Aplicação</th>
-            <th className="px-4 py-2 text-center text-xs font-medium text-gray-500 uppercase">Características</th>
-            <th className="px-4 py-2 text-center text-xs font-medium text-gray-500 uppercase">Status</th>
-            <th className="px-4 py-2 text-center text-xs font-medium text-gray-500 uppercase">Ações</th>
+            <ResizableSortableTh
+              columnId="plano"
+              label="Plano"
+              className="px-4 py-2"
+              sort={sort as any}
+              onSort={(col) => setSort((prev) => toggleSort(prev as any, col))}
+              onResizeStart={startResize as any}
+            />
+            <ResizableSortableTh
+              columnId="produto"
+              label="Produto"
+              className="px-4 py-2"
+              sort={sort as any}
+              onSort={(col) => setSort((prev) => toggleSort(prev as any, col))}
+              onResizeStart={startResize as any}
+            />
+            <ResizableSortableTh
+              columnId="aplicacao"
+              label="Aplicação"
+              className="px-4 py-2"
+              sort={sort as any}
+              onSort={(col) => setSort((prev) => toggleSort(prev as any, col))}
+              onResizeStart={startResize as any}
+            />
+            <ResizableSortableTh
+              columnId="caracteristicas"
+              label="Características"
+              align="center"
+              className="px-4 py-2"
+              sort={sort as any}
+              onSort={(col) => setSort((prev) => toggleSort(prev as any, col))}
+              onResizeStart={startResize as any}
+            />
+            <ResizableSortableTh
+              columnId="status"
+              label="Status"
+              align="center"
+              className="px-4 py-2"
+              sort={sort as any}
+              onSort={(col) => setSort((prev) => toggleSort(prev as any, col))}
+              onResizeStart={startResize as any}
+            />
+            <ResizableSortableTh
+              columnId="acoes"
+              label="Ações"
+              align="center"
+              className="px-4 py-2"
+              sortable={false}
+              resizable
+              onResizeStart={startResize as any}
+            />
           </tr>
         </thead>
         <tbody className="divide-y divide-gray-100 bg-white">
-          {planos.map(plano => (
+          {sortedPlanos.map(plano => (
             <tr key={plano.id}>
               <td className="px-4 py-3">
                 <div className="flex flex-col">

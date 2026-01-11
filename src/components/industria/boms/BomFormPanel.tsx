@@ -12,6 +12,9 @@ import ItemAutocomplete from '@/components/os/ItemAutocomplete';
 import DecimalInput from '@/components/ui/forms/DecimalInput';
 import { motion, AnimatePresence } from 'framer-motion';
 import { logger } from '@/lib/logger';
+import ResizableSortableTh from '@/components/ui/table/ResizableSortableTh';
+import TableColGroup from '@/components/ui/table/TableColGroup';
+import { useTableColumnWidths, type TableColumnWidthDef } from '@/components/ui/table/useTableColumnWidths';
 // ... existing imports
 
 // Inside the component return
@@ -30,6 +33,18 @@ export default function BomFormPanel({ bomId, initialData, onSaveSuccess, onClos
   const [isSaving, setIsSaving] = useState(false);
   const [activeTab, setActiveTab] = useState<'dados' | 'componentes'>('dados');
   const [unidades, setUnidades] = useState<UnidadeMedida[]>([]);
+  const bomColumns: TableColumnWidthDef[] = [
+    { id: 'produto', defaultWidth: 360, minWidth: 240 },
+    { id: 'qtd', defaultWidth: 140, minWidth: 120 },
+    { id: 'un', defaultWidth: 120, minWidth: 100 },
+    { id: 'perda', defaultWidth: 140, minWidth: 120 },
+    { id: 'obrig', defaultWidth: 120, minWidth: 100 },
+    { id: 'acoes', defaultWidth: 80, minWidth: 70, resizable: false },
+  ];
+  const { widths: bomWidths, startResize: startBomResize } = useTableColumnWidths({
+    tableId: `industria:bom:items:${bomId ?? 'new'}`,
+    columns: bomColumns,
+  });
 
   const [formData, setFormData] = useState<Partial<BomDetails>>({
     tipo_bom: 'producao',
@@ -352,15 +367,16 @@ export default function BomFormPanel({ bomId, initialData, onSaveSuccess, onClos
               </div>
 
               <div className="overflow-x-auto border border-gray-200 rounded-lg">
-                <table className="min-w-full divide-y divide-gray-200">
+                <table className="min-w-full divide-y divide-gray-200 table-fixed">
+                  <TableColGroup columns={bomColumns} widths={bomWidths} />
                   <thead className="bg-gray-50">
                     <tr>
-                      <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Produto</th>
-                      <th className="px-3 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider w-24">Qtd.</th>
-                      <th className="px-3 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider w-28">Un.</th>
-                      <th className="px-3 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider w-24">Perda %</th>
-                      <th className="px-3 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider w-20">Obrig.</th>
-                      <th className="px-3 py-3 w-10"></th>
+                      <ResizableSortableTh columnId="produto" label="Produto" sortable={false} onResizeStart={startBomResize} className="px-3 py-3" />
+                      <ResizableSortableTh columnId="qtd" label="Qtd." sortable={false} onResizeStart={startBomResize} align="right" className="px-3 py-3" />
+                      <ResizableSortableTh columnId="un" label="Un." sortable={false} onResizeStart={startBomResize} align="center" className="px-3 py-3" />
+                      <ResizableSortableTh columnId="perda" label="Perda %" sortable={false} onResizeStart={startBomResize} align="right" className="px-3 py-3" />
+                      <ResizableSortableTh columnId="obrig" label="Obrig." sortable={false} onResizeStart={startBomResize} align="center" className="px-3 py-3" />
+                      <ResizableSortableTh columnId="acoes" label="" sortable={false} onResizeStart={startBomResize} className="px-3 py-3" />
                     </tr>
                   </thead>
                   <tbody className="bg-white divide-y divide-gray-200">

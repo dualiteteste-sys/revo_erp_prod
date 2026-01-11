@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useMemo, useState, useEffect, useCallback } from 'react';
 import { Plus, Pencil, Trash2, Search, FolderTree } from 'lucide-react';
 import { useToast } from '../../contexts/ToastProvider';
 import { useConfirm } from '../../contexts/ConfirmProvider';
@@ -7,6 +7,10 @@ import Modal from '../../components/ui/Modal';
 import GrupoProdutoForm from '../../components/cadastros/GrupoProdutoForm';
 import { Button } from '../../components/ui/button';
 import CsvExportDialog from '@/components/ui/CsvExportDialog';
+import ResizableSortableTh, { type SortState } from '@/components/ui/table/ResizableSortableTh';
+import TableColGroup from '@/components/ui/table/TableColGroup';
+import { useTableColumnWidths, type TableColumnWidthDef } from '@/components/ui/table/useTableColumnWidths';
+import { sortRows, toggleSort } from '@/components/ui/table/sortUtils';
 
 const GrupoProdutosPage: React.FC = () => {
     const { addToast } = useToast();
@@ -17,6 +21,21 @@ const GrupoProdutosPage: React.FC = () => {
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [editingGrupo, setEditingGrupo] = useState<ProdutoGrupo | null>(null);
     const [isSaving, setIsSaving] = useState(false);
+    const [sort, setSort] = useState<SortState<string>>({ column: 'nome', direction: 'asc' });
+
+    const columns: TableColumnWidthDef[] = [
+        { id: 'nome', defaultWidth: 520, minWidth: 220 },
+        { id: 'acoes', defaultWidth: 180, minWidth: 140 },
+    ];
+    const { widths, startResize } = useTableColumnWidths({ tableId: 'cadastros:grupos-produtos', columns });
+
+    const sortedGrupos = useMemo(() => {
+        return sortRows(
+            grupos,
+            sort as any,
+            [{ id: 'nome', type: 'string', getValue: (g) => g.nome ?? '' }] as const
+        );
+    }, [grupos, sort]);
 
     const fetchGrupos = useCallback(async () => {
         setLoading(true);
@@ -113,10 +132,24 @@ const GrupoProdutosPage: React.FC = () => {
 
             <div className="bg-white rounded-lg shadow overflow-hidden">
                 <table className="min-w-full divide-y divide-gray-200">
+                    <TableColGroup columns={columns} widths={widths} />
                     <thead className="bg-gray-50">
                         <tr>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Nome</th>
-                            <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Ações</th>
+                            <ResizableSortableTh
+                                columnId="nome"
+                                label="Nome"
+                                sort={sort as any}
+                                onSort={(col) => setSort((prev) => toggleSort(prev as any, col))}
+                                onResizeStart={startResize as any}
+                            />
+                            <ResizableSortableTh
+                                columnId="acoes"
+                                label="Ações"
+                                align="right"
+                                sortable={false}
+                                resizable
+                                onResizeStart={startResize as any}
+                            />
                         </tr>
                     </thead>
                     <tbody className="bg-white divide-y divide-gray-200">
@@ -129,7 +162,7 @@ const GrupoProdutosPage: React.FC = () => {
                                 <td colSpan={2} className="px-6 py-4 text-center text-gray-500">Nenhum grupo encontrado.</td>
                             </tr>
                         ) : (
-                            grupos.map((grupo) => (
+                            sortedGrupos.map((grupo) => (
                                 <tr key={grupo.id} className="hover:bg-gray-50">
                                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{grupo.nome}</td>
                                     <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">

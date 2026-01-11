@@ -7,6 +7,10 @@ import { Button } from '@/components/ui/button';
 import { useToast } from '@/contexts/ToastProvider';
 import { supabase } from '@/lib/supabaseClient';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import ResizableSortableTh, { type SortState } from '@/components/ui/table/ResizableSortableTh';
+import TableColGroup from '@/components/ui/table/TableColGroup';
+import { useTableColumnWidths, type TableColumnWidthDef } from '@/components/ui/table/useTableColumnWidths';
+import { sortRows, toggleSort } from '@/components/ui/table/sortUtils';
 import {
   getOpsHealthSummary,
   getBusinessKpisFunnelSummary,
@@ -91,6 +95,68 @@ export default function HealthPage() {
   const [previewDescription, setPreviewDescription] = useState<string>('');
   const [previewJson, setPreviewJson] = useState<DlqReprocessResult | null>(null);
   const [previewAction, setPreviewAction] = useState<null | { kind: 'finance' | 'ecommerce' | 'nfe' | 'stripe'; id: string }>(null);
+  const [sortRecent, setSortRecent] = useState<SortState<'when' | 'kind' | 'message'>>({ column: 'when', direction: 'desc' });
+  const [sortNfe, setSortNfe] = useState<SortState<'when' | 'event' | 'attempts' | 'error'>>({ column: 'when', direction: 'desc' });
+  const [sortStripe, setSortStripe] = useState<SortState<'when' | 'event' | 'attempts' | 'error'>>({ column: 'when', direction: 'desc' });
+  const [sortFinanceDlq, setSortFinanceDlq] = useState<SortState<'when' | 'type' | 'error'>>({ column: 'when', direction: 'desc' });
+  const [sortEcommerceDlq, setSortEcommerceDlq] = useState<SortState<'when' | 'provider' | 'kind' | 'error'>>({ column: 'when', direction: 'desc' });
+
+  const recentColumns: TableColumnWidthDef[] = [
+    { id: 'when', defaultWidth: 190, minWidth: 170 },
+    { id: 'kind', defaultWidth: 160, minWidth: 130 },
+    { id: 'message', defaultWidth: 520, minWidth: 260 },
+  ];
+  const { widths: recentWidths, startResize: startRecentResize } = useTableColumnWidths({
+    tableId: 'ops:health:recent-failures',
+    columns: recentColumns,
+  });
+
+  const nfeColumns: TableColumnWidthDef[] = [
+    { id: 'when', defaultWidth: 190, minWidth: 170 },
+    { id: 'event', defaultWidth: 320, minWidth: 220 },
+    { id: 'attempts', defaultWidth: 120, minWidth: 100 },
+    { id: 'error', defaultWidth: 420, minWidth: 240 },
+    { id: 'actions', defaultWidth: 220, minWidth: 200, resizable: false },
+  ];
+  const { widths: nfeWidths, startResize: startNfeResize } = useTableColumnWidths({
+    tableId: 'ops:health:nfe-webhooks',
+    columns: nfeColumns,
+  });
+
+  const stripeColumns: TableColumnWidthDef[] = [
+    { id: 'when', defaultWidth: 190, minWidth: 170 },
+    { id: 'event', defaultWidth: 260, minWidth: 200 },
+    { id: 'attempts', defaultWidth: 120, minWidth: 100 },
+    { id: 'error', defaultWidth: 420, minWidth: 240 },
+    { id: 'actions', defaultWidth: 220, minWidth: 200, resizable: false },
+  ];
+  const { widths: stripeWidths, startResize: startStripeResize } = useTableColumnWidths({
+    tableId: 'ops:health:stripe-webhooks',
+    columns: stripeColumns,
+  });
+
+  const financeDlqColumns: TableColumnWidthDef[] = [
+    { id: 'when', defaultWidth: 190, minWidth: 170 },
+    { id: 'type', defaultWidth: 220, minWidth: 170 },
+    { id: 'error', defaultWidth: 480, minWidth: 260 },
+    { id: 'actions', defaultWidth: 220, minWidth: 200, resizable: false },
+  ];
+  const { widths: financeDlqWidths, startResize: startFinanceDlqResize } = useTableColumnWidths({
+    tableId: 'ops:health:finance-dlq',
+    columns: financeDlqColumns,
+  });
+
+  const ecommerceDlqColumns: TableColumnWidthDef[] = [
+    { id: 'when', defaultWidth: 190, minWidth: 170 },
+    { id: 'provider', defaultWidth: 160, minWidth: 140 },
+    { id: 'kind', defaultWidth: 200, minWidth: 160 },
+    { id: 'error', defaultWidth: 480, minWidth: 260 },
+    { id: 'actions', defaultWidth: 220, minWidth: 200, resizable: false },
+  ];
+  const { widths: ecommerceDlqWidths, startResize: startEcommerceDlqResize } = useTableColumnWidths({
+    tableId: 'ops:health:ecommerce-dlq',
+    columns: ecommerceDlqColumns,
+  });
 
   const hasSupabase = !!supabase;
   const isDev = import.meta.env.DEV;
@@ -190,6 +256,58 @@ export default function HealthPage() {
 
   const canReprocess = !!permManage.data;
   const canSeeEcommerce = !!permEcommerceView.data;
+  const recentSorted = sortRows(
+    recent,
+    sortRecent as any,
+    [
+      { id: 'when', type: 'date', getValue: (r: OpsRecentFailure) => r.occurred_at ?? '' },
+      { id: 'kind', type: 'string', getValue: (r: OpsRecentFailure) => r.kind ?? '' },
+      { id: 'message', type: 'string', getValue: (r: OpsRecentFailure) => r.message ?? '' },
+    ] as const
+  );
+
+  const nfeSorted = sortRows(
+    nfeRows,
+    sortNfe as any,
+    [
+      { id: 'when', type: 'date', getValue: (r: NfeWebhookRow) => r.received_at ?? '' },
+      { id: 'event', type: 'string', getValue: (r: NfeWebhookRow) => r.event_type ?? '' },
+      { id: 'attempts', type: 'number', getValue: (r: NfeWebhookRow) => r.process_attempts ?? 0 },
+      { id: 'error', type: 'string', getValue: (r: NfeWebhookRow) => r.last_error ?? '' },
+    ] as const
+  );
+
+  const stripeSorted = sortRows(
+    stripeRows,
+    sortStripe as any,
+    [
+      { id: 'when', type: 'date', getValue: (r: StripeWebhookRow) => r.received_at ?? '' },
+      { id: 'event', type: 'string', getValue: (r: StripeWebhookRow) => r.event_type ?? '' },
+      { id: 'attempts', type: 'number', getValue: (r: StripeWebhookRow) => r.process_attempts ?? 0 },
+      { id: 'error', type: 'string', getValue: (r: StripeWebhookRow) => r.last_error ?? '' },
+    ] as const
+  );
+
+  const financeDlqSorted = sortRows(
+    financeDlqRows,
+    sortFinanceDlq as any,
+    [
+      { id: 'when', type: 'date', getValue: (r: FinanceDlqRow) => r.dead_lettered_at ?? '' },
+      { id: 'type', type: 'string', getValue: (r: FinanceDlqRow) => r.job_type ?? '' },
+      { id: 'error', type: 'string', getValue: (r: FinanceDlqRow) => r.last_error ?? '' },
+    ] as const
+  );
+
+  const ecommerceDlqSorted = sortRows(
+    ecommerceDlqRows,
+    sortEcommerceDlq as any,
+    [
+      { id: 'when', type: 'date', getValue: (r: EcommerceDlqRow) => r.failed_at ?? '' },
+      { id: 'provider', type: 'string', getValue: (r: EcommerceDlqRow) => r.provider ?? '' },
+      { id: 'kind', type: 'string', getValue: (r: EcommerceDlqRow) => r.kind ?? '' },
+      { id: 'error', type: 'string', getValue: (r: EcommerceDlqRow) => r.last_error ?? '' },
+    ] as const
+  );
 
   const openPreview = (
     title: string,
@@ -640,16 +758,38 @@ export default function HealthPage() {
             <div className="text-sm text-gray-600">Nenhuma falha relevante encontrada.</div>
           ) : (
             <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-gray-200">
+              <table className="min-w-full divide-y divide-gray-200 table-fixed">
+                <TableColGroup columns={recentColumns} widths={recentWidths} />
                 <thead className="bg-gray-50">
                   <tr>
-                    <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Quando</th>
-                    <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Tipo</th>
-                    <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Mensagem</th>
+                    <ResizableSortableTh
+                      columnId="when"
+                      label="Quando"
+                      sort={sortRecent}
+                      onSort={(col) => setSortRecent((prev) => toggleSort(prev as any, col))}
+                      onResizeStart={startRecentResize}
+                      className="px-3 py-2"
+                    />
+                    <ResizableSortableTh
+                      columnId="kind"
+                      label="Tipo"
+                      sort={sortRecent}
+                      onSort={(col) => setSortRecent((prev) => toggleSort(prev as any, col))}
+                      onResizeStart={startRecentResize}
+                      className="px-3 py-2"
+                    />
+                    <ResizableSortableTh
+                      columnId="message"
+                      label="Mensagem"
+                      sort={sortRecent}
+                      onSort={(col) => setSortRecent((prev) => toggleSort(prev as any, col))}
+                      onResizeStart={startRecentResize}
+                      className="px-3 py-2"
+                    />
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
-                  {recent.map((r, idx) => (
+                  {recentSorted.map((r, idx) => (
                     <tr key={`${r.kind}-${r.occurred_at}-${idx}`} className="hover:bg-gray-50">
                       <td className="px-3 py-2 text-sm text-gray-600 whitespace-nowrap">{formatDateTimeBR(r.occurred_at)}</td>
                       <td className="px-3 py-2 text-sm text-gray-700 whitespace-nowrap">{r.kind}</td>
@@ -674,18 +814,55 @@ export default function HealthPage() {
             <div className="text-sm text-gray-600">Nenhum webhook em falha.</div>
           ) : (
             <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-gray-200">
+              <table className="min-w-full divide-y divide-gray-200 table-fixed">
+                <TableColGroup columns={nfeColumns} widths={nfeWidths} />
                 <thead className="bg-gray-50">
                   <tr>
-                    <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Quando</th>
-                    <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Evento</th>
-                    <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Tent.</th>
-                    <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Erro</th>
-                    <th className="px-3 py-2" />
+                    <ResizableSortableTh
+                      columnId="when"
+                      label="Quando"
+                      sort={sortNfe}
+                      onSort={(col) => setSortNfe((prev) => toggleSort(prev as any, col))}
+                      onResizeStart={startNfeResize}
+                      className="px-3 py-2"
+                    />
+                    <ResizableSortableTh
+                      columnId="event"
+                      label="Evento"
+                      sort={sortNfe}
+                      onSort={(col) => setSortNfe((prev) => toggleSort(prev as any, col))}
+                      onResizeStart={startNfeResize}
+                      className="px-3 py-2"
+                    />
+                    <ResizableSortableTh
+                      columnId="attempts"
+                      label="Tent."
+                      sort={sortNfe}
+                      onSort={(col) => setSortNfe((prev) => toggleSort(prev as any, col))}
+                      onResizeStart={startNfeResize}
+                      className="px-3 py-2"
+                    />
+                    <ResizableSortableTh
+                      columnId="error"
+                      label="Erro"
+                      sort={sortNfe}
+                      onSort={(col) => setSortNfe((prev) => toggleSort(prev as any, col))}
+                      onResizeStart={startNfeResize}
+                      className="px-3 py-2"
+                    />
+                    <ResizableSortableTh
+                      columnId="actions"
+                      label={<span className="sr-only">Ações</span>}
+                      sortable={false}
+                      sort={sortNfe}
+                      onResizeStart={startNfeResize}
+                      className="px-3 py-2"
+                      align="right"
+                    />
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
-                  {nfeRows.map((e) => {
+                  {nfeSorted.map((e) => {
                     const busy = reprocessingId === e.id;
                     return (
                       <tr key={e.id} className="hover:bg-gray-50">
@@ -746,18 +923,55 @@ export default function HealthPage() {
             <div className="text-sm text-gray-600">Nenhum webhook em falha.</div>
           ) : (
             <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-gray-200">
+              <table className="min-w-full divide-y divide-gray-200 table-fixed">
+                <TableColGroup columns={stripeColumns} widths={stripeWidths} />
                 <thead className="bg-gray-50">
                   <tr>
-                    <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Quando</th>
-                    <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Evento</th>
-                    <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Tent.</th>
-                    <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Erro</th>
-                    <th className="px-3 py-2" />
+                    <ResizableSortableTh
+                      columnId="when"
+                      label="Quando"
+                      sort={sortStripe}
+                      onSort={(col) => setSortStripe((prev) => toggleSort(prev as any, col))}
+                      onResizeStart={startStripeResize}
+                      className="px-3 py-2"
+                    />
+                    <ResizableSortableTh
+                      columnId="event"
+                      label="Evento"
+                      sort={sortStripe}
+                      onSort={(col) => setSortStripe((prev) => toggleSort(prev as any, col))}
+                      onResizeStart={startStripeResize}
+                      className="px-3 py-2"
+                    />
+                    <ResizableSortableTh
+                      columnId="attempts"
+                      label="Tent."
+                      sort={sortStripe}
+                      onSort={(col) => setSortStripe((prev) => toggleSort(prev as any, col))}
+                      onResizeStart={startStripeResize}
+                      className="px-3 py-2"
+                    />
+                    <ResizableSortableTh
+                      columnId="error"
+                      label="Erro"
+                      sort={sortStripe}
+                      onSort={(col) => setSortStripe((prev) => toggleSort(prev as any, col))}
+                      onResizeStart={startStripeResize}
+                      className="px-3 py-2"
+                    />
+                    <ResizableSortableTh
+                      columnId="actions"
+                      label={<span className="sr-only">Ações</span>}
+                      sortable={false}
+                      sort={sortStripe}
+                      onResizeStart={startStripeResize}
+                      className="px-3 py-2"
+                      align="right"
+                    />
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
-                  {stripeRows.map((e) => {
+                  {stripeSorted.map((e) => {
                     const busy = reprocessingStripeId === e.id;
                     return (
                       <tr key={e.id} className="hover:bg-gray-50">
@@ -827,17 +1041,47 @@ export default function HealthPage() {
             <div className="text-sm text-gray-600">Nenhum item na DLQ.</div>
           ) : (
             <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-gray-200">
+              <table className="min-w-full divide-y divide-gray-200 table-fixed">
+                <TableColGroup columns={financeDlqColumns} widths={financeDlqWidths} />
                 <thead className="bg-gray-50">
                   <tr>
-                    <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Quando</th>
-                    <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Tipo</th>
-                    <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Erro</th>
-                    <th className="px-3 py-2" />
+                    <ResizableSortableTh
+                      columnId="when"
+                      label="Quando"
+                      sort={sortFinanceDlq}
+                      onSort={(col) => setSortFinanceDlq((prev) => toggleSort(prev as any, col))}
+                      onResizeStart={startFinanceDlqResize}
+                      className="px-3 py-2"
+                    />
+                    <ResizableSortableTh
+                      columnId="type"
+                      label="Tipo"
+                      sort={sortFinanceDlq}
+                      onSort={(col) => setSortFinanceDlq((prev) => toggleSort(prev as any, col))}
+                      onResizeStart={startFinanceDlqResize}
+                      className="px-3 py-2"
+                    />
+                    <ResizableSortableTh
+                      columnId="error"
+                      label="Erro"
+                      sort={sortFinanceDlq}
+                      onSort={(col) => setSortFinanceDlq((prev) => toggleSort(prev as any, col))}
+                      onResizeStart={startFinanceDlqResize}
+                      className="px-3 py-2"
+                    />
+                    <ResizableSortableTh
+                      columnId="actions"
+                      label={<span className="sr-only">Ações</span>}
+                      sortable={false}
+                      sort={sortFinanceDlq}
+                      onResizeStart={startFinanceDlqResize}
+                      className="px-3 py-2"
+                      align="right"
+                    />
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
-                  {financeDlqRows.map((row) => {
+                  {financeDlqSorted.map((row) => {
                     const busy = reprocessingFinanceDlqId === row.id;
                     return (
                       <tr key={row.id} className="hover:bg-gray-50">
@@ -902,18 +1146,55 @@ export default function HealthPage() {
             <div className="text-sm text-gray-600">Nenhum item na DLQ.</div>
           ) : (
             <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-gray-200">
+              <table className="min-w-full divide-y divide-gray-200 table-fixed">
+                <TableColGroup columns={ecommerceDlqColumns} widths={ecommerceDlqWidths} />
                 <thead className="bg-gray-50">
                   <tr>
-                    <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Quando</th>
-                    <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Provider</th>
-                    <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Tipo</th>
-                    <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Erro</th>
-                    <th className="px-3 py-2" />
+                    <ResizableSortableTh
+                      columnId="when"
+                      label="Quando"
+                      sort={sortEcommerceDlq}
+                      onSort={(col) => setSortEcommerceDlq((prev) => toggleSort(prev as any, col))}
+                      onResizeStart={startEcommerceDlqResize}
+                      className="px-3 py-2"
+                    />
+                    <ResizableSortableTh
+                      columnId="provider"
+                      label="Provider"
+                      sort={sortEcommerceDlq}
+                      onSort={(col) => setSortEcommerceDlq((prev) => toggleSort(prev as any, col))}
+                      onResizeStart={startEcommerceDlqResize}
+                      className="px-3 py-2"
+                    />
+                    <ResizableSortableTh
+                      columnId="kind"
+                      label="Tipo"
+                      sort={sortEcommerceDlq}
+                      onSort={(col) => setSortEcommerceDlq((prev) => toggleSort(prev as any, col))}
+                      onResizeStart={startEcommerceDlqResize}
+                      className="px-3 py-2"
+                    />
+                    <ResizableSortableTh
+                      columnId="error"
+                      label="Erro"
+                      sort={sortEcommerceDlq}
+                      onSort={(col) => setSortEcommerceDlq((prev) => toggleSort(prev as any, col))}
+                      onResizeStart={startEcommerceDlqResize}
+                      className="px-3 py-2"
+                    />
+                    <ResizableSortableTh
+                      columnId="actions"
+                      label={<span className="sr-only">Ações</span>}
+                      sortable={false}
+                      sort={sortEcommerceDlq}
+                      onResizeStart={startEcommerceDlqResize}
+                      className="px-3 py-2"
+                      align="right"
+                    />
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
-                  {ecommerceDlqRows.map((row) => {
+                  {ecommerceDlqSorted.map((row) => {
                     const busy = reprocessingEcommerceDlqId === row.id;
                     return (
                       <tr key={row.id} className="hover:bg-gray-50">

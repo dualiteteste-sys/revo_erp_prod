@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import { cancelarRecebimento, deleteRecebimento, listRecebimentoItens, listRecebimentos, Recebimento, type RecebimentoItem } from '@/services/recebimento';
 import { useNavigate } from 'react-router-dom';
 import { Loader2, PackageCheck, AlertTriangle, CheckCircle, Clock, FileText, Trash2, RotateCcw, TrendingDown } from 'lucide-react';
@@ -9,6 +9,10 @@ import { createContaPagarFromRecebimento, getContaPagarFromRecebimento } from '@
 import CsvExportDialog from '@/components/ui/CsvExportDialog';
 import { listDepositos, type EstoqueDeposito } from '@/services/suprimentos';
 import { applyDevolucaoFornecedor, createDevolucaoFornecedor } from '@/services/devolucaoFornecedor';
+import ResizableSortableTh, { type SortState } from '@/components/ui/table/ResizableSortableTh';
+import TableColGroup from '@/components/ui/table/TableColGroup';
+import { useTableColumnWidths, type TableColumnWidthDef } from '@/components/ui/table/useTableColumnWidths';
+import { sortRows, toggleSort } from '@/components/ui/table/sortUtils';
 
 export default function RecebimentoListPage() {
     const [recebimentos, setRecebimentos] = useState<Recebimento[]>([]);
@@ -32,6 +36,25 @@ export default function RecebimentoListPage() {
     const [devolucaoQtd, setDevolucaoQtd] = useState<Record<string, number>>({});
     const [depositos, setDepositos] = useState<EstoqueDeposito[]>([]);
     const [depositoId, setDepositoId] = useState<string | null>(null);
+    const [sort, setSort] = useState<SortState<string>>({ column: 'data', direction: 'desc' });
+    const [devSort, setDevSort] = useState<SortState<string>>({ column: 'produto', direction: 'asc' });
+
+    const listColumns: TableColumnWidthDef[] = [
+        { id: 'data', defaultWidth: 160, minWidth: 140 },
+        { id: 'fornecedor', defaultWidth: 420, minWidth: 220 },
+        { id: 'documento', defaultWidth: 220, minWidth: 180 },
+        { id: 'valor_total', defaultWidth: 160, minWidth: 140 },
+        { id: 'status', defaultWidth: 160, minWidth: 140 },
+        { id: 'acoes', defaultWidth: 200, minWidth: 180 },
+    ];
+    const devColumns: TableColumnWidthDef[] = [
+        { id: 'produto', defaultWidth: 420, minWidth: 240 },
+        { id: 'nfe', defaultWidth: 220, minWidth: 160 },
+        { id: 'qtd_recebida', defaultWidth: 160, minWidth: 140 },
+        { id: 'qtd_devolver', defaultWidth: 160, minWidth: 140 },
+    ];
+    const { widths: listWidths, startResize: startResizeList } = useTableColumnWidths({ tableId: 'suprimentos:recebimentos', columns: listColumns });
+    const { widths: devWidths, startResize: startResizeDev } = useTableColumnWidths({ tableId: 'suprimentos:recebimentos:devolucao', columns: devColumns });
 
     useEffect(() => {
         loadData();
@@ -48,6 +71,40 @@ export default function RecebimentoListPage() {
             setLoading(false);
         }
     };
+
+    const sortedRecebimentos = useMemo(() => {
+        return sortRows(
+            recebimentos,
+            sort as any,
+            [
+                { id: 'data', type: 'date', getValue: (r) => r.data_recebimento ?? null },
+                { id: 'fornecedor', type: 'string', getValue: (r) => r.fiscal_nfe_imports?.emitente_nome ?? '' },
+                {
+                    id: 'documento',
+                    type: 'string',
+                    getValue: (r) =>
+                        r.fiscal_nfe_imports?.numero
+                            ? `NF ${r.fiscal_nfe_imports.numero}/${r.fiscal_nfe_imports.serie ?? ''}`
+                            : '',
+                },
+                { id: 'valor_total', type: 'number', getValue: (r) => Number(r.fiscal_nfe_imports?.total_nf ?? 0) },
+                { id: 'status', type: 'string', getValue: (r) => String(r.status ?? '') },
+            ] as const
+        );
+    }, [recebimentos, sort]);
+
+    const sortedDevolucaoItens = useMemo(() => {
+        return sortRows(
+            devolucaoItens,
+            devSort as any,
+            [
+                { id: 'produto', type: 'string', getValue: (it) => it.produtos?.nome ?? it.fiscal_nfe_import_items?.xprod ?? 'Item' },
+                { id: 'nfe', type: 'string', getValue: (it) => `${it.fiscal_nfe_import_items?.cprod ?? ''} ${it.fiscal_nfe_import_items?.ean ?? ''}` },
+                { id: 'qtd_recebida', type: 'number', getValue: (it) => Number(it.quantidade_conferida || it.quantidade_xml || 0) },
+                { id: 'qtd_devolver', type: 'number', getValue: (it) => Number(devolucaoQtd[it.id] ?? 0) },
+            ] as const
+        );
+    }, [devolucaoItens, devSort, devolucaoQtd]);
 
     const getStatusBadge = (status: string) => {
         switch (status) {
@@ -220,14 +277,15 @@ export default function RecebimentoListPage() {
             <div className="bg-white rounded-xl shadow overflow-hidden">
                 <div className="overflow-x-auto">
                     <table className="min-w-full divide-y divide-gray-200">
+                        <TableColGroup columns={listColumns} widths={listWidths} />
                         <thead className="bg-gray-50">
                             <tr>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Data</th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Fornecedor / Cliente</th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Documento</th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Valor Total</th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Ações</th>
+                                <ResizableSortableTh columnId="data" label="Data" sort={sort as any} onSort={(col) => setSort((prev) => toggleSort(prev as any, col))} onResizeStart={startResizeList as any} />
+                                <ResizableSortableTh columnId="fornecedor" label="Fornecedor / Cliente" sort={sort as any} onSort={(col) => setSort((prev) => toggleSort(prev as any, col))} onResizeStart={startResizeList as any} />
+                                <ResizableSortableTh columnId="documento" label="Documento" sort={sort as any} onSort={(col) => setSort((prev) => toggleSort(prev as any, col))} onResizeStart={startResizeList as any} />
+                                <ResizableSortableTh columnId="valor_total" label="Valor Total" sort={sort as any} onSort={(col) => setSort((prev) => toggleSort(prev as any, col))} onResizeStart={startResizeList as any} />
+                                <ResizableSortableTh columnId="status" label="Status" sort={sort as any} onSort={(col) => setSort((prev) => toggleSort(prev as any, col))} onResizeStart={startResizeList as any} />
+                                <ResizableSortableTh columnId="acoes" label="Ações" align="right" sortable={false} resizable onResizeStart={startResizeList as any} />
                             </tr>
                         </thead>
                         <tbody className="bg-white divide-y divide-gray-200">
@@ -236,7 +294,7 @@ export default function RecebimentoListPage() {
                             ) : recebimentos.length === 0 ? (
                                 <tr><td colSpan={6} className="p-8 text-center text-gray-500">Nenhum recebimento registrado.</td></tr>
                             ) : (
-                                recebimentos.map((rec) => (
+                                sortedRecebimentos.map((rec) => (
                                     <tr key={rec.id} className="hover:bg-gray-50 transition-colors">
                                         <td className="px-6 py-4 text-sm text-gray-900">
                                             {new Date(rec.data_recebimento).toLocaleDateString()}
@@ -423,16 +481,17 @@ export default function RecebimentoListPage() {
                         <div className="bg-gray-50 px-4 py-2 text-xs font-semibold text-gray-600">Itens</div>
                         <div className="max-h-[50vh] overflow-auto">
                             <table className="min-w-full text-sm">
+                                <TableColGroup columns={devColumns} widths={devWidths} />
                                 <thead className="bg-white sticky top-0 z-10">
                                     <tr className="text-left text-gray-500 border-b">
-                                        <th className="p-3">Produto</th>
-                                        <th className="p-3">NF-e</th>
-                                        <th className="p-3 text-right">Qtd. recebida</th>
-                                        <th className="p-3 text-right">Qtd. devolver</th>
+                                        <ResizableSortableTh columnId="produto" label="Produto" className="p-3 normal-case tracking-normal" sort={devSort as any} onSort={(col) => setDevSort((prev) => toggleSort(prev as any, col))} onResizeStart={startResizeDev as any} />
+                                        <ResizableSortableTh columnId="nfe" label="NF-e" className="p-3 normal-case tracking-normal" sort={devSort as any} onSort={(col) => setDevSort((prev) => toggleSort(prev as any, col))} onResizeStart={startResizeDev as any} />
+                                        <ResizableSortableTh columnId="qtd_recebida" label="Qtd. recebida" align="right" className="p-3 normal-case tracking-normal" sort={devSort as any} onSort={(col) => setDevSort((prev) => toggleSort(prev as any, col))} onResizeStart={startResizeDev as any} />
+                                        <ResizableSortableTh columnId="qtd_devolver" label="Qtd. devolver" align="right" className="p-3 normal-case tracking-normal" sort={devSort as any} onSort={(col) => setDevSort((prev) => toggleSort(prev as any, col))} onResizeStart={startResizeDev as any} />
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y">
-                                    {devolucaoItens.map((it) => {
+                                    {sortedDevolucaoItens.map((it) => {
                                         const max = Number(it.quantidade_conferida || it.quantidade_xml || 0);
                                         const current = devolucaoQtd[it.id] ?? 0;
                                         return (

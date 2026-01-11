@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import Modal from '@/components/ui/Modal';
 import Input from '@/components/ui/forms/Input';
 import Select from '@/components/ui/forms/Select';
@@ -19,6 +19,10 @@ import { useConfirm } from '@/contexts/ConfirmProvider';
 import PlanoCaracteristicaModal from './PlanoCaracteristicaModal';
 import { getRoteiroDetails, listRoteiros, RoteiroEtapa, RoteiroListItem } from '@/services/industriaRoteiros';
 import { logger } from '@/lib/logger';
+import ResizableSortableTh, { type SortState } from '@/components/ui/table/ResizableSortableTh';
+import TableColGroup from '@/components/ui/table/TableColGroup';
+import { useTableColumnWidths, type TableColumnWidthDef } from '@/components/ui/table/useTableColumnWidths';
+import { sortRows, toggleSort } from '@/components/ui/table/sortUtils';
 
 interface Props {
   isOpen: boolean;
@@ -60,6 +64,38 @@ export default function PlanoInspecaoFormModal({ isOpen, onClose, planoId, onSav
   const [roteiros, setRoteiros] = useState<RoteiroListItem[]>([]);
   const [etapas, setEtapas] = useState<RoteiroEtapa[]>([]);
   const [caracteristicas, setCaracteristicas] = useState<PlanoCaracteristica[]>([]);
+  const [caracteristicasSort, setCaracteristicasSort] = useState<SortState<string>>({
+    column: 'descricao',
+    direction: 'asc',
+  });
+
+  const caracteristicasColumns: TableColumnWidthDef[] = [
+    { id: 'descricao', defaultWidth: 360, minWidth: 220 },
+    { id: 'tolerancia', defaultWidth: 220, minWidth: 160 },
+    { id: 'unidade', defaultWidth: 160, minWidth: 120 },
+    { id: 'instrumento', defaultWidth: 220, minWidth: 160 },
+    { id: 'acoes', defaultWidth: 180, minWidth: 160 },
+  ];
+  const { widths: caracteristicasWidths, startResize: startCaracteristicasResize } = useTableColumnWidths({
+    tableId: 'industria:qualidade:plano-inspecao-caracteristicas',
+    columns: caracteristicasColumns,
+  });
+  const sortedCaracteristicas = useMemo(() => {
+    return sortRows(
+      caracteristicas,
+      caracteristicasSort as any,
+      [
+        { id: 'descricao', type: 'string', getValue: (c) => c.descricao ?? '' },
+        {
+          id: 'tolerancia',
+          type: 'string',
+          getValue: (c) => `${c.tolerancia_min ?? ''}/${c.tolerancia_max ?? ''}`,
+        },
+        { id: 'unidade', type: 'string', getValue: (c) => c.unidade ?? '' },
+        { id: 'instrumento', type: 'string', getValue: (c) => c.instrumento ?? '' },
+      ] as const
+    );
+  }, [caracteristicas, caracteristicasSort]);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [caracteristicaModalOpen, setCaracteristicaModalOpen] = useState(false);
@@ -388,18 +424,55 @@ export default function PlanoInspecaoFormModal({ isOpen, onClose, planoId, onSav
                   <p className="text-sm text-gray-500">Nenhuma característica cadastrada.</p>
                 ) : (
                   <div className="overflow-x-auto">
-                    <table className="min-w-full text-sm">
+                    <table className="min-w-full text-sm table-fixed">
+                      <TableColGroup columns={caracteristicasColumns} widths={caracteristicasWidths} />
                       <thead className="bg-gray-50 text-gray-500 uppercase text-xs">
                         <tr>
-                          <th className="px-3 py-2 text-left">Descrição</th>
-                          <th className="px-3 py-2 text-left">Tolerância</th>
-                          <th className="px-3 py-2 text-left">Unidade</th>
-                          <th className="px-3 py-2 text-left">Instrumento</th>
-                          <th className="px-3 py-2 text-center">Ações</th>
+                          <ResizableSortableTh
+                            columnId="descricao"
+                            label="Descrição"
+                            className="px-3 py-2 text-left"
+                            sort={caracteristicasSort as any}
+                            onSort={(col) => setCaracteristicasSort((prev) => toggleSort(prev as any, col))}
+                            onResizeStart={startCaracteristicasResize}
+                          />
+                          <ResizableSortableTh
+                            columnId="tolerancia"
+                            label="Tolerância"
+                            className="px-3 py-2 text-left"
+                            sort={caracteristicasSort as any}
+                            onSort={(col) => setCaracteristicasSort((prev) => toggleSort(prev as any, col))}
+                            onResizeStart={startCaracteristicasResize}
+                          />
+                          <ResizableSortableTh
+                            columnId="unidade"
+                            label="Unidade"
+                            className="px-3 py-2 text-left"
+                            sort={caracteristicasSort as any}
+                            onSort={(col) => setCaracteristicasSort((prev) => toggleSort(prev as any, col))}
+                            onResizeStart={startCaracteristicasResize}
+                          />
+                          <ResizableSortableTh
+                            columnId="instrumento"
+                            label="Instrumento"
+                            className="px-3 py-2 text-left"
+                            sort={caracteristicasSort as any}
+                            onSort={(col) => setCaracteristicasSort((prev) => toggleSort(prev as any, col))}
+                            onResizeStart={startCaracteristicasResize}
+                          />
+                          <ResizableSortableTh
+                            columnId="acoes"
+                            label="Ações"
+                            align="center"
+                            className="px-3 py-2"
+                            sortable={false}
+                            resizable
+                            onResizeStart={startCaracteristicasResize}
+                          />
                         </tr>
                       </thead>
                       <tbody>
-                        {caracteristicas.map((car) => (
+                        {sortedCaracteristicas.map((car) => (
                           <tr key={car.id} className="border-t">
                             <td className="px-3 py-2 font-medium text-gray-800">{car.descricao}</td>
                             <td className="px-3 py-2 text-gray-600">

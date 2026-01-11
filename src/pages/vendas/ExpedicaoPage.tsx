@@ -3,6 +3,10 @@ import { AlertTriangle, CheckCircle2, Clock3, Loader2, PlusCircle, ScanLine, Sea
 import Modal from '@/components/ui/Modal';
 import { useToast } from '@/contexts/ToastProvider';
 import { listVendas, type VendaPedido } from '@/services/vendas';
+import ResizableSortableTh, { type SortState } from '@/components/ui/table/ResizableSortableTh';
+import TableColGroup from '@/components/ui/table/TableColGroup';
+import { useTableColumnWidths, type TableColumnWidthDef } from '@/components/ui/table/useTableColumnWidths';
+import { sortRows, toggleSort } from '@/components/ui/table/sortUtils';
 import {
   getExpedicaoSlaStats,
   listExpedicaoEventos,
@@ -51,6 +55,17 @@ export default function ExpedicaoPage() {
   const [form, setForm] = useState<FormState>(emptyForm);
   const [isScanOpen, setIsScanOpen] = useState(false);
   const [scanMode, setScanMode] = useState<'search' | 'tracking'>('search');
+  const [sort, setSort] = useState<SortState<string>>({ column: 'pedido', direction: 'desc' });
+
+  const columns: TableColumnWidthDef[] = [
+    { id: 'pedido', defaultWidth: 360, minWidth: 240 },
+    { id: 'status', defaultWidth: 160, minWidth: 140 },
+    { id: 'rastreio', defaultWidth: 200, minWidth: 160 },
+    { id: 'envio', defaultWidth: 150, minWidth: 140 },
+    { id: 'entrega', defaultWidth: 150, minWidth: 140 },
+    { id: 'acoes', defaultWidth: 140, minWidth: 120 },
+  ];
+  const { widths, startResize } = useTableColumnWidths({ tableId: 'vendas:expedicao', columns });
 
   const filteredRows = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -62,6 +77,20 @@ export default function ExpedicaoPage() {
       return hay.includes(q);
     });
   }, [rows, search, statusFilter, onlyOverdue]);
+
+  const sortedRows = useMemo(() => {
+    return sortRows(
+      filteredRows,
+      sort as any,
+      [
+        { id: 'pedido', type: 'number', getValue: (r) => r.pedido_numero ?? 0 },
+        { id: 'status', type: 'string', getValue: (r) => statusLabel[r.status] ?? String(r.status ?? '') },
+        { id: 'rastreio', type: 'string', getValue: (r) => r.tracking_code ?? '' },
+        { id: 'envio', type: 'date', getValue: (r) => r.data_envio ?? null },
+        { id: 'entrega', type: 'date', getValue: (r) => r.data_entrega ?? null },
+      ] as const
+    );
+  }, [filteredRows, sort]);
 
   async function load() {
     setLoading(true);
@@ -341,18 +370,19 @@ export default function ExpedicaoPage() {
         ) : (
           <div className="overflow-auto">
             <table className="min-w-full text-sm">
+              <TableColGroup columns={columns} widths={widths} />
               <thead className="bg-gray-50">
                 <tr className="text-left text-gray-600">
-                  <th className="px-4 py-3">Pedido</th>
-                  <th className="px-4 py-3">Status</th>
-                  <th className="px-4 py-3">Rastreio</th>
-                  <th className="px-4 py-3">Envio</th>
-                  <th className="px-4 py-3">Entrega</th>
-                  <th className="px-4 py-3 text-right">Ações</th>
+                  <ResizableSortableTh columnId="pedido" label="Pedido" className="px-4 py-3 normal-case tracking-normal" sort={sort as any} onSort={(col) => setSort((prev) => toggleSort(prev as any, col))} onResizeStart={startResize as any} />
+                  <ResizableSortableTh columnId="status" label="Status" className="px-4 py-3 normal-case tracking-normal" sort={sort as any} onSort={(col) => setSort((prev) => toggleSort(prev as any, col))} onResizeStart={startResize as any} />
+                  <ResizableSortableTh columnId="rastreio" label="Rastreio" className="px-4 py-3 normal-case tracking-normal" sort={sort as any} onSort={(col) => setSort((prev) => toggleSort(prev as any, col))} onResizeStart={startResize as any} />
+                  <ResizableSortableTh columnId="envio" label="Envio" className="px-4 py-3 normal-case tracking-normal" sort={sort as any} onSort={(col) => setSort((prev) => toggleSort(prev as any, col))} onResizeStart={startResize as any} />
+                  <ResizableSortableTh columnId="entrega" label="Entrega" className="px-4 py-3 normal-case tracking-normal" sort={sort as any} onSort={(col) => setSort((prev) => toggleSort(prev as any, col))} onResizeStart={startResize as any} />
+                  <ResizableSortableTh columnId="acoes" label="Ações" align="right" className="px-4 py-3 normal-case tracking-normal" sortable={false} resizable onResizeStart={startResize as any} />
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200">
-                {filteredRows.map((r) => {
+                {sortedRows.map((r) => {
                   return (
                     <tr key={r.expedicao_id} className={`hover:bg-gray-50 ${r.overdue ? 'bg-orange-50/40' : ''}`}>
                       <td className="px-4 py-3 font-medium text-gray-800">

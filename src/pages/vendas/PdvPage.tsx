@@ -1,9 +1,13 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { DoorClosed, DoorOpen, Loader2, PlusCircle, Printer, Search, Store, Wallet } from 'lucide-react';
 import Modal from '@/components/ui/Modal';
 import { useToast } from '@/contexts/ToastProvider';
 import PedidoVendaFormPanel from '@/components/vendas/PedidoVendaFormPanel';
 import { listContasCorrentes, type ContaCorrente } from '@/services/treasury';
+import ResizableSortableTh, { type SortState } from '@/components/ui/table/ResizableSortableTh';
+import TableColGroup from '@/components/ui/table/TableColGroup';
+import { useTableColumnWidths, type TableColumnWidthDef } from '@/components/ui/table/useTableColumnWidths';
+import { sortRows, toggleSort } from '@/components/ui/table/sortUtils';
 import {
   closePdvCaixa,
   estornarPdv,
@@ -121,6 +125,16 @@ export default function PdvPage() {
   const [receiptVenda, setReceiptVenda] = useState<VendaDetails | null>(null);
   const [isReceiptOpen, setIsReceiptOpen] = useState(false);
   const [queuedIds, setQueuedIds] = useState<Set<string>>(() => getQueuedPdvFinalizeIds());
+  const [sort, setSort] = useState<SortState<string>>({ column: 'data', direction: 'desc' });
+
+  const columns: TableColumnWidthDef[] = [
+    { id: 'numero', defaultWidth: 120, minWidth: 100 },
+    { id: 'data', defaultWidth: 150, minWidth: 140 },
+    { id: 'status', defaultWidth: 220, minWidth: 160 },
+    { id: 'total', defaultWidth: 160, minWidth: 140 },
+    { id: 'acoes', defaultWidth: 360, minWidth: 240 },
+  ];
+  const { widths, startResize } = useTableColumnWidths({ tableId: 'vendas:pdv', columns });
 
   const refreshQueued = () => setQueuedIds(getQueuedPdvFinalizeIds());
 
@@ -198,12 +212,27 @@ export default function PdvPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const filteredRows = rows.filter((r) => {
+  const filteredRows = useMemo(() => {
     const q = search.trim().toLowerCase();
-    if (statusFilter !== 'all' && String(r.status) !== statusFilter) return false;
-    if (!q) return true;
-    return String(r.numero).includes(q);
-  });
+    return rows.filter((r) => {
+      if (statusFilter !== 'all' && String(r.status) !== statusFilter) return false;
+      if (!q) return true;
+      return String(r.numero).includes(q);
+    });
+  }, [rows, search, statusFilter]);
+
+  const sortedRows = useMemo(() => {
+    return sortRows(
+      filteredRows,
+      sort as any,
+      [
+        { id: 'numero', type: 'number', getValue: (r) => r.numero ?? 0 },
+        { id: 'data', type: 'date', getValue: (r) => r.data_emissao ?? null },
+        { id: 'status', type: 'string', getValue: (r) => String(r.status ?? '') },
+        { id: 'total', type: 'number', getValue: (r) => r.total_geral ?? 0 },
+      ] as const
+    );
+  }, [filteredRows, sort]);
 
   const openNew = () => {
     setSelectedId(null);
@@ -590,17 +619,18 @@ export default function PdvPage() {
         ) : (
           <div className="overflow-auto">
             <table className="min-w-full text-sm">
+              <TableColGroup columns={columns} widths={widths} />
               <thead className="bg-gray-50">
                 <tr className="text-left text-gray-600">
-                  <th className="px-4 py-3">Número</th>
-                  <th className="px-4 py-3">Data</th>
-                  <th className="px-4 py-3">Status</th>
-                  <th className="px-4 py-3">Total</th>
-                  <th className="px-4 py-3 text-right">Ações</th>
+                  <ResizableSortableTh columnId="numero" label="Número" className="px-4 py-3 normal-case tracking-normal" sort={sort as any} onSort={(col) => setSort((prev) => toggleSort(prev as any, col))} onResizeStart={startResize as any} />
+                  <ResizableSortableTh columnId="data" label="Data" className="px-4 py-3 normal-case tracking-normal" sort={sort as any} onSort={(col) => setSort((prev) => toggleSort(prev as any, col))} onResizeStart={startResize as any} />
+                  <ResizableSortableTh columnId="status" label="Status" className="px-4 py-3 normal-case tracking-normal" sort={sort as any} onSort={(col) => setSort((prev) => toggleSort(prev as any, col))} onResizeStart={startResize as any} />
+                  <ResizableSortableTh columnId="total" label="Total" className="px-4 py-3 normal-case tracking-normal" sort={sort as any} onSort={(col) => setSort((prev) => toggleSort(prev as any, col))} onResizeStart={startResize as any} />
+                  <ResizableSortableTh columnId="acoes" label="Ações" align="right" className="px-4 py-3 normal-case tracking-normal" sortable={false} resizable onResizeStart={startResize as any} />
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200">
-                {filteredRows.map((r) => (
+                {sortedRows.map((r) => (
                   <tr key={r.id} className="hover:bg-gray-50">
                     <td className="px-4 py-3 font-medium text-gray-800">#{r.numero}</td>
                     <td className="px-4 py-3">{r.data_emissao}</td>

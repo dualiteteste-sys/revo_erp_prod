@@ -5,6 +5,10 @@ import { useToast } from '@/contexts/ToastProvider';
 import { getVendaDetails, listVendas, type VendaDetails, type VendaPedido } from '@/services/vendas';
 import { createDevolucaoWithSideEffects, listDevolucoes, type Devolucao } from '@/services/vendasMvp';
 import { listContasCorrentes, type ContaCorrente } from '@/services/treasury';
+import ResizableSortableTh, { type SortState } from '@/components/ui/table/ResizableSortableTh';
+import TableColGroup from '@/components/ui/table/TableColGroup';
+import { useTableColumnWidths, type TableColumnWidthDef } from '@/components/ui/table/useTableColumnWidths';
+import { sortRows, toggleSort } from '@/components/ui/table/sortUtils';
 
 type ItemState = {
   produto_id: string;
@@ -34,6 +38,23 @@ export default function DevolucoesPage() {
   const [isOpen, setIsOpen] = useState(false);
   const [form, setForm] = useState<FormState>(emptyForm);
   const [loadingPedido, setLoadingPedido] = useState(false);
+  const [sort, setSort] = useState<SortState<string>>({ column: 'data', direction: 'desc' });
+  const [itemsSort, setItemsSort] = useState<SortState<string>>({ column: 'produto', direction: 'asc' });
+
+  const listColumns: TableColumnWidthDef[] = [
+    { id: 'data', defaultWidth: 150, minWidth: 140 },
+    { id: 'pedido', defaultWidth: 420, minWidth: 260 },
+    { id: 'status', defaultWidth: 160, minWidth: 140 },
+    { id: 'valor', defaultWidth: 160, minWidth: 140 },
+  ];
+  const itensColumns: TableColumnWidthDef[] = [
+    { id: 'sel', defaultWidth: 80, minWidth: 70 },
+    { id: 'produto', defaultWidth: 360, minWidth: 220 },
+    { id: 'qtd', defaultWidth: 120, minWidth: 100 },
+    { id: 'unit', defaultWidth: 140, minWidth: 120 },
+  ];
+  const { widths: listWidths, startResize: startResizeList } = useTableColumnWidths({ tableId: 'vendas:devolucoes', columns: listColumns });
+  const { widths: itensWidths, startResize: startResizeItens } = useTableColumnWidths({ tableId: 'vendas:devolucoes:itens', columns: itensColumns });
 
   async function load() {
     setLoading(true);
@@ -69,6 +90,33 @@ export default function DevolucoesPage() {
     for (const o of orders) map.set(o.id, o);
     return map;
   }, [orders]);
+
+  const sortedRows = useMemo(() => {
+    return sortRows(
+      rows,
+      sort as any,
+      [
+        { id: 'data', type: 'date', getValue: (r) => (r as any).data_devolucao ?? null },
+        { id: 'pedido', type: 'number', getValue: (r) => orderById.get((r as any).pedido_id)?.numero ?? 0 },
+        { id: 'status', type: 'string', getValue: (r) => String((r as any).status ?? '') },
+        { id: 'valor', type: 'number', getValue: (r) => Number((r as any).valor_total ?? 0) },
+      ] as const
+    );
+  }, [orderById, rows, sort]);
+
+  const sortedItens = useMemo(() => {
+    const base = form.itens.map((item, index) => ({ item, index }));
+    const sorted = sortRows(
+      base,
+      itemsSort as any,
+      [
+        { id: 'produto', type: 'string', getValue: (r) => r.item.produto_nome ?? '' },
+        { id: 'qtd', type: 'number', getValue: (r) => Number(r.item.quantidade ?? 0) },
+        { id: 'unit', type: 'number', getValue: (r) => Number(r.item.valor_unitario ?? 0) },
+      ] as const
+    );
+    return sorted;
+  }, [form.itens, itemsSort]);
 
   const openNew = () => {
     setForm((s) => ({ ...emptyForm, conta_corrente_id: s.conta_corrente_id }));
@@ -169,16 +217,17 @@ export default function DevolucoesPage() {
         ) : (
           <div className="overflow-auto">
             <table className="min-w-full text-sm">
+              <TableColGroup columns={listColumns} widths={listWidths} />
               <thead className="bg-gray-50">
                 <tr className="text-left text-gray-600">
-                  <th className="px-4 py-3">Data</th>
-                  <th className="px-4 py-3">Pedido</th>
-                  <th className="px-4 py-3">Status</th>
-                  <th className="px-4 py-3">Valor</th>
+                  <ResizableSortableTh columnId="data" label="Data" className="px-4 py-3 normal-case tracking-normal" sort={sort as any} onSort={(col) => setSort((prev) => toggleSort(prev as any, col))} onResizeStart={startResizeList as any} />
+                  <ResizableSortableTh columnId="pedido" label="Pedido" className="px-4 py-3 normal-case tracking-normal" sort={sort as any} onSort={(col) => setSort((prev) => toggleSort(prev as any, col))} onResizeStart={startResizeList as any} />
+                  <ResizableSortableTh columnId="status" label="Status" className="px-4 py-3 normal-case tracking-normal" sort={sort as any} onSort={(col) => setSort((prev) => toggleSort(prev as any, col))} onResizeStart={startResizeList as any} />
+                  <ResizableSortableTh columnId="valor" label="Valor" className="px-4 py-3 normal-case tracking-normal" sort={sort as any} onSort={(col) => setSort((prev) => toggleSort(prev as any, col))} onResizeStart={startResizeList as any} />
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200">
-                {rows.map((r) => {
+                {sortedRows.map((r) => {
                   const o = orderById.get(r.pedido_id);
                   return (
                     <tr key={r.id} className="hover:bg-gray-50">
@@ -250,17 +299,18 @@ export default function DevolucoesPage() {
             ) : (
               <div className="overflow-auto max-h-[320px]">
                 <table className="min-w-full text-sm">
+                  <TableColGroup columns={itensColumns} widths={itensWidths} />
                   <thead>
                     <tr className="text-left text-gray-600">
-                      <th className="py-2 pr-2">Sel.</th>
-                      <th className="py-2 pr-2">Produto</th>
-                      <th className="py-2 pr-2">Qtd</th>
-                      <th className="py-2 pr-2">Vl. Unit.</th>
+                      <ResizableSortableTh columnId="sel" label="Sel." className="py-2 pr-2 px-0 normal-case tracking-normal" sortable={false} resizable onResizeStart={startResizeItens as any} />
+                      <ResizableSortableTh columnId="produto" label="Produto" className="py-2 pr-2 px-0 normal-case tracking-normal" sort={itemsSort as any} onSort={(col) => setItemsSort((prev) => toggleSort(prev as any, col))} onResizeStart={startResizeItens as any} />
+                      <ResizableSortableTh columnId="qtd" label="Qtd" className="py-2 pr-2 px-0 normal-case tracking-normal" sort={itemsSort as any} onSort={(col) => setItemsSort((prev) => toggleSort(prev as any, col))} onResizeStart={startResizeItens as any} />
+                      <ResizableSortableTh columnId="unit" label="Vl. Unit." className="py-2 pr-2 px-0 normal-case tracking-normal" sort={itemsSort as any} onSort={(col) => setItemsSort((prev) => toggleSort(prev as any, col))} onResizeStart={startResizeItens as any} />
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-200">
-                    {form.itens.map((it, idx) => (
-                      <tr key={`${it.produto_id}-${idx}`}>
+                    {sortedItens.map(({ item: it, index }) => (
+                      <tr key={`${it.produto_id}-${index}`}>
                         <td className="py-2 pr-2">
                           <input
                             type="checkbox"
@@ -268,7 +318,7 @@ export default function DevolucoesPage() {
                             onChange={(e) =>
                               setForm((s) => ({
                                 ...s,
-                                itens: s.itens.map((x, i) => (i === idx ? { ...x, selected: e.target.checked } : x)),
+                                itens: s.itens.map((x, i) => (i === index ? { ...x, selected: e.target.checked } : x)),
                               }))
                             }
                           />
@@ -281,7 +331,7 @@ export default function DevolucoesPage() {
                             onChange={(e) =>
                               setForm((s) => ({
                                 ...s,
-                                itens: s.itens.map((x, i) => (i === idx ? { ...x, quantidade: e.target.value } : x)),
+                                itens: s.itens.map((x, i) => (i === index ? { ...x, quantidade: e.target.value } : x)),
                               }))
                             }
                             className="w-24 p-2 border border-gray-300 rounded-lg"
@@ -294,7 +344,7 @@ export default function DevolucoesPage() {
                             onChange={(e) =>
                               setForm((s) => ({
                                 ...s,
-                                itens: s.itens.map((x, i) => (i === idx ? { ...x, valor_unitario: e.target.value } : x)),
+                                itens: s.itens.map((x, i) => (i === index ? { ...x, valor_unitario: e.target.value } : x)),
                               }))
                             }
                             className="w-28 p-2 border border-gray-300 rounded-lg"

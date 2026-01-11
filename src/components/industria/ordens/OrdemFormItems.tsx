@@ -7,6 +7,9 @@ import ItemAutocomplete from '@/components/os/ItemAutocomplete';
 import { OsItemSearchResult } from '@/services/os';
 import ReservaLotesModal from '@/components/industria/estoque/ReservaLotesModal';
 import ConsumoItemModal from '@/components/industria/estoque/ConsumoItemModal';
+import ResizableSortableTh from '@/components/ui/table/ResizableSortableTh';
+import TableColGroup from '@/components/ui/table/TableColGroup';
+import { useTableColumnWidths, type TableColumnWidthDef } from '@/components/ui/table/useTableColumnWidths';
 
 interface OrdemFormItemsProps {
   ordemId?: string; // Add ordemId to props to pass to modals
@@ -25,6 +28,16 @@ const OrdemFormItems: React.FC<OrdemFormItemsProps> = ({ items, ordemId, onRemov
   const [consumoModalOpen, setConsumoModalOpen] = useState(false);
   const [selectedItem, setSelectedItem] = useState<OrdemComponente | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
+  const columns: TableColumnWidthDef[] = [
+    { id: 'produto', defaultWidth: 360, minWidth: 240 },
+    { id: 'qtd', defaultWidth: 160, minWidth: 140 },
+    { id: 'perda', defaultWidth: 120, minWidth: 110 },
+    { id: 'un', defaultWidth: 100, minWidth: 90 },
+    { id: 'reservado', defaultWidth: 140, minWidth: 120 },
+    { id: 'consumido', defaultWidth: 140, minWidth: 120 },
+    { id: 'acoes', defaultWidth: 80, minWidth: 70, resizable: false },
+  ];
+  const { widths, startResize } = useTableColumnWidths({ tableId: `industria:ordem:itens:${ordemId ?? 'new'}`, columns });
 
   const activeHighlight = useMemo(() => {
     if (!highlightItemId) return null;
@@ -63,16 +76,17 @@ const OrdemFormItems: React.FC<OrdemFormItemsProps> = ({ items, ordemId, onRemov
         )}
 
         <div ref={containerRef} className="overflow-x-auto border border-gray-200 rounded-lg">
-          <table className="min-w-full divide-y divide-gray-200">
+          <table className="min-w-full divide-y divide-gray-200 table-fixed">
+            <TableColGroup columns={columns} widths={widths} />
             <thead className="bg-gray-50">
               <tr>
-                <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Produto</th>
-                <th className="px-3 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Qtd. Planejada</th>
-                <th className="px-3 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Perda %</th>
-                <th className="px-3 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Un.</th>
-                <th className="px-3 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Reservado</th>
-                <th className="px-3 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Consumido</th>
-                {!readOnly && <th className="px-3 py-3"></th>}
+                <ResizableSortableTh columnId="produto" label="Produto" sortable={false} onResizeStart={startResize} className="px-3 py-3" />
+                <ResizableSortableTh columnId="qtd" label="Qtd. Planejada" sortable={false} onResizeStart={startResize} align="right" className="px-3 py-3" />
+                <ResizableSortableTh columnId="perda" label="Perda %" sortable={false} onResizeStart={startResize} align="center" className="px-3 py-3" />
+                <ResizableSortableTh columnId="un" label="Un." sortable={false} onResizeStart={startResize} align="center" className="px-3 py-3" />
+                <ResizableSortableTh columnId="reservado" label="Reservado" sortable={false} onResizeStart={startResize} align="right" className="px-3 py-3" />
+                <ResizableSortableTh columnId="consumido" label="Consumido" sortable={false} onResizeStart={startResize} align="right" className="px-3 py-3" />
+                {!readOnly && <ResizableSortableTh columnId="acoes" label="" sortable={false} onResizeStart={startResize} className="px-3 py-3" />}
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">

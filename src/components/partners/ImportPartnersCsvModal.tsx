@@ -8,6 +8,10 @@ import { useToast } from '@/contexts/ToastProvider';
 import type { PartnerPayload } from '@/services/partners';
 import { digitsOnly, getFirst, parseCsv, type ParsedCsvRow } from '@/lib/csvImport';
 import { readTabularImportFile, TABULAR_IMPORT_ACCEPT } from '@/lib/tabularImport';
+import ResizableSortableTh, { type SortState } from '@/components/ui/table/ResizableSortableTh';
+import TableColGroup from '@/components/ui/table/TableColGroup';
+import { useTableColumnWidths, type TableColumnWidthDef } from '@/components/ui/table/useTableColumnWidths';
+import { sortRows, toggleSort } from '@/components/ui/table/sortUtils';
 
 type PreviewRow = {
   line: number;
@@ -192,6 +196,23 @@ export default function ImportPartnersCsvModal(props: {
   const [dedupeKey, setDedupeKey] = useState<DedupeKey>('documento');
   const [dedupeStrategy, setDedupeStrategy] = useState<DedupeStrategy>('first');
   const [forceUppercase, setForceUppercase] = useState(false);
+  const [previewSort, setPreviewSort] = useState<SortState<'line' | 'nome' | 'tipo' | 'doc' | 'endereco' | 'errors'>>({
+    column: 'line',
+    direction: 'asc',
+  });
+
+  const previewColumns: TableColumnWidthDef[] = [
+    { id: 'line', defaultWidth: 90, minWidth: 80 },
+    { id: 'nome', defaultWidth: 320, minWidth: 220 },
+    { id: 'tipo', defaultWidth: 140, minWidth: 130 },
+    { id: 'doc', defaultWidth: 190, minWidth: 170 },
+    { id: 'endereco', defaultWidth: 320, minWidth: 240 },
+    { id: 'errors', defaultWidth: 520, minWidth: 260 },
+  ];
+  const { widths: previewWidths, startResize: startPreviewResize } = useTableColumnWidths({
+    tableId: 'import:partners:preview',
+    columns: previewColumns,
+  });
 
   useEffect(() => {
     if (!isOpen) return;
@@ -366,6 +387,21 @@ export default function ImportPartnersCsvModal(props: {
     }
     return { preview: base.filter((r) => keepLine.get(r.line)), duplicateKeys: duplicates };
   }, [parsed, dedupeKey, dedupeStrategy, mapping, forceUppercase]);
+
+  const previewSorted = useMemo(() => {
+    return sortRows(
+      preview,
+      previewSort as any,
+      [
+        { id: 'line', type: 'number', getValue: (r: PreviewRow) => r.line ?? 0 },
+        { id: 'nome', type: 'string', getValue: (r: PreviewRow) => r.nome ?? '' },
+        { id: 'tipo', type: 'string', getValue: (r: PreviewRow) => r.tipo ?? '' },
+        { id: 'doc', type: 'string', getValue: (r: PreviewRow) => r.doc ?? '' },
+        { id: 'endereco', type: 'string', getValue: (r: PreviewRow) => r.enderecoResumo ?? '' },
+        { id: 'errors', type: 'string', getValue: (r: PreviewRow) => r.errors.join('; ') ?? '' },
+      ] as const
+    );
+  }, [preview, previewSort]);
 
   const totals = useMemo(() => {
     const total = preview.length;
@@ -708,19 +744,62 @@ export default function ImportPartnersCsvModal(props: {
             <div className="mt-2 text-sm text-gray-600">Cole um CSV acima para ver a prévia (ou envie um XLS/XLSX).</div>
           ) : (
             <div className="mt-3 max-h-[260px] overflow-auto rounded-lg border border-gray-200 bg-white">
-              <table className="min-w-full text-sm">
+              <table className="min-w-full text-sm table-fixed">
+                <TableColGroup columns={previewColumns} widths={previewWidths} />
                 <thead className="sticky top-0 bg-gray-50 text-xs uppercase text-gray-500">
                   <tr>
-                    <th className="px-3 py-2 text-left">Linha</th>
-                    <th className="px-3 py-2 text-left">Nome</th>
-                    <th className="px-3 py-2 text-left">Tipo</th>
-                    <th className="px-3 py-2 text-left">Doc</th>
-                    <th className="px-3 py-2 text-left">Endereço</th>
-                    <th className="px-3 py-2 text-left">Erros</th>
+                    <ResizableSortableTh
+                      columnId="line"
+                      label="Linha"
+                      sort={previewSort}
+                      onSort={(col) => setPreviewSort((prev) => toggleSort(prev as any, col))}
+                      onResizeStart={startPreviewResize}
+                      className="px-3 py-2"
+                    />
+                    <ResizableSortableTh
+                      columnId="nome"
+                      label="Nome"
+                      sort={previewSort}
+                      onSort={(col) => setPreviewSort((prev) => toggleSort(prev as any, col))}
+                      onResizeStart={startPreviewResize}
+                      className="px-3 py-2"
+                    />
+                    <ResizableSortableTh
+                      columnId="tipo"
+                      label="Tipo"
+                      sort={previewSort}
+                      onSort={(col) => setPreviewSort((prev) => toggleSort(prev as any, col))}
+                      onResizeStart={startPreviewResize}
+                      className="px-3 py-2"
+                    />
+                    <ResizableSortableTh
+                      columnId="doc"
+                      label="Doc"
+                      sort={previewSort}
+                      onSort={(col) => setPreviewSort((prev) => toggleSort(prev as any, col))}
+                      onResizeStart={startPreviewResize}
+                      className="px-3 py-2"
+                    />
+                    <ResizableSortableTh
+                      columnId="endereco"
+                      label="Endereço"
+                      sort={previewSort}
+                      onSort={(col) => setPreviewSort((prev) => toggleSort(prev as any, col))}
+                      onResizeStart={startPreviewResize}
+                      className="px-3 py-2"
+                    />
+                    <ResizableSortableTh
+                      columnId="errors"
+                      label="Erros"
+                      sort={previewSort}
+                      onSort={(col) => setPreviewSort((prev) => toggleSort(prev as any, col))}
+                      onResizeStart={startPreviewResize}
+                      className="px-3 py-2"
+                    />
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100">
-                  {preview.slice(0, 80).map((r) => (
+                  {previewSorted.slice(0, 80).map((r) => (
                     <tr key={r.line} className={r.errors.length ? 'bg-rose-50/40' : ''}>
                       <td className="px-3 py-2 text-gray-600 whitespace-nowrap">{r.line}</td>
                       <td className="px-3 py-2">{r.nome || '—'}</td>

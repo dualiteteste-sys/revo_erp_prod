@@ -1,8 +1,11 @@
 import React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ArrowUpDown, RotateCcw, SquarePen, Trash2 } from 'lucide-react';
+import { RotateCcw, SquarePen, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import type { Colaborador } from '@/services/rh';
+import ResizableSortableTh, { type SortState as UiSortState } from '@/components/ui/table/ResizableSortableTh';
+import TableColGroup from '@/components/ui/table/TableColGroup';
+import { useTableColumnWidths, type TableColumnWidthDef } from '@/components/ui/table/useTableColumnWidths';
 
 type SortState = { column: keyof Colaborador; ascending: boolean };
 
@@ -16,28 +19,6 @@ interface ColaboradoresTableProps {
   canToggleAtivo?: boolean;
 }
 
-const SortableHeader: React.FC<{
-  column: keyof Colaborador;
-  label: string;
-  sortBy: SortState;
-  onSort: (column: keyof Colaborador) => void;
-  className?: string;
-}> = ({ column, label, sortBy, onSort, className }) => {
-  const isSorted = sortBy.column === column;
-  return (
-    <th
-      scope="col"
-      className={`px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 ${className || ''}`}
-      onClick={() => onSort(column)}
-    >
-      <div className="flex items-center gap-2">
-        {label}
-        {isSorted && <ArrowUpDown size={14} className={sortBy.ascending ? '' : 'rotate-180'} />}
-      </div>
-    </th>
-  );
-};
-
 export default function ColaboradoresTable({
   colaboradores,
   onEdit,
@@ -47,18 +28,34 @@ export default function ColaboradoresTable({
   canEdit = true,
   canToggleAtivo = true,
 }: ColaboradoresTableProps) {
+  const columns: TableColumnWidthDef[] = [
+    { id: 'nome', defaultWidth: 300, minWidth: 220 },
+    { id: 'cargo_nome', defaultWidth: 220, minWidth: 180 },
+    { id: 'email', defaultWidth: 260, minWidth: 220 },
+    { id: 'ativo', defaultWidth: 140, minWidth: 120 },
+    { id: 'acoes', defaultWidth: 170, minWidth: 150 },
+  ];
+  const { widths, startResize } = useTableColumnWidths({ tableId: 'rh:colaboradores', columns });
+  const sort: UiSortState<string> = sortBy ? { column: sortBy.column, direction: sortBy.ascending ? 'asc' : 'desc' } : null;
+
   return (
     <div className="overflow-x-auto">
-      <table className="min-w-full divide-y divide-gray-200">
+      <table className="min-w-[980px] w-full divide-y divide-gray-200 table-fixed">
+        <TableColGroup columns={columns} widths={widths} />
         <thead className="bg-gray-50">
           <tr>
-            <SortableHeader column="nome" label="Nome" sortBy={sortBy} onSort={onSort} />
-            <SortableHeader column="cargo_nome" label="Cargo" sortBy={sortBy} onSort={onSort} />
-            <SortableHeader column="email" label="E-mail" sortBy={sortBy} onSort={onSort} />
-            <SortableHeader column="ativo" label="Status" sortBy={sortBy} onSort={onSort} />
-            <th scope="col" className="relative px-6 py-3">
-              <span className="sr-only">Ações</span>
-            </th>
+            <ResizableSortableTh columnId="nome" label="Nome" sort={sort} onSort={onSort as any} onResizeStart={startResize} />
+            <ResizableSortableTh columnId="cargo_nome" label="Cargo" sort={sort} onSort={onSort as any} onResizeStart={startResize} />
+            <ResizableSortableTh columnId="email" label="E-mail" sort={sort} onSort={onSort as any} onResizeStart={startResize} />
+            <ResizableSortableTh columnId="ativo" label="Status" sort={sort} onSort={onSort as any} onResizeStart={startResize} />
+            <ResizableSortableTh
+              columnId="acoes"
+              label={<span className="sr-only">Ações</span>}
+              sortable={false}
+              onResizeStart={startResize}
+              align="right"
+              className="px-6"
+            />
           </tr>
         </thead>
         <motion.tbody layout className="bg-white divide-y divide-gray-200">

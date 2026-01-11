@@ -8,6 +8,10 @@ import Toggle from '@/components/ui/forms/Toggle';
 import ConfirmationModal from '@/components/ui/ConfirmationModal';
 import { useToast } from '@/contexts/ToastProvider';
 import { previewTenantCleanup, executeTenantCleanup, CleanupUser } from '@/services/admin';
+import ResizableSortableTh, { type SortState } from '@/components/ui/table/ResizableSortableTh';
+import TableColGroup from '@/components/ui/table/TableColGroup';
+import { useTableColumnWidths, type TableColumnWidthDef } from '@/components/ui/table/useTableColumnWidths';
+import { sortRows, toggleSort } from '@/components/ui/table/sortUtils';
 
 interface PreviewData {
   tenantId: string;
@@ -28,6 +32,25 @@ export default function TenantCleanupPage() {
   const [error, setError] = useState<string | null>(null);
 
   const [isConfirmModalOpen, setIsConfirmModalOpen] = useState(false);
+  const [previewSort, setPreviewSort] = useState<SortState<'email' | 'status'>>({ column: 'email', direction: 'asc' });
+
+  const previewColumns: TableColumnWidthDef[] = [
+    { id: 'email', defaultWidth: 360, minWidth: 220 },
+    { id: 'status', defaultWidth: 160, minWidth: 140 },
+  ];
+  const { widths: previewWidths, startResize: startPreviewResize } = useTableColumnWidths({
+    tableId: 'admin:tenant-cleanup:preview',
+    columns: previewColumns,
+  });
+
+  const sortedPreviewUsers = sortRows(
+    previewData?.users ?? [],
+    previewSort as any,
+    [
+      { id: 'email', type: 'string', getValue: (u: CleanupUser) => u.email ?? '' },
+      { id: 'status', type: 'string', getValue: (u: CleanupUser) => u.status ?? '' },
+    ] as const
+  );
 
   const handlePreview = async () => {
     if (!keepEmail) {
@@ -141,15 +164,30 @@ export default function TenantCleanupPage() {
 
             {previewData.users.length > 0 && (
               <div className="max-h-60 overflow-y-auto border rounded-lg">
-                <table className="min-w-full divide-y divide-gray-200">
+                <table className="min-w-full divide-y divide-gray-200 table-fixed">
+                  <TableColGroup columns={previewColumns} widths={previewWidths} />
                   <thead className="bg-gray-50 sticky top-0">
                     <tr>
-                      <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">E-mail</th>
-                      <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
+                      <ResizableSortableTh
+                        columnId="email"
+                        label="E-mail"
+                        sort={previewSort}
+                        onSort={(col) => setPreviewSort((prev) => toggleSort(prev as any, col))}
+                        onResizeStart={startPreviewResize}
+                        className="px-4 py-2"
+                      />
+                      <ResizableSortableTh
+                        columnId="status"
+                        label="Status"
+                        sort={previewSort}
+                        onSort={(col) => setPreviewSort((prev) => toggleSort(prev as any, col))}
+                        onResizeStart={startPreviewResize}
+                        className="px-4 py-2"
+                      />
                     </tr>
                   </thead>
                   <tbody className="bg-white divide-y divide-gray-200">
-                    {previewData.users.map(user => (
+                    {sortedPreviewUsers.map(user => (
                       <tr key={user.user_id}>
                         <td className="px-4 py-2 text-sm text-gray-800">{user.email}</td>
                         <td className="px-4 py-2 text-sm">

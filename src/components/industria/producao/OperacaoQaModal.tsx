@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import Modal from '@/components/ui/Modal';
 import { Button } from '@/components/ui/button';
 import {
@@ -10,6 +10,10 @@ import {
 } from '@/services/industriaProducao';
 import { useToast } from '@/contexts/ToastProvider';
 import { ShieldCheck, AlertTriangle, ClipboardCheck } from 'lucide-react';
+import ResizableSortableTh, { type SortState } from '@/components/ui/table/ResizableSortableTh';
+import TableColGroup from '@/components/ui/table/TableColGroup';
+import { useTableColumnWidths, type TableColumnWidthDef } from '@/components/ui/table/useTableColumnWidths';
+import { sortRows, toggleSort } from '@/components/ui/table/sortUtils';
 
 interface Props {
     operacao: OrdemOperacao | null;
@@ -38,6 +42,34 @@ export default function OperacaoQaModal({ operacao, isOpen, onClose, onUpdated, 
     const [requireIf, setRequireIf] = useState(false);
     const [inspecoes, setInspecoes] = useState<RegistroInspecao[]>([]);
     const [loadingInspecoes, setLoadingInspecoes] = useState(false);
+    const [inspecoesSort, setInspecoesSort] = useState<SortState<string>>({ column: 'data', direction: 'desc' });
+
+    const inspecoesColumns: TableColumnWidthDef[] = [
+        { id: 'tipo', defaultWidth: 120, minWidth: 100 },
+        { id: 'resultado', defaultWidth: 160, minWidth: 140 },
+        { id: 'qtd_insp', defaultWidth: 140, minWidth: 120 },
+        { id: 'qtd_rej', defaultWidth: 140, minWidth: 120 },
+        { id: 'data', defaultWidth: 220, minWidth: 200 },
+        { id: 'obs', defaultWidth: 420, minWidth: 160 },
+    ];
+    const { widths: inspecoesWidths, startResize: startInspecoesResize } = useTableColumnWidths({
+        tableId: 'industria:producao:inspecoes',
+        columns: inspecoesColumns,
+    });
+    const sortedInspecoes = useMemo(() => {
+        return sortRows(
+            inspecoes,
+            inspecoesSort as any,
+            [
+                { id: 'tipo', type: 'string', getValue: (r) => r.tipo ?? '' },
+                { id: 'resultado', type: 'string', getValue: (r) => r.resultado ?? '' },
+                { id: 'qtd_insp', type: 'number', getValue: (r) => r.quantidade_inspecionada ?? 0 },
+                { id: 'qtd_rej', type: 'number', getValue: (r) => r.quantidade_rejeitada ?? 0 },
+                { id: 'data', type: 'date', getValue: (r) => r.created_at },
+                { id: 'obs', type: 'string', getValue: (r) => r.observacoes ?? '' },
+            ] as const
+        );
+    }, [inspecoes, inspecoesSort]);
 
     useEffect(() => {
         if (operacao && isOpen) {
@@ -184,15 +216,60 @@ export default function OperacaoQaModal({ operacao, isOpen, onClose, onUpdated, 
                                 <span className="text-xs text-gray-500">{inspecoes.length} registro(s)</span>
                             </div>
                             <div className="border rounded-lg max-h-64 overflow-y-auto">
-                                <table className="min-w-full text-sm">
+                                <table className="min-w-full text-sm table-fixed">
+                                    <TableColGroup columns={inspecoesColumns} widths={inspecoesWidths} />
                                     <thead className="bg-gray-50 text-gray-500 text-xs uppercase">
                                         <tr>
-                                            <th className="px-3 py-2 text-left">Tipo</th>
-                                            <th className="px-3 py-2 text-left">Resultado</th>
-                                            <th className="px-3 py-2 text-right">Qtd. Insp.</th>
-                                            <th className="px-3 py-2 text-right">Qtd. Rej.</th>
-                                            <th className="px-3 py-2 text-left">Data</th>
-                                            <th className="px-3 py-2 text-left">Obs.</th>
+                                            <ResizableSortableTh
+                                                columnId="tipo"
+                                                label="Tipo"
+                                                className="px-3 py-2 text-left"
+                                                sort={inspecoesSort as any}
+                                                onSort={(col) => setInspecoesSort((prev) => toggleSort(prev as any, col))}
+                                                onResizeStart={startInspecoesResize}
+                                            />
+                                            <ResizableSortableTh
+                                                columnId="resultado"
+                                                label="Resultado"
+                                                className="px-3 py-2 text-left"
+                                                sort={inspecoesSort as any}
+                                                onSort={(col) => setInspecoesSort((prev) => toggleSort(prev as any, col))}
+                                                onResizeStart={startInspecoesResize}
+                                            />
+                                            <ResizableSortableTh
+                                                columnId="qtd_insp"
+                                                label="Qtd. Insp."
+                                                align="right"
+                                                className="px-3 py-2"
+                                                sort={inspecoesSort as any}
+                                                onSort={(col) => setInspecoesSort((prev) => toggleSort(prev as any, col))}
+                                                onResizeStart={startInspecoesResize}
+                                            />
+                                            <ResizableSortableTh
+                                                columnId="qtd_rej"
+                                                label="Qtd. Rej."
+                                                align="right"
+                                                className="px-3 py-2"
+                                                sort={inspecoesSort as any}
+                                                onSort={(col) => setInspecoesSort((prev) => toggleSort(prev as any, col))}
+                                                onResizeStart={startInspecoesResize}
+                                            />
+                                            <ResizableSortableTh
+                                                columnId="data"
+                                                label="Data"
+                                                className="px-3 py-2 text-left"
+                                                sort={inspecoesSort as any}
+                                                onSort={(col) => setInspecoesSort((prev) => toggleSort(prev as any, col))}
+                                                onResizeStart={startInspecoesResize}
+                                            />
+                                            <ResizableSortableTh
+                                                columnId="obs"
+                                                label="Obs."
+                                                className="px-3 py-2 text-left"
+                                                sort={inspecoesSort as any}
+                                                onSort={(col) => setInspecoesSort((prev) => toggleSort(prev as any, col))}
+                                                onResizeStart={startInspecoesResize}
+                                            />
                                         </tr>
                                     </thead>
                                     <tbody>
@@ -208,7 +285,7 @@ export default function OperacaoQaModal({ operacao, isOpen, onClose, onUpdated, 
                                                 </td>
                                             </tr>
                                         )}
-                                        {inspecoes.map((item) => (
+                                        {sortedInspecoes.map((item) => (
                                             <tr key={item.id} className="border-t">
                                                 <td className="px-3 py-2 font-medium">{item.tipo}</td>
                                                 <td className="px-3 py-2">

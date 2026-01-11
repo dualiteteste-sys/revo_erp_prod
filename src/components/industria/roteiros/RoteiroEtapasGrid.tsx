@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { RoteiroEtapa, manageRoteiroEtapa } from '@/services/industriaRoteiros';
 import { CentroTrabalho, listCentrosTrabalho } from '@/services/industriaCentros';
 import { Trash2, Plus, Save, X } from 'lucide-react';
@@ -9,6 +9,9 @@ import Modal from '@/components/ui/Modal';
 import CentroTrabalhoFormPanel from '@/components/industria/centros-trabalho/CentroTrabalhoFormPanel';
 import { Button } from '@/components/ui/button';
 import { useConfirm } from '@/contexts/ConfirmProvider';
+import ResizableSortableTh from '@/components/ui/table/ResizableSortableTh';
+import TableColGroup from '@/components/ui/table/TableColGroup';
+import { useTableColumnWidths, type TableColumnWidthDef } from '@/components/ui/table/useTableColumnWidths';
 
 interface Props {
   roteiroId: string;
@@ -42,6 +45,25 @@ export default function RoteiroEtapasGrid({ roteiroId, etapas, onUpdate, readOnl
   useEffect(() => {
     listCentrosTrabalho(undefined, true).then(setCentros);
   }, []);
+
+  const etapasColumns = useMemo<TableColumnWidthDef[]>(() => {
+    const cols: TableColumnWidthDef[] = [
+      { id: 'seq', defaultWidth: 90, minWidth: 80 },
+      { id: 'centro', defaultWidth: 240, minWidth: 180 },
+      { id: 'operacao', defaultWidth: 180, minWidth: 140 },
+      { id: 'setup', defaultWidth: 140, minWidth: 120 },
+      { id: 'ciclo', defaultWidth: 180, minWidth: 140 },
+      { id: 'producao', defaultWidth: 180, minWidth: 140 },
+      { id: 'overlap', defaultWidth: 120, minWidth: 100 },
+      { id: 'obs', defaultWidth: 420, minWidth: 200 },
+    ];
+    if (!readOnly) cols.push({ id: 'acoes', defaultWidth: 56, minWidth: 44 });
+    return cols;
+  }, [readOnly]);
+  const { widths: etapasWidths, startResize: startEtapasResize } = useTableColumnWidths({
+    tableId: 'industria:roteiros:etapas',
+    columns: etapasColumns,
+  });
 
   const handleAdd = async () => {
     if (!newEtapa.centro_trabalho_id) {
@@ -247,18 +269,88 @@ export default function RoteiroEtapasGrid({ roteiroId, etapas, onUpdate, readOnl
       )}
 
       <div className="overflow-x-auto border border-gray-200 rounded-lg bg-white">
-        <table className="min-w-full divide-y divide-gray-200">
+        <table className="min-w-full divide-y divide-gray-200 table-fixed">
+          <TableColGroup columns={etapasColumns} widths={etapasWidths} />
           <thead className="bg-gray-50">
             <tr>
-              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase w-20 min-w-[80px] whitespace-nowrap">Seq.</th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase min-w-[180px] whitespace-nowrap">Centro de Trabalho</th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase min-w-[140px] whitespace-nowrap">Operação</th>
-              <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase w-28 min-w-[100px] whitespace-nowrap">Setup (min)</th>
-              <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase w-32 min-w-[120px]">Ciclo (min/un)</th>
-              <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase min-w-[140px] whitespace-nowrap">Produção</th>
-              <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase w-20 min-w-[80px] whitespace-nowrap">Overlap</th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase w-full min-w-[200px] whitespace-nowrap">Observações</th>
-              {!readOnly && <th className="px-4 py-3 w-10"></th>}
+              <ResizableSortableTh
+                columnId="seq"
+                label="Seq."
+                className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase whitespace-nowrap"
+                sortable={false}
+                resizable
+                onResizeStart={startEtapasResize}
+              />
+              <ResizableSortableTh
+                columnId="centro"
+                label="Centro de Trabalho"
+                className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase whitespace-nowrap"
+                sortable={false}
+                resizable
+                onResizeStart={startEtapasResize}
+              />
+              <ResizableSortableTh
+                columnId="operacao"
+                label="Operação"
+                className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase whitespace-nowrap"
+                sortable={false}
+                resizable
+                onResizeStart={startEtapasResize}
+              />
+              <ResizableSortableTh
+                columnId="setup"
+                label="Setup (min)"
+                align="right"
+                className="px-4 py-3 text-xs font-medium text-gray-500 uppercase whitespace-nowrap"
+                sortable={false}
+                resizable
+                onResizeStart={startEtapasResize}
+              />
+              <ResizableSortableTh
+                columnId="ciclo"
+                label="Ciclo (min/un)"
+                align="right"
+                className="px-4 py-3 text-xs font-medium text-gray-500 uppercase whitespace-nowrap"
+                sortable={false}
+                resizable
+                onResizeStart={startEtapasResize}
+              />
+              <ResizableSortableTh
+                columnId="producao"
+                label="Produção"
+                align="right"
+                className="px-4 py-3 text-xs font-medium text-gray-500 uppercase whitespace-nowrap"
+                sortable={false}
+                resizable
+                onResizeStart={startEtapasResize}
+              />
+              <ResizableSortableTh
+                columnId="overlap"
+                label="Overlap"
+                align="center"
+                className="px-4 py-3 text-xs font-medium text-gray-500 uppercase whitespace-nowrap"
+                sortable={false}
+                resizable
+                onResizeStart={startEtapasResize}
+              />
+              <ResizableSortableTh
+                columnId="obs"
+                label="Observações"
+                className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase whitespace-nowrap"
+                sortable={false}
+                resizable
+                onResizeStart={startEtapasResize}
+              />
+              {!readOnly ? (
+                <ResizableSortableTh
+                  columnId="acoes"
+                  label=""
+                  className="px-4 py-3"
+                  sortable={false}
+                  resizable
+                  onResizeStart={startEtapasResize}
+                />
+              ) : null}
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-200">

@@ -5,6 +5,9 @@ import { getLotesDisponiveis, reservarEstoque, EstoqueLote } from '@/services/in
 import { useToast } from '@/contexts/ToastProvider';
 import { Loader2 } from 'lucide-react';
 import { logger } from '@/lib/logger';
+import ResizableSortableTh from '@/components/ui/table/ResizableSortableTh';
+import TableColGroup from '@/components/ui/table/TableColGroup';
+import { useTableColumnWidths, type TableColumnWidthDef } from '@/components/ui/table/useTableColumnWidths';
 
 interface ReservaLotesModalProps {
     isOpen: boolean;
@@ -32,6 +35,13 @@ const ReservaLotesModal: React.FC<ReservaLotesModalProps> = ({
     const [submitting, setSubmitting] = useState(false);
     const [lotes, setLotes] = useState<EstoqueLote[]>([]);
     const [selectedQuantities, setSelectedQuantities] = useState<Record<string, number>>({});
+    const columns: TableColumnWidthDef[] = [
+        { id: 'lote', defaultWidth: 220, minWidth: 180 },
+        { id: 'validade', defaultWidth: 180, minWidth: 150 },
+        { id: 'disponivel', defaultWidth: 160, minWidth: 140 },
+        { id: 'reservar', defaultWidth: 200, minWidth: 160 },
+    ];
+    const { widths, startResize } = useTableColumnWidths({ tableId: `industria:reserva-lotes:${produtoId}`, columns });
 
     useEffect(() => {
         if (isOpen && produtoId) {
@@ -151,13 +161,14 @@ const ReservaLotesModal: React.FC<ReservaLotesModalProps> = ({
                         ) : lotes.length === 0 ? (
                             <div className="p-8 text-center text-gray-500">Nenhum lote disponível para este produto.</div>
                         ) : (
-                            <table className="min-w-full divide-y divide-gray-200">
+                            <table className="min-w-full divide-y divide-gray-200 table-fixed">
+                                <TableColGroup columns={columns} widths={widths} />
                                 <thead className="bg-gray-50 sticky top-0">
                                     <tr>
-                                        <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Lote</th>
-                                        <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Validade</th>
-                                        <th className="px-3 py-2 text-right text-xs font-medium text-gray-500 uppercase">Disponível</th>
-                                        <th className="px-3 py-2 text-right text-xs font-medium text-gray-500 uppercase">Reservar</th>
+                                        <ResizableSortableTh columnId="lote" label="Lote" sortable={false} onResizeStart={startResize} className="px-3 py-2" />
+                                        <ResizableSortableTh columnId="validade" label="Validade" sortable={false} onResizeStart={startResize} className="px-3 py-2" />
+                                        <ResizableSortableTh columnId="disponivel" label="Disponível" sortable={false} onResizeStart={startResize} align="right" className="px-3 py-2" />
+                                        <ResizableSortableTh columnId="reservar" label="Reservar" sortable={false} onResizeStart={startResize} align="right" className="px-3 py-2" />
                                     </tr>
                                 </thead>
                                 <tbody className="bg-white divide-y divide-gray-200">

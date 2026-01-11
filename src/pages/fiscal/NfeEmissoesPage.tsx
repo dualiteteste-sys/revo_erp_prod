@@ -13,6 +13,10 @@ import { Link } from 'react-router-dom';
 import ClientAutocomplete from '@/components/common/ClientAutocomplete';
 import ProductAutocomplete from '@/components/common/ProductAutocomplete';
 import UnidadeMedidaSelect from '@/components/common/UnidadeMedidaSelect';
+import ResizableSortableTh, { type SortState } from '@/components/ui/table/ResizableSortableTh';
+import TableColGroup from '@/components/ui/table/TableColGroup';
+import { useTableColumnWidths, type TableColumnWidthDef } from '@/components/ui/table/useTableColumnWidths';
+import { sortRows, toggleSort } from '@/components/ui/table/sortUtils';
 
 type AmbienteNfe = 'homologacao' | 'producao';
 
@@ -99,6 +103,17 @@ export default function NfeEmissoesPage() {
 
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
+  const [sort, setSort] = useState<SortState<string>>({ column: 'atualizado', direction: 'desc' });
+
+  const columns: TableColumnWidthDef[] = [
+    { id: 'status', defaultWidth: 260, minWidth: 200 },
+    { id: 'numero_serie', defaultWidth: 160, minWidth: 140 },
+    { id: 'ambiente', defaultWidth: 140, minWidth: 120 },
+    { id: 'valor', defaultWidth: 160, minWidth: 140 },
+    { id: 'atualizado', defaultWidth: 220, minWidth: 180 },
+    { id: 'acao', defaultWidth: 320, minWidth: 260 },
+  ];
+  const { widths, startResize } = useTableColumnWidths({ tableId: 'fiscal:nfe-emissoes', columns });
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editing, setEditing] = useState<NfeEmissao | null>(null);
@@ -190,6 +205,20 @@ export default function NfeEmissoesPage() {
     const pendentes = rows.filter((r) => ['enfileirada', 'processando'].includes(r.status)).length;
     return { total, rascunhos, autorizadas, pendentes };
   }, [rows]);
+
+  const sortedRows = useMemo(() => {
+    return sortRows(
+      rows,
+      sort as any,
+      [
+        { id: 'status', type: 'string', getValue: (r) => STATUS_LABEL[r.status] || r.status },
+        { id: 'numero_serie', type: 'number', getValue: (r) => Number(r.numero ?? 0) * 1000 + Number(r.serie ?? 0) },
+        { id: 'ambiente', type: 'string', getValue: (r) => r.ambiente ?? '' },
+        { id: 'valor', type: 'number', getValue: (r) => Number(r.total_nfe ?? r.valor_total ?? 0) },
+        { id: 'atualizado', type: 'date', getValue: (r) => r.updated_at ?? null },
+      ] as const
+    );
+  }, [rows, sort]);
 
   const openNew = async () => {
     setEditing(null);
@@ -673,18 +702,19 @@ export default function NfeEmissoesPage() {
         ) : (
           <div className="overflow-x-auto">
             <table className="min-w-full divide-y divide-gray-200">
+              <TableColGroup columns={columns} widths={widths} />
               <thead className="bg-gray-50">
                 <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Número/Série</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Ambiente</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Valor</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Atualizado</th>
-                  <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Ação</th>
+                  <ResizableSortableTh columnId="status" label="Status" sort={sort as any} onSort={(col) => setSort((prev) => toggleSort(prev as any, col))} onResizeStart={startResize as any} />
+                  <ResizableSortableTh columnId="numero_serie" label="Número/Série" sort={sort as any} onSort={(col) => setSort((prev) => toggleSort(prev as any, col))} onResizeStart={startResize as any} />
+                  <ResizableSortableTh columnId="ambiente" label="Ambiente" sort={sort as any} onSort={(col) => setSort((prev) => toggleSort(prev as any, col))} onResizeStart={startResize as any} />
+                  <ResizableSortableTh columnId="valor" label="Valor" sort={sort as any} onSort={(col) => setSort((prev) => toggleSort(prev as any, col))} onResizeStart={startResize as any} />
+                  <ResizableSortableTh columnId="atualizado" label="Atualizado" sort={sort as any} onSort={(col) => setSort((prev) => toggleSort(prev as any, col))} onResizeStart={startResize as any} />
+                  <ResizableSortableTh columnId="acao" label="Ação" align="right" sortable={false} resizable onResizeStart={startResize as any} />
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
-                {rows.map((row) => (
+                {sortedRows.map((row) => (
                   <tr key={row.id} className="hover:bg-gray-50">
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
                       <span className="font-semibold">{STATUS_LABEL[row.status] || row.status}</span>

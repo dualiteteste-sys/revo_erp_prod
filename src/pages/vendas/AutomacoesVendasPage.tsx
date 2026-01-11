@@ -1,7 +1,11 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Bot, Loader2, PlusCircle } from 'lucide-react';
 import Modal from '@/components/ui/Modal';
 import { useToast } from '@/contexts/ToastProvider';
+import ResizableSortableTh, { type SortState } from '@/components/ui/table/ResizableSortableTh';
+import TableColGroup from '@/components/ui/table/TableColGroup';
+import { useTableColumnWidths, type TableColumnWidthDef } from '@/components/ui/table/useTableColumnWidths';
+import { sortRows, toggleSort } from '@/components/ui/table/sortUtils';
 import {
   deleteAutomacaoVendas,
   enqueueAutomacaoNow,
@@ -31,6 +35,27 @@ export default function AutomacoesVendasPage() {
   const [rows, setRows] = useState<VendaAutomacao[]>([]);
   const [isOpen, setIsOpen] = useState(false);
   const [form, setForm] = useState<FormState>(emptyForm);
+  const [sort, setSort] = useState<SortState<string>>({ column: 'nome', direction: 'asc' });
+
+  const columns: TableColumnWidthDef[] = [
+    { id: 'nome', defaultWidth: 420, minWidth: 220 },
+    { id: 'gatilho', defaultWidth: 180, minWidth: 160 },
+    { id: 'ativa', defaultWidth: 120, minWidth: 100 },
+    { id: 'acoes', defaultWidth: 240, minWidth: 200 },
+  ];
+  const { widths, startResize } = useTableColumnWidths({ tableId: 'vendas:automacoes', columns });
+
+  const sortedRows = useMemo(() => {
+    return sortRows(
+      rows,
+      sort as any,
+      [
+        { id: 'nome', type: 'string', getValue: (r) => r.nome ?? '' },
+        { id: 'gatilho', type: 'string', getValue: (r) => r.gatilho ?? '' },
+        { id: 'ativa', type: 'boolean', getValue: (r) => Boolean(r.enabled) },
+      ] as const
+    );
+  }, [rows, sort]);
 
   async function load() {
     setLoading(true);
@@ -198,16 +223,46 @@ export default function AutomacoesVendasPage() {
         ) : (
           <div className="overflow-auto">
             <table className="min-w-full text-sm">
+              <TableColGroup columns={columns} widths={widths} />
               <thead className="bg-gray-50">
                 <tr className="text-left text-gray-600">
-                  <th className="px-4 py-3">Nome</th>
-                  <th className="px-4 py-3">Gatilho</th>
-                  <th className="px-4 py-3">Ativa</th>
-                  <th className="px-4 py-3 text-right">Ações</th>
+                  <ResizableSortableTh
+                    columnId="nome"
+                    label="Nome"
+                    className="px-4 py-3 normal-case tracking-normal"
+                    sort={sort as any}
+                    onSort={(col) => setSort((prev) => toggleSort(prev as any, col))}
+                    onResizeStart={startResize as any}
+                  />
+                  <ResizableSortableTh
+                    columnId="gatilho"
+                    label="Gatilho"
+                    className="px-4 py-3 normal-case tracking-normal"
+                    sort={sort as any}
+                    onSort={(col) => setSort((prev) => toggleSort(prev as any, col))}
+                    onResizeStart={startResize as any}
+                  />
+                  <ResizableSortableTh
+                    columnId="ativa"
+                    label="Ativa"
+                    className="px-4 py-3 normal-case tracking-normal"
+                    sort={sort as any}
+                    onSort={(col) => setSort((prev) => toggleSort(prev as any, col))}
+                    onResizeStart={startResize as any}
+                  />
+                  <ResizableSortableTh
+                    columnId="acoes"
+                    label="Ações"
+                    align="right"
+                    className="px-4 py-3 normal-case tracking-normal"
+                    sortable={false}
+                    resizable
+                    onResizeStart={startResize as any}
+                  />
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200">
-                {rows.map((r) => (
+                {sortedRows.map((r) => (
                   <tr key={r.id} className="hover:bg-gray-50">
                     <td className="px-4 py-3 font-medium text-gray-800">{r.nome}</td>
                     <td className="px-4 py-3">{r.gatilho}</td>

@@ -8,6 +8,10 @@ import { useConfirm } from '@/contexts/ConfirmProvider';
 import { Button } from '@/components/ui/button';
 import Select from '@/components/ui/forms/Select';
 import CsvExportDialog from '@/components/ui/CsvExportDialog';
+import ResizableSortableTh, { type SortState } from '@/components/ui/table/ResizableSortableTh';
+import TableColGroup from '@/components/ui/table/TableColGroup';
+import { useTableColumnWidths, type TableColumnWidthDef } from '@/components/ui/table/useTableColumnWidths';
+import { sortRows, toggleSort } from '@/components/ui/table/sortUtils';
 
 export default function UnidadesPage() {
     const [unidades, setUnidades] = useState<UnidadeMedida[]>([]);
@@ -16,8 +20,18 @@ export default function UnidadesPage() {
     const [statusFilter, setStatusFilter] = useState<'all' | 'ativo' | 'inativo'>('all');
     const [isFormOpen, setIsFormOpen] = useState(false);
     const [selectedUnidade, setSelectedUnidade] = useState<UnidadeMedida | null>(null);
+    const [sort, setSort] = useState<SortState<string>>({ column: 'sigla', direction: 'asc' });
     const { addToast } = useToast();
     const { confirm } = useConfirm();
+
+    const columns: TableColumnWidthDef[] = [
+        { id: 'sigla', defaultWidth: 120, minWidth: 90 },
+        { id: 'descricao', defaultWidth: 420, minWidth: 220 },
+        { id: 'origem', defaultWidth: 160, minWidth: 140 },
+        { id: 'status', defaultWidth: 140, minWidth: 120 },
+        { id: 'acoes', defaultWidth: 120, minWidth: 100 },
+    ];
+    const { widths, startResize } = useTableColumnWidths({ tableId: 'cadastros:unidades', columns });
 
     const loadUnidades = async () => {
         setLoading(true);
@@ -45,6 +59,19 @@ export default function UnidadesPage() {
             return `${u.sigla} ${u.descricao}`.toLowerCase().includes(q);
         });
     }, [search, statusFilter, unidades]);
+
+    const sorted = useMemo(() => {
+        return sortRows(
+            filtered,
+            sort as any,
+            [
+                { id: 'sigla', type: 'string', getValue: (u) => u.sigla ?? '' },
+                { id: 'descricao', type: 'string', getValue: (u) => u.descricao ?? '' },
+                { id: 'origem', type: 'string', getValue: (u) => (u.empresa_id ? 'Personalizada' : 'Padrão') },
+                { id: 'status', type: 'boolean', getValue: (u) => Boolean(u.ativo) },
+            ] as const
+        );
+    }, [filtered, sort]);
 
     const handleNew = () => {
         setSelectedUnidade(null);
@@ -138,13 +165,14 @@ export default function UnidadesPage() {
             <div className="bg-white rounded-lg shadow overflow-hidden flex-grow">
                 <div className="overflow-auto max-h-full">
                     <table className="min-w-full divide-y divide-gray-200">
+                        <TableColGroup columns={columns} widths={widths} />
                         <thead className="bg-gray-50 sticky top-0">
                             <tr>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Sigla</th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Descrição</th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Origem</th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Ações</th>
+                                <ResizableSortableTh columnId="sigla" label="Sigla" sort={sort as any} onSort={(col) => setSort((prev) => toggleSort(prev as any, col))} onResizeStart={startResize as any} />
+                                <ResizableSortableTh columnId="descricao" label="Descrição" sort={sort as any} onSort={(col) => setSort((prev) => toggleSort(prev as any, col))} onResizeStart={startResize as any} />
+                                <ResizableSortableTh columnId="origem" label="Origem" sort={sort as any} onSort={(col) => setSort((prev) => toggleSort(prev as any, col))} onResizeStart={startResize as any} />
+                                <ResizableSortableTh columnId="status" label="Status" sort={sort as any} onSort={(col) => setSort((prev) => toggleSort(prev as any, col))} onResizeStart={startResize as any} />
+                                <ResizableSortableTh columnId="acoes" label="Ações" align="right" sortable={false} resizable onResizeStart={startResize as any} />
                             </tr>
                         </thead>
                         <tbody className="bg-white divide-y divide-gray-200">
@@ -161,7 +189,7 @@ export default function UnidadesPage() {
                                     </td>
                                 </tr>
                             ) : (
-                                filtered.map((u) => (
+                                sorted.map((u) => (
                                     <tr key={u.id} className="hover:bg-gray-50">
                                         <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-900">{u.sigla}</td>
                                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">{u.descricao}</td>

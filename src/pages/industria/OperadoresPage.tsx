@@ -9,6 +9,10 @@ import { Button } from '@/components/ui/button';
 import QRCode from 'react-qr-code';
 import { useAuth } from '@/contexts/AuthProvider';
 import { useSupabase } from '@/providers/SupabaseProvider';
+import ResizableSortableTh, { type SortState } from '@/components/ui/table/ResizableSortableTh';
+import TableColGroup from '@/components/ui/table/TableColGroup';
+import { useTableColumnWidths, type TableColumnWidthDef } from '@/components/ui/table/useTableColumnWidths';
+import { sortRows, toggleSort } from '@/components/ui/table/sortUtils';
 
 const randomPin = () => Math.floor(1000 + Math.random() * 9000).toString();
 
@@ -32,6 +36,31 @@ export default function OperadoresPage() {
   const [logoUrl, setLogoUrl] = useState<string | null>(null);
   const [logoLoading, setLogoLoading] = useState(false);
   const [savingPrintPin, setSavingPrintPin] = useState(false);
+  const [sort, setSort] = useState<SortState<'nome' | 'email' | 'centros' | 'status'>>({ column: 'nome', direction: 'asc' });
+
+  const columns: TableColumnWidthDef[] = [
+    { id: 'nome', defaultWidth: 260, minWidth: 200 },
+    { id: 'email', defaultWidth: 260, minWidth: 200 },
+    { id: 'centros', defaultWidth: 140, minWidth: 120 },
+    { id: 'status', defaultWidth: 140, minWidth: 120 },
+    { id: 'acoes', defaultWidth: 180, minWidth: 160, resizable: false },
+  ];
+  const { widths, startResize } = useTableColumnWidths({ tableId: 'industria:operadores:list', columns });
+
+  const sortedItems = sortRows(
+    items,
+    sort as any,
+    [
+      { id: 'nome', type: 'string', getValue: (r: OperadorRecord) => r.nome ?? '' },
+      { id: 'email', type: 'string', getValue: (r: OperadorRecord) => r.email ?? '' },
+      {
+        id: 'centros',
+        type: 'number',
+        getValue: (r: OperadorRecord) => (r.centros_trabalho_ids?.length ? r.centros_trabalho_ids.length : 999999),
+      },
+      { id: 'status', type: 'boolean', getValue: (r: OperadorRecord) => !!r.ativo },
+    ] as const
+  );
 
   const loadData = async () => {
     setLoading(true);
@@ -218,14 +247,51 @@ export default function OperadoresPage() {
       </div>
 
       <div className="bg-white border rounded-xl shadow-sm overflow-hidden">
-        <table className="min-w-full text-sm">
+        <table className="min-w-full text-sm table-fixed">
+          <TableColGroup columns={columns} widths={widths} />
           <thead className="bg-gray-50 text-gray-600">
             <tr>
-              <th className="px-4 py-2 text-left">Nome</th>
-              <th className="px-4 py-2 text-left">E-mail</th>
-              <th className="px-4 py-2 text-left">Centros</th>
-              <th className="px-4 py-2 text-left">Status</th>
-              <th className="px-4 py-2 text-right">Ações</th>
+              <ResizableSortableTh
+                columnId="nome"
+                label="Nome"
+                sort={sort}
+                onSort={(col) => setSort((prev) => toggleSort(prev as any, col))}
+                onResizeStart={startResize}
+                className="px-4 py-2 normal-case tracking-normal"
+              />
+              <ResizableSortableTh
+                columnId="email"
+                label="E-mail"
+                sort={sort}
+                onSort={(col) => setSort((prev) => toggleSort(prev as any, col))}
+                onResizeStart={startResize}
+                className="px-4 py-2 normal-case tracking-normal"
+              />
+              <ResizableSortableTh
+                columnId="centros"
+                label="Centros"
+                sort={sort}
+                onSort={(col) => setSort((prev) => toggleSort(prev as any, col))}
+                onResizeStart={startResize}
+                className="px-4 py-2 normal-case tracking-normal"
+              />
+              <ResizableSortableTh
+                columnId="status"
+                label="Status"
+                sort={sort}
+                onSort={(col) => setSort((prev) => toggleSort(prev as any, col))}
+                onResizeStart={startResize}
+                className="px-4 py-2 normal-case tracking-normal"
+              />
+              <ResizableSortableTh
+                columnId="acoes"
+                label="Ações"
+                sortable={false}
+                sort={sort}
+                onResizeStart={startResize}
+                align="right"
+                className="px-4 py-2 normal-case tracking-normal"
+              />
             </tr>
           </thead>
           <tbody>
@@ -244,7 +310,7 @@ export default function OperadoresPage() {
                 </td>
               </tr>
             )}
-            {!loading && items.map((op) => (
+            {!loading && sortedItems.map((op) => (
               <tr key={op.id} className="border-t">
                 <td className="px-4 py-2 font-semibold text-gray-900">{op.nome}</td>
                 <td className="px-4 py-2 text-gray-700">{op.email || '—'}</td>

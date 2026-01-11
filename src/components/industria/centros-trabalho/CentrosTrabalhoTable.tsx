@@ -1,6 +1,10 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { CentroTrabalho } from '@/services/industriaCentros';
 import { Edit, CheckCircle, XCircle, Copy, Trash2, MoreHorizontal } from 'lucide-react';
+import ResizableSortableTh, { type SortState } from '@/components/ui/table/ResizableSortableTh';
+import TableColGroup from '@/components/ui/table/TableColGroup';
+import { useTableColumnWidths, type TableColumnWidthDef } from '@/components/ui/table/useTableColumnWidths';
+import { sortRows, toggleSort } from '@/components/ui/table/sortUtils';
 
 interface Props {
   centros: CentroTrabalho[];
@@ -13,21 +17,86 @@ interface Props {
 export default function CentrosTrabalhoTable({ centros, onEdit, onClone, onDelete, highlightCentroId }: Props) {
   const [menuId, setMenuId] = useState<string | null>(null);
 
+  const columns: TableColumnWidthDef[] = [
+    { id: 'nome', defaultWidth: 360, minWidth: 220 },
+    { id: 'codigo', defaultWidth: 180, minWidth: 140 },
+    { id: 'tipo_uso', defaultWidth: 200, minWidth: 160 },
+    { id: 'capacidade', defaultWidth: 200, minWidth: 160 },
+    { id: 'ativo', defaultWidth: 110, minWidth: 90 },
+    { id: 'acoes', defaultWidth: 160, minWidth: 140 },
+  ];
+  const { widths, startResize } = useTableColumnWidths({ tableId: 'industria:centros-trabalho', columns });
+
+  const [sort, setSort] = useState<SortState<string>>({ column: 'nome', direction: 'asc' });
+  const sortedCentros = useMemo(() => {
+    return sortRows(
+      centros,
+      sort as any,
+      [
+        { id: 'nome', type: 'string', getValue: (c) => c.nome ?? '' },
+        { id: 'codigo', type: 'string', getValue: (c) => c.codigo ?? '' },
+        { id: 'tipo_uso', type: 'string', getValue: (c) => c.tipo_uso ?? '' },
+        { id: 'capacidade', type: 'number', getValue: (c) => c.capacidade_unidade_hora ?? 0 },
+        { id: 'ativo', type: 'boolean', getValue: (c) => Boolean(c.ativo) },
+      ] as const
+    );
+  }, [centros, sort]);
+
   return (
     <div className="overflow-x-auto overflow-y-visible">
       <table className="min-w-full divide-y divide-gray-200">
+        <TableColGroup columns={columns} widths={widths} />
         <thead className="bg-gray-50">
           <tr>
-            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Nome</th>
-            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Código</th>
-            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Tipo de Uso</th>
-            <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Capacidade (un/h)</th>
-            <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase">Ativo</th>
-            <th className="px-6 py-3"></th>
+            <ResizableSortableTh
+              columnId="nome"
+              label="Nome"
+              sort={sort as any}
+              onSort={(col) => setSort((prev) => toggleSort(prev as any, col))}
+              onResizeStart={startResize as any}
+            />
+            <ResizableSortableTh
+              columnId="codigo"
+              label="Código"
+              sort={sort as any}
+              onSort={(col) => setSort((prev) => toggleSort(prev as any, col))}
+              onResizeStart={startResize as any}
+            />
+            <ResizableSortableTh
+              columnId="tipo_uso"
+              label="Tipo de Uso"
+              sort={sort as any}
+              onSort={(col) => setSort((prev) => toggleSort(prev as any, col))}
+              onResizeStart={startResize as any}
+            />
+            <ResizableSortableTh
+              columnId="capacidade"
+              label="Capacidade (un/h)"
+              align="right"
+              sort={sort as any}
+              onSort={(col) => setSort((prev) => toggleSort(prev as any, col))}
+              onResizeStart={startResize as any}
+            />
+            <ResizableSortableTh
+              columnId="ativo"
+              label="Ativo"
+              align="center"
+              sort={sort as any}
+              onSort={(col) => setSort((prev) => toggleSort(prev as any, col))}
+              onResizeStart={startResize as any}
+            />
+            <ResizableSortableTh
+              columnId="acoes"
+              label="Ações"
+              align="right"
+              sortable={false}
+              resizable
+              onResizeStart={startResize as any}
+            />
           </tr>
         </thead>
         <tbody className="bg-white divide-y divide-gray-200">
-          {centros.map(centro => {
+          {sortedCentros.map(centro => {
             const isHighlighted = highlightCentroId === centro.id;
             return (
             <tr
@@ -100,7 +169,7 @@ export default function CentrosTrabalhoTable({ centros, onEdit, onClone, onDelet
             </tr>
           );
           })}
-          {centros.length === 0 && (
+          {sortedCentros.length === 0 && (
             <tr>
               <td colSpan={6} className="px-6 py-12 text-center text-gray-500">Nenhum centro de trabalho encontrado.</td>
             </tr>

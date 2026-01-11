@@ -1,8 +1,11 @@
 import React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ContaPagar } from '@/services/financeiro';
-import { CheckCircle2, Edit, Trash2, ArrowUpDown, Ban, RotateCcw } from 'lucide-react';
+import { CheckCircle2, Edit, Trash2, Ban, RotateCcw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import ResizableSortableTh, { type SortState } from '@/components/ui/table/ResizableSortableTh';
+import TableColGroup from '@/components/ui/table/TableColGroup';
+import { useTableColumnWidths, type TableColumnWidthDef } from '@/components/ui/table/useTableColumnWidths';
 
 interface ContasPagarTableProps {
   contas: ContaPagar[];
@@ -22,28 +25,6 @@ const statusConfig: Record<string, { label: string; color: string }> = {
   cancelada: { label: 'Cancelada', color: 'bg-gray-100 text-gray-800' },
 };
 
-const SortableHeader: React.FC<{
-  column: string;
-  label: string;
-  sortBy: { column: string; ascending: boolean };
-  onSort: (column: string) => void;
-  className?: string;
-}> = ({ column, label, sortBy, onSort, className }) => {
-  const isSorted = sortBy.column === column;
-  return (
-    <th
-      scope="col"
-      className={`px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 ${className}`}
-      onClick={() => onSort(column)}
-    >
-      <div className="flex items-center gap-2">
-        {label}
-        {isSorted && <ArrowUpDown size={14} className={sortBy.ascending ? '' : 'rotate-180'} />}
-      </div>
-    </th>
-  );
-};
-
 const ContasPagarTable: React.FC<ContasPagarTableProps> = ({
   contas,
   onEdit,
@@ -54,18 +35,38 @@ const ContasPagarTable: React.FC<ContasPagarTableProps> = ({
   sortBy,
   onSort,
 }) => {
+  const columns: TableColumnWidthDef[] = [
+    { id: 'descricao', defaultWidth: 320, minWidth: 220 },
+    { id: 'fornecedor_nome', defaultWidth: 260, minWidth: 200 },
+    { id: 'data_vencimento', defaultWidth: 160, minWidth: 140 },
+    { id: 'valor_total', defaultWidth: 170, minWidth: 150 },
+    { id: 'saldo', defaultWidth: 160, minWidth: 140 },
+    { id: 'status', defaultWidth: 140, minWidth: 120 },
+    { id: 'acoes', defaultWidth: 180, minWidth: 160 },
+  ];
+  const { widths, startResize } = useTableColumnWidths({ tableId: 'financeiro:contas-pagar', columns });
+  const sort: SortState<string> = sortBy ? { column: sortBy.column, direction: sortBy.ascending ? 'asc' : 'desc' } : null;
+
   return (
     <div className="overflow-x-auto">
-      <table className="min-w-full divide-y divide-gray-200">
+      <table className="min-w-[1100px] w-full divide-y divide-gray-200 table-fixed">
+        <TableColGroup columns={columns} widths={widths} />
         <thead className="bg-gray-50">
           <tr>
-            <SortableHeader column="descricao" label="Descrição" sortBy={sortBy} onSort={onSort} />
-            <SortableHeader column="fornecedor_nome" label="Fornecedor" sortBy={sortBy} onSort={onSort} />
-            <SortableHeader column="data_vencimento" label="Vencimento" sortBy={sortBy} onSort={onSort} />
-            <SortableHeader column="valor_total" label="Valor Total" sortBy={sortBy} onSort={onSort} />
-            <SortableHeader column="saldo" label="Saldo" sortBy={sortBy} onSort={onSort} />
-            <SortableHeader column="status" label="Status" sortBy={sortBy} onSort={onSort} />
-            <th scope="col" className="relative px-6 py-3"><span className="sr-only">Ações</span></th>
+            <ResizableSortableTh columnId="descricao" label="Descrição" sort={sort} onSort={onSort} onResizeStart={startResize} />
+            <ResizableSortableTh columnId="fornecedor_nome" label="Fornecedor" sort={sort} onSort={onSort} onResizeStart={startResize} />
+            <ResizableSortableTh columnId="data_vencimento" label="Vencimento" sort={sort} onSort={onSort} onResizeStart={startResize} />
+            <ResizableSortableTh columnId="valor_total" label="Valor Total" sort={sort} onSort={onSort} onResizeStart={startResize} align="right" />
+            <ResizableSortableTh columnId="saldo" label="Saldo" sort={sort} onSort={onSort} onResizeStart={startResize} align="right" />
+            <ResizableSortableTh columnId="status" label="Status" sort={sort} onSort={onSort} onResizeStart={startResize} />
+            <ResizableSortableTh
+              columnId="acoes"
+              label={<span className="sr-only">Ações</span>}
+              sortable={false}
+              onResizeStart={startResize}
+              align="right"
+              className="px-6"
+            />
           </tr>
         </thead>
         <motion.tbody layout className="bg-white divide-y divide-gray-200">

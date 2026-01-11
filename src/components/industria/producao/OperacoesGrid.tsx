@@ -17,6 +17,9 @@ import RegistrarInspecaoModal from './RegistrarInspecaoModal';
 import OperacaoDocsModal from './OperacaoDocsModal';
 import { logger } from '@/lib/logger';
 import { useConfirm } from '@/contexts/ConfirmProvider';
+import ResizableSortableTh from '@/components/ui/table/ResizableSortableTh';
+import TableColGroup from '@/components/ui/table/TableColGroup';
+import { useTableColumnWidths, type TableColumnWidthDef } from '@/components/ui/table/useTableColumnWidths';
 
 interface Props {
     ordemId: string;
@@ -37,6 +40,20 @@ export default function OperacoesGrid({ ordemId, highlightOperacaoId, canOperate
     const btnSecondary = "bg-gray-100 text-gray-800 hover:bg-gray-200";
     const btnSuccess = "bg-green-600 text-white hover:bg-green-700";
     const btnOutlineBlue = "border border-blue-200 text-blue-700 hover:bg-blue-50";
+    const columns: TableColumnWidthDef[] = [
+        { id: 'seq', defaultWidth: 90, minWidth: 80 },
+        { id: 'ct', defaultWidth: 220, minWidth: 180 },
+        { id: 'status', defaultWidth: 160, minWidth: 140 },
+        { id: 'planejado', defaultWidth: 140, minWidth: 120 },
+        { id: 'boas', defaultWidth: 160, minWidth: 140 },
+        { id: 'refugo', defaultWidth: 140, minWidth: 120 },
+        { id: 'transferido', defaultWidth: 160, minWidth: 140 },
+        { id: 'aTransferir', defaultWidth: 160, minWidth: 140 },
+        { id: 'qa', defaultWidth: 140, minWidth: 120 },
+        { id: 'acoes', defaultWidth: 180, minWidth: 160, resizable: false },
+        ...(canReset ? [{ id: 'more', defaultWidth: 80, minWidth: 70, resizable: false }] : []),
+    ];
+    const { widths, startResize } = useTableColumnWidths({ tableId: `industria:operacoes:grid:${ordemId}`, columns });
 
     // Controle de modal de apontamento
     const [selectedOp, setSelectedOp] = useState<OrdemOperacao | null>(null);
@@ -195,20 +212,21 @@ export default function OperacoesGrid({ ordemId, highlightOperacaoId, canOperate
     return (
         <div className="space-y-4">
             <div ref={tableRef} className="overflow-x-auto">
-                <table className="min-w-full divide-y divide-gray-200">
+                <table className="min-w-full divide-y divide-gray-200 table-fixed">
+                    <TableColGroup columns={columns} widths={widths} />
                     <thead className="bg-gray-50">
                         <tr>
-                            <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Seq</th>
-                            <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Centro de Trabalho</th>
-                            <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
-                            <th className="px-3 py-2 text-right text-xs font-medium text-gray-500 uppercase">Planejado</th>
-                            <th className="px-3 py-2 text-right text-xs font-medium text-gray-500 uppercase">Produzido (Boas)</th>
-                            <th className="px-3 py-2 text-right text-xs font-medium text-gray-500 uppercase">Refugo</th>
-                            <th className="px-3 py-2 text-right text-xs font-medium text-gray-500 uppercase">Transferido</th>
-                            <th className="px-3 py-2 text-right text-xs font-medium text-gray-500 uppercase">A transferir</th>
-                            <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">QA</th>
-                            <th className="px-3 py-2 text-center text-xs font-medium text-gray-500 uppercase">Ações</th>
-                            {canReset && <th className="px-3 py-2 text-center text-xs font-medium text-gray-500 uppercase">⋯</th>}
+                            <ResizableSortableTh columnId="seq" label="Seq" sortable={false} onResizeStart={startResize} className="px-3 py-2" />
+                            <ResizableSortableTh columnId="ct" label="Centro de Trabalho" sortable={false} onResizeStart={startResize} className="px-3 py-2" />
+                            <ResizableSortableTh columnId="status" label="Status" sortable={false} onResizeStart={startResize} className="px-3 py-2" />
+                            <ResizableSortableTh columnId="planejado" label="Planejado" sortable={false} onResizeStart={startResize} align="right" className="px-3 py-2" />
+                            <ResizableSortableTh columnId="boas" label="Produzido (Boas)" sortable={false} onResizeStart={startResize} align="right" className="px-3 py-2" />
+                            <ResizableSortableTh columnId="refugo" label="Refugo" sortable={false} onResizeStart={startResize} align="right" className="px-3 py-2" />
+                            <ResizableSortableTh columnId="transferido" label="Transferido" sortable={false} onResizeStart={startResize} align="right" className="px-3 py-2" />
+                            <ResizableSortableTh columnId="aTransferir" label="A transferir" sortable={false} onResizeStart={startResize} align="right" className="px-3 py-2" />
+                            <ResizableSortableTh columnId="qa" label="QA" sortable={false} onResizeStart={startResize} className="px-3 py-2" />
+                            <ResizableSortableTh columnId="acoes" label="Ações" sortable={false} onResizeStart={startResize} align="center" className="px-3 py-2" />
+                            {canReset && <ResizableSortableTh columnId="more" label="⋯" sortable={false} onResizeStart={startResize} align="center" className="px-3 py-2" />}
                         </tr>
                     </thead>
                     <tbody className="bg-white divide-y divide-gray-200">

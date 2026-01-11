@@ -8,6 +8,10 @@ import { motion } from 'framer-motion';
 import { logger } from '@/lib/logger';
 import { formatOrderNumber } from '@/lib/utils';
 import { useNavigate } from 'react-router-dom';
+import ResizableSortableTh, { type SortState } from '@/components/ui/table/ResizableSortableTh';
+import TableColGroup from '@/components/ui/table/TableColGroup';
+import { useTableColumnWidths, type TableColumnWidthDef } from '@/components/ui/table/useTableColumnWidths';
+import { sortRows, toggleSort } from '@/components/ui/table/sortUtils';
 
 export default function IndustriaDashboardPage() {
   const navigate = useNavigate();
@@ -20,6 +24,36 @@ export default function IndustriaDashboardPage() {
   const [benefOrders, setBenefOrders] = useState<OrdemIndustria[]>([]);
   const [benefLoading, setBenefLoading] = useState(false);
   const [benefError, setBenefError] = useState<string | null>(null);
+  const [atrasosSort, setAtrasosSort] = useState<SortState<'tipo' | 'ordem' | 'cliente' | 'prev' | 'status'>>({ column: 'prev', direction: 'asc' });
+  const [benefSort, setBenefSort] = useState<SortState<'itens' | 'caixas' | 'op' | 'cliente' | 'nfCliente' | 'nf' | 'pedido' | 'entrada' | 'saldo'>>({ column: 'saldo', direction: 'desc' });
+
+  const atrasosColumns: TableColumnWidthDef[] = [
+    { id: 'tipo', defaultWidth: 90, minWidth: 80 },
+    { id: 'ordem', defaultWidth: 130, minWidth: 110 },
+    { id: 'cliente', defaultWidth: 240, minWidth: 200 },
+    { id: 'prev', defaultWidth: 150, minWidth: 130 },
+    { id: 'status', defaultWidth: 180, minWidth: 150 },
+  ];
+  const { widths: atrasosWidths, startResize: startAtrasosResize } = useTableColumnWidths({
+    tableId: 'industria:dashboard:atrasos',
+    columns: atrasosColumns,
+  });
+
+  const benefColumns: TableColumnWidthDef[] = [
+    { id: 'itens', defaultWidth: 160, minWidth: 140 },
+    { id: 'caixas', defaultWidth: 140, minWidth: 120 },
+    { id: 'op', defaultWidth: 120, minWidth: 110 },
+    { id: 'cliente', defaultWidth: 220, minWidth: 180 },
+    { id: 'nfCliente', defaultWidth: 160, minWidth: 140 },
+    { id: 'nf', defaultWidth: 160, minWidth: 140 },
+    { id: 'pedido', defaultWidth: 140, minWidth: 120 },
+    { id: 'entrada', defaultWidth: 160, minWidth: 140 },
+    { id: 'saldo', defaultWidth: 170, minWidth: 150 },
+  ];
+  const { widths: benefWidths, startResize: startBenefResize } = useTableColumnWidths({
+    tableId: 'industria:dashboard:benef-top',
+    columns: benefColumns,
+  });
 
   const fetchStats = useCallback(async () => {
     setLoading(true);
@@ -197,6 +231,23 @@ export default function IndustriaDashboardPage() {
   );
 
   const benefTop = useMemo(() => benefEmAndamento.slice(0, 8), [benefEmAndamento]);
+  const benefTopSorted = useMemo(() => {
+    return sortRows(
+      benefTop,
+      benefSort as any,
+      [
+        { id: 'itens', type: 'number', getValue: (o: OrdemIndustria) => o.quantidade_planejada ?? 0 },
+        { id: 'caixas', type: 'number', getValue: (o: OrdemIndustria) => Number(o.qtde_caixas ?? 0) },
+        { id: 'op', type: 'number', getValue: (o: OrdemIndustria) => o.numero ?? 0 },
+        { id: 'cliente', type: 'string', getValue: (o: OrdemIndustria) => o.cliente_nome ?? '' },
+        { id: 'nfCliente', type: 'number', getValue: (o: OrdemIndustria) => o.total_entregue ?? 0 },
+        { id: 'nf', type: 'string', getValue: (o: OrdemIndustria) => o.numero_nf || o.documento_ref || '' },
+        { id: 'pedido', type: 'string', getValue: (o: OrdemIndustria) => o.pedido_numero ?? '' },
+        { id: 'entrada', type: 'date', getValue: (o: OrdemIndustria) => o.created_at || o.data_prevista_inicio || '' },
+        { id: 'saldo', type: 'number', getValue: (o: OrdemIndustria) => Math.max((o.quantidade_planejada ?? 0) - (o.total_entregue ?? 0), 0) },
+      ] as const
+    );
+  }, [benefSort, benefTop]);
 
   const ordensAtrasadas = useMemo(() => {
     const now = new Date();
@@ -214,6 +265,19 @@ export default function IndustriaDashboardPage() {
     });
     return late.slice(0, 10);
   }, [prodOrders, benefOrders]);
+  const ordensAtrasadasSorted = useMemo(() => {
+    return sortRows(
+      ordensAtrasadas,
+      atrasosSort as any,
+      [
+        { id: 'tipo', type: 'string', getValue: (o: OrdemIndustria) => o.tipo_ordem ?? '' },
+        { id: 'ordem', type: 'number', getValue: (o: OrdemIndustria) => o.numero ?? 0 },
+        { id: 'cliente', type: 'string', getValue: (o: OrdemIndustria) => o.cliente_nome ?? '' },
+        { id: 'prev', type: 'date', getValue: (o: OrdemIndustria) => o.data_prevista_entrega ?? '' },
+        { id: 'status', type: 'string', getValue: (o: OrdemIndustria) => o.status ?? '' },
+      ] as const
+    );
+  }, [atrasosSort, ordensAtrasadas]);
 
   const benefSaldoPorCliente = useMemo(() => {
     const map: Record<string, number> = {};
@@ -386,18 +450,19 @@ export default function IndustriaDashboardPage() {
           </div>
         )}
         <div className="overflow-x-auto border border-gray-100 rounded-xl">
-          <table className="min-w-full text-sm">
+          <table className="min-w-full text-sm table-fixed">
+            <TableColGroup columns={atrasosColumns} widths={atrasosWidths} />
             <thead className="bg-gray-50">
               <tr>
-                <th className="px-3 py-2 text-left text-xs font-semibold text-gray-500 uppercase">Tipo</th>
-                <th className="px-3 py-2 text-left text-xs font-semibold text-gray-500 uppercase">Ordem</th>
-                <th className="px-3 py-2 text-left text-xs font-semibold text-gray-500 uppercase">Cliente</th>
-                <th className="px-3 py-2 text-left text-xs font-semibold text-gray-500 uppercase">Prev. entrega</th>
-                <th className="px-3 py-2 text-left text-xs font-semibold text-gray-500 uppercase">Status</th>
+                <ResizableSortableTh columnId="tipo" label="Tipo" sort={atrasosSort} onSort={(col) => setAtrasosSort((prev) => toggleSort(prev as any, col))} onResizeStart={startAtrasosResize} className="px-3 py-2" />
+                <ResizableSortableTh columnId="ordem" label="Ordem" sort={atrasosSort} onSort={(col) => setAtrasosSort((prev) => toggleSort(prev as any, col))} onResizeStart={startAtrasosResize} className="px-3 py-2" />
+                <ResizableSortableTh columnId="cliente" label="Cliente" sort={atrasosSort} onSort={(col) => setAtrasosSort((prev) => toggleSort(prev as any, col))} onResizeStart={startAtrasosResize} className="px-3 py-2" />
+                <ResizableSortableTh columnId="prev" label="Prev. entrega" sort={atrasosSort} onSort={(col) => setAtrasosSort((prev) => toggleSort(prev as any, col))} onResizeStart={startAtrasosResize} className="px-3 py-2" />
+                <ResizableSortableTh columnId="status" label="Status" sort={atrasosSort} onSort={(col) => setAtrasosSort((prev) => toggleSort(prev as any, col))} onResizeStart={startAtrasosResize} className="px-3 py-2" />
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
-              {ordensAtrasadas.map((o) => (
+              {ordensAtrasadasSorted.map((o) => (
                 <tr
                   key={o.id}
                   className="hover:bg-gray-50 cursor-pointer"
@@ -410,7 +475,7 @@ export default function IndustriaDashboardPage() {
                   <td className="px-3 py-2 text-gray-700">{o.status.replace(/_/g, ' ')}</td>
                 </tr>
               ))}
-              {ordensAtrasadas.length === 0 && (
+              {ordensAtrasadasSorted.length === 0 && (
                 <tr>
                   <td colSpan={5} className="px-3 py-6 text-center text-gray-500 text-sm">
                     Nenhum atraso detectado (ou não há datas previstas).
@@ -473,22 +538,23 @@ export default function IndustriaDashboardPage() {
 
         <div className="flex flex-col gap-4">
           <div className="overflow-x-auto border border-gray-100 rounded-xl">
-            <table className="min-w-full text-sm">
+            <table className="min-w-full text-sm table-fixed">
+              <TableColGroup columns={benefColumns} widths={benefWidths} />
               <thead className="bg-gray-50">
                 <tr>
-                  <th className="px-3 py-2 text-left text-xs font-semibold text-gray-500 uppercase">Itens em produção</th>
-                  <th className="px-3 py-2 text-left text-xs font-semibold text-gray-500 uppercase">Qtde. Caixas</th>
-                  <th className="px-3 py-2 text-left text-xs font-semibold text-gray-500 uppercase">OP</th>
-                  <th className="px-3 py-2 text-left text-xs font-semibold text-gray-500 uppercase">Cliente</th>
-                  <th className="px-3 py-2 text-left text-xs font-semibold text-gray-500 uppercase">Qtde. NF Cliente</th>
-                  <th className="px-3 py-2 text-left text-xs font-semibold text-gray-500 uppercase">NF</th>
-                  <th className="px-3 py-2 text-left text-xs font-semibold text-gray-500 uppercase">Pedido</th>
-                  <th className="px-3 py-2 text-left text-xs font-semibold text-gray-500 uppercase">Data de entrada</th>
-                  <th className="px-3 py-2 text-left text-xs font-semibold text-gray-500 uppercase">Saldo (A entregar)</th>
+                  <ResizableSortableTh columnId="itens" label="Itens em produção" sort={benefSort} onSort={(col) => setBenefSort((prev) => toggleSort(prev as any, col))} onResizeStart={startBenefResize} className="px-3 py-2" />
+                  <ResizableSortableTh columnId="caixas" label="Qtde. Caixas" sort={benefSort} onSort={(col) => setBenefSort((prev) => toggleSort(prev as any, col))} onResizeStart={startBenefResize} className="px-3 py-2" />
+                  <ResizableSortableTh columnId="op" label="OP" sort={benefSort} onSort={(col) => setBenefSort((prev) => toggleSort(prev as any, col))} onResizeStart={startBenefResize} className="px-3 py-2" />
+                  <ResizableSortableTh columnId="cliente" label="Cliente" sort={benefSort} onSort={(col) => setBenefSort((prev) => toggleSort(prev as any, col))} onResizeStart={startBenefResize} className="px-3 py-2" />
+                  <ResizableSortableTh columnId="nfCliente" label="Qtde. NF Cliente" sort={benefSort} onSort={(col) => setBenefSort((prev) => toggleSort(prev as any, col))} onResizeStart={startBenefResize} className="px-3 py-2" />
+                  <ResizableSortableTh columnId="nf" label="NF" sort={benefSort} onSort={(col) => setBenefSort((prev) => toggleSort(prev as any, col))} onResizeStart={startBenefResize} className="px-3 py-2" />
+                  <ResizableSortableTh columnId="pedido" label="Pedido" sort={benefSort} onSort={(col) => setBenefSort((prev) => toggleSort(prev as any, col))} onResizeStart={startBenefResize} className="px-3 py-2" />
+                  <ResizableSortableTh columnId="entrada" label="Data de entrada" sort={benefSort} onSort={(col) => setBenefSort((prev) => toggleSort(prev as any, col))} onResizeStart={startBenefResize} className="px-3 py-2" />
+                  <ResizableSortableTh columnId="saldo" label="Saldo (A entregar)" sort={benefSort} onSort={(col) => setBenefSort((prev) => toggleSort(prev as any, col))} onResizeStart={startBenefResize} className="px-3 py-2" />
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
-                {benefTop.map((o) => {
+                {benefTopSorted.map((o) => {
                   const saldo = Math.max((o.quantidade_planejada ?? 0) - (o.total_entregue ?? 0), 0);
                   const qtdeCaixas = o.qtde_caixas ?? '—';
                   const nfNumero = o.numero_nf || o.documento_ref || '—';

@@ -3,6 +3,10 @@ import { Loader2, PlusCircle, Receipt } from 'lucide-react';
 import Modal from '@/components/ui/Modal';
 import { useToast } from '@/contexts/ToastProvider';
 import Input from '@/components/ui/forms/Input';
+import ResizableSortableTh, { type SortState } from '@/components/ui/table/ResizableSortableTh';
+import TableColGroup from '@/components/ui/table/TableColGroup';
+import { useTableColumnWidths, type TableColumnWidthDef } from '@/components/ui/table/useTableColumnWidths';
+import { sortRows, toggleSort } from '@/components/ui/table/sortUtils';
 import {
   deleteNotaServico,
   listNotasServico,
@@ -34,6 +38,7 @@ export default function NotasServicoPage() {
   const [contratos, setContratos] = useState<ServicoContrato[]>([]);
   const [isOpen, setIsOpen] = useState(false);
   const [form, setForm] = useState<FormState>(emptyForm);
+  const [sort, setSort] = useState<SortState<string>>({ column: 'competencia', direction: 'desc' });
   const valorProps = useNumericField(form.valor, (value) => setForm((s) => ({ ...s, valor: value })));
 
   const contratoById = useMemo(() => {
@@ -41,6 +46,30 @@ export default function NotasServicoPage() {
     for (const c of contratos) m.set(c.id, c);
     return m;
   }, [contratos]);
+
+  const columns: TableColumnWidthDef[] = [
+    { id: 'competencia', defaultWidth: 160, minWidth: 140 },
+    { id: 'contrato', defaultWidth: 260, minWidth: 200 },
+    { id: 'descricao', defaultWidth: 360, minWidth: 220 },
+    { id: 'valor', defaultWidth: 140, minWidth: 120 },
+    { id: 'status', defaultWidth: 140, minWidth: 120 },
+    { id: 'acoes', defaultWidth: 220, minWidth: 200 },
+  ];
+  const { widths, startResize } = useTableColumnWidths({ tableId: 'servicos:notas', columns });
+
+  const sortedRows = useMemo(() => {
+    return sortRows(
+      rows,
+      sort as any,
+      [
+        { id: 'competencia', type: 'date', getValue: (r) => r.competencia ?? null },
+        { id: 'contrato', type: 'string', getValue: (r) => (r.contrato_id ? contratoById.get(r.contrato_id)?.descricao ?? '' : '') },
+        { id: 'descricao', type: 'string', getValue: (r) => r.descricao ?? '' },
+        { id: 'valor', type: 'number', getValue: (r) => r.valor ?? 0 },
+        { id: 'status', type: 'string', getValue: (r) => r.status ?? '' },
+      ] as const
+    );
+  }, [contratoById, rows, sort]);
 
   async function load() {
     setLoading(true);
@@ -155,18 +184,19 @@ export default function NotasServicoPage() {
         ) : (
           <div className="overflow-auto">
             <table className="min-w-full text-sm">
+              <TableColGroup columns={columns} widths={widths} />
               <thead className="bg-gray-50">
                 <tr className="text-left text-gray-600">
-                  <th className="px-4 py-3">Competência</th>
-                  <th className="px-4 py-3">Contrato</th>
-                  <th className="px-4 py-3">Descrição</th>
-                  <th className="px-4 py-3">Valor</th>
-                  <th className="px-4 py-3">Status</th>
-                  <th className="px-4 py-3 text-right">Ações</th>
+                  <ResizableSortableTh columnId="competencia" label="Competência" className="px-4 py-3 normal-case tracking-normal" sort={sort as any} onSort={(col) => setSort((prev) => toggleSort(prev as any, col))} onResizeStart={startResize as any} />
+                  <ResizableSortableTh columnId="contrato" label="Contrato" className="px-4 py-3 normal-case tracking-normal" sort={sort as any} onSort={(col) => setSort((prev) => toggleSort(prev as any, col))} onResizeStart={startResize as any} />
+                  <ResizableSortableTh columnId="descricao" label="Descrição" className="px-4 py-3 normal-case tracking-normal" sort={sort as any} onSort={(col) => setSort((prev) => toggleSort(prev as any, col))} onResizeStart={startResize as any} />
+                  <ResizableSortableTh columnId="valor" label="Valor" className="px-4 py-3 normal-case tracking-normal" sort={sort as any} onSort={(col) => setSort((prev) => toggleSort(prev as any, col))} onResizeStart={startResize as any} />
+                  <ResizableSortableTh columnId="status" label="Status" className="px-4 py-3 normal-case tracking-normal" sort={sort as any} onSort={(col) => setSort((prev) => toggleSort(prev as any, col))} onResizeStart={startResize as any} />
+                  <ResizableSortableTh columnId="acoes" label="Ações" align="right" className="px-4 py-3 normal-case tracking-normal" sortable={false} resizable onResizeStart={startResize as any} />
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200">
-                {rows.map((r) => {
+                {sortedRows.map((r) => {
                   const c = r.contrato_id ? contratoById.get(r.contrato_id) : null;
                   return (
                     <tr key={r.id} className="hover:bg-gray-50">

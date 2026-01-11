@@ -16,6 +16,10 @@ import {
   upperPtBr,
   type ImportFieldMapping,
 } from '@/lib/importMapping';
+import ResizableSortableTh, { type SortState } from '@/components/ui/table/ResizableSortableTh';
+import TableColGroup from '@/components/ui/table/TableColGroup';
+import { useTableColumnWidths, type TableColumnWidthDef } from '@/components/ui/table/useTableColumnWidths';
+import { sortRows, toggleSort } from '@/components/ui/table/sortUtils';
 
 type PreviewRow = {
   line: number;
@@ -117,6 +121,33 @@ export default function ImportProductsCsvModal(props: {
   const [dedupeKey, setDedupeKey] = useState<DedupeKey>('sku');
   const [dedupeStrategy, setDedupeStrategy] = useState<DedupeStrategy>('first');
   const [forceUppercase, setForceUppercase] = useState(false);
+  const [previewSort, setPreviewSort] = useState<SortState<'line' | 'nome' | 'sku' | 'preco' | 'status' | 'errors'>>({
+    column: 'line',
+    direction: 'asc',
+  });
+
+  const mappingColumns: TableColumnWidthDef[] = [
+    { id: 'campo', defaultWidth: 260, minWidth: 180 },
+    { id: 'coluna', defaultWidth: 340, minWidth: 220 },
+    { id: 'obrigatorio', defaultWidth: 140, minWidth: 120 },
+  ];
+  const { widths: mappingWidths, startResize: startMappingResize } = useTableColumnWidths({
+    tableId: 'import:products:mapping',
+    columns: mappingColumns,
+  });
+
+  const previewColumns: TableColumnWidthDef[] = [
+    { id: 'line', defaultWidth: 90, minWidth: 80 },
+    { id: 'nome', defaultWidth: 320, minWidth: 200 },
+    { id: 'sku', defaultWidth: 160, minWidth: 120 },
+    { id: 'preco', defaultWidth: 140, minWidth: 120 },
+    { id: 'status', defaultWidth: 120, minWidth: 110 },
+    { id: 'errors', defaultWidth: 520, minWidth: 260 },
+  ];
+  const { widths: previewWidths, startResize: startPreviewResize } = useTableColumnWidths({
+    tableId: 'import:products:preview',
+    columns: previewColumns,
+  });
 
   useEffect(() => {
     if (!isOpen) return;
@@ -239,6 +270,21 @@ export default function ImportProductsCsvModal(props: {
     const valid = preview.filter((p) => p.errors.length === 0).length;
     return { total, valid, invalid: total - valid };
   }, [preview]);
+
+  const previewSorted = useMemo(() => {
+    return sortRows(
+      preview,
+      previewSort as any,
+      [
+        { id: 'line', type: 'number', getValue: (r: PreviewRow) => r.line ?? 0 },
+        { id: 'nome', type: 'string', getValue: (r: PreviewRow) => r.nome ?? '' },
+        { id: 'sku', type: 'string', getValue: (r: PreviewRow) => r.sku ?? '' },
+        { id: 'preco', type: 'number', getValue: (r: PreviewRow) => r.preco ?? NaN },
+        { id: 'status', type: 'string', getValue: (r: PreviewRow) => r.status ?? '' },
+        { id: 'errors', type: 'string', getValue: (r: PreviewRow) => r.errors.join('; ') ?? '' },
+      ] as const
+    );
+  }, [preview, previewSort]);
 
   const handlePickFile = async (file: File) => {
     const { text, rows } = await readTabularImportFile(file);
@@ -459,12 +505,13 @@ export default function ImportProductsCsvModal(props: {
             </div>
 
             <div className="overflow-auto rounded-lg border border-gray-200 bg-white">
-              <table className="min-w-full text-sm">
+              <table className="min-w-full text-sm table-fixed">
+                <TableColGroup columns={mappingColumns} widths={mappingWidths} />
                 <thead className="sticky top-0 bg-gray-50 text-xs uppercase text-gray-500">
                   <tr>
-                    <th className="px-3 py-2 text-left">Campo</th>
-                    <th className="px-3 py-2 text-left">Coluna da planilha</th>
-                    <th className="px-3 py-2 text-left">Obrigatório</th>
+                    <ResizableSortableTh columnId="campo" label="Campo" sortable={false} onResizeStart={startMappingResize} className="px-3 py-2" />
+                    <ResizableSortableTh columnId="coluna" label="Coluna da planilha" sortable={false} onResizeStart={startMappingResize} className="px-3 py-2" />
+                    <ResizableSortableTh columnId="obrigatorio" label="Obrigatório" sortable={false} onResizeStart={startMappingResize} className="px-3 py-2" />
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100">
@@ -518,19 +565,62 @@ export default function ImportProductsCsvModal(props: {
                 <div className="mt-2 text-sm text-gray-600">Volte e cole um CSV (ou envie um XLS/XLSX).</div>
               ) : (
                 <div className="mt-3 max-h-[260px] overflow-auto rounded-lg border border-gray-200 bg-white">
-                  <table className="min-w-full text-sm">
+                  <table className="min-w-full text-sm table-fixed">
+                    <TableColGroup columns={previewColumns} widths={previewWidths} />
                     <thead className="sticky top-0 bg-gray-50 text-xs uppercase text-gray-500">
                       <tr>
-                        <th className="px-3 py-2 text-left">Linha</th>
-                        <th className="px-3 py-2 text-left">Nome</th>
-                        <th className="px-3 py-2 text-left">SKU</th>
-                        <th className="px-3 py-2 text-left">Preço</th>
-                        <th className="px-3 py-2 text-left">Status</th>
-                        <th className="px-3 py-2 text-left">Erros</th>
+                        <ResizableSortableTh
+                          columnId="line"
+                          label="Linha"
+                          sort={previewSort}
+                          onSort={(col) => setPreviewSort((prev) => toggleSort(prev as any, col))}
+                          onResizeStart={startPreviewResize}
+                          className="px-3 py-2"
+                        />
+                        <ResizableSortableTh
+                          columnId="nome"
+                          label="Nome"
+                          sort={previewSort}
+                          onSort={(col) => setPreviewSort((prev) => toggleSort(prev as any, col))}
+                          onResizeStart={startPreviewResize}
+                          className="px-3 py-2"
+                        />
+                        <ResizableSortableTh
+                          columnId="sku"
+                          label="SKU"
+                          sort={previewSort}
+                          onSort={(col) => setPreviewSort((prev) => toggleSort(prev as any, col))}
+                          onResizeStart={startPreviewResize}
+                          className="px-3 py-2"
+                        />
+                        <ResizableSortableTh
+                          columnId="preco"
+                          label="Preço"
+                          sort={previewSort}
+                          onSort={(col) => setPreviewSort((prev) => toggleSort(prev as any, col))}
+                          onResizeStart={startPreviewResize}
+                          className="px-3 py-2"
+                        />
+                        <ResizableSortableTh
+                          columnId="status"
+                          label="Status"
+                          sort={previewSort}
+                          onSort={(col) => setPreviewSort((prev) => toggleSort(prev as any, col))}
+                          onResizeStart={startPreviewResize}
+                          className="px-3 py-2"
+                        />
+                        <ResizableSortableTh
+                          columnId="errors"
+                          label="Erros"
+                          sort={previewSort}
+                          onSort={(col) => setPreviewSort((prev) => toggleSort(prev as any, col))}
+                          onResizeStart={startPreviewResize}
+                          className="px-3 py-2"
+                        />
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-100">
-                      {preview.slice(0, 120).map((r) => (
+                      {previewSorted.slice(0, 120).map((r) => (
                         <tr key={r.line} className={r.errors.length ? 'bg-rose-50/40' : ''}>
                           <td className="px-3 py-2 text-gray-600 whitespace-nowrap">{r.line}</td>
                           <td className="px-3 py-2">{r.nome || '—'}</td>
@@ -570,4 +660,3 @@ export default function ImportProductsCsvModal(props: {
     </Modal>
   );
 }
-

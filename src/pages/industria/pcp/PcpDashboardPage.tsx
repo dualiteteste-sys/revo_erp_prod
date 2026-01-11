@@ -35,6 +35,9 @@ import { getCentroApsConfig, upsertCentroApsConfig } from '@/services/industriaC
 import { differenceInCalendarDays, format } from 'date-fns';
 import Modal from '@/components/ui/Modal';
 import { useConfirm } from '@/contexts/ConfirmProvider';
+import ResizableSortableTh from '@/components/ui/table/ResizableSortableTh';
+import TableColGroup from '@/components/ui/table/TableColGroup';
+import { useTableColumnWidths, type TableColumnWidthDef } from '@/components/ui/table/useTableColumnWidths';
 
 const fmtInput = (date: Date) => date.toISOString().slice(0, 10);
 
@@ -97,6 +100,93 @@ export default function PcpDashboardPage() {
   const [ganttStatusFilter, setGanttStatusFilter] = useState<string>('all');
   const [ganttApsFilter, setGanttApsFilter] = useState<string>('all');
   const [sequencingCtId, setSequencingCtId] = useState<string | null>(null);
+
+  const batchColumns: TableColumnWidthDef[] = [
+    { id: 'centro', defaultWidth: 240, minWidth: 180 },
+    { id: 'atualizadas', defaultWidth: 140, minWidth: 120 },
+    { id: 'semAgenda', defaultWidth: 140, minWidth: 120 },
+    { id: 'freeze', defaultWidth: 120, minWidth: 110 },
+    { id: 'run', defaultWidth: 140, minWidth: 120 },
+    { id: 'acoes', defaultWidth: 180, minWidth: 160, resizable: false },
+  ];
+  const { widths: batchWidths, startResize: startBatchResize } = useTableColumnWidths({ tableId: 'pcp:aps:batch-summary', columns: batchColumns });
+
+  const overloadColumns: TableColumnWidthDef[] = [
+    { id: 'centro', defaultWidth: 240, minWidth: 180 },
+    { id: 'sobrecarga', defaultWidth: 140, minWidth: 120 },
+    { id: 'pico', defaultWidth: 140, minWidth: 120 },
+    { id: 'sugestao', defaultWidth: 240, minWidth: 180 },
+    { id: 'preview', defaultWidth: 200, minWidth: 160 },
+    { id: 'resultado', defaultWidth: 200, minWidth: 160 },
+    { id: 'acoes', defaultWidth: 180, minWidth: 160, resizable: false },
+  ];
+  const { widths: overloadWidths, startResize: startOverloadResize } = useTableColumnWidths({ tableId: 'pcp:aps:replan-candidates', columns: overloadColumns });
+
+  const replanPreviewColumns: TableColumnWidthDef[] = [
+    { id: 'select', defaultWidth: 48, minWidth: 48, maxWidth: 48, resizable: false },
+    { id: 'ordem', defaultWidth: 140, minWidth: 120 },
+    { id: 'produto', defaultWidth: 260, minWidth: 200 },
+    { id: 'horas', defaultWidth: 120, minWidth: 110 },
+    { id: 'old', defaultWidth: 140, minWidth: 120 },
+    { id: 'new', defaultWidth: 140, minWidth: 120 },
+    { id: 'status', defaultWidth: 180, minWidth: 140 },
+  ];
+  const { widths: replanPreviewWidths, startResize: startReplanPreviewResize } = useTableColumnWidths({
+    tableId: 'pcp:aps:replan-preview',
+    columns: replanPreviewColumns,
+  });
+
+  const leadTimeColumns: TableColumnWidthDef[] = [
+    { id: 'op', defaultWidth: 120, minWidth: 110 },
+    { id: 'produto', defaultWidth: 320, minWidth: 220 },
+    { id: 'status', defaultWidth: 160, minWidth: 140 },
+    { id: 'plan', defaultWidth: 160, minWidth: 140 },
+    { id: 'real', defaultWidth: 160, minWidth: 140 },
+    { id: 'delta', defaultWidth: 140, minWidth: 120 },
+  ];
+  const { widths: leadTimeWidths, startResize: startLeadTimeResize } = useTableColumnWidths({ tableId: 'pcp:lead-times', columns: leadTimeColumns });
+
+  const ganttColumns: TableColumnWidthDef[] = [
+    { id: 'op', defaultWidth: 140, minWidth: 120 },
+    { id: 'produto', defaultWidth: 260, minWidth: 200 },
+    { id: 'ctseq', defaultWidth: 220, minWidth: 180 },
+    { id: 'aps', defaultWidth: 140, minWidth: 120 },
+    { id: 'status', defaultWidth: 160, minWidth: 140 },
+    { id: 'timeline', defaultWidth: 560, minWidth: 320 },
+  ];
+  const { widths: ganttWidths, startResize: startGanttResize } = useTableColumnWidths({ tableId: 'pcp:gantt:list', columns: ganttColumns });
+
+  const apsPreviewColumns: TableColumnWidthDef[] = [
+    { id: 'op', defaultWidth: 120, minWidth: 110 },
+    { id: 'produto', defaultWidth: 260, minWidth: 200 },
+    { id: 'antes', defaultWidth: 200, minWidth: 160 },
+    { id: 'depois', defaultWidth: 200, minWidth: 160 },
+    { id: 'status', defaultWidth: 220, minWidth: 180 },
+    { id: 'aps', defaultWidth: 140, minWidth: 120 },
+  ];
+  const { widths: apsPreviewWidths, startResize: startApsPreviewResize } = useTableColumnWidths({ tableId: 'pcp:aps:preview-changes', columns: apsPreviewColumns });
+
+  const apsRunColumns: TableColumnWidthDef[] = [
+    { id: 'op', defaultWidth: 120, minWidth: 110 },
+    { id: 'produto', defaultWidth: 260, minWidth: 200 },
+    { id: 'seq', defaultWidth: 160, minWidth: 140 },
+    { id: 'antes', defaultWidth: 200, minWidth: 160 },
+    { id: 'depois', defaultWidth: 200, minWidth: 160 },
+    { id: 'status', defaultWidth: 180, minWidth: 140 },
+    { id: 'aps', defaultWidth: 140, minWidth: 120 },
+  ];
+  const { widths: apsRunWidths, startResize: startApsRunResize } = useTableColumnWidths({ tableId: 'pcp:aps:run-details', columns: apsRunColumns });
+
+  const atpColumns: TableColumnWidthDef[] = [
+    { id: 'produto', defaultWidth: 320, minWidth: 220 },
+    { id: 'estoque', defaultWidth: 140, minWidth: 120 },
+    { id: 'emProducao', defaultWidth: 160, minWidth: 140 },
+    { id: 'demanda', defaultWidth: 140, minWidth: 120 },
+    { id: 'atp', defaultWidth: 140, minWidth: 120 },
+    { id: 'carga', defaultWidth: 180, minWidth: 150 },
+    { id: 'ctp', defaultWidth: 140, minWidth: 120 },
+  ];
+  const { widths: atpWidths, startResize: startAtpResize } = useTableColumnWidths({ tableId: 'pcp:atp-ctp', columns: atpColumns });
 
   const [apsModal, setApsModal] = useState<{
     open: boolean;
@@ -1102,15 +1192,16 @@ export default function PcpDashboardPage() {
               )}
             </div>
             <div className="overflow-x-auto">
-              <table className="min-w-full text-xs">
+              <table className="min-w-full text-xs table-fixed">
+                <TableColGroup columns={batchColumns} widths={batchWidths} />
                 <thead className="bg-gray-50 text-gray-600">
                   <tr>
-                    <th className="px-3 py-2 text-left">Centro</th>
-                    <th className="px-3 py-2 text-right">Atualizadas</th>
-                    <th className="px-3 py-2 text-right">Sem agenda</th>
-                    <th className="px-3 py-2 text-right">Freeze</th>
-                    <th className="px-3 py-2 text-left">Run</th>
-                    <th className="px-3 py-2 text-left">Ações</th>
+                    <ResizableSortableTh columnId="centro" label="Centro" sortable={false} onResizeStart={startBatchResize} className="px-3 py-2" />
+                    <ResizableSortableTh columnId="atualizadas" label="Atualizadas" sortable={false} onResizeStart={startBatchResize} align="right" className="px-3 py-2" />
+                    <ResizableSortableTh columnId="semAgenda" label="Sem agenda" sortable={false} onResizeStart={startBatchResize} align="right" className="px-3 py-2" />
+                    <ResizableSortableTh columnId="freeze" label="Freeze" sortable={false} onResizeStart={startBatchResize} align="right" className="px-3 py-2" />
+                    <ResizableSortableTh columnId="run" label="Run" sortable={false} onResizeStart={startBatchResize} className="px-3 py-2" />
+                    <ResizableSortableTh columnId="acoes" label="Ações" sortable={false} onResizeStart={startBatchResize} className="px-3 py-2" />
                   </tr>
                 </thead>
                 <tbody>
@@ -1174,16 +1265,17 @@ export default function PcpDashboardPage() {
           <div className="bg-white border rounded-lg overflow-hidden">
             <div className="border-b px-4 py-2 text-sm font-semibold text-gray-800">CTs com sobrecarga (preview)</div>
             <div className="overflow-x-auto">
-              <table className="min-w-full text-xs">
+              <table className="min-w-full text-xs table-fixed">
+                <TableColGroup columns={overloadColumns} widths={overloadWidths} />
                 <thead className="bg-gray-50 text-gray-600">
                   <tr>
-                    <th className="px-3 py-2 text-left">Centro</th>
-                    <th className="px-3 py-2 text-right">Sobrecarga</th>
-                    <th className="px-3 py-2 text-left">Pico</th>
-                    <th className="px-3 py-2 text-left">Sugestão</th>
-                    <th className="px-3 py-2 text-left">Preview</th>
-                    <th className="px-3 py-2 text-left">Resultado</th>
-                    <th className="px-3 py-2 text-left">Ações</th>
+                    <ResizableSortableTh columnId="centro" label="Centro" sortable={false} onResizeStart={startOverloadResize} className="px-3 py-2" />
+                    <ResizableSortableTh columnId="sobrecarga" label="Sobrecarga" sortable={false} onResizeStart={startOverloadResize} align="right" className="px-3 py-2" />
+                    <ResizableSortableTh columnId="pico" label="Pico" sortable={false} onResizeStart={startOverloadResize} className="px-3 py-2" />
+                    <ResizableSortableTh columnId="sugestao" label="Sugestão" sortable={false} onResizeStart={startOverloadResize} className="px-3 py-2" />
+                    <ResizableSortableTh columnId="preview" label="Preview" sortable={false} onResizeStart={startOverloadResize} className="px-3 py-2" />
+                    <ResizableSortableTh columnId="resultado" label="Resultado" sortable={false} onResizeStart={startOverloadResize} className="px-3 py-2" />
+                    <ResizableSortableTh columnId="acoes" label="Ações" sortable={false} onResizeStart={startOverloadResize} className="px-3 py-2" />
                   </tr>
                 </thead>
                 <tbody>
@@ -1391,36 +1483,43 @@ export default function PcpDashboardPage() {
 
                 <div className="bg-white border rounded-lg overflow-hidden">
                   <div className="overflow-x-auto">
-                    <table className="min-w-full text-xs">
+                    <table className="min-w-full text-xs table-fixed">
+                      <TableColGroup columns={replanPreviewColumns} widths={replanPreviewWidths} />
                       <thead className="bg-gray-50 text-gray-600">
                         <tr>
-                          <th className="px-3 py-2 text-left w-[1%]">
-                            <input
-                              type="checkbox"
-                              disabled={movableRows.length === 0}
-                              checked={allMovableSelected}
-                              onChange={(e) => {
-                                const checked = e.target.checked;
-                                if (!checked) {
-                                  setReplanPreviewSelectedOps({});
-                                  return;
-                                }
-                                setReplanPreviewSelectedOps(
-                                  movableRows.reduce((acc, r) => {
-                                    acc[r.operacao_id] = true;
-                                    return acc;
-                                  }, {} as Record<string, boolean>)
-                                );
-                              }}
-                              title="Selecionar todas as operações movíveis"
-                            />
-                          </th>
-                          <th className="px-3 py-2 text-left">Ordem</th>
-                          <th className="px-3 py-2 text-left">Produto</th>
-                          <th className="px-3 py-2 text-right">Horas</th>
-                          <th className="px-3 py-2 text-left">Old</th>
-                          <th className="px-3 py-2 text-left">New</th>
-                          <th className="px-3 py-2 text-left">Status</th>
+                          <ResizableSortableTh
+                            columnId="select"
+                            label={
+                              <input
+                                type="checkbox"
+                                disabled={movableRows.length === 0}
+                                checked={allMovableSelected}
+                                onChange={(e) => {
+                                  const checked = e.target.checked;
+                                  if (!checked) {
+                                    setReplanPreviewSelectedOps({});
+                                    return;
+                                  }
+                                  setReplanPreviewSelectedOps(
+                                    movableRows.reduce((acc, r) => {
+                                      acc[r.operacao_id] = true;
+                                      return acc;
+                                    }, {} as Record<string, boolean>)
+                                  );
+                                }}
+                                title="Selecionar todas as operações movíveis"
+                              />
+                            }
+                            sortable={false}
+                            onResizeStart={startReplanPreviewResize}
+                            className="px-3 py-2"
+                          />
+                          <ResizableSortableTh columnId="ordem" label="Ordem" sortable={false} onResizeStart={startReplanPreviewResize} className="px-3 py-2" />
+                          <ResizableSortableTh columnId="produto" label="Produto" sortable={false} onResizeStart={startReplanPreviewResize} className="px-3 py-2" />
+                          <ResizableSortableTh columnId="horas" label="Horas" sortable={false} onResizeStart={startReplanPreviewResize} align="right" className="px-3 py-2" />
+                          <ResizableSortableTh columnId="old" label="Old" sortable={false} onResizeStart={startReplanPreviewResize} className="px-3 py-2" />
+                          <ResizableSortableTh columnId="new" label="New" sortable={false} onResizeStart={startReplanPreviewResize} className="px-3 py-2" />
+                          <ResizableSortableTh columnId="status" label="Status" sortable={false} onResizeStart={startReplanPreviewResize} className="px-3 py-2" />
                         </tr>
                       </thead>
                       <tbody>
@@ -1555,15 +1654,16 @@ export default function PcpDashboardPage() {
           <LineChart className="text-indigo-600" size={18} /> Lead time real x planejado (OP)
         </div>
         <div className="overflow-x-auto">
-          <table className="min-w-full text-sm">
+          <table className="min-w-full text-sm table-fixed">
+            <TableColGroup columns={leadTimeColumns} widths={leadTimeWidths} />
             <thead className="bg-gray-50 text-gray-600">
               <tr>
-                <th className="px-4 py-2 text-left">OP</th>
-                <th className="px-4 py-2 text-left">Produto</th>
-                <th className="px-4 py-2 text-left">Status</th>
-                <th className="px-4 py-2 text-right">Planejado (h)</th>
-                <th className="px-4 py-2 text-right">Real (h)</th>
-                <th className="px-4 py-2 text-right">Δ horas</th>
+                <ResizableSortableTh columnId="op" label="OP" sortable={false} onResizeStart={startLeadTimeResize} className="px-4 py-2" />
+                <ResizableSortableTh columnId="produto" label="Produto" sortable={false} onResizeStart={startLeadTimeResize} className="px-4 py-2" />
+                <ResizableSortableTh columnId="status" label="Status" sortable={false} onResizeStart={startLeadTimeResize} className="px-4 py-2" />
+                <ResizableSortableTh columnId="plan" label="Planejado (h)" sortable={false} onResizeStart={startLeadTimeResize} align="right" className="px-4 py-2" />
+                <ResizableSortableTh columnId="real" label="Real (h)" sortable={false} onResizeStart={startLeadTimeResize} align="right" className="px-4 py-2" />
+                <ResizableSortableTh columnId="delta" label="Δ horas" sortable={false} onResizeStart={startLeadTimeResize} align="right" className="px-4 py-2" />
               </tr>
             </thead>
             <tbody>
@@ -1863,15 +1963,16 @@ export default function PcpDashboardPage() {
           </div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="min-w-full text-sm">
+            <table className="min-w-full text-sm table-fixed">
+              <TableColGroup columns={ganttColumns} widths={ganttWidths} />
               <thead className="bg-gray-50 text-gray-600">
                 <tr>
-                  <th className="px-4 py-2 text-left">OP</th>
-                  <th className="px-4 py-2 text-left">Produto</th>
-                  <th className="px-4 py-2 text-left">CT / Seq</th>
-                  <th className="px-4 py-2 text-left">APS</th>
-                  <th className="px-4 py-2 text-left">Status</th>
-                  <th className="px-4 py-2 text-left w-2/5">Linha do tempo</th>
+                  <ResizableSortableTh columnId="op" label="OP" sortable={false} onResizeStart={startGanttResize} className="px-4 py-2" />
+                  <ResizableSortableTh columnId="produto" label="Produto" sortable={false} onResizeStart={startGanttResize} className="px-4 py-2" />
+                  <ResizableSortableTh columnId="ctseq" label="CT / Seq" sortable={false} onResizeStart={startGanttResize} className="px-4 py-2" />
+                  <ResizableSortableTh columnId="aps" label="APS" sortable={false} onResizeStart={startGanttResize} className="px-4 py-2" />
+                  <ResizableSortableTh columnId="status" label="Status" sortable={false} onResizeStart={startGanttResize} className="px-4 py-2" />
+                  <ResizableSortableTh columnId="timeline" label="Linha do tempo" sortable={false} onResizeStart={startGanttResize} className="px-4 py-2" />
                 </tr>
               </thead>
               <tbody>
@@ -2147,15 +2248,16 @@ export default function PcpDashboardPage() {
             <div className="bg-white border rounded-lg overflow-hidden">
               <div className="border-b px-4 py-2 text-sm font-semibold text-gray-800">Preview (mudanças)</div>
               <div className="overflow-x-auto">
-                <table className="min-w-full text-xs">
+                <table className="min-w-full text-xs table-fixed">
+                  <TableColGroup columns={apsPreviewColumns} widths={apsPreviewWidths} />
                   <thead className="bg-gray-50 text-gray-600">
                     <tr>
-                      <th className="px-3 py-2 text-left">OP</th>
-                      <th className="px-3 py-2 text-left">Produto</th>
-                      <th className="px-3 py-2 text-left">Antes</th>
-                      <th className="px-3 py-2 text-left">Depois</th>
-                      <th className="px-3 py-2 text-left">Status</th>
-                      <th className="px-3 py-2 text-left">APS</th>
+                      <ResizableSortableTh columnId="op" label="OP" sortable={false} onResizeStart={startApsPreviewResize} className="px-3 py-2" />
+                      <ResizableSortableTh columnId="produto" label="Produto" sortable={false} onResizeStart={startApsPreviewResize} className="px-3 py-2" />
+                      <ResizableSortableTh columnId="antes" label="Antes" sortable={false} onResizeStart={startApsPreviewResize} className="px-3 py-2" />
+                      <ResizableSortableTh columnId="depois" label="Depois" sortable={false} onResizeStart={startApsPreviewResize} className="px-3 py-2" />
+                      <ResizableSortableTh columnId="status" label="Status" sortable={false} onResizeStart={startApsPreviewResize} className="px-3 py-2" />
+                      <ResizableSortableTh columnId="aps" label="APS" sortable={false} onResizeStart={startApsPreviewResize} className="px-3 py-2" />
                     </tr>
                   </thead>
                   <tbody>
@@ -2258,16 +2360,17 @@ export default function PcpDashboardPage() {
                 Detalhes do run {apsSelectedRunId.slice(0, 8)}
               </div>
               <div className="overflow-x-auto">
-                <table className="min-w-full text-xs">
+                <table className="min-w-full text-xs table-fixed">
+                  <TableColGroup columns={apsRunColumns} widths={apsRunWidths} />
                   <thead className="bg-gray-50 text-gray-600">
                     <tr>
-                      <th className="px-3 py-2 text-left">OP</th>
-                      <th className="px-3 py-2 text-left">Produto</th>
-                      <th className="px-3 py-2 text-left">Seq</th>
-                      <th className="px-3 py-2 text-left">Antes</th>
-                      <th className="px-3 py-2 text-left">Depois</th>
-                      <th className="px-3 py-2 text-left">Status</th>
-                      <th className="px-3 py-2 text-left">APS</th>
+                      <ResizableSortableTh columnId="op" label="OP" sortable={false} onResizeStart={startApsRunResize} className="px-3 py-2" />
+                      <ResizableSortableTh columnId="produto" label="Produto" sortable={false} onResizeStart={startApsRunResize} className="px-3 py-2" />
+                      <ResizableSortableTh columnId="seq" label="Seq" sortable={false} onResizeStart={startApsRunResize} className="px-3 py-2" />
+                      <ResizableSortableTh columnId="antes" label="Antes" sortable={false} onResizeStart={startApsRunResize} className="px-3 py-2" />
+                      <ResizableSortableTh columnId="depois" label="Depois" sortable={false} onResizeStart={startApsRunResize} className="px-3 py-2" />
+                      <ResizableSortableTh columnId="status" label="Status" sortable={false} onResizeStart={startApsRunResize} className="px-3 py-2" />
+                      <ResizableSortableTh columnId="aps" label="APS" sortable={false} onResizeStart={startApsRunResize} className="px-3 py-2" />
                     </tr>
                   </thead>
                   <tbody>
@@ -2325,16 +2428,17 @@ export default function PcpDashboardPage() {
           <PackageSearch className="text-emerald-600" size={18} /> ATP / CTP por produto
         </div>
         <div className="overflow-x-auto">
-          <table className="min-w-full text-sm">
+          <table className="min-w-full text-sm table-fixed">
+            <TableColGroup columns={atpColumns} widths={atpWidths} />
             <thead className="bg-gray-50 text-gray-600">
               <tr>
-                <th className="px-4 py-2 text-left">Produto</th>
-                <th className="px-4 py-2 text-right">Estoque</th>
-                <th className="px-4 py-2 text-right">Em produção</th>
-                <th className="px-4 py-2 text-right">Demanda</th>
-                <th className="px-4 py-2 text-right">ATP</th>
-                <th className="px-4 py-2 text-right">Carga pendente (h)</th>
-                <th className="px-4 py-2 text-left">Data CTP</th>
+                <ResizableSortableTh columnId="produto" label="Produto" sortable={false} onResizeStart={startAtpResize} className="px-4 py-2" />
+                <ResizableSortableTh columnId="estoque" label="Estoque" sortable={false} onResizeStart={startAtpResize} align="right" className="px-4 py-2" />
+                <ResizableSortableTh columnId="emProducao" label="Em produção" sortable={false} onResizeStart={startAtpResize} align="right" className="px-4 py-2" />
+                <ResizableSortableTh columnId="demanda" label="Demanda" sortable={false} onResizeStart={startAtpResize} align="right" className="px-4 py-2" />
+                <ResizableSortableTh columnId="atp" label="ATP" sortable={false} onResizeStart={startAtpResize} align="right" className="px-4 py-2" />
+                <ResizableSortableTh columnId="carga" label="Carga pendente (h)" sortable={false} onResizeStart={startAtpResize} align="right" className="px-4 py-2" />
+                <ResizableSortableTh columnId="ctp" label="Data CTP" sortable={false} onResizeStart={startAtpResize} className="px-4 py-2" />
               </tr>
             </thead>
             <tbody>

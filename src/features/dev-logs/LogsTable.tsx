@@ -1,6 +1,10 @@
-import React from 'react';
+import React, { useMemo, useState } from 'react';
 import { AuditEvent } from './types';
 import { Loader2 } from 'lucide-react';
+import ResizableSortableTh, { type SortState } from '@/components/ui/table/ResizableSortableTh';
+import TableColGroup from '@/components/ui/table/TableColGroup';
+import { useTableColumnWidths, type TableColumnWidthDef } from '@/components/ui/table/useTableColumnWidths';
+import { sortRows, toggleSort } from '@/components/ui/table/sortUtils';
 
 interface LogsTableProps {
   events: AuditEvent[];
@@ -26,23 +30,94 @@ const MemoizedLogsTable: React.FC<LogsTableProps> = ({ events, onShowDetails, on
     return JSON.stringify(pk);
   };
 
+  const columns: TableColumnWidthDef[] = [
+    { id: 'data_hora', defaultWidth: 200, minWidth: 180 },
+    { id: 'origem', defaultWidth: 140, minWidth: 120 },
+    { id: 'operacao', defaultWidth: 140, minWidth: 120 },
+    { id: 'tabela', defaultWidth: 200, minWidth: 160 },
+    { id: 'ator', defaultWidth: 240, minWidth: 180 },
+    { id: 'pk', defaultWidth: 240, minWidth: 180 },
+    { id: 'acoes', defaultWidth: 120, minWidth: 100 },
+  ];
+  const { widths, startResize } = useTableColumnWidths({ tableId: 'dev:logs', columns });
+
+  const [sort, setSort] = useState<SortState<string>>({ column: 'data_hora', direction: 'desc' });
+  const sortedEvents = useMemo(() => {
+    return sortRows(
+      events,
+      sort as any,
+      [
+        { id: 'data_hora', type: 'date', getValue: (e) => e.occurred_at },
+        { id: 'origem', type: 'string', getValue: (e) => e.source ?? '' },
+        { id: 'operacao', type: 'string', getValue: (e) => e.op ?? '' },
+        { id: 'tabela', type: 'string', getValue: (e) => e.table_name ?? '' },
+        { id: 'ator', type: 'string', getValue: (e) => e.actor_email ?? 'Sistema' },
+        { id: 'pk', type: 'string', getValue: (e) => renderPkSummary(e.pk) },
+      ] as const
+    );
+  }, [events, sort]);
+
   return (
     <div className="bg-white rounded-lg shadow overflow-hidden">
       <div className="overflow-x-auto">
         <table className="min-w-full divide-y divide-gray-200">
+          <TableColGroup columns={columns} widths={widths} />
           <thead className="bg-gray-50">
             <tr>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Data/Hora</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Origem</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Operação</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Tabela</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Ator</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Resumo/PK</th>
-              <th className="relative px-6 py-3"><span className="sr-only">Ações</span></th>
+              <ResizableSortableTh
+                columnId="data_hora"
+                label="Data/Hora"
+                sort={sort as any}
+                onSort={(col) => setSort((prev) => toggleSort(prev as any, col))}
+                onResizeStart={startResize as any}
+              />
+              <ResizableSortableTh
+                columnId="origem"
+                label="Origem"
+                sort={sort as any}
+                onSort={(col) => setSort((prev) => toggleSort(prev as any, col))}
+                onResizeStart={startResize as any}
+              />
+              <ResizableSortableTh
+                columnId="operacao"
+                label="Operação"
+                sort={sort as any}
+                onSort={(col) => setSort((prev) => toggleSort(prev as any, col))}
+                onResizeStart={startResize as any}
+              />
+              <ResizableSortableTh
+                columnId="tabela"
+                label="Tabela"
+                sort={sort as any}
+                onSort={(col) => setSort((prev) => toggleSort(prev as any, col))}
+                onResizeStart={startResize as any}
+              />
+              <ResizableSortableTh
+                columnId="ator"
+                label="Ator"
+                sort={sort as any}
+                onSort={(col) => setSort((prev) => toggleSort(prev as any, col))}
+                onResizeStart={startResize as any}
+              />
+              <ResizableSortableTh
+                columnId="pk"
+                label="Resumo/PK"
+                sort={sort as any}
+                onSort={(col) => setSort((prev) => toggleSort(prev as any, col))}
+                onResizeStart={startResize as any}
+              />
+              <ResizableSortableTh
+                columnId="acoes"
+                label="Ações"
+                align="right"
+                sortable={false}
+                resizable
+                onResizeStart={startResize as any}
+              />
             </tr>
           </thead>
           <tbody className="bg-white divide-y divide-gray-200">
-            {events.map(event => (
+            {sortedEvents.map(event => (
               <tr key={event.id} className="hover:bg-gray-50">
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{new Date(event.occurred_at).toLocaleString('pt-BR')}</td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{event.source}</td>

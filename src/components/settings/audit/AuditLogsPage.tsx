@@ -4,6 +4,10 @@ import { useAuth } from '@/contexts/AuthProvider';
 import { useToast } from '@/contexts/ToastProvider';
 import { Loader2, RefreshCw, Search, ShieldCheck } from 'lucide-react';
 import Select from '@/components/ui/forms/Select';
+import ResizableSortableTh, { type SortState } from '@/components/ui/table/ResizableSortableTh';
+import TableColGroup from '@/components/ui/table/TableColGroup';
+import { useTableColumnWidths, type TableColumnWidthDef } from '@/components/ui/table/useTableColumnWidths';
+import { sortRows, toggleSort } from '@/components/ui/table/sortUtils';
 
 type AuditLogRow = {
   id: string;
@@ -31,6 +35,17 @@ export default function AuditLogsPage() {
   const [tableFilter, setTableFilter] = useState<string>('');
   const [q, setQ] = useState('');
   const [preset, setPreset] = useState<'all' | 'admin'>('admin');
+  const [sort, setSort] = useState<SortState<'when' | 'op' | 'table' | 'record' | 'by'>>({ column: 'when', direction: 'desc' });
+
+  const columns: TableColumnWidthDef[] = [
+    { id: 'when', defaultWidth: 200, minWidth: 180 },
+    { id: 'op', defaultWidth: 140, minWidth: 130 },
+    { id: 'table', defaultWidth: 220, minWidth: 180 },
+    { id: 'record', defaultWidth: 240, minWidth: 180 },
+    { id: 'by', defaultWidth: 240, minWidth: 180 },
+    { id: 'summary', defaultWidth: 520, minWidth: 320 },
+  ];
+  const { widths, startResize } = useTableColumnWidths({ tableId: 'settings:audit:logs', columns });
 
   const adminTables = useMemo(() => ([
     'empresa_unidades',
@@ -61,6 +76,19 @@ export default function AuditLogsPage() {
       );
     });
   }, [adminTables, preset, q, rows, tableFilter]);
+  const filteredSorted = useMemo(() => {
+    return sortRows(
+      filtered,
+      sort as any,
+      [
+        { id: 'when', type: 'date', getValue: (r: AuditLogRow) => r.changed_at ?? '' },
+        { id: 'op', type: 'string', getValue: (r: AuditLogRow) => r.operation ?? '' },
+        { id: 'table', type: 'string', getValue: (r: AuditLogRow) => r.table_name ?? '' },
+        { id: 'record', type: 'string', getValue: (r: AuditLogRow) => r.record_id ?? '' },
+        { id: 'by', type: 'string', getValue: (r: AuditLogRow) => r.changed_by ?? '' },
+      ] as const
+    );
+  }, [filtered, sort]);
 
   const fetchLogs = async () => {
     if (!activeEmpresa?.id) return;
@@ -159,15 +187,58 @@ export default function AuditLogsPage() {
       </div>
 
       <div className="overflow-auto rounded-xl border border-gray-200 bg-white">
-        <table className="min-w-[980px] w-full text-sm">
+        <table className="min-w-[980px] w-full text-sm table-fixed">
+          <TableColGroup columns={columns} widths={widths} />
           <thead className="bg-gray-50 text-gray-600">
             <tr>
-              <th className="text-left p-3">Quando</th>
-              <th className="text-left p-3">Operação</th>
-              <th className="text-left p-3">Tabela</th>
-              <th className="text-left p-3">Record</th>
-              <th className="text-left p-3">Por</th>
-              <th className="text-left p-3">Resumo</th>
+              <ResizableSortableTh
+                columnId="when"
+                label="Quando"
+                sort={sort}
+                onSort={(col) => setSort((prev) => toggleSort(prev as any, col))}
+                onResizeStart={startResize}
+                className="text-left p-3 normal-case tracking-normal"
+              />
+              <ResizableSortableTh
+                columnId="op"
+                label="Operação"
+                sort={sort}
+                onSort={(col) => setSort((prev) => toggleSort(prev as any, col))}
+                onResizeStart={startResize}
+                className="text-left p-3 normal-case tracking-normal"
+              />
+              <ResizableSortableTh
+                columnId="table"
+                label="Tabela"
+                sort={sort}
+                onSort={(col) => setSort((prev) => toggleSort(prev as any, col))}
+                onResizeStart={startResize}
+                className="text-left p-3 normal-case tracking-normal"
+              />
+              <ResizableSortableTh
+                columnId="record"
+                label="Record"
+                sort={sort}
+                onSort={(col) => setSort((prev) => toggleSort(prev as any, col))}
+                onResizeStart={startResize}
+                className="text-left p-3 normal-case tracking-normal"
+              />
+              <ResizableSortableTh
+                columnId="by"
+                label="Por"
+                sort={sort}
+                onSort={(col) => setSort((prev) => toggleSort(prev as any, col))}
+                onResizeStart={startResize}
+                className="text-left p-3 normal-case tracking-normal"
+              />
+              <ResizableSortableTh
+                columnId="summary"
+                label="Resumo"
+                sortable={false}
+                sort={sort}
+                onResizeStart={startResize}
+                className="text-left p-3 normal-case tracking-normal"
+              />
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100">
@@ -179,14 +250,14 @@ export default function AuditLogsPage() {
                   </span>
                 </td>
               </tr>
-            ) : filtered.length === 0 ? (
+            ) : filteredSorted.length === 0 ? (
               <tr>
                 <td colSpan={6} className="p-6 text-center text-gray-500">
                   Nenhum log encontrado.
                 </td>
               </tr>
             ) : (
-              filtered.map((r) => (
+              filteredSorted.map((r) => (
                 <tr key={r.id} className="hover:bg-gray-50/50">
                   <td className="p-3 whitespace-nowrap">{new Date(r.changed_at).toLocaleString('pt-BR')}</td>
                   <td className="p-3 whitespace-nowrap">

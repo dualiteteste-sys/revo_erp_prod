@@ -1,6 +1,10 @@
-import React from 'react';
+import React, { useMemo, useState } from 'react';
 import { CompraPedido } from '@/services/compras';
 import { Edit, Eye } from 'lucide-react';
+import ResizableSortableTh, { type SortState } from '@/components/ui/table/ResizableSortableTh';
+import TableColGroup from '@/components/ui/table/TableColGroup';
+import { useTableColumnWidths, type TableColumnWidthDef } from '@/components/ui/table/useTableColumnWidths';
+import { sortRows, toggleSort } from '@/components/ui/table/sortUtils';
 
 interface Props {
   orders: CompraPedido[];
@@ -15,21 +19,85 @@ const statusColors: Record<string, string> = {
 };
 
 export default function ComprasTable({ orders, onEdit }: Props) {
+  const columns: TableColumnWidthDef[] = [
+    { id: 'numero', defaultWidth: 120, minWidth: 90 },
+    { id: 'fornecedor', defaultWidth: 420, minWidth: 200 },
+    { id: 'data', defaultWidth: 160, minWidth: 140 },
+    { id: 'total', defaultWidth: 160, minWidth: 140 },
+    { id: 'status', defaultWidth: 160, minWidth: 140 },
+    { id: 'acoes', defaultWidth: 80, minWidth: 70, maxWidth: 140 },
+  ];
+  const { widths, startResize } = useTableColumnWidths({ tableId: 'suprimentos:compras', columns });
+
+  const [sort, setSort] = useState<SortState<string>>({ column: 'data', direction: 'desc' });
+  const sortedOrders = useMemo(() => {
+    return sortRows(
+      orders,
+      sort as any,
+      [
+        { id: 'numero', type: 'number', getValue: (o) => o.numero },
+        { id: 'fornecedor', type: 'string', getValue: (o) => o.fornecedor_nome ?? '' },
+        { id: 'data', type: 'date', getValue: (o) => o.data_emissao },
+        { id: 'total', type: 'number', getValue: (o) => o.total_geral },
+        { id: 'status', type: 'string', getValue: (o) => o.status },
+      ] as const
+    );
+  }, [orders, sort]);
+
   return (
     <div className="overflow-x-auto">
       <table className="min-w-full divide-y divide-gray-200">
+        <TableColGroup columns={columns} widths={widths} />
         <thead className="bg-gray-50">
           <tr>
-            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Número</th>
-            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Fornecedor</th>
-            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Data</th>
-            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Total</th>
-            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
-            <th className="px-6 py-3"></th>
+            <ResizableSortableTh
+              columnId="numero"
+              label="Número"
+              sort={sort as any}
+              onSort={(col) => setSort((prev) => toggleSort(prev as any, col))}
+              onResizeStart={startResize as any}
+            />
+            <ResizableSortableTh
+              columnId="fornecedor"
+              label="Fornecedor"
+              sort={sort as any}
+              onSort={(col) => setSort((prev) => toggleSort(prev as any, col))}
+              onResizeStart={startResize as any}
+            />
+            <ResizableSortableTh
+              columnId="data"
+              label="Data"
+              sort={sort as any}
+              onSort={(col) => setSort((prev) => toggleSort(prev as any, col))}
+              onResizeStart={startResize as any}
+            />
+            <ResizableSortableTh
+              columnId="total"
+              label="Total"
+              sort={sort as any}
+              onSort={(col) => setSort((prev) => toggleSort(prev as any, col))}
+              align="right"
+              onResizeStart={startResize as any}
+            />
+            <ResizableSortableTh
+              columnId="status"
+              label="Status"
+              sort={sort as any}
+              onSort={(col) => setSort((prev) => toggleSort(prev as any, col))}
+              onResizeStart={startResize as any}
+            />
+            <ResizableSortableTh
+              columnId="acoes"
+              label="Ações"
+              align="right"
+              sortable={false}
+              resizable
+              onResizeStart={startResize as any}
+            />
           </tr>
         </thead>
         <tbody className="bg-white divide-y divide-gray-200">
-          {orders.map(order => (
+          {sortedOrders.map(order => (
             <tr key={order.id} className="hover:bg-gray-50">
               <td className="px-6 py-4 text-sm font-medium text-gray-900">#{order.numero}</td>
               <td className="px-6 py-4 text-sm text-gray-700">{order.fornecedor_nome}</td>
@@ -49,7 +117,7 @@ export default function ComprasTable({ orders, onEdit }: Props) {
               </td>
             </tr>
           ))}
-          {orders.length === 0 && (
+          {sortedOrders.length === 0 && (
             <tr>
               <td colSpan={6} className="px-6 py-12 text-center text-gray-500">Nenhum pedido de compra encontrado.</td>
             </tr>

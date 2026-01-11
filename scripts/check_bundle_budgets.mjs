@@ -81,16 +81,24 @@ console.log(`- max CSS gzip:   ${maxCss.file} (${formatBytes(maxCss.gzip)})`);
 
 const failures = [];
 if (max.total_js_gzip_bytes && totalJsGzip > max.total_js_gzip_bytes) {
-  failures.push(`total JS gzip excedeu: ${formatBytes(totalJsGzip)} > ${formatBytes(max.total_js_gzip_bytes)}`);
+  failures.push(
+    `total JS gzip excedeu: ${formatBytes(totalJsGzip)} (${totalJsGzip} B) > ${formatBytes(max.total_js_gzip_bytes)} (${max.total_js_gzip_bytes} B)`
+  );
 }
 if (max.total_css_gzip_bytes && totalCssGzip > max.total_css_gzip_bytes) {
-  failures.push(`total CSS gzip excedeu: ${formatBytes(totalCssGzip)} > ${formatBytes(max.total_css_gzip_bytes)}`);
+  failures.push(
+    `total CSS gzip excedeu: ${formatBytes(totalCssGzip)} (${totalCssGzip} B) > ${formatBytes(max.total_css_gzip_bytes)} (${max.total_css_gzip_bytes} B)`
+  );
 }
 if (max.max_js_file_gzip_bytes && maxJs.gzip > max.max_js_file_gzip_bytes) {
-  failures.push(`maior arquivo JS gzip excedeu: ${maxJs.file} (${formatBytes(maxJs.gzip)} > ${formatBytes(max.max_js_file_gzip_bytes)})`);
+  failures.push(
+    `maior arquivo JS gzip excedeu: ${maxJs.file} (${formatBytes(maxJs.gzip)} / ${maxJs.gzip} B > ${formatBytes(max.max_js_file_gzip_bytes)} / ${max.max_js_file_gzip_bytes} B)`
+  );
 }
 if (max.max_css_file_gzip_bytes && maxCss.gzip > max.max_css_file_gzip_bytes) {
-  failures.push(`maior arquivo CSS gzip excedeu: ${maxCss.file} (${formatBytes(maxCss.gzip)} > ${formatBytes(max.max_css_file_gzip_bytes)})`);
+  failures.push(
+    `maior arquivo CSS gzip excedeu: ${maxCss.file} (${formatBytes(maxCss.gzip)} / ${maxCss.gzip} B > ${formatBytes(max.max_css_file_gzip_bytes)} / ${max.max_css_file_gzip_bytes} B)`
+  );
 }
 
 if (failures.length) {
@@ -104,4 +112,3 @@ if (failures.length) {
 
 console.log('');
 console.log('[BUDGET] OK');
-
