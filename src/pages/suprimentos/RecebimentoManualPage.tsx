@@ -7,7 +7,7 @@ import { createRecebimentoFromXml, listRecebimentoItens, updateRecebimentoItemPr
 import GlassCard from '@/components/ui/GlassCard';
 import Section from '@/components/ui/forms/Section';
 import Input from '@/components/ui/forms/Input';
-import ClientAutocomplete from '@/components/common/ClientAutocomplete';
+import ClienteFornecedorAutocomplete from '@/components/common/ClienteFornecedorAutocomplete';
 import ItemAutocomplete from '@/components/os/ItemAutocomplete';
 import UnidadeMedidaSelect from '@/components/common/UnidadeMedidaSelect';
 import { OsItemSearchResult } from '@/services/os';
@@ -167,7 +167,7 @@ export default function RecebimentoManualPage() {
           <Section title="Dados do Documento" description="Informações básicas da nota ou documento de remessa.">
             <div className="sm:col-span-4">
               <label className="block text-sm font-medium text-gray-700 mb-1">Cliente / Fornecedor</label>
-              <ClientAutocomplete 
+              <ClienteFornecedorAutocomplete
                 value={emitenteId} 
                 onChange={(id, name) => {
                   setEmitenteId(id);
