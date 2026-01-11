@@ -355,6 +355,11 @@ begin
     ) THEN
       RAISE EXCEPTION 'RG-03/SVC-CT-02: public.servicos_cobrancas sem colunas origem_tipo/origem_id/observacoes (gera 400 no RPC de títulos).';
     END IF;
+
+    -- Não depender de enum que pode não existir em ambientes antigos.
+    IF pg_get_functiondef('public.servicos_contratos_billing_generate_receivables(uuid, date, integer)'::regprocedure) ILIKE '%::public.status_cobranca%' THEN
+      RAISE EXCEPTION 'RG-03/SVC-CT-02: RPC generate_receivables referencia public.status_cobranca (tipo pode não existir).';
+    END IF;
   END IF;
 
   -- 9.1) SVC-CT-01: evita bug de assignment de composite via SELECT INTO (causa 400 e console sujo)
