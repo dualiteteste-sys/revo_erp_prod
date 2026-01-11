@@ -7,6 +7,7 @@ Objetivo: ter uma lista que você consegue seguir periodicamente para reduzir bu
 ## 0) Pré-requisitos (1 vez por ambiente)
 
 - `main` é a única fonte de deploy em PROD (sem hotfix manual sem virar migration).
+- Regra: qualquer alteração no Supabase (por mínima que seja) vira migration em `supabase/migrations/*` (sem “ajuste manual no dashboard”).
 - Redirect URLs no Supabase (Auth → URL Configuration) incluem, no mínimo:
   - `https://erprevo.com/auth/update-password`
   - `https://erprevo.com/auth/force-change-password`
@@ -87,6 +88,21 @@ Objetivo: ter uma lista que você consegue seguir periodicamente para reduzir bu
 - Prioridade: warnings `react-hooks/exhaustive-deps` nos fluxos críticos (financeiro/estoque/onboarding).
 - Regra: quando suprimir dependência, justificar com memo/callback estável ou ref.
 
+## 4.1) Guias rápidos e Roadmap (nunca desatualizar)
+
+Objetivo: toda mudança de fluxo/UX deve refletir no “Guia rápido” (ajuda contextual) e, quando aplicável, no Roadmap/Onboarding.
+
+- Ajuda contextual (por página): `src/components/support/helpCatalog.ts`
+  - Se mudar um fluxo ou a ordem ideal de ações em uma rota, atualizar `whatIs/steps/dependsOn/commonMistakes/links`.
+  - Se criar módulo/rota nova, criar entrada com `match: '/app/...'` e texto objetivo.
+- Roadmap/Onboarding por módulo: `src/components/roadmap/roadmaps.ts`
+  - Se mudar o “mínimo necessário” para começar a operar (ex.: conciliação, centro de custo, unidades de medida), atualizar o passo e a função `check`.
+  - Se criar novo “gate” (regra/validação), garantir que existe passo no Roadmap explicando e linkando para o módulo correto.
+- Regra de ouro: PR que altera UI/fluxo deve trazer **junto**:
+  - atualização do guia e/ou roadmap correspondente
+  - ao menos um E2E/Smoke cobrindo o fluxo alterado (ou ajuste do existente)
+  - “console limpo” (evitar `console.error` em produção; E2E falha com isso)
+
 ---
 
 ## 5) Deploy e gates (sempre antes de merge/release)
@@ -97,6 +113,22 @@ Objetivo: ter uma lista que você consegue seguir periodicamente para reduzir bu
 - Gate completo (quando for release):
   - `yarn release:check`
   - (inclui `verify:migrations` e E2E gates)
+
+## 5.1) Política “anti‑surpresa” (testes por risco)
+
+Objetivo: minimizar ao máximo surpresas durante QA e, principalmente, em PROD.
+
+- Regra: **toda mudança deve ter um “sinal de segurança”** (teste automatizado ou gate) proporcional ao risco.
+- Console limpo é obrigatório: `e2e/fixtures.ts` falha com `console.error` e `pageerror`.
+- Quando mudar fluxo/UX crítico (auth/onboarding/financeiro/estoque/vendas):
+  - atualizar/criar ao menos 1 E2E/Smoke cobrindo o “happy path”
+  - adicionar 1 cenário de falha comum (retry, permissão, validação) quando fizer sentido
+- Quando mudar service/RPC/shape de retorno:
+  - adicionar/ajustar teste unitário de normalização/contrato (evitar regressão silenciosa)
+- Quando tocar Supabase:
+  - migration obrigatória + `verify:migrations`/RG-03 passando no CI
+- Checklist de validação manual curta (quando necessário):
+  - 3–5 passos “golden path” no ambiente (DEV/preview) apenas para UX (não substitui testes)
 
 ---
 
@@ -115,4 +147,3 @@ Objetivo: ter uma lista que você consegue seguir periodicamente para reduzir bu
 
 - Não depender de fallback hardcoded de `VITE_SUPABASE_URL`/`VITE_SUPABASE_ANON_KEY` em PROD.
 - `.env.example` deve listar o mínimo que precisa existir para build/execução.
-
