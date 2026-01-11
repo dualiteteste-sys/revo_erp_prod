@@ -65,6 +65,7 @@ export default function PedidoVendaFormPanel({ vendaId, onSaveSuccess, onClose, 
     itens: []
   });
 
+  const isLocked = formData.status !== 'orcamento';
   const freteProps = useNumericField(formData.frete, (v) => handleHeaderChange('frete', v));
   const descontoProps = useNumericField(formData.desconto, (v) => handleHeaderChange('desconto', v));
   const canDiscountQuery = useHasPermission('vendas', 'discount');
@@ -549,7 +550,7 @@ export default function PedidoVendaFormPanel({ vendaId, onSaveSuccess, onClose, 
     }
   };
 
-	  const handleCancel = async () => {
+  const handleCancel = async () => {
 	    const ok = await confirm({
 	      title: 'Cancelar pedido',
 	      description: 'Cancelar este pedido? Essa ação pode ser revertida apenas reabrindo um novo pedido.',
@@ -601,9 +602,7 @@ export default function PedidoVendaFormPanel({ vendaId, onSaveSuccess, onClose, 
 	    } finally {
 	      setIsSaving(false);
 	    }
-	  };
-
-  const isLocked = formData.status !== 'orcamento';
+		  };
   const isMarketplaceOrder = (formData as any)?.canal === 'marketplace';
   const subtotal = toMoney(formData.itens?.reduce((acc, i) => acc + toMoney(i.total), 0) || 0);
   const frete = toMoney(formData.frete);
