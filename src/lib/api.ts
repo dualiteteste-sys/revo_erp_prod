@@ -100,7 +100,6 @@ export async function callRpc<T = unknown>(fn: string, args: RpcArgs = {}): Prom
 
 export function isRpcMissingError(err: unknown): boolean {
   if (!(err instanceof RpcError)) return false;
-  if (err.status === 404) return true;
   if (err.code === "PGRST202") return true; // "Could not find the function ... in the schema cache"
   if (/Could not find the function/i.test(err.message)) return true;
   if (/schema cache/i.test(err.message)) return true;
