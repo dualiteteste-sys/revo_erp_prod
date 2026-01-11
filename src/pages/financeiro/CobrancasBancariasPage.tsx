@@ -153,19 +153,19 @@ export default function CobrancasBancariasPage() {
           <option value="erro">Com Erro</option>
         </Select>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-3">
             <DatePicker 
                 label="" 
                 value={startVenc} 
                 onChange={setStartVenc} 
-                className="w-[160px]"
+                className="w-[200px]"
             />
-            <span className="text-gray-500">até</span>
+            <span className="text-gray-500 whitespace-nowrap px-1">até</span>
             <DatePicker 
                 label="" 
                 value={endVenc} 
                 onChange={setEndVenc} 
-                className="w-[160px]"
+                className="w-[200px]"
             />
             {(startVenc || endVenc) && (
               <Button

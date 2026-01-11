@@ -243,19 +243,19 @@ const ContasAReceberPage: React.FC = () => {
           <option value="cancelado">Cancelado</option>
         </Select>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-3">
           <DatePicker
             label=""
             value={filterStartDate}
             onChange={setFilterStartDate}
-            className="w-[160px]"
+            className="w-[200px]"
           />
-          <span className="text-gray-500">até</span>
+          <span className="text-gray-500 whitespace-nowrap px-1">até</span>
           <DatePicker
             label=""
             value={filterEndDate}
             onChange={setFilterEndDate}
-            className="w-[160px]"
+            className="w-[200px]"
           />
           {(filterStartDate || filterEndDate) && (
             <button
