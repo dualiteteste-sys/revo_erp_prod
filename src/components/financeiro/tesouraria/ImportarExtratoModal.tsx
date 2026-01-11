@@ -105,23 +105,30 @@ const parseOfxText = (text: string): ImportarExtratoPayload[] => {
   for (let i = 0; i < blocks.length; i++) {
     const b = blocks[i];
     const dt = b.match(/<DTPOSTED>([^<\r\n]+)/i)?.[1]?.trim() ?? '';
+    const trntype = (b.match(/<TRNTYPE>([^<\r\n]+)/i)?.[1]?.trim() ?? '').toUpperCase();
     const trnamtRaw = b.match(/<TRNAMT>([^<\r\n]+)/i)?.[1]?.trim() ?? '';
     const fitid = b.match(/<FITID>([^<\r\n]+)/i)?.[1]?.trim() ?? '';
     const checknum = b.match(/<CHECKNUM>([^<\r\n]+)/i)?.[1]?.trim() ?? '';
     const name = b.match(/<NAME>([^<\r\n]+)/i)?.[1]?.trim() ?? '';
     const memo = b.match(/<MEMO>([^<\r\n]+)/i)?.[1]?.trim() ?? '';
 
-    const dataISO = parseDateToISO(dt.slice(0, 8));
-    const valorNum = parseMoney(trnamtRaw);
+    const dt8 = dt.match(/\d{8}/)?.[0] ?? '';
+    const dataISO = parseDateToISO(dt8);
+    const parsedAmount = parseMoney(trnamtRaw);
     const descricao = (memo || name || 'Lançamento').trim();
     const documento = (checknum || fitid || '').trim() || undefined;
 
-    if (!dataISO || valorNum === null) continue;
-    const tipo = valorNum >= 0 ? 'credito' : 'debito';
-    const valorAbs = Math.abs(valorNum);
+    if (!dataISO || parsedAmount === null) continue;
+
+    let signedAmount = parsedAmount;
+    if (trntype === 'DEBIT' && signedAmount > 0) signedAmount = -signedAmount;
+    if (trntype === 'CREDIT' && signedAmount < 0) signedAmount = Math.abs(signedAmount);
+
+    const tipo = signedAmount >= 0 ? 'credito' : 'debito';
+    const valorAbs = Math.abs(signedAmount);
     if (valorAbs <= 0) continue;
 
-    const raw = `${dataISO}|${descricao}|${valorNum}|${documento ?? ''}|${fitid}`;
+    const raw = `${dataISO}|${descricao}|${signedAmount}|${documento ?? ''}|${fitid}|${trntype}`;
     itens.push({
       data_lancamento: dataISO,
       descricao,
@@ -520,7 +527,7 @@ export default function ImportarExtratoModal({ isOpen, onClose, onImport, contaC
                 Data;Descrição;Valor;Documento
               </code>
               <p className="mt-2 text-xs">Ex.: 2025-01-11;Pagamento fornecedor;-250.90;DOC123</p>
-              <p className="mt-2 text-xs">Suporta também arquivo <b>.ofx</b> (parcial) e CSV com “,”.</p>
+              <p className="mt-2 text-xs">Suporta também arquivo <b>.ofx</b> e CSV com “,”.</p>
               <div className="mt-3 flex flex-wrap gap-2">
                 <Button
                   type="button"

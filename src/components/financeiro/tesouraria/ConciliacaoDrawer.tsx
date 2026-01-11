@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { X, Loader2, Search, Link2, Plus } from 'lucide-react';
+import { X, Loader2, Link2, Plus } from 'lucide-react';
 import { ExtratoItem, Movimentacao, listMovimentacoes, saveMovimentacao } from '@/services/treasury';
 import { useToast } from '@/contexts/ToastProvider';
-import Input from '@/components/ui/forms/Input';
 import { listConciliacaoRegras, type ConciliacaoRegra } from '@/services/conciliacaoRegras';
+import { rankCandidates, scoreExtratoToMovimentacao, type MatchResult } from '@/lib/conciliacao/matching';
 
 interface Props {
   isOpen: boolean;
@@ -16,9 +16,8 @@ interface Props {
 
 export default function ConciliacaoDrawer({ isOpen, onClose, extratoItem, contaCorrenteId, onConciliate }: Props) {
   const { addToast } = useToast();
-  const [movements, setMovements] = useState<Movimentacao[]>([]);
+  const [candidates, setCandidates] = useState<Array<MatchResult<Movimentacao>>>([]);
   const [loading, setLoading] = useState(false);
-  const [searchTerm, setSearchTerm] = useState('');
   const [isCreating, setIsCreating] = useState(false);
   const [linkingId, setLinkingId] = useState<string | null>(null);
   const [rules, setRules] = useState<ConciliacaoRegra[]>([]);
@@ -83,20 +82,26 @@ export default function ConciliacaoDrawer({ isOpen, onClose, extratoItem, contaC
         pageSize: 50
       });
       
-      // Client-side filter for unconciliated and exact amount match priority
       const unconciliated = data.filter(m => !m.conciliado);
-      
-      // Sort: Exact amount match first, then date proximity
-      unconciliated.sort((a, b) => {
-        const diffA = Math.abs(a.valor - extratoItem.valor);
-        const diffB = Math.abs(b.valor - extratoItem.valor);
-        if (diffA !== diffB) return diffA - diffB;
-        return new Date(b.data_movimento).getTime() - new Date(a.data_movimento).getTime();
-      });
+      const ranked = rankCandidates(
+        unconciliated.map((mov) => {
+          const { score, reasons } = scoreExtratoToMovimentacao({
+            extratoDescricao: extratoItem.descricao || '',
+            extratoDocumento: extratoItem.documento_ref,
+            extratoValor: extratoItem.valor,
+            extratoDataISO: extratoItem.data_lancamento,
+            movDescricao: mov.descricao,
+            movDocumento: mov.documento_ref,
+            movValor: mov.valor,
+            movDataISO: mov.data_movimento,
+          });
+          return { item: mov, score, reasons };
+        }),
+      );
 
-      setMovements(unconciliated);
-    } catch (e) {
-      console.error(e);
+      setCandidates(ranked);
+    } catch (e: any) {
+      addToast(e?.message || 'Erro ao buscar movimentações.', 'error');
     } finally {
       setLoading(false);
     }
@@ -169,15 +174,18 @@ export default function ConciliacaoDrawer({ isOpen, onClose, extratoItem, contaC
 
   if (!isOpen) return null;
 
+  const bestCandidate = candidates[0] ?? null;
+  const canAutoConciliate = !!bestCandidate && bestCandidate.score >= 85;
+
   return (
     <div className="fixed inset-0 z-50 flex justify-end pointer-events-none">
-      <div className="absolute inset-0 bg-black/20 backdrop-blur-sm pointer-events-auto" onClick={onClose} />
+      <div className="absolute inset-0 bg-black/20 backdrop-blur-sm pointer-events-auto z-0" onClick={onClose} />
       <motion.div
         initial={{ x: '100%' }}
         animate={{ x: 0 }}
         exit={{ x: '100%' }}
         transition={{ type: 'spring', damping: 25, stiffness: 200 }}
-        className="w-full max-w-md bg-white h-full shadow-2xl pointer-events-auto flex flex-col"
+        className="w-full max-w-md bg-white h-full shadow-2xl pointer-events-auto flex flex-col relative z-10"
       >
         <div className="p-4 border-b flex justify-between items-center bg-gray-50">
           <h3 className="font-bold text-gray-800">Conciliar Lançamento</h3>
@@ -201,13 +209,25 @@ export default function ConciliacaoDrawer({ isOpen, onClose, extratoItem, contaC
         <div className="flex-1 overflow-y-auto p-4">
             <div className="flex justify-between items-center mb-4">
                 <h4 className="font-semibold text-gray-700">Movimentações Sugeridas</h4>
-                <button
-                  onClick={fetchSuggestions}
-                  disabled={loading || !!linkingId}
-                  className="text-blue-600 text-xs hover:underline disabled:opacity-60"
-                >
-                  Atualizar
-                </button>
+                <div className="flex items-center gap-2">
+                  {canAutoConciliate ? (
+                    <button
+                      onClick={() => void handleLink(bestCandidate.item.id)}
+                      disabled={loading || !!linkingId}
+                      className="text-emerald-700 text-xs font-semibold hover:underline disabled:opacity-60"
+                      title="Conciliar automaticamente com a melhor sugestão (score alto)."
+                    >
+                      Conciliar melhor sugestão (Score {bestCandidate.score})
+                    </button>
+                  ) : null}
+                  <button
+                    onClick={fetchSuggestions}
+                    disabled={loading || !!linkingId}
+                    className="text-blue-600 text-xs hover:underline disabled:opacity-60"
+                  >
+                    Atualizar
+                  </button>
+                </div>
             </div>
 
             {loadingRules ? (
@@ -238,7 +258,7 @@ export default function ConciliacaoDrawer({ isOpen, onClose, extratoItem, contaC
 
             {loading ? (
                 <div className="flex justify-center py-8"><Loader2 className="animate-spin text-blue-500" /></div>
-            ) : movements.length === 0 ? (
+            ) : candidates.length === 0 ? (
                 <div className="text-center py-8 text-gray-500 border-2 border-dashed rounded-lg">
                     <p>Nenhuma movimentação compatível encontrada.</p>
                     <button 
@@ -252,7 +272,7 @@ export default function ConciliacaoDrawer({ isOpen, onClose, extratoItem, contaC
                 </div>
             ) : (
                 <div className="space-y-3">
-                    {movements.map(mov => {
+                    {candidates.map(({ item: mov, score, reasons }) => {
                         const isExactMatch = mov.valor === extratoItem?.valor;
                         const isLinking = linkingId === mov.id;
                         return (
@@ -265,8 +285,27 @@ export default function ConciliacaoDrawer({ isOpen, onClose, extratoItem, contaC
                                 </div>
                                 <div className="flex justify-between items-center text-xs text-gray-500 mb-3">
                                     <span>{new Date(mov.data_movimento).toLocaleDateString('pt-BR')}</span>
-                                    {isExactMatch && <span className="bg-green-100 text-green-800 px-2 py-0.5 rounded-full">Valor Exato</span>}
+                                    <div className="flex items-center gap-2">
+                                      <span className="bg-slate-100 text-slate-700 px-2 py-0.5 rounded-full">Score {score}</span>
+                                      {isExactMatch && <span className="bg-green-100 text-green-800 px-2 py-0.5 rounded-full">Valor Exato</span>}
+                                    </div>
                                 </div>
+                                {reasons.length > 0 ? (
+                                  <div className="flex flex-wrap gap-1 mb-3">
+                                    {reasons
+                                      .slice()
+                                      .sort((a, b) => b.points - a.points)
+                                      .slice(0, 4)
+                                      .map((r) => (
+                                        <span
+                                          key={`${mov.id}:${r.label}`}
+                                          className="text-[11px] px-2 py-0.5 rounded-full bg-gray-100 text-gray-600"
+                                        >
+                                          {r.label}
+                                        </span>
+                                      ))}
+                                  </div>
+                                ) : null}
                                 <button 
                                     onClick={() => void handleLink(mov.id)}
                                     disabled={!!linkingId}
@@ -280,7 +319,7 @@ export default function ConciliacaoDrawer({ isOpen, onClose, extratoItem, contaC
                 </div>
             )}
             
-            {movements.length > 0 && (
+            {candidates.length > 0 && (
                  <div className="mt-6 pt-6 border-t">
                     <button 
                         onClick={handleCreateAndConciliate}

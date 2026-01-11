@@ -13,17 +13,20 @@ import ExtratosTable from '@/components/financeiro/tesouraria/ExtratosTable';
 import ImportarExtratoModal from '@/components/financeiro/tesouraria/ImportarExtratoModal';
 import ConciliacaoDrawer from '@/components/financeiro/tesouraria/ConciliacaoDrawer';
 import ConciliacaoRegrasPanel from '@/components/financeiro/tesouraria/ConciliacaoRegrasPanel';
-import { ContaCorrente, Movimentacao, ExtratoItem, deleteContaCorrente, deleteMovimentacao, importarExtrato, conciliarExtrato, desconciliarExtrato, setContaCorrentePadrao } from '@/services/treasury';
+import { ContaCorrente, Movimentacao, ExtratoItem, deleteContaCorrente, deleteMovimentacao, importarExtrato, conciliarExtrato, desconciliarExtrato, setContaCorrentePadrao, listMovimentacoes } from '@/services/treasury';
 import ConfirmationModal from '@/components/ui/ConfirmationModal';
 import DatePicker from '@/components/ui/DatePicker';
 import Toggle from '@/components/ui/forms/Toggle';
 import { Button } from '@/components/ui/button';
+import { scoreExtratoToMovimentacao } from '@/lib/conciliacao/matching';
 
 export default function TesourariaPage() {
   const [activeTab, setActiveTab] = useState<'contas' | 'movimentos' | 'conciliacao' | 'regras'>('contas');
   const { addToast } = useToast();
   const { confirm } = useConfirm();
   const [busyExtratoId, setBusyExtratoId] = useState<string | null>(null);
+  const [bulkConciliando, setBulkConciliando] = useState(false);
+  const [bulkThreshold, setBulkThreshold] = useState(85);
 
   // --- Contas State ---
   const {
@@ -182,6 +185,84 @@ export default function TesourariaPage() {
     }
   };
 
+  const handleAutoConciliarPagina = async () => {
+    if (!selectedContaId) {
+      addToast('Selecione uma conta corrente primeiro.', 'warning');
+      return;
+    }
+    if (busyExtratoId || bulkConciliando) return;
+
+    const pendentes = (extratos || []).filter((e) => !e.conciliado);
+    if (pendentes.length === 0) {
+      addToast('Nenhum lançamento pendente nesta página.', 'info');
+      return;
+    }
+
+    setBulkConciliando(true);
+    let conciliados = 0;
+    let pulados = 0;
+    let falhas = 0;
+
+    try {
+      for (const extratoItem of pendentes) {
+        try {
+          const date = new Date(extratoItem.data_lancamento);
+          const startDate = new Date(date);
+          startDate.setDate(date.getDate() - 5);
+          const endDate = new Date(date);
+          endDate.setDate(date.getDate() + 5);
+
+          const { data } = await listMovimentacoes({
+            contaCorrenteId: selectedContaId,
+            startDate,
+            endDate,
+            tipoMov: extratoItem.tipo_lancamento === 'credito' ? 'entrada' : 'saida',
+            page: 1,
+            pageSize: 50,
+          });
+
+          const unconciliated = (data || []).filter((m) => !m.conciliado);
+          if (unconciliated.length === 0) {
+            pulados++;
+            continue;
+          }
+
+          let best: { id: string; score: number } | null = null;
+          for (const mov of unconciliated) {
+            const { score } = scoreExtratoToMovimentacao({
+              extratoDescricao: extratoItem.descricao || '',
+              extratoDocumento: extratoItem.documento_ref,
+              extratoValor: extratoItem.valor,
+              extratoDataISO: extratoItem.data_lancamento,
+              movDescricao: mov.descricao,
+              movDocumento: mov.documento_ref,
+              movValor: mov.valor,
+              movDataISO: mov.data_movimento,
+            });
+            if (!best || score > best.score) best = { id: mov.id, score };
+          }
+
+          if (!best || best.score < bulkThreshold) {
+            pulados++;
+            continue;
+          }
+
+          await conciliarExtrato(extratoItem.id, best.id);
+          conciliados++;
+        } catch (e: any) {
+          falhas++;
+          addToast(e?.message || 'Erro ao conciliar um lançamento.', 'error');
+        }
+      }
+    } finally {
+      setBulkConciliando(false);
+      refreshExtrato();
+      refreshMov();
+      refreshContas();
+      addToast(`Auto-conciliação: ${conciliados} conciliado(s), ${pulados} pulado(s), ${falhas} falha(s).`, falhas > 0 ? 'warning' : 'success');
+    }
+  };
+
   return (
     <div className="p-1 h-full flex flex-col">
       <div className="flex justify-between items-center mb-6 flex-shrink-0">
@@ -327,6 +408,35 @@ export default function TesourariaPage() {
                         checked={filterConciliado === false} 
                         onChange={(checked) => setFilterConciliado(checked ? false : null)} 
                     />
+                </div>
+
+                <div className="flex items-end gap-2 bg-white p-2 rounded-lg border">
+                  <label className="text-xs text-gray-600">
+                    Threshold
+                    <select
+                      value={bulkThreshold}
+                      onChange={(e) => setBulkThreshold(Number(e.target.value))}
+                      className="mt-1 w-[120px] rounded-md border border-gray-200 bg-white px-2 py-2 text-sm"
+                      disabled={!selectedContaId || bulkConciliando}
+                    >
+                      {[70, 75, 80, 85, 90, 95].map((n) => (
+                        <option key={n} value={n}>
+                          {n}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    onClick={() => void handleAutoConciliarPagina()}
+                    disabled={!selectedContaId || bulkConciliando || !!busyExtratoId}
+                    className="gap-2"
+                    title="Tenta conciliar automaticamente todos os lançamentos pendentes da página atual."
+                  >
+                    {bulkConciliando ? <Loader2 className="h-4 w-4 animate-spin" /> : <ArrowRightLeft size={18} />}
+                    Auto conciliar (página)
+                  </Button>
                 </div>
 
                 <Button

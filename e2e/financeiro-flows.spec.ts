@@ -395,3 +395,328 @@ test('Financeiro: registrar recebimento e pagamento (fluxo básico)', async ({ p
     .click();
   await expect(page.getByRole('table').getByText('Cancelada')).toBeVisible();
 });
+
+test('Financeiro: tesouraria conciliação (score + conciliar)', async ({ page }) => {
+  test.setTimeout(60000);
+  const today = new Date().toISOString().slice(0, 10);
+
+  const contas = [
+    {
+      id: 'cc-1',
+      empresa_id: 'empresa-1',
+      nome: 'Conta E2E',
+      apelido: null,
+      banco_codigo: '001',
+      banco_nome: 'Banco Teste',
+      agencia: '0001',
+      conta: '12345',
+      digito: '6',
+      tipo_conta: 'corrente',
+      moeda: 'BRL',
+      saldo_inicial: 0,
+      data_saldo_inicial: null,
+      limite_credito: 0,
+      permite_saldo_negativo: false,
+      ativo: true,
+      padrao_para_pagamentos: false,
+      padrao_para_recebimentos: false,
+      observacoes: null,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+      total_count: 1,
+    },
+  ];
+
+  const extratos: any[] = [
+    {
+      id: 'ext-1',
+      data_lancamento: today,
+      descricao: 'Pagamento fornecedor ABC',
+      documento_ref: 'DOC123',
+      tipo_lancamento: 'debito',
+      valor: 220,
+      saldo_apos_lancamento: null,
+      conciliado: false,
+      movimentacao_id: null,
+      movimentacao_data: null,
+      movimentacao_descricao: null,
+      movimentacao_valor: null,
+      total_count: 1,
+    },
+  ];
+
+  const movimentacoes: any[] = [
+    {
+      id: 'mov-1',
+      empresa_id: 'empresa-1',
+      conta_corrente_id: 'cc-1',
+      data_movimento: today,
+      data_competencia: null,
+      tipo_mov: 'saida',
+      valor: 220,
+      descricao: 'Pagto fornecedor ABC',
+      documento_ref: 'DOC123',
+      origem_tipo: null,
+      origem_id: null,
+      categoria: null,
+      centro_custo: null,
+      centro_de_custo_id: null,
+      conciliado: false,
+      observacoes: null,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+      total_count: 2,
+    },
+    {
+      id: 'mov-2',
+      empresa_id: 'empresa-1',
+      conta_corrente_id: 'cc-1',
+      data_movimento: today,
+      data_competencia: null,
+      tipo_mov: 'saida',
+      valor: 180,
+      descricao: 'Compra qualquer',
+      documento_ref: null,
+      origem_tipo: null,
+      origem_id: null,
+      categoria: null,
+      centro_custo: null,
+      centro_de_custo_id: null,
+      conciliado: false,
+      observacoes: null,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+      total_count: 2,
+    },
+  ];
+
+  await page.route('**/rest/v1/**', async (route) => {
+    const req = route.request();
+    const url = req.url();
+
+    if (req.method() === 'OPTIONS') {
+      await route.fulfill({ status: 204, body: '' });
+      return;
+    }
+
+    if (url.includes('/rest/v1/rpc/financeiro_contas_correntes_list')) {
+      await route.fulfill({ json: contas });
+      return;
+    }
+
+    if (url.includes('/rest/v1/rpc/financeiro_extratos_bancarios_list')) {
+      await route.fulfill({ json: extratos });
+      return;
+    }
+
+    if (url.includes('/rest/v1/rpc/financeiro_movimentacoes_list')) {
+      await route.fulfill({ json: movimentacoes });
+      return;
+    }
+
+    if (url.includes('/rest/v1/rpc/financeiro_extratos_bancarios_vincular_movimentacao')) {
+      const body = (await req.postDataJSON()) as any;
+      const extratoId = body?.p_extrato_id;
+      const movId = body?.p_movimentacao_id;
+      const extIdx = extratos.findIndex((e) => e.id === extratoId);
+      const mov = movimentacoes.find((m) => m.id === movId);
+      if (extIdx >= 0 && mov) {
+        extratos[extIdx] = {
+          ...extratos[extIdx],
+          conciliado: true,
+          movimentacao_id: mov.id,
+          movimentacao_data: mov.data_movimento,
+          movimentacao_descricao: mov.descricao,
+          movimentacao_valor: mov.valor,
+        };
+        const movIdx = movimentacoes.findIndex((m) => m.id === movId);
+        if (movIdx >= 0) movimentacoes[movIdx] = { ...movimentacoes[movIdx], conciliado: true };
+      }
+      await route.fulfill({ json: null });
+      return;
+    }
+
+    if (url.includes('/rest/v1/financeiro_conciliacao_regras')) {
+      await route.fulfill({ json: [] });
+      return;
+    }
+
+    // Default: responder vazio para não travar navegação.
+    await route.fulfill({ json: [] });
+  });
+
+  await mockAuthAndEmpresa(page);
+
+  await page.goto('/auth/login');
+  await page.getByPlaceholder('seu@email.com').fill('test@example.com');
+  await page.getByLabel('Senha').fill('password123');
+  await page.getByRole('button', { name: 'Entrar' }).click();
+  await expect(page).toHaveURL(/\/app\//);
+
+  await page.goto('/app/financeiro/tesouraria');
+  await expect(page.getByRole('heading', { name: 'Tesouraria' })).toBeVisible({ timeout: 20000 });
+
+  await page.getByRole('button', { name: 'Conciliação' }).click();
+  const contaSelect = page.locator('label:has-text("Conta Corrente")').locator('..').locator('select');
+  await contaSelect.selectOption('cc-1');
+
+  await expect(page.getByRole('table')).toBeVisible();
+  await page.getByRole('table').getByRole('button', { name: 'Conciliar', exact: true }).click();
+
+  const autoBtn = page.getByRole('button', { name: /Conciliar melhor sugestão/i });
+  await expect(autoBtn).toBeVisible();
+  await expect(autoBtn).toContainText('Score');
+  await autoBtn.click();
+
+  await expect(page.getByText('Conciliação realizada!')).toBeVisible();
+  await expect(page.getByRole('table').getByText('Pendente')).not.toBeVisible();
+});
+
+test('Financeiro: tesouraria auto-conciliar (página)', async ({ page }) => {
+  test.setTimeout(60000);
+  const today = new Date().toISOString().slice(0, 10);
+
+  const contas = [
+    {
+      id: 'cc-1',
+      empresa_id: 'empresa-1',
+      nome: 'Conta E2E',
+      apelido: null,
+      banco_codigo: '001',
+      banco_nome: 'Banco Teste',
+      agencia: '0001',
+      conta: '12345',
+      digito: '6',
+      tipo_conta: 'corrente',
+      moeda: 'BRL',
+      saldo_inicial: 0,
+      data_saldo_inicial: null,
+      limite_credito: 0,
+      permite_saldo_negativo: false,
+      ativo: true,
+      padrao_para_pagamentos: false,
+      padrao_para_recebimentos: false,
+      observacoes: null,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+      total_count: 1,
+    },
+  ];
+
+  const extratos: any[] = [
+    {
+      id: 'ext-1',
+      data_lancamento: today,
+      descricao: 'Pagamento fornecedor ABC',
+      documento_ref: 'DOC123',
+      tipo_lancamento: 'debito',
+      valor: 220,
+      saldo_apos_lancamento: null,
+      conciliado: false,
+      movimentacao_id: null,
+      movimentacao_data: null,
+      movimentacao_descricao: null,
+      movimentacao_valor: null,
+      total_count: 1,
+    },
+  ];
+
+  const movimentacoes: any[] = [
+    {
+      id: 'mov-1',
+      empresa_id: 'empresa-1',
+      conta_corrente_id: 'cc-1',
+      data_movimento: today,
+      data_competencia: null,
+      tipo_mov: 'saida',
+      valor: 220,
+      descricao: 'Pagto fornecedor ABC',
+      documento_ref: 'DOC123',
+      origem_tipo: null,
+      origem_id: null,
+      categoria: null,
+      centro_custo: null,
+      centro_de_custo_id: null,
+      conciliado: false,
+      observacoes: null,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+      total_count: 1,
+    },
+  ];
+
+  await page.route('**/rest/v1/**', async (route) => {
+    const req = route.request();
+    const url = req.url();
+
+    if (req.method() === 'OPTIONS') {
+      await route.fulfill({ status: 204, body: '' });
+      return;
+    }
+
+    if (url.includes('/rest/v1/rpc/financeiro_contas_correntes_list')) {
+      await route.fulfill({ json: contas });
+      return;
+    }
+
+    if (url.includes('/rest/v1/rpc/financeiro_extratos_bancarios_list')) {
+      await route.fulfill({ json: extratos });
+      return;
+    }
+
+    if (url.includes('/rest/v1/rpc/financeiro_movimentacoes_list')) {
+      await route.fulfill({ json: movimentacoes });
+      return;
+    }
+
+    if (url.includes('/rest/v1/rpc/financeiro_extratos_bancarios_vincular_movimentacao')) {
+      const body = (await req.postDataJSON()) as any;
+      const extratoId = body?.p_extrato_id;
+      const movId = body?.p_movimentacao_id;
+      const extIdx = extratos.findIndex((e) => e.id === extratoId);
+      const mov = movimentacoes.find((m) => m.id === movId);
+      if (extIdx >= 0 && mov) {
+        extratos[extIdx] = {
+          ...extratos[extIdx],
+          conciliado: true,
+          movimentacao_id: mov.id,
+          movimentacao_data: mov.data_movimento,
+          movimentacao_descricao: mov.descricao,
+          movimentacao_valor: mov.valor,
+        };
+        const movIdx = movimentacoes.findIndex((m) => m.id === movId);
+        if (movIdx >= 0) movimentacoes[movIdx] = { ...movimentacoes[movIdx], conciliado: true };
+      }
+      await route.fulfill({ json: null });
+      return;
+    }
+
+    if (url.includes('/rest/v1/financeiro_conciliacao_regras')) {
+      await route.fulfill({ json: [] });
+      return;
+    }
+
+    await route.fulfill({ json: [] });
+  });
+
+  await mockAuthAndEmpresa(page);
+
+  await page.goto('/auth/login');
+  await page.getByPlaceholder('seu@email.com').fill('test@example.com');
+  await page.getByLabel('Senha').fill('password123');
+  await page.getByRole('button', { name: 'Entrar' }).click();
+  await expect(page).toHaveURL(/\/app\//);
+
+  await page.goto('/app/financeiro/tesouraria');
+  await expect(page.getByRole('heading', { name: 'Tesouraria' })).toBeVisible({ timeout: 20000 });
+
+  await page.getByRole('button', { name: 'Conciliação' }).click();
+  const contaSelect = page.locator('label:has-text("Conta Corrente")').locator('..').locator('select');
+  await contaSelect.selectOption('cc-1');
+
+  await expect(page.getByRole('table')).toBeVisible();
+  await page.getByRole('button', { name: /Auto conciliar \(página\)/i }).click();
+
+  await expect(page.getByText(/Auto-conciliação:/i)).toBeVisible();
+  await expect(page.getByRole('table').getByText('Pendente')).not.toBeVisible();
+});
