@@ -342,6 +342,21 @@ begin
     RAISE EXCEPTION 'SEC-02/RG-03: existem RPCs SECURITY DEFINER usadas pelo app sem guard de permissão.';
   END IF;
 
+  -- 9.2) SVC-CT-02: gerar títulos de contrato exige colunas de origem em servicos_cobrancas
+  IF to_regprocedure('public.servicos_contratos_billing_generate_receivables(uuid, date, integer)') IS NOT NULL THEN
+    IF NOT EXISTS (
+      SELECT 1
+      FROM information_schema.columns
+      WHERE table_schema='public'
+        AND table_name='servicos_cobrancas'
+        AND column_name IN ('origem_tipo','origem_id','observacoes')
+      GROUP BY table_schema, table_name
+      HAVING count(*) = 3
+    ) THEN
+      RAISE EXCEPTION 'RG-03/SVC-CT-02: public.servicos_cobrancas sem colunas origem_tipo/origem_id/observacoes (gera 400 no RPC de títulos).';
+    END IF;
+  END IF;
+
   -- 9.1) SVC-CT-01: evita bug de assignment de composite via SELECT INTO (causa 400 e console sujo)
   -- Em PL/pgSQL, `SELECT func() INTO v_composite;` com select-list de 1 coluna
   -- tenta atribuir ao *primeiro campo* do composite, gerando cast inválido para uuid.
