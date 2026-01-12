@@ -574,7 +574,7 @@ export default function ConferenciaPage() {
                     it.produtos?.nome || 'Material',
                     unidade,
                     {
-                        codigoCliente: it.fiscal_nfe_import_items?.cprod || null,
+                        codigoCliente: it.fiscal_nfe_import_items?.cprod || it.fiscal_nfe_import_items?.ean || null,
                         nomeCliente: it.fiscal_nfe_import_items?.xprod || null,
                     }
                 );
