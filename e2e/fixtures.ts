@@ -3,6 +3,7 @@ import { test as base, expect, type ConsoleMessage } from '@playwright/test';
 export const test = base.extend({
   page: async ({ page }, run, testInfo) => {
     const consoleErrors: string[] = [];
+    const failedApiResponses: string[] = [];
     const allowFailedResource503 = testInfo.title.toLowerCase().includes('offline-lite');
 
     const onConsole = (msg: ConsoleMessage) => {
@@ -18,16 +19,37 @@ export const test = base.extend({
       consoleErrors.push(`[pageerror] ${err.message}`);
     };
 
+    const isSupabaseApi = (url: string) =>
+      url.includes('/rest/v1/') || url.includes('/auth/v1/') || url.includes('/functions/v1/');
+
+    const onResponse = (response: any) => {
+      const url = response.url?.() ?? '';
+      if (!url || !isSupabaseApi(url)) return;
+
+      const status = response.status?.() ?? 0;
+      if (status < 400) return;
+
+      const req = response.request?.();
+      const method = req?.method?.() ?? 'GET';
+      failedApiResponses.push(`[${status}] ${method} ${url}`);
+    };
+
     page.on('console', onConsole);
     page.on('pageerror', onPageError);
+    page.on('response', onResponse);
 
     await run(page);
 
     page.off('console', onConsole);
     page.off('pageerror', onPageError);
+    page.off('response', onResponse);
 
     if (consoleErrors.length > 0) {
       throw new Error(`Erros de console detectados:\n${consoleErrors.join('\n')}`);
+    }
+
+    if (failedApiResponses.length > 0) {
+      throw new Error(`Respostas 4xx/5xx detectadas (Supabase):\n${failedApiResponses.join('\n')}`);
     }
   },
 });

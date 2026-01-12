@@ -87,20 +87,31 @@ export async function ensureMaterialClienteV2(
   unidade: string,
   opts?: { codigoCliente?: string | null; nomeCliente?: string | null }
 ): Promise<string> {
-  // 1. Tenta encontrar existente
-  const { data } = await listMateriaisCliente(undefined, clienteId, true, 1, 100);
-  const existing = data.find(m => m.produto_id === produtoId);
-  
-  if (existing) {
-    return existing.id;
-  }
+  const normalizeCodigoCliente = (raw?: string | null) => {
+    const value = (raw ?? '').trim();
+    if (!value) return null;
+    const upper = value.toUpperCase();
+    if (upper === 'SEM GTIN' || upper === 'SEMGTIN' || upper === 'N/A' || upper === 'NAO INFORMADO') return null;
+    return value;
+  };
 
-  // 2. Se não existir, cria um novo
+  const codigoCliente = normalizeCodigoCliente(opts?.codigoCliente ?? null);
+
+  // 1) Tenta encontrar existente (lookup direto no banco)
+  const existingId = await callRpc<string | null>('industria_materiais_cliente_find_id', {
+    p_cliente_id: clienteId,
+    p_produto_id: produtoId,
+    p_codigo_cliente: codigoCliente,
+  });
+
+  if (existingId) return existingId;
+
+  // 2) Se não existir, cria um novo
   const payload: MaterialClientePayload = {
     cliente_id: clienteId,
     produto_id: produtoId,
     nome_cliente: (opts?.nomeCliente ?? produtoNome) || produtoNome,
-    codigo_cliente: opts?.codigoCliente ?? null,
+    codigo_cliente: codigoCliente,
     unidade: unidade,
     ativo: true,
     observacoes: 'Gerado automaticamente via Ordem de Beneficiamento'
