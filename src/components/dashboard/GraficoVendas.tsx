@@ -2,13 +2,54 @@ import React from 'react';
 import ReactECharts from 'echarts-for-react';
 import GlassCard from '../ui/GlassCard';
 
-const GraficoVendas: React.FC = () => {
+type StatusRow = { status: string; count: number };
+
+const palette = ['#3b82f6', '#10b981', '#f97316', '#ef4444', '#8b5cf6', '#06b6d4', '#f59e0b', '#64748b'];
+
+const GraficoVendas: React.FC<{ status: StatusRow[]; loading?: boolean }> = ({ status, loading }) => {
+  const rows = (status ?? []).filter(Boolean);
+  const top = rows.slice(0, 6);
+  const rest = rows.slice(6);
+  const restCount = rest.reduce((acc, r) => acc + Number(r.count || 0), 0);
+
+  const pieData = [
+    ...top.map((r, idx) => ({
+      value: Number(r.count || 0),
+      name: r.status,
+      itemStyle: {
+        color: {
+          type: 'linear',
+          x: 0,
+          y: 0,
+          x2: 1,
+          y2: 1,
+          colorStops: [
+            { offset: 0, color: palette[idx % palette.length] },
+            { offset: 1, color: palette[(idx + 2) % palette.length] },
+          ],
+        },
+      },
+    })),
+    ...(restCount > 0
+      ? [
+          {
+            value: restCount,
+            name: 'Outros',
+            itemStyle: { color: '#94a3b8' },
+          },
+        ]
+      : []),
+  ];
+
   const option = {
-    tooltip: { trigger: 'item', formatter: '{b}: {d}%' },
+    tooltip: {
+      trigger: 'item',
+      formatter: (p: any) => `${p?.name}: <strong>${p?.value ?? 0}</strong> (${p?.percent ?? 0}%)`,
+    },
     legend: { show: false },
     series: [
       {
-        name: 'Vendas',
+        name: 'Pedidos por status',
         type: 'pie',
         radius: ['40%', '70%'],
         avoidLabelOverlap: false,
@@ -23,7 +64,7 @@ const GraficoVendas: React.FC = () => {
             show: true,
             fontSize: '16',
             fontWeight: 'bold',
-            formatter: '{b}\n{d}%'
+            formatter: (p: any) => `${p?.name}\n${p?.percent ?? 0}%`,
           },
           itemStyle: {
             shadowBlur: 10,
@@ -32,13 +73,7 @@ const GraficoVendas: React.FC = () => {
           }
         },
         labelLine: { show: false },
-        data: [
-          { value: 1048, name: 'Eletrônicos', itemStyle: { color: { type: 'linear', x: 0, y: 0, x2: 1, y2: 1, colorStops: [{ offset: 0, color: '#3b82f6' }, { offset: 1, color: '#60a5fa' }] } } },
-          { value: 735, name: 'Móveis', itemStyle: { color: { type: 'linear', x: 0, y: 0, x2: 1, y2: 1, colorStops: [{ offset: 0, color: '#10b981' }, { offset: 1, color: '#34d399' }] } } },
-          { value: 580, name: 'Roupas', itemStyle: { color: { type: 'linear', x: 0, y: 0, x2: 1, y2: 1, colorStops: [{ offset: 0, color: '#f97316' }, { offset: 1, color: '#fb923c' }] } } },
-          { value: 484, name: 'Alimentos', itemStyle: { color: { type: 'linear', x: 0, y: 0, x2: 1, y2: 1, colorStops: [{ offset: 0, color: '#ef4444' }, { offset: 1, color: '#f87171' }] } } },
-          { value: 300, name: 'Outros', itemStyle: { color: { type: 'linear', x: 0, y: 0, x2: 1, y2: 1, colorStops: [{ offset: 0, color: '#8b5cf6' }, { offset: 1, color: '#a78bfa' }] } } }
-        ],
+        data: pieData,
         animationType: 'scale',
         animationEasing: 'elasticOut',
         animationDelay: (idx: number) => Math.random() * 200
@@ -48,7 +83,11 @@ const GraficoVendas: React.FC = () => {
 
   return (
     <GlassCard className="p-0 overflow-hidden h-96">
-      <ReactECharts option={option} style={{ height: '100%', width: '100%' }} />
+      {loading ? (
+        <div className="h-full w-full animate-pulse bg-slate-100" />
+      ) : (
+        <ReactECharts option={option} style={{ height: '100%', width: '100%' }} />
+      )}
     </GlassCard>
   );
 };

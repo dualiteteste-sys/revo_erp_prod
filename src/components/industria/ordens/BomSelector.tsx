@@ -12,6 +12,11 @@ const labelTipoBom = (tipo?: string | null) => {
   return { label: 'Produção', className: 'bg-blue-100 text-blue-800' };
 };
 
+const isBomCompatibleWithOrder = (bom: BomListItem, tipoOrdem: 'producao' | 'beneficiamento') => {
+  if (tipoOrdem === 'producao') return bom.tipo_bom === 'producao' || bom.tipo_bom === 'ambos';
+  return bom.tipo_bom === 'beneficiamento' || bom.tipo_bom === 'ambos';
+};
+
 interface Props {
   ordemId: string;
   produtoId: string;
@@ -191,20 +196,33 @@ export default function BomSelector({ ordemId, produtoId, tipoOrdem, openOnMount
                     <p className="text-xs text-gray-500 mt-1">Produto: {bom.produto_nome}</p>
                   </div>
                   <div className="flex gap-2">
+                    {(() => {
+                      const compatible = isBomCompatibleWithOrder(bom, tipoOrdem);
+                      const tip =
+                        tipoOrdem === 'producao'
+                          ? 'Esta ordem é de Produção: selecione uma BOM do tipo Produção ou Ambos.'
+                          : 'Esta ordem é de Beneficiamento: selecione uma BOM do tipo Beneficiamento ou Ambos.';
+                      return (
+                        <>
                     <button
                       onClick={() => handleApply(bom.id, 'substituir')}
-                      disabled={!!applying}
+                      disabled={!!applying || !compatible}
+                      title={!compatible ? tip : 'Substituir componentes atuais pelos da BOM'}
                       className="px-3 py-1.5 bg-blue-600 text-white text-xs font-bold rounded hover:bg-blue-700 disabled:opacity-50"
                     >
                       {applying === bom.id ? <Loader2 className="animate-spin w-4 h-4" /> : 'Substituir'}
                     </button>
                     <button
                       onClick={() => handleApply(bom.id, 'adicionar')}
-                      disabled={!!applying}
+                      disabled={!!applying || !compatible}
+                      title={!compatible ? tip : 'Adicionar componentes da BOM mantendo os atuais'}
                       className="px-3 py-1.5 border border-blue-600 text-blue-600 text-xs font-bold rounded hover:bg-blue-50 disabled:opacity-50"
                     >
                       Adicionar
                     </button>
+                        </>
+                      );
+                    })()}
                   </div>
                 </div>
               ))}

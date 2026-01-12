@@ -147,3 +147,81 @@ Objetivo: minimizar ao máximo surpresas durante QA e, principalmente, em PROD.
 
 - Não depender de fallback hardcoded de `VITE_SUPABASE_URL`/`VITE_SUPABASE_ANON_KEY` em PROD.
 - `.env.example` deve listar o mínimo que precisa existir para build/execução.
+
+---
+
+## 8) Manutenibilidade / Padrões de código (reduzir bugs e custo)
+
+- [ ] Não aumentar warnings de lint (meta: reduzir continuamente); CI deve falhar se exceder teto de warnings (teto desce com o tempo).
+- [ ] Proibir `console.*` no código de app (`src/**`) — usar `logger` + toast; manter E2E “console limpo”.
+- [ ] Reduzir `any` em diretórios críticos (`src/services`, `src/lib`, `src/hooks`) e reforçar tipagem de payload/retornos de RPC.
+- [ ] Proibir `select('*')` em services (listar colunas ou preferir RPC com contrato).
+- [ ] Evitar componentes “God” e duplicação de lógica: extrair para `services/hooks/lib`.
+- [ ] Padronizar inputs e UI base (sem “um módulo por estética”): `Modal/Table/Input/DatePicker/Autocomplete`.
+
+## 9) Segurança (AppSec + Multi-tenant)
+
+- [ ] “Tudo é tenant”: garantir `empresa_id` em todas as tabelas relevantes e em todo fluxo crítico.
+- [ ] RLS como base: tabelas multi-tenant com policies corretas e testadas (nenhuma tela deve depender de bypass).
+- [ ] Preferir RPCs seguras: evitar acesso direto às tabelas quando houver risco de vazamento ou lógica de permissão.
+- [ ] Operações sensíveis (financeiro/vendas/estoque) devem ser idempotentes e protegidas contra double-submit.
+- [ ] Sanitização de logs: nunca logar token/OTP/PII sensível; manter sanitização atualizada ao adicionar campos.
+
+## 10) Confiabilidade / Resiliência (menos “meio gravado”)
+
+- [ ] RPCs críticas em transação (atomicidade) e com mensagens de erro úteis e “actionable”.
+- [ ] Idempotência em: geração de cobranças/títulos, baixas, estornos, conciliações, importações em lote.
+- [ ] “Retry seguro”: front deve permitir retry sem efeitos colaterais (especialmente em rede instável).
+- [ ] “Plano B” em fluxos essenciais (convite/cadastro manual, importações, conciliação).
+
+## 11) Performance / Escalabilidade
+
+- [ ] Padrão de paginação consistente em listas grandes (server-side + filtros).
+- [ ] Reduzir overfetching e N+1 (principalmente em dashboards e telas de alta navegação).
+- [ ] Medir e limitar payload de RPCs (retorno “shape” estável e pequeno).
+- [ ] Bundle budgets e code-splitting por rota (`yarn verify:bundle`).
+
+## 12) Observabilidade (debug rápido em produção)
+
+- [ ] Logs estruturados com `x-revo-request-id` em Edge Functions e RPCs (correlação).
+- [ ] Eventos de auditoria para ações críticas (quem criou/alterou/estornou/gerou).
+- [ ] Padrão de erro de API consistente: `{ ok:false, error, detail, request_id }`.
+- [ ] Sentry/monitoramento: rotas críticas com breadcrumbs úteis (sem PII).
+
+## 13) Testabilidade (anti‑surpresa)
+
+- [ ] Unit tests para “contratos” de services (normalização/shape de retorno).
+- [ ] E2E gate cobrindo fluxos críticos (auth, vendas, financeiro, estoque, contratos) + console limpo.
+- [ ] Visual capture (screenshots) para páginas-chave (regressão visual “barata”).
+- [ ] Toda mudança em UI global deve passar `yarn test:e2e:gate:all` antes de merge/release.
+
+## 14) UX / UI (“estado da arte” e consistência)
+
+- [ ] Componentes globais como fonte de verdade: `DatePicker`, `Input`, `Modal`, `Table`, `Autocomplete`.
+- [ ] Padrão de calendário do sistema:
+  - [ ] Cabeçalho `<` `Mês Ano` `>`; clique em `Mês Ano` abre overlay anos/meses com animação; sem scrollbars.
+  - [ ] Popover expande apenas quando a view de anos/meses está aberta.
+- [ ] Campos de data padronizados: evitar `input type="date"` nativo; sempre usar o padrão do sistema.
+- [ ] Acessibilidade: navegação por teclado, foco visível, labels/aria corretos.
+- [ ] Micro-interações sutis (150–220ms, ease-out) e consistentes; evitar “layout jump” e sobreposições incoerentes.
+
+## 15) Compliance / Privacidade (LGPD)
+
+- [ ] Inventário mínimo de dados pessoais (cadastros, colaboradores, usuários) e onde são usados.
+- [ ] Exportação/remoção: processos internos para atender solicitações (mesmo que manual inicialmente).
+- [ ] Minimização: evitar armazenar dados desnecessários e evitar exposição em logs/respostas.
+
+## 16) FinOps / Eficiência operacional
+
+- [ ] Evitar consultas pesadas em loop e “dashboards com 20 RPCs”.
+- [ ] Arquivamento/limpeza: estratégia para logs/eventos e dados antigos (quando volume crescer).
+- [ ] Monitorar custos por feature (conciliação, importações, automações).
+
+---
+
+## 17) Rotina semanal (recomendado)
+
+- [ ] Rodar `yarn test --run`
+- [ ] Rodar `yarn test:e2e:gate:all` (ou gates por plano, quando aplicável)
+- [ ] Rodar `yarn verify:migrations` (garante clean slate e evita drift)
+- [ ] Revisar `docs/checklist-estado-da-arte-gaps.md` e registrar novos gaps com dono + prazo
