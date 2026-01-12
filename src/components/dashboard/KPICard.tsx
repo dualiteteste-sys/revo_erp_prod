@@ -12,9 +12,10 @@ interface KPICardProps {
   iconBg: string;
   iconColor: string;
   index: number;
+  loading?: boolean;
 }
 
-const KPICard: React.FC<KPICardProps> = ({ title, value, trend, isPositive, icon: Icon, iconBg, iconColor, index }) => {
+const KPICard: React.FC<KPICardProps> = ({ title, value, trend, isPositive, icon: Icon, iconBg, iconColor, index, loading }) => {
   const trendColor = isPositive ? "text-green-600" : "text-red-600";
   const TrendIcon = isPositive ? TrendingUp : TrendingDown;
 
@@ -28,11 +29,20 @@ const KPICard: React.FC<KPICardProps> = ({ title, value, trend, isPositive, icon
       <GlassCard className="p-6 flex items-start justify-between h-full bg-white/70 shadow-2xl shadow-blue-500/10 rounded-2xl">
         <div>
           <p className="text-gray-600 text-sm font-medium">{title}</p>
-          <p className="text-3xl font-bold text-gray-800 mt-2">{value}</p>
-          <div className={`flex items-center gap-1 text-sm mt-2 ${trendColor}`}>
-            <TrendIcon size={16} />
-            <span>{trend}</span>
-          </div>
+          {loading ? (
+            <>
+              <div className="mt-3 h-8 w-40 rounded bg-slate-200/70 animate-pulse" />
+              <div className="mt-3 h-4 w-20 rounded bg-slate-200/70 animate-pulse" />
+            </>
+          ) : (
+            <>
+              <p className="text-3xl font-bold text-gray-800 mt-2">{value}</p>
+              <div className={`flex items-center gap-1 text-sm mt-2 ${trendColor}`}>
+                <TrendIcon size={16} />
+                <span>{trend}</span>
+              </div>
+            </>
+          )}
         </div>
         <div className={`p-3 rounded-full bg-gradient-to-br ${iconBg}`}>
           <Icon size={24} className={iconColor} />

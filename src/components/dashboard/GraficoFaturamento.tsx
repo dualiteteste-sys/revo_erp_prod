@@ -1,8 +1,14 @@
 import React from 'react';
 import ReactECharts from 'echarts-for-react';
 import GlassCard from '../ui/GlassCard';
+import { formatCurrency } from '@/lib/utils';
 
-const GraficoFaturamento: React.FC = () => {
+type SeriesPoint = { label: string; total: number };
+
+const GraficoFaturamento: React.FC<{ series: SeriesPoint[]; loading?: boolean }> = ({ series, loading }) => {
+  const x = (series ?? []).map(s => s.label);
+  const y = (series ?? []).map(s => Number(s.total ?? 0));
+
   const option = {
     tooltip: {
       trigger: 'axis',
@@ -10,13 +16,17 @@ const GraficoFaturamento: React.FC = () => {
       borderColor: '#e5e7eb',
       borderWidth: 1,
       textStyle: { color: '#374151' },
-      formatter: '{b}: <strong>R$ {c}</strong>'
+      formatter: (params: any) => {
+        const p = Array.isArray(params) ? params[0] : params;
+        const value = formatCurrency(Math.round(Number(p?.value || 0) * 100));
+        return `${p?.axisValueLabel}: <strong>${value}</strong>`;
+      },
     },
     grid: { left: '3%', right: '4%', bottom: '3%', top: '10%', containLabel: true },
     xAxis: {
       type: 'category',
       boundaryGap: false,
-      data: ['Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb', 'Dom'],
+      data: x,
       axisLine: { show: false },
       axisTick: { show: false },
     },
@@ -51,7 +61,7 @@ const GraficoFaturamento: React.FC = () => {
             colorStops: [{ offset: 0, color: 'rgba(59, 130, 246, 0.3)' }, { offset: 1, color: 'rgba(59, 130, 246, 0)' }]
           }
         },
-        data: [1200, 1800, 1500, 2500, 2100, 3000, 2800],
+        data: y,
         animationDuration: 2000,
         animationEasing: 'cubicInOut',
       },
@@ -60,7 +70,11 @@ const GraficoFaturamento: React.FC = () => {
 
   return (
     <GlassCard className="p-0 overflow-hidden h-96">
-      <ReactECharts option={option} style={{ height: '100%', width: '100%' }} />
+      {loading ? (
+        <div className="h-full w-full animate-pulse bg-slate-100" />
+      ) : (
+        <ReactECharts option={option} style={{ height: '100%', width: '100%' }} />
+      )}
     </GlassCard>
   );
 };
