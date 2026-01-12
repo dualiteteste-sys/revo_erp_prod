@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { AlertTriangle, CheckCircle2, Clock3, Loader2, PlusCircle, ScanLine, Search, Truck } from 'lucide-react';
 import Modal from '@/components/ui/Modal';
 import { useToast } from '@/contexts/ToastProvider';
+import Input from '@/components/ui/forms/Input';
 import { listVendas, type VendaPedido } from '@/services/vendas';
 import ResizableSortableTh, { type SortState } from '@/components/ui/table/ResizableSortableTh';
 import TableColGroup from '@/components/ui/table/TableColGroup';
@@ -480,24 +481,22 @@ export default function ExpedicaoPage() {
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <label className="text-sm text-gray-700">Data de envio</label>
-                <input
+                <Input
+                  label="Data de envio"
+                  name="data_envio"
                   type="date"
                   value={form.data_envio}
                   onChange={(e) => setForm((s) => ({ ...s, data_envio: e.target.value }))}
-                  className="mt-1 w-full p-3 border border-gray-300 rounded-lg"
                 />
                 <div className="mt-1 text-xs text-gray-500">Se marcar “Enviado/Entregue”, preenchimento automático se vazio.</div>
               </div>
-              <div>
-                <label className="text-sm text-gray-700">Data de entrega</label>
-                <input
-                  type="date"
-                  value={form.data_entrega}
-                  onChange={(e) => setForm((s) => ({ ...s, data_entrega: e.target.value }))}
-                  className="mt-1 w-full p-3 border border-gray-300 rounded-lg"
-                />
-              </div>
+              <Input
+                label="Data de entrega"
+                name="data_entrega"
+                type="date"
+                value={form.data_entrega}
+                onChange={(e) => setForm((s) => ({ ...s, data_entrega: e.target.value }))}
+              />
             </div>
 
             <div>

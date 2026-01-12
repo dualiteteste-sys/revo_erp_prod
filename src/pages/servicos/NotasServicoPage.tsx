@@ -246,15 +246,13 @@ export default function NotasServicoPage() {
                 ))}
               </select>
             </div>
-            <div>
-              <label className="text-sm text-gray-700">Competência</label>
-              <input
-                type="date"
-                value={form.competencia}
-                onChange={(e) => setForm((s) => ({ ...s, competencia: e.target.value }))}
-                className="mt-1 w-full p-3 border border-gray-300 rounded-lg"
-              />
-            </div>
+            <Input
+              label="Competência"
+              name="competencia"
+              type="date"
+              value={form.competencia}
+              onChange={(e) => setForm((s) => ({ ...s, competencia: e.target.value }))}
+            />
           </div>
           <div>
             <label className="text-sm text-gray-700">Descrição</label>

@@ -324,15 +324,13 @@ export default function CobrancasServicosPage() {
             </div>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label className="text-sm text-gray-700">Vencimento</label>
-              <input
-                type="date"
-                value={form.data_vencimento}
-                onChange={(e) => setForm((s) => ({ ...s, data_vencimento: e.target.value }))}
-                className="mt-1 w-full p-3 border border-gray-300 rounded-lg"
-              />
-            </div>
+            <Input
+              label="Vencimento"
+              name="data_vencimento"
+              type="date"
+              value={form.data_vencimento}
+              onChange={(e) => setForm((s) => ({ ...s, data_vencimento: e.target.value }))}
+            />
             <div>
               <Input label="Valor" name="valor" startAdornment="R$" inputMode="numeric" {...valorProps} disabled={saving} />
             </div>

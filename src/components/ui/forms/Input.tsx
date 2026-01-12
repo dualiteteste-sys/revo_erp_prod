@@ -1,6 +1,7 @@
 import React from 'react';
 import { cva, type VariantProps } from 'class-variance-authority';
 import { cn } from '@/lib/utils';
+import DatePicker from '@/components/ui/DatePicker';
 
 const inputVariants = cva(
   'w-full bg-white/80 border rounded-lg transition shadow-sm text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ring-offset-background disabled:opacity-60 disabled:cursor-not-allowed',
@@ -32,42 +33,101 @@ interface InputProps extends React.InputHTMLAttributes<HTMLInputElement>, Varian
 
 const Input = React.forwardRef<HTMLInputElement, InputProps>(
   ({ label, name, className, startAdornment, endAdornment, helperText, error, ...props }, ref) => {
-  const startPadding = startAdornment ? 'pl-12' : 'pl-3';
-  const endPadding = endAdornment ? 'pr-12' : 'pr-3';
-  const state = error ? 'error' : 'default';
+    const startPadding = startAdornment ? 'pl-12' : 'pl-3';
+    const endPadding = endAdornment ? 'pr-12' : 'pr-3';
+    const state = error ? 'error' : 'default';
 
-  return (
-    <div className={className}>
-      {label ? <label htmlFor={name} className="block text-sm font-medium text-gray-700 mb-1">{label}</label> : null}
-      <div className="relative">
-        {startAdornment && (
-          <div className="absolute inset-y-0 left-0 flex items-center pl-4 pointer-events-none">
-            <span className="text-gray-400 sm:text-sm">{startAdornment}</span>
-          </div>
-        )}
-        <input
-          ref={ref}
-          id={name}
-          name={name}
-          {...props}
-          aria-invalid={!!error}
-          className={cn(
-            inputVariants({ size: props.size ?? 'default', state }),
-            startPadding,
-            endPadding,
-            props.className,
+    const isDate = props.type === 'date';
+    const valueStr = typeof props.value === 'string' ? props.value : '';
+    const dateValue = React.useMemo(() => {
+      if (!isDate) return null;
+      const s = (valueStr || '').slice(0, 10);
+      const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(s);
+      if (!m) return null;
+      const y = Number(m[1]);
+      const mo = Number(m[2]);
+      const d = Number(m[3]);
+      if (!y || !mo || !d) return null;
+      return new Date(y, mo - 1, d);
+    }, [isDate, valueStr]);
+
+    const handleDateChange = React.useCallback(
+      (date: Date | null) => {
+        const next =
+          date
+            ? `${String(date.getFullYear()).padStart(4, '0')}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(
+                date.getDate(),
+              ).padStart(2, '0')}`
+            : '';
+
+        const syntheticEvent = {
+          target: { value: next, name },
+          currentTarget: { value: next, name },
+        } as unknown as React.ChangeEvent<HTMLInputElement>;
+
+        props.onChange?.(syntheticEvent);
+      },
+      [name, props],
+    );
+
+    return (
+      <div className={className}>
+        {label ? (
+          <label htmlFor={name} className="mb-1 block text-sm font-medium text-gray-700">
+            {label}
+          </label>
+        ) : null}
+        <div className="relative">
+          {isDate ? (
+            <>
+              <input ref={ref} id={name} name={name} type="hidden" value={valueStr} />
+              <DatePicker
+                value={dateValue}
+                onChange={handleDateChange}
+                placeholder={props.placeholder || 'Selecione uma data'}
+                disabled={props.disabled}
+                required={props.required}
+                className="w-full"
+                triggerClassName={cn(
+                  inputVariants({ size: props.size ?? 'default', state }),
+                  startPadding,
+                  endPadding,
+                  props.className,
+                )}
+              />
+            </>
+          ) : (
+            <>
+              {startAdornment && (
+                <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-4">
+                  <span className="text-gray-400 sm:text-sm">{startAdornment}</span>
+                </div>
+              )}
+              <input
+                ref={ref}
+                id={name}
+                name={name}
+                {...props}
+                aria-invalid={!!error}
+                className={cn(
+                  inputVariants({ size: props.size ?? 'default', state }),
+                  startPadding,
+                  endPadding,
+                  props.className,
+                )}
+              />
+              {endAdornment && (
+                <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3">
+                  <span className="text-gray-500 sm:text-sm">{endAdornment}</span>
+                </div>
+              )}
+            </>
           )}
-        />
-        {endAdornment && (
-          <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
-            <span className="text-gray-500 sm:text-sm">{endAdornment}</span>
-          </div>
-        )}
+        </div>
+        {error && <p className="mt-1 text-xs text-red-500">{error}</p>}
+        {!error && helperText && <p className="mt-1 text-xs text-gray-500">{helperText}</p>}
       </div>
-      {error && <p className="text-red-500 text-xs mt-1">{error}</p>}
-      {!error && helperText && <p className="text-gray-500 text-xs mt-1">{helperText}</p>}
-    </div>
-  );
+    );
 });
 
 Input.displayName = 'Input';

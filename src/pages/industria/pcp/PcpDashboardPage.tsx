@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Activity, AlertTriangle, BarChart3, BellRing, Filter, GripVertical, LineChart, Loader2, PackageSearch, PieChart, RefreshCw, TrendingUp } from 'lucide-react';
 import { DragDropContext, Draggable, Droppable, DropResult } from '@hello-pangea/dnd';
 import { useToast } from '@/contexts/ToastProvider';
+import Input from '@/components/ui/forms/Input';
 import {
   EstoqueProjetadoPoint,
   listPcpAtpCtp,
@@ -1094,17 +1095,23 @@ export default function PcpDashboardPage() {
           </p>
         </div>
         <div className="flex gap-2 flex-wrap">
-          <input
+          <Input
+            label="Início"
+            name="pcp_start_date"
             type="date"
+            size="sm"
             value={startDate}
             onChange={(e) => setStartDate(e.target.value)}
-            className="border rounded-md px-3 py-2 text-sm"
+            className="w-[200px]"
           />
-          <input
+          <Input
+            label="Fim"
+            name="pcp_end_date"
             type="date"
+            size="sm"
             value={endDate}
             onChange={(e) => setEndDate(e.target.value)}
-            className="border rounded-md px-3 py-2 text-sm"
+            className="w-[200px]"
           />
           <button
             className="inline-flex items-center gap-2 px-4 py-2 rounded-md border border-gray-200 text-gray-700 hover:bg-gray-50"

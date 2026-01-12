@@ -6,6 +6,7 @@ import TopSellersChart from '../components/sales-dashboard/TopSellersChart';
 import TopProductsChart from '../components/sales-dashboard/TopProductsChart';
 import PageHeader from '@/components/ui/PageHeader';
 import Select from '@/components/ui/forms/Select';
+import Input from '@/components/ui/forms/Input';
 import { Loader2 } from 'lucide-react';
 import { getVendasDashboardStats, type VendasDashboardStats } from '@/services/salesDashboard';
 import { useToast } from '@/contexts/ToastProvider';
@@ -251,30 +252,28 @@ export default function SalesDashboard() {
           </Select>
         </div>
         <div className="grid grid-cols-2 gap-3">
-          <div>
-            <label className="block text-sm font-semibold text-gray-700 mb-2">Início</label>
-            <input
-              type="date"
-              value={startDate}
-              onChange={(e) => {
-                setPreset('custom');
-                setStartDate(e.target.value);
-              }}
-              className="w-full p-2.5 border border-gray-300 rounded-xl shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-semibold text-gray-700 mb-2">Fim</label>
-            <input
-              type="date"
-              value={endDate}
-              onChange={(e) => {
-                setPreset('custom');
-                setEndDate(e.target.value);
-              }}
-              className="w-full p-2.5 border border-gray-300 rounded-xl shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-            />
-          </div>
+          <Input
+            label="Início"
+            name="startDate"
+            type="date"
+            size="sm"
+            value={startDate}
+            onChange={(e) => {
+              setPreset('custom');
+              setStartDate(e.target.value);
+            }}
+          />
+          <Input
+            label="Fim"
+            name="endDate"
+            type="date"
+            size="sm"
+            value={endDate}
+            onChange={(e) => {
+              setPreset('custom');
+              setEndDate(e.target.value);
+            }}
+          />
         </div>
       </div>
 
