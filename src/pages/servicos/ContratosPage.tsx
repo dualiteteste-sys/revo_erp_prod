@@ -1151,16 +1151,14 @@ export default function ContratosPage() {
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label className="text-sm text-gray-700">Início</label>
-              <input
-                type="date"
-                value={form.data_inicio}
-                onChange={(e) => setForm((s) => ({ ...s, data_inicio: e.target.value }))}
-                className="mt-1 w-full p-3 border border-gray-300 rounded-lg"
-                disabled={saving}
-              />
-            </div>
+            <Input
+              label="Início"
+              name="data_inicio"
+              type="date"
+              value={form.data_inicio}
+              onChange={(e) => setForm((s) => ({ ...s, data_inicio: e.target.value }))}
+              disabled={saving}
+            />
             <div>
               <label className="text-sm text-gray-700">Fim</label>
               <label className="mt-2 flex items-center gap-2 text-xs text-gray-600">
@@ -1182,12 +1180,14 @@ export default function ContratosPage() {
                 />
                 Sem data de fim (renovação automática)
               </label>
-              <input
+              <Input
+                label={null}
+                name="data_fim"
                 type="date"
                 value={form.data_fim}
                 onChange={(e) => setForm((s) => ({ ...s, data_fim: e.target.value }))}
-                className="mt-1 w-full p-3 border border-gray-300 rounded-lg"
                 disabled={saving || !form.data_fim}
+                className="mt-1"
               />
             </div>
           </div>
@@ -1266,12 +1266,13 @@ export default function ContratosPage() {
                     />
                   </div>
                   <div>
-                    <label className="text-xs text-gray-600">Primeira competência</label>
-                    <input
+                    <Input
+                      label="Primeira competência"
+                      name="primeira_competencia"
                       type="date"
+                      size="sm"
                       value={billingRule?.primeira_competencia || ''}
                       onChange={(e) => setBillingRule((r) => (r ? { ...r, primeira_competencia: e.target.value } : r))}
-                      className="mt-1 w-full rounded-lg border border-gray-200 bg-white p-2 text-sm"
                       disabled={billingActionLoading}
                     />
                   </div>
@@ -1324,16 +1325,16 @@ export default function ContratosPage() {
                     Recalcular futuro
                   </button>
                   <div className="flex items-end gap-2">
-                    <div>
-                      <div className="text-[11px] text-gray-600">Gerar títulos até</div>
-                      <input
-                        type="date"
-                        value={billingUntil}
-                        onChange={(e) => setBillingUntil(e.target.value)}
-                        className="mt-1 h-9 rounded-lg border border-gray-200 bg-white px-2 text-sm"
-                        disabled={billingActionLoading}
-                      />
-                    </div>
+                    <Input
+                      label="Gerar títulos até"
+                      name="billing_until"
+                      type="date"
+                      size="sm"
+                      value={billingUntil}
+                      onChange={(e) => setBillingUntil(e.target.value)}
+                      disabled={billingActionLoading}
+                      className="w-[220px]"
+                    />
                   </div>
                   <button
                     type="button"
@@ -1353,16 +1354,15 @@ export default function ContratosPage() {
                 <div className="mt-4 rounded-lg border border-gray-200 bg-white p-3">
                   <div className="text-xs font-semibold text-gray-700">Lançamento avulso</div>
                   <div className="mt-2 grid grid-cols-1 md:grid-cols-4 gap-2">
-                    <div>
-                      <div className="text-[11px] text-gray-600">Vencimento</div>
-                      <input
-                        type="date"
-                        value={avulsoVencimento}
-                        onChange={(e) => setAvulsoVencimento(e.target.value)}
-                        className="mt-1 w-full rounded-lg border border-gray-200 bg-white p-2 text-sm"
-                        disabled={billingActionLoading}
-                      />
-                    </div>
+                    <Input
+                      label="Vencimento"
+                      name="avulso_vencimento"
+                      type="date"
+                      size="sm"
+                      value={avulsoVencimento}
+                      onChange={(e) => setAvulsoVencimento(e.target.value)}
+                      disabled={billingActionLoading}
+                    />
                     <div>
                       <Input
                         label="Valor"

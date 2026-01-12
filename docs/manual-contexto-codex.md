@@ -78,6 +78,20 @@ Princípio: a experiência do usuário é definida pela soma **UI + performance 
 - **Regra de ouro**
   - Se um efeito visual não melhora clareza/feedback, ele é ruído (não entra).
 
+### 4.1.2 Como não sofrer em detalhes de UI (processo)
+
+- **Definição visual antes do código:** sempre registrar 1 print/rascunho + critérios objetivos (5–10 bullets) do que será entregue. Ex.: “Cabeçalho: mês/ano centralizado; setas; clique em mês/ano abre overlay; overlay cobre todo o calendário; sem scrollbars; animação slide direita→esquerda + scale-up; saída inversa”.
+- **Componente único como “source of truth”:** UI crítica deve ser centralizada em componentes padrão (ex.: `DatePicker`/`Calendar`) — evitar implementações locais divergentes.
+- **Playground DEV para iterar isolado:** usar a rota `/app/desenvolvedor/ui-playground` para validar rapidamente estilos, responsividade e micro-interações sem depender de telas complexas.
+- **Efeitos sutis por padrão:** transições 150–220ms, `ease-out`, hover azul claro, foco com ring; evitar layout quebrando (overflow), sobreposições incoerentes e scrollbars inesperadas.
+- **Critério de pronto:** console limpo + `yarn test --run`; quando for componente global (muitos módulos), rodar também `yarn test:e2e:gate:all` antes de push para PROD.
+
+### 4.1.3 Padrão obrigatório para campos de data
+
+- **Calendário padrão do sistema:** cabeçalho com `<` `Mês Ano` `>`; clique em `Mês Ano` abre overlay de anos/meses (anos em cima, meses em baixo), com animação e fechamento inversos; sem barras de rolagem.
+- **Expansão do popover:** o popover do DatePicker só aumenta quando a view de anos/meses está aberta, e volta ao tamanho normal ao fechar.
+- **Uso obrigatório em todo o sistema:** qualquer campo de data deve usar o padrão do sistema (não usar `input type="date"` nativo nem “um datepicker por módulo”).
+
 ### 4.2 React Hooks (evitar bugs “fantasmas”)
 
 - Tratar warnings de `react-hooks/exhaustive-deps` como prioridade em fluxos críticos.

@@ -353,13 +353,13 @@ export default function DealFormPanel({ deal, funilId, etapaId, onSaveSuccess, o
                   />
                 </div>
                 <div>
-                  <label className="text-sm text-gray-700">Vencimento</label>
-                  <input
+                  <Input
+                    label="Vencimento"
+                    name="atividade_due_date"
                     type="date"
                     value={atividadeDueDate}
                     onChange={(e) => setAtividadeDueDate(e.target.value)}
                     disabled={atividadeType !== 'tarefa'}
-                    className="mt-1 w-full p-3 border border-gray-300 rounded-lg disabled:opacity-50"
                   />
                 </div>
                 <div className="md:col-span-4">

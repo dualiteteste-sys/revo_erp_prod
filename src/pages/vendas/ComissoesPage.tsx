@@ -7,6 +7,7 @@ import ResizableSortableTh, { type SortState } from '@/components/ui/table/Resiz
 import TableColGroup from '@/components/ui/table/TableColGroup';
 import { useTableColumnWidths, type TableColumnWidthDef } from '@/components/ui/table/useTableColumnWidths';
 import { sortRows, toggleSort } from '@/components/ui/table/sortUtils';
+import Input from '@/components/ui/forms/Input';
 
 type VendaComissaoRow = {
   id: string;
@@ -237,19 +238,23 @@ export default function ComissoesPage() {
           <option value="cancelado">Cancelado</option>
         </select>
         <div className="flex items-center gap-2">
-          <label className="text-xs text-gray-600">De</label>
-          <input
+          <Input
+            label="De"
+            name="startDate"
             type="date"
+            size="sm"
             value={startDate}
             onChange={(e) => setStartDate(e.target.value)}
-            className="p-2 border border-gray-300 rounded-lg"
+            className="w-[200px]"
           />
-          <label className="text-xs text-gray-600">Até</label>
-          <input
+          <Input
+            label="Até"
+            name="endDate"
             type="date"
+            size="sm"
             value={endDate}
             onChange={(e) => setEndDate(e.target.value)}
-            className="p-2 border border-gray-300 rounded-lg"
+            className="w-[200px]"
           />
         </div>
       </div>
