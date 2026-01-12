@@ -820,10 +820,52 @@ export default function ContratosPage() {
     }
   };
 
+  const persistBillingRuleForActions = async (): Promise<boolean> => {
+    if (!form.id || !billingRule) return false;
+    if (billingRule.tipo !== 'mensal') {
+      addToast('Por enquanto, apenas regra mensal está habilitada.', 'warn');
+      return false;
+    }
+
+    const valor = Number(billingRule.valor_mensal ?? 0);
+    if (Number.isNaN(valor) || valor < 0) {
+      addToast('Valor mensal inválido.', 'error');
+      return false;
+    }
+
+    const dia = Number(billingRule.dia_vencimento ?? 5);
+    if (!Number.isFinite(dia) || dia < 1 || dia > 28) {
+      addToast('Dia de vencimento inválido (1..28).', 'error');
+      return false;
+    }
+
+    const comp = String(billingRule.primeira_competencia ?? '').trim();
+    if (!comp) {
+      addToast('Informe a primeira competência.', 'error');
+      return false;
+    }
+
+    const payload = {
+      contrato_id: form.id,
+      tipo: 'mensal' as const,
+      ativo: billingRule.ativo !== false,
+      valor_mensal: valor,
+      dia_vencimento: dia,
+      primeira_competencia: comp,
+      centro_de_custo_id: billingRule.centro_de_custo_id || null,
+    };
+    const savedRule = await upsertBillingRule(payload);
+    setBillingRule(savedRule as BillingRuleRow);
+    return true;
+  };
+
   const generateSchedule = async () => {
     if (!form.id) return;
     setBillingActionLoading(true);
     try {
+      // Estado da arte: não surpreender o usuário.
+      // Ao gerar agenda/títulos, persistimos a regra atual (incluindo centro de custo) antes de recarregar o preview.
+      if (!(await persistBillingRuleForActions())) return;
       const res = await rpcGenerateSchedule({ contratoId: form.id, monthsAhead: 12 });
       addToast(`Agenda atualizada. Inseridos: ${res.inserted}`, 'success');
       await loadBilling({ id: form.id, valor_mensal: Number(form.valor_mensal ?? 0), data_inicio: form.data_inicio || null });
@@ -838,6 +880,8 @@ export default function ContratosPage() {
     if (!form.id) return;
     setBillingActionLoading(true);
     try {
+      // Persistir centro de custo/regra antes de gerar títulos evita que o select volte para "(sem centro de custo)".
+      if (!(await persistBillingRuleForActions())) return;
       const until = String(billingUntil || new Date().toISOString().slice(0, 10));
       const res = await rpcGenerateReceivables({ contratoId: form.id, until });
       const meta = res.monthsAhead ? ` (agenda ${res.monthsAhead}m)` : '';
@@ -864,6 +908,7 @@ export default function ContratosPage() {
 
     setBillingActionLoading(true);
     try {
+      if (!(await persistBillingRuleForActions())) return;
       await addAvulso({
         contratoId: form.id,
         dataVencimento: avulsoVencimento,
@@ -885,6 +930,7 @@ export default function ContratosPage() {
     if (!form.id) return;
     setBillingActionLoading(true);
     try {
+      if (!(await persistBillingRuleForActions())) return;
       const res = await recalcMensalFuture({ contratoId: form.id, from: new Date().toISOString().slice(0, 10) });
       if (res.reason === 'nao_mensal') {
         addToast('Recalcular futuro aplica-se apenas a regras mensais.', 'warn');
