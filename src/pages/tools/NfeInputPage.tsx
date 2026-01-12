@@ -1,15 +1,17 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useMemo, useRef, useState, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useDropzone } from 'react-dropzone';
 import { XMLParser } from 'fast-xml-parser';
 import { FileUp, Loader2, AlertTriangle, CheckCircle, Save, Link as LinkIcon, ArrowRight, RefreshCw } from 'lucide-react';
 import GlassCard from '@/components/ui/GlassCard';
 import { useToast } from '@/contexts/ToastProvider';
+import { useConfirm } from '@/contexts/ConfirmProvider';
 import { useNavigate } from 'react-router-dom';
 import ResizableSortableTh, { type SortState } from '@/components/ui/table/ResizableSortableTh';
 import TableColGroup from '@/components/ui/table/TableColGroup';
 import { useTableColumnWidths, type TableColumnWidthDef } from '@/components/ui/table/useTableColumnWidths';
 import { sortRows, toggleSort } from '@/components/ui/table/sortUtils';
+import Modal from '@/components/ui/Modal';
 import {
   registerNfeImport,
   previewBeneficiamento,
@@ -27,8 +29,10 @@ import {
   updateRecebimentoItemProduct,
 } from '@/services/recebimento';
 import ItemAutocomplete from '@/components/os/ItemAutocomplete';
-import { getProductDetails } from '@/services/products';
-import { savePartner, searchClients } from '@/services/partners';
+import PartnerFormPanel from '@/components/partners/PartnerFormPanel';
+import { documentMask } from '@/lib/masks';
+import { searchClients, type PartnerDetails } from '@/services/partners';
+import { logger } from '@/lib/logger';
 
 // Helper para acesso seguro a propriedades aninhadas
 const get = (obj: any, path: string, defaultValue: any = null) => {
@@ -52,6 +56,7 @@ type NfeInputPageProps = {
 
 export default function NfeInputPage({ embedded, onRecebimentoReady, autoFinalizeMaterialCliente }: NfeInputPageProps) {
   const { addToast } = useToast();
+  const { confirm } = useConfirm();
   const navigate = useNavigate();
 
   // Estado do Arquivo e Parsing
@@ -65,17 +70,21 @@ export default function NfeInputPage({ embedded, onRecebimentoReady, autoFinaliz
   const [recebimentoId, setRecebimentoId] = useState<string | null>(null);
   const [previewData, setPreviewData] = useState<PreviewResult | null>(null);
   const [manualMatches, setManualMatches] = useState<Record<string, { id: string, name: string }>>({}); // item_id -> { id, name }
-  const [creatingObItemId, setCreatingObItemId] = useState<string | null>(null);
   const [conferidas, setConferidas] = useState<Record<string, number>>({}); // item_id (fiscal) -> quantidade conferida
   const [matchSort, setMatchSort] = useState<SortState<'item' | 'qty' | 'vinculo' | 'status'>>({ column: 'status', direction: 'asc' });
   const [confSort, setConfSort] = useState<SortState<'item' | 'qtyXml' | 'qtyConf' | 'status'>>({ column: 'item', direction: 'asc' });
+
+  const [clienteXml, setClienteXml] = useState<{ id: string; nome: string; doc: string } | null>(null);
+  const [createClientOpen, setCreateClientOpen] = useState(false);
+  const [createClientInitialValues, setCreateClientInitialValues] = useState<Partial<PartnerDetails> | null>(null);
+  const createClientResolverRef = useRef<((value: { id: string; nome: string; doc: string } | null) => void) | null>(null);
+  const clientPromptedRef = useRef<string | null>(null);
 
   const matchColumns: TableColumnWidthDef[] = [
     { id: 'item', defaultWidth: 360, minWidth: 260 },
     { id: 'qty', defaultWidth: 130, minWidth: 110 },
     { id: 'vinculo', defaultWidth: 640, minWidth: 420 },
     { id: 'status', defaultWidth: 160, minWidth: 140 },
-    { id: 'acao', defaultWidth: 170, minWidth: 150, resizable: false },
   ];
   const { widths: matchWidths, startResize: startMatchResize } = useTableColumnWidths({
     tableId: 'tools:nfe-input:matching',
@@ -110,6 +119,53 @@ export default function NfeInputPage({ embedded, onRecebimentoReady, autoFinaliz
     return Number.isFinite(parsed) ? parsed : NaN;
   };
 
+  const getInfNfe = () => {
+    if (!nfeData) return null;
+    const root = nfeData.nfeProc ? nfeData.nfeProc.NFe : nfeData.NFe;
+    return root?.infNFe ?? null;
+  };
+
+  const buildClientInitialValuesFromXml = (infNFe: any): Partial<PartnerDetails> | null => {
+    const cnpjRaw = get(infNFe, 'emit.CNPJ');
+    const cnpj = digitsOnly(cnpjRaw);
+    if (!cnpj) return null;
+
+    const nome = String(get(infNFe, 'emit.xNome') || '').trim();
+    const fantasia = String(get(infNFe, 'emit.xFant') || '').trim();
+    const email = String(get(infNFe, 'emit.email') || '').trim();
+    const telefone = String(get(infNFe, 'emit.enderEmit.fone') || get(infNFe, 'emit.fone') || '').trim();
+
+    const end = get(infNFe, 'emit.enderEmit') || null;
+    const endereco =
+      end
+        ? {
+            tipo_endereco: 'comercial',
+            logradouro: String(end.xLgr || '').trim() || null,
+            numero: String(end.nro || '').trim() || null,
+            complemento: String(end.xCpl || '').trim() || null,
+            bairro: String(end.xBairro || '').trim() || null,
+            cidade: String(end.xMun || '').trim() || null,
+            uf: String(end.UF || '').trim() || null,
+            cep: digitsOnly(end.CEP || null) || null,
+            pais: String(end.xPais || '').trim() || 'Brasil',
+          }
+        : null;
+
+    const hasEndereco = endereco && Object.values(endereco).some((v) => v && String(v).trim().length > 0);
+
+    return {
+      tipo: 'cliente' as any,
+      tipo_pessoa: 'juridica' as any,
+      doc_unico: documentMask(cnpj),
+      nome: nome || fantasia || 'Cliente (XML)',
+      fantasia: fantasia || nome || null,
+      email: email || null,
+      telefone: telefone || null,
+      enderecos: hasEndereco ? [endereco as any] : [],
+      contatos: [],
+    } as Partial<PartnerDetails>;
+  };
+
   useEffect(() => {
     if (!previewData?.itens) return;
     setConferidas((prev) => {
@@ -123,7 +179,7 @@ export default function NfeInputPage({ embedded, onRecebimentoReady, autoFinaliz
     });
   }, [previewData]);
 
-  const matchingSorted = React.useMemo(() => {
+  const matchingSorted = useMemo(() => {
     const itens = previewData?.itens ?? [];
     return sortRows(
       itens,
@@ -137,7 +193,7 @@ export default function NfeInputPage({ embedded, onRecebimentoReady, autoFinaliz
     );
   }, [manualMatches, matchSort, previewData?.itens]);
 
-  const conferenciaSorted = React.useMemo(() => {
+  const conferenciaSorted = useMemo(() => {
     const itens = previewData?.itens ?? [];
     return sortRows(
       itens,
@@ -158,6 +214,14 @@ export default function NfeInputPage({ embedded, onRecebimentoReady, autoFinaliz
     );
   }, [confSort, conferidas, previewData?.itens]);
 
+  const requestClientCreation = async (initialValues: Partial<PartnerDetails>): Promise<{ id: string; nome: string; doc: string } | null> => {
+    setCreateClientInitialValues(initialValues);
+    setCreateClientOpen(true);
+    return await new Promise((resolve) => {
+      createClientResolverRef.current = resolve;
+    });
+  };
+
   const resolveClienteFromCnpj = async (cnpj?: string | null): Promise<{ id: string; nome: string; doc: string } | null> => {
     const doc = digitsOnly(cnpj);
     if (!doc) return null;
@@ -168,94 +232,72 @@ export default function NfeInputPage({ embedded, onRecebimentoReady, autoFinaliz
       if (!exact) return null;
       return { id: exact.id, nome: exact.nome, doc: exact.doc_unico || doc };
     } catch (e) {
-      console.warn('[NFE][CTA][resolveClienteFromCnpj] failed', e);
+      logger.warn('[NFE][CTA][resolveClienteFromCnpj] failed', { err: e });
       return null;
     }
   };
 
   const ensureClienteFromNfe = async (): Promise<{ id: string; nome: string; doc: string } | null> => {
     const doc = digitsOnly(previewData?.import?.emitente_cnpj || null);
-    const nome = (previewData?.import?.emitente_nome || '').trim() || 'Cliente (NF-e)';
     if (!doc) return null;
+
+    if (clienteXml?.id && digitsOnly(clienteXml.doc) === doc) return clienteXml;
 
     const resolved = await resolveClienteFromCnpj(doc);
     if (resolved) return resolved;
 
-    try {
-      const created = await savePartner({
-        pessoa: {
-          tipo: 'cliente',
-          tipo_pessoa: 'juridica',
-          nome,
-          fantasia: nome,
-          doc_unico: doc,
-        },
-        enderecos: [],
-        contatos: [],
-      });
+    const infNFe = getInfNfe();
+    const initialValues = infNFe ? buildClientInitialValuesFromXml(infNFe) : null;
 
-      return { id: created.id, nome: created.nome || nome, doc: created.doc_unico || doc };
-    } catch (e) {
-      // Se deu race/unique, tenta resolver novamente.
-      const retry = await resolveClienteFromCnpj(doc);
-      if (retry) return retry;
-      throw e;
+    const ok = await confirm({
+      title: 'Cliente não cadastrado',
+      description:
+        `Não encontramos um cliente com o CNPJ ${documentMask(doc)}.\n\nDeseja cadastrar agora? ` +
+        'O cadastro será aberto com os dados do XML pré-preenchidos (como no botão de IA do CNPJ).',
+      confirmText: 'Cadastrar cliente',
+      cancelText: 'Agora não',
+      variant: 'primary',
+    });
+    if (!ok) return null;
+
+    if (!initialValues) {
+      addToast('Não foi possível extrair os dados do cliente a partir do XML.', 'error');
+      return null;
     }
+
+    const created = await requestClientCreation(initialValues);
+    if (created) setClienteXml(created);
+    return created;
   };
 
-  const handleCreateObFromItem = async (item: any) => {
-    if (!previewData) return;
-    const matchId: string | null = item.match_produto_id || manualMatches[item.item_id]?.id || null;
-    if (!matchId) {
-      addToast('Vincule o item a um produto antes de criar a OB.', 'warning');
+  const maybePromptCadastrarCliente = async (infNFe: any) => {
+    const doc = digitsOnly(get(infNFe, 'emit.CNPJ') || null);
+    if (!doc) return;
+    if (clientPromptedRef.current === doc) return;
+    clientPromptedRef.current = doc;
+
+    const resolved = await resolveClienteFromCnpj(doc);
+    if (resolved) {
+      setClienteXml(resolved);
       return;
     }
 
-    setCreatingObItemId(item.item_id);
-    try {
-      const produto = manualMatches[item.item_id]
-        ? { id: matchId, nome: manualMatches[item.item_id]?.name }
-        : await (async () => {
-          const details = await getProductDetails(matchId);
-          return { id: matchId, nome: details?.nome || 'Produto vinculado' };
-        })();
+    const initialValues = buildClientInitialValuesFromXml(infNFe);
+    if (!initialValues) return;
 
-      const clienteDoc = previewData.import?.emitente_cnpj || null;
-      const clienteNomeSugerido = previewData.import?.emitente_nome || null;
-      const clienteResolved = await resolveClienteFromCnpj(clienteDoc);
+    const ok = await confirm({
+      title: 'Cadastrar cliente do XML?',
+      description: `Encontramos o CNPJ ${documentMask(doc)} no XML, mas ele ainda não está cadastrado.\n\nDeseja cadastrar agora?`,
+      confirmText: 'Cadastrar',
+      cancelText: 'Depois',
+      variant: 'primary',
+    });
+    if (!ok) return;
 
-      const numero = previewData.import?.numero || '';
-      const serie = previewData.import?.serie || '';
-      const chave = previewData.import?.chave_acesso || '';
-      const documentoRef = `NF-e ${numero}${serie ? `/${serie}` : ''}${chave ? ` — ${chave}` : ''}`.trim();
-
-      navigate('/app/industria/ordens?tipo=beneficiamento&new=1', {
-        state: {
-          prefill: {
-            clienteId: clienteResolved?.id || null,
-            clienteNome: clienteResolved?.nome || clienteNomeSugerido,
-            clienteDoc: clienteResolved?.doc || clienteDoc,
-            produtoId: produto.id,
-            produtoNome: produto.nome,
-            quantidade: typeof item.qcom === 'number' ? item.qcom : Number(item.qcom),
-            unidade: item.ucom || null,
-            documentoRef,
-            materialClienteNome: item.xprod || null,
-            materialClienteCodigo: item.cprod || null,
-            materialClienteUnidade: item.ucom || null,
-            origemNfeImportId: importId,
-            origemNfeItemId: item.item_id,
-            origemQtdXml: typeof item.qcom === 'number' ? item.qcom : Number(item.qcom),
-            origemUnidadeXml: item.ucom || null,
-          },
-          source: { kind: 'nfe-beneficiamento', importId, itemId: item.item_id },
-        },
-      });
-    } catch (e: any) {
-      console.error(e);
-      addToast(e.message || 'Erro ao preparar a Ordem de Beneficiamento.', 'error');
-    } finally {
-      setCreatingObItemId(null);
+    const created = await requestClientCreation(initialValues);
+    if (created) {
+      setClienteXml(created);
+      addToast('Cliente cadastrado. Você pode continuar a importação.', 'success');
     }
   };
 
@@ -356,6 +398,14 @@ export default function NfeInputPage({ embedded, onRecebimentoReady, autoFinaliz
       const preview = await previewBeneficiamento(id);
       setPreviewData(preview);
 
+      // Estado da arte: se o cliente (emitente) ainda não existe, oferecer cadastro com dados do XML.
+      // Mantém o controle com o usuário e evita criar registros automaticamente sem confirmação.
+      try {
+        await maybePromptCadastrarCliente(infNFe);
+      } catch (e) {
+        logger.warn('[NFE_IMPORT][PROMPT_CLIENT] failed', { err: e });
+      }
+
       setStep('matching');
       if (!embedded) {
         addToast('Nota registrada! Verifique os vínculos dos produtos.', 'success');
@@ -452,7 +502,7 @@ export default function NfeInputPage({ embedded, onRecebimentoReady, autoFinaliz
 
         const cliente = await ensureClienteFromNfe();
         if (!cliente?.id) {
-          addToast('Não foi possível determinar/criar o cliente (emitente) do XML.', 'error');
+          addToast('Cadastre/seleciona o cliente do XML para continuar.', 'warning');
           return;
         }
 
@@ -526,6 +576,41 @@ export default function NfeInputPage({ embedded, onRecebimentoReady, autoFinaliz
   // Renderização
   return (
     <div className="p-1">
+      <Modal
+        isOpen={createClientOpen}
+        onClose={() => {
+          setCreateClientOpen(false);
+          const resolve = createClientResolverRef.current;
+          createClientResolverRef.current = null;
+          resolve?.(null);
+        }}
+        title="Cadastrar cliente do XML"
+        size="xl"
+      >
+        <PartnerFormPanel
+          partner={null}
+          initialValues={createClientInitialValues ?? undefined}
+          onSaveSuccess={(saved) => {
+            setCreateClientOpen(false);
+            const result = {
+              id: saved.id,
+              nome: String(saved.nome || '').trim() || 'Cliente',
+              doc: digitsOnly((saved as any).doc_unico || '') || digitsOnly(previewData?.import?.emitente_cnpj || null),
+            };
+            setClienteXml(result);
+            const resolve = createClientResolverRef.current;
+            createClientResolverRef.current = null;
+            resolve?.(result);
+          }}
+          onClose={() => {
+            setCreateClientOpen(false);
+            const resolve = createClientResolverRef.current;
+            createClientResolverRef.current = null;
+            resolve?.(null);
+          }}
+        />
+      </Modal>
+
       {!embedded && (
         <>
           <h1 className="text-3xl font-bold text-gray-800 mb-2">Entrada de Beneficiamento (NF-e)</h1>
@@ -684,15 +769,6 @@ export default function NfeInputPage({ embedded, onRecebimentoReady, autoFinaliz
                       align="center"
                       className="px-4 py-3"
                     />
-                    <ResizableSortableTh
-                      columnId="acao"
-                      label="Ação"
-                      sortable={false}
-                      sort={matchSort}
-                      onResizeStart={startMatchResize}
-                      align="center"
-                      className="px-4 py-3"
-                    />
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
@@ -757,16 +833,6 @@ export default function NfeInputPage({ embedded, onRecebimentoReady, autoFinaliz
                               Pendente
                             </span>
                           )}
-                        </td>
-                        <td className="px-4 py-3 text-center">
-                          <button
-                            onClick={() => handleCreateObFromItem(item)}
-                            disabled={!isMatched || creatingObItemId === item.item_id}
-                            className="inline-flex items-center justify-center px-3 py-1.5 text-xs font-bold rounded-lg border border-blue-600 text-blue-700 hover:bg-blue-50 disabled:opacity-50 disabled:cursor-not-allowed"
-                            title={isMatched ? 'Criar Ordem de Beneficiamento' : 'Vincule o produto para habilitar'}
-                          >
-                            {creatingObItemId === item.item_id ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Criar OB'}
-                          </button>
                         </td>
                       </tr>
                     );
