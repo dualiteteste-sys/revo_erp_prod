@@ -28,6 +28,7 @@ export const test = base.extend({
 
       const status = response.status?.() ?? 0;
       if (status < 400) return;
+      if (allowFailedResource503 && status === 503) return;
 
       const req = response.request?.();
       const method = req?.method?.() ?? 'GET';
