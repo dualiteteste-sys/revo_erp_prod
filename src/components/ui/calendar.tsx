@@ -122,8 +122,10 @@ function Calendar({
       onMonthChange={handleMonthChange}
       components={{
         ...(props.components ?? {}),
-        Root: ({ children, ...rootProps }) => (
-          <div {...rootProps} className={cn("relative h-full", rootProps.className)}>
+        Root: ({ children, ...rootProps }) => {
+          const { rootRef, ...rest } = rootProps as any;
+          return (
+            <div ref={rootRef} {...rest} className={cn("relative h-full", rest.className)}>
             {children}
             <AnimatePresence initial={false}>
               {monthYearOpen ? (
@@ -206,8 +208,9 @@ function Calendar({
                 </motion.div>
               ) : null}
             </AnimatePresence>
-          </div>
-        ),
+            </div>
+          );
+        },
         CaptionLabel: ({ children, ...labelProps }) => (
           <button
             type="button"
