@@ -19,6 +19,8 @@ type Props = {
 };
 
 function formatCentroLabel(cc: CentroDeCustoListItem) {
+  const isRoot = (cc.nivel ?? 0) === 0;
+  if (isRoot) return `- ${cc.nome}`.trim();
   const code = cc.codigo ? `${cc.codigo} ` : '';
   const indent = cc.nivel && cc.nivel > 0 ? `${'—'.repeat(Math.min(6, cc.nivel))} ` : '';
   return `${indent}${code}${cc.nome}`.trim();
@@ -39,7 +41,7 @@ function parseNumericCode(code: string): number[] {
     .map((n) => (Number.isFinite(n) ? n : 0));
 }
 
-function compareCentros(a: CentroDeCustoListItem, b: CentroDeCustoListItem, mode: 'numeric_desc' | 'alpha_asc'): number {
+function compareCentros(a: CentroDeCustoListItem, b: CentroDeCustoListItem, mode: 'numeric_asc' | 'alpha_asc'): number {
   if (mode === 'alpha_asc') {
     return String(a.nome ?? '').localeCompare(String(b.nome ?? ''), 'pt-BR', { sensitivity: 'base' });
   }
@@ -57,11 +59,11 @@ function compareCentros(a: CentroDeCustoListItem, b: CentroDeCustoListItem, mode
     const av = as[i];
     const bv = bs[i];
     if (av === undefined && bv === undefined) break;
-    // Regra: ordenação numérica desc (maior→menor). Se um código é prefixo do outro,
-    // o mais profundo é considerado "maior" (ex.: 3.01.06 antes de 3.01).
-    if (av === undefined) return 1;
-    if (bv === undefined) return -1;
-    if (av !== bv) return bv - av; // desc
+    // Regra: ordenação numérica asc (menor→maior). Se um código é prefixo do outro,
+    // o mais raso vem primeiro (ex.: 3.01 antes de 3.01.06).
+    if (av === undefined) return -1;
+    if (bv === undefined) return 1;
+    if (av !== bv) return av - bv; // asc
   }
 
   // fallback estável
@@ -109,13 +111,50 @@ export default function CentroDeCustoDropdown({
   }, [addToast, items.length, open, valueId, valueName]);
 
   const filteredSorted = React.useMemo(() => {
-    const filtered = (allowedTipos?.length ? items.filter((cc) => allowedTipos.includes(cc.tipo)) : items).filter(
-      (cc) => (cc.nivel ?? 0) > 0,
-    );
-    const shouldNumeric = filtered.every((cc) => isNumericCode(cc.codigo));
-    const mode: 'numeric_desc' | 'alpha_asc' = shouldNumeric ? 'numeric_desc' : 'alpha_asc';
+    const filtered = allowedTipos?.length ? items.filter((cc) => allowedTipos.includes(cc.tipo)) : items;
+    const hasAnyCode = filtered.some((cc) => String(cc.codigo ?? '').trim().length > 0);
+    const shouldNumeric = hasAnyCode && filtered.every((cc) => !String(cc.codigo ?? '').trim() || isNumericCode(cc.codigo));
+    const mode: 'numeric_asc' | 'alpha_asc' = shouldNumeric ? 'numeric_asc' : 'alpha_asc';
 
-    return filtered.sort((a, b) => compareCentros(a, b, mode));
+    const byTipo = new Map<TipoCentroCusto, CentroDeCustoListItem[]>();
+    for (const cc of filtered) {
+      const arr = byTipo.get(cc.tipo) ?? [];
+      arr.push(cc);
+      byTipo.set(cc.tipo, arr);
+    }
+
+    const tiposInScope = (allowedTipos?.length ? allowedTipos : Array.from(byTipo.keys())).filter((t) => byTipo.has(t));
+
+    const groupEntries = tiposInScope
+      .map((tipo) => {
+        const group = byTipo.get(tipo) ?? [];
+        const roots = group.filter((cc) => (cc.nivel ?? 0) === 0).sort((a, b) => compareCentros(a, b, mode));
+        const children = group.filter((cc) => (cc.nivel ?? 0) > 0).sort((a, b) => compareCentros(a, b, mode));
+        const rootCode = String(roots[0]?.codigo ?? '').trim();
+        return { tipo, roots, children, rootCode };
+      })
+      .filter((g) => g.roots.length > 0 || g.children.length > 0);
+
+    // Ordena grupos (Receitas/Despesas) por código raiz quando numérico; fallback por nome do tipo.
+    groupEntries.sort((a, b) => {
+      if (mode === 'numeric_asc' && isNumericCode(a.rootCode) && isNumericCode(b.rootCode)) {
+        const as = parseNumericCode(a.rootCode);
+        const bs = parseNumericCode(b.rootCode);
+        const n = Math.max(as.length, bs.length);
+        for (let i = 0; i < n; i += 1) {
+          const av = as[i];
+          const bv = bs[i];
+          if (av === undefined && bv === undefined) break;
+          if (av === undefined) return -1;
+          if (bv === undefined) return 1;
+          if (av !== bv) return av - bv;
+        }
+        return 0;
+      }
+      return String(a.tipo).localeCompare(String(b.tipo), 'pt-BR', { sensitivity: 'base' });
+    });
+
+    return groupEntries.flatMap((g) => [...g.roots, ...g.children]);
   }, [allowedTipos, items]);
 
   const selectedId = React.useMemo(() => {
