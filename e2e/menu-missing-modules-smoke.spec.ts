@@ -55,10 +55,11 @@ async function mockAuthAndEmpresa(page: Page, opts?: { role?: 'member' | 'admin'
   await page.route('**/rest/v1/empresa_usuarios*', async (route) => {
     const url = new URL(route.request().url());
     const select = url.searchParams.get('select') || '';
+    const accept = (route.request().headers()['accept'] || '').toLowerCase();
 
-    // A tela de usuários busca `select=role` em formato objeto (single).
-    if (select === 'role') {
-      await route.fulfill({ json: { role } });
+    // O app usa `.maybeSingle()` para buscar role (Accept: vnd.pgrst.object+json) e pode incluir join em `roles`.
+    if (accept.includes('application/vnd.pgrst.object+json') || select === 'role' || select.includes('roles:roles') || (select.includes('role') && !select.includes('empresa:'))) {
+      await route.fulfill({ json: { role, roles: { slug: role } } });
       return;
     }
 

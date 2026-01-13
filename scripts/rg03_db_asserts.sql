@@ -389,6 +389,86 @@ begin
     END IF;
   END IF;
 
+  -- 9) FIN-REC-01: gerar recorrências (pagar) não pode falhar em runtime por mismatch de parâmetros ($19)
+  IF to_regprocedure('public.financeiro_recorrencias_upsert(jsonb)') IS NOT NULL
+     AND to_regprocedure('public.financeiro_recorrencias_generate(uuid, date, int)') IS NOT NULL
+     AND to_regclass('public.financeiro_contas_pagar') IS NOT NULL
+  THEN
+    <<fin_rec01>>
+    DECLARE
+      v_user uuid := gen_random_uuid();
+      v_empresa uuid := gen_random_uuid();
+      v_fornecedor uuid;
+      v_rec_id uuid;
+      v_result jsonb;
+    BEGIN
+      -- Setup
+      INSERT INTO auth.users(id, aud, role, email, created_at, updated_at)
+      VALUES (v_user, 'authenticated', 'authenticated', 'finrec01+' || replace(v_user::text, '-', '') || '@example.com', now(), now())
+      ON CONFLICT (id) DO NOTHING;
+
+      INSERT INTO public.empresas(id, nome_razao_social, razao_social, fantasia, nome)
+      VALUES (v_empresa, 'FINREC01 Empresa LTDA', 'FINREC01 Empresa LTDA', 'FINREC01', 'FINREC01')
+      ON CONFLICT DO NOTHING;
+
+      INSERT INTO public.empresa_usuarios(empresa_id, user_id, role, created_at)
+      VALUES (v_empresa, v_user, 'admin', now())
+      ON CONFLICT DO NOTHING;
+
+      INSERT INTO public.user_active_empresa(user_id, empresa_id, updated_at)
+      VALUES (v_user, v_empresa, now())
+      ON CONFLICT (user_id) DO UPDATE SET empresa_id = excluded.empresa_id, updated_at = excluded.updated_at;
+
+      -- Fornecedor mínimo (quando tabela pessoas existir)
+      IF to_regclass('public.pessoas') IS NOT NULL THEN
+        INSERT INTO public.pessoas(empresa_id, nome, tipo)
+        VALUES (v_empresa, 'FINREC01 Fornecedor', 'fornecedor')
+        RETURNING id INTO v_fornecedor;
+      ELSE
+        v_fornecedor := gen_random_uuid();
+      END IF;
+
+      EXECUTE 'SET LOCAL ROLE authenticated';
+      PERFORM set_config('request.jwt.claim.sub', v_user::text, true);
+
+      SELECT public.financeiro_recorrencias_upsert(
+        jsonb_build_object(
+          'tipo','pagar',
+          'ativo',true,
+          'frequencia','mensal',
+          'ajuste_dia_util','proximo_dia_util',
+          'start_date',to_char(current_date + 7, 'YYYY-MM-DD'),
+          'descricao','FINREC01 Conta recorrente',
+          'fornecedor_id',v_fornecedor::text,
+          'valor_total','100.00'
+        )
+      ) INTO v_result;
+
+      v_rec_id := nullif(v_result->>'id','')::uuid;
+      IF v_rec_id IS NULL THEN
+        RAISE EXCEPTION 'RG-03/FIN-REC-01: upsert não retornou id.';
+      END IF;
+
+      -- Deve executar sem erro (era aqui que estourava "there is no parameter $19")
+      SELECT public.financeiro_recorrencias_generate(v_rec_id, null, 1) INTO v_result;
+
+      IF coalesce(v_result->>'status','') <> 'ok' THEN
+        RAISE EXCEPTION 'RG-03/FIN-REC-01: generate retornou status=%', v_result->>'status';
+      END IF;
+      IF coalesce((v_result->>'contas_geradas')::int, 0) + coalesce((v_result->>'contas_reparadas')::int, 0) <= 0 THEN
+        RAISE EXCEPTION 'RG-03/FIN-REC-01: generate não gerou contas. retorno=%', v_result::text;
+      END IF;
+
+      -- Evita vazar SET LOCAL ROLE para os próximos asserts dentro do mesmo bloco.
+      EXECUTE 'RESET ROLE';
+    EXCEPTION
+      WHEN undefined_table THEN
+        -- ambientes antigos sem módulo financeiro completo: ignora
+        EXECUTE 'RESET ROLE';
+        NULL;
+    END fin_rec01;
+  END IF;
+
   -- 10) SEC-MT-04: isolamento multi-tenant (A não pode ver B)
   IF to_regclass('public.empresas') IS NOT NULL
      AND to_regclass('public.empresa_usuarios') IS NOT NULL
