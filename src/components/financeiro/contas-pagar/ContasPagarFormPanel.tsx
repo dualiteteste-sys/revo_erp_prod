@@ -10,10 +10,12 @@ import TextArea from '@/components/ui/forms/TextArea';
 import { useNumericField } from '@/hooks/useNumericField';
 import ClientAutocomplete from '@/components/common/ClientAutocomplete';
 import CentroDeCustoAutocomplete from '@/components/common/CentroDeCustoAutocomplete';
+import { Switch } from '@/components/ui/switch';
+import { generateRecorrencia, upsertRecorrencia, type FinanceiroRecorrenciaAjusteDiaUtil, type FinanceiroRecorrenciaFrequencia } from '@/services/financeiroRecorrencias';
 
 interface ContasPagarFormPanelProps {
   conta: Partial<ContaPagar> | null;
-  onSaveSuccess: (savedConta: ContaPagar) => void;
+  onSaveSuccess: (savedConta?: ContaPagar) => void;
   onClose: () => void;
 }
 
@@ -28,6 +30,14 @@ const ContasPagarFormPanel: React.FC<ContasPagarFormPanelProps> = ({ conta, onSa
   const [formData, setFormData] = useState<Partial<ContaPagarPayload>>({});
   const [fornecedorName, setFornecedorName] = useState('');
   const isPagoOuParcial = formData.status === 'paga' || formData.status === 'parcial';
+  const isEditing = !!conta?.id;
+
+  const [isRecorrente, setIsRecorrente] = useState(false);
+  const [frequencia, setFrequencia] = useState<FinanceiroRecorrenciaFrequencia>('mensal');
+  const [ajusteDiaUtil, setAjusteDiaUtil] = useState<FinanceiroRecorrenciaAjusteDiaUtil>('proximo_dia_util');
+  const [hasEndDate, setHasEndDate] = useState(false);
+  const [endDate, setEndDate] = useState<string>('');
+  const [gerarN, setGerarN] = useState<number>(12);
 
   const valorTotalProps = useNumericField(formData.valor_total, (value) => handleFormChange('valor_total', value));
   const valorPagoProps = useNumericField(formData.valor_pago, (value) => handleFormChange('valor_pago', value));
@@ -53,6 +63,7 @@ const ContasPagarFormPanel: React.FC<ContasPagarFormPanelProps> = ({ conta, onSa
       } else {
         setFornecedorName('');
       }
+      setIsRecorrente(false);
     } else {
       setFormData({ 
         status: 'aberta', 
@@ -63,6 +74,12 @@ const ContasPagarFormPanel: React.FC<ContasPagarFormPanelProps> = ({ conta, onSa
         desconto: 0 
       });
       setFornecedorName('');
+      setIsRecorrente(false);
+      setFrequencia('mensal');
+      setAjusteDiaUtil('proximo_dia_util');
+      setHasEndDate(false);
+      setEndDate('');
+      setGerarN(12);
     }
   }, [conta]);
 
@@ -78,6 +95,45 @@ const ContasPagarFormPanel: React.FC<ContasPagarFormPanelProps> = ({ conta, onSa
 
     setIsSaving(true);
     try {
+      if (!isEditing && isRecorrente) {
+        if (!formData.fornecedor_id) {
+          addToast('Fornecedor é obrigatório para recorrência.', 'error');
+          return;
+        }
+
+        const startDate = String(formData.data_vencimento).slice(0, 10);
+        const payload = {
+          tipo: 'pagar',
+          ativo: true,
+          frequencia,
+          ajuste_dia_util: ajusteDiaUtil,
+          start_date: startDate,
+          end_date: hasEndDate ? (endDate || null) : null,
+          descricao: formData.descricao,
+          documento_ref: formData.documento_ref ?? null,
+          observacoes: formData.observacoes ?? null,
+          centro_de_custo_id: (formData as any).centro_de_custo_id ?? null,
+          fornecedor_id: formData.fornecedor_id,
+          valor_total: formData.valor_total,
+          categoria: formData.categoria ?? null,
+          forma_pagamento: formData.forma_pagamento ?? null,
+        };
+
+        const rec = await upsertRecorrencia(payload);
+        const gen = await generateRecorrencia({
+          recorrenciaId: rec.id,
+          until: hasEndDate ? (endDate || null) : null,
+          max: Math.max(1, Math.min(240, Number(gerarN) || 12)),
+        });
+
+        addToast(
+          `Recorrência criada. Contas geradas: ${gen.contas_geradas ?? 0}.`,
+          'success',
+        );
+        onSaveSuccess();
+        return;
+      }
+
       const savedConta = await saveContaPagar(formData);
       addToast('Conta a pagar salva com sucesso!', 'success');
       onSaveSuccess(savedConta);
@@ -126,6 +182,83 @@ const ContasPagarFormPanel: React.FC<ContasPagarFormPanelProps> = ({ conta, onSa
             {statusOptions.map(opt => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
           </Select>
         </Section>
+
+        {!isEditing ? (
+          <Section title="Recorrência" description="Para contas mensais (luz, aluguel, etc.), gere automaticamente as próximas parcelas.">
+            <div className="sm:col-span-6 flex items-center justify-between gap-4 rounded-lg border border-gray-200 bg-white/60 px-4 py-3">
+              <div>
+                <div className="text-sm font-medium text-gray-800">Conta recorrente</div>
+                <div className="text-xs text-gray-500">Cria um modelo e gera as próximas ocorrências automaticamente.</div>
+              </div>
+              <Switch checked={isRecorrente} onCheckedChange={setIsRecorrente} />
+            </div>
+
+            {isRecorrente ? (
+              <>
+                <Select
+                  label="Frequência"
+                  name="rec_frequencia"
+                  value={frequencia}
+                  onChange={(e) => setFrequencia(e.target.value as any)}
+                  className="sm:col-span-3"
+                >
+                  <option value="semanal">Semanal</option>
+                  <option value="mensal">Mensal</option>
+                  <option value="bimestral">Bimestral</option>
+                  <option value="trimestral">Trimestral</option>
+                  <option value="semestral">Semestral</option>
+                  <option value="anual">Anual</option>
+                </Select>
+
+                <Select
+                  label="Ajuste para dia útil"
+                  name="rec_ajuste"
+                  value={ajusteDiaUtil}
+                  onChange={(e) => setAjusteDiaUtil(e.target.value as any)}
+                  className="sm:col-span-3"
+                >
+                  <option value="proximo_dia_util">Próximo dia útil</option>
+                  <option value="dia_util_anterior">Dia útil anterior</option>
+                  <option value="nao_ajustar">Não ajustar</option>
+                </Select>
+
+                <Input
+                  label="Gerar próximas (ocorrências)"
+                  name="rec_gerar_n"
+                  type="number"
+                  min={1}
+                  max={240}
+                  value={String(gerarN)}
+                  onChange={(e) => setGerarN(Number(e.target.value))}
+                  className="sm:col-span-3"
+                  helperText="Dica: para mensal, 12 gera 1 ano."
+                />
+
+                <div className="sm:col-span-3 flex items-center justify-between gap-4 rounded-lg border border-gray-200 bg-white/60 px-4 py-3">
+                  <div>
+                    <div className="text-sm font-medium text-gray-800">Definir data final</div>
+                    <div className="text-xs text-gray-500">Se desligado, a recorrência fica indeterminada.</div>
+                  </div>
+                  <Switch checked={hasEndDate} onCheckedChange={setHasEndDate} />
+                </div>
+
+                {hasEndDate ? (
+                  <Input
+                    label="Fim da recorrência"
+                    name="rec_end_date"
+                    type="date"
+                    value={endDate}
+                    onChange={(e) => setEndDate(e.target.value)}
+                    className="sm:col-span-3"
+                    required
+                  />
+                ) : (
+                  <div className="sm:col-span-3" />
+                )}
+              </>
+            ) : null}
+          </Section>
+        ) : null}
 
         <Section title="Detalhes do Pagamento" description="Informações sobre o pagamento, juros e descontos.">
           <div className="sm:col-span-6 text-sm text-gray-600">
