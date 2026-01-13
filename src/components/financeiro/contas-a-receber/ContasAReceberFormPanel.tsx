@@ -9,7 +9,7 @@ import Select from '@/components/ui/forms/Select';
 import TextArea from '@/components/ui/forms/TextArea';
 import { useNumericField } from '@/hooks/useNumericField';
 import ClientAutocomplete from '@/components/common/ClientAutocomplete';
-import CentroDeCustoAutocomplete from '@/components/common/CentroDeCustoAutocomplete';
+import CentroDeCustoSelect from '@/components/common/CentroDeCustoSelect';
 import { Switch } from '@/components/ui/switch';
 import { generateRecorrencia, upsertRecorrencia, type FinanceiroRecorrenciaAjusteDiaUtil, type FinanceiroRecorrenciaFrequencia } from '@/services/financeiroRecorrencias';
 
@@ -232,7 +232,7 @@ const ContasAReceberFormPanel: React.FC<ContasAReceberFormPanelProps> = ({ conta
         <Section title="Centro de Custo" description="Opcional (quando você quiser analisar por centro).">
           <div className="sm:col-span-6">
             <label className="block text-sm font-medium text-gray-700 mb-1">Centro de Custo</label>
-            <CentroDeCustoAutocomplete
+            <CentroDeCustoSelect
               value={(formData as any).centro_de_custo_id || null}
               onChange={(id, name) => {
                 handleFormChange('centro_de_custo_id', id);
@@ -241,7 +241,7 @@ const ContasAReceberFormPanel: React.FC<ContasAReceberFormPanelProps> = ({ conta
                   handleFormChange('centro_custo' as any, name);
                 }
               }}
-              placeholder="Buscar centro de custo…"
+              placeholder="Selecionar…"
             />
           </div>
         </Section>

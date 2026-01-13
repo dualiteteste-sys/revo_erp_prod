@@ -9,7 +9,7 @@ import Select from '@/components/ui/forms/Select';
 import TextArea from '@/components/ui/forms/TextArea';
 import { useNumericField } from '@/hooks/useNumericField';
 import ClientAutocomplete from '@/components/common/ClientAutocomplete';
-import CentroDeCustoAutocomplete from '@/components/common/CentroDeCustoAutocomplete';
+import CentroDeCustoSelect from '@/components/common/CentroDeCustoSelect';
 import { Switch } from '@/components/ui/switch';
 import { generateRecorrencia, upsertRecorrencia, type FinanceiroRecorrenciaAjusteDiaUtil, type FinanceiroRecorrenciaFrequencia } from '@/services/financeiroRecorrencias';
 
@@ -277,14 +277,14 @@ const ContasPagarFormPanel: React.FC<ContasPagarFormPanelProps> = ({ conta, onSa
 
           <div className="sm:col-span-6">
             <label className="block text-sm font-medium text-gray-700 mb-1">Centro de Custo (opcional)</label>
-            <CentroDeCustoAutocomplete
+            <CentroDeCustoSelect
               value={(formData as any).centro_de_custo_id || null}
               initialName={formData.centro_custo || ''}
               onChange={(id, name) => {
                 handleFormChange('centro_de_custo_id' as any, id);
                 if (name) handleFormChange('centro_custo' as any, name);
               }}
-              placeholder="Buscar centro de custo…"
+              placeholder="Selecionar…"
             />
             <div className="mt-1 text-xs text-gray-500">
               Dica: o campo legado <span className="font-medium">centro_custo</span> ainda existe para compatibilidade; ao selecionar aqui, ele é preenchido automaticamente.
