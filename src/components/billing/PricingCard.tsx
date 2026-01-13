@@ -144,7 +144,7 @@ const PricingCard: React.FC<PricingCardProps> = ({
               : 'bg-blue-100 text-blue-700 hover:bg-blue-200'
           } disabled:opacity-70 disabled:cursor-not-allowed`}
         >
-          {isLoading ? <Loader2 className="animate-spin" /> : 'Teste 30 dias grátis'}
+          {isLoading ? <Loader2 className="animate-spin" /> : 'Teste 180 dias grátis'}
         </button>
       </div>
     </motion.div>

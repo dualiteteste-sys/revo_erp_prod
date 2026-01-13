@@ -223,7 +223,11 @@ Deno.serve(async (req) => {
 
       // Compat: clientes antigos podem existir sem metadata.empresa_id (webhook depende disso).
       try {
-        await stripe.customers.update(customerId, { metadata: { empresa_id } });
+        await stripe.customers.update(customerId, {
+          metadata: { empresa_id },
+          name: empresa.fantasia ?? empresa.razao_social ?? undefined,
+          email: user.email ?? undefined,
+        });
       } catch {
         // best-effort
       }
@@ -266,7 +270,6 @@ Deno.serve(async (req) => {
         ...(allowTrial
           ? { trial_settings: { end_behavior: { missing_payment_method: "cancel" } } }
           : {}),
-        payment_settings: { save_default_payment_method: "on_subscription" },
         metadata: { empresa_id, plan_slug: String(plan_slug).toUpperCase(), billing_cycle },
       },
     });
