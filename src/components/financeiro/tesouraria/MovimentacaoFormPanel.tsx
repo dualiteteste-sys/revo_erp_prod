@@ -8,7 +8,7 @@ import Select from '@/components/ui/forms/Select';
 import TextArea from '@/components/ui/forms/TextArea';
 import { useNumericField } from '@/hooks/useNumericField';
 import { Button } from '@/components/ui/button';
-import CentroDeCustoSelect from '@/components/common/CentroDeCustoSelect';
+import CentroDeCustoDropdown from '@/components/common/CentroDeCustoDropdown';
 
 interface Props {
   movimentacao: Movimentacao | null;
@@ -116,9 +116,9 @@ export default function MovimentacaoFormPanel({ movimentacao, contaCorrenteId, o
 
           <div className="sm:col-span-3">
             <label className="block text-sm font-medium text-gray-700 mb-1">Centro de Custo (opcional)</label>
-            <CentroDeCustoSelect
-              value={formData.centro_de_custo_id ?? null}
-              initialName={formData.centro_custo ?? undefined}
+            <CentroDeCustoDropdown
+              valueId={formData.centro_de_custo_id ?? null}
+              valueName={(formData as any).centro_custo ?? null}
               onChange={(id, name) => {
                 handleChange('centro_de_custo_id', id);
                 handleChange('centro_custo', name ?? null);

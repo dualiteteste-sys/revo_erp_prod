@@ -11,7 +11,7 @@ import { Database } from '@/types/database.types';
 import OsFormItems from './OsFormItems';
 import { useNumericField } from '@/hooks/useNumericField';
 import ClientAutocomplete from '../common/ClientAutocomplete';
-import MeioPagamentoSelect from '@/components/common/MeioPagamentoSelect';
+import MeioPagamentoDropdown from '@/components/common/MeioPagamentoDropdown';
 import { Button } from '@/components/ui/button';
 import OsAuditTrailPanel from '@/components/os/OsAuditTrailPanel';
 import { createContaAReceberFromOs, createContasAReceberFromOsParcelas, getContaAReceberDetails, getContaAReceberFromOs, receberContaAReceber, type ContaAReceber } from '@/services/contasAReceber';
@@ -1089,10 +1089,9 @@ const OsFormPanel: React.FC<OsFormPanelProps> = ({ os, onSaveSuccess, onClose })
           </div>
           <div className="sm:col-span-3">
             <label className="block text-sm font-medium text-gray-700 mb-1">Forma de Recebimento</label>
-            <MeioPagamentoSelect
+            <MeioPagamentoDropdown
               tipo="recebimento"
               value={formData.forma_recebimento || null}
-              initialName={formData.forma_recebimento || undefined}
               onChange={(name) => handleFormChange('forma_recebimento', name || '')}
               placeholder="Selecionar…"
               disabled={readOnly}
