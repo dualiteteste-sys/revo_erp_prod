@@ -44,6 +44,7 @@ export const menuConfig: MenuItem[] = [
       { name: 'Serviços', icon: Wrench, href: '/app/services', permission: { domain: 'servicos', action: 'view' } },
       { name: 'Vendedores', icon: UserSquare, href: '/app/cadastros/vendedores', permission: { domain: 'vendedores', action: 'view' } },
       { name: 'Embalagens', icon: Box, href: '/app/cadastros/embalagens', permission: { domain: 'produtos', action: 'view' } },
+      { name: 'Meios de Pagamento', icon: Banknote, href: '/app/cadastros/meios-pagamento', permission: { domain: 'contas_a_pagar', action: 'view' } },
       { name: 'Relatórios', icon: BarChart2, href: '/app/relatorios' },
     ],
   },

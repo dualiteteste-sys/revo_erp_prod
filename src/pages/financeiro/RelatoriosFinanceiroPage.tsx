@@ -20,7 +20,7 @@ import {
   type FinanceiroRelatoriosResumo,
 } from '@/services/financeiroRelatorios';
 import { useNavigate } from 'react-router-dom';
-import CentroDeCustoAutocomplete from '@/components/common/CentroDeCustoAutocomplete';
+import CentroDeCustoSelect from '@/components/common/CentroDeCustoSelect';
 
 function formatBRL(value: number) {
   return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value || 0);
@@ -369,14 +369,14 @@ export default function RelatoriosFinanceiroPage() {
                 </div>
                 <div className="w-full sm:w-[360px]">
                   <label className="block text-xs font-medium text-gray-700 mb-1">Filtrar por centro de custo (opcional)</label>
-                  <CentroDeCustoAutocomplete
+                  <CentroDeCustoSelect
                     value={dreCentroId}
                     initialName={dreCentroName}
                     onChange={(id, name) => {
                       setDreCentroId(id);
                       setDreCentroName(name ?? '');
                     }}
-                    placeholder="Buscar centro de custo…"
+                    placeholder="Selecionar…"
                   />
                 </div>
               </div>

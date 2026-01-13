@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import Input from '@/components/ui/forms/Input';
 import Select from '@/components/ui/forms/Select';
 import TextArea from '@/components/ui/forms/TextArea';
+import CentroDeCustoSelect from '@/components/common/CentroDeCustoSelect';
 import Modal from '@/components/ui/Modal';
 import type { ContaCorrente } from '@/services/treasury';
 import { deleteConciliacaoRegra, listConciliacaoRegras, type ConciliacaoRegra, upsertConciliacaoRegra } from '@/services/conciliacaoRegras';
@@ -245,12 +246,16 @@ export default function ConciliacaoRegrasPanel({ contas, selectedContaId, setSel
             onChange={(e) => setDraft((p) => ({ ...p, categoria: e.target.value }))}
             placeholder="Ex.: Vendas, Tarifas, Impostos..."
           />
-          <Input
-            label="Centro de custo (sugestão)"
-            value={String(draft.centro_custo || '')}
-            onChange={(e) => setDraft((p) => ({ ...p, centro_custo: e.target.value }))}
-            placeholder="Ex.: Comercial, Administrativo..."
-          />
+          <div>
+            <label className="mb-1 block text-sm font-medium text-gray-700">Centro de custo (sugestão)</label>
+            <CentroDeCustoSelect
+              value={null}
+              initialName={draft.centro_custo || undefined}
+              onChange={(_id, name) => setDraft((p) => ({ ...p, centro_custo: (name || '').trim() || null }))}
+              placeholder="Selecionar…"
+            />
+            <div className="mt-1 text-xs text-gray-500">Usado para sugerir o centro nas movimentações geradas.</div>
+          </div>
           <Input
             label="Descrição (override opcional)"
             value={String(draft.descricao_override || '')}
@@ -278,4 +283,3 @@ export default function ConciliacaoRegrasPanel({ contas, selectedContaId, setSel
     </div>
   );
 }
-

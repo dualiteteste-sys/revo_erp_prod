@@ -92,6 +92,22 @@ Princípio: a experiência do usuário é definida pela soma **UI + performance 
 - **Expansão do popover:** o popover do DatePicker só aumenta quando a view de anos/meses está aberta, e volta ao tamanho normal ao fechar.
 - **Uso obrigatório em todo o sistema:** qualquer campo de data deve usar o padrão do sistema (não usar `input type="date"` nativo nem “um datepicker por módulo”).
 
+### 4.1.4 “Estado da Arte” sempre primeiro (regra de comunicação)
+
+Quando o usuário trouxer uma demanda, **sempre** responder primeiro com a proposta “Estado da Arte” (padrão de mercado + melhor UX/arquitetura), e só depois apresentar:
+
+- **MVP mínimo aceitável** (se fizer sentido), com trade-offs claros.
+- **Etapas de entrega** (quando grande), com critérios objetivos de validação.
+- **Impacto em banco/Supabase** (migrations necessárias) e **plano de testes** (unit + E2E, console/network limpos).
+
+### 4.1.5 Onde colocar: Cadastros vs Configurações (regra de IA)
+
+Regra: tudo que é **dado mestre** (master data) que será **selecionado em múltiplos fluxos** deve ficar em **Cadastros**.
+
+- **Cadastros**: listas e entidades reutilizáveis no operacional (ex.: centros de custo, unidades de medida, meios/formas de pagamento/recebimento, serviços, produtos, clientes/fornecedores).
+- **Configurações**: parâmetros do sistema/empresa, permissões, integrações, preferências e políticas (ex.: usuários/roles, integração Stripe/ZapSign, regras fiscais, parâmetros globais).
+- Se houver dúvida: preferir **Cadastros**; só ir para Configurações quando o usuário “não escolhe” aquilo no dia a dia, apenas define uma vez.
+
 ### 4.2 React Hooks (evitar bugs “fantasmas”)
 
 - Tratar warnings de `react-hooks/exhaustive-deps` como prioridade em fluxos críticos.
