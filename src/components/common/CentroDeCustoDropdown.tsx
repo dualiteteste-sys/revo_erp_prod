@@ -38,7 +38,10 @@ export default function CentroDeCustoDropdown({
   const [loading, setLoading] = React.useState(false);
 
   React.useEffect(() => {
-    if (!open || disabled) return;
+    const needsResolveSelected = !!valueId && !(valueName || '').trim();
+    const shouldFetch = open || needsResolveSelected;
+    if (!shouldFetch) return;
+    if (items.length > 0) return;
     let cancelled = false;
     const run = async () => {
       setLoading(true);
@@ -57,7 +60,7 @@ export default function CentroDeCustoDropdown({
     return () => {
       cancelled = true;
     };
-  }, [addToast, disabled, open]);
+  }, [addToast, items.length, open, valueId, valueName]);
 
   const selectedId = React.useMemo(() => {
     if (valueId) return valueId;
