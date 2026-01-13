@@ -8,6 +8,13 @@ export type MeioPagamento = {
   tipo: MeioPagamentoTipo;
 };
 
+export type MeioPagamentoAdminRow = MeioPagamento & {
+  ativo: boolean;
+  is_system: boolean;
+  created_at?: string | null;
+  updated_at?: string | null;
+};
+
 export async function searchMeiosPagamento(params: {
   tipo: MeioPagamentoTipo;
   q: string | null;
@@ -31,3 +38,28 @@ export async function upsertMeioPagamento(payload: { id?: string | null; tipo: M
   });
 }
 
+export async function listMeiosPagamentoAdmin(params: {
+  tipo: MeioPagamentoTipo;
+  q?: string | null;
+  status?: 'all' | 'ativo' | 'inativo';
+  limit?: number;
+}): Promise<MeioPagamentoAdminRow[]> {
+  return callRpc<MeioPagamentoAdminRow[]>('financeiro_meios_pagamento_list', {
+    p_tipo: params.tipo,
+    p_q: params.q ?? null,
+    p_status: params.status ?? 'all',
+    p_limit: params.limit ?? 200,
+  });
+}
+
+export async function setMeioPagamentoAtivo(params: {
+  id: string;
+  tipo: MeioPagamentoTipo;
+  ativo: boolean;
+}): Promise<MeioPagamentoAdminRow> {
+  return callRpc<any>('financeiro_meios_pagamento_set_ativo', {
+    p_id: params.id,
+    p_tipo: params.tipo,
+    p_ativo: params.ativo,
+  });
+}
