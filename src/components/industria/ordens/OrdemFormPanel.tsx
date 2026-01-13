@@ -956,10 +956,26 @@ export default function OrdemFormPanel({
                     openOnMount={false}
                     disabled={isExecucaoGerada || isLockedEffective}
                     onEnsureOrder={ensureOrderSaved}
-                    onApplied={(bom, appliedOrdemId) => {
+                    onApplied={async (bom, appliedOrdemId) => {
+                      const label = bom.codigo ? `${bom.codigo} (v${bom.versao})` : bom.descricao || 'Ficha técnica aplicada';
                       handleHeaderChange('bom_aplicado_id', bom.id);
-                      handleHeaderChange('bom_aplicado_desc', bom.codigo ? `${bom.codigo} (v${bom.versao})` : bom.descricao || 'Ficha técnica aplicada');
-                      loadDetails(appliedOrdemId);
+                      handleHeaderChange('bom_aplicado_desc', label);
+                      try {
+                        const currentId = appliedOrdemId || (await ensureOrderSaved());
+                        if (!currentId) return;
+                        await saveOrdem({
+                          ...formData,
+                          id: currentId,
+                          bom_aplicado_id: bom.id,
+                          bom_aplicado_desc: label,
+                        });
+                        await loadDetails(currentId);
+                        addToast('BOM vinculada com sucesso!', 'success');
+                      } catch (e: any) {
+                        logger.error('[Indústria][OP/OB] Falha ao salvar BOM aplicada', e, { ordemId: formData.id, bomId: bom?.id });
+                        addToast('BOM aplicada, mas falha ao persistir. Tente salvar novamente.', 'warning');
+                        await loadDetails(appliedOrdemId);
+                      }
                     }}
                   />
                 </div>
