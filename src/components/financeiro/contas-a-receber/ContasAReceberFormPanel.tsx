@@ -243,6 +243,7 @@ const ContasAReceberFormPanel: React.FC<ContasAReceberFormPanelProps> = ({ conta
                 }
               }}
               placeholder="Selecionar…"
+              allowedTipos={['receita']}
             />
           </div>
         </Section>

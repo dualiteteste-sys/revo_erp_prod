@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Command, CommandEmpty, CommandGroup, CommandItem, CommandList } from '@/components/ui/command';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { cn } from '@/lib/utils';
-import { listAllCentrosDeCusto, type CentroDeCustoListItem } from '@/services/centrosDeCusto';
+import { listAllCentrosDeCusto, type CentroDeCustoListItem, type TipoCentroCusto } from '@/services/centrosDeCusto';
 import { useToast } from '@/contexts/ToastProvider';
 
 type Props = {
@@ -14,6 +14,7 @@ type Props = {
   disabled?: boolean;
   placeholder?: string;
   includeEmpty?: boolean;
+  allowedTipos?: TipoCentroCusto[] | null;
   className?: string;
 };
 
@@ -23,6 +24,50 @@ function formatCentroLabel(cc: CentroDeCustoListItem) {
   return `${indent}${code}${cc.nome}`.trim();
 }
 
+function isNumericCode(code: string | null | undefined): boolean {
+  const v = String(code ?? '').trim();
+  if (!v) return false;
+  return /^\d+(?:\.\d+)*$/.test(v);
+}
+
+function parseNumericCode(code: string): number[] {
+  return code
+    .split('.')
+    .map((s) => s.trim())
+    .filter(Boolean)
+    .map((s) => Number.parseInt(s, 10))
+    .map((n) => (Number.isFinite(n) ? n : 0));
+}
+
+function compareCentros(a: CentroDeCustoListItem, b: CentroDeCustoListItem, mode: 'numeric_desc' | 'alpha_asc'): number {
+  if (mode === 'alpha_asc') {
+    return String(a.nome ?? '').localeCompare(String(b.nome ?? ''), 'pt-BR', { sensitivity: 'base' });
+  }
+
+  const ac = String(a.codigo ?? '').trim();
+  const bc = String(b.codigo ?? '').trim();
+  if (!ac && !bc) return String(a.nome ?? '').localeCompare(String(b.nome ?? ''), 'pt-BR', { sensitivity: 'base' });
+  if (!ac) return 1;
+  if (!bc) return -1;
+
+  const as = parseNumericCode(ac);
+  const bs = parseNumericCode(bc);
+  const n = Math.max(as.length, bs.length);
+  for (let i = 0; i < n; i += 1) {
+    const av = as[i];
+    const bv = bs[i];
+    if (av === undefined && bv === undefined) break;
+    // Regra: ordenação numérica desc (maior→menor). Se um código é prefixo do outro,
+    // o mais profundo é considerado "maior" (ex.: 3.01.06 antes de 3.01).
+    if (av === undefined) return 1;
+    if (bv === undefined) return -1;
+    if (av !== bv) return bv - av; // desc
+  }
+
+  // fallback estável
+  return String(a.nome ?? '').localeCompare(String(b.nome ?? ''), 'pt-BR', { sensitivity: 'base' });
+}
+
 export default function CentroDeCustoDropdown({
   valueId = null,
   valueName,
@@ -30,6 +75,7 @@ export default function CentroDeCustoDropdown({
   disabled,
   placeholder = 'Selecionar…',
   includeEmpty = true,
+  allowedTipos = null,
   className,
 }: Props) {
   const { addToast } = useToast();
@@ -61,6 +107,16 @@ export default function CentroDeCustoDropdown({
       cancelled = true;
     };
   }, [addToast, items.length, open, valueId, valueName]);
+
+  const filteredSorted = React.useMemo(() => {
+    const filtered = (allowedTipos?.length ? items.filter((cc) => allowedTipos.includes(cc.tipo)) : items).filter(
+      (cc) => (cc.nivel ?? 0) > 0,
+    );
+    const shouldNumeric = filtered.every((cc) => isNumericCode(cc.codigo));
+    const mode: 'numeric_desc' | 'alpha_asc' = shouldNumeric ? 'numeric_desc' : 'alpha_asc';
+
+    return filtered.sort((a, b) => compareCentros(a, b, mode));
+  }, [allowedTipos, items]);
 
   const selectedId = React.useMemo(() => {
     if (valueId) return valueId;
@@ -124,18 +180,27 @@ export default function CentroDeCustoDropdown({
                   </CommandItem>
                 ) : null}
 
-                {items.map((cc) => {
+                {filteredSorted.map((cc) => {
                   const isSelected = !!selectedId && cc.id === selectedId;
                   const label = formatCentroLabel(cc);
+                  const isRoot = (cc.nivel ?? 0) === 0;
                   return (
                     <CommandItem
                       key={cc.id}
                       value={label}
-                      onSelect={() => {
-                        onChange(cc.id, cc.nome);
-                        setOpen(false);
-                      }}
-                      className="flex items-start gap-2 py-2"
+                      onSelect={
+                        isRoot
+                          ? undefined
+                          : () => {
+                              onChange(cc.id, cc.nome);
+                              setOpen(false);
+                            }
+                      }
+                      disabled={isRoot}
+                      className={cn(
+                        'flex items-start gap-2 py-2',
+                        isRoot && 'cursor-default opacity-70',
+                      )}
                     >
                       <span
                         className={cn(
@@ -144,9 +209,9 @@ export default function CentroDeCustoDropdown({
                         )}
                         aria-hidden
                       >
-                        {isSelected ? <Check className="h-3.5 w-3.5" /> : null}
+                        {!isRoot && isSelected ? <Check className="h-3.5 w-3.5" /> : null}
                       </span>
-                      <span className="truncate text-sm font-medium text-gray-800">{label}</span>
+                      <span className={cn('truncate text-sm font-medium text-gray-800', isRoot && 'font-semibold text-gray-700')}>{label}</span>
                     </CommandItem>
                   );
                 })}
