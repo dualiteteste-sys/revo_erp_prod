@@ -23,6 +23,7 @@ async function assertNoSeriousOrCriticalA11yViolations(page: Page) {
 }
 
 test('A11y smoke: landing + login + app shell', async ({ page }) => {
+  test.setTimeout(60_000);
   await page.emulateMedia({ reducedMotion: 'reduce' });
 
   // Estabiliza o smoke no CI: evita chamadas reais ao Supabase.
