@@ -82,7 +82,6 @@ export const menuConfig: MenuItem[] = [
       { name: 'Controle de Estoques', icon: Warehouse, href: '/app/suprimentos/estoque', permission: { domain: 'suprimentos', action: 'view' } },
       { name: 'Ordens de Compra', icon: ShoppingCart, href: '/app/suprimentos/compras', permission: { domain: 'suprimentos', action: 'view' } },
       { name: 'Recebimentos', icon: PackageCheck, href: '/app/suprimentos/recebimentos', permission: { domain: 'suprimentos', action: 'view' } },
-      { name: 'Importar XML', icon: FileUp, href: '/app/nfe-input' },
       { name: 'Relatórios', icon: BarChart2, href: '/app/suprimentos/relatorios', permission: { domain: 'suprimentos', action: 'view' } },
     ]
   },
@@ -98,7 +97,6 @@ export const menuConfig: MenuItem[] = [
       { name: 'Metas de Vendas', icon: Target, href: '/app/vendas/metas', permission: { domain: 'vendas', action: 'view' } },
       { name: 'Propostas Comerciais', icon: FileSignature, href: '/app/vendas/propostas' },
       { name: 'PDV', icon: Store, href: '/app/vendas/pdv' },
-      { name: 'Notas Fiscais (NF-e)', icon: Receipt, href: '/app/fiscal/nfe' },
       { name: 'Expedição', icon: Truck, href: '/app/vendas/expedicao' },
       { name: 'Comissões', icon: Percent, href: '/app/vendas/comissoes' },
       { name: 'Painel de Automações', icon: Bot, href: '/app/vendas/automacoes' },
