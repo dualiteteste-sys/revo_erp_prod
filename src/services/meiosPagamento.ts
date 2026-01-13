@@ -63,3 +63,19 @@ export async function setMeioPagamentoAtivo(params: {
     p_ativo: params.ativo,
   });
 }
+
+export async function bulkUpsertMeiosPagamento(params: {
+  tipo: MeioPagamentoTipo;
+  nomes: string[];
+  ativo: boolean;
+  limit?: number;
+}): Promise<{ ok: boolean; tipo: string; ativo: boolean; total: number; inserted: number; updated: number }> {
+  return callRpc<any>('financeiro_meios_pagamento_bulk_upsert', {
+    p_payload: {
+      tipo: params.tipo,
+      ativo: params.ativo,
+      nomes: params.nomes,
+      limit: params.limit ?? 500,
+    },
+  });
+}
