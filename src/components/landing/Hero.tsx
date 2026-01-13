@@ -57,11 +57,10 @@ const Hero: React.FC = () => {
                 transition={{ delay: 0.05, duration: 2, ease: [0.16, 1, 0.3, 1] }}
                 className="inline-block [transform-style:preserve-3d]"
               >
-                Um ERP{' '}
+                O ERP para empresários{' '}
                 <span className="bg-gradient-to-r from-blue-700 via-sky-500 to-indigo-600 bg-clip-text text-transparent">
-                  Simples
-                </span>{' '}
-                de usar.
+                  Diferentes.
+                </span>
               </motion.div>
               <br />
               <motion.div
@@ -71,7 +70,10 @@ const Hero: React.FC = () => {
                 transition={{ delay: 0.32, duration: 2, ease: [0.16, 1, 0.3, 1] }}
                 className="inline-block [transform-style:preserve-3d]"
               >
-                Mas poderoso no CORE.
+                E empresas{' '}
+                <span className="bg-gradient-to-r from-indigo-700 via-sky-500 to-blue-700 bg-clip-text text-transparent">
+                  DIFERENCIADAS.
+                </span>
               </motion.div>
             </motion.h1>
             <motion.p
@@ -93,7 +95,7 @@ const Hero: React.FC = () => {
                 onClick={scrollToPricing}
                 className="px-6 py-3 rounded-full bg-blue-700 text-white font-semibold hover:bg-blue-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-700 transition-colors"
               >
-                Começar teste grátis
+                Experimente nossa versão beta por 6 meses grátis.
               </button>
               <a
                 href="#pricing"
@@ -108,9 +110,9 @@ const Hero: React.FC = () => {
           transition={{ duration: 0.6, delay: 0.85 }}
               className="mt-8 flex justify-center lg:justify-start items-center gap-4 text-slate-600 flex-wrap"
             >
-              <span className="flex items-center gap-1.5"><CheckCircle size={16} className="text-emerald-600" /> Sem cartão</span>
-              <span className="flex items-center gap-1.5"><CheckCircle size={16} className="text-emerald-600" /> Onboarding guiado</span>
-              <span className="flex items-center gap-1.5"><CheckCircle size={16} className="text-emerald-600" /> Cresce por módulos</span>
+              <span className="flex items-center gap-1.5"><CheckCircle size={16} className="text-emerald-600" /> Primeiro uso rápido</span>
+              <span className="flex items-center gap-1.5"><CheckCircle size={16} className="text-emerald-600" /> Assistente guiado.</span>
+              <span className="flex items-center gap-1.5"><CheckCircle size={16} className="text-emerald-600" /> Cresce por demanda.</span>
             </motion.div>
           </div>
 
