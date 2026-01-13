@@ -294,6 +294,7 @@ const ContasPagarFormPanel: React.FC<ContasPagarFormPanelProps> = ({ conta, onSa
                 if (name) handleFormChange('centro_custo' as any, name);
               }}
               placeholder="Selecionar…"
+              allowedTipos={['custo_fixo', 'custo_variavel', 'investimento']}
             />
             <div className="mt-1 text-xs text-gray-500">
               Dica: o campo legado <span className="font-medium">centro_custo</span> ainda existe para compatibilidade; ao selecionar aqui, ele é preenchido automaticamente.
