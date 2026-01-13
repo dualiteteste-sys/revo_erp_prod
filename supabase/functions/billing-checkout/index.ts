@@ -9,6 +9,15 @@ function requireEnv(name: string): string | null {
   return v ? v : null;
 }
 
+function parseTrialDays(): number {
+  const raw = (Deno.env.get("BILLING_TRIAL_DAYS") ?? "").trim();
+  // Default para fase beta.
+  const fallback = 180;
+  const n = raw ? Number.parseInt(raw, 10) : fallback;
+  if (!Number.isFinite(n) || Number.isNaN(n)) return fallback;
+  return Math.max(0, Math.min(3650, n));
+}
+
 function pickSiteUrl(req: Request): string | null {
   const envUrl = (Deno.env.get("SITE_URL") ?? "").trim();
 
@@ -229,7 +238,8 @@ Deno.serve(async (req) => {
     }
 
     // 7) Checkout session (trial via código)
-    let allowTrial = !!trial;
+    const trialDays = parseTrialDays();
+    let allowTrial = typeof trial === 'boolean' ? trial : trialDays > 0;
     if (allowTrial) {
       try {
         const existing = await stripe.subscriptions.list({ customer: customerId, status: "all", limit: 1 });
@@ -244,13 +254,19 @@ Deno.serve(async (req) => {
     const session = await stripe.checkout.sessions.create({
       mode: "subscription",
       customer: customerId,
+      // Estado da arte SaaS: coleta forma de pagamento mesmo em trial (evita churn no fim do beta).
+      payment_method_collection: allowTrial ? "always" : "if_required",
       line_items: [{ price: priceId, quantity: 1 }],
       allow_promotion_codes: true,
       success_url: `${siteUrl}/app/billing/success?session_id={CHECKOUT_SESSION_ID}`,
       cancel_url:  `${siteUrl}/app/billing/cancel`,
       metadata: { empresa_id, plan_slug: String(plan_slug).toUpperCase(), billing_cycle, kind: 'subscription' },
       subscription_data: {
-        ...(allowTrial ? { trial_period_days: 30 } : {}),
+        ...(allowTrial ? { trial_period_days: trialDays } : {}),
+        ...(allowTrial
+          ? { trial_settings: { end_behavior: { missing_payment_method: "cancel" } } }
+          : {}),
+        payment_settings: { save_default_payment_method: "on_subscription" },
         metadata: { empresa_id, plan_slug: String(plan_slug).toUpperCase(), billing_cycle },
       },
     });
