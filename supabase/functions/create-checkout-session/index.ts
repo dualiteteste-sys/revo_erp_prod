@@ -11,6 +11,14 @@ const supabaseAdmin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
   auth: { autoRefreshToken: false, persistSession: false },
 });
 
+function parseTrialDays(): number {
+  const raw = (Deno.env.get("BILLING_TRIAL_DAYS") ?? "").trim();
+  const fallback = 180;
+  const n = raw ? Number.parseInt(raw, 10) : fallback;
+  if (!Number.isFinite(n) || Number.isNaN(n)) return fallback;
+  return Math.max(0, Math.min(3650, n));
+}
+
 function buildCorsHeaders(req: Request) {
   const origin = req.headers.get("origin") || "";
   const acrh = req.headers.get("access-control-request-headers") || "";
@@ -107,14 +115,18 @@ Deno.serve(async (req) => {
       }
     }
 
+    const trialDays = parseTrialDays();
     const session = await stripe.checkout.sessions.create({
       mode: "subscription",
       success_url: `${SITE_URL}/app/billing/success?session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${SITE_URL}/app/settings`,
       customer: customerId,
+      payment_method_collection: trialDays > 0 ? "always" : "if_required",
       line_items: [{ price: plan.stripe_price_id, quantity: 1 }],
       subscription_data: {
-        trial_period_days: 30,
+        ...(trialDays > 0 ? { trial_period_days: trialDays } : {}),
+        ...(trialDays > 0 ? { trial_settings: { end_behavior: { missing_payment_method: "cancel" } } } : {}),
+        payment_settings: { save_default_payment_method: "on_subscription" },
         metadata: { empresa_id },
       },
       metadata: { empresa_id },

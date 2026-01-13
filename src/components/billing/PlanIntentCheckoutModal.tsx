@@ -152,7 +152,7 @@ export function PlanIntentCheckoutModal() {
           <DialogTitle>Ativar teste grátis</DialogTitle>
           <DialogDescription>
             Você escolheu o plano <span className="font-semibold">{intent.planSlug}</span> ({" "}
-            {intent.billingCycle === "yearly" ? "anual" : "mensal"}). Para liberar o teste grátis de 30 dias, finalize a
+            {intent.billingCycle === "yearly" ? "anual" : "mensal"}). Para liberar o teste grátis (fase beta), finalize a
             assinatura no Stripe.
           </DialogDescription>
         </DialogHeader>
