@@ -2,7 +2,8 @@ import React from 'react';
 import Modal from '@/components/ui/Modal';
 import Input from '@/components/ui/forms/Input';
 import Select from '@/components/ui/forms/Select';
-import { Switch } from '@/components/ui/switch';
+import Section from '@/components/ui/forms/Section';
+import Toggle from '@/components/ui/forms/Toggle';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/contexts/ToastProvider';
 import { MeioPagamentoAdminRow, MeioPagamentoTipo, upsertMeioPagamento } from '@/services/meiosPagamento';
@@ -59,43 +60,73 @@ export default function MeioPagamentoFormPanel({ open, onClose, initial, default
 
   return (
     <Modal isOpen={open} onClose={onClose} title={isEdit ? 'Editar meio' : 'Novo meio'} size="md">
-      <div className="space-y-4">
-        <Select
-          value={tipo}
-          onChange={(e) => setTipo(e.target.value as MeioPagamentoTipo)}
-          disabled={saving || isEdit}
-        >
-          <option value="pagamento">Pagamento</option>
-          <option value="recebimento">Recebimento</option>
-        </Select>
+      <div className="flex flex-col h-full">
+        <div className="flex-grow p-6 overflow-y-auto scrollbar-styled">
+          <Section
+            title="Dados do meio"
+            description="Defina como este meio aparecerá nos lançamentos. Itens padrão do sistema podem ser ativados/inativados."
+          >
+            <Select
+              name="tipo"
+              label="Tipo"
+              value={tipo}
+              onChange={(e) => setTipo(e.target.value as MeioPagamentoTipo)}
+              disabled={saving || isEdit}
+              className="sm:col-span-3"
+              required
+            >
+              <option value="pagamento">Pagamento</option>
+              <option value="recebimento">Recebimento</option>
+            </Select>
 
-        <Input
-          name="nome"
-          label="Nome"
-          placeholder="Ex.: Pix, Boleto, Cartão…"
-          value={nome}
-          onChange={(e) => setNome(e.target.value)}
-          disabled={saving || (isEdit && !canEdit)}
-        />
+            <Input
+              name="nome"
+              label="Nome"
+              placeholder="Ex.: Pix, Boleto, Cartão…"
+              value={nome}
+              onChange={(e) => setNome(e.target.value)}
+              disabled={saving || (isEdit && !canEdit)}
+              className="sm:col-span-6"
+              required
+            />
 
-        <div className="flex items-center justify-between rounded-lg border border-gray-200 bg-white/70 px-4 py-3">
-          <div>
-            <div className="text-sm font-medium text-gray-900">Ativo</div>
-            <div className="text-xs text-gray-500">Disponível para seleção nos formulários.</div>
+            <div className="sm:col-span-6">
+              <Toggle
+                label="Ativo"
+                name="ativo"
+                checked={ativo}
+                onChange={setAtivo}
+                description="Disponível para seleção nos formulários."
+              />
+            </div>
+
+            {isEdit && !canEdit ? (
+              <div className="sm:col-span-6 rounded-xl bg-yellow-50 border border-yellow-200 px-4 py-3 text-sm text-yellow-800">
+                Este é um item padrão do sistema. Você pode ativar/inativar, mas não editar o nome.
+              </div>
+            ) : null}
+          </Section>
+        </div>
+
+        <footer className="flex-shrink-0 p-4 flex justify-end items-center border-t border-white/20">
+          <div className="flex gap-3">
+            <button
+              onClick={onClose}
+              disabled={saving}
+              className="rounded-md border border-gray-300 bg-white py-2 px-4 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50 disabled:opacity-60"
+            >
+              Cancelar
+            </button>
+            <button
+              onClick={handleSubmit}
+              disabled={saving}
+              className="bg-blue-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-blue-700 disabled:opacity-50"
+            >
+              {saving ? 'Salvando…' : 'Salvar'}
+            </button>
           </div>
-          <Switch checked={ativo} onCheckedChange={setAtivo} disabled={saving} />
-        </div>
-
-        <div className="flex justify-end gap-2 pt-2">
-          <Button variant="outline" onClick={onClose} disabled={saving}>
-            Cancelar
-          </Button>
-          <Button onClick={handleSubmit} disabled={saving}>
-            {saving ? 'Salvando…' : 'Salvar'}
-          </Button>
-        </div>
+        </footer>
       </div>
     </Modal>
   );
 }
-

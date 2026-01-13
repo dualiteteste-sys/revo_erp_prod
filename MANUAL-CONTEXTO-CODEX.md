@@ -92,6 +92,20 @@ Princípio: a experiência do usuário é definida pela soma **UI + performance 
 - **Expansão do popover:** o popover do DatePicker só aumenta quando a view de anos/meses está aberta, e volta ao tamanho normal ao fechar.
 - **Uso obrigatório em todo o sistema:** qualquer campo de data deve usar o padrão do sistema (não usar `input type="date"` nativo nem “um datepicker por módulo”).
 
+### 4.1.6 “Qualidade de Frontend” como regra (não-negociável)
+
+Objetivo: manter consistência visual e velocidade de entrega sem “matar” a qualidade do front.
+
+- **Source of truth**: antes de criar “mais um modal/form”, procure e reutilize padrões existentes (ex.: `Modal`, `Section`, `Input`, `Select`, `Toggle/Switch`, `GlassCard`, `ResizableSortableTh`).
+- **Padrão preferido**: quando o formulário tem poucos campos e o usuário pode cadastrar muitos itens, preferir **cadastro em lista/inline** + **Adicionar em massa** em vez de modal de 3 campos.
+- **Espaçamento e bordas**: priorizar “respiro” (padding generoso) e cantos consistentes; evitar layouts “apertados” ou sem hierarquia visual.
+- **Consistência**: não introduzir novo estilo local sem necessidade; se a UI exige um ajuste global, faça-o no componente base (design system) e reaplique em todos os módulos.
+- **Critério de pronto (front)**:
+  - “Console limpo” e “Network limpo” (sem 4xx/5xx) no fluxo principal.
+  - UX sem fricção: foco/teclado funcionando, salvar sem recarregar, feedback claro (loading/toast).
+  - Tests: pelo menos 1 smoke E2E para a rota nova + `yarn test --run`.
+- **Regra anti-regressão**: qualquer novo módulo deve parecer “nativo” do REVO (mesma densidade visual, mesmos componentes, mesmos padrões de tabela/form).
+
 ### 4.1.4 “Estado da Arte” sempre primeiro (regra de comunicação)
 
 Quando o usuário trouxer uma demanda, **sempre** responder primeiro com a proposta “Estado da Arte” (padrão de mercado + melhor UX/arquitetura), e só depois apresentar:
