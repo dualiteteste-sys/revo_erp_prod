@@ -64,11 +64,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const activeEmpresa = useMemo(() => {
     const found = empresas.find((e) => e.id === activeEmpresaId) || null;
-    console.log('[AuthProvider] activeEmpresa calc:', {
-      empresasCount: empresas.length,
-      activeEmpresaId,
-      foundId: found?.id
-    });
+    if ((import.meta as any).env?.DEV) {
+      // apenas dev: evita poluir console em produção e nos testes e2e de "console limpo"
+      console.log('[AuthProvider] activeEmpresa calc:', {
+        empresasCount: empresas.length,
+        activeEmpresaId,
+        foundId: found?.id
+      });
+    }
     return found;
   }, [empresas, activeEmpresaId]);
 

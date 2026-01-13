@@ -1,13 +1,13 @@
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
-import { Loader2, Mail, Lock, User } from 'lucide-react';
+import { Loader2, Mail, Lock, Building2 } from 'lucide-react';
 import { useToast } from '@/contexts/ToastProvider';
 import { signUpWithEmail } from '@/lib/auth';
 import Input from '@/components/ui/forms/Input';
 
 const SignUpPage: React.FC = () => {
-  const [name, setName] = useState('');
+  const [companyName, setCompanyName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
@@ -26,7 +26,7 @@ const SignUpPage: React.FC = () => {
     try {
       // We can pass metadata like name directly if the auth function supports it,
       // otherwise it's handled post-signup via triggers or profile updates.
-      const res = await signUpWithEmail(email, password);
+      const res = await signUpWithEmail(email, password, companyName);
       const identitiesLen = res?.user?.identities?.length ?? null;
 
       // Supabase pode retornar "sucesso" com identities vazias quando o e-mail já existe
@@ -44,6 +44,7 @@ const SignUpPage: React.FC = () => {
       
       try {
         localStorage.setItem('pending_signup_email', email.trim().toLowerCase());
+        if (companyName.trim()) localStorage.setItem('pending_company_name', companyName.trim());
       } catch {
         // ignore
       }
@@ -78,15 +79,15 @@ const SignUpPage: React.FC = () => {
       <form onSubmit={handleSignUp} className="space-y-4">
         <div>
           <Input
-            label="Nome Completo"
+            label="Empresa"
             id="name-signup"
             name="name"
             type="text"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
+            value={companyName}
+            onChange={(e) => setCompanyName(e.target.value)}
             required
-            placeholder="Seu nome"
-            startAdornment={<User size={20} />}
+            placeholder="Nome da sua empresa"
+            startAdornment={<Building2 size={20} />}
           />
         </div>
         <div>

@@ -25,6 +25,26 @@ export default function Callback() {
       console.log("[AUTH][CALLBACK] hasSession:", !!first?.data?.session);
 
       try {
+        // Preferir nome da empresa vindo do signup (metadata/localStorage).
+        let empresaNome: string | null = null;
+        try {
+          const { data } = await supabase.auth.getUser();
+          const meta: any = (data?.user as any)?.user_metadata ?? {};
+          if (typeof meta.company_name === "string" && meta.company_name.trim()) {
+            empresaNome = meta.company_name.trim();
+          }
+        } catch {
+          // ignore
+        }
+        if (!empresaNome) {
+          try {
+            const ls = localStorage.getItem("pending_company_name");
+            if (ls && ls.trim()) empresaNome = ls.trim();
+          } catch {
+            // ignore
+          }
+        }
+
         // 1) Bootstrap de empresa para o usuário atual (idempotente)
         let ok = false;
         let lastErr: any = null;
@@ -32,7 +52,10 @@ export default function Callback() {
         for (let i = 0; i < RETRIES_MS.length; i++) {
           const { error } = await supabase.rpc(
             "secure_bootstrap_empresa_for_current_user",
-            { p_razao_social: "Empresa sem Nome", p_fantasia: null }
+            {
+              p_razao_social: empresaNome || "Empresa sem Nome",
+              p_fantasia: empresaNome || null,
+            }
           );
 
           if (error) {
@@ -59,6 +82,12 @@ export default function Callback() {
 
         if (prefErr) console.warn("[AUTH][CALLBACK][PREF][WARN]", prefErr);
         console.log("[AUTH][CALLBACK] success", pref?.[0] ?? null);
+
+        try {
+          localStorage.removeItem("pending_company_name");
+        } catch {
+          // ignore
+        }
 
         if (!cancelled) navigate("/app", { replace: true });
       } catch (e: any) {

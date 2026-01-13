@@ -73,10 +73,20 @@ export function useBootstrapEmpresa() {
     return useMutation({
         mutationFn: async () => {
             logger.info("[MUTATION][bootstrap] start");
+            let companyName: string | null = null;
+            try {
+                const { data } = await supabase.auth.getUser();
+                const meta: any = (data?.user as any)?.user_metadata ?? {};
+                if (typeof meta.company_name === "string" && meta.company_name.trim()) {
+                    companyName = meta.company_name.trim();
+                }
+            } catch {
+                // ignore
+            }
             // @ts-ignore - RPC types mismatch
             const { data, error } = await supabase.rpc("secure_bootstrap_empresa_for_current_user", {
-                p_razao_social: "Empresa sem Nome",
-                p_fantasia: null,
+                p_razao_social: companyName || "Empresa sem Nome",
+                p_fantasia: companyName || null,
             });
 
             if (error) {

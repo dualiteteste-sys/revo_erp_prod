@@ -16,13 +16,15 @@ function emailConfirmRedirect(): string {
  * Faz signup por e-mail/senha.
  * O e-mail de confirmação será enviado para a URL de produção.
  */
-export async function signUpWithEmail(email: string, password: string) {
+export async function signUpWithEmail(email: string, password: string, companyName?: string) {
   logger.info("[AUTH] signUpWithEmail", { email });
+  const company = (companyName ?? "").trim();
   const { data, error } = await supabase.auth.signUp({
     email,
     password,
     options: {
       emailRedirectTo: emailConfirmRedirect(),
+      data: company ? { company_name: company } : undefined,
     },
   });
   if (error) {

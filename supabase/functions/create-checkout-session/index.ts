@@ -126,7 +126,6 @@ Deno.serve(async (req) => {
       subscription_data: {
         ...(trialDays > 0 ? { trial_period_days: trialDays } : {}),
         ...(trialDays > 0 ? { trial_settings: { end_behavior: { missing_payment_method: "cancel" } } } : {}),
-        payment_settings: { save_default_payment_method: "on_subscription" },
         metadata: { empresa_id },
       },
       metadata: { empresa_id },
