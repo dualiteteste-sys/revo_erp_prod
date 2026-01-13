@@ -1,5 +1,5 @@
 import React from 'react';
-import { Banknote, Edit3, Plus, Search, Lock, ListPlus, Loader2 } from 'lucide-react';
+import { Banknote, Edit3, Plus, Search, Lock, ListPlus, Loader2, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import Input from '@/components/ui/forms/Input';
 import Select from '@/components/ui/forms/Select';
@@ -8,6 +8,7 @@ import Modal from '@/components/ui/Modal';
 import Section from '@/components/ui/forms/Section';
 import Toggle from '@/components/ui/forms/Toggle';
 import { useToast } from '@/contexts/ToastProvider';
+import { useConfirm } from '@/contexts/ConfirmProvider';
 import ResizableSortableTh, { type SortState } from '@/components/ui/table/ResizableSortableTh';
 import TableColGroup from '@/components/ui/table/TableColGroup';
 import { useTableColumnWidths, type TableColumnWidthDef } from '@/components/ui/table/useTableColumnWidths';
@@ -17,6 +18,7 @@ import {
   MeioPagamentoAdminRow,
   MeioPagamentoTipo,
   bulkUpsertMeiosPagamento,
+  deleteMeioPagamento,
   listMeiosPagamentoAdmin,
   setMeioPagamentoAtivo,
   upsertMeioPagamento,
@@ -30,6 +32,7 @@ type NewRowState = {
 
 export default function MeiosPagamentoPage() {
   const { addToast } = useToast();
+  const { confirm } = useConfirm();
 
   const [tipo, setTipo] = React.useState<MeioPagamentoTipo>('pagamento');
   const [statusFilter, setStatusFilter] = React.useState<'all' | 'ativo' | 'inativo'>('all');
@@ -129,6 +132,30 @@ export default function MeiosPagamentoPage() {
       addToast(msg, 'error');
     } finally {
       setSavingId(null);
+    }
+  };
+
+  const handleDelete = async (r: MeioPagamentoAdminRow) => {
+    if (r.is_system) {
+      addToast('Não é possível excluir meios padrão do sistema.', 'error');
+      return;
+    }
+    const ok = await confirm({
+      title: 'Excluir meio',
+      description: `Deseja excluir "${r.nome}"? Só será possível se nunca tiver sido utilizado.`,
+      confirmText: 'Excluir',
+      cancelText: 'Cancelar',
+      variant: 'danger',
+    });
+    if (!ok) return;
+
+    try {
+      await deleteMeioPagamento({ id: r.id, tipo: r.tipo });
+      addToast('Meio excluído.', 'success');
+      await load();
+    } catch (e: any) {
+      const msg = String(e?.message || e || 'Não foi possível excluir.');
+      addToast(msg, 'error');
     }
   };
 
@@ -404,14 +431,24 @@ export default function MeiosPagamentoPage() {
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                      <button
-                        onClick={() => startEdit(r)}
-                        className={r.is_system ? 'text-gray-300 cursor-not-allowed' : 'text-blue-600 hover:text-blue-900'}
-                        title={r.is_system ? 'Padrão do sistema' : 'Editar nome'}
-                        disabled={r.is_system || savingId === r.id}
-                      >
-                        <Edit3 size={18} />
-                      </button>
+                      <div className="flex justify-end items-center gap-3">
+                        <button
+                          onClick={() => startEdit(r)}
+                          className={r.is_system ? 'text-gray-300 cursor-not-allowed' : 'text-blue-600 hover:text-blue-900'}
+                          title={r.is_system ? 'Padrão do sistema' : 'Editar nome'}
+                          disabled={r.is_system || savingId === r.id}
+                        >
+                          <Edit3 size={18} />
+                        </button>
+                        <button
+                          onClick={() => void handleDelete(r)}
+                          className={r.is_system ? 'text-gray-300 cursor-not-allowed' : 'text-red-600 hover:text-red-800'}
+                          title={r.is_system ? 'Padrão do sistema' : 'Excluir (se nunca usado)'}
+                          disabled={r.is_system}
+                        >
+                          <Trash2 size={18} />
+                        </button>
+                      </div>
                     </td>
                   </tr>
                   ))}

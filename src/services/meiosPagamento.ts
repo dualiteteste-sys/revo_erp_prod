@@ -79,3 +79,10 @@ export async function bulkUpsertMeiosPagamento(params: {
     },
   });
 }
+
+export async function deleteMeioPagamento(params: { id: string; tipo: MeioPagamentoTipo }): Promise<{ ok: boolean; id: string }> {
+  return callRpc<any>('financeiro_meios_pagamento_delete', {
+    p_id: params.id,
+    p_tipo: params.tipo,
+  });
+}
