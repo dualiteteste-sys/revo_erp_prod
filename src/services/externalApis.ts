@@ -1,5 +1,6 @@
 import axios from 'axios';
 import { withRetry } from '@/lib/retry';
+import { supabase } from '@/lib/supabase';
 
 const http = axios.create({
   timeout: 12000,
@@ -68,17 +69,29 @@ export const fetchCnpjData = async (cnpj: string): Promise<Partial<CnpjData>> =>
   if (cleanedCnpj.length !== 14) {
     throw new Error('CNPJ inválido. Deve conter 14 dígitos.');
   }
+
+  // Preferimos Edge Function (proxy) para manter Network/Console limpos e evitar CORS/404 no browser.
   try {
-    const { data } = await withRetry(
-      async () => http.get<CnpjData>(`https://brasilapi.com.br/api/cnpj/v1/${cleanedCnpj}`),
-      { maxAttempts: 3, shouldRetry: isRetryableHttpError }
-    );
-    return data;
-  } catch (error: any) {
-    if (error.response && error.response.status === 404) {
-      throw new Error('CNPJ não encontrado na base da Receita Federal.');
+    const { data, error } = await supabase.functions.invoke('cnpj-lookup', { body: { cnpj: cleanedCnpj } });
+    if (error) throw error;
+    if (!data?.ok) {
+      throw new Error(String(data?.message || 'CNPJ não encontrado.'));
     }
-    throw new Error('Falha ao consultar o CNPJ. Verifique sua conexão.');
+    return (data?.data ?? {}) as Partial<CnpjData>;
+  } catch (e: any) {
+    // Fallback (último recurso) para não quebrar DEV caso a Edge Function não esteja disponível.
+    try {
+      const { data } = await withRetry(
+        async () => http.get<CnpjData>(`https://brasilapi.com.br/api/cnpj/v1/${cleanedCnpj}`),
+        { maxAttempts: 3, shouldRetry: isRetryableHttpError }
+      );
+      return data;
+    } catch (error: any) {
+      if (error.response && error.response.status === 404) {
+        throw new Error('CNPJ não encontrado na base da Receita Federal.');
+      }
+      throw new Error(e?.message || 'Falha ao consultar o CNPJ. Verifique sua conexão.');
+    }
   }
 };
 
