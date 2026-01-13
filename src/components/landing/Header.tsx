@@ -52,10 +52,19 @@ const Header: React.FC<HeaderProps> = ({ onLoginClick }) => {
       >
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16">
-            <div className="flex-shrink-0">
+            <div className="flex-shrink-0 flex items-center gap-3">
               <Link to="/" aria-label="REVO ERP Home">
                 <RevoLogo className="h-7 w-auto text-gray-900" />
               </Link>
+              <div className="flex items-center">
+                <span className="hidden sm:inline-flex items-center gap-2 rounded-full bg-blue-600/10 text-blue-700 px-3 py-1 text-xs font-semibold ring-1 ring-blue-600/20">
+                  <span className="inline-flex h-2 w-2 rounded-full bg-blue-600" aria-hidden="true" />
+                  Versão beta
+                </span>
+                <span className="inline-flex sm:hidden items-center rounded-full bg-blue-600/10 text-blue-700 px-2.5 py-1 text-[11px] font-semibold ring-1 ring-blue-600/20">
+                  BETA
+                </span>
+              </div>
             </div>
             <nav className="hidden md:flex items-center space-x-8">
               <div className="relative" onMouseEnter={() => setIsProductsMenuOpen(true)} onMouseLeave={() => setIsProductsMenuOpen(false)}>

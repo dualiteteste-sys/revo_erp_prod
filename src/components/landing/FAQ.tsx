@@ -4,8 +4,8 @@ import { motion, AnimatePresence } from 'framer-motion';
 
 const faqs = [
   {
-    question: 'Como funciona o período de teste grátis de 30 dias?',
-    answer: 'Você pode usar todos os recursos do plano escolhido por 30 dias, sem compromisso. Nenhum cartão de crédito é necessário para iniciar. Ao final do período, você pode escolher assinar um plano para continuar usando o REVO ERP.',
+    question: 'Como funciona o período de teste de 180 dias?',
+    answer: 'Se trata de uma oportunidade única. Você pode usar todos os recursos do plano escolhido por 180 dias, sem compromisso. Por se tratar de uma versão beta, o sistema ainda pode conter erros, mas nosso suporte está pronto para resolvê-los em até 1 dia útil. Ao final do período, você pode escolher continuar com o plano ou continuar usando o REVO ERP. Para clientes que já possuem planos de outros sistemas com a REVO nosso compromisso é manter o mesmo valor que já vem sendo pago atualmente por 6 meses para qualquer plano escolhido.',
   },
   {
     question: 'Posso cancelar minha assinatura a qualquer momento?',
@@ -18,6 +18,14 @@ const faqs = [
   {
     question: 'Vocês ajudam na migração dos meus dados atuais?',
     answer: 'Sim! Oferecemos ferramentas de importação via planilhas para cadastros de clientes, fornecedores e produtos. Para operações mais complexas, nossos planos Max e Ultra incluem suporte para uma implementação guiada ou personalizada.',
+  },
+  {
+    question: 'Já tenho um plano assinado com a Revo, como funciona nesse caso?',
+    answer: 'Todas as nossas assinaturas anteriores foram fechadas com parâmetros específicos com base em nossos custos, além do suporte prioritário. Sendo assim, não haverá redução de valores, mas nos comprometemos a manter o mesmo valor pago atualmente pelo plano escolhido durante os próximos 6 meses.',
+  },
+  {
+    question: 'Como funciona o suporte em tempo real?',
+    answer: 'O suporte prioritário (em tempo real, via WhatsApp) pode ser contratado separadamente por R$98,00 / mês. Ao cancelar, você terá acesso ao suporte até o final do período já faturado.',
   },
 ];
 

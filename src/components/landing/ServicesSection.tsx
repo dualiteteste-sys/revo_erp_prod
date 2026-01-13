@@ -1,4 +1,5 @@
 import React from 'react';
+import { motion } from 'framer-motion';
 import { CalendarClock, FileText, HandCoins, Wrench } from 'lucide-react';
 import GlassCard from '@/components/ui/GlassCard';
 
@@ -27,7 +28,13 @@ const ServicesSection: React.FC = () => {
   ];
 
   return (
-    <section className="py-16 md:py-24">
+    <motion.section
+      className="pt-0 pb-5"
+      initial={{ opacity: 0, scale: 0.985 }}
+      whileInView={{ opacity: 1, scale: 1 }}
+      viewport={{ once: true, amount: 0.25 }}
+      transition={{ duration: 1 }}
+    >
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="relative overflow-hidden rounded-[32px] border border-slate-200 bg-white/70 backdrop-blur">
           <div className="pointer-events-none absolute inset-0">
@@ -67,9 +74,8 @@ const ServicesSection: React.FC = () => {
           </div>
         </div>
       </div>
-    </section>
+    </motion.section>
   );
 };
 
 export default ServicesSection;
-
