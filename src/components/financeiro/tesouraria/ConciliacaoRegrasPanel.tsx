@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import Input from '@/components/ui/forms/Input';
 import Select from '@/components/ui/forms/Select';
 import TextArea from '@/components/ui/forms/TextArea';
-import CentroDeCustoSelect from '@/components/common/CentroDeCustoSelect';
+import CentroDeCustoDropdown from '@/components/common/CentroDeCustoDropdown';
 import Modal from '@/components/ui/Modal';
 import type { ContaCorrente } from '@/services/treasury';
 import { deleteConciliacaoRegra, listConciliacaoRegras, type ConciliacaoRegra, upsertConciliacaoRegra } from '@/services/conciliacaoRegras';
@@ -248,9 +248,8 @@ export default function ConciliacaoRegrasPanel({ contas, selectedContaId, setSel
           />
           <div>
             <label className="mb-1 block text-sm font-medium text-gray-700">Centro de custo (sugestão)</label>
-            <CentroDeCustoSelect
-              value={null}
-              initialName={draft.centro_custo || undefined}
+            <CentroDeCustoDropdown
+              valueName={draft.centro_custo || null}
               onChange={(_id, name) => setDraft((p) => ({ ...p, centro_custo: (name || '').trim() || null }))}
               placeholder="Selecionar…"
             />

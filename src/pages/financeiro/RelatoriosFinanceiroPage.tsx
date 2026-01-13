@@ -20,7 +20,7 @@ import {
   type FinanceiroRelatoriosResumo,
 } from '@/services/financeiroRelatorios';
 import { useNavigate } from 'react-router-dom';
-import CentroDeCustoSelect from '@/components/common/CentroDeCustoSelect';
+import CentroDeCustoDropdown from '@/components/common/CentroDeCustoDropdown';
 
 function formatBRL(value: number) {
   return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value || 0);
@@ -369,9 +369,9 @@ export default function RelatoriosFinanceiroPage() {
                 </div>
                 <div className="w-full sm:w-[360px]">
                   <label className="block text-xs font-medium text-gray-700 mb-1">Filtrar por centro de custo (opcional)</label>
-                  <CentroDeCustoSelect
-                    value={dreCentroId}
-                    initialName={dreCentroName}
+                  <CentroDeCustoDropdown
+                    valueId={dreCentroId}
+                    valueName={dreCentroName || null}
                     onChange={(id, name) => {
                       setDreCentroId(id);
                       setDreCentroName(name ?? '');

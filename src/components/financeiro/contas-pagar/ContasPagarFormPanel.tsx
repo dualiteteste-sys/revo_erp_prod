@@ -9,8 +9,8 @@ import Select from '@/components/ui/forms/Select';
 import TextArea from '@/components/ui/forms/TextArea';
 import { useNumericField } from '@/hooks/useNumericField';
 import ClientAutocomplete from '@/components/common/ClientAutocomplete';
-import CentroDeCustoSelect from '@/components/common/CentroDeCustoSelect';
-import MeioPagamentoSelect from '@/components/common/MeioPagamentoSelect';
+import CentroDeCustoDropdown from '@/components/common/CentroDeCustoDropdown';
+import MeioPagamentoDropdown from '@/components/common/MeioPagamentoDropdown';
 import { Switch } from '@/components/ui/switch';
 import { generateRecorrencia, upsertRecorrencia, type FinanceiroRecorrenciaAjusteDiaUtil, type FinanceiroRecorrenciaFrequencia } from '@/services/financeiroRecorrencias';
 
@@ -275,22 +275,20 @@ const ContasPagarFormPanel: React.FC<ContasPagarFormPanelProps> = ({ conta, onSa
 
           <div className="sm:col-span-3">
             <label className="block text-sm font-medium text-gray-700 mb-1">Forma de Pagamento</label>
-            <MeioPagamentoSelect
+            <MeioPagamentoDropdown
               tipo="pagamento"
               value={formData.forma_pagamento || null}
-              initialName={formData.forma_pagamento || undefined}
               onChange={(name) => handleFormChange('forma_pagamento', name || '')}
               placeholder="Selecionar…"
-              disabled={false}
             />
           </div>
           <Input label="Categoria" name="categoria" value={formData.categoria || ''} onChange={e => handleFormChange('categoria', e.target.value)} className="sm:col-span-3" />
 
           <div className="sm:col-span-6">
             <label className="block text-sm font-medium text-gray-700 mb-1">Centro de Custo (opcional)</label>
-            <CentroDeCustoSelect
-              value={(formData as any).centro_de_custo_id || null}
-              initialName={formData.centro_custo || ''}
+            <CentroDeCustoDropdown
+              valueId={(formData as any).centro_de_custo_id || null}
+              valueName={formData.centro_custo || null}
               onChange={(id, name) => {
                 handleFormChange('centro_de_custo_id' as any, id);
                 if (name) handleFormChange('centro_custo' as any, name);
