@@ -11,6 +11,7 @@ import { Database } from '@/types/database.types';
 import OsFormItems from './OsFormItems';
 import { useNumericField } from '@/hooks/useNumericField';
 import ClientAutocomplete from '../common/ClientAutocomplete';
+import MeioPagamentoSelect from '@/components/common/MeioPagamentoSelect';
 import { Button } from '@/components/ui/button';
 import OsAuditTrailPanel from '@/components/os/OsAuditTrailPanel';
 import { createContaAReceberFromOs, createContasAReceberFromOsParcelas, getContaAReceberDetails, getContaAReceberFromOs, receberContaAReceber, type ContaAReceber } from '@/services/contasAReceber';
@@ -1086,7 +1087,17 @@ const OsFormPanel: React.FC<OsFormPanelProps> = ({ os, onSaveSuccess, onClose })
             <label className="block text-sm font-medium text-gray-700 mb-1">Total Geral</label>
             <div className="p-3 bg-blue-100 text-blue-800 rounded-lg text-right font-bold text-lg">{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(formData.total_geral || 0)}</div>
           </div>
-          <Input label="Forma de Recebimento" name="forma_recebimento" value={formData.forma_recebimento || ''} onChange={e => handleFormChange('forma_recebimento', e.target.value)} className="sm:col-span-3" disabled={readOnly} />
+          <div className="sm:col-span-3">
+            <label className="block text-sm font-medium text-gray-700 mb-1">Forma de Recebimento</label>
+            <MeioPagamentoSelect
+              tipo="recebimento"
+              value={formData.forma_recebimento || null}
+              initialName={formData.forma_recebimento || undefined}
+              onChange={(name) => handleFormChange('forma_recebimento', name || '')}
+              placeholder="Selecionar…"
+              disabled={readOnly}
+            />
+          </div>
           <Input label="Condição de Pagamento" name="condicao_pagamento" value={formData.condicao_pagamento || ''} onChange={e => handleFormChange('condicao_pagamento', e.target.value)} className="sm:col-span-3" disabled={readOnly} />
 
           {canGenerateConta ? (

@@ -10,6 +10,7 @@ import TextArea from '@/components/ui/forms/TextArea';
 import { useNumericField } from '@/hooks/useNumericField';
 import ClientAutocomplete from '@/components/common/ClientAutocomplete';
 import CentroDeCustoSelect from '@/components/common/CentroDeCustoSelect';
+import MeioPagamentoSelect from '@/components/common/MeioPagamentoSelect';
 import { Switch } from '@/components/ui/switch';
 import { generateRecorrencia, upsertRecorrencia, type FinanceiroRecorrenciaAjusteDiaUtil, type FinanceiroRecorrenciaFrequencia } from '@/services/financeiroRecorrencias';
 
@@ -272,7 +273,17 @@ const ContasPagarFormPanel: React.FC<ContasPagarFormPanelProps> = ({ conta, onSa
           <Input label="Juros" name="juros" startAdornment="R$" inputMode="numeric" {...jurosProps} className="sm:col-span-2" />
           <Input label="Desconto" name="desconto" startAdornment="R$" inputMode="numeric" {...descontoProps} className="sm:col-span-2" />
 
-          <Input label="Forma de Pagamento" name="forma_pagamento" value={formData.forma_pagamento || ''} onChange={e => handleFormChange('forma_pagamento', e.target.value)} className="sm:col-span-3" placeholder="Ex: Boleto, Pix" />
+          <div className="sm:col-span-3">
+            <label className="block text-sm font-medium text-gray-700 mb-1">Forma de Pagamento</label>
+            <MeioPagamentoSelect
+              tipo="pagamento"
+              value={formData.forma_pagamento || null}
+              initialName={formData.forma_pagamento || undefined}
+              onChange={(name) => handleFormChange('forma_pagamento', name || '')}
+              placeholder="Selecionar…"
+              disabled={false}
+            />
+          </div>
           <Input label="Categoria" name="categoria" value={formData.categoria || ''} onChange={e => handleFormChange('categoria', e.target.value)} className="sm:col-span-3" />
 
           <div className="sm:col-span-6">
