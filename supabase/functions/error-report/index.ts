@@ -75,14 +75,23 @@ Deno.serve(async (req) => {
   try {
     const supabaseUrl = requireEnv("SUPABASE_URL");
     const supabaseAnonKey = requireEnv("SUPABASE_ANON_KEY");
+    const supabaseServiceKey = requireEnv("SUPABASE_SERVICE_ROLE_KEY");
     const resendApiKey = requireEnv("RESEND_API_KEY");
     const reportEmailTo = requireEnv("ERROR_REPORT_EMAIL_TO");
     const reportEmailFrom = requireEnv("ERROR_REPORT_EMAIL_FROM");
     const githubToken = requireEnv("GITHUB_TOKEN");
     const githubRepo = requireEnv("GITHUB_REPO");
 
-    if (!supabaseUrl || !supabaseAnonKey) {
-      return json(500, { ok: false, error: "config_error", message: "SUPABASE_URL/SUPABASE_ANON_KEY ausentes." }, corsHeaders);
+    if (!supabaseUrl || !supabaseAnonKey || !supabaseServiceKey) {
+      return json(
+        500,
+        {
+          ok: false,
+          error: "config_error",
+          message: "SUPABASE_URL/SUPABASE_ANON_KEY/SUPABASE_SERVICE_ROLE_KEY ausentes.",
+        },
+        corsHeaders,
+      );
     }
 
     const authHeader = req.headers.get("Authorization") ?? "";
@@ -98,6 +107,15 @@ Deno.serve(async (req) => {
     const user = userData?.user ?? null;
     if (userErr || !user) {
       return json(401, { ok: false, error: "invalid_token", message: userErr?.message ?? "Token inválido." }, corsHeaders);
+    }
+
+    const { data: empresaId, error: empresaErr } = await supabaseAuth.rpc("current_empresa_id");
+    if (empresaErr || !empresaId) {
+      return json(
+        400,
+        { ok: false, error: "empresa_not_selected", message: "Empresa ativa não encontrada para o usuário atual." },
+        corsHeaders,
+      );
     }
 
     const payload = await req.json().catch(() => null) as any;
@@ -116,6 +134,40 @@ Deno.serve(async (req) => {
 
     const subjectPrefix = (Deno.env.get("ERROR_REPORT_SUBJECT_PREFIX") ?? "[REVO ERP][BUG]").trim();
     const subject = `${subjectPrefix} ${sentryEventId.slice(0, 8)} — ${context?.url ?? "sem-url"}`.slice(0, 200);
+
+    const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
+
+    // Persist report first (so we never lose the signal)
+    const baseRow = {
+      empresa_id: empresaId,
+      created_by: user.id,
+      status: "new",
+      severity: "error",
+      user_email: userEmail || null,
+      user_message: userMessage,
+      url: context?.url ?? null,
+      user_agent: context?.user_agent ?? null,
+      sentry_event_id: sentryEventId,
+      context: context ?? {},
+      recent_network_errors: recentNetworkErrors ?? [],
+      email_ok: false,
+      github_ok: false,
+    };
+
+    const { data: reportRow, error: insErr } = await supabaseAdmin
+      .from("error_reports")
+      .insert(baseRow as any)
+      .select("id")
+      .single();
+
+    const reportId = (reportRow as any)?.id ?? null;
+    if (insErr || !reportId) {
+      return json(
+        500,
+        { ok: false, error: "db_error", message: "Falha ao registrar o relatório no banco." },
+        corsHeaders,
+      );
+    }
 
     const issueBody = [
       `**Sentry event id:** \`${sentryEventId}\``,
@@ -154,44 +206,66 @@ Deno.serve(async (req) => {
     let emailOk = false;
     let githubOk = false;
     let githubIssueUrl: string | null = null;
+    let emailError: string | null = null;
+    let githubError: string | null = null;
 
     if (resendApiKey && reportEmailTo && reportEmailFrom) {
-      await sendEmailViaResend({
-        apiKey: resendApiKey,
-        from: reportEmailFrom,
-        to: reportEmailTo,
-        subject,
-        text: emailText,
-      });
-      emailOk = true;
+      try {
+        await sendEmailViaResend({
+          apiKey: resendApiKey,
+          from: reportEmailFrom,
+          to: reportEmailTo,
+          subject,
+          text: emailText,
+        });
+        emailOk = true;
+      } catch (e) {
+        emailError = String((e as any)?.message ?? e);
+      }
     }
 
     if (githubToken && githubRepo) {
-      const issue = await createGithubIssue({
-        token: githubToken,
-        repo: githubRepo,
-        title: `${subjectPrefix} ${sentryEventId.slice(0, 8)} — ${userMessage.slice(0, 80)}`.slice(0, 200),
-        body: issueBody,
-        labels: githubLabels,
-      });
-      githubOk = true;
-      githubIssueUrl = issue.html_url ?? null;
+      try {
+        const issue = await createGithubIssue({
+          token: githubToken,
+          repo: githubRepo,
+          title: `${subjectPrefix} ${sentryEventId.slice(0, 8)} — ${userMessage.slice(0, 80)}`.slice(0, 200),
+          body: issueBody,
+          labels: githubLabels,
+        });
+        githubOk = true;
+        githubIssueUrl = issue.html_url ?? null;
+      } catch (e) {
+        githubError = String((e as any)?.message ?? e);
+      }
     }
+
+    await supabaseAdmin
+      .from("error_reports")
+      .update({
+        email_ok: emailOk,
+        email_error: emailError,
+        github_ok: githubOk,
+        github_issue_url: githubIssueUrl,
+        github_error: githubError,
+      } as any)
+      .eq("id", reportId);
 
     if (!emailOk && !githubOk) {
       return json(
         500,
         {
           ok: false,
-          error: "config_error",
+          error: "delivery_failed",
           message:
-            "Nenhum destino configurado. Configure RESEND_API_KEY + ERROR_REPORT_EMAIL_TO/FROM e/ou GITHUB_TOKEN + GITHUB_REPO.",
+            "Falha ao enviar relatório. Verifique configuração de e-mail (Resend) e/ou GitHub.",
+          report_id: reportId,
         },
         corsHeaders,
       );
     }
 
-    return json(200, { ok: true, email_ok: emailOk, github_ok: githubOk, github_issue_url: githubIssueUrl }, corsHeaders);
+    return json(200, { ok: true, report_id: reportId, email_ok: emailOk, github_ok: githubOk, github_issue_url: githubIssueUrl }, corsHeaders);
   } catch (e) {
     return json(
       500,
@@ -204,4 +278,3 @@ Deno.serve(async (req) => {
     );
   }
 });
-

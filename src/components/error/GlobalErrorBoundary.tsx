@@ -69,6 +69,12 @@ export class GlobalErrorBoundary extends Component<Props, State> {
                             >
                                 Abrir logs (se habilitado)
                             </a>
+                            <a
+                                href="/app/desenvolvedor/error-reports"
+                                className="text-sm font-medium text-blue-700 hover:text-blue-800 hover:underline"
+                            >
+                                Abrir error reports (Beta)
+                            </a>
                         </div>
 
                         {import.meta.env.DEV && this.state.error && (
