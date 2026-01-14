@@ -61,9 +61,10 @@ export function ReportIssueDialog({ open, onOpenChange, sentryEventId }: Props) 
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-xl rounded-2xl">
         <DialogHeader>
-          <DialogTitle>Enviar para os desenvolvedores</DialogTitle>
+          <DialogTitle>O ERP Revo Beta encontrou um erro</DialogTitle>
           <DialogDescription>
-            Envia um relatório técnico (com replay do Sentry) para o time. Não inclua senhas nem dados sensíveis.
+            O ERP Revo Beta encontrou um erro que precisa ser resolvido pelos desenvolvedores. Gostaria de enviar e aguardar 1 dia útil para correção?
+            Não inclua senhas nem dados sensíveis.
           </DialogDescription>
         </DialogHeader>
 
@@ -113,4 +114,3 @@ export function ReportIssueDialog({ open, onOpenChange, sentryEventId }: Props) 
     </Dialog>
   );
 }
-
