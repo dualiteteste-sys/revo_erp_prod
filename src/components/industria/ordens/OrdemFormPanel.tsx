@@ -477,6 +477,9 @@ export default function OrdemFormPanel({
   const handleGoToExecucao = (q?: string) => {
     const next = new URLSearchParams();
     next.set('view', 'list');
+    // Forçar filtros limpos ao deep-linkar (evita ficar "vazio" por filtros persistidos no localStorage).
+    next.set('status', '');
+    next.set('centro', '');
     if (q) next.set('q', q);
     navigate(`/app/industria/execucao?${next.toString()}`);
   };
@@ -484,8 +487,7 @@ export default function OrdemFormPanel({
   const getExecucaoSearchTerm = () => {
     const n = formData.numero;
     if (n) {
-      const prefix = formData.tipo_ordem === 'beneficiamento' ? 'OB' : 'OP';
-      return `${prefix}-${n}`;
+      return String(n);
     }
     return formData.produto_nome || undefined;
   };
