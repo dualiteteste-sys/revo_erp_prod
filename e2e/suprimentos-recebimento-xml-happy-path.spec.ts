@@ -401,16 +401,9 @@ test('SUP-03: importar XML → criar recebimento → finalizar (happy path)', as
   await expect(page.getByText('Conferência de Quantidades')).toBeVisible({ timeout: 15000 });
   await page.getByRole('button', { name: 'Salvar Conferência e Criar Recebimento' }).click();
 
-  await expect(page.getByText('Importação Concluída!')).toBeVisible({ timeout: 15000 });
-  await page.getByRole('button', { name: 'Voltar para Recebimentos' }).click();
-
-  // Listagem de recebimentos
-  await expect(page.getByRole('heading', { name: 'Recebimento de Mercadorias' })).toBeVisible({ timeout: 15000 });
-  await expect(page.getByText('Fornecedor XML')).toBeVisible({ timeout: 15000 });
-  await page.getByRole('button', { name: 'Conferir' }).click();
-
-  // Conferência (finalização)
-  await expect(page.getByText(/Confer[iê]ncia de Recebimento|Detalhes do Recebimento/)).toBeVisible({ timeout: 15000 });
+  // Após concluir a importação, o fluxo "estado da arte" redireciona direto para a conferência/finalização.
+  await expect(page).toHaveURL(new RegExp(`/app/suprimentos/recebimento/${recebimentoId}`), { timeout: 15000 });
+  await expect(page.getByRole('button', { name: 'Finalizar Recebimento' })).toBeVisible({ timeout: 15000 });
 
   // Landed cost (SUP-STA-04): salva custos adicionais antes de finalizar
   await expect(page.getByText('Custo adicional (landed cost)')).toBeVisible({ timeout: 15000 });
@@ -421,6 +414,12 @@ test('SUP-03: importar XML → criar recebimento → finalizar (happy path)', as
 
   await page.getByRole('button', { name: 'Finalizar Recebimento' }).click();
   await expect(page.getByText('Recebimento concluído.', { exact: true })).toBeVisible({ timeout: 15000 });
+
+  await page.goto('/app/suprimentos/recebimentos');
+
+  // Listagem de recebimentos
+  await expect(page.getByRole('heading', { name: 'Recebimento de Mercadorias' })).toBeVisible({ timeout: 15000 });
+  await expect(page.getByText('Fornecedor XML')).toBeVisible({ timeout: 15000 });
 
   // Volta e cancela (estorno) — SUP-04
   await page.goto('/app/suprimentos/recebimentos');
