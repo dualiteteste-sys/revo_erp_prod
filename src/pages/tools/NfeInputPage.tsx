@@ -84,6 +84,14 @@ export default function NfeInputPage({ embedded, onRecebimentoReady, autoFinaliz
   const createClientResolverRef = useRef<((value: { id: string; nome: string; doc: string } | null) => void) | null>(null);
   const clientPromptedRef = useRef<string | null>(null);
 
+  const closeCreateClientModal = (result: { id: string; nome: string; doc: string } | null) => {
+    setCreateClientOpen(false);
+    setCreateClientInitialValues(null);
+    const resolve = createClientResolverRef.current;
+    createClientResolverRef.current = null;
+    resolve?.(result);
+  };
+
   const matchColumns: TableColumnWidthDef[] = [
     { id: 'item', defaultWidth: 360, minWidth: 260 },
     { id: 'qty', defaultWidth: 130, minWidth: 110 },
@@ -602,12 +610,7 @@ export default function NfeInputPage({ embedded, onRecebimentoReady, autoFinaliz
     <div className="p-1">
       <Modal
         isOpen={createClientOpen}
-        onClose={() => {
-          setCreateClientOpen(false);
-          const resolve = createClientResolverRef.current;
-          createClientResolverRef.current = null;
-          resolve?.(null);
-        }}
+        onClose={() => closeCreateClientModal(null)}
         title="Cadastrar cliente do XML"
         size="xl"
       >
@@ -615,23 +618,15 @@ export default function NfeInputPage({ embedded, onRecebimentoReady, autoFinaliz
           partner={null}
           initialValues={createClientInitialValues ?? undefined}
           onSaveSuccess={(saved) => {
-            setCreateClientOpen(false);
             const result = {
               id: saved.id,
               nome: String(saved.nome || '').trim() || 'Cliente',
               doc: digitsOnly((saved as any).doc_unico || '') || digitsOnly(previewData?.import?.emitente_cnpj || null),
             };
             setClienteXml(result);
-            const resolve = createClientResolverRef.current;
-            createClientResolverRef.current = null;
-            resolve?.(result);
+            closeCreateClientModal(result);
           }}
-          onClose={() => {
-            setCreateClientOpen(false);
-            const resolve = createClientResolverRef.current;
-            createClientResolverRef.current = null;
-            resolve?.(null);
-          }}
+          onClose={() => closeCreateClientModal(null)}
         />
       </Modal>
 

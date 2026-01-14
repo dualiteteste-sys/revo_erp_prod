@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useSupabase } from '@/providers/SupabaseProvider';
 import { useAuth } from '../contexts/AuthProvider';
 import { logger } from '@/lib/logger';
+import { isLocalBillingBypassEnabled } from '@/lib/localDev';
 
 export interface FeatureFlags {
   revo_send_enabled: boolean;
@@ -13,6 +14,7 @@ export interface FeatureFlags {
 export const useFeatureFlags = (): FeatureFlags => {
   const supabase = useSupabase();
   const { activeEmpresa } = useAuth();
+  const localBypass = isLocalBillingBypassEnabled();
   const [flags, setFlags] = useState<Omit<FeatureFlags, 'loading'>>({
     revo_send_enabled: false,
     nfe_emissao_enabled: false,
@@ -23,6 +25,15 @@ export const useFeatureFlags = (): FeatureFlags => {
   const fetchFlags = useCallback(async (empresaId: string) => {
     setLoading(true);
     try {
+      if (localBypass) {
+        setFlags({
+          revo_send_enabled: true,
+          nfe_emissao_enabled: true,
+          refetch: async () => fetchFlags(empresaId),
+        });
+        return;
+      }
+
       const { data, error } = await supabase
         .from('empresa_features')
         .select('revo_send_enabled, nfe_emissao_enabled')
@@ -43,7 +54,7 @@ export const useFeatureFlags = (): FeatureFlags => {
     } finally {
       setLoading(false);
     }
-  }, [supabase]);
+  }, [localBypass, supabase]);
 
   useEffect(() => {
     if (activeEmpresa?.id) {

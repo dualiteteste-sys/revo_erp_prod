@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { useSupabase } from '@/providers/SupabaseProvider';
 import { useAuth } from '@/contexts/AuthProvider';
 import { logger } from '@/lib/logger';
+import { getLocalPlanSlug, isLocalBillingBypassEnabled } from '@/lib/localDev';
 
 export type PlanoMvp = 'servicos' | 'industria' | 'ambos';
 
@@ -37,7 +38,28 @@ export function useEmpresaFeatures(): EmpresaFeatures {
   const [loading, setLoading] = useState(true);
   const [features, setFeatures] = useState(DEFAULT_FEATURES);
 
+  const localBypass = isLocalBillingBypassEnabled();
+
   const fetch = useCallback(async () => {
+    if (localBypass) {
+      const slug = getLocalPlanSlug();
+      const industriaEnabled = slug === 'INDUSTRIA' || slug === 'SCALE';
+      const servicosEnabled = slug !== 'INDUSTRIA';
+      setFeatures({
+        revo_send_enabled: true,
+        nfe_emissao_enabled: true,
+        plano_mvp: 'ambos',
+        max_users: 999,
+        max_nfe_monthly: 999,
+        servicos_enabled: servicosEnabled,
+        industria_enabled: industriaEnabled,
+        isFallback: true,
+        error: null,
+      });
+      setLoading(false);
+      return;
+    }
+
     const empresaId = activeEmpresa?.id;
     if (!empresaId) {
       setFeatures(DEFAULT_FEATURES);
@@ -85,7 +107,7 @@ export function useEmpresaFeatures(): EmpresaFeatures {
     } finally {
       setLoading(false);
     }
-  }, [activeEmpresa?.id, supabase]);
+  }, [activeEmpresa?.id, localBypass, supabase]);
 
   useEffect(() => {
     void fetch();
