@@ -61,6 +61,7 @@ export default function NfeInputPage({ embedded, onRecebimentoReady, autoFinaliz
   const navigate = useNavigate();
   const features = useEmpresaFeatures();
   const canMaterialCliente = !features.loading && features.industria_enabled;
+  const redirectAfterSuccessRef = useRef(false);
 
   // Estado do Arquivo e Parsing
   const [xmlFile, setXmlFile] = useState<File | null>(null);
@@ -181,6 +182,17 @@ export default function NfeInputPage({ embedded, onRecebimentoReady, autoFinaliz
       return next;
     });
   }, [previewData]);
+
+  useEffect(() => {
+    if (embedded) return;
+    if (autoFinalizeMaterialCliente) return;
+    if (step !== 'success') return;
+    if (!recebimentoId) return;
+    if (redirectAfterSuccessRef.current) return;
+
+    redirectAfterSuccessRef.current = true;
+    navigate(`/app/suprimentos/recebimento/${recebimentoId}`);
+  }, [autoFinalizeMaterialCliente, embedded, navigate, recebimentoId, step]);
 
   const matchingSorted = useMemo(() => {
     const itens = previewData?.itens ?? [];
@@ -1012,7 +1024,7 @@ export default function NfeInputPage({ embedded, onRecebimentoReady, autoFinaliz
                 ? (autoFinalizeMaterialCliente
                     ? 'O recebimento foi concluído e os Materiais de Clientes foram sincronizados.'
                     : 'O recebimento foi criado. Você pode continuar e concluir o recebimento quando desejar.')
-                : 'O recebimento foi criado e a conferência foi registrada. Ele também está disponível em Suprimentos → Recebimentos.'}
+                : 'O recebimento foi criado e a conferência foi registrada. Você já pode finalizar agora.'}
             </p>
             <div className="flex gap-4">
               <button
@@ -1023,20 +1035,20 @@ export default function NfeInputPage({ embedded, onRecebimentoReady, autoFinaliz
               </button>
               {!embedded && (
                 <>
+                  {recebimentoId && (
+                    <button
+                      onClick={() => navigate(`/app/suprimentos/recebimento/${recebimentoId}`)}
+                      className="px-6 py-2 bg-blue-600 text-white font-bold rounded-lg hover:bg-blue-700"
+                    >
+                      Ir para Finalizar Recebimento
+                    </button>
+                  )}
                   <button
                     onClick={() => navigate('/app/suprimentos/recebimentos')}
-                    className="px-6 py-2 bg-blue-600 text-white font-bold rounded-lg hover:bg-blue-700"
+                    className="px-6 py-2 bg-white border border-gray-300 text-gray-700 font-semibold rounded-lg hover:bg-gray-50"
                   >
                     Voltar para Recebimentos
                   </button>
-                  {recebimentoId && (
-                    <button
-                      onClick={() => navigate(`/app/suprimentos/recebimento/${recebimentoId}?view=details`)}
-                      className="px-6 py-2 bg-white border border-gray-300 text-gray-700 font-semibold rounded-lg hover:bg-gray-50"
-                    >
-                      Ver Detalhes
-                    </button>
-                  )}
                 </>
               )}
             </div>
