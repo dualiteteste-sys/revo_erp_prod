@@ -251,21 +251,20 @@ Deno.serve(async (req) => {
       } as any)
       .eq("id", reportId);
 
-    if (!emailOk && !githubOk) {
-      return json(
-        500,
-        {
-          ok: false,
-          error: "delivery_failed",
-          message:
-            "Falha ao enviar relatório. Verifique configuração de e-mail (Resend) e/ou GitHub.",
-          report_id: reportId,
-        },
-        corsHeaders,
-      );
-    }
-
-    return json(200, { ok: true, report_id: reportId, email_ok: emailOk, github_ok: githubOk, github_issue_url: githubIssueUrl }, corsHeaders);
+    // Estado da arte: nunca retornar 5xx se o relatório já foi persistido.
+    // Integrações (Resend/GitHub) são best-effort; se falharem, o time ainda consegue ver o erro na tela interna.
+    return json(
+      200,
+      {
+        ok: true,
+        report_id: reportId,
+        email_ok: emailOk,
+        github_ok: githubOk,
+        github_issue_url: githubIssueUrl,
+        delivery_warning: (!emailOk && !githubOk) ? "Relatório registrado, mas não foi possível enviar para e-mail/GitHub." : null,
+      },
+      corsHeaders,
+    );
   } catch (e) {
     return json(
       500,

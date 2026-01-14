@@ -1,5 +1,6 @@
 import * as Sentry from "@sentry/react";
 import { sanitizeLogData } from "@/lib/sanitizeLog";
+import { shouldPromptDeveloperReport } from "@/lib/errorReporting";
 
 type LogLevel = "info" | "warn" | "error" | "debug";
 
@@ -79,11 +80,14 @@ class Logger {
             lastSentryEventId = eventId;
             try {
                 if (!this.isTest && typeof window !== "undefined") {
-                    window.dispatchEvent(
-                        new CustomEvent("revo:sentry_error_captured", {
-                            detail: { eventId, message },
-                        })
-                    );
+                    const reportable = shouldPromptDeveloperReport({ message, error });
+                    if (reportable) {
+                        window.dispatchEvent(
+                            new CustomEvent("revo:sentry_error_captured", {
+                                detail: { eventId, message },
+                            })
+                        );
+                    }
                 }
             } catch {
                 // noop
