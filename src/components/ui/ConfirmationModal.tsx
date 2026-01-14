@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Loader2, AlertTriangle } from 'lucide-react';
+import { createPortal } from 'react-dom';
 
 interface ConfirmationModalProps {
   isOpen: boolean;
@@ -95,7 +96,9 @@ const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
     warning: 'bg-amber-500 hover:bg-amber-600 text-white',
   };
 
-  return (
+  if (typeof document === 'undefined') return null;
+
+  return createPortal(
     <AnimatePresence>
       {isOpen && (
         <motion.div
@@ -156,7 +159,8 @@ const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
           </motion.div>
         </motion.div>
       )}
-    </AnimatePresence>
+    </AnimatePresence>,
+    document.body,
   );
 };
 
