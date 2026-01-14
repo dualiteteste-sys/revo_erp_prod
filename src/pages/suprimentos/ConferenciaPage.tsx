@@ -283,6 +283,24 @@ export default function ConferenciaPage() {
             return;
         }
 
+        // Estado da arte (UX): se a classificação ainda não foi definida, resolvemos aqui
+        // para não depender exclusivamente do backend retornar "pendente_classificacao".
+        if (!recebimento?.classificacao) {
+            if (canMaterialCliente) {
+                setIsClassificacaoOpen(true);
+                addToast('Escolha o destino do estoque antes de concluir.', 'warning');
+                return;
+            }
+            try {
+                await setRecebimentoClassificacao(id, 'estoque_proprio', null);
+                setRecebimento((prev) => (prev ? { ...prev, classificacao: 'estoque_proprio' } : prev));
+            } catch (e: any) {
+                console.error(e);
+                addToast(e?.message || 'Erro ao definir o destino do estoque.', 'error');
+                return;
+            }
+        }
+
         // Verifica se há pendências
         const pendentes = itens.filter(i => i.quantidade_conferida === 0);
         if (pendentes.length > 0) {
@@ -446,6 +464,14 @@ export default function ConferenciaPage() {
         setClassificando(true);
         try {
             await setRecebimentoClassificacao(id, classificacao, classificacao === 'material_cliente' ? classificacaoClienteId : null);
+            setRecebimento((prev) => {
+                if (!prev) return prev;
+                return {
+                    ...prev,
+                    classificacao,
+                    cliente_id: classificacao === 'material_cliente' ? classificacaoClienteId : null,
+                };
+            });
             setIsClassificacaoOpen(false);
             addToast('Classificação salva. Finalizando...', 'success');
             await handleFinalizar();
