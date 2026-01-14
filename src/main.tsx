@@ -17,7 +17,10 @@ Sentry.init({
   dsn: import.meta.env.VITE_SENTRY_DSN,
   integrations: [
     Sentry.browserTracingIntegration(),
-    Sentry.replayIntegration(),
+    Sentry.replayIntegration({
+      maskAllText: true,
+      blockAllMedia: true,
+    }),
   ],
   // Tracing
   tracesSampleRate: 1.0, // Capture 100% of the transactions, reduce in production!

@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, ReactNode, useCallback, useRef } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import Toast, { ToastProps } from '../components/ui/Toast';
+import { SentryReportListener } from '@/components/error/SentryReportListener';
 
 type ToastType = "success" | "error" | "warning" | "info";
 
@@ -64,6 +65,7 @@ export const ToastProvider = ({ children }: { children: ReactNode }) => {
   return (
     <ToastContext.Provider value={{ addToast }}>
       {children}
+      <SentryReportListener />
       <div className="fixed top-5 right-5 z-50 space-y-3">
         <AnimatePresence>
           {toasts.map((toast) => (

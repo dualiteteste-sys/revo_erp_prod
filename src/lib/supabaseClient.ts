@@ -2,6 +2,7 @@ import { createClient } from "@supabase/supabase-js";
 import type { Database } from "@/types/database.types";
 import { logger } from "@/lib/logger";
 import { newRequestId } from "@/lib/requestId";
+import { recordNetworkError } from "@/lib/telemetry/networkErrors";
 
 export const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || "https://lrfwiaekipwkjkzvcnfd.supabase.co";
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxyZndpYWVraXB3a2prenZjbmZkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjA4OTQwNzEsImV4cCI6MjA3NjQ3MDA3MX0.BnDwDZpWV62D_kPJb6ZtOzeRxgTPSQncqja332rxCYk";
@@ -51,7 +52,28 @@ export const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey, {
         }
 
         try {
-          return await fetch(input as any, { ...(init ?? {}), headers, signal: controller.signal });
+          const res = await fetch(input as any, { ...(init ?? {}), headers, signal: controller.signal });
+
+          if (!res.ok && (isRpc || isEdgeFn)) {
+            try {
+              const cloned = res.clone();
+              const responseText = await cloned.text();
+              recordNetworkError({
+                at: new Date().toISOString(),
+                requestId,
+                url,
+                method,
+                status: res.status,
+                isRpc,
+                isEdgeFn,
+                responseText,
+              });
+            } catch {
+              // best-effort
+            }
+          }
+
+          return res;
         } catch (e) {
           if ((e as any)?.name === "AbortError") {
             logger.warn("[HTTP][TIMEOUT]", { method, url, timeoutMs, requestId });

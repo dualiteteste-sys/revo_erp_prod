@@ -1,6 +1,7 @@
 import React, { Component, ErrorInfo, ReactNode } from 'react';
 import { logger } from '@/lib/logger';
 import { AlertTriangle, RefreshCw } from 'lucide-react';
+import { ReportIssueDialog } from '@/components/error/ReportIssueDialog';
 
 interface Props {
     children: ReactNode;
@@ -9,22 +10,27 @@ interface Props {
 interface State {
     hasError: boolean;
     error: Error | null;
+    sentryEventId: string | null;
+    reportOpen: boolean;
 }
 
 export class GlobalErrorBoundary extends Component<Props, State> {
     public state: State = {
         hasError: false,
         error: null,
+        sentryEventId: null,
+        reportOpen: false,
     };
 
     public static getDerivedStateFromError(error: Error): State {
-        return { hasError: true, error };
+        return { hasError: true, error, sentryEventId: null, reportOpen: false };
     }
 
     public componentDidCatch(error: Error, errorInfo: ErrorInfo) {
-        logger.error('Uncaught error in React component tree', error, {
+        const eventId = logger.error('Uncaught error in React component tree', error, {
             componentStack: errorInfo.componentStack,
         });
+        this.setState({ sentryEventId: eventId ?? null });
     }
 
     private handleReload = () => {
@@ -80,7 +86,23 @@ export class GlobalErrorBoundary extends Component<Props, State> {
                             <RefreshCw className="w-5 h-5 mr-2" />
                             Recarregar Aplicação
                         </button>
+
+                        <div className="mt-3">
+                            <button
+                                type="button"
+                                onClick={() => this.setState({ reportOpen: true })}
+                                className="w-full inline-flex items-center justify-center px-6 py-3 rounded-md text-base font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-slate-300 transition-colors"
+                            >
+                                Enviar para os desenvolvedores
+                            </button>
+                        </div>
                     </div>
+
+                    <ReportIssueDialog
+                        open={this.state.reportOpen}
+                        onOpenChange={(open) => this.setState({ reportOpen: open })}
+                        sentryEventId={this.state.sentryEventId}
+                    />
                 </div>
             );
         }
