@@ -60,6 +60,7 @@ export default function PageHelp(props: PageHelpProps) {
     const base: HelpLink[] = [
       { label: 'Diagnóstico guiado (Suporte)', href: '/app/suporte', kind: 'internal' },
       ...(canOps ? [{ label: 'Saúde (Ops)', href: '/app/desenvolvedor/saude', kind: 'internal' } as HelpLink] : []),
+      ...(canOps ? [{ label: 'Error Reports (Beta)', href: '/app/desenvolvedor/error-reports', kind: 'internal' } as HelpLink] : []),
     ];
     return [...links, ...base];
   }, [links, canOps]);

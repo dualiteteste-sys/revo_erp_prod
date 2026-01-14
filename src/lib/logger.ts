@@ -14,8 +14,15 @@ const originalConsole = {
     debug: console.debug.bind(console),
 };
 
+let lastSentryEventId: string | null = null;
+
+export function getLastSentryEventId() {
+    return lastSentryEventId;
+}
+
 class Logger {
     private isDev = import.meta.env.DEV;
+    private isTest = import.meta.env.MODE === "test";
 
     private formatMessage(level: LogLevel, message: string, context?: LogContext) {
         const timestamp = new Date().toISOString();
@@ -61,12 +68,29 @@ class Logger {
             originalConsole.error(`[ERROR] ${message}`, error || "", safeContext || "");
         }
 
-        Sentry.captureException(error || new Error(message), {
+        const eventId = Sentry.captureException(error || new Error(message), {
             extra: {
                 message,
                 ...(safeContext as any),
             },
         });
+
+        if (eventId) {
+            lastSentryEventId = eventId;
+            try {
+                if (!this.isTest && typeof window !== "undefined") {
+                    window.dispatchEvent(
+                        new CustomEvent("revo:sentry_error_captured", {
+                            detail: { eventId, message },
+                        })
+                    );
+                }
+            } catch {
+                // noop
+            }
+        }
+
+        return eventId;
     }
 
     debug(message: string, context?: LogContext) {

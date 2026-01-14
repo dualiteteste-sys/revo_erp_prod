@@ -38,6 +38,7 @@ const LogsPage = lazyImport(() => import("../pages/dev/LogsPage"));
 const HealthPage = lazyImport(() => import("../pages/dev/HealthPage"));
 const SchemaDiagnosticsPage = lazyImport(() => import("../pages/dev/SchemaDiagnosticsPage"));
 const UiPlaygroundPage = lazyImport(() => import("../pages/dev/UiPlaygroundPage"));
+const ErrorReportsPage = lazyImport(() => import("../pages/dev/ErrorReportsPage"));
 const SupabaseDemoPage = lazyImport(() => import("../pages/tools/SupabaseDemoPage"));
 const SettingsPage = lazyImport(() => import("../pages/settings/SettingsPage"));
 
@@ -504,6 +505,14 @@ export const appRoutes: RouteObject[] = [
               element: (
                 <RequirePermission permission={{ domain: "ops", action: "view" }}>
                   <Suspense fallback={<PageLoader />}><UiPlaygroundPage /></Suspense>
+                </RequirePermission>
+              ),
+            },
+            {
+              path: "desenvolvedor/error-reports",
+              element: (
+                <RequirePermission permission={{ domain: "ops", action: "view" }}>
+                  <Suspense fallback={<PageLoader />}><ErrorReportsPage /></Suspense>
                 </RequirePermission>
               ),
             },

@@ -11,6 +11,7 @@ import { useSupabase } from "@/providers/SupabaseProvider";
 import { Database } from "@/types/database.types";
 import { logger } from "@/lib/logger";
 import { useEmpresas, useActiveEmpresaId, useBootstrapEmpresa, useSetActiveEmpresa } from "@/hooks/useEmpresas";
+import * as Sentry from "@sentry/react";
 
 type Empresa = Database['public']['Tables']['empresas']['Row'];
 
@@ -64,16 +65,45 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const activeEmpresa = useMemo(() => {
     const found = empresas.find((e) => e.id === activeEmpresaId) || null;
-    if ((import.meta as any).env?.DEV) {
-      // apenas dev: evita poluir console em produção e nos testes e2e de "console limpo"
-      console.log('[AuthProvider] activeEmpresa calc:', {
+    if ((import.meta as any).env?.DEV && (window as any).__REVO_DEBUG_AUTH === true) {
+      console.log("[AuthProvider] activeEmpresa calc:", {
         empresasCount: empresas.length,
         activeEmpresaId,
-        foundId: found?.id
+        foundId: found?.id,
       });
     }
     return found;
   }, [empresas, activeEmpresaId]);
+
+  useEffect(() => {
+    try {
+      Sentry.setUser(userId ? { id: userId } : null);
+    } catch {
+      // noop
+    }
+  }, [userId]);
+
+  useEffect(() => {
+    try {
+      if (activeEmpresaId) Sentry.setTag("empresa_id", activeEmpresaId);
+    } catch {
+      // noop
+    }
+  }, [activeEmpresaId]);
+
+  useEffect(() => {
+    try {
+      if (activeEmpresa) {
+        Sentry.setContext("empresa", {
+          id: activeEmpresa.id,
+          nome: (activeEmpresa as any)?.nome ?? null,
+          razao_social: (activeEmpresa as any)?.razao_social ?? null,
+        });
+      }
+    } catch {
+      // noop
+    }
+  }, [activeEmpresa]);
 
   // ===== Helpers =====
 
