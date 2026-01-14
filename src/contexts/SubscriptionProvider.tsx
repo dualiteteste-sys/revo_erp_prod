@@ -3,6 +3,7 @@ import { useSupabase } from '@/providers/SupabaseProvider';
 import { useAuth } from './AuthProvider';
 import { Database } from '../types/database.types';
 import { logger } from '@/lib/logger';
+import { getLocalPlanSlug, isLocalBillingBypassEnabled } from '@/lib/localDev';
 
 type Subscription = Database['public']['Tables']['subscriptions']['Row'];
 type Plan = Database['public']['Tables']['plans']['Row'];
@@ -26,6 +27,7 @@ export const SubscriptionProvider = ({ children }: { children: ReactNode }) => {
   const [loadingSubscription, setLoadingSubscription] = useState(true);
 
   const empresaId = useMemo(() => activeEmpresa?.id ?? null, [activeEmpresa?.id]);
+  const localBypass = useMemo(() => isLocalBillingBypassEnabled(), []);
 
   const fetchSubscription = useCallback(async (empresaId: string) => {
     setLoadingSubscription(true);
@@ -73,15 +75,51 @@ export const SubscriptionProvider = ({ children }: { children: ReactNode }) => {
   }, [supabase]);
 
   useEffect(() => {
+    if (localBypass) {
+      const now = new Date();
+      const end = new Date(now.getTime() + 180 * 24 * 60 * 60 * 1000).toISOString();
+      const slug = getLocalPlanSlug();
+      const fakePlan: Plan = {
+        id: 'local-plan',
+        slug: slug as any,
+        name: `LOCAL ${slug}`,
+        billing_cycle: 'yearly',
+        currency: 'BRL',
+        amount_cents: 0,
+        stripe_price_id: 'local_price',
+        active: true,
+        created_at: now.toISOString(),
+      };
+
+      const fakeSub: Subscription = {
+        id: 'local-subscription',
+        empresa_id: empresaId ?? 'local-empresa',
+        status: 'active',
+        current_period_end: end,
+        created_at: now.toISOString(),
+        updated_at: now.toISOString(),
+        stripe_subscription_id: null,
+        stripe_price_id: fakePlan.stripe_price_id,
+        plan_slug: slug,
+        billing_cycle: 'yearly',
+        cancel_at_period_end: false,
+      };
+
+      setSubscription({ ...fakeSub, plan: fakePlan });
+      setLoadingSubscription(false);
+      return;
+    }
+
     if (empresaId) {
       fetchSubscription(empresaId);
     } else {
       setSubscription(null);
       setLoadingSubscription(false);
     }
-  }, [empresaId, fetchSubscription]);
+  }, [empresaId, fetchSubscription, localBypass]);
 
   useEffect(() => {
+    if (localBypass) return;
     if (!empresaId) return;
 
     const channel = supabase
@@ -98,9 +136,10 @@ export const SubscriptionProvider = ({ children }: { children: ReactNode }) => {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [empresaId, fetchSubscription, supabase]);
+  }, [empresaId, fetchSubscription, supabase, localBypass]);
 
   const refetchSubscription = () => {
+    if (localBypass) return;
     if (empresaId) {
       fetchSubscription(empresaId);
     }

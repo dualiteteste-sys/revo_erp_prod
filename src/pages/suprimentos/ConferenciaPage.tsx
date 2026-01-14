@@ -275,7 +275,7 @@ export default function ConferenciaPage() {
         }
     };
 
-    const handleFinalizar = async () => {
+    const handleFinalizar = async (opts?: { skipEnsureClassificacao?: boolean }) => {
         if (!id) return;
         if (finalizing) return;
         if (recebimento?.status === 'cancelado') {
@@ -285,7 +285,7 @@ export default function ConferenciaPage() {
 
         // Estado da arte (UX): se a classificação ainda não foi definida, resolvemos aqui
         // para não depender exclusivamente do backend retornar "pendente_classificacao".
-        if (!recebimento?.classificacao) {
+        if (!opts?.skipEnsureClassificacao && !recebimento?.classificacao) {
             if (canMaterialCliente) {
                 setIsClassificacaoOpen(true);
                 addToast('Escolha o destino do estoque antes de concluir.', 'warning');
@@ -474,7 +474,7 @@ export default function ConferenciaPage() {
             });
             setIsClassificacaoOpen(false);
             addToast('Classificação salva. Finalizando...', 'success');
-            await handleFinalizar();
+            await handleFinalizar({ skipEnsureClassificacao: true });
         } catch (e: any) {
             console.error(e);
             addToast(e.message || 'Erro ao classificar recebimento.', 'error');
