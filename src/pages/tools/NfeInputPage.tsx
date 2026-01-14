@@ -33,6 +33,7 @@ import PartnerFormPanel from '@/components/partners/PartnerFormPanel';
 import { documentMask } from '@/lib/masks';
 import { searchClients, type PartnerDetails } from '@/services/partners';
 import { logger } from '@/lib/logger';
+import { useEmpresaFeatures } from '@/hooks/useEmpresaFeatures';
 
 // Helper para acesso seguro a propriedades aninhadas
 const get = (obj: any, path: string, defaultValue: any = null) => {
@@ -58,6 +59,8 @@ export default function NfeInputPage({ embedded, onRecebimentoReady, autoFinaliz
   const { addToast } = useToast();
   const { confirm } = useConfirm();
   const navigate = useNavigate();
+  const features = useEmpresaFeatures();
+  const canMaterialCliente = !features.loading && features.industria_enabled;
 
   // Estado do Arquivo e Parsing
   const [xmlFile, setXmlFile] = useState<File | null>(null);
@@ -492,6 +495,15 @@ export default function NfeInputPage({ embedded, onRecebimentoReady, autoFinaliz
       );
 
       if (embedded && autoFinalizeMaterialCliente) {
+        if (features.loading) {
+          addToast('Carregando recursos do plano. Tente novamente em alguns segundos.', 'info');
+          return;
+        }
+        if (!canMaterialCliente) {
+          addToast('A opção “Material do Cliente” está disponível apenas nos planos Indústria e Scale.', 'error');
+          return;
+        }
+
         const rec = await getRecebimento(recebimentoId);
         if (rec.status === 'concluido') {
           addToast('Recebimento já estava concluído.', 'info');

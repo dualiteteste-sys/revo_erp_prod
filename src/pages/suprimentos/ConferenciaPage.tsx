@@ -28,6 +28,7 @@ import ResizableSortableTh, { type SortState } from '@/components/ui/table/Resiz
 import TableColGroup from '@/components/ui/table/TableColGroup';
 import { useTableColumnWidths, type TableColumnWidthDef } from '@/components/ui/table/useTableColumnWidths';
 import { sortRows, toggleSort } from '@/components/ui/table/sortUtils';
+import { useEmpresaFeatures } from '@/hooks/useEmpresaFeatures';
 
 export default function ConferenciaPage() {
     const { id } = useParams<{ id: string }>();
@@ -35,6 +36,8 @@ export default function ConferenciaPage() {
     const location = useLocation();
     const { addToast } = useToast();
     const { confirm } = useConfirm();
+    const features = useEmpresaFeatures();
+    const canMaterialCliente = !features.loading && features.industria_enabled;
 
     const [recebimento, setRecebimento] = useState<Recebimento | null>(null);
     const [itens, setItens] = useState<RecebimentoItem[]>([]);
@@ -150,6 +153,14 @@ export default function ConferenciaPage() {
             setShowItens(false);
         }
     }, [detailsViewParam, recebimento?.status]);
+
+    useEffect(() => {
+        if (!canMaterialCliente && classificacao === 'material_cliente') {
+            setClassificacao('estoque_proprio');
+            setClassificacaoClienteId(null);
+            setClassificacaoClienteNome(undefined);
+        }
+    }, [canMaterialCliente, classificacao]);
 
     const loadData = async (recId: string) => {
         setLoading(true);
@@ -293,7 +304,12 @@ export default function ConferenciaPage() {
             await lastSavePromiseRef.current;
 
             const result = await runWithActionLock(`recebimento:finalizar:${id}`, async () => {
-                return await finalizarRecebimentoV2(id);
+                const res = await finalizarRecebimentoV2(id);
+                if (res.status === 'pendente_classificacao' && !features.loading && !features.industria_enabled) {
+                    await setRecebimentoClassificacao(id, 'estoque_proprio', null);
+                    return await finalizarRecebimentoV2(id);
+                }
+                return res;
             });
             if (result.status === 'pendente_classificacao') {
                 setIsClassificacaoOpen(true);
@@ -418,6 +434,10 @@ export default function ConferenciaPage() {
 
     const handleConfirmarClassificacao = async () => {
         if (!id) return;
+        if (classificacao === 'material_cliente' && !canMaterialCliente) {
+            addToast('A opção “Material do Cliente” está disponível apenas nos planos Indústria e Scale.', 'error');
+            return;
+        }
         if (classificacao === 'material_cliente' && !classificacaoClienteId) {
             addToast('Selecione o cliente/dono do material.', 'error');
             return;
@@ -1109,12 +1129,20 @@ export default function ConferenciaPage() {
                                 type="radio"
                                 checked={classificacao === 'material_cliente'}
                                 onChange={() => setClassificacao('material_cliente')}
+                                disabled={!canMaterialCliente}
                             />
-                            <span className="text-sm font-medium text-gray-800">Material do Cliente (não vender)</span>
+                            <span className={`text-sm font-medium ${canMaterialCliente ? 'text-gray-800' : 'text-gray-400'}`}>
+                                Material do Cliente (não vender)
+                            </span>
+                            {!canMaterialCliente && (
+                                <span className="ml-1 rounded-full bg-gray-100 px-2 py-0.5 text-[11px] font-semibold text-gray-600">
+                                    Indústria/Scale
+                                </span>
+                            )}
                         </label>
                     </div>
 
-                    {classificacao === 'material_cliente' && (
+                    {classificacao === 'material_cliente' && canMaterialCliente && (
                         <div>
                             <label className="block text-sm font-medium text-gray-700 mb-1">Cliente (dono do material)</label>
                             <ClientAutocomplete

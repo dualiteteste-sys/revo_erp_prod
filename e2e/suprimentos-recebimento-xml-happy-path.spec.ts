@@ -103,7 +103,7 @@ async function mockAuthAndEmpresa(page: Page) {
         plano_mvp: 'servicos',
         max_users: 2,
         servicos_enabled: true,
-        industria_enabled: true,
+        industria_enabled: false,
       },
     });
   });
@@ -280,8 +280,38 @@ test('SUP-03: importar XML → criar recebimento → finalizar (happy path)', as
 
     // RPC: finalizar recebimento
     if (url.includes('/rest/v1/rpc/finalizar_recebimento')) {
-      recebimentos = recebimentos.map((r) => (r.id === recebimentoId ? { ...r, status: 'concluido', updated_at: new Date().toISOString() } : r));
+      const rec = recebimentos.find((r) => r.id === recebimentoId);
+      if (!rec?.classificacao) {
+        await route.fulfill({
+          json: {
+            status: 'pendente_classificacao',
+            message: 'Selecione o destino do estoque antes de concluir.',
+          },
+        });
+        return;
+      }
+      recebimentos = recebimentos.map((r) =>
+        r.id === recebimentoId ? { ...r, status: 'concluido', updated_at: new Date().toISOString() } : r
+      );
       await route.fulfill({ json: { status: 'concluido', message: 'Recebimento concluído.' } });
+      return;
+    }
+
+    // RPC: set classificação do recebimento
+    if (url.includes('/rest/v1/rpc/recebimento_set_classificacao')) {
+      const body = (await req.postDataJSON()) as any;
+      const recId = body?.p_recebimento_id;
+      recebimentos = recebimentos.map((r) =>
+        r.id === recId
+          ? {
+              ...r,
+              classificacao: body?.p_classificacao ?? r.classificacao,
+              cliente_id: body?.p_cliente_id ?? r.cliente_id,
+              updated_at: new Date().toISOString(),
+            }
+          : r
+      );
+      await route.fulfill({ json: { ok: true } });
       return;
     }
 
