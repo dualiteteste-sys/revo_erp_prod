@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X } from 'lucide-react';
+import { createPortal } from 'react-dom';
 import { cn } from '@/lib/utils';
 import GlassCard from './GlassCard';
 
@@ -133,7 +134,9 @@ const Modal: React.FC<ModalProps> = ({
     };
   }, [isOpen]);
 
-  return (
+  if (typeof document === 'undefined') return null;
+
+  return createPortal(
     <AnimatePresence>
       {isOpen && (
         <motion.div
@@ -143,7 +146,7 @@ const Modal: React.FC<ModalProps> = ({
           exit={{ opacity: 0 }}
           transition={{ duration: 0.3 }}
           className={cn(
-            'fixed inset-0 z-40 flex items-center justify-center p-4 bg-slate-950/30 backdrop-blur-md',
+            'fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/30 backdrop-blur-md',
             overlayClassName,
           )}
           onMouseDown={(e) => {
@@ -156,11 +159,11 @@ const Modal: React.FC<ModalProps> = ({
             animate={{ scale: 1, y: 0 }}
             exit={{ scale: 0.95, y: 20 }}
             transition={{ type: 'spring', stiffness: 300, damping: 30 }}
-          className={cn(
-            'w-full max-h-[95vh] flex flex-col relative',
-            sizeClasses[size],
-            containerClassName,
-          )}
+            className={cn(
+              'w-full max-h-[95vh] flex flex-col relative',
+              sizeClasses[size],
+              containerClassName,
+            )}
             onClick={(e) => e.stopPropagation()}
             role="dialog"
             aria-modal="true"
@@ -182,14 +185,15 @@ const Modal: React.FC<ModalProps> = ({
                   <X size={24} />
                 </button>
               </header>
-              <div className={cn('flex-grow overflow-y-auto scrollbar-styled', bodyClassName)}>
+              <div className={cn('flex-grow min-h-0 overflow-y-auto scrollbar-styled', bodyClassName)}>
                 {children}
               </div>
             </GlassCard>
           </motion.div>
         </motion.div>
       )}
-    </AnimatePresence>
+    </AnimatePresence>,
+    document.body,
   );
 };
 

@@ -181,3 +181,34 @@ test('Menu missing modules: rotas principais abrem (MVP)', async ({ page }) => {
     await expect(page.getByRole('heading', { name: c.heading })).toBeVisible();
   }
 });
+
+test('UI: modal stack — Criar Novo Produto dentro de BOM não corta footer', async ({ page }) => {
+  test.setTimeout(60_000);
+
+  await mockAuthAndEmpresa(page, { role: 'admin' });
+
+  await page.goto('/auth/login');
+  await page.getByPlaceholder('seu@email.com').fill('test@example.com');
+  await page.getByLabel('Senha').fill('password123');
+  await page.getByRole('button', { name: 'Entrar' }).click();
+  await expect(page).toHaveURL(/\/app(\/|$)/);
+
+  await page.goto('/app/industria/boms');
+  await expect(page.getByRole('heading', { name: 'Fichas Técnicas (BOM)' })).toBeVisible();
+
+  await page.getByRole('button', { name: 'Nova Ficha Técnica' }).click();
+  const bomDialog = page.getByRole('dialog', { name: 'Nova Ficha Técnica' });
+  await expect(bomDialog).toBeVisible();
+
+  await bomDialog.getByRole('button', { name: 'Criar Novo' }).click();
+
+  const productDialog = page.getByRole('dialog', { name: 'Novo Produto' });
+  await expect(productDialog).toBeVisible();
+  await expect(productDialog.getByRole('button', { name: /Salvar/i })).toBeVisible();
+
+  await productDialog.getByRole('button', { name: 'Cancelar' }).click();
+  await expect(productDialog).toBeHidden();
+
+  await bomDialog.getByRole('button', { name: 'Cancelar' }).click();
+  await expect(bomDialog).toBeHidden();
+});
