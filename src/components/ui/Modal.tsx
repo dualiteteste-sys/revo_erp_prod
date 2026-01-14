@@ -160,7 +160,7 @@ const Modal: React.FC<ModalProps> = ({
             exit={{ scale: 0.95, y: 20 }}
             transition={{ type: 'spring', stiffness: 300, damping: 30 }}
             className={cn(
-              'w-full max-h-[95vh] flex flex-col relative',
+              'w-full min-w-[40vw] max-h-[95vh] flex flex-col relative',
               sizeClasses[size],
               containerClassName,
             )}
