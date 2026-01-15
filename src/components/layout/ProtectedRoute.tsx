@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthProvider';
 import GlassCard from '../ui/GlassCard';
@@ -131,18 +131,33 @@ const AutoSelectEmpresa = ({
   onDone: () => void;
 }) => {
   useEffect(() => {
+    // Mantém o efeito estável mesmo se callbacks mudarem de identidade por re-render.
+  }, []);
+
+  const setActiveRef = useRef(setActive);
+  const onDoneRef = useRef(onDone);
+
+  useEffect(() => {
+    setActiveRef.current = setActive;
+  }, [setActive]);
+
+  useEffect(() => {
+    onDoneRef.current = onDone;
+  }, [onDone]);
+
+  useEffect(() => {
     let mounted = true;
     (async () => {
       try {
-        await setActive();
+        await setActiveRef.current();
       } finally {
-        if (mounted) onDone();
+        if (mounted) onDoneRef.current();
       }
     })();
     return () => {
       mounted = false;
     };
-  }, [empresaId, onDone, setActive]);
+  }, [empresaId]);
 
   return <FullscreenLoading label="Definindo empresa ativa…" />;
 };

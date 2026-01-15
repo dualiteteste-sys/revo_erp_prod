@@ -21,24 +21,25 @@ Objetivo: **zerar 403 intermitente** em Scale/OWNER e evitar que isso apareça e
 ### 0.1 Diagnóstico rápido (reprodutibilidade)
 - [ ] Capturar 10 ocorrências reais de `403` em produção/dev com: rota, RPC/tabela, `request_id`, usuário, empresa_id, status/erro completo.
 - [ ] Confirmar se o 403 é Postgres `42501` (“Acesso negado/empresa inválida/plano indisponível”) vs 403 de Edge Function (billing/portal/invite/etc.).
-- [ ] Criar uma página interna “Diagnóstico → 403” (ou estender a atual) para listar últimos erros 403 agrupados por `fn`/rota.
+- [x] Criar uma página interna “Diagnóstico → 403” (ou estender a atual) para listar últimos erros 403 agrupados por `fn`/rota.
 
 ### 0.2 Frontend: tornar “empresa ativa” determinística (não oscilar)
-- [ ] Ajustar React Query keys em `useEmpresas/useActiveEmpresaId` para incluir `userId` (evitar cache cruzado).
-- [ ] Implementar retry/backoff para `user_active_empresa` e `empresa_usuarios` (somente para falhas transitórias: timeout/failed to fetch/502/503).
-- [ ] Não converter erro transitório em `null/[]` silenciosamente; manter último valor válido do cache e expor estado “reconectando”.
-- [ ] Implementar **AuthGate**: não renderizar módulos `app/*` enquanto `activeEmpresaId` não estiver resolvido (mostrar tela bonita “Carregando ambiente…”).
-- [ ] Implementar “recovery automático” quando uma RPC falhar por `42501`/sem empresa ativa: refetch → set_active (se único vínculo) → retry 1x.
-- [ ] Padronizar o tratamento de “empresa ativa ausente”: modal “Selecione sua empresa” (nunca um 403 genérico).
+- [x] Ajustar React Query keys em `useEmpresas/useActiveEmpresaId` para incluir `userId` (evitar cache cruzado).
+- [x] Implementar retry/backoff para `user_active_empresa` e `empresa_usuarios` (somente para falhas transitórias: timeout/failed to fetch/502/503).
+- [x] Não converter erro transitório em `null/[]` silenciosamente; manter último valor válido do cache.
+- [x] Implementar **AuthGate**: não renderizar módulos `app/*` enquanto `activeEmpresaId` não estiver resolvido (mostrar tela bonita “Carregando ambiente…”).
+- [x] Implementar “recovery automático” quando uma RPC falhar por `42501`/sem empresa ativa: refetch → set_active (se único vínculo) → retry 1x.
+- [x] Padronizar o tratamento de “empresa ativa ausente”: modal “Selecione sua empresa” (nunca um 403 genérico).
+- [x] E2E regressão: “empresa ativa ausente” não quebra login e auto-seleciona quando há vínculo único.
 
 ### 0.3 Supabase: garantir preferências de empresa (para multi-empresa)
-- [ ] Trigger/rotina para garantir que `user_active_empresa` exista quando o usuário tiver 1 empresa (auto-set) e quando virar multi-empresa (preservar escolha).
-- [ ] Restringir `DELETE` de `user_active_empresa` quando o usuário for membro de >1 empresa (ou forçar troca via RPC).
-- [ ] Criar/ajustar RPC “context snapshot” (whoami + empresa ativa + role + plano) para debug rápido.
+- [x] Trigger/rotina para garantir que `user_active_empresa` exista quando o usuário tiver 1 empresa (auto-set) e quando virar multi-empresa (preservar escolha).
+- [x] Restringir `DELETE` de `user_active_empresa` quando o usuário for membro de >1 empresa (ou forçar troca via RPC).
+- [x] Criar/ajustar RPC “context snapshot” (whoami + empresa ativa + role + plano) para debug rápido.
 
 ### 0.4 Observabilidade do 403
-- [ ] Logar automaticamente (em tabela) todo `HTTP_403` com `fn`, `request_id`, `empresa_id`, `user_id`, `route`, `role`, `plan`.
-- [ ] Dashboard interno “Top 403 por módulo” com filtros e status “investigando/corrigido”.
+- [x] Logar automaticamente (em tabela) todo `HTTP_403` com `fn`, `request_id`, `empresa_id`, `user_id`, `route`, `role`, `plan`.
+- [x] Dashboard interno “Top 403 por módulo” com filtros e status “investigando/corrigido”.
 
 **Aceite P0**
 - [ ] Rodar `yarn test:e2e:gate:all` com **console-sweep verde**.
@@ -178,4 +179,3 @@ Objetivo: **zerar 403 intermitente** em Scale/OWNER e evitar que isso apareça e
 - [ ] `release:check` verde e executado regularmente.
 - [ ] Painel interno de erros/403 com triagem e SLA (beta).
 - [ ] Documentação mínima: arquitetura, multi-tenant, migrations, padrões de UI e testes.
-
