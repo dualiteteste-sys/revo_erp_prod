@@ -7,13 +7,27 @@ type Empresa = Database['public']['Tables']['empresas']['Row'];
 
 export const EMPRESAS_KEYS = {
     all: ['empresas'] as const,
-    list: () => [...EMPRESAS_KEYS.all, 'list'] as const,
-    active: () => [...EMPRESAS_KEYS.all, 'active'] as const,
+    list: (userId: string | null) => [...EMPRESAS_KEYS.all, 'list', userId ?? 'anon'] as const,
+    active: (userId: string | null) => [...EMPRESAS_KEYS.all, 'active', userId ?? 'anon'] as const,
 };
+
+function isTransientNetworkError(error: unknown): boolean {
+    const msg = String((error as any)?.message ?? error ?? '').toLowerCase();
+    const status = (error as any)?.status ?? (error as any)?.statusCode ?? null;
+    if (status === 0) return true;
+    if (typeof status === 'number' && status >= 500) return true;
+    return (
+        msg.includes('failed to fetch') ||
+        msg.includes('load failed') ||
+        msg.includes('networkerror') ||
+        msg.includes('timeout') ||
+        msg.includes('ecconnreset')
+    );
+}
 
 export function useEmpresas(userId: string | null) {
     return useQuery({
-        queryKey: EMPRESAS_KEYS.list(),
+        queryKey: EMPRESAS_KEYS.list(userId),
         queryFn: async () => {
             if (!userId) return [];
 
@@ -24,11 +38,6 @@ export function useEmpresas(userId: string | null) {
                 .order("created_at", { ascending: false });
 
             if (error) {
-                const message = String((error as any)?.message || '');
-                if (message.toLowerCase().includes('failed to fetch')) {
-                    logger.warn('[QUERY][empresas] list error (network)', { error });
-                    return [] as Empresa[];
-                }
                 logger.error('[QUERY][empresas] list error', error);
                 throw error;
             }
@@ -39,12 +48,15 @@ export function useEmpresas(userId: string | null) {
         },
         enabled: !!userId,
         staleTime: 1000 * 60 * 5, // 5 minutes
+        placeholderData: (prev) => prev,
+        retry: (failureCount, error) => isTransientNetworkError(error) && failureCount < 3,
+        retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 8000),
     });
 }
 
 export function useActiveEmpresaId(userId: string | null) {
     return useQuery({
-        queryKey: EMPRESAS_KEYS.active(),
+        queryKey: EMPRESAS_KEYS.active(userId),
         queryFn: async () => {
             if (!userId) return null;
 
@@ -57,13 +69,17 @@ export function useActiveEmpresaId(userId: string | null) {
 
             if (error) {
                 logger.warn('[QUERY][active_empresa] error', error);
-                return null;
+                throw error;
             }
 
             // @ts-ignore - Table types might be missing or generic
             return ((data?.[0] as any)?.empresa_id ?? null) as string | null;
         },
         enabled: !!userId,
+        staleTime: 1000 * 30,
+        placeholderData: (prev) => prev,
+        retry: (failureCount, error) => isTransientNetworkError(error) && failureCount < 3,
+        retryDelay: (attemptIndex) => Math.min(750 * 2 ** attemptIndex, 6000),
     });
 }
 
@@ -121,9 +137,8 @@ export function useSetActiveEmpresa() {
         },
         onSuccess: (_, empresaId) => {
             logger.info("[MUTATION][set_active] success");
-            // Update the cache immediately
-            queryClient.setQueryData(EMPRESAS_KEYS.active(), empresaId);
-            queryClient.invalidateQueries({ queryKey: EMPRESAS_KEYS.active() });
+            // Invalida para todos os usuários/sessões (chave inclui userId).
+            queryClient.invalidateQueries({ queryKey: EMPRESAS_KEYS.all });
         },
     });
 }
