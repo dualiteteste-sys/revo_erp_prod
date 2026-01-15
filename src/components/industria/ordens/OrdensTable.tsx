@@ -4,8 +4,7 @@ import { Copy, Edit, Eye, Calendar, User, Package, MoreHorizontal, Trash2 } from
 import { formatOrderNumber } from '@/lib/utils';
 import { useToast } from '@/contexts/ToastProvider';
 import { useConfirm } from '@/contexts/ConfirmProvider';
-import { deleteOrdemProducao } from '@/services/industriaProducao';
-import { deleteOrdemBeneficiamento } from '@/services/industria';
+import { deleteOrdemIndustria } from '@/services/industria';
 import ResizableSortableTh, { type SortState } from '@/components/ui/table/ResizableSortableTh';
 import TableColGroup from '@/components/ui/table/TableColGroup';
 import { useTableColumnWidths, type TableColumnWidthDef } from '@/components/ui/table/useTableColumnWidths';
@@ -82,7 +81,7 @@ export default function OrdensTable({ orders, onEdit, onClone, onChanged }: Prop
       title: isOb ? 'Excluir OB' : 'Excluir OP',
       description: isOb
         ? 'Excluirá esta OB se estiver em rascunho e sem operações (execução) / entregas.'
-        : 'Excluirá esta OP se estiver em rascunho e sem operações/apontamentos/entregas.',
+        : 'Excluirá esta OP se estiver em rascunho e sem operações (execução) / entregas.',
       confirmText: 'Excluir',
       cancelText: 'Cancelar',
       variant: 'warning',
@@ -90,15 +89,12 @@ export default function OrdensTable({ orders, onEdit, onClone, onChanged }: Prop
     if (!ok) return;
 
     try {
-      if (isOp) {
-        await deleteOrdemProducao(order.id);
-      } else if (isOb) {
-        await deleteOrdemBeneficiamento(order.id);
-      } else {
+      if (!isOp && !isOb) {
         addToast('Tipo de ordem não suportado para exclusão.', 'error');
         return;
       }
 
+      await deleteOrdemIndustria(order.id);
       addToast(`${isOb ? 'OB' : 'OP'} excluída com sucesso.`, 'success');
       onChanged?.();
     } catch (e: any) {

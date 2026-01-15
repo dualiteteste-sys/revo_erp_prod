@@ -22,6 +22,7 @@ interface Props {
 export default function RoteiroFormPanel({ roteiroId, initialData, onSaveSuccess, onClose }: Props) {
   const { addToast } = useToast();
   const [loading, setLoading] = useState(!!roteiroId);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [activeTab, setActiveTab] = useState<'dados' | 'etapas'>('dados');
 
@@ -53,6 +54,7 @@ export default function RoteiroFormPanel({ roteiroId, initialData, onSaveSuccess
       return;
     }
     try {
+      setLoadError(null);
       const data = await getRoteiroDetails(idToLoad);
       if (data) {
         setFormData(data);
@@ -61,10 +63,11 @@ export default function RoteiroFormPanel({ roteiroId, initialData, onSaveSuccess
       }
     } catch (e) {
       logger.error('[Indústria][Roteiro] Falha ao carregar roteiro', e, { roteiroId: idToLoad });
-      addToast('Erro ao carregar roteiro.', 'error');
-      // Não feche o modal em refresh: evita perda de contexto do usuário em falhas transitórias.
-      // No carregamento inicial (editar), fechar evita um formulário "morto".
-      if (behavior === 'initial') onClose();
+      const message = behavior === 'initial'
+        ? 'Não foi possível abrir este roteiro. Tente recarregar.'
+        : 'Erro ao atualizar dados do roteiro.';
+      setLoadError(message);
+      addToast(message, 'error');
     } finally {
       setLoading(false);
     }
@@ -127,6 +130,33 @@ export default function RoteiroFormPanel({ roteiroId, initialData, onSaveSuccess
   };
 
   if (loading) return <div className="flex justify-center p-8"><Loader2 className="animate-spin" /></div>;
+
+  if (loadError && roteiroId) {
+    return (
+      <div className="p-6">
+        <div className="rounded-xl border border-red-200 bg-red-50 p-4">
+          <div className="text-sm font-semibold text-red-800">Não foi possível carregar o roteiro</div>
+          <div className="mt-1 text-sm text-red-700">{loadError}</div>
+          <div className="mt-4 flex gap-2">
+            <button
+              type="button"
+              onClick={() => loadDetails(roteiroId, 'initial')}
+              className="rounded-md bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700"
+            >
+              Recarregar
+            </button>
+            <button
+              type="button"
+              onClick={onClose}
+              className="rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50"
+            >
+              Fechar
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col h-full">
