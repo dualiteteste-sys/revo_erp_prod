@@ -183,6 +183,12 @@ export async function deleteOrdemBeneficiamento(id: string): Promise<void> {
   await callRpc('industria_delete_ordem', { p_id: id });
 }
 
+// OP/OB (módulo unificado `industria_ordens`)
+// Mantém o nome separado para não quebrar imports legados, mas internamente é o mesmo RPC.
+export async function deleteOrdemIndustria(id: string): Promise<void> {
+  await callRpc('industria_delete_ordem', { p_id: id });
+}
+
 export async function replanejarOperacao(operacaoId: string, centroTrabalhoId: string, prioridade?: number) {
   await callRpc('industria_operacao_replanejar', {
     p_operacao_id: operacaoId,
