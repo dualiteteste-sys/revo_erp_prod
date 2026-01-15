@@ -5,6 +5,7 @@ import GraficoFaturamento from '../components/dashboard/GraficoFaturamento';
 import AtividadesRecentes from '../components/dashboard/AtividadesRecentes';
 import GraficoVendas from '../components/dashboard/GraficoVendas';
 import RankingCategorias from '../components/dashboard/RankingCategorias';
+import GraficoPagarReceber from '../components/dashboard/GraficoPagarReceber';
 import { getMainDashboardData } from '@/services/mainDashboard';
 import { formatCurrency } from '@/lib/utils';
 import { logger } from '@/lib/logger';
@@ -139,6 +140,10 @@ const Dashboard: React.FC = () => {
 
       <div className="lg:col-span-7">
         <RankingCategorias topProducts={data?.current?.top_produtos ?? []} loading={loading} />
+      </div>
+
+      <div className="lg:col-span-12">
+        <GraficoPagarReceber series={data?.financeiroPagarReceber3m ?? []} loading={loading} />
       </div>
     </div>
   );
