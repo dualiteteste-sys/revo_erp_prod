@@ -1,4 +1,4 @@
-name: Tenant Restore from R2 (Empresa) — Supabase
+name: Tenant Restore from R2 (Empresa) - Supabase
 
 on:
   workflow_dispatch:
@@ -17,7 +17,7 @@ on:
         type: string
         required: true
       r2_key:
-        description: "Chave completa no R2 (zip) — ex.: revo/tenants/<empresa_id>/prod/YYYY/MM/DD/tenant_export_*.zip"
+        description: "Chave completa no R2 (zip) - ex.: revo/tenants/<empresa_id>/prod/YYYY/MM/DD/tenant_export_*.zip"
         type: string
         required: true
       confirm:
@@ -238,4 +238,3 @@ SQL
                 labels,
               });
             }
-

@@ -1,4 +1,4 @@
-name: Tenant Backup (Empresa) — Supabase
+name: Tenant Backup (Empresa) - Supabase
 
 on:
   workflow_dispatch:
@@ -17,7 +17,7 @@ on:
         type: string
         required: true
       label:
-        description: "Rótulo opcional (vai no nome do arquivo)"
+        description: "Rotulo opcional (vai no nome do arquivo)"
         required: false
         default: ""
 
@@ -203,4 +203,3 @@ jobs:
             tenant_export_*.zip
             tenant_export_*.manifest.json
           retention-days: 7
-
