@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useMemo, useState, ReactNode, useCallback } from 'react';
+import { createContext, useContext, useEffect, useMemo, useRef, useState, ReactNode, useCallback } from 'react';
 import { useSupabase } from '@/providers/SupabaseProvider';
 import { useAuth } from './AuthProvider';
 import { Database } from '../types/database.types';
@@ -25,6 +25,7 @@ export const SubscriptionProvider = ({ children }: { children: ReactNode }) => {
   const { activeEmpresa } = useAuth();
   const [subscription, setSubscription] = useState<SubscriptionWithPlan | null>(null);
   const [loadingSubscription, setLoadingSubscription] = useState(true);
+  const autoSyncAttemptedRef = useRef<string | null>(null);
 
   const empresaId = useMemo(() => activeEmpresa?.id ?? null, [activeEmpresa?.id]);
   const localBypass = useMemo(() => isLocalBillingBypassEnabled(), []);
@@ -73,6 +74,36 @@ export const SubscriptionProvider = ({ children }: { children: ReactNode }) => {
       setLoadingSubscription(false);
     }
   }, [supabase]);
+
+  // Estado da arte: se a empresa acabou de assinar e o webhook ainda não sincronizou,
+  // tentamos um "self-heal" (best-effort) sem exigir clique manual em "Sincronizar com Stripe".
+  useEffect(() => {
+    if (localBypass) return;
+    if (!empresaId) return;
+    if (loadingSubscription) return;
+
+    // Só tenta quando não há assinatura local ainda.
+    if (subscription) return;
+
+    // Evita loops: 1 tentativa por empresa por sessão (runtime).
+    if (autoSyncAttemptedRef.current === empresaId) return;
+    autoSyncAttemptedRef.current = empresaId;
+
+    void (async () => {
+      try {
+        const { error } = await supabase.functions.invoke('billing-sync-subscription', {
+          body: { empresa_id: empresaId },
+        });
+        if (error) {
+          logger.warn('[Billing][AutoSync] Falha ao sincronizar assinatura (best-effort)', { error });
+          return;
+        }
+        await fetchSubscription(empresaId);
+      } catch (e) {
+        logger.warn('[Billing][AutoSync] Erro inesperado (best-effort)', { error: e });
+      }
+    })();
+  }, [empresaId, fetchSubscription, loadingSubscription, localBypass, subscription, supabase.functions]);
 
   useEffect(() => {
     if (localBypass) {

@@ -76,14 +76,15 @@ Deno.serve(async (req) => {
 
     const { data: empresa, error: empErr } = await admin
       .from("empresas")
-      .select("id, stripe_customer_id")
+      .select("id, stripe_customer_id, cnpj")
       .eq("id", empresa_id)
       .maybeSingle();
     if (empErr || !empresa) {
       return json(corsHeaders, 404, { error: "company_not_found" });
     }
 
-    const customerId = empresa.stripe_customer_id ? String(empresa.stripe_customer_id) : "";
+    const empresaCnpj = (empresa as any)?.cnpj ? String((empresa as any).cnpj).replace(/\D/g, "") : "";
+    const customerId = (empresa as any).stripe_customer_id ? String((empresa as any).stripe_customer_id) : "";
     const stripe = new Stripe(Deno.env.get("STRIPE_SECRET_KEY")!, { apiVersion: "2024-06-20" });
 
     // Auto-link: tenta encontrar o Customer no Stripe via metadata.empresa_id (evita fricção no app).
@@ -106,6 +107,94 @@ Deno.serve(async (req) => {
         }
       } catch (e) {
         console.warn("billing-sync-subscription: customer auto-link search failed (best-effort)", e);
+      }
+    }
+
+    if (!effectiveCustomerId && empresaCnpj) {
+      try {
+        const q = `metadata['cnpj']:'${empresaCnpj}'`;
+        const found = await stripe.customers.search({ query: q, limit: 1 });
+        const candidate = found.data?.[0];
+        if (candidate?.id) {
+          effectiveCustomerId = candidate.id;
+          const { error: updErr } = await admin
+            .from("empresas")
+            .update({ stripe_customer_id: effectiveCustomerId })
+            .eq("id", empresa_id);
+          if (updErr) {
+            console.warn("billing-sync-subscription: failed to persist stripe_customer_id (best-effort)", updErr);
+          }
+        }
+      } catch (e) {
+        console.warn("billing-sync-subscription: customer auto-link search by cnpj failed (best-effort)", e);
+      }
+    }
+
+    if (!effectiveCustomerId) {
+      // Último fallback (best-effort): busca por email e escolhe o customer com "melhor" subscription.
+      // Isso ajuda a reparar casos antigos onde o customer foi criado sem metadata.
+      const email = (user.email ?? "").trim();
+      if (email) {
+        try {
+          const found = await stripe.customers.search({ query: `email:'${email}'`, limit: 10 });
+          const candidates = found.data ?? [];
+          if (candidates.length > 0) {
+            let best: { customerId: string; sub: StripeSubscription | null } | null = null;
+            for (const c of candidates) {
+              const listed = await stripe.subscriptions.list({
+                customer: c.id,
+                status: "all",
+                limit: 10,
+              });
+              const picked = pickBestSubscription(listed.data as StripeSubscription[]);
+              if (!picked) continue;
+              if (!best) {
+                best = { customerId: c.id, sub: picked };
+                continue;
+              }
+              const pa = (best.sub?.status ?? "canceled") as any;
+              const pb = (picked.status ?? "canceled") as any;
+              // Reutiliza o mesmo critério de prioridade de pickBestSubscription
+              const priority: Record<string, number> = {
+                active: 0,
+                trialing: 1,
+                past_due: 2,
+                unpaid: 3,
+                incomplete: 4,
+                incomplete_expired: 5,
+                canceled: 6,
+              };
+              const ca = priority[pa] ?? 99;
+              const cb = priority[pb] ?? 99;
+              if (cb < ca) best = { customerId: c.id, sub: picked };
+              else if (cb === ca) {
+                const ea = best.sub?.current_period_end ?? 0;
+                const eb = picked.current_period_end ?? 0;
+                if (eb > ea) best = { customerId: c.id, sub: picked };
+              }
+            }
+
+            if (best?.customerId) {
+              effectiveCustomerId = best.customerId;
+              const { error: updErr } = await admin
+                .from("empresas")
+                .update({ stripe_customer_id: effectiveCustomerId })
+                .eq("id", empresa_id);
+              if (updErr) {
+                console.warn("billing-sync-subscription: failed to persist stripe_customer_id from email fallback (best-effort)", updErr);
+              }
+              try {
+                await stripe.customers.update(effectiveCustomerId, {
+                  metadata: { empresa_id, ...(empresaCnpj ? { cnpj: empresaCnpj } : {}) },
+                });
+              } catch {
+                // best-effort
+              }
+            }
+          }
+        } catch (e) {
+          console.warn("billing-sync-subscription: customer auto-link search by email failed (best-effort)", e);
+        }
       }
     }
 

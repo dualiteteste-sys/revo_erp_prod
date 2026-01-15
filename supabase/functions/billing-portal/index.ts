@@ -64,15 +64,21 @@ Deno.serve(async (req) => {
     }
     
     const { data: empresa } = await supabase.from("empresas")
-      .select("stripe_customer_id, fantasia, razao_social")
+      .select("stripe_customer_id, fantasia, razao_social, nome_fantasia, nome_razao_social, cnpj")
       .eq("id", empresa_id).single();
 
     const stripe = new Stripe(Deno.env.get("STRIPE_SECRET_KEY")!, { apiVersion: "2024-06-20" });
+    const empresaCnpj = (empresa as any)?.cnpj ? String((empresa as any).cnpj).replace(/\D/g, "") : "";
+    const displayRazao = (empresa as any)?.razao_social ?? (empresa as any)?.nome_razao_social ?? null;
+    const displayFantasia = (empresa as any)?.fantasia ?? (empresa as any)?.nome_fantasia ?? null;
+    const displayName = (displayFantasia || displayRazao || `Empresa ${empresa_id}`).slice(0, 250);
+
     let customerId = empresa?.stripe_customer_id ? String(empresa.stripe_customer_id) : "";
     if (!customerId) {
       const customer = await stripe.customers.create({
-        name: (empresa?.fantasia || empresa?.razao_social || `Empresa ${empresa_id}`).slice(0, 250),
-        metadata: { empresa_id },
+        name: displayName,
+        email: user.email ?? undefined,
+        metadata: { empresa_id, ...(empresaCnpj ? { cnpj: empresaCnpj } : {}) },
       });
       customerId = customer.id;
       await supabase.from("empresas").update({ stripe_customer_id: customerId }).eq("id", empresa_id);

@@ -90,6 +90,7 @@ Objetivo: **zerar 403 intermitente** em Scale/OWNER e evitar que isso apareça e
 - [ ] Backups manuais (UI interna): “Dev → Backups” com disparo de backup/restore via workflows (com confirmações de segurança).
   - [x] Implementação no código (UI + Edge Function + workflows + migration catálogo `ops_db_backups`).
   - [ ] Deploy/migrations aplicadas (dev/prod) + validação de ponta a ponta (disparo, catálogo, restore em `dev/verify`).
+- [ ] Stripe/Assinaturas + Backup por tenant (403 intermitente): ver `CHECKLIST-STRIPE-ASSINATURAS.md`.
 
 ---
 
