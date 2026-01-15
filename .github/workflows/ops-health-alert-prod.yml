@@ -25,6 +25,9 @@ jobs:
       THRESHOLD_RPC_P95_MS: "2000"
       THRESHOLD_RPC_ERROR_RATE_PCT: "1"
       THRESHOLD_RPC_MIN_SAMPLES: "30"
+      # 403 (intermitente) deve ser zero para missing_active_empresa e falha de recovery.
+      THRESHOLD_403_MISSING_ACTIVE_15M: "0"
+      THRESHOLD_403_RECOVERY_FAILED_15M: "0"
     steps:
       - name: Install psql + jq
         run: |
@@ -136,6 +139,28 @@ jobs:
                     and event = 'metric.rpc'
                     and (context ? 'duration_ms')
                 ) end
+              ,
+              'ops_403_total_15m',
+                case when to_regclass('public.ops_403_events') is null then 0 else (
+                  select count(*)::int
+                  from public.ops_403_events
+                  where created_at >= (now() - interval '15 minutes')
+                ) end,
+              'ops_403_missing_active_empresa_15m',
+                case when to_regclass('public.ops_403_events') is null then 0 else (
+                  select count(*)::int
+                  from public.ops_403_events
+                  where created_at >= (now() - interval '15 minutes')
+                    and (kind = 'missing_active_empresa' or kind is null)
+                ) end,
+              'ops_403_recovery_failed_15m',
+                case when to_regclass('public.ops_403_events') is null then 0 else (
+                  select count(*)::int
+                  from public.ops_403_events
+                  where created_at >= (now() - interval '15 minutes')
+                    and coalesce((context->>'recovery_attempted')::boolean, false) is true
+                    and coalesce((context->>'recovery_ok')::boolean, false) is false
+                ) end
             )::text;
           ")"
 
@@ -147,6 +172,9 @@ jobs:
           rpc_count_15m="$(echo "$HEALTH_JSON" | jq -r '.rpc_count_15m')"
           rpc_error_rate_pct_15m="$(echo "$HEALTH_JSON" | jq -r '.rpc_error_rate_pct_15m')"
           rpc_p95_ms_15m="$(echo "$HEALTH_JSON" | jq -r '.rpc_p95_ms_15m')"
+          ops_403_total_15m="$(echo "$HEALTH_JSON" | jq -r '.ops_403_total_15m')"
+          ops_403_missing_active_empresa_15m="$(echo "$HEALTH_JSON" | jq -r '.ops_403_missing_active_empresa_15m')"
+          ops_403_recovery_failed_15m="$(echo "$HEALTH_JSON" | jq -r '.ops_403_recovery_failed_15m')"
 
           echo "pending_max=$pending_max" >> "$GITHUB_OUTPUT"
           echo "failed_sum=$failed_sum" >> "$GITHUB_OUTPUT"
@@ -154,22 +182,34 @@ jobs:
           echo "rpc_count_15m=$rpc_count_15m" >> "$GITHUB_OUTPUT"
           echo "rpc_error_rate_pct_15m=$rpc_error_rate_pct_15m" >> "$GITHUB_OUTPUT"
           echo "rpc_p95_ms_15m=$rpc_p95_ms_15m" >> "$GITHUB_OUTPUT"
+          echo "ops_403_total_15m=$ops_403_total_15m" >> "$GITHUB_OUTPUT"
+          echo "ops_403_missing_active_empresa_15m=$ops_403_missing_active_empresa_15m" >> "$GITHUB_OUTPUT"
+          echo "ops_403_recovery_failed_15m=$ops_403_recovery_failed_15m" >> "$GITHUB_OUTPUT"
 
-          alert="false"
-          if [[ "$dlq_sum" -gt "${THRESHOLD_DLQ}" ]]; then alert="true"; fi
-          if [[ "$failed_sum" -gt "${THRESHOLD_FAILED}" ]]; then alert="true"; fi
-          if [[ "$pending_max" -gt "${THRESHOLD_PENDING}" ]]; then alert="true"; fi
+          alert_queues="false"
+          alert_403="false"
+
+          if [[ "$dlq_sum" -gt "${THRESHOLD_DLQ}" ]]; then alert_queues="true"; fi
+          if [[ "$failed_sum" -gt "${THRESHOLD_FAILED}" ]]; then alert_queues="true"; fi
+          if [[ "$pending_max" -gt "${THRESHOLD_PENDING}" ]]; then alert_queues="true"; fi
           if [[ "$rpc_count_15m" -ge "${THRESHOLD_RPC_MIN_SAMPLES}" ]]; then
             rpc_p95_int="${rpc_p95_ms_15m%.*}"
             rpc_err_int="${rpc_error_rate_pct_15m%.*}"
-            if [[ "$rpc_p95_int" -gt "${THRESHOLD_RPC_P95_MS}" ]]; then alert="true"; fi
-            if [[ "$rpc_err_int" -gt "${THRESHOLD_RPC_ERROR_RATE_PCT}" ]]; then alert="true"; fi
+            if [[ "$rpc_p95_int" -gt "${THRESHOLD_RPC_P95_MS}" ]]; then alert_queues="true"; fi
+            if [[ "$rpc_err_int" -gt "${THRESHOLD_RPC_ERROR_RATE_PCT}" ]]; then alert_queues="true"; fi
           fi
+          if [[ "$ops_403_missing_active_empresa_15m" -gt "${THRESHOLD_403_MISSING_ACTIVE_15M}" ]]; then alert_403="true"; fi
+          if [[ "$ops_403_recovery_failed_15m" -gt "${THRESHOLD_403_RECOVERY_FAILED_15M}" ]]; then alert_403="true"; fi
 
-          echo "alert=$alert" >> "$GITHUB_OUTPUT"
+          alert_any="false"
+          if [[ "$alert_queues" == "true" || "$alert_403" == "true" ]]; then alert_any="true"; fi
 
-      - name: Upsert ops alert issue (when alert=true)
-        if: steps.health.outputs.alert == 'true'
+          echo "alert_queues=$alert_queues" >> "$GITHUB_OUTPUT"
+          echo "alert_403=$alert_403" >> "$GITHUB_OUTPUT"
+          echo "alert=$alert_any" >> "$GITHUB_OUTPUT"
+
+      - name: Upsert ops alert issue — queues/DLQ (when alert_queues=true)
+        if: steps.health.outputs.alert_queues == 'true'
         uses: actions/github-script@v7
         env:
           HEALTH_JSON: ${{ steps.health.outputs.health_json }}
@@ -230,8 +270,8 @@ jobs:
               });
             }
 
-      - name: Auto-close ops alert issue (when alert=false)
-        if: steps.health.outputs.alert == 'false'
+      - name: Auto-close ops alert issue — queues/DLQ (when alert_queues=false)
+        if: steps.health.outputs.alert_queues == 'false'
         uses: actions/github-script@v7
         with:
           script: |
@@ -242,6 +282,90 @@ jobs:
               repo: context.repo.repo,
               state: "open",
               labels: labels.join(","),
+              per_page: 100,
+            });
+            const existing = issues.find(i => i.title === title);
+            if (!existing) return;
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: existing.number,
+              body: `✅ Resolvido automaticamente. Run: ${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`,
+            });
+            await github.rest.issues.update({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: existing.number,
+              state: "closed",
+            });
+
+      - name: Upsert ops alert issue — 403 (when alert_403=true)
+        if: steps.health.outputs.alert_403 == 'true'
+        uses: actions/github-script@v7
+        env:
+          HEALTH_JSON: ${{ steps.health.outputs.health_json }}
+          OPS_403_TOTAL_15M: ${{ steps.health.outputs.ops_403_total_15m }}
+          OPS_403_MISSING_ACTIVE_15M: ${{ steps.health.outputs.ops_403_missing_active_empresa_15m }}
+          OPS_403_RECOVERY_FAILED_15M: ${{ steps.health.outputs.ops_403_recovery_failed_15m }}
+        with:
+          script: |
+            const title = "OPS ALERT (PROD): 403 intermitente (empresa ativa)";
+            const labels = ["ops-alert", "ops-403"];
+            const body = [
+              "Detectado `403` recente em PROD — provável instabilidade de multi-tenant (empresa ativa) ou permissão/gating.",
+              "",
+              `- ops_403_total_15m: ${process.env.OPS_403_TOTAL_15M}`,
+              `- ops_403_missing_active_empresa_15m: ${process.env.OPS_403_MISSING_ACTIVE_15M}`,
+              `- ops_403_recovery_failed_15m: ${process.env.OPS_403_RECOVERY_FAILED_15M}`,
+              "",
+              "Próximos passos sugeridos:",
+              "- Abrir `Desenvolvedor → Diagnóstico 403` no app e usar “Copiar amostra (10)” para anexar no issue.",
+              "- Priorizar `kind=missing_active_empresa` e `recovery_ok=false`.",
+              "",
+              "Detalhes (JSON):",
+              "```json",
+              String(process.env.HEALTH_JSON ?? "{}"),
+              "```",
+              "",
+              `Run: ${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`,
+            ].join(\"\\n\");
+
+            const { data: issues } = await github.rest.issues.listForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: "open",
+              labels: "ops-403",
+              per_page: 100,
+            });
+            const existing = issues.find(i => i.title === title);
+            if (existing) {
+              await github.rest.issues.update({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: existing.number,
+                body,
+              });
+            } else {
+              await github.rest.issues.create({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                title,
+                body,
+                labels,
+              });
+            }
+
+      - name: Auto-close ops alert issue — 403 (when alert_403=false)
+        if: steps.health.outputs.alert_403 == 'false'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const title = "OPS ALERT (PROD): 403 intermitente (empresa ativa)";
+            const { data: issues } = await github.rest.issues.listForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: "open",
+              labels: "ops-403",
               per_page: 100,
             });
             const existing = issues.find(i => i.title === title);
