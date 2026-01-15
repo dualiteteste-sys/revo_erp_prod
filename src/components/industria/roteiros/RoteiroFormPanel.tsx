@@ -38,7 +38,7 @@ export default function RoteiroFormPanel({ roteiroId, initialData, onSaveSuccess
 
   useEffect(() => {
     if (roteiroId) {
-      loadDetails(roteiroId);
+      loadDetails(roteiroId, 'initial');
     } else if (initialData) {
       setFormData(initialData);
     } else {
@@ -46,7 +46,7 @@ export default function RoteiroFormPanel({ roteiroId, initialData, onSaveSuccess
     }
   }, [roteiroId, initialData]);
 
-  const loadDetails = async (idOverride?: string | null) => {
+  const loadDetails = async (idOverride?: string | null, behavior: 'initial' | 'refresh' = 'refresh') => {
     const idToLoad = idOverride ?? roteiroId ?? formData?.id;
     if (!idToLoad) {
       setLoading(false);
@@ -62,7 +62,9 @@ export default function RoteiroFormPanel({ roteiroId, initialData, onSaveSuccess
     } catch (e) {
       logger.error('[Indústria][Roteiro] Falha ao carregar roteiro', e, { roteiroId: idToLoad });
       addToast('Erro ao carregar roteiro.', 'error');
-      onClose();
+      // Não feche o modal em refresh: evita perda de contexto do usuário em falhas transitórias.
+      // No carregamento inicial (editar), fechar evita um formulário "morto".
+      if (behavior === 'initial') onClose();
     } finally {
       setLoading(false);
     }
@@ -235,7 +237,7 @@ export default function RoteiroFormPanel({ roteiroId, initialData, onSaveSuccess
           <RoteiroEtapasGrid
             roteiroId={formData.id}
             etapas={formData.etapas || []}
-            onUpdate={() => loadDetails(formData.id)}
+            onUpdate={() => loadDetails(formData.id, 'refresh')}
           />
         )}
       </div>
