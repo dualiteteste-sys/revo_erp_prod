@@ -38,7 +38,7 @@ export default function RoteiroFormPanel({ roteiroId, initialData, onSaveSuccess
 
   useEffect(() => {
     if (roteiroId) {
-      loadDetails();
+      loadDetails(roteiroId);
     } else if (initialData) {
       setFormData(initialData);
     } else {
@@ -46,16 +46,21 @@ export default function RoteiroFormPanel({ roteiroId, initialData, onSaveSuccess
     }
   }, [roteiroId, initialData]);
 
-  const loadDetails = async () => {
+  const loadDetails = async (idOverride?: string | null) => {
+    const idToLoad = idOverride ?? roteiroId ?? formData?.id;
+    if (!idToLoad) {
+      setLoading(false);
+      return;
+    }
     try {
-      const data = await getRoteiroDetails(roteiroId!);
+      const data = await getRoteiroDetails(idToLoad);
       if (data) {
         setFormData(data);
       } else {
         throw new Error('Roteiro não encontrado');
       }
     } catch (e) {
-      logger.error('[Indústria][Roteiro] Falha ao carregar roteiro', e, { roteiroId });
+      logger.error('[Indústria][Roteiro] Falha ao carregar roteiro', e, { roteiroId: idToLoad });
       addToast('Erro ao carregar roteiro.', 'error');
       onClose();
     } finally {
@@ -230,7 +235,7 @@ export default function RoteiroFormPanel({ roteiroId, initialData, onSaveSuccess
           <RoteiroEtapasGrid
             roteiroId={formData.id}
             etapas={formData.etapas || []}
-            onUpdate={loadDetails}
+            onUpdate={() => loadDetails(formData.id)}
           />
         )}
       </div>
