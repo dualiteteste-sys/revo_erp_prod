@@ -22,6 +22,7 @@ Objetivo: **zerar 403 intermitente** em Scale/OWNER e evitar que isso apareça e
 - [ ] Capturar 10 ocorrências reais de `403` em produção/dev com: rota, RPC/tabela, `request_id`, usuário, empresa_id, status/erro completo.
 - [ ] Confirmar se o 403 é Postgres `42501` (“Acesso negado/empresa inválida/plano indisponível”) vs 403 de Edge Function (billing/portal/invite/etc.).
 - [x] Criar uma página interna “Diagnóstico → 403” (ou estender a atual) para listar últimos erros 403 agrupados por `fn`/rota.
+- [x] Exportar amostra (snapshot + 10 eventos) com botão “Copiar amostra (10)” para colar direto no suporte/dev.
 
 ### 0.2 Frontend: tornar “empresa ativa” determinística (não oscilar)
 - [x] Ajustar React Query keys em `useEmpresas/useActiveEmpresaId` para incluir `userId` (evitar cache cruzado).
@@ -50,7 +51,8 @@ Objetivo: **zerar 403 intermitente** em Scale/OWNER e evitar que isso apareça e
 ## P1 — Segurança / Multi-tenant (RLS + RPC) (meta 9/10)
 
 ### 1.1 RLS/Isolamento por empresa (inventário)
-- [ ] Inventariar todas as tabelas públicas e garantir `empresa_id` e policy com `current_empresa_id()` quando aplicável.
+- [x] Criar inventário RLS (RPC + UI) listando tabelas públicas, flags de RLS/policies e metadados para triagem rápida.
+- [ ] Executar o inventário: garantir `empresa_id` e policy com `current_empresa_id()` quando aplicável.
 - [ ] Identificar tabelas acessadas diretamente pelo client e migrar para RPC sempre que houver risco de bypass.
 - [ ] Validar que `SECURITY DEFINER` nunca retorna dados de outra empresa (sempre filtrar por `current_empresa_id()`).
 

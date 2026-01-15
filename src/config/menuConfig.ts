@@ -178,6 +178,7 @@ export const menuConfig: MenuItem[] = [
       { name: 'Saúde', icon: Activity, href: '/app/desenvolvedor/saude', permission: { domain: 'ops', action: 'view' } },
       { name: 'Diagnóstico', icon: FileCode, href: '/app/desenvolvedor/diagnostico', permission: { domain: 'ops', action: 'view' } },
       { name: '403 (Empresa ativa)', icon: ShieldAlert, href: '/app/desenvolvedor/403', permission: { domain: 'ops', action: 'view' } },
+      { name: 'Inventário RLS', icon: Database, href: '/app/desenvolvedor/rls', permission: { domain: 'ops', action: 'view' } },
       { name: 'Logs', icon: FileText, href: '/app/desenvolvedor/logs', permission: { domain: 'logs', action: 'view' } },
       { name: 'Supabase Demo', icon: Database, href: '/app/desenvolvedor/supabase-demo' },
     ],

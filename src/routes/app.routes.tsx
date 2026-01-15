@@ -40,6 +40,7 @@ const SchemaDiagnosticsPage = lazyImport(() => import("../pages/dev/SchemaDiagno
 const UiPlaygroundPage = lazyImport(() => import("../pages/dev/UiPlaygroundPage"));
 const ErrorReportsPage = lazyImport(() => import("../pages/dev/ErrorReportsPage"));
 const Ops403Page = lazyImport(() => import("../pages/dev/Ops403Page"));
+const OpsRlsInventoryPage = lazyImport(() => import("../pages/dev/OpsRlsInventoryPage"));
 const SupabaseDemoPage = lazyImport(() => import("../pages/tools/SupabaseDemoPage"));
 const SettingsPage = lazyImport(() => import("../pages/settings/SettingsPage"));
 
@@ -522,6 +523,14 @@ export const appRoutes: RouteObject[] = [
               element: (
                 <RequirePermission permission={{ domain: "ops", action: "view" }}>
                   <Suspense fallback={<PageLoader />}><Ops403Page /></Suspense>
+                </RequirePermission>
+              ),
+            },
+            {
+              path: "desenvolvedor/rls",
+              element: (
+                <RequirePermission permission={{ domain: "ops", action: "view" }}>
+                  <Suspense fallback={<PageLoader />}><OpsRlsInventoryPage /></Suspense>
                 </RequirePermission>
               ),
             },
