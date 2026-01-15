@@ -10,6 +10,113 @@ import { logRpcMetric, maybeLogFirstValue } from "@/lib/metrics";
 
 type RpcArgs = Record<string, any>;
 
+let activeEmpresaRecoveryInFlight: Promise<boolean> | null = null;
+const ops403LogDedupe = new Map<string, number>();
+const OPS403_LOG_DEDUPE_MS = 10_000;
+
+function getCurrentRoute(): string | null {
+  if (typeof window === "undefined") return null;
+  try {
+    return window.location?.pathname ?? null;
+  } catch {
+    return null;
+  }
+}
+
+async function logOps403EventBestEffort(input: {
+  rpc_fn: string;
+  route: string | null;
+  request_id: string | null;
+  code: string | null;
+  message: string;
+  details: string | null;
+}): Promise<void> {
+  const route = input.route ?? "";
+  const requestId = input.request_id ?? "";
+  const code = input.code ?? "";
+  const details = input.details ?? "";
+  const key = `${input.rpc_fn}|${route}|${requestId}|${code}|${input.message}`;
+
+  const now = Date.now();
+  const last = ops403LogDedupe.get(key) ?? 0;
+  if (now - last < OPS403_LOG_DEDUPE_MS) return;
+  ops403LogDedupe.set(key, now);
+
+  // Best-effort: nunca lança erro, e não usa callRpc() para evitar loops.
+  try {
+    await (supabase as any).rpc("ops_403_events_log", {
+      p_rpc_fn: input.rpc_fn,
+      p_route: route,
+      p_request_id: requestId,
+      p_code: code,
+      p_message: input.message,
+      p_details: details,
+    });
+  } catch {
+    // ignore
+  }
+}
+
+async function tryRecoverActiveEmpresaContext(): Promise<boolean> {
+  if (activeEmpresaRecoveryInFlight) return activeEmpresaRecoveryInFlight;
+
+  activeEmpresaRecoveryInFlight = (async () => {
+    try {
+      const { data: userData } = await supabase.auth.getUser();
+      const uid = userData?.user?.id ?? null;
+      if (!uid) return false;
+
+      // 1) Já existe empresa ativa? nada a fazer.
+      const { data: activeRows, error: activeErr } = await (supabase as any)
+        .from("user_active_empresa")
+        .select("empresa_id")
+        .limit(1);
+      if (!activeErr) {
+        const activeEmpresaId = (activeRows?.[0] as any)?.empresa_id ?? null;
+        if (activeEmpresaId) return false;
+      }
+
+      // 2) Se o usuário tem exatamente 1 vínculo, definimos automaticamente.
+      const { data: links, error: linkErr } = await (supabase as any)
+        .from("empresa_usuarios")
+        .select("empresa_id")
+        .order("created_at", { ascending: false })
+        .limit(2);
+      if (linkErr) return false;
+
+      const empresaIds = (links ?? []).map((r: any) => r?.empresa_id).filter(Boolean);
+      if (empresaIds.length !== 1) return false;
+
+      const empresaId = empresaIds[0] as string;
+      const { error: rpcErr } = await (supabase as any).rpc("set_active_empresa_for_current_user", {
+        p_empresa_id: empresaId,
+      });
+      if (rpcErr) return false;
+
+      return true;
+    } catch {
+      return false;
+    } finally {
+      activeEmpresaRecoveryInFlight = null;
+    }
+  })();
+
+  return activeEmpresaRecoveryInFlight;
+}
+
+function isLikelyMissingActiveEmpresa(code: string | null, message: string): boolean {
+  const msg = String(message || "").toLowerCase();
+  if (code === "42501") return true;
+  return (
+    msg.includes("nenhuma empresa ativa") ||
+    msg.includes("empresa_id inválido") ||
+    msg.includes("empresa_id invalido") ||
+    msg.includes("sessão sem empresa") ||
+    msg.includes("acesso negado à empresa ativa") ||
+    msg.includes("acesso negado a esta empresa")
+  );
+}
+
 export class RpcError extends Error {
   status?: number;
   details?: string | null;
@@ -52,6 +159,33 @@ export async function callRpc<T = unknown>(fn: string, args: RpcArgs = {}): Prom
       const code = (error as any).code ?? null;
       const hint = (error as any).hint ?? null;
       const request_id = getLastRequestId();
+
+      // Auto-recover: quando a empresa ativa "oscila" (multi-tenant), várias RPCs devolvem 403/42501.
+      // Se o usuário tiver apenas 1 empresa, podemos setar automaticamente e re-tentar 1 vez.
+      if (attempt === 1 && status === 403 && isLikelyMissingActiveEmpresa(code, msg)) {
+        const recovered = await tryRecoverActiveEmpresaContext();
+        if (recovered) {
+          const startedAt2 = performance.now();
+          const retryRes = await supabase.rpc(fn, args);
+          const durationMs2 = performance.now() - startedAt2;
+          if (!retryRes.error) {
+            logRpcMetric({ fn, ok: true, status: retryRes.status, durationMs: durationMs2, attempt: attempt + 0.1 });
+            logger.info("[RPC][AUTO_RECOVER_ACTIVE_EMPRESA][OK]", { fn, request_id });
+            return retryRes.data as T;
+          }
+        }
+      }
+
+      if (status === 403 && isLikelyMissingActiveEmpresa(code, msg)) {
+        await logOps403EventBestEffort({
+          rpc_fn: fn,
+          route: getCurrentRoute(),
+          request_id,
+          code,
+          message: msg,
+          details,
+        });
+      }
 
       const transient = isRetryableRpcFailure(status, msg);
       const willRetry = transient && attempt < 3;
