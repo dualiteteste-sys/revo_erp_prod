@@ -36,7 +36,9 @@ jobs:
     timeout-minutes: 30
     env:
       R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
-      R2_BUCKET: ${{ secrets.R2_BUCKET }}
+      # Se você criou o bucket sugerido ("revo-erp-backups-prod") e não quer manter mais uma secret,
+      # esse fallback mantém o workflow funcionando.
+      R2_BUCKET: ${{ secrets.R2_BUCKET || 'revo-erp-backups-prod' }}
       AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
       AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
     steps:
@@ -77,6 +79,7 @@ jobs:
           echo "url=$url" >> "$GITHUB_OUTPUT"
 
       - name: Dump
+        id: dump
         shell: bash
         env:
           DATABASE_URL: ${{ steps.db.outputs.url }}
@@ -127,8 +130,13 @@ jobs:
           EOF
 
           ls -lh "$gz" "${base}.manifest.json"
+          echo "gz=$gz" >> "$GITHUB_OUTPUT"
+          echo "manifest=${base}.manifest.json" >> "$GITHUB_OUTPUT"
+          echo "sha256=$sha" >> "$GITHUB_OUTPUT"
+          echo "bytes=$size" >> "$GITHUB_OUTPUT"
 
       - name: Upload to Cloudflare R2 (durável)
+        id: r2
         shell: bash
         run: |
           set -euo pipefail
@@ -155,7 +163,48 @@ jobs:
             aws --endpoint-url "${R2_ENDPOINT}" s3 cp "$f" "s3://${R2_BUCKET}/${prefix}/${f}" --only-show-errors
           done
 
+          # r2_key do dump (para catálogo)
+          gz="${{ steps.dump.outputs.gz }}"
+          echo "r2_key=${prefix}/$(basename "$gz")" >> "$GITHUB_OUTPUT"
+
           echo "OK: upload concluído."
+
+      - name: Register backup in DB catalog (ops_db_backups)
+        shell: bash
+        env:
+          DATABASE_URL: ${{ steps.db.outputs.url }}
+          TARGET: ${{ steps.db.outputs.target }}
+          MODE: ${{ inputs.mode }}
+          R2_BUCKET: ${{ env.R2_BUCKET }}
+          R2_KEY: ${{ steps.r2.outputs.r2_key }}
+          SHA256: ${{ steps.dump.outputs.sha256 }}
+          BYTES: ${{ steps.dump.outputs.bytes }}
+          GIT_SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+
+          if [[ -z "${R2_KEY:-}" ]]; then
+            echo "::warning::R2 upload não executado; pulando registro no catálogo."
+            exit 0
+          fi
+
+          echo "Registrando backup no banco (target=$TARGET)..."
+
+          docker run --rm postgres:17 \
+            psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -X -qAt -c "
+              insert into public.ops_db_backups (
+                target, mode, r2_bucket, r2_key, sha256, bytes, git_sha, status, meta
+              ) values (
+                '${TARGET}', '${MODE}', '${R2_BUCKET}', '${R2_KEY}', '${SHA256}', ${BYTES}, '${GIT_SHA}', 'uploaded',
+                jsonb_build_object('source','github-actions','workflow','db-backup.yml')
+              )
+              on conflict (r2_key) do update
+                set sha256=excluded.sha256,
+                    bytes=excluded.bytes,
+                    git_sha=excluded.git_sha,
+                    status=excluded.status,
+                    meta=excluded.meta;
+            "
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
