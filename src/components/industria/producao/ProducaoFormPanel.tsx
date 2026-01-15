@@ -317,8 +317,17 @@ export default function ProducaoFormPanel({
 
     try {
       setIsSaving(true);
-      await saveOrdemProducao({ ...formData, status: 'em_producao' });
+      // Estado da arte: garantir a sequência do state machine
+      // e gerar operações ANTES de entrar em execução.
+      if (formData.status === 'rascunho') {
+        await saveOrdemProducao({ ...formData, status: 'planejada' });
+      }
+      if (formData.status === 'rascunho' || formData.status === 'planejada') {
+        await saveOrdemProducao({ ...formData, status: 'em_programacao' });
+      }
+
       await gerarOperacoes(formData.id);
+      await saveOrdemProducao({ ...formData, status: 'em_producao' });
 
       addToast('Ordem liberada e operações geradas!', 'success');
       await loadDetails(formData.id);
