@@ -86,6 +86,7 @@ Objetivo: **zerar 403 intermitente** em Scale/OWNER e evitar que isso apareça e
 ### 2.3 Migrações seguras
 - [ ] Criar checklist de migration: reversibilidade, `grant/revoke`, `pgrst reload`, seed incremental, compatibilidade.
 - [ ] Garantir `verify:migrations` sempre verde (local + CI).
+- [ ] Backup de dados (registros) durável e barato: dump diário → Cloudflare R2 + restore drill semanal + backup local (script).
 
 ---
 

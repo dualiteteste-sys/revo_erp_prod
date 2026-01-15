@@ -1,0 +1,160 @@
+name: DB Backup Restore Drill (R2)
+
+on:
+  workflow_dispatch:
+    inputs:
+      target:
+        description: "Qual target testar?"
+        type: choice
+        required: true
+        default: prod
+        options:
+          - prod
+          - dev
+  schedule:
+    # Semanal (Domingo 05:30 UTC)
+    - cron: "30 5 * * 0"
+
+permissions:
+  contents: read
+  issues: write
+
+concurrency:
+  group: db-backup-restore-drill
+  cancel-in-progress: false
+
+jobs:
+  restore-drill:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
+      R2_BUCKET: ${{ secrets.R2_BUCKET }}
+      AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+      TARGET: ${{ inputs.target }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Ensure R2 secrets configured
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ -z "${TARGET:-}" ]]; then TARGET="prod"; fi
+          if [[ -z "${R2_ENDPOINT:-}" || -z "${R2_BUCKET:-}" || -z "${AWS_ACCESS_KEY_ID:-}" || -z "${AWS_SECRET_ACCESS_KEY:-}" ]]; then
+            echo "::error::Missing R2 secrets (R2_ENDPOINT/R2_BUCKET/R2_ACCESS_KEY_ID/R2_SECRET_ACCESS_KEY)."
+            exit 1
+          fi
+
+      - name: Install awscli + psql
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y awscli postgresql-client
+
+      - name: Download latest backup from R2
+        id: dl
+        shell: bash
+        run: |
+          set -euo pipefail
+          target="${TARGET:-prod}"
+          echo "target=$target" >> "$GITHUB_OUTPUT"
+
+          # Lista todos os dumps e pega o mais recente (ordenação lexicográfica serve pelo timestamp no nome).
+          latest="$(aws --endpoint-url "${R2_ENDPOINT}" s3 ls "s3://${R2_BUCKET}/revo/${target}/" --recursive | awk '{print $4}' | grep -E "\\.dump\\.gz$" | sort | tail -n 1)"
+          if [[ -z "${latest:-}" ]]; then
+            echo "::error::Nenhum backup encontrado em s3://${R2_BUCKET}/revo/${target}/"
+            exit 1
+          fi
+
+          file="$(basename "$latest")"
+          echo "latest_key=$latest" >> "$GITHUB_OUTPUT"
+          echo "file=$file" >> "$GITHUB_OUTPUT"
+
+          aws --endpoint-url "${R2_ENDPOINT}" s3 cp "s3://${R2_BUCKET}/${latest}" "$file" --only-show-errors
+
+          manifest_key="${latest%.dump.gz}.manifest.json"
+          aws --endpoint-url "${R2_ENDPOINT}" s3 cp "s3://${R2_BUCKET}/${manifest_key}" "${file%.dump.gz}.manifest.json" --only-show-errors || true
+
+          ls -lh "$file" || true
+
+      - name: Restore into local Postgres (docker)
+        shell: bash
+        run: |
+          set -euo pipefail
+          file="${{ steps.dl.outputs.file }}"
+
+          gunzip -c "$file" > "${file%.gz}"
+
+          docker run -d --name pg_restore_drill \
+            -e POSTGRES_PASSWORD=postgres \
+            -p 54329:5432 \
+            postgres:17
+
+          # Wait for DB
+          for i in {1..60}; do
+            if PGPASSWORD=postgres psql "postgresql://postgres@localhost:54329/postgres" -c "select 1" >/dev/null 2>&1; then
+              break
+            fi
+            sleep 1
+          done
+
+          echo "Restaurando dump..."
+          PGPASSWORD=postgres pg_restore \
+            --clean --if-exists \
+            --no-owner --no-privileges \
+            -d "postgresql://postgres@localhost:54329/postgres" \
+            "${file%.gz}"
+
+          echo "Rodando RG-03 DB asserts..."
+          PGPASSWORD=postgres psql "postgresql://postgres@localhost:54329/postgres" -v ON_ERROR_STOP=1 -X -qAt -f scripts/rg03_db_asserts.sql
+
+      - name: Cleanup
+        if: always()
+        run: |
+          docker rm -f pg_restore_drill || true
+
+      - name: Upsert issue on failure
+        if: failure()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const title = "OPS ALERT: Backup restore drill falhou";
+            const labels = ["ops-alert", "backup"];
+            const body = [
+              "O restore drill semanal falhou.",
+              "",
+              `- target: ${process.env.TARGET || "prod"}`,
+              `- run: ${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`,
+              "",
+              "Ação recomendada:",
+              "- Verificar se o dump está íntegro no R2 (manifest/sha256).",
+              "- Verificar permissões/extensões no restore local.",
+              "- Rodar o workflow manualmente para reproduzir.",
+            ].join("\n");
+
+            const { data: issues } = await github.rest.issues.listForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: "open",
+              labels: labels.join(","),
+              per_page: 100,
+            });
+            const existing = issues.find(i => i.title === title);
+            if (existing) {
+              await github.rest.issues.update({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: existing.number,
+                body,
+              });
+            } else {
+              await github.rest.issues.create({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                title,
+                body,
+                labels,
+              });
+            }
+
