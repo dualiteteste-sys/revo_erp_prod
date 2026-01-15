@@ -11,6 +11,51 @@ import { logRpcMetric, maybeLogFirstValue } from "@/lib/metrics";
 type RpcArgs = Record<string, any>;
 
 let activeEmpresaRecoveryInFlight: Promise<boolean> | null = null;
+const ops403LogDedupe = new Map<string, number>();
+const OPS403_LOG_DEDUPE_MS = 10_000;
+
+function getCurrentRoute(): string | null {
+  if (typeof window === "undefined") return null;
+  try {
+    return window.location?.pathname ?? null;
+  } catch {
+    return null;
+  }
+}
+
+async function logOps403EventBestEffort(input: {
+  rpc_fn: string;
+  route: string | null;
+  request_id: string | null;
+  code: string | null;
+  message: string;
+  details: string | null;
+}): Promise<void> {
+  const route = input.route ?? "";
+  const requestId = input.request_id ?? "";
+  const code = input.code ?? "";
+  const details = input.details ?? "";
+  const key = `${input.rpc_fn}|${route}|${requestId}|${code}|${input.message}`;
+
+  const now = Date.now();
+  const last = ops403LogDedupe.get(key) ?? 0;
+  if (now - last < OPS403_LOG_DEDUPE_MS) return;
+  ops403LogDedupe.set(key, now);
+
+  // Best-effort: nunca lança erro, e não usa callRpc() para evitar loops.
+  try {
+    await (supabase as any).rpc("ops_403_events_log", {
+      p_rpc_fn: input.rpc_fn,
+      p_route: route,
+      p_request_id: requestId,
+      p_code: code,
+      p_message: input.message,
+      p_details: details,
+    });
+  } catch {
+    // ignore
+  }
+}
 
 async function tryRecoverActiveEmpresaContext(): Promise<boolean> {
   if (activeEmpresaRecoveryInFlight) return activeEmpresaRecoveryInFlight;
@@ -129,6 +174,17 @@ export async function callRpc<T = unknown>(fn: string, args: RpcArgs = {}): Prom
             return retryRes.data as T;
           }
         }
+      }
+
+      if (status === 403 && isLikelyMissingActiveEmpresa(code, msg)) {
+        await logOps403EventBestEffort({
+          rpc_fn: fn,
+          route: getCurrentRoute(),
+          request_id,
+          code,
+          message: msg,
+          details,
+        });
       }
 
       const transient = isRetryableRpcFailure(status, msg);
