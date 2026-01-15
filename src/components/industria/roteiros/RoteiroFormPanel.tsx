@@ -10,6 +10,7 @@ import Toggle from '@/components/ui/forms/Toggle';
 import ItemAutocomplete from '@/components/os/ItemAutocomplete';
 import RoteiroEtapasGrid from './RoteiroEtapasGrid';
 import { logger } from '@/lib/logger';
+import WizardStepper from '@/components/ui/WizardStepper';
 
 interface Props {
   roteiroId: string | null;
@@ -98,7 +99,7 @@ export default function RoteiroFormPanel({ roteiroId, initialData, onSaveSuccess
 
       if (!formData.id) {
         addToast('Roteiro criado! Adicione as etapas.', 'success');
-        // setActiveTab('etapas'); // User functionality preference override: close window
+        setActiveTab('etapas');
       } else {
         addToast('Roteiro salvo.', 'success');
       }
@@ -113,12 +114,18 @@ export default function RoteiroFormPanel({ roteiroId, initialData, onSaveSuccess
     }
   };
 
+  const handlePrimarySaveClick = async () => {
+    const savedId = await handleSaveHeader();
+    if (savedId && activeTab === 'etapas') onClose();
+  };
+
   if (loading) return <div className="flex justify-center p-8"><Loader2 className="animate-spin" /></div>;
 
   return (
     <div className="flex flex-col h-full">
       <div className="border-b border-white/20">
-        <nav className="-mb-px flex space-x-6 p-4 overflow-x-auto" aria-label="Tabs">
+        <nav className="-mb-px flex items-center justify-between gap-4 p-4 overflow-x-auto" aria-label="Tabs">
+          <div className="flex space-x-6">
           <button
             onClick={() => setActiveTab('dados')}
             className={`whitespace-nowrap py-2 px-3 border-b-2 font-medium text-sm transition-colors ${activeTab === 'dados'
@@ -138,6 +145,13 @@ export default function RoteiroFormPanel({ roteiroId, initialData, onSaveSuccess
           >
             Etapas ({formData?.etapas?.length || 0})
           </button>
+          </div>
+          <WizardStepper
+            steps={[{ label: 'Dados' }, { label: 'Etapas' }]}
+            activeIndex={activeTab === 'dados' ? 0 : 1}
+            maxCompletedIndex={formData?.id ? 0 : -1}
+            className="shrink-0"
+          />
         </nav>
       </div>
 
@@ -224,15 +238,15 @@ export default function RoteiroFormPanel({ roteiroId, initialData, onSaveSuccess
       <footer className="flex-shrink-0 p-4 flex justify-end items-center border-t border-white/20 bg-gray-50">
         <div className="flex gap-3">
           <button onClick={onClose} className="rounded-md border border-gray-300 bg-white py-2 px-4 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50">
-            Cancelar
+            {activeTab === 'etapas' ? 'Concluir' : 'Cancelar'}
           </button>
           <button
-            onClick={handleSaveHeader}
+            onClick={handlePrimarySaveClick}
             disabled={isSaving}
             className="flex items-center gap-2 bg-blue-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-blue-700 disabled:opacity-50"
           >
             {isSaving ? <Loader2 className="animate-spin" size={20} /> : <Save size={20} />}
-            Salvar
+            {!formData?.id && activeTab === 'dados' ? 'Salvar e continuar' : 'Salvar'}
           </button>
         </div>
       </footer>

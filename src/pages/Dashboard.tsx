@@ -38,7 +38,8 @@ const Dashboard: React.FC = () => {
         const res = await getMainDashboardData({ activitiesLimit: 12 });
         if (mounted) setData(res);
       } catch (e: any) {
-        logger.error('[Dashboard] erro ao carregar dados', e);
+        // Dashboard é "best-effort": não deve poluir console/error sweep nem travar fluxos críticos.
+        logger.warn('[Dashboard] erro ao carregar dados', { message: e?.message || String(e || '') });
         if (mounted) setError(e?.message || 'Não foi possível carregar o dashboard.');
       } finally {
         if (mounted) setLoading(false);

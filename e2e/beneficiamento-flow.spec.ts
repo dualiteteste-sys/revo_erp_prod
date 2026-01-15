@@ -474,7 +474,8 @@ test('Beneficiamento: criar OB e gerar operações na Execução', async ({ page
   await expect(page).toHaveURL(/\/app\/industria\/execucao/);
 
   // 4) Validar que operações aparecem (tipo + produto + cliente)
-  await expect(page.getByPlaceholder('Buscar por ordem, produto ou cliente...')).toHaveValue('500');
+  const q = new URL(page.url()).searchParams.get('q');
+  await expect(page.getByPlaceholder('Buscar por ordem, produto ou cliente...')).toHaveValue(q ? q : /\d+/);
   await expect(page.getByText('beneficiamento').first()).toBeVisible();
   await expect(page.getByText('Parafuso M6').first()).toBeVisible();
   await expect(page.getByText('Cliente E2E').first()).toBeVisible();

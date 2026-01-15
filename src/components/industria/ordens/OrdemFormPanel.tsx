@@ -477,8 +477,19 @@ export default function OrdemFormPanel({
   const handleGoToExecucao = (q?: string) => {
     const next = new URLSearchParams();
     next.set('view', 'list');
+    // Forçar filtros limpos ao deep-linkar (evita ficar "vazio" por filtros persistidos no localStorage).
+    next.set('status', '');
+    next.set('centro', '');
     if (q) next.set('q', q);
     navigate(`/app/industria/execucao?${next.toString()}`);
+  };
+
+  const getExecucaoSearchTerm = () => {
+    const n = formData.numero;
+    if (n) {
+      return String(n);
+    }
+    return formData.produto_nome || undefined;
   };
 
   const handleDesvincularOrigemNfe = async () => {
@@ -522,7 +533,7 @@ export default function OrdemFormPanel({
       const result = await gerarExecucaoOrdem(currentId, formData.roteiro_aplicado_id ?? null);
       await loadDetails(currentId);
       addToast(`Operações geradas (${result.operacoes}).`, 'success');
-      handleGoToExecucao(result.producao_ordem_numero ? String(result.producao_ordem_numero) : formData.produto_nome || undefined);
+      handleGoToExecucao(getExecucaoSearchTerm());
     } catch (e: any) {
       addToast(e?.message || 'Não foi possível gerar operações.', 'error');
     } finally {
@@ -1081,7 +1092,7 @@ export default function OrdemFormPanel({
           {formData.execucao_ordem_id && (
             <button
               type="button"
-              onClick={() => handleGoToExecucao(formData.execucao_ordem_numero ? String(formData.execucao_ordem_numero) : undefined)}
+              onClick={() => handleGoToExecucao(getExecucaoSearchTerm())}
               className="flex items-center gap-2 border border-gray-200 bg-white text-gray-800 font-bold py-2 px-4 rounded-lg hover:bg-gray-50"
               title="Abrir Execução"
             >

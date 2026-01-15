@@ -2,6 +2,8 @@ import React, { createContext, useContext, useState, ReactNode, useCallback, use
 import { AnimatePresence, motion } from 'framer-motion';
 import Toast, { ToastProps } from '../components/ui/Toast';
 import { SentryReportListener } from '@/components/error/SentryReportListener';
+import { createPortal } from 'react-dom';
+import { normalizeToastErrorMessage } from '@/lib/toastErrorNormalizer';
 
 type ToastType = "success" | "error" | "warning" | "info";
 
@@ -53,8 +55,16 @@ export const ToastProvider = ({ children }: { children: ReactNode }) => {
         ? { title: titleOrOptions }
         : (titleOrOptions ?? {});
 
+    let finalMessage = message;
+    let finalTitle = options.title;
+    if (type === 'error') {
+      const normalized = normalizeToastErrorMessage({ message, title: options.title });
+      finalMessage = normalized.message;
+      finalTitle = normalized.title ?? finalTitle;
+    }
+
     const durationMs = typeof options.durationMs === 'number' ? options.durationMs : 5000;
-    setToasts((prevToasts) => [...prevToasts, { id, message, type, title: options.title, durationMs, action: options.action }]);
+    setToasts((prevToasts) => [...prevToasts, { id, message: finalMessage, type, title: finalTitle, durationMs, action: options.action }]);
 
     const t = window.setTimeout(() => {
       removeToast(id);
@@ -66,36 +76,41 @@ export const ToastProvider = ({ children }: { children: ReactNode }) => {
     <ToastContext.Provider value={{ addToast }}>
       {children}
       <SentryReportListener />
-      <div className="fixed top-5 right-5 z-50 space-y-3">
-        <AnimatePresence>
-          {toasts.map((toast) => (
-            <motion.div
-              key={toast.id}
-              layout
-              initial={{ opacity: 0, y: -20, scale: 0.9 }}
-              animate={{ opacity: 1, y: 0, scale: 1 }}
-              exit={{ opacity: 0, x: 50, scale: 0.9 }}
-              transition={{ duration: 0.3, ease: 'easeOut' }}
-            >
-              <Toast
-                type={toast.type}
-                title={toast.title}
-                message={toast.message}
-                actionLabel={toast.action?.label}
-                actionAriaLabel={toast.action?.ariaLabel}
-                onAction={toast.action ? async () => {
-                  try {
-                    await toast.action.onClick();
-                  } finally {
-                    removeToast(toast.id);
-                  }
-                } : undefined}
-                onClose={() => removeToast(toast.id)}
-              />
-            </motion.div>
-          ))}
-        </AnimatePresence>
-      </div>
+      {typeof document !== 'undefined'
+        ? createPortal(
+          <div className="fixed top-5 right-5 z-[9999] space-y-3">
+            <AnimatePresence>
+              {toasts.map((toast) => (
+                <motion.div
+                  key={toast.id}
+                  layout
+                  initial={{ opacity: 0, y: -20, scale: 0.9 }}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  exit={{ opacity: 0, x: 50, scale: 0.9 }}
+                  transition={{ duration: 0.3, ease: 'easeOut' }}
+                >
+                  <Toast
+                    type={toast.type}
+                    title={toast.title}
+                    message={toast.message}
+                    actionLabel={toast.action?.label}
+                    actionAriaLabel={toast.action?.ariaLabel}
+                    onAction={toast.action ? async () => {
+                      try {
+                        await toast.action.onClick();
+                      } finally {
+                        removeToast(toast.id);
+                      }
+                    } : undefined}
+                    onClose={() => removeToast(toast.id)}
+                  />
+                </motion.div>
+              ))}
+            </AnimatePresence>
+          </div>,
+          document.body,
+        )
+        : null}
     </ToastContext.Provider>
   );
 };

@@ -125,7 +125,6 @@ export default function BomsPage() {
 
   const handleSuccess = () => {
     fetchBoms();
-    handleClose();
   };
 
   const handleSeed = async () => {

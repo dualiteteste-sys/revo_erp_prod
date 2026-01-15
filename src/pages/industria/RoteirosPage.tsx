@@ -141,7 +141,6 @@ export default function RoteirosPage() {
 
   const handleSuccess = () => {
     fetchRoteiros();
-    handleClose();
   };
 
   const handleSeed = async () => {

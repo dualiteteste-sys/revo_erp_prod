@@ -46,6 +46,32 @@ export default function RoteiroEtapasGrid({ roteiroId, etapas, onUpdate, readOnl
     listCentrosTrabalho(undefined, true).then(setCentros);
   }, []);
 
+  const applyDefaultsFromCentro = (centroId: string) => {
+    const centro = centros.find((c) => c.id === centroId);
+    if (!centro) return;
+
+    setNewEtapa((prev) => {
+      const next: Partial<RoteiroEtapa> = { ...prev, centro_trabalho_id: centroId };
+
+      // Setup padrão do centro (se o usuário ainda não definiu)
+      if ((prev.tempo_setup_min == null || Number(prev.tempo_setup_min) === 0) && centro.tempo_setup_min != null) {
+        next.tempo_setup_min = centro.tempo_setup_min;
+      }
+
+      // Ciclo (min/un) = 60 / (un/h)
+      const cap = Number(centro.capacidade_unidade_hora ?? 0);
+      if (cap > 0) {
+        const ciclo = 60 / cap;
+        // Só autopreenche se ainda estiver zerado (evita sobrescrever ajuste manual)
+        if (!prev.tempo_ciclo_min_por_unidade || Number(prev.tempo_ciclo_min_por_unidade) === 0) {
+          next.tempo_ciclo_min_por_unidade = Number(ciclo.toFixed(4));
+        }
+      }
+
+      return next;
+    });
+  };
+
   const etapasColumns = useMemo<TableColumnWidthDef[]>(() => {
     const cols: TableColumnWidthDef[] = [
       { id: 'seq', defaultWidth: 90, minWidth: 80 },
@@ -176,7 +202,11 @@ export default function RoteiroEtapasGrid({ roteiroId, etapas, onUpdate, readOnl
           <div className="md:col-span-3">
             <label className="block text-xs font-medium text-gray-700">Centro de Trabalho</label>
             <div className="flex gap-1">
-              <select value={newEtapa.centro_trabalho_id || ''} onChange={e => setNewEtapa({ ...newEtapa, centro_trabalho_id: e.target.value })} className="w-full p-2 rounded border border-gray-300">
+              <select
+                value={newEtapa.centro_trabalho_id || ''}
+                onChange={(e) => applyDefaultsFromCentro(e.target.value)}
+                className="w-full p-2 rounded border border-gray-300"
+              >
                 <option value="">Selecione...</option>
                 {centros.map(c => <option key={c.id} value={c.id}>{c.nome}</option>)}
               </select>
