@@ -14,6 +14,14 @@ let activeEmpresaRecoveryInFlight: Promise<boolean> | null = null;
 const ops403LogDedupe = new Map<string, number>();
 const OPS403_LOG_DEDUPE_MS = 10_000;
 
+function classifyOps403(code: string | null, message: string): string {
+  const msg = String(message || "").toLowerCase();
+  if (code === "42501" && (msg.includes("nenhuma empresa ativa") || msg.includes("sessão sem empresa"))) return "missing_active_empresa";
+  if (msg.includes("recurso indisponível no plano") || msg.includes("faça upgrade") || msg.includes("plano atual")) return "plan_gating";
+  if (code === "42501") return "permission";
+  return "unknown";
+}
+
 function getCurrentRoute(): string | null {
   if (typeof window === "undefined") return null;
   try {
@@ -30,12 +38,16 @@ async function logOps403EventBestEffort(input: {
   code: string | null;
   message: string;
   details: string | null;
+  kind?: string | null;
+  recovery_attempted?: boolean;
+  recovery_ok?: boolean;
 }): Promise<void> {
   const route = input.route ?? "";
   const requestId = input.request_id ?? "";
   const code = input.code ?? "";
   const details = input.details ?? "";
-  const key = `${input.rpc_fn}|${route}|${requestId}|${code}|${input.message}`;
+  const kind = input.kind ?? "";
+  const key = `${input.rpc_fn}|${route}|${requestId}|${code}|${kind}|${input.message}`;
 
   const now = Date.now();
   const last = ops403LogDedupe.get(key) ?? 0;
@@ -44,14 +56,27 @@ async function logOps403EventBestEffort(input: {
 
   // Best-effort: nunca lança erro, e não usa callRpc() para evitar loops.
   try {
-    await (supabase as any).rpc("ops_403_events_log", {
+    const { error: v2Err } = await (supabase as any).rpc("ops_403_events_log_v2", {
       p_rpc_fn: input.rpc_fn,
       p_route: route,
       p_request_id: requestId,
       p_code: code,
       p_message: input.message,
       p_details: details,
+      p_kind: input.kind ?? null,
+      p_recovery_attempted: input.recovery_attempted ?? false,
+      p_recovery_ok: input.recovery_ok ?? false,
     });
+    if (v2Err) {
+      await (supabase as any).rpc("ops_403_events_log", {
+        p_rpc_fn: input.rpc_fn,
+        p_route: route,
+        p_request_id: requestId,
+        p_code: code,
+        p_message: input.message,
+        p_details: details,
+      });
+    }
   } catch {
     // ignore
   }
@@ -159,11 +184,15 @@ export async function callRpc<T = unknown>(fn: string, args: RpcArgs = {}): Prom
       const code = (error as any).code ?? null;
       const hint = (error as any).hint ?? null;
       const request_id = getLastRequestId();
+      let recoveryAttempted = false;
+      let recoveryOk = false;
 
       // Auto-recover: quando a empresa ativa "oscila" (multi-tenant), várias RPCs devolvem 403/42501.
       // Se o usuário tiver apenas 1 empresa, podemos setar automaticamente e re-tentar 1 vez.
       if (attempt === 1 && status === 403 && isLikelyMissingActiveEmpresa(code, msg)) {
+        recoveryAttempted = true;
         const recovered = await tryRecoverActiveEmpresaContext();
+        recoveryOk = recovered;
         if (recovered) {
           const startedAt2 = performance.now();
           const retryRes = await supabase.rpc(fn, args);
@@ -184,6 +213,9 @@ export async function callRpc<T = unknown>(fn: string, args: RpcArgs = {}): Prom
           code,
           message: msg,
           details,
+          kind: classifyOps403(code, msg),
+          recovery_attempted: recoveryAttempted,
+          recovery_ok: recoveryOk,
         });
       }
 

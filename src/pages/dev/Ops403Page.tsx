@@ -18,6 +18,19 @@ function formatDateTimeBR(value?: string | null) {
   return Number.isNaN(d.getTime()) ? String(value) : d.toLocaleString('pt-BR');
 }
 
+function formatKind(kind?: string | null) {
+  switch (kind) {
+    case 'missing_active_empresa':
+      return { label: 'Empresa ativa', className: 'text-amber-700 bg-amber-50 border-amber-200' };
+    case 'plan_gating':
+      return { label: 'Plano', className: 'text-indigo-700 bg-indigo-50 border-indigo-200' };
+    case 'permission':
+      return { label: 'Permissão', className: 'text-rose-700 bg-rose-50 border-rose-200' };
+    default:
+      return { label: kind || 'unknown', className: 'text-slate-700 bg-slate-50 border-slate-200' };
+  }
+}
+
 export default function Ops403Page() {
   const { addToast } = useToast();
   const [loading, setLoading] = useState(true);
@@ -34,6 +47,7 @@ export default function Ops403Page() {
     { id: 'rpc', defaultWidth: 300, minWidth: 220 },
     { id: 'route', defaultWidth: 320, minWidth: 220 },
     { id: 'message', defaultWidth: 520, minWidth: 260 },
+    { id: 'context', defaultWidth: 260, minWidth: 220 },
     { id: 'status', defaultWidth: 140, minWidth: 120, resizable: false },
     { id: 'actions', defaultWidth: 200, minWidth: 180, resizable: false },
   ];
@@ -187,6 +201,7 @@ export default function Ops403Page() {
                       onResizeStart={startResize}
                       className="text-left p-3"
                     />
+                    <th className="p-3 text-left">Contexto</th>
                     <th className="p-3 text-left">Status</th>
                     <th className="p-3 text-left">Ações</th>
                   </tr>
@@ -200,6 +215,42 @@ export default function Ops403Page() {
                       <td className="p-3 text-slate-900">
                         <div className="line-clamp-2">{r.message}</div>
                         {r.request_id ? <div className="mt-1 text-xs text-slate-500 font-mono">{r.request_id}</div> : null}
+                      </td>
+                      <td className="p-3">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span
+                            className={[
+                              'inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-medium',
+                              formatKind(r.kind).className,
+                            ].join(' ')}
+                            title={r.kind ?? 'unknown'}
+                          >
+                            {formatKind(r.kind).label}
+                          </span>
+                          {r.role ? (
+                            <span className="inline-flex items-center rounded-full border border-slate-200 bg-white px-2 py-0.5 text-xs text-slate-700">
+                              {r.role}
+                            </span>
+                          ) : null}
+                          {r.plano_mvp ? (
+                            <span className="inline-flex items-center rounded-full border border-slate-200 bg-white px-2 py-0.5 text-xs text-slate-700">
+                              {r.plano_mvp}
+                            </span>
+                          ) : null}
+                          {r.recovery_attempted ? (
+                            <span
+                              className={[
+                                'inline-flex items-center rounded-full border px-2 py-0.5 text-xs',
+                                r.recovery_ok
+                                  ? 'border-green-200 bg-green-50 text-green-700'
+                                  : 'border-amber-200 bg-amber-50 text-amber-700',
+                              ].join(' ')}
+                              title="Auto-recover de empresa ativa"
+                            >
+                              Recover {r.recovery_ok ? 'OK' : 'FAIL'}
+                            </span>
+                          ) : null}
+                        </div>
                       </td>
                       <td className="p-3">
                         {r.resolved ? (
@@ -226,7 +277,7 @@ export default function Ops403Page() {
                   ))}
                   {sorted.length === 0 && (
                     <tr>
-                      <td className="p-6 text-center text-slate-500" colSpan={6}>
+                      <td className="p-6 text-center text-slate-500" colSpan={7}>
                         Nenhum evento 403 encontrado.
                       </td>
                     </tr>
@@ -240,4 +291,3 @@ export default function Ops403Page() {
     </PageShell>
   );
 }
-

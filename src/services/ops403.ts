@@ -11,6 +11,11 @@ export type Ops403EventRow = {
   code: string | null;
   message: string;
   resolved: boolean;
+  kind?: string | null;
+  plano_mvp?: string | null;
+  role?: string | null;
+  recovery_attempted?: boolean;
+  recovery_ok?: boolean;
 };
 
 export async function listOps403Events(params: {
@@ -38,4 +43,3 @@ export async function countOps403Events(params: { q?: string | null; onlyOpen?: 
 export async function setOps403EventResolved(id: string, resolved: boolean) {
   await callRpc('ops_403_events_set_resolved', { p_id: id, p_resolved: resolved });
 }
-
