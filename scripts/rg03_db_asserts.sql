@@ -369,9 +369,27 @@ begin
       FROM information_schema.columns
       WHERE table_schema='public'
         AND table_name='ops_403_events'
-        AND column_name IN ('id','created_at','rpc_fn','route','user_id','empresa_id','kind','context','resolved')
+        AND column_name IN (
+          'id',
+          'created_at',
+          'empresa_id',
+          'user_id',
+          'request_id',
+          'route',
+          'rpc_fn',
+          'http_status',
+          'code',
+          'message',
+          'details',
+          'resolved',
+          'kind',
+          'plano_mvp',
+          'role',
+          'recovery_attempted',
+          'recovery_ok'
+        )
       GROUP BY table_schema, table_name
-      HAVING count(*) = 9
+      HAVING count(*) = 17
     ) THEN
       RAISE EXCEPTION 'RG-03/OPS-403: schema de public.ops_403_events não contém colunas esperadas.';
     END IF;

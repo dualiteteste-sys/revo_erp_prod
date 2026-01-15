@@ -151,15 +151,15 @@ jobs:
                   select count(*)::int
                   from public.ops_403_events
                   where created_at >= (now() - interval '15 minutes')
-                    and (kind = 'missing_active_empresa' or kind is null)
+                    and kind = 'missing_active_empresa'
                 ) end,
               'ops_403_recovery_failed_15m',
                 case when to_regclass('public.ops_403_events') is null then 0 else (
                   select count(*)::int
                   from public.ops_403_events
                   where created_at >= (now() - interval '15 minutes')
-                    and coalesce((context->>'recovery_attempted')::boolean, false) is true
-                    and coalesce((context->>'recovery_ok')::boolean, false) is false
+                    and coalesce(recovery_attempted, false) is true
+                    and coalesce(recovery_ok, false) is false
                 ) end
             )::text;
           ")"
