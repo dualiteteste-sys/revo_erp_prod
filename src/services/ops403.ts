@@ -70,3 +70,13 @@ export async function topOps403Rpcs(params: { limit?: number; onlyOpen?: boolean
     p_only_open: params.onlyOpen ?? true,
   });
 }
+
+export async function exportOps403Sample(params: { limit?: number; onlyOpen?: boolean } = {}): Promise<any[]> {
+  const res = await callRpc<any>('ops_403_events_export_sample', {
+    p_limit: params.limit ?? 10,
+    p_only_open: params.onlyOpen ?? true,
+  });
+  if (!res) return [];
+  if (Array.isArray(res)) return res;
+  return [];
+}

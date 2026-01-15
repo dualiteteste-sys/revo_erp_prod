@@ -10,7 +10,7 @@ import ResizableSortableTh, { type SortState } from '@/components/ui/table/Resiz
 import TableColGroup from '@/components/ui/table/TableColGroup';
 import { useTableColumnWidths, type TableColumnWidthDef } from '@/components/ui/table/useTableColumnWidths';
 import { sortRows, toggleSort } from '@/components/ui/table/sortUtils';
-import { countOps403Events, listOps403Events, setOps403EventResolved, topOps403Kinds, topOps403Rpcs, type Ops403EventRow } from '@/services/ops403';
+import { countOps403Events, exportOps403Sample, listOps403Events, setOps403EventResolved, topOps403Kinds, topOps403Rpcs, type Ops403EventRow } from '@/services/ops403';
 import { getOpsContextSnapshot } from '@/services/opsContext';
 
 function formatDateTimeBR(value?: string | null) {
@@ -124,6 +124,26 @@ export default function Ops403Page() {
           icon={<ShieldAlert size={20} />}
           actions={
             <div className="flex items-center gap-2">
+              <Button
+                variant="secondary"
+                onClick={async () => {
+                  try {
+                    const sample = await exportOps403Sample({ limit: 10, onlyOpen: true });
+                    const snap = await getOpsContextSnapshot();
+                    const payload = { snapshot: snap, sample };
+                    await navigator.clipboard.writeText(JSON.stringify(payload, null, 2));
+                    addToast('Amostra (10) copiada para a área de transferência.', 'success');
+                  } catch (e: any) {
+                    addToast(e?.message || 'Falha ao copiar amostra.', 'error');
+                  }
+                }}
+                className="gap-2"
+                disabled={loading}
+                title="Copia uma amostra dos últimos 10 eventos 403 (em aberto) + contexto"
+              >
+                <FileText size={16} />
+                Copiar amostra (10)
+              </Button>
               <Button
                 variant="secondary"
                 onClick={async () => {
