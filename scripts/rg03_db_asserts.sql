@@ -362,6 +362,39 @@ begin
     END IF;
   END IF;
 
+  -- 10) OPS-403: observabilidade 403 deve existir (evita regressão de diagnóstico)
+  IF to_regclass('public.ops_403_events') IS NOT NULL THEN
+    IF NOT EXISTS (
+      SELECT 1
+      FROM information_schema.columns
+      WHERE table_schema='public'
+        AND table_name='ops_403_events'
+        AND column_name IN (
+          'id',
+          'created_at',
+          'empresa_id',
+          'user_id',
+          'request_id',
+          'route',
+          'rpc_fn',
+          'http_status',
+          'code',
+          'message',
+          'details',
+          'resolved',
+          'kind',
+          'plano_mvp',
+          'role',
+          'recovery_attempted',
+          'recovery_ok'
+        )
+      GROUP BY table_schema, table_name
+      HAVING count(*) = 17
+    ) THEN
+      RAISE EXCEPTION 'RG-03/OPS-403: schema de public.ops_403_events não contém colunas esperadas.';
+    END IF;
+  END IF;
+
   -- 9.1) SVC-CT-01: evita bug de assignment de composite via SELECT INTO (causa 400 e console sujo)
   -- Em PL/pgSQL, `SELECT func() INTO v_composite;` com select-list de 1 coluna
   -- tenta atribuir ao *primeiro campo* do composite, gerando cast inválido para uuid.

@@ -41,6 +41,7 @@ Objetivo: **zerar 403 intermitente** em Scale/OWNER e evitar que isso apareça e
 ### 0.4 Observabilidade do 403
 - [x] Logar automaticamente (em tabela) todo `HTTP_403` com `fn`, `request_id`, `empresa_id`, `user_id`, `route`, `role`, `plan`.
 - [x] Dashboard interno “Top 403 por módulo” com filtros e status “investigando/corrigido”.
+- [ ] Alertar automaticamente quando houver 403 do tipo `missing_active_empresa` (GitHub Issue/OPS ALERT).
 
 **Aceite P0**
 - [ ] Rodar `yarn test:e2e:gate:all` com **console-sweep verde**.
