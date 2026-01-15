@@ -43,3 +43,30 @@ export async function countOps403Events(params: { q?: string | null; onlyOpen?: 
 export async function setOps403EventResolved(id: string, resolved: boolean) {
   await callRpc('ops_403_events_set_resolved', { p_id: id, p_resolved: resolved });
 }
+
+export type Ops403TopKindRow = {
+  kind: string;
+  total: number;
+  last_at: string;
+};
+
+export type Ops403TopRpcRow = {
+  rpc_fn: string;
+  total: number;
+  last_at: string;
+  kinds: Record<string, number> | null;
+};
+
+export async function topOps403Kinds(params: { limit?: number; onlyOpen?: boolean }): Promise<Ops403TopKindRow[]> {
+  return callRpc<Ops403TopKindRow[]>('ops_403_events_top_kind', {
+    p_limit: params.limit ?? 8,
+    p_only_open: params.onlyOpen ?? true,
+  });
+}
+
+export async function topOps403Rpcs(params: { limit?: number; onlyOpen?: boolean }): Promise<Ops403TopRpcRow[]> {
+  return callRpc<Ops403TopRpcRow[]>('ops_403_events_top_rpc', {
+    p_limit: params.limit ?? 12,
+    p_only_open: params.onlyOpen ?? true,
+  });
+}

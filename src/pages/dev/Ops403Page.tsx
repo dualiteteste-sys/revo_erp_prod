@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { CheckCircle2, Circle, RefreshCw, Search, ShieldAlert } from 'lucide-react';
+import { CheckCircle2, Circle, FileText, RefreshCw, Search, ShieldAlert } from 'lucide-react';
 
 import PageHeader from '@/components/ui/PageHeader';
 import PageShell from '@/components/ui/PageShell';
@@ -10,7 +10,8 @@ import ResizableSortableTh, { type SortState } from '@/components/ui/table/Resiz
 import TableColGroup from '@/components/ui/table/TableColGroup';
 import { useTableColumnWidths, type TableColumnWidthDef } from '@/components/ui/table/useTableColumnWidths';
 import { sortRows, toggleSort } from '@/components/ui/table/sortUtils';
-import { countOps403Events, listOps403Events, setOps403EventResolved, type Ops403EventRow } from '@/services/ops403';
+import { countOps403Events, listOps403Events, setOps403EventResolved, topOps403Kinds, topOps403Rpcs, type Ops403EventRow } from '@/services/ops403';
+import { getOpsContextSnapshot } from '@/services/opsContext';
 
 function formatDateTimeBR(value?: string | null) {
   if (!value) return '—';
@@ -40,6 +41,8 @@ export default function Ops403Page() {
   const [q, setQ] = useState('');
   const [onlyOpen, setOnlyOpen] = useState(true);
   const [total, setTotal] = useState(0);
+  const [topKinds, setTopKinds] = useState<any[]>([]);
+  const [topRpcs, setTopRpcs] = useState<any[]>([]);
   const [sort, setSort] = useState<SortState<'when' | 'rpc' | 'route' | 'message'>>({ column: 'when', direction: 'desc' });
 
   const columns: TableColumnWidthDef[] = [
@@ -73,15 +76,21 @@ export default function Ops403Page() {
     setLoading(true);
     setError(null);
     try {
-      const [count, list] = await Promise.all([
+      const [count, list, kinds, rpcs] = await Promise.all([
         countOps403Events({ q: q.trim() ? q.trim() : null, onlyOpen }),
         listOps403Events({ q: q.trim() ? q.trim() : null, onlyOpen, limit: 100, offset: 0 }),
+        topOps403Kinds({ onlyOpen, limit: 8 }),
+        topOps403Rpcs({ onlyOpen, limit: 12 }),
       ]);
       setTotal(count);
       setRows(list ?? []);
+      setTopKinds(kinds ?? []);
+      setTopRpcs(rpcs ?? []);
     } catch (e: any) {
       setRows([]);
       setTotal(0);
+      setTopKinds([]);
+      setTopRpcs([]);
       setError(e?.message || 'Falha ao carregar eventos 403.');
     } finally {
       setLoading(false);
@@ -115,6 +124,25 @@ export default function Ops403Page() {
           icon={<ShieldAlert size={20} />}
           actions={
             <div className="flex items-center gap-2">
+              <Button
+                variant="secondary"
+                onClick={async () => {
+                  try {
+                    const snap = await getOpsContextSnapshot();
+                    const text = JSON.stringify(snap, null, 2);
+                    await navigator.clipboard.writeText(text);
+                    addToast('Contexto copiado para a área de transferência.', 'success');
+                  } catch (e: any) {
+                    addToast(e?.message || 'Falha ao copiar contexto.', 'error');
+                  }
+                }}
+                className="gap-2"
+                disabled={loading}
+                title="Copia user/empresa/role/plano para facilitar debug"
+              >
+                <FileText size={16} />
+                Copiar contexto
+              </Button>
               <Button variant="outline" onClick={load} className="gap-2" disabled={loading}>
                 <RefreshCw size={16} />
                 Atualizar
@@ -157,6 +185,54 @@ export default function Ops403Page() {
         <div className="text-xs text-slate-600">
           Total: <span className="font-semibold text-slate-900">{total}</span>
         </div>
+
+        {!loading && !error ? (
+          <div className="grid gap-3 lg:grid-cols-2">
+            <div className="rounded-xl border border-gray-200 bg-white p-4">
+              <div className="text-sm font-semibold text-slate-900">Top por tipo</div>
+              <div className="mt-2 flex flex-wrap gap-2">
+                {topKinds.length === 0 ? (
+                  <div className="text-sm text-slate-500">—</div>
+                ) : (
+                  topKinds.map((k: any) => (
+                    <span
+                      key={k.kind}
+                      className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-1 text-xs text-slate-700"
+                      title={k.last_at}
+                    >
+                      <span className="font-semibold">{formatKind(k.kind).label}</span>
+                      <span className="text-slate-500">{k.total}</span>
+                    </span>
+                  ))
+                )}
+              </div>
+            </div>
+            <div className="rounded-xl border border-gray-200 bg-white p-4">
+              <div className="text-sm font-semibold text-slate-900">Top RPCs</div>
+              <div className="mt-2 space-y-2">
+                {topRpcs.length === 0 ? (
+                  <div className="text-sm text-slate-500">—</div>
+                ) : (
+                  topRpcs.slice(0, 6).map((r: any) => (
+                    <div key={r.rpc_fn} className="flex items-center justify-between gap-3">
+                      <div className="min-w-0">
+                        <div className="font-mono text-xs text-slate-800 truncate">{r.rpc_fn}</div>
+                        {r.kinds ? (
+                          <div className="mt-0.5 text-[11px] text-slate-500">
+                            {Object.entries(r.kinds)
+                              .map(([kind, cnt]) => `${formatKind(kind).label}:${cnt}`)
+                              .join(' · ')}
+                          </div>
+                        ) : null}
+                      </div>
+                      <div className="text-xs font-semibold text-slate-700">{r.total}</div>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+          </div>
+        ) : null}
 
         {loading ? (
           <div className="text-sm text-slate-600">Carregando…</div>
