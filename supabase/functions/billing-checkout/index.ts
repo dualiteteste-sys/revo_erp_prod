@@ -153,8 +153,12 @@ Deno.serve(async (req) => {
     }
 
     // 2) Payload
-    const { empresa_id, plan_slug, billing_cycle, trial } = await req.json() as {
-      empresa_id?: string; plan_slug?: string; billing_cycle?: Cycle; trial?: boolean;
+    const { empresa_id, plan_slug, billing_cycle, trial, empresa: empresaPayload } = await req.json() as {
+      empresa_id?: string;
+      plan_slug?: string;
+      billing_cycle?: Cycle;
+      trial?: boolean;
+      empresa?: { cnpj?: string; nome_razao_social?: string; nome_fantasia?: string };
     };
     if (!empresa_id || !plan_slug || !billing_cycle) {
       return new Response(JSON.stringify({ error: 'invalid_payload', message: 'empresa_id, plan_slug e billing_cycle são obrigatórios.' }), {
@@ -198,12 +202,16 @@ Deno.serve(async (req) => {
               } as any,
               { onConflict: "slug,billing_cycle" },
             );
-          if (!upsertErr) {
-            planErr = null;
-            planRow = { stripe_price_id: fallbackPrice, active: true } as any;
+          // Mesmo se o upsert falhar por drift (constraint inexistente, schema antigo, cache),
+          // seguimos com o fallback para não bloquear checkout.
+          if (upsertErr) {
+            console.warn("billing-checkout: failed to upsert plan mapping (best-effort)", upsertErr);
           }
+          planErr = null;
+          planRow = { stripe_price_id: fallbackPrice, active: true } as any;
         } catch {
-          // best-effort
+          planErr = null;
+          planRow = { stripe_price_id: fallbackPrice, active: true } as any;
         }
       }
     }
@@ -225,9 +233,10 @@ Deno.serve(async (req) => {
 
     console.log('billing-checkout→price', { plan_slug: normalizedSlug, billing_cycle, priceId });
 
+    // Buscar mínimo possível (evita quebrar por drift de colunas em dev).
     const { data: empresa, error: empErr } = await supabaseAdmin
       .from("empresas")
-      .select("id, nome_fantasia, nome_razao_social, cnpj, stripe_customer_id")
+      .select("id, cnpj, stripe_customer_id")
       .eq("id", empresa_id)
       .single();
     if (empErr || !empresa) {
@@ -250,10 +259,32 @@ Deno.serve(async (req) => {
     // 5) Stripe
     const stripe = new Stripe(stripeSecretKey, { apiVersion: "2024-06-20" });
 
-    const empresaCnpj = (empresa as any)?.cnpj ? String((empresa as any).cnpj).replace(/\D/g, "") : "";
-    const displayRazao = (empresa as any)?.nome_razao_social ?? null;
-    const displayFantasia = (empresa as any)?.nome_fantasia ?? null;
+    const payloadCnpj = (empresaPayload?.cnpj ?? "").trim();
+    const payloadCnpjClean = payloadCnpj ? payloadCnpj.replace(/\D/g, "") : "";
+    const empresaCnpj = payloadCnpjClean || ((empresa as any)?.cnpj ? String((empresa as any).cnpj).replace(/\D/g, "") : "");
+
+    const displayRazao = (empresaPayload?.nome_razao_social ?? "").trim();
+    const displayFantasia = (empresaPayload?.nome_fantasia ?? "").trim();
     const displayName = (displayFantasia || displayRazao || `Empresa ${empresa_id}`) as string;
+
+    // Best-effort persist (não quebra checkout se schema/cache estiver desatualizado).
+    if (empresaPayload?.nome_razao_social || empresaPayload?.nome_fantasia || payloadCnpjClean) {
+      try {
+        const { error: updErr } = await supabaseAdmin
+          .from("empresas")
+          .update({
+            cnpj: payloadCnpjClean || undefined,
+            nome_razao_social: displayRazao || undefined,
+            nome_fantasia: displayFantasia || undefined,
+          } as any)
+          .eq("id", empresa_id);
+        if (updErr) {
+          console.warn("billing-checkout: failed to persist empresa fields (best-effort)", updErr);
+        }
+      } catch {
+        // ignore
+      }
+    }
 
     let customerId = (empresa as any).stripe_customer_id as string | null;
     if (!customerId) {

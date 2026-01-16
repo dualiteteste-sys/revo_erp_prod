@@ -30,7 +30,7 @@ export const SubscriptionProvider = ({ children }: { children: ReactNode }) => {
   const empresaId = useMemo(() => activeEmpresa?.id ?? null, [activeEmpresa?.id]);
   const accessToken = useMemo(() => session?.access_token ?? null, [session?.access_token]);
   const localBypass = useMemo(() => isLocalBillingBypassEnabled(), []);
-  const hasPendingPlanIntent = useMemo(() => {
+  const hasPendingPlanIntent = useCallback(() => {
     try {
       return Boolean((localStorage.getItem('pending_plan_slug') ?? '').trim());
     } catch {
@@ -99,7 +99,7 @@ export const SubscriptionProvider = ({ children }: { children: ReactNode }) => {
     if (loadingSubscription) return;
     // Se o usuário está no fluxo de iniciar checkout (teste grátis),
     // não faz sentido tentar sincronizar assinatura antes do checkout.
-    if (hasPendingPlanIntent) return;
+    if (hasPendingPlanIntent()) return;
 
     // Só tenta quando não há assinatura local ainda.
     if (subscription) return;
