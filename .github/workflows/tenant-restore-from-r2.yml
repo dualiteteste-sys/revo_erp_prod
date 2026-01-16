@@ -130,7 +130,7 @@ jobs:
           begin;
           -- Desativa constraints/triggers temporariamente (restore por tenant).
           set session_replication_role = replica;
-SQL
+          SQL
 
           # Delete em todas as tabelas (ordem alfabética; constraints desativadas).
           while IFS= read -r t; do
