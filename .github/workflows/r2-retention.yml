@@ -38,8 +38,8 @@ jobs:
       AWS_S3_ADDRESSING_STYLE: path
       AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
       AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
-      DAYS: ${{ inputs.days || 90 }}
-      PREFIX: ${{ inputs.prefix || 'revo/' }}
+      DAYS: ${{ (github.event_name == 'workflow_dispatch' && inputs.days) || 90 }}
+      PREFIX: ${{ (github.event_name == 'workflow_dispatch' && inputs.prefix) || 'revo/' }}
     steps:
       - name: Ensure secrets configured
         shell: bash
@@ -170,4 +170,3 @@ PY
                 labels,
               });
             }
-

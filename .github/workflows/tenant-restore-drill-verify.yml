@@ -49,9 +49,9 @@ jobs:
       DEV_URL: ${{ secrets.SUPABASE_DB_URL_DEV }}
       PROD_URL: ${{ secrets.SUPABASE_DB_URL_PROD }}
       VERIFY_URL: ${{ secrets.SUPABASE_DB_URL_VERIFY }}
-      SOURCE_TARGET: ${{ inputs.source_target || 'prod' }}
-      EMPRESA_ID_INPUT: ${{ inputs.empresa_id || '' }}
-      LABEL: ${{ inputs.label || 'restore-drill' }}
+      SOURCE_TARGET: ${{ (github.event_name == 'workflow_dispatch' && inputs.source_target) || 'prod' }}
+      EMPRESA_ID_INPUT: ${{ (github.event_name == 'workflow_dispatch' && inputs.empresa_id) || '' }}
+      LABEL: ${{ (github.event_name == 'workflow_dispatch' && inputs.label) || 'restore-drill' }}
     steps:
       - uses: actions/checkout@v4
 
@@ -315,4 +315,3 @@ jobs:
                 labels,
               });
             }
-
