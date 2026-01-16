@@ -124,23 +124,14 @@ Deno.serve(async (req) => {
 
     const admin = createClient(supabaseUrl, serviceKey);
 
-    let empresa: {
-      id: string;
-      cnpj: string | null;
-      stripe_customer_id: string | null;
-      nome_razao_social: string;
-      nome_fantasia: string | null;
-      email: string | null;
-    } | null = null;
-  if (empresaId) {
-      const { data, error } = await admin
-        .from("empresas")
-        .select("id, cnpj, stripe_customer_id, nome_razao_social, nome_fantasia, email")
-        .eq("id", empresaId)
-        .maybeSingle();
+    let empresa: Record<string, any> | null = null;
+    if (empresaId) {
+      // Importante: `empresas` já teve variações de schema (ex.: `nome_fantasia` vs `fantasia`),
+      // então usamos `select('*')` para evitar erro de "coluna não existe" em produção.
+      const { data, error } = await admin.from("empresas").select("*").eq("id", empresaId).maybeSingle();
       if (error || !data) return json(corsHeaders, 404, { error: "company_not_found", message: "Empresa não encontrada." });
       empresa = data as any;
-  }
+    }
 
     const cnpj = inputCnpj || stripNonDigits(String(empresa?.cnpj ?? ""));
     const email = inputEmail || (user.email ?? "").trim().toLowerCase();
@@ -158,7 +149,7 @@ Deno.serve(async (req) => {
     }
 
     if (empresaId) {
-      const current = (empresa?.stripe_customer_id ?? "").trim();
+      const current = String(empresa?.stripe_customer_id ?? "").trim();
       if (current) {
         try {
           const c = await stripe.customers.retrieve(current);
@@ -294,7 +285,14 @@ Deno.serve(async (req) => {
     // Link: atualiza empresa.stripe_customer_id e garante metadata no customer.
     await admin.from("empresas").update({ stripe_customer_id: chosenId }).eq("id", empresaId);
     try {
-      const empresaName = String(empresa?.nome_fantasia || empresa?.nome_razao_social || "").trim();
+      const empresaName = String(
+        empresa?.nome_fantasia ||
+          empresa?.fantasia ||
+          empresa?.nome_razao_social ||
+          empresa?.razao_social ||
+          empresa?.nome ||
+          "",
+      ).trim();
       await stripe.customers.update(chosenId, {
         ...(empresaName ? { name: empresaName } : {}),
         metadata: { empresa_id: empresaId, ...(cnpj ? { cnpj } : {}) },
