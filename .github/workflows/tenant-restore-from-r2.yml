@@ -54,6 +54,9 @@ jobs:
       PROD_URL: ${{ secrets.SUPABASE_DB_URL_PROD }}
       VERIFY_URL: ${{ secrets.SUPABASE_DB_URL_VERIFY }}
     steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
       - name: Safety checks
         shell: bash
         run: |
@@ -188,6 +191,20 @@ jobs:
             -w /work \
             postgres:17 \
             bash -lc "psql \"${DATABASE_URL}\" -v ON_ERROR_STOP=1 -X -q -c \"set session_replication_role=origin; commit;\""
+
+      - name: Post-restore asserts (verify)
+        if: ${{ inputs.target == 'verify' }}
+        shell: bash
+        env:
+          DATABASE_URL: ${{ steps.db.outputs.url }}
+        run: |
+          set -euo pipefail
+          echo "Running post-restore asserts for EMPRESA_ID=${EMPRESA_ID} on verify..."
+          docker run --rm \
+            -v "$PWD:/work" \
+            -w /work \
+            postgres:17 \
+            bash -lc "psql \"${DATABASE_URL}\" -v ON_ERROR_STOP=1 -X -q -v empresa_id=\"${EMPRESA_ID}\" -f scripts/tenant_restore_verify_asserts.sql"
 
       - name: Update tenant backup catalog (status=restored)
         if: always()
