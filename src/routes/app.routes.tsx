@@ -43,6 +43,7 @@ const Ops403Page = lazyImport(() => import("../pages/dev/Ops403Page"));
 const OpsRlsInventoryPage = lazyImport(() => import("../pages/dev/OpsRlsInventoryPage"));
 const OpsBackupsPage = lazyImport(() => import("../pages/dev/OpsBackupsPage"));
 const OpsTenantBackupsPage = lazyImport(() => import("../pages/dev/OpsTenantBackupsPage"));
+const OpsStripeDedupePage = lazyImport(() => import("../pages/dev/OpsStripeDedupePage"));
 const SupabaseDemoPage = lazyImport(() => import("../pages/tools/SupabaseDemoPage"));
 const SettingsPage = lazyImport(() => import("../pages/settings/SettingsPage"));
 
@@ -549,6 +550,14 @@ export const appRoutes: RouteObject[] = [
               element: (
                 <RequirePermission permission={{ domain: "ops", action: "view" }}>
                   <Suspense fallback={<PageLoader />}><OpsTenantBackupsPage /></Suspense>
+                </RequirePermission>
+              ),
+            },
+            {
+              path: "desenvolvedor/stripe-dedupe",
+              element: (
+                <RequirePermission permission={{ domain: "ops", action: "manage" }}>
+                  <Suspense fallback={<PageLoader />}><OpsStripeDedupePage /></Suspense>
                 </RequirePermission>
               ),
             },

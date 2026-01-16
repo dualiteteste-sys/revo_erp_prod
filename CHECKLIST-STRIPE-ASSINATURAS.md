@@ -30,11 +30,13 @@ Objetivo: eliminar **403 intermitente** causado por inconsistências de assinatu
   - [x] rodar `billing-sync-subscription` automaticamente (best-effort)
   - [x] atualizar UI/entitlements sem exigir ação manual do usuário
 - [x] Idempotência: limitar tentativas automáticas (ex.: 1 por sessão / janela de tempo)
+- [x] Pós-checkout: na rota `/app/billing/success`, rodar `billing-sync-subscription` (best-effort) e disparar refresh de features
 
 ## P3 — Higienização e dedupe (ops/admin)
 - [ ] Ferramenta interna (ops) para encontrar duplicados no Stripe:
   - [ ] por `metadata.cnpj` e/ou email
   - [ ] por múltiplos customers ligados à mesma empresa
+- [x] Tool (estado da arte): `/app/desenvolvedor/stripe-dedupe` para inspecionar customers e vincular o `stripe_customer_id` correto no tenant (não destrutivo)
 - [ ] Procedimento de dedupe seguro (checklist operacional):
   - [ ] gerar backup do tenant (prod) **antes**
   - [ ] remover/mesclar customer duplicado no Stripe

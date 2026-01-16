@@ -51,6 +51,29 @@ const SuccessPage: React.FC = () => {
           setData(responseData);
           setStatus('success');
           addToast('Assinatura confirmada com sucesso!', 'success');
+
+          // Estado da arte: garantir que a assinatura/entitlements já estejam sincronizados
+          // sem exigir clique manual em "Sincronizar com Stripe".
+          try {
+            const empresaId = responseData?.company?.id ?? responseData?.company?.empresa_id ?? responseData?.subscription?.empresa_id;
+            if (empresaId) {
+              await supabase.functions.invoke('billing-sync-subscription', {
+                body: { empresa_id: empresaId },
+                headers: { Authorization: `Bearer ${session.access_token}` },
+              });
+              window.dispatchEvent(new Event('empresa-features-refresh'));
+            }
+          } catch {
+            // best-effort: não bloquear sucesso do usuário
+          }
+
+          // Limpar intent do pricing/landing (evita autosync/fluxos inconsistentes).
+          try {
+            localStorage.removeItem('pending_plan_slug');
+            localStorage.removeItem('pending_plan_cycle');
+          } catch {
+            // ignore
+          }
         }
       } catch (e: any) {
         setStatus('error');
