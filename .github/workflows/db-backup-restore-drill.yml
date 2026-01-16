@@ -30,6 +30,9 @@ jobs:
     env:
       R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
       R2_BUCKET: ${{ secrets.R2_BUCKET }}
+      AWS_REGION: auto
+      AWS_DEFAULT_REGION: auto
+      AWS_EC2_METADATA_DISABLED: "true"
       AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
       AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
       TARGET: ${{ inputs.target }}
@@ -63,7 +66,7 @@ jobs:
           echo "target=$target" >> "$GITHUB_OUTPUT"
 
           # Lista todos os dumps e pega o mais recente (ordenação lexicográfica serve pelo timestamp no nome).
-          latest="$(aws --endpoint-url "${R2_ENDPOINT}" s3 ls "s3://${R2_BUCKET}/revo/${target}/" --recursive | awk '{print $4}' | grep -E "\\.dump\\.gz$" | sort | tail -n 1)"
+          latest="$(aws --region auto --endpoint-url "${R2_ENDPOINT}" s3 ls "s3://${R2_BUCKET}/revo/${target}/" --recursive | awk '{print $4}' | grep -E "\\.dump\\.gz$" | sort | tail -n 1)"
           if [[ -z "${latest:-}" ]]; then
             echo "::error::Nenhum backup encontrado em s3://${R2_BUCKET}/revo/${target}/"
             exit 1
@@ -73,10 +76,10 @@ jobs:
           echo "latest_key=$latest" >> "$GITHUB_OUTPUT"
           echo "file=$file" >> "$GITHUB_OUTPUT"
 
-          aws --endpoint-url "${R2_ENDPOINT}" s3 cp "s3://${R2_BUCKET}/${latest}" "$file" --only-show-errors
+          aws --region auto --endpoint-url "${R2_ENDPOINT}" s3 cp "s3://${R2_BUCKET}/${latest}" "$file" --only-show-errors
 
           manifest_key="${latest%.dump.gz}.manifest.json"
-          aws --endpoint-url "${R2_ENDPOINT}" s3 cp "s3://${R2_BUCKET}/${manifest_key}" "${file%.dump.gz}.manifest.json" --only-show-errors || true
+          aws --region auto --endpoint-url "${R2_ENDPOINT}" s3 cp "s3://${R2_BUCKET}/${manifest_key}" "${file%.dump.gz}.manifest.json" --only-show-errors || true
 
           ls -lh "$file" || true
 

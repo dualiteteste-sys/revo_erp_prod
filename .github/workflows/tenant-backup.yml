@@ -31,6 +31,9 @@ jobs:
     env:
       R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
       R2_BUCKET: ${{ secrets.R2_BUCKET || 'revo-erp-backups-prod' }}
+      AWS_REGION: auto
+      AWS_DEFAULT_REGION: auto
+      AWS_EC2_METADATA_DISABLED: "true"
       AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
       AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
       DEV_URL: ${{ secrets.SUPABASE_DB_URL_DEV }}
@@ -169,8 +172,8 @@ jobs:
           manifest="$(ls -1 tenant_export_${target}_${EMPRESA_ID}_*.manifest.json | tail -n 1)"
 
           echo "Enviando para s3://${R2_BUCKET}/${prefix}/"
-          aws --endpoint-url "${R2_ENDPOINT}" s3 cp "$zipfile" "s3://${R2_BUCKET}/${prefix}/$(basename "$zipfile")" --only-show-errors
-          aws --endpoint-url "${R2_ENDPOINT}" s3 cp "$manifest" "s3://${R2_BUCKET}/${prefix}/$(basename "$manifest")" --only-show-errors
+          aws --region auto --endpoint-url "${R2_ENDPOINT}" s3 cp "$zipfile" "s3://${R2_BUCKET}/${prefix}/$(basename "$zipfile")" --only-show-errors
+          aws --region auto --endpoint-url "${R2_ENDPOINT}" s3 cp "$manifest" "s3://${R2_BUCKET}/${prefix}/$(basename "$manifest")" --only-show-errors
 
           echo "r2_key=${prefix}/$(basename "$zipfile")" >> "$GITHUB_OUTPUT"
 

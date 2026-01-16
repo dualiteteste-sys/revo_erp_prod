@@ -44,6 +44,9 @@ jobs:
       CONFIRM: ${{ inputs.confirm }}
       R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
       R2_BUCKET: ${{ secrets.R2_BUCKET || 'revo-erp-backups-prod' }}
+      AWS_REGION: auto
+      AWS_DEFAULT_REGION: auto
+      AWS_EC2_METADATA_DISABLED: "true"
       AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
       AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
       DEV_URL: ${{ secrets.SUPABASE_DB_URL_DEV }}
@@ -102,7 +105,7 @@ jobs:
           set -euo pipefail
           file="$(basename "${R2_KEY}")"
           echo "Baixando s3://${R2_BUCKET}/${R2_KEY}"
-          aws --endpoint-url "${R2_ENDPOINT}" s3 cp "s3://${R2_BUCKET}/${R2_KEY}" "$file" --only-show-errors
+          aws --region auto --endpoint-url "${R2_ENDPOINT}" s3 cp "s3://${R2_BUCKET}/${R2_KEY}" "$file" --only-show-errors
           ls -lh "$file"
           unzip -q "$file" -d tenant_restore
           ls -la tenant_restore | head
