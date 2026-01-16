@@ -13,23 +13,23 @@ Objetivo: eliminar **403 intermitente** causado por inconsistências de assinatu
   - [ ] “assinatura não sincronizada” (dados ainda não chegaram no Supabase)
 
 ## P1 — Prevenir duplicidade e “Empresa sem nome” (checkout)
-- [ ] Modal inicial de assinatura pedir **CNPJ primeiro**
-  - [ ] Ao blur/tab, buscar Razão Social/Nome fantasia e preencher automaticamente
-  - [ ] Validar CNPJ (14 dígitos)
-- [ ] Persistir empresa antes do checkout:
-  - [ ] `cnpj`
-  - [ ] `razao_social`/`nome_razao_social`
-  - [ ] `fantasia`/`nome_fantasia`
-- [ ] Edge Function `billing-checkout`:
-  - [ ] Criar/atualizar Customer com `name` correto
-  - [ ] Setar `metadata: { empresa_id, cnpj }`
-  - [ ] Reusar customer via `metadata['empresa_id']` e fallback via `metadata['cnpj']`
+- [x] Modal inicial de assinatura pedir **CNPJ primeiro**
+  - [x] Ao blur/tab, buscar Razão Social/Nome fantasia e preencher automaticamente
+  - [x] Validar CNPJ (14 dígitos)
+- [x] Persistir empresa antes do checkout:
+  - [x] `cnpj`
+  - [x] `razao_social`/`nome_razao_social`
+  - [x] `fantasia`/`nome_fantasia`
+- [x] Edge Function `billing-checkout`:
+  - [x] Criar/atualizar Customer com `name` correto
+  - [x] Setar `metadata: { empresa_id, cnpj }`
+  - [x] Reusar customer via `metadata['empresa_id']` e fallback via `metadata['cnpj']`
 
 ## P2 — Sync automático (anti “precisa clicar sincronizar”)
-- [ ] Boot: ao entrar no app (empresa ativa), se não houver subscription local:
-  - [ ] rodar `billing-sync-subscription` automaticamente (best-effort)
-  - [ ] atualizar UI/entitlements sem exigir ação manual do usuário
-- [ ] Idempotência: limitar tentativas automáticas (ex.: 1 por sessão / janela de tempo)
+- [x] Boot: ao entrar no app (empresa ativa), se não houver subscription local:
+  - [x] rodar `billing-sync-subscription` automaticamente (best-effort)
+  - [x] atualizar UI/entitlements sem exigir ação manual do usuário
+- [x] Idempotência: limitar tentativas automáticas (ex.: 1 por sessão / janela de tempo)
 
 ## P3 — Higienização e dedupe (ops/admin)
 - [ ] Ferramenta interna (ops) para encontrar duplicados no Stripe:
@@ -41,8 +41,8 @@ Objetivo: eliminar **403 intermitente** causado por inconsistências de assinatu
   - [ ] re-sync e validar acesso (sem 403)
 
 ## P4 — Backup por tenant (empresa) — antes do go-live
-- [ ] `Dev → Backup por Empresa` (empresa ativa)
+- [x] Implementar `Dev → Backup por Empresa` (empresa ativa)
+- [ ] Validar em `prod` (empresa `leandrofmarques@me.com`) antes de dedupe no Stripe:
   - [ ] Disparar export do tenant em `prod` com label `antes-limpeza-stripe`
   - [ ] Confirmar que apareceu no catálogo `ops_tenant_backups`
   - [ ] Validar restore em `verify` (ou `dev`) e checar dados mínimos
-

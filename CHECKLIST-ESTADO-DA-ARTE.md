@@ -44,7 +44,7 @@ Objetivo: **zerar 403 intermitente** em Scale/OWNER e evitar que isso apareça e
 - [ ] Alertar automaticamente quando houver 403 do tipo `missing_active_empresa` (GitHub Issue/OPS ALERT).
 
 **Aceite P0**
-- [ ] Rodar `yarn test:e2e:gate:all` com **console-sweep verde**.
+- [x] Rodar `yarn test:e2e:gate:all` com **console-sweep verde**.
 - [ ] 0 ocorrências de 403 intermitente em 48h (dev) para fluxos principais (auth, dashboard, vendas, suprimentos, financeiro, indústria).
 
 ---
