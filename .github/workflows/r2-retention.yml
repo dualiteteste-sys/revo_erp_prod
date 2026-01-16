@@ -5,9 +5,9 @@ on:
     inputs:
       days:
         description: "Apagar objetos com LastModified < (hoje - N dias)"
-        type: number
+        type: string
         required: true
-        default: 90
+        default: "90"
       prefix:
         description: "Prefixo (ex.: revo/tenants/)"
         type: string
