@@ -134,12 +134,20 @@ export async function manageComponente(
   unidade: string,
   action: 'upsert' | 'delete' = 'upsert'
 ): Promise<void> {
+  const safeOrdemId = String(ordemId || '').trim();
+  const safeComponenteId = String(componenteId || '').trim() || null;
+  const safeProdutoId = String(produtoId || '').trim() || null;
+  const safeUnidade = String(unidade || '').trim() || null;
+
+  // PostgREST faz cast do payload para o tipo do parâmetro do RPC.
+  // Se mandarmos "" para uuid/date/numeric, vira 22P02/22007 etc.
+  // Para delete, campos extras são ignorados no servidor — então mandamos NULL.
   await callRpc('industria_manage_componente', {
-    p_ordem_id: ordemId,
-    p_componente_id: componenteId,
-    p_produto_id: produtoId,
-    p_quantidade_planejada: qtdPlanejada,
-    p_unidade: unidade,
+    p_ordem_id: safeOrdemId,
+    p_componente_id: safeComponenteId,
+    p_produto_id: action === 'delete' ? null : safeProdutoId,
+    p_quantidade_planejada: action === 'delete' ? null : (Number.isFinite(qtdPlanejada) ? qtdPlanejada : null),
+    p_unidade: action === 'delete' ? null : safeUnidade,
     p_action: action,
   });
 }
