@@ -160,11 +160,8 @@ export function PlanIntentCheckoutModal() {
           .from("empresas")
           .update({
             cnpj: cleanedCnpj,
-            // manter compatibilidade com ambos os schemas (dev/prod historicamente já tiveram nomes diferentes):
-            nome_razao_social: razaoFinal as any,
-            nome_fantasia: fantasiaFinal as any,
-            razao_social: razaoFinal as any,
-            fantasia: fantasiaFinal as any,
+            nome_razao_social: razaoFinal,
+            nome_fantasia: fantasiaFinal,
           } as any)
           .eq("id", empresaId);
       } catch (e) {

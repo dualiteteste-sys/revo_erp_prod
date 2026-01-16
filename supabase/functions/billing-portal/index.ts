@@ -1,39 +1,11 @@
 import { createClient } from "@supabase/supabase-js";
 import Stripe from "stripe";
-
-function buildCorsHeaders(req: Request) {
-  const origin = req.headers.get("origin") || "";
-  const acrh = req.headers.get("access-control-request-headers") || "";
-  const raw = Deno.env.get("ALLOWED_ORIGINS") || "";
-  const list = raw.split(",").map(s => s.trim()).filter(Boolean);
-
-  const exacts = list.filter(v => !v.startsWith("suffix:"));
-  const suffixes = list.filter(v => v.startsWith("suffix:")).map(v => v.replace("suffix:", ""));
-
-  const permissive = (Deno.env.get("CORS_MODE") || "").toLowerCase() === "permissive";
-  const isExact = exacts.includes(origin);
-  const isSuffix = suffixes.some(sfx => origin.endsWith(sfx));
-
-  const allowOrigin = permissive
-    ? (origin || "*")
-    : (isExact || isSuffix) ? origin : (Deno.env.get("SITE_URL") || "*");
-
-  const allowHeaders = acrh || "authorization, x-client-info, apikey, content-type";
-
-  return {
-    "Content-Type": "application/json",
-    "Access-Control-Allow-Origin": allowOrigin,
-    "Access-Control-Allow-Methods": "POST, OPTIONS",
-    "Access-Control-Allow-Headers": allowHeaders,
-    "Access-Control-Max-Age": "600",
-    "Vary": "Origin, Access-Control-Request-Headers",
-  };
-}
+import { buildCorsHeaders } from "../_shared/cors.ts";
 
 function cors(req: Request, status = 200, body?: unknown) {
   return new Response(body ? JSON.stringify(body) : null, {
     status,
-    headers: buildCorsHeaders(req),
+    headers: { "Content-Type": "application/json", ...buildCorsHeaders(req) },
   });
 }
 
@@ -64,13 +36,13 @@ Deno.serve(async (req) => {
     }
     
     const { data: empresa } = await supabase.from("empresas")
-      .select("stripe_customer_id, fantasia, razao_social, nome_fantasia, nome_razao_social, cnpj")
+      .select("stripe_customer_id, nome_fantasia, nome_razao_social, cnpj")
       .eq("id", empresa_id).single();
 
     const stripe = new Stripe(Deno.env.get("STRIPE_SECRET_KEY")!, { apiVersion: "2024-06-20" });
     const empresaCnpj = (empresa as any)?.cnpj ? String((empresa as any).cnpj).replace(/\D/g, "") : "";
-    const displayRazao = (empresa as any)?.razao_social ?? (empresa as any)?.nome_razao_social ?? null;
-    const displayFantasia = (empresa as any)?.fantasia ?? (empresa as any)?.nome_fantasia ?? null;
+    const displayRazao = (empresa as any)?.nome_razao_social ?? null;
+    const displayFantasia = (empresa as any)?.nome_fantasia ?? null;
     const displayName = (displayFantasia || displayRazao || `Empresa ${empresa_id}`).slice(0, 250);
 
     let customerId = empresa?.stripe_customer_id ? String(empresa.stripe_customer_id) : "";

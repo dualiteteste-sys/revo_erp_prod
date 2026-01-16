@@ -55,12 +55,17 @@ export async function getMainDashboardData(params?: { activitiesLimit?: number }
     financeiroPagarReceber3mPromise,
   ]);
 
-  if (activitiesRes.error) throw activitiesRes.error;
+  if (activitiesRes.error) {
+    const status = (activitiesRes as any)?.status ?? 0;
+    // Estado da arte: `app_logs` pode ser restrita para usuários finais.
+    // Não quebrar o dashboard por falta de permissão.
+    if (status !== 403) throw activitiesRes.error;
+  }
 
   return {
     current,
     previous,
-    activities: (activitiesRes.data ?? []) as DashboardActivity[],
+    activities: activitiesRes.error ? [] : ((activitiesRes.data ?? []) as DashboardActivity[]),
     financeiroPagarReceber3m,
   };
 }
