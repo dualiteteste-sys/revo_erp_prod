@@ -38,8 +38,8 @@ jobs:
       AWS_S3_ADDRESSING_STYLE: path
       AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
       AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
-      DAYS: ${{ (github.event_name == 'workflow_dispatch' && inputs.days) || 90 }}
-      PREFIX: ${{ (github.event_name == 'workflow_dispatch' && inputs.prefix) || 'revo/' }}
+      DAYS: ${{ inputs.days }}
+      PREFIX: ${{ inputs.prefix }}
     steps:
       - name: Ensure secrets configured
         shell: bash
@@ -69,9 +69,11 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          cutoff="$(date -u -d "${DAYS} days ago" +'%Y-%m-%dT%H:%M:%SZ')"
+          days="${DAYS:-90}"
+          prefix="${PREFIX:-revo/}"
+          cutoff="$(date -u -d "${days} days ago" +'%Y-%m-%dT%H:%M:%SZ')"
           echo "Cutoff UTC: ${cutoff}"
-          echo "Prefix: ${PREFIX}"
+          echo "Prefix: ${prefix}"
 
           # Pagina e remove em lotes (seguro/custo baixo). Não falha se não houver nada para apagar.
           token=""
@@ -79,9 +81,9 @@ jobs:
           scanned=0
           while :; do
             if [[ -n "$token" ]]; then
-              page="$(aws --region auto --endpoint-url "${R2_ENDPOINT}" s3api list-objects-v2 --bucket "${R2_BUCKET}" --prefix "${PREFIX}" --continuation-token "$token")"
+              page="$(aws --region auto --endpoint-url "${R2_ENDPOINT}" s3api list-objects-v2 --bucket "${R2_BUCKET}" --prefix "${prefix}" --continuation-token "$token")"
             else
-              page="$(aws --region auto --endpoint-url "${R2_ENDPOINT}" s3api list-objects-v2 --bucket "${R2_BUCKET}" --prefix "${PREFIX}")"
+              page="$(aws --region auto --endpoint-url "${R2_ENDPOINT}" s3api list-objects-v2 --bucket "${R2_BUCKET}" --prefix "${prefix}")"
             fi
             token="$(echo "$page" | python3 -c "import sys, json; j=json.load(sys.stdin); print(j.get('NextContinuationToken',''))")"
 
