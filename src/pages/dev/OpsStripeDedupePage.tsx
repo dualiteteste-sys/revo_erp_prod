@@ -104,7 +104,7 @@ export default function OpsStripeDedupePage() {
       <PageHeader
         title="Stripe: dedupe / vincular Customer"
         description="Ferramenta interna para diagnosticar duplicidade no Stripe (email/CNPJ) e vincular o Customer correto ao tenant."
-        icon={ShieldAlert}
+        icon={<ShieldAlert size={20} />}
       />
 
       <PageCard className="p-6 space-y-4">
@@ -246,4 +246,3 @@ export default function OpsStripeDedupePage() {
     </PageShell>
   );
 }
-
