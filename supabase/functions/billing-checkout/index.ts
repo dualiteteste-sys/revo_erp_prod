@@ -69,7 +69,28 @@ function parseTrialDays(): number {
   return Math.max(0, Math.min(3650, n));
 }
 
-function pickSiteUrl(req: Request): string | null {
+function isSupabasePermissionError(error: unknown): boolean {
+  const code = String((error as any)?.code ?? '');
+  const msg = String((error as any)?.message ?? '');
+  // 42501 = insufficient_privilege (RLS/GRANT)
+  if (code === '42501') return true;
+  if (msg.toLowerCase().includes('permission denied')) return true;
+  return false;
+}
+
+function permissionFixHint(): string {
+  return "Permissão insuficiente para o `service_role` no schema public. Aplique a migration de grants (fix_service_role_privileges) no Supabase do ambiente.";
+}
+
+function isLocalOrigin(origin: string): boolean {
+  const o = origin.trim().toLowerCase();
+  return o === "http://localhost:5173"
+    || o === "http://127.0.0.1:5173"
+    || o === "http://localhost:4173"
+    || o === "http://127.0.0.1:4173";
+}
+
+function pickSiteUrl(req: Request, stripeSecretKey: string): string | null {
   const envUrl = (Deno.env.get("SITE_URL") ?? "").trim();
 
   // Preferir o domínio do front que está chamando a função (evita "dev" em PROD).
@@ -80,11 +101,15 @@ function pickSiteUrl(req: Request): string | null {
     "https://erprevodev.com",
   ]);
 
-  const candidate = allowedExact.has(origin) ? origin : envUrl;
+  const isLive = stripeSecretKey.startsWith('sk_live_') || stripeSecretKey.startsWith('rk_live_');
+  // Segurança: só permite redirect para localhost quando usando Stripe TEST.
+  const allowLocal = !isLive && isLocalOrigin(origin);
+
+  const candidate = (allowedExact.has(origin) || allowLocal) ? origin : envUrl;
 
   // Segurança: evita open redirect se SITE_URL estiver errado/malicioso.
-  if (allowedExact.has(candidate)) return candidate;
-  if (candidate) return candidate; // fallback: mantém compatibilidade (localhost / previews), assumindo env correto
+  if (allowedExact.has(candidate) || allowLocal) return candidate;
+  if (candidate) return candidate; // fallback: mantém compatibilidade (previews), assumindo env correto
   return null;
 }
 
@@ -166,6 +191,9 @@ Deno.serve(async (req) => {
       });
     }
 
+    // 3) Stripe client (usado também para validar priceId)
+    const stripe = new Stripe(stripeSecretKey, { apiVersion: "2024-06-20" });
+
     // 4) DB & permission
     const supabaseAdmin = createClient(
       supabaseUrl,
@@ -205,7 +233,14 @@ Deno.serve(async (req) => {
           // Mesmo se o upsert falhar por drift (constraint inexistente, schema antigo, cache),
           // seguimos com o fallback para não bloquear checkout.
           if (upsertErr) {
-            console.warn("billing-checkout: failed to upsert plan mapping (best-effort)", upsertErr);
+            if (isSupabasePermissionError(upsertErr)) {
+              console.warn("billing-checkout: failed to upsert plan mapping (best-effort)", {
+                ...upsertErr,
+                hint: permissionFixHint(),
+              });
+            } else {
+              console.warn("billing-checkout: failed to upsert plan mapping (best-effort)", upsertErr);
+            }
           }
           planErr = null;
           planRow = { stripe_price_id: fallbackPrice, active: true } as any;
@@ -223,7 +258,7 @@ Deno.serve(async (req) => {
       }), { status: 400, headers: { 'Content-Type': 'application/json', ...corsHeaders } });
     }
 
-    const priceId = String(planRow.stripe_price_id);
+    let priceId = String(planRow.stripe_price_id);
     if (!priceId.startsWith("price_")) {
       return new Response(JSON.stringify({
         error: 'misconfigured_price_id',
@@ -231,33 +266,75 @@ Deno.serve(async (req) => {
       }), { status: 500, headers: { 'Content-Type': 'application/json', ...corsHeaders } });
     }
 
+    // Valida que o price existe no ambiente (test vs live). Se não existir, tenta fallback.
+    try {
+      await stripe.prices.retrieve(priceId);
+    } catch (e: any) {
+      const stripeCode = (e as any)?.code ?? (e as any)?.raw?.code ?? null;
+      if (stripeCode === "resource_missing") {
+        const key = `${normalizedSlug}/${billing_cycle}` as PlanKey;
+        const fallbackPrice = getDefaultPriceMap(stripeSecretKey)[key];
+        if (fallbackPrice) {
+          console.warn("billing-checkout: priceId not found in Stripe; using fallback mapping", { priceId, fallbackPrice });
+          priceId = fallbackPrice;
+        }
+      }
+    }
+
     console.log('billing-checkout→price', { plan_slug: normalizedSlug, billing_cycle, priceId });
 
-    // Buscar mínimo possível (evita quebrar por drift de colunas em dev).
-    const { data: empresa, error: empErr } = await supabaseAdmin
+    // 4.2) Empresa + permissão
+    // Preferimos `service_role` para reduzir dependência de RLS, mas fazemos fallback
+    // para o contexto do usuário caso as secrets estejam erradas no ambiente DEV.
+    let empresa:
+      | { id: string; cnpj: string | null; stripe_customer_id: string | null }
+      | null = null;
+    let canOperateEmpresa = false;
+
+    const adminEmpresaRes = await supabaseAdmin
       .from("empresas")
       .select("id, cnpj, stripe_customer_id")
       .eq("id", empresa_id)
-      .single();
-    if (empErr || !empresa) {
-      return new Response(JSON.stringify({ error: "company_not_found" }), {
-        status: 404, headers: { 'Content-Type': 'application/json', ...corsHeaders }
-      });
+      .maybeSingle();
+    if (!adminEmpresaRes.error && adminEmpresaRes.data) {
+      empresa = adminEmpresaRes.data as any;
+      const memberRes = await supabaseAdmin
+        .from('empresa_usuarios')
+        .select('empresa_id', { count: 'exact', head: true })
+        .eq('empresa_id', empresa_id)
+        .eq('user_id', user.id);
+      canOperateEmpresa = !memberRes.error && (memberRes.count ?? 0) > 0;
     }
 
-    const { count: memberCount, error: memberErr } = await supabaseAdmin
-      .from('empresa_usuarios')
-      .select('*', { count: 'exact', head: true })
-      .eq('empresa_id', empresa_id)
-      .eq('user_id', user.id);
-    if (memberErr || !memberCount || memberCount < 1) {
-      return new Response(JSON.stringify({ error: 'forbidden', message: 'Usuário não tem permissão para operar nesta empresa.' }), {
-        status: 403, headers: { 'Content-Type': 'application/json', ...corsHeaders }
-      });
-    }
+    if (!empresa || !canOperateEmpresa) {
+      // Fallback RLS-safe: buscar via vínculo (empresa_usuarios → empresas)
+      const linkRes = await supabaseAuth
+        .from("empresa_usuarios")
+        .select("empresa:empresas(id, cnpj, stripe_customer_id)")
+        .eq("empresa_id", empresa_id)
+        .eq("user_id", user.id)
+        .maybeSingle();
 
-    // 5) Stripe
-    const stripe = new Stripe(stripeSecretKey, { apiVersion: "2024-06-20" });
+      const linkEmpresa = (linkRes.data as any)?.empresa ?? null;
+      if (linkEmpresa) {
+        empresa = linkEmpresa as any;
+        canOperateEmpresa = true;
+      } else {
+        // Se o admin deu erro de permissão, explicitar que o ambiente está mal configurado.
+        if (adminEmpresaRes.error && isSupabasePermissionError(adminEmpresaRes.error)) {
+          return new Response(JSON.stringify({
+            error: "config_error",
+            message:
+              "Ambiente de billing mal configurado (service role sem permissão). Configure SUPABASE_SERVICE_ROLE_KEY corretamente no projeto DEV.",
+          }), { status: 500, headers: { 'Content-Type': 'application/json', ...corsHeaders } });
+        }
+
+        // Caso comum: empresa não existe ou usuário não é membro.
+        return new Response(JSON.stringify({ error: 'forbidden', message: 'Usuário não tem permissão para operar nesta empresa.' }), {
+          status: 403, headers: { 'Content-Type': 'application/json', ...corsHeaders }
+        });
+      }
+    }
 
     const payloadCnpj = (empresaPayload?.cnpj ?? "").trim();
     const payloadCnpjClean = payloadCnpj ? payloadCnpj.replace(/\D/g, "") : "";
@@ -270,15 +347,17 @@ Deno.serve(async (req) => {
     // Best-effort persist (não quebra checkout se schema/cache estiver desatualizado).
     if (empresaPayload?.nome_razao_social || empresaPayload?.nome_fantasia || payloadCnpjClean) {
       try {
-        const { error: updErr } = await supabaseAdmin
-          .from("empresas")
-          .update({
-            cnpj: payloadCnpjClean || undefined,
-            nome_razao_social: displayRazao || undefined,
-            nome_fantasia: displayFantasia || undefined,
-          } as any)
-          .eq("id", empresa_id);
-        if (updErr) {
+        const upd = {
+          cnpj: payloadCnpjClean || undefined,
+          nome_razao_social: displayRazao || undefined,
+          nome_fantasia: displayFantasia || undefined,
+        } as any;
+
+        const { error: updErr } = await supabaseAdmin.from("empresas").update(upd).eq("id", empresa_id);
+        if (updErr && isSupabasePermissionError(updErr)) {
+          const { error: updErr2 } = await supabaseAuth.from("empresas").update(upd).eq("id", empresa_id);
+          if (updErr2) console.warn("billing-checkout: failed to persist empresa fields (best-effort)", updErr2);
+        } else if (updErr) {
           console.warn("billing-checkout: failed to persist empresa fields (best-effort)", updErr);
         }
       } catch {
@@ -321,11 +400,14 @@ Deno.serve(async (req) => {
       }
 
       // Persistência é best-effort: em alguns hardenings, service_role não tem UPDATE em `empresas`.
-      const { error: upErr } = await supabaseAdmin
-        .from("empresas")
-        .update({ stripe_customer_id: customerId })
-        .eq("id", empresa_id);
-      if (upErr) {
+      const { error: upErr } = await supabaseAdmin.from("empresas").update({ stripe_customer_id: customerId }).eq("id", empresa_id);
+      if (upErr && isSupabasePermissionError(upErr)) {
+        const { error: upErr2 } = await supabaseAuth
+          .from("empresas")
+          .update({ stripe_customer_id: customerId })
+          .eq("id", empresa_id);
+        if (upErr2) console.warn("billing-checkout: failed to persist stripe_customer_id (best-effort)", upErr2);
+      } else if (upErr) {
         console.warn("billing-checkout: failed to persist stripe_customer_id (best-effort)", upErr);
       }
     } else {
@@ -337,16 +419,21 @@ Deno.serve(async (req) => {
         const code = (_e as any)?.code ?? (_e as any)?.raw?.code ?? null;
         if (code === "resource_missing") {
           const customer = await stripe.customers.create({
-            name: empresa.fantasia ?? empresa.razao_social ?? undefined,
+            name: displayName,
             email: user.email ?? undefined,
             metadata: { empresa_id },
           });
           customerId = customer.id;
-          const { error: upErr } = await supabaseAdmin
-            .from("empresas")
-            .update({ stripe_customer_id: customerId })
-            .eq("id", empresa_id);
-          if (upErr) {
+          const { error: upErr } = await supabaseAdmin.from("empresas").update({ stripe_customer_id: customerId }).eq("id", empresa_id);
+          if (upErr && isSupabasePermissionError(upErr)) {
+            const { error: upErr2 } = await supabaseAuth
+              .from("empresas")
+              .update({ stripe_customer_id: customerId })
+              .eq("id", empresa_id);
+            if (upErr2) {
+              console.warn("billing-checkout: failed to persist stripe_customer_id after recreate (best-effort)", upErr2);
+            }
+          } else if (upErr) {
             console.warn("billing-checkout: failed to persist stripe_customer_id after recreate (best-effort)", upErr);
           }
         }
@@ -365,7 +452,7 @@ Deno.serve(async (req) => {
     }
 
     // 6) SITE_URL sanity (prefer origin when it's a known domain)
-    const siteUrl = pickSiteUrl(req);
+    const siteUrl = pickSiteUrl(req, stripeSecretKey);
     if (!siteUrl) {
       return new Response(JSON.stringify({ error: 'config_error', message: 'SITE_URL não configurada' }), {
         status: 500, headers: { 'Content-Type': 'application/json', ...corsHeaders },

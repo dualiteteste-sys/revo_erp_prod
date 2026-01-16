@@ -23,6 +23,8 @@ export async function getMainDashboardData(params?: { activitiesLimit?: number }
   activities: DashboardActivity[];
   financeiroPagarReceber3m: { mes: string; receber: number; pagar: number }[];
 }> {
+  const includeActivities = params?.activitiesLimit !== 0;
+
   const now = new Date();
   const currentStart = startOfMonth(now);
   const currentEnd = endOfMonth(now);
@@ -44,14 +46,18 @@ export async function getMainDashboardData(params?: { activitiesLimit?: number }
     }
   })();
 
+  const activitiesPromise = includeActivities
+    ? supabase
+        .from('app_logs' as any)
+        .select('id, level, source, event, message, created_at')
+        .order('created_at', { ascending: false })
+        .limit(params?.activitiesLimit ?? 12)
+    : Promise.resolve({ data: [], error: null } as any);
+
   const [current, previous, activitiesRes, financeiroPagarReceber3m] = await Promise.all([
     getVendasDashboardStats({ startDate: toIsoDate(currentStart), endDate: toIsoDate(currentEnd) }),
     getVendasDashboardStats({ startDate: toIsoDate(prevStart), endDate: toIsoDate(prevEnd) }),
-    supabase
-      .from('app_logs' as any)
-      .select('id, level, source, event, message, created_at')
-      .order('created_at', { ascending: false })
-      .limit(params?.activitiesLimit ?? 12),
+    activitiesPromise,
     financeiroPagarReceber3mPromise,
   ]);
 
