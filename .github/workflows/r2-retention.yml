@@ -74,32 +74,32 @@ jobs:
             scanned="$((scanned + count_page))"
 
             keys="$(echo "$page" | python3 - "$cutoff" <<'PY'
-import sys, json, datetime
-cutoff = sys.argv[1]
-cutoff_dt = datetime.datetime.fromisoformat(cutoff.replace('Z','+00:00'))
-j = json.load(sys.stdin)
-out=[]
-for it in j.get('Contents', []) or []:
-  lm = it.get('LastModified')
-  if not lm:
-    continue
-  lm_dt = datetime.datetime.fromisoformat(lm.replace('Z','+00:00'))
-  if lm_dt < cutoff_dt:
-    out.append(it['Key'])
-print("\n".join(out))
-PY
-)"
+          import sys, json, datetime
+          cutoff = sys.argv[1]
+          cutoff_dt = datetime.datetime.fromisoformat(cutoff.replace('Z','+00:00'))
+          j = json.load(sys.stdin)
+          out=[]
+          for it in j.get('Contents', []) or []:
+            lm = it.get('LastModified')
+            if not lm:
+              continue
+            lm_dt = datetime.datetime.fromisoformat(lm.replace('Z','+00:00'))
+            if lm_dt < cutoff_dt:
+              out.append(it['Key'])
+          print("\n".join(out))
+          PY
+            )"
 
             if [[ -n "$keys" ]]; then
               echo "$keys" | split -l 900 - keys_chunk_
               for f in keys_chunk_*; do
                 payload="$(python3 - "$f" <<'PY'
-import sys, json
-fn = sys.argv[1]
-objs=[{"Key": line.strip()} for line in open(fn, 'r', encoding='utf-8') if line.strip()]
-print(json.dumps({"Objects": objs, "Quiet": True}))
-PY
-)"
+          import sys, json
+          fn = sys.argv[1]
+          objs=[{"Key": line.strip()} for line in open(fn, 'r', encoding='utf-8') if line.strip()]
+          print(json.dumps({"Objects": objs, "Quiet": True}))
+          PY
+                )"
                 n="$(python3 - "$f" -c "import sys; print(sum(1 for _ in open(sys.argv[1], 'r', encoding='utf-8') if _.strip()))")"
                 aws --region auto --endpoint-url "${R2_ENDPOINT}" s3api delete-objects --bucket "${R2_BUCKET}" --delete "$payload" >/dev/null
                 removed="$((removed + n))"
