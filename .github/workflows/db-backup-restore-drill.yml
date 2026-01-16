@@ -50,7 +50,9 @@ jobs:
         run: |
           set -euo pipefail
           sudo apt-get update
-          sudo apt-get install -y awscli postgresql-client
+          sudo apt-get install -y postgresql-client python3-pip
+          python3 -m pip install --upgrade pip
+          python3 -m pip install --upgrade awscli
 
       - name: Download latest backup from R2
         id: dl
@@ -157,4 +159,3 @@ jobs:
                 labels,
               });
             }
-
