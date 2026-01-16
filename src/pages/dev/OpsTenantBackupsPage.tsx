@@ -11,7 +11,13 @@ import TableColGroup from '@/components/ui/table/TableColGroup';
 import { useTableColumnWidths, type TableColumnWidthDef } from '@/components/ui/table/useTableColumnWidths';
 import { sortRows, toggleSort } from '@/components/ui/table/sortUtils';
 import { useToast } from '@/contexts/ToastProvider';
-import { dispatchTenantBackup, dispatchTenantRestore, listOpsTenantBackups, type OpsTenantBackupRow } from '@/services/opsTenantBackups';
+import {
+  dispatchTenantBackup,
+  dispatchTenantRestore,
+  dispatchTenantRestoreLatest,
+  listOpsTenantBackups,
+  type OpsTenantBackupRow,
+} from '@/services/opsTenantBackups';
 
 function formatDateTimeBR(value?: string | null) {
   if (!value) return '—';
@@ -57,6 +63,8 @@ export default function OpsTenantBackupsPage() {
   const [backupBusy, setBackupBusy] = useState(false);
   const [backupLabel, setBackupLabel] = useState('');
   const [backupTarget, setBackupTarget] = useState<OpsTenantBackupRow['target']>('prod');
+  const [drillOpen, setDrillOpen] = useState(false);
+  const [drillBusy, setDrillBusy] = useState(false);
 
   const columns: TableColumnWidthDef[] = [
     { id: 'when', defaultWidth: 190, minWidth: 170 },
@@ -137,6 +145,21 @@ export default function OpsTenantBackupsPage() {
     }
   };
 
+  const onDispatchRestoreDrillVerify = async () => {
+    setDrillBusy(true);
+    try {
+      const res = await dispatchTenantRestoreLatest({ source_target: 'prod', target: 'verify' });
+      addToast('Restore drill (verify) disparado no GitHub Actions.', 'success');
+      setDrillOpen(false);
+      setTimeout(() => void load(), 1500);
+      if (res?.run_url) window.open(res.run_url, '_blank', 'noopener,noreferrer');
+    } catch (e: any) {
+      addToast(e?.message || 'Falha ao disparar restore drill (verify).', 'error');
+    } finally {
+      setDrillBusy(false);
+    }
+  };
+
   return (
     <PageShell
       header={
@@ -149,6 +172,9 @@ export default function OpsTenantBackupsPage() {
               <Button variant="outline" onClick={load} className="gap-2" disabled={loading}>
                 <RefreshCw size={16} />
                 Atualizar
+              </Button>
+              <Button variant="outline" onClick={() => setDrillOpen(true)} className="gap-2">
+                Restore drill (verify)
               </Button>
               <Button onClick={() => setBackupOpen(true)} className="gap-2">
                 <Database size={16} />
@@ -248,6 +274,19 @@ export default function OpsTenantBackupsPage() {
                           >
                             Restaurar…
                           </Button>
+                          {r.target === 'prod' && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => {
+                                setRestoreTarget('verify');
+                                setRestoreConfirm('');
+                                setRestoreOpen({ open: true, row: r });
+                              }}
+                            >
+                              Drill (verify)
+                            </Button>
+                          )}
                         </div>
                       </td>
                     </tr>
@@ -357,7 +396,35 @@ export default function OpsTenantBackupsPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <Dialog open={drillOpen} onOpenChange={setDrillOpen}>
+        <DialogContent className="max-w-2xl rounded-2xl">
+          <DialogHeader>
+            <DialogTitle>Restore drill (verify)</DialogTitle>
+            <DialogDescription>
+              Restaura o <span className="font-semibold">último backup catalogado</span> do tenant em <span className="font-mono">prod</span> para o banco{' '}
+              <span className="font-mono">verify</span>. Não toca em produção.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="rounded-xl border border-gray-200 bg-slate-50 p-3 text-sm text-slate-700">
+            Recomendações:
+            <ul className="list-disc pl-5">
+              <li>Gere um backup em prod imediatamente antes do drill.</li>
+              <li>Após o restore, valide os dados mínimos no verify e confirme que o login/assinatura funcionam.</li>
+            </ul>
+          </div>
+
+          <DialogFooter className="gap-2 sm:gap-2">
+            <Button variant="outline" onClick={() => setDrillOpen(false)} disabled={drillBusy}>
+              Cancelar
+            </Button>
+            <Button onClick={onDispatchRestoreDrillVerify} disabled={drillBusy}>
+              {drillBusy ? 'Disparando…' : 'Disparar restore drill'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </PageShell>
   );
 }
-

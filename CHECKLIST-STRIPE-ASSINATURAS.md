@@ -44,11 +44,29 @@ Objetivo: eliminar **403 intermitente** causado por inconsistências de assinatu
 
 ## P4 — Backup por tenant (empresa) — antes do go-live
 - [x] Implementar `Dev → Backup por Empresa` (empresa ativa)
-- [ ] Configurar no **Supabase PROD** (Edge Functions → Secrets) as variáveis usadas pelo dispatcher:
-  - [ ] `GITHUB_TOKEN` (ou `GITHUB_PAT`) com permissão **Actions: Read and write** no repo que contém os workflows (`dualiteteste-sys/revo_erp_prod`)
-  - [ ] (Opcional) `GITHUB_REPO` (default: `dualiteteste-sys/revo_erp_prod`)
-  - [ ] (Opcional) `GITHUB_DEFAULT_REF` (default: `main`)
+- [x] Configurar no **Supabase PROD** (Edge Functions → Secrets) as variáveis usadas pelo dispatcher:
+  - [x] `GITHUB_TOKEN` (ou `GITHUB_PAT`) com permissão **Actions: Read and write** no repo que contém os workflows (`dualiteteste-sys/revo_erp_prod`)
+  - [x] (Opcional) `GITHUB_REPO` (default: `dualiteteste-sys/revo_erp_prod`)
+  - [x] (Opcional) `GITHUB_DEFAULT_REF` (default: `main`)
 - [ ] Validar em `prod` (empresa `leandrofmarques@me.com`) antes de dedupe no Stripe:
-  - [ ] Disparar export do tenant em `prod` com label `antes-limpeza-stripe`
-  - [ ] Confirmar que apareceu no catálogo `ops_tenant_backups`
-  - [ ] Validar restore em `verify` (ou `dev`) e checar dados mínimos
+  - [x] Disparar export do tenant em `prod` com label `antes-limpeza-stripe`
+  - [ ] Confirmar que apareceu no catálogo `Dev → Backup por Empresa` (tabela `ops_tenant_backups`)
+  - [ ] Rodar **restore drill** em `verify` (sem tocar em prod):
+    - [ ] Ação rápida: `Dev → Backup por Empresa` → `Restore drill (verify)` (usa o último backup catalogado de `prod`)
+    - [ ] Alternativa: clicar em um backup `prod` e restaurar em `verify`
+  - [ ] Check mínimo pós-restore (verify):
+    - [ ] Login funciona (owner)
+    - [ ] Empresa ativa abre sem 403
+    - [ ] Assinatura sincroniza automaticamente (sem clicar em “Sincronizar”)
+
+## P5 — Backup/Restore por tenant (global, estado da arte)
+Objetivo: garantir que **cada tenant** consiga ter backup/restore seguro, com custo controlado e sem risco de vazamento entre empresas.
+- [ ] Segurança & auditoria:
+  - [ ] Backup/restore só para `ops:manage` e sempre amarrado ao `current_empresa_id()`
+  - [ ] Logar evento interno (quem disparou, quando, target, r2_key, run_url)
+- [ ] Resiliência:
+  - [ ] Restore sempre para `verify` como drill padrão (sem tocar em prod)
+  - [ ] Bloquear restore em `prod` sem confirmação explícita (`RESTORE_PROD_TENANT`)
+- [ ] Retenção/custos:
+  - [ ] Definir regra de retenção (ex.: manter 7/30/90 dias) e expirar no R2
+  - [ ] Documentar política: quando gerar backup por tenant (ex.: antes de dedupe/limpeza, antes de migrações grandes, antes de ações destrutivas)
