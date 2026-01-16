@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { useToast } from '@/contexts/ToastProvider';
 import { useAuth } from '@/contexts/AuthProvider';
-import { opsStripeDedupeInspect, opsStripeDedupeLink, type OpsStripeCustomerSummary } from '@/services/opsStripeDedupe';
+import { opsStripeDedupeDelete, opsStripeDedupeInspect, opsStripeDedupeLink, type OpsStripeCustomerSummary } from '@/services/opsStripeDedupe';
 import { ShieldAlert } from 'lucide-react';
 
 function formatDateTimeBRFromUnix(sec: number) {
@@ -42,8 +42,10 @@ export default function OpsStripeDedupePage() {
   const [email, setEmail] = useState('');
   const [cnpj, setCnpj] = useState('');
   const [linkOpen, setLinkOpen] = useState(false);
+  const [deleteOpen, setDeleteOpen] = useState(false);
   const [selectedCustomerId, setSelectedCustomerId] = useState<string | null>(null);
   const [busyLink, setBusyLink] = useState(false);
+  const [busyDelete, setBusyDelete] = useState(false);
 
   const chosen = useMemo(() => rows.find((r) => r.id === selectedCustomerId) ?? null, [rows, selectedCustomerId]);
 
@@ -74,6 +76,11 @@ export default function OpsStripeDedupePage() {
     setLinkOpen(true);
   };
 
+  const openDelete = (customerId: string) => {
+    setSelectedCustomerId(customerId);
+    setDeleteOpen(true);
+  };
+
   const link = async () => {
     if (!empresaId || !selectedCustomerId) return;
     setBusyLink(true);
@@ -96,6 +103,31 @@ export default function OpsStripeDedupePage() {
       addToast(e?.message || 'Falha ao vincular customer.', 'error');
     } finally {
       setBusyLink(false);
+    }
+  };
+
+  const del = async () => {
+    if (!empresaId || !selectedCustomerId) return;
+    setBusyDelete(true);
+    try {
+      const res = await opsStripeDedupeDelete({
+        empresa_id: empresaId,
+        customer_id: selectedCustomerId,
+        email: email.trim() || null,
+        cnpj: cnpj.trim() || null,
+        dry_run: false,
+      });
+      if (res?.deleted) {
+        addToast('Customer arquivado no Stripe.', 'success');
+      } else {
+        addToast(res?.message || 'Não foi possível arquivar o customer.', 'error');
+      }
+      setDeleteOpen(false);
+      await inspect();
+    } catch (e: any) {
+      addToast(e?.message || 'Falha ao arquivar customer.', 'error');
+    } finally {
+      setBusyDelete(false);
     }
   };
 
@@ -157,6 +189,7 @@ export default function OpsStripeDedupePage() {
                 const metaEmpresa = r.metadata?.empresa_id ?? null;
                 const metaCnpj = r.metadata?.cnpj ?? null;
                 const isRecommended = recommendedId && r.id === recommendedId;
+                const canDelete = !isRecommended && !r.subscription;
                 return (
                   <tr key={r.id} className="border-t border-gray-100">
                     <td className="p-3">
@@ -185,9 +218,20 @@ export default function OpsStripeDedupePage() {
                     </td>
                     <td className="p-3">{formatDateTimeBRFromUnix(r.created)}</td>
                     <td className="p-3 text-right">
-                      <Button variant="outline" className="rounded-xl" onClick={() => openLink(r.id)}>
-                        Vincular ao tenant
-                      </Button>
+                      <div className="flex gap-2 justify-end">
+                        <Button variant="outline" className="rounded-xl" onClick={() => openLink(r.id)}>
+                          Vincular ao tenant
+                        </Button>
+                        <Button
+                          variant="outline"
+                          className="rounded-xl"
+                          disabled={!canDelete}
+                          onClick={() => openDelete(r.id)}
+                          title={canDelete ? 'Arquivar customer duplicado no Stripe' : 'Só é permitido arquivar customers sem assinatura e não recomendados.'}
+                        >
+                          Arquivar
+                        </Button>
+                      </div>
                     </td>
                   </tr>
                 );
@@ -239,6 +283,46 @@ export default function OpsStripeDedupePage() {
             </Button>
             <Button onClick={() => void link()} disabled={busyLink || !selectedCustomerId}>
               {busyLink ? 'Vinculando…' : 'Confirmar vínculo'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={deleteOpen} onOpenChange={setDeleteOpen}>
+        <DialogContent className="max-w-2xl rounded-2xl">
+          <DialogHeader>
+            <DialogTitle>Arquivar customer duplicado (Stripe)</DialogTitle>
+            <DialogDescription>
+              Esta ação remove o customer do Stripe (delete). Use apenas em duplicados sem assinatura. Recomendado: ter um backup do tenant antes.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-2 text-sm text-slate-700">
+            <div>
+              <span className="font-semibold">Customer:</span> <span className="font-mono">{chosen?.id ?? '—'}</span>
+            </div>
+            <div>
+              <span className="font-semibold">Nome:</span> {chosen?.name ?? '—'}
+            </div>
+            <div>
+              <span className="font-semibold">Email:</span> {chosen?.email ?? '—'}
+            </div>
+            <div>
+              <span className="font-semibold">Assinatura:</span>{' '}
+              {chosen?.subscription ? (
+                <span className={badge(chosen.subscription.status)}>{chosen.subscription.status}</span>
+              ) : (
+                <span className="text-slate-600">— (nenhuma)</span>
+              )}
+            </div>
+          </div>
+
+          <DialogFooter className="gap-2 sm:gap-2">
+            <Button variant="outline" onClick={() => setDeleteOpen(false)} disabled={busyDelete}>
+              Cancelar
+            </Button>
+            <Button onClick={() => void del()} disabled={busyDelete || !selectedCustomerId || !!chosen?.subscription}>
+              {busyDelete ? 'Arquivando…' : 'Arquivar'}
             </Button>
           </DialogFooter>
         </DialogContent>

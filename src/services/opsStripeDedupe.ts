@@ -60,3 +60,23 @@ export async function opsStripeDedupeLink(params: {
   return data as any;
 }
 
+export async function opsStripeDedupeDelete(params: {
+  empresa_id: string;
+  customer_id: string;
+  email?: string | null;
+  cnpj?: string | null;
+  dry_run?: boolean;
+}): Promise<{ deleted: boolean; safety?: string; message?: string }> {
+  const { data, error } = await supabase.functions.invoke('ops-stripe-dedupe', {
+    body: {
+      action: 'delete',
+      empresa_id: params.empresa_id,
+      customer_id: params.customer_id,
+      email: params.email ?? null,
+      cnpj: params.cnpj ?? null,
+      dry_run: params.dry_run ?? false,
+    },
+  });
+  if (error) throw error;
+  return data as any;
+}

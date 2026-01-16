@@ -2,7 +2,8 @@ import Stripe from "npm:stripe@17.7.0";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { buildCorsHeaders } from "../_shared/cors.ts";
 
-type Action = "inspect" | "link";
+type Action = "inspect" | "link" | "delete";
+type DeleteSafety = "blocked_active_subscription" | "ok";
 
 function json(corsHeaders: Record<string, string>, status: number, body: unknown) {
   return new Response(JSON.stringify(body), {
@@ -17,6 +18,19 @@ function stripNonDigits(v: string): string {
 
 function isTruthy(v: unknown): boolean {
   return v === true || v === "true" || v === 1 || v === "1";
+}
+
+async function logOpsEvent(supabase: any, input: { level: "info" | "warn" | "error"; event: string; message: string; context?: Record<string, unknown> }) {
+  await supabase
+    .rpc("log_app_event", {
+      p_level: input.level,
+      p_event: input.event,
+      p_message: input.message,
+      p_context: input.context ?? {},
+      p_source: "ops-stripe-dedupe",
+    })
+    .then(() => null)
+    .catch(() => null);
 }
 
 type CustomerSummary = {
@@ -226,6 +240,47 @@ Deno.serve(async (req) => {
         customers: summaries,
         recommended_customer_id: best?.id ?? null,
       });
+    }
+
+    if (action === "delete") {
+      if (!empresaId) return json(corsHeaders, 400, { error: "invalid_payload", message: "empresa_id é obrigatório." });
+      if (!explicitCustomerId) return json(corsHeaders, 400, { error: "invalid_payload", message: "customer_id é obrigatório." });
+
+      // Não permitir deletar o customer recomendado (segurança básica)
+      if (best?.id && explicitCustomerId === best.id) {
+        return json(corsHeaders, 409, { error: "cannot_delete_recommended", message: "Este customer é o recomendado; selecione outro para arquivar." });
+      }
+
+      const listed = await stripe.subscriptions.list({ customer: explicitCustomerId, status: "all", limit: 20 });
+      const subs = listed.data as Stripe.Subscription[];
+      const blocked = subs.some((s) => ["active", "trialing", "past_due", "unpaid", "incomplete"].includes(s.status));
+      const safety: DeleteSafety = blocked ? "blocked_active_subscription" : "ok";
+      if (blocked) {
+        return json(corsHeaders, 409, {
+          error: "blocked",
+          message: "Não é possível arquivar este customer: há assinatura ativa/trialing/past_due/unpaid/incomplete associada.",
+          safety,
+        });
+      }
+
+      if (dryRun) {
+        return json(corsHeaders, 200, { dry_run: true, deleted: false, safety, customer_id: explicitCustomerId });
+      }
+
+      const del = await stripe.customers.del(explicitCustomerId);
+      await logOpsEvent(admin, {
+        level: "info",
+        event: "ops_stripe_dedupe_delete_customer",
+        message: "Customer arquivado no Stripe.",
+        context: {
+          empresa_id: empresaId,
+          customer_id: explicitCustomerId,
+          email,
+          cnpj: cnpj || null,
+          deleted: (del as any)?.deleted ?? null,
+        },
+      });
+      return json(corsHeaders, 200, { deleted: true, safety, customer_id: explicitCustomerId });
     }
 
     if (!empresaId) return json(corsHeaders, 400, { error: "invalid_payload", message: "empresa_id é obrigatório para link." });
