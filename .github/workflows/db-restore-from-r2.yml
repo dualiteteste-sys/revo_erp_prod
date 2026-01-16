@@ -43,6 +43,7 @@ jobs:
       AWS_REGION: auto
       AWS_DEFAULT_REGION: auto
       AWS_EC2_METADATA_DISABLED: "true"
+      AWS_S3_ADDRESSING_STYLE: path
       AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
       AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
       DEV_URL: ${{ secrets.SUPABASE_DB_URL_DEV }}

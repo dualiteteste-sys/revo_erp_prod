@@ -47,6 +47,7 @@ jobs:
       AWS_REGION: auto
       AWS_DEFAULT_REGION: auto
       AWS_EC2_METADATA_DISABLED: "true"
+      AWS_S3_ADDRESSING_STYLE: path
       AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
       AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
       DEV_URL: ${{ secrets.SUPABASE_DB_URL_DEV }}
@@ -98,6 +99,13 @@ jobs:
           sudo apt-get install -y unzip python3-pip
           python3 -m pip install --upgrade pip
           python3 -m pip install --upgrade awscli
+          aws configure set default.s3.addressing_style path
+
+      - name: Validate R2 access (preflight)
+        shell: bash
+        run: |
+          set -euo pipefail
+          aws --region auto --endpoint-url "${R2_ENDPOINT}" s3api head-bucket --bucket "${R2_BUCKET}"
 
       - name: Download zip from R2
         shell: bash

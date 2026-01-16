@@ -33,6 +33,7 @@ jobs:
       AWS_REGION: auto
       AWS_DEFAULT_REGION: auto
       AWS_EC2_METADATA_DISABLED: "true"
+      AWS_S3_ADDRESSING_STYLE: path
       AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
       AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
       TARGET: ${{ inputs.target }}
@@ -56,6 +57,7 @@ jobs:
           sudo apt-get install -y postgresql-client python3-pip
           python3 -m pip install --upgrade pip
           python3 -m pip install --upgrade awscli
+          aws configure set default.s3.addressing_style path
 
       - name: Download latest backup from R2
         id: dl
