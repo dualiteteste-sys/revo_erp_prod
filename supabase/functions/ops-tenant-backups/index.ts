@@ -6,6 +6,14 @@ function requireEnv(name: string): string | null {
   return v ? v : null;
 }
 
+function requireAnyEnv(names: string[]): { name: string; value: string } | null {
+  for (const name of names) {
+    const v = requireEnv(name);
+    if (v) return { name, value: v };
+  }
+  return null;
+}
+
 function json(status: number, body: unknown, headers: Record<string, string>) {
   return new Response(JSON.stringify(body), {
     status,
@@ -67,17 +75,29 @@ Deno.serve(async (req) => {
   try {
     const supabaseUrl = requireEnv("SUPABASE_URL");
     const supabaseAnonKey = requireEnv("SUPABASE_ANON_KEY");
-    const githubToken = requireEnv("GITHUB_TOKEN");
-    const githubRepo = requireEnv("GITHUB_REPO");
+    const githubToken = requireAnyEnv(["GITHUB_TOKEN", "GITHUB_PAT"]);
+    const githubRepo =
+      (requireEnv("GITHUB_REPO") ??
+        // Compat com GitHub Actions env naming (quando espelhado como secret)
+        requireEnv("GITHUB_REPOSITORY") ??
+        // Default do repo oficial (reduz chance de config faltando)
+        "dualiteteste-sys/revo_erp_prod").trim();
     const githubRef = (requireEnv("GITHUB_DEFAULT_REF") ?? "main").trim();
 
     if (!supabaseUrl || !supabaseAnonKey) {
       return json(500, { ok: false, error: "config_error", message: "SUPABASE_URL/SUPABASE_ANON_KEY ausentes." }, corsHeaders);
     }
-    if (!githubToken || !githubRepo) {
+    if (!githubToken?.value) {
       return json(
         500,
-        { ok: false, error: "config_error", message: "GITHUB_TOKEN/GITHUB_REPO ausentes (necessário para dispatch dos workflows)." },
+        {
+          ok: false,
+          error: "config_error",
+          message:
+            "GITHUB_TOKEN ausente (necessário para dispatch dos workflows). Crie um Fine-grained PAT com permissão Actions: Read and write para o repo e salve como secret de Edge Functions.",
+          required_secrets: ["GITHUB_TOKEN (ou GITHUB_PAT)", "GITHUB_REPO (opcional)", "GITHUB_DEFAULT_REF (opcional)"],
+          defaults: { GITHUB_REPO: githubRepo, GITHUB_DEFAULT_REF: githubRef },
+        },
         corsHeaders,
       );
     }
@@ -118,7 +138,7 @@ Deno.serve(async (req) => {
       const label = String(payload?.label ?? "").trim();
 
       await dispatchWorkflow({
-        token: githubToken,
+        token: githubToken.value,
         repo: githubRepo,
         workflowFile: "tenant-backup.yml",
         ref: githubRef,
@@ -132,7 +152,7 @@ Deno.serve(async (req) => {
       let runUrl: string | null = null;
       for (let i = 0; i < 5; i++) {
         await new Promise((r) => setTimeout(r, 900));
-        runUrl = await getLatestWorkflowRunUrl({ token: githubToken, repo: githubRepo, workflowFile: "tenant-backup.yml", ref: githubRef });
+        runUrl = await getLatestWorkflowRunUrl({ token: githubToken.value, repo: githubRepo, workflowFile: "tenant-backup.yml", ref: githubRef });
         if (runUrl) break;
       }
 
@@ -146,7 +166,7 @@ Deno.serve(async (req) => {
       if (!r2Key) return json(400, { ok: false, error: "invalid_payload", message: "r2_key é obrigatório." }, corsHeaders);
 
       await dispatchWorkflow({
-        token: githubToken,
+        token: githubToken.value,
         repo: githubRepo,
         workflowFile: "tenant-restore-from-r2.yml",
         ref: githubRef,
@@ -161,7 +181,7 @@ Deno.serve(async (req) => {
       let runUrl: string | null = null;
       for (let i = 0; i < 5; i++) {
         await new Promise((r) => setTimeout(r, 900));
-        runUrl = await getLatestWorkflowRunUrl({ token: githubToken, repo: githubRepo, workflowFile: "tenant-restore-from-r2.yml", ref: githubRef });
+        runUrl = await getLatestWorkflowRunUrl({ token: githubToken.value, repo: githubRepo, workflowFile: "tenant-restore-from-r2.yml", ref: githubRef });
         if (runUrl) break;
       }
 
@@ -173,4 +193,3 @@ Deno.serve(async (req) => {
     return json(500, { ok: false, error: "internal_server_error", message: e?.message ?? "Erro interno." }, buildCorsHeaders(req));
   }
 });
-
