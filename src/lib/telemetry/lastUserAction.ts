@@ -22,6 +22,9 @@ function describeTarget(target: EventTarget | null): string | null {
     const aria = el.getAttribute("aria-label");
     if (aria) return `aria:${safeText(aria)}`;
 
+    const title = el.getAttribute("title");
+    if (title) return `title:${safeText(title)}`;
+
     const text = (el.textContent ?? "").trim();
     if (text) return safeText(text);
 
@@ -64,4 +67,3 @@ export function getLastUserAction(): { route: string | null; label: string; ageM
     ageMs: Date.now() - lastAction.at,
   };
 }
-

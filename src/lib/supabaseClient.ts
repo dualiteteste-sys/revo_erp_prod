@@ -182,7 +182,7 @@ export const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey, {
                   parsed = null;
                 }
                 const code = typeof parsed?.code === "string" ? parsed.code : null;
-                const msg =
+                const msgRaw =
                   typeof parsed?.message === "string"
                     ? parsed.message
                     : typeof parsed?.error === "string"
@@ -191,6 +191,16 @@ export const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey, {
 
                 const route = typeof window !== "undefined" ? (window.location?.pathname ?? null) : null;
                 const lastAction = getLastUserAction();
+
+                const subject = (() => {
+                  if (isRpc) {
+                    const m = url.match(/\/rest\/v1\/rpc\/([^/?#]+)/);
+                    return m?.[1] ? `rpc:${decodeURIComponent(m[1])}` : "rpc";
+                  }
+                  const m = url.match(/\/functions\/v1\/([^/?#]+)/);
+                  return m?.[1] ? `fn:${decodeURIComponent(m[1])}` : "fn";
+                })();
+                const msg = `${subject}: ${msgRaw}`;
                 await logOpsAppErrorFetchBestEffort({
                   requestId,
                   url,
