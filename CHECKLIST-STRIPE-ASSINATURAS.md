@@ -70,6 +70,7 @@ Objetivo: garantir que **cada tenant** consiga ter backup/restore seguro, com cu
   - [x] Rodar assert mínimo pós-restore automaticamente quando target=`verify` (script `scripts/tenant_restore_verify_asserts.sql`)
 - [ ] Retenção/custos:
   - [x] Definir retenção automática no R2 via GitHub Actions (`.github/workflows/r2-retention.yml`)
+    - Detalhes atuais: purge diário (06:10 UTC), `PREFIX=revo/`, `DAYS=90` (ajustável via PR/parametrização futura).
   - [ ] Documentar política: quando gerar backup por tenant (ex.: antes de dedupe/limpeza, antes de migrações grandes, antes de ações destrutivas)
 
 - [x] Restore drill recorrente (amostra) em `verify` (`.github/workflows/tenant-restore-drill-verify.yml`)
