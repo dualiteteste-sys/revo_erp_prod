@@ -30,6 +30,13 @@ export const SubscriptionProvider = ({ children }: { children: ReactNode }) => {
   const empresaId = useMemo(() => activeEmpresa?.id ?? null, [activeEmpresa?.id]);
   const accessToken = useMemo(() => session?.access_token ?? null, [session?.access_token]);
   const localBypass = useMemo(() => isLocalBillingBypassEnabled(), []);
+  const hasPendingPlanIntent = useCallback(() => {
+    try {
+      return Boolean((localStorage.getItem('pending_plan_slug') ?? '').trim());
+    } catch {
+      return false;
+    }
+  }, []);
 
   const firstRow = useCallback(<T,>(data: unknown): T | null => {
     if (!data) return null;
@@ -90,6 +97,9 @@ export const SubscriptionProvider = ({ children }: { children: ReactNode }) => {
     if (!empresaId) return;
     if (!accessToken) return;
     if (loadingSubscription) return;
+    // Se o usuário está no fluxo de iniciar checkout (teste grátis),
+    // não faz sentido tentar sincronizar assinatura antes do checkout.
+    if (hasPendingPlanIntent()) return;
 
     // Só tenta quando não há assinatura local ainda.
     if (subscription) return;
@@ -112,7 +122,7 @@ export const SubscriptionProvider = ({ children }: { children: ReactNode }) => {
         logger.warn('[Billing][AutoSync] Erro inesperado (best-effort)', { error: e });
       }
     })();
-  }, [empresaId, fetchSubscription, loadingSubscription, localBypass, subscription, supabase.functions]);
+  }, [empresaId, fetchSubscription, loadingSubscription, localBypass, subscription, supabase.functions, accessToken, hasPendingPlanIntent]);
 
   useEffect(() => {
     if (localBypass) {

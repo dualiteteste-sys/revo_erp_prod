@@ -4,6 +4,14 @@ export function buildCorsHeaders(req: Request) {
   const raw = Deno.env.get("ALLOWED_ORIGINS") || "";
   const list = raw.split(",").map((s) => s.trim()).filter(Boolean);
 
+  // Fallback seguro: domínios oficiais do Revo (evita CORS quebrar por env mal configurada).
+  // Obs: para ambientes adicionais (staging/preview), preferir configurar ALLOWED_ORIGINS.
+  const defaultExacts = [
+    "https://erprevo.com",
+    "https://erprevodev.com",
+    "https://erpreveoprod.netlify.app",
+  ];
+
   const localExacts = [
     "http://localhost:5173",
     "http://127.0.0.1:5173",
@@ -11,7 +19,11 @@ export function buildCorsHeaders(req: Request) {
     "http://127.0.0.1:4173",
   ];
 
-  const exacts = [...list.filter((v) => !v.startsWith("suffix:")), ...localExacts];
+  const exacts = [
+    ...defaultExacts,
+    ...list.filter((v) => !v.startsWith("suffix:")),
+    ...localExacts,
+  ];
   const suffixes = list.filter((v) => v.startsWith("suffix:")).map((v) => v.replace("suffix:", ""));
 
   const permissive = (Deno.env.get("CORS_MODE") || "").toLowerCase() === "permissive";

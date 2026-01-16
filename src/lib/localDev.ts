@@ -9,7 +9,6 @@ export function isLocalBillingBypassEnabled(): boolean {
     .toLowerCase() === 'true';
 
   if (!enabled) return false;
-  if (!(import.meta as any)?.env?.DEV) return false;
 
   try {
     return isLocalhostHost(window.location.hostname);
@@ -27,4 +26,3 @@ export function getLocalPlanSlug(): LocalPlanSlug {
   const allowed: LocalPlanSlug[] = ['ESSENCIAL', 'PRO', 'MAX', 'INDUSTRIA', 'SCALE'];
   return (allowed.includes(raw as any) ? (raw as LocalPlanSlug) : 'SCALE');
 }
-

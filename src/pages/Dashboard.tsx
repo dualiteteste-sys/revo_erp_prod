@@ -9,6 +9,7 @@ import GraficoPagarReceber from '../components/dashboard/GraficoPagarReceber';
 import { getMainDashboardData } from '@/services/mainDashboard';
 import { formatCurrency } from '@/lib/utils';
 import { logger } from '@/lib/logger';
+import { useHasPermission } from '@/hooks/useHasPermission';
 
 const formatMoney = (value: number) => formatCurrency(Math.round(Number(value || 0) * 100));
 
@@ -29,6 +30,8 @@ const Dashboard: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [data, setData] = useState<Awaited<ReturnType<typeof getMainDashboardData>> | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const opsView = useHasPermission('ops', 'view');
+  const includeActivities = !!opsView.data;
 
   useEffect(() => {
     let mounted = true;
@@ -36,7 +39,7 @@ const Dashboard: React.FC = () => {
       setLoading(true);
       setError(null);
       try {
-        const res = await getMainDashboardData({ activitiesLimit: 12 });
+        const res = await getMainDashboardData({ activitiesLimit: includeActivities ? 12 : 0 });
         if (mounted) setData(res);
       } catch (e: any) {
         // Dashboard é "best-effort": não deve poluir console/error sweep nem travar fluxos críticos.
@@ -49,7 +52,7 @@ const Dashboard: React.FC = () => {
     return () => {
       mounted = false;
     };
-  }, []);
+  }, [includeActivities]);
 
   const kpiData = useMemo(() => {
     if (!data) return [];

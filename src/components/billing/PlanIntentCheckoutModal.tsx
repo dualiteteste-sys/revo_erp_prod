@@ -153,23 +153,10 @@ export function PlanIntentCheckoutModal() {
       }
       const fantasiaFinal = (fantasia.trim() || razaoFinal).slice(0, 120);
 
-      // Persistência antes do checkout: evita “Empresa sem nome” no Stripe e garante metadata consistente.
-      // Best-effort: se falhar por RLS, o checkout ainda tenta seguir, mas vai usar dados atuais do banco.
-      try {
-        await supabase
-          .from("empresas")
-          .update({
-            cnpj: cleanedCnpj,
-            // manter compatibilidade com ambos os schemas (dev/prod historicamente já tiveram nomes diferentes):
-            nome_razao_social: razaoFinal as any,
-            nome_fantasia: fantasiaFinal as any,
-            razao_social: razaoFinal as any,
-            fantasia: fantasiaFinal as any,
-          } as any)
-          .eq("id", empresaId);
-      } catch (e) {
-        logger.warn("[Billing][PlanIntent] Falha ao atualizar dados da empresa antes do checkout (best-effort)", { error: e });
-      }
+      // IMPORTANTE (console limpo):
+      // Não fazemos PATCH direto em `empresas` aqui, porque em ambientes onde o PostgREST cache está desatualizado
+      // (ou o schema ainda não foi sincronizado), isso gera 400/403 no Console do usuário.
+      // Em vez disso, enviamos os dados para a Edge Function, que aplica as atualizações com service role (best-effort).
 
       const { data, error } = await supabase.functions.invoke("billing-checkout", {
         headers: { Authorization: `Bearer ${session.access_token}` },
@@ -178,6 +165,11 @@ export function PlanIntentCheckoutModal() {
           plan_slug: intent.planSlug,
           billing_cycle: intent.billingCycle,
           trial: true,
+          empresa: {
+            cnpj: cleanedCnpj,
+            nome_razao_social: razaoFinal,
+            nome_fantasia: fantasiaFinal,
+          },
         },
       });
       if (error) throw error;
