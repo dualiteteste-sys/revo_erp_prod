@@ -3,6 +3,7 @@ import type { Database } from "@/types/database.types";
 import { logger } from "@/lib/logger";
 import { newRequestId } from "@/lib/requestId";
 import { recordNetworkError } from "@/lib/telemetry/networkErrors";
+import { getLastUserAction } from "@/lib/telemetry/lastUserAction";
 
 export const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || "https://lrfwiaekipwkjkzvcnfd.supabase.co";
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxyZndpYWVraXB3a2prenZjbmZkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjA4OTQwNzEsImV4cCI6MjA3NjQ3MDA3MX0.BnDwDZpWV62D_kPJb6ZtOzeRxgTPSQncqja332rxCYk";
@@ -16,6 +17,8 @@ if (!supabaseUrl || !supabaseAnonKey) {
 const rawFetch = globalThis.fetch.bind(globalThis);
 const ops403Dedupe = new Map<string, number>();
 const OPS403_DEDUPE_MS = 10_000;
+const opsAppErrorsDedupe = new Map<string, number>();
+const OPS_APP_ERRORS_DEDUPE_MS = 10_000;
 
 function classifyOps403(code: string | null, message: string): string {
   const msg = String(message || "").toLowerCase();
@@ -55,6 +58,52 @@ async function logOps403FetchBestEffort(input: {
       p_kind: classifyOps403(input.code, input.message),
       p_recovery_attempted: Boolean(input.recoveryAttempted),
       p_recovery_ok: Boolean(input.recoveryOk),
+    };
+
+    const headers = new Headers(input.headers);
+    if (!headers.has("Content-Type")) headers.set("Content-Type", "application/json");
+    headers.set("x-revo-request-id", input.requestId);
+
+    await rawFetch(endpoint, { method: "POST", headers, body: JSON.stringify(body) });
+  } catch {
+    // best-effort
+  }
+}
+
+async function logOpsAppErrorFetchBestEffort(input: {
+  requestId: string;
+  url: string;
+  route: string | null;
+  lastAction: string | null;
+  source: string;
+  method: string;
+  status: number;
+  code: string | null;
+  message: string;
+  responseText: string | null;
+  headers: Headers;
+}) {
+  try {
+    const now = Date.now();
+    const key = `${input.source}|${input.method}|${input.status}|${input.code ?? ""}|${input.route ?? ""}|${input.url.split("?")[0]}|${input.message}`;
+    const last = opsAppErrorsDedupe.get(key) ?? 0;
+    if (now - last < OPS_APP_ERRORS_DEDUPE_MS) return;
+    opsAppErrorsDedupe.set(key, now);
+
+    const endpoint = `${supabaseUrl.replace(/\/+$/, "")}/rest/v1/rpc/ops_app_errors_log_v1`;
+    const body = {
+      p_source: input.source,
+      p_route: input.route ?? "",
+      p_last_action: input.lastAction ?? "",
+      p_message: input.message,
+      p_stack: "",
+      p_request_id: input.requestId,
+      p_url: input.url,
+      p_method: input.method,
+      p_http_status: input.status,
+      p_code: input.code ?? "",
+      p_response_text: input.responseText ?? "",
+      p_fingerprint: `${input.source}|${input.route ?? ""}|${input.code ?? ""}|${input.status}|${input.url.split("?")[0]}|${input.message}`.slice(0, 500),
     };
 
     const headers = new Headers(input.headers);
@@ -122,6 +171,42 @@ export const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey, {
                 isEdgeFn,
                 responseText,
               });
+
+              // Erros de rede (RPC/Edge) aparecem em vermelho no console do navegador,
+              // mas não passam por console.error. Registramos também no OPS "Erros no Sistema".
+              try {
+                let parsed: any = null;
+                try {
+                  parsed = JSON.parse(responseText);
+                } catch {
+                  parsed = null;
+                }
+                const code = typeof parsed?.code === "string" ? parsed.code : null;
+                const msg =
+                  typeof parsed?.message === "string"
+                    ? parsed.message
+                    : typeof parsed?.error === "string"
+                      ? parsed.error
+                      : `HTTP_${res.status}`;
+
+                const route = typeof window !== "undefined" ? (window.location?.pathname ?? null) : null;
+                const lastAction = getLastUserAction();
+                await logOpsAppErrorFetchBestEffort({
+                  requestId,
+                  url,
+                  route,
+                  lastAction: lastAction?.label ?? null,
+                  source: isRpc ? "network.rpc" : "network.edge",
+                  method,
+                  status: res.status,
+                  code,
+                  message: msg,
+                  responseText: responseText && responseText.length < 4000 ? responseText : responseText.slice(0, 4000),
+                  headers,
+                });
+              } catch {
+                // ignore
+              }
             } catch {
               // best-effort
             }

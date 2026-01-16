@@ -142,6 +142,9 @@ test('dev pages: Ops 403 e Inventário RLS carregam sem erro', async ({ page }) 
   await page.route('**/rest/v1/rpc/ops_app_errors_set_resolved', async (route) => {
     await route.fulfill({ json: null });
   });
+  await page.route('**/rest/v1/rpc/ops_app_errors_log_v1', async (route) => {
+    await route.fulfill({ json: null });
+  });
   await page.route('**/rest/v1/rpc/ops_rls_inventory_list', async (route) => {
     await route.fulfill({
       json: [
