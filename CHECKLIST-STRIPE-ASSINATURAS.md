@@ -69,5 +69,7 @@ Objetivo: garantir que **cada tenant** consiga ter backup/restore seguro, com cu
   - [x] Bloquear restore em `prod` sem confirmação explícita (`RESTORE_PROD_TENANT`)
   - [x] Rodar assert mínimo pós-restore automaticamente quando target=`verify` (script `scripts/tenant_restore_verify_asserts.sql`)
 - [ ] Retenção/custos:
-  - [ ] Definir regra de retenção (ex.: manter 7/30/90 dias) e expirar no R2
+  - [x] Definir retenção automática no R2 via GitHub Actions (`.github/workflows/r2-retention.yml`)
   - [ ] Documentar política: quando gerar backup por tenant (ex.: antes de dedupe/limpeza, antes de migrações grandes, antes de ações destrutivas)
+
+- [x] Restore drill recorrente (amostra) em `verify` (`.github/workflows/tenant-restore-drill-verify.yml`)

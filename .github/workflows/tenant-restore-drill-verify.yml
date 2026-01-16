@@ -1,0 +1,318 @@
+name: Tenant Restore Drill (VERIFY)
+
+on:
+  workflow_dispatch:
+    inputs:
+      empresa_id:
+        description: "Opcional: força um tenant específico (uuid). Se vazio, escolhe automaticamente."
+        type: string
+        required: false
+        default: ""
+      source_target:
+        description: "Exportar a partir de qual DB?"
+        type: choice
+        required: true
+        default: prod
+        options:
+          - prod
+          - dev
+      label:
+        description: "Rótulo do backup (opcional)"
+        type: string
+        required: false
+        default: "restore-drill"
+  schedule:
+    # Semanal (Segunda 06:30 UTC)
+    - cron: "30 6 * * 1"
+
+permissions:
+  contents: read
+  issues: write
+
+concurrency:
+  group: tenant-restore-drill-verify
+  cancel-in-progress: false
+
+jobs:
+  drill:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
+      R2_BUCKET: ${{ secrets.R2_BUCKET || 'revo-erp-backups-prod' }}
+      AWS_REGION: auto
+      AWS_DEFAULT_REGION: auto
+      AWS_EC2_METADATA_DISABLED: "true"
+      AWS_S3_ADDRESSING_STYLE: path
+      AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+      DEV_URL: ${{ secrets.SUPABASE_DB_URL_DEV }}
+      PROD_URL: ${{ secrets.SUPABASE_DB_URL_PROD }}
+      VERIFY_URL: ${{ secrets.SUPABASE_DB_URL_VERIFY }}
+      SOURCE_TARGET: ${{ inputs.source_target || 'prod' }}
+      EMPRESA_ID_INPUT: ${{ inputs.empresa_id || '' }}
+      LABEL: ${{ inputs.label || 'restore-drill' }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install awscli + zip + psql client
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y zip postgresql-client python3-pip
+          python3 -m pip install --upgrade pip
+          python3 -m pip install --upgrade awscli
+          aws configure set default.s3.addressing_style path
+
+      - name: Resolve DB URLs
+        id: db
+        shell: bash
+        run: |
+          set -euo pipefail
+          case "${SOURCE_TARGET}" in
+            dev) src="${DEV_URL}" ;;
+            prod) src="${PROD_URL}" ;;
+            *) echo "::error::SOURCE_TARGET inválido: ${SOURCE_TARGET}"; exit 1 ;;
+          esac
+          if [[ -z "${src:-}" ]]; then
+            echo "::error::DB URL secret ausente para SOURCE_TARGET=${SOURCE_TARGET}"
+            exit 1
+          fi
+          if [[ -z "${VERIFY_URL:-}" ]]; then
+            echo "::error::DB URL secret ausente para VERIFY"
+            exit 1
+          fi
+          echo "src=$src" >> "$GITHUB_OUTPUT"
+          echo "verify=${VERIFY_URL}" >> "$GITHUB_OUTPUT"
+
+      - name: Pick tenant (empresa_id)
+        id: pick
+        shell: bash
+        env:
+          DATABASE_URL: ${{ steps.db.outputs.src }}
+        run: |
+          set -euo pipefail
+          if [[ -n "${EMPRESA_ID_INPUT:-}" ]]; then
+            echo "empresa_id=${EMPRESA_ID_INPUT}" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          # Pega um tenant "ativo" como amostra (assinatura ativa/trialing) — custo baixo, cobertura real.
+          empresa_id="$(docker run --rm postgres:17 psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -X -qAt -c "
+            select s.empresa_id
+            from public.subscriptions s
+            where s.status in ('trialing','active','past_due')
+            order by s.updated_at desc nulls last, s.created_at desc
+            limit 1;
+          ")"
+          if [[ -z "${empresa_id:-}" ]]; then
+            # fallback: última empresa criada
+            empresa_id="$(docker run --rm postgres:17 psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -X -qAt -c "
+              select e.id from public.empresas e order by e.created_at desc limit 1;
+            ")"
+          fi
+          if [[ -z "${empresa_id:-}" ]]; then
+            echo "::error::Não consegui selecionar um empresa_id para o drill."
+            exit 1
+          fi
+          echo "empresa_id=${empresa_id}" >> "$GITHUB_OUTPUT"
+
+      - name: Validate R2 access (preflight)
+        shell: bash
+        run: |
+          set -euo pipefail
+          aws --region auto --endpoint-url "${R2_ENDPOINT}" s3api head-bucket --bucket "${R2_BUCKET}"
+
+      - name: Export tenant tables (empresa_id)
+        id: export
+        shell: bash
+        env:
+          DATABASE_URL: ${{ steps.db.outputs.src }}
+          EMPRESA_ID: ${{ steps.pick.outputs.empresa_id }}
+        run: |
+          set -euo pipefail
+          ts="$(date -u +'%Y%m%d_%H%M%S')"
+          label="${LABEL:-restore-drill}"
+          label="_${label// /_}"
+
+          outdir="tenant_export_${SOURCE_TARGET}_${EMPRESA_ID}_${ts}${label}"
+          mkdir -p "$outdir/tables"
+
+          echo "${EMPRESA_ID}" > "$outdir/empresa_id.txt"
+          echo "${SOURCE_TARGET}" > "$outdir/target.txt"
+          echo "${GITHUB_SHA}" > "$outdir/git_sha.txt"
+          date -u +'%Y-%m-%dT%H:%M:%SZ' > "$outdir/created_at_utc.txt"
+
+          docker run --rm postgres:17 \
+            psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -X -qAt -c "
+              select table_name
+              from information_schema.columns
+              where table_schema='public'
+                and column_name='empresa_id'
+              order by table_name;
+            " > "$outdir/tables.txt"
+
+          if [[ ! -s "$outdir/tables.txt" ]]; then
+            echo "::error::Nenhuma tabela com empresa_id encontrada."
+            exit 1
+          fi
+
+          : > "$outdir/export_report.jsonl"
+          while IFS= read -r t; do
+            [[ -z "$t" ]] && continue
+            file="$outdir/tables/${t}.csv"
+            docker run --rm \
+              -v "$PWD:/work" \
+              -w /work \
+              postgres:17 \
+              bash -lc "psql \"${DATABASE_URL}\" -v ON_ERROR_STOP=1 -X -q -c \"\\\\copy (select * from public.\\\"${t}\\\" where empresa_id='${EMPRESA_ID}') to '${file}' with (format csv, header true)\""
+            rows="$(tail -n +2 "$file" | wc -l | tr -d ' ')"
+            echo "{\"table\":\"${t}\",\"rows\":${rows}}" >> "$outdir/export_report.jsonl"
+          done < "$outdir/tables.txt"
+
+          zipfile="${outdir}.zip"
+          zip -9 -r "$zipfile" "$outdir" >/dev/null
+
+          sha="$(sha256sum "$zipfile" | awk '{print $1}')"
+          size="$(stat -c '%s' "$zipfile" || stat -f '%z' "$zipfile")"
+
+          echo "zipfile=$zipfile" >> "$GITHUB_OUTPUT"
+          echo "sha256=$sha" >> "$GITHUB_OUTPUT"
+          echo "bytes=$size" >> "$GITHUB_OUTPUT"
+
+      - name: Upload drill backup to R2
+        id: r2
+        shell: bash
+        env:
+          EMPRESA_ID: ${{ steps.pick.outputs.empresa_id }}
+        run: |
+          set -euo pipefail
+          prefix="revo/drills/tenants/${EMPRESA_ID}/${SOURCE_TARGET}/$(date -u +'%Y/%m/%d')"
+          zipfile="${{ steps.export.outputs.zipfile }}"
+          echo "Upload s3://${R2_BUCKET}/${prefix}/$(basename "$zipfile")"
+          aws --region auto --endpoint-url "${R2_ENDPOINT}" s3 cp "$zipfile" "s3://${R2_BUCKET}/${prefix}/$(basename "$zipfile")" --only-show-errors
+          echo "r2_key=${prefix}/$(basename "$zipfile")" >> "$GITHUB_OUTPUT"
+
+      - name: Restore into VERIFY (delete + copy)
+        shell: bash
+        env:
+          DATABASE_URL: ${{ steps.db.outputs.verify }}
+          EMPRESA_ID: ${{ steps.pick.outputs.empresa_id }}
+        run: |
+          set -euo pipefail
+
+          zipfile="${{ steps.export.outputs.zipfile }}"
+          rm -rf tenant_restore
+          unzip -q "$zipfile" -d tenant_restore
+
+          dir="$(find tenant_restore -maxdepth 2 -type d -name 'tenant_export_*' | head -n 1)"
+          if [[ -z "${dir:-}" ]]; then
+            echo "::error::Diretório tenant_export_* não encontrado no zip."
+            exit 1
+          fi
+
+          tablesFile="${dir}/tables.txt"
+          if [[ ! -f "$tablesFile" ]]; then
+            echo "::error::tables.txt não encontrado no export."
+            exit 1
+          fi
+
+          restoreSql="restore_tenant.sql"
+          cat > "$restoreSql" <<'SQL'
+          begin;
+          set session_replication_role = replica;
+          SQL
+          while IFS= read -r t; do
+            [[ -z "$t" ]] && continue
+            echo "delete from public.\"${t}\" where empresa_id = '${EMPRESA_ID}';" >> "$restoreSql"
+          done < "$tablesFile"
+          echo "set session_replication_role = origin;" >> "$restoreSql"
+          echo "commit;" >> "$restoreSql"
+
+          docker run --rm \
+            -v "$PWD:/work" \
+            -w /work \
+            postgres:17 \
+            bash -lc "psql \"${DATABASE_URL}\" -v ON_ERROR_STOP=1 -X -q -f \"${restoreSql}\""
+
+          docker run --rm \
+            -v "$PWD:/work" \
+            -w /work \
+            postgres:17 \
+            bash -lc "psql \"${DATABASE_URL}\" -v ON_ERROR_STOP=1 -X -q -c \"begin; set session_replication_role=replica;\""
+
+          while IFS= read -r t; do
+            [[ -z "$t" ]] && continue
+            csv="${dir}/tables/${t}.csv"
+            [[ ! -f "$csv" ]] && continue
+            docker run --rm \
+              -v "$PWD:/work" \
+              -w /work \
+              postgres:17 \
+              bash -lc "psql \"${DATABASE_URL}\" -v ON_ERROR_STOP=1 -X -q -c \"\\\\copy public.\\\"${t}\\\" from '${csv}' with (format csv, header true)\""
+          done < "$tablesFile"
+
+          docker run --rm \
+            -v "$PWD:/work" \
+            -w /work \
+            postgres:17 \
+            bash -lc "psql \"${DATABASE_URL}\" -v ON_ERROR_STOP=1 -X -q -c \"set session_replication_role=origin; commit;\""
+
+      - name: Post-restore asserts (verify)
+        shell: bash
+        env:
+          DATABASE_URL: ${{ steps.db.outputs.verify }}
+          EMPRESA_ID: ${{ steps.pick.outputs.empresa_id }}
+        run: |
+          set -euo pipefail
+          docker run --rm \
+            -v "$PWD:/work" \
+            -w /work \
+            postgres:17 \
+            bash -lc "psql \"${DATABASE_URL}\" -v ON_ERROR_STOP=1 -X -q -v empresa_id=\"${EMPRESA_ID}\" -f scripts/tenant_restore_verify_asserts.sql"
+
+      - name: Summary
+        shell: bash
+        run: |
+          echo "empresa_id=${{ steps.pick.outputs.empresa_id }}"
+          echo "r2_key=${{ steps.r2.outputs.r2_key }}"
+
+      - name: Upsert issue on failure
+        if: failure()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const title = "OPS ALERT: Tenant restore drill (verify) falhou";
+            const labels = ["ops-alert", "backup", "tenant", "verify"];
+            const body = [
+              "Falha no restore drill semanal (verify).",
+              "",
+              `- source_target: ${process.env.SOURCE_TARGET}`,
+              `- empresa_id: ${process.env.EMPRESA_ID_INPUT || "(auto)"}`,
+              `- run: ${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`,
+            ].join("\n");
+
+            const { data: issues } = await github.rest.issues.listForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: "open",
+              labels: labels.join(","),
+              per_page: 100,
+            });
+            const existing = issues.find(i => i.title === title);
+            if (existing) {
+              await github.rest.issues.update({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: existing.number,
+                body,
+              });
+            } else {
+              await github.rest.issues.create({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                title,
+                body,
+                labels,
+              });
+            }
+
