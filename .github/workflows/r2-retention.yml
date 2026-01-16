@@ -6,12 +6,12 @@ on:
       days:
         description: "Apagar objetos com LastModified < (hoje - N dias)"
         type: string
-        required: true
+        required: false
         default: "90"
       prefix:
         description: "Prefixo (ex.: revo/tenants/)"
         type: string
-        required: true
+        required: false
         default: "revo/"
   schedule:
     # Diário 06:10 UTC (custo baixo; remove só objetos antigos)
@@ -38,8 +38,8 @@ jobs:
       AWS_S3_ADDRESSING_STYLE: path
       AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
       AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
-      DAYS: ${{ inputs.days }}
-      PREFIX: ${{ inputs.prefix }}
+      DAYS: ${{ (github.event_name == 'workflow_dispatch' && inputs.days) || '90' }}
+      PREFIX: ${{ (github.event_name == 'workflow_dispatch' && inputs.prefix) || 'revo/' }}
     steps:
       - name: Ensure secrets configured
         shell: bash
