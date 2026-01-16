@@ -1,4 +1,4 @@
-import Stripe from "stripe";
+import Stripe from "npm:stripe@17.7.0";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { buildCorsHeaders } from "../_shared/cors.ts";
 
