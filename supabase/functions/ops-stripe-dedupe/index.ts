@@ -110,16 +110,23 @@ Deno.serve(async (req) => {
 
     const admin = createClient(supabaseUrl, serviceKey);
 
-    let empresa: { id: string; cnpj: string | null; stripe_customer_id: string | null } | null = null;
-    if (empresaId) {
+    let empresa: {
+      id: string;
+      cnpj: string | null;
+      stripe_customer_id: string | null;
+      nome_razao_social: string;
+      nome_fantasia: string | null;
+      email: string | null;
+    } | null = null;
+  if (empresaId) {
       const { data, error } = await admin
         .from("empresas")
-        .select("id, cnpj, stripe_customer_id")
+        .select("id, cnpj, stripe_customer_id, nome_razao_social, nome_fantasia, email")
         .eq("id", empresaId)
         .maybeSingle();
       if (error || !data) return json(corsHeaders, 404, { error: "company_not_found", message: "Empresa não encontrada." });
       empresa = data as any;
-    }
+  }
 
     const cnpj = inputCnpj || stripNonDigits(String(empresa?.cnpj ?? ""));
     const email = inputEmail || (user.email ?? "").trim().toLowerCase();
@@ -232,7 +239,11 @@ Deno.serve(async (req) => {
     // Link: atualiza empresa.stripe_customer_id e garante metadata no customer.
     await admin.from("empresas").update({ stripe_customer_id: chosenId }).eq("id", empresaId);
     try {
-      await stripe.customers.update(chosenId, { metadata: { empresa_id: empresaId, ...(cnpj ? { cnpj } : {}) } });
+      const empresaName = String(empresa?.nome_fantasia || empresa?.nome_razao_social || "").trim();
+      await stripe.customers.update(chosenId, {
+        ...(empresaName ? { name: empresaName } : {}),
+        metadata: { empresa_id: empresaId, ...(cnpj ? { cnpj } : {}) },
+      });
     } catch {
       // best-effort
     }
