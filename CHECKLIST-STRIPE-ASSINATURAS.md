@@ -44,6 +44,10 @@ Objetivo: eliminar **403 intermitente** causado por inconsistências de assinatu
 
 ## P4 — Backup por tenant (empresa) — antes do go-live
 - [x] Implementar `Dev → Backup por Empresa` (empresa ativa)
+- [ ] Configurar no **Supabase PROD** (Edge Functions → Secrets) as variáveis usadas pelo dispatcher:
+  - [ ] `GITHUB_TOKEN` (ou `GITHUB_PAT`) com permissão **Actions: Read and write** no repo que contém os workflows (`dualiteteste-sys/revo_erp_prod`)
+  - [ ] (Opcional) `GITHUB_REPO` (default: `dualiteteste-sys/revo_erp_prod`)
+  - [ ] (Opcional) `GITHUB_DEFAULT_REF` (default: `main`)
 - [ ] Validar em `prod` (empresa `leandrofmarques@me.com`) antes de dedupe no Stripe:
   - [ ] Disparar export do tenant em `prod` com label `antes-limpeza-stripe`
   - [ ] Confirmar que apareceu no catálogo `ops_tenant_backups`
