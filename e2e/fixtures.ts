@@ -4,6 +4,7 @@ export const test = base.extend({
   page: async ({ page }, run, testInfo) => {
     const consoleErrors: string[] = [];
     const failedApiResponses: string[] = [];
+    const failed401Responses: string[] = [];
     const allowFailedResource503 = testInfo.title.toLowerCase().includes('offline-lite');
 
     const onConsole = (msg: ConsoleMessage) => {
@@ -24,11 +25,17 @@ export const test = base.extend({
 
     const onResponse = (response: any) => {
       const url = response.url?.() ?? '';
-      if (!url || !isSupabaseApi(url)) return;
+      if (!url) return;
 
       const status = response.status?.() ?? 0;
       if (status < 400) return;
       if (allowFailedResource503 && status === 503) return;
+
+      if (status === 401) {
+        failed401Responses.push(`[401] ${url}`);
+      }
+
+      if (!isSupabaseApi(url)) return;
 
       const req = response.request?.();
       const method = req?.method?.() ?? 'GET';
@@ -46,7 +53,10 @@ export const test = base.extend({
     page.off('response', onResponse);
 
     if (consoleErrors.length > 0) {
-      throw new Error(`Erros de console detectados:\n${consoleErrors.join('\n')}`);
+      const hint401 = failed401Responses.length > 0
+        ? `\n\nPossíveis respostas 401 correlacionadas:\n${[...new Set(failed401Responses)].join('\n')}`
+        : '';
+      throw new Error(`Erros de console detectados:\n${consoleErrors.join('\n')}${hint401}`);
     }
 
     if (failedApiResponses.length > 0) {
