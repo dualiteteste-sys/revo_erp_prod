@@ -133,6 +133,15 @@ test('dev pages: Ops 403 e Inventário RLS carregam sem erro', async ({ page }) 
   await page.route('**/rest/v1/rpc/ops_403_events_export_sample', async (route) => {
     await route.fulfill({ json: [] });
   });
+  await page.route('**/rest/v1/rpc/ops_app_errors_count', async (route) => {
+    await route.fulfill({ json: 0 });
+  });
+  await page.route('**/rest/v1/rpc/ops_app_errors_list', async (route) => {
+    await route.fulfill({ json: [] });
+  });
+  await page.route('**/rest/v1/rpc/ops_app_errors_set_resolved', async (route) => {
+    await route.fulfill({ json: null });
+  });
   await page.route('**/rest/v1/rpc/ops_rls_inventory_list', async (route) => {
     await route.fulfill({
       json: [
@@ -162,8 +171,11 @@ test('dev pages: Ops 403 e Inventário RLS carregam sem erro', async ({ page }) 
   await page.waitForLoadState('networkidle');
   await expect(page.getByText('Diagnóstico: 403 (Empresa ativa)')).toBeVisible({ timeout: 15000 });
 
+  await page.goto('/app/desenvolvedor/erros');
+  await page.waitForLoadState('networkidle');
+  await expect(page.getByRole('heading', { name: 'Erros no Sistema' })).toBeVisible({ timeout: 15000 });
+
   await page.goto('/app/desenvolvedor/rls');
   await page.waitForLoadState('networkidle');
   await expect(page.getByText('Diagnóstico: Inventário RLS (multi-tenant)')).toBeVisible({ timeout: 15000 });
 });
-

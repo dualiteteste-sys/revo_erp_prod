@@ -177,6 +177,7 @@ export const menuConfig: MenuItem[] = [
     children: [
       { name: 'Saúde', icon: Activity, href: '/app/desenvolvedor/saude', permission: { domain: 'ops', action: 'view' } },
       { name: 'Diagnóstico', icon: FileCode, href: '/app/desenvolvedor/diagnostico', permission: { domain: 'ops', action: 'view' } },
+      { name: 'Erros no Sistema', icon: ShieldAlert, href: '/app/desenvolvedor/erros', permission: { domain: 'ops', action: 'view' } },
       { name: '403 (Empresa ativa)', icon: ShieldAlert, href: '/app/desenvolvedor/403', permission: { domain: 'ops', action: 'view' } },
       { name: 'Stripe: Dedupe', icon: ShieldAlert, href: '/app/desenvolvedor/stripe-dedupe', permission: { domain: 'ops', action: 'manage' } },
       { name: 'Inventário RLS', icon: Database, href: '/app/desenvolvedor/rls', permission: { domain: 'ops', action: 'view' } },

@@ -1,6 +1,9 @@
 import { logger } from "@/lib/logger";
 import { supabase } from "@/lib/supabaseClient";
 import { sanitizeLogData } from "@/lib/sanitizeLog";
+import { getLastRequestId } from "@/lib/requestId";
+import { getRecentNetworkErrors } from "@/lib/telemetry/networkErrors";
+import { getLastUserAction, setupLastUserActionTracking } from "@/lib/telemetry/lastUserAction";
 
 type AnyFunction = (...args: any[]) => any;
 
@@ -19,6 +22,8 @@ export function setupGlobalErrorHandlers() {
 
   const recentlySent = new Map<string, number>();
   const DEDUPE_WINDOW_MS = 10_000;
+
+  setupLastUserActionTracking();
 
   const trySendAppLog = (params: { event: string; message: string; context?: Record<string, unknown> }) => {
     try {
@@ -43,7 +48,57 @@ export function setupGlobalErrorHandlers() {
     }
   };
 
+  const trySendOpsSystemError = (params: {
+    source: string;
+    message: string;
+    stack?: string | null;
+    hintCode?: string | null;
+  }) => {
+    try {
+      if (!supabase) return;
+
+      const lastAction = getLastUserAction();
+      const route = lastAction?.route ?? (window.location?.pathname ?? null);
+      const requestId = getLastRequestId();
+      const recentNet = getRecentNetworkErrors();
+      const lastNet = recentNet[0] ?? null;
+
+      const fingerprint = [
+        params.source,
+        route ?? "",
+        params.hintCode ?? "",
+        (lastNet?.status ?? "").toString(),
+        (lastNet?.url ?? "").split("?")[0],
+        params.message,
+      ]
+        .join("|")
+        .slice(0, 500);
+
+      void (supabase as any).rpc("ops_app_errors_log_v1", {
+        p_source: params.source,
+        p_route: route ?? "",
+        p_last_action: lastAction?.label ?? "",
+        p_message: params.message,
+        p_stack: params.stack ?? "",
+        p_request_id: requestId ?? "",
+        p_url: lastNet?.url ?? "",
+        p_method: lastNet?.method ?? "",
+        p_http_status: lastNet?.status ?? null,
+        p_code: params.hintCode ?? "",
+        p_response_text: lastNet?.responseText ?? "",
+        p_fingerprint: fingerprint,
+      });
+    } catch {
+      // best-effort
+    }
+  };
+
   window.addEventListener("error", (event) => {
+    trySendOpsSystemError({
+      source: "window.error",
+      message: safeToString(event.error || event.message),
+      stack: event?.error instanceof Error ? event.error.stack ?? event.error.message : null,
+    });
     trySendAppLog({
       event: "window.error",
       message: safeToString(event.error || event.message),
@@ -61,6 +116,11 @@ export function setupGlobalErrorHandlers() {
   });
 
   window.addEventListener("unhandledrejection", (event) => {
+    trySendOpsSystemError({
+      source: "unhandledrejection",
+      message: safeToString(event.reason),
+      stack: event?.reason instanceof Error ? event.reason.stack ?? event.reason.message : null,
+    });
     trySendAppLog({
       event: "unhandledrejection",
       message: safeToString(event.reason),
@@ -78,6 +138,16 @@ export function setupGlobalErrorHandlers() {
 
   console.error = ((...args: unknown[]) => {
     const safeArgs = sanitizeLogData(args) as any;
+    trySendOpsSystemError({
+      source: "console.error",
+      message: safeToString(args[0]),
+      stack: args[0] instanceof Error ? args[0].stack ?? args[0].message : null,
+      hintCode: (() => {
+        const raw = safeToString(args[0]);
+        const m = raw.match(/\b([A-Z0-9]{4,5}\d{0,2})\b/);
+        return m?.[1] ?? null;
+      })(),
+    });
     trySendAppLog({
       event: "console.error",
       message: safeToString(args[0]),
