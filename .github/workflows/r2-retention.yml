@@ -9,7 +9,112 @@ on:
 jobs:
   purge:
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 20
+    env:
+      R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
+      R2_BUCKET: ${{ secrets.R2_BUCKET }}
+      AWS_REGION: auto
+      AWS_DEFAULT_REGION: auto
+      AWS_EC2_METADATA_DISABLED: "true"
+      AWS_S3_ADDRESSING_STYLE: path
+      AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+      DAYS: "90"
+      PREFIX: "revo/"
     steps:
-      - name: Smoke
-        run: echo "r2-retention workflow loaded"
+      - name: Ensure secrets configured
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ -z "${R2_ENDPOINT:-}" || -z "${R2_BUCKET:-}" || -z "${AWS_ACCESS_KEY_ID:-}" || -z "${AWS_SECRET_ACCESS_KEY:-}" ]]; then
+            echo "::error::Missing R2 secrets (R2_ENDPOINT/R2_BUCKET/R2_ACCESS_KEY_ID/R2_SECRET_ACCESS_KEY)."
+            exit 1
+          fi
+
+      - name: Install awscli
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y python3-pip
+          python3 -m pip install --upgrade pip
+          python3 -m pip install --upgrade awscli
+          aws configure set default.s3.addressing_style path
+
+      - name: Preflight bucket
+        shell: bash
+        run: |
+          set -euo pipefail
+          aws --region auto --endpoint-url "${R2_ENDPOINT}" s3api head-bucket --bucket "${R2_BUCKET}"
+
+      - name: Purge objects older than N days
+        id: purge
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          days="${DAYS:-90}"
+          prefix="${PREFIX:-revo/}"
+          cutoff="$(date -u -d "${days} days ago" +'%Y-%m-%dT%H:%M:%SZ')"
+          echo "Cutoff UTC: ${cutoff}"
+          echo "Prefix: ${prefix}"
+
+          token=""
+          removed=0
+          scanned=0
+          while :; do
+            if [[ -n "$token" ]]; then
+              page="$(aws --region auto --endpoint-url "${R2_ENDPOINT}" s3api list-objects-v2 --bucket "${R2_BUCKET}" --prefix "${prefix}" --continuation-token "$token")"
+            else
+              page="$(aws --region auto --endpoint-url "${R2_ENDPOINT}" s3api list-objects-v2 --bucket "${R2_BUCKET}" --prefix "${prefix}")"
+            fi
+
+            token="$(echo "$page" | python3 -c "import sys, json; j=json.load(sys.stdin); print(j.get('NextContinuationToken',''))")"
+            count_page="$(echo "$page" | python3 -c "import sys, json; j=json.load(sys.stdin); print(len(j.get('Contents', []) or []))")"
+            scanned="$((scanned + count_page))"
+
+            keys="$(echo "$page" | python3 - "$cutoff" <<'PY'
+          import sys, json, datetime
+          cutoff = sys.argv[1]
+          cutoff_dt = datetime.datetime.fromisoformat(cutoff.replace('Z','+00:00'))
+          j = json.load(sys.stdin)
+          out=[]
+          for it in j.get('Contents', []) or []:
+            lm = it.get('LastModified')
+            if not lm:
+              continue
+            lm_dt = datetime.datetime.fromisoformat(lm.replace('Z','+00:00'))
+            if lm_dt < cutoff_dt:
+              out.append(it['Key'])
+          print("\n".join(out))
+          PY
+            )"
+
+            if [[ -n "$keys" ]]; then
+              echo "$keys" | split -l 900 - keys_chunk_
+              for f in keys_chunk_*; do
+                payload="$(python3 - "$f" <<'PY'
+          import sys, json
+          fn = sys.argv[1]
+          objs=[{"Key": line.strip()} for line in open(fn, 'r', encoding='utf-8') if line.strip()]
+          print(json.dumps({"Objects": objs, "Quiet": True}))
+          PY
+                )"
+                n="$(python3 - "$f" -c "import sys; print(sum(1 for _ in open(sys.argv[1], 'r', encoding='utf-8') if _.strip()))")"
+                aws --region auto --endpoint-url "${R2_ENDPOINT}" s3api delete-objects --bucket "${R2_BUCKET}" --delete "$payload" >/dev/null
+                removed="$((removed + n))"
+              done
+              rm -f keys_chunk_*
+            fi
+
+            [[ -z "$token" ]] && break
+          done
+
+          echo "removed=${removed}" >> "$GITHUB_OUTPUT"
+          echo "scanned=${scanned}" >> "$GITHUB_OUTPUT"
+
+      - name: Summary
+        if: always()
+        run: |
+          echo "removed=${{ steps.purge.outputs.removed || '0' }}" >> "$GITHUB_STEP_SUMMARY"
+          echo "scanned=${{ steps.purge.outputs.scanned || '0' }}" >> "$GITHUB_STEP_SUMMARY"
