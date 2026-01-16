@@ -21,6 +21,12 @@ function json(status: number, body: unknown, headers: Record<string, string>) {
   });
 }
 
+function isUuid(value: string) {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
+}
+
+const ALLOWED_TARGETS = new Set(["prod", "dev", "verify"]);
+
 async function dispatchWorkflow(input: {
   token: string;
   repo: string;
@@ -136,6 +142,9 @@ Deno.serve(async (req) => {
     if (action === "backup") {
       const target = String(payload?.target ?? "prod").trim();
       const label = String(payload?.label ?? "").trim();
+      if (!ALLOWED_TARGETS.has(target)) {
+        return json(400, { ok: false, error: "invalid_payload", message: "target inválido. Use prod/dev/verify." }, corsHeaders);
+      }
 
       await dispatchWorkflow({
         token: githubToken.value,
@@ -159,11 +168,53 @@ Deno.serve(async (req) => {
       return json(200, { ok: true, kind: "tenant_backup", run_url: runUrl }, corsHeaders);
     }
 
-    if (action === "restore") {
-      const target = String(payload?.target ?? "dev").trim();
-      const r2Key = String(payload?.r2_key ?? "").trim();
+    if (action === "restore_latest") {
+      const sourceTarget = String(payload?.source_target ?? "prod").trim();
+      const target = String(payload?.target ?? "verify").trim();
       const confirm = String(payload?.confirm ?? "").trim();
-      if (!r2Key) return json(400, { ok: false, error: "invalid_payload", message: "r2_key é obrigatório." }, corsHeaders);
+      if (!ALLOWED_TARGETS.has(sourceTarget)) {
+        return json(400, { ok: false, error: "invalid_payload", message: "source_target inválido. Use prod/dev/verify." }, corsHeaders);
+      }
+      if (!ALLOWED_TARGETS.has(target)) {
+        return json(400, { ok: false, error: "invalid_payload", message: "target inválido. Use prod/dev/verify." }, corsHeaders);
+      }
+
+      const list = await supabase.rpc("ops_tenant_backups_list", {
+        p_target: sourceTarget,
+        p_limit: 1,
+        p_offset: 0,
+      } as any);
+      if (list.error) return json(500, { ok: false, error: "catalog_failed", message: list.error.message }, corsHeaders);
+
+      const row = (Array.isArray(list.data) ? list.data[0] : null) as any;
+      const r2Key = String(row?.r2_key ?? "").trim();
+      if (!r2Key) {
+        return json(
+          400,
+          {
+            ok: false,
+            error: "no_backup_found",
+            message: `Nenhum backup encontrado no catálogo para target=${sourceTarget}. Gere um backup antes do restore drill.`,
+          },
+          corsHeaders,
+        );
+      }
+
+      const empresaIdStr = String(empresaId);
+      if (!isUuid(empresaIdStr)) {
+        return json(500, { ok: false, error: "invalid_empresa_id", message: "Empresa ativa inválida." }, corsHeaders);
+      }
+      if (!r2Key.includes(`/tenants/${empresaIdStr}/`)) {
+        return json(
+          400,
+          {
+            ok: false,
+            error: "invalid_r2_key",
+            message: "O backup selecionado não pertence à empresa ativa.",
+          },
+          corsHeaders,
+        );
+      }
 
       await dispatchWorkflow({
         token: githubToken.value,
@@ -172,7 +223,50 @@ Deno.serve(async (req) => {
         ref: githubRef,
         inputs: {
           target,
-          empresa_id: String(empresaId),
+          empresa_id: empresaIdStr,
+          r2_key: r2Key,
+          confirm,
+        },
+      });
+
+      let runUrl: string | null = null;
+      for (let i = 0; i < 5; i++) {
+        await new Promise((r) => setTimeout(r, 900));
+        runUrl = await getLatestWorkflowRunUrl({ token: githubToken.value, repo: githubRepo, workflowFile: "tenant-restore-from-r2.yml", ref: githubRef });
+        if (runUrl) break;
+      }
+
+      return json(
+        200,
+        { ok: true, kind: "tenant_restore_latest", source_target: sourceTarget, target, r2_key: r2Key, run_url: runUrl },
+        corsHeaders,
+      );
+    }
+
+    if (action === "restore") {
+      const target = String(payload?.target ?? "dev").trim();
+      const r2Key = String(payload?.r2_key ?? "").trim();
+      const confirm = String(payload?.confirm ?? "").trim();
+      if (!ALLOWED_TARGETS.has(target)) {
+        return json(400, { ok: false, error: "invalid_payload", message: "target inválido. Use prod/dev/verify." }, corsHeaders);
+      }
+      if (!r2Key) return json(400, { ok: false, error: "invalid_payload", message: "r2_key é obrigatório." }, corsHeaders);
+      const empresaIdStr = String(empresaId);
+      if (!isUuid(empresaIdStr)) {
+        return json(500, { ok: false, error: "invalid_empresa_id", message: "Empresa ativa inválida." }, corsHeaders);
+      }
+      if (!r2Key.includes(`/tenants/${empresaIdStr}/`)) {
+        return json(400, { ok: false, error: "invalid_r2_key", message: "O backup informado não pertence à empresa ativa." }, corsHeaders);
+      }
+
+      await dispatchWorkflow({
+        token: githubToken.value,
+        repo: githubRepo,
+        workflowFile: "tenant-restore-from-r2.yml",
+        ref: githubRef,
+        inputs: {
+          target,
+          empresa_id: empresaIdStr,
           r2_key: r2Key,
           confirm,
         },
@@ -188,7 +282,7 @@ Deno.serve(async (req) => {
       return json(200, { ok: true, kind: "tenant_restore", run_url: runUrl }, corsHeaders);
     }
 
-    return json(400, { ok: false, error: "invalid_action", message: "Informe action=backup ou action=restore." }, corsHeaders);
+    return json(400, { ok: false, error: "invalid_action", message: "Informe action=backup, action=restore, ou action=restore_latest." }, corsHeaders);
   } catch (e: any) {
     return json(500, { ok: false, error: "internal_server_error", message: e?.message ?? "Erro interno." }, buildCorsHeaders(req));
   }
