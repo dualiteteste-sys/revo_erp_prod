@@ -62,11 +62,12 @@ Objetivo: eliminar **403 intermitente** causado por inconsistências de assinatu
 ## P5 — Backup/Restore por tenant (global, estado da arte)
 Objetivo: garantir que **cada tenant** consiga ter backup/restore seguro, com custo controlado e sem risco de vazamento entre empresas.
 - [ ] Segurança & auditoria:
-  - [ ] Backup/restore só para `ops:manage` e sempre amarrado ao `current_empresa_id()`
-  - [ ] Logar evento interno (quem disparou, quando, target, r2_key, run_url)
+  - [x] Backup/restore só para `ops:manage` e sempre amarrado ao `current_empresa_id()`
+  - [x] Logar evento interno (quem disparou, quando, target, r2_key, run_url) via `public.log_app_event` (Developer → Logs)
 - [ ] Resiliência:
-  - [ ] Restore sempre para `verify` como drill padrão (sem tocar em prod)
-  - [ ] Bloquear restore em `prod` sem confirmação explícita (`RESTORE_PROD_TENANT`)
+  - [x] Restore sempre para `verify` como drill padrão (sem tocar em prod)
+  - [x] Bloquear restore em `prod` sem confirmação explícita (`RESTORE_PROD_TENANT`)
+  - [x] Rodar assert mínimo pós-restore automaticamente quando target=`verify` (script `scripts/tenant_restore_verify_asserts.sql`)
 - [ ] Retenção/custos:
   - [ ] Definir regra de retenção (ex.: manter 7/30/90 dias) e expirar no R2
   - [ ] Documentar política: quando gerar backup por tenant (ex.: antes de dedupe/limpeza, antes de migrações grandes, antes de ações destrutivas)

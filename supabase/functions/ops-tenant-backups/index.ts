@@ -27,6 +27,19 @@ function isUuid(value: string) {
 
 const ALLOWED_TARGETS = new Set(["prod", "dev", "verify"]);
 
+async function logOpsEvent(supabase: any, input: { level: "info" | "warn" | "error"; event: string; message: string; context?: Record<string, unknown> }) {
+  await supabase
+    .rpc("log_app_event", {
+      p_level: input.level,
+      p_event: input.event,
+      p_message: input.message,
+      p_context: input.context ?? {},
+      p_source: "ops-tenant-backups",
+    })
+    .then(() => null)
+    .catch(() => null);
+}
+
 async function dispatchWorkflow(input: {
   token: string;
   repo: string;
@@ -165,6 +178,24 @@ Deno.serve(async (req) => {
         if (runUrl) break;
       }
 
+      await logOpsEvent(supabase, {
+        level: "info",
+        event: "ops_tenant_backup_dispatch",
+        message: `Backup do tenant disparado (target=${target}).`,
+        context: {
+          action,
+          empresa_id: String(empresaId),
+          target,
+          label: label || null,
+          workflow: "tenant-backup.yml",
+          github_repo: githubRepo,
+          github_ref: githubRef,
+          run_url: runUrl,
+          actor_id: user.id,
+          actor_email: user.email,
+        },
+      });
+
       return json(200, { ok: true, kind: "tenant_backup", run_url: runUrl }, corsHeaders);
     }
 
@@ -236,6 +267,25 @@ Deno.serve(async (req) => {
         if (runUrl) break;
       }
 
+      await logOpsEvent(supabase, {
+        level: "info",
+        event: "ops_tenant_restore_dispatch",
+        message: `Restore do tenant disparado (source=${sourceTarget} -> target=${target}).`,
+        context: {
+          action,
+          empresa_id: empresaIdStr,
+          source_target: sourceTarget,
+          target,
+          r2_key: r2Key,
+          workflow: "tenant-restore-from-r2.yml",
+          github_repo: githubRepo,
+          github_ref: githubRef,
+          run_url: runUrl,
+          actor_id: user.id,
+          actor_email: user.email,
+        },
+      });
+
       return json(
         200,
         { ok: true, kind: "tenant_restore_latest", source_target: sourceTarget, target, r2_key: r2Key, run_url: runUrl },
@@ -278,6 +328,24 @@ Deno.serve(async (req) => {
         runUrl = await getLatestWorkflowRunUrl({ token: githubToken.value, repo: githubRepo, workflowFile: "tenant-restore-from-r2.yml", ref: githubRef });
         if (runUrl) break;
       }
+
+      await logOpsEvent(supabase, {
+        level: "info",
+        event: "ops_tenant_restore_dispatch",
+        message: `Restore do tenant disparado (target=${target}).`,
+        context: {
+          action,
+          empresa_id: empresaIdStr,
+          target,
+          r2_key: r2Key,
+          workflow: "tenant-restore-from-r2.yml",
+          github_repo: githubRepo,
+          github_ref: githubRef,
+          run_url: runUrl,
+          actor_id: user.id,
+          actor_email: user.email,
+        },
+      });
 
       return json(200, { ok: true, kind: "tenant_restore", run_url: runUrl }, corsHeaders);
     }
