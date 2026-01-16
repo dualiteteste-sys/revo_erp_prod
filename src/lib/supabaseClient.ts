@@ -13,6 +13,59 @@ if (!supabaseUrl || !supabaseAnonKey) {
   );
 }
 
+const rawFetch = globalThis.fetch.bind(globalThis);
+const ops403Dedupe = new Map<string, number>();
+const OPS403_DEDUPE_MS = 10_000;
+
+function classifyOps403(code: string | null, message: string): string {
+  const msg = String(message || "").toLowerCase();
+  if (code === "42501" && (msg.includes("nenhuma empresa ativa") || msg.includes("sessão sem empresa"))) return "missing_active_empresa";
+  if (msg.includes("recurso indisponível no plano") || msg.includes("faça upgrade") || msg.includes("plano atual")) return "plan_gating";
+  if (code === "42501") return "permission";
+  return "unknown";
+}
+
+async function logOps403FetchBestEffort(input: {
+  requestId: string;
+  url: string;
+  route: string | null;
+  rpcFn: string;
+  code: string | null;
+  message: string;
+  details: string | null;
+  recoveryAttempted?: boolean;
+  recoveryOk?: boolean;
+  headers: Headers;
+}) {
+  try {
+    const now = Date.now();
+    const key = `${input.rpcFn}|${input.route ?? ""}|${input.code ?? ""}|${input.message}`;
+    const last = ops403Dedupe.get(key) ?? 0;
+    if (now - last < OPS403_DEDUPE_MS) return;
+    ops403Dedupe.set(key, now);
+
+    const endpoint = `${supabaseUrl.replace(/\/+$/, "")}/rest/v1/rpc/ops_403_events_log_v2`;
+    const body = {
+      p_rpc_fn: input.rpcFn,
+      p_route: input.route ?? "",
+      p_request_id: input.requestId,
+      p_code: input.code ?? "",
+      p_message: input.message,
+      p_details: input.details ?? "",
+      p_kind: classifyOps403(input.code, input.message),
+      p_recovery_attempted: Boolean(input.recoveryAttempted),
+      p_recovery_ok: Boolean(input.recoveryOk),
+    };
+
+    const headers = new Headers(input.headers);
+    if (!headers.has("Content-Type")) headers.set("Content-Type", "application/json");
+    headers.set("x-revo-request-id", input.requestId);
+
+    await rawFetch(endpoint, { method: "POST", headers, body: JSON.stringify(body) });
+  } catch {
+    // best-effort
+  }
+}
 
 
 /**
@@ -34,6 +87,7 @@ export const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey, {
       const method = (init?.method || (input instanceof Request ? input.method : "GET")).toUpperCase();
       const isRpc = /\/rest\/v1\/rpc\//.test(url);
       const isEdgeFn = /\/functions\/v1\//.test(url);
+      const isRest = /\/rest\/v1\//.test(url);
       const timeoutMs = method === "GET" || method === "HEAD"
         ? 30000
         : isRpc || isEdgeFn
@@ -70,6 +124,53 @@ export const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey, {
               });
             } catch {
               // best-effort
+            }
+          }
+
+          // Estado da arte: capturar 403 também fora de callRpc (ex.: REST select em app_logs).
+          // Best-effort: não quebra o fluxo do usuário nem gera loops (usa rawFetch).
+          if (res.status === 403 && (isRpc || isEdgeFn || isRest)) {
+            try {
+              const cloned = res.clone();
+              const txt = await cloned.text();
+              let parsed: any = null;
+              try {
+                parsed = JSON.parse(txt);
+              } catch {
+                parsed = null;
+              }
+              const code = typeof parsed?.code === "string" ? parsed.code : null;
+              const msg =
+                typeof parsed?.message === "string"
+                  ? parsed.message
+                  : typeof parsed?.error === "string"
+                    ? parsed.error
+                    : "HTTP_403";
+              const details = txt && txt.length < 4000 ? txt : null;
+
+              const route = typeof window !== "undefined" ? (window.location?.pathname ?? null) : null;
+              const rpcFn = (() => {
+                const mRpc = url.match(/\/rest\/v1\/rpc\/([^/?#]+)/);
+                if (mRpc?.[1]) return `rpc:${decodeURIComponent(mRpc[1])}`;
+                const mRest = url.match(/\/rest\/v1\/([^/?#]+)/);
+                if (mRest?.[1]) return `rest:${decodeURIComponent(mRest[1])}`;
+                const mFn = url.match(/\/functions\/v1\/([^/?#]+)/);
+                if (mFn?.[1]) return `fn:${decodeURIComponent(mFn[1])}`;
+                return "unknown";
+              })();
+
+              await logOps403FetchBestEffort({
+                requestId,
+                url,
+                route,
+                rpcFn,
+                code,
+                message: msg,
+                details,
+                headers,
+              });
+            } catch {
+              // ignore
             }
           }
 

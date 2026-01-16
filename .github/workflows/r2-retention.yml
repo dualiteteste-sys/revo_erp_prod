@@ -1,0 +1,15 @@
+name: R2 Retention (Purge Old Backups)
+
+on:
+  workflow_dispatch: {}
+  schedule:
+    # Diário 06:10 UTC
+    - cron: "10 6 * * *"
+
+jobs:
+  purge:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Smoke
+        run: echo "r2-retention workflow loaded"
