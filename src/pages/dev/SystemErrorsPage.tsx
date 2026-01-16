@@ -27,21 +27,27 @@ function formatHttp(status?: number | null) {
 
 function buildDevMessage(row: OpsAppErrorRow, extra?: { userEmail?: string; userNote?: string }) {
   const where = row.route ?? "—";
-  const action = row.last_action ? ` (última ação: ${row.last_action})` : "";
+  const action = row.last_action ? row.last_action : "—";
+  const origin = typeof window !== "undefined" ? window.location?.origin ?? "" : "";
   const consoleMsg = row.message ?? "—";
-  const network =
+  const networkLine =
     row.url || row.http_status || row.response_text
-      ? `(${row.method ?? "GET"} ${row.url ?? "—"} → ${row.http_status ?? "—"}) ${row.response_text ?? "—"}`
+      ? `${row.method ?? "GET"} ${row.url ?? "—"} → ${row.http_status ?? "—"}`
       : "—";
+  const response = row.response_text ?? "—";
 
-  const parts = [
-    `Ao acessar ${where}${action} estou com console: ${consoleMsg} e Network -> Response: ${network}.`,
-  ];
-  if (row.request_id) parts.push(`request_id: ${row.request_id}`);
-  if (row.code) parts.push(`code: ${row.code}`);
-  if (extra?.userEmail) parts.push(`email: ${extra.userEmail}`);
-  if (extra?.userNote) parts.push(`o que eu estava tentando fazer: ${extra.userNote}`);
-  return parts.join("\n");
+  const blocks: string[] = [];
+  blocks.push(`Ao acessar ${where} (última ação: ${action}) estou com console: ${consoleMsg}`);
+  blocks.push("");
+  blocks.push(`Network -> Response: (${networkLine}) ${response}`);
+  blocks.push("");
+  blocks.push(`source: ${row.source}`);
+  if (origin) blocks.push(`origin: ${origin}`);
+  if (row.request_id) blocks.push(`request_id: ${row.request_id}`);
+  if (row.code) blocks.push(`code: ${row.code}`);
+  if (extra?.userEmail) blocks.push(`email (opcional): ${extra.userEmail}`);
+  if (extra?.userNote) blocks.push(`o que eu estava tentando fazer: ${extra.userNote}`);
+  return blocks.join("\n");
 }
 
 export default function SystemErrorsPage() {
@@ -405,4 +411,3 @@ export default function SystemErrorsPage() {
     </PageShell>
   );
 }
-
