@@ -42,6 +42,7 @@ const ErrorReportsPage = lazyImport(() => import("../pages/dev/ErrorReportsPage"
 const Ops403Page = lazyImport(() => import("../pages/dev/Ops403Page"));
 const OpsRlsInventoryPage = lazyImport(() => import("../pages/dev/OpsRlsInventoryPage"));
 const OpsBackupsPage = lazyImport(() => import("../pages/dev/OpsBackupsPage"));
+const OpsTenantBackupsPage = lazyImport(() => import("../pages/dev/OpsTenantBackupsPage"));
 const SupabaseDemoPage = lazyImport(() => import("../pages/tools/SupabaseDemoPage"));
 const SettingsPage = lazyImport(() => import("../pages/settings/SettingsPage"));
 
@@ -540,6 +541,14 @@ export const appRoutes: RouteObject[] = [
               element: (
                 <RequirePermission permission={{ domain: "ops", action: "view" }}>
                   <Suspense fallback={<PageLoader />}><OpsBackupsPage /></Suspense>
+                </RequirePermission>
+              ),
+            },
+            {
+              path: "desenvolvedor/backups-tenant",
+              element: (
+                <RequirePermission permission={{ domain: "ops", action: "view" }}>
+                  <Suspense fallback={<PageLoader />}><OpsTenantBackupsPage /></Suspense>
                 </RequirePermission>
               ),
             },

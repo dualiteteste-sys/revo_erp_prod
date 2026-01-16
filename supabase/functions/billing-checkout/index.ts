@@ -144,7 +144,7 @@ Deno.serve(async (req) => {
 
     const { data: empresa, error: empErr } = await supabaseAdmin
       .from("empresas")
-      .select("id, fantasia, razao_social, stripe_customer_id")
+      .select("id, fantasia, razao_social, nome_fantasia, nome_razao_social, cnpj, stripe_customer_id")
       .eq("id", empresa_id)
       .single();
     if (empErr || !empresa) {
@@ -167,10 +167,15 @@ Deno.serve(async (req) => {
     // 5) Stripe
     const stripe = new Stripe(stripeSecretKey, { apiVersion: "2024-06-20" });
 
-    let customerId = empresa.stripe_customer_id;
+    const empresaCnpj = (empresa as any)?.cnpj ? String((empresa as any).cnpj).replace(/\D/g, "") : "";
+    const displayRazao = (empresa as any)?.razao_social ?? (empresa as any)?.nome_razao_social ?? null;
+    const displayFantasia = (empresa as any)?.fantasia ?? (empresa as any)?.nome_fantasia ?? null;
+    const displayName = (displayFantasia || displayRazao || `Empresa ${empresa_id}`) as string;
+
+    let customerId = (empresa as any).stripe_customer_id as string | null;
     if (!customerId) {
       // Primeiro tenta reusar um Customer já existente neste ambiente (evita criar duplicados)
-      // Obs: só funciona se o customer tiver metadata.empresa_id.
+      // Obs: só funciona se o customer tiver metadata (empresa_id/cnpj).
       try {
         const q = `metadata['empresa_id']:'${empresa_id}'`;
         const found = await stripe.customers.search({ query: q, limit: 1 });
@@ -180,11 +185,23 @@ Deno.serve(async (req) => {
         // best-effort
       }
 
+      // Fallback por CNPJ (mais humano e útil em dedupe).
+      if (!customerId && empresaCnpj) {
+        try {
+          const q = `metadata['cnpj']:'${empresaCnpj}'`;
+          const found = await stripe.customers.search({ query: q, limit: 1 });
+          const candidate = found.data?.[0];
+          if (candidate?.id) customerId = candidate.id;
+        } catch {
+          // best-effort
+        }
+      }
+
       if (!customerId) {
         const customer = await stripe.customers.create({
-          name: empresa.fantasia ?? empresa.razao_social ?? undefined,
+          name: displayName,
           email: user.email ?? undefined,
-          metadata: { empresa_id },
+          metadata: { empresa_id, ...(empresaCnpj ? { cnpj: empresaCnpj } : {}) },
         });
         customerId = customer.id;
       }
@@ -224,8 +241,8 @@ Deno.serve(async (req) => {
       // Compat: clientes antigos podem existir sem metadata.empresa_id (webhook depende disso).
       try {
         await stripe.customers.update(customerId, {
-          metadata: { empresa_id },
-          name: empresa.fantasia ?? empresa.razao_social ?? undefined,
+          metadata: { empresa_id, ...(empresaCnpj ? { cnpj: empresaCnpj } : {}) },
+          name: displayName,
           email: user.email ?? undefined,
         });
       } catch {

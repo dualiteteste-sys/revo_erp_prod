@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useMemo, useState, ReactNode, useCallback } from 'react';
+import { createContext, useContext, useEffect, useMemo, useRef, useState, ReactNode, useCallback } from 'react';
 import { useSupabase } from '@/providers/SupabaseProvider';
 import { useAuth } from './AuthProvider';
 import { Database } from '../types/database.types';
@@ -22,12 +22,21 @@ const SubscriptionContext = createContext<SubscriptionContextType | undefined>(u
 
 export const SubscriptionProvider = ({ children }: { children: ReactNode }) => {
   const supabase = useSupabase();
-  const { activeEmpresa } = useAuth();
+  const { activeEmpresa, session } = useAuth();
   const [subscription, setSubscription] = useState<SubscriptionWithPlan | null>(null);
   const [loadingSubscription, setLoadingSubscription] = useState(true);
+  const autoSyncAttemptedRef = useRef<string | null>(null);
 
   const empresaId = useMemo(() => activeEmpresa?.id ?? null, [activeEmpresa?.id]);
+  const accessToken = useMemo(() => session?.access_token ?? null, [session?.access_token]);
   const localBypass = useMemo(() => isLocalBillingBypassEnabled(), []);
+
+  const firstRow = useCallback(<T,>(data: unknown): T | null => {
+    if (!data) return null;
+    if (Array.isArray(data)) return ((data[0] ?? null) as T | null);
+    if (typeof data === 'object') return (data as T);
+    return null;
+  }, []);
 
   const fetchSubscription = useCallback(async (empresaId: string) => {
     setLoadingSubscription(true);
@@ -45,7 +54,7 @@ export const SubscriptionProvider = ({ children }: { children: ReactNode }) => {
         throw subError;
       }
 
-      const subData = (subRows?.[0] ?? null) as Subscription | null;
+      const subData = firstRow<Subscription>(subRows);
 
       if (subData?.stripe_price_id) {
         // Também evitar `.single()` para não gerar 406 caso o catálogo esteja incompleto/desatualizado.
@@ -59,7 +68,7 @@ export const SubscriptionProvider = ({ children }: { children: ReactNode }) => {
           console.warn('Plano não encontrado para a assinatura:', planError);
         }
 
-        const planData = (planRows?.[0] ?? null) as Plan | null;
+        const planData = firstRow<Plan>(planRows);
         setSubscription({ ...subData, plan: planData });
 
       } else {
@@ -72,7 +81,38 @@ export const SubscriptionProvider = ({ children }: { children: ReactNode }) => {
     } finally {
       setLoadingSubscription(false);
     }
-  }, [supabase]);
+  }, [firstRow, supabase]);
+
+  // Estado da arte: se a empresa acabou de assinar e o webhook ainda não sincronizou,
+  // tentamos um "self-heal" (best-effort) sem exigir clique manual em "Sincronizar com Stripe".
+  useEffect(() => {
+    if (localBypass) return;
+    if (!empresaId) return;
+    if (!accessToken) return;
+    if (loadingSubscription) return;
+
+    // Só tenta quando não há assinatura local ainda.
+    if (subscription) return;
+
+    // Evita loops: 1 tentativa por empresa por sessão (runtime).
+    if (autoSyncAttemptedRef.current === empresaId) return;
+    autoSyncAttemptedRef.current = empresaId;
+
+    void (async () => {
+      try {
+        const { error } = await supabase.functions.invoke('billing-sync-subscription', {
+          body: { empresa_id: empresaId },
+        });
+        if (error) {
+          logger.warn('[Billing][AutoSync] Falha ao sincronizar assinatura (best-effort)', { error });
+          return;
+        }
+        await fetchSubscription(empresaId);
+      } catch (e) {
+        logger.warn('[Billing][AutoSync] Erro inesperado (best-effort)', { error: e });
+      }
+    })();
+  }, [empresaId, fetchSubscription, loadingSubscription, localBypass, subscription, supabase.functions]);
 
   useEffect(() => {
     if (localBypass) {
@@ -110,17 +150,18 @@ export const SubscriptionProvider = ({ children }: { children: ReactNode }) => {
       return;
     }
 
-    if (empresaId) {
+    if (empresaId && accessToken) {
       fetchSubscription(empresaId);
     } else {
       setSubscription(null);
       setLoadingSubscription(false);
     }
-  }, [empresaId, fetchSubscription, localBypass]);
+  }, [empresaId, fetchSubscription, localBypass, accessToken]);
 
   useEffect(() => {
     if (localBypass) return;
     if (!empresaId) return;
+    if (!accessToken) return;
 
     const channel = supabase
       .channel(`revo:subscriptions:${empresaId}`)
@@ -136,7 +177,7 @@ export const SubscriptionProvider = ({ children }: { children: ReactNode }) => {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [empresaId, fetchSubscription, supabase, localBypass]);
+  }, [empresaId, fetchSubscription, supabase, localBypass, accessToken]);
 
   const refetchSubscription = () => {
     if (localBypass) return;

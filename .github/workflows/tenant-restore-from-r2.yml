@@ -1,0 +1,240 @@
+name: Tenant Restore from R2 (Empresa) - Supabase
+
+on:
+  workflow_dispatch:
+    inputs:
+      target:
+        description: "Qual banco restaurar?"
+        type: choice
+        required: true
+        default: dev
+        options:
+          - dev
+          - verify
+          - prod
+      empresa_id:
+        description: "Empresa (tenant) id (uuid)"
+        type: string
+        required: true
+      r2_key:
+        description: "Chave completa no R2 (zip) - ex.: revo/tenants/<empresa_id>/prod/YYYY/MM/DD/tenant_export_*.zip"
+        type: string
+        required: true
+      confirm:
+        description: "Para PROD, digite RESTORE_PROD_TENANT"
+        type: string
+        required: false
+
+permissions:
+  contents: read
+  issues: write
+
+concurrency:
+  group: tenant-restore-from-r2
+  cancel-in-progress: false
+
+jobs:
+  restore:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      TARGET: ${{ inputs.target }}
+      EMPRESA_ID: ${{ inputs.empresa_id }}
+      R2_KEY: ${{ inputs.r2_key }}
+      CONFIRM: ${{ inputs.confirm }}
+      R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
+      R2_BUCKET: ${{ secrets.R2_BUCKET || 'revo-erp-backups-prod' }}
+      AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+      DEV_URL: ${{ secrets.SUPABASE_DB_URL_DEV }}
+      PROD_URL: ${{ secrets.SUPABASE_DB_URL_PROD }}
+      VERIFY_URL: ${{ secrets.SUPABASE_DB_URL_VERIFY }}
+    steps:
+      - name: Safety checks
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ -z "${R2_ENDPOINT:-}" || -z "${R2_BUCKET:-}" || -z "${AWS_ACCESS_KEY_ID:-}" || -z "${AWS_SECRET_ACCESS_KEY:-}" ]]; then
+            echo "::error::Missing R2 secrets."
+            exit 1
+          fi
+          if [[ -z "${EMPRESA_ID:-}" ]]; then
+            echo "::error::Missing empresa_id."
+            exit 1
+          fi
+          if [[ -z "${R2_KEY:-}" ]]; then
+            echo "::error::Missing r2_key."
+            exit 1
+          fi
+          if [[ "${TARGET}" == "prod" && "${CONFIRM:-}" != "RESTORE_PROD_TENANT" ]]; then
+            echo "::error::Para restaurar PROD, informe confirm=RESTORE_PROD_TENANT."
+            exit 1
+          fi
+
+      - name: Resolve target DB URL
+        id: db
+        shell: bash
+        run: |
+          set -euo pipefail
+          case "${TARGET}" in
+            dev) url="${DEV_URL}" ;;
+            prod) url="${PROD_URL}" ;;
+            verify) url="${VERIFY_URL}" ;;
+            *) echo "::error::Target inválido: ${TARGET}"; exit 1 ;;
+          esac
+          if [[ -z "${url:-}" ]]; then
+            echo "::error::DB URL secret ausente para target=${TARGET}"
+            exit 1
+          fi
+          echo "url=$url" >> "$GITHUB_OUTPUT"
+
+      - name: Install awscli + unzip
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y awscli unzip
+
+      - name: Download zip from R2
+        shell: bash
+        run: |
+          set -euo pipefail
+          file="$(basename "${R2_KEY}")"
+          echo "Baixando s3://${R2_BUCKET}/${R2_KEY}"
+          aws --endpoint-url "${R2_ENDPOINT}" s3 cp "s3://${R2_BUCKET}/${R2_KEY}" "$file" --only-show-errors
+          ls -lh "$file"
+          unzip -q "$file" -d tenant_restore
+          ls -la tenant_restore | head
+
+      - name: Restore tenant into target DB (delete + copy)
+        shell: bash
+        env:
+          DATABASE_URL: ${{ steps.db.outputs.url }}
+        run: |
+          set -euo pipefail
+
+          # encontra o diretório exportado dentro do zip
+          dir="$(find tenant_restore -maxdepth 2 -type d -name 'tenant_export_*' | head -n 1)"
+          if [[ -z "${dir:-}" ]]; then
+            echo "::error::Diretório tenant_export_* não encontrado no zip."
+            exit 1
+          fi
+          tablesFile="${dir}/tables.txt"
+          if [[ ! -f "$tablesFile" ]]; then
+            echo "::error::tables.txt não encontrado no export."
+            exit 1
+          fi
+
+          echo "Criando script de restore..."
+          restoreSql="restore_tenant.sql"
+          cat > "$restoreSql" <<'SQL'
+          begin;
+          -- Desativa constraints/triggers temporariamente (restore por tenant).
+          set session_replication_role = replica;
+          SQL
+
+          # Delete em todas as tabelas (ordem alfabética; constraints desativadas).
+          while IFS= read -r t; do
+            [[ -z "$t" ]] && continue
+            echo "delete from public.\"${t}\" where empresa_id = '${EMPRESA_ID}';" >> "$restoreSql"
+          done < "$tablesFile"
+
+          echo "set session_replication_role = origin;" >> "$restoreSql"
+          echo "commit;" >> "$restoreSql"
+
+          echo "Executando deletes..."
+          docker run --rm \
+            -v "$PWD:/work" \
+            -w /work \
+            postgres:17 \
+            bash -lc "psql \"${DATABASE_URL}\" -v ON_ERROR_STOP=1 -X -q -f \"${restoreSql}\""
+
+          echo "Importando CSVs..."
+          # Import por tabela (com constraints desativadas durante inserts).
+          docker run --rm \
+            -v "$PWD:/work" \
+            -w /work \
+            postgres:17 \
+            bash -lc "psql \"${DATABASE_URL}\" -v ON_ERROR_STOP=1 -X -q -c \"begin; set session_replication_role=replica;\""
+
+          while IFS= read -r t; do
+            [[ -z "$t" ]] && continue
+            csv="${dir}/tables/${t}.csv"
+            if [[ ! -f "$csv" ]]; then
+              echo \"::warning::CSV ausente para tabela ${t}; pulando.\"
+              continue
+            fi
+            docker run --rm \
+              -v "$PWD:/work" \
+              -w /work \
+              postgres:17 \
+              bash -lc "psql \"${DATABASE_URL}\" -v ON_ERROR_STOP=1 -X -q -c \"\\\\copy public.\\\"${t}\\\" from '${csv}' with (format csv, header true)\""
+          done < "$tablesFile"
+
+          docker run --rm \
+            -v "$PWD:/work" \
+            -w /work \
+            postgres:17 \
+            bash -lc "psql \"${DATABASE_URL}\" -v ON_ERROR_STOP=1 -X -q -c \"set session_replication_role=origin; commit;\""
+
+      - name: Update tenant backup catalog (status=restored)
+        if: always()
+        shell: bash
+        env:
+          DATABASE_URL: ${{ steps.db.outputs.url }}
+        run: |
+          set -euo pipefail
+          status="restored"
+          if [[ "${{ job.status }}" != "success" ]]; then status="failed"; fi
+
+          docker run --rm postgres:17 \
+            psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -X -qAt -c "
+              update public.ops_tenant_backups
+                 set status='${status}',
+                     meta = jsonb_set(coalesce(meta,'{}'::jsonb), '{last_restore}', jsonb_build_object(
+                       'at', now(),
+                       'run', '${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}',
+                       'target', '${TARGET}'
+                     ), true)
+               where r2_key = '${R2_KEY}';
+            " || true
+
+      - name: Upsert issue on failure
+        if: failure()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const title = "OPS ALERT: Restore de tenant falhou";
+            const labels = ["ops-alert", "backup", "tenant"];
+            const body = [
+              "Falha ao restaurar export de tenant do R2 para o banco alvo.",
+              "",
+              `- target: ${process.env.TARGET}`,
+              `- empresa_id: ${process.env.EMPRESA_ID}`,
+              `- r2_key: ${process.env.R2_KEY}`,
+              `- run: ${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`,
+            ].join("\n");
+
+            const { data: issues } = await github.rest.issues.listForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: "open",
+              labels: labels.join(","),
+              per_page: 100,
+            });
+            const existing = issues.find(i => i.title === title);
+            if (existing) {
+              await github.rest.issues.update({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: existing.number,
+                body,
+              });
+            } else {
+              await github.rest.issues.create({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                title,
+                body,
+                labels,
+              });
+            }

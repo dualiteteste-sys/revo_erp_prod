@@ -1,0 +1,205 @@
+name: Tenant Backup (Empresa) - Supabase
+
+on:
+  workflow_dispatch:
+    inputs:
+      target:
+        description: "Qual banco exportar?"
+        type: choice
+        required: true
+        default: prod
+        options:
+          - prod
+          - dev
+          - verify
+      empresa_id:
+        description: "Empresa (tenant) id (uuid)"
+        type: string
+        required: true
+      label:
+        description: "Rotulo opcional (vai no nome do arquivo)"
+        required: false
+        default: ""
+
+permissions:
+  contents: read
+
+jobs:
+  tenant-backup:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
+      R2_BUCKET: ${{ secrets.R2_BUCKET || 'revo-erp-backups-prod' }}
+      AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+      DEV_URL: ${{ secrets.SUPABASE_DB_URL_DEV }}
+      PROD_URL: ${{ secrets.SUPABASE_DB_URL_PROD }}
+      VERIFY_URL: ${{ secrets.SUPABASE_DB_URL_VERIFY }}
+      TARGET: ${{ inputs.target }}
+      EMPRESA_ID: ${{ inputs.empresa_id }}
+      LABEL: ${{ inputs.label }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Safety checks
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ -z "${R2_ENDPOINT:-}" || -z "${R2_BUCKET:-}" || -z "${AWS_ACCESS_KEY_ID:-}" || -z "${AWS_SECRET_ACCESS_KEY:-}" ]]; then
+            echo "::error::Missing R2 secrets."
+            exit 1
+          fi
+          if [[ -z "${EMPRESA_ID:-}" ]]; then
+            echo "::error::Missing empresa_id."
+            exit 1
+          fi
+
+      - name: Resolve target DB URL
+        id: db
+        shell: bash
+        run: |
+          set -euo pipefail
+          case "${TARGET}" in
+            dev) url="${DEV_URL}" ;;
+            prod) url="${PROD_URL}" ;;
+            verify) url="${VERIFY_URL}" ;;
+            *) echo "::error::Target inválido: ${TARGET}"; exit 1 ;;
+          esac
+          if [[ -z "${url:-}" ]]; then
+            echo "::error::DB URL secret ausente para target=${TARGET}"
+            exit 1
+          fi
+          echo "url=$url" >> "$GITHUB_OUTPUT"
+
+      - name: Install awscli + zip
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y awscli zip
+
+      - name: Export tenant tables (empresa_id)
+        shell: bash
+        env:
+          DATABASE_URL: ${{ steps.db.outputs.url }}
+        run: |
+          set -euo pipefail
+
+          ts="$(date -u +'%Y%m%d_%H%M%S')"
+          label="${LABEL:-}"
+          if [[ -n "$label" ]]; then
+            label="_${label// /_}"
+          fi
+
+          outdir="tenant_export_${TARGET}_${EMPRESA_ID}_${ts}${label}"
+          mkdir -p "$outdir/tables"
+
+          echo "${EMPRESA_ID}" > "$outdir/empresa_id.txt"
+          echo "${TARGET}" > "$outdir/target.txt"
+          echo "${GITHUB_SHA}" > "$outdir/git_sha.txt"
+          date -u +'%Y-%m-%dT%H:%M:%SZ' > "$outdir/created_at_utc.txt"
+
+          # Descobrir tabelas no public que tenham coluna empresa_id (uuid)
+          docker run --rm postgres:17 \
+            psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -X -qAt -c "
+              select table_name
+              from information_schema.columns
+              where table_schema='public'
+                and column_name='empresa_id'
+              order by table_name;
+            " > "$outdir/tables.txt"
+
+          if [[ ! -s "$outdir/tables.txt" ]]; then
+            echo "::error::Nenhuma tabela com empresa_id encontrada."
+            exit 1
+          fi
+
+          echo "Exportando $(wc -l < "$outdir/tables.txt") tabelas..."
+
+          # Export por tabela (CSV). Best-effort: não falha se uma tabela específica tiver problema; registra no report.
+          : > "$outdir/export_report.jsonl"
+          while IFS= read -r t; do
+            [[ -z "$t" ]] && continue
+            file="$outdir/tables/${t}.csv"
+            echo " - $t"
+            docker run --rm \
+              -v "$PWD:/work" \
+              -w /work \
+              postgres:17 \
+              bash -lc "psql \"${DATABASE_URL}\" -v ON_ERROR_STOP=1 -X -q -c \"\\\\copy (select * from public.\\\"${t}\\\" where empresa_id='${EMPRESA_ID}') to '${file}' with (format csv, header true)\""
+            rows="$(tail -n +2 "$file" | wc -l | tr -d ' ')"
+            echo "{\"table\":\"${t}\",\"rows\":${rows}}" >> "$outdir/export_report.jsonl"
+          done < "$outdir/tables.txt"
+
+          zipfile="${outdir}.zip"
+          zip -9 -r "$zipfile" "$outdir" >/dev/null
+
+          sha="$(sha256sum "$zipfile" | awk '{print $1}')"
+          size="$(stat -c '%s' "$zipfile" || stat -f '%z' "$zipfile")"
+
+          cat > "${outdir}.manifest.json" <<EOF
+          {
+            "kind": "tenant_export",
+            "empresa_id": "${EMPRESA_ID}",
+            "target": "${TARGET}",
+            "created_at_utc": "$(date -u +'%Y-%m-%dT%H:%M:%SZ')",
+            "zip": "$(basename "$zipfile")",
+            "sha256": "${sha}",
+            "bytes": ${size},
+            "git_sha": "${GITHUB_SHA}"
+          }
+          EOF
+
+          echo "ZIP=$zipfile" >> "$GITHUB_OUTPUT"
+          echo "SHA256=$sha" >> "$GITHUB_OUTPUT"
+          echo "BYTES=$size" >> "$GITHUB_OUTPUT"
+        id: export
+
+      - name: Upload to Cloudflare R2
+        id: r2
+        shell: bash
+        run: |
+          set -euo pipefail
+          target="${TARGET}"
+          prefix="revo/tenants/${EMPRESA_ID}/${target}/$(date -u +'%Y/%m/%d')"
+          zipfile="$(ls -1 tenant_export_${target}_${EMPRESA_ID}_*.zip | tail -n 1)"
+          manifest="$(ls -1 tenant_export_${target}_${EMPRESA_ID}_*.manifest.json | tail -n 1)"
+
+          echo "Enviando para s3://${R2_BUCKET}/${prefix}/"
+          aws --endpoint-url "${R2_ENDPOINT}" s3 cp "$zipfile" "s3://${R2_BUCKET}/${prefix}/$(basename "$zipfile")" --only-show-errors
+          aws --endpoint-url "${R2_ENDPOINT}" s3 cp "$manifest" "s3://${R2_BUCKET}/${prefix}/$(basename "$manifest")" --only-show-errors
+
+          echo "r2_key=${prefix}/$(basename "$zipfile")" >> "$GITHUB_OUTPUT"
+
+      - name: Register in DB catalog (ops_tenant_backups)
+        shell: bash
+        env:
+          DATABASE_URL: ${{ steps.db.outputs.url }}
+          R2_KEY: ${{ steps.r2.outputs.r2_key }}
+          SHA256: ${{ steps.export.outputs.SHA256 }}
+          BYTES: ${{ steps.export.outputs.BYTES }}
+        run: |
+          set -euo pipefail
+          docker run --rm postgres:17 \
+            psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -X -qAt -c "
+              insert into public.ops_tenant_backups (empresa_id, target, r2_bucket, r2_key, bytes, sha256, status, meta)
+              values (
+                '${EMPRESA_ID}', '${TARGET}', '${R2_BUCKET}', '${R2_KEY}', ${BYTES}, '${SHA256}', 'uploaded',
+                jsonb_build_object('source','github-actions','workflow','tenant-backup.yml')
+              )
+              on conflict (r2_key) do update
+                set bytes=excluded.bytes,
+                    sha256=excluded.sha256,
+                    status=excluded.status,
+                    meta=excluded.meta;
+            "
+
+      - name: Upload artifact (fallback)
+        uses: actions/upload-artifact@v4
+        with:
+          name: tenant-export-${{ inputs.target }}-${{ inputs.empresa_id }}
+          path: |
+            tenant_export_*.zip
+            tenant_export_*.manifest.json
+          retention-days: 7
