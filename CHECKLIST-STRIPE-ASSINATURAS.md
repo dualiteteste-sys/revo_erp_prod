@@ -37,6 +37,7 @@ Objetivo: eliminar **403 intermitente** causado por inconsistências de assinatu
   - [ ] por `metadata.cnpj` e/ou email
   - [ ] por múltiplos customers ligados à mesma empresa
 - [x] Tool (estado da arte): `/app/desenvolvedor/stripe-dedupe` para inspecionar customers e vincular o `stripe_customer_id` correto no tenant (não destrutivo)
+- [x] Tool: permitir **arquivar** customers duplicados (Stripe delete) quando **não há assinatura** (bloqueia customer recomendado/ativo)
 - [ ] Procedimento de dedupe seguro (checklist operacional):
   - [ ] gerar backup do tenant (prod) **antes**
   - [ ] remover/mesclar customer duplicado no Stripe
