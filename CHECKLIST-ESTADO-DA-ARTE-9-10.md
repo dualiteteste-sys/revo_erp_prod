@@ -29,7 +29,7 @@ Definições:
 - [ ] Unificar “source of truth” do contexto (userId, empresa ativa, role, plano) em um único ponto.
 - [ ] Garantir que nenhum módulo faça fetch de dados antes de `activeEmpresaId` estar resolvido (gates consistentes).
 - [ ] Padronizar recovery automático (apenas quando seguro) e mensagens UX (“Selecione sua empresa”).
-- [ ] Cobrir boot com E2E: login → empresa ativa → navegação por 5 módulos sem 403.
+- [x] Cobrir boot com E2E: login → empresa ativa → navegação por 5 módulos sem 403.
 
 ### 0.2 RBAC e áreas internas (Ops/Dev)
 - [ ] Garantir que `ops/*` e ferramentas internas exijam permissão explícita (sem bypass por admin/owner).
@@ -46,7 +46,9 @@ Definições:
 
 ### 1.1 RLS: isolamento por empresa (inventário e correções)
 - [ ] Rodar inventário RLS (UI/RPC) e exportar snapshot (dev e prod).
-- [x] Adicionar snapshots do inventário RLS (RPC + UI) para evidência/auditoria.
+- [ ] Evidência snapshot RLS (DEV): anexar/colar link do arquivo exportado (JSON) + data/hora.
+- [ ] Evidência snapshot RLS (PROD): anexar/colar link do arquivo exportado (JSON) + data/hora.
+- [x] Ajustar heurística do inventário para considerar membership (`empresa_usuarios` + `auth.uid()`) como tenant-safe (reduz “MÉDIO” falso-positivo).
 - [ ] Corrigir RLS crítico: tabelas que permitem leitura ampla indevida (ex.: policies `using(true)`).
   - [x] Corrigir `public.empresas`: remover `using(true)` e restringir SELECT por membership/owner (migration).
 - [x] Remover/evitar “grants sem RLS” em tabelas `public` (gated por asserts RG01).
@@ -59,6 +61,7 @@ Definições:
 ### 1.2 Acesso a dados: RPC-first para áreas sensíveis
 - [ ] Definir regra: “acesso direto a tabela” permitido **somente** quando RLS for simples e auditado.
 - [ ] Migrar acesso direto do client para RPC em domínios críticos (billing, financeiro, indústria, LGPD).
+- [x] RPC-first (Financeiro): substituir `supabase.from('financeiro_conciliacao_regras')` por RPCs SECURITY DEFINER com RBAC (tesouraria).
 - [ ] Padronizar respostas de erro (códigos + mensagens PT-BR) e traduzir para UX palatável.
 
 ### 1.3 Segurança de funções e grants

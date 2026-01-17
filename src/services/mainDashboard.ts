@@ -1,4 +1,3 @@
-import { supabase } from '@/lib/supabaseClient';
 import { callRpc } from '@/lib/api';
 import { logger } from '@/lib/logger';
 import { getVendasDashboardStats, type VendasDashboardStats } from '@/services/salesDashboard';
@@ -47,31 +46,31 @@ export async function getMainDashboardData(params?: { activitiesLimit?: number }
   })();
 
   const activitiesPromise = includeActivities
-    ? supabase
-        .from('app_logs' as any)
-        .select('id, level, source, event, message, created_at')
-        .order('created_at', { ascending: false })
-        .limit(params?.activitiesLimit ?? 12)
-    : Promise.resolve({ data: [], error: null } as any);
+    ? (async () => {
+        try {
+          const rows = await callRpc<DashboardActivity[]>('ops_app_logs_list', {
+            p_limit: params?.activitiesLimit ?? 12,
+          });
+          return rows ?? [];
+        } catch (e: any) {
+          // Best-effort: logs são informativos; não quebrar o dashboard nem sujar console.
+          logger.warn('[Dashboard][LOGS] erro ao carregar atividades', { message: e?.message || String(e || '') });
+          return [];
+        }
+      })()
+    : Promise.resolve([] as DashboardActivity[]);
 
-  const [current, previous, activitiesRes, financeiroPagarReceber3m] = await Promise.all([
+  const [current, previous, activities, financeiroPagarReceber3m] = await Promise.all([
     getVendasDashboardStats({ startDate: toIsoDate(currentStart), endDate: toIsoDate(currentEnd) }),
     getVendasDashboardStats({ startDate: toIsoDate(prevStart), endDate: toIsoDate(prevEnd) }),
     activitiesPromise,
     financeiroPagarReceber3mPromise,
   ]);
 
-  if (activitiesRes.error) {
-    const status = (activitiesRes as any)?.status ?? 0;
-    // Estado da arte: `app_logs` pode ser restrita para usuários finais.
-    // Não quebrar o dashboard por falta de permissão.
-    if (status !== 403) throw activitiesRes.error;
-  }
-
   return {
     current,
     previous,
-    activities: activitiesRes.error ? [] : ((activitiesRes.data ?? []) as DashboardActivity[]),
+    activities,
     financeiroPagarReceber3m,
   };
 }

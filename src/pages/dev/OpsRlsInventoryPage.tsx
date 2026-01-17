@@ -97,7 +97,7 @@ export default function OpsRlsInventoryPage() {
     { id: 'table', defaultWidth: 260, minWidth: 220 },
     { id: 'rls', defaultWidth: 120, minWidth: 110 },
     { id: 'empresa', defaultWidth: 140, minWidth: 120 },
-    { id: 'policy', defaultWidth: 200, minWidth: 170 },
+    { id: 'policy', defaultWidth: 240, minWidth: 200 },
     { id: 'policies', defaultWidth: 120, minWidth: 110 },
     { id: 'grants', defaultWidth: 240, minWidth: 200, resizable: false },
   ];
@@ -367,7 +367,7 @@ export default function OpsRlsInventoryPage() {
                     />
                     <ResizableSortableTh
                       columnId="policy"
-                      label="policy current_empresa_id"
+                      label="policy tenant (empresa ativa/membership)"
                       sort={sort}
                       onSort={(col) => setSort((prev) => toggleSort(prev as any, col))}
                       onResizeStart={startResize}
