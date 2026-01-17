@@ -104,6 +104,23 @@ jobs:
           python3 -m pip install --upgrade awscli
           aws configure set default.s3.addressing_style path
 
+      - name: Install Supabase CLI (verify pre-restore)
+        if: ${{ inputs.target == 'verify' }}
+        uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Apply migrations to VERIFY (pre-restore)
+        if: ${{ inputs.target == 'verify' }}
+        env:
+          DATABASE_URL: ${{ steps.db.outputs.url }}
+        run: |
+          set -euo pipefail
+          echo "[VERIFY] Apply migrations before restore (schema must match export)..."
+          echo "y" | supabase db push --include-all --db-url "$DATABASE_URL"
+          docker run --rm postgres:17 \
+            psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -X -qAt -c "notify pgrst, 'reload schema';"
+
       - name: Validate R2 access (preflight)
         shell: bash
         run: |
