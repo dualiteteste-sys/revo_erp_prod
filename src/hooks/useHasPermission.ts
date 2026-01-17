@@ -16,13 +16,17 @@ export function useHasPermission(module: string, action: string) {
   const { session } = useAuth();
   const empresaRoleQuery = useEmpresaRole();
   const isAdminLike = empresaRoleQuery.isFetched && roleAtLeast(empresaRoleQuery.data, 'admin');
+  const isOpsModule = module === 'ops' || module.startsWith('ops:') || module.startsWith('ops_');
 
   const canCheck = !!session && !!module && !!action && empresaRoleQuery.isFetched;
 
   const query = useQuery({
     queryKey: ['permission', module, action, isAdminLike],
     queryFn: async () => {
-      if (isAdminLike) return true;
+      // Estado da arte:
+      // - Admin/Owner tem permissão ampla dentro do tenant
+      // - "ops/*" é reservado para usuários internos (não deve ser liberado só por ser admin/owner)
+      if (isAdminLike && !isOpsModule) return true;
       const { data, error } = await supabase.rpc('has_permission_for_current_user', {
         p_module: module,
         p_action: action,
@@ -42,7 +46,7 @@ export function useHasPermission(module: string, action: string) {
 
   // Evita "flicker" e regressões: enquanto o role não está resolvido, tratamos como loading.
   const isLoading = !empresaRoleQuery.isFetched || query.isLoading;
-  const data = isAdminLike ? true : (query.data ?? false);
+  const data = isAdminLike && !isOpsModule ? true : (query.data ?? false);
 
   return { ...query, isLoading, data };
 }

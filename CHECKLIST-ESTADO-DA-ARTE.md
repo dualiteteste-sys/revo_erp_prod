@@ -26,6 +26,7 @@ Objetivo: **zerar 403 intermitente** em Scale/OWNER e evitar que isso apareça e
 
 ### 0.2 Frontend: tornar “empresa ativa” determinística (não oscilar)
 - [x] Ajustar React Query keys em `useEmpresas/useActiveEmpresaId` para incluir `userId` (evitar cache cruzado).
+- [x] Corrigir `useHasPermission/RequirePermission`: admin/owner **não** ganha acesso a `ops/*` automaticamente (evita 403 em `app_logs` e ferramentas internas).
 - [x] Implementar retry/backoff para `user_active_empresa` e `empresa_usuarios` (somente para falhas transitórias: timeout/failed to fetch/502/503).
 - [x] Não converter erro transitório em `null/[]` silenciosamente; manter último valor válido do cache.
 - [x] Implementar **AuthGate**: não renderizar módulos `app/*` enquanto `activeEmpresaId` não estiver resolvido (mostrar tela bonita “Carregando ambiente…”).
