@@ -322,11 +322,11 @@ jobs:
             fi
             importSql="tenant_restore/tmp/import_${t}.sql"
             mkdir -p tenant_restore/tmp
-            cat > "$importSql" <<SQL
-            set session_replication_role=replica;
-            \\copy public."${t}" from '/work/${csv}' with (format csv, header true);
-            set session_replication_role=origin;
-            SQL
+            printf '%s\n' \
+              "set session_replication_role=replica;" \
+              "\\\\copy public.\\\"${t}\\\" from '/work/${csv}' with (format csv, header true);" \
+              "set session_replication_role=origin;" \
+              > "$importSql"
             docker run --rm \
               -v "$PWD:/work" \
               -w /work \
