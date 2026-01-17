@@ -4,6 +4,7 @@ import { Loader2, ShieldCheck, ShieldX, MinusCircle } from 'lucide-react';
 import { supabase } from '@/lib/supabaseClient';
 import { useAuth } from '@/contexts/AuthProvider';
 import { useToast } from '@/contexts/ToastProvider';
+import { callRpc } from '@/lib/api';
 import ResizableSortableTh from '@/components/ui/table/ResizableSortableTh';
 import TableColGroup from '@/components/ui/table/TableColGroup';
 import { useTableColumnWidths, type TableColumnWidthDef } from '@/components/ui/table/useTableColumnWidths';
@@ -45,13 +46,8 @@ export default function UserPermissionOverrides({ userId }: { userId: string }) 
   const permissionsQuery = useQuery({
     queryKey: ['rbac', 'permissions'],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from('permissions')
-        .select('id,module,action')
-        .order('module', { ascending: true })
-        .order('action', { ascending: true });
-      if (error) throw error;
-      return (data || []) as PermissionRow[];
+      const rows = await callRpc<PermissionRow[]>('roles_permissions_list');
+      return (rows || []).map((p) => ({ id: p.id, module: p.module, action: p.action as PermissionRow['action'] }));
     },
   });
 
