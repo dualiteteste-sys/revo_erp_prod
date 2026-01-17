@@ -4,23 +4,30 @@
 -- Entrada esperada:
 --   psql -v empresa_id="<uuid>" -f scripts/tenant_restore_verify_asserts.sql
 
-do $$
-declare
-  v_empresa uuid := :'empresa_id'::uuid;
-  v_exists boolean;
-begin
-  select exists(select 1 from public.empresas where id = v_empresa) into v_exists;
-  if not v_exists then
-    raise exception 'ASSERT_FAIL: empresa % não encontrada em public.empresas', v_empresa;
-  end if;
+select count(*)::int as empresas_count
+from public.empresas
+where id = :'empresa_id'::uuid;
+\gset
 
-  if to_regclass('public.empresa_usuarios') is not null then
-    select exists(select 1 from public.empresa_usuarios where empresa_id = v_empresa) into v_exists;
-    if not v_exists then
-      raise exception 'ASSERT_FAIL: empresa % sem memberships em public.empresa_usuarios', v_empresa;
-    end if;
-  end if;
-end $$;
+\if :empresas_count = 0
+  \echo 'ASSERT_FAIL: empresa não encontrada em public.empresas'
+  \quit 3
+\endif
+
+select (to_regclass('public.empresa_usuarios') is not null) as has_empresa_usuarios;
+\gset
+
+\if :has_empresa_usuarios = 't'
+  select count(*)::int as memberships_count
+  from public.empresa_usuarios
+  where empresa_id = :'empresa_id'::uuid;
+  \gset
+
+  \if :memberships_count = 0
+    \echo 'ASSERT_FAIL: empresa sem memberships em public.empresa_usuarios'
+    \quit 3
+  \endif
+\endif
 
 -- Informativo: assinatura pode não existir (ex.: tenant ainda sem checkout)
 select
@@ -28,4 +35,3 @@ select
   count(*)::int as value
 from public.subscriptions
 where empresa_id = :'empresa_id'::uuid;
-
