@@ -20,6 +20,11 @@ export type OpsStripeDedupeInspectResponse = {
   query: { empresa_id: string | null; email: string | null; cnpj: string | null };
   customers: OpsStripeCustomerSummary[];
   recommended_customer_id: string | null;
+  duplicates?: {
+    by_email: Array<{ key: string; count: number; customer_ids: string[] }>;
+    by_cnpj: Array<{ key: string; count: number; customer_ids: string[] }>;
+    by_empresa_id: Array<{ key: string; count: number; customer_ids: string[] }>;
+  };
 };
 
 export async function opsStripeDedupeInspect(params: {
