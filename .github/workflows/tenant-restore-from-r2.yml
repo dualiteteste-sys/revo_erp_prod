@@ -229,19 +229,7 @@ jobs:
               echo "::warning::CSV/Schema mismatch em ${t} (csv=${csvCols} cols, target=${tableCols} cols). Ajustando arquivo para restore drill..."
               mkdir -p tenant_restore/tmp
               fixed="tenant_restore/tmp/${t}.csv"
-              python3 - <<'PY' "$csv" "$fixed" "$tableCols"
-import csv, sys
-inp, outp, n = sys.argv[1], sys.argv[2], int(sys.argv[3])
-with open(inp, newline='', encoding='utf-8') as f_in, open(outp, 'w', newline='', encoding='utf-8') as f_out:
-  r = csv.reader(f_in)
-  w = csv.writer(f_out)
-  for row in r:
-    if len(row) < n:
-      row = row + [''] * (n - len(row))
-    elif len(row) > n:
-      row = row[:n]
-    w.writerow(row)
-PY
+              python3 -c 'import csv,sys; inp,outp,n=sys.argv[1],sys.argv[2],int(sys.argv[3]);\nimport io; \nwith open(inp, newline=\"\", encoding=\"utf-8\") as f_in, open(outp, \"w\", newline=\"\", encoding=\"utf-8\") as f_out:\n  r=csv.reader(f_in); w=csv.writer(f_out);\n  [w.writerow((row + [\"\"]*(n-len(row)))[:n]) for row in r]' "$csv" "$fixed" "$tableCols"
               csv="$fixed"
             fi
             docker run --rm \
