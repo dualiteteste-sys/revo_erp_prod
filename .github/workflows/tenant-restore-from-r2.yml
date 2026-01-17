@@ -202,13 +202,7 @@ jobs:
             bash -lc "psql \"${DATABASE_URL}\" -v ON_ERROR_STOP=1 -X -q -f \"${restoreSql}\""
 
           echo "Importando CSVs..."
-          # Import por tabela (com constraints desativadas durante inserts).
-          docker run --rm \
-            -v "$PWD:/work" \
-            -w /work \
-            postgres:17 \
-            bash -lc "psql \"${DATABASE_URL}\" -v ON_ERROR_STOP=1 -X -q -c \"begin; set session_replication_role=replica;\""
-
+          # Import por tabela (constraints/triggers desativados por conexão para evitar FK/order issues).
           while IFS= read -r t; do
             [[ -z "$t" ]] && continue
             if ! grep -Fxq "$t" "$targetTables"; then
@@ -223,14 +217,11 @@ jobs:
               -v "$PWD:/work" \
               -w /work \
               postgres:17 \
-              bash -lc "psql \"${DATABASE_URL}\" -v ON_ERROR_STOP=1 -X -q -c \"\\\\copy public.\\\"${t}\\\" from '${csv}' with (format csv, header true)\""
+              bash -lc "psql \"${DATABASE_URL}\" -v ON_ERROR_STOP=1 -X -q \
+                -c \"set session_replication_role=replica;\" \
+                -c \"\\\\copy public.\\\"${t}\\\" from '${csv}' with (format csv, header true)\" \
+                -c \"set session_replication_role=origin;\""
           done < "$tablesFile"
-
-          docker run --rm \
-            -v "$PWD:/work" \
-            -w /work \
-            postgres:17 \
-            bash -lc "psql \"${DATABASE_URL}\" -v ON_ERROR_STOP=1 -X -q -c \"set session_replication_role=origin; commit;\""
 
       - name: Post-restore asserts (verify)
         if: ${{ inputs.target == 'verify' }}
