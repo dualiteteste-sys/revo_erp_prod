@@ -46,6 +46,74 @@ export const test = base.extend({
     page.on('pageerror', onPageError);
     page.on('response', onResponse);
 
+    // ---------------------------------------------------------------------
+    // Global mocks (estado da arte para CI):
+    // - Evitar bater em Supabase real via Edge Functions no gate de E2E.
+    // - Manter "console limpo" (sem 401/403/5xx inesperados).
+    //
+    // Observação: Playwright resolve conflitos por ordem de registro (último wins),
+    // então specs específicas ainda podem sobrescrever estes mocks.
+    // ---------------------------------------------------------------------
+    await page.route('**/functions/v1/**', async (route) => {
+      const req = route.request();
+      if (req.method() === 'OPTIONS') {
+        await route.fulfill({ status: 204, body: '' });
+        return;
+      }
+
+      const url = req.url();
+      if (url.includes('/billing-invoices')) {
+        await route.fulfill({ json: { items: [] } });
+        return;
+      }
+      if (url.includes('/billing-sync-subscription')) {
+        await route.fulfill({ json: { synced: false, message: 'noop (e2e mock)' } });
+        return;
+      }
+
+      await route.fulfill({ json: {} });
+    });
+
+    // Billing (RPC-first): evitar depender de `.from('subscriptions'/'plans')` nos specs.
+    await page.route('**/rest/v1/rpc/billing_subscription_with_plan_get', async (route) => {
+      await route.fulfill({
+        json: {
+          subscription: {
+            id: 'sub_123',
+            empresa_id: 'empresa-1',
+            status: 'active',
+            current_period_end: new Date(Date.now() + 86400000).toISOString(),
+            stripe_price_id: 'price_123',
+            stripe_subscription_id: 'stripe_sub_123',
+            plan_slug: 'SCALE',
+            billing_cycle: 'monthly',
+            cancel_at_period_end: false,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          },
+          plan: {
+            id: 'plan_123',
+            slug: 'SCALE',
+            name: 'Scale',
+            billing_cycle: 'monthly',
+            currency: 'BRL',
+            amount_cents: 0,
+            stripe_price_id: 'price_123',
+            active: true,
+            created_at: new Date().toISOString(),
+          },
+        },
+      });
+    });
+
+    await page.route('**/rest/v1/rpc/billing_plans_public_list', async (route) => {
+      await route.fulfill({ json: [] });
+    });
+
+    await page.route('**/rest/v1/rpc/billing_stripe_webhook_events_list', async (route) => {
+      await route.fulfill({ json: [] });
+    });
+
     await run(page);
 
     page.off('console', onConsole);
