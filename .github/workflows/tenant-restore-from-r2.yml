@@ -144,10 +144,14 @@ jobs:
           targetTables="target_emp_tables.txt"
           docker run --rm postgres:17 \
             psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -X -qAt -c "
-              select distinct table_name
-                from information_schema.columns
-               where table_schema = 'public'
-                 and column_name = 'empresa_id'
+              select distinct t.table_name
+                from information_schema.tables t
+                join information_schema.columns c
+                  on c.table_schema = t.table_schema
+                 and c.table_name = t.table_name
+               where t.table_schema = 'public'
+                 and t.table_type = 'BASE TABLE'
+                 and c.column_name = 'empresa_id'
                order by 1;
             " > "$targetTables"
           sort -u "$targetTables" -o "$targetTables"
