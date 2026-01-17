@@ -224,12 +224,12 @@ jobs:
                  where table_schema='public'
                    and table_name='${t}';
               \" | tr -d '[:space:]')"
-            csvCols="$(python3 -c "import csv,sys; p=sys.argv[1]; f=open(p, newline='', encoding='utf-8'); r=csv.reader(f); row=next(r, None); print(0 if row is None else len(row))" "$csv")"
+            csvCols="$(python3 scripts/tenant_csv_cols.py "$csv")"
             if [[ -n "${tableCols:-}" && -n "${csvCols:-}" && "$tableCols" != "$csvCols" ]]; then
               echo "::warning::CSV/Schema mismatch em ${t} (csv=${csvCols} cols, target=${tableCols} cols). Ajustando arquivo para restore drill..."
               mkdir -p tenant_restore/tmp
               fixed="tenant_restore/tmp/${t}.csv"
-              python3 -c "import csv,sys; inp,outp,n=sys.argv[1],sys.argv[2],int(sys.argv[3]); f_in=open(inp, newline='', encoding='utf-8'); f_out=open(outp,'w',newline='',encoding='utf-8'); r=csv.reader(f_in); w=csv.writer(f_out); [w.writerow((row + ['']*(n-len(row)))[:n]) for row in r]" "$csv" "$fixed" "$tableCols"
+              python3 scripts/tenant_csv_pad_trim.py "$csv" "$fixed" "$tableCols"
               csv="$fixed"
             fi
             docker run --rm \
