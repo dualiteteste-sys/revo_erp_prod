@@ -218,40 +218,29 @@ jobs:
             # para bater com a contagem de colunas do target (Postgres: colunas novas normalmente
             # são adicionadas no final, então trim/pad por posição é seguro).
             tableCols="$(docker run --rm postgres:17 \
-              psql \"$DATABASE_URL\" -v ON_ERROR_STOP=1 -X -qAt -c \"
-                select count(*)
-                  from information_schema.columns
-                 where table_schema='public'
-                   and table_name='${t}';
-              \" | tr -d '[:space:]')"
-            csvCols="$(python3 -c 'import csv,sys; p=sys.argv[1];\nwith open(p, newline=\"\", encoding=\"utf-8\") as f:\n  r=csv.reader(f)\n  row=next(r, None)\n  print(0 if row is None else len(row))' "$csv")"
+              psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -X -qAt \
+                -c "select count(*) from information_schema.columns where table_schema='public' and table_name='${t}' and is_generated = 'NEVER';" \
+              | tr -d '[:space:]')"
+            csvCols="$(python3 scripts/tenant_csv_cols.py "$csv")"
             if [[ -n "${tableCols:-}" && -n "${csvCols:-}" && "$tableCols" != "$csvCols" ]]; then
               echo "::warning::CSV/Schema mismatch em ${t} (csv=${csvCols} cols, target=${tableCols} cols). Ajustando arquivo para restore drill..."
               mkdir -p tenant_restore/tmp
               fixed="tenant_restore/tmp/${t}.csv"
-              python3 - <<'PY' "$csv" "$fixed" "$tableCols"
-import csv, sys
-inp, outp, n = sys.argv[1], sys.argv[2], int(sys.argv[3])
-with open(inp, newline='', encoding='utf-8') as f_in, open(outp, 'w', newline='', encoding='utf-8') as f_out:
-  r = csv.reader(f_in)
-  w = csv.writer(f_out)
-  for row in r:
-    if len(row) < n:
-      row = row + [''] * (n - len(row))
-    elif len(row) > n:
-      row = row[:n]
-    w.writerow(row)
-PY
+              python3 scripts/tenant_csv_pad_trim.py "$csv" "$fixed" "$tableCols"
               csv="$fixed"
             fi
+            importSql="tenant_restore/tmp/import_${t}.sql"
+            mkdir -p tenant_restore/tmp
+            printf '%s\n' \
+              "set session_replication_role=replica;" \
+              "\\copy public.\"${t}\" from '/work/${csv}' with (format csv, header true);" \
+              "set session_replication_role=origin;" \
+              > "$importSql"
             docker run --rm \
               -v "$PWD:/work" \
               -w /work \
               postgres:17 \
-              bash -lc "psql \"${DATABASE_URL}\" -v ON_ERROR_STOP=1 -X -q \
-                -c \"set session_replication_role=replica;\" \
-                -c \"\\\\copy public.\\\"${t}\\\" from '${csv}' with (format csv, header true)\" \
-                -c \"set session_replication_role=origin;\""
+              psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 -X -q -f "/work/${importSql}"
           done < "$tablesFile"
 
       - name: Post-restore asserts (verify)

@@ -16,8 +16,13 @@ export default function RequirePermission({
   const { session } = useAuth();
   const empresaRoleQuery = useEmpresaRole();
   const isAdminLike = empresaRoleQuery.isFetched && roleAtLeast(empresaRoleQuery.data, "admin");
+  const isOpsDomain = (permission?.domain ?? "") === "ops" || (permission?.domain ?? "").startsWith("ops:");
 
-  const shouldCheckPermission = !!session && !!permission && !isAdminLike && empresaRoleQuery.isFetched;
+  // Estado da arte:
+  // - Admin/Owner: permissões amplas dentro do tenant.
+  // - "ops/*": reservado para usuários internos; sempre checar permissão explicitamente.
+  const shouldCheckPermission =
+    !!session && !!permission && empresaRoleQuery.isFetched && (!isAdminLike || isOpsDomain);
   const permQuery = useHasPermission(permission?.domain || "", permission?.action || "");
 
   const state = useMemo(() => {
@@ -30,7 +35,7 @@ export default function RequirePermission({
     if (!empresaRoleQuery.isFetched) {
       return { allowed: null, loading: true, message: "Verificando permissões…" };
     }
-    if (isAdminLike) {
+    if (isAdminLike && !isOpsDomain) {
       return { allowed: true, loading: false, message: "" };
     }
     if (!shouldCheckPermission) {
@@ -41,7 +46,16 @@ export default function RequirePermission({
     }
     const ok = !!permQuery.data;
     return { allowed: ok, loading: false, message: ok ? "" : "Você não tem permissão para acessar esta área." };
-  }, [session, permission, empresaRoleQuery.isFetched, isAdminLike, shouldCheckPermission, permQuery.isLoading, permQuery.data]);
+  }, [
+    session,
+    permission,
+    empresaRoleQuery.isFetched,
+    isAdminLike,
+    isOpsDomain,
+    shouldCheckPermission,
+    permQuery.isLoading,
+    permQuery.data,
+  ]);
 
   if (state.loading) {
     return (
