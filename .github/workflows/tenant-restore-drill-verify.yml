@@ -326,7 +326,7 @@ jobs:
             set session_replication_role=replica;
             \\copy public."${t}" from '/work/${csv}' with (format csv, header true);
             set session_replication_role=origin;
-SQL
+            SQL
             docker run --rm \
               -v "$PWD:/work" \
               -w /work \
