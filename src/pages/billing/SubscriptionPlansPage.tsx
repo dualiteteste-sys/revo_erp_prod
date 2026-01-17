@@ -5,6 +5,7 @@ import PricingCard from '../../components/billing/PricingCard';
 import { Loader2 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthProvider';
 import { useToast } from '../../contexts/ToastProvider';
+import { callRpc } from '@/lib/api';
 
 type Plan = Database['public']['Tables']['plans']['Row'];
 
@@ -27,19 +28,15 @@ const SubscriptionPlansPage: React.FC = () => {
   useEffect(() => {
     const fetchPlans = async () => {
       setLoading(true);
-      const { data, error } = await supabase
-        .from('plans')
-        .select('*')
-        .eq('active', true)
-        .order('amount_cents', { ascending: true });
-
-      if (error) {
+      try {
+        const data = await callRpc<Plan[]>('billing_plans_public_list', { p_billing_cycle: null });
+        setPlans(Array.isArray(data) ? data : []);
+      } catch (error) {
         console.error('Erro ao buscar planos:', error);
         addToast('Não foi possível carregar os planos.', 'error');
-      } else {
-        setPlans(data);
+      } finally {
+        setLoading(false);
       }
-      setLoading(false);
     };
     fetchPlans();
   }, [addToast]);

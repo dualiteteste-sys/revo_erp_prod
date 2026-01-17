@@ -9,6 +9,7 @@ import { Database } from '../../../types/database.types';
 import { roleAtLeast, useEmpresaRole } from '@/hooks/useEmpresaRole';
 import { useEmpresaFeatures } from '@/hooks/useEmpresaFeatures';
 import Modal from '@/components/ui/Modal';
+import { callRpc } from '@/lib/api';
 
 type EmpresaAddon = Database['public']['Tables']['empresa_addons']['Row'];
 type PlanoMvp = 'ambos' | 'servicos' | 'industria';
@@ -232,7 +233,7 @@ const SubscriptionSettings: React.FC<SubscriptionSettingsProps> = ({ onSwitchToP
       setCurrentUsersCount(null);
       setPendingUsersCount(null);
     }
-  }, [activeEmpresa?.id, supabase]);
+  }, [activeEmpresa?.id]);
 
   const fetchFinopsLimitsStatus = useCallback(async () => {
     const empresaId = activeEmpresa?.id;
@@ -284,14 +285,11 @@ const SubscriptionSettings: React.FC<SubscriptionSettingsProps> = ({ onSwitchToP
     if (!empresaId) return;
     setLoadingStripeHistory(true);
     try {
-      const { data, error } = await (supabase as any)
-        .from('billing_stripe_webhook_events')
-        .select('id,event_type,plan_slug,billing_cycle,subscription_status,current_period_end,received_at,processed_at,last_error')
-        .eq('empresa_id', empresaId)
-        .order('received_at', { ascending: false })
-        .limit(15);
-      if (error) throw error;
-      setStripeHistory((data || []) as StripeWebhookEventRow[]);
+      const data = await callRpc<StripeWebhookEventRow[]>('billing_stripe_webhook_events_list', {
+        p_limit: 15,
+        p_offset: 0,
+      });
+      setStripeHistory(Array.isArray(data) ? data : []);
     } catch {
       setStripeHistory([]);
     } finally {

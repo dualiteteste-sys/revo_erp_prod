@@ -51,6 +51,27 @@ function looksLikePortugueseUserMessage(text: string): boolean {
 function normalizeByPatterns(text: string): NormalizedToastError | null {
   const t = text.toLowerCase();
 
+  if (/\bcompany_not_found\b/i.test(text) || t.includes('empresa não encontrada')) {
+    return {
+      title: "Empresa não encontrada",
+      message: "Não encontramos a empresa informada. Verifique os dados (ex.: CNPJ) e tente novamente.",
+    };
+  }
+
+  if (/\bplan_not_mapped\b/i.test(text) || t.includes('plano não encontrado/ativo') || t.includes('plano não encontrado')) {
+    return {
+      title: "Plano indisponível",
+      message: "O plano selecionado não está disponível no momento. Atualize a página e tente novamente.",
+    };
+  }
+
+  if (/\bmissing_customer\b/i.test(text) || t.includes('sem cliente stripe')) {
+    return {
+      title: "Assinatura não vinculada",
+      message: "Não encontramos um cliente Stripe vinculado para esta empresa. Vincule o customer e tente novamente.",
+    };
+  }
+
   if (/transi[cç][aã]o inv[áa]lida/i.test(t)) {
     return {
       title: "Ação não permitida",
@@ -212,4 +233,3 @@ export function normalizeToastErrorMessage(input: {
     message: "Ocorreu um erro ao concluir esta ação. Tente novamente.",
   };
 }
-

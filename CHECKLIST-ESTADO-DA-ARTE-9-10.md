@@ -46,6 +46,7 @@ Definições:
 
 ### 1.1 RLS: isolamento por empresa (inventário e correções)
 - [ ] Rodar inventário RLS (UI/RPC) e exportar snapshot (dev e prod).
+- [x] Automatizar snapshot RLS via GitHub Actions (`.github/workflows/ops-rls-snapshot.yml`).
 - [ ] Evidência snapshot RLS (DEV): anexar/colar link do arquivo exportado (JSON) + data/hora.
 - [ ] Evidência snapshot RLS (PROD): anexar/colar link do arquivo exportado (JSON) + data/hora.
 - [x] Ajustar heurística do inventário para considerar membership (`empresa_usuarios` + `auth.uid()`) como tenant-safe (reduz “MÉDIO” falso-positivo).
@@ -61,9 +62,10 @@ Definições:
 ### 1.2 Acesso a dados: RPC-first para áreas sensíveis
 - [ ] Definir regra: “acesso direto a tabela” permitido **somente** quando RLS for simples e auditado.
 - [ ] Migrar acesso direto do client para RPC em domínios críticos (billing, financeiro, indústria, LGPD).
+- [x] RPC-first (Billing): substituir `supabase.from('plans'/'subscriptions'/'billing_stripe_webhook_events')` por RPCs (`billing_plans_public_list`, `billing_subscription_with_plan_get`, `billing_stripe_webhook_events_list`).
 - [x] RPC-first (Financeiro): substituir `supabase.from('financeiro_conciliacao_regras')` por RPCs SECURITY DEFINER com RBAC (tesouraria).
 - [x] RPC-first (RBAC): substituir `supabase.from('roles/permissions/role_permissions')` por RPCs SECURITY DEFINER com `roles:manage` e update atômico.
-- [ ] Padronizar respostas de erro (códigos + mensagens PT-BR) e traduzir para UX palatável.
+- [x] Padronizar respostas de erro (códigos + mensagens PT-BR) e traduzir para UX palatável (`src/lib/toastErrorNormalizer.ts`).
 
 ### 1.3 Segurança de funções e grants
 - [ ] Revisar RPCs `SECURITY DEFINER`: sempre filtrar por `current_empresa_id()` e validar permissões.

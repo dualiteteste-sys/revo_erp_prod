@@ -1,0 +1,127 @@
+name: Ops — RLS Snapshot (DEV+PROD)
+
+on:
+  workflow_dispatch:
+    inputs:
+      label:
+        description: "Label do snapshot (ex.: pre-release, audit, etc.)"
+        required: false
+        default: "ci"
+
+jobs:
+  snapshot_dev:
+    name: Snapshot RLS (DEV)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ensure psql
+        shell: bash
+        run: |
+          set -euo pipefail
+          if command -v psql >/dev/null 2>&1; then
+            psql --version
+            exit 0
+          fi
+          sudo apt-get update
+          sudo apt-get install -y postgresql-client
+
+      - name: Create snapshot (DEV)
+        shell: bash
+        env:
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL_DEV }}
+          LABEL: ${{ github.event.inputs.label }}
+          GIT_REF: ${{ github.ref_name }}
+          GIT_SHA: ${{ github.sha }}
+          RUN_ID: ${{ github.run_id }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          set -euo pipefail
+
+          SNAP_ID="$(psql "$SUPABASE_DB_URL" -tA -v ON_ERROR_STOP=1 -c \
+            "select public.ops_rls_inventory_snapshot_create(
+              '${LABEL}-dev',
+              jsonb_build_object(
+                'source','github_actions',
+                'env','dev',
+                'ref','${GIT_REF}',
+                'sha','${GIT_SHA}',
+                'run_id','${RUN_ID}',
+                'run_url','${RUN_URL}'
+              )
+            );" | tr -d '[:space:]')"
+
+          if [[ -z "$SNAP_ID" ]]; then
+            echo "Snapshot id vazio (DEV)" >&2
+            exit 1
+          fi
+
+          echo "$SNAP_ID" > rls_snapshot_dev.id
+          psql "$SUPABASE_DB_URL" -tA -v ON_ERROR_STOP=1 -c \
+            "select row_to_json(x) from public.ops_rls_inventory_snapshot_get('${SNAP_ID}') x;" \
+            > rls_snapshot_dev.json
+
+      - name: Upload artifact (DEV)
+        uses: actions/upload-artifact@v4
+        with:
+          name: rls-snapshot-dev
+          path: |
+            rls_snapshot_dev.id
+            rls_snapshot_dev.json
+
+  snapshot_prod:
+    name: Snapshot RLS (PROD)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ensure psql
+        shell: bash
+        run: |
+          set -euo pipefail
+          if command -v psql >/dev/null 2>&1; then
+            psql --version
+            exit 0
+          fi
+          sudo apt-get update
+          sudo apt-get install -y postgresql-client
+
+      - name: Create snapshot (PROD)
+        shell: bash
+        env:
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL_PROD }}
+          LABEL: ${{ github.event.inputs.label }}
+          GIT_REF: ${{ github.ref_name }}
+          GIT_SHA: ${{ github.sha }}
+          RUN_ID: ${{ github.run_id }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          set -euo pipefail
+
+          SNAP_ID="$(psql "$SUPABASE_DB_URL" -tA -v ON_ERROR_STOP=1 -c \
+            "select public.ops_rls_inventory_snapshot_create(
+              '${LABEL}-prod',
+              jsonb_build_object(
+                'source','github_actions',
+                'env','prod',
+                'ref','${GIT_REF}',
+                'sha','${GIT_SHA}',
+                'run_id','${RUN_ID}',
+                'run_url','${RUN_URL}'
+              )
+            );" | tr -d '[:space:]')"
+
+          if [[ -z "$SNAP_ID" ]]; then
+            echo "Snapshot id vazio (PROD)" >&2
+            exit 1
+          fi
+
+          echo "$SNAP_ID" > rls_snapshot_prod.id
+          psql "$SUPABASE_DB_URL" -tA -v ON_ERROR_STOP=1 -c \
+            "select row_to_json(x) from public.ops_rls_inventory_snapshot_get('${SNAP_ID}') x;" \
+            > rls_snapshot_prod.json
+
+      - name: Upload artifact (PROD)
+        uses: actions/upload-artifact@v4
+        with:
+          name: rls-snapshot-prod
+          path: |
+            rls_snapshot_prod.id
+            rls_snapshot_prod.json
+

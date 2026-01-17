@@ -4,6 +4,7 @@ import { useAuth } from './AuthProvider';
 import { Database } from '../types/database.types';
 import { logger } from '@/lib/logger';
 import { getLocalPlanSlug, isLocalBillingBypassEnabled } from '@/lib/localDev';
+import { callRpc } from '@/lib/api';
 
 type Subscription = Database['public']['Tables']['subscriptions']['Row'];
 type Plan = Database['public']['Tables']['plans']['Row'];
@@ -38,57 +39,28 @@ export const SubscriptionProvider = ({ children }: { children: ReactNode }) => {
     }
   }, []);
 
-  const firstRow = useCallback(<T,>(data: unknown): T | null => {
-    if (!data) return null;
-    if (Array.isArray(data)) return ((data[0] ?? null) as T | null);
-    if (typeof data === 'object') return (data as T);
-    return null;
-  }, []);
-
   const fetchSubscription = useCallback(async (empresaId: string) => {
     setLoadingSubscription(true);
     try {
-      // Importante: evitar `.single()`/`.maybeSingle()` aqui para não gerar 406 no PostgREST
-      // quando a empresa ainda não tem assinatura (caso comum no primeiro login).
-      const { data: subRows, error: subError } = await supabase
-        .from('subscriptions')
-        .select('*')
-        .eq('empresa_id', empresaId)
-        .order('updated_at', { ascending: false })
-        .limit(1);
+      // RPC-first: evita 403/406 por PostgREST e não depende de "empresa ativa" para ler a assinatura.
+      const data = await callRpc<{ subscription: Subscription | null; plan: Plan | null } | null>(
+        'billing_subscription_with_plan_get',
+        { p_empresa_id: empresaId },
+      );
 
-      if (subError) {
-        throw subError;
+      if (!data?.subscription) {
+        setSubscription(null);
+        return;
       }
 
-      const subData = firstRow<Subscription>(subRows);
-
-      if (subData?.stripe_price_id) {
-        // Também evitar `.single()` para não gerar 406 caso o catálogo esteja incompleto/desatualizado.
-        const { data: planRows, error: planError } = await supabase
-          .from('plans')
-          .select('*')
-          .eq('stripe_price_id', subData.stripe_price_id)
-          .limit(1);
-
-        if (planError) {
-          console.warn('Plano não encontrado para a assinatura:', planError);
-        }
-
-        const planData = firstRow<Plan>(planRows);
-        setSubscription({ ...subData, plan: planData });
-
-      } else {
-        setSubscription(subData ? { ...subData, plan: null } : null);
-      }
-
+      setSubscription({ ...data.subscription, plan: data.plan ?? null });
     } catch (error) {
       logger.warn('Falha ao buscar assinatura', { error });
       setSubscription(null);
     } finally {
       setLoadingSubscription(false);
     }
-  }, [firstRow, supabase]);
+  }, []);
 
   // Estado da arte: se a empresa acabou de assinar e o webhook ainda não sincronizou,
   // tentamos um "self-heal" (best-effort) sem exigir clique manual em "Sincronizar com Stripe".
