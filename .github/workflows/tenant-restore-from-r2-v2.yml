@@ -1,4 +1,4 @@
-name: Tenant Restore from R2 (Empresa) - Supabase
+name: Tenant Restore from R2 (Empresa) - Supabase (v2)
 
 on:
   workflow_dispatch:
@@ -30,7 +30,7 @@ permissions:
   issues: write
 
 concurrency:
-  group: tenant-restore-from-r2
+  group: tenant-restore-from-r2-v2
   cancel-in-progress: false
 
 jobs:

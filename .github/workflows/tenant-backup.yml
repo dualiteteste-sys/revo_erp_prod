@@ -114,14 +114,18 @@ jobs:
           echo "${GITHUB_SHA}" > "$outdir/git_sha.txt"
           date -u +'%Y-%m-%dT%H:%M:%SZ' > "$outdir/created_at_utc.txt"
 
-          # Descobrir tabelas no public que tenham coluna empresa_id (uuid)
+          # Descobrir tabelas (BASE TABLE) no public que tenham coluna empresa_id (uuid)
           docker run --rm postgres:17 \
             psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -X -qAt -c "
-              select table_name
-              from information_schema.columns
-              where table_schema='public'
-                and column_name='empresa_id'
-              order by table_name;
+              select distinct t.table_name
+                from information_schema.tables t
+                join information_schema.columns c
+                  on c.table_schema = t.table_schema
+                 and c.table_name = t.table_name
+               where t.table_schema = 'public'
+                 and t.table_type = 'BASE TABLE'
+                 and c.column_name = 'empresa_id'
+               order by 1;
             " > "$outdir/tables.txt"
 
           if [[ ! -s "$outdir/tables.txt" ]]; then

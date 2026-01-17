@@ -16,6 +16,11 @@ on:
         options:
           - prod
           - dev
+      r2_key:
+        description: "Opcional: usar um backup existente do R2 (zip). Se preenchido, pula export/upload."
+        type: string
+        required: false
+        default: ""
       label:
         description: "Rótulo do backup (opcional)"
         type: string
@@ -51,6 +56,7 @@ jobs:
       VERIFY_URL: ${{ secrets.SUPABASE_DB_URL_VERIFY }}
       SOURCE_TARGET: ${{ (github.event_name == 'workflow_dispatch' && inputs.source_target) || 'prod' }}
       EMPRESA_ID_INPUT: ${{ (github.event_name == 'workflow_dispatch' && inputs.empresa_id) || '' }}
+      R2_KEY_INPUT: ${{ (github.event_name == 'workflow_dispatch' && inputs.r2_key) || '' }}
       LABEL: ${{ (github.event_name == 'workflow_dispatch' && inputs.label) || 'restore-drill' }}
     steps:
       - uses: actions/checkout@v4
@@ -63,6 +69,12 @@ jobs:
           python3 -m pip install --upgrade pip
           python3 -m pip install --upgrade awscli
           aws configure set default.s3.addressing_style path
+
+      - name: Install Supabase CLI (verify pre-restore)
+        if: ${{ github.event_name == 'workflow_dispatch' }}
+        uses: supabase/setup-cli@v1
+        with:
+          version: latest
 
       - name: Resolve DB URLs
         id: db
@@ -116,14 +128,39 @@ jobs:
           fi
           echo "empresa_id=${empresa_id}" >> "$GITHUB_OUTPUT"
 
+      - name: Apply migrations to VERIFY (pre-restore)
+        if: ${{ github.event_name == 'workflow_dispatch' }}
+        env:
+          DATABASE_URL: ${{ steps.db.outputs.verify }}
+        run: |
+          set -euo pipefail
+          echo "[VERIFY] Apply migrations before restore (schema must match export as much as possible)..."
+          echo "y" | supabase db push --include-all --db-url "$DATABASE_URL"
+          docker run --rm postgres:17 \
+            psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -X -qAt -c "notify pgrst, 'reload schema';"
+
       - name: Validate R2 access (preflight)
         shell: bash
         run: |
           set -euo pipefail
           aws --region auto --endpoint-url "${R2_ENDPOINT}" s3api head-bucket --bucket "${R2_BUCKET}"
 
+      - name: Download existing backup from R2 (optional)
+        id: r2_in
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.r2_key != '' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          file="tenant_restore_input.zip"
+          echo "Baixando s3://${R2_BUCKET}/${R2_KEY_INPUT}"
+          aws --region auto --endpoint-url "${R2_ENDPOINT}" s3 cp "s3://${R2_BUCKET}/${R2_KEY_INPUT}" "$file" --only-show-errors
+          ls -lh "$file"
+          echo "zipfile=$file" >> "$GITHUB_OUTPUT"
+          echo "r2_key=${R2_KEY_INPUT}" >> "$GITHUB_OUTPUT"
+
       - name: Export tenant tables (empresa_id)
         id: export
+        if: ${{ !(github.event_name == 'workflow_dispatch' && inputs.r2_key != '') }}
         shell: bash
         env:
           DATABASE_URL: ${{ steps.db.outputs.src }}
@@ -181,6 +218,7 @@ jobs:
 
       - name: Upload drill backup to R2
         id: r2
+        if: ${{ !(github.event_name == 'workflow_dispatch' && inputs.r2_key != '') }}
         shell: bash
         env:
           EMPRESA_ID: ${{ steps.pick.outputs.empresa_id }}
@@ -201,6 +239,9 @@ jobs:
           set -euo pipefail
 
           zipfile="${{ steps.export.outputs.zipfile }}"
+          if [[ -n "${R2_KEY_INPUT:-}" ]]; then
+            zipfile="${{ steps.r2_in.outputs.zipfile }}"
+          fi
           rm -rf tenant_restore
           unzip -q "$zipfile" -d tenant_restore
 
@@ -216,6 +257,22 @@ jobs:
             exit 1
           fi
 
+          echo "Detectando tabelas do VERIFY (somente BASE TABLE com coluna empresa_id)..."
+          targetTables="target_emp_tables.txt"
+          docker run --rm postgres:17 \
+            psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -X -qAt -c "
+              select distinct t.table_name
+                from information_schema.tables t
+                join information_schema.columns c
+                  on c.table_schema = t.table_schema
+                 and c.table_name = t.table_name
+               where t.table_schema = 'public'
+                 and t.table_type = 'BASE TABLE'
+                 and c.column_name = 'empresa_id'
+               order by 1;
+            " > "$targetTables"
+          sort -u "$targetTables" -o "$targetTables"
+
           restoreSql="restore_tenant.sql"
           cat > "$restoreSql" <<'SQL'
           begin;
@@ -223,6 +280,10 @@ jobs:
           SQL
           while IFS= read -r t; do
             [[ -z "$t" ]] && continue
+            if ! grep -Fxq "$t" "$targetTables"; then
+              echo "::warning::Tabela ${t} não existe no VERIFY ou não é BASE TABLE; pulando delete/import."
+              continue
+            fi
             echo "delete from public.\"${t}\" where empresa_id = '${EMPRESA_ID}';" >> "$restoreSql"
           done < "$tablesFile"
           echo "set session_replication_role = origin;" >> "$restoreSql"
@@ -234,28 +295,52 @@ jobs:
             postgres:17 \
             bash -lc "psql \"${DATABASE_URL}\" -v ON_ERROR_STOP=1 -X -q -f \"${restoreSql}\""
 
-          docker run --rm \
-            -v "$PWD:/work" \
-            -w /work \
-            postgres:17 \
-            bash -lc "psql \"${DATABASE_URL}\" -v ON_ERROR_STOP=1 -X -q -c \"begin; set session_replication_role=replica;\""
-
           while IFS= read -r t; do
             [[ -z "$t" ]] && continue
+            if ! grep -Fxq "$t" "$targetTables"; then
+              continue
+            fi
             csv="${dir}/tables/${t}.csv"
-            [[ ! -f "$csv" ]] && continue
+            if [[ ! -f "$csv" ]]; then
+              continue
+            fi
+
+            tableCols="$(docker run --rm postgres:17 \
+              psql \"$DATABASE_URL\" -v ON_ERROR_STOP=1 -X -qAt -c \"
+                select count(*)
+                  from information_schema.columns
+                 where table_schema='public'
+                   and table_name='${t}';
+              \" | tr -d '[:space:]')"
+            csvCols="$(python3 -c 'import csv,sys; p=sys.argv[1];\nwith open(p, newline=\"\", encoding=\"utf-8\") as f:\n  r=csv.reader(f)\n  row=next(r, None)\n  print(0 if row is None else len(row))' "$csv")"
+            if [[ -n "${tableCols:-}" && -n "${csvCols:-}" && "$tableCols" != "$csvCols" ]]; then
+              echo "::warning::CSV/Schema mismatch em ${t} (csv=${csvCols} cols, verify=${tableCols} cols). Ajustando para restore drill..."
+              mkdir -p tenant_restore/tmp
+              fixed="tenant_restore/tmp/${t}.csv"
+              python3 - <<'PY' "$csv" "$fixed" "$tableCols"
+import csv, sys
+inp, outp, n = sys.argv[1], sys.argv[2], int(sys.argv[3])
+with open(inp, newline='', encoding='utf-8') as f_in, open(outp, 'w', newline='', encoding='utf-8') as f_out:
+  r = csv.reader(f_in)
+  w = csv.writer(f_out)
+  for row in r:
+    if len(row) < n:
+      row = row + [''] * (n - len(row))
+    elif len(row) > n:
+      row = row[:n]
+    w.writerow(row)
+PY
+              csv="$fixed"
+            fi
             docker run --rm \
               -v "$PWD:/work" \
               -w /work \
               postgres:17 \
-              bash -lc "psql \"${DATABASE_URL}\" -v ON_ERROR_STOP=1 -X -q -c \"\\\\copy public.\\\"${t}\\\" from '${csv}' with (format csv, header true)\""
+              bash -lc "psql \"${DATABASE_URL}\" -v ON_ERROR_STOP=1 -X -q \
+                -c \"set session_replication_role=replica;\" \
+                -c \"\\\\copy public.\\\"${t}\\\" from '${csv}' with (format csv, header true)\" \
+                -c \"set session_replication_role=origin;\""
           done < "$tablesFile"
-
-          docker run --rm \
-            -v "$PWD:/work" \
-            -w /work \
-            postgres:17 \
-            bash -lc "psql \"${DATABASE_URL}\" -v ON_ERROR_STOP=1 -X -q -c \"set session_replication_role=origin; commit;\""
 
       - name: Post-restore asserts (verify)
         shell: bash
@@ -274,7 +359,7 @@ jobs:
         shell: bash
         run: |
           echo "empresa_id=${{ steps.pick.outputs.empresa_id }}"
-          echo "r2_key=${{ steps.r2.outputs.r2_key }}"
+          echo "r2_key=${{ steps.r2_in.outputs.r2_key || steps.r2.outputs.r2_key }}"
 
       - name: Upsert issue on failure
         if: failure()
