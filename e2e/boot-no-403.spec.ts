@@ -13,6 +13,46 @@ async function mockAuthAndEmpresaNoAppLogs(page: Page, opts?: { role?: 'member' 
     await route.fulfill({ status: 403, contentType: 'application/json', body: JSON.stringify({ message: 'Forbidden' }) });
   });
 
+  // Billing (RPC-first): precisa ser registrado ANTES do fallback `**/rest/v1/**`.
+  await page.route('**/rest/v1/rpc/billing_subscription_with_plan_get', async (route) => {
+    await route.fulfill({
+      json: {
+        subscription: {
+          id: 'sub_123',
+          empresa_id: 'empresa-1',
+          status: 'active',
+          current_period_end: new Date(Date.now() + 86400000).toISOString(),
+          stripe_price_id: 'price_123',
+          stripe_subscription_id: 'stripe_sub_123',
+          plan_slug: 'SCALE',
+          billing_cycle: 'monthly',
+          cancel_at_period_end: false,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        },
+        plan: {
+          id: 'plan_123',
+          slug: 'SCALE',
+          name: 'Scale',
+          billing_cycle: 'monthly',
+          currency: 'BRL',
+          amount_cents: 0,
+          stripe_price_id: 'price_123',
+          active: true,
+          created_at: new Date().toISOString(),
+        },
+      },
+    });
+  });
+
+  await page.route('**/rest/v1/rpc/billing_plans_public_list', async (route) => {
+    await route.fulfill({ json: [] });
+  });
+
+  await page.route('**/rest/v1/rpc/billing_stripe_webhook_events_list', async (route) => {
+    await route.fulfill({ json: [] });
+  });
+
   // Fallback genérico: estabiliza no CI sem bater em Supabase real.
   await page.route('**/rest/v1/**', async (route) => {
     const req = route.request();
@@ -142,6 +182,22 @@ async function mockAuthAndEmpresaNoAppLogs(page: Page, opts?: { role?: 'member' 
   await page.route('**/rest/v1/rpc/ops_app_logs_list', async (route) => {
     await route.fulfill({ json: [] });
   });
+
+  // Edge Functions: manter CI estável (não bater em Supabase real).
+  await page.route('**/functions/v1/**', async (route) => {
+    const req = route.request();
+    if (req.method() === 'OPTIONS') {
+      await route.fulfill({ status: 204, body: '' });
+      return;
+    }
+    // billing-invoices espera { items: [] }
+    const url = req.url();
+    if (url.includes('/billing-invoices')) {
+      await route.fulfill({ json: { items: [] } });
+      return;
+    }
+    await route.fulfill({ json: {} });
+  });
 }
 
 test('RG-05: boot sem 403 (login → empresa ativa → navegar 5 módulos)', async ({ page }) => {
@@ -161,6 +217,7 @@ test('RG-05: boot sem 403 (login → empresa ativa → navegar 5 módulos)', asy
     { path: '/app/products' },
     { path: '/app/financeiro/tesouraria' },
     { path: '/app/industria/ordens' },
+    { path: '/app/configuracoes/geral/assinatura' },
     // `/app/configuracoes` redireciona para `/app/configuracoes/:section/:page`
     { path: '/app/configuracoes', allowRedirectPrefix: '/app/configuracoes/' },
   ];

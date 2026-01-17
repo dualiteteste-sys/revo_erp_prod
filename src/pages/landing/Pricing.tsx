@@ -1,11 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { useSupabase } from '@/providers/SupabaseProvider';
 import { Database } from '@/types/database.types';
 import PricingCard from '@/components/billing/PricingCard';
 import { Loader2 } from 'lucide-react';
 import { useToast } from '@/contexts/ToastProvider';
 import { motion } from 'framer-motion';
 import { OnboardingIntent } from '@/types/onboarding';
+import { callRpc } from '@/lib/api';
 
 type Plan = Database['public']['Tables']['plans']['Row'];
 
@@ -14,7 +14,6 @@ interface PricingProps {
 }
 
 const Pricing: React.FC<PricingProps> = ({ onSignUpClick }) => {
-  const supabase = useSupabase();
   const [plans, setPlans] = useState<Plan[]>([]);
   const [loading, setLoading] = useState(true);
   const [billingCycle, setBillingCycle] = useState<'monthly' | 'yearly'>('yearly');
@@ -31,22 +30,18 @@ const Pricing: React.FC<PricingProps> = ({ onSignUpClick }) => {
   useEffect(() => {
     const fetchPlans = async () => {
       setLoading(true);
-      const { data, error } = await supabase
-        .from('plans')
-        .select('*')
-        .eq('active', true)
-        .order('amount_cents', { ascending: true });
-
-      if (error) {
+      try {
+        const data = await callRpc<Plan[]>('billing_plans_public_list', { p_billing_cycle: null });
+        setPlans(Array.isArray(data) ? data : []);
+      } catch (error) {
         console.error('Erro ao buscar planos:', error);
         addToast('Não foi possível carregar os planos.', 'error');
-      } else {
-        setPlans(data);
+      } finally {
+        setLoading(false);
       }
-      setLoading(false);
     };
     fetchPlans();
-  }, [addToast, supabase]);
+  }, [addToast]);
 
   const handleStartTrial = (plan: Plan) => {
     const intent: OnboardingIntent = {
