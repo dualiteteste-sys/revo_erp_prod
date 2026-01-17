@@ -51,10 +51,15 @@ Objetivo: eliminar **403 intermitente** causado por inconsistências de assinatu
   - [x] (Opcional) `GITHUB_DEFAULT_REF` (default: `main`)
 - [ ] Validar em `prod` (empresa `leandrofmarques@me.com`) antes de dedupe no Stripe:
   - [x] Disparar export do tenant em `prod` com label `antes-limpeza-stripe`
-  - [ ] Confirmar que apareceu no catálogo `Dev → Backup por Empresa` (tabela `ops_tenant_backups`)
+  - [x] Confirmar que apareceu no catálogo `Dev → Backup por Empresa` (tabela `ops_tenant_backups`)
+    - Evidência técnica: workflow `Tenant Backup (Empresa) - Supabase` run `21060982240` log mostra `insert into public.ops_tenant_backups` + `R2_KEY: revo/tenants/a7980903-acc8-409a-875a-3ac84ad9096e/prod/2026/01/16/tenant_export_prod_a7980903-acc8-409a-875a-3ac84ad9096e_20260116_085215_antes-limpeza-stripe.zip`
   - [ ] Rodar **restore drill** em `verify` (sem tocar em prod):
     - [ ] Ação rápida: `Dev → Backup por Empresa` → `Restore drill (verify)` (usa o último backup catalogado de `prod`)
     - [ ] Alternativa: clicar em um backup `prod` e restaurar em `verify`
+    - Observação: se falhar com `cannot delete from view "empresa_features"` ou `extra data after last expected column`, corrigir workflow de restore drill/restore-from-r2 para:
+      - ignorar views (restaurar apenas `BASE TABLE`)
+      - ignorar tabelas ausentes no target
+      - compatibilizar CSV ↔ schema (trim/pad por contagem de colunas, já que colunas novas entram no final)
   - [ ] Check mínimo pós-restore (verify):
     - [ ] Login funciona (owner)
     - [ ] Empresa ativa abre sem 403
