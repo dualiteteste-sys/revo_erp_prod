@@ -219,7 +219,7 @@ jobs:
             # são adicionadas no final, então trim/pad por posição é seguro).
             tableCols="$(docker run --rm postgres:17 \
               psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -X -qAt \
-                -c "select count(*) from information_schema.columns where table_schema='public' and table_name='${t}';" \
+                -c "select count(*) from information_schema.columns where table_schema='public' and table_name='${t}' and is_generated = 'NEVER';" \
               | tr -d '[:space:]')"
             csvCols="$(python3 scripts/tenant_csv_cols.py "$csv")"
             if [[ -n "${tableCols:-}" && -n "${csvCols:-}" && "$tableCols" != "$csvCols" ]]; then
