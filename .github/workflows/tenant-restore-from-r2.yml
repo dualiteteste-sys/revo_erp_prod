@@ -140,6 +140,18 @@ jobs:
             exit 1
           fi
 
+          echo "Detectando tabelas do target (somente tabelas com coluna empresa_id)..."
+          targetTables="target_emp_tables.txt"
+          docker run --rm postgres:17 \
+            psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -X -qAt -c "
+              select distinct table_name
+                from information_schema.columns
+               where table_schema = 'public'
+                 and column_name = 'empresa_id'
+               order by 1;
+            " > "$targetTables"
+          sort -u "$targetTables" -o "$targetTables"
+
           echo "Criando script de restore..."
           restoreSql="restore_tenant.sql"
           cat > "$restoreSql" <<'SQL'
@@ -151,6 +163,10 @@ jobs:
           # Delete em todas as tabelas (ordem alfabética; constraints desativadas).
           while IFS= read -r t; do
             [[ -z "$t" ]] && continue
+            if ! grep -Fxq "$t" "$targetTables"; then
+              echo "::warning::Tabela ${t} não existe no target ou não possui empresa_id; pulando delete/import."
+              continue
+            fi
             echo "delete from public.\"${t}\" where empresa_id = '${EMPRESA_ID}';" >> "$restoreSql"
           done < "$tablesFile"
 
@@ -174,6 +190,9 @@ jobs:
 
           while IFS= read -r t; do
             [[ -z "$t" ]] && continue
+            if ! grep -Fxq "$t" "$targetTables"; then
+              continue
+            fi
             csv="${dir}/tables/${t}.csv"
             if [[ ! -f "$csv" ]]; then
               echo \"::warning::CSV ausente para tabela ${t}; pulando.\"
