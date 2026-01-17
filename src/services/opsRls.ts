@@ -21,3 +21,36 @@ export async function listOpsRlsInventory(params: { q?: string | null; limit?: n
   });
 }
 
+export type OpsRlsInventorySnapshotRow = {
+  id: string;
+  created_at: string;
+  created_by: string | null;
+  label: string | null;
+  meta: Record<string, unknown>;
+  high_count: number;
+  medium_count: number;
+  ok_count: number;
+};
+
+export type OpsRlsInventorySnapshotFull = OpsRlsInventorySnapshotRow & {
+  rows: Array<OpsRlsInventoryRow & { risk?: 'high' | 'medium' | 'ok' }>;
+};
+
+export async function listOpsRlsInventorySnapshots(params: { limit?: number; offset?: number } = {}) {
+  return callRpc<OpsRlsInventorySnapshotRow[]>('ops_rls_inventory_snapshots_list', {
+    p_limit: params.limit ?? 50,
+    p_offset: params.offset ?? 0,
+  });
+}
+
+export async function createOpsRlsInventorySnapshot(params: { label?: string | null; meta?: Record<string, unknown> } = {}) {
+  return callRpc<string>('ops_rls_inventory_snapshot_create', {
+    p_label: params.label ?? null,
+    p_meta: params.meta ?? {},
+  });
+}
+
+export async function getOpsRlsInventorySnapshot(params: { id: string }) {
+  const rows = await callRpc<OpsRlsInventorySnapshotFull[]>('ops_rls_inventory_snapshot_get', { p_id: params.id });
+  return rows?.[0] ?? null;
+}

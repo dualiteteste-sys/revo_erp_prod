@@ -226,6 +226,10 @@ export default function ChaoDeFabricaPage() {
 
   const handleStart = async () => {
     if (!selectedOp) return;
+    if (selectedOp.status !== 'liberada') {
+      addToast('Para iniciar, altere o status para “Liberada” e tente novamente.', 'warning', 'Ação indisponível');
+      return;
+    }
     try {
         await apontarExecucao(selectedOp.id, 'iniciar');
         addToast('Operação iniciada.', 'success');

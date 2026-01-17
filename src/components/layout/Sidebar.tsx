@@ -125,9 +125,9 @@ const Sidebar: React.FC<SidebarProps> = ({
       variants={sidebarVariants}
       initial={false}
       animate={isCollapsed ? 'collapsed' : 'expanded'}
-      className="h-full relative z-20"
+      className="h-full min-h-0 relative z-20"
     >
-      <GlassCard className="h-full flex flex-col p-4">
+      <GlassCard className="h-full min-h-0 flex flex-col p-4">
         {/* HEADER */}
         <div className={`h-[88px] flex-shrink-0 flex items-center ${isCollapsed ? 'justify-center' : 'px-0'}`}>
           <RevoLogo className="h-8 w-auto text-gray-800" />
@@ -138,7 +138,7 @@ const Sidebar: React.FC<SidebarProps> = ({
 
 
         {/* NAVIGATION */}
-        <nav className="flex-1 relative overflow-y-auto scrollbar-styled -mr-4 pr-4 pt-4">
+        <nav className="flex-1 min-h-0 relative overflow-y-auto scrollbar-styled -mr-4 pr-4 pt-4">
           <AnimatePresence mode="wait">
             {isCollapsed ? (
               <motion.ul

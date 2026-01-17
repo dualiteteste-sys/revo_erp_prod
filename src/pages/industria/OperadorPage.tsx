@@ -229,6 +229,10 @@ const OperadorPage: React.FC = () => {
 
   const handleStart = async () => {
     if (!currentOp) return;
+    if (currentOp.status !== 'liberada') {
+      addToast('Para iniciar, altere o status para “Liberada” e tente novamente.', 'warning', 'Ação indisponível');
+      return;
+    }
     try {
       await apontarExecucao(currentOp.id, 'iniciar');
       addToast('Operação iniciada.', 'success');

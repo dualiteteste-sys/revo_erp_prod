@@ -206,13 +206,16 @@ export default function OperacoesTable({ operacoes, onUpdateStatus, onOpenDocs, 
                       )}
                       {onStart && (
                         <button
-                          className="w-full flex items-center gap-2 px-3 py-2 text-left hover:bg-gray-100 disabled:opacity-50"
+                          className={`w-full flex items-center gap-2 px-3 py-2 text-left hover:bg-gray-100 ${
+                            op.status !== 'liberada' ? 'opacity-60 cursor-not-allowed' : ''
+                          } disabled:opacity-50`}
                           onClick={() => {
-                            if (!onStart || op.status === 'em_execucao' || op.status === 'concluida' || op.status === 'cancelada') return;
+                            if (!onStart || op.status === 'concluida' || op.status === 'cancelada') return;
                             setMenuId(null);
                             onStart(op);
                           }}
-                          disabled={op.status === 'em_execucao' || op.status === 'concluida' || op.status === 'cancelada'}
+                          aria-disabled={op.status !== 'liberada'}
+                          disabled={op.status === 'concluida' || op.status === 'cancelada'}
                         >
                           <PlayCircle size={14} /> Iniciar
                         </button>

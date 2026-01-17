@@ -48,6 +48,30 @@ type CustomerSummary = {
   } | null;
 };
 
+type DuplicateGroup = {
+  key: string;
+  count: number;
+  customer_ids: string[];
+};
+
+function groupDuplicatesBy(
+  customers: CustomerSummary[],
+  getKey: (c: CustomerSummary) => string | null,
+): DuplicateGroup[] {
+  const groups = new Map<string, string[]>();
+  for (const c of customers) {
+    const key = (getKey(c) ?? "").trim();
+    if (!key) continue;
+    const arr = groups.get(key) ?? [];
+    arr.push(c.id);
+    groups.set(key, arr);
+  }
+  return [...groups.entries()]
+    .filter(([, ids]) => ids.length > 1)
+    .map(([key, ids]) => ({ key, count: ids.length, customer_ids: ids }))
+    .sort((a, b) => b.count - a.count || a.key.localeCompare(b.key));
+}
+
 function pickBestCustomer(customers: CustomerSummary[]): CustomerSummary | null {
   if (customers.length === 0) return null;
   const priority: Record<string, number> = {
@@ -225,11 +249,17 @@ Deno.serve(async (req) => {
     const best = pickBestCustomer(summaries);
 
     if (action === "inspect") {
+      const duplicates = {
+        by_email: groupDuplicatesBy(summaries, (c) => (c.email ?? "").trim().toLowerCase() || null),
+        by_cnpj: groupDuplicatesBy(summaries, (c) => stripNonDigits(String(c.metadata?.cnpj ?? "")) || null),
+        by_empresa_id: groupDuplicatesBy(summaries, (c) => String(c.metadata?.empresa_id ?? "").trim() || null),
+      };
       return json(corsHeaders, 200, {
         empresa: empresa ? { id: empresa.id, stripe_customer_id: empresa.stripe_customer_id, cnpj: empresa.cnpj } : null,
         query: { empresa_id: empresaId || null, email: email || null, cnpj: cnpj || null },
         customers: summaries,
         recommended_customer_id: best?.id ?? null,
+        duplicates,
       });
     }
 

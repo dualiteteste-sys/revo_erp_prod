@@ -98,6 +98,14 @@ export default function ExecucaoPage() {
   };
 
   const handleStart = async (op: Operacao) => {
+    if (op.status !== 'liberada') {
+      addToast(
+        'Para iniciar uma operação, altere o status para “Liberada” e tente novamente.',
+        'warning',
+        'Ação indisponível',
+      );
+      return;
+    }
     try {
       await apontarExecucao(op.id, 'iniciar');
       addToast('Operação iniciada.', 'success');

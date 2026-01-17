@@ -3,14 +3,14 @@
 Objetivo: eliminar **403 intermitente** causado por inconsistências de assinatura/tenant e garantir **idempotência**, **sync automático** e **backup/restore por empresa** antes de operações sensíveis (ex.: dedupe no Stripe).
 
 ## P0 — Diagnóstico (antes de mexer em fluxo)
-- [ ] Capturar 1 sessão real com 403 (Scale/Owner) e registrar:
-  - [ ] RPC/rota que falhou (Ops → Diagnóstico: 403)
-  - [ ] `request_id`, `empresa_id`, `role`, `plano_mvp`, `kind` (missing_active_empresa / plan_gating / permission)
-  - [ ] Print/JSON do evento (Copiar amostra + Copiar contexto)
-- [ ] Confirmar se o 403 vem de:
-  - [ ] RLS / permissão (42501)
-  - [ ] enforcement de plano/entitlements
-  - [ ] “assinatura não sincronizada” (dados ainda não chegaram no Supabase)
+- [x] Capturar 1 sessão real com 403 (Scale/Owner) e registrar:
+  - [x] RPC/rota que falhou (Ops → Diagnóstico: 403)
+  - [x] `request_id`, `empresa_id`, `role`, `plano_mvp`, `kind` (missing_active_empresa / plan_gating / permission)
+  - [x] Print/JSON do evento (Copiar amostra + Copiar contexto)
+- [x] Confirmar se o 403 vem de:
+  - [x] RLS / permissão (42501)
+  - [x] enforcement de plano/entitlements
+  - [x] “assinatura não sincronizada” (dados ainda não chegaram no Supabase)
 
 ## P1 — Prevenir duplicidade e “Empresa sem nome” (checkout)
 - [x] Modal inicial de assinatura pedir **CNPJ primeiro**
@@ -33,15 +33,15 @@ Objetivo: eliminar **403 intermitente** causado por inconsistências de assinatu
 - [x] Pós-checkout: na rota `/app/billing/success`, rodar `billing-sync-subscription` (best-effort) e disparar refresh de features
 
 ## P3 — Higienização e dedupe (ops/admin)
-- [ ] Ferramenta interna (ops) para encontrar duplicados no Stripe:
-  - [ ] por `metadata.cnpj` e/ou email
-  - [ ] por múltiplos customers ligados à mesma empresa
+- [x] Ferramenta interna (ops) para encontrar duplicados no Stripe:
+  - [x] por `metadata.cnpj` e/ou email
+  - [x] por múltiplos customers ligados à mesma empresa
 - [x] Tool (estado da arte): `/app/desenvolvedor/stripe-dedupe` para inspecionar customers e vincular o `stripe_customer_id` correto no tenant (não destrutivo)
 - [x] Tool: permitir **arquivar** customers duplicados (Stripe delete) quando **não há assinatura** (bloqueia customer recomendado/ativo)
-- [ ] Procedimento de dedupe seguro (checklist operacional):
-  - [ ] gerar backup do tenant (prod) **antes**
-  - [ ] remover/mesclar customer duplicado no Stripe
-  - [ ] re-sync e validar acesso (sem 403)
+- [x] Procedimento de dedupe seguro (checklist operacional): `docs/runbooks/stripe-dedupe-operacional.md`
+  - [x] gerar backup do tenant (prod) **antes**
+  - [x] remover/mesclar customer duplicado no Stripe (com bloqueio de delete quando há assinatura)
+  - [x] re-sync e validar acesso (sem 403)
 
 ## P4 — Backup por tenant (empresa) — antes do go-live
 - [x] Implementar `Dev → Backup por Empresa` (empresa ativa)
@@ -52,6 +52,7 @@ Objetivo: eliminar **403 intermitente** causado por inconsistências de assinatu
 - [ ] Validar em `prod` (empresa `leandrofmarques@me.com`) antes de dedupe no Stripe:
   - [x] Disparar export do tenant em `prod` com label `antes-limpeza-stripe`
   - [x] Confirmar que apareceu no catálogo `Dev → Backup por Empresa` (tabela `ops_tenant_backups`)
+    - Evidência técnica: workflow `Tenant Backup (Empresa) - Supabase` run `21060982240` log mostra `insert into public.ops_tenant_backups` + `R2_KEY: revo/tenants/a7980903-acc8-409a-875a-3ac84ad9096e/prod/2026/01/16/tenant_export_prod_a7980903-acc8-409a-875a-3ac84ad9096e_20260116_085215_antes-limpeza-stripe.zip`
   - [x] Rodar **restore drill** em `verify` (sem tocar em prod):
     - [ ] Ação rápida: `Dev → Backup por Empresa` → `Restore drill (verify)` (usa o último backup catalogado de `prod`)
     - [ ] Alternativa: clicar em um backup `prod` e restaurar em `verify`

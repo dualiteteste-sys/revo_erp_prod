@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { useToast } from '@/contexts/ToastProvider';
 import { useAuth } from '@/contexts/AuthProvider';
-import { opsStripeDedupeDelete, opsStripeDedupeInspect, opsStripeDedupeLink, type OpsStripeCustomerSummary } from '@/services/opsStripeDedupe';
+import { opsStripeDedupeDelete, opsStripeDedupeInspect, opsStripeDedupeLink, type OpsStripeCustomerSummary, type OpsStripeDedupeInspectResponse } from '@/services/opsStripeDedupe';
 import { ShieldAlert } from 'lucide-react';
 
 function formatDateTimeBRFromUnix(sec: number) {
@@ -39,8 +39,10 @@ export default function OpsStripeDedupePage() {
   const [loading, setLoading] = useState(false);
   const [rows, setRows] = useState<OpsStripeCustomerSummary[]>([]);
   const [recommendedId, setRecommendedId] = useState<string | null>(null);
+  const [duplicates, setDuplicates] = useState<OpsStripeDedupeInspectResponse['duplicates'] | null>(null);
   const [email, setEmail] = useState('');
   const [cnpj, setCnpj] = useState('');
+  const [activeDuplicateFilter, setActiveDuplicateFilter] = useState<{ kind: 'email' | 'cnpj' | 'empresa_id'; key: string } | null>(null);
   const [linkOpen, setLinkOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [selectedCustomerId, setSelectedCustomerId] = useState<string | null>(null);
@@ -48,6 +50,17 @@ export default function OpsStripeDedupePage() {
   const [busyDelete, setBusyDelete] = useState(false);
 
   const chosen = useMemo(() => rows.find((r) => r.id === selectedCustomerId) ?? null, [rows, selectedCustomerId]);
+
+  const filteredRows = useMemo(() => {
+    if (!activeDuplicateFilter) return rows;
+    if (activeDuplicateFilter.kind === 'email') {
+      return rows.filter((r) => (r.email ?? '').trim().toLowerCase() === activeDuplicateFilter.key);
+    }
+    if (activeDuplicateFilter.kind === 'cnpj') {
+      return rows.filter((r) => String(r.metadata?.cnpj ?? '').replace(/\D/g, '') === activeDuplicateFilter.key);
+    }
+    return rows.filter((r) => (r.metadata?.empresa_id ?? '').trim() === activeDuplicateFilter.key);
+  }, [activeDuplicateFilter, rows]);
 
   const inspect = async () => {
     if (!empresaId) {
@@ -63,6 +76,8 @@ export default function OpsStripeDedupePage() {
       });
       setRows(res.customers ?? []);
       setRecommendedId(res.recommended_customer_id ?? null);
+      setDuplicates(res.duplicates ?? null);
+      setActiveDuplicateFilter(null);
       addToast('Consulta concluída.', 'success');
     } catch (e: any) {
       addToast(e?.message || 'Falha ao consultar customers no Stripe.', 'error');
@@ -135,7 +150,7 @@ export default function OpsStripeDedupePage() {
     <PageShell>
       <PageHeader
         title="Stripe: dedupe / vincular Customer"
-        description="Ferramenta interna para diagnosticar duplicidade no Stripe (email/CNPJ) e vincular o Customer correto ao tenant."
+        description="Ferramenta interna para diagnosticar duplicidade no Stripe (email/CNPJ/empresa_id) e vincular o Customer correto ao tenant."
         icon={<ShieldAlert size={20} />}
       />
 
@@ -172,6 +187,81 @@ export default function OpsStripeDedupePage() {
           </div>
         </div>
 
+        {activeDuplicateFilter ? (
+          <div className="flex items-center justify-between gap-2 rounded-2xl border border-blue-200 bg-blue-50/60 px-4 py-3">
+            <div className="text-sm text-blue-900">
+              Filtro ativo: <span className="font-mono text-xs">{activeDuplicateFilter.kind}:{activeDuplicateFilter.key}</span>
+            </div>
+            <Button variant="outline" className="rounded-xl" onClick={() => setActiveDuplicateFilter(null)}>
+              Limpar filtro
+            </Button>
+          </div>
+        ) : null}
+
+        {duplicates ? (
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-3">
+            <div className="rounded-2xl border border-gray-200 bg-slate-50/40 p-4">
+              <div className="text-sm font-semibold text-slate-900">Duplicidade por email</div>
+              <div className="mt-2 space-y-2">
+                {duplicates.by_email?.length ? duplicates.by_email.slice(0, 4).map((g) => (
+                  <button
+                    key={g.key}
+                    type="button"
+                    className="w-full flex items-center justify-between rounded-xl border border-gray-200 bg-white px-3 py-2 text-left hover:bg-blue-50 transition-colors"
+                    onClick={() => setActiveDuplicateFilter({ kind: 'email', key: g.key })}
+                    title="Filtrar tabela por este email"
+                  >
+                    <span className="text-xs font-mono text-slate-700 truncate">{g.key}</span>
+                    <span className="text-xs text-slate-600">{g.count}</span>
+                  </button>
+                )) : (
+                  <div className="text-sm text-slate-600">Nenhuma duplicidade detectada.</div>
+                )}
+              </div>
+            </div>
+
+            <div className="rounded-2xl border border-gray-200 bg-slate-50/40 p-4">
+              <div className="text-sm font-semibold text-slate-900">Duplicidade por CNPJ (metadata)</div>
+              <div className="mt-2 space-y-2">
+                {duplicates.by_cnpj?.length ? duplicates.by_cnpj.slice(0, 4).map((g) => (
+                  <button
+                    key={g.key}
+                    type="button"
+                    className="w-full flex items-center justify-between rounded-xl border border-gray-200 bg-white px-3 py-2 text-left hover:bg-blue-50 transition-colors"
+                    onClick={() => setActiveDuplicateFilter({ kind: 'cnpj', key: g.key })}
+                    title="Filtrar tabela por este CNPJ"
+                  >
+                    <span className="text-xs font-mono text-slate-700 truncate">{g.key}</span>
+                    <span className="text-xs text-slate-600">{g.count}</span>
+                  </button>
+                )) : (
+                  <div className="text-sm text-slate-600">Nenhuma duplicidade detectada.</div>
+                )}
+              </div>
+            </div>
+
+            <div className="rounded-2xl border border-gray-200 bg-slate-50/40 p-4">
+              <div className="text-sm font-semibold text-slate-900">Duplicidade por empresa_id (metadata)</div>
+              <div className="mt-2 space-y-2">
+                {duplicates.by_empresa_id?.length ? duplicates.by_empresa_id.slice(0, 4).map((g) => (
+                  <button
+                    key={g.key}
+                    type="button"
+                    className="w-full flex items-center justify-between rounded-xl border border-gray-200 bg-white px-3 py-2 text-left hover:bg-blue-50 transition-colors"
+                    onClick={() => setActiveDuplicateFilter({ kind: 'empresa_id', key: g.key })}
+                    title="Filtrar tabela por este empresa_id"
+                  >
+                    <span className="text-xs font-mono text-slate-700 truncate">{g.key}</span>
+                    <span className="text-xs text-slate-600">{g.count}</span>
+                  </button>
+                )) : (
+                  <div className="text-sm text-slate-600">Nenhuma duplicidade detectada.</div>
+                )}
+              </div>
+            </div>
+          </div>
+        ) : null}
+
         <div className="rounded-2xl border border-gray-200 overflow-hidden">
           <table className="w-full text-sm">
             <thead className="bg-slate-50 text-slate-600">
@@ -185,7 +275,7 @@ export default function OpsStripeDedupePage() {
               </tr>
             </thead>
             <tbody>
-              {rows.map((r) => {
+              {filteredRows.map((r) => {
                 const metaEmpresa = r.metadata?.empresa_id ?? null;
                 const metaCnpj = r.metadata?.cnpj ?? null;
                 const isRecommended = recommendedId && r.id === recommendedId;
@@ -236,10 +326,10 @@ export default function OpsStripeDedupePage() {
                   </tr>
                 );
               })}
-              {rows.length === 0 ? (
+              {filteredRows.length === 0 ? (
                 <tr>
                   <td className="p-6 text-center text-slate-500" colSpan={6}>
-                    Nenhum customer encontrado ainda.
+                    Nenhum customer encontrado para o filtro atual.
                   </td>
                 </tr>
               ) : null}

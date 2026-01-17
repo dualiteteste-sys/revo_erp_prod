@@ -1,4 +1,4 @@
-import { supabase } from '@/lib/supabaseClient';
+import { callRpc } from '@/lib/api';
 
 export type ConciliacaoRegra = {
   id: string;
@@ -34,37 +34,19 @@ export type ConciliacaoRegraUpsert = Partial<
 > & { id?: string };
 
 export async function listConciliacaoRegras(contaCorrenteId: string | null): Promise<ConciliacaoRegra[]> {
-  let q = supabase
-    .from('financeiro_conciliacao_regras')
-    .select(
-      'id,empresa_id,conta_corrente_id,tipo_lancamento,match_text,min_valor,max_valor,categoria,centro_custo,descricao_override,observacoes,ativo,created_at,updated_at'
-    )
-    .order('updated_at', { ascending: false });
-
-  q = contaCorrenteId ? q.eq('conta_corrente_id', contaCorrenteId) : q.is('conta_corrente_id', null);
-
-  const { data, error } = await q;
-  if (error) throw error;
-  return (data || []) as ConciliacaoRegra[];
+  const data = await callRpc<ConciliacaoRegra[]>('financeiro_conciliacao_regras_list', {
+    p_conta_corrente_id: contaCorrenteId ?? null,
+  });
+  return data ?? [];
 }
 
 export async function upsertConciliacaoRegra(payload: ConciliacaoRegraUpsert): Promise<ConciliacaoRegra> {
-  const { id, ...rest } = payload;
-  const base = supabase
-    .from('financeiro_conciliacao_regras')
-    .upsert({ ...(id ? { id } : {}), ...rest }, { onConflict: 'id' })
-    .select(
-      'id,empresa_id,conta_corrente_id,tipo_lancamento,match_text,min_valor,max_valor,categoria,centro_custo,descricao_override,observacoes,ativo,created_at,updated_at'
-    )
-    .single();
-
-  const { data, error } = await base;
-  if (error) throw error;
-  return data as ConciliacaoRegra;
+  const rows = await callRpc<ConciliacaoRegra[]>('financeiro_conciliacao_regras_upsert', { p_payload: payload });
+  const row = rows?.[0];
+  if (!row) throw new Error('Não foi possível salvar a regra.');
+  return row;
 }
 
 export async function deleteConciliacaoRegra(id: string): Promise<void> {
-  const { error } = await supabase.from('financeiro_conciliacao_regras').delete().eq('id', id);
-  if (error) throw error;
+  await callRpc('financeiro_conciliacao_regras_delete', { p_id: id });
 }
-
