@@ -321,7 +321,7 @@ jobs:
             mkdir -p tenant_restore/tmp
             printf '%s\n' \
               "set session_replication_role=replica;" \
-              "\\\\copy public.\\\"${t}\\\" from '/work/${csv}' with (format csv, header true);" \
+              "\\copy public.\"${t}\" from '/work/${csv}' with (format csv, header true);" \
               "set session_replication_role=origin;" \
               > "$importSql"
             docker run --rm \
