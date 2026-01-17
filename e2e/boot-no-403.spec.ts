@@ -155,18 +155,22 @@ test('RG-05: boot sem 403 (login → empresa ativa → navegar 5 módulos)', asy
   await page.getByRole('button', { name: 'Entrar' }).click();
   await expect(page).toHaveURL(/\/app(\/|$)/);
 
-  const routes = [
-    '/app/dashboard',
-    '/app/partners',
-    '/app/products',
-    '/app/financeiro/tesouraria',
-    '/app/industria/ordens',
+  const routes: Array<{ path: string; allowRedirectPrefix?: string }> = [
+    { path: '/app/dashboard' },
+    { path: '/app/partners' },
+    { path: '/app/products' },
+    { path: '/app/financeiro/tesouraria' },
+    { path: '/app/industria/ordens' },
+    // `/app/configuracoes` redireciona para `/app/configuracoes/:section/:page`
+    { path: '/app/configuracoes', allowRedirectPrefix: '/app/configuracoes/' },
   ];
 
-  for (const path of routes) {
-    await page.goto(path);
+  for (const r of routes) {
+    await page.goto(r.path);
     await expect(page.getByRole('heading', { name: 'Erro de Configuração' })).toHaveCount(0);
-    await expect(page).toHaveURL(new RegExp(path.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
+
+    const expected = r.allowRedirectPrefix || r.path;
+    const safe = expected.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    await expect(page).toHaveURL(new RegExp(`${safe}`));
   }
 });
-

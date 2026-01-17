@@ -1,6 +1,6 @@
 # Inventário — `supabase.from()` por domínio
 
-Gerado em: 17/01/2026, 17:17:17
+Gerado em: 17/01/2026, 18:27:18
 
 Objetivo: mapear acessos diretos a tabelas (client-side) para migrar gradualmente para RPC-first em domínios sensíveis.
 
@@ -37,16 +37,6 @@ Objetivo: mapear acessos diretos a tabelas (client-side) para migrar gradualment
 - `src/pages/fiscal/NfeEmissoesPage.tsx`
 - `src/pages/fiscal/NfeSettingsPage.tsx`
 
-## services/rbac.ts — 3 ocorrência(s)
-
-**Tabelas mais acessadas**
-- `roles`: 1
-- `permissions`: 1
-- `role_permissions`: 1
-
-**Arquivos**
-- `src/services/rbac.ts`
-
 ## components/products — 1 ocorrência(s)
 
 **Tabelas mais acessadas**
@@ -54,11 +44,3 @@ Objetivo: mapear acessos diretos a tabelas (client-side) para migrar gradualment
 
 **Arquivos**
 - `src/components/products/form-tabs/MediaTab.tsx`
-
-## services/conciliacaoRegras.ts — 1 ocorrência(s)
-
-**Tabelas mais acessadas**
-- `financeiro_conciliacao_regras`: 1
-
-**Arquivos**
-- `src/services/conciliacaoRegras.ts`
