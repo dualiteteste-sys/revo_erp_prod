@@ -255,7 +255,7 @@ jobs:
             -v "$PWD:/work" \
             -w /work \
             postgres:17 \
-            bash -lc "psql \"${DATABASE_URL}\" -v ON_ERROR_STOP=1 -X -q -v empresa_id=\"'${EMPRESA_ID}'\" -f scripts/tenant_restore_verify_asserts.sql"
+            bash -lc "psql \"${DATABASE_URL}\" -v ON_ERROR_STOP=1 -X -q -v empresa_id=\"${EMPRESA_ID}\" -f scripts/tenant_restore_verify_asserts.sql"
 
       - name: Update tenant backup catalog (status=restored)
         if: always()
