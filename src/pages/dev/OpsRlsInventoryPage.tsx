@@ -10,7 +10,14 @@ import ResizableSortableTh, { type SortState } from '@/components/ui/table/Resiz
 import TableColGroup from '@/components/ui/table/TableColGroup';
 import { useTableColumnWidths, type TableColumnWidthDef } from '@/components/ui/table/useTableColumnWidths';
 import { sortRows, toggleSort } from '@/components/ui/table/sortUtils';
-import { listOpsRlsInventory, type OpsRlsInventoryRow } from '@/services/opsRls';
+import {
+  createOpsRlsInventorySnapshot,
+  getOpsRlsInventorySnapshot,
+  listOpsRlsInventory,
+  listOpsRlsInventorySnapshots,
+  type OpsRlsInventoryRow,
+  type OpsRlsInventorySnapshotRow,
+} from '@/services/opsRls';
 
 function yesNo(value: boolean) {
   return value ? 'Sim' : 'Não';
@@ -79,6 +86,8 @@ export default function OpsRlsInventoryPage() {
   const [loading, setLoading] = useState(true);
   const [rows, setRows] = useState<OpsRlsInventoryRow[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [snapshotsLoading, setSnapshotsLoading] = useState(false);
+  const [snapshots, setSnapshots] = useState<OpsRlsInventorySnapshotRow[]>([]);
   const [q, setQ] = useState('');
   const [onlyRisk, setOnlyRisk] = useState<'all' | 'high' | 'high_medium'>('all');
   const [sort, setSort] = useState<SortState<'table' | 'rls' | 'empresa' | 'policy'>>({ column: 'table', direction: 'asc' });
@@ -112,8 +121,22 @@ export default function OpsRlsInventoryPage() {
     }
   };
 
+  const loadSnapshots = async () => {
+    setSnapshotsLoading(true);
+    try {
+      const list = await listOpsRlsInventorySnapshots({ limit: 10, offset: 0 });
+      setSnapshots(list ?? []);
+    } catch (e: any) {
+      setSnapshots([]);
+      addToast(e?.message || 'Falha ao carregar snapshots.', 'error');
+    } finally {
+      setSnapshotsLoading(false);
+    }
+  };
+
   useEffect(() => {
     void load();
+    void loadSnapshots();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -146,6 +169,51 @@ export default function OpsRlsInventoryPage() {
     }
   };
 
+  const createSnapshot = async () => {
+    setSnapshotsLoading(true);
+    try {
+      const id = await createOpsRlsInventorySnapshot({
+        label: 'manual',
+        meta: {
+          origin: window.location.origin,
+          path: window.location.pathname,
+          at: new Date().toISOString(),
+        },
+      });
+      addToast('Snapshot criado.', 'success');
+      await loadSnapshots();
+      return id;
+    } catch (e: any) {
+      addToast(e?.message || 'Falha ao criar snapshot.', 'error');
+      return null;
+    } finally {
+      setSnapshotsLoading(false);
+    }
+  };
+
+  const downloadSnapshotJson = async (snapshotId: string) => {
+    try {
+      const snap = await getOpsRlsInventorySnapshot({ id: snapshotId });
+      if (!snap) {
+        addToast('Snapshot não encontrado.', 'error');
+        return;
+      }
+      const content = JSON.stringify(snap, null, 2);
+      const blob = new Blob([content], { type: 'application/json;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      const stamp = new Date(snap.created_at).toISOString().replaceAll(':', '-');
+      a.href = url;
+      a.download = `rls_inventory_snapshot_${stamp}_${snap.id}.json`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    } catch (e: any) {
+      addToast(e?.message || 'Falha ao baixar snapshot.', 'error');
+    }
+  };
+
   return (
     <PageShell
       header={
@@ -158,6 +226,10 @@ export default function OpsRlsInventoryPage() {
               <Button variant="outline" onClick={load} className="gap-2" disabled={loading}>
                 <RefreshCw size={16} />
                 Atualizar
+              </Button>
+              <Button variant="secondary" onClick={createSnapshot} className="gap-2" disabled={snapshotsLoading}>
+                <Database size={16} />
+                Gerar snapshot
               </Button>
             </div>
           }
@@ -216,6 +288,47 @@ export default function OpsRlsInventoryPage() {
       }
     >
       <PageCard className="space-y-3">
+        <div className="rounded-xl border border-gray-200 bg-white p-3">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+            <div className="text-sm font-semibold text-slate-900">Snapshots (evidência)</div>
+            <div className="text-xs text-slate-600">
+              {snapshotsLoading ? 'Carregando…' : snapshots.length ? `Últimos ${snapshots.length}` : 'Nenhum ainda'}
+            </div>
+          </div>
+          {snapshots.length > 0 && (
+            <div className="mt-2 overflow-auto">
+              <table className="min-w-full text-sm">
+                <thead className="text-xs text-slate-500">
+                  <tr>
+                    <th className="py-2 text-left">Quando</th>
+                    <th className="py-2 text-left">Label</th>
+                    <th className="py-2 text-left">Resumo</th>
+                    <th className="py-2 text-right">Ação</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100">
+                  {snapshots.map((s) => (
+                    <tr key={s.id} className="hover:bg-gray-50">
+                      <td className="py-2 pr-3 text-slate-700 whitespace-nowrap">
+                        {new Date(s.created_at).toLocaleString('pt-BR')}
+                      </td>
+                      <td className="py-2 pr-3 text-slate-700">{s.label ?? '—'}</td>
+                      <td className="py-2 pr-3 text-slate-700 whitespace-nowrap">
+                        ALTO={s.high_count} • MÉDIO={s.medium_count} • OK={s.ok_count}
+                      </td>
+                      <td className="py-2 text-right">
+                        <Button variant="outline" className="h-8 px-3 text-xs" onClick={() => downloadSnapshotJson(s.id)}>
+                          Baixar JSON
+                        </Button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+
         {loading ? (
           <div className="text-sm text-slate-600">Carregando…</div>
         ) : error ? (

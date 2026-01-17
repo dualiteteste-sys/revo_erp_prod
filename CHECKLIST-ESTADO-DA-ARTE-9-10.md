@@ -46,8 +46,11 @@ Definições:
 
 ### 1.1 RLS: isolamento por empresa (inventário e correções)
 - [ ] Rodar inventário RLS (UI/RPC) e exportar snapshot (dev e prod).
+- [x] Adicionar snapshots do inventário RLS (RPC + UI) para evidência/auditoria.
 - [ ] Corrigir RLS crítico: tabelas que permitem leitura ampla indevida (ex.: policies `using(true)`).
   - [x] Corrigir `public.empresas`: remover `using(true)` e restringir SELECT por membership/owner (migration).
+- [x] Remover/evitar “grants sem RLS” em tabelas `public` (gated por asserts RG01).
+  - [ ] (Exceção a tratar) `public.wrappers_fdw_stats` (extensão) pode vir com grants amplos e não é tenant-data.
 - [ ] Garantir que tabelas multi-tenant tenham:
   - [ ] `empresa_id` obrigatório e consistente
   - [ ] policies `USING/WITH CHECK` baseadas em `current_empresa_id()`
@@ -139,6 +142,7 @@ Definições:
 - [ ] `release:check` verde (unit + e2e + verify migrations) como pré-requisito de merge.
 - [ ] Expandir console-sweep para rotas principais e erros esperados “não vermelhos”.
 - [ ] Testes DB asserts (verify) para RLS e invariantes críticos.
+  - [x] RG01 DB asserts: bloquear tabela `public` com grants p/ `authenticated` sem RLS; bloquear policy `qual/with_check=true` em tabelas com `empresa_id` para `authenticated/public/anon`.
 
 ### 6.2 Mocks e isolamento
 - [ ] Services desacoplados de UI (facilitar mocks).
