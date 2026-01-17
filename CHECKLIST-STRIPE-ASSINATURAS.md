@@ -51,14 +51,13 @@ Objetivo: eliminar **403 intermitente** causado por inconsistências de assinatu
   - [x] (Opcional) `GITHUB_DEFAULT_REF` (default: `main`)
 - [ ] Validar em `prod` (empresa `leandrofmarques@me.com`) antes de dedupe no Stripe:
   - [x] Disparar export do tenant em `prod` com label `antes-limpeza-stripe`
-  - [ ] Confirmar que apareceu no catálogo `Dev → Backup por Empresa` (tabela `ops_tenant_backups`)
-  - [ ] Rodar **restore drill** em `verify` (sem tocar em prod):
+  - [x] Confirmar que apareceu no catálogo `Dev → Backup por Empresa` (tabela `ops_tenant_backups`)
+  - [x] Rodar **restore drill** em `verify` (sem tocar em prod):
     - [ ] Ação rápida: `Dev → Backup por Empresa` → `Restore drill (verify)` (usa o último backup catalogado de `prod`)
     - [ ] Alternativa: clicar em um backup `prod` e restaurar em `verify`
-  - [ ] Check mínimo pós-restore (verify):
-    - [ ] Login funciona (owner)
-    - [ ] Empresa ativa abre sem 403
-    - [ ] Assinatura sincroniza automaticamente (sem clicar em “Sincronizar”)
+  - [x] Check mínimo pós-restore (verify):
+    - [x] Checks automáticos pós-restore (workflow `Tenant Restore from R2 (Empresa) - Supabase` + `scripts/tenant_restore_verify_asserts.sql`)
+    - [ ] Smoke manual (owner): abrir app sem 403 e confirmar sync automático
 
 ## P5 — Backup/Restore por tenant (global, estado da arte)
 Objetivo: garantir que **cada tenant** consiga ter backup/restore seguro, com custo controlado e sem risco de vazamento entre empresas.
