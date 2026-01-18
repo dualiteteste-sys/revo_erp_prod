@@ -1,7 +1,6 @@
 import { useMemo } from "react";
 import { Loader2 } from "lucide-react";
 import { useAppContext } from "@/contexts/AppContextProvider";
-import { roleAtLeast } from "@/hooks/useEmpresaRole";
 import { useHasPermission } from "@/hooks/useHasPermission";
 
 type Permission = { domain: string; action: string };
@@ -13,14 +12,12 @@ export default function RequirePermission({
   permission?: Permission; // se não passar, apenas exige sessão
   children: React.ReactNode;
 }) {
-  const { session, empresaRole, empresaRoleLoading, isAdminLike } = useAppContext();
-  const isOpsDomain = (permission?.domain ?? "") === "ops" || (permission?.domain ?? "").startsWith("ops:");
+  const { session, empresaRoleLoading } = useAppContext();
 
   // Estado da arte:
-  // - Admin/Owner: permissões amplas dentro do tenant.
-  // - "ops/*": reservado para usuários internos; sempre checar permissão explicitamente.
-  const shouldCheckPermission =
-    !!session && !!permission && !empresaRoleLoading && (!isAdminLike || isOpsDomain);
+  // - Sempre usar o backend como fonte da verdade (inclui overrides).
+  // - Evitar bypass no frontend, para não divergir do enforcement do banco.
+  const shouldCheckPermission = !!session && !!permission && !empresaRoleLoading;
   const permQuery = useHasPermission(permission?.domain || "", permission?.action || "");
 
   const state = useMemo(() => {
@@ -32,9 +29,6 @@ export default function RequirePermission({
     }
     if (empresaRoleLoading) {
       return { allowed: null, loading: true, message: "Verificando permissões…" };
-    }
-    if ((isAdminLike || roleAtLeast(empresaRole, "admin")) && !isOpsDomain) {
-      return { allowed: true, loading: false, message: "" };
     }
     if (!shouldCheckPermission) {
       return { allowed: null, loading: true, message: "Verificando permissões…" };
@@ -48,9 +42,6 @@ export default function RequirePermission({
     session,
     permission,
     empresaRoleLoading,
-    empresaRole,
-    isAdminLike,
-    isOpsDomain,
     shouldCheckPermission,
     permQuery.isLoading,
     permQuery.data,
