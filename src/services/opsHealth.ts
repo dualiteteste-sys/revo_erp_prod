@@ -73,6 +73,33 @@ export type EcommerceDlqRow = {
   last_error: string;
 };
 
+export type NfeWebhookRow = {
+  id: string;
+  received_at: string;
+  event_type: string | null;
+  provider: string | null;
+  nfeio_id: string | null;
+  process_attempts: number;
+  next_retry_at: string | null;
+  locked_at: string | null;
+  last_error: string | null;
+};
+
+export type StripeWebhookRow = {
+  id: string;
+  received_at: string;
+  event_type: string;
+  stripe_event_id: string;
+  stripe_subscription_id: string | null;
+  stripe_price_id: string | null;
+  plan_slug: string | null;
+  billing_cycle: string | null;
+  process_attempts: number;
+  next_retry_at: string | null;
+  locked_at: string | null;
+  last_error: string | null;
+};
+
 export type DlqReprocessResult = {
   mode: 'dry_run' | 'reprocess';
   preview?: Record<string, unknown> | null;
@@ -101,6 +128,22 @@ export async function listOpsRecentFailures(params?: { from?: string | null; lim
     p_from: params?.from ?? null,
     p_limit: params?.limit ?? 50,
   });
+}
+
+export async function listOpsFinanceDlq(params?: { limit?: number }): Promise<FinanceDlqRow[]> {
+  return callRpc<FinanceDlqRow[]>('ops_finance_dlq_list', { p_limit: params?.limit ?? 30 });
+}
+
+export async function listOpsEcommerceDlq(params?: { limit?: number }): Promise<EcommerceDlqRow[]> {
+  return callRpc<EcommerceDlqRow[]>('ops_ecommerce_dlq_list', { p_limit: params?.limit ?? 30 });
+}
+
+export async function listOpsNfeWebhookErrors(params?: { limit?: number }): Promise<NfeWebhookRow[]> {
+  return callRpc<NfeWebhookRow[]>('ops_fiscal_nfe_webhook_errors_list', { p_limit: params?.limit ?? 30 });
+}
+
+export async function listOpsStripeWebhookErrors(params?: { limit?: number }): Promise<StripeWebhookRow[]> {
+  return callRpc<StripeWebhookRow[]>('ops_billing_stripe_webhook_errors_list', { p_limit: params?.limit ?? 30 });
 }
 
 export async function reprocessFinanceDlq(dlqId: string): Promise<string> {

@@ -26,12 +26,13 @@ Definições:
 ## P0 — Fundamentos do Multi-tenant (Segurança + estabilidade do contexto)
 
 ### 0.1 Empresa ativa / contexto (boot determinístico)
-- [ ] Unificar “source of truth” do contexto (userId, empresa ativa, role, plano) em um único ponto.
+- [x] Unificar “source of truth” do contexto (userId, empresa ativa, role, plano) em um único ponto.
   - [x] Criar `AppContextProvider` consolidando `Auth + Subscription + Role` e expor `useAppContext()` (frontend).
   - [x] Migrar guards de permissão (`RequirePermission`) para usar o contexto unificado (reduz race/duplicação).
-- [ ] Garantir que nenhum módulo faça fetch de dados antes de `activeEmpresaId` estar resolvido (gates consistentes).
-- [ ] Padronizar recovery automático (apenas quando seguro) e mensagens UX (“Selecione sua empresa”).
+- [x] Garantir que nenhum módulo faça fetch de dados antes de `activeEmpresaId` estar resolvido (gates consistentes).
+- [x] Padronizar recovery automático (apenas quando seguro) e mensagens UX (“Selecione sua empresa”).
 - [x] Cobrir boot com E2E: login → empresa ativa → navegação por 5 módulos sem 403.
+- [x] Cobrir landing pública sem sessão/empresa ativa (E2E `e2e/landing-public.spec.ts`).
 
 ### 0.2 RBAC e áreas internas (Ops/Dev)
 - [x] Garantir que `ops/*` e ferramentas internas exijam permissão explícita (sem bypass por admin/owner).
@@ -60,6 +61,8 @@ Definições:
   - [x] Corrigir `public.empresas`: remover `using(true)` e restringir SELECT por membership/owner (migration).
 - [x] Remover/evitar “grants sem RLS” em tabelas `public` (gated por asserts RG01).
   - [x] (Exceção tratada) `public.wrappers_fdw_stats` (extensão): revogar grants de `authenticated/anon/public` (migration `20270118121500_revoke_wrappers_fdw_stats_grants.sql`).
+- [x] Corrigir itens “MÉDIO” do inventário (policies multi-tenant com `current_empresa_id()`), via migrations.
+  - [x] `unidades_medida`, `embalagens`, `industria_ct_aps_config`, `industria_ct_calendario_semana`, `pcp_aps_runs`, `pcp_aps_run_changes` (migration `20270118130000_sec_rls_current_empresa_cadastros_ops.sql`).
 - [ ] Garantir que tabelas multi-tenant tenham:
   - [ ] `empresa_id` obrigatório e consistente
   - [ ] policies `USING/WITH CHECK` baseadas em `current_empresa_id()`
@@ -70,6 +73,8 @@ Definições:
 - [ ] Migrar acesso direto do client para RPC em domínios críticos (billing, financeiro, indústria, LGPD).
 - [x] Inventário `supabase.from()` atualizado (regex cobre quebras de linha) e exportado em `INVENTARIO-SUPABASE-FROM.md`.
 - [x] RPC-first (Billing): substituir `supabase.from('plans'/'subscriptions'/'billing_stripe_webhook_events')` por RPCs (`billing_plans_public_list`, `billing_subscription_with_plan_get`, `billing_stripe_webhook_events_list`).
+- [x] RPC-first (Financeiro piloto): revogar grants em tabelas `financeiro_%/finance_%/finops_%` e manter acesso via RPCs (migration `20270118133000_fin_ops_health_rpc_and_revoke_fin_grants.sql`).
+  - [x] Ops/Health: substituir `supabase.from()` por RPCs SECURITY DEFINER (mesma migration) e verificar via asserts (script `scripts/verify_financeiro_rpc_first.sql`).
 - [x] RPC-first (Empresa Features): substituir `supabase.from('empresa_features')` por `rpc/empresa_features_get` e revogar grants de tabela (migration `20270118124000_empresa_features_rpc_first.sql`).
 - [x] RPC-first (Fiscal/NF-e settings): remover escrita direta do client e exigir admin no backend (RPCs `fiscal_feature_flags_set`, `fiscal_nfe_emissao_config_*`, `fiscal_nfe_emitente_*`, `fiscal_nfe_numeracao_*`).
 - [x] RPC-first (Fiscal/NF-e emissões): remover leitura/escrita direta no client e exigir RPCs tenant-safe (RPCs `fiscal_nfe_emissoes_list`, `fiscal_nfe_emissao_itens_list`, `fiscal_nfe_audit_timeline_list`, `fiscal_nfe_emissao_draft_upsert`).
@@ -149,7 +154,7 @@ Definições:
 
 ### 5.2 “Erros no Sistema” (beta)
 - [x] Capturar erros reais (uncaught/5xx/network.rpc) com contexto (rota/última ação/request_id).
-- [ ] Workflow triagem (status: novo → investigando → corrigido) e SLA beta.
+- [x] Workflow triagem (status: novo → investigando → corrigido/ignorado) e SLA beta (migration `20270118140000_ops_app_errors_triage_status.sql`).
 
 ---
 
@@ -157,7 +162,7 @@ Definições:
 
 ### 6.1 Gates e regressão
 - [ ] `release:check` verde (unit + e2e + verify migrations) como pré-requisito de merge.
-- [ ] Expandir console-sweep para rotas principais e erros esperados “não vermelhos”.
+- [x] Expandir console-sweep para rotas principais e erros esperados “não vermelhos” (inclui Financeiro + landing pública).
 - [ ] Testes DB asserts (verify) para RLS e invariantes críticos.
   - [x] RG01 DB asserts: bloquear tabela `public` com grants p/ `authenticated` sem RLS; bloquear policy `qual/with_check=true` em tabelas com `empresa_id` para `authenticated/public/anon`.
 

@@ -16,13 +16,20 @@ export type OpsAppErrorRow = {
   code: string | null;
   response_text: string | null;
   fingerprint: string | null;
+  status: "novo" | "investigando" | "corrigido" | "ignorado";
   resolved: boolean;
+  resolved_at?: string | null;
+  resolved_by?: string | null;
+  triage_note?: string | null;
+  triage_updated_at?: string | null;
+  triage_updated_by?: string | null;
 };
 
 export async function listOpsAppErrors(params: {
   q?: string | null;
   source?: string | null;
   onlyOpen?: boolean;
+  statuses?: Array<OpsAppErrorRow["status"]> | null;
   limit?: number;
   offset?: number;
 }): Promise<OpsAppErrorRow[]> {
@@ -32,6 +39,7 @@ export async function listOpsAppErrors(params: {
     p_only_open: params.onlyOpen ?? true,
     p_q: params.q ?? null,
     p_source: params.source ?? null,
+    p_statuses: params.statuses?.length ? params.statuses : null,
   });
 }
 
@@ -39,11 +47,13 @@ export async function countOpsAppErrors(params: {
   q?: string | null;
   source?: string | null;
   onlyOpen?: boolean;
+  statuses?: Array<OpsAppErrorRow["status"]> | null;
 }): Promise<number> {
   const res = await callRpc<number>("ops_app_errors_count", {
     p_only_open: params.onlyOpen ?? true,
     p_q: params.q ?? null,
     p_source: params.source ?? null,
+    p_statuses: params.statuses?.length ? params.statuses : null,
   });
   return Number(res ?? 0);
 }
@@ -52,3 +62,10 @@ export async function setOpsAppErrorResolved(id: string, resolved: boolean) {
   await callRpc("ops_app_errors_set_resolved", { p_id: id, p_resolved: resolved });
 }
 
+export async function setOpsAppErrorStatus(
+  id: string,
+  status: OpsAppErrorRow["status"],
+  note?: string | null,
+) {
+  await callRpc("ops_app_errors_set_status", { p_id: id, p_status: status, p_note: note ?? null });
+}

@@ -11,13 +11,23 @@ import ResizableSortableTh, { type SortState } from "@/components/ui/table/Resiz
 import TableColGroup from "@/components/ui/table/TableColGroup";
 import { useTableColumnWidths, type TableColumnWidthDef } from "@/components/ui/table/useTableColumnWidths";
 import { sortRows, toggleSort } from "@/components/ui/table/sortUtils";
-import { countOpsAppErrors, listOpsAppErrors, setOpsAppErrorResolved, type OpsAppErrorRow } from "@/services/opsAppErrors";
+import { countOpsAppErrors, listOpsAppErrors, setOpsAppErrorStatus, type OpsAppErrorRow } from "@/services/opsAppErrors";
 import { getOpsContextSnapshot } from "@/services/opsContext";
 
 function formatDateTimeBR(value?: string | null) {
   if (!value) return "—";
   const d = new Date(value);
   return Number.isNaN(d.getTime()) ? String(value) : d.toLocaleString("pt-BR");
+}
+
+function formatSla(createdAt?: string | null, status?: OpsAppErrorRow["status"] | null) {
+  if (!createdAt) return null;
+  if (!status || status === "corrigido" || status === "ignorado") return null;
+  const created = new Date(createdAt).getTime();
+  if (Number.isNaN(created)) return null;
+  const hours = (Date.now() - created) / 36e5;
+  if (hours <= 24) return null;
+  return "SLA estourado (> 1 dia)";
 }
 
 function formatHttp(status?: number | null) {
@@ -57,10 +67,10 @@ export default function SystemErrorsPage() {
   const [rows, setRows] = useState<OpsAppErrorRow[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [q, setQ] = useState("");
-  const [onlyOpen, setOnlyOpen] = useState(true);
+  const [statusFilter, setStatusFilter] = useState<"open" | OpsAppErrorRow["status"] | "all">("open");
   const [total, setTotal] = useState(0);
   const [source, setSource] = useState<string>("");
-  const [sort, setSort] = useState<SortState<"when" | "source" | "route" | "message" | "http">>({
+  const [sort, setSort] = useState<SortState<"when" | "source" | "route" | "message" | "http" | "status">>({
     column: "when",
     direction: "desc",
   });
@@ -95,6 +105,7 @@ export default function SystemErrorsPage() {
         { id: "route", type: "string", getValue: (r: OpsAppErrorRow) => r.route ?? "" },
         { id: "message", type: "string", getValue: (r: OpsAppErrorRow) => r.message ?? "" },
         { id: "http", type: "number", getValue: (r: OpsAppErrorRow) => r.http_status ?? 0 },
+        { id: "status", type: "string", getValue: (r: OpsAppErrorRow) => r.status ?? "" },
       ] as const
     );
   }, [rows, sort]);
@@ -105,9 +116,16 @@ export default function SystemErrorsPage() {
     try {
       const qv = q.trim() ? q.trim() : null;
       const src = source.trim() ? source.trim() : null;
+      const statuses =
+        statusFilter === "all"
+          ? null
+          : statusFilter === "open"
+            ? (["novo", "investigando"] as const)
+            : ([statusFilter] as const);
+      const onlyOpen = statusFilter === "open";
       const [count, list] = await Promise.all([
-        countOpsAppErrors({ q: qv, onlyOpen, source: src }),
-        listOpsAppErrors({ q: qv, onlyOpen, source: src, limit: 100, offset: 0 }),
+        countOpsAppErrors({ q: qv, onlyOpen, source: src, statuses: statuses as any }),
+        listOpsAppErrors({ q: qv, onlyOpen, source: src, statuses: statuses as any, limit: 100, offset: 0 }),
       ]);
       setTotal(count);
       setRows(list ?? []);
@@ -123,13 +141,21 @@ export default function SystemErrorsPage() {
   useEffect(() => {
     void load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [onlyOpen]);
+  }, [statusFilter]);
 
-  const toggleResolved = async (id: string, resolved: boolean) => {
+  const setStatus = async (id: string, status: OpsAppErrorRow["status"]) => {
     setSavingId(id);
     try {
-      await setOpsAppErrorResolved(id, resolved);
-      addToast(resolved ? "Marcado como resolvido." : "Reaberto.", "success");
+      await setOpsAppErrorStatus(id, status);
+      const label =
+        status === "novo"
+          ? "Reaberto."
+          : status === "investigando"
+            ? "Marcado como investigando."
+            : status === "ignorado"
+              ? "Marcado como ignorado."
+              : "Marcado como corrigido.";
+      addToast(label, "success");
       await load();
     } catch (e: any) {
       addToast(e?.message || "Falha ao atualizar status.", "error");
@@ -206,15 +232,27 @@ export default function SystemErrorsPage() {
               placeholder="Fonte (ex.: console.error)"
               className="w-[220px] max-w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm"
             />
+            <select
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value as any)}
+              className="w-[220px] max-w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm"
+              title="Status"
+            >
+              <option value="open">Em aberto (novo + investigando)</option>
+              <option value="novo">Novo</option>
+              <option value="investigando">Investigando</option>
+              <option value="corrigido">Corrigido</option>
+              <option value="ignorado">Ignorado</option>
+              <option value="all">Todos</option>
+            </select>
             <Button variant="secondary" onClick={load} className="gap-2" disabled={loading} title="Aplicar filtro">
               <Search size={16} />
               Filtrar
             </Button>
           </div>
-          <label className="flex items-center gap-2 text-sm text-slate-700 select-none">
-            <input type="checkbox" checked={onlyOpen} onChange={(e) => setOnlyOpen(e.target.checked)} />
-            Mostrar apenas em aberto
-          </label>
+          <div className="text-xs text-slate-600">
+            SLA (beta): <span className="font-semibold">1 dia útil</span>.
+          </div>
         </div>
       }
     >
@@ -274,7 +312,14 @@ export default function SystemErrorsPage() {
                       onResizeStart={startResize}
                       className="text-left p-3"
                     />
-                    <th className="p-3 text-left">Status</th>
+                    <ResizableSortableTh
+                      columnId="status"
+                      label="Status"
+                      sort={sort}
+                      onSort={(col) => setSort((prev) => toggleSort(prev as any, col))}
+                      onResizeStart={startResize}
+                      className="text-left p-3"
+                    />
                     <th className="p-3 text-left">Ações</th>
                   </tr>
                 </thead>
@@ -296,15 +341,28 @@ export default function SystemErrorsPage() {
                         {r.url ? <div className="mt-1 text-[11px] font-mono text-slate-500 break-all">{r.url}</div> : null}
                       </td>
                       <td className="p-3">
-                        {r.resolved ? (
-                          <span className="inline-flex items-center gap-1 text-xs text-green-700">
-                            <CheckCircle2 size={14} /> Resolvido
-                          </span>
-                        ) : (
-                          <span className="inline-flex items-center gap-1 text-xs text-amber-700">
-                            <Circle size={14} /> Em aberto
-                          </span>
-                        )}
+                        <div className="flex flex-col gap-1">
+                          {r.status === "corrigido" ? (
+                            <span className="inline-flex items-center gap-1 text-xs text-green-700">
+                              <CheckCircle2 size={14} /> Corrigido
+                            </span>
+                          ) : r.status === "ignorado" ? (
+                            <span className="inline-flex items-center gap-1 text-xs text-slate-600">
+                              <CheckCircle2 size={14} /> Ignorado
+                            </span>
+                          ) : r.status === "investigando" ? (
+                            <span className="inline-flex items-center gap-1 text-xs text-blue-700">
+                              <Circle size={14} /> Investigando
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center gap-1 text-xs text-amber-700">
+                              <Circle size={14} /> Novo
+                            </span>
+                          )}
+                          {formatSla(r.created_at, r.status) ? (
+                            <span className="text-[11px] text-red-700">{formatSla(r.created_at, r.status)}</span>
+                          ) : null}
+                        </div>
                       </td>
                       <td className="p-3">
                         <div className="flex flex-wrap items-center gap-2">
@@ -312,9 +370,29 @@ export default function SystemErrorsPage() {
                             variant="outline"
                             size="sm"
                             disabled={savingId === r.id}
-                            onClick={() => toggleResolved(r.id, !r.resolved)}
+                            onClick={() => setStatus(r.id, r.status === "corrigido" || r.status === "ignorado" ? "novo" : "corrigido")}
                           >
-                            {r.resolved ? "Reabrir" : "Resolver"}
+                            {r.status === "corrigido" || r.status === "ignorado" ? "Reabrir" : "Corrigido"}
+                          </Button>
+                          <Button
+                            variant="secondary"
+                            size="sm"
+                            disabled={savingId === r.id}
+                            onClick={() => setStatus(r.id, r.status === "investigando" ? "novo" : "investigando")}
+                            className="gap-2"
+                            title="Marcar como investigando (ou voltar para novo)"
+                          >
+                            <Circle size={14} />
+                            {r.status === "investigando" ? "Voltar p/ novo" : "Investigar"}
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            disabled={savingId === r.id}
+                            onClick={() => setStatus(r.id, "ignorado")}
+                            title="Ignorar (não é bug do sistema / não precisa correção)"
+                          >
+                            Ignorar
                           </Button>
                           <Button variant="secondary" size="sm" className="gap-2" onClick={() => openSend(r)}>
                             <Send size={14} />

@@ -5,7 +5,6 @@ import PageHeader from '@/components/ui/PageHeader';
 import GlassCard from '@/components/ui/GlassCard';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/contexts/ToastProvider';
-import { supabase } from '@/lib/supabaseClient';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import ResizableSortableTh, { type SortState } from '@/components/ui/table/ResizableSortableTh';
 import TableColGroup from '@/components/ui/table/TableColGroup';
@@ -16,6 +15,10 @@ import {
   getBusinessKpisFunnelSummary,
   getProductMetricsSummary,
   listOpsRecentFailures,
+  listOpsNfeWebhookErrors,
+  listOpsFinanceDlq,
+  listOpsEcommerceDlq,
+  listOpsStripeWebhookErrors,
   dryRunEcommerceDlq,
   dryRunFinanceDlq,
   dryRunNfeWebhookEvent,
@@ -29,6 +32,8 @@ import {
   type DlqReprocessResult,
   type EcommerceDlqRow,
   type FinanceDlqRow,
+  type NfeWebhookRow,
+  type StripeWebhookRow,
   type OpsHealthSummary,
   type BusinessKpisFunnelSummary,
   type ProductMetricsSummary,
@@ -36,33 +41,6 @@ import {
 } from '@/services/opsHealth';
 import { useHasPermission } from '@/hooks/useHasPermission';
 import { getEcommerceHealthSummary, type EcommerceHealthSummary } from '@/services/ecommerceIntegrations';
-
-type NfeWebhookRow = {
-  id: string;
-  received_at: string;
-  event_type: string | null;
-  provider: string | null;
-  nfeio_id: string | null; // coluna legado; usada como referência do provedor
-  process_attempts: number;
-  next_retry_at: string | null;
-  locked_at: string | null;
-  last_error: string | null;
-};
-
-type StripeWebhookRow = {
-  id: string;
-  received_at: string;
-  event_type: string;
-  stripe_event_id: string;
-  stripe_subscription_id: string | null;
-  stripe_price_id: string | null;
-  plan_slug: string | null;
-  billing_cycle: string | null;
-  process_attempts: number;
-  next_retry_at: string | null;
-  locked_at: string | null;
-  last_error: string | null;
-};
 
 function formatDateTimeBR(value?: string | null) {
   if (!value) return '—';
@@ -158,9 +136,6 @@ export default function HealthPage() {
     columns: ecommerceDlqColumns,
   });
 
-  const hasSupabase = !!supabase;
-  const isDev = import.meta.env.DEV;
-
   const fetchAll = useCallback(async () => {
     setLoading(true);
     setLoadError(null);
@@ -178,7 +153,8 @@ export default function HealthPage() {
       setRecent(r ?? []);
       setEcommerceHealth(eh);
 
-      if (!hasSupabase) {
+      // "Ops Health" detalhado: depende de permissão interna (ops/manage).
+      if (!permManage.data) {
         setNfeRows([]);
         setFinanceDlqRows([]);
         setEcommerceDlqRows([]);
@@ -186,52 +162,17 @@ export default function HealthPage() {
         return;
       }
 
-      const [
-        { data: nfeData, error: nfeError },
-        { data: finDlqData, error: finDlqError },
-        { data: ecoDlqData, error: ecoDlqError },
-        { data: stripeData, error: stripeError },
-      ] =
-        await Promise.all([
-          supabase
-            .from('fiscal_nfe_webhook_events')
-            .select('id,received_at,event_type,provider,nfeio_id,process_attempts,next_retry_at,locked_at,last_error')
-            .is('processed_at', null)
-            .not('last_error', 'is', null)
-            .order('received_at', { ascending: false })
-            .limit(30),
-          supabase
-            .from('finance_job_dead_letters')
-            .select('id,dead_lettered_at,job_type,idempotency_key,last_error')
-            .order('dead_lettered_at', { ascending: false })
-            .limit(30),
-          permEcommerceView.data
-            ? supabase
-                .from('ecommerce_job_dead_letters')
-                .select('id,failed_at,provider,kind,dedupe_key,last_error')
-                .order('failed_at', { ascending: false })
-                .limit(30)
-            : Promise.resolve({ data: [], error: null } as any),
-          supabase
-            .from('billing_stripe_webhook_events')
-            .select(
-              'id,received_at,event_type,stripe_event_id,stripe_subscription_id,stripe_price_id,plan_slug,billing_cycle,process_attempts,next_retry_at,locked_at,last_error'
-            )
-            .is('processed_at', null)
-            .not('last_error', 'is', null)
-            .order('received_at', { ascending: false })
-            .limit(30),
-        ]);
+      const [nfeData, finDlqData, ecoDlqData, stripeData] = await Promise.all([
+        listOpsNfeWebhookErrors({ limit: 30 }),
+        listOpsFinanceDlq({ limit: 30 }),
+        permEcommerceView.data ? listOpsEcommerceDlq({ limit: 30 }) : Promise.resolve([]),
+        listOpsStripeWebhookErrors({ limit: 30 }),
+      ]);
 
-      if (nfeError) throw nfeError;
-      if (finDlqError) throw finDlqError;
-      if (ecoDlqError) throw ecoDlqError;
-      if (stripeError) throw stripeError;
-
-      setNfeRows((nfeData ?? []) as unknown as NfeWebhookRow[]);
-      setFinanceDlqRows((finDlqData ?? []) as unknown as FinanceDlqRow[]);
-      setEcommerceDlqRows((ecoDlqData ?? []) as unknown as EcommerceDlqRow[]);
-      setStripeRows((stripeData ?? []) as unknown as StripeWebhookRow[]);
+      setNfeRows(nfeData ?? []);
+      setFinanceDlqRows(finDlqData ?? []);
+      setEcommerceDlqRows(ecoDlqData ?? []);
+      setStripeRows(stripeData ?? []);
     } catch (e: any) {
       const msg = e?.message || 'Falha ao carregar monitor de saúde.';
       addToast(msg, 'error');
@@ -248,7 +189,7 @@ export default function HealthPage() {
     } finally {
       setLoading(false);
     }
-  }, [addToast, hasSupabase, permEcommerceView.data]);
+  }, [addToast, permEcommerceView.data, permManage.data]);
 
   useEffect(() => {
     void fetchAll();
