@@ -1,26 +1,52 @@
-import { readFileSync } from 'node:fs';
-import { spawnSync } from 'node:child_process';
+import { readFileSync, readdirSync } from 'node:fs';
+import path from 'node:path';
 
-function rg(pattern) {
-  const res = spawnSync('rg', ['-n', pattern, 'src'], { encoding: 'utf8' });
-  if (res.status === 0) return (res.stdout || '').trim();
-  if (res.status === 1) return '';
-  throw new Error((res.stderr || res.stdout || 'rg failed').trim());
+const root = path.resolve('src');
+
+function listFiles(dir) {
+  const out = [];
+  for (const ent of readdirSync(dir, { withFileTypes: true })) {
+    const full = path.join(dir, ent.name);
+    if (ent.isDirectory()) out.push(...listFiles(full));
+    else out.push(full);
+  }
+  return out;
 }
 
 const patterns = [
-  String.raw`supabase\.from\(\s*['"\`]financeiro_`,
-  String.raw`supabase\.from\(\s*['"\`]finance_`,
+  {
+    name: 'supabase.from(financeiro_)',
+    re: /supabase\.from\(\s*['"`]financeiro_/g,
+  },
+  {
+    name: 'supabase.from(finance_)',
+    re: /supabase\.from\(\s*['"`]finance_/g,
+  },
 ];
 
-const hits = patterns
-  .map((p) => ({ pattern: p, output: rg(p) }))
-  .filter((h) => h.output);
+const hits = [];
+
+for (const file of listFiles(root)) {
+  if (!file.endsWith('.ts') && !file.endsWith('.tsx')) continue;
+  const rel = path.relative(process.cwd(), file);
+  const text = readFileSync(file, 'utf8');
+
+  for (const p of patterns) {
+    p.re.lastIndex = 0;
+    let m;
+    while ((m = p.re.exec(text))) {
+      const upto = text.slice(0, m.index);
+      const line = upto.split('\n').length;
+      hits.push({ file: rel, line, pattern: p.name });
+    }
+  }
+}
 
 if (hits.length) {
   const details = hits
-    .map((h) => `Pattern: ${h.pattern}\n${h.output}`)
-    .join('\n\n');
+    .slice(0, 200)
+    .map((h) => `${h.file}:${h.line}  ${h.pattern}`)
+    .join('\n');
   // eslint-disable-next-line no-console
   console.error(
     [
@@ -28,10 +54,10 @@ if (hits.length) {
       'O módulo Financeiro deve ser RPC-first (sem supabase.from("financeiro_*")).',
       '',
       details,
+      hits.length > 200 ? `\n(+${hits.length - 200} ocorrências omitidas)` : '',
     ].join('\n')
   );
   process.exit(1);
 }
 
-// Sanity: falha se o script for executado fora do repo (ajuda CI).
 readFileSync('package.json', 'utf8');
