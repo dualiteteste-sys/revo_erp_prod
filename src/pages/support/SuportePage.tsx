@@ -165,12 +165,14 @@ export default function SuportePage() {
       description="Diagnóstico guiado (sem console) + informações úteis para atendimento."
       icon={<LifeBuoy size={20} />}
       actions={
-        <Button asChild variant="secondary" className="gap-2">
-          <Link to="/app/desenvolvedor/saude">
-            <Activity size={16} />
-            Saúde (Ops)
-          </Link>
-        </Button>
+        permOpsManage.data ? (
+          <Button asChild variant="secondary" className="gap-2">
+            <Link to="/app/desenvolvedor/saude">
+              <Activity size={16} />
+              Saúde (Ops)
+            </Link>
+          </Button>
+        ) : null
       }
     />
   );
@@ -496,9 +498,11 @@ export default function SuportePage() {
                 <div>
                   Não lidas: <span className="font-semibold text-gray-900">{unreadCount}</span>
                 </div>
-                <Button asChild size="sm" variant="secondary">
-                  <Link to="/app/desenvolvedor/saude">Abrir painel de saúde</Link>
-                </Button>
+                {permOpsManage.data ? (
+                  <Button asChild size="sm" variant="secondary">
+                    <Link to="/app/desenvolvedor/saude">Abrir painel de saúde</Link>
+                  </Button>
+                ) : null}
               </div>
 
               {notifications.length === 0 ? (

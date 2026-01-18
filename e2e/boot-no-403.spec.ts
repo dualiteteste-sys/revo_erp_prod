@@ -70,6 +70,11 @@ async function mockAuthAndEmpresaNoAppLogs(page: Page, opts?: { role?: 'member' 
     await route.fulfill({ json: [] });
   });
 
+  // Fiscal (RPC-first NF-e emissões)
+  await page.route('**/rest/v1/rpc/fiscal_nfe_emissoes_list', async (route) => {
+    await route.fulfill({ json: [] });
+  });
+
   // Fallback genérico: estabiliza no CI sem bater em Supabase real.
   await page.route('**/rest/v1/**', async (route) => {
     const req = route.request();
@@ -195,8 +200,8 @@ async function mockAuthAndEmpresaNoAppLogs(page: Page, opts?: { role?: 'member' 
     });
   });
 
-  // Dashboard "atividades" (ops_app_logs_list): deve ser best-effort, sem 403.
-  await page.route('**/rest/v1/rpc/ops_app_logs_list', async (route) => {
+  // Dashboard "atividades" (tenant-safe): não pode depender de ops/logs.
+  await page.route('**/rest/v1/rpc/dashboard_activity_feed', async (route) => {
     await route.fulfill({ json: [] });
   });
 

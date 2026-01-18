@@ -1,41 +1,19 @@
 # Inventário — `supabase.from()` por domínio
 
-Gerado em: 18/01/2026, 01:55:39
+Gerado em: 18/01/2026, 03:52:44
 
 Objetivo: mapear acessos diretos a tabelas (client-side) para migrar gradualmente para RPC-first em domínios sensíveis.
 
-## pages/fiscal — 18 ocorrência(s)
-
-**Tabelas mais acessadas**
-- `fiscal_nfe_emitente`: 4
-- `fiscal_nfe_emissoes`: 3
-- `fiscal_nfe_emissao_itens`: 3
-- `empresa_feature_flags`: 2
-- `fiscal_nfe_emissao_configs`: 2
-- `fiscal_nfe_numeracao`: 2
-- `produtos`: 1
-- `fiscal_nfe_audit_timeline`: 1
-
-**Arquivos**
-- `src/pages/fiscal/NfeEmissoesPage.tsx`
-- `src/pages/fiscal/NfeSettingsPage.tsx`
-
-## components/settings — 14 ocorrência(s)
+## components/settings — 8 ocorrência(s)
 
 **Tabelas mais acessadas**
 - `empresa_onboarding`: 3
 - `financeiro_contas_correntes`: 3
-- `empresa_feature_flags`: 2
-- `fiscal_nfe_emissao_configs`: 2
 - `empresa_addons`: 1
-- `fiscal_nfe_emitente`: 1
-- `fiscal_nfe_numeracao`: 1
 - `centros_de_custo`: 1
 
 **Arquivos**
 - `src/components/settings/billing/SubscriptionSettings.tsx`
-- `src/components/settings/feature-flags/FeatureFlagsPage.tsx`
-- `src/components/settings/fiscal/NfeEmissaoSettings.tsx`
 - `src/components/settings/onboarding/OnboardingWizardModal.tsx`
 - `src/components/settings/onboarding/onboardingChecks.ts`
 
@@ -143,6 +121,14 @@ Objetivo: mapear acessos diretos a tabelas (client-side) para migrar gradualment
 
 **Arquivos**
 - `src/pages/auth/Callback.tsx`
+
+## pages/fiscal — 1 ocorrência(s)
+
+**Tabelas mais acessadas**
+- `produtos`: 1
+
+**Arquivos**
+- `src/pages/fiscal/NfeEmissoesPage.tsx`
 
 ## pages/landing — 1 ocorrência(s)
 

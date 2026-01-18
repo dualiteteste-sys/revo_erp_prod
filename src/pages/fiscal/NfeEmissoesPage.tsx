@@ -17,6 +17,12 @@ import ResizableSortableTh, { type SortState } from '@/components/ui/table/Resiz
 import TableColGroup from '@/components/ui/table/TableColGroup';
 import { useTableColumnWidths, type TableColumnWidthDef } from '@/components/ui/table/useTableColumnWidths';
 import { sortRows, toggleSort } from '@/components/ui/table/sortUtils';
+import {
+  fiscalNfeAuditTimelineList,
+  fiscalNfeEmissaoDraftUpsert,
+  fiscalNfeEmissaoItensList,
+  fiscalNfeEmissoesList,
+} from '@/services/fiscalNfeEmissoes';
 
 type AmbienteNfe = 'homologacao' | 'producao';
 
@@ -133,65 +139,42 @@ export default function NfeEmissoesPage() {
     if (!empresaId) return;
     setLoading(true);
     try {
-      let query = supabase
-        .from('fiscal_nfe_emissoes')
-        .select(
-          'id,status,numero,serie,chave_acesso,destinatario_pessoa_id,ambiente,natureza_operacao,valor_total,total_produtos,total_descontos,total_frete,total_impostos,total_nfe,payload,last_error,created_at,updated_at,destinatario:pessoas(nome)'
-        )
-        .eq('empresa_id', empresaId)
-        .order('updated_at', { ascending: false })
-        .limit(200);
+      const data = await fiscalNfeEmissoesList({
+        status: statusFilter || undefined,
+        q: search.trim() || undefined,
+        limit: 200,
+      });
 
-      if (statusFilter) query = query.eq('status', statusFilter);
+      const list: NfeEmissao[] = (data || []).map((r: any) => ({
+        id: r.id,
+        status: r.status,
+        numero: r.numero ?? null,
+        serie: r.serie ?? null,
+        chave_acesso: r.chave_acesso ?? null,
+        destinatario_pessoa_id: r.destinatario_pessoa_id ?? null,
+        destinatario_nome: r.destinatario_nome ?? null,
+        valor_total: r.valor_total ?? null,
+        total_produtos: r.total_produtos ?? null,
+        total_descontos: r.total_descontos ?? null,
+        total_frete: r.total_frete ?? null,
+        total_impostos: r.total_impostos ?? null,
+        total_nfe: r.total_nfe ?? null,
+        natureza_operacao: r.natureza_operacao ?? null,
+        ambiente: (r.ambiente ?? 'homologacao') as AmbienteNfe,
+        payload: r.payload ?? {},
+        last_error: r.last_error ?? null,
+        created_at: r.created_at,
+        updated_at: r.updated_at,
+      }));
 
-      const { data, error } = await query;
-      if (error) throw error;
-
-        const list: NfeEmissao[] = (data || []).map((r: any) => ({
-          id: r.id,
-          status: r.status,
-          numero: r.numero ?? null,
-          serie: r.serie ?? null,
-          chave_acesso: r.chave_acesso ?? null,
-          destinatario_pessoa_id: r.destinatario_pessoa_id ?? null,
-          destinatario_nome: r?.destinatario?.nome ?? null,
-          valor_total: r.valor_total ?? null,
-          total_produtos: typeof r.total_produtos === 'number' ? r.total_produtos : null,
-          total_descontos: typeof r.total_descontos === 'number' ? r.total_descontos : null,
-          total_frete: typeof r.total_frete === 'number' ? r.total_frete : null,
-          total_impostos: typeof r.total_impostos === 'number' ? r.total_impostos : null,
-          total_nfe: typeof r.total_nfe === 'number' ? r.total_nfe : null,
-          natureza_operacao: r.natureza_operacao ?? null,
-          ambiente: (r.ambiente ?? 'homologacao') as AmbienteNfe,
-          payload: r.payload ?? {},
-          last_error: r.last_error ?? null,
-          created_at: r.created_at,
-          updated_at: r.updated_at,
-        }));
-
-      const filtered = search.trim()
-        ? list.filter((row) => {
-            const hay = [
-              row.chave_acesso || '',
-              row.destinatario_nome || '',
-              String(row.numero ?? ''),
-              String(row.serie ?? ''),
-              row.status || '',
-            ]
-              .join(' ')
-              .toLowerCase();
-            return hay.includes(search.trim().toLowerCase());
-          })
-        : list;
-
-      setRows(filtered);
+      setRows(list);
     } catch (e: any) {
       addToast(e?.message || 'Erro ao listar NF-e.', 'error');
       setRows([]);
     } finally {
       setLoading(false);
     }
-  }, [addToast, empresaId, search, statusFilter, supabase]);
+  }, [addToast, empresaId, search, statusFilter]);
 
   useEffect(() => {
     if (!empresaId) return;
@@ -244,14 +227,7 @@ export default function NfeEmissoesPage() {
     setProductToAddName(undefined);
 
     try {
-      const { data, error } = await supabase
-        .from('fiscal_nfe_emissao_itens')
-        .select('id,produto_id,descricao,unidade,quantidade,valor_unitario,valor_desconto,ncm,cfop,cst,csosn')
-        .eq('empresa_id', empresaId)
-        .eq('emissao_id', row.id)
-        .order('ordem', { ascending: true });
-      if (error) throw error;
-
+      const data = await fiscalNfeEmissaoItensList(row.id);
       setItems(
         (data || []).map((it: any) => ({
           id: it.id,
@@ -384,69 +360,28 @@ export default function NfeEmissoesPage() {
       })),
     };
 
-    let emissaoId = editing?.id ?? null;
-    if (emissaoId) {
-      const { error } = await supabase
-        .from('fiscal_nfe_emissoes')
-        .update({
-          destinatario_pessoa_id: formDestinatarioId ?? null,
-          ambiente: formAmbiente,
-          natureza_operacao: formNaturezaOperacao?.trim() || null,
-          total_frete: frete,
-          payload: payloadJson,
-        })
-        .eq('id', emissaoId)
-        .eq('empresa_id', empresaId);
-      if (error) throw error;
-    } else {
-      const { data, error } = await supabase
-        .from('fiscal_nfe_emissoes')
-        .insert({
-          empresa_id: empresaId,
-          provider_slug: 'FOCUSNFE',
-          ambiente: formAmbiente,
-          status: 'rascunho',
-          destinatario_pessoa_id: formDestinatarioId ?? null,
-          natureza_operacao: formNaturezaOperacao?.trim() || null,
-          total_frete: frete,
-          payload: payloadJson,
-        })
-        .select('id')
-        .single();
-      if (error) throw error;
-      emissaoId = data?.id ?? null;
-    }
+    const emissaoId = await fiscalNfeEmissaoDraftUpsert({
+      emissaoId: editing?.id ?? null,
+      destinatarioPessoaId: formDestinatarioId ?? '',
+      ambiente: formAmbiente,
+      naturezaOperacao: formNaturezaOperacao?.trim() || '',
+      totalFrete: frete,
+      payload: payloadJson,
+      items: items.map((it) => ({
+        produto_id: it.produto_id,
+        descricao: it.produto_nome,
+        unidade: it.unidade,
+        quantidade: it.quantidade,
+        valor_unitario: it.valor_unitario,
+        valor_desconto: it.valor_desconto,
+        ncm: it.ncm || null,
+        cfop: it.cfop || null,
+        cst: it.cst || null,
+        csosn: it.csosn || null,
+      })),
+    });
 
     if (!emissaoId) throw new Error('Falha ao persistir rascunho (sem id).');
-
-    const { error: delErr } = await supabase
-      .from('fiscal_nfe_emissao_itens')
-      .delete()
-      .eq('empresa_id', empresaId)
-      .eq('emissao_id', emissaoId);
-    if (delErr) throw delErr;
-
-    const rowsToInsert = items.map((it, idx) => ({
-      empresa_id: empresaId,
-      emissao_id: emissaoId,
-      produto_id: it.produto_id,
-      ordem: idx + 1,
-      descricao: it.produto_nome,
-      unidade: it.unidade,
-      ncm: it.ncm || null,
-      cfop: it.cfop || null,
-      cst: it.cst || null,
-      csosn: it.csosn || null,
-      quantidade: it.quantidade,
-      valor_unitario: it.valor_unitario,
-      valor_desconto: it.valor_desconto,
-      valor_total: Math.max(0, it.quantidade * it.valor_unitario - (it.valor_desconto || 0)),
-    }));
-
-    const { error: insErr } = await supabase.from('fiscal_nfe_emissao_itens').insert(rowsToInsert);
-    if (insErr) throw insErr;
-
-    await supabase.rpc('fiscal_nfe_recalc_totais', { p_emissao_id: emissaoId });
     return emissaoId;
   };
 
@@ -586,13 +521,7 @@ export default function NfeEmissoesPage() {
     setAuditLoading(true);
     setAuditItems([]);
     try {
-      const { data, error } = await supabase
-        .from('fiscal_nfe_audit_timeline')
-        .select('kind,occurred_at,message,payload,source')
-        .eq('emissao_id', emissaoId)
-        .order('occurred_at', { ascending: false })
-        .limit(200);
-      if (error) throw error;
+      const data = await fiscalNfeAuditTimelineList(emissaoId, { limit: 200 });
       setAuditItems(Array.isArray(data) ? data : []);
     } catch (e: any) {
       addToast(e?.message || 'Erro ao carregar auditoria.', 'error');

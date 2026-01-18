@@ -48,7 +48,7 @@ export async function getMainDashboardData(params?: { activitiesLimit?: number }
   const activitiesPromise = includeActivities
     ? (async () => {
         try {
-          const rows = await callRpc<DashboardActivity[]>('ops_app_logs_list', {
+          const rows = await callRpc<DashboardActivity[]>('dashboard_activity_feed', {
             p_limit: params?.activitiesLimit ?? 12,
           });
           return rows ?? [];

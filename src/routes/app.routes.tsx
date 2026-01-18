@@ -493,7 +493,7 @@ export const appRoutes: RouteObject[] = [
             {
               path: "desenvolvedor/logs",
               element: (
-                <RequirePermission permission={{ domain: "logs", action: "view" }}>
+                <RequirePermission permission={{ domain: "ops", action: "view" }}>
                   <Suspense fallback={<PageLoader />}><LogsPage /></Suspense>
                 </RequirePermission>
               ),
@@ -570,7 +570,14 @@ export const appRoutes: RouteObject[] = [
                 </RequirePermission>
               ),
             },
-            { path: "desenvolvedor/supabase-demo", element: <Suspense fallback={<PageLoader />}><SupabaseDemoPage /></Suspense> },
+            {
+              path: "desenvolvedor/supabase-demo",
+              element: (
+                <RequirePermission permission={{ domain: "ops", action: "manage" }}>
+                  <Suspense fallback={<PageLoader />}><SupabaseDemoPage /></Suspense>
+                </RequirePermission>
+              ),
+            },
             {
                 path: 'tools/xml-tester',
                 element: (

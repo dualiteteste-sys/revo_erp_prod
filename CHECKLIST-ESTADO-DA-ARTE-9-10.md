@@ -27,14 +27,18 @@ Definições:
 
 ### 0.1 Empresa ativa / contexto (boot determinístico)
 - [ ] Unificar “source of truth” do contexto (userId, empresa ativa, role, plano) em um único ponto.
+  - [x] Criar `AppContextProvider` consolidando `Auth + Subscription + Role` e expor `useAppContext()` (frontend).
+  - [x] Migrar guards de permissão (`RequirePermission`) para usar o contexto unificado (reduz race/duplicação).
 - [ ] Garantir que nenhum módulo faça fetch de dados antes de `activeEmpresaId` estar resolvido (gates consistentes).
 - [ ] Padronizar recovery automático (apenas quando seguro) e mensagens UX (“Selecione sua empresa”).
 - [x] Cobrir boot com E2E: login → empresa ativa → navegação por 5 módulos sem 403.
 
 ### 0.2 RBAC e áreas internas (Ops/Dev)
-- [ ] Garantir que `ops/*` e ferramentas internas exijam permissão explícita (sem bypass por admin/owner).
+- [x] Garantir que `ops/*` e ferramentas internas exijam permissão explícita (sem bypass por admin/owner).
 - [ ] Padronizar verificação de permissão: UI (guards) + backend (RPC) coerentes.
-- [ ] Garantir que o sistema não dispare chamadas “ops” em telas de usuário final.
+- [x] Garantir que o sistema não dispare chamadas “ops” em telas de usuário final.
+  - [x] Dashboard: trocar `ops_app_logs_list` por RPC tenant-safe `dashboard_activity_feed`.
+  - [x] Remover links diretos para `/app/desenvolvedor/*` do ErrorBoundary e expor apenas para `ops:view`.
 
 **Aceite P0**
 - [ ] 0 ocorrências de 403 intermitente em `dev` por 72h (fluxos core).
@@ -67,6 +71,7 @@ Definições:
 - [x] Inventário `supabase.from()` atualizado (regex cobre quebras de linha) e exportado em `INVENTARIO-SUPABASE-FROM.md`.
 - [x] RPC-first (Billing): substituir `supabase.from('plans'/'subscriptions'/'billing_stripe_webhook_events')` por RPCs (`billing_plans_public_list`, `billing_subscription_with_plan_get`, `billing_stripe_webhook_events_list`).
 - [x] RPC-first (Fiscal/NF-e settings): remover escrita direta do client e exigir admin no backend (RPCs `fiscal_feature_flags_set`, `fiscal_nfe_emissao_config_*`, `fiscal_nfe_emitente_*`, `fiscal_nfe_numeracao_*`).
+- [x] RPC-first (Fiscal/NF-e emissões): remover leitura/escrita direta no client e exigir RPCs tenant-safe (RPCs `fiscal_nfe_emissoes_list`, `fiscal_nfe_emissao_itens_list`, `fiscal_nfe_audit_timeline_list`, `fiscal_nfe_emissao_draft_upsert`).
 - [x] RPC-first (Financeiro): substituir `supabase.from('financeiro_conciliacao_regras')` por RPCs SECURITY DEFINER com RBAC (tesouraria).
 - [x] RPC-first (RBAC): substituir `supabase.from('roles/permissions/role_permissions')` por RPCs SECURITY DEFINER com `roles:manage` e update atômico.
 - [x] Padronizar respostas de erro (códigos + mensagens PT-BR) e traduzir para UX palatável (`src/lib/toastErrorNormalizer.ts`).

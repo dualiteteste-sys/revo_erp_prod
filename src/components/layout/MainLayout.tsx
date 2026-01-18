@@ -4,6 +4,7 @@ import { Outlet, useLocation, useNavigate } from 'react-router-dom';
 import Sidebar from './Sidebar';
 import SettingsPanel from '../../pages/settings/SettingsPanel';
 import { SubscriptionProvider } from '../../contexts/SubscriptionProvider';
+import { AppContextProvider } from '@/contexts/AppContextProvider';
 import SubscriptionGuard from './SubscriptionGuard';
 import { menuConfig } from '../../config/menuConfig';
 import { useAuth } from '../../contexts/AuthProvider';
@@ -180,79 +181,81 @@ const MainLayout: React.FC = () => {
 
   return (
     <SubscriptionProvider>
-      <OnboardingGateProvider
-        openWizard={async (stepKey) => {
-          setOnboardingForceStepKey(stepKey ?? null);
-          setIsOnboardingWizardOpen(true);
-        }}
-      >
-        <RoadmapProvider>
-          <div className="h-screen p-4 flex gap-4">
-            <CommandPalette />
-            <OnboardingWizardModal
-              isOpen={isOnboardingWizardOpen}
-              mode="auto"
-              forceStepKey={onboardingForceStepKey}
-              onClose={() => {
-                setIsOnboardingWizardOpen(false);
-                setOnboardingForceStepKey(null);
-              }}
-            />
-            <PostInviteWelcomeModal
-              isOpen={isPostInviteWelcomeOpen}
-              onClose={() => setIsPostInviteWelcomeOpen(false)}
-            />
-            <PlanIntentCheckoutModal />
-            <Sidebar
-              isCollapsed={isSidebarCollapsed}
-              setIsCollapsed={setIsSidebarCollapsed}
-              onOpenSettings={handleOpenSettings}
-              onOpenCreateCompanyModal={() => {
-                /* No-op, modal removido */
-              }}
-              activeItem={activeItem}
-              setActiveItem={handleSetActiveItem}
-            />
-            <div className="flex-1 flex flex-col overflow-hidden">
-              <SubscriptionGuard>
-                <div className="pb-3">
-                  <div className="flex justify-end gap-2 items-start flex-wrap">
-                    <SubscriptionStatusBanner />
-                    <OnboardingGateBanner
-                      onOpenWizard={() => {
-                        setOnboardingForceStepKey(null);
-                        setIsOnboardingWizardOpen(true);
-                      }}
-                    />
-                    <RoadmapButton />
+      <AppContextProvider>
+        <OnboardingGateProvider
+          openWizard={async (stepKey) => {
+            setOnboardingForceStepKey(stepKey ?? null);
+            setIsOnboardingWizardOpen(true);
+          }}
+        >
+          <RoadmapProvider>
+            <div className="h-screen p-4 flex gap-4">
+              <CommandPalette />
+              <OnboardingWizardModal
+                isOpen={isOnboardingWizardOpen}
+                mode="auto"
+                forceStepKey={onboardingForceStepKey}
+                onClose={() => {
+                  setIsOnboardingWizardOpen(false);
+                  setOnboardingForceStepKey(null);
+                }}
+              />
+              <PostInviteWelcomeModal
+                isOpen={isPostInviteWelcomeOpen}
+                onClose={() => setIsPostInviteWelcomeOpen(false)}
+              />
+              <PlanIntentCheckoutModal />
+              <Sidebar
+                isCollapsed={isSidebarCollapsed}
+                setIsCollapsed={setIsSidebarCollapsed}
+                onOpenSettings={handleOpenSettings}
+                onOpenCreateCompanyModal={() => {
+                  /* No-op, modal removido */
+                }}
+                activeItem={activeItem}
+                setActiveItem={handleSetActiveItem}
+              />
+              <div className="flex-1 flex flex-col overflow-hidden">
+                <SubscriptionGuard>
+                  <div className="pb-3">
+                    <div className="flex justify-end gap-2 items-start flex-wrap">
+                      <SubscriptionStatusBanner />
+                      <OnboardingGateBanner
+                        onOpenWizard={() => {
+                          setOnboardingForceStepKey(null);
+                          setIsOnboardingWizardOpen(true);
+                        }}
+                      />
+                      <RoadmapButton />
+                    </div>
                   </div>
-                </div>
-                <main
-                  className="flex-1 overflow-y-auto scrollbar-styled pr-2 flex flex-col min-h-0"
-                  tabIndex={0}
-                  aria-label="Conteúdo principal"
-                >
-                  <ContextualHelp />
-                  <div className="flex-1 min-h-0">
-                    <Outlet />
-                  </div>
-                </main>
-              </SubscriptionGuard>
-            </div>
+                  <main
+                    className="flex-1 overflow-y-auto scrollbar-styled pr-2 flex flex-col min-h-0"
+                    tabIndex={0}
+                    aria-label="Conteúdo principal"
+                  >
+                    <ContextualHelp />
+                    <div className="flex-1 min-h-0">
+                      <Outlet />
+                    </div>
+                  </main>
+                </SubscriptionGuard>
+              </div>
 
-            <AnimatePresence>
-              {isSettingsPanelOpen && (
-                <SettingsPanel
-                  onClose={handleCloseSettings}
-                  canClose={settingsCanClose}
-                  initialTab={settingsInitialTab}
-                  initialItem={settingsInitialItem}
-                />
-              )}
-            </AnimatePresence>
-          </div>
-        </RoadmapProvider>
-      </OnboardingGateProvider>
+              <AnimatePresence>
+                {isSettingsPanelOpen && (
+                  <SettingsPanel
+                    onClose={handleCloseSettings}
+                    canClose={settingsCanClose}
+                    initialTab={settingsInitialTab}
+                    initialItem={settingsInitialItem}
+                  />
+                )}
+              </AnimatePresence>
+            </div>
+          </RoadmapProvider>
+        </OnboardingGateProvider>
+      </AppContextProvider>
     </SubscriptionProvider>
   );
 };
