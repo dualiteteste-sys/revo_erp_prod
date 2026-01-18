@@ -107,6 +107,21 @@ async function mockAuthAndEmpresa(page: Page) {
       },
     });
   });
+  await page.route('**/rest/v1/rpc/empresa_features_get*', async (route) => {
+    await route.fulfill({
+      json: [
+        {
+          empresa_id: 'empresa-1',
+          revo_send_enabled: false,
+          nfe_emissao_enabled: false,
+          plano_mvp: 'industria',
+          max_users: 10,
+          servicos_enabled: true,
+          industria_enabled: true,
+        },
+      ],
+    });
+  });
 }
 
 test('IND-04: Importar XML (Materiais do Cliente) → auto finalizar recebimento + sync (happy path)', async ({ page }) => {

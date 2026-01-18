@@ -1,32 +1,8 @@
 # Inventário — `supabase.from()` por domínio
 
-Gerado em: 18/01/2026, 05:15:22
+Gerado em: 18/01/2026, 06:19:14
 
 Objetivo: mapear acessos diretos a tabelas (client-side) para migrar gradualmente para RPC-first em domínios sensíveis.
-
-## components/settings — 5 ocorrência(s)
-
-**Tabelas mais acessadas**
-- `financeiro_contas_correntes`: 3
-- `empresa_addons`: 1
-- `centros_de_custo`: 1
-
-**Arquivos**
-- `src/components/settings/billing/SubscriptionSettings.tsx`
-- `src/components/settings/onboarding/onboardingChecks.ts`
-
-## hooks — 5 ocorrência(s)
-
-**Tabelas mais acessadas**
-- `empresa_features`: 2
-- `empresa_usuarios`: 2
-- `user_active_empresa`: 1
-
-**Arquivos**
-- `src/hooks/useEmpresaFeatures.ts`
-- `src/hooks/useEmpresaRole.ts`
-- `src/hooks/useEmpresas.ts`
-- `src/hooks/useFeatureFlags.ts`
 
 ## services/embalagens.ts — 5 ocorrência(s)
 
@@ -64,6 +40,16 @@ Objetivo: mapear acessos diretos a tabelas (client-side) para migrar gradualment
 **Arquivos**
 - `src/pages/dev/HealthPage.tsx`
 
+## hooks — 3 ocorrência(s)
+
+**Tabelas mais acessadas**
+- `empresa_usuarios`: 2
+- `user_active_empresa`: 1
+
+**Arquivos**
+- `src/hooks/useEmpresaRole.ts`
+- `src/hooks/useEmpresas.ts`
+
 ## services/osEquipamentos.ts — 3 ocorrência(s)
 
 **Tabelas mais acessadas**
@@ -95,6 +81,14 @@ Objetivo: mapear acessos diretos a tabelas (client-side) para migrar gradualment
 
 **Arquivos**
 - `src/components/industria/audit/IndustriaAuditTrailPanel.tsx`
+
+## components/settings — 1 ocorrência(s)
+
+**Tabelas mais acessadas**
+- `empresa_addons`: 1
+
+**Arquivos**
+- `src/components/settings/billing/SubscriptionSettings.tsx`
 
 ## pages/SalesDashboard.tsx — 1 ocorrência(s)
 

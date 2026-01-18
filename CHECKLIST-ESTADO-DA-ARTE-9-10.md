@@ -70,6 +70,7 @@ Definições:
 - [ ] Migrar acesso direto do client para RPC em domínios críticos (billing, financeiro, indústria, LGPD).
 - [x] Inventário `supabase.from()` atualizado (regex cobre quebras de linha) e exportado em `INVENTARIO-SUPABASE-FROM.md`.
 - [x] RPC-first (Billing): substituir `supabase.from('plans'/'subscriptions'/'billing_stripe_webhook_events')` por RPCs (`billing_plans_public_list`, `billing_subscription_with_plan_get`, `billing_stripe_webhook_events_list`).
+- [x] RPC-first (Empresa Features): substituir `supabase.from('empresa_features')` por `rpc/empresa_features_get` e revogar grants de tabela (migration `20270118124000_empresa_features_rpc_first.sql`).
 - [x] RPC-first (Fiscal/NF-e settings): remover escrita direta do client e exigir admin no backend (RPCs `fiscal_feature_flags_set`, `fiscal_nfe_emissao_config_*`, `fiscal_nfe_emitente_*`, `fiscal_nfe_numeracao_*`).
 - [x] RPC-first (Fiscal/NF-e emissões): remover leitura/escrita direta no client e exigir RPCs tenant-safe (RPCs `fiscal_nfe_emissoes_list`, `fiscal_nfe_emissao_itens_list`, `fiscal_nfe_audit_timeline_list`, `fiscal_nfe_emissao_draft_upsert`).
 - [x] RPC-first (Onboarding/Roadmap): remover acesso direto do client a `empresa_onboarding` e persistir via RPC (`onboarding_wizard_state_get`, `onboarding_wizard_state_upsert`).
@@ -147,7 +148,7 @@ Definições:
 - [ ] Painel interno: erros por severidade, por módulo, por empresa, por usuário.
 
 ### 5.2 “Erros no Sistema” (beta)
-- [ ] Capturar erros reais (uncaught/5xx/network.rpc) com contexto (rota/última ação/request_id).
+- [x] Capturar erros reais (uncaught/5xx/network.rpc) com contexto (rota/última ação/request_id).
 - [ ] Workflow triagem (status: novo → investigando → corrigido) e SLA beta.
 
 ---
