@@ -26,7 +26,7 @@ function yesNo(value: boolean) {
 function riskLabel(row: OpsRlsInventoryRow) {
   const hasAnyGrant = row.grants_select || row.grants_insert || row.grants_update || row.grants_delete;
   if (hasAnyGrant && !row.rls_enabled) return { label: 'ALTO', className: 'border-rose-200 bg-rose-50 text-rose-700' };
-  if (row.has_empresa_id && row.rls_enabled && !row.has_current_empresa_policy)
+  if (hasAnyGrant && row.has_empresa_id && row.rls_enabled && !row.has_current_empresa_policy)
     return { label: 'MÉDIO', className: 'border-amber-200 bg-amber-50 text-amber-700' };
   return { label: 'OK', className: 'border-green-200 bg-green-50 text-green-700' };
 }
@@ -37,7 +37,8 @@ function isHighRisk(row: OpsRlsInventoryRow) {
 }
 
 function isMediumRisk(row: OpsRlsInventoryRow) {
-  return row.has_empresa_id && row.rls_enabled && !row.has_current_empresa_policy;
+  const hasAnyGrant = row.grants_select || row.grants_insert || row.grants_update || row.grants_delete;
+  return hasAnyGrant && row.has_empresa_id && row.rls_enabled && !row.has_current_empresa_policy;
 }
 
 function toMarkdown(rows: OpsRlsInventoryRow[]) {

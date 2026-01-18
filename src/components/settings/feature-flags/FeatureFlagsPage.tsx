@@ -3,18 +3,12 @@ import { AlertTriangle, BadgeCheck, Loader2, Lock, RefreshCw, ToggleLeft } from 
 
 import { useAuth } from '@/contexts/AuthProvider';
 import { useToast } from '@/contexts/ToastProvider';
-import { useSupabase } from '@/providers/SupabaseProvider';
 import { roleAtLeast, useEmpresaRole } from '@/hooks/useEmpresaRole';
 import { useEmpresaFeatures } from '@/hooks/useEmpresaFeatures';
 import { Button } from '@/components/ui/button';
-
-type FlagsRow = {
-  empresa_id: string;
-  nfe_emissao_enabled: boolean;
-};
+import { setFiscalNfeEmissaoEnabled } from '@/services/fiscalNfeSettings';
 
 export default function FeatureFlagsPage() {
-  const supabase = useSupabase();
   const { activeEmpresa } = useAuth();
   const { addToast } = useToast();
   const empresaRoleQuery = useEmpresaRole();
@@ -41,12 +35,7 @@ export default function FeatureFlagsPage() {
     }
     setSaving(true);
     try {
-      const payload: FlagsRow = {
-        empresa_id: empresaId,
-        nfe_emissao_enabled: !!nfeEnabled,
-      };
-      const { error } = await supabase.from('empresa_feature_flags').upsert(payload, { onConflict: 'empresa_id' });
-      if (error) throw error;
+      await setFiscalNfeEmissaoEnabled(!!nfeEnabled);
       addToast('Feature flags salvas.', 'success');
       setLocalNfeEnabled(null);
       window.dispatchEvent(new Event('empresa-features-refresh'));
@@ -162,4 +151,3 @@ export default function FeatureFlagsPage() {
     </div>
   );
 }
-

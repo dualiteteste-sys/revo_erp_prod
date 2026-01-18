@@ -2,9 +2,9 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { BadgeCheck, Lock, Save } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthProvider';
 import { useToast } from '@/contexts/ToastProvider';
-import { useSupabase } from '@/providers/SupabaseProvider';
 import { useEmpresaFeatures } from '@/hooks/useEmpresaFeatures';
 import { roleAtLeast, useEmpresaRole } from '@/hooks/useEmpresaRole';
+import { getFiscalNfeEmissaoConfig, setFiscalNfeEmissaoEnabled, upsertFiscalNfeEmissaoConfig } from '@/services/fiscalNfeSettings';
 
 type AmbienteNfe = 'homologacao' | 'producao';
 
@@ -21,7 +21,6 @@ const DEFAULT_FORM: NfeConfigForm = {
 };
 
 const NfeEmissaoSettings: React.FC = () => {
-  const supabase = useSupabase();
   const { activeEmpresa } = useAuth();
   const { addToast } = useToast();
   const features = useEmpresaFeatures();
@@ -43,14 +42,7 @@ const NfeEmissaoSettings: React.FC = () => {
       if (!activeEmpresa?.id) return;
       setLoading(true);
       try {
-        const { data, error } = await supabase
-          .from('fiscal_nfe_emissao_configs')
-          .select('ambiente, webhook_secret_hint, observacoes')
-          .eq('empresa_id', activeEmpresa.id)
-          .eq('provider_slug', 'FOCUSNFE')
-          .maybeSingle();
-
-        if (error) throw error;
+        const data = await getFiscalNfeEmissaoConfig('FOCUSNFE');
 
         const next: NfeConfigForm = {
           ambiente: (data?.ambiente as AmbienteNfe) || 'homologacao',
@@ -67,7 +59,7 @@ const NfeEmissaoSettings: React.FC = () => {
     };
 
     load();
-  }, [activeEmpresa?.id, addToast, supabase]);
+  }, [activeEmpresa?.id, addToast]);
 
   const handleToggleNfeEnabled = async (next: boolean) => {
     if (!activeEmpresa?.id) return;
@@ -77,17 +69,7 @@ const NfeEmissaoSettings: React.FC = () => {
     }
     setSavingFeatureFlag(true);
     try {
-      const { error } = await supabase
-        .from('empresa_feature_flags')
-        .upsert(
-          {
-            empresa_id: activeEmpresa.id,
-            nfe_emissao_enabled: next,
-          },
-          { onConflict: 'empresa_id' }
-        );
-
-      if (error) throw error;
+      await setFiscalNfeEmissaoEnabled(next);
       addToast(next ? 'Emissão de NF-e habilitada.' : 'Emissão de NF-e desativada.', 'success');
       window.dispatchEvent(new Event('empresa-features-refresh'));
       await features.refetch();
@@ -106,20 +88,12 @@ const NfeEmissaoSettings: React.FC = () => {
     }
     setSaving(true);
     try {
-      const payload = {
-        empresa_id: activeEmpresa.id,
+      await upsertFiscalNfeEmissaoConfig({
         provider_slug: 'FOCUSNFE',
         ambiente: form.ambiente,
         webhook_secret_hint: form.webhook_secret_hint.trim() || null,
         observacoes: form.observacoes.trim() || null,
-        updated_at: new Date().toISOString(),
-      };
-
-      const { error } = await supabase
-        .from('fiscal_nfe_emissao_configs')
-        .upsert(payload, { onConflict: 'empresa_id,provider_slug' });
-
-      if (error) throw error;
+      });
 
       setInitial(form);
       addToast('Configurações de NF-e salvas com sucesso.', 'success');

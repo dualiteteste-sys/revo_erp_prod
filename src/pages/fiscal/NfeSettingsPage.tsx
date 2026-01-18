@@ -10,6 +10,16 @@ import { useEmpresaFeatures } from '@/hooks/useEmpresaFeatures';
 import { Loader2, Receipt, Save, ShieldCheck, Upload, FileKey, Trash2 } from 'lucide-react';
 import { roleAtLeast, useEmpresaRole } from '@/hooks/useEmpresaRole';
 import RoadmapButton from '@/components/roadmap/RoadmapButton';
+import {
+  getFiscalFeatureFlags,
+  getFiscalNfeEmissaoConfig,
+  getFiscalNfeEmitente,
+  listFiscalNfeNumeracoes,
+  setFiscalNfeEmissaoEnabled,
+  upsertFiscalNfeEmissaoConfig,
+  upsertFiscalNfeEmitente,
+  upsertFiscalNfeNumeracao,
+} from '@/services/fiscalNfeSettings';
 
 type AmbienteNfe = 'homologacao' | 'producao';
 
@@ -91,39 +101,14 @@ export default function NfeSettingsPage({ onEmitenteSaved, onNumeracaoSaved }: P
     if (!empresaId) return;
     setLoading(true);
     try {
-      const [
-        { data: flagRow, error: flagError },
-        { data: cfgFocusRow, error: cfgFocusError },
-        { data: emitRow, error: emitErr },
-        { data: numsRows, error: numErr },
-      ] = await Promise.all([
-        supabase.from('empresa_feature_flags').select('nfe_emissao_enabled').eq('empresa_id', empresaId).maybeSingle(),
-        supabase
-          .from('fiscal_nfe_emissao_configs')
-          .select('id, empresa_id, provider_slug, ambiente, webhook_secret_hint, observacoes')
-          .eq('empresa_id', empresaId)
-          .eq('provider_slug', 'FOCUSNFE')
-          .maybeSingle(),
-        supabase
-          .from('fiscal_nfe_emitente')
-          .select(
-            'empresa_id,razao_social,nome_fantasia,cnpj,ie,im,cnae,crt,endereco_logradouro,endereco_numero,endereco_complemento,endereco_bairro,endereco_municipio,endereco_municipio_codigo,endereco_uf,endereco_cep,telefone,email,certificado_storage_path'
-          )
-          .eq('empresa_id', empresaId)
-          .maybeSingle(),
-        supabase
-          .from('fiscal_nfe_numeracao')
-          .select('id,empresa_id,serie,proximo_numero,ativo')
-          .eq('empresa_id', empresaId)
-          .order('serie', { ascending: true }),
+      const [flags, cfgFocusRow, emitRow, numsRows] = await Promise.all([
+        getFiscalFeatureFlags(),
+        getFiscalNfeEmissaoConfig('FOCUSNFE'),
+        getFiscalNfeEmitente(),
+        listFiscalNfeNumeracoes(),
       ]);
 
-      if (flagError) throw flagError;
-      if (cfgFocusError) throw cfgFocusError;
-      if (emitErr) throw emitErr;
-      if (numErr) throw numErr;
-
-      setNfeEnabled(!!flagRow?.nfe_emissao_enabled);
+      setNfeEnabled(!!flags?.nfe_emissao_enabled);
       setConfig(
         cfgFocusRow
           ? {
@@ -221,10 +206,7 @@ export default function NfeSettingsPage({ onEmitenteSaved, onNumeracaoSaved }: P
     }
     setSavingFlag(true);
     try {
-      const { error } = await supabase
-        .from('empresa_feature_flags')
-        .upsert({ empresa_id: empresaId, nfe_emissao_enabled: nfeEnabled }, { onConflict: 'empresa_id' });
-      if (error) throw error;
+      await setFiscalNfeEmissaoEnabled(nfeEnabled);
       addToast('Configuração da emissão atualizada.', 'success');
       await features.refetch();
       window.dispatchEvent(new Event('empresa-features-refresh'));
@@ -243,18 +225,12 @@ export default function NfeSettingsPage({ onEmitenteSaved, onNumeracaoSaved }: P
     }
     setSaving(true);
     try {
-      const payload = {
-        id: config.id,
-        empresa_id: empresaId,
+      await upsertFiscalNfeEmissaoConfig({
         provider_slug: 'FOCUSNFE',
         ambiente: config.ambiente,
         webhook_secret_hint: config.webhook_secret_hint || null,
         observacoes: config.observacoes || null,
-      };
-      const { error } = await supabase
-        .from('fiscal_nfe_emissao_configs')
-        .upsert(payload, { onConflict: 'empresa_id,provider_slug' });
-      if (error) throw error;
+      });
       addToast('Configurações do provedor salvas.', 'success');
       await fetchData();
     } catch (e: any) {
@@ -290,8 +266,7 @@ export default function NfeSettingsPage({ onEmitenteSaved, onNumeracaoSaved }: P
         endereco_cep: digitsOnly(emitente.endereco_cep || '') || null,
         endereco_municipio_codigo: digitsOnly(emitente.endereco_municipio_codigo || '') || null,
       };
-      const { error } = await supabase.from('fiscal_nfe_emitente').upsert(payload, { onConflict: 'empresa_id' });
-      if (error) throw error;
+      await upsertFiscalNfeEmitente(payload);
       addToast('Emitente salvo.', 'success');
       await fetchData();
       await onEmitenteSaved?.();
@@ -313,17 +288,7 @@ export default function NfeSettingsPage({ onEmitenteSaved, onNumeracaoSaved }: P
 
     setSavingNumeracao(true);
     try {
-      const payload = {
-        id: numeracao.id,
-        empresa_id: empresaId,
-        serie,
-        proximo_numero,
-        ativo: !!numeracao.ativo,
-      };
-      const { error } = await supabase
-        .from('fiscal_nfe_numeracao')
-        .upsert(payload, { onConflict: 'empresa_id,serie' });
-      if (error) throw error;
+      await upsertFiscalNfeNumeracao({ serie, proximo_numero, ativo: !!numeracao.ativo });
       addToast('Numeração salva.', 'success');
       await fetchData();
       await onNumeracaoSaved?.();
@@ -376,10 +341,7 @@ export default function NfeSettingsPage({ onEmitenteSaved, onNumeracaoSaved }: P
       if (error) throw error;
 
       // salva referência no emitente
-      const { error: upErr } = await supabase
-        .from('fiscal_nfe_emitente')
-        .upsert({ empresa_id: empresaId, certificado_storage_path: objectName }, { onConflict: 'empresa_id' });
-      if (upErr) throw upErr;
+      await upsertFiscalNfeEmitente({ empresa_id: empresaId, certificado_storage_path: objectName });
 
       addToast('Certificado enviado (A1).', 'success');
       await fetchData();
@@ -401,10 +363,7 @@ export default function NfeSettingsPage({ onEmitenteSaved, onNumeracaoSaved }: P
       const path = emitente.certificado_storage_path;
       const { error: rmErr } = await supabase.storage.from('nfe_certificados').remove([path]);
       if (rmErr) throw rmErr;
-      const { error: upErr } = await supabase
-        .from('fiscal_nfe_emitente')
-        .upsert({ empresa_id: empresaId, certificado_storage_path: null }, { onConflict: 'empresa_id' });
-      if (upErr) throw upErr;
+      await upsertFiscalNfeEmitente({ empresa_id: empresaId, certificado_storage_path: null });
       addToast('Certificado removido.', 'success');
       await fetchData();
     } catch (e: any) {
