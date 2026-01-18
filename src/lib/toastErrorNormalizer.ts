@@ -51,6 +51,13 @@ function looksLikePortugueseUserMessage(text: string): boolean {
 function normalizeByPatterns(text: string): NormalizedToastError | null {
   const t = text.toLowerCase();
 
+  if (t.includes('nenhuma empresa ativa') || t.includes('sessão sem empresa') || t.includes('selecione sua empresa')) {
+    return {
+      title: "Selecione sua empresa",
+      message: "Para continuar, selecione a empresa ativa e tente novamente.",
+    };
+  }
+
   if (/\bcompany_not_found\b/i.test(text) || t.includes('empresa não encontrada')) {
     return {
       title: "Empresa não encontrada",

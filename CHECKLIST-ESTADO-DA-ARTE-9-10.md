@@ -63,6 +63,8 @@ Definições:
   - [x] (Exceção tratada) `public.wrappers_fdw_stats` (extensão): revogar grants de `authenticated/anon/public` (migration `20270118121500_revoke_wrappers_fdw_stats_grants.sql`).
 - [x] Corrigir itens “MÉDIO” do inventário (policies multi-tenant com `current_empresa_id()`), via migrations.
   - [x] `unidades_medida`, `embalagens`, `industria_ct_aps_config`, `industria_ct_calendario_semana`, `pcp_aps_runs`, `pcp_aps_run_changes` (migration `20270118130000_sec_rls_current_empresa_cadastros_ops.sql`).
+- [x] Garantir que o inventário não tenha itens “MÉDIO” (grants + empresa_id + RLS ON, mas sem policy `current_empresa_id()`).
+  - [x] Gate em `scripts/rg03_db_asserts.sql` (SEC-01b/RG-03).
 - [ ] Garantir que tabelas multi-tenant tenham:
   - [ ] `empresa_id` obrigatório e consistente
   - [ ] policies `USING/WITH CHECK` baseadas em `current_empresa_id()`

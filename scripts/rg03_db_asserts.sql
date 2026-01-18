@@ -235,6 +235,19 @@ begin
     RAISE EXCEPTION 'SEC-01/RG-03: existem tabelas com empresa_id sem RLS habilitado (verifique migrations).';
   END IF;
 
+  -- 8.1) SEC-01b: inventário RLS não pode ter itens "MÉDIO" (tabela com grants + empresa_id + RLS ON, mas sem policy current_empresa_id)
+  -- Evita regressões que voltam a gerar 403 intermitente em tenants.
+  IF EXISTS (
+    SELECT 1
+    FROM public.ops_rls_inventory_list(NULL, 5000, 0)
+    WHERE (grants_select OR grants_insert OR grants_update OR grants_delete)
+      AND has_empresa_id
+      AND rls_enabled
+      AND NOT has_current_empresa_policy
+  ) THEN
+    RAISE EXCEPTION 'SEC-01b/RG-03: inventário RLS com itens MÉDIO (grants + empresa_id, mas sem policy current_empresa_id).';
+  END IF;
+
   -- 9) SEC-02: RPCs SECURITY DEFINER usadas pelo app devem exigir permissão (anti-burla via console)
   IF EXISTS (
     SELECT 1
