@@ -8,6 +8,7 @@ import { useSupabase } from '@/providers/SupabaseProvider';
 import { useAuth } from '@/contexts/AuthProvider';
 import { useToast } from '@/contexts/ToastProvider';
 import { useEmpresaFeatures } from '@/hooks/useEmpresaFeatures';
+import { onboardingWizardStateGet, onboardingWizardStateUpsert } from '@/services/onboardingWizardState';
 
 import type { RoadmapGroup, RoadmapGroupKey, RoadmapStepStatus } from './types';
 import { getRoadmaps } from './roadmaps';
@@ -21,11 +22,6 @@ type Props = {
 type RoadmapState = {
   active?: RoadmapGroupKey;
   ack?: Record<string, true>;
-};
-
-type EmpresaOnboardingRow = {
-  empresa_id: string;
-  steps: Record<string, unknown> | null;
 };
 
 function safeGetRoadmapState(steps: Record<string, unknown> | null | undefined): RoadmapState {
@@ -62,6 +58,7 @@ export default function RoadmapWizardModal({ isOpen, initialKey, onClose }: Prop
   const [statuses, setStatuses] = useState<Record<string, RoadmapStepStatus>>({});
   const [unknownKeys, setUnknownKeys] = useState<Set<string>>(new Set());
   const ackRef = useRef<Record<string, true>>({});
+  const stateRef = useRef<RoadmapState>({});
 
   const roadmaps = useMemo<RoadmapGroup[]>(() => {
     const all = getRoadmaps();
@@ -76,37 +73,28 @@ export default function RoadmapWizardModal({ isOpen, initialKey, onClose }: Prop
 
   const ensureRow = useCallback(async () => {
     if (!empresaId) return;
-    await supabase.from('empresa_onboarding').upsert({ empresa_id: empresaId }, { onConflict: 'empresa_id' });
-  }, [empresaId, supabase]);
+    await onboardingWizardStateGet();
+  }, [empresaId]);
 
   const loadState = useCallback(async (): Promise<RoadmapState> => {
     if (!empresaId) return {};
-    const { data, error } = await supabase.from('empresa_onboarding').select('empresa_id,steps').eq('empresa_id', empresaId).maybeSingle();
-    if (error) return {};
-    const row = (data ?? null) as EmpresaOnboardingRow | null;
-    const state = safeGetRoadmapState((row?.steps ?? null) as any);
+    const row = await onboardingWizardStateGet();
+    const state = safeGetRoadmapState(((row?.steps ?? null) as any) ?? null);
     ackRef.current = state.ack ?? {};
+    stateRef.current = state;
     return state;
-  }, [empresaId, supabase]);
+  }, [empresaId]);
 
   const updateState = useCallback(
     async (patch: Partial<RoadmapState>) => {
       if (!empresaId) return;
-      const { data, error } = await supabase
-        .from('empresa_onboarding')
-        .select('steps')
-        .eq('empresa_id', empresaId)
-        .maybeSingle();
-      if (error) return;
-      const existingSteps = ((data as any)?.steps ?? {}) as Record<string, unknown>;
-      const current = safeGetRoadmapState(existingSteps);
-      const next: RoadmapState = {
-        active: patch.active ?? current.active,
-        ack: patch.ack ?? current.ack,
-      };
-      await supabase.from('empresa_onboarding').update({ steps: { ...existingSteps, roadmap: next } }).eq('empresa_id', empresaId);
+      const current = stateRef.current;
+      const next: RoadmapState = { active: patch.active ?? current.active, ack: patch.ack ?? current.ack };
+      stateRef.current = next;
+      ackRef.current = next.ack ?? {};
+      await onboardingWizardStateUpsert({ steps: { roadmap: next } });
     },
-    [empresaId, supabase]
+    [empresaId]
   );
 
   useEffect(() => {

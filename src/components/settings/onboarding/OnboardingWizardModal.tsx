@@ -5,10 +5,11 @@ import { useNavigate } from 'react-router-dom';
 import Modal from '@/components/ui/Modal';
 import { Button } from '@/components/ui/button';
 import { useSupabase } from '@/providers/SupabaseProvider';
-import { useAuth } from '@/contexts/AuthProvider';
+import { useAppContext } from '@/contexts/AppContextProvider';
 import { useToast } from '@/contexts/ToastProvider';
 import { fetchOnboardingChecks, type OnboardingCheck } from './onboardingChecks';
 import OnboardingStepModal, { isEmbeddedOnboardingStep } from './OnboardingStepModal';
+import { onboardingWizardStateGet, onboardingWizardStateUpsert } from '@/services/onboardingWizardState';
 
 type Props = {
   isOpen: boolean;
@@ -26,7 +27,7 @@ type EmpresaOnboardingRow = {
 
 export default function OnboardingWizardModal({ isOpen, onClose, mode = 'manual', forceStepKey }: Props) {
   const supabase = useSupabase();
-  const { activeEmpresa } = useAuth();
+  const { activeEmpresa } = useAppContext();
   const { addToast } = useToast();
   const navigate = useNavigate();
 
@@ -39,26 +40,27 @@ export default function OnboardingWizardModal({ isOpen, onClose, mode = 'manual'
 
   const ensureOnboardingRow = useCallback(async () => {
     if (!empresaId) return;
-    await supabase.from('empresa_onboarding').upsert({ empresa_id: empresaId }, { onConflict: 'empresa_id' });
-  }, [empresaId, supabase]);
+    await onboardingWizardStateGet();
+  }, [empresaId]);
 
   const loadState = useCallback(async () => {
     if (!empresaId) return null;
-    const { data, error } = await supabase
-      .from('empresa_onboarding')
-      .select('empresa_id,wizard_dismissed_at,last_step_key,steps')
-      .eq('empresa_id', empresaId)
-      .maybeSingle();
-    if (error) return null;
-    return (data ?? null) as EmpresaOnboardingRow | null;
-  }, [empresaId, supabase]);
+    const row = await onboardingWizardStateGet();
+    return row ? (row as unknown as EmpresaOnboardingRow) : null;
+  }, [empresaId]);
 
   const updateState = useCallback(
     async (patch: Partial<EmpresaOnboardingRow>) => {
       if (!empresaId) return;
-      await supabase.from('empresa_onboarding').update(patch).eq('empresa_id', empresaId);
+      await onboardingWizardStateUpsert({
+        wizard_dismissed_at:
+          typeof patch.wizard_dismissed_at === "string" || patch.wizard_dismissed_at === null
+            ? (patch.wizard_dismissed_at as any)
+            : undefined,
+        last_step_key: typeof patch.last_step_key === "string" || patch.last_step_key === null ? (patch.last_step_key as any) : undefined,
+      });
     },
-    [empresaId, supabase]
+    [empresaId]
   );
 
   const refresh = useCallback(async (): Promise<OnboardingCheck[]> => {

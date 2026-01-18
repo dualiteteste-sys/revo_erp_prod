@@ -59,7 +59,7 @@ Definições:
 - [ ] Corrigir RLS crítico: tabelas que permitem leitura ampla indevida (ex.: policies `using(true)`).
   - [x] Corrigir `public.empresas`: remover `using(true)` e restringir SELECT por membership/owner (migration).
 - [x] Remover/evitar “grants sem RLS” em tabelas `public` (gated por asserts RG01).
-  - [ ] (Exceção a tratar) `public.wrappers_fdw_stats` (extensão) pode vir com grants amplos e não é tenant-data.
+  - [x] (Exceção tratada) `public.wrappers_fdw_stats` (extensão): revogar grants de `authenticated/anon/public` (migration `20270118121500_revoke_wrappers_fdw_stats_grants.sql`).
 - [ ] Garantir que tabelas multi-tenant tenham:
   - [ ] `empresa_id` obrigatório e consistente
   - [ ] policies `USING/WITH CHECK` baseadas em `current_empresa_id()`
@@ -72,6 +72,7 @@ Definições:
 - [x] RPC-first (Billing): substituir `supabase.from('plans'/'subscriptions'/'billing_stripe_webhook_events')` por RPCs (`billing_plans_public_list`, `billing_subscription_with_plan_get`, `billing_stripe_webhook_events_list`).
 - [x] RPC-first (Fiscal/NF-e settings): remover escrita direta do client e exigir admin no backend (RPCs `fiscal_feature_flags_set`, `fiscal_nfe_emissao_config_*`, `fiscal_nfe_emitente_*`, `fiscal_nfe_numeracao_*`).
 - [x] RPC-first (Fiscal/NF-e emissões): remover leitura/escrita direta no client e exigir RPCs tenant-safe (RPCs `fiscal_nfe_emissoes_list`, `fiscal_nfe_emissao_itens_list`, `fiscal_nfe_audit_timeline_list`, `fiscal_nfe_emissao_draft_upsert`).
+- [x] RPC-first (Onboarding/Roadmap): remover acesso direto do client a `empresa_onboarding` e persistir via RPC (`onboarding_wizard_state_get`, `onboarding_wizard_state_upsert`).
 - [x] RPC-first (Financeiro): substituir `supabase.from('financeiro_conciliacao_regras')` por RPCs SECURITY DEFINER com RBAC (tesouraria).
 - [x] RPC-first (RBAC): substituir `supabase.from('roles/permissions/role_permissions')` por RPCs SECURITY DEFINER com `roles:manage` e update atômico.
 - [x] Padronizar respostas de erro (códigos + mensagens PT-BR) e traduzir para UX palatável (`src/lib/toastErrorNormalizer.ts`).
