@@ -24,6 +24,16 @@ async function safeRpcList<T>(supabase: SupabaseClient, fn: string, args: Record
   }
 }
 
+async function safeRpcValue<T>(supabase: SupabaseClient, fn: string, args: Record<string, any> = {}): Promise<T | null> {
+  try {
+    const { data, error } = await supabase.rpc(fn as any, args as any);
+    if (error) return null;
+    return (data as T) ?? null;
+  } catch {
+    return null;
+  }
+}
+
 async function safeTableHasAny(
   supabase: SupabaseClient,
   table: string,
@@ -426,8 +436,8 @@ export function getRoadmaps(): RoadmapGroup[] {
           actionLabel: 'Abrir Configurações NF-e',
           actionHref: '/app/fiscal/nfe/configuracoes',
           check: async (supabase) => {
-            const has = await safeTableHasAny(supabase, 'fiscal_nfe_emitente');
-            return requireKnown(has, 'Não foi possível validar emitente agora.');
+            const row = await safeRpcValue<any>(supabase, 'fiscal_nfe_emitente_get');
+            return requireKnown(row !== null, 'Não foi possível validar emitente agora.');
           },
         },
         {
@@ -437,8 +447,8 @@ export function getRoadmaps(): RoadmapGroup[] {
           actionLabel: 'Abrir Configurações NF-e',
           actionHref: '/app/fiscal/nfe/configuracoes',
           check: async (supabase) => {
-            const has = await safeTableHasAny(supabase, 'fiscal_nfe_numeracao');
-            return requireKnown(has, 'Não foi possível validar numeração agora.');
+            const rows = await safeRpcList<any>(supabase, 'fiscal_nfe_numeracoes_list', {});
+            return requireKnown(rows, 'Não foi possível validar numeração agora.').length > 0;
           },
         },
         {
@@ -448,8 +458,8 @@ export function getRoadmaps(): RoadmapGroup[] {
           actionLabel: 'Abrir NF-e (Rascunhos)',
           actionHref: '/app/fiscal/nfe',
           check: async (supabase) => {
-            const has = await safeTableHasAny(supabase, 'fiscal_nfe_emissoes');
-            return requireKnown(has, 'Não foi possível validar rascunhos de NF-e agora.');
+            const rows = await safeRpcList<any>(supabase, 'fiscal_nfe_emissoes_list', { p_status: null, p_q: null, p_limit: 1 });
+            return requireKnown(rows, 'Não foi possível validar rascunhos de NF-e agora.').length > 0;
           },
         },
       ],

@@ -39,6 +39,15 @@ export class GlobalErrorBoundary extends Component<Props, State> {
 
     public render() {
         if (this.state.hasError) {
+            const showInternalLinks = (() => {
+                if (import.meta.env.DEV) return true;
+                try {
+                    return window.location?.pathname?.startsWith('/app/desenvolvedor') ?? false;
+                } catch {
+                    return false;
+                }
+            })();
+
             return (
                 <div className="min-h-screen flex items-center justify-center bg-gray-50 p-4">
                     <div className="max-w-md w-full bg-white rounded-lg shadow-xl p-8 text-center">
@@ -56,26 +65,34 @@ export class GlobalErrorBoundary extends Component<Props, State> {
                             Encontramos um erro inesperado. Nossa equipe já foi notificada (se os logs estiverem configurados).
                         </p>
 
-                        <div className="mb-6 grid grid-cols-1 gap-2">
-                            <a
-                                href="/app/desenvolvedor/saude"
-                                className="text-sm font-medium text-blue-700 hover:text-blue-800 hover:underline"
-                            >
-                                Abrir diagnóstico (Saúde)
-                            </a>
-                            <a
-                                href="/app/desenvolvedor/logs"
-                                className="text-sm font-medium text-blue-700 hover:text-blue-800 hover:underline"
-                            >
-                                Abrir logs (se habilitado)
-                            </a>
-                            <a
-                                href="/app/desenvolvedor/error-reports"
-                                className="text-sm font-medium text-blue-700 hover:text-blue-800 hover:underline"
-                            >
-                                Abrir error reports (Beta)
-                            </a>
-                        </div>
+                        <a
+                            href="/app/suporte"
+                            className="mb-6 block text-sm font-medium text-blue-700 hover:text-blue-800 hover:underline"
+                        >
+                            Abrir diagnóstico guiado (Suporte)
+                        </a>
+                        {showInternalLinks ? (
+                            <div className="mb-6 grid grid-cols-1 gap-2">
+                                <a
+                                    href="/app/desenvolvedor/saude"
+                                    className="text-sm font-medium text-blue-700 hover:text-blue-800 hover:underline"
+                                >
+                                    Abrir diagnóstico (Saúde)
+                                </a>
+                                <a
+                                    href="/app/desenvolvedor/logs"
+                                    className="text-sm font-medium text-blue-700 hover:text-blue-800 hover:underline"
+                                >
+                                    Abrir logs (interno)
+                                </a>
+                                <a
+                                    href="/app/desenvolvedor/error-reports"
+                                    className="text-sm font-medium text-blue-700 hover:text-blue-800 hover:underline"
+                                >
+                                    Abrir error reports (Beta)
+                                </a>
+                            </div>
+                        ) : null}
 
                         {import.meta.env.DEV && this.state.error && (
                             <div className="mb-6 p-4 bg-gray-100 rounded text-left overflow-auto max-h-48">

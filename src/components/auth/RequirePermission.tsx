@@ -1,7 +1,7 @@
 import { useMemo } from "react";
 import { Loader2 } from "lucide-react";
-import { useAuth } from "@/contexts/AuthProvider";
-import { roleAtLeast, useEmpresaRole } from "@/hooks/useEmpresaRole";
+import { useAppContext } from "@/contexts/AppContextProvider";
+import { roleAtLeast } from "@/hooks/useEmpresaRole";
 import { useHasPermission } from "@/hooks/useHasPermission";
 
 type Permission = { domain: string; action: string };
@@ -13,16 +13,14 @@ export default function RequirePermission({
   permission?: Permission; // se não passar, apenas exige sessão
   children: React.ReactNode;
 }) {
-  const { session } = useAuth();
-  const empresaRoleQuery = useEmpresaRole();
-  const isAdminLike = empresaRoleQuery.isFetched && roleAtLeast(empresaRoleQuery.data, "admin");
+  const { session, empresaRole, empresaRoleLoading, isAdminLike } = useAppContext();
   const isOpsDomain = (permission?.domain ?? "") === "ops" || (permission?.domain ?? "").startsWith("ops:");
 
   // Estado da arte:
   // - Admin/Owner: permissões amplas dentro do tenant.
   // - "ops/*": reservado para usuários internos; sempre checar permissão explicitamente.
   const shouldCheckPermission =
-    !!session && !!permission && empresaRoleQuery.isFetched && (!isAdminLike || isOpsDomain);
+    !!session && !!permission && !empresaRoleLoading && (!isAdminLike || isOpsDomain);
   const permQuery = useHasPermission(permission?.domain || "", permission?.action || "");
 
   const state = useMemo(() => {
@@ -32,10 +30,10 @@ export default function RequirePermission({
     if (!permission) {
       return { allowed: true, loading: false, message: "" };
     }
-    if (!empresaRoleQuery.isFetched) {
+    if (empresaRoleLoading) {
       return { allowed: null, loading: true, message: "Verificando permissões…" };
     }
-    if (isAdminLike && !isOpsDomain) {
+    if ((isAdminLike || roleAtLeast(empresaRole, "admin")) && !isOpsDomain) {
       return { allowed: true, loading: false, message: "" };
     }
     if (!shouldCheckPermission) {
@@ -49,7 +47,8 @@ export default function RequirePermission({
   }, [
     session,
     permission,
-    empresaRoleQuery.isFetched,
+    empresaRoleLoading,
+    empresaRole,
     isAdminLike,
     isOpsDomain,
     shouldCheckPermission,

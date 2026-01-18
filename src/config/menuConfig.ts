@@ -183,8 +183,8 @@ export const menuConfig: MenuItem[] = [
       { name: 'Inventário RLS', icon: Database, href: '/app/desenvolvedor/rls', permission: { domain: 'ops', action: 'view' } },
       { name: 'Backups', icon: Database, href: '/app/desenvolvedor/backups', permission: { domain: 'ops', action: 'view' } },
       { name: 'Backup por Empresa', icon: Database, href: '/app/desenvolvedor/backups-tenant', permission: { domain: 'ops', action: 'view' } },
-      { name: 'Logs', icon: FileText, href: '/app/desenvolvedor/logs', permission: { domain: 'logs', action: 'view' } },
-      { name: 'Supabase Demo', icon: Database, href: '/app/desenvolvedor/supabase-demo' },
+      { name: 'Logs', icon: FileText, href: '/app/desenvolvedor/logs', permission: { domain: 'ops', action: 'view' } },
+      { name: 'Supabase Demo', icon: Database, href: '/app/desenvolvedor/supabase-demo', permission: { domain: 'ops', action: 'manage' } },
     ],
   },
   {
