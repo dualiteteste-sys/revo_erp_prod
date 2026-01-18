@@ -59,6 +59,38 @@ export const handlers = [
             return HttpResponse.json('owner');
         }
 
+        if (functionName === 'empresa_features_get') {
+            return HttpResponse.json([
+                {
+                    revo_send_enabled: true,
+                    nfe_emissao_enabled: true,
+                    plano_mvp: 'ambos',
+                    max_users: 999,
+                    max_nfe_monthly: 999,
+                    servicos_enabled: true,
+                    industria_enabled: true,
+                    updated_at: new Date().toISOString(),
+                }
+            ]);
+        }
+
+        if (functionName === 'empresa_features_set') {
+            // Best-effort merge para simular update.
+            const patch = (body?.p_patch ?? {}) as any;
+            return HttpResponse.json([
+                {
+                    revo_send_enabled: patch.revo_send_enabled ?? true,
+                    nfe_emissao_enabled: patch.nfe_emissao_enabled ?? true,
+                    plano_mvp: patch.plano_mvp ?? 'ambos',
+                    max_users: patch.max_users ?? 999,
+                    max_nfe_monthly: patch.max_nfe_monthly ?? 999,
+                    servicos_enabled: patch.servicos_enabled ?? true,
+                    industria_enabled: patch.industria_enabled ?? true,
+                    updated_at: new Date().toISOString(),
+                }
+            ]);
+        }
+
         // Default fallback for unhandled RPCs
         return HttpResponse.json({ error: `Unhandled RPC: ${functionName}` }, { status: 500 });
     }),
@@ -85,7 +117,7 @@ export const handlers = [
         ]);
     }),
 
-    http.get(`${supabaseUrl}/rest/v1/empresa_features`, ({ request }) => {
+  http.get(`${supabaseUrl}/rest/v1/empresa_features`, ({ request }) => {
         console.log('[MSW] GET empresa_features', request.url);
         return HttpResponse.json({
             empresa_id: 'empresa-1',
@@ -96,7 +128,7 @@ export const handlers = [
             servicos_enabled: true,
             industria_enabled: true,
         });
-    }),
+  }),
 
     // Auth endpoints
     http.post(`${supabaseUrl}/auth/v1/token`, ({ request }) => {

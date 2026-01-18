@@ -1,10 +1,8 @@
 import { useCallback, useEffect, useState } from 'react';
-import { useSupabase } from '@/providers/SupabaseProvider';
 import { useAuth } from '@/contexts/AuthProvider';
 import { logger } from '@/lib/logger';
 import { getLocalPlanSlug, isLocalBillingBypassEnabled } from '@/lib/localDev';
-
-export type PlanoMvp = 'servicos' | 'industria' | 'ambos';
+import { empresaFeaturesGet, type PlanoMvp } from '@/services/empresaFeatures';
 
 export interface EmpresaFeatures {
   revo_send_enabled: boolean;
@@ -33,7 +31,6 @@ const DEFAULT_FEATURES: Omit<EmpresaFeatures, 'loading' | 'refetch'> = {
 };
 
 export function useEmpresaFeatures(): EmpresaFeatures {
-  const supabase = useSupabase();
   const { activeEmpresa } = useAuth();
   const [loading, setLoading] = useState(true);
   const [features, setFeatures] = useState(DEFAULT_FEATURES);
@@ -69,15 +66,8 @@ export function useEmpresaFeatures(): EmpresaFeatures {
 
     setLoading(true);
     try {
-      const { data, error } = await supabase
-        .from('empresa_features')
-        .select(
-          'revo_send_enabled, nfe_emissao_enabled, plano_mvp, max_users, max_nfe_monthly, servicos_enabled, industria_enabled'
-        )
-        .eq('empresa_id', empresaId)
-        .single();
-
-      if (error) throw error;
+      const data = await empresaFeaturesGet();
+      if (!data) throw new Error('Falha ao carregar empresa_features.');
 
       setFeatures({
         revo_send_enabled: !!data?.revo_send_enabled,
@@ -107,7 +97,7 @@ export function useEmpresaFeatures(): EmpresaFeatures {
     } finally {
       setLoading(false);
     }
-  }, [activeEmpresa?.id, localBypass, supabase]);
+  }, [activeEmpresa?.id, localBypass]);
 
   useEffect(() => {
     void fetch();

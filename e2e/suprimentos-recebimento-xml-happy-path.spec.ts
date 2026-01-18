@@ -107,6 +107,21 @@ async function mockAuthAndEmpresa(page: Page) {
       },
     });
   });
+  await page.route('**/rest/v1/rpc/empresa_features_get*', async (route) => {
+    await route.fulfill({
+      json: [
+        {
+          empresa_id: 'empresa-1',
+          revo_send_enabled: false,
+          nfe_emissao_enabled: false,
+          plano_mvp: 'servicos',
+          max_users: 2,
+          servicos_enabled: true,
+          industria_enabled: false,
+        },
+      ],
+    });
+  });
 }
 
 test('SUP-03: importar XML → criar recebimento → finalizar (happy path)', async ({ page }) => {

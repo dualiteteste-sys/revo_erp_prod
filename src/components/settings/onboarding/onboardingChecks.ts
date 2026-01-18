@@ -35,42 +35,20 @@ export async function fetchOnboardingChecks(
     // ignore and fallback
   }
 
-  const [
-    ccAny,
-    ccRec,
-    ccPag,
-    nfeEmitente,
-    nfeNumeracao,
-    centrosCusto,
-  ] = await Promise.all([
-    supabase
-      .from('financeiro_contas_correntes')
-      .select('id', { count: 'exact', head: true })
-      .eq('empresa_id', empresaId),
-    supabase
-      .from('financeiro_contas_correntes')
-      .select('id')
-      .eq('empresa_id', empresaId)
-      .eq('padrao_para_recebimentos', true)
-      .limit(1),
-    supabase
-      .from('financeiro_contas_correntes')
-      .select('id')
-      .eq('empresa_id', empresaId)
-      .eq('padrao_para_pagamentos', true)
-      .limit(1),
-    // RPC-first (Fiscal): evita depender de grants diretos nessas tabelas.
+  const [ccList, nfeEmitente, nfeNumeracao, centros] = await Promise.all([
+    supabase.rpc('financeiro_contas_correntes_list', { p_q: null, p_limit: 200 }),
     supabase.rpc('fiscal_nfe_emitente_get'),
     supabase.rpc('fiscal_nfe_numeracoes_list'),
-    supabase.from('centros_de_custo').select('id', { count: 'exact', head: true }).eq('empresa_id', empresaId),
+    supabase.rpc('financeiro_centros_custos_list', { p_q: null, p_tipo: null, p_limit: 1 }),
   ]);
 
-  const hasContaCorrente = !ccAny.error && (ccAny.count ?? 0) > 0;
-  const hasPadraoReceb = !ccRec.error && (ccRec.data?.length ?? 0) > 0;
-  const hasPadraoPag = !ccPag.error && (ccPag.data?.length ?? 0) > 0;
+  const contas = Array.isArray(ccList.data) ? (ccList.data as any[]) : [];
+  const hasContaCorrente = !ccList.error && contas.length > 0;
+  const hasPadraoReceb = contas.some((c) => !!c?.padrao_para_recebimentos);
+  const hasPadraoPag = contas.some((c) => !!c?.padrao_para_pagamentos);
   const hasEmitente = !nfeEmitente.error && !!(nfeEmitente.data as any)?.empresa_id;
   const hasNumeracao = !nfeNumeracao.error && Array.isArray(nfeNumeracao.data) && nfeNumeracao.data.length > 0;
-  const hasCentros = !centrosCusto.error && (centrosCusto.count ?? 0) > 0;
+  const hasCentros = !centros.error && Array.isArray(centros.data) && centros.data.length > 0;
 
   const checks: OnboardingCheck[] = [
     {

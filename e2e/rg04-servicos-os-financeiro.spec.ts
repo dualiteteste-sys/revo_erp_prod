@@ -107,6 +107,21 @@ async function mockAuthAndEmpresa(page: Page) {
       },
     });
   });
+  await page.route('**/rest/v1/rpc/empresa_features_get*', async (route) => {
+    await route.fulfill({
+      json: [
+        {
+          empresa_id: 'empresa-1',
+          revo_send_enabled: false,
+          nfe_emissao_enabled: false,
+          plano_mvp: 'ambos',
+          max_users: 999,
+          servicos_enabled: true,
+          industria_enabled: true,
+        },
+      ],
+    });
+  });
 }
 
 test('RG-04 (Serviços): concluir OS → gerar Conta a Receber (happy path)', async ({ page }) => {

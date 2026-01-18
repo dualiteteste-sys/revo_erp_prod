@@ -144,6 +144,21 @@ test('should allow user to log in and view products', async ({ page }) => {
         },
       });
     });
+    await page.route('**/rest/v1/rpc/empresa_features_get*', async (route) => {
+      await route.fulfill({
+        json: [
+          {
+            empresa_id: 'empresa-1',
+            revo_send_enabled: false,
+            nfe_emissao_enabled: false,
+            plano_mvp: 'ambos',
+            max_users: 999,
+            servicos_enabled: true,
+            industria_enabled: true,
+          },
+        ],
+      });
+    });
 
     // Mock Products List RPC
     await page.route('**/rest/v1/rpc/produtos_list_for_current_user', async route => {
@@ -311,6 +326,21 @@ test('auto-seleciona empresa quando empresa ativa está ausente', async ({ page 
           servicos_enabled: true,
           industria_enabled: true,
         },
+      });
+    });
+    await page.route('**/rest/v1/rpc/empresa_features_get*', async (route) => {
+      await route.fulfill({
+        json: [
+          {
+            empresa_id: 'empresa-1',
+            revo_send_enabled: false,
+            nfe_emissao_enabled: false,
+            plano_mvp: 'ambos',
+            max_users: 999,
+            servicos_enabled: true,
+            industria_enabled: true,
+          },
+        ],
       });
     });
 

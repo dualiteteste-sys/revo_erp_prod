@@ -115,6 +115,21 @@ test('CFG-04: Feature Flags (NF-e) salva por admin', async ({ page }) => {
       },
     });
   });
+  await page.route('**/rest/v1/rpc/empresa_features_get*', async (route) => {
+    await route.fulfill({
+      json: [
+        {
+          empresa_id: 'empresa-1',
+          revo_send_enabled: false,
+          nfe_emissao_enabled: nfeEnabled,
+          plano_mvp: 'ambos',
+          max_users: 999,
+          servicos_enabled: true,
+          industria_enabled: true,
+        },
+      ],
+    });
+  });
 
   await page.route('**/rest/v1/empresa_feature_flags*', async (route) => {
     const req = route.request();

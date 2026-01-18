@@ -105,6 +105,21 @@ test('dev pages: Ops 403 e Inventário RLS carregam sem erro', async ({ page }) 
       },
     });
   });
+  await page.route('**/rest/v1/rpc/empresa_features_get*', async (route) => {
+    await route.fulfill({
+      json: [
+        {
+          empresa_id: 'empresa-1',
+          revo_send_enabled: false,
+          nfe_emissao_enabled: false,
+          plano_mvp: 'ambos',
+          max_users: 999,
+          servicos_enabled: true,
+          industria_enabled: true,
+        },
+      ],
+    });
+  });
 
   await page.route('**/rest/v1/rpc/ops_403_events_count', async (route) => {
     await route.fulfill({ json: 0 });
