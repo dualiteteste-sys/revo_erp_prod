@@ -36,7 +36,7 @@ Definições:
 
 ### 0.2 RBAC e áreas internas (Ops/Dev)
 - [x] Garantir que `ops/*` e ferramentas internas exijam permissão explícita (sem bypass por admin/owner).
-- [ ] Padronizar verificação de permissão: UI (guards) + backend (RPC) coerentes.
+- [x] Padronizar verificação de permissão: UI (guards) + backend (RPC) coerentes.
 - [x] Garantir que o sistema não dispare chamadas “ops” em telas de usuário final.
   - [x] Dashboard: trocar `ops_app_logs_list` por RPC tenant-safe `dashboard_activity_feed`.
   - [x] Remover links diretos para `/app/desenvolvedor/*` do ErrorBoundary e expor apenas para `ops:view`.
@@ -57,7 +57,7 @@ Definições:
 - [x] Link (evidência): `https://github.com/dualiteteste-sys/revo_erp_prod/actions/runs/21106091992`
 - [x] Ajustar heurística do inventário para considerar membership (`empresa_usuarios` + `auth.uid()`) como tenant-safe (reduz “MÉDIO” falso-positivo).
 - [x] Refinar classificação “MÉDIO”: não sinalizar como “MÉDIO” tabelas sem grants para `authenticated` (service_role-only/internal), para reduzir ruído operacional.
-- [ ] Corrigir RLS crítico: tabelas que permitem leitura ampla indevida (ex.: policies `using(true)`).
+- [x] Corrigir RLS crítico: tabelas que permitem leitura ampla indevida (ex.: policies `using(true)`).
   - [x] Corrigir `public.empresas`: remover `using(true)` e restringir SELECT por membership/owner (migration).
 - [x] Remover/evitar “grants sem RLS” em tabelas `public` (gated por asserts RG01).
   - [x] (Exceção tratada) `public.wrappers_fdw_stats` (extensão): revogar grants de `authenticated/anon/public` (migration `20270118121500_revoke_wrappers_fdw_stats_grants.sql`).
@@ -66,7 +66,7 @@ Definições:
 - [x] Garantir que o inventário não tenha itens “MÉDIO” (grants + empresa_id + RLS ON, mas sem policy `current_empresa_id()`).
   - [x] Gate em `scripts/rg03_db_asserts.sql` (SEC-01b/RG-03).
 - [ ] Garantir que tabelas multi-tenant tenham:
-  - [ ] `empresa_id` obrigatório e consistente
+  - [x] `empresa_id` obrigatório e consistente (guardrails via migration `20270118193000_mt_empresa_id_guardrails.sql`).
   - [ ] policies `USING/WITH CHECK` baseadas em `current_empresa_id()`
   - [ ] índices mínimos para filtros por `empresa_id`
 
@@ -87,6 +87,7 @@ Definições:
 
 ### 1.3 Segurança de funções e grants
 - [ ] Revisar RPCs `SECURITY DEFINER`: sempre filtrar por `current_empresa_id()` e validar permissões.
+  - [x] Financeiro: gate de hardening em `scripts/verify_financeiro_rpc_first.sql` (tenant + permission guard + search_path) + fixes em `supabase/migrations/20270118202000_fin_hardening_security_definer_financeiro.sql`.
 - [ ] Padronizar grants: `anon`/`authenticated` mínimos; `service_role` apenas onde necessário.
 - [ ] Padronizar “ops/service” tables: somente service_role escreve; leitura controlada.
 
