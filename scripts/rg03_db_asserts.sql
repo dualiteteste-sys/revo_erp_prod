@@ -408,6 +408,30 @@ begin
     END IF;
   END IF;
 
+  -- 10.1) MT-EMPID-01: guardrails empresa_id NN devem estar validados em VERIFY
+  -- (em PROD pode haver legado; em VERIFY esperamos schema "limpo" e enforcement real).
+  IF EXISTS (
+    SELECT 1
+    FROM pg_constraint con
+    JOIN pg_class rel ON rel.oid = con.conrelid
+    JOIN pg_namespace nsp ON nsp.oid = rel.relnamespace
+    WHERE nsp.nspname = 'public'
+      AND con.contype = 'c'
+      AND (
+        con.conname ~ '^ck_.*_empresa_id_nn$'
+        OR con.conname ~ '^ck_empid_nn_.*$'
+      )
+      AND rel.relname NOT IN (
+        'ops_403_events',
+        'ops_app_errors',
+        'unidades_medida',
+        'embalagens'
+      )
+      AND con.convalidated IS DISTINCT FROM true
+  ) THEN
+    RAISE EXCEPTION 'RG-03/MT-EMPID-01: existem constraints empresa_id NN (guardrails) ainda NOT VALID no ambiente verify.';
+  END IF;
+
   -- 9.1) SVC-CT-01: evita bug de assignment de composite via SELECT INTO (causa 400 e console sujo)
   -- Em PL/pgSQL, `SELECT func() INTO v_composite;` com select-list de 1 coluna
   -- tenta atribuir ao *primeiro campo* do composite, gerando cast inválido para uuid.

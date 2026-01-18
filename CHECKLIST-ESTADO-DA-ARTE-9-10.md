@@ -44,6 +44,7 @@ Definições:
 **Aceite P0**
 - [ ] 0 ocorrências de 403 intermitente em `dev` por 72h (fluxos core).
 - [ ] `yarn test:e2e:gate:all` verde com console-sweep limpo.
+- [x] Monitoramento contínuo em DEV: workflow `OPS health alert (DEV)` (a cada 15 min) abre issue quando `kind=missing_active_empresa` > 0.
 
 ---
 
@@ -66,7 +67,7 @@ Definições:
 - [x] Garantir que o inventário não tenha itens “MÉDIO” (grants + empresa_id + RLS ON, mas sem policy `current_empresa_id()`).
   - [x] Gate em `scripts/rg03_db_asserts.sql` (SEC-01b/RG-03).
 - [ ] Garantir que tabelas multi-tenant tenham:
-  - [x] `empresa_id` obrigatório e consistente (guardrails via migration `20270118193000_mt_empresa_id_guardrails.sql`).
+  - [x] `empresa_id` obrigatório e consistente (guardrails via migration `20270118193000_mt_empresa_id_guardrails.sql`), com exceções explícitas para catálogos globais (`unidades_medida`, `embalagens`).
   - [ ] policies `USING/WITH CHECK` baseadas em `current_empresa_id()`
   - [ ] índices mínimos para filtros por `empresa_id`
 
