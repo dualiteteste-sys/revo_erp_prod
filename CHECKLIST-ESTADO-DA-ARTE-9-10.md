@@ -45,11 +45,13 @@ Definições:
 ## P1 — Segurança / AppSec (RLS + RPC) (meta 9/10)
 
 ### 1.1 RLS: isolamento por empresa (inventário e correções)
-- [ ] Rodar inventário RLS (UI/RPC) e exportar snapshot (dev e prod).
+- [x] Rodar inventário RLS (UI/RPC) e exportar snapshot (dev e prod).
 - [x] Automatizar snapshot RLS via GitHub Actions (`.github/workflows/ops-rls-snapshot.yml`).
-- [ ] Evidência snapshot RLS (DEV): anexar/colar link do arquivo exportado (JSON) + data/hora.
-- [ ] Evidência snapshot RLS (PROD): anexar/colar link do arquivo exportado (JSON) + data/hora.
+- [x] Evidência snapshot RLS (DEV): Run `21106091992` (label `audit-20260118-013608-dev`) + artifacts `rls_snapshot_dev.json`/`.id` (baixado em `artifacts/rls-snapshot-21106091992/rls-snapshot-dev`).
+- [x] Evidência snapshot RLS (PROD): Run `21106091992` (label `audit-20260118-013608-prod`) + artifacts `rls_snapshot_prod.json`/`.id` (baixado em `artifacts/rls-snapshot-21106091992/rls-snapshot-prod`).
+- [x] Link (evidência): `https://github.com/dualiteteste-sys/revo_erp_prod/actions/runs/21106091992`
 - [x] Ajustar heurística do inventário para considerar membership (`empresa_usuarios` + `auth.uid()`) como tenant-safe (reduz “MÉDIO” falso-positivo).
+- [x] Refinar classificação “MÉDIO”: não sinalizar como “MÉDIO” tabelas sem grants para `authenticated` (service_role-only/internal), para reduzir ruído operacional.
 - [ ] Corrigir RLS crítico: tabelas que permitem leitura ampla indevida (ex.: policies `using(true)`).
   - [x] Corrigir `public.empresas`: remover `using(true)` e restringir SELECT por membership/owner (migration).
 - [x] Remover/evitar “grants sem RLS” em tabelas `public` (gated por asserts RG01).
@@ -62,7 +64,9 @@ Definições:
 ### 1.2 Acesso a dados: RPC-first para áreas sensíveis
 - [ ] Definir regra: “acesso direto a tabela” permitido **somente** quando RLS for simples e auditado.
 - [ ] Migrar acesso direto do client para RPC em domínios críticos (billing, financeiro, indústria, LGPD).
+- [x] Inventário `supabase.from()` atualizado (regex cobre quebras de linha) e exportado em `INVENTARIO-SUPABASE-FROM.md`.
 - [x] RPC-first (Billing): substituir `supabase.from('plans'/'subscriptions'/'billing_stripe_webhook_events')` por RPCs (`billing_plans_public_list`, `billing_subscription_with_plan_get`, `billing_stripe_webhook_events_list`).
+- [x] RPC-first (Fiscal/NF-e settings): remover escrita direta do client e exigir admin no backend (RPCs `fiscal_feature_flags_set`, `fiscal_nfe_emissao_config_*`, `fiscal_nfe_emitente_*`, `fiscal_nfe_numeracao_*`).
 - [x] RPC-first (Financeiro): substituir `supabase.from('financeiro_conciliacao_regras')` por RPCs SECURITY DEFINER com RBAC (tesouraria).
 - [x] RPC-first (RBAC): substituir `supabase.from('roles/permissions/role_permissions')` por RPCs SECURITY DEFINER com `roles:manage` e update atômico.
 - [x] Padronizar respostas de erro (códigos + mensagens PT-BR) e traduzir para UX palatável (`src/lib/toastErrorNormalizer.ts`).

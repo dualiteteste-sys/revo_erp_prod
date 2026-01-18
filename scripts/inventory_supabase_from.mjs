@@ -29,7 +29,8 @@ function domainForFile(filePath) {
 
 function extractTables(source) {
   const tables = [];
-  const re = /supabase\.from\(\s*(['"`])([^'"`]+)\1\s*\)/g;
+  // Captura `supabase.from('table')` mesmo quando há quebras de linha/espaços entre `supabase` e `.from`.
+  const re = /\bsupabase\s*\.\s*from\(\s*(['"`])([^'"`]+)\1\s*\)/g;
   let m;
   while ((m = re.exec(source))) {
     tables.push(m[2]);
@@ -42,7 +43,7 @@ const files = walk(SRC).filter((f) => /\.(ts|tsx)$/.test(f));
 const byDomain = new Map();
 for (const file of files) {
   const src = fs.readFileSync(file, 'utf8');
-  if (!src.includes('supabase.from(')) continue;
+  if (!/\bsupabase\s*\.\s*from\(/.test(src)) continue;
   const tables = extractTables(src);
   if (!tables.length) continue;
   const domain = domainForFile(file);
@@ -83,4 +84,3 @@ for (const [domain, data] of domains) {
 const outPath = path.join(ROOT, 'INVENTARIO-SUPABASE-FROM.md');
 fs.writeFileSync(outPath, lines.join('\n'), 'utf8');
 console.log(`Wrote ${path.relative(ROOT, outPath)}`);
-

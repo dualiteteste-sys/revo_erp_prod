@@ -59,16 +59,17 @@ export async function fetchOnboardingChecks(
       .eq('empresa_id', empresaId)
       .eq('padrao_para_pagamentos', true)
       .limit(1),
-    supabase.from('fiscal_nfe_emitente').select('empresa_id').eq('empresa_id', empresaId).maybeSingle(),
-    supabase.from('fiscal_nfe_numeracao').select('empresa_id').eq('empresa_id', empresaId).maybeSingle(),
+    // RPC-first (Fiscal): evita depender de grants diretos nessas tabelas.
+    supabase.rpc('fiscal_nfe_emitente_get'),
+    supabase.rpc('fiscal_nfe_numeracoes_list'),
     supabase.from('centros_de_custo').select('id', { count: 'exact', head: true }).eq('empresa_id', empresaId),
   ]);
 
   const hasContaCorrente = !ccAny.error && (ccAny.count ?? 0) > 0;
   const hasPadraoReceb = !ccRec.error && (ccRec.data?.length ?? 0) > 0;
   const hasPadraoPag = !ccPag.error && (ccPag.data?.length ?? 0) > 0;
-  const hasEmitente = !nfeEmitente.error && !!nfeEmitente.data?.empresa_id;
-  const hasNumeracao = !nfeNumeracao.error && !!nfeNumeracao.data?.empresa_id;
+  const hasEmitente = !nfeEmitente.error && !!(nfeEmitente.data as any)?.empresa_id;
+  const hasNumeracao = !nfeNumeracao.error && Array.isArray(nfeNumeracao.data) && nfeNumeracao.data.length > 0;
   const hasCentros = !centrosCusto.error && (centrosCusto.count ?? 0) > 0;
 
   const checks: OnboardingCheck[] = [

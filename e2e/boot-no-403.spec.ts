@@ -53,6 +53,23 @@ async function mockAuthAndEmpresaNoAppLogs(page: Page, opts?: { role?: 'member' 
     await route.fulfill({ json: [] });
   });
 
+  // Fiscal (RPC-first NF-e settings)
+  await page.route('**/rest/v1/rpc/fiscal_feature_flags_get', async (route) => {
+    await route.fulfill({ json: { empresa_id: 'empresa-1', nfe_emissao_enabled: false } });
+  });
+
+  await page.route('**/rest/v1/rpc/fiscal_nfe_emissao_config_get', async (route) => {
+    await route.fulfill({ json: null });
+  });
+
+  await page.route('**/rest/v1/rpc/fiscal_nfe_emitente_get', async (route) => {
+    await route.fulfill({ json: null });
+  });
+
+  await page.route('**/rest/v1/rpc/fiscal_nfe_numeracoes_list', async (route) => {
+    await route.fulfill({ json: [] });
+  });
+
   // Fallback genérico: estabiliza no CI sem bater em Supabase real.
   await page.route('**/rest/v1/**', async (route) => {
     const req = route.request();
@@ -217,6 +234,8 @@ test('RG-05: boot sem 403 (login → empresa ativa → navegar 5 módulos)', asy
     { path: '/app/products' },
     { path: '/app/financeiro/tesouraria' },
     { path: '/app/industria/ordens' },
+    { path: '/app/fiscal/nfe' },
+    { path: '/app/fiscal/nfe/configuracoes' },
     { path: '/app/configuracoes/geral/assinatura' },
     // `/app/configuracoes` redireciona para `/app/configuracoes/:section/:page`
     { path: '/app/configuracoes', allowRedirectPrefix: '/app/configuracoes/' },
