@@ -13,6 +13,7 @@ import CentroDeCustoDropdown from '@/components/common/CentroDeCustoDropdown';
 import MeioPagamentoDropdown from '@/components/common/MeioPagamentoDropdown';
 import { Switch } from '@/components/ui/switch';
 import RecorrenciaApplyScopeDialog from '@/components/financeiro/recorrencias/RecorrenciaApplyScopeDialog';
+import ParcelamentoDialog from '@/components/financeiro/parcelamento/ParcelamentoDialog';
 import {
   applyRecorrenciaUpdate,
   generateRecorrencia,
@@ -21,6 +22,7 @@ import {
   type FinanceiroRecorrenciaApplyScope,
   type FinanceiroRecorrenciaFrequencia,
 } from '@/services/financeiroRecorrencias';
+import { createParcelamentoContasPagar } from '@/services/financeiroParcelamento';
 
 interface ContasPagarFormPanelProps {
   conta: Partial<ContaPagar> | null;
@@ -50,6 +52,10 @@ const ContasPagarFormPanel: React.FC<ContasPagarFormPanelProps> = ({ conta, onSa
   const [hasEndDate, setHasEndDate] = useState(false);
   const [endDate, setEndDate] = useState<string>('');
   const [gerarN, setGerarN] = useState<number>(12);
+
+  const [isParcelado, setIsParcelado] = useState(false);
+  const [parcelarCondicao, setParcelarCondicao] = useState<string>('1x');
+  const [parcelarOpen, setParcelarOpen] = useState(false);
 
   const valorTotalProps = useNumericField(formData.valor_total, (value) => handleFormChange('valor_total', value));
   const valorPagoProps = useNumericField(formData.valor_pago, (value) => handleFormChange('valor_pago', value));
@@ -92,6 +98,8 @@ const ContasPagarFormPanel: React.FC<ContasPagarFormPanelProps> = ({ conta, onSa
       setHasEndDate(false);
       setEndDate('');
       setGerarN(12);
+      setIsParcelado(false);
+      setParcelarCondicao('1x');
     }
   }, [conta]);
 
@@ -183,6 +191,15 @@ const ContasPagarFormPanel: React.FC<ContasPagarFormPanelProps> = ({ conta, onSa
     }
 
     try {
+      if (!isEditing && !isRecorrente && isParcelado) {
+        if (!formData.fornecedor_id) {
+          addToast('Fornecedor é obrigatório para parcelar.', 'error');
+          return;
+        }
+        setParcelarOpen(true);
+        return;
+      }
+
       if (!isEditing && isRecorrente) {
         setIsSaving(true);
         if (!formData.fornecedor_id) {
@@ -242,6 +259,36 @@ const ContasPagarFormPanel: React.FC<ContasPagarFormPanelProps> = ({ conta, onSa
 
   return (
     <div className="flex flex-col h-full">
+      <ParcelamentoDialog
+        open={parcelarOpen}
+        onClose={() => setParcelarOpen(false)}
+        title="Parcelar conta a pagar"
+        total={Number(formData.valor_total || 0)}
+        defaultCondicao={parcelarCondicao}
+        defaultBaseDateISO={String(formData.data_vencimento || '').slice(0, 10) || new Date().toISOString().slice(0, 10)}
+        confirmText="Gerar parcelas"
+        onConfirm={async ({ condicao, baseDateISO }) => {
+          const fornecedorId = String(formData.fornecedor_id || '');
+          if (!fornecedorId) throw new Error('Fornecedor é obrigatório para parcelar.');
+          const res = await createParcelamentoContasPagar({
+            fornecedorId,
+            descricao: String(formData.descricao || ''),
+            total: Number(formData.valor_total || 0),
+            condicao,
+            baseDateISO,
+            dataEmissaoISO: String(formData.data_emissao || '').slice(0, 10) || null,
+            documentoRef: (formData.documento_ref ?? null) as any,
+            categoria: (formData.categoria ?? null) as any,
+            centroDeCustoId: ((formData as any).centro_de_custo_id ?? null) as any,
+            formaPagamento: (formData.forma_pagamento ?? null) as any,
+            observacoes: (formData.observacoes ?? null) as any,
+          });
+          if (!res?.ok) throw new Error('Não foi possível gerar as parcelas.');
+          addToast(`Parcelamento gerado: ${res.count ?? 0} título(s).`, 'success');
+          onSaveSuccess();
+          onClose();
+        }}
+      />
       <RecorrenciaApplyScopeDialog
         open={recApplyOpen}
         onOpenChange={setRecApplyOpen}
@@ -270,6 +317,29 @@ const ContasPagarFormPanel: React.FC<ContasPagarFormPanelProps> = ({ conta, onSa
               placeholder="Buscar fornecedor..."
             />
           </div>
+
+          {!isEditing ? (
+            <div className="sm:col-span-3 flex items-center justify-between gap-4 rounded-lg border border-gray-200 bg-white/60 px-4 py-3 mt-7">
+              <div>
+                <div className="text-sm font-medium text-gray-800">Parcelar</div>
+                <div className="text-xs text-gray-500">Gera múltiplos títulos a partir deste valor.</div>
+              </div>
+              <Switch checked={isParcelado} onCheckedChange={setIsParcelado} disabled={isRecorrente || isSaving} />
+            </div>
+          ) : null}
+
+          {!isEditing && isParcelado ? (
+            <Input
+              label="Condição (parcelas)"
+              name="parcelar_condicao"
+              value={parcelarCondicao}
+              onChange={(e) => setParcelarCondicao(e.target.value)}
+              className="sm:col-span-3"
+              placeholder="Ex: 30/60/90 ou 3x"
+              helperText="Você poderá revisar o preview antes de gerar."
+              disabled={isRecorrente || isSaving}
+            />
+          ) : null}
           
           <Input label="Valor Total" name="valor_total" startAdornment="R$" inputMode="numeric" {...valorTotalProps} required className="sm:col-span-3" />
           
