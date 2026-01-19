@@ -30,6 +30,9 @@ Definições:
   - [x] Criar `AppContextProvider` consolidando `Auth + Subscription + Role` e expor `useAppContext()` (frontend).
   - [x] Migrar guards de permissão (`RequirePermission`) para usar o contexto unificado (reduz race/duplicação).
 - [x] Garantir que nenhum módulo faça fetch de dados antes de `activeEmpresaId` estar resolvido (gates consistentes).
+- [x] Tornar “empresa ativa” RPC-first (evitar `.from('empresas'|'user_active_empresa')` no boot):
+  - [x] RPC `active_empresa_get_for_current_user()` (tenant-safe via `auth.uid()`).
+  - [x] RPC `empresas_list_for_current_user(p_limit)` (tenant-safe via `empresa_usuarios.user_id = auth.uid()`).
 - [x] Padronizar recovery automático (apenas quando seguro) e mensagens UX (“Selecione sua empresa”).
 - [x] Cobrir boot com E2E: login → empresa ativa → navegação por 5 módulos sem 403.
 - [x] Cobrir landing pública sem sessão/empresa ativa (E2E `e2e/landing-public.spec.ts`).
@@ -169,6 +172,7 @@ Definições:
 - [x] Expandir console-sweep para rotas principais e erros esperados “não vermelhos” (inclui Financeiro + landing pública).
 - [ ] Testes DB asserts (verify) para RLS e invariantes críticos.
   - [x] RG01 DB asserts: bloquear tabela `public` com grants p/ `authenticated` sem RLS; bloquear policy `qual/with_check=true` em tabelas com `empresa_id` para `authenticated/public/anon`.
+  - [x] RG03 DB asserts: falhar verify se houver tabela com `empresa_id` + grants p/ `authenticated` com RLS ON mas sem policy tenant-safe.
 
 ### 6.2 Mocks e isolamento
 - [ ] Services desacoplados de UI (facilitar mocks).

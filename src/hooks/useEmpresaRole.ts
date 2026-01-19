@@ -2,6 +2,7 @@ import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabaseClient';
 import { useAuth } from '@/contexts/AuthProvider';
 import { logger } from '@/lib/logger';
+import { callRpc } from '@/lib/api';
 
 export type EmpresaRole = 'owner' | 'admin' | 'member' | 'viewer';
 
@@ -29,14 +30,6 @@ export function useEmpresaRole() {
     queryFn: async (): Promise<EmpresaRole | null> => {
       if (!activeEmpresaId || !userId) return null;
 
-      // Fonte preferencial: vínculo + join em roles (legado), evita depender do schema cache de RPC.
-      const { data: row, error: rowError } = await supabase
-        .from('empresa_usuarios')
-        .select('role, roles:roles(slug)')
-        .eq('empresa_id', activeEmpresaId)
-        .eq('user_id', userId)
-        .maybeSingle();
-
       const normalize = (value: unknown): EmpresaRole | null => {
         const raw = (String(value || '').toLowerCase() || '').trim();
         const mapped =
@@ -49,9 +42,6 @@ export function useEmpresaRole() {
         return normalized in precedence ? normalized : null;
       };
 
-      const roleText = normalize((row as any)?.role);
-      const roleSlug = normalize((row as any)?.roles?.slug);
-
       const pickBest = (a: EmpresaRole | null, b: EmpresaRole | null) => {
         if (!a && !b) return null;
         if (!a) return b;
@@ -59,26 +49,31 @@ export function useEmpresaRole() {
         return precedence[b] > precedence[a] ? b : a;
       };
 
-      // Fallback: RPC current_empresa_role() (útil quando o schema/cache de join está inconsistênte).
-      // Isso ajuda a evitar situações onde um usuário "owner/admin" fica bloqueado por erro transitório de schema.
-      const tryRpcFallback = async (): Promise<EmpresaRole | null> => {
-        const { data, error: rpcError } = await supabase.rpc('current_empresa_role');
-        if (rpcError) {
-          logger.warn('[RBAC] Falha ao carregar role via RPC current_empresa_role()', rpcError, { activeEmpresaId, userId });
-          return null;
-        }
-        return normalize(data);
-      };
+      // Fonte preferencial: RPC current_empresa_role() (tenant-safe, evita dependência de schema cache de JOIN).
+      try {
+        const rpcRole = await callRpc<unknown>('current_empresa_role');
+        const normalized = normalize(rpcRole);
+        if (normalized) return normalized;
+      } catch (rpcError) {
+        logger.warn('[RBAC] Falha ao carregar role via RPC current_empresa_role()', rpcError, { activeEmpresaId, userId });
+      }
+
+      // Fallback: vínculo + join em roles (legado).
+      const { data: row, error: rowError } = await supabase
+        .from('empresa_usuarios')
+        .select('role, roles:roles(slug)')
+        .eq('empresa_id', activeEmpresaId)
+        .eq('user_id', userId)
+        .maybeSingle();
 
       if (rowError) {
         logger.warn('[RBAC] Falha ao carregar role da empresa (join)', rowError, { activeEmpresaId, userId });
-        return await tryRpcFallback();
+        return null;
       }
 
-      const bestFromJoin = pickBest(roleText, roleSlug);
-      if (bestFromJoin) return bestFromJoin;
-
-      return await tryRpcFallback();
+      const roleText = normalize((row as any)?.role);
+      const roleSlug = normalize((row as any)?.roles?.slug);
+      return pickBest(roleText, roleSlug);
     },
   });
 }

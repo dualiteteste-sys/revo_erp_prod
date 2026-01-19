@@ -432,6 +432,23 @@ begin
     RAISE EXCEPTION 'RG-03/MT-EMPID-01: existem constraints empresa_id NN (guardrails) ainda NOT VALID no ambiente verify.';
   END IF;
 
+  -- 10.2) MT-RLS-01: não pode haver itens "MÉDIO" no inventário RLS (grants + empresa_id + RLS ON, mas sem policy tenant-safe).
+  IF to_regprocedure('public.ops_rls_inventory_list(text, int, int)') IS NOT NULL THEN
+    IF EXISTS (
+      SELECT 1
+      FROM public.ops_rls_inventory_list(NULL, 5000, 0) r
+      WHERE (r.grants_select OR r.grants_insert OR r.grants_update OR r.grants_delete)
+        AND r.has_empresa_id
+        AND r.rls_enabled
+        AND NOT r.has_current_empresa_policy
+        AND r.table_name NOT LIKE 'ops_%'
+        AND r.table_name NOT IN ('unidades_medida', 'embalagens')
+      LIMIT 1
+    ) THEN
+      RAISE EXCEPTION 'RG-03/MT-RLS-01: existem tabelas com grants + empresa_id + RLS ON, mas sem policy tenant-safe (current_empresa_id()/membership). Corrija via migrations antes de promover.';
+    END IF;
+  END IF;
+
   -- 9.1) SVC-CT-01: evita bug de assignment de composite via SELECT INTO (causa 400 e console sujo)
   -- Em PL/pgSQL, `SELECT func() INTO v_composite;` com select-list de 1 coluna
   -- tenta atribuir ao *primeiro campo* do composite, gerando cast inválido para uuid.

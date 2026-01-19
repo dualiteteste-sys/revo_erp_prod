@@ -82,6 +82,14 @@ async function mockAuthAndEmpresaNoAppLogs(page: Page, opts?: { role?: 'member' 
       await route.fulfill({ status: 204, body: '' });
       return;
     }
+    const url = req.url();
+    if (
+      url.includes('/rest/v1/rpc/empresas_list_for_current_user') ||
+      url.includes('/rest/v1/rpc/active_empresa_get_for_current_user')
+    ) {
+      await route.fallback();
+      return;
+    }
 
     const accept = (req.headers()['accept'] || '').toLowerCase();
     const isSingle = accept.includes('application/vnd.pgrst.object+json');

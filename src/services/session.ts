@@ -92,39 +92,37 @@ export async function bootstrapEmpresaParaUsuarioAtual(opts?: {
     // Caso 2.1: Retorno moderno (void/null) → buscar empresa ativa após bootstrap (com retry curto)
     if (!rowEmpresaId) {
       for (let attempt = 0; attempt < 5; attempt++) {
-        const { data: activeRows, error: activeErr } = await (supabase as any)
-          .from("user_active_empresa")
-          .select("empresa_id")
-          .limit(1);
-        if (!activeErr) {
-          const empresaId = (activeRows?.[0] as any)?.empresa_id ?? null;
+        // 1) Já existe empresa ativa? (RPC-first)
+        try {
+          const empresaId = await callRpc<string | null>("active_empresa_get_for_current_user", {});
           if (empresaId) {
             logger.info("[RPC][bootstrap_empresa_for_current_user] Fetched active empresa after void bootstrap", {
               empresaId,
               attempt,
             });
             await applyMarketingPlanEntitlements(empresaId);
-            return { empresa_id: empresaId, status: 'unknown' };
+            return { empresa_id: empresaId, status: "unknown" };
           }
+        } catch {
+          // ignore (retry)
         }
 
-        // fallback: tenta achar o vínculo mais recente
-        const { data: links, error: linkErr } = await (supabase as any)
-          .from("empresa_usuarios")
-          .select("empresa_id")
-          .order("created_at", { ascending: false })
-          .limit(1);
-        if (!linkErr) {
-          const empresaId = (links?.[0] as any)?.empresa_id ?? null;
-          if (empresaId) {
+        // 2) fallback: tenta achar o vínculo mais recente (RPC-first)
+        try {
+          const empresas = await callRpc<any[]>("empresas_list_for_current_user", { p_limit: 2 });
+          const ids = (empresas ?? []).map((e) => e?.id).filter(Boolean);
+          if (ids.length === 1) {
+            const empresaId = String(ids[0]);
             try {
               await (supabase as any).rpc("set_active_empresa_for_current_user", { p_empresa_id: empresaId });
             } catch {
               // best-effort
             }
             await applyMarketingPlanEntitlements(empresaId);
-            return { empresa_id: empresaId, status: 'unknown' };
+            return { empresa_id: empresaId, status: "unknown" };
           }
+        } catch {
+          // ignore (retry)
         }
 
         await sleep(250 + attempt * 150);
