@@ -254,6 +254,15 @@ declare
   v_i int;
   v_due date;
 begin
+  -- Hardening (RPC-first): preview pode ser usado tanto para pagar quanto para receber.
+  if not (
+    public.has_permission_for_current_user('contas_a_receber','create')
+    or public.has_permission_for_current_user('contas_a_pagar','create')
+  ) then
+    -- dispara mensagem/padrão de permissão (PT-BR) do enforcement
+    perform public.require_permission_for_current_user('contas_a_receber','create');
+  end if;
+
   if v_empresa is null then
     raise exception 'Empresa não encontrada no contexto atual.' using errcode='42501';
   end if;
