@@ -53,21 +53,36 @@ export type RecebimentoItem = {
     };
 };
 
+function unwrapRpcRow<T>(data: unknown, key: string): T {
+    if (data && typeof data === 'object' && key in (data as any)) {
+        return (data as any)[key] as T;
+    }
+    return data as T;
+}
+
+function unwrapRpcRows<T>(data: unknown, key: string): T[] {
+    if (!Array.isArray(data)) return (data ?? []) as T[];
+    if (data.length && data[0] && typeof data[0] === 'object' && key in (data[0] as any)) {
+        return (data as any[]).map((row) => (row as any)[key]) as T[];
+    }
+    return data as T[];
+}
+
 export async function listRecebimentos(status?: RecebimentoStatus): Promise<Recebimento[]> {
     const rows = await callRpc('suprimentos_recebimentos_list', {
         p_status: status ?? null,
     });
-    return (rows ?? []) as Recebimento[];
+    return unwrapRpcRows<Recebimento>(rows, 'suprimentos_recebimentos_list');
 }
 
 export async function getRecebimento(id: string): Promise<Recebimento> {
     const row = await callRpc('suprimentos_recebimento_get', { p_recebimento_id: id });
-    return row as Recebimento;
+    return unwrapRpcRow<Recebimento>(row, 'suprimentos_recebimento_get');
 }
 
 export async function listRecebimentoItens(recebimentoId: string): Promise<RecebimentoItem[]> {
     const rows = await callRpc('suprimentos_recebimento_itens_list', { p_recebimento_id: recebimentoId });
-    return (rows ?? []) as RecebimentoItem[];
+    return unwrapRpcRows<RecebimentoItem>(rows, 'suprimentos_recebimento_itens_list');
 }
 
 export type CreateRecebimentoFromXmlStatus = 'created' | 'exists' | 'reopened';
@@ -168,5 +183,5 @@ export async function updateRecebimentoCustos(
         p_custo_outros: patch.custo_outros ?? null,
         p_rateio_base: patch.rateio_base ?? null,
     });
-    return row as Recebimento;
+    return unwrapRpcRow<Recebimento>(row, 'suprimentos_recebimento_update_custos');
 }
