@@ -103,6 +103,10 @@ alter table public.financeiro_parcelamentos force row level security;
 alter table public.financeiro_parcelamentos_parcelas enable row level security;
 alter table public.financeiro_parcelamentos_parcelas force row level security;
 
+-- RPC-first (financeiro): não permitir acesso direto às tabelas via PostgREST.
+revoke all on table public.financeiro_parcelamentos from anon, authenticated;
+revoke all on table public.financeiro_parcelamentos_parcelas from anon, authenticated;
+
 drop policy if exists fin_parcelamentos_sel on public.financeiro_parcelamentos;
 create policy fin_parcelamentos_sel on public.financeiro_parcelamentos
   for select to authenticated
