@@ -125,6 +125,14 @@ test('Financeiro: criar conta a pagar recorrente (mensal) sem erros', async ({ p
       return;
     }
 
+    if (
+      url.includes('/rest/v1/rpc/empresas_list_for_current_user') ||
+      url.includes('/rest/v1/rpc/active_empresa_get_for_current_user')
+    ) {
+      await route.fallback();
+      return;
+    }
+
     if (url.includes('/rest/v1/rpc/financeiro_contas_pagar_list')) {
       await route.fulfill({ json: [] });
       return;

@@ -48,6 +48,25 @@ export const handlers = [
             return HttpResponse.json(null); // Void return
         }
 
+        if (functionName === 'empresas_list_for_current_user') {
+            return HttpResponse.json([
+                {
+                    id: 'empresa-1',
+                    nome: 'Empresa Teste',
+                    razao_social: 'Empresa Teste',
+                    fantasia: 'Fantasia Teste',
+                    nome_razao_social: 'Empresa Teste',
+                    cnpj: '00000000000191',
+                    created_at: new Date().toISOString(),
+                    updated_at: new Date().toISOString(),
+                },
+            ]);
+        }
+
+        if (functionName === 'active_empresa_get_for_current_user') {
+            return HttpResponse.json('empresa-1');
+        }
+
         if (functionName === 'whoami') {
             return HttpResponse.json({
                 user_id: 'user-123',

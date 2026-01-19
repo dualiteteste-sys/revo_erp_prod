@@ -2,6 +2,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabaseClient';
 import { logger } from '@/lib/logger';
 import { Database } from '@/types/database.types';
+import { callRpc } from '@/lib/api';
 
 type Empresa = Database['public']['Tables']['empresas']['Row'];
 
@@ -32,19 +33,8 @@ export function useEmpresas(userId: string | null) {
             if (!userId) return [];
 
             logger.debug('[QUERY][empresas] fetching list');
-            const { data, error } = await supabase
-                .from("empresa_usuarios")
-                .select("empresa:empresas(*)")
-                .order("created_at", { ascending: false });
-
-            if (error) {
-                logger.error('[QUERY][empresas] list error', error);
-                throw error;
-            }
-
-            return (data ?? [])
-                .map((r: any) => r.empresa)
-                .filter((e: any) => e !== null) as Empresa[];
+            const data = await callRpc<Empresa[]>('empresas_list_for_current_user', { p_limit: 200 });
+            return (data ?? []) as Empresa[];
         },
         enabled: !!userId,
         staleTime: 1000 * 60 * 5, // 5 minutes
@@ -61,19 +51,8 @@ export function useActiveEmpresaId(userId: string | null) {
             if (!userId) return null;
 
             logger.debug('[QUERY][active_empresa] fetching');
-            const { data, error } = await supabase
-                .from("user_active_empresa")
-                .select("empresa_id")
-                // Evita 406 (Not Acceptable) quando não existe preferência ainda.
-                .limit(1);
-
-            if (error) {
-                logger.warn('[QUERY][active_empresa] error', error);
-                throw error;
-            }
-
-            // @ts-ignore - Table types might be missing or generic
-            return ((data?.[0] as any)?.empresa_id ?? null) as string | null;
+            const empresaId = await callRpc<string | null>('active_empresa_get_for_current_user', {});
+            return (empresaId ?? null) as string | null;
         },
         enabled: !!userId,
         staleTime: 1000 * 30,

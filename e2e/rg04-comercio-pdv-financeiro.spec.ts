@@ -179,6 +179,14 @@ test('RG-04 (Comércio): finalizar PDV gera movimento financeiro + baixa de esto
       return;
     }
 
+    if (
+      url.includes('/rest/v1/rpc/empresas_list_for_current_user') ||
+      url.includes('/rest/v1/rpc/active_empresa_get_for_current_user')
+    ) {
+      await route.fallback();
+      return;
+    }
+
     // PDV caixas (novo: multi-caixa). Mantemos um caixa "aberto" para não criar fricção no RG-04.
     if (url.includes('/rest/v1/rpc/vendas_pdv_ensure_default_caixa')) {
       await route.fulfill({ json: { ok: true } });
@@ -343,6 +351,14 @@ test('VEN-STA-02: PDV offline-lite enfileira e sincroniza depois (sem duplicar)'
 
     if (req.method() === 'OPTIONS') {
       await route.fulfill({ status: 204, body: '' });
+      return;
+    }
+
+    if (
+      url.includes('/rest/v1/rpc/empresas_list_for_current_user') ||
+      url.includes('/rest/v1/rpc/active_empresa_get_for_current_user')
+    ) {
+      await route.fallback();
       return;
     }
 

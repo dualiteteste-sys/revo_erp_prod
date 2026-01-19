@@ -141,6 +141,14 @@ test('Beneficiamento: criar OB e gerar operações na Execução', async ({ page
       await route.fulfill({ status: 204, body: '' });
       return;
     }
+    const url = route.request().url();
+    if (
+      url.includes('/rest/v1/rpc/empresas_list_for_current_user') ||
+      url.includes('/rest/v1/rpc/active_empresa_get_for_current_user')
+    ) {
+      await route.fallback();
+      return;
+    }
     await route.fulfill({ json: [] });
   });
 

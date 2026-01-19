@@ -114,6 +114,32 @@ export const test = base.extend({
       await route.fulfill({ json: [] });
     });
 
+    // ---------------------------------------------------------------------
+    // P0 (empresa ativa/contexto) — mocks globais para boot determinístico.
+    // Muitos specs instalam um fallback genérico `**/rest/v1/**` e precisam
+    // chamar `route.fallback()` para chegar aqui.
+    // ---------------------------------------------------------------------
+    await page.route('**/rest/v1/rpc/empresas_list_for_current_user', async (route) => {
+      await route.fulfill({
+        json: [
+          {
+            id: 'empresa-1',
+            nome: 'Empresa Teste E2E',
+            razao_social: 'Empresa Teste E2E',
+            fantasia: 'Fantasia E2E',
+            nome_razao_social: 'Empresa Teste E2E',
+            cnpj: '00000000000191',
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          },
+        ],
+      });
+    });
+
+    await page.route('**/rest/v1/rpc/active_empresa_get_for_current_user', async (route) => {
+      await route.fulfill({ json: 'empresa-1' });
+    });
+
     await run(page);
 
     page.off('console', onConsole);

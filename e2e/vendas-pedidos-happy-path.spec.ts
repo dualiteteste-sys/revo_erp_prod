@@ -111,6 +111,14 @@ test('Vendas: pedido (VEN-01/02) happy path (CRUD + itens + impostos básicos + 
       return;
     }
 
+    if (
+      url.includes('/rest/v1/rpc/empresas_list_for_current_user') ||
+      url.includes('/rest/v1/rpc/active_empresa_get_for_current_user')
+    ) {
+      await route.fallback();
+      return;
+    }
+
     // Listagem de pedidos
     if (url.includes('/rest/v1/rpc/vendas_list_pedidos')) {
       await route.fulfill({ json: pedido ? [{ ...pedido, total_count: 1 }] : [] });

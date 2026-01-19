@@ -208,6 +208,14 @@ test('Financeiro: registrar recebimento e pagamento (fluxo básico)', async ({ p
       return;
     }
 
+    if (
+      url.includes('/rest/v1/rpc/empresas_list_for_current_user') ||
+      url.includes('/rest/v1/rpc/active_empresa_get_for_current_user')
+    ) {
+      await route.fallback();
+      return;
+    }
+
     if (url.includes('/rest/v1/rpc/count_contas_a_receber_v2')) {
       await route.fulfill({ json: contasReceber.length });
       return;
@@ -514,6 +522,14 @@ test('Financeiro: tesouraria conciliação (score + conciliar)', async ({ page }
       return;
     }
 
+    if (
+      url.includes('/rest/v1/rpc/empresas_list_for_current_user') ||
+      url.includes('/rest/v1/rpc/active_empresa_get_for_current_user')
+    ) {
+      await route.fallback();
+      return;
+    }
+
     if (url.includes('/rest/v1/rpc/financeiro_contas_correntes_list')) {
       await route.fulfill({ json: contas });
       return;
@@ -666,6 +682,14 @@ test('Financeiro: tesouraria auto-conciliar (página)', async ({ page }) => {
 
     if (req.method() === 'OPTIONS') {
       await route.fulfill({ status: 204, body: '' });
+      return;
+    }
+
+    if (
+      url.includes('/rest/v1/rpc/empresas_list_for_current_user') ||
+      url.includes('/rest/v1/rpc/active_empresa_get_for_current_user')
+    ) {
+      await route.fallback();
       return;
     }
 
