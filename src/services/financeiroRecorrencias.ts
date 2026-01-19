@@ -24,6 +24,20 @@ export type FinanceiroRecorrenciaGenerateResult = {
   reason?: string;
 };
 
+export type FinanceiroRecorrenciaApplyScope = 'single' | 'future' | 'all_open';
+
+export type FinanceiroRecorrenciaApplyUpdateResult = {
+  ok: boolean;
+  scope: FinanceiroRecorrenciaApplyScope;
+  empresa_id: string;
+  recorrencia_id: string;
+  ocorrencia_id: string;
+  updated_template: number;
+  updated_accounts: number;
+  skipped_locked: number;
+  reason?: string;
+};
+
 export async function upsertRecorrencia(payload: Record<string, any>): Promise<FinanceiroRecorrencia> {
   return callRpc<FinanceiroRecorrencia>('financeiro_recorrencias_upsert', { p_payload: payload });
 }
@@ -40,3 +54,14 @@ export async function generateRecorrencia(params: {
   });
 }
 
+export async function applyRecorrenciaUpdate(params: {
+  ocorrenciaId: string;
+  scope: FinanceiroRecorrenciaApplyScope;
+  patch: Record<string, any>;
+}): Promise<FinanceiroRecorrenciaApplyUpdateResult> {
+  return callRpc<FinanceiroRecorrenciaApplyUpdateResult>('financeiro_recorrencias_apply_update', {
+    p_ocorrencia_id: params.ocorrenciaId,
+    p_scope: params.scope,
+    p_patch: params.patch ?? {},
+  });
+}

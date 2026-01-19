@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Loader2, Save } from 'lucide-react';
-import { ContaAReceber, saveContaAReceber } from '@/services/contasAReceber';
+import { ContaAReceber, getContaAReceberDetails, saveContaAReceber } from '@/services/contasAReceber';
 import { getPartnerDetails } from '@/services/partners';
 import { useToast } from '@/contexts/ToastProvider';
 import Section from '@/components/ui/forms/Section';
@@ -11,7 +11,15 @@ import { useNumericField } from '@/hooks/useNumericField';
 import ClientAutocomplete from '@/components/common/ClientAutocomplete';
 import CentroDeCustoDropdown from '@/components/common/CentroDeCustoDropdown';
 import { Switch } from '@/components/ui/switch';
-import { generateRecorrencia, upsertRecorrencia, type FinanceiroRecorrenciaAjusteDiaUtil, type FinanceiroRecorrenciaFrequencia } from '@/services/financeiroRecorrencias';
+import RecorrenciaApplyScopeDialog from '@/components/financeiro/recorrencias/RecorrenciaApplyScopeDialog';
+import {
+  applyRecorrenciaUpdate,
+  generateRecorrencia,
+  upsertRecorrencia,
+  type FinanceiroRecorrenciaAjusteDiaUtil,
+  type FinanceiroRecorrenciaApplyScope,
+  type FinanceiroRecorrenciaFrequencia,
+} from '@/services/financeiroRecorrencias';
 
 interface ContasAReceberFormPanelProps {
   conta: Partial<ContaAReceber> | null;
@@ -32,6 +40,9 @@ const ContasAReceberFormPanel: React.FC<ContasAReceberFormPanelProps> = ({ conta
   const [clienteName, setClienteName] = useState('');
   const isPago = formData.status === 'pago';
   const isEditing = !!conta?.id;
+
+  const [recApplyOpen, setRecApplyOpen] = useState(false);
+  const [recApplyScope, setRecApplyScope] = useState<FinanceiroRecorrenciaApplyScope>('single');
 
   const [isRecorrente, setIsRecorrente] = useState(false);
   const [frequencia, setFrequencia] = useState<FinanceiroRecorrenciaFrequencia>('mensal');
@@ -69,15 +80,80 @@ const ContasAReceberFormPanel: React.FC<ContasAReceberFormPanelProps> = ({ conta
     setFormData(prev => ({ ...(prev as any), [field]: value } as any));
   };
 
+  const isGeradaPorRecorrencia = (() => {
+    const origemTipo = (formData as any)?.origem_tipo ?? (conta as any)?.origem_tipo ?? null;
+    const origemId = (formData as any)?.origem_id ?? (conta as any)?.origem_id ?? null;
+    return isEditing && origemTipo === 'RECORRENCIA' && !!origemId;
+  })();
+
+  const buildRecorrenciaPatch = () => {
+    const base: any = conta ?? {};
+    const patch: Record<string, any> = {};
+    const keys: Array<keyof any> = ['descricao', 'observacoes', 'centro_de_custo_id', 'cliente_id', 'valor', 'data_vencimento'];
+    for (const k of keys) {
+      const next = (formData as any)?.[k];
+      const prev = (base as any)?.[k];
+      const normNext = next ?? null;
+      const normPrev = prev ?? null;
+      const changed =
+        k === 'valor' ? Number(normNext ?? 0) !== Number(normPrev ?? 0) : String(normNext) !== String(normPrev);
+      if (changed) patch[String(k)] = normNext;
+    }
+    return patch;
+  };
+
+  const shouldAskRecorrenciaScope = () => {
+    if (!isGeradaPorRecorrencia) return false;
+    const patch = buildRecorrenciaPatch();
+    const propagatableKeys = ['descricao', 'observacoes', 'centro_de_custo_id', 'cliente_id', 'valor'];
+    return propagatableKeys.some((k) => k in patch);
+  };
+
+  const applyRecorrencia = async (scope: FinanceiroRecorrenciaApplyScope) => {
+    const ocorrenciaId = String((formData as any)?.origem_id ?? (conta as any)?.origem_id ?? '');
+    if (!ocorrenciaId) {
+      addToast('Não foi possível identificar a recorrência desta conta.', 'error');
+      return;
+    }
+
+    const patch = buildRecorrenciaPatch();
+    setIsSaving(true);
+    try {
+      const result = await applyRecorrenciaUpdate({
+        ocorrenciaId,
+        scope,
+        patch,
+      });
+
+      if (!result?.ok) {
+        addToast('Não foi possível aplicar a alteração na recorrência.', 'error');
+        return;
+      }
+
+      const msg =
+        scope === 'single'
+          ? 'Conta recorrente atualizada.'
+          : `Recorrência atualizada. Contas afetadas: ${result.updated_accounts ?? 0}.`;
+      addToast(msg, 'success');
+
+      const refreshed = await getContaAReceberDetails(String(conta?.id));
+      onSaveSuccess(refreshed);
+    } catch (e: any) {
+      addToast(e?.message || 'Erro ao aplicar alteração na recorrência.', 'error');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
   const handleSave = async () => {
     if (!formData.descricao || !formData.data_vencimento || !formData.valor) {
       addToast('Descrição, Data de Vencimento e Valor são obrigatórios.', 'error');
       return;
     }
 
-    setIsSaving(true);
     try {
       if (!isEditing && isRecorrente) {
+        setIsSaving(true);
         if (!formData.cliente_id) {
           addToast('Cliente é obrigatório para recorrência.', 'error');
           return;
@@ -110,6 +186,13 @@ const ContasAReceberFormPanel: React.FC<ContasAReceberFormPanelProps> = ({ conta
         return;
       }
 
+      if (shouldAskRecorrenciaScope()) {
+        setRecApplyScope('single');
+        setRecApplyOpen(true);
+        return;
+      }
+
+      setIsSaving(true);
       const savedConta = await saveContaAReceber(formData);
       addToast('Conta a receber salva com sucesso!', 'success');
       onSaveSuccess(savedConta);
@@ -122,6 +205,17 @@ const ContasAReceberFormPanel: React.FC<ContasAReceberFormPanelProps> = ({ conta
 
   return (
     <div className="flex flex-col h-full">
+      <RecorrenciaApplyScopeDialog
+        open={recApplyOpen}
+        onOpenChange={setRecApplyOpen}
+        scope={recApplyScope}
+        onScopeChange={setRecApplyScope}
+        isLoading={isSaving}
+        onConfirm={async () => {
+          setRecApplyOpen(false);
+          await applyRecorrencia(recApplyScope);
+        }}
+      />
       <div className="flex-grow p-6 overflow-y-auto scrollbar-styled">
         <Section title="Dados da Conta" description="Informações principais da conta a receber.">
           <Input label="Descrição" name="descricao" value={formData.descricao || ''} onChange={e => handleFormChange('descricao', e.target.value)} required className="sm:col-span-6" />
