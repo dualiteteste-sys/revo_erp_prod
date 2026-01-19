@@ -96,6 +96,10 @@ Definições:
 - [ ] Padronizar grants: `anon`/`authenticated` mínimos; `service_role` apenas onde necessário.
 - [ ] Padronizar “ops/service” tables: somente service_role escreve; leitura controlada.
 
+### 1.2 RPC-first: Suprimentos (Recebimentos)
+- [x] Migrar Recebimentos para RPC-first (sem `supabase.from('recebimentos'|'recebimento_itens')` no app) e revogar grants diretos (migration `supabase/migrations/20270119191000_sup_recebimentos_rpc_first.sql`).
+- [x] Atualizar inventário `INVENTARIO-SUPABASE-FROM.md` e reduzir superfície de tabelas diretas em domínios sensíveis.
+
 **Aceite P1**
 - [ ] Auditoria manual: tentar acessar dados de outra empresa (negado sempre).
 - [ ] “Tabela direta” no client: inventariada e aprovada (com justificativa).

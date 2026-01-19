@@ -260,6 +260,56 @@ test('SUP-03: importar XML → criar recebimento → finalizar (happy path)', as
       return;
     }
 
+    // RPC-first: recebimentos list/get/itens
+    if (url.includes('/rest/v1/rpc/suprimentos_recebimentos_list')) {
+      await route.fulfill({ json: recebimentos });
+      return;
+    }
+
+    if (url.includes('/rest/v1/rpc/suprimentos_recebimento_get')) {
+      const body = (await req.postDataJSON()) as any;
+      const rid = body?.p_recebimento_id;
+      await route.fulfill({ json: recebimentos.find((r) => r.id === rid) || null });
+      return;
+    }
+
+    if (url.includes('/rest/v1/rpc/suprimentos_recebimento_itens_list')) {
+      await route.fulfill({ json: recebimentoItens });
+      return;
+    }
+
+    if (url.includes('/rest/v1/rpc/suprimentos_recebimento_item_set_produto')) {
+      const body = (await req.postDataJSON()) as any;
+      const itemId = body?.p_recebimento_item_id;
+      const produtoId = body?.p_produto_id ?? null;
+      recebimentoItens = recebimentoItens.map((it) => (it.id === itemId ? { ...it, produto_id: produtoId } : it));
+      await route.fulfill({ json: {} });
+      return;
+    }
+
+    if (url.includes('/rest/v1/rpc/suprimentos_recebimento_update_custos')) {
+      const body = (await req.postDataJSON()) as any;
+      const rid = body?.p_recebimento_id;
+      const patch = {
+        custo_frete: body?.p_custo_frete ?? null,
+        custo_seguro: body?.p_custo_seguro ?? null,
+        custo_impostos: body?.p_custo_impostos ?? null,
+        custo_outros: body?.p_custo_outros ?? null,
+        rateio_base: body?.p_rateio_base ?? null,
+      };
+      recebimentos = recebimentos.map((r) =>
+        r.id === rid
+          ? {
+              ...r,
+              ...patch,
+              updated_at: new Date().toISOString(),
+            }
+          : r
+      );
+      await route.fulfill({ json: recebimentos.find((r) => r.id === rid) || null });
+      return;
+    }
+
     // REST: recebimentos list/get
     if (url.includes('/rest/v1/recebimentos')) {
       if (req.method() === 'GET') {

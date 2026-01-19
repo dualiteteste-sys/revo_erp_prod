@@ -40,6 +40,23 @@ begin
     raise exception 'RG-03: role authenticated sem SELECT em public.pessoas (causa 403 em parceiros/RPCs).';
   end if;
 
+  -- 4.0) Recebimentos devem ser RPC-first (evita bypass/instabilidade por acesso direto via PostgREST)
+  if has_table_privilege('authenticated', 'public.recebimentos', 'select')
+     or has_table_privilege('authenticated', 'public.recebimentos', 'insert')
+     or has_table_privilege('authenticated', 'public.recebimentos', 'update')
+     or has_table_privilege('authenticated', 'public.recebimentos', 'delete')
+  then
+    raise exception 'RG-03: tabela public.recebimentos ainda possui grants diretos para authenticated (deve ser RPC-first).';
+  end if;
+
+  if has_table_privilege('authenticated', 'public.recebimento_itens', 'select')
+     or has_table_privilege('authenticated', 'public.recebimento_itens', 'insert')
+     or has_table_privilege('authenticated', 'public.recebimento_itens', 'update')
+     or has_table_privilege('authenticated', 'public.recebimento_itens', 'delete')
+  then
+    raise exception 'RG-03: tabela public.recebimento_itens ainda possui grants diretos para authenticated (deve ser RPC-first).';
+  end if;
+
   -- 4.1) MVP Menu: tabelas/perm/grants (evita 403/404 nos novos módulos)
   if not exists (select 1 from public.permissions where module='vendedores' and action='view') then
     raise exception 'RG-03: permissão vendedores:view ausente (MVP menu).';
