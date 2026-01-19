@@ -72,7 +72,7 @@ Definições:
 - [ ] Garantir que tabelas multi-tenant tenham:
   - [x] `empresa_id` obrigatório e consistente (guardrails via migration `20270118193000_mt_empresa_id_guardrails.sql`), com exceções explícitas para catálogos globais (`unidades_medida`, `embalagens`).
   - [ ] policies `USING/WITH CHECK` baseadas em `current_empresa_id()`
-  - [ ] índices mínimos para filtros por `empresa_id`
+  - [x] índices mínimos para filtros por `empresa_id` (migration `20270119174500_mt_empresa_id_min_indexes.sql`)
 
 ### 1.2 Acesso a dados: RPC-first para áreas sensíveis
 - [ ] Definir regra: “acesso direto a tabela” permitido **somente** quando RLS for simples e auditado.
@@ -81,6 +81,7 @@ Definições:
 - [x] RPC-first (Billing): substituir `supabase.from('plans'/'subscriptions'/'billing_stripe_webhook_events')` por RPCs (`billing_plans_public_list`, `billing_subscription_with_plan_get`, `billing_stripe_webhook_events_list`).
 - [x] RPC-first (Financeiro piloto): revogar grants em tabelas `financeiro_%/finance_%/finops_%` e manter acesso via RPCs (migration `20270118133000_fin_ops_health_rpc_and_revoke_fin_grants.sql`).
   - [x] Ops/Health: substituir `supabase.from()` por RPCs SECURITY DEFINER (mesma migration) e verificar via asserts (script `scripts/verify_financeiro_rpc_first.sql`).
+- [x] RPC-first (Financeiro piloto): incluir `contas_a_receber` no gate de grants e revogar grants diretos (migration `20270119180000_fin_rpc_first_contas_a_receber_revoke_grants.sql` + update `scripts/verify_financeiro_rpc_first.sql`).
 - [x] RPC-first (Empresa Features): substituir `supabase.from('empresa_features')` por `rpc/empresa_features_get` e revogar grants de tabela (migration `20270118124000_empresa_features_rpc_first.sql`).
 - [x] RPC-first (Fiscal/NF-e settings): remover escrita direta do client e exigir admin no backend (RPCs `fiscal_feature_flags_set`, `fiscal_nfe_emissao_config_*`, `fiscal_nfe_emitente_*`, `fiscal_nfe_numeracao_*`).
 - [x] RPC-first (Fiscal/NF-e emissões): remover leitura/escrita direta no client e exigir RPCs tenant-safe (RPCs `fiscal_nfe_emissoes_list`, `fiscal_nfe_emissao_itens_list`, `fiscal_nfe_audit_timeline_list`, `fiscal_nfe_emissao_draft_upsert`).

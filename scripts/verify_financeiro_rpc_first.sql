@@ -10,14 +10,16 @@ declare
 begin
   select string_agg(format('%I.%I (%s)', table_schema, table_name, privilege_type), E'\n' order by table_name, privilege_type)
   into v_bad
-  from information_schema.role_table_grants
-  where table_schema = 'public'
-    and grantee in ('authenticated', 'anon')
-    and (
-      table_name like 'financeiro_%'
-      or table_name like 'finance_%'
-      or table_name like 'finops_%'
-    );
+	  from information_schema.role_table_grants
+	  where table_schema = 'public'
+	    and grantee in ('authenticated', 'anon')
+	    and (
+	      table_name like 'financeiro_%'
+	      or table_name like 'finance_%'
+	      or table_name like 'finops_%'
+	      -- Financeiro (piloto) também inclui tabelas históricas fora do prefixo.
+	      or table_name in ('contas_a_receber')
+	    );
 
   if v_bad is not null then
     raise exception using

@@ -91,28 +91,32 @@ async function tryRecoverActiveEmpresaContext(): Promise<boolean> {
       const uid = userData?.user?.id ?? null;
       if (!uid) return false;
 
+      // RPC-first: evita depender de PostgREST para boot/recovery (reduz 403 intermitente).
       // 1) Já existe empresa ativa? nada a fazer.
-      const { data: activeRows, error: activeErr } = await (supabase as any)
-        .from("user_active_empresa")
-        .select("empresa_id")
-        .limit(1);
-      if (!activeErr) {
-        const activeEmpresaId = (activeRows?.[0] as any)?.empresa_id ?? null;
-        if (activeEmpresaId) return false;
+      try {
+        const { data: activeEmpresaId, error: activeErr } = await (supabase as any).rpc(
+          "active_empresa_get_for_current_user",
+          {},
+        );
+        if (!activeErr && activeEmpresaId) return false;
+      } catch {
+        // best-effort
       }
 
-      // 2) Se o usuário tem exatamente 1 vínculo, definimos automaticamente.
-      const { data: links, error: linkErr } = await (supabase as any)
-        .from("empresa_usuarios")
-        .select("empresa_id")
-        .order("created_at", { ascending: false })
-        .limit(2);
-      if (linkErr) return false;
+      // 2) Se o usuário tem exatamente 1 empresa, definimos automaticamente.
+      let empresaId: string | null = null;
+      try {
+        const { data: empresas, error: listErr } = await (supabase as any).rpc("empresas_list_for_current_user", {
+          p_limit: 2,
+        });
+        if (listErr) return false;
+        const ids = (empresas ?? []).map((e: any) => e?.id).filter(Boolean);
+        if (ids.length !== 1) return false;
+        empresaId = String(ids[0]);
+      } catch {
+        return false;
+      }
 
-      const empresaIds = (links ?? []).map((r: any) => r?.empresa_id).filter(Boolean);
-      if (empresaIds.length !== 1) return false;
-
-      const empresaId = empresaIds[0] as string;
       const { error: rpcErr } = await (supabase as any).rpc("set_active_empresa_for_current_user", {
         p_empresa_id: empresaId,
       });
