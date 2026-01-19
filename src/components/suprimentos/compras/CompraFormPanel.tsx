@@ -14,7 +14,8 @@ import { useNumericField } from '@/hooks/useNumericField';
 import Modal from '@/components/ui/Modal';
 import { getRelatorioBaixoEstoque, type RelatorioBaixoEstoqueItem } from '@/services/suprimentos';
 import { listMrpDemandas, type MrpDemanda } from '@/services/industriaProducao';
-import { createContaPagarFromCompra, getContaPagarFromCompra } from '@/services/financeiro';
+import ParcelamentoDialog from '@/components/financeiro/parcelamento/ParcelamentoDialog';
+import { createParcelamentoFromCompra } from '@/services/financeiroParcelamento';
 import ResizableSortableTh from '@/components/ui/table/ResizableSortableTh';
 import TableColGroup from '@/components/ui/table/TableColGroup';
 import { useTableColumnWidths, type TableColumnWidthDef } from '@/components/ui/table/useTableColumnWidths';
@@ -39,6 +40,7 @@ export default function CompraFormPanel({ compraId, onSaveSuccess, onClose }: Pr
     total_geral: 0,
     itens: []
   });
+  const [parcelamentoOpen, setParcelamentoOpen] = useState(false);
 
   const freteProps = useNumericField(formData.frete, (v) => handleHeaderChange('frete', v));
   const descontoProps = useNumericField(formData.desconto, (v) => handleHeaderChange('desconto', v));
@@ -197,16 +199,7 @@ export default function CompraFormPanel({ compraId, onSaveSuccess, onClose }: Pr
         variant: 'default',
       });
       if (!wantConta) return;
-
-      const existing = await getContaPagarFromCompra(String(formData.id));
-      const contaId =
-        existing ||
-        (await createContaPagarFromCompra({
-          compraId: String(formData.id),
-          dataVencimento: null,
-        }));
-      addToast('Conta a pagar gerada com sucesso!', 'success');
-      navigate(`/app/financeiro/contas-a-pagar?contaId=${encodeURIComponent(contaId)}`);
+      setParcelamentoOpen(true);
     } catch (e: any) {
       addToast(e.message, 'error');
     } finally {
@@ -326,6 +319,27 @@ export default function CompraFormPanel({ compraId, onSaveSuccess, onClose }: Pr
 
   return (
     <div className="flex flex-col h-full">
+      <ParcelamentoDialog
+        open={parcelamentoOpen}
+        onClose={() => setParcelamentoOpen(false)}
+        title="Gerar títulos (contas a pagar)"
+        total={Number(formData.total_geral || 0)}
+        defaultCondicao="1x"
+        defaultBaseDateISO={String(formData.data_emissao || '').slice(0, 10) || new Date().toISOString().slice(0, 10)}
+        confirmText="Gerar títulos"
+        onConfirm={async ({ condicao, baseDateISO }) => {
+          if (!formData.id) throw new Error('Compra inválida.');
+          const res = await createParcelamentoFromCompra({
+            compraId: String(formData.id),
+            condicao,
+            baseDateISO,
+          });
+          if (!res?.ok) throw new Error('Não foi possível gerar os títulos.');
+          const firstId = res.contas_ids?.[0] || null;
+          addToast(`Títulos gerados: ${res.count ?? 0}.`, 'success');
+          navigate(firstId ? `/app/financeiro/contas-a-pagar?contaId=${encodeURIComponent(firstId)}` : '/app/financeiro/contas-a-pagar');
+        }}
+      />
       <div className="flex-grow p-6 overflow-y-auto scrollbar-styled">
         {formData.numero && (
           <div className="mb-4 flex justify-between items-center">

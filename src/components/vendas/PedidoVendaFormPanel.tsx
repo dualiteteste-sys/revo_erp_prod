@@ -15,10 +15,13 @@ import { ensurePdvDefaultClienteId } from '@/services/vendasMvp';
 import { listVendedores, type Vendedor } from '@/services/vendedores';
 import { listMarketplaceOrderTimeline, type MarketplaceTimelineEvent } from '@/services/ecommerceOrders';
 import { listAuditLogsForTables, type AuditLogRow } from '@/services/auditLogs';
+import { useNavigate } from 'react-router-dom';
 import ResizableSortableTh, { type SortState } from '@/components/ui/table/ResizableSortableTh';
 import TableColGroup from '@/components/ui/table/TableColGroup';
 import { useTableColumnWidths, type TableColumnWidthDef } from '@/components/ui/table/useTableColumnWidths';
 import { sortRows, toggleSort } from '@/components/ui/table/sortUtils';
+import ParcelamentoDialog from '@/components/financeiro/parcelamento/ParcelamentoDialog';
+import { createParcelamentoFromVenda } from '@/services/financeiroParcelamento';
 
 interface Props {
   vendaId: string | null;
@@ -51,6 +54,7 @@ function formatMoneyBRL(n: number | null | undefined): string {
 export default function PedidoVendaFormPanel({ vendaId, onSaveSuccess, onClose, mode = 'erp', onFinalizePdv }: Props) {
   const { addToast } = useToast();
   const { confirm } = useConfirm();
+  const navigate = useNavigate();
   const [loading, setLoading] = useState(!!vendaId);
   const [isSaving, setIsSaving] = useState(false);
   const [vendedores, setVendedores] = useState<Vendedor[]>([]);
@@ -608,6 +612,7 @@ export default function PedidoVendaFormPanel({ vendaId, onSaveSuccess, onClose, 
   const frete = toMoney(formData.frete);
   const desconto = toMoney(formData.desconto);
   const previewTotalGeral = Math.max(0, toMoney(subtotal + frete - desconto));
+  const [parcelamentoOpen, setParcelamentoOpen] = useState(false);
 
   const canConcluir = useMemo(() => {
     return !!formData.id && formData.status === 'aprovado';
@@ -631,6 +636,15 @@ export default function PedidoVendaFormPanel({ vendaId, onSaveSuccess, onClose, 
       await loadDetails();
       addToast('Pedido concluído e estoque baixado.', 'success');
       onSaveSuccess();
+
+      const wantTitles = await confirm({
+        title: 'Gerar títulos (contas a receber)',
+        description: 'Deseja gerar automaticamente os títulos (parcelas) de Contas a Receber para este pedido?',
+        confirmText: 'Gerar agora',
+        cancelText: 'Agora não',
+        variant: 'default',
+      });
+      if (wantTitles) setParcelamentoOpen(true);
     } catch (e: any) {
       addToast(e?.message || 'Falha ao concluir pedido.', 'error');
     } finally {
@@ -640,6 +654,27 @@ export default function PedidoVendaFormPanel({ vendaId, onSaveSuccess, onClose, 
 
   return (
     <div className="flex flex-col h-full">
+      <ParcelamentoDialog
+        open={parcelamentoOpen}
+        onClose={() => setParcelamentoOpen(false)}
+        title="Gerar títulos (contas a receber)"
+        total={Number(previewTotalGeral || 0)}
+        defaultCondicao={formData.condicao_pagamento || '1x'}
+        defaultBaseDateISO={String(formData.data_emissao || '').slice(0, 10) || new Date().toISOString().slice(0, 10)}
+        confirmText="Gerar títulos"
+        onConfirm={async ({ condicao, baseDateISO }) => {
+          if (!formData.id) throw new Error('Pedido inválido.');
+          const res = await createParcelamentoFromVenda({
+            pedidoId: String(formData.id),
+            condicao,
+            baseDateISO,
+          });
+          if (!res?.ok) throw new Error('Não foi possível gerar os títulos.');
+          const firstId = res.contas_ids?.[0] || null;
+          addToast(`Títulos gerados: ${res.count ?? 0}.`, 'success');
+          navigate(firstId ? `/app/financeiro/contas-a-receber?contaId=${encodeURIComponent(firstId)}` : '/app/financeiro/contas-a-receber');
+        }}
+      />
       <div className="flex-grow p-6 overflow-y-auto scrollbar-styled">
         {formData.numero && (
           <div className="mb-4 flex justify-between items-center">

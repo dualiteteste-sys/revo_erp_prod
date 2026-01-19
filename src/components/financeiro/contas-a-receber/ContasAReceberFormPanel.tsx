@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Loader2, Save } from 'lucide-react';
-import { ContaAReceber, saveContaAReceber } from '@/services/contasAReceber';
+import { ContaAReceber, getContaAReceberDetails, saveContaAReceber } from '@/services/contasAReceber';
 import { getPartnerDetails } from '@/services/partners';
 import { useToast } from '@/contexts/ToastProvider';
 import Section from '@/components/ui/forms/Section';
@@ -11,7 +11,17 @@ import { useNumericField } from '@/hooks/useNumericField';
 import ClientAutocomplete from '@/components/common/ClientAutocomplete';
 import CentroDeCustoDropdown from '@/components/common/CentroDeCustoDropdown';
 import { Switch } from '@/components/ui/switch';
-import { generateRecorrencia, upsertRecorrencia, type FinanceiroRecorrenciaAjusteDiaUtil, type FinanceiroRecorrenciaFrequencia } from '@/services/financeiroRecorrencias';
+import RecorrenciaApplyScopeDialog from '@/components/financeiro/recorrencias/RecorrenciaApplyScopeDialog';
+import ParcelamentoDialog from '@/components/financeiro/parcelamento/ParcelamentoDialog';
+import {
+  applyRecorrenciaUpdate,
+  generateRecorrencia,
+  upsertRecorrencia,
+  type FinanceiroRecorrenciaAjusteDiaUtil,
+  type FinanceiroRecorrenciaApplyScope,
+  type FinanceiroRecorrenciaFrequencia,
+} from '@/services/financeiroRecorrencias';
+import { createParcelamentoContasAReceber } from '@/services/financeiroParcelamento';
 
 interface ContasAReceberFormPanelProps {
   conta: Partial<ContaAReceber> | null;
@@ -33,12 +43,19 @@ const ContasAReceberFormPanel: React.FC<ContasAReceberFormPanelProps> = ({ conta
   const isPago = formData.status === 'pago';
   const isEditing = !!conta?.id;
 
+  const [recApplyOpen, setRecApplyOpen] = useState(false);
+  const [recApplyScope, setRecApplyScope] = useState<FinanceiroRecorrenciaApplyScope>('single');
+
   const [isRecorrente, setIsRecorrente] = useState(false);
   const [frequencia, setFrequencia] = useState<FinanceiroRecorrenciaFrequencia>('mensal');
   const [ajusteDiaUtil, setAjusteDiaUtil] = useState<FinanceiroRecorrenciaAjusteDiaUtil>('proximo_dia_util');
   const [hasEndDate, setHasEndDate] = useState(false);
   const [endDate, setEndDate] = useState<string>('');
   const [gerarN, setGerarN] = useState<number>(12);
+
+  const [isParcelado, setIsParcelado] = useState(false);
+  const [parcelarCondicao, setParcelarCondicao] = useState<string>('1x');
+  const [parcelarOpen, setParcelarOpen] = useState(false);
 
   const valorProps = useNumericField(formData.valor, (value) => handleFormChange('valor', value));
 
@@ -62,11 +79,78 @@ const ContasAReceberFormPanel: React.FC<ContasAReceberFormPanelProps> = ({ conta
       setHasEndDate(false);
       setEndDate('');
       setGerarN(12);
+      setIsParcelado(false);
+      setParcelarCondicao('1x');
     }
   }, [conta]);
 
   const handleFormChange = (field: keyof ContaAReceber | 'centro_de_custo_id', value: any) => {
     setFormData(prev => ({ ...(prev as any), [field]: value } as any));
+  };
+
+  const isGeradaPorRecorrencia = (() => {
+    const origemTipo = (formData as any)?.origem_tipo ?? (conta as any)?.origem_tipo ?? null;
+    const origemId = (formData as any)?.origem_id ?? (conta as any)?.origem_id ?? null;
+    return isEditing && origemTipo === 'RECORRENCIA' && !!origemId;
+  })();
+
+  const buildRecorrenciaPatch = () => {
+    const base: any = conta ?? {};
+    const patch: Record<string, any> = {};
+    const keys: Array<keyof any> = ['descricao', 'observacoes', 'centro_de_custo_id', 'cliente_id', 'valor', 'data_vencimento'];
+    for (const k of keys) {
+      const next = (formData as any)?.[k];
+      const prev = (base as any)?.[k];
+      const normNext = next ?? null;
+      const normPrev = prev ?? null;
+      const changed =
+        k === 'valor' ? Number(normNext ?? 0) !== Number(normPrev ?? 0) : String(normNext) !== String(normPrev);
+      if (changed) patch[String(k)] = normNext;
+    }
+    return patch;
+  };
+
+  const shouldAskRecorrenciaScope = () => {
+    if (!isGeradaPorRecorrencia) return false;
+    const patch = buildRecorrenciaPatch();
+    const propagatableKeys = ['descricao', 'observacoes', 'centro_de_custo_id', 'cliente_id', 'valor'];
+    return propagatableKeys.some((k) => k in patch);
+  };
+
+  const applyRecorrencia = async (scope: FinanceiroRecorrenciaApplyScope) => {
+    const ocorrenciaId = String((formData as any)?.origem_id ?? (conta as any)?.origem_id ?? '');
+    if (!ocorrenciaId) {
+      addToast('Não foi possível identificar a recorrência desta conta.', 'error');
+      return;
+    }
+
+    const patch = buildRecorrenciaPatch();
+    setIsSaving(true);
+    try {
+      const result = await applyRecorrenciaUpdate({
+        ocorrenciaId,
+        scope,
+        patch,
+      });
+
+      if (!result?.ok) {
+        addToast('Não foi possível aplicar a alteração na recorrência.', 'error');
+        return;
+      }
+
+      const msg =
+        scope === 'single'
+          ? 'Conta recorrente atualizada.'
+          : `Recorrência atualizada. Contas afetadas: ${result.updated_accounts ?? 0}.`;
+      addToast(msg, 'success');
+
+      const refreshed = await getContaAReceberDetails(String(conta?.id));
+      onSaveSuccess(refreshed);
+    } catch (e: any) {
+      addToast(e?.message || 'Erro ao aplicar alteração na recorrência.', 'error');
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const handleSave = async () => {
@@ -75,9 +159,18 @@ const ContasAReceberFormPanel: React.FC<ContasAReceberFormPanelProps> = ({ conta
       return;
     }
 
-    setIsSaving(true);
     try {
+      if (!isEditing && !isRecorrente && isParcelado) {
+        if (!formData.cliente_id) {
+          addToast('Cliente é obrigatório para parcelar.', 'error');
+          return;
+        }
+        setParcelarOpen(true);
+        return;
+      }
+
       if (!isEditing && isRecorrente) {
+        setIsSaving(true);
         if (!formData.cliente_id) {
           addToast('Cliente é obrigatório para recorrência.', 'error');
           return;
@@ -110,6 +203,13 @@ const ContasAReceberFormPanel: React.FC<ContasAReceberFormPanelProps> = ({ conta
         return;
       }
 
+      if (shouldAskRecorrenciaScope()) {
+        setRecApplyScope('single');
+        setRecApplyOpen(true);
+        return;
+      }
+
+      setIsSaving(true);
       const savedConta = await saveContaAReceber(formData);
       addToast('Conta a receber salva com sucesso!', 'success');
       onSaveSuccess(savedConta);
@@ -122,6 +222,43 @@ const ContasAReceberFormPanel: React.FC<ContasAReceberFormPanelProps> = ({ conta
 
   return (
     <div className="flex flex-col h-full">
+      <ParcelamentoDialog
+        open={parcelarOpen}
+        onClose={() => setParcelarOpen(false)}
+        title="Parcelar conta a receber"
+        total={Number(formData.valor || 0)}
+        defaultCondicao={parcelarCondicao}
+        defaultBaseDateISO={String(formData.data_vencimento || '').slice(0, 10) || new Date().toISOString().slice(0, 10)}
+        confirmText="Gerar parcelas"
+        onConfirm={async ({ condicao, baseDateISO }) => {
+          const clienteId = String(formData.cliente_id || '');
+          if (!clienteId) throw new Error('Cliente é obrigatório para parcelar.');
+          const res = await createParcelamentoContasAReceber({
+            clienteId,
+            descricao: String(formData.descricao || ''),
+            total: Number(formData.valor || 0),
+            condicao,
+            baseDateISO,
+            centroDeCustoId: ((formData as any).centro_de_custo_id ?? null) as any,
+            observacoes: ((formData as any).observacoes ?? null) as any,
+          });
+          if (!res?.ok) throw new Error('Não foi possível gerar as parcelas.');
+          addToast(`Parcelamento gerado: ${res.count ?? 0} título(s).`, 'success');
+          onSaveSuccess();
+          onClose();
+        }}
+      />
+      <RecorrenciaApplyScopeDialog
+        open={recApplyOpen}
+        onOpenChange={setRecApplyOpen}
+        scope={recApplyScope}
+        onScopeChange={setRecApplyScope}
+        isLoading={isSaving}
+        onConfirm={async () => {
+          setRecApplyOpen(false);
+          await applyRecorrencia(recApplyScope);
+        }}
+      />
       <div className="flex-grow p-6 overflow-y-auto scrollbar-styled">
         <Section title="Dados da Conta" description="Informações principais da conta a receber.">
           <Input label="Descrição" name="descricao" value={formData.descricao || ''} onChange={e => handleFormChange('descricao', e.target.value)} required className="sm:col-span-6" />
@@ -137,6 +274,30 @@ const ContasAReceberFormPanel: React.FC<ContasAReceberFormPanelProps> = ({ conta
               placeholder="Buscar cliente..."
             />
           </div>
+
+          {!isEditing ? (
+            <div className="sm:col-span-3 flex items-center justify-between gap-4 rounded-lg border border-gray-200 bg-white/60 px-4 py-3 mt-7">
+              <div>
+                <div className="text-sm font-medium text-gray-800">Parcelar</div>
+                <div className="text-xs text-gray-500">Gera múltiplos títulos a partir deste valor.</div>
+              </div>
+              <Switch checked={isParcelado} onCheckedChange={setIsParcelado} disabled={isRecorrente || isSaving} />
+            </div>
+          ) : null}
+
+          {!isEditing && isParcelado ? (
+            <Input
+              label="Condição (parcelas)"
+              name="parcelar_condicao"
+              value={parcelarCondicao}
+              onChange={(e) => setParcelarCondicao(e.target.value)}
+              className="sm:col-span-3"
+              placeholder="Ex: 30/60/90 ou 3x"
+              helperText="Você poderá revisar o preview antes de gerar."
+              disabled={isRecorrente || isSaving}
+            />
+          ) : null}
+
           <Input label="Valor" name="valor" startAdornment="R$" inputMode="numeric" {...valorProps} required className="sm:col-span-3" />
           <Input label="Data de Vencimento" name="data_vencimento" type="date" value={formData.data_vencimento?.split('T')[0] || ''} onChange={e => handleFormChange('data_vencimento', e.target.value)} required className="sm:col-span-3" />
           <Select
