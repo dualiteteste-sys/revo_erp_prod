@@ -3,6 +3,7 @@ import GlassCard from '@/components/ui/GlassCard';
 import { AlertTriangle } from 'lucide-react';
 import { useEmpresaFeatures } from '@/hooks/useEmpresaFeatures';
 import { Button } from '@/components/ui/button';
+import { useAppContext } from '@/contexts/AppContextProvider';
 
 type GuardFeature = 'industria' | 'servicos';
 
@@ -17,7 +18,9 @@ const featureLabel: Record<GuardFeature, string> = {
 };
 
 export default function PlanGuard({ feature, children }: PlanGuardProps) {
+  const { subscription } = useAppContext();
   const { loading, industria_enabled, servicos_enabled, error, isFallback, refetch } = useEmpresaFeatures();
+  const isScale = String(subscription?.plan_slug ?? '').toUpperCase() === 'SCALE';
 
   if (loading) {
     return (
@@ -28,6 +31,11 @@ export default function PlanGuard({ feature, children }: PlanGuardProps) {
   }
 
   if (error) {
+    // O plano SCALE deve ser "tudo liberado" e não deve degradar UX com aviso por falha transiente
+    // de leitura de flags. Ainda assim, o enforcement real ocorre no banco.
+    if (isFallback && isScale) {
+      return <>{children}</>;
+    }
     return (
       <div className="p-6 space-y-4">
         <GlassCard className="p-6">
