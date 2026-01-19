@@ -1,4 +1,3 @@
-import { supabase } from '@/lib/supabase';
 import { callRpc } from '@/lib/api';
 
 export type RecebimentoStatus = 'pendente' | 'em_conferencia' | 'divergente' | 'concluido' | 'cancelado';
@@ -55,74 +54,20 @@ export type RecebimentoItem = {
 };
 
 export async function listRecebimentos(status?: RecebimentoStatus): Promise<Recebimento[]> {
-    let query = supabase
-        .from('recebimentos')
-        .select(`
-      *,
-      fiscal_nfe_imports (
-        chave_acesso,
-        emitente_nome,
-        emitente_cnpj,
-        numero,
-        serie,
-        total_nf,
-        pedido_numero
-      )
-    `)
-        .order('created_at', { ascending: false });
-
-    if (status) {
-        query = query.eq('status', status);
-    }
-
-    const { data, error } = await query;
-    if (error) throw error;
-    return data as Recebimento[];
+    const rows = await callRpc('suprimentos_recebimentos_list', {
+        p_status: status ?? null,
+    });
+    return (rows ?? []) as Recebimento[];
 }
 
 export async function getRecebimento(id: string): Promise<Recebimento> {
-    const { data, error } = await supabase
-        .from('recebimentos')
-        .select(`
-      *,
-      fiscal_nfe_imports (
-        chave_acesso,
-        emitente_nome,
-        emitente_cnpj,
-        numero,
-        serie,
-        total_nf,
-        pedido_numero
-      )
-    `)
-        .eq('id', id)
-        .single();
-
-    if (error) throw error;
-    return data as Recebimento;
+    const row = await callRpc('suprimentos_recebimento_get', { p_recebimento_id: id });
+    return row as Recebimento;
 }
 
 export async function listRecebimentoItens(recebimentoId: string): Promise<RecebimentoItem[]> {
-    const { data, error } = await supabase
-        .from('recebimento_itens')
-        .select(`
-      *,
-      produtos (
-        nome,
-        sku,
-        unidade
-      ),
-      fiscal_nfe_import_items (
-        xprod,
-        cprod,
-        ean,
-        ucom
-      )
-    `)
-        .eq('recebimento_id', recebimentoId);
-
-    if (error) throw error;
-    return data as RecebimentoItem[];
+    const rows = await callRpc('suprimentos_recebimento_itens_list', { p_recebimento_id: recebimentoId });
+    return (rows ?? []) as RecebimentoItem[];
 }
 
 export type CreateRecebimentoFromXmlStatus = 'created' | 'exists' | 'reopened';
@@ -199,12 +144,10 @@ export async function cancelarRecebimento(recebimentoId: string, motivo?: string
 }
 
 export async function updateRecebimentoItemProduct(itemId: string, productId: string | null): Promise<void> {
-    const { error } = await supabase
-        .from('recebimento_itens')
-        .update({ produto_id: productId })
-        .eq('id', itemId);
-
-    if (error) throw error;
+    await callRpc('suprimentos_recebimento_item_set_produto', {
+        p_recebimento_item_id: itemId,
+        p_produto_id: productId,
+    });
 }
 
 export async function updateRecebimentoCustos(
@@ -217,26 +160,13 @@ export async function updateRecebimentoCustos(
         rateio_base?: 'valor' | 'quantidade';
     }
 ): Promise<Recebimento> {
-    const { data, error } = await supabase
-        .from('recebimentos')
-        .update(patch as any)
-        .eq('id', recebimentoId)
-        .select(
-            `
-      *,
-      fiscal_nfe_imports (
-        chave_acesso,
-        emitente_nome,
-        emitente_cnpj,
-        numero,
-        serie,
-        total_nf,
-        pedido_numero
-      )
-    `
-        )
-        .single();
-
-    if (error) throw error;
-    return data as Recebimento;
+    const row = await callRpc('suprimentos_recebimento_update_custos', {
+        p_recebimento_id: recebimentoId,
+        p_custo_frete: patch.custo_frete ?? null,
+        p_custo_seguro: patch.custo_seguro ?? null,
+        p_custo_impostos: patch.custo_impostos ?? null,
+        p_custo_outros: patch.custo_outros ?? null,
+        p_rateio_base: patch.rateio_base ?? null,
+    });
+    return row as Recebimento;
 }

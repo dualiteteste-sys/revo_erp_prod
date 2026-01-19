@@ -1,0 +1,31 @@
+{
+  "generated_at": "2026-01-19T07:24:17.542Z",
+  "budgets": [
+    {
+      "name": "core-auth-context",
+      "include": [
+        "src/lib/**",
+        "src/contexts/**",
+        "src/services/session.ts"
+      ],
+      "exclude": [],
+      "maxAny": 56,
+      "maxAsAny": 43
+    },
+    {
+      "name": "billing-financeiro",
+      "include": [
+        "src/services/financeiro.ts",
+        "src/services/financeiroParcelamento.ts",
+        "src/services/financeiroRecorrencias.ts",
+        "src/services/financeiroRelatorios.ts",
+        "src/services/contasAReceber.ts",
+        "src/services/treasury.ts",
+        "src/services/meiosPagamento.ts"
+      ],
+      "exclude": [],
+      "maxAny": 41,
+      "maxAsAny": 5
+    }
+  ]
+}
