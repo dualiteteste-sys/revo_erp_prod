@@ -17,11 +17,11 @@ begin
     from pg_type t
     where t.typname = 'financeiro_parcelamento_tipo'
       and t.typnamespace = 'public'::regnamespace
-  ) then
-    execute $$create type public.financeiro_parcelamento_tipo as enum ('pagar','receber')$$;
-  end if;
-end;
-$$;
+	  ) then
+	    execute 'create type public.financeiro_parcelamento_tipo as enum (''pagar'',''receber'')';
+	  end if;
+	end;
+	$$;
 
 create table if not exists public.financeiro_parcelamentos (
   id uuid primary key default gen_random_uuid(),
