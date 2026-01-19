@@ -33,6 +33,18 @@ jobs:
         with:
           version: latest
 
+      - name: Ensure Supabase ports are free (54321/54322/54323/54324)
+        run: |
+          set -euo pipefail
+          for p in 54321 54322 54323 54324; do
+            if sudo lsof -iTCP:$p -sTCP:LISTEN -t >/dev/null 2>&1; then
+              echo "[VERIFY][dev] Port $p is in use; killing listener(s)..."
+              sudo lsof -iTCP:$p -sTCP:LISTEN -t | xargs -r sudo kill -9 || true
+            fi
+          done
+          # Also remove any docker containers that might have published these ports.
+          docker ps --format '{{.ID}} {{.Ports}}' | awk '/(54321|54322|54323|54324)->/ {print $1}' | xargs -r docker rm -f || true
+
       - name: Start Supabase (local)
         run: |
           set -euo pipefail
