@@ -25,7 +25,7 @@ BEGIN
     FROM pg_event_trigger_ddl_commands() c
     WHERE
       c.object_identity = 'public.wrappers_fdw_stats'
-      OR (c.schema_name = 'public' AND c.object_name = 'wrappers_fdw_stats')
+      OR (c.schema_name = 'public' AND c.object_identity LIKE 'public.wrappers_fdw_stats%')
   )
   INTO should_run;
 
@@ -38,4 +38,3 @@ $$;
 ALTER EVENT TRIGGER ev_ops_harden_wrappers_fdw_stats ENABLE;
 
 COMMIT;
-
