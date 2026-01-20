@@ -120,17 +120,6 @@ export async function deleteCompanyLogo(logoPath: string): Promise<void> {
  * Remove o usuário atual da empresa especificada.
  */
 export async function leaveCompany(empresaId: string): Promise<void> {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) throw new Error("Usuário não autenticado.");
-
-    const { error } = await supabase
-        .from('empresa_usuarios')
-        .delete()
-        .eq('empresa_id', empresaId)
-        .eq('user_id', user.id);
-
-    if (error) {
-        console.error('Error leaving company:', error);
-        throw new Error('Falha ao sair da empresa.');
-    }
+    const { error } = await supabase.rpc('empresa_leave_for_current_user', { p_empresa_id: empresaId });
+    if (error) throw error;
 }
