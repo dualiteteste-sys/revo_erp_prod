@@ -11,12 +11,7 @@ export async function sendErrorReport(payload: ErrorReportPayload) {
   const { data: userData } = await supabase.auth.getUser();
   const user = userData?.user ?? null;
 
-  const { data: activeEmpresaRows } = await (supabase as any)
-    .from("user_active_empresa")
-    .select("empresa_id")
-    .limit(1);
-
-  const empresaId = (activeEmpresaRows?.[0] as any)?.empresa_id ?? null;
+  const { data: empresaId } = await (supabase as any).rpc("active_empresa_get_for_current_user");
 
   const body = {
     ...payload,
@@ -36,4 +31,3 @@ export async function sendErrorReport(payload: ErrorReportPayload) {
   if (error) throw error;
   return data as any;
 }
-

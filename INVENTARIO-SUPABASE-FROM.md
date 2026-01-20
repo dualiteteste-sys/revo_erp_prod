@@ -1,6 +1,6 @@
 # Inventário — `supabase.from()` por domínio
 
-Gerado em: 19/01/2026, 04:26:20
+Gerado em: 19/01/2026, 23:22:38
 
 Objetivo: mapear acessos diretos a tabelas (client-side) para migrar gradualmente para RPC-first em domínios sensíveis.
 
@@ -20,30 +20,6 @@ Objetivo: mapear acessos diretos a tabelas (client-side) para migrar gradualment
 **Arquivos**
 - `src/features/users/components/UserPermissionOverrides.tsx`
 
-## services/osEquipamentos.ts — 3 ocorrência(s)
-
-**Tabelas mais acessadas**
-- `os_equipamentos`: 3
-
-**Arquivos**
-- `src/services/osEquipamentos.ts`
-
-## components/products — 2 ocorrência(s)
-
-**Tabelas mais acessadas**
-- `produto_imagens`: 2
-
-**Arquivos**
-- `src/components/products/form-tabs/MediaTab.tsx`
-
-## services/partners.ts — 2 ocorrência(s)
-
-**Tabelas mais acessadas**
-- `pessoas`: 2
-
-**Arquivos**
-- `src/services/partners.ts`
-
 ## components/industria — 1 ocorrência(s)
 
 **Tabelas mais acessadas**
@@ -60,14 +36,6 @@ Objetivo: mapear acessos diretos a tabelas (client-side) para migrar gradualment
 **Arquivos**
 - `src/components/settings/billing/SubscriptionSettings.tsx`
 
-## hooks — 1 ocorrência(s)
-
-**Tabelas mais acessadas**
-- `empresa_usuarios`: 1
-
-**Arquivos**
-- `src/hooks/useEmpresaRole.ts`
-
 ## pages/SalesDashboard.tsx — 1 ocorrência(s)
 
 **Tabelas mais acessadas**
@@ -75,14 +43,6 @@ Objetivo: mapear acessos diretos a tabelas (client-side) para migrar gradualment
 
 **Arquivos**
 - `src/pages/SalesDashboard.tsx`
-
-## pages/auth — 1 ocorrência(s)
-
-**Tabelas mais acessadas**
-- `user_active_empresa`: 1
-
-**Arquivos**
-- `src/pages/auth/Callback.tsx`
 
 ## pages/fiscal — 1 ocorrência(s)
 
@@ -124,14 +84,6 @@ Objetivo: mapear acessos diretos a tabelas (client-side) para migrar gradualment
 **Arquivos**
 - `src/services/auditLogs.ts`
 
-## services/company.ts — 1 ocorrência(s)
-
-**Tabelas mais acessadas**
-- `empresa_usuarios`: 1
-
-**Arquivos**
-- `src/services/company.ts`
-
 ## services/products.ts — 1 ocorrência(s)
 
 **Tabelas mais acessadas**
@@ -139,11 +91,3 @@ Objetivo: mapear acessos diretos a tabelas (client-side) para migrar gradualment
 
 **Arquivos**
 - `src/services/products.ts`
-
-## services/unidades.ts — 1 ocorrência(s)
-
-**Tabelas mais acessadas**
-- `unidades_medida`: 1
-
-**Arquivos**
-- `src/services/unidades.ts`

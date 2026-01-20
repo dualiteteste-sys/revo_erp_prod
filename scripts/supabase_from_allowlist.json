@@ -1,0 +1,16 @@
+{
+  "allowedFiles": [
+    "src/components/industria/audit/IndustriaAuditTrailPanel.tsx",
+    "src/components/roadmap/roadmaps.ts",
+    "src/components/settings/billing/SubscriptionSettings.tsx",
+    "src/features/users/components/UserPermissionOverrides.tsx",
+    "src/pages/SalesDashboard.tsx",
+    "src/pages/fiscal/NfeEmissoesPage.tsx",
+    "src/pages/landing/RevoSendPage.tsx",
+    "src/pages/settings/general/PrivacyLgpdPage.tsx",
+    "src/pages/tools/SupabaseDemoPage.tsx",
+    "src/services/auditLogs.ts",
+    "src/services/embalagens.ts",
+    "src/services/products.ts"
+  ]
+}
