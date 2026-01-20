@@ -71,7 +71,7 @@ Definições:
   - [x] Gate em `scripts/rg03_db_asserts.sql` (SEC-01b/RG-03).
 - [ ] Garantir que tabelas multi-tenant tenham:
   - [x] `empresa_id` obrigatório e consistente (guardrails via migration `20270118193000_mt_empresa_id_guardrails.sql`), com exceções explícitas para catálogos globais (`unidades_medida`, `embalagens`).
-  - [ ] policies `USING/WITH CHECK` baseadas em `current_empresa_id()`
+  - [x] policies `USING/WITH CHECK` baseadas em `current_empresa_id()` (ou heurística equivalente tenant-safe), com gate RG03 (`scripts/rg03_db_asserts.sql`) garantindo 0 “MÉDIO”.
   - [x] índices mínimos para filtros por `empresa_id` (migration `20270119174500_mt_empresa_id_min_indexes.sql`)
 
 ### 1.2 Acesso a dados: RPC-first para áreas sensíveis
