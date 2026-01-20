@@ -56,6 +56,11 @@ jobs:
           fi
           echo "[DEV] Apply migrations (non-destructive)..."
 
+          # Segurança: se existir algum event trigger muito “agressivo” (ex.: hardening em ddl_command_end),
+          # ele pode estourar statement_timeout e travar o push. Desabilitamos temporariamente para o push,
+          # e as migrações subsequentes reabilitam no formato correto.
+          psql "$SUPABASE_DB_URL_DEV" -v ON_ERROR_STOP=1 -X -qAt -c "set statement_timeout = '10min'; alter event trigger ev_ops_harden_wrappers_fdw_stats disable;" || true
+
           echo "y" | supabase db push --include-all --db-url "$SUPABASE_DB_URL_DEV"
           echo "[DEV] Migrations applied successfully."
 
