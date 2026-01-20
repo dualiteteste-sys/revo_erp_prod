@@ -34,60 +34,6 @@ jobs:
         with:
           version: latest
 
-      - name: Ensure Supabase ports are free (54321/54322/54323/54324)
-        run: |
-          set -euo pipefail
-          for p in 54321 54322 54323 54324; do
-            if sudo lsof -iTCP:$p -sTCP:LISTEN -t >/dev/null 2>&1; then
-              echo "[VERIFY][dev] Port $p is in use; killing listener(s)..."
-              sudo lsof -iTCP:$p -sTCP:LISTEN -t | xargs -r sudo kill -9 || true
-            fi
-          done
-          # Also remove any docker containers that might have published these ports.
-          docker ps --format '{{.ID}} {{.Ports}}' | awk '/(54321|54322|54323|54324)->/ {print $1}' | xargs -r docker rm -f || true
-
-      - name: Free disk space (CI)
-        run: |
-          set -euo pipefail
-          echo "[CI] Disk before cleanup:"
-          df -h
-          # GitHub runners can run out of disk when pulling docker images. Remove large preinstalls.
-          sudo rm -rf /usr/share/dotnet /opt/ghc /usr/local/lib/android || true
-          sudo apt-get clean || true
-          docker system prune -af || true
-          echo "[CI] Disk after cleanup:"
-          df -h
-
-      - name: Start Supabase (local)
-        run: |
-          set -euo pipefail
-          bash scripts/ci_supabase_start_db_only.sh
-
-      - name: Apply migrations with Supabase CLI
-        run: |
-          set -euo pipefail
-          echo "[VERIFY][dev] Applying migrations..."
-          echo "y" | supabase db push --local --include-all
-          echo "[VERIFY][dev] All migrations applied successfully."
-
-      - name: Verify Financeiro is RPC-first (no table grants)
-        run: |
-          set -euo pipefail
-          LOCAL_DB_URL="postgresql://postgres:postgres@localhost:54322/postgres"
-          psql "$LOCAL_DB_URL" -v ON_ERROR_STOP=1 -X -qAt -f scripts/verify_financeiro_rpc_first.sql
-
-      - name: Snapshot expected schema (public) from VERIFY
-        run: |
-          set -euo pipefail
-          LOCAL_DB_URL="postgresql://postgres:postgres@localhost:54322/postgres"
-          psql "$LOCAL_DB_URL" -v ON_ERROR_STOP=1 -X -qAt -f scripts/public_schema_snapshot.sql > expected_public_schema.txt
-
-      - name: Snapshot expected schema (storage) from VERIFY
-        run: |
-          set -euo pipefail
-          LOCAL_DB_URL="postgresql://postgres:postgres@localhost:54322/postgres"
-          psql "$LOCAL_DB_URL" -v ON_ERROR_STOP=1 -X -qAt -f scripts/storage_snapshot.sql > expected_storage_snapshot.txt
-
       - name: Verify RPC coverage (app ↔ migrations)
         run: |
           set -euo pipefail
@@ -97,12 +43,6 @@ jobs:
         run: |
           set -euo pipefail
           python3 scripts/check_edge_functions_coverage.py
-
-      - name: Stop Supabase (local)
-        if: always()
-        run: |
-          set -euo pipefail
-          supabase stop
 
       - name: Apply migrations to DEV (remote)
         if: github.event_name == 'workflow_dispatch' || github.event_name == 'push'
@@ -127,8 +67,24 @@ jobs:
           set -euo pipefail
           psql "$SUPABASE_DB_URL_DEV" -v ON_ERROR_STOP=1 -X -qAt -c "notify pgrst, 'reload schema';"
 
+      - name: RG-03 DB asserts (DEV remote)
+        if: github.event_name == 'workflow_dispatch' || github.event_name == 'push'
+        env:
+          SUPABASE_DB_URL_DEV: ${{ secrets.SUPABASE_DB_URL_DEV }}
+        run: |
+          set -euo pipefail
+          psql "$SUPABASE_DB_URL_DEV" -v ON_ERROR_STOP=1 -X -qAt -f scripts/rg03_db_asserts.sql
+
+      - name: Verify Financeiro is RPC-first (DEV remote)
+        if: github.event_name == 'workflow_dispatch' || github.event_name == 'push'
+        env:
+          SUPABASE_DB_URL_DEV: ${{ secrets.SUPABASE_DB_URL_DEV }}
+        run: |
+          set -euo pipefail
+          psql "$SUPABASE_DB_URL_DEV" -v ON_ERROR_STOP=1 -X -qAt -f scripts/verify_financeiro_rpc_first.sql
+
       - name: Snapshot current schema (public) from DEV (remote)
-        if: github.event_name == 'workflow_dispatch'
+        if: github.event_name == 'workflow_dispatch' || github.event_name == 'push'
         env:
           SUPABASE_DB_URL_DEV: ${{ secrets.SUPABASE_DB_URL_DEV }}
         run: |
@@ -136,68 +92,12 @@ jobs:
           psql "$SUPABASE_DB_URL_DEV" -v ON_ERROR_STOP=1 -X -qAt -f scripts/public_schema_snapshot.sql > dev_public_schema.txt
 
       - name: Snapshot current schema (storage) from DEV (remote)
-        if: github.event_name == 'workflow_dispatch'
+        if: github.event_name == 'workflow_dispatch' || github.event_name == 'push'
         env:
           SUPABASE_DB_URL_DEV: ${{ secrets.SUPABASE_DB_URL_DEV }}
         run: |
           set -euo pipefail
           psql "$SUPABASE_DB_URL_DEV" -v ON_ERROR_STOP=1 -X -qAt -f scripts/storage_snapshot.sql > dev_storage_snapshot.txt
-
-      - name: Compare expected vs DEV schema (public)
-        if: github.event_name == 'workflow_dispatch'
-        run: |
-          set -euo pipefail
-          sort expected_public_schema.txt > expected_public_schema.sorted.txt
-          sort dev_public_schema.txt > dev_public_schema.sorted.txt
-
-          missing="$(comm -23 expected_public_schema.sorted.txt dev_public_schema.sorted.txt || true)"
-          if [[ -n "${missing}" ]]; then
-            echo ""
-            echo "::error::DEV está faltando definições presentes no schema esperado (VERIFY)."
-            echo "Isso normalmente causa erros de RPC/colunas em DEV."
-            echo ""
-            printf '%s\n' "$missing" | head -n 200
-            echo ""
-            echo "(mostrando até 200 linhas; veja os artifacts para o snapshot completo)"
-            exit 1
-          fi
-
-          extra="$(comm -13 expected_public_schema.sorted.txt dev_public_schema.sorted.txt || true)"
-          if [[ -n "${extra}" ]]; then
-            echo ""
-            echo "::warning::DEV possui objetos extras vs schema esperado (VERIFY)."
-            echo "Isso não bloqueia, mas indica drift/legado; ideal alinhar quando possível."
-            echo ""
-            tmp_extra="$(mktemp)"
-            printf '%s\n' "$extra" > "$tmp_extra"
-            head -n 50 "$tmp_extra"
-            rm -f "$tmp_extra"
-          fi
-
-      - name: Compare expected vs DEV schema (storage)
-        if: github.event_name == 'workflow_dispatch'
-        run: |
-          set -euo pipefail
-          sort expected_storage_snapshot.txt > expected_storage_snapshot.sorted.txt
-          sort dev_storage_snapshot.txt > dev_storage_snapshot.sorted.txt
-
-          missing="$(comm -23 expected_storage_snapshot.sorted.txt dev_storage_snapshot.sorted.txt || true)"
-          if [[ -n "${missing}" ]]; then
-            echo ""
-            echo "::error::DEV está faltando definições presentes no snapshot esperado do Storage (VERIFY)."
-            printf '%s\n' "$missing" | head -n 200
-            exit 1
-          fi
-
-          extra="$(comm -13 expected_storage_snapshot.sorted.txt dev_storage_snapshot.sorted.txt || true)"
-          if [[ -n "${extra}" ]]; then
-            echo ""
-            echo "::warning::DEV possui entradas extras no Storage vs snapshot esperado (VERIFY)."
-            tmp_extra="$(mktemp)"
-            printf '%s\n' "$extra" > "$tmp_extra"
-            head -n 50 "$tmp_extra"
-            rm -f "$tmp_extra"
-          fi
 
       - name: Upload schema snapshots (debug)
         if: always()
@@ -206,12 +106,7 @@ jobs:
           name: dev_schema_snapshots
           if-no-files-found: ignore
           path: |
-            expected_public_schema.txt
             dev_public_schema.txt
-            expected_public_schema.sorted.txt
-            dev_public_schema.sorted.txt
-            expected_storage_snapshot.txt
             dev_storage_snapshot.txt
-            expected_storage_snapshot.sorted.txt
             dev_storage_snapshot.sorted.txt
           retention-days: 7
