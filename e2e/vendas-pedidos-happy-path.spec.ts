@@ -137,8 +137,8 @@ test('Vendas: pedido (VEN-01/02) happy path (CRUD + itens + impostos básicos + 
       return;
     }
 
-    // Vendedores (REST)
-    if (url.includes('/rest/v1/vendedores')) {
+    // Vendedores (RPC-first)
+    if (url.includes('/rest/v1/rpc/vendedores_list_full_for_current_empresa')) {
       await route.fulfill({ json: [vendedor] });
       return;
     }
