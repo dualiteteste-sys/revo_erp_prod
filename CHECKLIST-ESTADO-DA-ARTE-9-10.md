@@ -48,6 +48,7 @@ Definições:
 - [ ] 0 ocorrências de 403 intermitente em `dev` por 72h (fluxos core).
 - [x] `yarn test:e2e:gate:all` verde com console-sweep limpo.
 - [x] Monitoramento contínuo em DEV: workflow `OPS health alert (DEV)` (a cada 15 min) abre issue quando `kind=missing_active_empresa` > 0.
+- [x] Evidência automatizada do SLO 72h: workflows `OPS SLO — 72h sem 403 (DEV/PROD)` geram artifact/summary e abrem issue em caso de violação.
 
 ---
 
@@ -105,6 +106,10 @@ Definições:
 ### 1.2 RPC-first: Suprimentos (Recebimentos)
 - [x] Migrar Recebimentos para RPC-first (sem `supabase.from('recebimentos'|'recebimento_itens')` no app) e revogar grants diretos (migration `supabase/migrations/20270119191000_sup_recebimentos_rpc_first.sql`).
 - [x] Atualizar inventário `INVENTARIO-SUPABASE-FROM.md` e reduzir superfície de tabelas diretas em domínios sensíveis.
+
+### 1.3 RPC-first: Comissões (Vendedores) (piloto)
+- [x] Migrar Vendedores para RPC-first (sem PostgREST direto em `public.vendedores` no app) e revogar grants diretos (migration `supabase/migrations/20270120201000_sec_rpc_first_vendedores.sql`).
+- [x] Atualizar inventário `INVENTARIO-POSTGREST-FROM.md` e remover `src/services/vendedores.ts` do allowlist.
 
 **Aceite P1**
 - [ ] Auditoria manual: tentar acessar dados de outra empresa (negado sempre).
