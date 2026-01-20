@@ -50,7 +50,9 @@ jobs:
           set -euo pipefail
           # `supabase start` pode ficar silencioso por muito tempo em runners do GitHub e ser finalizado
           # automaticamente (no-output timeout). Rodamos com debug, menos serviços e um heartbeat.
-          supabase start --debug -x logflare -x vector &
+          # Para verify de migrations precisamos apenas do Postgres; excluir o resto evita pulls lentos.
+          supabase start --debug \
+            -x gotrue -x realtime -x storage-api -x imgproxy -x kong -x mailpit -x postgrest -x postgres-meta -x studio -x edge-runtime -x logflare -x vector -x supavisor &
           pid="$!"
 
           for i in $(seq 1 180); do
