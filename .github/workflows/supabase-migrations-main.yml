@@ -10,7 +10,7 @@ on:
   workflow_dispatch:
 
 concurrency:
-  group: verify-migrations-verify-db-main-v2
+  group: cicd-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
