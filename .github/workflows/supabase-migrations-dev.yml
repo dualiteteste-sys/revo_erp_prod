@@ -49,8 +49,22 @@ jobs:
         run: |
           set -euo pipefail
           # `supabase start` pode ficar silencioso por muito tempo em runners do GitHub e ser finalizado
-          # automaticamente (no-output timeout). Rodamos com debug e menos serviços para manter saída.
-          supabase start --debug -x logflare -x vector
+          # automaticamente (no-output timeout). Rodamos com debug, menos serviços e um heartbeat.
+          supabase start --debug -x logflare -x vector &
+          pid="$!"
+
+          for i in $(seq 1 180); do
+            if ! kill -0 "$pid" >/dev/null 2>&1; then
+              wait "$pid"
+              exit 0
+            fi
+            echo "[WAIT] supabase start still running ($i/180)"
+            sleep 5
+          done
+
+          echo "::error::Timeout aguardando supabase start."
+          kill -9 "$pid" || true
+          exit 1
 
       - name: Apply migrations with Supabase CLI
         run: |
