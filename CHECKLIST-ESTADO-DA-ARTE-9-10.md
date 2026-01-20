@@ -80,6 +80,8 @@ Definições:
 - [x] Inventário `supabase.from()` atualizado (regex cobre quebras de linha) e exportado em `INVENTARIO-SUPABASE-FROM.md`.
 - [x] Gate `supabase.from()` (client-side) ativo com allowlist vazio (`scripts/check_supabase_from_allowlist.mjs` OK; `INVENTARIO-SUPABASE-FROM.md` sem ocorrências).
 - [x] RPC-first (Inventário `supabase.from()`): remover ocorrências em `src/**` (migration `20270120123000_sec_rpc_first_inventory_supabase_from.sql`).
+- [x] Inventário PostgREST `.from('tabela')` exportado em `INVENTARIO-POSTGREST-FROM.md` (script `scripts/inventory_postgrest_from.mjs`).
+- [x] Gate PostgREST `.from('tabela')` ativo (allowlist `scripts/postgrest_from_allowlist.json` + `scripts/check_postgrest_from_allowlist.mjs`).
 - [x] RPC-first (Billing): substituir `supabase.from('plans'/'subscriptions'/'billing_stripe_webhook_events')` por RPCs (`billing_plans_public_list`, `billing_subscription_with_plan_get`, `billing_stripe_webhook_events_list`).
 - [x] RPC-first (Financeiro piloto): revogar grants em tabelas `financeiro_%/finance_%/finops_%` e manter acesso via RPCs (migration `20270118133000_fin_ops_health_rpc_and_revoke_fin_grants.sql`).
   - [x] Ops/Health: substituir `supabase.from()` por RPCs SECURITY DEFINER (mesma migration) e verificar via asserts (script `scripts/verify_financeiro_rpc_first.sql`).
@@ -104,7 +106,7 @@ Definições:
 
 **Aceite P1**
 - [ ] Auditoria manual: tentar acessar dados de outra empresa (negado sempre).
-- [ ] “Tabela direta” no client: inventariada e aprovada (com justificativa).
+- [ ] “Tabela direta” no client: inventariada e aprovada (com justificativa) — reduzir `scripts/postgrest_from_allowlist.json` por domínio até zerar em áreas sensíveis.
 
 ---
 

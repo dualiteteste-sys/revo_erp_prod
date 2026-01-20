@@ -25,7 +25,22 @@ done
 echo "[CI] Starting Supabase (DB-only)…"
 echo "[CI] Command: ${SUPABASE_START_CMD[*]}"
 
-if ! timeout 1200 "${SUPABASE_START_CMD[@]}"; then
+run_with_timeout() {
+  local seconds="$1"
+  shift
+  if command -v timeout >/dev/null 2>&1; then
+    timeout "$seconds" "$@"
+    return $?
+  fi
+  if command -v gtimeout >/dev/null 2>&1; then
+    gtimeout "$seconds" "$@"
+    return $?
+  fi
+  echo "[CI] WARN: 'timeout' not found; running without timeout (local/dev convenience)."
+  "$@"
+}
+
+if ! run_with_timeout 1200 "${SUPABASE_START_CMD[@]}"; then
   echo "::error::supabase start timed out or failed."
   supabase status || true
   docker ps || true

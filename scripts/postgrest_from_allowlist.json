@@ -1,0 +1,73 @@
+{
+  "entries": [
+    {
+      "file": "src/components/products/form-tabs/MediaTab.tsx",
+      "reason": "Acesso ao Supabase Storage (não é PostgREST multi-tenant)."
+    },
+    {
+      "file": "src/components/settings/audit/AuditLogsPage.tsx",
+      "reason": "Legacy: acesso direto a tabela (pendente migrar para RPC-first)."
+    },
+    {
+      "file": "src/components/settings/billing/SubscriptionSettings.tsx",
+      "reason": "Legacy: acesso direto a tabela (pendente migrar para RPC-first)."
+    },
+    {
+      "file": "src/pages/fiscal/NfeSettingsPage.tsx",
+      "reason": "Acesso ao Supabase Storage (certificados)."
+    },
+    {
+      "file": "src/pages/industria/OperadoresPage.tsx",
+      "reason": "Legacy: acesso direto a tabela (pendente migrar para RPC-first)."
+    },
+    {
+      "file": "src/pages/settings/general/PrivacyLgpdPage.tsx",
+      "reason": "Acesso ao Supabase Storage (LGPD exports)."
+    },
+    {
+      "file": "src/pages/vendas/ComissoesPage.tsx",
+      "reason": "Legacy: acesso direto a tabela (pendente migrar para RPC-first)."
+    },
+    {
+      "file": "src/pages/vendas/PdvPage.tsx",
+      "reason": "Legacy: acesso direto a tabela (pendente migrar para RPC-first)."
+    },
+    {
+      "file": "src/pages/vendas/RelatoriosVendasPage.tsx",
+      "reason": "Legacy: acesso direto a tabela (pendente migrar para RPC-first)."
+    },
+    {
+      "file": "src/services/errorReports.ts",
+      "reason": "Ops: tabela interna de erros (pendente evoluir para RPC-first)."
+    },
+    {
+      "file": "src/services/servicosContratosBilling.ts",
+      "reason": "Legacy: acesso direto a tabela (pendente migrar para RPC-first)."
+    },
+    {
+      "file": "src/services/servicosContratosItens.ts",
+      "reason": "Legacy: acesso direto a tabela (pendente migrar para RPC-first)."
+    },
+    {
+      "file": "src/services/servicosContratosTemplatesAdmin.ts",
+      "reason": "Legacy: acesso direto a tabela (pendente migrar para RPC-first)."
+    },
+    {
+      "file": "src/services/servicosMvp.ts",
+      "reason": "Legacy: acesso direto a tabela (pendente migrar para RPC-first)."
+    },
+    {
+      "file": "src/services/session.ts",
+      "reason": "Legacy: leitura de entitlements (pendente migrar para RPC-first)."
+    },
+    {
+      "file": "src/services/vendasMvp.ts",
+      "reason": "Legacy: acesso direto a tabela (pendente migrar para RPC-first)."
+    },
+    {
+      "file": "src/services/vendedores.ts",
+      "reason": "Legacy: acesso direto a tabela (pendente migrar para RPC-first)."
+    }
+  ]
+}
+
