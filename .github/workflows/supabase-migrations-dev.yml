@@ -48,7 +48,9 @@ jobs:
       - name: Start Supabase (local)
         run: |
           set -euo pipefail
-          supabase start
+          # `supabase start` pode ficar silencioso por muito tempo em runners do GitHub e ser finalizado
+          # automaticamente (no-output timeout). Rodamos com debug e menos serviços para manter saída.
+          supabase start --debug -x logflare -x vector
 
       - name: Apply migrations with Supabase CLI
         run: |

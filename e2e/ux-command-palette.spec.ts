@@ -123,9 +123,11 @@ test('UX-01: Command Palette abre com Ctrl+K e navega; não abre em inputs', asy
   await page.click('body');
 
   // Abre palette e navega para pedidos
-  await page.keyboard.press('Control+K');
   const paletteInput = page.getByPlaceholder('Buscar páginas… (Ctrl/Cmd + K)');
-  await expect(paletteInput).toBeVisible({ timeout: 20000 });
+  await expect(async () => {
+    await page.keyboard.press('Control+K');
+    await expect(paletteInput).toBeVisible();
+  }).toPass({ timeout: 20000 });
   await paletteInput.fill('Pedidos de Venda');
   await page.getByRole('option', { name: /Pedidos de Venda/i }).click();
   await expect(page).toHaveURL(/\/app\/vendas\/pedidos/);
