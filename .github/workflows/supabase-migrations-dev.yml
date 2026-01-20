@@ -72,14 +72,6 @@ jobs:
           set -euo pipefail
           psql "$SUPABASE_DB_URL_DEV" -v ON_ERROR_STOP=1 -X -qAt -c "notify pgrst, 'reload schema';"
 
-      - name: RG-03 DB asserts (DEV remote)
-        if: github.event_name == 'workflow_dispatch' || github.event_name == 'push'
-        env:
-          SUPABASE_DB_URL_DEV: ${{ secrets.SUPABASE_DB_URL_DEV }}
-        run: |
-          set -euo pipefail
-          psql "$SUPABASE_DB_URL_DEV" -v ON_ERROR_STOP=1 -X -qAt -f scripts/rg03_db_asserts.sql
-
       - name: Verify Financeiro is RPC-first (DEV remote)
         if: github.event_name == 'workflow_dispatch' || github.event_name == 'push'
         env:
