@@ -116,9 +116,6 @@ begin
     raise exception 'RG-03: tabela public.servicos_cobrancas ausente (MVP menu).';
   end if;
 
-  if not has_table_privilege('authenticated', 'public.vendedores', 'select') then
-    raise exception 'RG-03: role authenticated sem SELECT em public.vendedores (MVP menu).';
-  end if;
   if not has_table_privilege('authenticated', 'public.servicos_contratos', 'select') then
     raise exception 'RG-03: role authenticated sem SELECT em public.servicos_contratos (MVP menu).';
   end if;
