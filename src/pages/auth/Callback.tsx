@@ -74,14 +74,12 @@ export default function Callback() {
 
         if (!ok) throw lastErr ?? new Error("bootstrap_failed");
 
-        // 2) (Opcional) Confirma empresa ativa
-        const { data: pref, error: prefErr } = await supabase
-          .from("user_active_empresa")
-          .select("empresa_id")
-          .limit(1);
-
+        // 2) (Opcional) Confirma empresa ativa (RPC-first)
+        const { data: activeEmpresaId, error: prefErr } = await supabase.rpc(
+          "active_empresa_get_for_current_user"
+        );
         if (prefErr) console.warn("[AUTH][CALLBACK][PREF][WARN]", prefErr);
-        console.log("[AUTH][CALLBACK] success", pref?.[0] ?? null);
+        console.log("[AUTH][CALLBACK] success", { empresa_id: activeEmpresaId ?? null });
 
         try {
           localStorage.removeItem("pending_company_name");

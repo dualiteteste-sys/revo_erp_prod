@@ -46,7 +46,7 @@ Definições:
 
 **Aceite P0**
 - [ ] 0 ocorrências de 403 intermitente em `dev` por 72h (fluxos core).
-- [ ] `yarn test:e2e:gate:all` verde com console-sweep limpo.
+- [x] `yarn test:e2e:gate:all` verde com console-sweep limpo.
 - [x] Monitoramento contínuo em DEV: workflow `OPS health alert (DEV)` (a cada 15 min) abre issue quando `kind=missing_active_empresa` > 0.
 
 ---
@@ -148,7 +148,7 @@ Definições:
 - [ ] Remover duplicações (utilitários comuns, normalizers e contracts por domínio).
 
 ### 4.2 TypeScript (zero-any em áreas críticas)
-- [ ] Criar “budget” de `any` por domínio e bloquear novos `any` em auth/billing/financeiro/indústria.
+- [x] Criar “budget” de `any` por domínio e bloquear novos `any` em auth/billing/financeiro/indústria.
 - [ ] Tipar inputs/outputs dos RPCs (DTOs) e centralizar em `src/contracts/` (ou equivalente).
 - [ ] Normalizar retornos do Supabase (nullables, enums, data shapes) com testes.
 
@@ -173,7 +173,7 @@ Definições:
 ## P6 — Testabilidade / Qualidade (meta 9/10)
 
 ### 6.1 Gates e regressão
-- [ ] `release:check` verde (unit + e2e + verify migrations) como pré-requisito de merge.
+- [x] `release:check` verde (unit + e2e + verify migrations) como pré-requisito de merge (branch protection em `main` exigindo `Verify Migrations (Clean Slate)` + `Release Gate (Unit + E2E)`).
 - [x] Expandir console-sweep para rotas principais e erros esperados “não vermelhos” (inclui Financeiro + landing pública).
 - [ ] Testes DB asserts (verify) para RLS e invariantes críticos.
   - [x] RG01 DB asserts: bloquear tabela `public` com grants p/ `authenticated` sem RLS; bloquear policy `qual/with_check=true` em tabelas com `empresa_id` para `authenticated/public/anon`.

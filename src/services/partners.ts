@@ -1,6 +1,5 @@
 import { callRpc } from '@/lib/api';
 import { logger } from '@/lib/logger';
-import { supabase } from '@/lib/supabaseClient';
 import { Database } from '@/types/database.types';
 
 export type PartnerListItem = {
@@ -76,31 +75,14 @@ export type PartnerDuplicateHit = {
   celular?: string | null;
 };
 
-async function trySelectFromFirstTable<T = any>(
-  tableNames: string[],
-  buildQuery: (table: string) => Promise<{ data: T[] | null; error: any }>,
-): Promise<T[]> {
-  for (const table of tableNames) {
-    try {
-      const { data, error } = await buildQuery(table);
-      if (!error) return (data ?? []) as T[];
-    } catch {
-      // ignore and try next table
-    }
-  }
-  return [];
-}
-
 async function fetchPartnerEnderecos(pessoaId: string): Promise<EnderecoPayload[]> {
-  return trySelectFromFirstTable<EnderecoPayload>(['pessoa_enderecos', 'pessoas_enderecos'], (table) =>
-    supabase.from(table as any).select('*').eq('pessoa_id', pessoaId).order('created_at', { ascending: true }),
-  );
+  const data = await callRpc<any>('partner_enderecos_list', { p_pessoa_id: pessoaId });
+  return Array.isArray(data) ? (data as EnderecoPayload[]) : [];
 }
 
 async function fetchPartnerContatos(pessoaId: string): Promise<ContatoPayload[]> {
-  return trySelectFromFirstTable<ContatoPayload>(['pessoa_contatos', 'pessoas_contatos'], (table) =>
-    supabase.from(table as any).select('*').eq('pessoa_id', pessoaId).order('created_at', { ascending: true }),
-  );
+  const data = await callRpc<any>('partner_contatos_list', { p_pessoa_id: pessoaId });
+  return Array.isArray(data) ? (data as ContatoPayload[]) : [];
 }
 
 export async function findPartnerDuplicates(params: {
@@ -114,51 +96,30 @@ export async function findPartnerDuplicates(params: {
   const cel = String(params.celular || '').replace(/\D/g, '');
   const excludeId = params.excludeId ? String(params.excludeId) : null;
 
+  const rows = await callRpc<any[]>('pessoas_find_duplicates', {
+    p_email: email || null,
+    p_telefone: tel || null,
+    p_celular: cel || null,
+    p_exclude_id: excludeId,
+  });
+
   const results: PartnerDuplicateHit[] = [];
   const seen = new Set<string>();
-
-  const pushAll = (rows: any[] | null | undefined) => {
-    for (const r of rows || []) {
-      const id = String(r.id);
-      if (excludeId && id === excludeId) continue;
-      if (seen.has(id)) continue;
-      seen.add(id);
-      results.push({
-        id,
-        nome: String(r.nome || ''),
-        doc_unico: r.doc_unico ? String(r.doc_unico) : null,
-        email: r.email ? String(r.email) : null,
-        telefone: r.telefone ? String(r.telefone) : null,
-        celular: r.celular ? String(r.celular) : null,
-      });
-    }
-  };
-
-  if (email) {
-    const q = supabase
-      .from('pessoas')
-      .select('id,nome,doc_unico,email,telefone,celular')
-      .ilike('email', email)
-      .is('deleted_at', null)
-      .limit(10);
-    if (excludeId) q.neq('id', excludeId);
-    const { data, error } = await q;
-    if (!error) pushAll(data as any[]);
+  for (const r of rows || []) {
+    const id = String((r as any).id);
+    if (!id) continue;
+    if (excludeId && id === excludeId) continue;
+    if (seen.has(id)) continue;
+    seen.add(id);
+    results.push({
+      id,
+      nome: String((r as any).nome || ''),
+      doc_unico: (r as any).doc_unico ? String((r as any).doc_unico) : null,
+      email: (r as any).email ? String((r as any).email) : null,
+      telefone: (r as any).telefone ? String((r as any).telefone) : null,
+      celular: (r as any).celular ? String((r as any).celular) : null,
+    });
   }
-
-  const phones = [tel, cel].filter((d) => d && d.length >= 10);
-  for (const phone of phones) {
-    const q = supabase
-      .from('pessoas')
-      .select('id,nome,doc_unico,email,telefone,celular')
-      .or(`telefone.eq.${phone},celular.eq.${phone}`)
-      .is('deleted_at', null)
-      .limit(10);
-    if (excludeId) q.neq('id', excludeId);
-    const { data, error } = await q;
-    if (!error) pushAll(data as any[]);
-  }
-
   return results;
 }
 

@@ -213,22 +213,18 @@ const SubscriptionSettings: React.FC<SubscriptionSettingsProps> = ({ onSwitchToP
     }
 
     try {
-      const { count, error } = await (supabase as any)
-        .from('empresa_usuarios')
-        .select('user_id', { count: 'exact', head: true })
-        .eq('empresa_id', empresaId)
-        .eq('status', 'ACTIVE');
-
+      const { data: countActive, error } = await (supabase as any).rpc('empresa_usuarios_count_for_current_empresa', {
+        p_status: 'ACTIVE',
+      });
       if (error) throw error;
-      setCurrentUsersCount(typeof count === 'number' ? count : null);
+      setCurrentUsersCount(typeof countActive === 'number' ? countActive : null);
 
-      const { count: pendingCount, error: pendingErr } = await (supabase as any)
-        .from('empresa_usuarios')
-        .select('user_id', { count: 'exact', head: true })
-        .eq('empresa_id', empresaId)
-        .eq('status', 'PENDING');
+      const { data: countPending, error: pendingErr } = await (supabase as any).rpc(
+        'empresa_usuarios_count_for_current_empresa',
+        { p_status: 'PENDING' },
+      );
       if (pendingErr) throw pendingErr;
-      setPendingUsersCount(typeof pendingCount === 'number' ? pendingCount : null);
+      setPendingUsersCount(typeof countPending === 'number' ? countPending : null);
     } catch {
       setCurrentUsersCount(null);
       setPendingUsersCount(null);
