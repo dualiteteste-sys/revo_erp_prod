@@ -40,6 +40,23 @@ begin
     raise exception 'RG-03: role authenticated sem SELECT em public.pessoas (causa 403 em parceiros/RPCs).';
   end if;
 
+  -- 4.0b) Entitlements/audit devem ser RPC-first (evita bypass e 403 intermitente por grants inconsistentes)
+  if has_table_privilege('authenticated', 'public.empresa_entitlements', 'select')
+     or has_table_privilege('authenticated', 'public.empresa_entitlements', 'insert')
+     or has_table_privilege('authenticated', 'public.empresa_entitlements', 'update')
+     or has_table_privilege('authenticated', 'public.empresa_entitlements', 'delete')
+  then
+    raise exception 'RG-03: tabela public.empresa_entitlements ainda possui grants diretos para authenticated (deve ser RPC-first).';
+  end if;
+
+  if has_table_privilege('authenticated', 'public.audit_logs', 'select')
+     or has_table_privilege('authenticated', 'public.audit_logs', 'insert')
+     or has_table_privilege('authenticated', 'public.audit_logs', 'update')
+     or has_table_privilege('authenticated', 'public.audit_logs', 'delete')
+  then
+    raise exception 'RG-03: tabela public.audit_logs ainda possui grants diretos para authenticated (deve ser RPC-first).';
+  end if;
+
   -- 4.0) Recebimentos devem ser RPC-first (evita bypass/instabilidade por acesso direto via PostgREST)
   if has_table_privilege('authenticated', 'public.recebimentos', 'select')
      or has_table_privilege('authenticated', 'public.recebimentos', 'insert')

@@ -38,18 +38,13 @@ async function applyMarketingPlanEntitlements(empresaId: string) {
 
   const next = map[pending.slug];
   try {
-    const { error } = await (supabase as any)
-      .from("empresa_entitlements")
-      .upsert(
-        {
-          empresa_id: empresaId,
-          plano_mvp: next.plano_mvp,
-          max_users: next.max_users,
-          max_nfe_monthly: next.max_nfe_monthly,
-        },
-        { onConflict: "empresa_id" }
-      );
-    if (error) throw error;
+    const idempotencyKey = `plan_intent:${empresaId}:${pending.slug}:${pending.cycle ?? ''}`;
+    await callRpc("empresa_entitlements_upsert_for_current_empresa", {
+      p_plano_mvp: next.plano_mvp,
+      p_max_users: next.max_users,
+      p_max_nfe_monthly: next.max_nfe_monthly,
+      p_idempotency_key: idempotencyKey,
+    });
 
     logger.info("[PlanIntent] Applied marketing plan entitlements", { empresaId, ...next, cycle: pending.cycle });
   } catch (error) {
