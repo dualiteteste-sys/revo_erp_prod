@@ -10,8 +10,8 @@ on:
   workflow_dispatch:
 
 concurrency:
-  group: verify-migrations-verify-db
-  cancel-in-progress: false
+  group: verify-migrations-verify-db-main
+  cancel-in-progress: true
 
 jobs:
   verify-migrations:
