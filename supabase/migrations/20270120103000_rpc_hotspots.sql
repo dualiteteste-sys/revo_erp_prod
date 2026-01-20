@@ -136,7 +136,8 @@ GRANT EXECUTE ON FUNCTION public.partner_contatos_list(uuid) TO authenticated, s
 -- Empresa usuários: contagem por status (evita supabase.from head/count)
 -- ---------------------------------------------------------------------------
 DROP FUNCTION IF EXISTS public.empresa_usuarios_count_for_current_empresa(text);
-CREATE OR REPLACE FUNCTION public.empresa_usuarios_count_for_current_empresa(p_status text)
+DROP FUNCTION IF EXISTS public.empresa_usuarios_count_for_current_empresa(public.user_status_in_empresa);
+CREATE OR REPLACE FUNCTION public.empresa_usuarios_count_for_current_empresa(p_status public.user_status_in_empresa DEFAULT NULL)
 RETURNS int
 LANGUAGE sql
 SECURITY DEFINER
@@ -145,11 +146,11 @@ AS $$
   SELECT COUNT(*)::int
   FROM public.empresa_usuarios eu
   WHERE eu.empresa_id = public.current_empresa_id()
-    AND eu.status = p_status;
+    AND (p_status IS NULL OR eu.status = p_status);
 $$;
 
-REVOKE ALL ON FUNCTION public.empresa_usuarios_count_for_current_empresa(text) FROM public, anon;
-GRANT EXECUTE ON FUNCTION public.empresa_usuarios_count_for_current_empresa(text) TO authenticated, service_role;
+REVOKE ALL ON FUNCTION public.empresa_usuarios_count_for_current_empresa(public.user_status_in_empresa) FROM public, anon;
+GRANT EXECUTE ON FUNCTION public.empresa_usuarios_count_for_current_empresa(public.user_status_in_empresa) TO authenticated, service_role;
 
 -- Sair da empresa (delete seguro do próprio vínculo)
 DROP FUNCTION IF EXISTS public.empresa_leave_for_current_user(uuid);
@@ -183,7 +184,7 @@ BEGIN
     FROM public.empresa_usuarios eu
     WHERE eu.empresa_id = p_empresa_id
       AND LOWER(COALESCE(eu.role,'')) = 'owner'
-      AND eu.status = 'ACTIVE';
+      AND eu.status = 'ACTIVE'::public.user_status_in_empresa;
 
     IF COALESCE(v_owners, 0) <= 1 THEN
       RAISE EXCEPTION 'Não é possível sair: esta empresa ficaria sem owner.' USING errcode='P0001';
