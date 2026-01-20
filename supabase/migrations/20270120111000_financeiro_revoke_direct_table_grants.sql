@@ -14,10 +14,9 @@ BEGIN
     FROM information_schema.tables
     WHERE table_schema = 'public'
       AND table_type = 'BASE TABLE'
-      AND table_name LIKE 'financeiro\\_%' ESCAPE '\\'
+      AND table_name LIKE 'financeiro_%'
   LOOP
     EXECUTE format('REVOKE ALL ON TABLE %I.%I FROM anon, authenticated;', r.table_schema, r.table_name);
   END LOOP;
 END;
 $$;
-
