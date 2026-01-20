@@ -10,13 +10,14 @@ on:
   workflow_dispatch:
 
 concurrency:
-  group: verify-migrations-verify-db
-  cancel-in-progress: false
+  group: verify-migrations-verify-db-main-v2
+  cancel-in-progress: true
 
 jobs:
   verify-migrations:
     name: Verify Migrations (Clean Slate)
     runs-on: ubuntu-latest
+    timeout-minutes: 35
 
     steps:
       - name: Checkout repository
@@ -44,10 +45,21 @@ jobs:
           done
           docker ps --format '{{.ID}} {{.Ports}}' | awk '/(54321|54322|54323|54324)->/ {print $1}' | xargs -r docker rm -f || true
 
+      - name: Free disk space (CI)
+        run: |
+          set -euo pipefail
+          echo "[CI] Disk before cleanup:"
+          df -h
+          sudo rm -rf /usr/share/dotnet /opt/ghc /usr/local/lib/android || true
+          sudo apt-get clean || true
+          docker system prune -af || true
+          echo "[CI] Disk after cleanup:"
+          df -h
+
       - name: Start Supabase (local)
         run: |
           set -euo pipefail
-          supabase start
+          bash scripts/ci_supabase_start_db_only.sh
 
       - name: Apply All Migrations (Baseline + Incremental)
         run: |
