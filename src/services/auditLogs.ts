@@ -15,9 +15,8 @@ export type AuditLogRow = {
   changed_at: string;
 };
 
-export async function listAuditLogsForTables(tables: string[], limit = 300): Promise<AuditLogRow[]> {
-  const uniqueTables = Array.from(new Set(tables)).filter(Boolean);
-  if (uniqueTables.length === 0) return [];
+export async function listAuditLogsForTables(tables: string[] | null, limit = 300): Promise<AuditLogRow[]> {
+  const uniqueTables = tables ? Array.from(new Set(tables)).filter(Boolean) : null;
 
   try {
     const data = await callRpc<AuditLogRow[]>('audit_logs_list_for_tables', { p_tables: uniqueTables, p_limit: limit });

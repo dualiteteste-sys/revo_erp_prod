@@ -1,5 +1,4 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { supabase } from '@/lib/supabaseClient';
 import { useAuth } from '@/contexts/AuthProvider';
 import { useToast } from '@/contexts/ToastProvider';
 import { Loader2, RefreshCw, Search, ShieldCheck } from 'lucide-react';
@@ -8,18 +7,7 @@ import ResizableSortableTh, { type SortState } from '@/components/ui/table/Resiz
 import TableColGroup from '@/components/ui/table/TableColGroup';
 import { useTableColumnWidths, type TableColumnWidthDef } from '@/components/ui/table/useTableColumnWidths';
 import { sortRows, toggleSort } from '@/components/ui/table/sortUtils';
-
-type AuditLogRow = {
-  id: string;
-  empresa_id: string;
-  table_name: string;
-  record_id: string | null;
-  operation: 'INSERT' | 'UPDATE' | 'DELETE';
-  old_data: any | null;
-  new_data: any | null;
-  changed_by: string | null;
-  changed_at: string;
-};
+import { listAuditLogsForTables, type AuditLogRow } from '@/services/auditLogs';
 
 const OP_BADGE: Record<AuditLogRow['operation'], string> = {
   INSERT: 'bg-emerald-100 text-emerald-800',
@@ -94,14 +82,12 @@ export default function AuditLogsPage() {
     if (!activeEmpresa?.id) return;
     setLoading(true);
     try {
-      const { data, error } = await (supabase as any)
-        .from('audit_logs')
-        .select('id,empresa_id,table_name,record_id,operation,old_data,new_data,changed_by,changed_at')
-        .eq('empresa_id', activeEmpresa.id)
-        .order('changed_at', { ascending: false })
-        .limit(200);
-
-      if (error) throw error;
+      const tablesToFetch = tableFilter?.trim()
+        ? [tableFilter.trim()]
+        : preset === 'admin'
+          ? adminTables
+          : null;
+      const data = await listAuditLogsForTables(tablesToFetch, 200);
       setRows((data || []) as AuditLogRow[]);
     } catch (e: any) {
       addToast(e?.message || 'Erro ao carregar auditoria.', 'error');

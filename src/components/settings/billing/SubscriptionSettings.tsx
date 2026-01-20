@@ -178,19 +178,11 @@ const SubscriptionSettings: React.FC<SubscriptionSettingsProps> = ({ onSwitchToP
     setLoadingEntitlements(true);
 
     try {
-      // Evita `.single()`/`.maybeSingle()` para não gerar 406 quando não existir row ainda.
-      const { data: rows, error } = await (supabase as any)
-        .from('empresa_entitlements')
-        .select('plano_mvp, max_users, max_nfe_monthly')
-        .eq('empresa_id', empresaId)
-        .limit(1);
-
-      if (error) throw error;
-
-      const data = (rows?.[0] ?? null) as any;
-      setPlanoMvp((data?.plano_mvp ?? 'ambos') as PlanoMvp);
-      setMaxUsers(typeof data?.max_users === 'number' ? data.max_users : 999);
-      setMaxNfeMonthly(typeof data?.max_nfe_monthly === 'number' ? data.max_nfe_monthly : 999);
+      const result = await callRpc<any>('empresa_entitlements_get_for_current_empresa', {});
+      const row = Array.isArray(result) ? result[0] : result;
+      setPlanoMvp((row?.plano_mvp ?? 'ambos') as PlanoMvp);
+      setMaxUsers(typeof row?.max_users === 'number' ? row.max_users : 999);
+      setMaxNfeMonthly(typeof row?.max_nfe_monthly === 'number' ? row.max_nfe_monthly : 999);
     } catch (error: any) {
       addToast('Não foi possível carregar o Plano MVP (usando padrão).', 'warning');
       setPlanoMvp('ambos');
@@ -681,19 +673,13 @@ const SubscriptionSettings: React.FC<SubscriptionSettingsProps> = ({ onSwitchToP
 
     setSavingEntitlements(true);
     try {
-      const { error } = await (supabase as any)
-        .from('empresa_entitlements')
-        .upsert(
-          {
-            empresa_id: empresaId,
-            plano_mvp: planoMvp,
-            max_users: nextMaxUsers,
-            max_nfe_monthly: nextMaxNfeMonthly,
-          },
-          { onConflict: 'empresa_id' }
-        );
-
-      if (error) throw error;
+      const idempotencyKey = `entitlements_save:${empresaId}:${planoMvp}:${nextMaxUsers}:${nextMaxNfeMonthly}`;
+      await callRpc('empresa_entitlements_upsert_for_current_empresa', {
+        p_plano_mvp: planoMvp,
+        p_max_users: nextMaxUsers,
+        p_max_nfe_monthly: nextMaxNfeMonthly,
+        p_idempotency_key: idempotencyKey,
+      });
       addToast('Plano MVP salvo com sucesso.', 'success');
       await fetchEntitlements();
       await fetchFinopsLimitsStatus();

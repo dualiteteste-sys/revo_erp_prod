@@ -5,14 +5,6 @@
       "reason": "Acesso ao Supabase Storage (não é PostgREST multi-tenant)."
     },
     {
-      "file": "src/components/settings/audit/AuditLogsPage.tsx",
-      "reason": "Legacy: acesso direto a tabela (pendente migrar para RPC-first)."
-    },
-    {
-      "file": "src/components/settings/billing/SubscriptionSettings.tsx",
-      "reason": "Legacy: acesso direto a tabela (pendente migrar para RPC-first)."
-    },
-    {
       "file": "src/pages/fiscal/NfeSettingsPage.tsx",
       "reason": "Acesso ao Supabase Storage (certificados)."
     },
@@ -57,10 +49,6 @@
       "reason": "Legacy: acesso direto a tabela (pendente migrar para RPC-first)."
     },
     {
-      "file": "src/services/session.ts",
-      "reason": "Legacy: leitura de entitlements (pendente migrar para RPC-first)."
-    },
-    {
       "file": "src/services/vendasMvp.ts",
       "reason": "Legacy: acesso direto a tabela (pendente migrar para RPC-first)."
     },
@@ -70,4 +58,3 @@
     }
   ]
 }
-

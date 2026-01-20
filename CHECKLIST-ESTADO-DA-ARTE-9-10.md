@@ -92,6 +92,8 @@ Definições:
 - [x] RPC-first (Onboarding/Roadmap): remover acesso direto do client a `empresa_onboarding` e persistir via RPC (`onboarding_wizard_state_get`, `onboarding_wizard_state_upsert`).
 - [x] RPC-first (Financeiro): substituir `supabase.from('financeiro_conciliacao_regras')` por RPCs SECURITY DEFINER com RBAC (tesouraria).
 - [x] RPC-first (RBAC): substituir `supabase.from('roles/permissions/role_permissions')` por RPCs SECURITY DEFINER com `roles:manage` e update atômico.
+- [x] RPC-first (Billing/Entitlements): substituir acessos diretos a `empresa_entitlements` por RPCs tenant-safe + revogar grants diretos (migration `supabase/migrations/20270120193000_sec_rpc_first_audit_entitlements.sql`).
+- [x] RPC-first (Audit Trail UI): substituir `.from('audit_logs')` por RPC `audit_logs_list_for_tables` + revogar grants diretos da tabela (migration `supabase/migrations/20270120193000_sec_rpc_first_audit_entitlements.sql`).
 - [x] Padronizar respostas de erro (códigos + mensagens PT-BR) e traduzir para UX palatável (`src/lib/toastErrorNormalizer.ts`).
 
 ### 1.3 Segurança de funções e grants
