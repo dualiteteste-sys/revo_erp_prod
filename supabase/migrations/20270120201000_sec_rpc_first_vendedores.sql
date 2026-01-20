@@ -94,7 +94,7 @@ GRANT EXECUTE ON FUNCTION public.vendedores_get_for_current_empresa(uuid) TO aut
 -- -----------------------------------------------------------------------------
 DROP FUNCTION IF EXISTS public.vendedores_upsert_for_current_empresa(uuid, text, text, text, numeric, boolean, text);
 CREATE OR REPLACE FUNCTION public.vendedores_upsert_for_current_empresa(
-  p_id uuid DEFAULT NULL,
+  p_id uuid,
   p_nome text,
   p_email text DEFAULT NULL,
   p_telefone text DEFAULT NULL,
@@ -220,4 +220,3 @@ GRANT ALL ON TABLE public.vendedores TO service_role;
 SELECT pg_notify('pgrst','reload schema');
 
 COMMIT;
-
