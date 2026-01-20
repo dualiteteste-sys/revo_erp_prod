@@ -25,7 +25,7 @@ done
 echo "[CI] Starting Supabase (DB-only)…"
 echo "[CI] Command: ${SUPABASE_START_CMD[*]}"
 
-if ! timeout 600 "${SUPABASE_START_CMD[@]}"; then
+if ! timeout 1200 "${SUPABASE_START_CMD[@]}"; then
   echo "::error::supabase start timed out or failed."
   supabase status || true
   docker ps || true
@@ -47,4 +47,3 @@ echo "::error::Postgres not reachable after 120s."
 supabase status || true
 docker ps || true
 exit 1
-
