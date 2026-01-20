@@ -4,6 +4,7 @@ import { useAuth } from '@/contexts/AuthProvider';
 import { Button } from '@/components/ui/button';
 import { Download, FileText, Loader2 } from 'lucide-react';
 import { useToast } from '@/contexts/ToastProvider';
+import { callRpc } from '@/lib/api';
 
 type LgpdExportRow = {
   id: string;
@@ -40,13 +41,8 @@ export default function PrivacyLgpdPage() {
 
     setLoading(true);
     try {
-      const { data, error } = await supabase
-        .from('lgpd_exports')
-        .select('id,status,file_path,created_at,completed_at,error_message')
-        .order('created_at', { ascending: false })
-        .limit(20);
-      if (error) throw error;
-      setExports((data ?? []) as LgpdExportRow[]);
+      const rows = await callRpc<LgpdExportRow[]>('lgpd_exports_list_for_current_user', { p_limit: 20 });
+      setExports((rows ?? []) as LgpdExportRow[]);
     } catch (e: any) {
       addToast(e?.message ?? 'Erro ao carregar exports LGPD.', 'error');
       setExports([]);
@@ -183,4 +179,3 @@ export default function PrivacyLgpdPage() {
     </div>
   );
 }
-

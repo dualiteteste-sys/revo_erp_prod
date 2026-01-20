@@ -4,12 +4,12 @@ import { useAuth } from '@/contexts/AuthProvider';
 import { useToast } from '@/contexts/ToastProvider';
 import { listAuditLogsForTables, type AuditLogRow } from '@/services/auditLogs';
 import { Copy, RefreshCcw, Search } from 'lucide-react';
-import { supabase } from '@/lib/supabaseClient';
 import { logger } from '@/lib/logger';
 import ResizableSortableTh, { type SortState } from '@/components/ui/table/ResizableSortableTh';
 import TableColGroup from '@/components/ui/table/TableColGroup';
 import { useTableColumnWidths, type TableColumnWidthDef } from '@/components/ui/table/useTableColumnWidths';
 import { sortRows, toggleSort } from '@/components/ui/table/sortUtils';
+import { callRpc } from '@/lib/api';
 
 type Props = {
   ordemId: string;
@@ -262,19 +262,13 @@ export default function IndustriaAuditTrailPanel({ ordemId, tables, entityLabels
     if (ids.length === 0) return;
 
     try {
-      const { data: profiles, error } = await supabase
-        .from('profiles')
-        .select('id,nome_completo')
-        .in('id', ids);
-
-      if (error) {
-        logger.warn('[AuditLogs] Falha ao carregar profiles para nomes', error);
-        return;
-      }
+      const profiles = await callRpc<Array<{ id: string; nome_completo: string | null }>>('profiles_names_for_current_empresa', {
+        p_ids: ids,
+      });
 
       const next: Record<string, string> = {};
       for (const p of profiles || []) {
-        const name = (p as any)?.nome_completo as string | null | undefined;
+        const name = p?.nome_completo ?? null;
         if (p?.id && name) next[p.id] = name;
       }
       if (Object.keys(next).length === 0) return;

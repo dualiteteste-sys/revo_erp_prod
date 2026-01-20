@@ -23,6 +23,7 @@ import {
   fiscalNfeEmissaoItensList,
   fiscalNfeEmissoesList,
 } from '@/services/fiscalNfeEmissoes';
+import { callRpc } from '@/lib/api';
 
 type AmbienteNfe = 'homologacao' | 'producao';
 
@@ -398,12 +399,11 @@ export default function NfeEmissoesPage() {
 
     let fiscalDefaults: any = {};
     try {
-      const { data } = await supabase
-        .from('produtos')
-        .select('ncm,cfop_padrao,cst_padrao,csosn_padrao')
-        .eq('id', productId)
-        .maybeSingle();
-      fiscalDefaults = data || {};
+      const rows = await callRpc<Array<{ ncm: string | null; cfop_padrao: string | null; cst_padrao: string | null; csosn_padrao: string | null }>>(
+        'produtos_fiscal_defaults_get_for_current_user',
+        { p_id: productId }
+      );
+      fiscalDefaults = rows?.[0] || {};
     } catch {
       fiscalDefaults = {};
     }

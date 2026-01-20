@@ -162,18 +162,15 @@ const SubscriptionSettings: React.FC<SubscriptionSettingsProps> = ({ onSwitchToP
     const empresaId = activeEmpresa?.id;
     if (!empresaId) return;
     setLoadingAddons(true);
-    const { data, error } = await supabase
-        .from('empresa_addons')
-        .select('*')
-        .eq('empresa_id', empresaId);
-    
-    if (error) {
-        addToast('Erro ao buscar add-ons.', 'error');
-    } else {
-        setAddons(data);
+    try {
+      const rows = await callRpc<EmpresaAddon[]>('empresa_addons_list_for_current_empresa', {});
+      setAddons(rows || []);
+    } catch {
+      addToast('Erro ao buscar add-ons.', 'error');
+      setAddons([]);
     }
     setLoadingAddons(false);
-  }, [activeEmpresa?.id, addToast, supabase]);
+  }, [activeEmpresa?.id, addToast]);
 
   const fetchEntitlements = useCallback(async () => {
     const empresaId = activeEmpresa?.id;

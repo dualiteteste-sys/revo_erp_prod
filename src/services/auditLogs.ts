@@ -1,5 +1,5 @@
-import { supabase } from '@/lib/supabaseClient';
 import { logger } from '@/lib/logger';
+import { callRpc } from '@/lib/api';
 
 export type AuditLogOperation = 'INSERT' | 'UPDATE' | 'DELETE';
 
@@ -19,15 +19,11 @@ export async function listAuditLogsForTables(tables: string[], limit = 300): Pro
   const uniqueTables = Array.from(new Set(tables)).filter(Boolean);
   if (uniqueTables.length === 0) return [];
 
-  const { data, error } = await supabase
-    .from('audit_logs')
-    .select('id,empresa_id,table_name,record_id,operation,old_data,new_data,changed_by,changed_at')
-    .in('table_name', uniqueTables)
-    .order('changed_at', { ascending: false })
-    .limit(limit);
-
-  if (error) {
-    const msg = String((error as any)?.message ?? '');
+  try {
+    const data = await callRpc<AuditLogRow[]>('audit_logs_list_for_tables', { p_tables: uniqueTables, p_limit: limit });
+    return (data ?? []) as AuditLogRow[];
+  } catch (error: any) {
+    const msg = String(error?.message ?? '');
     const isTransientNetworkError = /(failed to fetch|networkerror|load failed|aborterror)/i.test(msg);
     if (isTransientNetworkError) {
       logger.warn('[AuditLogs] Falha transitória ao listar audit_logs', { message: msg, tables: uniqueTables, limit });
@@ -36,6 +32,4 @@ export async function listAuditLogsForTables(tables: string[], limit = 300): Pro
     logger.error('[AuditLogs] Falha ao listar audit_logs', error, { tables: uniqueTables, limit });
     throw new Error(msg || 'Falha ao listar audit_logs');
   }
-
-  return (data || []) as AuditLogRow[];
 }
