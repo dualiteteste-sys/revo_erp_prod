@@ -10,13 +10,14 @@ on:
   workflow_dispatch:
 
 concurrency:
-  group: verify-migrations-verify-db-dev
+  group: verify-migrations-verify-db-dev-v2
   cancel-in-progress: true
 
 jobs:
   verify-migrations:
     name: Verify migrations (clean DB)
     runs-on: ubuntu-latest
+    timeout-minutes: 25
 
     steps:
       - name: Checkout repository
@@ -48,25 +49,7 @@ jobs:
       - name: Start Supabase (local)
         run: |
           set -euo pipefail
-          # `supabase start` pode ficar silencioso por muito tempo em runners do GitHub e ser finalizado
-          # automaticamente (no-output timeout). Rodamos com debug, menos serviços e um heartbeat.
-          # Para verify de migrations precisamos apenas do Postgres; excluir o resto evita pulls lentos.
-          supabase start --debug \
-            -x gotrue -x realtime -x storage-api -x imgproxy -x kong -x mailpit -x postgrest -x postgres-meta -x studio -x edge-runtime -x logflare -x vector -x supavisor &
-          pid="$!"
-
-          for i in $(seq 1 180); do
-            if ! kill -0 "$pid" >/dev/null 2>&1; then
-              wait "$pid"
-              exit 0
-            fi
-            echo "[WAIT] supabase start still running ($i/180)"
-            sleep 5
-          done
-
-          echo "::error::Timeout aguardando supabase start."
-          kill -9 "$pid" || true
-          exit 1
+          bash scripts/ci_supabase_start_db_only.sh
 
       - name: Apply migrations with Supabase CLI
         run: |

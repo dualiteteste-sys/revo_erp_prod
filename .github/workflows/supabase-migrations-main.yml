@@ -10,13 +10,14 @@ on:
   workflow_dispatch:
 
 concurrency:
-  group: verify-migrations-verify-db-main
+  group: verify-migrations-verify-db-main-v2
   cancel-in-progress: true
 
 jobs:
   verify-migrations:
     name: Verify Migrations (Clean Slate)
     runs-on: ubuntu-latest
+    timeout-minutes: 25
 
     steps:
       - name: Checkout repository
@@ -47,7 +48,7 @@ jobs:
       - name: Start Supabase (local)
         run: |
           set -euo pipefail
-          supabase start
+          bash scripts/ci_supabase_start_db_only.sh
 
       - name: Apply All Migrations (Baseline + Incremental)
         run: |
