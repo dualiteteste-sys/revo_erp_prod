@@ -16,16 +16,13 @@ const SupabaseDemoPage: React.FC = () => {
     setCompanies([]);
 
     try {
-      const { data, error: fetchError } = await supabase
-        .from('empresas')
-        .select('*')
-        .limit(5);
+      const { data, error: fetchError } = await (supabase as any).rpc('empresas_list_for_current_user', { p_limit: 5 });
 
       if (fetchError) {
         throw fetchError;
       }
 
-      setCompanies(data);
+      setCompanies((data ?? []) as Empresa[]);
     } catch (err: any) {
       setError(err.message || 'Ocorreu um erro ao buscar os dados.');
     } finally {

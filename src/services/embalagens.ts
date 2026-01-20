@@ -1,62 +1,30 @@
-import { supabase } from '../lib/supabaseClient';
 import { Database } from '../types/database.types';
+import { callRpc } from '@/lib/api';
 
 export type Embalagem = Database['public']['Tables']['embalagens']['Row'];
 export type EmbalagemInsert = Database['public']['Tables']['embalagens']['Insert'];
 export type EmbalagemUpdate = Database['public']['Tables']['embalagens']['Update'];
 
 export const listEmbalagens = async (search?: string) => {
-    let query = supabase
-        .from('embalagens')
-        .select('*')
-        .order('nome');
-
-    if (search) {
-        query = query.ilike('nome', `%${search}%`);
-    }
-
-    const { data, error } = await query;
-    if (error) throw error;
-    return data;
+    const data = await callRpc<Embalagem[]>('embalagens_list_for_current_empresa', {
+        p_search: search || null,
+        p_limit: 2000,
+    });
+    return (data ?? []) as Embalagem[];
 };
 
 export const getEmbalagem = async (id: string) => {
-    const { data, error } = await supabase
-        .from('embalagens')
-        .select('*')
-        .eq('id', id)
-        .single();
-    if (error) throw error;
-    return data;
+    return callRpc<Embalagem>('embalagens_get_for_current_empresa', { p_id: id });
 };
 
 export const createEmbalagem = async (embalagem: EmbalagemInsert) => {
-    const { data, error } = await supabase
-        .from('embalagens')
-        // @ts-ignore
-        .insert(embalagem)
-        .select()
-        .single();
-    if (error) throw error;
-    return data;
+    return callRpc<Embalagem>('embalagens_upsert_for_current_empresa', { p_payload: embalagem as any });
 };
 
 export const updateEmbalagem = async (id: string, embalagem: EmbalagemUpdate) => {
-    const { data, error } = await supabase
-        .from('embalagens')
-        // @ts-ignore
-        .update(embalagem)
-        .eq('id', id)
-        .select()
-        .single();
-    if (error) throw error;
-    return data;
+    return callRpc<Embalagem>('embalagens_upsert_for_current_empresa', { p_payload: { ...embalagem, id } as any });
 };
 
 export const deleteEmbalagem = async (id: string) => {
-    const { error } = await supabase
-        .from('embalagens')
-        .delete()
-        .eq('id', id);
-    if (error) throw error;
+    await callRpc('embalagens_delete_for_current_empresa', { p_id: id });
 };

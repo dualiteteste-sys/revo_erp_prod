@@ -1,4 +1,3 @@
-import { supabase } from '@/lib/supabaseClient';
 import { callRpc } from '@/lib/api';
 import { Database } from '@/types/database.types';
 import { normalizeProductPayload } from './products.normalize';
@@ -69,20 +68,16 @@ export async function getProducts(options: {
  * Returns null if it's a legacy product that can't be edited from the 'produtos' table.
  */
 export async function getProductDetails(id: string): Promise<FullProduct | null> {
-  const { data, error } = await supabase
-    .from('produtos')
-    .select('*')
-    .eq('id', id)
-    .single();
-
-  if (error) {
-    if (error.code !== 'PGRST116') {
-      console.error('[SERVICE] [GET_PRODUCT_DETAILS] error:', error);
-      throw new Error('Erro ao buscar detalhes do produto.');
-    }
-    return null;
+  try {
+    const data = await callRpc<FullProduct | null>('produtos_get_for_current_user', { p_id: id });
+    return (data ?? null) as FullProduct | null;
+  } catch (error: any) {
+    const msg = String(error?.message ?? '');
+    // compat: produto inexistente/legado => null
+    if (/not found|não encontrada|nao encontrada|P0002/i.test(msg)) return null;
+    console.error('[SERVICE] [GET_PRODUCT_DETAILS_RPC] error:', error);
+    throw new Error('Erro ao buscar detalhes do produto.');
   }
-  return data as FullProduct;
 }
 
 /**

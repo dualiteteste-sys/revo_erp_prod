@@ -10,7 +10,7 @@ import Input from '@/components/ui/forms/Input';
 import { Loader2 } from 'lucide-react';
 import { getVendasDashboardStats, type VendasDashboardStats } from '@/services/salesDashboard';
 import { useToast } from '@/contexts/ToastProvider';
-import { useSupabase } from '@/providers/SupabaseProvider';
+import { callRpc } from '@/lib/api';
 
 function formatCurrency(value: number) {
   return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Number(value || 0));
@@ -29,7 +29,6 @@ function dateToISO(d: Date) {
 type Preset = '7d' | '30d' | '90d' | 'this_month' | 'last_month' | 'ytd' | 'custom';
 
 export default function SalesDashboard() {
-  const supabase = useSupabase() as any;
   const { addToast } = useToast();
 
   const [preset, setPreset] = useState<Preset>('30d');
@@ -46,16 +45,10 @@ export default function SalesDashboard() {
 
   useEffect(() => {
     // Lista vendedores para filtro (se não existir, o filtro funciona como "Todos")
-    supabase
-      .from('vendedores')
-      .select('id,nome')
-      .order('nome', { ascending: true })
-      .limit(500)
-      .then(({ data, error }: any) => {
-        if (error) return;
-        setVendedores((data || []) as any);
-      });
-  }, [supabase]);
+    callRpc<Array<{ id: string; nome: string }>>('vendedores_list_for_current_empresa', { p_limit: 500 })
+      .then((data) => setVendedores((data || []) as any))
+      .catch(() => setVendedores([]));
+  }, []);
 
   useEffect(() => {
     const now = new Date();

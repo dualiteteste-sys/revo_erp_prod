@@ -78,6 +78,7 @@ Definições:
 - [ ] Definir regra: “acesso direto a tabela” permitido **somente** quando RLS for simples e auditado.
 - [ ] Migrar acesso direto do client para RPC em domínios críticos (billing, financeiro, indústria, LGPD).
 - [x] Inventário `supabase.from()` atualizado (regex cobre quebras de linha) e exportado em `INVENTARIO-SUPABASE-FROM.md`.
+- [x] Gate `supabase.from()` (client-side) ativo com allowlist vazio (`scripts/check_supabase_from_allowlist.mjs` OK; `INVENTARIO-SUPABASE-FROM.md` sem ocorrências).
 - [x] RPC-first (Billing): substituir `supabase.from('plans'/'subscriptions'/'billing_stripe_webhook_events')` por RPCs (`billing_plans_public_list`, `billing_subscription_with_plan_get`, `billing_stripe_webhook_events_list`).
 - [x] RPC-first (Financeiro piloto): revogar grants em tabelas `financeiro_%/finance_%/finops_%` e manter acesso via RPCs (migration `20270118133000_fin_ops_health_rpc_and_revoke_fin_grants.sql`).
   - [x] Ops/Health: substituir `supabase.from()` por RPCs SECURITY DEFINER (mesma migration) e verificar via asserts (script `scripts/verify_financeiro_rpc_first.sql`).
@@ -175,7 +176,7 @@ Definições:
 ### 6.1 Gates e regressão
 - [x] `release:check` verde (unit + e2e + verify migrations) como pré-requisito de merge (branch protection em `main` exigindo `Verify Migrations (Clean Slate)` + `Release Gate (Unit + E2E)`).
 - [x] Expandir console-sweep para rotas principais e erros esperados “não vermelhos” (inclui Financeiro + landing pública).
-- [ ] Testes DB asserts (verify) para RLS e invariantes críticos.
+- [x] Testes DB asserts (verify) para RLS e invariantes críticos.
   - [x] RG01 DB asserts: bloquear tabela `public` com grants p/ `authenticated` sem RLS; bloquear policy `qual/with_check=true` em tabelas com `empresa_id` para `authenticated/public/anon`.
   - [x] RG03 DB asserts: falhar verify se houver tabela com `empresa_id` + grants p/ `authenticated` com RLS ON mas sem policy tenant-safe.
 

@@ -34,24 +34,6 @@ async function safeRpcValue<T>(supabase: SupabaseClient, fn: string, args: Recor
   }
 }
 
-async function safeTableHasAny(
-  supabase: SupabaseClient,
-  table: string,
-  filters: Record<string, any> = {}
-): Promise<boolean | null> {
-  try {
-    let query = supabase.from(table as any).select('id').limit(1);
-    for (const [key, value] of Object.entries(filters)) {
-      query = query.eq(key as any, value as any);
-    }
-    const { data, error } = await query;
-    if (error) return null;
-    return (data?.length ?? 0) > 0;
-  } catch {
-    return null;
-  }
-}
-
 function requireKnown<T>(value: T | null, message: string): T {
   if (value === null) throw new Error(message);
   return value;
@@ -158,8 +140,14 @@ export function getRoadmaps(): RoadmapGroup[] {
           actionLabel: 'Abrir Expedição',
           actionHref: '/app/vendas/expedicao',
           check: async (supabase) => {
-            const has = await safeTableHasAny(supabase, 'vendas_expedicoes');
-            return requireKnown(has, 'Não foi possível validar expedição agora.');
+            const rows = await safeRpcList<any>(supabase, 'vendas_expedicoes_sla_list', {
+              p_sla_hours: 48,
+              p_only_overdue: false,
+              p_status: null,
+              p_limit: 1,
+              p_offset: 0,
+            });
+            return requireKnown(rows, 'Não foi possível validar expedição agora.').length > 0;
           },
         },
       ],
@@ -203,8 +191,8 @@ export function getRoadmaps(): RoadmapGroup[] {
           actionLabel: 'Abrir Recebimentos',
           actionHref: '/app/suprimentos/recebimentos',
           check: async (supabase) => {
-            const has = await safeTableHasAny(supabase, 'recebimentos');
-            return requireKnown(has, 'Não foi possível validar recebimentos agora.');
+            const rows = await safeRpcList<any>(supabase, 'suprimentos_recebimentos_list', { p_status: null });
+            return requireKnown(rows, 'Não foi possível validar recebimentos agora.').length > 0;
           },
         },
       ],
@@ -476,8 +464,11 @@ export function getRoadmaps(): RoadmapGroup[] {
           actionLabel: 'Abrir Marketplaces',
           actionHref: '/app/configuracoes/ecommerce/marketplaces',
           check: async (supabase) => {
-            const has = await safeTableHasAny(supabase, 'ecommerces', { provider: 'meli', status: 'connected' });
-            return requireKnown(has, 'Não foi possível validar conexão Mercado Livre agora.');
+            const rows = await safeRpcList<any>(supabase, 'ecommerce_connections_list', {});
+            const has = requireKnown(rows, 'Não foi possível validar conexão Mercado Livre agora.').some(
+              (r) => r?.provider === 'meli' && r?.status === 'connected'
+            );
+            return has;
           },
         },
         {
@@ -487,8 +478,11 @@ export function getRoadmaps(): RoadmapGroup[] {
           actionLabel: 'Abrir Marketplaces',
           actionHref: '/app/configuracoes/ecommerce/marketplaces',
           check: async (supabase) => {
-            const has = await safeTableHasAny(supabase, 'ecommerces', { provider: 'shopee', status: 'connected' });
-            return requireKnown(has, 'Não foi possível validar conexão Shopee agora.');
+            const rows = await safeRpcList<any>(supabase, 'ecommerce_connections_list', {});
+            const has = requireKnown(rows, 'Não foi possível validar conexão Shopee agora.').some(
+              (r) => r?.provider === 'shopee' && r?.status === 'connected'
+            );
+            return has;
           },
         },
         {

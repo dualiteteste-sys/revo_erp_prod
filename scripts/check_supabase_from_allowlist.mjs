@@ -21,7 +21,29 @@ if (!fs.existsSync(allowlistPath)) {
   process.exit(2);
 }
 
-const allow = new Set(JSON.parse(fs.readFileSync(allowlistPath, 'utf8')).allowedFiles || []);
+const allowRaw = JSON.parse(fs.readFileSync(allowlistPath, 'utf8'));
+
+const allowEntries = Array.isArray(allowRaw?.entries)
+  ? allowRaw.entries
+  : Array.isArray(allowRaw?.allowedFiles)
+  ? allowRaw.allowedFiles.map((file) => ({ file, reason: '(legacy allowlist)' }))
+  : [];
+
+const allow = new Set(
+  allowEntries
+    .map((e) => (typeof e === 'string' ? e : e?.file))
+    .filter(Boolean)
+);
+
+const invalidAllowEntries = allowEntries
+  .filter((e) => typeof e !== 'string')
+  .filter((e) => !e?.file || typeof e.file !== 'string' || !String(e.reason || '').trim());
+
+if (invalidAllowEntries.length) {
+  console.error('Invalid allowlist entries in scripts/supabase_from_allowlist.json (missing `file` or `reason`).');
+  for (const e of invalidAllowEntries) console.error(`- ${JSON.stringify(e)}`);
+  process.exit(2);
+}
 
 // Captura `supabase.from(` mesmo com quebras de linha/espaços entre `supabase` e `.from`.
 const re = /\bsupabase\s*\.\s*from\s*\(/gms;

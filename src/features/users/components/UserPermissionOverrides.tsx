@@ -1,7 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Loader2, ShieldCheck, ShieldX, MinusCircle } from 'lucide-react';
-import { supabase } from '@/lib/supabaseClient';
 import { useAuth } from '@/contexts/AuthProvider';
 import { useToast } from '@/contexts/ToastProvider';
 import { callRpc } from '@/lib/api';
@@ -55,13 +54,8 @@ export default function UserPermissionOverrides({ userId }: { userId: string }) 
     queryKey: ['rbac', 'overrides', empresaId, userId],
     enabled: !!empresaId && !!userId,
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from('user_permission_overrides')
-        .select('empresa_id,user_id,permission_id,allow')
-        .eq('empresa_id', empresaId!)
-        .eq('user_id', userId);
-      if (error) throw error;
-      return (data || []) as OverrideRow[];
+      const rows = await callRpc<OverrideRow[]>('user_permission_overrides_list_for_current_empresa', { p_user_id: userId });
+      return (rows || []) as OverrideRow[];
     },
   });
 
@@ -84,13 +78,11 @@ export default function UserPermissionOverrides({ userId }: { userId: string }) 
     if (!empresaId) return;
     setSavingKey(permissionId);
     try {
-      const { error } = await supabase
-        .from('user_permission_overrides')
-        .upsert(
-          { empresa_id: empresaId, user_id: userId, permission_id: permissionId, allow },
-          { onConflict: 'empresa_id,user_id,permission_id' }
-        );
-      if (error) throw error;
+      await callRpc('user_permission_overrides_upsert_for_current_empresa', {
+        p_user_id: userId,
+        p_permission_id: permissionId,
+        p_allow: allow,
+      });
       await overridesQuery.refetch();
       addToast('Permissão específica atualizada.', 'success');
     } catch (e: any) {
@@ -105,13 +97,10 @@ export default function UserPermissionOverrides({ userId }: { userId: string }) 
     const previous = overridesByPermission.has(permissionId) ? overridesByPermission.get(permissionId)! : null;
     setSavingKey(permissionId);
     try {
-      const { error } = await supabase
-        .from('user_permission_overrides')
-        .delete()
-        .eq('empresa_id', empresaId)
-        .eq('user_id', userId)
-        .eq('permission_id', permissionId);
-      if (error) throw error;
+      await callRpc('user_permission_overrides_delete_for_current_empresa', {
+        p_user_id: userId,
+        p_permission_id: permissionId,
+      });
       await overridesQuery.refetch();
       addToast('Permissão específica removida.', 'success', previous === null ? undefined : {
         title: 'Ação concluída',
@@ -120,12 +109,11 @@ export default function UserPermissionOverrides({ userId }: { userId: string }) 
           label: 'Desfazer',
           ariaLabel: 'Desfazer remoção da permissão específica',
           onClick: async () => {
-            await supabase
-              .from('user_permission_overrides')
-              .upsert(
-                { empresa_id: empresaId, user_id: userId, permission_id: permissionId, allow: previous },
-                { onConflict: 'empresa_id,user_id,permission_id' }
-              );
+            await callRpc('user_permission_overrides_upsert_for_current_empresa', {
+              p_user_id: userId,
+              p_permission_id: permissionId,
+              p_allow: previous,
+            });
             await overridesQuery.refetch();
             addToast('Permissão específica restaurada.', 'success');
           },

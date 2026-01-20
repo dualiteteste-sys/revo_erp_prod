@@ -5,16 +5,26 @@ import { Check, Truck, Printer, Package, MapPin, Loader2 } from 'lucide-react';
 import Header from '../../components/landing/Header';
 import Footer from '../../components/landing/Footer';
 import { useSupabase } from '@/providers/SupabaseProvider';
-import { Database } from '../../types/database.types';
 import { useAuth } from '../../contexts/AuthProvider';
 import { useToast } from '../../contexts/ToastProvider';
+import { callRpc } from '@/lib/api';
 
-type Addon = Database['public']['Tables']['addons']['Row'];
+type AddonPublic = {
+  id: string;
+  slug: string;
+  name: string;
+  billing_cycle: 'monthly' | 'yearly';
+  currency: string;
+  amount_cents: number;
+  trial_days: number | null;
+  active: boolean;
+  created_at: string;
+};
 
 const RevoSendPage: React.FC = () => {
   const supabase = useSupabase();
   const navigate = useNavigate();
-  const [addons, setAddons] = useState<Addon[]>([]);
+  const [addons, setAddons] = useState<AddonPublic[]>([]);
   const [loading, setLoading] = useState(true);
   const [checkoutLoading, setCheckoutLoading] = useState<string | null>(null);
   const { session, activeEmpresa } = useAuth();
@@ -23,24 +33,19 @@ const RevoSendPage: React.FC = () => {
   useEffect(() => {
     const fetchAddons = async () => {
       setLoading(true);
-      const { data, error } = await supabase
-        .from('addons')
-        .select('*')
-        .eq('slug', 'REVO_SEND')
-        .eq('active', true);
-      
-      if (error) {
-        console.error('Erro ao buscar addons:', error);
+      try {
+        const data = await callRpc<AddonPublic[]>('addons_public_list_active_by_slug', { p_slug: 'REVO_SEND' });
+        setAddons((data || []).filter((a) => a?.active));
+      } catch (e: any) {
         addToast('Não foi possível carregar os planos do REVO Send.', 'error');
-      } else {
-        setAddons(data);
+        setAddons([]);
       }
       setLoading(false);
     };
     fetchAddons();
-  }, [addToast, supabase]);
+  }, [addToast]);
 
-  const handleCheckout = async (addon: Addon) => {
+  const handleCheckout = async (addon: AddonPublic) => {
     if (!session) {
       addToast("Você precisa estar logado para ativar um módulo.", "info");
       navigate('/auth/login');
