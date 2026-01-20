@@ -1,10 +1,13 @@
-# Política — uso de `supabase.from()` (RPC-first)
+# Política — acesso direto a tabelas (RPC-first)
 
 Objetivo: manter o ERP “RPC-first” em domínios sensíveis (multi-tenant), evitando bypass de RLS e instabilidade (403/400 intermitentes), e garantindo rastreabilidade/auditoria.
 
 ## Regra
 
-No código do app (`src/**`), **`supabase.from()` é proibido por padrão**.
+No código do app (`src/**`), **acesso direto a tabelas via PostgREST é proibido por padrão**:
+
+- `supabase.from('tabela')`
+- `sb.from('tabela')` / `useSupabase().from('tabela')` (aliases)
 
 ### Permitido somente quando
 
@@ -18,6 +21,8 @@ No código do app (`src/**`), **`supabase.from()` é proibido por padrão**.
 
 - `scripts/check_supabase_from_allowlist.mjs` falha o CI se encontrar `supabase.from()` fora do allowlist.
 - O inventário é mantido em `INVENTARIO-SUPABASE-FROM.md` (gerado por `scripts/inventory_supabase_from.mjs`).
+- `scripts/check_postgrest_from_allowlist.mjs` falha o CI se encontrar `.from('tabela')` (PostgREST) fora do allowlist em `scripts/postgrest_from_allowlist.json` (ignora `storage.from()`).
+- O inventário ampliado (PostgREST `.from`) é mantido em `INVENTARIO-POSTGREST-FROM.md` (gerado por `scripts/inventory_postgrest_from.mjs`).
 
 ## Como migrar para RPC-first
 
@@ -26,4 +31,3 @@ No código do app (`src/**`), **`supabase.from()` é proibido por padrão**.
 3. `SECURITY DEFINER` com `SET search_path = pg_catalog, public`.
 4. Remover grants diretos da tabela (se for domínio sensível) e cobrir com asserts de verify.
 5. Substituir `supabase.from()` no frontend por `callRpc()` / service.
-
