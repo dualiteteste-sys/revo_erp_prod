@@ -57,6 +57,15 @@ begin
     raise exception 'RG-03: tabela public.audit_logs ainda possui grants diretos para authenticated (deve ser RPC-first).';
   end if;
 
+  -- 4.0c) Vendedores deve ser RPC-first (evita bypass e inconsistência de grants)
+  if has_table_privilege('authenticated', 'public.vendedores', 'select')
+     or has_table_privilege('authenticated', 'public.vendedores', 'insert')
+     or has_table_privilege('authenticated', 'public.vendedores', 'update')
+     or has_table_privilege('authenticated', 'public.vendedores', 'delete')
+  then
+    raise exception 'RG-03: tabela public.vendedores ainda possui grants diretos para authenticated (deve ser RPC-first).';
+  end if;
+
   -- 4.0) Recebimentos devem ser RPC-first (evita bypass/instabilidade por acesso direto via PostgREST)
   if has_table_privilege('authenticated', 'public.recebimentos', 'select')
      or has_table_privilege('authenticated', 'public.recebimentos', 'insert')

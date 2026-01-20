@@ -1,0 +1,159 @@
+name: OPS SLO — 72h sem 403 (PROD)
+
+on:
+  schedule:
+    - cron: "25 * * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+concurrency:
+  group: ops-403-slo-72h-prod
+  cancel-in-progress: false
+
+jobs:
+  slo-403-72h:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      THRESHOLD_403_TOTAL_72H: "0"
+    steps:
+      - name: Install psql + jq
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y postgresql-client jq
+
+      - name: Compute 403 SLO window (PROD)
+        id: slo
+        env:
+          DATABASE_URL: ${{ secrets.SUPABASE_DB_URL_PROD }}
+        run: |
+          set -euo pipefail
+
+          if [[ -z "${DATABASE_URL:-}" ]]; then
+            echo "Missing secret SUPABASE_DB_URL_PROD" >&2
+            exit 1
+          fi
+
+          SLO_JSON="$(psql "$DATABASE_URL" -Atc "
+            select jsonb_build_object(
+              'window_hours', 72,
+              'total_72h',
+                case when to_regclass('public.ops_403_events') is null then 0 else (
+                  select count(*)::int
+                  from public.ops_403_events
+                  where created_at >= (now() - interval '72 hours')
+                ) end,
+              'missing_active_empresa_72h',
+                case when to_regclass('public.ops_403_events') is null then 0 else (
+                  select count(*)::int
+                  from public.ops_403_events
+                  where created_at >= (now() - interval '72 hours')
+                    and kind = 'missing_active_empresa'
+                ) end,
+              'recovery_failed_72h',
+                case when to_regclass('public.ops_403_events') is null then 0 else (
+                  select count(*)::int
+                  from public.ops_403_events
+                  where created_at >= (now() - interval '72 hours')
+                    and recovery_attempted is true
+                    and coalesce(recovery_ok,false) is false
+                ) end,
+              'distinct_users_72h',
+                case when to_regclass('public.ops_403_events') is null then 0 else (
+                  select count(distinct user_id)::int
+                  from public.ops_403_events
+                  where created_at >= (now() - interval '72 hours')
+                ) end,
+              'distinct_routes_72h',
+                case when to_regclass('public.ops_403_events') is null then 0 else (
+                  select count(distinct route)::int
+                  from public.ops_403_events
+                  where created_at >= (now() - interval '72 hours')
+                ) end
+            )::text
+          ")"
+
+          echo "slo_json=$SLO_JSON" >> "$GITHUB_OUTPUT"
+
+          total_72h="$(echo "$SLO_JSON" | jq -r '.total_72h')"
+          echo "total_72h=$total_72h" >> "$GITHUB_OUTPUT"
+
+          breach="false"
+          if [[ "$total_72h" -gt "${THRESHOLD_403_TOTAL_72H}" ]]; then breach="true"; fi
+          echo "breach=$breach" >> "$GITHUB_OUTPUT"
+
+          {
+            echo "### OPS SLO — 72h sem 403 (PROD)"
+            echo ""
+            echo "\`total_72h\`: **$total_72h** (threshold=${THRESHOLD_403_TOTAL_72H})"
+            echo ""
+            echo "```json"
+            echo "$SLO_JSON"
+            echo "```"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          echo "$SLO_JSON" > ops_403_slo_72h_prod.json
+
+      - name: Upload SLO artifact (PROD)
+        uses: actions/upload-artifact@v4
+        with:
+          name: ops_403_slo_72h_prod
+          path: ops_403_slo_72h_prod.json
+          if-no-files-found: error
+
+      - name: Upsert ops SLO issue — 72h sem 403 (PROD) (when breach=true)
+        if: steps.slo.outputs.breach == 'true'
+        uses: actions/github-script@v7
+        env:
+          SLO_JSON: ${{ steps.slo.outputs.slo_json }}
+          TOTAL_72H: ${{ steps.slo.outputs.total_72h }}
+        with:
+          script: |
+            const title = "OPS SLO (PROD): 72h sem 403 — VIOLAÇÃO";
+            const labels = ["ops-alert","env:prod","ops-403","slo"];
+            const body = [
+              "Detectada violação do SLO **72h sem 403** em PROD.",
+              "",
+              `- total_72h: ${process.env.TOTAL_72H}`,
+              "",
+              "Detalhes (JSON):",
+              "```json",
+              String(process.env.SLO_JSON ?? "{}"),
+              "```",
+              "",
+              `Run: ${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`,
+              "",
+              "Próximos passos sugeridos:",
+              "- Priorizar correção (risco para clientes).",
+              "- Rodar verify/restore drill se necessário.",
+              "- Confirmar gates e RPC-first nos domínios críticos.",
+            ].join(\"\\n\");
+
+            const { data: issues } = await github.rest.issues.listForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: \"open\",
+              labels: labels.join(\",\"),
+              per_page: 100,
+            });
+            const existing = issues.find(i => i.title === title);
+            if (existing) {
+              await github.rest.issues.update({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: existing.number,
+                body,
+              });
+              return;
+            }
+            await github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title,
+              body,
+              labels,
+            });
+
