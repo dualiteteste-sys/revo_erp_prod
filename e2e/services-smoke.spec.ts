@@ -255,6 +255,27 @@ test('Serviços > Contratos: gerar agenda de faturamento (MVP2) sem erros', asyn
   });
 
   // Lista de contratos
+  // (Compat) Antes era PostgREST direto; agora é RPC-first.
+  await page.route('**/rest/v1/rpc/servicos_contratos_list', async (route) => {
+    await route.fulfill({
+      json: [
+        {
+          id: 'ctr-1',
+          empresa_id: 'empresa-1',
+          cliente_id: 'cli-1',
+          numero: 'C-001',
+          descricao: 'Contrato E2E',
+          valor_mensal: 150,
+          status: 'ativo',
+          data_inicio: '2026-01-01',
+          data_fim: null,
+          observacoes: null,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        },
+      ],
+    });
+  });
   await page.route('**/rest/v1/servicos_contratos*', async (route) => {
     await route.fulfill({
       json: [

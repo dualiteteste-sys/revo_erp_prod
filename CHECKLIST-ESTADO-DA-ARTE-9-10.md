@@ -83,6 +83,9 @@ Definições:
 - [x] RPC-first (Inventário `supabase.from()`): remover ocorrências em `src/**` (migration `20270120123000_sec_rpc_first_inventory_supabase_from.sql`).
 - [x] Inventário PostgREST `.from('tabela')` exportado em `INVENTARIO-POSTGREST-FROM.md` (script `scripts/inventory_postgrest_from.mjs`).
 - [x] Gate PostgREST `.from('tabela')` ativo (allowlist `scripts/postgrest_from_allowlist.json` + `scripts/check_postgrest_from_allowlist.mjs`).
+- [x] RPC-first (Serviços MVP): migrar `src/services/servicosMvp.ts` para RPC (`servicos_contratos_*`, `servicos_notas_*`, `servicos_cobrancas_*`) e remover do allowlist (migration `20270121130000_sec_rpc_first_servicos_vendas_mvp.sql`).
+- [ ] RPC-first (Serviços Contratos): migrar `src/services/servicosContratosBilling.ts`, `src/services/servicosContratosItens.ts`, `src/services/servicosContratosTemplatesAdmin.ts` para RPC-first e remover do allowlist.
+- [ ] RPC-first (Vendas MVP): migrar `src/services/vendasMvp.ts` para RPC-first e remover do allowlist (inclui devolução transacional/idempotente).
 - [x] RPC-first (Billing): substituir `supabase.from('plans'/'subscriptions'/'billing_stripe_webhook_events')` por RPCs (`billing_plans_public_list`, `billing_subscription_with_plan_get`, `billing_stripe_webhook_events_list`).
 - [x] RPC-first (Financeiro piloto): revogar grants em tabelas `financeiro_%/finance_%/finops_%` e manter acesso via RPCs (migration `20270118133000_fin_ops_health_rpc_and_revoke_fin_grants.sql`).
   - [x] Ops/Health: substituir `supabase.from()` por RPCs SECURITY DEFINER (mesma migration) e verificar via asserts (script `scripts/verify_financeiro_rpc_first.sql`).

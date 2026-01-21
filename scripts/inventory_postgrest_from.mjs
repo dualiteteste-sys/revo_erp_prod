@@ -22,7 +22,11 @@ const re = /\.\s*from\s*\(\s*(['"])([^'"]+)\1\s*\)/gms;
 function isStorageFrom(src, matchIndex) {
   const start = Math.max(0, matchIndex - 80);
   const prefix = src.slice(start, matchIndex);
-  return /\bstorage\s*\.\s*$/.test(prefix) || /\bstorage\s*\.\s*from\s*\($/m.test(prefix);
+  // Casos:
+  // - `supabase.storage.from(...)` (o match aponta para `.from`)
+  // - `storage.from(...)`
+  // - Quebras de linha entre `storage` e `.from`
+  return /\bstorage\s*(?:\.\s*)?$/.test(prefix) || /\bstorage\s*\.\s*from\s*\($/m.test(prefix);
 }
 
 const hits = [];
@@ -73,4 +77,3 @@ for (const [table, filesList] of byTable.entries()) {
 
 fs.writeFileSync(OUT, md, "utf8");
 console.log(`Wrote ${path.relative(ROOT, OUT)} (${hits.length} referências)`);
-
