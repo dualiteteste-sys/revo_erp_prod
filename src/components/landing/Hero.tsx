@@ -95,7 +95,7 @@ const Hero: React.FC = () => {
                 onClick={scrollToPricing}
                 className="px-6 py-3 rounded-full bg-blue-700 text-white font-semibold hover:bg-blue-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-700 transition-colors"
               >
-                Experimente nossa versão beta por 6 meses grátis.
+                Experimente nossa versão beta por 2 meses grátis.
               </button>
               <a
                 href="#pricing"

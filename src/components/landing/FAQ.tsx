@@ -4,8 +4,8 @@ import { motion, AnimatePresence } from 'framer-motion';
 
 const faqs = [
   {
-    question: 'Como funciona o período de teste de 180 dias?',
-    answer: 'Se trata de uma oportunidade única. Você pode usar todos os recursos do plano escolhido por 180 dias, sem compromisso. Por se tratar de uma versão beta, o sistema ainda pode conter erros, mas nosso suporte está pronto para resolvê-los em até 1 dia útil. Ao final do período, você pode escolher continuar com o plano ou continuar usando o REVO ERP. Para clientes que já possuem planos de outros sistemas com a REVO nosso compromisso é manter o mesmo valor que já vem sendo pago atualmente por 6 meses para qualquer plano escolhido.',
+    question: 'Como funciona o período de teste de 60 dias?',
+    answer: 'Se trata de uma oportunidade única. Você pode usar todos os recursos do plano escolhido por 60 dias, sem compromisso. Por se tratar de uma versão beta, o sistema ainda pode conter erros, mas nosso suporte está pronto para resolvê-los em até 1 dia útil. Ao final do período, você pode escolher continuar com o plano ou continuar usando o REVO ERP. Para clientes que já possuem planos de outros sistemas com a REVO nosso compromisso é manter o mesmo valor que já vem sendo pago atualmente por 6 meses para qualquer plano escolhido.',
   },
   {
     question: 'Posso cancelar minha assinatura a qualquer momento?',

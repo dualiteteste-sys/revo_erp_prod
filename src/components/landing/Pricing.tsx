@@ -144,7 +144,7 @@ export default function Pricing() {
 
   const getPricing = (p: Plan) => {
     if (billingCycle === "monthly") {
-      return { label: `${money(p.monthlyAmountCents)}/mês`, sub: "Teste grátis 180 dias • Sem cartão" };
+      return { label: `${money(p.monthlyAmountCents)}/mês`, sub: "Teste grátis 60 dias • Sem cartão" };
     }
     const yearlyTotal = p.monthlyAmountCents * 10;
     const perMonth = Math.round(yearlyTotal / 12);

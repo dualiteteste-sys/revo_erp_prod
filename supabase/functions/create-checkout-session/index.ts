@@ -13,7 +13,7 @@ const supabaseAdmin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
 
 function parseTrialDays(): number {
   const raw = (Deno.env.get("BILLING_TRIAL_DAYS") ?? "").trim();
-  const fallback = 180;
+  const fallback = 60;
   const n = raw ? Number.parseInt(raw, 10) : fallback;
   if (!Number.isFinite(n) || Number.isNaN(n)) return fallback;
   return Math.max(0, Math.min(3650, n));

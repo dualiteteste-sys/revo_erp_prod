@@ -253,7 +253,7 @@ export function PlanIntentCheckoutModal() {
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Iniciando…
               </>
             ) : (
-              "Iniciar teste grátis (180 dias)"
+              "Iniciar teste grátis (60 dias)"
             )}
           </Button>
           {inlineError ? (
