@@ -1,7 +1,4 @@
-import { supabase } from '../lib/supabaseClient';
 import { callRpc } from '@/lib/api';
-
-const sb = supabase as any;
 
 export type ServicoContratoStatus = 'ativo' | 'suspenso' | 'cancelado';
 export type ServicoContrato = {
@@ -22,20 +19,17 @@ export type ServicoContrato = {
 };
 
 export async function listContratos(): Promise<ServicoContrato[]> {
-  const { data, error } = await sb.from('servicos_contratos').select('*').order('updated_at', { ascending: false });
-  if (error) throw error;
-  return (data || []) as any;
+  const rows = await callRpc<any>('servicos_contratos_list', { p_limit: 500 });
+  return (rows ?? []) as any;
 }
 
 export async function upsertContrato(payload: Partial<ServicoContrato> & { descricao: string }): Promise<ServicoContrato> {
-  const { data, error } = await sb.from('servicos_contratos').upsert(payload as any).select().single();
-  if (error) throw error;
-  return data as any;
+  const row = await callRpc<any>('servicos_contratos_upsert', { p_payload: payload as any });
+  return row as any;
 }
 
 export async function deleteContrato(id: string): Promise<void> {
-  const { error } = await sb.from('servicos_contratos').delete().eq('id', id);
-  if (error) throw error;
+  await callRpc('servicos_contratos_delete', { p_id: id });
 }
 
 export type NotaServicoStatus = 'rascunho' | 'emitida' | 'cancelada';
@@ -52,20 +46,17 @@ export type NotaServico = {
 };
 
 export async function listNotasServico(): Promise<NotaServico[]> {
-  const { data, error } = await sb.from('servicos_notas').select('*').order('updated_at', { ascending: false });
-  if (error) throw error;
-  return (data || []) as any;
+  const rows = await callRpc<any>('servicos_notas_list', { p_limit: 500 });
+  return (rows ?? []) as any;
 }
 
 export async function upsertNotaServico(payload: Partial<NotaServico> & { descricao: string }): Promise<NotaServico> {
-  const { data, error } = await sb.from('servicos_notas').upsert(payload as any).select().single();
-  if (error) throw error;
-  return data as any;
+  const row = await callRpc<any>('servicos_notas_upsert', { p_payload: payload as any });
+  return row as any;
 }
 
 export async function deleteNotaServico(id: string): Promise<void> {
-  const { error } = await sb.from('servicos_notas').delete().eq('id', id);
-  if (error) throw error;
+  await callRpc('servicos_notas_delete', { p_id: id });
 }
 
 export type CobrancaStatus = 'pendente' | 'paga' | 'cancelada';
@@ -83,20 +74,17 @@ export type CobrancaServico = {
 };
 
 export async function listCobrancasServico(): Promise<CobrancaServico[]> {
-  const { data, error } = await sb.from('servicos_cobrancas').select('*').order('updated_at', { ascending: false });
-  if (error) throw error;
-  return (data || []) as any;
+  const rows = await callRpc<any>('servicos_cobrancas_list', { p_limit: 500 });
+  return (rows ?? []) as any;
 }
 
 export async function upsertCobrancaServico(payload: Partial<CobrancaServico> & { data_vencimento: string; valor: number }): Promise<CobrancaServico> {
-  const { data, error } = await sb.from('servicos_cobrancas').upsert(payload as any).select().single();
-  if (error) throw error;
-  return data as any;
+  const row = await callRpc<any>('servicos_cobrancas_upsert', { p_payload: payload as any });
+  return row as any;
 }
 
 export async function deleteCobrancaServico(id: string): Promise<void> {
-  const { error } = await sb.from('servicos_cobrancas').delete().eq('id', id);
-  if (error) throw error;
+  await callRpc('servicos_cobrancas_delete', { p_id: id });
 }
 
 export async function gerarContaAReceberParaCobranca(params: {
@@ -120,10 +108,10 @@ export async function gerarContaAReceberParaCobranca(params: {
   const contaId = conta?.id as string | undefined;
   if (!contaId) throw new Error('Falha ao gerar conta a receber.');
 
-  await sb
-    .from('servicos_cobrancas')
-    .update({ conta_a_receber_id: contaId })
-    .eq('id', params.cobrancaId);
+  await callRpc('servicos_cobrancas_set_conta_a_receber', {
+    p_cobranca_id: params.cobrancaId,
+    p_conta_a_receber_id: contaId,
+  });
 
   return contaId;
 }
