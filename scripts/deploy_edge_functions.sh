@@ -53,9 +53,37 @@ for fn in "${functions[@]}"; do
     continue
   fi
   echo "[edge] Deploying: $fn"
-  if is_no_verify "$fn"; then
-    supabase functions deploy "$fn" --project-ref "$SUPABASE_PROJECT_REF" --no-verify-jwt
-  else
-    supabase functions deploy "$fn" --project-ref "$SUPABASE_PROJECT_REF"
-  fi
+  max_attempts=4
+  attempt=1
+  while true; do
+    set +e
+    if is_no_verify "$fn"; then
+      out="$(supabase functions deploy "$fn" --project-ref "$SUPABASE_PROJECT_REF" --no-verify-jwt 2>&1)"
+      code=$?
+    else
+      out="$(supabase functions deploy "$fn" --project-ref "$SUPABASE_PROJECT_REF" 2>&1)"
+      code=$?
+    fi
+    set -e
+
+    if [[ $code -eq 0 ]]; then
+      break
+    fi
+
+    # Retry on transient auth/rate-limit/network errors seen in Supabase API.
+    if echo "$out" | grep -E -q "status 401|Unauthorized|status 429|Too Many Requests|timeout|ECONNRESET|ENOTFOUND|EAI_AGAIN|5[0-9]{2}"; then
+      if [[ $attempt -lt $max_attempts ]]; then
+        sleep_for=$((attempt * 3))
+        echo "::warning::Edge deploy falhou para '$fn' (tentativa $attempt/$max_attempts). Retentando em ${sleep_for}s..."
+        echo "$out" | tail -n 5 || true
+        sleep "$sleep_for"
+        attempt=$((attempt + 1))
+        continue
+      fi
+    fi
+
+    echo "::error::Falha ao deployar Edge Function '$fn' (tentativa $attempt/$max_attempts)."
+    echo "$out"
+    exit $code
+  done
 done
