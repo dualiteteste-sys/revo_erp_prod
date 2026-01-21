@@ -34,6 +34,7 @@ Definições:
   - [x] RPC `active_empresa_get_for_current_user()` (tenant-safe via `auth.uid()`).
   - [x] RPC `empresas_list_for_current_user(p_limit)` (tenant-safe via `empresa_usuarios.user_id = auth.uid()`).
 - [x] Padronizar recovery automático (apenas quando seguro) e mensagens UX (“Selecione sua empresa”).
+- [x] Evitar tenant “sem plano”: ao concluir `/auth/callback`, criar trial no banco via RPC (`billing_start_trial_for_current_user`) quando veio da seleção de plano.
 - [x] Cobrir boot com E2E: login → empresa ativa → navegação por 5 módulos sem 403.
 - [x] Cobrir landing pública sem sessão/empresa ativa (E2E `e2e/landing-public.spec.ts`).
 
@@ -137,6 +138,7 @@ Definições:
 
 ### 2.2 Falhas de rede e timeouts
 - [ ] Retentativas padronizadas apenas para transitórios (408/429/5xx/failed-to-fetch).
+  - [x] Implementar helper `src/lib/retry.ts` e aplicar em `src/hooks/useEmpresaFeatures.ts`.
 - [ ] UX offline: estados “reconectando”, “tentar novamente”, sem perder formulário.
 - [ ] “Console limpo”: falhas esperadas nunca viram stacktrace vermelho.
 

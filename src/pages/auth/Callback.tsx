@@ -81,8 +81,32 @@ export default function Callback() {
         if (prefErr) console.warn("[AUTH][CALLBACK][PREF][WARN]", prefErr);
         console.log("[AUTH][CALLBACK] success", { empresa_id: activeEmpresaId ?? null });
 
+        // 3) Trial/billing bootstrap (evita tenant "sem plano" → 403/fallback).
+        // Regras:
+        // - Só roda quando o usuário veio da seleção de plano (localStorage).
+        // - É idempotente: se já existir assinatura ativa/trial, não altera.
+        try {
+          const planSlug = (localStorage.getItem("pending_plan_slug") ?? "").trim();
+          const cycle = (localStorage.getItem("pending_plan_cycle") ?? "").trim() || "monthly";
+          if (planSlug) {
+            const { data: trialRes, error: trialErr } = await supabase.rpc(
+              "billing_start_trial_for_current_user",
+              { p_plan_slug: planSlug, p_billing_cycle: cycle },
+            );
+            if (trialErr) {
+              console.warn("[AUTH][CALLBACK][TRIAL][WARN]", trialErr);
+            } else {
+              console.log("[AUTH][CALLBACK][TRIAL] ok", trialRes);
+            }
+          }
+        } catch (e: any) {
+          console.warn("[AUTH][CALLBACK][TRIAL][WARN]", e);
+        }
+
         try {
           localStorage.removeItem("pending_company_name");
+          localStorage.removeItem("pending_plan_slug");
+          localStorage.removeItem("pending_plan_cycle");
         } catch {
           // ignore
         }
