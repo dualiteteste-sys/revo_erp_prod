@@ -63,7 +63,7 @@ function requireEnv(name: string): string | null {
 function parseTrialDays(): number {
   const raw = (Deno.env.get("BILLING_TRIAL_DAYS") ?? "").trim();
   // Default para fase beta.
-  const fallback = 180;
+  const fallback = 60;
   const n = raw ? Number.parseInt(raw, 10) : fallback;
   if (!Number.isFinite(n) || Number.isNaN(n)) return fallback;
   return Math.max(0, Math.min(3650, n));

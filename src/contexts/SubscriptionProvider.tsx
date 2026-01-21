@@ -99,7 +99,7 @@ export const SubscriptionProvider = ({ children }: { children: ReactNode }) => {
   useEffect(() => {
     if (localBypass) {
       const now = new Date();
-      const end = new Date(now.getTime() + 180 * 24 * 60 * 60 * 1000).toISOString();
+      const end = new Date(now.getTime() + 60 * 24 * 60 * 60 * 1000).toISOString();
       const slug = getLocalPlanSlug();
       const fakePlan: Plan = {
         id: 'local-plan',
