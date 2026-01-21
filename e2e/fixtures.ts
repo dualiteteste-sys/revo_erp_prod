@@ -47,6 +47,80 @@ export const test = base.extend({
     page.on('response', onResponse);
 
     // ---------------------------------------------------------------------
+    // Hardening: desabilitar Supabase Realtime via WebSocket nos testes E2E.
+    // Motivo: o gate exige "console limpo" e o WebSocket pode falhar por
+    // instabilidade de rede no runner (não é requisito funcional dos fluxos).
+    // ---------------------------------------------------------------------
+    await page.addInitScript(() => {
+      const OriginalWebSocket = window.WebSocket;
+      const isSupabaseRealtime = (url: any) =>
+        typeof url === 'string' && url.includes('/realtime/v1/websocket');
+
+      const createNoopWebSocket = (url: string) => {
+        const listeners: Record<string, Function[]> = {};
+
+        const ws: any = {
+          url,
+          readyState: 1,
+          bufferedAmount: 0,
+          protocol: '',
+          extensions: '',
+          binaryType: 'blob',
+          onopen: null,
+          onmessage: null,
+          onerror: null,
+          onclose: null,
+          send: () => {},
+          close: () => {
+            ws.readyState = 3;
+            const evt: any = { code: 1000, reason: 'disabled_in_e2e', wasClean: true, type: 'close' };
+            (ws.onclose && ws.onclose(evt)) || null;
+            (listeners.close || []).forEach((fn) => fn(evt));
+          },
+          addEventListener: (type: string, cb: Function) => {
+            listeners[type] = listeners[type] || [];
+            listeners[type].push(cb);
+          },
+          removeEventListener: (type: string, cb: Function) => {
+            listeners[type] = (listeners[type] || []).filter((fn) => fn !== cb);
+          },
+          dispatchEvent: (evt: any) => {
+            (listeners[evt?.type] || []).forEach((fn) => fn(evt));
+            return true;
+          },
+        };
+
+        // Dispara "open" para não travar libs que aguardam conexão.
+        setTimeout(() => {
+          const evt: any = { type: 'open' };
+          (ws.onopen && ws.onopen(evt)) || null;
+          (listeners.open || []).forEach((fn) => fn(evt));
+        }, 0);
+
+        return ws;
+      };
+
+      function PatchedWebSocket(this: any, url: any, protocols?: any) {
+        if (isSupabaseRealtime(url)) return createNoopWebSocket(url);
+        // @ts-ignore
+        return new OriginalWebSocket(url, protocols);
+      }
+
+      // Preservar constantes.
+      // @ts-ignore
+      PatchedWebSocket.CONNECTING = OriginalWebSocket.CONNECTING;
+      // @ts-ignore
+      PatchedWebSocket.OPEN = OriginalWebSocket.OPEN;
+      // @ts-ignore
+      PatchedWebSocket.CLOSING = OriginalWebSocket.CLOSING;
+      // @ts-ignore
+      PatchedWebSocket.CLOSED = OriginalWebSocket.CLOSED;
+
+      // @ts-ignore
+      window.WebSocket = PatchedWebSocket;
+    });
+
+    // ---------------------------------------------------------------------
     // Global mocks (estado da arte para CI):
     // - Evitar bater em Supabase real via Edge Functions no gate de E2E.
     // - Manter "console limpo" (sem 401/403/5xx inesperados).

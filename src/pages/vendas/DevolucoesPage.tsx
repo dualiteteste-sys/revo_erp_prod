@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Loader2, PlusCircle, Undo2 } from 'lucide-react';
 import Modal from '@/components/ui/Modal';
 import { useToast } from '@/contexts/ToastProvider';
@@ -31,6 +31,7 @@ export default function DevolucoesPage() {
   const { addToast } = useToast();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const idempotencyKeyRef = useRef<string | null>(null);
   const [rows, setRows] = useState<(Devolucao & { itens: any[] })[]>([]);
   const [orders, setOrders] = useState<VendaPedido[]>([]);
   const [contas, setContas] = useState<ContaCorrente[]>([]);
@@ -55,6 +56,16 @@ export default function DevolucoesPage() {
   ];
   const { widths: listWidths, startResize: startResizeList } = useTableColumnWidths({ tableId: 'vendas:devolucoes', columns: listColumns });
   const { widths: itensWidths, startResize: startResizeItens } = useTableColumnWidths({ tableId: 'vendas:devolucoes:itens', columns: itensColumns });
+
+  const newIdempotencyKey = () => {
+    try {
+      // @ts-ignore
+      const uuid = typeof crypto?.randomUUID === 'function' ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`;
+      return `vendas:devolucao:${uuid}`;
+    } catch {
+      return `vendas:devolucao:${Date.now()}-${Math.random()}`;
+    }
+  };
 
   async function load() {
     setLoading(true);
@@ -120,12 +131,14 @@ export default function DevolucoesPage() {
 
   const openNew = () => {
     setForm((s) => ({ ...emptyForm, conta_corrente_id: s.conta_corrente_id }));
+    idempotencyKeyRef.current = newIdempotencyKey();
     setIsOpen(true);
   };
 
   const close = () => {
     setIsOpen(false);
     setForm((s) => ({ ...emptyForm, conta_corrente_id: s.conta_corrente_id }));
+    idempotencyKeyRef.current = null;
   };
 
   const loadPedidoItens = async (pedidoId: string) => {
@@ -149,6 +162,7 @@ export default function DevolucoesPage() {
   };
 
   const save = async () => {
+    if (saving) return;
     if (!form.pedido_id) {
       addToast('Selecione um pedido.', 'error');
       return;
@@ -178,6 +192,7 @@ export default function DevolucoesPage() {
         motivo: form.motivo.trim() || null,
         itens,
         contaCorrenteId: form.conta_corrente_id,
+        idempotencyKey: idempotencyKeyRef.current,
       });
       addToast(`Devolução criada: ${id}`, 'success');
       close();

@@ -1,6 +1,4 @@
-import { supabase } from '@/lib/supabaseClient';
-
-const sb = supabase as any;
+import { callRpc } from '@/lib/api';
 
 export type BillingRuleTipo = 'mensal' | 'avulso';
 
@@ -38,13 +36,8 @@ export type ServicosContratoBillingSchedule = {
 };
 
 export async function getBillingRuleByContratoId(contratoId: string): Promise<ServicosContratoBillingRule | null> {
-  const { data, error } = await sb
-    .from('servicos_contratos_billing_rules')
-    .select('*')
-    .eq('contrato_id', contratoId)
-    .maybeSingle();
-  if (error) throw error;
-  return (data ?? null) as any;
+  const row = await callRpc<any>('servicos_contratos_billing_rule_get', { p_contrato_id: contratoId });
+  return (row ?? null) as any;
 }
 
 export async function upsertBillingRule(payload: {
@@ -56,33 +49,21 @@ export async function upsertBillingRule(payload: {
   primeira_competencia: string;
   centro_de_custo_id: string | null;
 }): Promise<ServicosContratoBillingRule> {
-  const { data, error } = await sb
-    .from('servicos_contratos_billing_rules')
-    .upsert(payload, { onConflict: 'empresa_id,contrato_id' })
-    .select()
-    .single();
-  if (error) throw error;
-  return data as any;
+  const row = await callRpc<any>('servicos_contratos_billing_rule_upsert', { p_payload: payload as any });
+  return row as any;
 }
 
 export async function listScheduleByContratoId(contratoId: string, limit = 24): Promise<ServicosContratoBillingSchedule[]> {
-  const { data, error } = await sb
-    .from('servicos_contratos_billing_schedule')
-    .select('*')
-    .eq('contrato_id', contratoId)
-    .order('data_vencimento', { ascending: true })
-    .limit(limit);
-  if (error) throw error;
-  return (data ?? []) as any;
+  const rows = await callRpc<any>('servicos_contratos_billing_schedule_list', { p_contrato_id: contratoId, p_limit: limit });
+  return (rows ?? []) as any;
 }
 
 export async function generateSchedule(params: { contratoId: string; monthsAhead?: number }): Promise<{ inserted: number }> {
   const { contratoId, monthsAhead = 12 } = params;
-  const { data, error } = await sb.rpc('servicos_contratos_billing_generate_schedule', {
+  const data = await callRpc<any>('servicos_contratos_billing_generate_schedule', {
     p_contrato_id: contratoId,
     p_months_ahead: monthsAhead,
   });
-  if (error) throw error;
   return { inserted: Number(data?.inserted ?? 0) };
 }
 
@@ -98,8 +79,7 @@ export async function generateReceivables(params: {
   };
   if (monthsAhead != null) args.p_months_ahead = monthsAhead;
 
-  const { data, error } = await sb.rpc('servicos_contratos_billing_generate_receivables', args);
-  if (error) throw error;
+  const data = await callRpc<any>('servicos_contratos_billing_generate_receivables', args);
   return {
     created: Number(data?.created ?? 0),
     reason: data?.reason ?? undefined,
@@ -113,12 +93,11 @@ export async function cancelFutureBilling(params: {
   reason?: string | null;
 }): Promise<{ scheduleCancelled: number; receivablesCancelled: number; cobrancasCancelled: number }> {
   const { contratoId, cancelReceivables = false, reason = null } = params;
-  const { data, error } = await sb.rpc('servicos_contratos_billing_cancel_future', {
+  const data = await callRpc<any>('servicos_contratos_billing_cancel_future', {
     p_contrato_id: contratoId,
     p_cancel_receivables: cancelReceivables,
     p_reason: reason,
   });
-  if (error) throw error;
   return {
     scheduleCancelled: Number(data?.schedule_cancelled ?? 0),
     receivablesCancelled: Number(data?.receivables_cancelled ?? 0),
@@ -133,22 +112,20 @@ export async function addAvulso(params: {
   descricao?: string | null;
 }): Promise<ServicosContratoBillingSchedule> {
   const { contratoId, dataVencimento, valor, descricao = null } = params;
-  const { data, error } = await sb.rpc('servicos_contratos_billing_add_avulso', {
+  const data = await callRpc<any>('servicos_contratos_billing_add_avulso', {
     p_contrato_id: contratoId,
     p_data_vencimento: dataVencimento,
     p_valor: valor,
     p_descricao: descricao,
   });
-  if (error) throw error;
   return data as any;
 }
 
 export async function recalcMensalFuture(params: { contratoId: string; from?: string | null }): Promise<{ updated: number; reason?: string }> {
   const { contratoId, from = null } = params;
-  const { data, error } = await sb.rpc('servicos_contratos_billing_recalc_mensal_future', {
+  const data = await callRpc<any>('servicos_contratos_billing_recalc_mensal_future', {
     p_contrato_id: contratoId,
     p_from: from,
   });
-  if (error) throw error;
   return { updated: Number(data?.updated ?? 0), reason: data?.reason ?? undefined };
 }
