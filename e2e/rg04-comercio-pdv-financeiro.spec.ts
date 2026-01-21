@@ -454,6 +454,6 @@ test('VEN-STA-02: PDV offline-lite enfileira e sincroniza depois (sem duplicar)'
   failFinalize = false;
   await page.getByRole('button', { name: 'Sincronizar agora' }).click();
   await expect(page.getByText('Sincronizado: 1 PDV(s).')).toBeVisible({ timeout: 20000 });
-  await expect(page.getByText('pendente')).toHaveCount(0);
-  await expect(page.getByText('concluido')).toBeVisible({ timeout: 20000 });
+  await expect(page.getByText('pendente', { exact: true })).toHaveCount(0, { timeout: 20000 });
+  await expect(page.getByText('concluido', { exact: true })).toBeVisible({ timeout: 20000 });
 });

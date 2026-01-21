@@ -4,14 +4,17 @@ export function isLocalhostHost(hostname: string): boolean {
 }
 
 export function isLocalBillingBypassEnabled(): boolean {
-  const enabled = String((import.meta as any)?.env?.VITE_LOCAL_BILLING_BYPASS || '')
-    .trim()
-    .toLowerCase() === 'true';
-
-  if (!enabled) return false;
-
   try {
-    return isLocalhostHost(window.location.hostname);
+    const isLocal = isLocalhostHost(window.location.hostname);
+    if (!isLocal) return false;
+
+    // Estado da arte: em localhost, o bypass fica ON por padrão
+    // (Stripe checkout não funciona bem em ambiente local sem túnel).
+    // Para forçar OFF, defina VITE_LOCAL_BILLING_BYPASS=false.
+    const raw = String((import.meta as any)?.env?.VITE_LOCAL_BILLING_BYPASS ?? '').trim().toLowerCase();
+    if (raw === 'false') return false;
+    if (raw === 'true') return true;
+    return true;
   } catch {
     return false;
   }
