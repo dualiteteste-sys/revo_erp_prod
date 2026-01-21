@@ -1,4 +1,5 @@
 import React from 'react';
+import { Navigate, useLocation } from 'react-router-dom';
 import { useSubscription } from '../../contexts/SubscriptionProvider';
 import BillingBlockPage from '../../pages/billing/BillingBlockPage';
 import { getBillingAccessLevel } from '@/lib/billingAccess';
@@ -9,6 +10,7 @@ interface SubscriptionGuardProps {
 
 const SubscriptionGuard: React.FC<SubscriptionGuardProps> = ({ children }) => {
   const { subscription, loadingSubscription } = useSubscription();
+  const location = useLocation();
 
   if (loadingSubscription) {
     return (
@@ -18,9 +20,25 @@ const SubscriptionGuard: React.FC<SubscriptionGuardProps> = ({ children }) => {
     );
   }
 
-  // If no subscription exists, allow access (free mode)
+  // Estado da arte: empresa SEM assinatura não deve navegar no core do ERP,
+  // para evitar estados inconsistentes (ex.: 403 por ausência de plano/entitlements).
   if (!subscription) {
-    return <>{children}</>;
+    const path = location.pathname || '';
+    const allowNoSub =
+      // Permite acessar a tela de assinatura e demais configurações para corrigir o estado.
+      path.startsWith('/app/configuracoes') ||
+      // Mantém ferramentas internas acessíveis (triagem/recuperação).
+      path.startsWith('/app/desenvolvedor');
+
+    if (allowNoSub) return <>{children}</>;
+
+    return (
+      <Navigate
+        to="/app/configuracoes/geral/assinatura"
+        replace
+        state={{ from: location, reason: 'no_subscription' }}
+      />
+    );
   }
 
   const level = getBillingAccessLevel(subscription);

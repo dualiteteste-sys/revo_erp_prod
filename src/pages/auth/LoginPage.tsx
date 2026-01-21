@@ -129,9 +129,9 @@ const LoginPage: React.FC = () => {
 
       <p className="text-center text-sm text-gray-600 mt-6">
         Não tem uma conta?{' '}
-        <Link to="/auth/signup" className="font-medium text-blue-600 hover:underline focus:outline-none">
-          Crie sua conta
-        </Link>
+        <a href="/#pricing" className="font-medium text-blue-600 hover:underline focus:outline-none">
+          Veja os planos e crie sua conta
+        </a>
       </p>
     </motion.div>
   );

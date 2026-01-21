@@ -128,7 +128,7 @@ const RevoSendPage: React.FC = () => {
             className="mt-10"
           >
             <button
-              onClick={() => monthlyPlan ? handleCheckout(monthlyPlan) : navigate('/auth/signup')}
+              onClick={() => monthlyPlan ? handleCheckout(monthlyPlan) : navigate('/auth/login')}
               disabled={loading || !!checkoutLoading}
               className="px-8 py-3 bg-blue-600 text-white font-semibold rounded-lg shadow-md hover:bg-blue-700 transition-transform transform hover:scale-105 disabled:opacity-50"
             >

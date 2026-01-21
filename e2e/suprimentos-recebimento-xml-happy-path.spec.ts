@@ -478,7 +478,32 @@ test('SUP-03: importar XML → criar recebimento → finalizar (happy path)', as
   await expect(page.getByText(/Custos adicionais atualizados/)).toBeVisible({ timeout: 15000 });
 
   await page.getByRole('button', { name: 'Finalizar Recebimento' }).click();
-  await expect(page.getByText('Recebimento concluído.', { exact: true })).toBeVisible({ timeout: 15000 });
+  // Em planos Indústria/Scale, pode pedir classificação antes de concluir.
+  const classificacaoHeading = page.getByText('Classificar recebimento');
+  const needsClassificacao = await classificacaoHeading
+    .isVisible({ timeout: 1500 })
+    .catch(() => false);
+  if (needsClassificacao) {
+    await page.getByLabel('Estoque Próprio (para venda)').check();
+    await page.getByRole('button', { name: 'Confirmar' }).click();
+    await expect(classificacaoHeading).toBeHidden({ timeout: 15000 });
+    // Em alguns fluxos, o "Confirmar" já executa a finalização; em outros, ainda exige clicar em "Finalizar".
+    const finalizedBadge = page.getByText(/Recebimento Conclu[ií]do/i);
+    const finalizeButton = page.getByRole('button', { name: 'Finalizar Recebimento' });
+
+    await Promise.race([
+      finalizedBadge.waitFor({ state: 'visible', timeout: 15000 }),
+      finalizeButton.waitFor({ state: 'visible', timeout: 15000 }),
+    ]).catch(() => undefined);
+
+    const alreadyConcluido = await finalizedBadge.isVisible().catch(() => false);
+    const canFinalize = await finalizeButton.isVisible().catch(() => false);
+    if (!alreadyConcluido && canFinalize) {
+      await finalizeButton.click();
+    }
+  }
+
+  await expect(page.getByText('Recebimento Concluído', { exact: true })).toBeVisible({ timeout: 15000 });
 
   await page.goto('/app/suprimentos/recebimentos');
 

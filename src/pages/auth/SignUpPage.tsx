@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { Loader2, Mail, Lock, Building2 } from 'lucide-react';
@@ -19,8 +19,22 @@ const SignUpPage: React.FC = () => {
   const plan = searchParams.get('plan');
   const cycle = searchParams.get('cycle');
 
+  useEffect(() => {
+    // Estado da arte: cadastro público só deve acontecer via seleção de plano
+    // (evita tenants “sem plano” → 403 intermitente / fallback de permissões).
+    if (!plan) {
+      addToast('Para criar sua conta, escolha um plano primeiro.', 'info');
+      window.location.assign('/#pricing');
+    }
+  }, [addToast, plan]);
+
   const handleSignUp = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!plan) {
+      addToast('Escolha um plano antes de criar sua conta.', 'warning');
+      window.location.assign('/#pricing');
+      return;
+    }
     setLoading(true);
 
     try {
