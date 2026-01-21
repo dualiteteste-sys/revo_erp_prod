@@ -340,6 +340,28 @@ Deno.serve(async (req) => {
     const payloadCnpjClean = payloadCnpj ? payloadCnpj.replace(/\D/g, "") : "";
     const empresaCnpj = payloadCnpjClean || ((empresa as any)?.cnpj ? String((empresa as any).cnpj).replace(/\D/g, "") : "");
 
+    if (payloadCnpjClean) {
+      const dupRes = await supabaseAdmin
+        .from("empresas")
+        .select("id")
+        .eq("cnpj", payloadCnpjClean)
+        .neq("id", empresa_id)
+        .limit(1);
+      if (dupRes.error && isSupabasePermissionError(dupRes.error)) {
+        return new Response(JSON.stringify({
+          error: "config_error",
+          message:
+            "Ambiente de billing mal configurado (service role sem permissão). Configure SUPABASE_SERVICE_ROLE_KEY corretamente.",
+        }), { status: 500, headers: { 'Content-Type': 'application/json', ...corsHeaders } });
+      }
+      if (!dupRes.error && (dupRes.data?.length ?? 0) > 0) {
+        return new Response(JSON.stringify({
+          error: "cnpj_duplicate",
+          message: "CNPJ já cadastrado. Use outro CNPJ ou faça login na empresa existente.",
+        }), { status: 409, headers: { 'Content-Type': 'application/json', ...corsHeaders } });
+      }
+    }
+
     const displayRazao = (empresaPayload?.nome_razao_social ?? "").trim();
     const displayFantasia = (empresaPayload?.nome_fantasia ?? "").trim();
     const displayName = (displayFantasia || displayRazao || `Empresa ${empresa_id}`) as string;
