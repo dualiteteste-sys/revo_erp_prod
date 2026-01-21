@@ -208,9 +208,9 @@ test('RG-04 (Comércio): finalizar PDV gera movimento financeiro + baixa de esto
       return;
     }
 
-    // PDV list (REST)
-    if (url.includes('/rest/v1/vendas_pedidos')) {
-      await route.fulfill({ json: [pdvPedido] });
+    // PDV list (RPC-first)
+    if (url.includes('/rest/v1/rpc/vendas_pdv_pedidos_list')) {
+      await route.fulfill({ json: [{ ...pdvPedido, pdv_estornado_at: null }] });
       return;
     }
 
@@ -383,8 +383,8 @@ test('VEN-STA-02: PDV offline-lite enfileira e sincroniza depois (sem duplicar)'
       return;
     }
 
-    if (url.includes('/rest/v1/vendas_pedidos')) {
-      await route.fulfill({ json: [pdvPedido] });
+    if (url.includes('/rest/v1/rpc/vendas_pdv_pedidos_list')) {
+      await route.fulfill({ json: [{ ...pdvPedido, pdv_estornado_at: null }] });
       return;
     }
 

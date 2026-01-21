@@ -70,7 +70,7 @@ Definições:
   - [x] `unidades_medida`, `embalagens`, `industria_ct_aps_config`, `industria_ct_calendario_semana`, `pcp_aps_runs`, `pcp_aps_run_changes` (migration `20270118130000_sec_rls_current_empresa_cadastros_ops.sql`).
 - [x] Garantir que o inventário não tenha itens “MÉDIO” (grants + empresa_id + RLS ON, mas sem policy `current_empresa_id()`).
   - [x] Gate em `scripts/rg03_db_asserts.sql` (SEC-01b/RG-03).
-- [ ] Garantir que tabelas multi-tenant tenham:
+- [x] Garantir que tabelas multi-tenant tenham:
   - [x] `empresa_id` obrigatório e consistente (guardrails via migration `20270118193000_mt_empresa_id_guardrails.sql`), com exceções explícitas para catálogos globais (`unidades_medida`, `embalagens`).
   - [x] policies `USING/WITH CHECK` baseadas em `current_empresa_id()` (ou heurística equivalente tenant-safe), com gate RG03 (`scripts/rg03_db_asserts.sql`) garantindo 0 “MÉDIO”.
   - [x] índices mínimos para filtros por `empresa_id` (migration `20270119174500_mt_empresa_id_min_indexes.sql`)
@@ -110,6 +110,14 @@ Definições:
 ### 1.3 RPC-first: Comissões (Vendedores) (piloto)
 - [x] Migrar Vendedores para RPC-first (sem PostgREST direto em `public.vendedores` no app) e revogar grants diretos (migration `supabase/migrations/20270120201000_sec_rpc_first_vendedores.sql`).
 - [x] Atualizar inventário `INVENTARIO-POSTGREST-FROM.md` e remover `src/services/vendedores.ts` do allowlist.
+
+### 1.4 RPC-first: Vendas (PDV/Comissões/Relatórios) — read models
+- [x] Remover `.from('vendas_pedidos')` do frontend (PDV/Comissões/Relatórios) e expor RPCs dedicadas (migration `supabase/migrations/20270121100000_sec_rpc_first_vendas_pedidos_error_reports.sql`).
+- [x] Revogar grants diretos em `public.vendas_pedidos` (mesma migration) e manter acesso apenas via RPC/`service_role`.
+
+### 1.5 RPC-first: Ops — Error Reports
+- [x] Remover `.from('error_reports')` do frontend e migrar para RPC (`ops_error_reports_list`, `ops_error_reports_set_status`) (migration `supabase/migrations/20270121100000_sec_rpc_first_vendas_pedidos_error_reports.sql`).
+- [x] Revogar grants diretos em `public.error_reports` (mesma migration) e manter acesso apenas via RPC/`service_role`.
 
 **Aceite P1**
 - [ ] Auditoria manual: tentar acessar dados de outra empresa (negado sempre).

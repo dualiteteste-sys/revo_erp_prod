@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { BarChart2, Loader2 } from 'lucide-react';
 import { useToast } from '@/contexts/ToastProvider';
 import { listVendas, type VendaPedido } from '@/services/vendas';
-import { supabase } from '@/lib/supabaseClient';
+import { getRelatoriosVendasTotais } from '@/services/vendasReadModels';
 
 type Totais = {
   pedidos: number;
@@ -15,8 +15,6 @@ type Totais = {
   devolucoesTotal: number;
 };
 
-const sb = supabase as any;
-
 export default function RelatoriosVendasPage() {
   const { addToast } = useToast();
   const [loading, setLoading] = useState(true);
@@ -27,14 +25,10 @@ export default function RelatoriosVendasPage() {
   async function load() {
     setLoading(true);
     try {
-      const [all, pdvAgg, devAgg] = await Promise.all([
-        listVendas({ search: '', status: undefined, limit: 500, offset: 0 }),
-        sb.from('vendas_pedidos').select('total_geral').eq('canal', 'pdv'),
-        sb.from('vendas_devolucoes').select('valor_total'),
-      ]);
+      const [all, totals] = await Promise.all([listVendas({ search: '', status: undefined, limit: 500, offset: 0 }), getRelatoriosVendasTotais()]);
       setOrders(all);
-      setPdvTotal(((pdvAgg.data || []) as any[]).reduce((acc, r) => acc + Number(r.total_geral || 0), 0));
-      setDevolucoesTotal(((devAgg.data || []) as any[]).reduce((acc, r) => acc + Number(r.valor_total || 0), 0));
+      setPdvTotal(totals.pdvTotal);
+      setDevolucoesTotal(totals.devolucoesTotal);
     } catch (e: any) {
       addToast(e.message || 'Falha ao carregar relatórios.', 'error');
       setOrders([]);
