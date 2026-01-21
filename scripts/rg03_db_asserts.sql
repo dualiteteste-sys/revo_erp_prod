@@ -116,8 +116,40 @@ begin
     raise exception 'RG-03: tabela public.servicos_cobrancas ausente (MVP menu).';
   end if;
 
-  if not has_table_privilege('authenticated', 'public.servicos_contratos', 'select') then
-    raise exception 'RG-03: role authenticated sem SELECT em public.servicos_contratos (MVP menu).';
+  -- Serviços (MVP): preferir RPC-first. Se as RPCs existirem, as tabelas NÃO devem ter grants diretos para authenticated.
+  -- Mantém fallback para ambientes antigos (sem as RPCs) para evitar “menu quebra com 404/403”.
+  if to_regprocedure('public.servicos_contratos_list(integer)') is not null then
+    if has_table_privilege('authenticated', 'public.servicos_contratos', 'select')
+       or has_table_privilege('authenticated', 'public.servicos_contratos', 'insert')
+       or has_table_privilege('authenticated', 'public.servicos_contratos', 'update')
+       or has_table_privilege('authenticated', 'public.servicos_contratos', 'delete')
+    then
+      raise exception 'RG-03: tabela public.servicos_contratos ainda possui grants diretos para authenticated (deve ser RPC-first).';
+    end if;
+  else
+    if not has_table_privilege('authenticated', 'public.servicos_contratos', 'select') then
+      raise exception 'RG-03: role authenticated sem SELECT em public.servicos_contratos (MVP menu; legacy sem RPC).';
+    end if;
+  end if;
+
+  if to_regprocedure('public.servicos_notas_list(integer)') is not null then
+    if has_table_privilege('authenticated', 'public.servicos_notas', 'select')
+       or has_table_privilege('authenticated', 'public.servicos_notas', 'insert')
+       or has_table_privilege('authenticated', 'public.servicos_notas', 'update')
+       or has_table_privilege('authenticated', 'public.servicos_notas', 'delete')
+    then
+      raise exception 'RG-03: tabela public.servicos_notas ainda possui grants diretos para authenticated (deve ser RPC-first).';
+    end if;
+  end if;
+
+  if to_regprocedure('public.servicos_cobrancas_list(integer)') is not null then
+    if has_table_privilege('authenticated', 'public.servicos_cobrancas', 'select')
+       or has_table_privilege('authenticated', 'public.servicos_cobrancas', 'insert')
+       or has_table_privilege('authenticated', 'public.servicos_cobrancas', 'update')
+       or has_table_privilege('authenticated', 'public.servicos_cobrancas', 'delete')
+    then
+      raise exception 'RG-03: tabela public.servicos_cobrancas ainda possui grants diretos para authenticated (deve ser RPC-first).';
+    end if;
   end if;
 
   -- 5) IND-03: Gerar Execução deve aceitar roteiro tipo_bom='ambos' (evita erro em OP/OB sem roteiro específico)
