@@ -1,24 +1,20 @@
 # Inventário — PostgREST `.from('tabela')`
 
-Gerado em: 2026-01-20 21:35:33
+Gerado em: 2026-01-21 00:52:19
 
 Objetivo: mapear acessos diretos a tabelas via PostgREST (client-side), para migração RPC-first.
 
 ## Resumo
 
-- Arquivos: **13**
-- Referências: **40**
-- Tabelas: **18**
+- Arquivos: **9**
+- Referências: **34**
+- Tabelas: **16**
 
 ## Tabelas
 
 ### `company_logos`
 
 - `src/pages/industria/OperadoresPage.tsx`
-
-### `error_reports`
-
-- `src/services/errorReports.ts`
 
 ### `lgpd_exports`
 
@@ -70,7 +66,6 @@ Objetivo: mapear acessos diretos a tabelas via PostgREST (client-side), para mig
 
 ### `vendas_devolucoes`
 
-- `src/pages/vendas/RelatoriosVendasPage.tsx`
 - `src/services/vendasMvp.ts`
 
 ### `vendas_expedicao_eventos`
@@ -80,10 +75,4 @@ Objetivo: mapear acessos diretos a tabelas via PostgREST (client-side), para mig
 ### `vendas_expedicoes`
 
 - `src/services/vendasMvp.ts`
-
-### `vendas_pedidos`
-
-- `src/pages/vendas/ComissoesPage.tsx`
-- `src/pages/vendas/PdvPage.tsx`
-- `src/pages/vendas/RelatoriosVendasPage.tsx`
 

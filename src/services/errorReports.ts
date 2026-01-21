@@ -1,4 +1,4 @@
-import { supabase } from "@/lib/supabaseClient";
+import { callRpc } from "@/lib/api";
 
 export type ErrorReportStatus = "new" | "triaged" | "in_progress" | "resolved" | "ignored";
 export type ErrorReportSeverity = "error" | "warning";
@@ -21,8 +21,8 @@ export type ErrorReportRow = {
   github_ok: boolean;
   github_issue_url: string | null;
   github_error: string | null;
-  context: any;
-  recent_network_errors: any;
+  context: unknown;
+  recent_network_errors: unknown;
   resolved_at: string | null;
   resolved_by: string | null;
 };
@@ -38,44 +38,19 @@ export type ErrorReportsFilters = {
 };
 
 export async function listErrorReports(filters: ErrorReportsFilters): Promise<ErrorReportRow[]> {
-  const limit = typeof filters.limit === "number" ? filters.limit : 200;
-  let query = (supabase as any)
-    .from("error_reports")
-    .select("*")
-    .order("created_at", { ascending: false })
-    .limit(limit);
-
-  if (filters.statuses?.length) {
-    query = query.in("status", filters.statuses);
-  }
-
-  if (filters.from) query = query.gte("created_at", filters.from);
-  if (filters.to) query = query.lte("created_at", filters.to);
-
-  if (filters.onlyMine && filters.userId) {
-    query = query.eq("created_by", filters.userId);
-  }
-
-  if (filters.q?.trim()) {
-    const q = filters.q.trim().replace(/[%_]/g, "\\$&");
-    query = query.or(
-      `user_message.ilike.%${q}%,user_email.ilike.%${q}%,sentry_event_id.ilike.%${q}%,github_issue_url.ilike.%${q}%`
-    );
-  }
-
-  const { data, error } = await query;
-  if (error) throw error;
-  return (data ?? []) as ErrorReportRow[];
+  return callRpc<ErrorReportRow[]>("ops_error_reports_list", {
+    p_q: filters.q?.trim() ? filters.q.trim() : null,
+    p_statuses: filters.statuses?.length ? filters.statuses : null,
+    p_from: filters.from ?? null,
+    p_to: filters.to ?? null,
+    p_only_mine: !!filters.onlyMine,
+    p_limit: typeof filters.limit === "number" ? filters.limit : 200,
+  });
 }
 
 export async function updateErrorReportStatus(id: string, status: ErrorReportStatus) {
-  const { data, error } = await (supabase as any)
-    .from("error_reports")
-    .update({ status })
-    .eq("id", id)
-    .select("*")
-    .single();
-  if (error) throw error;
-  return data as ErrorReportRow;
+  return callRpc<ErrorReportRow>("ops_error_reports_set_status", {
+    p_id: id,
+    p_status: status,
+  });
 }
-

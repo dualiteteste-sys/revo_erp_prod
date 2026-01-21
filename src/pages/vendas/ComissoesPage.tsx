@@ -1,8 +1,8 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Download, Loader2, Percent, Search } from 'lucide-react';
 import { useToast } from '@/contexts/ToastProvider';
-import { supabase } from '@/lib/supabaseClient';
 import { listVendedores, type Vendedor } from '@/services/vendedores';
+import { listVendasComissoes } from '@/services/vendasReadModels';
 import ResizableSortableTh, { type SortState } from '@/components/ui/table/ResizableSortableTh';
 import TableColGroup from '@/components/ui/table/TableColGroup';
 import { useTableColumnWidths, type TableColumnWidthDef } from '@/components/ui/table/useTableColumnWidths';
@@ -18,8 +18,6 @@ type VendaComissaoRow = {
   data_emissao: string;
   status: string;
 };
-
-const sb = supabase as any;
 
 function formatMoneyBRL(n: number | null | undefined): string {
   return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Number(n ?? 0));
@@ -73,16 +71,7 @@ export default function ComissoesPage() {
   async function load() {
     setLoading(true);
     try {
-      const [{ data, error }, vend] = await Promise.all([
-        sb
-          .from('vendas_pedidos')
-          .select('id,numero,vendedor_id,comissao_percent,total_geral,data_emissao,status')
-          .not('vendedor_id', 'is', null)
-          .order('data_emissao', { ascending: false })
-          .limit(500),
-        listVendedores(undefined, false),
-      ]);
-      if (error) throw error;
+      const [data, vend] = await Promise.all([listVendasComissoes({ limit: 500 }), listVendedores(undefined, false)]);
       setRows((data || []) as any);
       setVendedores(vend);
     } catch (e: any) {

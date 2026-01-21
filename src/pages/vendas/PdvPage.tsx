@@ -19,8 +19,8 @@ import {
   type PdvCaixaRow,
   PdvQueuedError,
 } from '@/services/vendasMvp';
-import { supabase } from '@/lib/supabaseClient';
 import { getVendaDetails, type VendaDetails } from '@/services/vendas';
+import { listPdvPedidos } from '@/services/vendasReadModels';
 import CsvExportDialog from '@/components/ui/CsvExportDialog';
 import { useOnboardingGate } from '@/contexts/OnboardingGateContext';
 import { ActionLockedError, runWithActionLock } from '@/lib/actionLock';
@@ -36,8 +36,6 @@ type PdvRow = {
   updated_at: string;
   pdv_estornado_at?: string | null;
 };
-
-const sb = supabase as any;
 
 function formatMoneyBRL(n: number | null | undefined): string {
   return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Number(n ?? 0));
@@ -141,18 +139,12 @@ export default function PdvPage() {
   async function load() {
     setLoading(true);
     try {
-      const [{ data: contaData }, { data: pdvData, error: pdvError }, caixasData] = await Promise.all([
+      const [{ data: contaData }, pdvData, caixasData] = await Promise.all([
         listContasCorrentes({ page: 1, pageSize: 50, searchTerm: '', ativo: true }),
-        sb
-          .from('vendas_pedidos')
-          .select('id,numero,status,total_geral,data_emissao,updated_at,pdv_estornado_at')
-          .eq('canal', 'pdv')
-          .order('updated_at', { ascending: false })
-          .limit(200),
+        listPdvPedidos({ limit: 200 }),
         listPdvCaixas().catch(() => [] as PdvCaixaRow[]),
       ]);
 
-      if (pdvError) throw pdvError;
       setContas(contaData);
       setCaixas(caixasData || []);
       if (typeof window !== 'undefined') {
