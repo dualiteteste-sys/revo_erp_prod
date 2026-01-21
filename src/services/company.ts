@@ -31,7 +31,9 @@ export async function updateCompany(updateData: EmpresaUpdate): Promise<Empresa>
             msg.includes('duplicate key') ||
             details.includes('duplicate key') ||
             msg.includes('empresas_cnpj_key') ||
-            details.includes('empresas_cnpj_key')
+            details.includes('empresas_cnpj_key') ||
+            msg.toLowerCase().includes('cnpj já cadastrado') ||
+            details.toLowerCase().includes('cnpj já cadastrado')
         ) {
             throw new Error('Empresa já foi cadastrada em nosso sistema.');
         }
