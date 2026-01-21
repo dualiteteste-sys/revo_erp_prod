@@ -297,13 +297,8 @@ test('Serviços > Contratos: gerar agenda de faturamento (MVP2) sem erros', asyn
     });
   });
 
-  // Billing rule (sempre retorna uma regra para evitar comportamento de maybeSingle com 0 rows).
-  await page.route('**/rest/v1/servicos_contratos_billing_rules*', async (route) => {
-    const req = route.request();
-    if (req.method() === 'OPTIONS') {
-      await route.fulfill({ status: 204, body: '' });
-      return;
-    }
+  // Billing rule (RPC-first).
+  await page.route('**/rest/v1/rpc/servicos_contratos_billing_rule_get', async (route) => {
     await route.fulfill({
       json: {
         id: 'rule-1',
@@ -322,11 +317,7 @@ test('Serviços > Contratos: gerar agenda de faturamento (MVP2) sem erros', asyn
   });
 
   let scheduleGenerated = false;
-  await page.route('**/rest/v1/servicos_contratos_billing_schedule*', async (route) => {
-    if (route.request().method() === 'OPTIONS') {
-      await route.fulfill({ status: 204, body: '' });
-      return;
-    }
+  await page.route('**/rest/v1/rpc/servicos_contratos_billing_schedule_list', async (route) => {
     if (!scheduleGenerated) {
       await route.fulfill({ json: [] });
       return;

@@ -1,6 +1,4 @@
-import { supabase } from '@/lib/supabaseClient';
-
-const sb = supabase as any;
+import { callRpc } from '@/lib/api';
 
 export type ServicosContratoItem = {
   id: string;
@@ -18,24 +16,15 @@ export type ServicosContratoItem = {
 };
 
 export async function listItensByContratoId(contratoId: string): Promise<ServicosContratoItem[]> {
-  const { data, error } = await sb
-    .from('servicos_contratos_itens')
-    .select('*')
-    .eq('contrato_id', contratoId)
-    .order('pos', { ascending: true })
-    .order('created_at', { ascending: true });
-  if (error) throw error;
-  return (data ?? []) as any;
+  const rows = await callRpc<any>('servicos_contratos_itens_list', { p_contrato_id: contratoId });
+  return (rows ?? []) as any;
 }
 
 export async function upsertContratoItem(payload: Partial<ServicosContratoItem> & { contrato_id: string; titulo: string }): Promise<ServicosContratoItem> {
-  const { data, error } = await sb.from('servicos_contratos_itens').upsert(payload as any).select().single();
-  if (error) throw error;
-  return data as any;
+  const row = await callRpc<any>('servicos_contratos_itens_upsert', { p_payload: payload as any });
+  return row as any;
 }
 
 export async function deleteContratoItem(id: string): Promise<void> {
-  const { error } = await sb.from('servicos_contratos_itens').delete().eq('id', id);
-  if (error) throw error;
+  await callRpc<any>('servicos_contratos_itens_delete', { p_id: id });
 }
-

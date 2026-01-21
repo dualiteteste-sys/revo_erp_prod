@@ -1,46 +1,23 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-type FromResult = { data: any; error: any };
+const callRpcMock = vi.fn();
 
-function createQueryBuilder(result: Promise<FromResult> | FromResult) {
-  const resolved = Promise.resolve(result as any);
-
-  const builder: any = {
-    select: vi.fn(() => builder),
-    eq: vi.fn(() => builder),
-    order: vi.fn(() => builder),
-    limit: vi.fn(() => builder),
-    maybeSingle: vi.fn(async () => resolved),
-    upsert: vi.fn(() => builder),
-    single: vi.fn(async () => resolved),
-  };
-
-  return builder;
-}
-
-const fromMock = vi.fn();
-const rpcMock = vi.fn();
-
-vi.mock('@/lib/supabaseClient', () => ({
-  supabase: {
-    from: (...args: any[]) => fromMock(...args),
-    rpc: (...args: any[]) => rpcMock(...args),
-  },
+vi.mock('@/lib/api', () => ({
+  callRpc: (...args: any[]) => callRpcMock(...args),
 }));
 
 describe('servicosContratosBilling service', () => {
   beforeEach(() => {
-    fromMock.mockReset();
-    rpcMock.mockReset();
+    callRpcMock.mockReset();
   });
 
   it('generateSchedule chama RPC com params corretos', async () => {
-    rpcMock.mockResolvedValueOnce({ data: { inserted: 7 }, error: null });
+    callRpcMock.mockResolvedValueOnce({ inserted: 7 });
     const { generateSchedule } = await import('./servicosContratosBilling');
 
     const res = await generateSchedule({ contratoId: 'ctr-1' });
 
-    expect(rpcMock).toHaveBeenCalledWith('servicos_contratos_billing_generate_schedule', {
+    expect(callRpcMock).toHaveBeenCalledWith('servicos_contratos_billing_generate_schedule', {
       p_contrato_id: 'ctr-1',
       p_months_ahead: 12,
     });
@@ -48,12 +25,12 @@ describe('servicosContratosBilling service', () => {
   });
 
   it('generateReceivables chama RPC com params corretos', async () => {
-    rpcMock.mockResolvedValueOnce({ data: { created: 3, months_ahead: 12 }, error: null });
+    callRpcMock.mockResolvedValueOnce({ created: 3, months_ahead: 12 });
     const { generateReceivables } = await import('./servicosContratosBilling');
 
     const res = await generateReceivables({ contratoId: 'ctr-1', until: '2026-01-10' });
 
-    expect(rpcMock).toHaveBeenCalledWith(
+    expect(callRpcMock).toHaveBeenCalledWith(
       'servicos_contratos_billing_generate_receivables',
       expect.objectContaining({
         p_contrato_id: 'ctr-1',
@@ -64,16 +41,17 @@ describe('servicosContratosBilling service', () => {
   });
 
   it('getBillingRuleByContratoId retorna null quando data é null', async () => {
-    fromMock.mockReturnValueOnce(createQueryBuilder({ data: null, error: null }));
+    callRpcMock.mockResolvedValueOnce(null);
     const { getBillingRuleByContratoId } = await import('./servicosContratosBilling');
 
     const res = await getBillingRuleByContratoId('ctr-1');
 
+    expect(callRpcMock).toHaveBeenCalledWith('servicos_contratos_billing_rule_get', { p_contrato_id: 'ctr-1' });
     expect(res).toBeNull();
   });
 
-  it('upsertBillingRule usa onConflict empresa_id,contrato_id', async () => {
-    fromMock.mockReturnValueOnce(createQueryBuilder({ data: { id: 'rule-1' }, error: null }));
+  it('upsertBillingRule chama RPC com payload correto', async () => {
+    callRpcMock.mockResolvedValueOnce({ id: 'rule-1' });
     const { upsertBillingRule } = await import('./servicosContratosBilling');
 
     const payload = {
@@ -88,22 +66,27 @@ describe('servicosContratosBilling service', () => {
 
     const res = await upsertBillingRule(payload);
 
-    expect(fromMock).toHaveBeenCalledWith('servicos_contratos_billing_rules');
-    const qb = fromMock.mock.results[0]!.value;
-    expect(qb.upsert).toHaveBeenCalledWith(payload, { onConflict: 'empresa_id,contrato_id' });
+    expect(callRpcMock).toHaveBeenCalledWith('servicos_contratos_billing_rule_upsert', { p_payload: payload });
     expect(res).toEqual({ id: 'rule-1' });
   });
 
+  it('listScheduleByContratoId chama RPC com params corretos', async () => {
+    callRpcMock.mockResolvedValueOnce([{ id: 'sch-1' }, { id: 'sch-2' }]);
+    const { listScheduleByContratoId } = await import('./servicosContratosBilling');
+
+    const res = await listScheduleByContratoId('ctr-1', 10);
+
+    expect(callRpcMock).toHaveBeenCalledWith('servicos_contratos_billing_schedule_list', { p_contrato_id: 'ctr-1', p_limit: 10 });
+    expect(res).toEqual([{ id: 'sch-1' }, { id: 'sch-2' }]);
+  });
+
   it('cancelFutureBilling chama RPC com params corretos', async () => {
-    rpcMock.mockResolvedValueOnce({
-      data: { schedule_cancelled: 10, receivables_cancelled: 2, cobrancas_cancelled: 2 },
-      error: null,
-    });
+    callRpcMock.mockResolvedValueOnce({ schedule_cancelled: 10, receivables_cancelled: 2, cobrancas_cancelled: 2 });
     const { cancelFutureBilling } = await import('./servicosContratosBilling');
 
     const res = await cancelFutureBilling({ contratoId: 'ctr-1', cancelReceivables: true, reason: 'Contrato cancelado' });
 
-    expect(rpcMock).toHaveBeenCalledWith('servicos_contratos_billing_cancel_future', {
+    expect(callRpcMock).toHaveBeenCalledWith('servicos_contratos_billing_cancel_future', {
       p_contrato_id: 'ctr-1',
       p_cancel_receivables: true,
       p_reason: 'Contrato cancelado',
@@ -112,12 +95,12 @@ describe('servicosContratosBilling service', () => {
   });
 
   it('addAvulso chama RPC com params corretos', async () => {
-    rpcMock.mockResolvedValueOnce({ data: { id: 'sch-1', kind: 'avulso' }, error: null });
+    callRpcMock.mockResolvedValueOnce({ id: 'sch-1', kind: 'avulso' });
     const { addAvulso } = await import('./servicosContratosBilling');
 
     const res = await addAvulso({ contratoId: 'ctr-1', dataVencimento: '2026-02-10', valor: 99.9, descricao: 'Setup' });
 
-    expect(rpcMock).toHaveBeenCalledWith('servicos_contratos_billing_add_avulso', {
+    expect(callRpcMock).toHaveBeenCalledWith('servicos_contratos_billing_add_avulso', {
       p_contrato_id: 'ctr-1',
       p_data_vencimento: '2026-02-10',
       p_valor: 99.9,
@@ -127,12 +110,12 @@ describe('servicosContratosBilling service', () => {
   });
 
   it('recalcMensalFuture chama RPC com params corretos', async () => {
-    rpcMock.mockResolvedValueOnce({ data: { ok: true, updated: 5 }, error: null });
+    callRpcMock.mockResolvedValueOnce({ ok: true, updated: 5 });
     const { recalcMensalFuture } = await import('./servicosContratosBilling');
 
     const res = await recalcMensalFuture({ contratoId: 'ctr-1', from: '2026-01-01' });
 
-    expect(rpcMock).toHaveBeenCalledWith('servicos_contratos_billing_recalc_mensal_future', {
+    expect(callRpcMock).toHaveBeenCalledWith('servicos_contratos_billing_recalc_mensal_future', {
       p_contrato_id: 'ctr-1',
       p_from: '2026-01-01',
     });
