@@ -15,22 +15,6 @@
     {
       "file": "src/pages/settings/general/PrivacyLgpdPage.tsx",
       "reason": "Acesso ao Supabase Storage (LGPD exports)."
-    },
-    {
-      "file": "src/services/servicosContratosBilling.ts",
-      "reason": "Legacy: acesso direto a tabela (pendente migrar para RPC-first)."
-    },
-    {
-      "file": "src/services/servicosContratosItens.ts",
-      "reason": "Legacy: acesso direto a tabela (pendente migrar para RPC-first)."
-    },
-    {
-      "file": "src/services/servicosContratosTemplatesAdmin.ts",
-      "reason": "Legacy: acesso direto a tabela (pendente migrar para RPC-first)."
-    },
-    {
-      "file": "src/services/vendasMvp.ts",
-      "reason": "Legacy: acesso direto a tabela (pendente migrar para RPC-first)."
     }
   ]
 }
