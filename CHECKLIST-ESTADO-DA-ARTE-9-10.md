@@ -77,7 +77,7 @@ Definições:
 
 ### 1.2 Acesso a dados: RPC-first para áreas sensíveis
 - [x] Definir regra: “acesso direto a tabela” permitido **somente** quando RLS for simples e auditado (`docs/supabase-from-policy.md` + gate `scripts/check_supabase_from_allowlist.mjs`).
-- [ ] Migrar acesso direto do client para RPC em domínios críticos (billing, financeiro, indústria, LGPD).
+- [x] Migrar acesso direto do client para RPC em domínios críticos (billing, financeiro, indústria, LGPD) — inventários sem ocorrências (`INVENTARIO-SUPABASE-FROM.md` / `INVENTARIO-POSTGREST-FROM.md`).
 - [x] Inventário `supabase.from()` atualizado (regex cobre quebras de linha) e exportado em `INVENTARIO-SUPABASE-FROM.md`.
 - [x] Gate `supabase.from()` (client-side) ativo com allowlist vazio (`scripts/check_supabase_from_allowlist.mjs` OK; `INVENTARIO-SUPABASE-FROM.md` sem ocorrências).
 - [x] RPC-first (Inventário `supabase.from()`): remover ocorrências em `src/**` (migration `20270120123000_sec_rpc_first_inventory_supabase_from.sql`).
@@ -141,7 +141,7 @@ Definições:
 - [ ] “Console limpo”: falhas esperadas nunca viram stacktrace vermelho.
 
 **Aceite P2**
-- [ ] E2E de regressão para flows críticos (compra/recebimento/xml/PDV/pedido/financeiro/indústria).
+- [x] E2E de regressão para flows críticos (compra/recebimento/xml/PDV/pedido/financeiro/indústria) via `yarn test:e2e:gate:all` (suites definidas em `docs/e2e-release-gates.md`).
 - [ ] Zero duplicidade causada por double-submit.
 
 ---
