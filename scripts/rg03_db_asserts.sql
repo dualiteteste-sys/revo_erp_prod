@@ -321,12 +321,12 @@ begin
   END IF;
 
   -- 9) SEC-02: RPCs SECURITY DEFINER usadas pelo app devem exigir permissão (anti-burla via console)
-  IF EXISTS (
-    SELECT 1
-    FROM pg_proc p
-    JOIN pg_namespace n ON n.oid = p.pronamespace
-    WHERE n.nspname = 'public'
-      AND p.prosecdef IS TRUE
+	  IF EXISTS (
+	    SELECT 1
+	    FROM pg_proc p
+	    JOIN pg_namespace n ON n.oid = p.pronamespace
+	    WHERE n.nspname = 'public'
+	      AND p.prosecdef IS TRUE
       AND p.proname = ANY(ARRAY[
         'create_recebimento_from_xml',
         'compras_manage_item',
@@ -423,13 +423,30 @@ begin
         'vendas_manage_item'
       ])
       AND pg_get_functiondef(p.oid) NOT ILIKE '%require_permission_for_current_user%'
-  ) THEN
-    RAISE EXCEPTION 'SEC-02/RG-03: existem RPCs SECURITY DEFINER usadas pelo app sem guard de permissão.';
-  END IF;
+	  ) THEN
+	    RAISE EXCEPTION 'SEC-02/RG-03: existem RPCs SECURITY DEFINER usadas pelo app sem guard de permissão.';
+	  END IF;
 
-  -- 9.2) SVC-CT-02: gerar títulos de contrato exige colunas de origem em servicos_cobrancas
-  IF to_regprocedure('public.servicos_contratos_billing_generate_receivables(uuid, date, integer)') IS NOT NULL THEN
-    IF NOT EXISTS (
+	  -- 9.1) SEC-02b: Todas as funções SECURITY DEFINER em `public` devem ter search_path fixo (pg_catalog, public)
+	  IF EXISTS (
+	    SELECT 1
+	    FROM pg_proc p
+	    JOIN pg_namespace n ON n.oid = p.pronamespace
+	    WHERE n.nspname = 'public'
+	      AND p.prosecdef IS TRUE
+	      AND NOT EXISTS (
+	        SELECT 1
+	        FROM unnest(coalesce(p.proconfig, array[]::text[])) cfg
+	        WHERE cfg LIKE 'search_path=%'
+	          AND cfg LIKE '%pg_catalog%'
+	      )
+	  ) THEN
+	    RAISE EXCEPTION 'SEC-02b/RG-03: existem funções SECURITY DEFINER em public sem search_path fixo (pg_catalog, public).';
+	  END IF;
+
+	  -- 9.2) SVC-CT-02: gerar títulos de contrato exige colunas de origem em servicos_cobrancas
+	  IF to_regprocedure('public.servicos_contratos_billing_generate_receivables(uuid, date, integer)') IS NOT NULL THEN
+	    IF NOT EXISTS (
       SELECT 1
       FROM information_schema.columns
       WHERE table_schema='public'
