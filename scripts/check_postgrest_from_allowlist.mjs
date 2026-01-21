@@ -39,7 +39,11 @@ function isStorageFrom(src, matchIndex) {
   // Olha um pouco para trás para detectar `storage.from(...)`.
   const start = Math.max(0, matchIndex - 80);
   const prefix = src.slice(start, matchIndex);
-  return /\bstorage\s*\.\s*$/.test(prefix) || /\bstorage\s*\.\s*from\s*\($/m.test(prefix);
+  // Casos:
+  // - `supabase.storage.from(...)` (o match aponta para `.from`)
+  // - `storage.from(...)`
+  // - Quebras de linha entre `storage` e `.from`
+  return /\bstorage\s*(?:\.\s*)?$/.test(prefix) || /\bstorage\s*\.\s*from\s*\($/m.test(prefix);
 }
 
 const offenders = [];
@@ -66,4 +70,3 @@ if (offenders.length) {
 }
 
 console.log("OK: no disallowed PostgREST `.from()` found.");
-
