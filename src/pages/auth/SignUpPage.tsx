@@ -40,7 +40,7 @@ const SignUpPage: React.FC = () => {
     try {
       // We can pass metadata like name directly if the auth function supports it,
       // otherwise it's handled post-signup via triggers or profile updates.
-      const res = await signUpWithEmail(email, password, companyName);
+      const res = await signUpWithEmail(email, password, companyName, { plan, cycle });
       const identitiesLen = res?.user?.identities?.length ?? null;
 
       // Supabase pode retornar "sucesso" com identities vazias quando o e-mail já existe

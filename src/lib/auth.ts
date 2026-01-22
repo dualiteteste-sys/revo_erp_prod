@@ -8,22 +8,38 @@ function authSiteUrl(): string {
   return envSite || origin;
 }
 
-function emailConfirmRedirect(): string {
-  return `${authSiteUrl()}/auth/confirmed`;
+function emailConfirmRedirect(opts?: { plan?: string | null; cycle?: string | null }): string {
+  const url = new URL(`${authSiteUrl()}/auth/confirmed`);
+  try {
+    const fromArgsPlan = (opts?.plan ?? '').trim();
+    const fromArgsCycle = (opts?.cycle ?? '').trim();
+    const pendingPlan = fromArgsPlan || (localStorage.getItem('pending_plan_slug') ?? '').trim();
+    const pendingCycle = fromArgsCycle || (localStorage.getItem('pending_plan_cycle') ?? '').trim();
+    if (pendingPlan) url.searchParams.set('plan', pendingPlan);
+    if (pendingCycle) url.searchParams.set('cycle', pendingCycle);
+  } catch {
+    // ignore
+  }
+  return url.toString();
 }
 
 /**
  * Faz signup por e-mail/senha.
  * O e-mail de confirmação será enviado para a URL de produção.
  */
-export async function signUpWithEmail(email: string, password: string, companyName?: string) {
+export async function signUpWithEmail(
+  email: string,
+  password: string,
+  companyName?: string,
+  opts?: { plan?: string | null; cycle?: string | null },
+) {
   logger.info("[AUTH] signUpWithEmail", { email });
   const company = (companyName ?? "").trim();
   const { data, error } = await supabase.auth.signUp({
     email,
     password,
     options: {
-      emailRedirectTo: emailConfirmRedirect(),
+      emailRedirectTo: emailConfirmRedirect(opts),
       data: company ? { company_name: company } : undefined,
     },
   });

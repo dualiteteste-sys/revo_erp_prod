@@ -6,23 +6,38 @@ import { supabase } from '@/lib/supabaseClient';
 
 type Status = 'authenticating' | 'bootstrapping' | 'success' | 'error';
 
+function normalizePlanSlug(raw: string | null): string | null {
+  const v = String(raw ?? '').trim().toLowerCase();
+  if (!v) return null;
+  const allowed = ['essencial', 'pro', 'max', 'industria', 'scale'];
+  return allowed.includes(v) ? v : null;
+}
+
+function normalizeCycle(raw: string | null): string | null {
+  const v = String(raw ?? '').trim().toLowerCase();
+  if (!v) return null;
+  return v === 'monthly' || v === 'yearly' ? v : null;
+}
+
 export default function AuthConfirmed() {
   const navigate = useNavigate();
   const [status, setStatus] = useState<Status>('authenticating');
   const [message, setMessage] = useState('Confirmando autenticação...');
   const [errorDetail, setErrorDetail] = useState<string | null>(null);
 
-  const { code, token_hash, type, hashTokens } = useMemo(() => {
+  const { code, token_hash, type, hashTokens, planIntent } = useMemo(() => {
     const url = new URL(window.location.href);
     const qs = url.searchParams;
     const code = qs.get('code') ?? '';
     const token_hash = qs.get('token_hash') ?? '';
     const type = (qs.get('type') ?? '').toLowerCase();
+    const plan = normalizePlanSlug(qs.get('plan'));
+    const cycle = normalizeCycle(qs.get('cycle'));
     const h = url.hash?.startsWith('#') ? url.hash.slice(1) : url.hash;
     const sp = new URLSearchParams(h);
     const access_token = sp.get('access_token') ?? undefined;
     const refresh_token = sp.get('refresh_token') ?? undefined;
-    return { code, token_hash, type, hashTokens: { access_token, refresh_token } };
+    return { code, token_hash, type, planIntent: { plan, cycle }, hashTokens: { access_token, refresh_token } };
   }, []);
 
   useEffect(() => {
@@ -55,12 +70,46 @@ export default function AuthConfirmed() {
           throw new Error('Falha na autenticação. Faça login novamente.');
         }
 
+        // 1.1) Se o usuário escolheu um plano antes do signup (landing),
+        // persistir o intent no localStorage para manter o fluxo "à prova de cross-device".
+        // Isso permite abrir automaticamente o modal de checkout (PlanIntentCheckoutModal)
+        // mesmo quando o link de confirmação é aberto em outro computador.
+        try {
+          if (planIntent.plan) localStorage.setItem('pending_plan_slug', planIntent.plan);
+          if (planIntent.cycle) localStorage.setItem('pending_plan_cycle', planIntent.cycle);
+        } catch {
+          // ignore
+        }
+
+        // Preferir nome da empresa vindo do signup (metadata). Fallback: localStorage.
+        let empresaNome: string | null = null;
+        try {
+          const { data } = await supabase.auth.getUser();
+          const meta: any = (data?.user as any)?.user_metadata ?? {};
+          if (typeof meta.company_name === 'string' && meta.company_name.trim()) {
+            empresaNome = meta.company_name.trim();
+          }
+        } catch {
+          // ignore
+        }
+        if (!empresaNome) {
+          try {
+            const ls = localStorage.getItem('pending_company_name');
+            if (ls && ls.trim()) empresaNome = ls.trim();
+          } catch {
+            // ignore
+          }
+        }
+
         // 2) Bootstrap da empresa (idempotente)
         let ok = false;
         let lastErr: any = null;
         for (let attempt = 0; attempt < 3; attempt++) {
           try {
-            await bootstrapEmpresaParaUsuarioAtual();
+            await bootstrapEmpresaParaUsuarioAtual({
+              razao_social: empresaNome,
+              fantasia: empresaNome,
+            });
             ok = true;
             break;
           } catch (e: any) {
@@ -92,7 +141,7 @@ export default function AuthConfirmed() {
 
     if (status === 'authenticating') bootstrap();
 
-  }, [navigate, status, code, token_hash, type, hashTokens.access_token, hashTokens.refresh_token]);
+  }, [navigate, status, code, token_hash, type, hashTokens.access_token, hashTokens.refresh_token, planIntent.plan, planIntent.cycle]);
 
   const renderStatus = () => {
     switch (status) {
