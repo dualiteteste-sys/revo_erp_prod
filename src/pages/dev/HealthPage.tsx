@@ -50,6 +50,7 @@ function formatDateTimeBR(value?: string | null) {
 
 export default function HealthPage() {
   const { addToast } = useToast();
+  const isDev = import.meta.env.DEV;
   const permManage = useHasPermission('ops', 'manage');
   const permEcommerceView = useHasPermission('ecommerce', 'view');
 
