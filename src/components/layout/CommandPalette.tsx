@@ -100,13 +100,16 @@ export default function CommandPalette() {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
   const [recents, setRecents] = useState<RecentEntry[]>(() => readRecents());
-  const { industria_enabled, servicos_enabled, loading, error: featuresError } = useEmpresaFeatures();
+  const { industria_enabled, servicos_enabled, loading } = useEmpresaFeatures();
   const inputRef = useRef<HTMLInputElement | null>(null);
 
   const filteredMenu = useMemo(() => {
-    if (loading || featuresError) return menuConfig;
-    return filterMenuByFeatures(menuConfig, { industria_enabled, servicos_enabled });
-  }, [industria_enabled, servicos_enabled, loading, featuresError]);
+    // Estado da arte: não exibir módulos condicionais enquanto as features não carregaram.
+    return filterMenuByFeatures(menuConfig, {
+      industria_enabled: loading ? false : industria_enabled,
+      servicos_enabled: loading ? false : servicos_enabled,
+    });
+  }, [industria_enabled, servicos_enabled, loading]);
 
   const allItems = useMemo(
     () => [...getActionItems({ industriaEnabled: industria_enabled }), ...flattenMenu(filteredMenu)],

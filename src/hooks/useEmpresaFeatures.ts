@@ -93,11 +93,9 @@ export function useEmpresaFeatures(): EmpresaFeatures {
       });
       setFeatures((prev) => ({
         ...prev,
-        // Fallback seguro:
-        // - UI não fica "travada" por erro/transiente de permissão.
-        // - O enforcement real deve acontecer no DB via RPCs/Policies.
-        servicos_enabled: true,
-        industria_enabled: true,
+        // Fallback seguro (fail-closed no menu/rotas):
+        // - Mantém o último estado conhecido (se houver) em vez de "liberar tudo".
+        // - Evita expor módulos fora do plano quando há falha transiente/instabilidade.
         isFallback: true,
         error,
       }));

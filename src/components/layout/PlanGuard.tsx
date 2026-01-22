@@ -51,12 +51,6 @@ export default function PlanGuard({ feature, children }: PlanGuardProps) {
                   <span className="font-semibold">{featureLabel[feature]}</span> está habilitado para esta empresa.
                   Isso pode acontecer por instabilidade ou permissões no banco.
                 </p>
-                {isFallback ? (
-                  <p className="text-sm text-slate-600">
-                    Para não travar sua operação, o sistema entrou em <span className="font-semibold">modo fallback</span> e liberou a navegação.
-                    Se alguma ação estiver fora do plano, o banco vai bloquear com uma mensagem clara.
-                  </p>
-                ) : null}
               </div>
               <div className="flex flex-wrap gap-2">
                 <Button type="button" onClick={() => void refetch()}>
@@ -66,7 +60,6 @@ export default function PlanGuard({ feature, children }: PlanGuardProps) {
             </div>
           </div>
         </GlassCard>
-        {isFallback ? <>{children}</> : null}
       </div>
     );
   }

@@ -37,12 +37,15 @@ const Sidebar: React.FC<SidebarProps> = ({
   const [isHoveringSubmenu, setIsHoveringSubmenu] = useState(false);
   const timerRef = useRef<number | null>(null);
   const { signOut } = useAuth();
-  const { industria_enabled, servicos_enabled, loading: loadingFeatures, error: featuresError } = useEmpresaFeatures();
+  const { industria_enabled, servicos_enabled, loading: loadingFeatures } = useEmpresaFeatures();
 
   const visibleMenu = useMemo(() => {
-    if (loadingFeatures || featuresError) return menuConfig;
-    return filterMenuByFeatures(menuConfig, { industria_enabled, servicos_enabled });
-  }, [industria_enabled, servicos_enabled, loadingFeatures, featuresError]);
+    // Estado da arte: não exibir módulos condicionais enquanto as features não carregaram.
+    return filterMenuByFeatures(menuConfig, {
+      industria_enabled: loadingFeatures ? false : industria_enabled,
+      servicos_enabled: loadingFeatures ? false : servicos_enabled,
+    });
+  }, [industria_enabled, servicos_enabled, loadingFeatures]);
 
   const findParentGroup = (href: string) => {
     const parent = visibleMenu.find(group => group.children?.some(child => child.href === href));
