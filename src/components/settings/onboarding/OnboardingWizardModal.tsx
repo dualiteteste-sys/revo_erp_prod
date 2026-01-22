@@ -65,15 +65,21 @@ export default function OnboardingWizardModal({ isOpen, onClose, mode = 'manual'
   const updateState = useCallback(
     async (patch: Partial<EmpresaOnboardingRow>) => {
       if (!empresaId) return;
-      await onboardingWizardStateUpsert({
-        wizard_dismissed_at:
-          typeof patch.wizard_dismissed_at === "string" || patch.wizard_dismissed_at === null
-            ? (patch.wizard_dismissed_at as any)
-            : undefined,
-        last_step_key: typeof patch.last_step_key === "string" || patch.last_step_key === null ? (patch.last_step_key as any) : undefined,
-      });
+      try {
+        await onboardingWizardStateUpsert({
+          wizard_dismissed_at:
+            typeof patch.wizard_dismissed_at === "string" || patch.wizard_dismissed_at === null
+              ? (patch.wizard_dismissed_at as any)
+              : undefined,
+          last_step_key:
+            typeof patch.last_step_key === "string" || patch.last_step_key === null ? (patch.last_step_key as any) : undefined,
+        });
+      } catch (e: any) {
+        // Best-effort: progresso do assistente não pode quebrar o fluxo principal do usuário.
+        addToast(e?.message || "Não foi possível salvar o progresso do assistente.", "warning");
+      }
     },
-    [empresaId]
+    [addToast, empresaId]
   );
 
   const refresh = useCallback(async (): Promise<OnboardingCheck[]> => {
@@ -140,26 +146,34 @@ export default function OnboardingWizardModal({ isOpen, onClose, mode = 'manual'
   }, [checks, currentKey]);
 
   const handleSelect = async (step: OnboardingCheck) => {
-    setCurrentKey(step.key);
-    await updateState({ last_step_key: step.key, wizard_dismissed_at: null });
+    try {
+      setCurrentKey(step.key);
+      await updateState({ last_step_key: step.key, wizard_dismissed_at: null });
+    } catch {
+      // updateState já trata best-effort
+    }
   };
 
   const handleGoToStep = async () => {
-    if (!current) return;
-    if (!empresaId) {
-      addToast('Selecione uma empresa ativa para configurar este item.', 'warning');
-      return;
-    }
-    await updateState({ last_step_key: current.key, wizard_dismissed_at: null });
+    try {
+      if (!current) return;
+      if (!empresaId) {
+        addToast("Selecione uma empresa ativa para configurar este item.", "warning");
+        return;
+      }
+      await updateState({ last_step_key: current.key, wizard_dismissed_at: null });
 
-    // Gate suave “in-place”: todas as etapas abrem em modal por cima do assistente.
-    // Se a etapa não tiver UI embutida, mantemos como fallback navegar (mas hoje todas estão embutidas).
-    if (isEmbeddedOnboardingStep(current.key)) {
-      setCurrentKey(current.key);
-      setActiveStepModalKey(current.key);
-      return;
+      // Gate suave “in-place”: todas as etapas abrem em modal por cima do assistente.
+      // Se a etapa não tiver UI embutida, mantemos como fallback navegar.
+      if (isEmbeddedOnboardingStep(current.key)) {
+        setCurrentKey(current.key);
+        setActiveStepModalKey(current.key);
+        return;
+      }
+      navigate(current.actionHref);
+    } catch (e: any) {
+      addToast(e?.message || "Não foi possível abrir a configuração.", "error");
     }
-    navigate(current.actionHref);
   };
 
   const handleSkip = async () => {
