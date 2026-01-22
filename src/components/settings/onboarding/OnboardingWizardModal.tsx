@@ -38,6 +38,19 @@ export default function OnboardingWizardModal({ isOpen, onClose, mode = 'manual'
   const [currentKey, setCurrentKey] = useState<string | null>(null);
   const [activeStepModalKey, setActiveStepModalKey] = useState<string | null>(null);
 
+  const ensureEmpresaAtivaNoBanco = useCallback(async () => {
+    if (!empresaId) return false;
+    try {
+      // Estado da arte: garantir que o backend tenha empresa ativa antes de chamar RPCs baseadas em current_empresa_id().
+      const { error } = await (supabase as any).rpc('set_active_empresa_for_current_user', { p_empresa_id: empresaId });
+      if (error) throw error;
+      return true;
+    } catch {
+      // best-effort: algumas telas podem funcionar mesmo assim (fallbacks); mas evita "Sem itens" no onboarding.
+      return false;
+    }
+  }, [empresaId, supabase]);
+
   const ensureOnboardingRow = useCallback(async () => {
     if (!empresaId) return;
     await onboardingWizardStateGet();
@@ -64,9 +77,13 @@ export default function OnboardingWizardModal({ isOpen, onClose, mode = 'manual'
   );
 
   const refresh = useCallback(async (): Promise<OnboardingCheck[]> => {
-    if (!empresaId) return;
+    if (!empresaId) {
+      setChecks([]);
+      return [];
+    }
     setLoading(true);
     try {
+      await ensureEmpresaAtivaNoBanco();
       const res = await fetchOnboardingChecks(supabase, empresaId);
       setChecks(res.checks);
       return res.checks;
@@ -76,7 +93,7 @@ export default function OnboardingWizardModal({ isOpen, onClose, mode = 'manual'
     } finally {
       setLoading(false);
     }
-  }, [addToast, empresaId, supabase]);
+  }, [addToast, empresaId, ensureEmpresaAtivaNoBanco, supabase]);
 
   const afterStepDone = useCallback(async () => {
     const updated = await refresh();
@@ -89,9 +106,11 @@ export default function OnboardingWizardModal({ isOpen, onClose, mode = 'manual'
 
   useEffect(() => {
     if (!isOpen) return;
-    if (!empresaId) return;
     void (async () => {
       try {
+        // Abertura do modal deve ser determinística: garante empresa ativa no backend antes de buscar checks/state.
+        await ensureEmpresaAtivaNoBanco();
+        if (!empresaId) return;
         await ensureOnboardingRow();
         const state = await loadState();
         await refresh();
@@ -105,7 +124,7 @@ export default function OnboardingWizardModal({ isOpen, onClose, mode = 'manual'
         // ignore
       }
     })();
-  }, [empresaId, ensureOnboardingRow, forceStepKey, isOpen, loadState, refresh, updateState]);
+  }, [empresaId, ensureEmpresaAtivaNoBanco, ensureOnboardingRow, forceStepKey, isOpen, loadState, refresh, updateState]);
 
   const progress = useMemo(() => {
     if (checks.length === 0) return { ok: 0, total: 0 };
@@ -127,11 +146,16 @@ export default function OnboardingWizardModal({ isOpen, onClose, mode = 'manual'
 
   const handleGoToStep = async () => {
     if (!current) return;
+    if (!empresaId) {
+      addToast('Selecione uma empresa ativa para configurar este item.', 'warning');
+      return;
+    }
     await updateState({ last_step_key: current.key, wizard_dismissed_at: null });
 
     // Gate suave “in-place”: todas as etapas abrem em modal por cima do assistente.
     // Se a etapa não tiver UI embutida, mantemos como fallback navegar (mas hoje todas estão embutidas).
     if (isEmbeddedOnboardingStep(current.key)) {
+      setCurrentKey(current.key);
       setActiveStepModalKey(current.key);
       return;
     }
@@ -181,7 +205,13 @@ export default function OnboardingWizardModal({ isOpen, onClose, mode = 'manual'
         <div className="mt-5 grid grid-cols-1 md:grid-cols-3 gap-4">
           <div className="md:col-span-1 rounded-xl border border-gray-200 bg-white p-2">
             {checks.length === 0 ? (
-              <div className="p-4 text-sm text-gray-600">{loading ? 'Carregando…' : 'Sem itens (sem empresa ativa).'}</div>
+              <div className="p-4 text-sm text-gray-600">
+                {loading
+                  ? 'Carregando…'
+                  : !empresaId
+                    ? 'Sem itens (sem empresa ativa).'
+                    : 'Nenhuma pendência encontrada. Clique em “Verificar novamente” se acabou de concluir uma etapa.'}
+              </div>
             ) : (
               <div className="space-y-1">
                 {checks.map((step) => {
@@ -213,7 +243,9 @@ export default function OnboardingWizardModal({ isOpen, onClose, mode = 'manual'
 
           <div className="md:col-span-2 rounded-xl border border-gray-200 bg-white p-5">
             {!current ? (
-              <div className="text-sm text-gray-600">{loading ? 'Carregando…' : 'Selecione um item à esquerda.'}</div>
+              <div className="text-sm text-gray-600">
+                {loading ? 'Carregando…' : !empresaId ? 'Sem empresa ativa.' : 'Selecione um item à esquerda.'}
+              </div>
             ) : (
               <>
                 <div className="flex items-start justify-between gap-4">
@@ -238,7 +270,7 @@ export default function OnboardingWizardModal({ isOpen, onClose, mode = 'manual'
                   <div className="text-xs text-gray-500">
                     Após ajustar na tela indicada, volte e clique em <span className="font-medium">Verificar novamente</span>.
                   </div>
-                  <Button className="gap-2" onClick={() => void handleGoToStep()}>
+                  <Button className="gap-2" onClick={() => void handleGoToStep()} disabled={!empresaId || loading}>
                     <ExternalLink size={16} />
                     {isEmbeddedOnboardingStep(current.key) ? 'Configurar agora' : current.actionLabel}
                   </Button>

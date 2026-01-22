@@ -32,7 +32,7 @@ const CompanySettingsForm: React.FC<Props> = ({ onSaved }) => {
       const initialFormState: CompanyFormState = {
         ...activeEmpresa,
         razao_social: activeEmpresa.nome_razao_social || '',
-        fantasia: activeEmpresa.nome_fantasia || '',
+        fantasia: (activeEmpresa as any).nome_fantasia || (activeEmpresa as any).fantasia || '',
       };
       setFormData(initialFormState);
       setInitialData(initialFormState);
