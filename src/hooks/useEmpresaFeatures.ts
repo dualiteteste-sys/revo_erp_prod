@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { useAuth } from '@/contexts/AuthProvider';
 import { logger } from '@/lib/logger';
 import { getLocalPlanSlug, isLocalBillingBypassEnabled } from '@/lib/localDev';
+import { isTransientNetworkError, withRetry } from '@/lib/retry';
 import { empresaFeaturesGet, type PlanoMvp } from '@/services/empresaFeatures';
 
 export interface EmpresaFeatures {
@@ -66,7 +67,13 @@ export function useEmpresaFeatures(): EmpresaFeatures {
 
     setLoading(true);
     try {
-      const data = await empresaFeaturesGet();
+      const data = await withRetry(
+        async () => await empresaFeaturesGet(),
+        {
+          delaysMs: [0, 250, 800, 1500],
+          isRetryable: isTransientNetworkError,
+        }
+      );
       if (!data) throw new Error('Falha ao carregar empresa_features.');
 
       setFeatures({

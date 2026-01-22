@@ -25,6 +25,25 @@ async function applyMarketingPlanEntitlements(empresaId: string) {
   const pending = readPendingMarketingPlan();
   if (!pending) return;
 
+  // Preferência (estado da arte): criar uma assinatura "trial" no banco (sem checkout),
+  // pois isso alimenta o enforcement de plano/limites e evita tenants "sem plano" (403).
+  try {
+    await callRpc("billing_start_trial_for_current_user", {
+      p_plan_slug: pending.slug,
+      p_billing_cycle: pending.cycle ?? "monthly",
+    });
+    logger.info("[PlanIntent] Trial started (db-only)", { empresaId, slug: pending.slug, cycle: pending.cycle ?? "monthly" });
+    try {
+      localStorage.removeItem("pending_plan_slug");
+      localStorage.removeItem("pending_plan_cycle");
+    } catch {
+      // ignore
+    }
+    return;
+  } catch (error) {
+    logger.warn("[PlanIntent] Failed to start trial; falling back to entitlements upsert", { empresaId, error });
+  }
+
   const map: Record<
     PendingMarketingPlan,
     { plano_mvp: "servicos" | "industria" | "ambos"; max_users: number; max_nfe_monthly: number }
@@ -47,6 +66,12 @@ async function applyMarketingPlanEntitlements(empresaId: string) {
     });
 
     logger.info("[PlanIntent] Applied marketing plan entitlements", { empresaId, ...next, cycle: pending.cycle });
+    try {
+      localStorage.removeItem("pending_plan_slug");
+      localStorage.removeItem("pending_plan_cycle");
+    } catch {
+      // ignore
+    }
   } catch (error) {
     logger.warn("[PlanIntent] Failed to apply marketing plan entitlements", { empresaId, error });
   }
