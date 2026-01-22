@@ -30,6 +30,8 @@ export async function listOpsAppErrors(params: {
   source?: string | null;
   onlyOpen?: boolean;
   statuses?: Array<OpsAppErrorRow["status"]> | null;
+  from?: string | null; // ISO timestamptz
+  to?: string | null; // ISO timestamptz
   limit?: number;
   offset?: number;
 }): Promise<OpsAppErrorRow[]> {
@@ -40,6 +42,8 @@ export async function listOpsAppErrors(params: {
     p_q: params.q ?? null,
     p_source: params.source ?? null,
     p_statuses: params.statuses?.length ? params.statuses : null,
+    p_from: params.from ?? null,
+    p_to: params.to ?? null,
   });
 }
 
@@ -48,12 +52,16 @@ export async function countOpsAppErrors(params: {
   source?: string | null;
   onlyOpen?: boolean;
   statuses?: Array<OpsAppErrorRow["status"]> | null;
+  from?: string | null; // ISO timestamptz
+  to?: string | null; // ISO timestamptz
 }): Promise<number> {
   const res = await callRpc<number>("ops_app_errors_count", {
     p_only_open: params.onlyOpen ?? true,
     p_q: params.q ?? null,
     p_source: params.source ?? null,
     p_statuses: params.statuses?.length ? params.statuses : null,
+    p_from: params.from ?? null,
+    p_to: params.to ?? null,
   });
   return Number(res ?? 0);
 }
@@ -68,4 +76,16 @@ export async function setOpsAppErrorStatus(
   note?: string | null,
 ) {
   await callRpc("ops_app_errors_set_status", { p_id: id, p_status: status, p_note: note ?? null });
+}
+
+export async function setOpsAppErrorsStatusMany(
+  ids: string[],
+  status: OpsAppErrorRow["status"],
+  note?: string | null,
+) {
+  await callRpc("ops_app_errors_set_status_many", {
+    p_ids: ids,
+    p_status: status,
+    p_note: note ?? null,
+  });
 }

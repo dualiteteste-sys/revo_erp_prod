@@ -11,13 +11,28 @@ import ResizableSortableTh, { type SortState } from "@/components/ui/table/Resiz
 import TableColGroup from "@/components/ui/table/TableColGroup";
 import { useTableColumnWidths, type TableColumnWidthDef } from "@/components/ui/table/useTableColumnWidths";
 import { sortRows, toggleSort } from "@/components/ui/table/sortUtils";
-import { countOpsAppErrors, listOpsAppErrors, setOpsAppErrorStatus, type OpsAppErrorRow } from "@/services/opsAppErrors";
+import {
+  countOpsAppErrors,
+  listOpsAppErrors,
+  setOpsAppErrorStatus,
+  setOpsAppErrorsStatusMany,
+  type OpsAppErrorRow,
+} from "@/services/opsAppErrors";
 import { getOpsContextSnapshot } from "@/services/opsContext";
 
 function formatDateTimeBR(value?: string | null) {
   if (!value) return "—";
   const d = new Date(value);
   return Number.isNaN(d.getTime()) ? String(value) : d.toLocaleString("pt-BR");
+}
+
+function toIsoStartOfDay(date: string) {
+  if (!date) return null;
+  return new Date(`${date}T00:00:00.000Z`).toISOString();
+}
+function toIsoEndOfDay(date: string) {
+  if (!date) return null;
+  return new Date(`${date}T23:59:59.999Z`).toISOString();
 }
 
 function formatSla(createdAt?: string | null, status?: OpsAppErrorRow["status"] | null) {
@@ -64,16 +79,22 @@ export default function SystemErrorsPage() {
   const { addToast } = useToast();
   const [loading, setLoading] = useState(true);
   const [savingId, setSavingId] = useState<string | null>(null);
+  const [bulkSaving, setBulkSaving] = useState(false);
   const [rows, setRows] = useState<OpsAppErrorRow[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [q, setQ] = useState("");
   const [statusFilter, setStatusFilter] = useState<"open" | OpsAppErrorRow["status"] | "all">("open");
   const [total, setTotal] = useState(0);
   const [source, setSource] = useState<string>("");
+  const [from, setFrom] = useState("");
+  const [to, setTo] = useState("");
   const [sort, setSort] = useState<SortState<"when" | "source" | "route" | "message" | "http" | "status">>({
     column: "when",
     direction: "desc",
   });
+
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const selectedSet = useMemo(() => new Set(selectedIds), [selectedIds]);
 
   const [sendOpen, setSendOpen] = useState(false);
   const [sendRow, setSendRow] = useState<OpsAppErrorRow | null>(null);
@@ -81,6 +102,7 @@ export default function SystemErrorsPage() {
   const [sendNote, setSendNote] = useState("");
 
   const columns: TableColumnWidthDef[] = [
+    { id: "select", defaultWidth: 44, minWidth: 44, resizable: false },
     { id: "when", defaultWidth: 190, minWidth: 170 },
     { id: "source", defaultWidth: 160, minWidth: 140 },
     { id: "route", defaultWidth: 320, minWidth: 220 },
@@ -110,12 +132,19 @@ export default function SystemErrorsPage() {
     );
   }, [rows, sort]);
 
+  const visibleIds = useMemo(() => sorted.map((r) => r.id), [sorted]);
+  const visibleSelectedCount = useMemo(() => visibleIds.filter((id) => selectedSet.has(id)).length, [visibleIds, selectedSet]);
+  const allVisibleSelected = visibleIds.length > 0 && visibleSelectedCount === visibleIds.length;
+  const someVisibleSelected = visibleSelectedCount > 0 && visibleSelectedCount < visibleIds.length;
+
   const load = async () => {
     setLoading(true);
     setError(null);
     try {
       const qv = q.trim() ? q.trim() : null;
       const src = source.trim() ? source.trim() : null;
+      const fromIso = toIsoStartOfDay(from);
+      const toIso = toIsoEndOfDay(to);
       const statuses =
         statusFilter === "all"
           ? null
@@ -124,11 +153,12 @@ export default function SystemErrorsPage() {
             : ([statusFilter] as const);
       const onlyOpen = statusFilter === "open";
       const [count, list] = await Promise.all([
-        countOpsAppErrors({ q: qv, onlyOpen, source: src, statuses: statuses as any }),
-        listOpsAppErrors({ q: qv, onlyOpen, source: src, statuses: statuses as any, limit: 100, offset: 0 }),
+        countOpsAppErrors({ q: qv, onlyOpen, source: src, statuses: statuses as any, from: fromIso, to: toIso }),
+        listOpsAppErrors({ q: qv, onlyOpen, source: src, statuses: statuses as any, from: fromIso, to: toIso, limit: 100, offset: 0 }),
       ]);
       setTotal(count);
       setRows(list ?? []);
+      setSelectedIds((prev) => prev.filter((id) => (list ?? []).some((r) => r.id === id)));
     } catch (e: any) {
       setRows([]);
       setTotal(0);
@@ -161,6 +191,41 @@ export default function SystemErrorsPage() {
       addToast(e?.message || "Falha ao atualizar status.", "error");
     } finally {
       setSavingId(null);
+    }
+  };
+
+  const toggleRow = (id: string, checked: boolean) => {
+    setSelectedIds((prev) => {
+      if (checked) return prev.includes(id) ? prev : [...prev, id];
+      return prev.filter((x) => x !== id);
+    });
+  };
+
+  const toggleAllVisible = (checked: boolean) => {
+    setSelectedIds((prev) => {
+      if (checked) {
+        const merged = new Set(prev);
+        for (const id of visibleIds) merged.add(id);
+        return Array.from(merged);
+      }
+      const visible = new Set(visibleIds);
+      return prev.filter((id) => !visible.has(id));
+    });
+  };
+
+  const bulkIgnoreSelected = async () => {
+    const ids = selectedIds.slice();
+    if (ids.length === 0) return;
+    setBulkSaving(true);
+    try {
+      await setOpsAppErrorsStatusMany(ids, "ignorado");
+      addToast(`Ignorado em lote: ${ids.length} item(ns).`, "success");
+      setSelectedIds([]);
+      await load();
+    } catch (e: any) {
+      addToast(e?.message || "Falha ao ignorar em lote.", "error");
+    } finally {
+      setBulkSaving(false);
     }
   };
 
@@ -245,10 +310,39 @@ export default function SystemErrorsPage() {
               <option value="ignorado">Ignorado</option>
               <option value="all">Todos</option>
             </select>
+            <div className="flex items-center gap-2">
+              <input
+                type="date"
+                value={from}
+                onChange={(e) => setFrom(e.target.value)}
+                className="w-[155px] max-w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm"
+                title="De"
+              />
+              <input
+                type="date"
+                value={to}
+                onChange={(e) => setTo(e.target.value)}
+                className="w-[155px] max-w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm"
+                title="Até"
+              />
+            </div>
             <Button variant="secondary" onClick={load} className="gap-2" disabled={loading} title="Aplicar filtro">
               <Search size={16} />
               Filtrar
             </Button>
+            <Button
+              variant="outline"
+              onClick={() => void bulkIgnoreSelected()}
+              disabled={bulkSaving || selectedIds.length === 0}
+              title={selectedIds.length === 0 ? "Selecione itens na lista para ignorar em lote." : "Ignorar itens selecionados"}
+            >
+              Ignorar selecionados ({selectedIds.length})
+            </Button>
+            {selectedIds.length > 0 ? (
+              <Button variant="ghost" onClick={() => setSelectedIds([])} disabled={bulkSaving}>
+                Limpar seleção
+              </Button>
+            ) : null}
           </div>
           <div className="text-xs text-slate-600">
             SLA (beta): <span className="font-semibold">1 dia útil</span>.
@@ -272,6 +366,19 @@ export default function SystemErrorsPage() {
                 <TableColGroup columns={columns} widths={widths} />
                 <thead className="bg-gray-50 text-gray-600 sticky top-0">
                   <tr>
+                    <th className="p-3">
+                      <input
+                        type="checkbox"
+                        checked={allVisibleSelected}
+                        ref={(el) => {
+                          if (el) el.indeterminate = someVisibleSelected;
+                        }}
+                        onChange={(e) => toggleAllVisible(e.target.checked)}
+                        className="h-4 w-4 rounded border-gray-300"
+                        aria-label="Selecionar todos visíveis"
+                        disabled={sorted.length === 0}
+                      />
+                    </th>
                     <ResizableSortableTh
                       columnId="when"
                       label="Quando"
@@ -326,6 +433,15 @@ export default function SystemErrorsPage() {
                 <tbody className="divide-y divide-gray-100">
                   {sorted.map((r) => (
                     <tr key={r.id} className="hover:bg-gray-50">
+                      <td className="p-3">
+                        <input
+                          type="checkbox"
+                          checked={selectedSet.has(r.id)}
+                          onChange={(e) => toggleRow(r.id, e.target.checked)}
+                          className="h-4 w-4 rounded border-gray-300"
+                          aria-label="Selecionar item"
+                        />
+                      </td>
                       <td className="p-3 text-slate-700">{formatDateTimeBR(r.created_at)}</td>
                       <td className="p-3 font-mono text-slate-800 break-all">{r.source}</td>
                       <td className="p-3 font-mono text-slate-700 break-all">{r.route ?? "—"}</td>
@@ -404,7 +520,7 @@ export default function SystemErrorsPage() {
                   ))}
                   {sorted.length === 0 && (
                     <tr>
-                      <td className="p-6 text-center text-slate-500" colSpan={7}>
+                      <td className="p-6 text-center text-slate-500" colSpan={8}>
                         Nenhum erro encontrado.
                       </td>
                     </tr>
