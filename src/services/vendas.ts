@@ -21,6 +21,7 @@ export type VendaPedido = {
   total_geral: number;
   condicao_pagamento: string | null;
   observacoes: string | null;
+  tabela_preco_id?: string | null;
   total_count?: number;
 };
 
@@ -29,6 +30,8 @@ export type VendaItem = {
   pedido_id: string;
   produto_id: string;
   produto_nome?: string;
+  produto_unidade?: string | null;
+  produto_sku?: string | null;
   produto_ncm?: string | null;
   produto_cfop?: string | null;
   produto_cst?: string | null;

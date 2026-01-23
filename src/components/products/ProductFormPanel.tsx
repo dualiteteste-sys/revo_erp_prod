@@ -7,6 +7,8 @@ import AdditionalDataTab from './form-tabs/AdditionalDataTab';
 import MediaTab from './form-tabs/MediaTab';
 import SeoTab from './form-tabs/SeoTab';
 import OthersTab from './form-tabs/OthersTab';
+import VariacoesTab from './form-tabs/VariacoesTab';
+import PrecosTab from './form-tabs/PrecosTab';
 import { normalizeProductPayload } from '@/services/products.normalize';
 import { validatePackaging } from '@/services/products.validate';
 
@@ -23,7 +25,7 @@ interface ProductFormPanelProps {
   saveProduct: (formData: ProductFormData) => Promise<ProductFormData>;
 }
 
-const tabs = ['Dados Gerais', 'Dados Complementares', 'Mídia', 'SEO', 'Outros'];
+const tabs = ['Dados Gerais', 'Variações', 'Preço por Quantidade', 'Dados Complementares', 'Mídia', 'SEO', 'Outros'];
 
 const ProductFormPanel: React.FC<ProductFormPanelProps> = ({ product, onSaveSuccess, onClose, saveProduct }) => {
   const { addToast } = useToast();
@@ -131,6 +133,10 @@ const ProductFormPanel: React.FC<ProductFormPanelProps> = ({ product, onSaveSucc
     switch (activeTab) {
       case 'Dados Gerais':
         return <DadosGeraisTab data={formData} onChange={handleFormChange} errors={errors} isService={isService} />;
+      case 'Variações':
+        return <VariacoesTab produtoId={formData.id} produtoPaiId={formData.produto_pai_id} skuBase={formData.sku} />;
+      case 'Preço por Quantidade':
+        return <PrecosTab produtoId={formData.id} />;
       case 'Outros':
         return <OthersTab data={formData} onChange={handleFormChange} />;
       case 'Dados Complementares':
