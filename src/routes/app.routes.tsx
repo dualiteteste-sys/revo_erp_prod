@@ -110,6 +110,7 @@ const CobrancasServicosPage = lazyImport(() => import("../pages/servicos/Cobranc
 
 // Suporte
 const SuportePage = lazyImport(() => import("../pages/support/SuportePage"));
+const SupportConsolePage = lazyImport(() => import("../pages/support/SupportConsolePage"));
 
 export const appRoutes: RouteObject[] = [
     {
@@ -353,6 +354,12 @@ export const appRoutes: RouteObject[] = [
                 <RequirePermission permission={{ domain: "suporte", action: "view" }}>
                   <Suspense fallback={<PageLoader />}><SuportePage /></Suspense>
                 </RequirePermission>
+              ),
+            },
+            {
+              path: "suporte/console",
+              element: (
+                <Suspense fallback={<PageLoader />}><SupportConsolePage /></Suspense>
               ),
             },
 
