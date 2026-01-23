@@ -14,6 +14,11 @@ import { useHasPermission } from '@/hooks/useHasPermission';
 import { getOpsHealthSummary, listOpsRecentFailures } from '@/services/opsHealth';
 import { listSupportNotifications, markAllNotificationsRead, markNotificationsRead, type SupportNotification } from '@/services/supportNotifications';
 import { Switch } from '@/components/ui/switch';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import Input from '@/components/ui/forms/Input';
+import TextArea from '@/components/ui/forms/TextArea';
+import { useToast } from '@/contexts/ToastProvider';
+import { createSupportTicket, isOpsStaffForCurrentUser, listMySupportTickets, type SupportTicketListItem } from '@/services/supportTickets';
 
 type CheckStatus = 'ok' | 'warn' | 'missing';
 type GuidedCheck = {
@@ -61,6 +66,7 @@ export default function SuportePage() {
   const { session, activeEmpresa } = useAuth();
   const userId = session?.user?.id || '';
   const userEmail = session?.user?.email || '';
+  const { addToast } = useToast();
   const [loading, setLoading] = useState(true);
   const [onboarding, setOnboarding] = useState<ChecksRpc | null>(null);
   const [pdv, setPdv] = useState<ChecksRpc | null>(null);
@@ -73,6 +79,13 @@ export default function SuportePage() {
   const [notifLoading, setNotifLoading] = useState(false);
   const [notifOnlyUnread, setNotifOnlyUnread] = useState(true);
   const [notifications, setNotifications] = useState<SupportNotification[]>([]);
+  const [myTickets, setMyTickets] = useState<SupportTicketListItem[]>([]);
+  const [ticketsLoading, setTicketsLoading] = useState(false);
+  const [staffAllowed, setStaffAllowed] = useState<boolean>(false);
+  const [ticketOpen, setTicketOpen] = useState(false);
+  const [ticketSubject, setTicketSubject] = useState('');
+  const [ticketMessage, setTicketMessage] = useState('');
+  const [ticketRequesterEmail, setTicketRequesterEmail] = useState<string>(userEmail || '');
 
   useEffect(() => {
     let mounted = true;
@@ -110,6 +123,37 @@ export default function SuportePage() {
         setEcommerceError(e?.message || 'Sem permissão ou falha ao carregar integrações.');
       } finally {
         if (mounted) setLoading(false);
+      }
+    })();
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  const refreshMyTickets = useCallback(async () => {
+    setTicketsLoading(true);
+    try {
+      const items = await listMySupportTickets({ limit: 5, offset: 0 });
+      setMyTickets(Array.isArray(items) ? items : []);
+    } catch {
+      setMyTickets([]);
+    } finally {
+      setTicketsLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    refreshMyTickets();
+  }, [refreshMyTickets]);
+
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      try {
+        const ok = await isOpsStaffForCurrentUser();
+        if (mounted) setStaffAllowed(!!ok);
+      } catch {
+        if (mounted) setStaffAllowed(false);
       }
     })();
     return () => {
@@ -296,6 +340,128 @@ export default function SuportePage() {
               </Button>
             </div>
           </div>
+        </div>
+
+        <div className="rounded-2xl border border-gray-200 bg-white p-4">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <div className="text-sm font-semibold text-gray-900">Tickets de suporte</div>
+              <div className="text-xs text-gray-600 mt-1">
+                Abra um ticket com contexto automático (empresa, rota, request_id) para acelerar a correção.
+              </div>
+            </div>
+            <div className="flex gap-2">
+              {staffAllowed ? (
+                <Button asChild type="button" variant="secondary">
+                  <Link to="/app/suporte/console">Console (equipe)</Link>
+                </Button>
+              ) : null}
+              <Button type="button" className="gap-2" onClick={() => setTicketOpen(true)}>
+                <LifeBuoy size={16} />
+                Abrir ticket
+              </Button>
+            </div>
+          </div>
+
+          <div className="mt-3 space-y-2">
+            {ticketsLoading ? (
+              <div className="flex items-center gap-2 text-sm text-gray-600">
+                <Loader2 className="h-4 w-4 animate-spin" /> Carregando…
+              </div>
+            ) : myTickets.length === 0 ? (
+              <div className="text-sm text-gray-500">Nenhum ticket aberto por este usuário nesta empresa.</div>
+            ) : (
+              <div className="space-y-2">
+                {myTickets.map((t) => (
+                  <div key={t.id} className="flex items-center justify-between rounded-xl border border-gray-100 bg-gray-50 p-2">
+                    <div className="min-w-0">
+                      <div className="text-sm font-medium text-gray-900 truncate">{t.subject}</div>
+                      <div className="text-[11px] text-gray-500 mt-0.5">
+                        Status: <span className="font-mono">{t.status}</span> • Última atividade:{' '}
+                        <span className="font-mono">{new Date(t.last_activity_at).toLocaleString()}</span>
+                      </div>
+                    </div>
+                    <div className="text-[11px] font-mono text-gray-400">{t.id.slice(0, 8)}</div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          <Dialog open={ticketOpen} onOpenChange={setTicketOpen}>
+            <DialogContent className="max-w-2xl rounded-2xl">
+              <DialogHeader>
+                <DialogTitle>Abrir ticket</DialogTitle>
+                <DialogDescription>
+                  Inclua o que você estava tentando fazer. O sistema anexará contexto automaticamente.
+                </DialogDescription>
+              </DialogHeader>
+
+                <div className="grid gap-3">
+                <Input
+                  name="requester_email"
+                  label="E-mail (opcional)"
+                  value={ticketRequesterEmail}
+                  onChange={(e) => setTicketRequesterEmail(e.target.value)}
+                  placeholder="ex.: seu@email.com"
+                />
+                <Input
+                  name="subject"
+                  label="Assunto"
+                  value={ticketSubject}
+                  onChange={(e) => setTicketSubject(e.target.value)}
+                  placeholder="Ex.: Erro ao importar extrato OFX"
+                />
+                <TextArea
+                  name="message"
+                  label="Mensagem"
+                  value={ticketMessage}
+                  onChange={(e) => setTicketMessage(e.target.value)}
+                  placeholder="Descreva o que aconteceu…"
+                />
+                <div className="text-[11px] text-muted-foreground">
+                  Empresa: <span className="font-mono">{activeEmpresa?.id ?? '—'}</span> • Último request_id:{' '}
+                  <span className="font-mono">{getLastRequestId() ?? '—'}</span>
+                </div>
+              </div>
+
+              <DialogFooter className="gap-2 sm:gap-2">
+                <Button type="button" variant="secondary" onClick={() => setTicketOpen(false)}>
+                  Cancelar
+                </Button>
+                <Button
+                  type="button"
+                  onClick={async () => {
+                    try {
+                      const ticketId = await createSupportTicket({
+                        subject: ticketSubject,
+                        message: ticketMessage,
+                        requesterEmail: ticketRequesterEmail?.trim() || null,
+                        context: {
+                          origin: window.location.origin,
+                          pathname: window.location.pathname,
+                          empresa_id: activeEmpresa?.id ?? null,
+                          user_id: userId || null,
+                          user_email: userEmail || null,
+                          last_request_id: getLastRequestId() ?? null,
+                        },
+                      });
+                      addToast(`Ticket criado: ${ticketId.slice(0, 8)}`, 'success', 'Suporte');
+                      setTicketOpen(false);
+                      setTicketRequesterEmail(userEmail || '');
+                      setTicketSubject('');
+                      setTicketMessage('');
+                      await refreshMyTickets();
+                    } catch (e: any) {
+                      addToast(e?.message || 'Não foi possível criar o ticket.', 'error', 'Suporte');
+                    }
+                  }}
+                >
+                  Enviar
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
         </div>
 
         <div>
