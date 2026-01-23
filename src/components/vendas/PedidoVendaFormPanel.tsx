@@ -22,6 +22,7 @@ import { useTableColumnWidths, type TableColumnWidthDef } from '@/components/ui/
 import { sortRows, toggleSort } from '@/components/ui/table/sortUtils';
 import ParcelamentoDialog from '@/components/financeiro/parcelamento/ParcelamentoDialog';
 import { createParcelamentoFromVenda } from '@/services/financeiroParcelamento';
+import { getUnitPrice, listTabelasPreco, type TabelaPrecoRow } from '@/services/pricing';
 
 interface Props {
   vendaId: string | null;
@@ -82,6 +83,9 @@ export default function PedidoVendaFormPanel({ vendaId, onSaveSuccess, onClose, 
   const [loadingMarketplaceTimeline, setLoadingMarketplaceTimeline] = useState(false);
   const [discountAudit, setDiscountAudit] = useState<DiscountAuditRow[]>([]);
   const [loadingDiscountAudit, setLoadingDiscountAudit] = useState(false);
+  const [tabelasPreco, setTabelasPreco] = useState<TabelaPrecoRow[]>([]);
+  const manualPriceItemIdsRef = useRef<Set<string>>(new Set());
+  const [qtyUnitMode, setQtyUnitMode] = useState<Record<string, 'base' | 'g'>>({});
   const [marketplaceTimelineSort, setMarketplaceTimelineSort] = useState<SortState<string>>({
     column: 'quando',
     direction: 'desc',
@@ -160,6 +164,18 @@ export default function PedidoVendaFormPanel({ vendaId, onSaveSuccess, onClose, 
     void loadDetails({ id: vendaId, closeOnError: true });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [vendaId]);
+
+  useEffect(() => {
+    const load = async () => {
+      try {
+        const rows = await listTabelasPreco();
+        setTabelasPreco(rows ?? []);
+      } catch {
+        setTabelasPreco([]);
+      }
+    };
+    void load();
+  }, []);
 
   useEffect(() => {
     // COM-01: vendedores para comissões (opcional)
@@ -357,7 +373,8 @@ export default function PedidoVendaFormPanel({ vendaId, onSaveSuccess, onClose, 
         frete,
         desconto,
         condicao_pagamento: formData.condicao_pagamento,
-        observacoes: formData.observacoes
+        observacoes: formData.observacoes,
+        tabela_preco_id: (formData as any)?.tabela_preco_id ?? null,
       };
       const saved = await saveVenda(payload);
       setFormData(prev => ({ ...prev, ...saved }));
@@ -399,10 +416,17 @@ export default function PedidoVendaFormPanel({ vendaId, onSaveSuccess, onClose, 
     }
 
     try {
-      await manageVendaItem(currentId!, null, item.id, 1, item.preco_venda || 0, 0, 'add');
+      const pricing = await getUnitPrice({
+        produtoId: item.id,
+        quantidade: 1,
+        tabelaPrecoId: (formData as any)?.tabela_preco_id ?? null,
+        fallbackPrecoUnitario: item.preco_venda ?? 0,
+      });
+      const precoUnit = Number(pricing.preco_unitario ?? item.preco_venda ?? 0);
+      await manageVendaItem(currentId!, null, item.id, 1, precoUnit, 0, 'add');
       const refreshed = await loadDetails({ id: currentId, silent: true });
       if (!refreshed) {
-        const preco = toMoney(item.preco_venda || 0);
+        const preco = toMoney(precoUnit);
         const optimisticItem: any = {
           id: `tmp-${Date.now()}`,
           pedido_id: currentId,
@@ -481,21 +505,25 @@ export default function PedidoVendaFormPanel({ vendaId, onSaveSuccess, onClose, 
     }
   };
 
-  const handleUpdateItem = async (itemId: string, field: string, value: number) => {
-    const item = formData.itens?.find(i => i.id === itemId);
-    if (!item) return;
+	  const handleUpdateItem = async (itemId: string, field: string, value: number) => {
+	    const item = formData.itens?.find(i => i.id === itemId);
+	    if (!item) return;
 
     if (field === 'desconto' && !canDiscount) {
       addToast('Você não tem permissão para aplicar desconto.', 'error');
       return;
     }
 
-    const safe = Number.isFinite(value) ? value : 0;
-    const updates = {
-      quantidade: field === 'quantidade' ? safe : item.quantidade,
-      preco_unitario: field === 'preco' ? safe : item.preco_unitario,
-      desconto: field === 'desconto' ? safe : item.desconto,
-    };
+	    const safe = Number.isFinite(value) ? value : 0;
+	    const updates = {
+	      quantidade: field === 'quantidade' ? safe : item.quantidade,
+	      preco_unitario: field === 'preco' ? safe : item.preco_unitario,
+	      desconto: field === 'desconto' ? safe : item.desconto,
+	    };
+
+	    if (field === 'preco') {
+	      manualPriceItemIdsRef.current.add(itemId);
+	    }
 
     if (updates.quantidade <= 0) {
       addToast('Quantidade deve ser maior que zero.', 'error');
@@ -511,16 +539,24 @@ export default function PedidoVendaFormPanel({ vendaId, onSaveSuccess, onClose, 
     }
 
     const maxDesconto = toMoney(updates.quantidade * updates.preco_unitario);
-    if (updates.desconto > maxDesconto) {
-      updates.desconto = maxDesconto;
-      addToast('Desconto do item não pode ser maior que o total do item.', 'warning');
-    }
+	    if (updates.desconto > maxDesconto) {
+	      updates.desconto = maxDesconto;
+	      addToast('Desconto do item não pode ser maior que o total do item.', 'warning');
+	    }
 
-    try {
-      await manageVendaItem(formData.id!, itemId, item.produto_id, updates.quantidade, updates.preco_unitario, updates.desconto, 'update');
-      // Atualização otimista
-      setFormData(prev => ({
-        ...prev,
+	    try {
+	      if (field === 'quantidade' && !manualPriceItemIdsRef.current.has(itemId) && (updates.desconto || 0) === 0) {
+	        const pricing = await getUnitPrice({
+	          produtoId: item.produto_id,
+	          quantidade: updates.quantidade,
+	          tabelaPrecoId: (formData as any)?.tabela_preco_id ?? null,
+	        });
+	        updates.preco_unitario = Number(pricing.preco_unitario ?? updates.preco_unitario);
+	      }
+	      await manageVendaItem(formData.id!, itemId, item.produto_id, updates.quantidade, updates.preco_unitario, updates.desconto, 'update');
+	      // Atualização otimista
+	      setFormData(prev => ({
+	        ...prev,
         itens: prev.itens?.map(i => i.id === itemId ? { 
             ...i, 
             ...updates, 
@@ -528,10 +564,10 @@ export default function PedidoVendaFormPanel({ vendaId, onSaveSuccess, onClose, 
         } : i)
       }));
       // Recarregar totais no blur ou debounce seria ideal, aqui faremos reload completo ao salvar o cabeçalho novamente
-    } catch (e: any) {
-      addToast(e.message, 'error');
-    }
-  };
+	    } catch (e: any) {
+	      addToast(e.message, 'error');
+	    }
+	  };
 
   const handleAprovar = async () => {
     const ok = await confirm({
@@ -584,19 +620,20 @@ export default function PedidoVendaFormPanel({ vendaId, onSaveSuccess, onClose, 
 	        return;
 	      }
 
-	      const payload: VendaPayload = {
-	        id: formData.id,
-	        cliente_id: clienteId,
-	        status: 'cancelado',
-	        data_emissao: formData.data_emissao ?? new Date().toISOString().split('T')[0],
-	        data_entrega: formData.data_entrega ?? null,
-	        frete: toMoney(formData.frete),
-	        desconto: toMoney(formData.desconto),
-	        condicao_pagamento: formData.condicao_pagamento ?? null,
-	        observacoes: formData.observacoes ?? null,
-	        vendedor_id: formData.vendedor_id ?? null,
-	        comissao_percent: Math.max(0, Math.min(100, Number(formData.comissao_percent ?? 0) || 0)),
-	      };
+		      const payload: VendaPayload = {
+		        id: formData.id,
+		        cliente_id: clienteId,
+		        status: 'cancelado',
+		        data_emissao: formData.data_emissao ?? new Date().toISOString().split('T')[0],
+		        data_entrega: formData.data_entrega ?? null,
+		        frete: toMoney(formData.frete),
+		        desconto: toMoney(formData.desconto),
+		        condicao_pagamento: formData.condicao_pagamento ?? null,
+		        observacoes: formData.observacoes ?? null,
+		        vendedor_id: formData.vendedor_id ?? null,
+		        comissao_percent: Math.max(0, Math.min(100, Number(formData.comissao_percent ?? 0) || 0)),
+		        tabela_preco_id: (formData as any)?.tabela_preco_id ?? null,
+		      };
 
 	      await saveVenda(payload);
 	      addToast('Pedido cancelado.', 'success');
@@ -806,6 +843,25 @@ export default function PedidoVendaFormPanel({ vendaId, onSaveSuccess, onClose, 
           <div className="sm:col-span-3">
              <Input label="Condição Pagamento" name="condicao_pagamento" value={formData.condicao_pagamento || ''} onChange={e => handleHeaderChange('condicao_pagamento', e.target.value)} disabled={isLocked} placeholder="Ex: 30/60 dias" />
           </div>
+          <div className="sm:col-span-3">
+            <label className="block text-sm font-medium text-gray-700 mb-1">Tabela de preço</label>
+            <select
+              value={(formData as any)?.tabela_preco_id ?? ''}
+              onChange={(e) => handleHeaderChange('tabela_preco_id' as any, e.target.value || null)}
+              className="w-full p-3 border border-gray-300 rounded-lg"
+              disabled={isLocked}
+            >
+              <option value="">Varejo (padrão)</option>
+              {tabelasPreco
+                .filter((t) => t.status !== 'inativa')
+                .map((t) => (
+                  <option key={t.id} value={t.id}>
+                    {t.nome}
+                  </option>
+                ))}
+            </select>
+            <div className="text-xs text-gray-500 mt-1">Atacado/Varejo e preços por quantidade.</div>
+          </div>
         </Section>
 
         <Section title="Itens" description="Produtos vendidos.">
@@ -921,15 +977,50 @@ export default function PedidoVendaFormPanel({ vendaId, onSaveSuccess, onClose, 
                       ) : null}
                     </td>
                     <td className="px-3 py-2">
-                      <input 
-                        type="number" 
-                        value={item.quantidade} 
-                        onChange={e => handleUpdateItem(item.id, 'quantidade', parseFloat(e.target.value))}
-                        disabled={isLocked}
-                        className="w-full text-right p-1 border rounded text-sm"
-                        min="0.001"
-                        step="any"
-                      />
+                      {String((item as any).produto_unidade || '').toUpperCase() === 'KG' ? (
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="number"
+                            value={(qtyUnitMode[item.id] === 'g' ? Number(item.quantidade || 0) * 1000 : item.quantidade) as any}
+                            onChange={(e) => {
+                              const raw = parseFloat(e.target.value);
+                              const n = Number.isFinite(raw) ? raw : 0;
+                              const qtyKg = qtyUnitMode[item.id] === 'g' ? n / 1000 : n;
+                              handleUpdateItem(item.id, 'quantidade', qtyKg);
+                            }}
+                            disabled={isLocked}
+                            className="w-full text-right p-1 border rounded text-sm"
+                            min="0.001"
+                            step="any"
+                          />
+                          <select
+                            className="p-1 border rounded text-xs text-gray-700 bg-white"
+                            value={qtyUnitMode[item.id] ?? 'base'}
+                            onChange={(e) => setQtyUnitMode((prev) => ({ ...prev, [item.id]: e.target.value as any }))}
+                            disabled={isLocked}
+                            title="Unidade de entrada (o sistema armazena em KG)"
+                          >
+                            <option value="base">kg</option>
+                            <option value="g">g</option>
+                          </select>
+                        </div>
+                      ) : (
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="number"
+                            value={item.quantidade}
+                            onChange={e => handleUpdateItem(item.id, 'quantidade', parseFloat(e.target.value))}
+                            disabled={isLocked}
+                            className="w-full text-right p-1 border rounded text-sm"
+                            min="0.001"
+                            step="any"
+                          />
+                          <span className="text-xs text-gray-500 w-10 text-right">{(item as any).produto_unidade || ''}</span>
+                        </div>
+                      )}
+                      {String((item as any).produto_unidade || '').toUpperCase() === 'KG' ? (
+                        <div className="text-[11px] text-gray-500 mt-1 text-right">Dica: 400g = 0,400kg.</div>
+                      ) : null}
                     </td>
                     <td className="px-3 py-2">
                       <div className="relative">
