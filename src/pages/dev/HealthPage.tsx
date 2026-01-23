@@ -41,6 +41,9 @@ import {
 } from '@/services/opsHealth';
 import { useHasPermission } from '@/hooks/useHasPermission';
 import { getEcommerceHealthSummary, type EcommerceHealthSummary } from '@/services/ecommerceIntegrations';
+import { callRpc } from '@/lib/api';
+import { useAppContext } from '@/contexts/AppContextProvider';
+import { getEmpresaContextDiagnostics, opsDebugProdutosEmpresaIds, type EmpresaContextDiagnostics } from '@/services/tenantIsolation';
 
 function formatDateTimeBR(value?: string | null) {
   if (!value) return '—';
@@ -53,6 +56,7 @@ export default function HealthPage() {
   const isDev = import.meta.env.DEV;
   const permManage = useHasPermission('ops', 'manage');
   const permEcommerceView = useHasPermission('ecommerce', 'view');
+  const { activeEmpresaId } = useAppContext();
 
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -79,6 +83,11 @@ export default function HealthPage() {
   const [sortStripe, setSortStripe] = useState<SortState<'when' | 'event' | 'attempts' | 'error'>>({ column: 'when', direction: 'desc' });
   const [sortFinanceDlq, setSortFinanceDlq] = useState<SortState<'when' | 'type' | 'error'>>({ column: 'when', direction: 'desc' });
   const [sortEcommerceDlq, setSortEcommerceDlq] = useState<SortState<'when' | 'provider' | 'kind' | 'error'>>({ column: 'when', direction: 'desc' });
+  const [tenantDiagLoading, setTenantDiagLoading] = useState(false);
+  const [tenantDiag, setTenantDiag] = useState<EmpresaContextDiagnostics | null>(null);
+  const [tenantDiagMismatch, setTenantDiagMismatch] = useState<
+    null | { expectedEmpresaId: string; mismatches: Array<{ id: string; empresa_id: string }> }
+  >(null);
 
   const recentColumns: TableColumnWidthDef[] = [
     { id: 'when', defaultWidth: 190, minWidth: 170 },
@@ -195,6 +204,50 @@ export default function HealthPage() {
   useEffect(() => {
     void fetchAll();
   }, [fetchAll]);
+
+  const runTenantIsolationProbe = useCallback(async () => {
+    setTenantDiagLoading(true);
+    setTenantDiagMismatch(null);
+    try {
+      const diag = await getEmpresaContextDiagnostics().catch(() => null);
+      setTenantDiag(diag);
+
+      if (!activeEmpresaId) {
+        addToast('Sem empresa ativa no contexto do app. Abra o seletor de empresa e tente novamente.', 'warning');
+        return;
+      }
+
+      const rows = await callRpc<Array<{ id: string }>>('produtos_list_for_current_user', {
+        p_limit: 50,
+        p_offset: 0,
+        p_q: null,
+        p_status: null,
+        p_order: 'created_at desc',
+      });
+
+      const ids = (rows ?? []).map((r) => r.id).filter(Boolean);
+      const map = await opsDebugProdutosEmpresaIds(ids);
+      const mismatches = map.filter((r) => r.empresa_id !== activeEmpresaId);
+
+      if (mismatches.length) {
+        setTenantDiagMismatch({ expectedEmpresaId: activeEmpresaId, mismatches });
+        addToast(`Possível vazamento detectado: ${mismatches.length} item(ns) com empresa_id diferente da empresa ativa.`, 'error');
+      } else {
+        addToast('OK: nenhum indício de vazamento (produtos retornaram empresa_id compatível).', 'success');
+      }
+    } catch (e: any) {
+      const msg = e?.message || 'Falha ao rodar diagnóstico multi-tenant.';
+      addToast(msg, 'error');
+    } finally {
+      setTenantDiagLoading(false);
+    }
+  }, [activeEmpresaId, addToast]);
+
+  const tenantDiagSummary = useMemo(() => {
+    if (!tenantDiag) return null;
+    if (!tenantDiag.ok) return `Diagnóstico indisponível (${tenantDiag.reason ?? 'unknown'}).`;
+    return `ctx.current_empresa_id=${tenantDiag.current_empresa_id ?? 'null'} | user_active=${tenantDiag.user_active_empresa_id ?? 'null'} | guc=${tenantDiag.guc_current_empresa_id ?? 'null'} | memberships=${tenantDiag.memberships_count ?? 0}`;
+  }, [tenantDiag]);
 
   const canReprocess = !!permManage.data;
   const canSeeEcommerce = !!permEcommerceView.data;
@@ -595,6 +648,47 @@ export default function HealthPage() {
           </Button>
         }
       />
+
+      <GlassCard className="p-4">
+        <div className="flex items-start justify-between gap-4 flex-wrap">
+          <div className="min-w-[260px]">
+            <div className="flex items-center gap-2">
+              <ShieldCheck className="w-5 h-5 text-blue-600" />
+              <div className="text-sm font-semibold text-gray-900">Isolamento multi-tenant (diagnóstico)</div>
+            </div>
+            <div className="mt-1 text-xs text-gray-600">
+              Valida por ID se os registros retornados pertencem à empresa ativa. Use para investigar “vazamento”.
+            </div>
+            {tenantDiagSummary ? (
+              <div className="mt-2 text-xs text-gray-600 font-mono break-all">{tenantDiagSummary}</div>
+            ) : null}
+            {tenantDiagMismatch ? (
+              <div className="mt-3 rounded-xl border border-rose-200 bg-rose-50/60 p-3">
+                <div className="text-xs font-semibold text-rose-900">Possível vazamento detectado</div>
+                <div className="mt-1 text-xs text-rose-800">
+                  empresa ativa esperada: <span className="font-mono">{tenantDiagMismatch.expectedEmpresaId}</span>
+                </div>
+                <div className="mt-2 text-xs text-rose-800">
+                  exemplos (até 5):
+                  <ul className="mt-1 list-disc pl-5">
+                    {tenantDiagMismatch.mismatches.slice(0, 5).map((m) => (
+                      <li key={m.id}>
+                        <span className="font-mono">{m.id}</span> → <span className="font-mono">{m.empresa_id}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              </div>
+            ) : null}
+          </div>
+
+          <div className="flex gap-2">
+            <Button onClick={runTenantIsolationProbe} disabled={tenantDiagLoading} className="gap-2">
+              {tenantDiagLoading ? 'Verificando…' : 'Verificar (Produtos)'}
+            </Button>
+          </div>
+        </div>
+      </GlassCard>
 
       {!loading && loadError && (
         <GlassCard className="p-4 border border-rose-200 bg-rose-50/60">

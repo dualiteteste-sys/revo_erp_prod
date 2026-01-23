@@ -37,6 +37,7 @@ Definições:
 - [x] Evitar tenant “sem plano”: ao concluir `/auth/callback`, criar trial no banco via RPC (`billing_start_trial_for_current_user`) quando veio da seleção de plano.
 - [x] Cobrir boot com E2E: login → empresa ativa → navegação por 5 módulos sem 403.
 - [x] Cobrir landing pública sem sessão/empresa ativa (E2E `e2e/landing-public.spec.ts`).
+- [x] Anti-vazamento por cache: limpar `React Query` ao trocar `activeEmpresaId` + E2E `e2e/multi-tenant-isolation.spec.ts` + diagnóstico no Dev→Saúde (`dev_empresa_context_diagnostics`).
 
 ### 0.2 RBAC e áreas internas (Ops/Dev)
 - [x] Garantir que `ops/*` e ferramentas internas exijam permissão explícita (sem bypass por admin/owner).
@@ -65,6 +66,7 @@ Definições:
 - [x] Refinar classificação “MÉDIO”: não sinalizar como “MÉDIO” tabelas sem grants para `authenticated` (service_role-only/internal), para reduzir ruído operacional.
 - [x] Corrigir RLS crítico: tabelas que permitem leitura ampla indevida (ex.: policies `using(true)`).
   - [x] Corrigir `public.empresas`: remover `using(true)` e restringir SELECT por membership/owner (migration).
+  - [x] Hardening `public.produtos`: policies somente `TO authenticated` + diagnóstico de contexto/empresa ativa (migration `supabase/migrations/20270123190000_mt_tenant_isolation_diagnostics_and_produtos_rls_hardening.sql`).
 - [x] Remover/evitar “grants sem RLS” em tabelas `public` (gated por asserts RG01).
   - [x] (Exceção tratada) `public.wrappers_fdw_stats` (extensão): revogar grants de `authenticated/anon/public` (migration `20270118121500_revoke_wrappers_fdw_stats_grants.sql`).
 - [x] Corrigir itens “MÉDIO” do inventário (policies multi-tenant com `current_empresa_id()`), via migrations.
