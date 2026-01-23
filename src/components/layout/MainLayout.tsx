@@ -16,6 +16,7 @@ import RoadmapButton from '@/components/roadmap/RoadmapButton';
 import SubscriptionStatusBanner from '@/components/billing/SubscriptionStatusBanner';
 import { PlanIntentCheckoutModal } from '@/components/billing/PlanIntentCheckoutModal';
 import { RoadmapProvider } from '@/contexts/RoadmapProvider';
+import TenantQueryCacheGuard from '@/components/tenant/TenantQueryCacheGuard';
 import ContextualHelp from '@/components/support/ContextualHelp';
 import PostInviteWelcomeModal from '@/components/onboarding/PostInviteWelcomeModal';
 
@@ -189,6 +190,7 @@ const MainLayout: React.FC = () => {
           }}
         >
           <RoadmapProvider>
+            <TenantQueryCacheGuard />
             <div className="h-screen p-4 flex gap-4">
               <CommandPalette />
               <OnboardingWizardModal
