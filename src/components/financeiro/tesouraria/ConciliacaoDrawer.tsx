@@ -4,7 +4,9 @@ import { X, Loader2, Link2, Plus } from 'lucide-react';
 import { ExtratoItem, Movimentacao, listMovimentacoes, saveMovimentacao } from '@/services/treasury';
 import { useToast } from '@/contexts/ToastProvider';
 import { listConciliacaoRegras, type ConciliacaoRegra } from '@/services/conciliacaoRegras';
+import { conciliarExtratoComTitulo, searchTitulosParaConciliacao, sugerirTitulosParaExtrato, type ConciliacaoTituloCandidate, type ConciliacaoTituloTipo } from '@/services/conciliacaoTitulos';
 import { rankCandidates, scoreExtratoToMovimentacao, type MatchResult } from '@/lib/conciliacao/matching';
+import DatePicker from '@/components/ui/DatePicker';
 
 interface Props {
   isOpen: boolean;
@@ -16,6 +18,7 @@ interface Props {
 
 export default function ConciliacaoDrawer({ isOpen, onClose, extratoItem, contaCorrenteId, onConciliate }: Props) {
   const { addToast } = useToast();
+  const [mode, setMode] = useState<'movimentacoes' | 'titulos'>('movimentacoes');
   const [candidates, setCandidates] = useState<Array<MatchResult<Movimentacao>>>([]);
   const [loading, setLoading] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
@@ -23,11 +26,41 @@ export default function ConciliacaoDrawer({ isOpen, onClose, extratoItem, contaC
   const [rules, setRules] = useState<ConciliacaoRegra[]>([]);
   const [loadingRules, setLoadingRules] = useState(false);
   const [creatingFromRuleId, setCreatingFromRuleId] = useState<string | null>(null);
+  const [titulosLoading, setTitulosLoading] = useState(false);
+  const [titulosSuggestions, setTitulosSuggestions] = useState<ConciliacaoTituloCandidate[]>([]);
+  const [titulosSearchTerm, setTitulosSearchTerm] = useState('');
+  const [titulosStartDate, setTitulosStartDate] = useState<Date | null>(null);
+  const [titulosEndDate, setTitulosEndDate] = useState<Date | null>(null);
+  const [titulosValorEnabled, setTitulosValorEnabled] = useState(true);
+  const [titulosResults, setTitulosResults] = useState<ConciliacaoTituloCandidate[]>([]);
+  const [titulosSearching, setTitulosSearching] = useState(false);
+  const [titulosCount, setTitulosCount] = useState(0);
+  const [titulosPage, setTitulosPage] = useState(1);
 
   useEffect(() => {
     if (isOpen && extratoItem) {
       fetchSuggestions();
     }
+  }, [isOpen, extratoItem]);
+
+  useEffect(() => {
+    if (!isOpen || !extratoItem) return;
+    setMode('movimentacoes');
+    setTitulosSearchTerm('');
+    setTitulosResults([]);
+    setTitulosCount(0);
+    setTitulosPage(1);
+
+    const date = new Date(extratoItem.data_lancamento);
+    const start = new Date(date);
+    start.setDate(date.getDate() - 10);
+    const end = new Date(date);
+    end.setDate(date.getDate() + 10);
+    setTitulosStartDate(start);
+    setTitulosEndDate(end);
+    setTitulosValorEnabled(true);
+
+    void fetchTitulosSuggestions();
   }, [isOpen, extratoItem]);
 
   useEffect(() => {
@@ -46,6 +79,11 @@ export default function ConciliacaoDrawer({ isOpen, onClose, extratoItem, contaC
     })();
   }, [isOpen, contaCorrenteId]);
 
+  const tipoTitulo = (() => {
+    if (!extratoItem) return 'pagar' as ConciliacaoTituloTipo;
+    return extratoItem.tipo_lancamento === 'debito' ? 'pagar' : 'receber';
+  })();
+
   const matchedRules = (() => {
     if (!extratoItem) return [];
     const desc = String(extratoItem.descricao || '').toLowerCase();
@@ -63,6 +101,20 @@ export default function ConciliacaoDrawer({ isOpen, onClose, extratoItem, contaC
       })
       .slice(0, 3);
   })();
+
+  const fetchTitulosSuggestions = async () => {
+    if (!extratoItem) return;
+    setTitulosLoading(true);
+    try {
+      const rows = await sugerirTitulosParaExtrato(extratoItem.id, 10);
+      setTitulosSuggestions(rows);
+    } catch (e: any) {
+      setTitulosSuggestions([]);
+      addToast(e?.message || 'Erro ao buscar sugestões de títulos.', 'error');
+    } finally {
+      setTitulosLoading(false);
+    }
+  };
 
   const fetchSuggestions = async () => {
     if (!extratoItem) return;
@@ -104,6 +156,50 @@ export default function ConciliacaoDrawer({ isOpen, onClose, extratoItem, contaC
       addToast(e?.message || 'Erro ao buscar movimentações.', 'error');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchTitulosSearch = async (page = 1) => {
+    if (!extratoItem) return;
+    setTitulosSearching(true);
+    try {
+      const limit = 25;
+      const offset = (page - 1) * limit;
+      const { data, count } = await searchTitulosParaConciliacao({
+        tipo: tipoTitulo,
+        valor: titulosValorEnabled ? extratoItem.valor : null,
+        startDate: titulosStartDate ? titulosStartDate.toISOString().slice(0, 10) : null,
+        endDate: titulosEndDate ? titulosEndDate.toISOString().slice(0, 10) : null,
+        q: titulosSearchTerm.trim() || null,
+        limit,
+        offset,
+      });
+      setTitulosResults(data);
+      setTitulosCount(count);
+      setTitulosPage(page);
+    } catch (e: any) {
+      addToast(e?.message || 'Erro ao buscar títulos.', 'error');
+    } finally {
+      setTitulosSearching(false);
+    }
+  };
+
+  const handleConciliarComTitulo = async (row: ConciliacaoTituloCandidate) => {
+    if (!extratoItem) return;
+    if (linkingId) return;
+    setLinkingId(row.titulo_id);
+    try {
+      await conciliarExtratoComTitulo({
+        extratoId: extratoItem.id,
+        tipo: row.tipo,
+        tituloId: row.titulo_id,
+      });
+      addToast('Título conciliado com o extrato!', 'success');
+      onClose();
+    } catch (e: any) {
+      addToast(e?.message || 'Erro ao conciliar título.', 'error');
+    } finally {
+      setLinkingId(null);
     }
   };
 
@@ -207,7 +303,168 @@ export default function ConciliacaoDrawer({ isOpen, onClose, extratoItem, contaC
         </div>
 
         <div className="flex-1 overflow-y-auto p-4">
-            <div className="flex justify-between items-center mb-4">
+            <div className="flex items-center gap-2 mb-4">
+              <button
+                type="button"
+                onClick={() => setMode('movimentacoes')}
+                className={`px-3 py-1.5 rounded-full text-sm border transition-colors ${
+                  mode === 'movimentacoes' ? 'bg-white border-blue-200 text-blue-700' : 'bg-transparent border-transparent text-gray-600 hover:bg-white/60'
+                }`}
+              >
+                Movimentações
+              </button>
+              <button
+                type="button"
+                onClick={() => setMode('titulos')}
+                className={`px-3 py-1.5 rounded-full text-sm border transition-colors ${
+                  mode === 'titulos' ? 'bg-white border-blue-200 text-blue-700' : 'bg-transparent border-transparent text-gray-600 hover:bg-white/60'
+                }`}
+              >
+                Títulos (pagar/receber)
+              </button>
+            </div>
+
+            {mode === 'titulos' ? (
+              <div className="space-y-4">
+                <div className="rounded-lg border bg-white p-3">
+                  <div className="text-xs font-bold uppercase text-gray-600 mb-2">Sugestões automáticas</div>
+                  {titulosLoading ? (
+                    <div className="flex items-center gap-2 text-xs text-gray-500"><Loader2 className="h-3 w-3 animate-spin" /> Buscando…</div>
+                  ) : titulosSuggestions.length === 0 ? (
+                    <div className="text-xs text-gray-500">Nenhuma sugestão encontrada.</div>
+                  ) : (
+                    <div className="space-y-2">
+                      {titulosSuggestions.map((t) => {
+                        const disabled = !!linkingId;
+                        return (
+                          <div key={t.titulo_id} className="border rounded-lg p-3">
+                            <div className="flex items-start justify-between gap-2">
+                              <div>
+                                <div className="text-sm font-medium text-gray-800">{t.pessoa_nome || '—'}</div>
+                                <div className="text-xs text-gray-500">{t.descricao || '—'}</div>
+                              </div>
+                              <div className="text-right">
+                                <div className="text-sm font-bold text-gray-800">R$ {Number(t.saldo_aberto).toFixed(2)}</div>
+                                <div className="text-[11px] text-gray-500">Venc.: {new Date(t.data_vencimento).toLocaleDateString('pt-BR')}</div>
+                              </div>
+                            </div>
+                            <div className="mt-2 flex items-center justify-between gap-2">
+                              <div className="text-[11px] text-gray-600 flex items-center gap-2">
+                                <span className="px-2 py-0.5 rounded-full bg-slate-100">{t.tipo}</span>
+                                <span className="px-2 py-0.5 rounded-full bg-slate-100">{t.status}</span>
+                                {typeof t.score === 'number' ? <span className="px-2 py-0.5 rounded-full bg-slate-100">Score {t.score}</span> : null}
+                              </div>
+                              <button
+                                type="button"
+                                onClick={() => void handleConciliarComTitulo(t)}
+                                disabled={disabled}
+                                className="text-xs font-semibold text-blue-700 hover:underline disabled:opacity-60"
+                              >
+                                {linkingId === t.titulo_id ? 'Conciliando…' : 'Baixar e conciliar'}
+                              </button>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+
+                <div className="rounded-lg border bg-white p-3">
+                  <div className="text-xs font-bold uppercase text-gray-600 mb-2">Buscar manualmente (fallback)</div>
+                  <div className="grid grid-cols-1 gap-2">
+                    <input
+                      value={titulosSearchTerm}
+                      onChange={(e) => setTitulosSearchTerm(e.target.value)}
+                      placeholder="Buscar por nome/descrição/documento…"
+                      className="w-full rounded-md border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                    <div className="grid grid-cols-2 gap-2">
+                      <DatePicker label="De" value={titulosStartDate} onChange={setTitulosStartDate} />
+                      <DatePicker label="Até" value={titulosEndDate} onChange={setTitulosEndDate} />
+                    </div>
+                    <label className="flex items-center gap-2 text-xs text-gray-600 select-none">
+                      <input type="checkbox" checked={titulosValorEnabled} onChange={(e) => setTitulosValorEnabled(e.target.checked)} />
+                      Usar valor do extrato como filtro (R$ {extratoItem?.valor.toFixed(2)})
+                    </label>
+                    <div className="flex items-center justify-between gap-2">
+                      <button
+                        type="button"
+                        onClick={() => void fetchTitulosSearch(1)}
+                        disabled={titulosSearching || !!linkingId}
+                        className="inline-flex items-center gap-2 rounded-md bg-blue-600 px-3 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-60"
+                      >
+                        {titulosSearching ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+                        Buscar
+                      </button>
+                      <div className="text-xs text-gray-500">
+                        {titulosCount > 0 ? `${titulosCount} resultado(s)` : null}
+                      </div>
+                    </div>
+                  </div>
+
+                  {titulosResults.length > 0 ? (
+                    <div className="mt-3 space-y-2">
+                      {titulosResults.map((t) => (
+                        <div key={t.titulo_id} className="border rounded-lg p-3">
+                          <div className="flex items-start justify-between gap-2">
+                            <div>
+                              <div className="text-sm font-medium text-gray-800">{t.pessoa_nome || '—'}</div>
+                              <div className="text-xs text-gray-500">{t.descricao || '—'}</div>
+                              {t.documento_ref ? <div className="text-[11px] text-gray-400">Doc: {t.documento_ref}</div> : null}
+                            </div>
+                            <div className="text-right">
+                              <div className="text-sm font-bold text-gray-800">R$ {Number(t.saldo_aberto).toFixed(2)}</div>
+                              <div className="text-[11px] text-gray-500">Venc.: {new Date(t.data_vencimento).toLocaleDateString('pt-BR')}</div>
+                            </div>
+                          </div>
+                          <div className="mt-2 flex items-center justify-between">
+                            <div className="text-[11px] text-gray-600 flex items-center gap-2">
+                              <span className="px-2 py-0.5 rounded-full bg-slate-100">{t.tipo}</span>
+                              <span className="px-2 py-0.5 rounded-full bg-slate-100">{t.status}</span>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => void handleConciliarComTitulo(t)}
+                              disabled={!!linkingId}
+                              className="text-xs font-semibold text-blue-700 hover:underline disabled:opacity-60"
+                            >
+                              {linkingId === t.titulo_id ? 'Conciliando…' : 'Baixar e conciliar'}
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+
+                      {titulosCount > 25 ? (
+                        <div className="flex items-center justify-between pt-2">
+                          <button
+                            type="button"
+                            className="text-xs text-blue-700 hover:underline disabled:opacity-60"
+                            disabled={titulosPage <= 1 || titulosSearching}
+                            onClick={() => void fetchTitulosSearch(Math.max(1, titulosPage - 1))}
+                          >
+                            Anterior
+                          </button>
+                          <div className="text-xs text-gray-500">Página {titulosPage}</div>
+                          <button
+                            type="button"
+                            className="text-xs text-blue-700 hover:underline disabled:opacity-60"
+                            disabled={titulosSearching || titulosPage * 25 >= titulosCount}
+                            onClick={() => void fetchTitulosSearch(titulosPage + 1)}
+                          >
+                            Próxima
+                          </button>
+                        </div>
+                      ) : null}
+                    </div>
+                  ) : null}
+                </div>
+              </div>
+            ) : null}
+
+            {mode === 'movimentacoes' ? (
+            <>
+              <div className="flex justify-between items-center mb-4">
                 <h4 className="font-semibold text-gray-700">Movimentações Sugeridas</h4>
                 <div className="flex items-center gap-2">
                   {canAutoConciliate ? (
@@ -228,37 +485,37 @@ export default function ConciliacaoDrawer({ isOpen, onClose, extratoItem, contaC
                     Atualizar
                   </button>
                 </div>
-            </div>
-
-            {loadingRules ? (
-              <div className="mb-4 text-xs text-gray-500 flex items-center gap-2">
-                <Loader2 className="h-3 w-3 animate-spin" /> Carregando regras…
               </div>
-            ) : matchedRules.length > 0 ? (
-              <div className="mb-4 p-3 rounded-lg border border-emerald-200 bg-emerald-50">
-                <div className="text-xs font-bold uppercase text-emerald-700 mb-2">Sugestão por regra</div>
-                {matchedRules.map((r) => (
-                  <div key={r.id} className="flex items-center justify-between gap-3 py-1">
-                    <div className="text-xs text-emerald-900">
-                      Contém “{r.match_text}”
-                      {r.categoria ? <span> · Categoria: {r.categoria}</span> : null}
-                      {r.centro_custo ? <span> · Centro: {r.centro_custo}</span> : null}
+
+              {loadingRules ? (
+                <div className="mb-4 text-xs text-gray-500 flex items-center gap-2">
+                  <Loader2 className="h-3 w-3 animate-spin" /> Carregando regras…
+                </div>
+              ) : matchedRules.length > 0 ? (
+                <div className="mb-4 p-3 rounded-lg border border-emerald-200 bg-emerald-50">
+                  <div className="text-xs font-bold uppercase text-emerald-700 mb-2">Sugestão por regra</div>
+                  {matchedRules.map((r) => (
+                    <div key={r.id} className="flex items-center justify-between gap-3 py-1">
+                      <div className="text-xs text-emerald-900">
+                        Contém “{r.match_text}”
+                        {r.categoria ? <span> · Categoria: {r.categoria}</span> : null}
+                        {r.centro_custo ? <span> · Centro: {r.centro_custo}</span> : null}
+                      </div>
+                      <button
+                        onClick={() => void handleCreateFromRule(r)}
+                        disabled={!!linkingId || isCreating || creatingFromRuleId === r.id}
+                        className="text-xs font-semibold text-emerald-700 hover:underline disabled:opacity-60"
+                      >
+                        {creatingFromRuleId === r.id ? 'Aplicando…' : 'Criar e conciliar'}
+                      </button>
                     </div>
-                    <button
-                      onClick={() => void handleCreateFromRule(r)}
-                      disabled={!!linkingId || isCreating || creatingFromRuleId === r.id}
-                      className="text-xs font-semibold text-emerald-700 hover:underline disabled:opacity-60"
-                    >
-                      {creatingFromRuleId === r.id ? 'Aplicando…' : 'Criar e conciliar'}
-                    </button>
-                  </div>
-                ))}
-              </div>
-            ) : null}
+                  ))}
+                </div>
+              ) : null}
 
-            {loading ? (
+              {loading ? (
                 <div className="flex justify-center py-8"><Loader2 className="animate-spin text-blue-500" /></div>
-            ) : candidates.length === 0 ? (
+              ) : candidates.length === 0 ? (
                 <div className="text-center py-8 text-gray-500 border-2 border-dashed rounded-lg">
                     <p>Nenhuma movimentação compatível encontrada.</p>
                     <button 
@@ -331,6 +588,8 @@ export default function ConciliacaoDrawer({ isOpen, onClose, extratoItem, contaC
                     </button>
                  </div>
             )}
+            </>
+            ) : null}
         </div>
       </motion.div>
     </div>
