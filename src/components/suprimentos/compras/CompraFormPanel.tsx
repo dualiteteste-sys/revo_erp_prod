@@ -42,6 +42,8 @@ export default function CompraFormPanel({ compraId, onSaveSuccess, onClose }: Pr
   });
   const [parcelamentoOpen, setParcelamentoOpen] = useState(false);
 
+  const isLocked = formData.status === 'recebido' || formData.status === 'cancelado';
+
   const freteProps = useNumericField(formData.frete, (v) => handleHeaderChange('frete', v));
   const descontoProps = useNumericField(formData.desconto, (v) => handleHeaderChange('desconto', v));
 
@@ -207,7 +209,6 @@ export default function CompraFormPanel({ compraId, onSaveSuccess, onClose }: Pr
     }
   };
 
-  const isLocked = formData.status === 'recebido' || formData.status === 'cancelado';
   const totalItens = useMemo(() => formData.itens?.reduce((acc, i) => acc + i.total, 0) || 0, [formData.itens]);
 
   // ---------------------------------------------------------------------------
