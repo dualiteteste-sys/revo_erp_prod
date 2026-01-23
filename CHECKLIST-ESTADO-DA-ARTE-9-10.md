@@ -96,6 +96,7 @@ Definições:
 - [x] RPC-first (Fiscal/NF-e emissões): remover leitura/escrita direta no client e exigir RPCs tenant-safe (RPCs `fiscal_nfe_emissoes_list`, `fiscal_nfe_emissao_itens_list`, `fiscal_nfe_audit_timeline_list`, `fiscal_nfe_emissao_draft_upsert`).
 - [x] RPC-first (Onboarding/Roadmap): remover acesso direto do client a `empresa_onboarding` e persistir via RPC (`onboarding_wizard_state_get`, `onboarding_wizard_state_upsert`).
 - [x] RPC-first (Financeiro): substituir `supabase.from('financeiro_conciliacao_regras')` por RPCs SECURITY DEFINER com RBAC (tesouraria).
+- [x] RPC-first (Conciliação Bancária): sugerir/buscar/conciliar extratos com títulos (pagar/receber) via RPCs (`financeiro_conciliacao_titulos_sugerir`, `financeiro_conciliacao_titulos_search`, `financeiro_conciliacao_conciliar_extrato_com_titulo`).
 - [x] RPC-first (RBAC): substituir `supabase.from('roles/permissions/role_permissions')` por RPCs SECURITY DEFINER com `roles:manage` e update atômico.
 - [x] RPC-first (Billing/Entitlements): substituir acessos diretos a `empresa_entitlements` por RPCs tenant-safe + revogar grants diretos (migration `supabase/migrations/20270120193000_sec_rpc_first_audit_entitlements.sql`).
 - [x] RPC-first (Audit Trail UI): substituir `.from('audit_logs')` por RPC `audit_logs_list_for_tables` + revogar grants diretos da tabela (migration `supabase/migrations/20270120193000_sec_rpc_first_audit_entitlements.sql`).
