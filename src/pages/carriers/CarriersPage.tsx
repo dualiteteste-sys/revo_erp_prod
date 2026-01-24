@@ -315,7 +315,13 @@ const CarriersPage: React.FC = () => {
         </div>
       ) : null}
 
-      <Modal isOpen={isFormOpen} onClose={handleCloseForm} title={selectedCarrier ? 'Editar Transportadora' : 'Nova Transportadora'} size="lg">
+      <Modal
+        isOpen={isFormOpen}
+        onClose={handleCloseForm}
+        title={selectedCarrier ? 'Editar Transportadora' : 'Nova Transportadora'}
+        size="60pct"
+        containerClassName="min-w-[92vw] sm:min-w-[80vw] md:min-w-[60vw]"
+      >
         {isFetchingDetails ? (
           <div className="flex items-center justify-center h-full min-h-[400px]">
             <Loader2 className="animate-spin text-blue-600" size={48} />

@@ -287,27 +287,25 @@ export default function CondicoesPagamentoPage() {
       <div className="bg-white rounded-lg shadow overflow-hidden flex-1">
         <div className="p-4 border-b">
           <Section title="Nova condição" description="Dica: use 30/60/90 para parcelamento, ou 21 para prazo único.">
-            <div className="grid grid-cols-1 md:grid-cols-5 gap-3">
-              <Input
-                className="md:col-span-2"
-                label="Nome"
-                value={newRow.nome}
-                onChange={(e) => setNewRow((s) => ({ ...s, nome: e.target.value }))}
-                placeholder="Ex.: 30/60/90"
-              />
-              <Input
-                className="md:col-span-2"
-                label="Condição"
-                value={newRow.condicao}
-                onChange={(e) => setNewRow((s) => ({ ...s, condicao: e.target.value }))}
-                placeholder="Ex.: 30/60/90 ou 21"
-              />
-              <div className="md:col-span-1 flex items-end gap-3">
-                <div className="flex-1">
-                  <div className="text-sm font-medium text-gray-700 mb-1">Ativo</div>
-                  <div className="h-11 flex items-center">
-                    <Switch checked={newRow.ativo} onCheckedChange={(v) => setNewRow((s) => ({ ...s, ativo: v }))} />
-                  </div>
+            <Input
+              className="sm:col-span-3"
+              label="Nome"
+              value={newRow.nome}
+              onChange={(e) => setNewRow((s) => ({ ...s, nome: e.target.value }))}
+              placeholder="Ex.: 30/60/90"
+            />
+            <Input
+              className="sm:col-span-2"
+              label="Condição"
+              value={newRow.condicao}
+              onChange={(e) => setNewRow((s) => ({ ...s, condicao: e.target.value }))}
+              placeholder="Ex.: 30/60/90 ou 21"
+            />
+            <div className="sm:col-span-1 flex items-end gap-3">
+              <div className="flex-1">
+                <div className="text-sm font-medium text-gray-700 mb-1">Ativo</div>
+                <div className="h-11 flex items-center">
+                  <Switch checked={newRow.ativo} onCheckedChange={(v) => setNewRow((s) => ({ ...s, ativo: v }))} />
                 </div>
               </div>
             </div>
@@ -483,4 +481,3 @@ export default function CondicoesPagamentoPage() {
     </div>
   );
 }
-

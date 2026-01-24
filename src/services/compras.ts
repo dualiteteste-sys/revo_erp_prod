@@ -104,7 +104,13 @@ export async function receberCompra(id: string): Promise<void> {
 export type SupplierHit = { id: string; label: string; nome: string; doc_unico: string | null };
 
 export async function searchSuppliers(q: string): Promise<SupplierHit[]> {
-  return callRpc<SupplierHit[]>('search_suppliers_for_current_user', { p_search: q, p_limit: 20 });
+  try {
+    return await callRpc<SupplierHit[]>('search_suppliers_for_current_user', { p_search: q, p_limit: 20 });
+  } catch (err) {
+    // Backward-compat: ambientes com RPC antiga (sem p_limit) ou cache desatualizado.
+    if (!(isRpcMissingError(err) || isRpcOverloadError(err))) throw err;
+    return callRpc<SupplierHit[]>('search_suppliers_for_current_user', { p_search: q });
+  }
 }
 
 // Cache simples de capacidade (evita spam de 400/404 quando a DB está em versão antiga).
