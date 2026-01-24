@@ -26,6 +26,26 @@ interface Props {
   onClose: () => void;
 }
 
+function CurrencyCellInput({
+  value,
+  disabled,
+  onValueChange,
+}: {
+  value: number | null | undefined;
+  disabled: boolean;
+  onValueChange: (value: number | null) => void;
+}) {
+  const fieldProps = useNumericField(value ?? null, onValueChange);
+  return (
+    <input
+      inputMode="numeric"
+      {...fieldProps}
+      disabled={disabled}
+      className="w-full text-right p-2 border rounded-lg disabled:bg-gray-100"
+    />
+  );
+}
+
 export default function CompraFormPanel({ compraId, onSaveSuccess, onClose }: Props) {
   const { addToast } = useToast();
   const { confirm } = useConfirm();
@@ -281,10 +301,16 @@ export default function CompraFormPanel({ compraId, onSaveSuccess, onClose }: Pr
     }));
   };
 
-  const updateSelectedPrice = (produto_id: string, preco_unitario: number) => {
+  const updateSelectedPrice = (produto_id: string, preco_unitario: number | null) => {
     setSelected((prev) => ({
       ...prev,
-      [produto_id]: { ...prev[produto_id], preco_unitario: Number.isFinite(preco_unitario) ? preco_unitario : prev[produto_id].preco_unitario },
+      [produto_id]: {
+        ...prev[produto_id],
+        preco_unitario:
+          typeof preco_unitario === 'number' && Number.isFinite(preco_unitario)
+            ? preco_unitario
+            : prev[produto_id].preco_unitario,
+      },
     }));
   };
 
@@ -752,14 +778,10 @@ export default function CompraFormPanel({ compraId, onSaveSuccess, onClose }: Pr
                               />
                             </td>
                             <td className="px-4 py-2 text-right">
-                              <input
-                                type="number"
+                              <CurrencyCellInput
                                 value={price}
-                                min="0"
-                                step="0.01"
                                 disabled={!checked}
-                                onChange={(e) => updateSelectedPrice(item.produto_id, Number(e.target.value))}
-                                className="w-full text-right p-2 border rounded-lg disabled:bg-gray-100"
+                                onValueChange={(v) => updateSelectedPrice(item.produto_id, v)}
                               />
                             </td>
                           </tr>
@@ -812,14 +834,10 @@ export default function CompraFormPanel({ compraId, onSaveSuccess, onClose }: Pr
                             />
                           </td>
                           <td className="px-4 py-2 text-right">
-                            <input
-                              type="number"
+                            <CurrencyCellInput
                               value={price}
-                              min="0"
-                              step="0.01"
                               disabled={!checked}
-                              onChange={(e) => updateSelectedPrice(d.produto_id, Number(e.target.value))}
-                              className="w-full text-right p-2 border rounded-lg disabled:bg-gray-100"
+                              onValueChange={(v) => updateSelectedPrice(d.produto_id, v)}
                             />
                           </td>
                         </tr>
