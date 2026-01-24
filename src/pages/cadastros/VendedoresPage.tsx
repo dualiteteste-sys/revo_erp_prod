@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Loader2, PlusCircle, Search, UserSquare } from 'lucide-react';
 import Modal from '@/components/ui/Modal';
 import { useToast } from '@/contexts/ToastProvider';
@@ -7,13 +7,14 @@ import ResizableSortableTh, { type SortState } from '@/components/ui/table/Resiz
 import TableColGroup from '@/components/ui/table/TableColGroup';
 import { useTableColumnWidths, type TableColumnWidthDef } from '@/components/ui/table/useTableColumnWidths';
 import { sortRows, toggleSort } from '@/components/ui/table/sortUtils';
+import { useNumericField } from '@/hooks/useNumericField';
 
 type FormState = {
   id: string | null;
   nome: string;
   email: string;
   telefone: string;
-  comissao_percent: string;
+  comissao_percent: number | null;
   ativo: boolean;
 };
 
@@ -22,9 +23,11 @@ const emptyForm: FormState = {
   nome: '',
   email: '',
   telefone: '',
-  comissao_percent: '0',
+  comissao_percent: 0,
   ativo: true,
 };
+
+const pctFormatter = new Intl.NumberFormat('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
 export default function VendedoresPage() {
   const { addToast } = useToast();
@@ -37,6 +40,10 @@ export default function VendedoresPage() {
   const [isOpen, setIsOpen] = useState(false);
   const [form, setForm] = useState<FormState>(emptyForm);
   const [sort, setSort] = useState<SortState<string>>({ column: 'nome', direction: 'asc' });
+  const setComissao = useCallback((value: number | null) => {
+    setForm((s) => ({ ...s, comissao_percent: value }));
+  }, []);
+  const comissaoField = useNumericField(form.comissao_percent, setComissao);
 
   const columns: TableColumnWidthDef[] = [
     { id: 'nome', defaultWidth: 260, minWidth: 200 },
@@ -100,7 +107,7 @@ export default function VendedoresPage() {
       nome: row.nome || '',
       email: row.email || '',
       telefone: row.telefone || '',
-      comissao_percent: String(row.comissao_percent ?? 0),
+      comissao_percent: row.comissao_percent ?? 0,
       ativo: !!row.ativo,
     });
     setIsOpen(true);
@@ -116,7 +123,7 @@ export default function VendedoresPage() {
       addToast('Informe o nome do vendedor.', 'error');
       return;
     }
-    const comissao = Number(form.comissao_percent || 0);
+    const comissao = form.comissao_percent ?? 0;
     if (Number.isNaN(comissao) || comissao < 0) {
       addToast('Comissão inválida.', 'error');
       return;
@@ -227,7 +234,7 @@ export default function VendedoresPage() {
                     <td className="px-4 py-3 font-medium text-gray-800">{r.nome}</td>
                     <td className="px-4 py-3">{r.email || '-'}</td>
                     <td className="px-4 py-3">{r.telefone || '-'}</td>
-                    <td className="px-4 py-3">{Number(r.comissao_percent || 0).toFixed(2)}</td>
+                    <td className="px-4 py-3">{pctFormatter.format(Number(r.comissao_percent || 0))}</td>
                     <td className="px-4 py-3">{r.ativo ? 'Sim' : 'Não'}</td>
                     <td className="px-4 py-3">
                       <div className="flex justify-end gap-2">
@@ -291,9 +298,9 @@ export default function VendedoresPage() {
             <div>
               <label className="text-sm text-gray-700">Comissão (%)</label>
               <input
-                inputMode="decimal"
-                value={form.comissao_percent}
-                onChange={(e) => setForm((s) => ({ ...s, comissao_percent: e.target.value }))}
+                inputMode="numeric"
+                value={comissaoField.value}
+                onChange={comissaoField.onChange}
                 className="mt-1 w-full p-3 border border-gray-300 rounded-lg"
               />
             </div>

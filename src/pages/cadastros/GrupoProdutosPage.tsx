@@ -192,6 +192,7 @@ const GrupoProdutosPage: React.FC = () => {
                 isOpen={isModalOpen}
                 onClose={handleCloseModal}
                 title={editingGrupo ? 'Editar Grupo' : 'Novo Grupo'}
+                bodyClassName="p-6 md:p-8"
             >
                 <GrupoProdutoForm
                     grupo={editingGrupo}
