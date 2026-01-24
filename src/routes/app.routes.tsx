@@ -18,6 +18,7 @@ const GrupoProdutosPage = lazyImport(() => import("../pages/cadastros/GrupoProdu
 const UnidadesPage = lazyImport(() => import("../pages/cadastros/UnidadesPage"));
 const EmbalagensPage = lazyImport(() => import("../pages/cadastros/EmbalagensPage"));
 const MeiosPagamentoPage = lazyImport(() => import("../pages/cadastros/MeiosPagamentoPage"));
+const CondicoesPagamentoPage = lazyImport(() => import("../pages/cadastros/CondicoesPagamentoPage"));
 const SalesDashboard = lazyImport(() => import("../pages/SalesDashboard"));
 const SalesGoalsPage = lazyImport(() => import("../pages/sales/SalesGoalsPage"));
 const OSPage = lazyImport(() => import("../pages/os/OSPage"));
@@ -205,6 +206,14 @@ export const appRoutes: RouteObject[] = [
               element: (
                 <RequirePermission permission={{ domain: "contas_a_pagar", action: "view" }}>
                   <Suspense fallback={<PageLoader />}><MeiosPagamentoPage /></Suspense>
+                </RequirePermission>
+              ),
+            },
+            {
+              path: "cadastros/condicoes-pagamento",
+              element: (
+                <RequirePermission permission={{ domain: "contas_a_pagar", action: "view" }}>
+                  <Suspense fallback={<PageLoader />}><CondicoesPagamentoPage /></Suspense>
                 </RequirePermission>
               ),
             },

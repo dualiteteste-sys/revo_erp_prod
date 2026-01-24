@@ -6,6 +6,7 @@ import { useConfirm } from '@/contexts/ConfirmProvider';
 import Section from '@/components/ui/forms/Section';
 import Input from '@/components/ui/forms/Input';
 import TextArea from '@/components/ui/forms/TextArea';
+import Select from '@/components/ui/forms/Select';
 import ClientAutocomplete from '@/components/common/ClientAutocomplete';
 import ItemAutocomplete from '@/components/os/ItemAutocomplete';
 import { useNumericField } from '@/hooks/useNumericField';
@@ -23,6 +24,7 @@ import { sortRows, toggleSort } from '@/components/ui/table/sortUtils';
 import ParcelamentoDialog from '@/components/financeiro/parcelamento/ParcelamentoDialog';
 import { createParcelamentoFromVenda } from '@/services/financeiroParcelamento';
 import { getUnitPrice, listTabelasPreco, type TabelaPrecoRow } from '@/services/pricing';
+import { searchCondicoesPagamento, type CondicaoPagamento } from '@/services/condicoesPagamento';
 
 interface Props {
   vendaId: string | null;
@@ -58,6 +60,7 @@ export default function PedidoVendaFormPanel({ vendaId, onSaveSuccess, onClose, 
   const navigate = useNavigate();
   const [loading, setLoading] = useState(!!vendaId);
   const [isSaving, setIsSaving] = useState(false);
+  const [condicoesPagamento, setCondicoesPagamento] = useState<CondicaoPagamento[]>([]);
   const [vendedores, setVendedores] = useState<Vendedor[]>([]);
   const [formData, setFormData] = useState<Partial<VendaDetails>>({
     status: 'orcamento',
@@ -84,6 +87,23 @@ export default function PedidoVendaFormPanel({ vendaId, onSaveSuccess, onClose, 
   const [discountAudit, setDiscountAudit] = useState<DiscountAuditRow[]>([]);
   const [loadingDiscountAudit, setLoadingDiscountAudit] = useState(false);
   const [tabelasPreco, setTabelasPreco] = useState<TabelaPrecoRow[]>([]);
+
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      try {
+        const rows = await searchCondicoesPagamento({ tipo: 'ambos', q: null, limit: 50 });
+        if (!alive) return;
+        setCondicoesPagamento(rows ?? []);
+      } catch {
+        if (!alive) return;
+        setCondicoesPagamento([]);
+      }
+    })();
+    return () => {
+      alive = false;
+    };
+  }, []);
   const manualPriceItemIdsRef = useRef<Set<string>>(new Set());
   const [qtyUnitMode, setQtyUnitMode] = useState<Record<string, 'base' | 'g'>>({});
   const [marketplaceTimelineSort, setMarketplaceTimelineSort] = useState<SortState<string>>({
@@ -840,8 +860,36 @@ export default function PedidoVendaFormPanel({ vendaId, onSaveSuccess, onClose, 
           <div className="sm:col-span-3">
              <Input label="Data Entrega" type="date" value={formData.data_entrega || ''} onChange={e => handleHeaderChange('data_entrega', e.target.value)} disabled={isLocked} />
           </div>
-          <div className="sm:col-span-3">
-             <Input label="Condição Pagamento" name="condicao_pagamento" value={formData.condicao_pagamento || ''} onChange={e => handleHeaderChange('condicao_pagamento', e.target.value)} disabled={isLocked} placeholder="Ex: 30/60 dias" />
+          <div className="sm:col-span-3 grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <Select
+              label="Condição de Pagamento"
+              name="condicao_pagamento_preset"
+              value={condicoesPagamento.some((c) => (c.condicao || '').trim() === (formData.condicao_pagamento || '').trim()) ? (formData.condicao_pagamento || '').trim() : ''}
+              onChange={(e) => handleHeaderChange('condicao_pagamento', e.target.value)}
+              disabled={isLocked}
+            >
+              <option value="">Personalizada</option>
+              {condicoesPagamento.map((c) => (
+                <option key={c.id} value={c.condicao}>
+                  {c.nome} • {c.condicao}
+                </option>
+              ))}
+            </Select>
+            <Input
+              label="Personalizada (opcional)"
+              name="condicao_pagamento"
+              value={
+                condicoesPagamento.some((c) => (c.condicao || '').trim() === (formData.condicao_pagamento || '').trim())
+                  ? ''
+                  : (formData.condicao_pagamento || '')
+              }
+              onChange={(e) => handleHeaderChange('condicao_pagamento', e.target.value)}
+              disabled={
+                isLocked ||
+                condicoesPagamento.some((c) => (c.condicao || '').trim() === (formData.condicao_pagamento || '').trim())
+              }
+              placeholder="Ex: 30/60/90"
+            />
           </div>
           <div className="sm:col-span-3">
             <label className="block text-sm font-medium text-gray-700 mb-1">Tabela de preço</label>
