@@ -95,13 +95,15 @@ export default function CompraFormPanel({ compraId, onSaveSuccess, onClose }: Pr
 
   useEffect(() => {
     if (compraId) {
-      loadDetails();
+      loadDetails(compraId);
     }
   }, [compraId]);
 
-  const loadDetails = async () => {
+  const loadDetails = async (targetId?: string | null) => {
+    const id = targetId ?? formData.id ?? compraId;
+    if (!id) return;
     try {
-      const data = await getCompraDetails(compraId!);
+      const data = await getCompraDetails(id);
       setFormData(data);
     } catch (e) {
       console.error(e);
@@ -158,7 +160,7 @@ export default function CompraFormPanel({ compraId, onSaveSuccess, onClose }: Pr
 
     try {
       await manageCompraItem(currentId!, null, item.id, 1, item.preco_venda || 0, 'upsert');
-      await loadDetails(); // Reload to get updated totals and items
+      await loadDetails(currentId); // Reload to get updated totals and items
       addToast('Item adicionado.', 'success');
     } catch (e: any) {
       addToast(e.message, 'error');
@@ -168,7 +170,7 @@ export default function CompraFormPanel({ compraId, onSaveSuccess, onClose }: Pr
   const handleRemoveItem = async (itemId: string) => {
     try {
       await manageCompraItem(formData.id!, itemId, '', 0, 0, 'delete');
-      await loadDetails();
+      await loadDetails(formData.id);
       addToast('Item removido.', 'success');
     } catch (e: any) {
       addToast(e.message, 'error');
@@ -332,7 +334,7 @@ export default function CompraFormPanel({ compraId, onSaveSuccess, onClose }: Pr
       for (const item of items) {
         await manageCompraItem(currentId!, null, item.produto_id, item.quantidade, item.preco_unitario || 0, 'upsert');
       }
-      await loadDetails();
+      await loadDetails(currentId);
       addToast(`${items.length} item(ns) adicionados ao pedido.`, 'success');
       setIsSugestoesOpen(false);
     } catch (e: any) {
