@@ -20,6 +20,7 @@ interface FormErrors {
 
 interface ProductFormPanelProps {
   product: ProductFormData | null;
+  initialValues?: Partial<ProductFormData>;
   onSaveSuccess: (savedProduct: ProductFormData) => void;
   onClose: () => void;
   saveProduct: (formData: ProductFormData) => Promise<ProductFormData>;
@@ -27,7 +28,7 @@ interface ProductFormPanelProps {
 
 const tabs = ['Dados Gerais', 'Variações', 'Preço por Quantidade', 'Dados Complementares', 'Mídia', 'SEO', 'Outros'];
 
-const ProductFormPanel: React.FC<ProductFormPanelProps> = ({ product, onSaveSuccess, onClose, saveProduct }) => {
+const ProductFormPanel: React.FC<ProductFormPanelProps> = ({ product, initialValues, onSaveSuccess, onClose, saveProduct }) => {
   const { addToast } = useToast();
   const [formData, setFormData] = useState<ProductFormData>({});
   const [activeTab, setActiveTab] = useState(tabs[0]);
@@ -38,7 +39,7 @@ const ProductFormPanel: React.FC<ProductFormPanelProps> = ({ product, onSaveSucc
     if (product) {
       setFormData(product);
     } else {
-      setFormData({
+      const base: ProductFormData = {
         tipo: 'simples',
         status: 'ativo',
         unidade: 'un',
@@ -54,9 +55,10 @@ const ProductFormPanel: React.FC<ProductFormPanelProps> = ({ product, onSaveSucc
         pode_produzir: false,
         rastreio_lote: false,
         rastreio_serial: false,
-      });
+      };
+      setFormData({ ...base, ...(initialValues || {}) });
     }
-  }, [product]);
+  }, [product, initialValues]);
 
   useEffect(() => {
     const newErrors: FormErrors = {};

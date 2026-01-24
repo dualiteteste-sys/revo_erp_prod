@@ -7,8 +7,8 @@ import Section from '@/components/ui/forms/Section';
 import Input from '@/components/ui/forms/Input';
 import TextArea from '@/components/ui/forms/TextArea';
 import Select from '@/components/ui/forms/Select';
-import ClientAutocomplete from '@/components/common/ClientAutocomplete';
-import ItemAutocomplete from '@/components/os/ItemAutocomplete';
+import SearchFirstSelect from '@/components/common/SearchFirstSelect';
+import SideSheet from '@/components/ui/SideSheet';
 import { useNumericField } from '@/hooks/useNumericField';
 import { useHasPermission } from '@/hooks/useHasPermission';
 import { searchItemsForOs } from '@/services/os';
@@ -25,6 +25,10 @@ import ParcelamentoDialog from '@/components/financeiro/parcelamento/Parcelament
 import { createParcelamentoFromVenda } from '@/services/financeiroParcelamento';
 import { getUnitPrice, listTabelasPreco, type TabelaPrecoRow } from '@/services/pricing';
 import { searchCondicoesPagamento, type CondicaoPagamento } from '@/services/condicoesPagamento';
+import PartnerFormPanel from '@/components/partners/PartnerFormPanel';
+import ProductFormPanel, { type ProductFormData } from '@/components/products/ProductFormPanel';
+import { searchClients } from '@/services/clients';
+import { saveProduct } from '@/services/products';
 
 interface Props {
   vendaId: string | null;
@@ -81,6 +85,10 @@ export default function PedidoVendaFormPanel({ vendaId, onSaveSuccess, onClose, 
   const skuInputRef = useRef<HTMLInputElement>(null);
   const [skuQuery, setSkuQuery] = useState('');
   const [addingSku, setAddingSku] = useState(false);
+  const [isQuickCreatePartnerOpen, setIsQuickCreatePartnerOpen] = useState(false);
+  const [quickCreatePartnerDraft, setQuickCreatePartnerDraft] = useState<{ q: string } | null>(null);
+  const [isQuickCreateProductOpen, setIsQuickCreateProductOpen] = useState(false);
+  const [quickCreateProductDraft, setQuickCreateProductDraft] = useState<{ q: string } | null>(null);
   const canFinalizePdv = mode === 'pdv' && typeof onFinalizePdv === 'function';
   const [marketplaceTimeline, setMarketplaceTimeline] = useState<MarketplaceTimelineEvent[]>([]);
   const [loadingMarketplaceTimeline, setLoadingMarketplaceTimeline] = useState(false);
@@ -709,8 +717,53 @@ export default function PedidoVendaFormPanel({ vendaId, onSaveSuccess, onClose, 
     }
   };
 
+  const openQuickCreatePartner = (draft: { q: string }) => {
+    setQuickCreatePartnerDraft(draft);
+    setIsQuickCreatePartnerOpen(true);
+  };
+
+  const openQuickCreateProduct = (draft: { q: string }) => {
+    setQuickCreateProductDraft(draft);
+    setIsQuickCreateProductOpen(true);
+  };
+
+  const digitsOnly = (s: string) => String(s || '').replace(/\D/g, '');
+
+  const quickCreatePartnerInitialValues = (() => {
+    const q = quickCreatePartnerDraft?.q || '';
+    const digits = digitsOnly(q);
+    const isDoc = digits.length === 11 || digits.length === 14;
+    return isDoc ? ({ tipo: 'cliente', doc_unico: digits } as any) : ({ tipo: 'cliente', nome: q } as any);
+  })();
+
+  const quickCreateProductInitialValues: Partial<ProductFormData> = (() => {
+    const q = quickCreateProductDraft?.q || '';
+    return { nome: q, pode_vender: true, permitir_inclusao_vendas: true };
+  })();
+
+  const handlePartnerQuickCreateSuccess = (savedPartner: any) => {
+    setIsQuickCreatePartnerOpen(false);
+    setQuickCreatePartnerDraft(null);
+    handleHeaderChange('cliente_id', savedPartner.id);
+    handleHeaderChange('cliente_nome', savedPartner.nome || 'Novo Cliente');
+  };
+
+  const handleProductQuickCreateSuccess = (savedProduct: any) => {
+    setIsQuickCreateProductOpen(false);
+    setQuickCreateProductDraft(null);
+    handleAddItem({
+      id: savedProduct.id,
+      descricao: savedProduct.nome || 'Novo Produto',
+      unidade: savedProduct.unidade || 'un',
+      preco_venda: savedProduct.preco_venda || 0,
+      type: 'product',
+      codigo: savedProduct.codigo || null,
+    } as any);
+  };
+
   return (
-    <div className="flex flex-col h-full">
+    <>
+      <div className="flex flex-col h-full">
       <ParcelamentoDialog
         open={parcelamentoOpen}
         onClose={() => setParcelamentoOpen(false)}
@@ -805,14 +858,30 @@ export default function PedidoVendaFormPanel({ vendaId, onSaveSuccess, onClose, 
         <Section title="Dados do Pedido" description="Informações do cliente e condições.">
           <div className="sm:col-span-4">
             <label className="block text-sm font-medium text-gray-700 mb-1">Cliente</label>
-            <ClientAutocomplete
+            <SearchFirstSelect
               value={formData.cliente_id || null}
-              initialName={formData.cliente_nome}
-              onChange={(id, name) => {
-                handleHeaderChange('cliente_id', id);
-                if (name) handleHeaderChange('cliente_nome', name);
-              }}
+              initialLabel={formData.cliente_nome || undefined}
+              placeholder="Buscar cliente (Nome/CPF/CNPJ)…"
               disabled={isLocked}
+              search={async (q, limit) => {
+                const rows = await searchClients(q, limit);
+                return (rows || []).map((h: any) => ({
+                  id: h.id,
+                  label: h.nome || h.label,
+                  subtitle: h.doc_unico || null,
+                }));
+              }}
+              onSelect={(hit) => {
+                handleHeaderChange('cliente_id', hit.id);
+                handleHeaderChange('cliente_nome', hit.label);
+              }}
+              onClear={() => {
+                handleHeaderChange('cliente_id', null);
+                handleHeaderChange('cliente_nome', '');
+              }}
+              createLabel="Criar cliente/fornecedor"
+              onCreate={openQuickCreatePartner}
+              openCreateInNewTabHref="/app/cadastros/clientes-fornecedores?new=1"
             />
             {mode === 'pdv' ? (
               <div className="mt-1 text-xs text-gray-500">
@@ -945,7 +1014,27 @@ export default function PedidoVendaFormPanel({ vendaId, onSaveSuccess, onClose, 
                   </button>
                 </div>
               ) : null}
-              <ItemAutocomplete onSelect={handleAddItem} />
+              <SearchFirstSelect
+                value={null}
+                placeholder="Buscar produto ou serviço…"
+                disabled={isLocked}
+                search={async (q, limit) => {
+                  const rows = await searchItemsForOs(q, limit, true, 'all');
+                  return (rows || []).map((r: any) => ({
+                    id: `${r.type}:${r.id}`,
+                    label: r.descricao,
+                    subtitle: `${String(r.unidade || '').toUpperCase()} • ${formatMoneyBRL(Number(r.preco_venda) || 0)}`,
+                    meta: r,
+                  }));
+                }}
+                onSelect={(hit) => {
+                  const r = hit.meta as any;
+                  if (r) handleAddItem(r);
+                }}
+                createLabel="Criar produto"
+                onCreate={openQuickCreateProduct}
+                openCreateInNewTabHref="/app/products?new=1"
+              />
             </div>
           )}
           
@@ -1306,6 +1395,48 @@ export default function PedidoVendaFormPanel({ vendaId, onSaveSuccess, onClose, 
           )}
         </div>
       </footer>
-    </div>
+      </div>
+
+      <SideSheet
+        isOpen={isQuickCreatePartnerOpen}
+        onClose={() => {
+          setIsQuickCreatePartnerOpen(false);
+          setQuickCreatePartnerDraft(null);
+        }}
+        title="Criar cliente/fornecedor"
+        description="Fluxo ‘search-first’: use a busca para evitar duplicados. Se não encontrar, crie aqui e o pedido será atualizado automaticamente."
+      >
+        <PartnerFormPanel
+          partner={null}
+          initialValues={quickCreatePartnerInitialValues}
+          onSaveSuccess={handlePartnerQuickCreateSuccess}
+          onClose={() => {
+            setIsQuickCreatePartnerOpen(false);
+            setQuickCreatePartnerDraft(null);
+          }}
+        />
+      </SideSheet>
+
+      <SideSheet
+        isOpen={isQuickCreateProductOpen}
+        onClose={() => {
+          setIsQuickCreateProductOpen(false);
+          setQuickCreateProductDraft(null);
+        }}
+        title="Criar produto"
+        description="Crie o item e ele será inserido automaticamente no pedido."
+      >
+        <ProductFormPanel
+          product={null}
+          initialValues={quickCreateProductInitialValues}
+          onSaveSuccess={handleProductQuickCreateSuccess}
+          onClose={() => {
+            setIsQuickCreateProductOpen(false);
+            setQuickCreateProductDraft(null);
+          }}
+          saveProduct={(data) => saveProduct(data, '')}
+        />
+      </SideSheet>
+    </>
   );
 }
