@@ -447,14 +447,14 @@ test('Beneficiamento: criar OB e gerar operações na Execução', async ({ page
   await expect(page.getByRole('heading', { name: 'Nova Ordem de Beneficiamento' }).first()).toBeVisible({ timeout: 15000 });
 
   // 2.1) Cliente
-  const clienteInput = page.getByPlaceholder('Nome/CPF/CNPJ...');
+  const clienteInput = page.getByPlaceholder(/Nome\/CPF\/CNPJ/);
   await clienteInput.fill('Cl');
   const clienteHit = page.getByText('Cliente E2E').first();
   await expect(clienteHit).toBeVisible();
   await clienteHit.click();
 
   // 2.2) Produto/Serviço interno (Parafuso)
-  const itemInput = page.getByPlaceholder('Buscar produto ou serviço...');
+  const itemInput = page.getByPlaceholder(/Buscar produto ou servi[cç]o/);
   await itemInput.fill('Par');
   await page.getByText('Parafuso M6').first().click();
 
