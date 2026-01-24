@@ -250,14 +250,14 @@ test('Vendas: pedido (VEN-01/02) happy path (CRUD + itens + impostos básicos + 
   await page.getByLabel('Vendedor (opcional)').selectOption(vendedor.id);
 
   // Selecionar cliente via autocomplete (precisa >= 2 chars)
-  await page.getByPlaceholder('Nome/CPF/CNPJ...').fill('Cl');
+  await page.getByPlaceholder(/Nome\/CPF\/CNPJ/).fill('Cl');
   await page.getByText(clientHit.nome).click();
 
   await page.getByRole('button', { name: 'Salvar' }).click();
   await expect(page.getByText('Pedido criado! Agora adicione os itens.')).toBeVisible({ timeout: 20000 });
 
   // Adicionar item via autocomplete
-  await page.getByPlaceholder('Buscar produto ou serviço...').fill('Pr');
+  await page.getByPlaceholder(/Buscar produto ou servi[cç]o/).fill('Pr');
   await page.getByText(productHit.descricao).click();
   await expect(page.getByText('Item adicionado.')).toBeVisible({ timeout: 20000 });
 
