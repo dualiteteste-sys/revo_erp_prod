@@ -4,6 +4,8 @@ import Modal from '@/components/ui/Modal';
 import Input from '@/components/ui/forms/Input';
 import { previewParcelamento, type ParcelamentoPreviewItem } from '@/services/financeiroParcelamento';
 import { useToast } from '@/contexts/ToastProvider';
+import Select from '@/components/ui/forms/Select';
+import { searchCondicoesPagamento, type CondicaoPagamento } from '@/services/condicoesPagamento';
 
 type Props = {
   open: boolean;
@@ -31,6 +33,8 @@ export default function ParcelamentoDialog({
   onConfirm,
 }: Props) {
   const { addToast } = useToast();
+  const [condicoes, setCondicoes] = React.useState<CondicaoPagamento[]>([]);
+  const [condicaoPresetId, setCondicaoPresetId] = React.useState<string>('');
   const [condicao, setCondicao] = React.useState<string>('');
   const [baseDateISO, setBaseDateISO] = React.useState<string>('');
   const [loading, setLoading] = React.useState(false);
@@ -42,7 +46,35 @@ export default function ParcelamentoDialog({
     setCondicao((defaultCondicao ?? '').trim() || '1x');
     setBaseDateISO((defaultBaseDateISO ?? '').slice(0, 10) || new Date().toISOString().slice(0, 10));
     setPreview([]);
+    setCondicaoPresetId('');
   }, [open, defaultCondicao, defaultBaseDateISO]);
+
+  React.useEffect(() => {
+    if (!open) return;
+    let alive = true;
+    (async () => {
+      try {
+        const rows = await searchCondicoesPagamento({ tipo: 'ambos', q: null, limit: 50 });
+        if (!alive) return;
+        setCondicoes(rows ?? []);
+      } catch {
+        if (!alive) return;
+        setCondicoes([]);
+      }
+    })();
+    return () => {
+      alive = false;
+    };
+  }, [open]);
+
+  React.useEffect(() => {
+    if (!open) return;
+    if (condicaoPresetId) return;
+    const clean = (condicao || '').trim();
+    if (!clean) return;
+    const match = condicoes.find((c) => (c.condicao || '').trim() === clean);
+    if (match) setCondicaoPresetId(match.id);
+  }, [open, condicoes, condicao, condicaoPresetId]);
 
   React.useEffect(() => {
     if (!open) return;
@@ -110,11 +142,33 @@ export default function ParcelamentoDialog({
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-6 gap-4">
+          <Select
+            className="sm:col-span-3"
+            label="Condição cadastrada (opcional)"
+            name="condicao_pagamento_preset"
+            value={condicaoPresetId}
+            onChange={(e) => {
+              const nextId = e.target.value;
+              setCondicaoPresetId(nextId);
+              const picked = condicoes.find((c) => c.id === nextId);
+              if (picked?.condicao) setCondicao(String(picked.condicao));
+            }}
+          >
+            <option value="">Personalizada</option>
+            {condicoes.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.nome} • {c.condicao}
+              </option>
+            ))}
+          </Select>
           <Input
             className="sm:col-span-3"
             label="Condição de pagamento"
             value={condicao}
-            onChange={(e) => setCondicao(e.target.value)}
+            onChange={(e) => {
+              setCondicaoPresetId('');
+              setCondicao(e.target.value);
+            }}
             placeholder="Ex: 30/60/90 ou 3x"
           />
           <Input
@@ -189,4 +243,3 @@ export default function ParcelamentoDialog({
     </Modal>
   );
 }
-
