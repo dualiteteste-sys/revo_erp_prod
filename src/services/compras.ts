@@ -82,7 +82,7 @@ export async function saveCompra(payload: CompraPayload): Promise<CompraDetails>
 export async function manageCompraItem(
   pedidoId: string,
   itemId: string | null,
-  produtoId: string,
+  produtoId: string | null,
   quantidade: number,
   precoUnitario: number,
   action: 'upsert' | 'delete' = 'upsert'
