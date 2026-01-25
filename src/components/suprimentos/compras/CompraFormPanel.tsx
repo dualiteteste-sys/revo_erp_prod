@@ -169,7 +169,7 @@ export default function CompraFormPanel({ compraId, onSaveSuccess, onClose }: Pr
 
   const handleRemoveItem = async (itemId: string) => {
     try {
-      await manageCompraItem(formData.id!, itemId, '', 0, 0, 'delete');
+      await manageCompraItem(formData.id!, itemId, null, 0, 0, 'delete');
       await loadDetails(formData.id);
       addToast('Item removido.', 'success');
     } catch (e: any) {
