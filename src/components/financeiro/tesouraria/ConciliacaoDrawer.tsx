@@ -4,7 +4,7 @@ import { X, Loader2, Link2, Plus } from 'lucide-react';
 import { ExtratoItem, Movimentacao, listMovimentacoes, saveMovimentacao } from '@/services/treasury';
 import { useToast } from '@/contexts/ToastProvider';
 import { listConciliacaoRegras, type ConciliacaoRegra } from '@/services/conciliacaoRegras';
-import { conciliarExtratoComTitulo, searchTitulosParaConciliacao, sugerirTitulosParaExtrato, type ConciliacaoTituloCandidate, type ConciliacaoTituloTipo } from '@/services/conciliacaoTitulos';
+import { conciliarExtratoComTitulo, conciliarExtratoComTitulosLote, searchTitulosParaConciliacao, sugerirTitulosParaExtrato, type ConciliacaoTituloCandidate, type ConciliacaoTituloTipo } from '@/services/conciliacaoTitulos';
 import { rankCandidates, scoreExtratoToMovimentacao, type MatchResult } from '@/lib/conciliacao/matching';
 import DatePicker from '@/components/ui/DatePicker';
 
@@ -18,7 +18,7 @@ interface Props {
 
 export default function ConciliacaoDrawer({ isOpen, onClose, extratoItem, contaCorrenteId, onConciliate }: Props) {
   const { addToast } = useToast();
-  const [mode, setMode] = useState<'movimentacoes' | 'titulos'>('movimentacoes');
+  const [mode, setMode] = useState<'movimentacoes' | 'titulos'>('titulos');
   const [candidates, setCandidates] = useState<Array<MatchResult<Movimentacao>>>([]);
   const [loading, setLoading] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
@@ -36,6 +36,8 @@ export default function ConciliacaoDrawer({ isOpen, onClose, extratoItem, contaC
   const [titulosSearching, setTitulosSearching] = useState(false);
   const [titulosCount, setTitulosCount] = useState(0);
   const [titulosPage, setTitulosPage] = useState(1);
+  const [titulosSelected, setTitulosSelected] = useState<Record<string, ConciliacaoTituloCandidate>>({});
+  const [titulosBatchConciliando, setTitulosBatchConciliando] = useState(false);
 
   useEffect(() => {
     if (isOpen && extratoItem) {
@@ -45,11 +47,12 @@ export default function ConciliacaoDrawer({ isOpen, onClose, extratoItem, contaC
 
   useEffect(() => {
     if (!isOpen || !extratoItem) return;
-    setMode('movimentacoes');
+    setMode('titulos');
     setTitulosSearchTerm('');
     setTitulosResults([]);
     setTitulosCount(0);
     setTitulosPage(1);
+    setTitulosSelected({});
 
     const date = new Date(extratoItem.data_lancamento);
     const start = new Date(date);
@@ -203,6 +206,50 @@ export default function ConciliacaoDrawer({ isOpen, onClose, extratoItem, contaC
     }
   };
 
+  const toggleTituloSelected = (row: ConciliacaoTituloCandidate) => {
+    setTitulosSelected((prev) => {
+      const next = { ...prev };
+      if (next[row.titulo_id]) {
+        delete next[row.titulo_id];
+      } else {
+        next[row.titulo_id] = row;
+      }
+      return next;
+    });
+  };
+
+  const clearSelectedTitulos = () => setTitulosSelected({});
+
+  const selectedTitulosArray = Object.values(titulosSelected);
+  const selectedTitulosTotal = selectedTitulosArray.reduce((acc, t) => acc + Number(t.saldo_aberto || 0), 0);
+  const selectedTitulosDiff = extratoItem ? Number(extratoItem.valor || 0) - selectedTitulosTotal : 0;
+
+  const handleConciliarTitulosSelecionados = async () => {
+    if (!extratoItem) return;
+    if (titulosBatchConciliando || linkingId) return;
+    if (selectedTitulosArray.length === 0) return;
+    if (Math.abs(selectedTitulosDiff) > 0.01) {
+      addToast('A soma dos títulos selecionados precisa bater com o valor do extrato.', 'error');
+      return;
+    }
+
+    setTitulosBatchConciliando(true);
+    try {
+      const { movimentacaoId } = await conciliarExtratoComTitulosLote({
+        extratoId: extratoItem.id,
+        tipo: tipoTitulo,
+        tituloIds: selectedTitulosArray.map((t) => t.titulo_id),
+      });
+      await onConciliate(movimentacaoId);
+      addToast('Conciliação em lote concluída!', 'success');
+      onClose();
+    } catch (e: any) {
+      addToast(e?.message || 'Erro ao conciliar em lote.', 'error');
+    } finally {
+      setTitulosBatchConciliando(false);
+    }
+  };
+
   const handleCreateFromRule = async (rule: ConciliacaoRegra) => {
     if (!extratoItem) return;
     if (creatingFromRuleId) return;
@@ -306,15 +353,6 @@ export default function ConciliacaoDrawer({ isOpen, onClose, extratoItem, contaC
             <div className="flex items-center gap-2 mb-4">
               <button
                 type="button"
-                onClick={() => setMode('movimentacoes')}
-                className={`px-3 py-1.5 rounded-full text-sm border transition-colors ${
-                  mode === 'movimentacoes' ? 'bg-white border-blue-200 text-blue-700' : 'bg-transparent border-transparent text-gray-600 hover:bg-white/60'
-                }`}
-              >
-                Movimentações
-              </button>
-              <button
-                type="button"
                 onClick={() => setMode('titulos')}
                 className={`px-3 py-1.5 rounded-full text-sm border transition-colors ${
                   mode === 'titulos' ? 'bg-white border-blue-200 text-blue-700' : 'bg-transparent border-transparent text-gray-600 hover:bg-white/60'
@@ -322,10 +360,67 @@ export default function ConciliacaoDrawer({ isOpen, onClose, extratoItem, contaC
               >
                 Títulos (pagar/receber)
               </button>
+              <button
+                type="button"
+                onClick={() => setMode('movimentacoes')}
+                className={`px-3 py-1.5 rounded-full text-sm border transition-colors ${
+                  mode === 'movimentacoes' ? 'bg-white border-blue-200 text-blue-700' : 'bg-transparent border-transparent text-gray-600 hover:bg-white/60'
+                }`}
+              >
+                Movimentações
+              </button>
             </div>
 
             {mode === 'titulos' ? (
               <div className="space-y-4">
+                <div className="rounded-lg border bg-white p-3">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <div className="text-xs font-bold uppercase text-gray-600">Conciliação em lote</div>
+                      <div className="mt-1 text-xs text-gray-500">
+                        Selecione títulos para que a soma bata com o valor do extrato e clique em <span className="font-semibold">Conciliar selecionados</span>.
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={clearSelectedTitulos}
+                      disabled={selectedTitulosArray.length === 0 || titulosBatchConciliando || !!linkingId}
+                      className="text-xs text-gray-600 hover:underline disabled:opacity-60"
+                    >
+                      Limpar
+                    </button>
+                  </div>
+
+                  <div className="mt-3 flex items-center justify-between gap-3">
+                    <div className="text-xs text-gray-600">
+                      <div><span className="font-semibold">{selectedTitulosArray.length}</span> selecionado(s)</div>
+                      <div className="mt-0.5">
+                        Soma: <span className="font-semibold">R$ {selectedTitulosTotal.toFixed(2)}</span>
+                        {' · '}
+                        Diferença:{' '}
+                        <span className={`font-semibold ${Math.abs(selectedTitulosDiff) <= 0.01 ? 'text-emerald-700' : 'text-rose-700'}`}>
+                          R$ {selectedTitulosDiff.toFixed(2)}
+                        </span>
+                      </div>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => void handleConciliarTitulosSelecionados()}
+                      disabled={
+                        selectedTitulosArray.length === 0 ||
+                        titulosBatchConciliando ||
+                        !!linkingId ||
+                        Math.abs(selectedTitulosDiff) > 0.01
+                      }
+                      className="inline-flex items-center gap-2 rounded-md bg-emerald-600 px-3 py-2 text-sm font-medium text-white hover:bg-emerald-700 disabled:opacity-60"
+                    >
+                      {titulosBatchConciliando ? <Loader2 className="h-4 w-4 animate-spin" /> : <Link2 size={16} />}
+                      Conciliar selecionados
+                    </button>
+                  </div>
+                </div>
+
                 <div className="rounded-lg border bg-white p-3">
                   <div className="text-xs font-bold uppercase text-gray-600 mb-2">Sugestões automáticas</div>
                   {titulosLoading ? (
@@ -336,12 +431,23 @@ export default function ConciliacaoDrawer({ isOpen, onClose, extratoItem, contaC
                     <div className="space-y-2">
                       {titulosSuggestions.map((t) => {
                         const disabled = !!linkingId;
+                        const checked = !!titulosSelected[t.titulo_id];
                         return (
                           <div key={t.titulo_id} className="border rounded-lg p-3">
                             <div className="flex items-start justify-between gap-2">
-                              <div>
-                                <div className="text-sm font-medium text-gray-800">{t.pessoa_nome || '—'}</div>
-                                <div className="text-xs text-gray-500">{t.descricao || '—'}</div>
+                              <div className="flex items-start gap-2 min-w-0">
+                                <label className="pt-0.5">
+                                  <input
+                                    type="checkbox"
+                                    checked={checked}
+                                    disabled={titulosBatchConciliando || disabled}
+                                    onChange={() => toggleTituloSelected(t)}
+                                  />
+                                </label>
+                                <div className="min-w-0">
+                                  <div className="text-sm font-medium text-gray-800">{t.pessoa_nome || '—'}</div>
+                                  <div className="text-xs text-gray-500">{t.descricao || '—'}</div>
+                                </div>
                               </div>
                               <div className="text-right">
                                 <div className="text-sm font-bold text-gray-800">R$ {Number(t.saldo_aberto).toFixed(2)}</div>
@@ -408,10 +514,20 @@ export default function ConciliacaoDrawer({ isOpen, onClose, extratoItem, contaC
                       {titulosResults.map((t) => (
                         <div key={t.titulo_id} className="border rounded-lg p-3">
                           <div className="flex items-start justify-between gap-2">
-                            <div>
-                              <div className="text-sm font-medium text-gray-800">{t.pessoa_nome || '—'}</div>
-                              <div className="text-xs text-gray-500">{t.descricao || '—'}</div>
-                              {t.documento_ref ? <div className="text-[11px] text-gray-400">Doc: {t.documento_ref}</div> : null}
+                            <div className="flex items-start gap-2 min-w-0">
+                              <label className="pt-0.5">
+                                <input
+                                  type="checkbox"
+                                  checked={!!titulosSelected[t.titulo_id]}
+                                  disabled={titulosBatchConciliando || !!linkingId}
+                                  onChange={() => toggleTituloSelected(t)}
+                                />
+                              </label>
+                              <div className="min-w-0">
+                                <div className="text-sm font-medium text-gray-800">{t.pessoa_nome || '—'}</div>
+                                <div className="text-xs text-gray-500">{t.descricao || '—'}</div>
+                                {t.documento_ref ? <div className="text-[11px] text-gray-400">Doc: {t.documento_ref}</div> : null}
+                              </div>
                             </div>
                             <div className="text-right">
                               <div className="text-sm font-bold text-gray-800">R$ {Number(t.saldo_aberto).toFixed(2)}</div>

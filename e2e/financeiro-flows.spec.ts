@@ -594,6 +594,10 @@ test('Financeiro: tesouraria conciliação (score + conciliar)', async ({ page }
   await expect(page.getByRole('table')).toBeVisible();
   await page.getByRole('table').getByRole('button', { name: 'Conciliar', exact: true }).click();
 
+  // Drawer abre em "Títulos" (padrão). Para este cenário, vamos para "Movimentações".
+  const drawer = page.locator('div.fixed.inset-0.z-50');
+  await drawer.getByRole('button', { name: 'Movimentações' }).click();
+
   const autoBtn = page.getByRole('button', { name: /Conciliar melhor sugestão/i });
   await expect(autoBtn).toBeVisible();
   await expect(autoBtn).toContainText('Score');
