@@ -20,6 +20,7 @@ import Toggle from '@/components/ui/forms/Toggle';
 import { Button } from '@/components/ui/button';
 import { scoreExtratoToMovimentacao } from '@/lib/conciliacao/matching';
 import Pagination from '@/components/ui/Pagination';
+import ListPaginationBar from '@/components/ui/ListPaginationBar';
 
 export default function TesourariaPage() {
   const [activeTab, setActiveTab] = useState<'contas' | 'movimentos' | 'conciliacao' | 'regras'>('contas');
@@ -527,7 +528,7 @@ export default function TesourariaPage() {
             </div>
 
             {selectedContaId && extratoCount > 0 ? (
-              <div className="mt-4 flex-shrink-0">
+              <ListPaginationBar sticky={false} className="mt-4" innerClassName="px-3 sm:px-4">
                 <Pagination
                   currentPage={extratoPage}
                   totalCount={extratoCount}
@@ -538,7 +539,7 @@ export default function TesourariaPage() {
                     setExtratoPageSize(next);
                   }}
                 />
-              </div>
+              </ListPaginationBar>
             ) : null}
         </div>
       )}

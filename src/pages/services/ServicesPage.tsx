@@ -278,7 +278,7 @@ export default function ServicesPage() {
 
   return (
     <PageShell header={header} summary={summary} filters={filters} footer={footer}>
-      <PageCard>
+      <PageCard className="flex flex-col flex-1 min-h-0">
         {loading && services.length === 0 ? (
           <div className="h-96 flex items-center justify-center">
             <Loader2 className="animate-spin text-blue-500" size={32} />
@@ -315,19 +315,21 @@ export default function ServicesPage() {
                 },
               ]}
             />
-            <ServicesTable
-              services={services}
-              onEdit={handleOpenForm}
-              onDelete={openDeleteModal}
-              onClone={handleClone}
-              sortBy={sortBy}
-              onSort={handleSort}
-              selectedIds={bulk.selectedIds}
-              allSelected={bulk.allSelected}
-              someSelected={bulk.someSelected}
-              onToggleSelect={(id) => bulk.toggle(id)}
-              onToggleSelectAll={() => bulk.toggleAll(bulk.allIds)}
-            />
+            <div className="flex-1 min-h-0 overflow-auto">
+              <ServicesTable
+                services={services}
+                onEdit={handleOpenForm}
+                onDelete={openDeleteModal}
+                onClone={handleClone}
+                sortBy={sortBy}
+                onSort={handleSort}
+                selectedIds={bulk.selectedIds}
+                allSelected={bulk.allSelected}
+                someSelected={bulk.someSelected}
+                onToggleSelect={(id) => bulk.toggle(id)}
+                onToggleSelectAll={() => bulk.toggleAll(bulk.allIds)}
+              />
+            </div>
           </>
         )}
       </PageCard>

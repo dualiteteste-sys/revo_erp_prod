@@ -170,6 +170,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const setActiveEmpresa = async (empresa: Empresa) => {
     if (!userId) return;
     try {
+      // [FIX] Update storage immediately for faster feedback and next-request correctness
+      if (typeof window !== "undefined") {
+        sessionStorage.setItem("revo_active_empresa_id", empresa.id);
+      }
       await setActiveMutation.mutateAsync(empresa.id);
     } catch (e) {
       // Logger handled in mutation
@@ -214,12 +218,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         bootRef.current = false;
         setMustChangePassword(false);
         setPendingEmpresaId(null);
-        // setEmpresas([]); // Handled by query key change (userId becomes null)
-        // setActiveEmpresaId(null);
+        // [FIX] Clear session storage on sign out
+        if (typeof window !== "undefined") {
+          sessionStorage.removeItem("revo_active_empresa_id");
+        }
       }
     });
     return () => sub.subscription.unsubscribe();
   }, [supabase, refreshUserFlags]);
+
+  // Sync activeEmpresaId to sessionStorage for Header Injection (Tenant Leak fix)
+  useEffect(() => {
+    if (typeof window !== "undefined" && activeEmpresaId) {
+      sessionStorage.setItem("revo_active_empresa_id", activeEmpresaId);
+    }
+  }, [activeEmpresaId]);
 
   // Bootstrap + carga de empresas no primeiro login
   useEffect(() => {

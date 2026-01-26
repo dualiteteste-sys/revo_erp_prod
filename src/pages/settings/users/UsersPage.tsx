@@ -71,7 +71,7 @@ export default function UsersPage() {
 
   return (
     <PageShell header={header} filters={<UsersFilters filters={filters} onFilterChange={handleFilterChange} />} footer={footer}>
-      <PageCard className="flex flex-col h-full">
+      <PageCard className="flex flex-col flex-1 min-h-0">
         <div className="flex-1 min-h-0 overflow-auto">
           {isLoading ? (
             <UsersTableSkeleton />

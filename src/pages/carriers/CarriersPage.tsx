@@ -4,6 +4,7 @@ import { useToast } from '../../contexts/ToastProvider';
 import * as carriersService from '../../services/carriers';
 import { FileUp, Loader2, PlusCircle, Search, Truck, DatabaseBackup } from 'lucide-react';
 import Pagination from '../../components/ui/Pagination';
+import ListPaginationBar from '../../components/ui/ListPaginationBar';
 import ConfirmationModal from '../../components/ui/ConfirmationModal';
 import Modal from '../../components/ui/Modal';
 import CarriersTable from '../../components/carriers/CarriersTable';
@@ -229,7 +230,7 @@ const CarriersPage: React.FC = () => {
         </Select>
       </div>
 
-      <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden flex-1 min-h-0">
+      <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden flex flex-col flex-1 min-h-0">
         {loading && carriers.length === 0 ? (
           <div className="h-96 flex items-center justify-center">
             <Loader2 className="animate-spin text-blue-500" size={32} />
@@ -284,24 +285,26 @@ const CarriersPage: React.FC = () => {
                 },
               ]}
             />
-            <CarriersTable
-              carriers={carriers}
-              onEdit={handleOpenForm}
-              onDelete={handleOpenDeleteModal}
-              sortBy={sortBy}
-              onSort={handleSort}
-              selectedIds={bulk.selectedIds}
-              allSelected={bulk.allSelected}
-              someSelected={bulk.someSelected}
-              onToggleSelect={(id) => bulk.toggle(id)}
-              onToggleSelectAll={() => bulk.toggleAll(bulk.allIds)}
-            />
+            <div className="flex-1 min-h-0 overflow-auto">
+              <CarriersTable
+                carriers={carriers}
+                onEdit={handleOpenForm}
+                onDelete={handleOpenDeleteModal}
+                sortBy={sortBy}
+                onSort={handleSort}
+                selectedIds={bulk.selectedIds}
+                allSelected={bulk.allSelected}
+                someSelected={bulk.someSelected}
+                onToggleSelect={(id) => bulk.toggle(id)}
+                onToggleSelectAll={() => bulk.toggleAll(bulk.allIds)}
+              />
+            </div>
           </>
         )}
       </div>
 
       {count > 0 ? (
-        <div className="sticky bottom-0 z-20 mt-4 border-t border-gray-100 bg-white/95 backdrop-blur supports-[backdrop-filter]:bg-white/80">
+        <ListPaginationBar className="mt-4" innerClassName="px-3 sm:px-4">
           <Pagination
             currentPage={page}
             totalCount={count}
@@ -312,7 +315,7 @@ const CarriersPage: React.FC = () => {
               setPageSize(next);
             }}
           />
-        </div>
+        </ListPaginationBar>
       ) : null}
 
       <Modal

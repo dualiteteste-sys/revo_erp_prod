@@ -145,6 +145,16 @@ export const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey, {
 
       try {
         const headers = new Headers(init?.headers ?? (input instanceof Request ? input.headers : undefined));
+        
+        // [FIX] Tenant Leakage: Inject Active Company ID from Session Storage (Per-Tab Isolation)
+        // This ensures that the backend receives the correct company context for THIS specific tab/window.
+        if (typeof window !== "undefined") {
+          const activeEmpresaId = sessionStorage.getItem("revo_active_empresa_id");
+          if (activeEmpresaId && !headers.has("x-empresa-id")) {
+            headers.set("x-empresa-id", activeEmpresaId);
+          }
+        }
+
         if (!headers.has("x-revo-request-id")) headers.set("x-revo-request-id", requestId);
         const controller = new AbortController();
         const timeout = setTimeout(() => controller.abort(), timeoutMs);

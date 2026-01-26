@@ -158,8 +158,8 @@ export default function PedidosVendasPage() {
 
   return (
     <PageShell header={header} filters={filters} footer={footer}>
-      <PageCard className="flex flex-col h-full">
-        <div className="flex-grow overflow-auto">
+      <PageCard className="flex flex-col flex-1 min-h-0">
+        <div className="flex-1 min-h-0 overflow-auto">
           {loading ? (
             <div className="flex justify-center h-64 items-center">
               <Loader2 className="animate-spin text-blue-600 w-10 h-10" />

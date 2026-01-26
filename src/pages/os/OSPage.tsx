@@ -5,6 +5,7 @@ import { useToast } from '@/contexts/ToastProvider';
 import * as osService from '@/services/os';
 import { Loader2, PlusCircle, ClipboardCheck, LayoutGrid } from 'lucide-react';
 import Pagination from '@/components/ui/Pagination';
+import ListPaginationBar from '@/components/ui/ListPaginationBar';
 import ConfirmationModal from '@/components/ui/ConfirmationModal';
 import Modal from '@/components/ui/Modal';
 import OsTable from '@/components/os/OsTable';
@@ -283,40 +284,42 @@ const OSPage: React.FC = () => {
         </Select>
       </div>
 
-      <div className="bg-white rounded-lg shadow overflow-hidden flex-1 min-h-0">
-        {loading && serviceOrders.length === 0 ? (
-          <div className="h-96 flex items-center justify-center">
-            <Loader2 className="animate-spin text-blue-500" size={32} />
-          </div>
-        ) : error ? (
-          <div className="h-96 flex items-center justify-center text-red-500">{error}</div>
-        ) : serviceOrders.length === 0 ? (
-          <div className="h-96 flex flex-col items-center justify-center text-gray-500">
-            <ClipboardCheck size={48} className="mb-4" />
-            <p>Nenhuma Ordem de Serviço encontrada.</p>
-            {searchTerm && <p className="text-sm">Tente ajustar sua busca.</p>}
-          </div>
-        ) : (
-          <DragDropContext onDragEnd={onDragEnd}>
-            <OsTable
-              serviceOrders={serviceOrders}
-              onEdit={handleOpenForm}
-              onDelete={handleOpenDeleteModal}
-              onOpenAgenda={() => setIsKanbanModalOpen(true)}
-              onSetStatus={handleSetStatus}
-              sortBy={sortBy}
-              onSort={handleSort}
-              canUpdate={permUpdate.data}
-              canManage={permManage.data}
-              canDelete={permDelete.data}
-              busyOsId={statusUpdatingId}
-            />
-          </DragDropContext>
-        )}
+      <div className="bg-white rounded-lg shadow overflow-hidden flex flex-col flex-1 min-h-0">
+        <div className="flex-1 min-h-0 overflow-auto">
+          {loading && serviceOrders.length === 0 ? (
+            <div className="h-96 flex items-center justify-center">
+              <Loader2 className="animate-spin text-blue-500" size={32} />
+            </div>
+          ) : error ? (
+            <div className="h-96 flex items-center justify-center text-red-500">{error}</div>
+          ) : serviceOrders.length === 0 ? (
+            <div className="h-96 flex flex-col items-center justify-center text-gray-500">
+              <ClipboardCheck size={48} className="mb-4" />
+              <p>Nenhuma Ordem de Serviço encontrada.</p>
+              {searchTerm && <p className="text-sm">Tente ajustar sua busca.</p>}
+            </div>
+          ) : (
+            <DragDropContext onDragEnd={onDragEnd}>
+              <OsTable
+                serviceOrders={serviceOrders}
+                onEdit={handleOpenForm}
+                onDelete={handleOpenDeleteModal}
+                onOpenAgenda={() => setIsKanbanModalOpen(true)}
+                onSetStatus={handleSetStatus}
+                sortBy={sortBy}
+                onSort={handleSort}
+                canUpdate={permUpdate.data}
+                canManage={permManage.data}
+                canDelete={permDelete.data}
+                busyOsId={statusUpdatingId}
+              />
+            </DragDropContext>
+          )}
+        </div>
       </div>
 
       {count > 0 ? (
-        <div className="sticky bottom-0 z-20 mt-4 border-t border-gray-100 bg-white/95 backdrop-blur supports-[backdrop-filter]:bg-white/80">
+        <ListPaginationBar className="mt-4" innerClassName="px-3 sm:px-4">
           <Pagination
             currentPage={page}
             totalCount={count}
@@ -327,7 +330,7 @@ const OSPage: React.FC = () => {
               setPageSize(next);
             }}
           />
-        </div>
+        </ListPaginationBar>
       ) : null}
 
       <Modal isOpen={isFormOpen} onClose={handleCloseForm} title={selectedOs ? 'Editar Ordem de Serviço' : 'Nova Ordem de Serviço'}>

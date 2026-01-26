@@ -9,6 +9,7 @@ import CompraFormPanel from '@/components/suprimentos/compras/CompraFormPanel';
 import Select from '@/components/ui/forms/Select';
 import CsvExportDialog from '@/components/ui/CsvExportDialog';
 import Pagination from '@/components/ui/Pagination';
+import ListPaginationBar from '@/components/ui/ListPaginationBar';
 import { useSearchParams } from 'react-router-dom';
 
 export default function ComprasPage() {
@@ -139,18 +140,20 @@ export default function ComprasPage() {
         </Select>
       </div>
 
-      <div className="bg-white rounded-lg shadow overflow-hidden min-h-[400px] flex-1 min-h-0">
-        {loading ? (
-          <div className="flex justify-center h-64 items-center">
-            <Loader2 className="animate-spin text-blue-600 w-10 h-10" />
-          </div>
-        ) : (
-          <ComprasTable orders={orders} onEdit={handleEdit} />
-        )}
+      <div className="bg-white rounded-lg shadow overflow-hidden flex flex-col flex-1 min-h-0 min-h-[400px]">
+        <div className="flex-1 min-h-0 overflow-auto">
+          {loading ? (
+            <div className="flex justify-center h-64 items-center">
+              <Loader2 className="animate-spin text-blue-600 w-10 h-10" />
+            </div>
+          ) : (
+            <ComprasTable orders={orders} onEdit={handleEdit} />
+          )}
+        </div>
       </div>
 
       {totalCount > 0 ? (
-        <div className="sticky bottom-0 z-20 mt-4 border-t border-gray-100 bg-white/95 backdrop-blur supports-[backdrop-filter]:bg-white/80">
+        <ListPaginationBar className="mt-4" innerClassName="px-3 sm:px-4">
           <Pagination
             currentPage={page}
             totalCount={totalCount}
@@ -161,7 +164,7 @@ export default function ComprasPage() {
               setPageSize(next);
             }}
           />
-        </div>
+        </ListPaginationBar>
       ) : null}
 
       <Modal isOpen={isFormOpen} onClose={handleClose} title={selectedId ? 'Editar Pedido de Compra' : 'Novo Pedido de Compra'} size="5xl">
