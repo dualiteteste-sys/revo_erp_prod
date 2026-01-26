@@ -19,6 +19,7 @@ import DatePicker from '@/components/ui/DatePicker';
 import Toggle from '@/components/ui/forms/Toggle';
 import { Button } from '@/components/ui/button';
 import { scoreExtratoToMovimentacao } from '@/lib/conciliacao/matching';
+import Pagination from '@/components/ui/Pagination';
 
 export default function TesourariaPage() {
   const [activeTab, setActiveTab] = useState<'contas' | 'movimentos' | 'conciliacao' | 'regras'>('contas');
@@ -63,6 +64,11 @@ export default function TesourariaPage() {
     loading: loadingExtrato,
     refresh: refreshExtrato,
     filterConciliado, setFilterConciliado,
+    count: extratoCount,
+    page: extratoPage,
+    pageSize: extratoPageSize,
+    setPage: setExtratoPage,
+    setPageSize: setExtratoPageSize,
   } = useExtratos(selectedContaId);
 
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
@@ -465,6 +471,21 @@ export default function TesourariaPage() {
                     />
                 )}
             </div>
+
+            {selectedContaId && extratoCount > 0 ? (
+              <div className="sticky bottom-0 z-20 mt-4 border-t border-gray-100 bg-white/95 backdrop-blur supports-[backdrop-filter]:bg-white/80">
+                <Pagination
+                  currentPage={extratoPage}
+                  totalCount={extratoCount}
+                  pageSize={extratoPageSize}
+                  onPageChange={setExtratoPage}
+                  onPageSizeChange={(next) => {
+                    setExtratoPage(1);
+                    setExtratoPageSize(next);
+                  }}
+                />
+              </div>
+            ) : null}
         </>
       )}
 
