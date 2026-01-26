@@ -362,9 +362,9 @@ export default function TesourariaPage() {
       )}
 
       {activeTab === 'movimentos' && (
-        <>
-            <div className="mb-6 flex flex-wrap gap-4 items-end">
-                <div className="min-w-[250px]">
+        <div className="flex flex-1 flex-col min-h-0">
+            <div className="mb-6 grid grid-cols-1 gap-4 items-end md:grid-cols-12">
+                <div className="md:col-span-4 min-w-0">
                     <label className="block text-sm font-medium text-gray-700 mb-1">Conta Corrente</label>
                     <select 
                         value={selectedContaId || ''} 
@@ -378,21 +378,23 @@ export default function TesourariaPage() {
                     </select>
                 </div>
                 
-                <div className="flex items-center gap-2">
-                    <DatePicker label="De" value={movStartDate} onChange={setMovStartDate} className="w-40" />
-                    <DatePicker label="Até" value={movEndDate} onChange={setMovEndDate} className="w-40" />
+                <div className="md:col-span-5 min-w-0 flex flex-wrap gap-3">
+                    <DatePicker label="De" value={movStartDate} onChange={setMovStartDate} className="min-w-[11rem] flex-1" />
+                    <DatePicker label="Até" value={movEndDate} onChange={setMovEndDate} className="min-w-[11rem] flex-1" />
                 </div>
 
-                <Button
-                  onClick={handleNewMov}
-                  disabled={!selectedContaId}
-                  className="gap-2 ml-auto"
-                >
-                  <ArrowRightLeft size={18} /> Registrar Movimento
-                </Button>
+                <div className="md:col-span-3 flex justify-start md:justify-end">
+                  <Button
+                    onClick={handleNewMov}
+                    disabled={!selectedContaId}
+                    className="gap-2 w-full md:w-auto"
+                  >
+                    <ArrowRightLeft size={18} /> Registrar Movimento
+                  </Button>
+                </div>
             </div>
 
-            <div className="bg-white rounded-lg shadow overflow-hidden flex-grow">
+            <div className="bg-white rounded-lg shadow overflow-hidden flex-1 min-h-0">
                 {!selectedContaId ? (
                     <div className="flex flex-col items-center justify-center h-64 text-gray-500">
                         <Landmark size={48} className="mb-4 opacity-20" />
@@ -401,20 +403,22 @@ export default function TesourariaPage() {
                 ) : loadingMov ? (
                     <div className="flex justify-center h-64 items-center"><Loader2 className="animate-spin text-blue-600 w-10 h-10" /></div>
                 ) : (
+                  <div className="h-full overflow-auto">
                     <MovimentacoesTable 
                         movimentacoes={movimentacoes} 
                         onEdit={handleEditMov} 
                         onDelete={setMovToDelete} 
                     />
+                  </div>
                 )}
             </div>
-        </>
+        </div>
       )}
 
       {activeTab === 'conciliacao' && (
-        <>
-            <div className="mb-6 flex flex-wrap gap-4 items-end">
-                <div className="min-w-[250px]">
+        <div className="flex flex-1 flex-col min-h-0">
+            <div className="mb-6 grid grid-cols-1 gap-4 items-end md:grid-cols-12">
+                <div className="md:col-span-3 min-w-0">
                     <label className="block text-sm font-medium text-gray-700 mb-1">Conta Corrente</label>
                     <select 
                         value={selectedContaId || ''} 
@@ -428,59 +432,81 @@ export default function TesourariaPage() {
                     </select>
                 </div>
 
-                <div className="flex items-center gap-4 bg-white p-2 rounded-lg border">
-                    <Toggle 
-                        label="Apenas Pendentes" 
-                        name="pendentes" 
-                        checked={filterConciliado === false} 
-                        onChange={(checked) => setFilterConciliado(checked ? false : null)} 
-                    />
+                <div className="md:col-span-2 flex items-end">
+                  <div className="w-full bg-white p-2 rounded-lg border">
+                      <Toggle 
+                          label="Apenas Pendentes" 
+                          name="pendentes" 
+                          checked={filterConciliado === false} 
+                          onChange={(checked) => setFilterConciliado(checked ? false : null)} 
+                      />
+                  </div>
                 </div>
 
-                <div className="flex items-center gap-2">
-                  <DatePicker label="De" value={extratoStartDate} onChange={(d) => { setExtratoStartDate(d); setExtratoPage(1); }} className="w-40" />
-                  <DatePicker label="Até" value={extratoEndDate} onChange={(d) => { setExtratoEndDate(d); setExtratoPage(1); }} className="w-40" />
+                <div className="md:col-span-4 min-w-0 flex flex-wrap gap-3">
+                  <DatePicker
+                    label="De"
+                    value={extratoStartDate}
+                    onChange={(d) => {
+                      setExtratoStartDate(d);
+                      setExtratoPage(1);
+                    }}
+                    className="min-w-[11rem] flex-1"
+                  />
+                  <DatePicker
+                    label="Até"
+                    value={extratoEndDate}
+                    onChange={(d) => {
+                      setExtratoEndDate(d);
+                      setExtratoPage(1);
+                    }}
+                    className="min-w-[11rem] flex-1"
+                  />
                 </div>
 
-                <div className="flex items-end gap-2 bg-white p-2 rounded-lg border">
-                  <label className="text-xs text-gray-600">
-                    Threshold
-                    <select
-                      value={bulkThreshold}
-                      onChange={(e) => setBulkThreshold(Number(e.target.value))}
-                      className="mt-1 w-[120px] rounded-md border border-gray-200 bg-white px-2 py-2 text-sm"
-                      disabled={!selectedContaId || bulkConciliando}
+                <div className="md:col-span-3 min-w-0">
+                  <div className="w-full flex flex-wrap items-end gap-2 bg-white p-2 rounded-lg border">
+                    <label className="text-xs text-gray-600">
+                      Threshold
+                      <select
+                        value={bulkThreshold}
+                        onChange={(e) => setBulkThreshold(Number(e.target.value))}
+                        className="mt-1 w-[120px] rounded-md border border-gray-200 bg-white px-2 py-2 text-sm"
+                        disabled={!selectedContaId || bulkConciliando}
+                      >
+                        {[70, 75, 80, 85, 90, 95].map((n) => (
+                          <option key={n} value={n}>
+                            {n}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      onClick={() => void handleAutoConciliarPagina()}
+                      disabled={!selectedContaId || bulkConciliando || !!busyExtratoId}
+                      className="gap-2 flex-1"
+                      title="Tenta conciliar automaticamente todos os lançamentos pendentes da página atual."
                     >
-                      {[70, 75, 80, 85, 90, 95].map((n) => (
-                        <option key={n} value={n}>
-                          {n}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
+                      {bulkConciliando ? <Loader2 className="h-4 w-4 animate-spin" /> : <ArrowRightLeft size={18} />}
+                      Auto conciliar (página)
+                    </Button>
+                  </div>
+                </div>
+
+                <div className="md:col-span-12 flex justify-start md:justify-end">
                   <Button
-                    type="button"
-                    variant="secondary"
-                    onClick={() => void handleAutoConciliarPagina()}
-                    disabled={!selectedContaId || bulkConciliando || !!busyExtratoId}
-                    className="gap-2"
-                    title="Tenta conciliar automaticamente todos os lançamentos pendentes da página atual."
+                    onClick={() => setIsImportModalOpen(true)}
+                    disabled={!selectedContaId}
+                    className="gap-2 w-full md:w-auto"
                   >
-                    {bulkConciliando ? <Loader2 className="h-4 w-4 animate-spin" /> : <ArrowRightLeft size={18} />}
-                    Auto conciliar (página)
+                    <UploadCloud size={18} /> Importar Extrato
                   </Button>
                 </div>
-
-                <Button
-                  onClick={() => setIsImportModalOpen(true)}
-                  disabled={!selectedContaId}
-                  className="gap-2 ml-auto"
-                >
-                  <UploadCloud size={18} /> Importar Extrato
-                </Button>
             </div>
 
-            <div className="bg-white rounded-lg shadow overflow-hidden flex-grow">
+            <div className="bg-white rounded-lg shadow overflow-hidden flex-1 min-h-0">
                 {!selectedContaId ? (
                     <div className="flex flex-col items-center justify-center h-64 text-gray-500">
                         <FileSpreadsheet size={48} className="mb-4 opacity-20" />
@@ -489,17 +515,19 @@ export default function TesourariaPage() {
                 ) : loadingExtrato ? (
                     <div className="flex justify-center h-64 items-center"><Loader2 className="animate-spin text-blue-600 w-10 h-10" /></div>
                 ) : (
+                  <div className="h-full overflow-auto">
                     <ExtratosTable 
                         extratos={extratos} 
                         onConciliate={(item) => (busyExtratoId ? undefined : setConciliacaoItem(item))} 
                         onUnconciliate={handleUnconciliate}
                         busyExtratoId={busyExtratoId}
                     />
+                  </div>
                 )}
             </div>
 
             {selectedContaId && extratoCount > 0 ? (
-              <div className="sticky bottom-0 z-20 mt-4 border-t border-gray-100 bg-white/95 backdrop-blur supports-[backdrop-filter]:bg-white/80">
+              <div className="mt-4 flex-shrink-0">
                 <Pagination
                   currentPage={extratoPage}
                   totalCount={extratoCount}
@@ -512,7 +540,7 @@ export default function TesourariaPage() {
                 />
               </div>
             ) : null}
-        </>
+        </div>
       )}
 
       {activeTab === 'regras' && (
