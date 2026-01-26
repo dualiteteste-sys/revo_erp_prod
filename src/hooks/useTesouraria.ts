@@ -121,7 +121,7 @@ export const useExtratos = (contaCorrenteId: string | null) => {
   const [endDate, setEndDate] = useState<Date | null>(null);
   const [filterConciliado, setFilterConciliado] = useState<boolean | null>(null); // null = all
   const [page, setPage] = useState(1);
-  const [pageSize] = useState(50);
+  const [pageSize, setPageSize] = useState(50);
 
   const queryOptions = {
     contaCorrenteId: contaCorrenteId!,
@@ -155,6 +155,7 @@ export const useExtratos = (contaCorrenteId: string | null) => {
     endDate,
     filterConciliado,
     setPage,
+    setPageSize,
     setSearchTerm,
     setStartDate,
     setEndDate,
