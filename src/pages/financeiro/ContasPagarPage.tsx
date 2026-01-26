@@ -240,8 +240,8 @@ const ContasPagarPage: React.FC = () => {
               className="min-w-[180px]"
             >
               <option value="">Todos os status</option>
-              <option value="aberta">Aberta</option>
-              <option value="pendente">Pendente (Aberta)</option>
+              <option value="aberta">Em aberto</option>
+              <option value="vencidas">Vencidas</option>
               <option value="parcial">Parcial</option>
               <option value="paga">Paga</option>
               <option value="cancelada">Cancelada</option>

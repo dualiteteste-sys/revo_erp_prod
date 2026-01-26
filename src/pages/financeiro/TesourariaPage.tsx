@@ -63,6 +63,10 @@ export default function TesourariaPage() {
     extratos,
     loading: loadingExtrato,
     refresh: refreshExtrato,
+    startDate: extratoStartDate,
+    endDate: extratoEndDate,
+    setStartDate: setExtratoStartDate,
+    setEndDate: setExtratoEndDate,
     filterConciliado, setFilterConciliado,
     count: extratoCount,
     page: extratoPage,
@@ -148,6 +152,23 @@ export default function TesourariaPage() {
   const handleImport = async (itens: any[]) => {
     if (!selectedContaId) return;
     await importarExtrato(selectedContaId, itens);
+    // UX: após import, garantir que o usuário veja o período importado (e primeira página).
+    try {
+      const dates = (itens || [])
+        .map((i: any) => String(i?.data_lancamento || ''))
+        .filter((s: string) => /^\d{4}-\d{2}-\d{2}$/.test(s))
+        .map((s: string) => new Date(`${s}T00:00:00`))
+        .filter((d: Date) => !Number.isNaN(d.getTime()));
+      if (dates.length > 0) {
+        const min = new Date(Math.min(...dates.map((d) => d.getTime())));
+        const max = new Date(Math.max(...dates.map((d) => d.getTime())));
+        setExtratoStartDate(min);
+        setExtratoEndDate(max);
+      }
+    } catch {
+      // best-effort
+    }
+    setExtratoPage(1);
     refreshExtrato();
   };
 
@@ -414,6 +435,11 @@ export default function TesourariaPage() {
                         checked={filterConciliado === false} 
                         onChange={(checked) => setFilterConciliado(checked ? false : null)} 
                     />
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <DatePicker label="De" value={extratoStartDate} onChange={(d) => { setExtratoStartDate(d); setExtratoPage(1); }} className="w-40" />
+                  <DatePicker label="Até" value={extratoEndDate} onChange={(d) => { setExtratoEndDate(d); setExtratoPage(1); }} className="w-40" />
                 </div>
 
                 <div className="flex items-end gap-2 bg-white p-2 rounded-lg border">
