@@ -19,6 +19,7 @@ declare
   v_header_emp uuid;
   v_uid uuid := public.current_user_id();
   v_headers json;
+  v_guc_emp uuid;
 begin
   if v_uid is null then
     return null;
@@ -33,30 +34,30 @@ begin
 
   if v_headers is not null and (v_headers ->> 'x-empresa-id') is not null then
     begin
+      -- Try cast to UUID
       v_header_emp := (v_headers ->> 'x-empresa-id')::uuid;
       
       -- SEGURANÇA: Valida se o usuário REALMENTE pertence a essa empresa.
-      -- Impede que um atacante force um ID de empresa alheia no header.
       if public.is_user_member_of(v_header_emp) then
         return v_header_emp;
       end if;
-      -- Se não for membro, ignora o header e cai no fallback (ou poderia retornar null).
-      -- Optamos por cair no fallback para manter compatibilidade em casos de borda.
     exception when others then
-      -- ID inválido no header (não UUID), ignora.
       null;
     end;
   end if;
 
   -- B) Configuração de Sessão (GUC) - usado por jobs/testes
   begin
-     return nullif(current_setting('app.current_empresa_id', true), '')::uuid;
+     v_guc_emp := nullif(current_setting('app.current_empresa_id', true), '')::uuid;
   exception when others then
-     null;
+     v_guc_emp := null;
   end;
+  
+  if v_guc_emp is not null then
+    return v_guc_emp;
+  end if;
 
   -- C) Fallback Legado: Estado persistido no banco (user_active_empresa)
-  -- Mantém compatibilidade se o frontend não mandar o header (Rollback Safe).
   return public.get_preferred_empresa_for_user(v_uid);
 end;
 $$;
@@ -64,7 +65,6 @@ $$;
 revoke all on function public.current_empresa_id() from public, anon;
 grant execute on function public.current_empresa_id() to authenticated, service_role, postgres;
 
--- Notifica PostgREST para recarregar schema (necessário para cache de funções STABLE)
 select pg_notify('pgrst', 'reload schema');
 
 COMMIT;
