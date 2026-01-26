@@ -3,6 +3,7 @@ import { useExtrato } from '@/hooks/useExtrato';
 import { useContasCorrentes } from '@/hooks/useTesouraria';
 import { Loader2, Search, FileSpreadsheet, X, Printer, Download } from 'lucide-react';
 import Pagination from '@/components/ui/Pagination';
+import ListPaginationBar from '@/components/ui/ListPaginationBar';
 import ExtratoTable from '@/components/financeiro/extrato/ExtratoTable';
 import ExtratoSummaryCards from '@/components/financeiro/extrato/ExtratoSummary';
 import Select from '@/components/ui/forms/Select';
@@ -195,7 +196,7 @@ export default function ExtratoPage() {
 
       {selectedContaId && <ExtratoSummaryCards summary={summary} />}
 
-      <div className="bg-white rounded-lg shadow overflow-hidden print:shadow-none print:border flex-1 min-h-0">
+      <div className="bg-white rounded-lg shadow overflow-hidden print:overflow-visible print:shadow-none print:border flex-1 min-h-0 flex flex-col">
         {loading ? (
           <div className="h-96 flex items-center justify-center">
             <Loader2 className="animate-spin text-blue-500" size={32} />
@@ -203,13 +204,15 @@ export default function ExtratoPage() {
         ) : error ? (
           <div className="h-96 flex items-center justify-center text-red-500">{error}</div>
         ) : (
-          <ExtratoTable lancamentos={lancamentos} />
+          <div className="flex-1 min-h-0 overflow-auto print:overflow-visible">
+            <ExtratoTable lancamentos={lancamentos} />
+          </div>
         )}
       </div>
 
       <div className="print:hidden">
         {count > 0 ? (
-          <div className="sticky bottom-0 z-20 mt-4 border-t border-gray-100 bg-white/95 backdrop-blur supports-[backdrop-filter]:bg-white/80">
+          <ListPaginationBar className="mt-4" innerClassName="px-3 sm:px-4">
             <Pagination
               currentPage={page}
               totalCount={count}
@@ -220,7 +223,7 @@ export default function ExtratoPage() {
                 setPageSize(next);
               }}
             />
-          </div>
+          </ListPaginationBar>
         ) : null}
       </div>
     </div>

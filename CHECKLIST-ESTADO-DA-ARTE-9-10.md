@@ -155,6 +155,9 @@ Definições:
 
 ### 3.1 Padrões de listagem
 - [ ] Padronizar paginação/ordenção/filtros em todas as listas grandes.
+  - [x] Padrão de paginação + scroll interno (barra sticky + page size 10/50/100/200) aplicado nas listagens principais (via `src/components/ui/ListPaginationBar.tsx` e `src/components/ui/PageShell.tsx`).
+  - [ ] Padronizar ordenação (tipo-aware) em todas as tabelas/listas grandes.
+  - [ ] Padronizar filtros (layout + defaults) em todas as listas grandes.
 - [ ] Remover `select('*')` onde não é necessário (buscar colunas mínimas).
 - [ ] Evitar N+1: consolidar agregações no backend (RPC) e usar joins/CTEs com índices.
 

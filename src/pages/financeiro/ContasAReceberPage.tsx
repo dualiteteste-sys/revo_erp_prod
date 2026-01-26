@@ -4,6 +4,7 @@ import { useToast } from '@/contexts/ToastProvider';
 import * as contasAReceberService from '@/services/contasAReceber';
 import { Loader2, PlusCircle, Search, TrendingUp, DatabaseBackup, X } from 'lucide-react';
 import Pagination from '@/components/ui/Pagination';
+import ListPaginationBar from '@/components/ui/ListPaginationBar';
 import ConfirmationModal from '@/components/ui/ConfirmationModal';
 import Modal from '@/components/ui/Modal';
 import ContasAReceberTable from '@/components/financeiro/contas-a-receber/ContasAReceberTable';
@@ -269,35 +270,37 @@ const ContasAReceberPage: React.FC = () => {
         </div>
       </div>
 
-      <div className="bg-white rounded-lg shadow overflow-hidden flex-1 min-h-0">
-        {loading && contas.length === 0 ? (
-          <div className="h-96 flex items-center justify-center">
-            <Loader2 className="animate-spin text-blue-500" size={32} />
-          </div>
-        ) : error ? (
-          <div className="h-96 flex items-center justify-center text-red-500">{error}</div>
-        ) : contas.length === 0 ? (
-          <div className="h-96 flex flex-col items-center justify-center text-gray-500">
-            <TrendingUp size={48} className="mb-4" />
-            <p>Nenhuma conta a receber encontrada.</p>
-            {searchTerm && <p className="text-sm">Tente ajustar sua busca.</p>}
-          </div>
-        ) : (
-          <ContasAReceberTable
-            contas={contas}
-            onEdit={handleOpenForm}
-            onReceive={handleReceive}
-            onCancel={handleOpenCancel}
-            onReverse={handleOpenEstorno}
-            onDelete={handleOpenDeleteModal}
-            sortBy={sortBy}
-            onSort={handleSort}
-          />
-        )}
+      <div className="bg-white rounded-lg shadow overflow-hidden flex flex-col flex-1 min-h-0">
+        <div className="flex-1 min-h-0 overflow-auto">
+          {loading && contas.length === 0 ? (
+            <div className="h-96 flex items-center justify-center">
+              <Loader2 className="animate-spin text-blue-500" size={32} />
+            </div>
+          ) : error ? (
+            <div className="h-96 flex items-center justify-center text-red-500">{error}</div>
+          ) : contas.length === 0 ? (
+            <div className="h-96 flex flex-col items-center justify-center text-gray-500">
+              <TrendingUp size={48} className="mb-4" />
+              <p>Nenhuma conta a receber encontrada.</p>
+              {searchTerm && <p className="text-sm">Tente ajustar sua busca.</p>}
+            </div>
+          ) : (
+            <ContasAReceberTable
+              contas={contas}
+              onEdit={handleOpenForm}
+              onReceive={handleReceive}
+              onCancel={handleOpenCancel}
+              onReverse={handleOpenEstorno}
+              onDelete={handleOpenDeleteModal}
+              sortBy={sortBy}
+              onSort={handleSort}
+            />
+          )}
+        </div>
       </div>
 
       {count > 0 ? (
-        <div className="sticky bottom-0 z-20 mt-4 border-t border-gray-100 bg-white/95 backdrop-blur supports-[backdrop-filter]:bg-white/80">
+        <ListPaginationBar className="mt-4" innerClassName="px-3 sm:px-4">
           <Pagination
             currentPage={page}
             totalCount={count}
@@ -308,7 +311,7 @@ const ContasAReceberPage: React.FC = () => {
               setPageSize(next);
             }}
           />
-        </div>
+        </ListPaginationBar>
       ) : null}
 
       <Modal isOpen={isFormOpen} onClose={handleCloseForm} title={selectedConta ? 'Editar Conta a Receber' : 'Nova Conta a Receber'}>

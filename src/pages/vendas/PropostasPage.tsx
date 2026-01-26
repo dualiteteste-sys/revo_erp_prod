@@ -6,6 +6,7 @@ import Modal from '@/components/ui/Modal';
 import PedidosVendasTable from '@/components/vendas/PedidosVendasTable';
 import PedidoVendaFormPanel from '@/components/vendas/PedidoVendaFormPanel';
 import Pagination from '@/components/ui/Pagination';
+import ListPaginationBar from '@/components/ui/ListPaginationBar';
 import { useToast } from '@/contexts/ToastProvider';
 import { SeedButton } from '@/components/common/SeedButton';
 
@@ -119,7 +120,7 @@ export default function PropostasPage() {
           )}
         </div>
         {totalCount > 0 ? (
-          <div className="sticky bottom-0 z-20 border-t border-gray-200 bg-white/95 px-4 backdrop-blur supports-[backdrop-filter]:bg-white/80">
+          <ListPaginationBar innerClassName="px-3 sm:px-4">
             <Pagination
               currentPage={page}
               totalCount={totalCount}
@@ -130,7 +131,7 @@ export default function PropostasPage() {
                 setPageSize(next);
               }}
             />
-          </div>
+          </ListPaginationBar>
         ) : null}
       </div>
 

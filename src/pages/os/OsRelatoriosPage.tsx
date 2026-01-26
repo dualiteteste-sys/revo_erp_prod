@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button';
 import { useToast } from '@/contexts/ToastProvider';
 import { getOsRelatoriosResumo, listOsRelatorios, type OsRelatoriosListRow, type OsRelatoriosResumo } from '@/services/osRelatorios';
 import Pagination from '@/components/ui/Pagination';
+import ListPaginationBar from '@/components/ui/ListPaginationBar';
 import SearchField from '@/components/ui/forms/SearchField';
 import { useNavigate } from 'react-router-dom';
 import ClientAutocomplete from '@/components/common/ClientAutocomplete';
@@ -638,7 +639,7 @@ export default function OsRelatoriosPage() {
             </div>
 
             {count > 0 ? (
-              <div className="sticky bottom-0 z-20 mt-3 border-t border-gray-100 bg-white/95 backdrop-blur supports-[backdrop-filter]:bg-white/80">
+              <ListPaginationBar className="mt-3" innerClassName="px-3 sm:px-4">
                 <Pagination
                   currentPage={page}
                   totalCount={count}
@@ -649,7 +650,7 @@ export default function OsRelatoriosPage() {
                     setPageSize(next);
                   }}
                 />
-              </div>
+              </ListPaginationBar>
             ) : null}
           </GlassCard>
         </>

@@ -35,7 +35,13 @@ export default function PageShell({
             stickyFooter ? 'sticky bottom-0 z-20 -mx-1 px-1 pt-3' : 'mt-4',
           )}
         >
-          <div className={cn(stickyFooter ? 'border-t border-gray-100 bg-white/95 backdrop-blur supports-[backdrop-filter]:bg-white/80' : null)}>
+          <div
+            className={cn(
+              stickyFooter
+                ? 'border-t border-gray-100 bg-white/95 px-3 sm:px-4 backdrop-blur supports-[backdrop-filter]:bg-white/80'
+                : null,
+            )}
+          >
             {footer}
           </div>
         </div>

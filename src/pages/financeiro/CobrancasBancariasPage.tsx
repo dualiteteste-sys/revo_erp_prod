@@ -4,6 +4,7 @@ import { useToast } from '@/contexts/ToastProvider';
 import * as cobrancasService from '@/services/cobrancas';
 import { Loader2, PlusCircle, Search, Landmark, DatabaseBackup, X } from 'lucide-react';
 import Pagination from '@/components/ui/Pagination';
+import ListPaginationBar from '@/components/ui/ListPaginationBar';
 import ConfirmationModal from '@/components/ui/ConfirmationModal';
 import Modal from '@/components/ui/Modal';
 import CobrancasTable from '@/components/financeiro/cobrancas/CobrancasTable';
@@ -181,26 +182,28 @@ export default function CobrancasBancariasPage() {
         </div>
       </div>
 
-      <div className="bg-white rounded-lg shadow overflow-hidden flex-1 min-h-0">
-        {loading && cobrancas.length === 0 ? (
-          <div className="h-96 flex items-center justify-center">
-            <Loader2 className="animate-spin text-blue-500" size={32} />
-          </div>
-        ) : error ? (
-          <div className="h-96 flex items-center justify-center text-red-500">{error}</div>
-        ) : cobrancas.length === 0 ? (
-          <div className="h-96 flex flex-col items-center justify-center text-gray-500">
-            <Landmark size={48} className="mb-4 opacity-20" />
-            <p>Nenhuma cobrança encontrada.</p>
-            {searchTerm && <p className="text-sm">Tente ajustar sua busca.</p>}
-          </div>
-        ) : (
-          <CobrancasTable cobrancas={cobrancas} onEdit={handleOpenForm} onDelete={handleOpenDeleteModal} />
-        )}
+      <div className="bg-white rounded-lg shadow overflow-hidden flex flex-col flex-1 min-h-0">
+        <div className="flex-1 min-h-0 overflow-auto">
+          {loading && cobrancas.length === 0 ? (
+            <div className="h-96 flex items-center justify-center">
+              <Loader2 className="animate-spin text-blue-500" size={32} />
+            </div>
+          ) : error ? (
+            <div className="h-96 flex items-center justify-center text-red-500">{error}</div>
+          ) : cobrancas.length === 0 ? (
+            <div className="h-96 flex flex-col items-center justify-center text-gray-500">
+              <Landmark size={48} className="mb-4 opacity-20" />
+              <p>Nenhuma cobrança encontrada.</p>
+              {searchTerm && <p className="text-sm">Tente ajustar sua busca.</p>}
+            </div>
+          ) : (
+            <CobrancasTable cobrancas={cobrancas} onEdit={handleOpenForm} onDelete={handleOpenDeleteModal} />
+          )}
+        </div>
       </div>
 
       {count > 0 ? (
-        <div className="sticky bottom-0 z-20 mt-4 border-t border-gray-100 bg-white/95 backdrop-blur supports-[backdrop-filter]:bg-white/80">
+        <ListPaginationBar className="mt-4" innerClassName="px-3 sm:px-4">
           <Pagination
             currentPage={page}
             totalCount={count}
@@ -211,7 +214,7 @@ export default function CobrancasBancariasPage() {
               setPageSize(next);
             }}
           />
-        </div>
+        </ListPaginationBar>
       ) : null}
 
       <Modal isOpen={isFormOpen} onClose={handleCloseForm} title={selectedCobranca ? 'Editar Cobrança' : 'Nova Cobrança'} size="4xl">

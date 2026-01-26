@@ -10,6 +10,7 @@ import MaterialFormPanel from '@/components/industria/materiais/MaterialFormPane
 import { useToast } from '@/contexts/ToastProvider';
 import ConfirmationModal from '@/components/ui/ConfirmationModal';
 import Pagination from '@/components/ui/Pagination';
+import ListPaginationBar from '@/components/ui/ListPaginationBar';
 import ImportarXmlSuprimentosModal from '@/components/industria/materiais/ImportarXmlSuprimentosModal';
 import { listRecebimentos, setRecebimentoClassificacao, Recebimento } from '@/services/recebimento';
 import ClientAutocomplete from '@/components/common/ClientAutocomplete';
@@ -224,18 +225,18 @@ export default function MateriaisClientePage() {
         </Select>
       </div>
 
-      <div className="bg-white rounded-lg shadow overflow-hidden flex-grow overflow-y-auto flex flex-col">
+      <div className="bg-white rounded-lg shadow overflow-hidden flex flex-col flex-1 min-h-0">
         {loading ? (
           <div className="flex justify-center h-64 items-center">
             <Loader2 className="animate-spin text-blue-600 w-10 h-10" />
           </div>
         ) : (
           <>
-            <div className="flex-grow">
-                <MateriaisTable materiais={materiais} onEdit={handleEdit} onDelete={handleDeleteClick} />
+            <div className="flex-1 min-h-0 overflow-auto">
+              <MateriaisTable materiais={materiais} onEdit={handleEdit} onDelete={handleDeleteClick} />
             </div>
             {totalCount > 0 ? (
-              <div className="sticky bottom-0 z-20 border-t border-gray-200 bg-white/95 p-2 backdrop-blur supports-[backdrop-filter]:bg-white/80">
+              <ListPaginationBar innerClassName="px-3 sm:px-4">
                 <Pagination
                   currentPage={page}
                   totalCount={totalCount}
@@ -246,7 +247,7 @@ export default function MateriaisClientePage() {
                     setPageSize(next);
                   }}
                 />
-              </div>
+              </ListPaginationBar>
             ) : null}
           </>
         )}
