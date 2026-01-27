@@ -12,6 +12,23 @@ export type DashboardActivity = {
   created_at: string;
 };
 
+export type FinanceiroFluxoCaixaItem = {
+  mes: string;
+  receber: number;
+  pagar: number;
+};
+
+export type FinanceiroAlertas = {
+  atrasados: {
+    receber: { qtd: number; valor: number };
+    pagar: { qtd: number; valor: number };
+  };
+  hoje: {
+    receber: { qtd: number; valor: number };
+    pagar: { qtd: number; valor: number };
+  };
+};
+
 function toIsoDate(d: Date) {
   return format(d, 'yyyy-MM-dd');
 }
@@ -21,6 +38,7 @@ export async function getMainDashboardData(params?: { activitiesLimit?: number }
   previous: VendasDashboardStats;
   activities: DashboardActivity[];
   financeiroPagarReceber3m: { mes: string; receber: number; pagar: number }[];
+  financeiroAlertas: FinanceiroAlertas | null;
 }> {
   const includeActivities = params?.activitiesLimit !== 0;
 
@@ -45,26 +63,36 @@ export async function getMainDashboardData(params?: { activitiesLimit?: number }
     }
   })();
 
+  const financeiroAlertasPromise = (async () => {
+    try {
+      return await callRpc<FinanceiroAlertas>('financeiro_alertas_vencimentos');
+    } catch (e: any) {
+      logger.warn('[Dashboard][FIN] erro ao carregar alertas', { message: e?.message });
+      return null;
+    }
+  })();
+
   const activitiesPromise = includeActivities
     ? (async () => {
-        try {
-          const rows = await callRpc<DashboardActivity[]>('dashboard_activity_feed', {
-            p_limit: params?.activitiesLimit ?? 12,
-          });
-          return rows ?? [];
-        } catch (e: any) {
-          // Best-effort: logs são informativos; não quebrar o dashboard nem sujar console.
-          logger.warn('[Dashboard][LOGS] erro ao carregar atividades', { message: e?.message || String(e || '') });
-          return [];
-        }
-      })()
+      try {
+        const rows = await callRpc<DashboardActivity[]>('dashboard_activity_feed', {
+          p_limit: params?.activitiesLimit ?? 12,
+        });
+        return rows ?? [];
+      } catch (e: any) {
+        // Best-effort: logs são informativos; não quebrar o dashboard nem sujar console.
+        logger.warn('[Dashboard][LOGS] erro ao carregar atividades', { message: e?.message || String(e || '') });
+        return [];
+      }
+    })()
     : Promise.resolve([] as DashboardActivity[]);
 
-  const [current, previous, activities, financeiroPagarReceber3m] = await Promise.all([
+  const [current, previous, activities, financeiroPagarReceber3m, financeiroAlertas] = await Promise.all([
     getVendasDashboardStats({ startDate: toIsoDate(currentStart), endDate: toIsoDate(currentEnd) }),
     getVendasDashboardStats({ startDate: toIsoDate(prevStart), endDate: toIsoDate(prevEnd) }),
     activitiesPromise,
     financeiroPagarReceber3mPromise,
+    financeiroAlertasPromise,
   ]);
 
   return {
@@ -72,5 +100,10 @@ export async function getMainDashboardData(params?: { activitiesLimit?: number }
     previous,
     activities,
     financeiroPagarReceber3m,
+    financeiroAlertas,
   };
+}
+
+export async function getFinanceiroFluxoCaixaCustom(months: number) {
+  return callRpc<FinanceiroFluxoCaixaItem[]>('financeiro_fluxo_caixa_custom', { p_months: months });
 }
