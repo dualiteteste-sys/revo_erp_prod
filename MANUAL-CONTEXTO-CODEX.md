@@ -6,7 +6,7 @@ Objetivo: quando uma nova janela de contexto for aberta, este documento deve ser
 
 **Prompt padrão (copiar e colar):**
 
-1) Leia `docs/checklist-estado-da-arte-gaps.md` e `.github/pull_request_template.md`.
+1) Leia `CHECKLIST-ESTADO-DA-ARTE.md` e `CHECKLIST-ESTADO-DA-ARTE-9-10.md`.
 2) Resuma em 6 bullets: (a) como fazemos deploy, (b) regras de migrations, (c) padrão de testes, (d) padrão de logs/console, (e) padrão de UX “estado da arte”, (f) o que você vai evitar.
 3) Antes de codar, liste os arquivos que você pretende tocar e os testes que vai rodar.
 
