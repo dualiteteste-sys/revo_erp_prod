@@ -43,7 +43,14 @@ import { useHasPermission } from '@/hooks/useHasPermission';
 import { getEcommerceHealthSummary, type EcommerceHealthSummary } from '@/services/ecommerceIntegrations';
 import { callRpc } from '@/lib/api';
 import { useAppContext } from '@/contexts/AppContextProvider';
-import { getEmpresaContextDiagnostics, opsDebugProdutosEmpresaIds, type EmpresaContextDiagnostics } from '@/services/tenantIsolation';
+import {
+  getEmpresaContextDiagnostics,
+  opsDebugProdutosEmpresaDetails,
+  opsDebugProdutosEmpresaIds,
+  type EmpresaContextDiagnostics,
+  type ProdutosEmpresaDetailsRow,
+  type ProdutosEmpresaIdRow,
+} from '@/services/tenantIsolation';
 
 function formatDateTimeBR(value?: string | null) {
   if (!value) return '—';
@@ -86,7 +93,14 @@ export default function HealthPage() {
   const [tenantDiagLoading, setTenantDiagLoading] = useState(false);
   const [tenantDiag, setTenantDiag] = useState<EmpresaContextDiagnostics | null>(null);
   const [tenantDiagMismatch, setTenantDiagMismatch] = useState<
-    null | { expectedEmpresaId: string; mismatches: Array<{ id: string; empresa_id: string }> }
+    null | {
+      expectedEmpresaId: string;
+      expectedEmpresaName?: string | null;
+      mismatches: Array<
+        | (ProdutosEmpresaDetailsRow & { empresa_nome?: string | null })
+        | (ProdutosEmpresaIdRow & { empresa_nome?: string | null; produto_nome?: string | null; sku?: string | null })
+      >;
+    }
   >(null);
 
   const recentColumns: TableColumnWidthDef[] = [
@@ -226,11 +240,20 @@ export default function HealthPage() {
       });
 
       const ids = (rows ?? []).map((r) => r.id).filter(Boolean);
-      const map = await opsDebugProdutosEmpresaIds(ids);
+      const map =
+        (await opsDebugProdutosEmpresaDetails(ids).catch(() => null)) ??
+        (await opsDebugProdutosEmpresaIds(ids));
       const mismatches = map.filter((r) => r.empresa_id !== activeEmpresaId);
 
       if (mismatches.length) {
-        setTenantDiagMismatch({ expectedEmpresaId: activeEmpresaId, mismatches });
+        const expectedEmpresaName =
+          diag?.ok && diag.user_active_empresa_id === activeEmpresaId
+            ? (diag.user_active_empresa_name ?? null)
+            : diag?.ok && diag.current_empresa_id === activeEmpresaId
+              ? (diag.current_empresa_name ?? null)
+              : null;
+
+        setTenantDiagMismatch({ expectedEmpresaId: activeEmpresaId, expectedEmpresaName, mismatches });
         addToast(`Possível vazamento detectado: ${mismatches.length} item(ns) com empresa_id diferente da empresa ativa.`, 'error');
       } else {
         addToast('OK: nenhum indício de vazamento (produtos retornaram empresa_id compatível).', 'success');
@@ -246,7 +269,17 @@ export default function HealthPage() {
   const tenantDiagSummary = useMemo(() => {
     if (!tenantDiag) return null;
     if (!tenantDiag.ok) return `Diagnóstico indisponível (${tenantDiag.reason ?? 'unknown'}).`;
-    return `ctx.current_empresa_id=${tenantDiag.current_empresa_id ?? 'null'} | user_active=${tenantDiag.user_active_empresa_id ?? 'null'} | guc=${tenantDiag.guc_current_empresa_id ?? 'null'} | memberships=${tenantDiag.memberships_count ?? 0}`;
+    const who = tenantDiag.user_email ? `user=${tenantDiag.user_email}` : `user_id=${tenantDiag.user_id ?? '—'}`;
+    const current = tenantDiag.current_empresa_id
+      ? `${tenantDiag.current_empresa_id}${tenantDiag.current_empresa_name ? ` (${tenantDiag.current_empresa_name})` : ''}`
+      : 'null';
+    const active = tenantDiag.user_active_empresa_id
+      ? `${tenantDiag.user_active_empresa_id}${tenantDiag.user_active_empresa_name ? ` (${tenantDiag.user_active_empresa_name})` : ''}`
+      : 'null';
+    const guc = tenantDiag.guc_current_empresa_id
+      ? `${tenantDiag.guc_current_empresa_id}${tenantDiag.guc_current_empresa_name ? ` (${tenantDiag.guc_current_empresa_name})` : ''}`
+      : 'null';
+    return `${who} | ctx.current_empresa_id=${current} | user_active=${active} | guc=${guc} | memberships=${tenantDiag.memberships_count ?? 0}`;
   }, [tenantDiag]);
 
   const canReprocess = !!permManage.data;
@@ -666,14 +699,32 @@ export default function HealthPage() {
               <div className="mt-3 rounded-xl border border-rose-200 bg-rose-50/60 p-3">
                 <div className="text-xs font-semibold text-rose-900">Possível vazamento detectado</div>
                 <div className="mt-1 text-xs text-rose-800">
-                  empresa ativa esperada: <span className="font-mono">{tenantDiagMismatch.expectedEmpresaId}</span>
+                  empresa ativa esperada:{' '}
+                  <span className="font-mono">{tenantDiagMismatch.expectedEmpresaId}</span>
+                  {tenantDiagMismatch.expectedEmpresaName ? (
+                    <span className="ml-2 text-rose-900">({tenantDiagMismatch.expectedEmpresaName})</span>
+                  ) : null}
                 </div>
                 <div className="mt-2 text-xs text-rose-800">
                   exemplos (até 5):
                   <ul className="mt-1 list-disc pl-5">
                     {tenantDiagMismatch.mismatches.slice(0, 5).map((m) => (
                       <li key={m.id}>
-                        <span className="font-mono">{m.id}</span> → <span className="font-mono">{m.empresa_id}</span>
+                        <div className="flex flex-col gap-0.5">
+                          <div>
+                            <span className="font-mono">{m.id}</span>{' '}
+                            {m.produto_nome || m.sku ? (
+                              <span className="text-rose-900">
+                                — {m.produto_nome ?? '—'}
+                                {m.sku ? ` (${m.sku})` : ''}
+                              </span>
+                            ) : null}
+                          </div>
+                          <div>
+                            → <span className="font-mono">{m.empresa_id}</span>
+                            {m.empresa_nome ? <span className="ml-2 text-rose-900">({m.empresa_nome})</span> : null}
+                          </div>
+                        </div>
                       </li>
                     ))}
                   </ul>
