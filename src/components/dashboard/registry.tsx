@@ -5,14 +5,14 @@ import {
     Calendar, AlertTriangle, Zap, Server, Trophy, FileText, ArrowRight, ArrowUp, ArrowDown,
     Wallet, Target, Clock
 } from 'lucide-react';
-import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, AreaChart, Area, CartesianGrid, ComposedChart, Line, Cell, Legend } from 'recharts';
+import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, AreaChart, Area, CartesianGrid, ComposedChart, Line, Cell, Legend, ReferenceLine } from 'recharts';
 import KPICard from './KPICard';
 import GraficoFaturamento from './GraficoFaturamento';
 import AtividadesRecentes from './AtividadesRecentes';
 import GraficoVendas from './GraficoVendas';
 import RankingCategorias from './RankingCategorias';
 import GraficoPagarReceber from './GraficoPagarReceber';
-import { getMainDashboardData, getFinanceiroFluxoCaixaCustom, FinanceiroFluxoCaixaItem } from '@/services/mainDashboard';
+import { getMainDashboardData, getFinanceiroFluxoCaixaCentered, FinanceiroFluxoCaixaCenteredItem } from '@/services/mainDashboard';
 import { formatCurrency } from '@/lib/utils';
 import { Layout } from 'react-grid-layout';
 import { Button } from '@/components/ui/button';
@@ -265,24 +265,52 @@ const CalendarWidget: React.FC<WidgetProps> = () => {
     );
 };
 
+type ChartDataItem = {
+    mes: string;
+    mes_iso: string;
+    receber: number;
+    pagar: number;
+    saldo: number;
+    is_past: boolean;
+    is_current: boolean;
+};
+
 const FinancialChartWidget: React.FC<WidgetProps> = ({ loading }) => {
     const [period, setPeriod] = useState(6);
-    const [chartData, setChartData] = useState<(FinanceiroFluxoCaixaItem & { saldo: number; liquido: number })[]>([]);
+    const [chartData, setChartData] = useState<ChartDataItem[]>([]);
     const [isLoading, setIsLoading] = useState(true);
+    const [currentMonthIndex, setCurrentMonthIndex] = useState<number>(-1);
 
     useEffect(() => {
         let active = true;
         setIsLoading(true);
         
-        getFinanceiroFluxoCaixaCustom(period)
+        getFinanceiroFluxoCaixaCentered(period)
             .then(res => {
                 if (!active) return;
                 if (res && res.length > 0) {
                     let saldoAcumulado = 0;
-                    const enriched = res.map(item => {
-                        const liquido = (item.receber || 0) - (item.pagar || 0);
+                    const enriched = res.map((item, idx) => {
+                        const receber = item.is_past 
+                            ? (item.receber_realizado || 0) 
+                            : (item.receber_realizado || 0) + (item.receber_previsto || 0);
+                        const pagar = item.is_past 
+                            ? (item.pagar_realizado || 0) 
+                            : (item.pagar_realizado || 0) + (item.pagar_previsto || 0);
+                        const liquido = receber - pagar;
                         saldoAcumulado += liquido;
-                        return { ...item, saldo: saldoAcumulado, liquido };
+                        
+                        if (item.is_current) setCurrentMonthIndex(idx);
+                        
+                        return {
+                            mes: item.mes,
+                            mes_iso: item.mes_iso,
+                            receber,
+                            pagar,
+                            saldo: saldoAcumulado,
+                            is_past: item.is_past,
+                            is_current: item.is_current,
+                        };
                     });
                     setChartData(enriched);
                 } else {
@@ -301,9 +329,22 @@ const FinancialChartWidget: React.FC<WidgetProps> = ({ loading }) => {
 
     const CustomTooltip = ({ active, payload, label }: any) => {
         if (!active || !payload?.length) return null;
+        const dataPoint = payload[0]?.payload as ChartDataItem;
+        const isPast = dataPoint?.is_past;
+        const isCurrent = dataPoint?.is_current;
+        
         return (
-            <div className="bg-white/95 backdrop-blur-xl rounded-2xl shadow-2xl border border-slate-100 p-4 min-w-[200px]">
-                <p className="font-semibold text-slate-800 mb-3 pb-2 border-b border-slate-100">{label}</p>
+            <div className="bg-white/95 backdrop-blur-xl rounded-2xl shadow-2xl border border-slate-100 p-4 min-w-[220px]">
+                <div className="flex items-center justify-between mb-3 pb-2 border-b border-slate-100">
+                    <p className="font-semibold text-slate-800">{label}</p>
+                    <span className={`text-xs px-2 py-0.5 rounded-full ${
+                        isPast ? 'bg-slate-100 text-slate-600' : 
+                        isCurrent ? 'bg-indigo-100 text-indigo-700' : 
+                        'bg-amber-100 text-amber-700'
+                    }`}>
+                        {isPast ? 'Realizado' : isCurrent ? 'Atual' : 'Previsto'}
+                    </span>
+                </div>
                 {payload.map((p: any, i: number) => (
                     <div key={i} className="flex items-center justify-between gap-4 py-1">
                         <span className="flex items-center gap-2 text-sm text-slate-600">
@@ -317,12 +358,43 @@ const FinancialChartWidget: React.FC<WidgetProps> = ({ loading }) => {
         );
     };
 
+    const CustomBar = (props: any) => {
+        const { x, y, width, height, is_past, is_current, dataKey } = props;
+        const isReceber = dataKey === 'receber';
+        
+        let fillColor;
+        let opacity = 1;
+        
+        if (is_past) {
+            fillColor = isReceber ? '#10b981' : '#f43f5e';
+        } else if (is_current) {
+            fillColor = isReceber ? '#10b981' : '#f43f5e';
+            opacity = 0.8;
+        } else {
+            fillColor = isReceber ? '#10b981' : '#f43f5e';
+            opacity = 0.5;
+        }
+        
+        return (
+            <rect
+                x={x}
+                y={y}
+                width={width}
+                height={height}
+                fill={fillColor}
+                fillOpacity={opacity}
+                rx={4}
+                ry={4}
+            />
+        );
+    };
+
     return (
         <div className="h-full flex flex-col overflow-hidden">
             <div className="p-5 pb-3 flex items-center justify-between">
                 <WidgetHeader icon={BarChart3} title="Fluxo de Caixa" iconColor="text-indigo-500" />
                 <div className="flex bg-slate-100 rounded-xl p-1">
-                    {[3, 6, 12].map(m => (
+                    {[6, 12].map(m => (
                         <button
                             key={m}
                             onClick={() => setPeriod(m)}
@@ -337,6 +409,22 @@ const FinancialChartWidget: React.FC<WidgetProps> = ({ loading }) => {
                     ))}
                 </div>
             </div>
+            
+            <div className="px-5 pb-2 flex items-center gap-4 text-xs">
+                <div className="flex items-center gap-1.5">
+                    <div className="w-3 h-3 rounded bg-emerald-500" />
+                    <span className="text-slate-500">Realizado</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                    <div className="w-3 h-3 rounded bg-emerald-500/50" />
+                    <span className="text-slate-500">Previsto</span>
+                </div>
+                <div className="flex items-center gap-1.5 ml-auto">
+                    <div className="w-6 h-0.5 bg-indigo-500 rounded" />
+                    <span className="text-slate-500">Saldo</span>
+                </div>
+            </div>
+            
             <div className="flex-1 w-full min-h-0 px-2">
                 {(loading || isLoading) ? (
                     <div className="w-full h-full flex items-center justify-center">
@@ -357,16 +445,8 @@ const FinancialChartWidget: React.FC<WidgetProps> = ({ loading }) => {
                     </div>
                 ) : (
                     <ResponsiveContainer width="100%" height="100%">
-                        <ComposedChart data={chartData} margin={{ top: 20, right: 30, left: 10, bottom: 10 }}>
+                        <ComposedChart data={chartData} margin={{ top: 10, right: 20, left: 0, bottom: 5 }}>
                             <defs>
-                                <linearGradient id="gradientReceber" x1="0" y1="0" x2="0" y2="1">
-                                    <stop offset="0%" stopColor="#10b981" stopOpacity={0.8} />
-                                    <stop offset="100%" stopColor="#10b981" stopOpacity={0.3} />
-                                </linearGradient>
-                                <linearGradient id="gradientPagar" x1="0" y1="0" x2="0" y2="1">
-                                    <stop offset="0%" stopColor="#f43f5e" stopOpacity={0.8} />
-                                    <stop offset="100%" stopColor="#f43f5e" stopOpacity={0.3} />
-                                </linearGradient>
                                 <linearGradient id="gradientSaldo" x1="0" y1="0" x2="1" y2="0">
                                     <stop offset="0%" stopColor="#6366f1" />
                                     <stop offset="100%" stopColor="#8b5cf6" />
@@ -377,29 +457,45 @@ const FinancialChartWidget: React.FC<WidgetProps> = ({ loading }) => {
                                 dataKey="mes" 
                                 axisLine={false} 
                                 tickLine={false} 
-                                tick={{ fontSize: 12, fill: '#64748b', fontWeight: 500 }} 
+                                tick={{ fontSize: 11, fill: '#64748b', fontWeight: 500 }} 
                             />
                             <YAxis 
                                 axisLine={false} 
                                 tickLine={false} 
-                                tick={{ fontSize: 11, fill: '#94a3b8' }}
-                                tickFormatter={(v) => `${(v / 1000).toFixed(0)}k`}
+                                tick={{ fontSize: 10, fill: '#94a3b8' }}
+                                tickFormatter={(v) => v >= 1000 ? `${(v / 1000).toFixed(0)}k` : v}
+                                width={45}
                             />
                             <Tooltip content={<CustomTooltip />} />
-                            <Legend 
-                                wrapperStyle={{ paddingTop: 20 }}
-                                formatter={(value) => <span className="text-sm font-medium text-slate-600">{value}</span>}
+                            {currentMonthIndex >= 0 && (
+                                <ReferenceLine 
+                                    x={chartData[currentMonthIndex]?.mes} 
+                                    stroke="#6366f1" 
+                                    strokeDasharray="4 4" 
+                                    strokeWidth={2}
+                                    label={{ value: 'Hoje', position: 'top', fontSize: 10, fill: '#6366f1' }}
+                                />
+                            )}
+                            <Bar 
+                                dataKey="receber" 
+                                name="Receitas" 
+                                shape={(props: any) => <CustomBar {...props} dataKey="receber" />}
+                                maxBarSize={35}
                             />
-                            <Bar dataKey="receber" name="Receitas" fill="url(#gradientReceber)" radius={[6, 6, 0, 0]} maxBarSize={40} />
-                            <Bar dataKey="pagar" name="Despesas" fill="url(#gradientPagar)" radius={[6, 6, 0, 0]} maxBarSize={40} />
+                            <Bar 
+                                dataKey="pagar" 
+                                name="Despesas" 
+                                shape={(props: any) => <CustomBar {...props} dataKey="pagar" />}
+                                maxBarSize={35}
+                            />
                             <Line 
                                 type="monotone" 
                                 dataKey="saldo" 
                                 name="Saldo Acumulado" 
                                 stroke="url(#gradientSaldo)" 
                                 strokeWidth={3}
-                                dot={{ fill: '#6366f1', strokeWidth: 2, r: 5 }}
-                                activeDot={{ r: 8, fill: '#6366f1', stroke: '#fff', strokeWidth: 3 }}
+                                dot={{ fill: '#6366f1', strokeWidth: 2, r: 4 }}
+                                activeDot={{ r: 7, fill: '#6366f1', stroke: '#fff', strokeWidth: 2 }}
                             />
                         </ComposedChart>
                     </ResponsiveContainer>

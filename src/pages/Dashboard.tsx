@@ -1,5 +1,5 @@
-import React, { useEffect, useState, useMemo, useRef } from 'react';
-import { Responsive } from 'react-grid-layout';
+import React, { useEffect, useState, useMemo, useRef, useCallback } from 'react';
+import { Responsive, Layout } from 'react-grid-layout';
 import useLocalStorageState from 'use-local-storage-state';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Settings2, RotateCcw, Plus, X, GripHorizontal, Check } from 'lucide-react';
@@ -13,7 +13,34 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/co
 import 'react-grid-layout/css/styles.css';
 import 'react-resizable/css/styles.css';
 
-// Simple hook to measure width
+const BREAKPOINTS = { lg: 1200, md: 996, sm: 768, xs: 480, xxs: 0 };
+const COLS = { lg: 12, md: 10, sm: 6, xs: 4, xxs: 2 };
+
+function generateResponsiveLayouts(baseLayout: Layout[]): Record<string, Layout[]> {
+  const layouts: Record<string, Layout[]> = {};
+  
+  Object.keys(COLS).forEach(breakpoint => {
+    const cols = COLS[breakpoint as keyof typeof COLS];
+    let currentY = 0;
+    
+    layouts[breakpoint] = baseLayout.map(item => {
+      const w = Math.min(item.w, cols);
+      const newItem = {
+        ...item,
+        w,
+        x: 0,
+        y: currentY,
+      };
+      currentY += item.h;
+      return newItem;
+    });
+  });
+  
+  layouts.lg = baseLayout;
+  
+  return layouts;
+}
+
 function useWidth() {
   const [width, setWidth] = useState(1200);
   const ref = useRef<HTMLDivElement>(null);
@@ -41,19 +68,18 @@ const Dashboard: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const opsView = useHasPermission('ops', 'view');
 
-  // Layout State - v3 para forçar reset do layout quebrado
-  const [layouts, setLayouts] = useLocalStorageState('revo_dashboard_layout_v3', {
-    defaultValue: { lg: DEFAULT_LAYOUT }
+  const defaultLayouts = useMemo(() => generateResponsiveLayouts(DEFAULT_LAYOUT as Layout[]), []);
+  
+  const [layouts, setLayouts] = useLocalStorageState<Record<string, Layout[]>>('revo_dashboard_layout_v4', {
+    defaultValue: defaultLayouts
   });
   const [isEditing, setIsEditing] = useState(false);
-  const [activeWidgets, setActiveWidgets] = useLocalStorageState<string[]>('revo_dashboard_active_widgets_v3', {
-    // @ts-ignore
+  const [activeWidgets, setActiveWidgets] = useLocalStorageState<string[]>('revo_dashboard_active_widgets_v4', {
     defaultValue: DEFAULT_LAYOUT.map(l => l.i)
   });
 
   const { width, ref: containerRef } = useWidth();
 
-  // Data Fetching
   useEffect(() => {
     let mounted = true;
     (async () => {
@@ -72,15 +98,13 @@ const Dashboard: React.FC = () => {
     return () => { mounted = false; };
   }, []);
 
-  // Handlers
-  const handleLayoutChange = (currentLayout: any, allLayouts: any) => {
-    setLayouts({ lg: currentLayout });
-  };
+  const handleLayoutChange = useCallback((currentLayout: Layout[], allLayouts: Record<string, Layout[]>) => {
+    setLayouts(allLayouts);
+  }, [setLayouts]);
 
   const handleResetLayout = () => {
     if (confirm('Restaurar layout padrão?')) {
-      setLayouts({ lg: DEFAULT_LAYOUT });
-      // @ts-ignore
+      setLayouts(defaultLayouts);
       setActiveWidgets(DEFAULT_LAYOUT.map(l => l.i));
     }
   };
@@ -94,23 +118,23 @@ const Dashboard: React.FC = () => {
     });
   };
 
-  // Memoized Props for Grid
   const gridProps = useMemo(() => ({
     className: "layout",
-    breakpoints: { lg: 1200, md: 996, sm: 768, xs: 480, xxs: 0 },
-    cols: { lg: 12, md: 10, sm: 6, xs: 4, xxs: 2 },
+    breakpoints: BREAKPOINTS,
+    cols: COLS,
     rowHeight: 32,
-    layouts: layouts as any,
+    layouts: layouts,
     onLayoutChange: handleLayoutChange,
     isDraggable: isEditing,
     isResizable: isEditing,
-    margin: [20, 20] as [number, number],
+    margin: [16, 16] as [number, number],
     containerPadding: [0, 0] as [number, number],
     draggableHandle: ".drag-handle",
     compactType: "vertical" as const,
     preventCollision: false,
-    width: width
-  }), [layouts, isEditing, width]);
+    width: width,
+    useCSSTransforms: true,
+  }), [layouts, isEditing, width, handleLayoutChange]);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/30 to-indigo-50/40 p-6 space-y-6">

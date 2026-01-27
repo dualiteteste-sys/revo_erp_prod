@@ -18,6 +18,17 @@ export type FinanceiroFluxoCaixaItem = {
   pagar: number;
 };
 
+export type FinanceiroFluxoCaixaCenteredItem = {
+  mes: string;
+  mes_iso: string;
+  receber_realizado: number;
+  receber_previsto: number;
+  pagar_realizado: number;
+  pagar_previsto: number;
+  is_past: boolean;
+  is_current: boolean;
+};
+
 export type FinanceiroAlertas = {
   atrasados: {
     receber: { qtd: number; valor: number };
@@ -106,4 +117,8 @@ export async function getMainDashboardData(params?: { activitiesLimit?: number }
 
 export async function getFinanceiroFluxoCaixaCustom(months: number) {
   return callRpc<FinanceiroFluxoCaixaItem[]>('financeiro_fluxo_caixa_custom', { p_months: months });
+}
+
+export async function getFinanceiroFluxoCaixaCentered(months: number) {
+  return callRpc<FinanceiroFluxoCaixaCenteredItem[]>('financeiro_fluxo_caixa_centered', { p_months: months });
 }
