@@ -128,7 +128,8 @@ const parseOfxText = (text: string): ImportarExtratoPayload[] => {
     const valorAbs = Math.abs(signedAmount);
     if (valorAbs <= 0) continue;
 
-    const raw = `${dataISO}|${descricao}|${signedAmount}|${documento ?? ''}|${fitid}|${trntype}`;
+    const fitIdOrFallback = fitid || '';
+    const raw = `${dataISO}|${descricao}|${signedAmount}|${documento ?? ''}|${fitIdOrFallback}|${trntype}|${i + 1}`;
     itens.push({
       data_lancamento: dataISO,
       descricao,
@@ -136,7 +137,7 @@ const parseOfxText = (text: string): ImportarExtratoPayload[] => {
       tipo_lancamento: tipo,
       documento_ref: documento,
       identificador_banco: fitid || `OFX-${hashString(raw)}-${i + 1}`,
-      hash_importacao: hashString(raw),
+      hash_importacao: fitid ? hashString(`${dataISO}|${descricao}|${signedAmount}|${documento ?? ''}|${fitIdOrFallback}|${trntype}`) : hashString(raw),
       linha_bruta: raw,
     });
   }
@@ -169,7 +170,7 @@ function parseLegacyCsvText(text: string): ImportarExtratoPayload[] {
     const valorAbs = Math.abs(valorNum);
     if (valorAbs <= 0) continue;
 
-    const raw = `${dataISO}|${descricao}|${valorNum}|${doc ?? ''}`;
+    const raw = `${dataISO}|${descricao}|${valorNum}|${doc ?? ''}|${i + 1}`;
     itens.push({
       data_lancamento: dataISO,
       descricao,

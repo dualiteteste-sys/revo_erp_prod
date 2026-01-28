@@ -119,7 +119,7 @@ export const useExtratos = (contaCorrenteId: string | null) => {
   const debouncedSearchTerm = useDebounce(searchTerm, 500);
   const [startDate, setStartDate] = useState<Date | null>(null);
   const [endDate, setEndDate] = useState<Date | null>(null);
-  const [filterConciliado, setFilterConciliado] = useState<boolean | null>(null); // null = all
+  const [filterConciliado, setFilterConciliado] = useState<boolean | null>(false); // false = apenas pendentes
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(50);
 

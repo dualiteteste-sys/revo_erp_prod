@@ -24,10 +24,25 @@ export default function VariacoesTab({ produtoId, produtoPaiId, skuBase }: Props
   const [atributoId, setAtributoId] = useState<string>('');
   const [novoAtributoNome, setNovoAtributoNome] = useState('Cor');
   const [valoresRaw, setValoresRaw] = useState('');
+  const [valoresTags, setValoresTags] = useState<string[]>([]);
   const [skuSuffixMode, setSkuSuffixMode] = useState<'slug' | 'num'>('slug');
 
   const canUse = !!produtoId && !produtoPaiId;
-  const valores = useMemo(() => splitValores(valoresRaw), [valoresRaw]);
+  const valores = useMemo(() => {
+    const fromRaw = splitValores(valoresRaw);
+    const merged = [...valoresTags, ...fromRaw];
+    const seen = new Set<string>();
+    const out: string[] = [];
+    for (const v of merged) {
+      const clean = v.trim();
+      if (!clean) continue;
+      const key = clean.toLowerCase();
+      if (seen.has(key)) continue;
+      seen.add(key);
+      out.push(clean);
+    }
+    return out;
+  }, [valoresRaw, valoresTags]);
 
   const reload = async () => {
     if (!produtoId) return;
@@ -86,12 +101,40 @@ export default function VariacoesTab({ produtoId, produtoPaiId, skuBase }: Props
 
       addToast(`Variações criadas: ${created?.length ?? 0}.`, 'success');
       setValoresRaw('');
+      setValoresTags([]);
       await reload();
     } catch (e: any) {
       addToast(e?.message || 'Falha ao gerar variações.', 'error');
     } finally {
       setLoading(false);
     }
+  };
+
+  const normalizeToken = (raw: string): string | null => {
+    const clean = raw.trim().replace(/\s+/g, ' ');
+    if (!clean) return null;
+    return clean;
+  };
+
+  const commitRawToTags = () => {
+    const tokens = splitValores(valoresRaw).map((t) => normalizeToken(t)).filter(Boolean) as string[];
+    if (tokens.length === 0) return;
+    setValoresTags((prev) => {
+      const next = [...prev];
+      const existing = new Set(prev.map((x) => x.toLowerCase()));
+      for (const t of tokens) {
+        const key = t.toLowerCase();
+        if (existing.has(key)) continue;
+        existing.add(key);
+        next.push(t);
+      }
+      return next;
+    });
+    setValoresRaw('');
+  };
+
+  const removeTagAt = (index: number) => {
+    setValoresTags((prev) => prev.filter((_, i) => i !== index));
   };
 
   if (!produtoId) {
@@ -188,13 +231,48 @@ export default function VariacoesTab({ produtoId, produtoPaiId, skuBase }: Props
 
           <div className="sm:col-span-6">
             <label className="block text-sm font-medium text-gray-700 mb-1">Valores (separados por vírgula)</label>
-            <textarea
-              className="w-full p-3 border border-gray-300 rounded-lg text-sm min-h-[96px]"
-              value={valoresRaw}
-              onChange={(e) => setValoresRaw(e.target.value)}
-              placeholder="Ex.: Branca, Vermelha, Dourada"
-              disabled={loading}
-            />
+            <div className="w-full p-2 border border-gray-300 rounded-lg bg-white min-h-[56px] focus-within:ring-2 focus-within:ring-blue-200 focus-within:border-blue-300">
+              <div className="flex flex-wrap gap-2">
+                {valoresTags.map((tag, idx) => (
+                  <button
+                    key={`${tag}:${idx}`}
+                    type="button"
+                    onClick={() => removeTagAt(idx)}
+                    className="inline-flex items-center gap-2 px-2.5 py-1 rounded-full bg-gray-100 text-gray-800 text-sm border border-gray-200 hover:bg-gray-200"
+                    disabled={loading}
+                    aria-label={`Remover ${tag}`}
+                    title="Remover"
+                  >
+                    <span className="max-w-[240px] truncate">{tag}</span>
+                    <span className="text-gray-500">×</span>
+                  </button>
+                ))}
+                <input
+                  className="flex-1 min-w-[180px] px-2 py-2 text-sm outline-none bg-transparent"
+                  value={valoresRaw}
+                  onChange={(e) => setValoresRaw(e.target.value)}
+                  onBlur={() => commitRawToTags()}
+                  onKeyDown={(e) => {
+                    if (e.key === ',' || e.key === 'Tab') {
+                      e.preventDefault();
+                      commitRawToTags();
+                      return;
+                    }
+                    if (e.key === 'Backspace' && valoresRaw.trim() === '' && valoresTags.length > 0) {
+                      e.preventDefault();
+                      removeTagAt(valoresTags.length - 1);
+                      return;
+                    }
+                    if (e.key === 'Delete' && valoresRaw.trim() === '' && valoresTags.length > 0) {
+                      e.preventDefault();
+                      removeTagAt(valoresTags.length - 1);
+                    }
+                  }}
+                  placeholder={valoresTags.length ? 'Digite e use vírgula ou Tab…' : 'Ex.: Branca, Vermelha, Dourada'}
+                  disabled={loading}
+                />
+              </div>
+            </div>
             <div className="text-xs text-gray-500 mt-2">
               Será criado 1 produto por valor. Preço/unidade e demais campos são herdados do produto pai.
             </div>
