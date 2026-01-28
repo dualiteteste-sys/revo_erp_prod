@@ -27,7 +27,9 @@ export type FinanceiroFluxoCaixaCenteredItem = {
   pagar_previsto: number;
   is_past: boolean;
   is_current: boolean;
+  saldo_inicial_cc?: number;  // Saldo atual das contas correntes (apenas no primeiro registro)
 };
+
 
 export type FinanceiroAlertas = {
   atrasados: {

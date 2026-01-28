@@ -1,9 +1,9 @@
-import React, { useState, useEffect } from 'react';
-import { motion } from 'framer-motion';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 import {
     DollarSign, Users, ShoppingCart, TrendingUp, BarChart3, Activity, List, PieChart,
     Calendar, AlertTriangle, Zap, Server, Trophy, FileText, ArrowRight, ArrowUp, ArrowDown,
-    Wallet, Target, Clock
+    Wallet, Target, Clock, Settings, Check
 } from 'lucide-react';
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, AreaChart, Area, CartesianGrid, ComposedChart, Line, Cell, Legend, ReferenceLine } from 'recharts';
 import KPICard from './KPICard';
@@ -18,6 +18,11 @@ import { Layout } from 'react-grid-layout';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { cn } from '@/lib/utils';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { ALL_SHORTCUTS, DEFAULT_SHORTCUT_IDS } from '@/config/shortcutsConfig';
+import { getShortcuts, setShortcuts } from '@/services/dashboardShortcuts';
+import { useEmpresaFeatures } from '@/hooks/useEmpresaFeatures';
+import { useNavigate } from 'react-router-dom';
 
 // --- Types ---
 
@@ -150,16 +155,15 @@ const TopSellersWidget: React.FC<WidgetProps> = ({ data, loading }) => {
                                 transition={{ delay: i * 0.1 }}
                                 className="relative flex items-center gap-3 p-3 rounded-xl bg-gradient-to-r from-slate-50/80 to-white hover:from-slate-100 hover:to-slate-50 transition-all duration-300 group overflow-hidden"
                             >
-                                <div 
+                                <div
                                     className="absolute left-0 top-0 bottom-0 bg-gradient-to-r from-indigo-500/10 to-transparent transition-all duration-500"
                                     style={{ width: `${(s.total / maxTotal) * 100}%` }}
                                 />
-                                <div className={`relative z-10 w-10 h-10 rounded-xl flex items-center justify-center font-bold text-sm shadow-lg ${
-                                    i === 0 ? 'bg-gradient-to-br from-amber-400 to-orange-500 text-white' : 
-                                    i === 1 ? 'bg-gradient-to-br from-slate-300 to-slate-400 text-white' : 
-                                    i === 2 ? 'bg-gradient-to-br from-orange-300 to-amber-400 text-white' : 
-                                    'bg-slate-100 text-slate-500'
-                                }`}>
+                                <div className={`relative z-10 w-10 h-10 rounded-xl flex items-center justify-center font-bold text-sm shadow-lg ${i === 0 ? 'bg-gradient-to-br from-amber-400 to-orange-500 text-white' :
+                                    i === 1 ? 'bg-gradient-to-br from-slate-300 to-slate-400 text-white' :
+                                        i === 2 ? 'bg-gradient-to-br from-orange-300 to-amber-400 text-white' :
+                                            'bg-slate-100 text-slate-500'
+                                    }`}>
                                     {i + 1}
                                 </div>
                                 <div className="relative z-10 flex-1 min-w-0">
@@ -177,32 +181,145 @@ const TopSellersWidget: React.FC<WidgetProps> = ({ data, loading }) => {
 };
 
 const ShortcutsWidget: React.FC<WidgetProps> = () => {
-    const actions = [
-        { label: 'Nova Venda', icon: ShoppingCart, gradient: 'from-blue-500 to-indigo-600', shadow: 'shadow-blue-200' },
-        { label: 'Novo Cliente', icon: Users, gradient: 'from-emerald-500 to-teal-600', shadow: 'shadow-emerald-200' },
-        { label: 'Add Produto', icon: BarChart3, gradient: 'from-violet-500 to-purple-600', shadow: 'shadow-violet-200' },
-        { label: 'Pagamento', icon: Wallet, gradient: 'from-rose-500 to-pink-600', shadow: 'shadow-rose-200' },
-    ];
+    const navigate = useNavigate();
+    const { industria_enabled, servicos_enabled, loading: featuresLoading } = useEmpresaFeatures();
+    const [savedIds, setSavedIds] = useState<string[]>([]);
+    const [isConfigOpen, setIsConfigOpen] = useState(false);
+    const [pendingIds, setPendingIds] = useState<string[]>([]);
+    const [isLoading, setIsLoading] = useState(true);
+    const [isSaving, setIsSaving] = useState(false);
+
+    const availableShortcuts = useMemo(() => {
+        return ALL_SHORTCUTS.filter(s => {
+            if (s.requiredFeature === 'industria') return industria_enabled;
+            if (s.requiredFeature === 'servicos') return servicos_enabled;
+            return true;
+        });
+    }, [industria_enabled, servicos_enabled]);
+
+    useEffect(() => {
+        let mounted = true;
+        getShortcuts()
+            .then(ids => {
+                if (!mounted) return;
+                setSavedIds(ids.length > 0 ? ids : DEFAULT_SHORTCUT_IDS);
+            })
+            .catch(() => {
+                if (mounted) setSavedIds(DEFAULT_SHORTCUT_IDS);
+            })
+            .finally(() => {
+                if (mounted) setIsLoading(false);
+            });
+        return () => { mounted = false; };
+    }, []);
+
+    const activeShortcuts = useMemo(() => {
+        const availableIds = new Set(availableShortcuts.map(s => s.id));
+        return savedIds
+            .filter(id => availableIds.has(id))
+            .map(id => availableShortcuts.find(s => s.id === id)!)
+            .filter(Boolean)
+            .slice(0, 8);
+    }, [savedIds, availableShortcuts]);
+
+    const openConfig = () => {
+        setPendingIds([...savedIds]);
+        setIsConfigOpen(true);
+    };
+
+    const toggleShortcut = (id: string) => {
+        setPendingIds(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
+    };
+
+    const saveConfig = async () => {
+        setIsSaving(true);
+        try {
+            await setShortcuts(pendingIds);
+            setSavedIds(pendingIds);
+            setIsConfigOpen(false);
+        } catch (e) {
+            // silent fail
+        } finally {
+            setIsSaving(false);
+        }
+    };
+
+    if (isLoading || featuresLoading) {
+        return (
+            <div className="h-full p-5 flex flex-col">
+                <WidgetHeader icon={Zap} title="Ações Rápidas" iconColor="text-amber-500" />
+                <div className="flex-1 grid grid-cols-2 gap-3">
+                    {[...Array(4)].map((_, i) => (
+                        <div key={i} className="rounded-2xl bg-gradient-to-br from-slate-100 to-slate-50 animate-pulse" />
+                    ))}
+                </div>
+            </div>
+        );
+    }
 
     return (
         <div className="h-full p-5 flex flex-col">
-            <WidgetHeader icon={Zap} title="Acoes Rapidas" iconColor="text-amber-500" />
+            <WidgetHeader icon={Zap} title="Ações Rápidas" iconColor="text-amber-500">
+                <Dialog open={isConfigOpen} onOpenChange={setIsConfigOpen}>
+                    <DialogTrigger asChild>
+                        <button onClick={openConfig} className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors" title="Configurar atalhos">
+                            <Settings size={16} />
+                        </button>
+                    </DialogTrigger>
+                    <DialogContent className="max-w-md">
+                        <DialogHeader>
+                            <DialogTitle className="flex items-center gap-2">
+                                <Zap size={20} className="text-amber-500" />
+                                Configurar Atalhos
+                            </DialogTitle>
+                        </DialogHeader>
+                        <p className="text-sm text-slate-500 -mt-2">Escolha até 8 ações rápidas.</p>
+                        <ScrollArea className="max-h-[400px] pr-2 -mr-2">
+                            <div className="space-y-2 py-2">
+                                {availableShortcuts.map((shortcut) => {
+                                    const isSelected = pendingIds.includes(shortcut.id);
+                                    const Icon = shortcut.icon;
+                                    return (
+                                        <button key={shortcut.id} onClick={() => toggleShortcut(shortcut.id)} disabled={!isSelected && pendingIds.length >= 8}
+                                            className={cn("w-full flex items-center gap-3 p-3 rounded-xl border-2 transition-all duration-200",
+                                                isSelected ? "bg-gradient-to-r from-indigo-50 to-violet-50 border-indigo-300 shadow-sm" : "bg-white border-slate-100 hover:border-slate-200",
+                                                !isSelected && pendingIds.length >= 8 && "opacity-50 cursor-not-allowed")}>
+                                            <div className={cn("p-2 rounded-xl transition-all", isSelected ? `bg-gradient-to-br ${shortcut.gradient} text-white shadow-lg` : "bg-slate-100 text-slate-500")}>
+                                                <Icon size={18} />
+                                            </div>
+                                            <span className={cn("flex-1 text-left font-medium", isSelected ? "text-indigo-900" : "text-slate-700")}>{shortcut.label}</span>
+                                            {isSelected && <div className="w-6 h-6 rounded-full bg-gradient-to-br from-indigo-500 to-violet-500 flex items-center justify-center"><Check size={14} className="text-white" /></div>}
+                                        </button>
+                                    );
+                                })}
+                            </div>
+                        </ScrollArea>
+                        <div className="flex justify-between items-center pt-2 border-t border-slate-100">
+                            <span className="text-xs text-slate-400">{pendingIds.length}/8 selecionados</span>
+                            <div className="flex gap-2">
+                                <Button variant="outline" size="sm" onClick={() => setIsConfigOpen(false)}>Cancelar</Button>
+                                <Button size="sm" onClick={saveConfig} disabled={isSaving}>{isSaving ? 'Salvando...' : 'Salvar'}</Button>
+                            </div>
+                        </div>
+                    </DialogContent>
+                </Dialog>
+            </WidgetHeader>
             <div className="flex-1 grid grid-cols-2 gap-3">
-                {actions.map((a, i) => (
-                    <motion.button
-                        key={i}
-                        whileHover={{ scale: 1.05, y: -2 }}
-                        whileTap={{ scale: 0.95 }}
-                        className={`flex flex-col items-center justify-center p-4 rounded-2xl bg-gradient-to-br ${a.gradient} text-white shadow-lg ${a.shadow} transition-all duration-300`}
-                    >
-                        <a.icon size={22} className="mb-2" strokeWidth={2} />
-                        <span className="text-xs font-semibold">{a.label}</span>
-                    </motion.button>
-                ))}
+                <AnimatePresence mode="popLayout">
+                    {activeShortcuts.map((a) => (
+                        <motion.button key={a.id} layout initial={{ opacity: 0, scale: 0.8 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.8 }}
+                            whileHover={{ scale: 1.05, y: -2 }} whileTap={{ scale: 0.95 }} onClick={() => navigate(a.href)}
+                            className={`flex flex-col items-center justify-center p-4 rounded-2xl bg-gradient-to-br ${a.gradient} text-white shadow-lg ${a.shadow} transition-all duration-300`}>
+                            <a.icon size={22} className="mb-2" strokeWidth={2} />
+                            <span className="text-xs font-semibold text-center leading-tight">{a.label}</span>
+                        </motion.button>
+                    ))}
+                </AnimatePresence>
             </div>
         </div>
     );
 };
+
 
 const SystemHealthWidget: React.FC<WidgetProps> = () => {
     const items = [
@@ -284,24 +401,27 @@ const FinancialChartWidget: React.FC<WidgetProps> = ({ loading }) => {
     useEffect(() => {
         let active = true;
         setIsLoading(true);
-        
+
         getFinanceiroFluxoCaixaCentered(period)
             .then(res => {
                 if (!active) return;
                 if (res && res.length > 0) {
-                    let saldoAcumulado = 0;
+                    // Saldo inicial vem do primeiro registro (soma dos saldos das contas correntes)
+                    const saldoInicialCC = res[0]?.saldo_inicial_cc || 0;
+                    let saldoAcumulado = saldoInicialCC;
+
                     const enriched = res.map((item, idx) => {
-                        const receber = item.is_past 
-                            ? (item.receber_realizado || 0) 
+                        const receber = item.is_past
+                            ? (item.receber_realizado || 0)
                             : (item.receber_realizado || 0) + (item.receber_previsto || 0);
-                        const pagar = item.is_past 
-                            ? (item.pagar_realizado || 0) 
+                        const pagar = item.is_past
+                            ? (item.pagar_realizado || 0)
                             : (item.pagar_realizado || 0) + (item.pagar_previsto || 0);
                         const liquido = receber - pagar;
                         saldoAcumulado += liquido;
-                        
+
                         if (item.is_current) setCurrentMonthIndex(idx);
-                        
+
                         return {
                             mes: item.mes,
                             mes_iso: item.mes_iso,
@@ -311,6 +431,7 @@ const FinancialChartWidget: React.FC<WidgetProps> = ({ loading }) => {
                             is_past: item.is_past,
                             is_current: item.is_current,
                         };
+
                     });
                     setChartData(enriched);
                 } else {
@@ -323,7 +444,7 @@ const FinancialChartWidget: React.FC<WidgetProps> = ({ loading }) => {
             .finally(() => {
                 if (active) setIsLoading(false);
             });
-            
+
         return () => { active = false; };
     }, [period]);
 
@@ -332,16 +453,15 @@ const FinancialChartWidget: React.FC<WidgetProps> = ({ loading }) => {
         const dataPoint = payload[0]?.payload as ChartDataItem;
         const isPast = dataPoint?.is_past;
         const isCurrent = dataPoint?.is_current;
-        
+
         return (
             <div className="bg-white/95 backdrop-blur-xl rounded-2xl shadow-2xl border border-slate-100 p-4 min-w-[220px]">
                 <div className="flex items-center justify-between mb-3 pb-2 border-b border-slate-100">
                     <p className="font-semibold text-slate-800">{label}</p>
-                    <span className={`text-xs px-2 py-0.5 rounded-full ${
-                        isPast ? 'bg-slate-100 text-slate-600' : 
-                        isCurrent ? 'bg-indigo-100 text-indigo-700' : 
-                        'bg-amber-100 text-amber-700'
-                    }`}>
+                    <span className={`text-xs px-2 py-0.5 rounded-full ${isPast ? 'bg-slate-100 text-slate-600' :
+                        isCurrent ? 'bg-indigo-100 text-indigo-700' :
+                            'bg-amber-100 text-amber-700'
+                        }`}>
                         {isPast ? 'Realizado' : isCurrent ? 'Atual' : 'Previsto'}
                     </span>
                 </div>
@@ -361,10 +481,10 @@ const FinancialChartWidget: React.FC<WidgetProps> = ({ loading }) => {
     const CustomBar = (props: any) => {
         const { x, y, width, height, is_past, is_current, dataKey } = props;
         const isReceber = dataKey === 'receber';
-        
+
         let fillColor;
         let opacity = 1;
-        
+
         if (is_past) {
             fillColor = isReceber ? '#10b981' : '#f43f5e';
         } else if (is_current) {
@@ -374,7 +494,7 @@ const FinancialChartWidget: React.FC<WidgetProps> = ({ loading }) => {
             fillColor = isReceber ? '#10b981' : '#f43f5e';
             opacity = 0.5;
         }
-        
+
         return (
             <rect
                 x={x}
@@ -398,18 +518,17 @@ const FinancialChartWidget: React.FC<WidgetProps> = ({ loading }) => {
                         <button
                             key={m}
                             onClick={() => setPeriod(m)}
-                            className={`px-4 py-1.5 text-xs font-semibold rounded-lg transition-all duration-300 ${
-                                period === m 
-                                    ? 'bg-white text-indigo-600 shadow-md shadow-indigo-100' 
-                                    : 'text-slate-700 hover:text-slate-900'
-                            }`}
+                            className={`px-4 py-1.5 text-xs font-semibold rounded-lg transition-all duration-300 ${period === m
+                                ? 'bg-white text-indigo-600 shadow-md shadow-indigo-100'
+                                : 'text-slate-700 hover:text-slate-900'
+                                }`}
                         >
                             {m}m
                         </button>
                     ))}
                 </div>
             </div>
-            
+
             <div className="px-5 pb-2 flex items-center gap-4 text-xs">
                 <div className="flex items-center gap-1.5">
                     <div className="w-3 h-3 rounded bg-emerald-500" />
@@ -424,7 +543,7 @@ const FinancialChartWidget: React.FC<WidgetProps> = ({ loading }) => {
                     <span className="text-slate-500">Saldo</span>
                 </div>
             </div>
-            
+
             <div className="flex-1 w-full min-h-0 px-2">
                 {(loading || isLoading) ? (
                     <div className="w-full h-full flex items-center justify-center">
@@ -453,46 +572,46 @@ const FinancialChartWidget: React.FC<WidgetProps> = ({ loading }) => {
                                 </linearGradient>
                             </defs>
                             <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
-                            <XAxis 
-                                dataKey="mes" 
-                                axisLine={false} 
-                                tickLine={false} 
-                                tick={{ fontSize: 11, fill: '#64748b', fontWeight: 500 }} 
+                            <XAxis
+                                dataKey="mes"
+                                axisLine={false}
+                                tickLine={false}
+                                tick={{ fontSize: 11, fill: '#64748b', fontWeight: 500 }}
                             />
-                            <YAxis 
-                                axisLine={false} 
-                                tickLine={false} 
+                            <YAxis
+                                axisLine={false}
+                                tickLine={false}
                                 tick={{ fontSize: 10, fill: '#94a3b8' }}
                                 tickFormatter={(v) => v >= 1000 ? `${(v / 1000).toFixed(0)}k` : v}
                                 width={45}
                             />
                             <Tooltip content={<CustomTooltip />} />
                             {currentMonthIndex >= 0 && (
-                                <ReferenceLine 
-                                    x={chartData[currentMonthIndex]?.mes} 
-                                    stroke="#6366f1" 
-                                    strokeDasharray="4 4" 
+                                <ReferenceLine
+                                    x={chartData[currentMonthIndex]?.mes}
+                                    stroke="#6366f1"
+                                    strokeDasharray="4 4"
                                     strokeWidth={2}
                                     label={{ value: 'Hoje', position: 'top', fontSize: 10, fill: '#6366f1' }}
                                 />
                             )}
-                            <Bar 
-                                dataKey="receber" 
-                                name="Receitas" 
+                            <Bar
+                                dataKey="receber"
+                                name="Receitas"
                                 shape={(props: any) => <CustomBar {...props} dataKey="receber" />}
                                 maxBarSize={35}
                             />
-                            <Bar 
-                                dataKey="pagar" 
-                                name="Despesas" 
+                            <Bar
+                                dataKey="pagar"
+                                name="Despesas"
                                 shape={(props: any) => <CustomBar {...props} dataKey="pagar" />}
                                 maxBarSize={35}
                             />
-                            <Line 
-                                type="monotone" 
-                                dataKey="saldo" 
-                                name="Saldo Acumulado" 
-                                stroke="url(#gradientSaldo)" 
+                            <Line
+                                type="monotone"
+                                dataKey="saldo"
+                                name="Saldo Acumulado"
+                                stroke="url(#gradientSaldo)"
                                 strokeWidth={3}
                                 dot={{ fill: '#6366f1', strokeWidth: 2, r: 4 }}
                                 activeDot={{ r: 7, fill: '#6366f1', stroke: '#fff', strokeWidth: 2 }}
@@ -575,25 +694,23 @@ const AlertsWidget: React.FC<WidgetProps> = ({ data, loading }) => {
         const isPagar = type === 'pagar';
         const valor = val?.valor ?? 0;
         const qtd = val?.qtd ?? 0;
-        
+
         return (
             <motion.div
                 initial={{ opacity: 0, x: -20 }}
                 animate={{ opacity: 1, x: 0 }}
                 transition={{ delay: index * 0.1 }}
-                className={`flex items-center gap-3 p-3 rounded-xl transition-all duration-300 ${
-                    isToday 
-                        ? 'bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200/50' 
-                        : valor > 0 
-                            ? `bg-gradient-to-r ${isPagar ? 'from-rose-50 to-pink-50 border border-rose-200/50' : 'from-emerald-50 to-teal-50 border border-emerald-200/50'}`
-                            : 'bg-slate-50/50'
-                }`}
+                className={`flex items-center gap-3 p-3 rounded-xl transition-all duration-300 ${isToday
+                    ? 'bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200/50'
+                    : valor > 0
+                        ? `bg-gradient-to-r ${isPagar ? 'from-rose-50 to-pink-50 border border-rose-200/50' : 'from-emerald-50 to-teal-50 border border-emerald-200/50'}`
+                        : 'bg-slate-50/50'
+                    }`}
             >
-                <div className={`p-2.5 rounded-xl ${
-                    isPagar 
-                        ? 'bg-gradient-to-br from-rose-500 to-pink-600 text-white shadow-lg shadow-rose-200' 
-                        : 'bg-gradient-to-br from-emerald-500 to-teal-600 text-white shadow-lg shadow-emerald-200'
-                }`}>
+                <div className={`p-2.5 rounded-xl ${isPagar
+                    ? 'bg-gradient-to-br from-rose-500 to-pink-600 text-white shadow-lg shadow-rose-200'
+                    : 'bg-gradient-to-br from-emerald-500 to-teal-600 text-white shadow-lg shadow-emerald-200'
+                    }`}>
                     {isPagar ? <ArrowUp size={16} strokeWidth={2.5} /> : <ArrowDown size={16} strokeWidth={2.5} />}
                 </div>
                 <div className="flex-1 min-w-0">
@@ -652,7 +769,7 @@ const GoalGaugeWidget: React.FC<WidgetProps> = ({ data, loading }) => {
             {loading ? (
                 <div className="w-40 h-40 rounded-full bg-slate-100 animate-pulse" />
             ) : (
-                <motion.div 
+                <motion.div
                     className="relative flex items-center justify-center"
                     initial={{ opacity: 0, scale: 0.8 }}
                     animate={{ opacity: 1, scale: 1 }}

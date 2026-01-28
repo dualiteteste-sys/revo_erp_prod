@@ -1,0 +1,70 @@
+name: Deploy Netlify (DEV)
+
+on:
+  workflow_run:
+    workflows:
+      - "Release Gate (dev) — unit + e2e + migrations"
+    branches:
+      - dev
+    types:
+      - completed
+
+concurrency:
+  group: netlify-deploy-dev
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    name: Deploy Netlify (DEV)
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout (dev)
+        uses: actions/checkout@v4
+        with:
+          ref: dev
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Enable Corepack (Yarn)
+        run: corepack enable
+
+      - name: Install dependencies
+        run: yarn install --immutable
+
+      - name: Validate required secrets (DEV)
+        env:
+          NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
+          NETLIFY_SITE_ID: ${{ secrets.NETLIFY_SITE_ID_DEV }}
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL_DEV }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY_DEV }}
+        run: |
+          set -euo pipefail
+          if [[ -z "${NETLIFY_AUTH_TOKEN:-}" ]]; then echo "::error::Missing secret NETLIFY_AUTH_TOKEN"; exit 1; fi
+          if [[ -z "${NETLIFY_SITE_ID:-}" ]]; then echo "::error::Missing secret NETLIFY_SITE_ID_DEV"; exit 1; fi
+          if [[ -z "${VITE_SUPABASE_URL:-}" ]]; then echo "::error::Missing secret VITE_SUPABASE_URL_DEV"; exit 1; fi
+          if [[ -z "${VITE_SUPABASE_ANON_KEY:-}" ]]; then echo "::error::Missing secret VITE_SUPABASE_ANON_KEY_DEV"; exit 1; fi
+
+      - name: Build (DEV)
+        env:
+          CI: true
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL_DEV }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY_DEV }}
+          VITE_SUPABASE_FUNCTIONS_URL: ${{ secrets.VITE_SUPABASE_FUNCTIONS_URL_DEV }}
+          VITE_SITE_URL: ${{ secrets.VITE_SITE_URL_DEV }}
+          VITE_SENTRY_DSN: ${{ secrets.VITE_SENTRY_DSN_DEV }}
+        run: yarn build
+
+      - name: Deploy to Netlify (DEV)
+        env:
+          NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
+          NETLIFY_SITE_ID: ${{ secrets.NETLIFY_SITE_ID_DEV }}
+        run: |
+          set -euo pipefail
+          npx -y netlify-cli@17.41.1 deploy --dir dist --site "$NETLIFY_SITE_ID" --message "deploy(dev) ${GITHUB_SHA}"
+

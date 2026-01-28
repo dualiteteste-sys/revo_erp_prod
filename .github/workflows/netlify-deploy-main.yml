@@ -1,0 +1,70 @@
+name: Deploy Netlify (PROD)
+
+on:
+  workflow_run:
+    workflows:
+      - "CI/CD Pipeline"
+    branches:
+      - main
+    types:
+      - completed
+
+concurrency:
+  group: netlify-deploy-prod
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    name: Deploy Netlify (PROD)
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout (main)
+        uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Enable Corepack (Yarn)
+        run: corepack enable
+
+      - name: Install dependencies
+        run: yarn install --immutable
+
+      - name: Validate required secrets (PROD)
+        env:
+          NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
+          NETLIFY_SITE_ID: ${{ secrets.NETLIFY_SITE_ID_PROD }}
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL_PROD }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY_PROD }}
+        run: |
+          set -euo pipefail
+          if [[ -z "${NETLIFY_AUTH_TOKEN:-}" ]]; then echo "::error::Missing secret NETLIFY_AUTH_TOKEN"; exit 1; fi
+          if [[ -z "${NETLIFY_SITE_ID:-}" ]]; then echo "::error::Missing secret NETLIFY_SITE_ID_PROD"; exit 1; fi
+          if [[ -z "${VITE_SUPABASE_URL:-}" ]]; then echo "::error::Missing secret VITE_SUPABASE_URL_PROD"; exit 1; fi
+          if [[ -z "${VITE_SUPABASE_ANON_KEY:-}" ]]; then echo "::error::Missing secret VITE_SUPABASE_ANON_KEY_PROD"; exit 1; fi
+
+      - name: Build (PROD)
+        env:
+          CI: true
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL_PROD }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY_PROD }}
+          VITE_SUPABASE_FUNCTIONS_URL: ${{ secrets.VITE_SUPABASE_FUNCTIONS_URL_PROD }}
+          VITE_SITE_URL: ${{ secrets.VITE_SITE_URL_PROD }}
+          VITE_SENTRY_DSN: ${{ secrets.VITE_SENTRY_DSN_PROD }}
+        run: yarn build
+
+      - name: Deploy to Netlify (PROD)
+        env:
+          NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
+          NETLIFY_SITE_ID: ${{ secrets.NETLIFY_SITE_ID_PROD }}
+        run: |
+          set -euo pipefail
+          npx -y netlify-cli@17.41.1 deploy --dir dist --prod --site "$NETLIFY_SITE_ID" --message "deploy(prod) ${GITHUB_SHA}"
+

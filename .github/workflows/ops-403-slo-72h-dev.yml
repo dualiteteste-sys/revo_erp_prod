@@ -18,7 +18,11 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     env:
-      THRESHOLD_403_TOTAL_72H: "0"
+      # DEV: tolera algum ruído de 403 (instabilidade / testes),
+      # mas mantém tolerância zero para falhas de recuperação e falta de empresa ativa.
+      THRESHOLD_403_TOTAL_72H: "20"
+      THRESHOLD_403_MISSING_ACTIVE_72H: "0"
+      THRESHOLD_403_RECOVERY_FAILED_72H: "0"
     steps:
       - name: Install psql + jq
         run: |
@@ -79,16 +83,22 @@ jobs:
           echo "slo_json=$SLO_JSON" >> "$GITHUB_OUTPUT"
 
           total_72h="$(echo "$SLO_JSON" | jq -r '.total_72h')"
+          missing_active_72h="$(echo "$SLO_JSON" | jq -r '.missing_active_empresa_72h')"
+          recovery_failed_72h="$(echo "$SLO_JSON" | jq -r '.recovery_failed_72h')"
           echo "total_72h=$total_72h" >> "$GITHUB_OUTPUT"
 
           breach="false"
           if [[ "$total_72h" -gt "${THRESHOLD_403_TOTAL_72H}" ]]; then breach="true"; fi
+          if [[ "$missing_active_72h" -gt "${THRESHOLD_403_MISSING_ACTIVE_72H}" ]]; then breach="true"; fi
+          if [[ "$recovery_failed_72h" -gt "${THRESHOLD_403_RECOVERY_FAILED_72H}" ]]; then breach="true"; fi
           echo "breach=$breach" >> "$GITHUB_OUTPUT"
 
           {
             echo "### OPS SLO — 72h sem 403 (DEV)"
             echo ""
             echo "\`total_72h\`: **$total_72h** (threshold=${THRESHOLD_403_TOTAL_72H})"
+            echo "\`missing_active_empresa_72h\`: **$missing_active_72h** (threshold=${THRESHOLD_403_MISSING_ACTIVE_72H})"
+            echo "\`recovery_failed_72h\`: **$recovery_failed_72h** (threshold=${THRESHOLD_403_RECOVERY_FAILED_72H})"
             echo ""
             echo "```json"
             echo "$SLO_JSON"
@@ -114,10 +124,13 @@ jobs:
           script: |
             const title = "OPS SLO (DEV): 72h sem 403 — VIOLAÇÃO";
             const labels = ["ops-alert","env:dev","ops-403","slo"];
+            const slo = (() => { try { return JSON.parse(process.env.SLO_JSON ?? "{}"); } catch { return {}; } })();
             const body = [
               "Detectada violação do SLO **72h sem 403** em DEV.",
               "",
-              `- total_72h: ${process.env.TOTAL_72H}`,
+              `- total_72h: ${slo.total_72h ?? process.env.TOTAL_72H ?? "?"}`,
+              `- missing_active_empresa_72h: ${slo.missing_active_empresa_72h ?? "?"}`,
+              `- recovery_failed_72h: ${slo.recovery_failed_72h ?? "?"}`,
               "",
               "Detalhes (JSON):",
               "```json",
@@ -156,4 +169,3 @@ jobs:
               body,
               labels,
             });
-
