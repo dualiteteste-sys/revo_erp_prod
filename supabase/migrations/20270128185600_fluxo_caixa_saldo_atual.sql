@@ -14,6 +14,12 @@ declare
   v_empresa uuid := public.current_empresa_id();
   v_total numeric;
 begin
+  -- Permission guard obrigatório para SECURITY DEFINER
+  if v_empresa is null then
+    raise exception 'Empresa não identificada';
+  end if;
+  perform public.require_permission_for_current_user('contas_correntes', 'view');
+
   select coalesce(sum(
     cc.saldo_inicial
     + coalesce((
@@ -33,6 +39,7 @@ begin
   return v_total;
 end;
 $$;
+
 
 comment on function public.financeiro_saldo_atual_total() is 
 'Retorna a soma dos saldos atuais (saldo_inicial + movimentacoes) de todas as contas correntes ativas da empresa.';
