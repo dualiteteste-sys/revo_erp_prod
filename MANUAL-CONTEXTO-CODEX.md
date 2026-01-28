@@ -24,6 +24,21 @@ Objetivo: quando uma nova janela de contexto for aberta, este documento deve ser
 - Qualquer ajuste que envolva banco/Supabase deve virar migration em `supabase/migrations/*` (nada de ajuste manual “só em prod”).
 - O ciclo padrão é: **commit → push em `dev` → Actions verdes → merge para `main` → Actions verdes**.
 
+### 3.1.1 Branch `dev` é permanente (nunca excluir)
+
+- A branch `dev` é **long-lived** e serve como trilho de integração antes de `main`. **Nunca excluir** a branch `dev`.
+- Por que ela “sumiu” no passado (causa comum):
+  - PRs `dev → main` foram mergeados com a opção **“Delete branch”** (ou via `gh pr merge --delete-branch`).
+  - O repositório estava com **Automatically delete head branches** habilitado e `dev` foi usada como *head branch* em PR.
+  - Falta de **branch protection** (permitindo deleção/force-push acidental).
+- Como blindar (Estado da Arte):
+  - GitHub → **Settings → Branches → Add rule** para `dev`:
+    - **Restrict deletions** (impede apagar a branch).
+    - Desabilitar **force pushes** (ou restringir a admins específicos).
+    - Exigir **status checks** (Release Gate / Verify Migrations) para merge.
+  - Evitar PRs com `dev` como branch “descartável”: preferir branches `release/*`/`feature/*` como *head* e manter `dev` como trilho.
+  - Em merges via CLI, **nunca** usar `--delete-branch` quando a branch for `dev`.
+
 ### 3.2 Console limpo (E2E)
 
 - E2E falha se existir `console.error` ou `pageerror` (ver `e2e/fixtures.ts`).
