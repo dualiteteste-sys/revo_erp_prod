@@ -1,0 +1,30 @@
+name: Require dev before main
+
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, reopened, synchronize, ready_for_review]
+
+permissions:
+  contents: read
+
+jobs:
+  enforce:
+    name: Enforce PR source = dev
+    runs-on: ubuntu-latest
+    steps:
+      - name: Validate head branch
+        run: |
+          set -euo pipefail
+          echo "base_ref=${{ github.base_ref }}"
+          echo "head_ref=${{ github.head_ref }}"
+          if [[ "${{ github.base_ref }}" != "main" ]]; then
+            echo "::error::Este check só se aplica a PRs para main."
+            exit 1
+          fi
+          if [[ "${{ github.head_ref }}" != "dev" ]]; then
+            echo "::error::Política do Revo: main só recebe merge via PR dev→main. Abra PR para dev primeiro, aguarde checks verdes, e então crie PR dev→main."
+            exit 1
+          fi
+          echo "OK: PR dev→main."
+

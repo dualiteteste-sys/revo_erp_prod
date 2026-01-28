@@ -6,7 +6,7 @@ Objetivo: quando uma nova janela de contexto for aberta, este documento deve ser
 
 **Prompt padrão (copiar e colar):**
 
-1) Leia `docs/checklist-estado-da-arte-gaps.md` e `.github/pull_request_template.md`.
+1) Leia `CHECKLIST-ESTADO-DA-ARTE.md` e `CHECKLIST-ESTADO-DA-ARTE-9-10.md`.
 2) Resuma em 6 bullets: (a) como fazemos deploy, (b) regras de migrations, (c) padrão de testes, (d) padrão de logs/console, (e) padrão de UX “estado da arte”, (f) o que você vai evitar.
 3) Antes de codar, liste os arquivos que você pretende tocar e os testes que vai rodar.
 
@@ -23,6 +23,21 @@ Objetivo: quando uma nova janela de contexto for aberta, este documento deve ser
 - `main` é a fonte do deploy em PROD.
 - Qualquer ajuste que envolva banco/Supabase deve virar migration em `supabase/migrations/*` (nada de ajuste manual “só em prod”).
 - O ciclo padrão é: **commit → push em `dev` → Actions verdes → merge para `main` → Actions verdes**.
+
+### 3.1.1 Branch `dev` é permanente (nunca excluir)
+
+- A branch `dev` é **long-lived** e serve como trilho de integração antes de `main`. **Nunca excluir** a branch `dev`.
+- Por que ela “sumiu” no passado (causa comum):
+  - PRs `dev → main` foram mergeados com a opção **“Delete branch”** (ou via `gh pr merge --delete-branch`).
+  - O repositório estava com **Automatically delete head branches** habilitado e `dev` foi usada como *head branch* em PR.
+  - Falta de **branch protection** (permitindo deleção/force-push acidental).
+- Como blindar (Estado da Arte):
+  - GitHub → **Settings → Branches → Add rule** para `dev`:
+    - **Restrict deletions** (impede apagar a branch).
+    - Desabilitar **force pushes** (ou restringir a admins específicos).
+    - Exigir **status checks** (Release Gate / Verify Migrations) para merge.
+  - Evitar PRs com `dev` como branch “descartável”: preferir branches `release/*`/`feature/*` como *head* e manter `dev` como trilho.
+  - Em merges via CLI, **nunca** usar `--delete-branch` quando a branch for `dev`.
 
 ### 3.2 Console limpo (E2E)
 
