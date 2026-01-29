@@ -44,6 +44,11 @@ const CargoFormPanel: React.FC<CargoFormPanelProps> = ({ cargo, onSaveSuccess, o
   const [auditRows, setAuditRows] = useState<AuditLogRow[]>([]);
   const [treinReqSort, setTreinReqSort] = useState<SortState<string>>({ column: 'treinamento', direction: 'asc' });
   const [auditSort, setAuditSort] = useState<SortState<string>>({ column: 'quando', direction: 'desc' });
+  const [availableTreinamentos, setAvailableTreinamentos] = useState<Treinamento[]>([]);
+  const [treinamentosReq, setTreinamentosReq] = useState<CargoTreinamentoRequirement[]>([]);
+  const [loadingTreinReq, setLoadingTreinReq] = useState(false);
+  const [selectedTreinamentoId, setSelectedTreinamentoId] = useState<string>('');
+  const [treinValidadeMeses, setTreinValidadeMeses] = useState<string>('');
 
   const treinReqColumns: TableColumnWidthDef[] = [
     { id: 'treinamento', defaultWidth: 520, minWidth: 220 },
@@ -97,12 +102,6 @@ const CargoFormPanel: React.FC<CargoFormPanelProps> = ({ cargo, onSaveSuccess, o
   const canSave = isEditing ? permUpdate.data : permCreate.data;
   const readOnly = !permsLoading && !canSave;
   const canManage = !permsLoading && !!permManage.data;
-
-  const [availableTreinamentos, setAvailableTreinamentos] = useState<Treinamento[]>([]);
-  const [treinamentosReq, setTreinamentosReq] = useState<CargoTreinamentoRequirement[]>([]);
-  const [loadingTreinReq, setLoadingTreinReq] = useState(false);
-  const [selectedTreinamentoId, setSelectedTreinamentoId] = useState<string>('');
-  const [treinValidadeMeses, setTreinValidadeMeses] = useState<string>('');
 
   useEffect(() => {
     const loadCompetencias = async () => {
