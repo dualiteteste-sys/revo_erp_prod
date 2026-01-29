@@ -2,6 +2,10 @@
 
 Este documento existe para que qualquer pessoa (ou um novo “contexto” de IA) consiga continuar o trabalho **sem perder a linha**: o que já existe, o que é regra de ouro, e como entregar com qualidade.
 
+## Entrada principal (AGENTS)
+
+Antes de qualquer coisa, leia `AGENTS.md` (raiz). Ele é a “constituição” do projeto: invariantes, DoD, gatilhos e links para os demais docs.
+
 ## 1) Regras de ouro (não negociar)
 
 1) **Schema do banco só muda via migration versionada** (`supabase/migrations/*`).
