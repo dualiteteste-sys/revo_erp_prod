@@ -21,6 +21,8 @@ export function useIsMobile(): boolean {
 
     useEffect(() => {
         if (typeof window === 'undefined') return;
+        // matchMedia may not exist in test environments
+        if (typeof window.matchMedia !== 'function') return;
 
         // Usar matchMedia é mais performático que resize listener
         const mediaQuery = window.matchMedia('(max-width: 767px)');
