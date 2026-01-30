@@ -260,7 +260,7 @@ export default function ImportarExtratoModal({ isOpen, onClose, onImport, contaC
     if (!isOpen) return;
     setMapping((current) => {
       if (hasCustomMapping) return sanitizeMapping(current, sourceKeys);
-      const saved = loadSavedMapping<FieldMapping>(MAPPING_STORAGE_KEY, TARGET_KEYS);
+      const saved = loadSavedMapping<TargetFieldKey>(MAPPING_STORAGE_KEY, TARGET_KEYS);
       const derived = deriveDefaultMapping({ targetKeys: TARGET_KEYS, sourceKeys, synonyms: FIELD_SYNONYMS });
       return sanitizeMapping({ ...derived, ...(saved ?? {}) } as FieldMapping, sourceKeys);
     });
@@ -320,15 +320,15 @@ export default function ImportarExtratoModal({ isOpen, onClose, onImport, contaC
         errors.length > 0 || !dataISO || valorNum === null || !tipo || valorAbs === null
           ? null
           : {
-              data_lancamento: dataISO,
-              descricao,
-              valor: valorAbs,
-              tipo_lancamento: tipo,
-              documento_ref: doc,
-              identificador_banco: `CSV-${dedupeKey}-${r.line}`,
-              hash_importacao: dedupeKey,
-              linha_bruta: JSON.stringify(row),
-            };
+            data_lancamento: dataISO,
+            descricao,
+            valor: valorAbs,
+            tipo_lancamento: tipo,
+            documento_ref: doc,
+            identificador_banco: `CSV-${dedupeKey}-${r.line}`,
+            hash_importacao: dedupeKey ?? undefined,
+            linha_bruta: JSON.stringify(row),
+          };
 
       return { line: r.line, data: dataISO, descricao, valor: valorAbs, tipo, documento: doc, errors, payload, dedupeKey };
     });
@@ -642,7 +642,7 @@ export default function ImportarExtratoModal({ isOpen, onClose, onImport, contaC
                   disabled={isOfx || !canUseMapping}
                   onClick={() => {
                     setHasCustomMapping(false);
-                    const saved = loadSavedMapping<FieldMapping>(MAPPING_STORAGE_KEY, TARGET_KEYS);
+                    const saved = loadSavedMapping<TargetFieldKey>(MAPPING_STORAGE_KEY, TARGET_KEYS);
                     const derived = deriveDefaultMapping({ targetKeys: TARGET_KEYS, sourceKeys, synonyms: FIELD_SYNONYMS });
                     setMapping(sanitizeMapping({ ...derived, ...(saved ?? {}) } as FieldMapping, sourceKeys));
                   }}

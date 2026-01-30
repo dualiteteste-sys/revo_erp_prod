@@ -8,6 +8,8 @@ import ListPaginationBar from '@/components/ui/ListPaginationBar';
 import ConfirmationModal from '@/components/ui/ConfirmationModal';
 import Modal from '@/components/ui/Modal';
 import ContasPagarTable from '@/components/financeiro/contas-pagar/ContasPagarTable';
+import { ContaPagarMobileCard } from '@/components/financeiro/contas-pagar/ContaPagarMobileCard';
+import { ResponsiveTable } from '@/components/ui/ResponsiveTable';
 import ContasPagarFormPanel from '@/components/financeiro/contas-pagar/ContasPagarFormPanel';
 import ContasPagarSummary from '@/components/financeiro/contas-pagar/ContasPagarSummary';
 import BaixaRapidaModal from '@/components/financeiro/common/BaixaRapidaModal';
@@ -193,30 +195,30 @@ const ContasPagarPage: React.FC = () => {
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-3xl font-bold text-gray-800">Contas a Pagar</h1>
         <div className="flex items-center gap-2">
-            {enableSeed ? (
-              <Button
-                variant="secondary"
-                onClick={handleSeed}
-                disabled={isSeeding || loading}
-                className="gap-2"
-              >
-                {isSeeding ? <Loader2 className="animate-spin" size={18} /> : <DatabaseBackup size={18} />}
-                Popular Dados
-              </Button>
-            ) : null}
-            <Button onClick={() => handleOpenForm()} className="gap-2">
-              <PlusCircle size={18} />
-              Nova Conta
+          {enableSeed ? (
+            <Button
+              variant="secondary"
+              onClick={handleSeed}
+              disabled={isSeeding || loading}
+              className="gap-2"
+            >
+              {isSeeding ? <Loader2 className="animate-spin" size={18} /> : <DatabaseBackup size={18} />}
+              Popular Dados
             </Button>
+          ) : null}
+          <Button onClick={() => handleOpenForm()} className="gap-2">
+            <PlusCircle size={18} />
+            Nova Conta
+          </Button>
         </div>
       </div>
 
       {error ? (
         <div className="my-8">
-          <ErrorAlert 
-            title="Erro ao carregar dados" 
-            message={error} 
-            onRetry={refresh} 
+          <ErrorAlert
+            title="Erro ao carregar dados"
+            message={error}
+            onRetry={refresh}
           />
         </div>
       ) : (
@@ -234,7 +236,7 @@ const ContasPagarPage: React.FC = () => {
                 className="w-full p-3 pl-10 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
               />
             </div>
-            
+
             <Select
               value={filterStatus || ''}
               onChange={(e) => setFilterStatus(e.target.value || null)}
@@ -248,29 +250,29 @@ const ContasPagarPage: React.FC = () => {
               <option value="cancelada">Cancelada</option>
             </Select>
 
-	            <div className="flex items-center gap-3">
-	                <DatePicker 
-	                    label="" 
-	                    value={filterStartDate} 
-	                    onChange={setFilterStartDate} 
-	                    className="w-[200px]"
-	                />
-	                <span className="text-gray-500 whitespace-nowrap px-1">até</span>
-	                <DatePicker 
-	                    label="" 
-	                    value={filterEndDate} 
-	                    onChange={setFilterEndDate} 
-	                    className="w-[200px]"
-	                />
-	                {(filterStartDate || filterEndDate) && (
-	                    <button 
-	                        onClick={clearDateFilters}
-                        className="p-2 text-gray-500 hover:text-red-500 hover:bg-red-50 rounded-full transition-colors"
-                        title="Limpar datas"
-                    >
-                        <X size={18} />
-                    </button>
-                )}
+            <div className="flex items-center gap-3">
+              <DatePicker
+                label=""
+                value={filterStartDate}
+                onChange={setFilterStartDate}
+                className="w-[200px]"
+              />
+              <span className="text-gray-500 whitespace-nowrap px-1">até</span>
+              <DatePicker
+                label=""
+                value={filterEndDate}
+                onChange={setFilterEndDate}
+                className="w-[200px]"
+              />
+              {(filterStartDate || filterEndDate) && (
+                <button
+                  onClick={clearDateFilters}
+                  className="p-2 text-gray-500 hover:text-red-500 hover:bg-red-50 rounded-full transition-colors"
+                  title="Limpar datas"
+                >
+                  <X size={18} />
+                </button>
+              )}
             </div>
           </div>
 
@@ -287,15 +289,33 @@ const ContasPagarPage: React.FC = () => {
                   {searchTerm && <p className="text-sm">Tente ajustar sua busca.</p>}
                 </div>
               ) : (
-                <ContasPagarTable
-                  contas={contas}
-                  onEdit={handleOpenForm}
-                  onPay={handlePay}
-                  onReverse={handleOpenReverse}
-                  onCancel={handleOpenCancel}
-                  onDelete={handleOpenDeleteModal}
-                  sortBy={sortBy}
-                  onSort={handleSort}
+                <ResponsiveTable
+                  data={contas}
+                  getItemId={(c) => c.id}
+                  loading={loading}
+                  tableComponent={
+                    <ContasPagarTable
+                      contas={contas}
+                      onEdit={handleOpenForm}
+                      onPay={handlePay}
+                      onReverse={handleOpenReverse}
+                      onCancel={handleOpenCancel}
+                      onDelete={handleOpenDeleteModal}
+                      sortBy={sortBy}
+                      onSort={handleSort}
+                    />
+                  }
+                  renderMobileCard={(conta) => (
+                    <ContaPagarMobileCard
+                      key={conta.id}
+                      conta={conta}
+                      onEdit={() => handleOpenForm(conta)}
+                      onPay={() => handlePay(conta)}
+                      onReverse={() => handleOpenReverse(conta)}
+                      onCancel={() => handleOpenCancel(conta)}
+                      onDelete={() => handleOpenDeleteModal(conta)}
+                    />
+                  )}
                 />
               )}
             </div>

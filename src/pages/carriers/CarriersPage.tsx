@@ -8,6 +8,8 @@ import ListPaginationBar from '../../components/ui/ListPaginationBar';
 import ConfirmationModal from '../../components/ui/ConfirmationModal';
 import Modal from '../../components/ui/Modal';
 import CarriersTable from '../../components/carriers/CarriersTable';
+import { CarrierMobileCard } from '../../components/carriers/CarrierMobileCard';
+import { ResponsiveTable } from '../../components/ui/ResponsiveTable';
 import CarrierFormPanel from '../../components/carriers/CarrierFormPanel';
 import Select from '@/components/ui/forms/Select';
 import { isSeedEnabled } from '@/utils/seed';
@@ -156,55 +158,55 @@ const CarriersPage: React.FC = () => {
     <div className="p-1 min-h-full flex flex-col">
       <div className="flex justify-between items-center mb-6">
         <div>
-            <h1 className="text-3xl font-bold text-gray-800">Transportadoras</h1>
-            <p className="text-gray-600 text-sm mt-1">Gerencie as empresas responsáveis pelo transporte de suas mercadorias.</p>
+          <h1 className="text-3xl font-bold text-gray-800">Transportadoras</h1>
+          <p className="text-gray-600 text-sm mt-1">Gerencie as empresas responsáveis pelo transporte de suas mercadorias.</p>
         </div>
         <div className="flex items-center gap-2">
-            <CsvExportDialog
-              filename="transportadoras.csv"
-              rows={carriers}
-              disabled={loading}
-              columns={[
-                { key: 'nome', label: 'Nome', getValue: (r) => r.nome },
-                { key: 'codigo', label: 'Código', getValue: (r) => r.codigo ?? '' },
-                { key: 'documento', label: 'Documento', getValue: (r) => r.documento ?? '' },
-                { key: 'cidade', label: 'Cidade', getValue: (r) => r.cidade ?? '' },
-                { key: 'uf', label: 'UF', getValue: (r) => r.uf ?? '' },
-                { key: 'modal', label: 'Modal', getValue: (r) => r.modal_principal ?? '' },
-                { key: 'frete_tipo', label: 'Frete padrão', getValue: (r) => r.frete_tipo_padrao ?? '' },
-                { key: 'prazo', label: 'Prazo médio (dias)', getValue: (r) => r.prazo_medio_dias ?? '' },
-                { key: 'status', label: 'Status', getValue: (r) => (r.ativo ? 'Ativa' : 'Inativa') },
-                { key: 'padrao', label: 'Padrão para frete', getValue: (r) => (r.padrao_para_frete ? 'Sim' : 'Não') },
-              ]}
-            />
+          <CsvExportDialog
+            filename="transportadoras.csv"
+            rows={carriers}
+            disabled={loading}
+            columns={[
+              { key: 'nome', label: 'Nome', getValue: (r) => r.nome },
+              { key: 'codigo', label: 'Código', getValue: (r) => r.codigo ?? '' },
+              { key: 'documento', label: 'Documento', getValue: (r) => r.documento ?? '' },
+              { key: 'cidade', label: 'Cidade', getValue: (r) => r.cidade ?? '' },
+              { key: 'uf', label: 'UF', getValue: (r) => r.uf ?? '' },
+              { key: 'modal', label: 'Modal', getValue: (r) => r.modal_principal ?? '' },
+              { key: 'frete_tipo', label: 'Frete padrão', getValue: (r) => r.frete_tipo_padrao ?? '' },
+              { key: 'prazo', label: 'Prazo médio (dias)', getValue: (r) => r.prazo_medio_dias ?? '' },
+              { key: 'status', label: 'Status', getValue: (r) => (r.ativo ? 'Ativa' : 'Inativa') },
+              { key: 'padrao', label: 'Padrão para frete', getValue: (r) => (r.padrao_para_frete ? 'Sim' : 'Não') },
+            ]}
+          />
+          <button
+            onClick={() => setIsImportOpen(true)}
+            disabled={permsLoading || !canCreate}
+            title={!canCreate ? 'Sem permissão para importar' : 'Importar transportadoras por CSV/XLSX'}
+            className="flex items-center gap-2 bg-gray-100 text-gray-700 font-semibold py-2 px-4 rounded-lg hover:bg-gray-200 transition-colors disabled:opacity-50"
+          >
+            <FileUp size={20} />
+            Importar CSV/XLSX
+          </button>
+          {enableSeed ? (
             <button
-              onClick={() => setIsImportOpen(true)}
-              disabled={permsLoading || !canCreate}
-              title={!canCreate ? 'Sem permissão para importar' : 'Importar transportadoras por CSV/XLSX'}
+              onClick={handleSeed}
+              disabled={isSeeding || loading}
               className="flex items-center gap-2 bg-gray-100 text-gray-700 font-semibold py-2 px-4 rounded-lg hover:bg-gray-200 transition-colors disabled:opacity-50"
             >
-              <FileUp size={20} />
-              Importar CSV/XLSX
+              {isSeeding ? <Loader2 className="animate-spin" size={20} /> : <DatabaseBackup size={20} />}
+              Popular Dados
             </button>
-            {enableSeed ? (
-              <button
-                onClick={handleSeed}
-                disabled={isSeeding || loading}
-                className="flex items-center gap-2 bg-gray-100 text-gray-700 font-semibold py-2 px-4 rounded-lg hover:bg-gray-200 transition-colors disabled:opacity-50"
-              >
-                {isSeeding ? <Loader2 className="animate-spin" size={20} /> : <DatabaseBackup size={20} />}
-                Popular Dados
-              </button>
-            ) : null}
-            <button
-              onClick={() => handleOpenForm()}
-              disabled={permsLoading || !canCreate}
-              title={!canCreate ? 'Sem permissão para criar' : undefined}
-              className="flex items-center gap-2 bg-blue-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-blue-700 transition-colors shadow-sm disabled:opacity-50"
-            >
-              <PlusCircle size={20} />
-              Nova Transportadora
-            </button>
+          ) : null}
+          <button
+            onClick={() => handleOpenForm()}
+            disabled={permsLoading || !canCreate}
+            title={!canCreate ? 'Sem permissão para criar' : undefined}
+            className="flex items-center gap-2 bg-blue-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-blue-700 transition-colors shadow-sm disabled:opacity-50"
+          >
+            <PlusCircle size={20} />
+            Nova Transportadora
+          </button>
         </div>
       </div>
 
@@ -243,31 +245,31 @@ const CarriersPage: React.FC = () => {
         ) : carriers.length === 0 ? (
           <div className="h-96 flex flex-col items-center justify-center text-gray-500 p-4">
             <div className="bg-gray-100 p-4 rounded-full mb-4">
-                <Truck size={48} className="text-gray-400" />
+              <Truck size={48} className="text-gray-400" />
             </div>
             <p className="font-semibold text-lg text-gray-700">Nenhuma transportadora encontrada.</p>
             <p className="text-sm mb-6">
               Comece cadastrando uma nova transportadora{enableSeed ? ' ou popule com dados de exemplo.' : '.'}
             </p>
             <div className="flex gap-3">
-                {enableSeed ? (
-                  <button
-                      onClick={handleSeed}
-                      disabled={isSeeding}
-                      className="flex items-center gap-2 bg-blue-100 text-blue-700 font-bold py-2 px-4 rounded-lg hover:bg-blue-200 transition-colors disabled:opacity-50"
-                  >
-                      {isSeeding ? <Loader2 className="animate-spin" size={20} /> : <DatabaseBackup size={20} />}
-                      Popular Dados
-                  </button>
-                ) : null}
+              {enableSeed ? (
                 <button
-                    onClick={() => handleOpenForm()}
-                    disabled={permsLoading || !canCreate}
-                    title={!canCreate ? 'Sem permissão para criar' : undefined}
-                    className="text-blue-600 hover:text-blue-800 font-medium hover:underline flex items-center disabled:opacity-50"
+                  onClick={handleSeed}
+                  disabled={isSeeding}
+                  className="flex items-center gap-2 bg-blue-100 text-blue-700 font-bold py-2 px-4 rounded-lg hover:bg-blue-200 transition-colors disabled:opacity-50"
                 >
-                    Cadastrar manualmente
+                  {isSeeding ? <Loader2 className="animate-spin" size={20} /> : <DatabaseBackup size={20} />}
+                  Popular Dados
                 </button>
+              ) : null}
+              <button
+                onClick={() => handleOpenForm()}
+                disabled={permsLoading || !canCreate}
+                title={!canCreate ? 'Sem permissão para criar' : undefined}
+                className="text-blue-600 hover:text-blue-800 font-medium hover:underline flex items-center disabled:opacity-50"
+              >
+                Cadastrar manualmente
+              </button>
             </div>
           </div>
         ) : (
@@ -286,17 +288,34 @@ const CarriersPage: React.FC = () => {
               ]}
             />
             <div className="flex-1 min-h-0 overflow-auto">
-              <CarriersTable
-                carriers={carriers}
-                onEdit={handleOpenForm}
-                onDelete={handleOpenDeleteModal}
-                sortBy={sortBy}
-                onSort={handleSort}
-                selectedIds={bulk.selectedIds}
-                allSelected={bulk.allSelected}
-                someSelected={bulk.someSelected}
-                onToggleSelect={(id) => bulk.toggle(id)}
-                onToggleSelectAll={() => bulk.toggleAll(bulk.allIds)}
+              <ResponsiveTable
+                data={carriers}
+                getItemId={(c) => c.id}
+                loading={loading}
+                tableComponent={
+                  <CarriersTable
+                    carriers={carriers}
+                    onEdit={handleOpenForm}
+                    onDelete={handleOpenDeleteModal}
+                    sortBy={sortBy}
+                    onSort={handleSort}
+                    selectedIds={bulk.selectedIds}
+                    allSelected={bulk.allSelected}
+                    someSelected={bulk.someSelected}
+                    onToggleSelect={(id) => bulk.toggle(id)}
+                    onToggleSelectAll={() => bulk.toggleAll(bulk.allIds)}
+                  />
+                }
+                renderMobileCard={(carrier) => (
+                  <CarrierMobileCard
+                    key={carrier.id}
+                    carrier={carrier}
+                    onEdit={() => handleOpenForm(carrier)}
+                    onDelete={() => handleOpenDeleteModal(carrier)}
+                    selected={bulk.selectedIds.has(carrier.id)}
+                    onToggleSelect={(id) => bulk.toggle(id)}
+                  />
+                )}
               />
             </div>
           </>

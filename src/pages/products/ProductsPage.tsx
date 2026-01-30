@@ -2,6 +2,8 @@ import React, { useCallback, useMemo, useState } from 'react';
 import { useProducts } from '../../hooks/useProducts';
 import { useToast } from '../../contexts/ToastProvider';
 import ProductsTable from '../../components/products/ProductsTable';
+import { ProductMobileCard } from '../../components/products/ProductMobileCard';
+import { ResponsiveTable } from '../../components/ui/ResponsiveTable';
 import Pagination from '../../components/ui/Pagination';
 import DeleteProductModal from '../../components/products/DeleteProductModal';
 import { Loader2, Search, Package, DatabaseBackup, Plus, FileDown, FileUp } from 'lucide-react';
@@ -91,7 +93,7 @@ const ProductsPage: React.FC = () => {
       setSelectedProduct(null);
 
       const fullProduct = await productsService.getProductDetails(product.id);
-      
+
       setIsFetchingDetails(false);
 
       if (!fullProduct) {
@@ -341,18 +343,36 @@ const ProductsPage: React.FC = () => {
               ]}
             />
             <div className="flex-1 min-h-0 overflow-auto">
-              <ProductsTable
-                products={products}
-                onEdit={(p) => handleOpenForm(p)}
-                onDelete={handleOpenDeleteModal}
-                onClone={handleClone}
-                sortBy={sortBy}
-                onSort={handleSort}
-                selectedIds={bulk.selectedIds}
-                allSelected={bulk.allSelected}
-                someSelected={bulk.someSelected}
-                onToggleSelect={(id) => bulk.toggle(id)}
-                onToggleSelectAll={() => bulk.toggleAll(bulk.allIds)}
+              <ResponsiveTable
+                data={products}
+                getItemId={(p) => p.id}
+                loading={loading}
+                tableComponent={
+                  <ProductsTable
+                    products={products}
+                    onEdit={(p) => handleOpenForm(p)}
+                    onDelete={handleOpenDeleteModal}
+                    onClone={handleClone}
+                    sortBy={sortBy}
+                    onSort={handleSort}
+                    selectedIds={bulk.selectedIds}
+                    allSelected={bulk.allSelected}
+                    someSelected={bulk.someSelected}
+                    onToggleSelect={(id) => bulk.toggle(id)}
+                    onToggleSelectAll={() => bulk.toggleAll(bulk.allIds)}
+                  />
+                }
+                renderMobileCard={(product) => (
+                  <ProductMobileCard
+                    key={product.id}
+                    product={product}
+                    onEdit={() => handleOpenForm(product)}
+                    onDelete={() => handleOpenDeleteModal(product)}
+                    onClone={() => handleClone(product)}
+                    selected={bulk.selectedIds.has(product.id)}
+                    onToggleSelect={(id) => bulk.toggle(id)}
+                  />
+                )}
               />
             </div>
           </>
@@ -369,11 +389,11 @@ const ProductsPage: React.FC = () => {
             <Loader2 className="animate-spin text-blue-600" size={48} />
           </div>
         ) : (
-          <ProductFormPanel 
-              product={selectedProduct}
-              onSaveSuccess={handleSaveSuccess}
-              onClose={handleCloseForm}
-              saveProduct={saveProduct}
+          <ProductFormPanel
+            product={selectedProduct}
+            onSaveSuccess={handleSaveSuccess}
+            onClose={handleCloseForm}
+            saveProduct={saveProduct}
           />
         )}
       </Modal>

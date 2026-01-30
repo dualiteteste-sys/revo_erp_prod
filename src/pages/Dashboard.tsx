@@ -10,21 +10,55 @@ import { DEFAULT_LAYOUT, WIDGETS, DashboardData } from '@/components/dashboard/r
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
+import { useIsMobile } from '@/hooks/useIsMobile';
 import 'react-grid-layout/css/styles.css';
 import 'react-resizable/css/styles.css';
 
 const BREAKPOINTS = { lg: 1200, md: 996, sm: 768, xs: 480, xxs: 0 };
 const COLS = { lg: 12, md: 10, sm: 6, xs: 4, xxs: 2 };
 
+// IDs de widgets KPI para tratamento especial
+const KPI_WIDGET_IDS = ['kpi-faturamento', 'kpi-clientes', 'kpi-pedidos', 'kpi-ticket'];
+
 function generateResponsiveLayouts(baseLayout: Layout[]): Record<string, Layout[]> {
   const layouts: Record<string, Layout[]> = {};
-  
+
   Object.keys(COLS).forEach(breakpoint => {
     const cols = COLS[breakpoint as keyof typeof COLS];
     let currentY = 0;
-    
+    let currentX = 0;
+
+    // Em mobile (xxs/xs), KPIs ficam em grid 2x2 com altura menor
+    const isMobileBreakpoint = breakpoint === 'xxs' || breakpoint === 'xs';
+
     layouts[breakpoint] = baseLayout.map(item => {
+      const isKpi = KPI_WIDGET_IDS.includes(item.i);
+
+      if (isMobileBreakpoint && isKpi) {
+        // KPIs: 2 colunas, altura reduzida
+        const w = Math.max(1, Math.floor(cols / 2));
+        const h = 4; // Altura menor para mobile
+        const newItem = {
+          ...item,
+          w,
+          h,
+          x: currentX,
+          y: currentY,
+        };
+        currentX += w;
+        if (currentX >= cols) {
+          currentX = 0;
+          currentY += h;
+        }
+        return newItem;
+      }
+
+      // Widgets normais: coluna única
       const w = Math.min(item.w, cols);
+      if (currentX !== 0) {
+        currentX = 0;
+        currentY += 4; // Reset row after KPIs
+      }
       const newItem = {
         ...item,
         w,
@@ -35,9 +69,9 @@ function generateResponsiveLayouts(baseLayout: Layout[]): Record<string, Layout[
       return newItem;
     });
   });
-  
+
   layouts.lg = baseLayout;
-  
+
   return layouts;
 }
 
@@ -67,14 +101,15 @@ const Dashboard: React.FC = () => {
   const [data, setData] = useState<DashboardData | null>(null);
   const [error, setError] = useState<string | null>(null);
   const opsView = useHasPermission('ops', 'view');
+  const isMobile = useIsMobile();
 
   const defaultLayouts = useMemo(() => generateResponsiveLayouts(DEFAULT_LAYOUT as Layout[]), []);
-  
-  const [layouts, setLayouts] = useLocalStorageState<Record<string, Layout[]>>('revo_dashboard_layout_v4', {
+
+  const [layouts, setLayouts] = useLocalStorageState<Record<string, Layout[]>>('revo_dashboard_layout_v5', {
     defaultValue: defaultLayouts
   });
   const [isEditing, setIsEditing] = useState(false);
-  const [activeWidgets, setActiveWidgets] = useLocalStorageState<string[]>('revo_dashboard_active_widgets_v4', {
+  const [activeWidgets, setActiveWidgets] = useLocalStorageState<string[]>('revo_dashboard_active_widgets_v5', {
     defaultValue: DEFAULT_LAYOUT.map(l => l.i)
   });
 
@@ -122,39 +157,41 @@ const Dashboard: React.FC = () => {
     className: "layout",
     breakpoints: BREAKPOINTS,
     cols: COLS,
-    rowHeight: 32,
+    rowHeight: isMobile ? 28 : 32,
     layouts: layouts,
     onLayoutChange: handleLayoutChange,
-    isDraggable: isEditing,
-    isResizable: isEditing,
-    margin: [16, 16] as [number, number],
+    isDraggable: isEditing && !isMobile, // Desativar drag em mobile
+    isResizable: isEditing && !isMobile, // Desativar resize em mobile
+    margin: (isMobile ? [8, 8] : [16, 16]) as [number, number],
     containerPadding: [0, 0] as [number, number],
     draggableHandle: ".drag-handle",
     compactType: "vertical" as const,
     preventCollision: false,
     width: width,
     useCSSTransforms: true,
-  }), [layouts, isEditing, width, handleLayoutChange]);
+  }), [layouts, isEditing, width, handleLayoutChange, isMobile]);
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/30 to-indigo-50/40 p-6 space-y-6">
+    <div className={`min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/30 to-indigo-50/40 ${isMobile ? 'p-3 space-y-4' : 'p-6 space-y-6'}`}>
       <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAiIGhlaWdodD0iNjAiIHZpZXdCb3g9IjAgMCA2MCA2MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZyBmaWxsPSJub25lIiBmaWxsLXJ1bGU9ImV2ZW5vZGQiPjxnIGZpbGw9IiM2MzY2ZjEiIGZpbGwtb3BhY2l0eT0iMC4wMyI+PGNpcmNsZSBjeD0iMzAiIGN5PSIzMCIgcj0iMiIvPjwvZz48L2c+PC9zdmc+')] opacity-60 pointer-events-none" />
-      
+
       <div className="relative z-10">
         <motion.div
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5 }}
-          className="flex items-center justify-between mb-8"
+          className={`flex items-center justify-between ${isMobile ? 'mb-4' : 'mb-8'}`}
         >
           <div>
-            <h1 className="text-3xl font-bold bg-gradient-to-r from-gray-900 via-indigo-900 to-indigo-800 bg-clip-text text-transparent tracking-tight">
+            <h1 className={`font-bold bg-gradient-to-r from-gray-900 via-indigo-900 to-indigo-800 bg-clip-text text-transparent tracking-tight ${isMobile ? 'text-xl' : 'text-3xl'}`}>
               Visao Geral
             </h1>
-            <p className="text-gray-500 mt-1 flex items-center gap-2">
-              <span className="inline-block w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-              Dados atualizados em tempo real
-            </p>
+            {!isMobile && (
+              <p className="text-gray-500 mt-1 flex items-center gap-2">
+                <span className="inline-block w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                Dados atualizados em tempo real
+              </p>
+            )}
           </div>
 
           <div className="flex items-center gap-3">
@@ -204,8 +241,8 @@ const Dashboard: React.FC = () => {
                               animate={{ opacity: 1, x: 0 }}
                               transition={{ delay: idx * 0.05 }}
                               className={`p-4 rounded-2xl border-2 transition-all duration-300 cursor-pointer flex items-center justify-between group
-                                ${isActive 
-                                  ? 'bg-gradient-to-r from-indigo-50 to-violet-50 border-indigo-300 shadow-md shadow-indigo-100' 
+                                ${isActive
+                                  ? 'bg-gradient-to-r from-indigo-50 to-violet-50 border-indigo-300 shadow-md shadow-indigo-100'
                                   : 'bg-white border-slate-100 hover:border-slate-200 hover:shadow-lg hover:scale-[1.02]'}
                               `}
                               onClick={() => toggleWidget(widget.id)}

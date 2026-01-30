@@ -9,6 +9,8 @@ import ListPaginationBar from '@/components/ui/ListPaginationBar';
 import ConfirmationModal from '@/components/ui/ConfirmationModal';
 import Modal from '@/components/ui/Modal';
 import OsTable from '@/components/os/OsTable';
+import { OsMobileCard } from '@/components/os/OsMobileCard';
+import { ResponsiveTable } from '@/components/ui/ResponsiveTable';
 import OsFormPanel from '@/components/os/OsFormPanel';
 import Select from '@/components/ui/forms/Select';
 import OsKanbanModal from '@/components/os/kanban/OsKanbanModal';
@@ -199,7 +201,7 @@ const OSPage: React.FC = () => {
       ascending: prev.column === column ? !prev.ascending : true,
     }));
   };
-  
+
   const onDragEnd = async (result: DropResult) => {
     if (!result.destination) return;
     if (!permUpdate.data) {
@@ -211,10 +213,10 @@ const OSPage: React.FC = () => {
     const endIndex = result.destination.index;
 
     try {
-        await reorderOs(startIndex, endIndex);
-        addToast('Ordem das O.S. atualizada.', 'success');
+      await reorderOs(startIndex, endIndex);
+      addToast('Ordem das O.S. atualizada.', 'success');
     } catch (error: any) {
-        addToast(error.message || 'Falha ao reordenar.', 'error');
+      addToast(error.message || 'Falha ao reordenar.', 'error');
     }
   };
 
@@ -299,21 +301,40 @@ const OSPage: React.FC = () => {
               {searchTerm && <p className="text-sm">Tente ajustar sua busca.</p>}
             </div>
           ) : (
-            <DragDropContext onDragEnd={onDragEnd}>
-              <OsTable
-                serviceOrders={serviceOrders}
-                onEdit={handleOpenForm}
-                onDelete={handleOpenDeleteModal}
-                onOpenAgenda={() => setIsKanbanModalOpen(true)}
-                onSetStatus={handleSetStatus}
-                sortBy={sortBy}
-                onSort={handleSort}
-                canUpdate={permUpdate.data}
-                canManage={permManage.data}
-                canDelete={permDelete.data}
-                busyOsId={statusUpdatingId}
-              />
-            </DragDropContext>
+            <ResponsiveTable
+              data={serviceOrders}
+              getItemId={(os) => os.id}
+              loading={loading}
+              tableComponent={
+                <DragDropContext onDragEnd={onDragEnd}>
+                  <OsTable
+                    serviceOrders={serviceOrders}
+                    onEdit={handleOpenForm}
+                    onDelete={handleOpenDeleteModal}
+                    onOpenAgenda={() => setIsKanbanModalOpen(true)}
+                    onSetStatus={handleSetStatus}
+                    sortBy={sortBy}
+                    onSort={handleSort}
+                    canUpdate={permUpdate.data}
+                    canManage={permManage.data}
+                    canDelete={permDelete.data}
+                    busyOsId={statusUpdatingId}
+                  />
+                </DragDropContext>
+              }
+              renderMobileCard={(os) => (
+                <OsMobileCard
+                  key={os.id}
+                  os={os}
+                  onEdit={() => handleOpenForm(os)}
+                  onDelete={() => handleOpenDeleteModal(os)}
+                  onSetStatus={handleSetStatus}
+                  canUpdate={permUpdate.data}
+                  canDelete={permDelete.data}
+                  busyOsId={statusUpdatingId}
+                />
+              )}
+            />
           )}
         </div>
       </div>
@@ -353,7 +374,7 @@ const OSPage: React.FC = () => {
         isLoading={isDeleting}
         variant="danger"
       />
-      
+
       <OsKanbanModal
         isOpen={isKanbanModalOpen}
         onClose={() => setIsKanbanModalOpen(false)}

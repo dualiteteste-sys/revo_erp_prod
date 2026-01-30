@@ -1,9 +1,10 @@
 import React, { useEffect, useMemo, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X } from 'lucide-react';
+import { X, ChevronLeft } from 'lucide-react';
 import { createPortal } from 'react-dom';
 import { cn } from '@/lib/utils';
 import GlassCard from './GlassCard';
+import { useIsMobile } from '@/hooks/useIsMobile';
 
 type ModalSize = 'sm' | 'md' | 'lg' | 'xl' | '2xl' | '3xl' | '4xl' | '5xl' | '6xl' | '7xl' | 'full' | '60pct' | '70pct' | '80pct' | '90pct';
 
@@ -68,6 +69,7 @@ const Modal: React.FC<ModalProps> = ({
   bodyClassName,
   glassClassName,
 }) => {
+  const isMobile = useIsMobile();
   const overlayRef = useRef<HTMLDivElement | null>(null);
   const dialogRef = useRef<HTMLDivElement | null>(null);
   const closeBtnRef = useRef<HTMLButtonElement | null>(null);
@@ -146,8 +148,11 @@ const Modal: React.FC<ModalProps> = ({
           exit={{ opacity: 0 }}
           transition={{ duration: 0.3 }}
           className={cn(
-            'fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/30 backdrop-blur-md',
-            overlayClassName,
+            'fixed inset-0 z-50 flex',
+            isMobile
+              ? 'items-end justify-center' // Mobile: align to bottom for slide-up
+              : 'items-center justify-center p-4 bg-slate-950/30 backdrop-blur-md',
+            !isMobile && overlayClassName,
           )}
           onMouseDown={(e) => {
             // clique no backdrop fecha (sem fechar ao clicar dentro do modal)
@@ -155,13 +160,18 @@ const Modal: React.FC<ModalProps> = ({
           }}
         >
           <motion.div
-            initial={{ scale: 0.95, y: 20 }}
-            animate={{ scale: 1, y: 0 }}
-            exit={{ scale: 0.95, y: 20 }}
-            transition={{ type: 'spring', stiffness: 300, damping: 30 }}
+            initial={isMobile ? { y: '100%' } : { scale: 0.95, y: 20 }}
+            animate={isMobile ? { y: 0 } : { scale: 1, y: 0 }}
+            exit={isMobile ? { y: '100%' } : { scale: 0.95, y: 20 }}
+            transition={isMobile
+              ? { type: 'spring', stiffness: 300, damping: 30 }
+              : { type: 'spring', stiffness: 300, damping: 30 }
+            }
             className={cn(
-              'w-full min-w-[40vw] max-h-[95vh] flex flex-col relative',
-              sizeClasses[size],
+              'w-full flex flex-col relative',
+              isMobile
+                ? 'h-full max-h-[100dvh] rounded-t-2xl' // Mobile: full-screen sheet
+                : cn('min-w-[40vw] max-h-[95vh]', sizeClasses[size]),
               containerClassName,
             )}
             onClick={(e) => e.stopPropagation()}
@@ -171,24 +181,63 @@ const Modal: React.FC<ModalProps> = ({
             aria-labelledby={titleId}
             ref={dialogRef}
           >
-            <GlassCard className={cn('h-full flex flex-col overflow-hidden', glassClassName)}>
-              <header className={cn('flex-shrink-0 px-6 py-5 flex justify-between items-center border-b border-white/20', headerClassName)}>
-                <h2 id={titleId} className={cn('text-lg md:text-xl font-bold text-gray-900', titleClassName)}>
-                  {title}
-                </h2>
-                <button
-                  ref={closeBtnRef}
-                  onClick={() => onCloseRef.current()}
-                  className="text-gray-600 hover:text-gray-900 z-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 rounded-full p-2 hover:bg-white/40 active:bg-white/50 transition"
-                  aria-label="Fechar modal"
-                >
-                  <X size={24} />
-                </button>
-              </header>
-              <div className={cn('flex-grow min-h-0 overflow-y-auto scrollbar-styled', bodyClassName)}>
-                {children}
+            {isMobile ? (
+              // Mobile: Full-screen sheet style
+              <div className="h-full flex flex-col bg-white rounded-t-2xl overflow-hidden">
+                {/* Mobile header with drag handle */}
+                <header className={cn(
+                  'flex-shrink-0 px-4 pt-3 pb-2 flex flex-col items-center border-b border-gray-100',
+                  'pt-[env(safe-area-inset-top)]',
+                  headerClassName
+                )}>
+                  {/* Drag handle */}
+                  <div className="w-10 h-1 bg-gray-300 rounded-full mb-3" />
+
+                  <div className="w-full flex justify-between items-center">
+                    <button
+                      ref={closeBtnRef}
+                      onClick={() => onCloseRef.current()}
+                      className="flex items-center gap-1 text-blue-600 font-medium text-sm"
+                      aria-label="Fechar"
+                    >
+                      <ChevronLeft size={20} />
+                      Voltar
+                    </button>
+                    <h2 id={titleId} className={cn('text-base font-semibold text-gray-900 flex-1 text-center', titleClassName)}>
+                      {title}
+                    </h2>
+                    <div className="w-16" /> {/* Spacer for centering */}
+                  </div>
+                </header>
+                <div className={cn(
+                  'flex-grow min-h-0 overflow-y-auto',
+                  'pb-[env(safe-area-inset-bottom)]',
+                  bodyClassName
+                )}>
+                  {children}
+                </div>
               </div>
-            </GlassCard>
+            ) : (
+              // Desktop: Original GlassCard style
+              <GlassCard className={cn('h-full flex flex-col overflow-hidden', glassClassName)}>
+                <header className={cn('flex-shrink-0 px-6 py-5 flex justify-between items-center border-b border-white/20', headerClassName)}>
+                  <h2 id={titleId} className={cn('text-lg md:text-xl font-bold text-gray-900', titleClassName)}>
+                    {title}
+                  </h2>
+                  <button
+                    ref={closeBtnRef}
+                    onClick={() => onCloseRef.current()}
+                    className="text-gray-600 hover:text-gray-900 z-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 rounded-full p-2 hover:bg-white/40 active:bg-white/50 transition"
+                    aria-label="Fechar modal"
+                  >
+                    <X size={24} />
+                  </button>
+                </header>
+                <div className={cn('flex-grow min-h-0 overflow-y-auto scrollbar-styled', bodyClassName)}>
+                  {children}
+                </div>
+              </GlassCard>
+            )}
           </motion.div>
         </motion.div>
       )}

@@ -85,7 +85,7 @@ const ContasAReceberFormPanel: React.FC<ContasAReceberFormPanelProps> = ({ conta
   }, [conta]);
 
   const handleFormChange = (field: keyof ContaAReceber | 'centro_de_custo_id', value: any) => {
-    setFormData(prev => ({ ...(prev as any), [field]: value } as any));
+    setFormData((prev: Partial<ContaAReceber>) => ({ ...(prev as any), [field]: value } as any));
   };
 
   const isGeradaPorRecorrencia = (() => {

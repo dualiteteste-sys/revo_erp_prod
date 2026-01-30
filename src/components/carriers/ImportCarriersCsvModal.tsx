@@ -171,7 +171,7 @@ export default function ImportCarriersCsvModal(props: {
     if (!isOpen) return;
     setMapping((current) => {
       if (hasCustomMapping) return sanitizeMapping(current, sourceKeys);
-      const saved = loadSavedMapping<FieldMapping>(MAPPING_STORAGE_KEY, TARGET_KEYS);
+      const saved = loadSavedMapping<TargetFieldKey>(MAPPING_STORAGE_KEY, TARGET_KEYS);
       const derived = deriveDefaultMapping({ targetKeys: TARGET_KEYS, sourceKeys, synonyms: FIELD_SYNONYMS });
       return sanitizeMapping({ ...derived, ...(saved ?? {}) } as FieldMapping, sourceKeys);
     });
@@ -247,27 +247,27 @@ export default function ImportCarriersCsvModal(props: {
       errors.length > 0
         ? null
         : {
-            nome: nome.trim(),
-            codigo: codigo || null,
-            tipo_pessoa,
-            documento: documento || null,
-            email: email || null,
-            telefone: telefone || null,
-            cep,
-            uf,
-            cidade,
-            logradouro,
-            numero,
-            complemento,
-            bairro,
-            pais: 'Brasil',
-            ativo: true,
-            modal_principal: 'rodoviario',
-            frete_tipo_padrao: 'nao_definido',
-            isento_ie: false,
-            exige_agendamento: false,
-            padrao_para_frete: false,
-          };
+          nome: nome.trim(),
+          codigo: codigo || null,
+          tipo_pessoa,
+          documento: documento || null,
+          email: email || null,
+          telefone: telefone || null,
+          cep,
+          uf,
+          cidade,
+          logradouro,
+          numero,
+          complemento,
+          bairro,
+          pais: 'Brasil',
+          ativo: true,
+          modal_principal: 'rodoviario',
+          frete_tipo_padrao: 'nao_definido',
+          isento_ie: false,
+          exige_agendamento: false,
+          padrao_para_frete: false,
+        };
 
     return { line: r.line, nome, documento, uf, cidade, errors, payload };
   }, [forceUppercase, resolveField]);
@@ -538,7 +538,7 @@ export default function ImportCarriersCsvModal(props: {
                   variant="secondary"
                   onClick={() => {
                     setHasCustomMapping(false);
-                    const saved = loadSavedMapping<FieldMapping>(MAPPING_STORAGE_KEY, TARGET_KEYS);
+                    const saved = loadSavedMapping<TargetFieldKey>(MAPPING_STORAGE_KEY, TARGET_KEYS);
                     const derived = deriveDefaultMapping({ targetKeys: TARGET_KEYS, sourceKeys, synonyms: FIELD_SYNONYMS });
                     setMapping(sanitizeMapping({ ...derived, ...(saved ?? {}) } as FieldMapping, sourceKeys));
                   }}

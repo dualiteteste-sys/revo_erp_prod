@@ -8,6 +8,8 @@ import ListPaginationBar from '@/components/ui/ListPaginationBar';
 import ConfirmationModal from '@/components/ui/ConfirmationModal';
 import Modal from '@/components/ui/Modal';
 import CobrancasTable from '@/components/financeiro/cobrancas/CobrancasTable';
+import { CobrancaMobileCard } from '@/components/financeiro/cobrancas/CobrancaMobileCard';
+import { ResponsiveTable } from '@/components/ui/ResponsiveTable';
 import CobrancaFormPanel from '@/components/financeiro/cobrancas/CobrancaFormPanel';
 import CobrancasSummary from '@/components/financeiro/cobrancas/CobrancasSummary';
 import Select from '@/components/ui/forms/Select';
@@ -108,10 +110,10 @@ export default function CobrancasBancariasPage() {
     <div className="p-1 min-h-full flex flex-col">
       <div className="flex justify-between items-center mb-6">
         <div>
-            <h1 className="text-3xl font-bold text-gray-800 flex items-center gap-2">
-                <Landmark className="text-blue-600" /> Cobranças Bancárias
-            </h1>
-            <p className="text-gray-600 text-sm mt-1">Gestão de boletos, Pix e links de pagamento.</p>
+          <h1 className="text-3xl font-bold text-gray-800 flex items-center gap-2">
+            <Landmark className="text-blue-600" /> Cobranças Bancárias
+          </h1>
+          <p className="text-gray-600 text-sm mt-1">Gestão de boletos, Pix e links de pagamento.</p>
         </div>
         <div className="flex items-center gap-2">
           {enableSeed ? (
@@ -140,7 +142,7 @@ export default function CobrancasBancariasPage() {
             className="w-full p-3 pl-10 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
           />
         </div>
-        
+
         <Select
           value={filterStatus || ''}
           onChange={(e) => setFilterStatus(e.target.value as any || null)}
@@ -155,30 +157,30 @@ export default function CobrancasBancariasPage() {
         </Select>
 
         <div className="flex items-center gap-3">
-            <DatePicker 
-                label="" 
-                value={startVenc} 
-                onChange={setStartVenc} 
-                className="w-[200px]"
-            />
-            <span className="text-gray-500 whitespace-nowrap px-1">até</span>
-            <DatePicker 
-                label="" 
-                value={endVenc} 
-                onChange={setEndVenc} 
-                className="w-[200px]"
-            />
-            {(startVenc || endVenc) && (
-              <Button
-                onClick={clearDateFilters}
-                variant="ghost"
-                size="icon"
-                title="Limpar datas"
-                className="text-muted-foreground hover:text-destructive"
-              >
-                <X size={18} />
-              </Button>
-            )}
+          <DatePicker
+            label=""
+            value={startVenc}
+            onChange={setStartVenc}
+            className="w-[200px]"
+          />
+          <span className="text-gray-500 whitespace-nowrap px-1">até</span>
+          <DatePicker
+            label=""
+            value={endVenc}
+            onChange={setEndVenc}
+            className="w-[200px]"
+          />
+          {(startVenc || endVenc) && (
+            <Button
+              onClick={clearDateFilters}
+              variant="ghost"
+              size="icon"
+              title="Limpar datas"
+              className="text-muted-foreground hover:text-destructive"
+            >
+              <X size={18} />
+            </Button>
+          )}
         </div>
       </div>
 
@@ -197,7 +199,26 @@ export default function CobrancasBancariasPage() {
               {searchTerm && <p className="text-sm">Tente ajustar sua busca.</p>}
             </div>
           ) : (
-            <CobrancasTable cobrancas={cobrancas} onEdit={handleOpenForm} onDelete={handleOpenDeleteModal} />
+            <ResponsiveTable
+              data={cobrancas}
+              getItemId={(c) => c.id}
+              loading={loading}
+              tableComponent={
+                <CobrancasTable
+                  cobrancas={cobrancas}
+                  onEdit={handleOpenForm}
+                  onDelete={handleOpenDeleteModal}
+                />
+              }
+              renderMobileCard={(cobranca) => (
+                <CobrancaMobileCard
+                  key={cobranca.id}
+                  cobranca={cobranca}
+                  onEdit={() => handleOpenForm(cobranca)}
+                  onDelete={() => handleOpenDeleteModal(cobranca)}
+                />
+              )}
+            />
           )}
         </div>
       </div>

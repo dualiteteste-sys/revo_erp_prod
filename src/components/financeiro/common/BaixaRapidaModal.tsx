@@ -36,7 +36,7 @@ export default function BaixaRapidaModal({
   const [dataISO, setDataISO] = useState<string>(defaultDateISO || new Date().toISOString().slice(0, 10));
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [valor, setValor] = useState<number>(defaultValor || 0);
-  const valorProps = useNumericField(valor, setValor);
+  const valorProps = useNumericField(valor, (v) => setValor(v ?? 0));
 
   useEffect(() => {
     if (!isOpen) return;

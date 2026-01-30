@@ -4,6 +4,8 @@ import { VendaPedido, seedVendas } from '@/services/vendas';
 import { Loader2, PlusCircle, Search, ShoppingCart } from 'lucide-react';
 import Modal from '@/components/ui/Modal';
 import PedidosVendasTable from '@/components/vendas/PedidosVendasTable';
+import { PedidoVendaMobileCard } from '@/components/Vendas/PedidoVendaMobileCard';
+import { ResponsiveTable } from '@/components/ui/ResponsiveTable';
 import PedidoVendaFormPanel from '@/components/vendas/PedidoVendaFormPanel';
 import Select from '@/components/ui/forms/Select';
 import Pagination from '@/components/ui/Pagination';
@@ -167,7 +169,19 @@ export default function PedidosVendasPage() {
           ) : error ? (
             <div className="flex justify-center h-64 items-center text-red-500">{error}</div>
           ) : (
-            <PedidosVendasTable orders={orders} onEdit={handleEdit} />
+            <ResponsiveTable
+              data={orders}
+              getItemId={(o) => o.id}
+              loading={loading}
+              tableComponent={<PedidosVendasTable orders={orders} onEdit={handleEdit} />}
+              renderMobileCard={(order) => (
+                <PedidoVendaMobileCard
+                  key={order.id}
+                  order={order}
+                  onEdit={() => handleEdit(order)}
+                />
+              )}
+            />
           )}
         </div>
       </PageCard>
