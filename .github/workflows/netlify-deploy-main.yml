@@ -38,6 +38,7 @@ jobs:
         run: yarn install --immutable
 
       - name: Validate required secrets (PROD)
+        id: precheck
         env:
           NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
           NETLIFY_SITE_ID: ${{ secrets.NETLIFY_SITE_ID_PROD }}
@@ -45,12 +46,22 @@ jobs:
           VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY_PROD }}
         run: |
           set -euo pipefail
-          if [[ -z "${NETLIFY_AUTH_TOKEN:-}" ]]; then echo "::error::Missing secret NETLIFY_AUTH_TOKEN"; exit 1; fi
-          if [[ -z "${NETLIFY_SITE_ID:-}" ]]; then echo "::error::Missing secret NETLIFY_SITE_ID_PROD"; exit 1; fi
-          if [[ -z "${VITE_SUPABASE_URL:-}" ]]; then echo "::error::Missing secret VITE_SUPABASE_URL_PROD"; exit 1; fi
-          if [[ -z "${VITE_SUPABASE_ANON_KEY:-}" ]]; then echo "::error::Missing secret VITE_SUPABASE_ANON_KEY_PROD"; exit 1; fi
+          missing=()
+          if [[ -z "${NETLIFY_AUTH_TOKEN:-}" ]]; then missing+=("NETLIFY_AUTH_TOKEN"); fi
+          if [[ -z "${NETLIFY_SITE_ID:-}" ]]; then missing+=("NETLIFY_SITE_ID_PROD"); fi
+          if [[ -z "${VITE_SUPABASE_URL:-}" ]]; then missing+=("VITE_SUPABASE_URL_PROD"); fi
+          if [[ -z "${VITE_SUPABASE_ANON_KEY:-}" ]]; then missing+=("VITE_SUPABASE_ANON_KEY_PROD"); fi
+
+          if (( ${#missing[@]} )); then
+            echo "::warning::Skipping Netlify PROD deploy because required secrets are missing: ${missing[*]}"
+            echo "should_deploy=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          echo "should_deploy=true" >> "$GITHUB_OUTPUT"
 
       - name: Build (PROD)
+        if: steps.precheck.outputs.should_deploy == 'true'
         env:
           CI: true
           VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL_PROD }}
@@ -61,10 +72,10 @@ jobs:
         run: yarn build
 
       - name: Deploy to Netlify (PROD)
+        if: steps.precheck.outputs.should_deploy == 'true'
         env:
           NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
           NETLIFY_SITE_ID: ${{ secrets.NETLIFY_SITE_ID_PROD }}
         run: |
           set -euo pipefail
           npx -y netlify-cli@17.41.1 deploy --dir dist --prod --site "$NETLIFY_SITE_ID" --message "deploy(prod) ${GITHUB_SHA}"
-

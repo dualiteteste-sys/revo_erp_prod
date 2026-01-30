@@ -130,13 +130,13 @@ jobs:
               "- Priorizar correção (risco para clientes).",
               "- Rodar verify/restore drill se necessário.",
               "- Confirmar gates e RPC-first nos domínios críticos.",
-            ].join(\"\\n\");
+            ].join("\n");
 
             const { data: issues } = await github.rest.issues.listForRepo({
               owner: context.repo.owner,
               repo: context.repo.repo,
-              state: \"open\",
-              labels: labels.join(\",\"),
+              state: "open",
+              labels: labels.join(","),
               per_page: 100,
             });
             const existing = issues.find(i => i.title === title);
@@ -156,4 +156,3 @@ jobs:
               body,
               labels,
             });
-
