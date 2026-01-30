@@ -849,6 +849,6 @@ export const DEFAULT_LAYOUT = [
 
     { i: 'top-sellers', x: 0, y: 15, w: 4, h: 9 },
     { i: 'activities', x: 4, y: 15, w: 4, h: 9 },
-    { i: 'shortcuts', x: 8, y: 15, w: 4, h: 5 },
-    { i: 'system-health', x: 8, y: 20, w: 4, h: 4 },
+    { i: 'shortcuts', x: 8, y: 15, w: 4, h: 6 },
+    { i: 'system-health', x: 8, y: 21, w: 4, h: 3 },
 ];

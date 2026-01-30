@@ -17,51 +17,44 @@ import 'react-resizable/css/styles.css';
 const BREAKPOINTS = { lg: 1200, md: 996, sm: 768, xs: 480, xxs: 0 };
 const COLS = { lg: 12, md: 10, sm: 6, xs: 4, xxs: 2 };
 
-// IDs de widgets KPI para tratamento especial
+// IDs de widgets KPI para tratamento especial - renderizados com CSS Grid
 const KPI_WIDGET_IDS = ['kpi-faturamento', 'kpi-clientes', 'kpi-pedidos', 'kpi-ticket'];
+
+// Layout para widgets que NÃO são KPIs (usados no react-grid-layout)
+const NON_KPI_LAYOUT = DEFAULT_LAYOUT.filter(item => !KPI_WIDGET_IDS.includes(item.i)).map(item => ({
+  ...item,
+  y: item.y - 5, // Ajusta Y pois KPIs são renderizados separadamente
+}));
 
 function generateResponsiveLayouts(baseLayout: Layout[]): Record<string, Layout[]> {
   const layouts: Record<string, Layout[]> = {};
 
   Object.keys(COLS).forEach(breakpoint => {
     const cols = COLS[breakpoint as keyof typeof COLS];
+
+    // lg: layout original sem modificação
+    if (breakpoint === 'lg') {
+      layouts[breakpoint] = baseLayout.map(item => ({ ...item }));
+      return;
+    }
+
+    // md: escalar proporcionalmente
+    if (breakpoint === 'md') {
+      const scale = cols / 12;
+      layouts[breakpoint] = baseLayout.map(item => ({
+        ...item,
+        x: Math.round(item.x * scale),
+        w: Math.max(Math.round(item.w * scale), 2),
+      }));
+      return;
+    }
+
+    // sm/xs/xxs: layout empilhado vertical
     let currentY = 0;
-    let currentX = 0;
-
-    // Em mobile (xxs/xs), KPIs ficam em grid 2x2 com altura menor
-    const isMobileBreakpoint = breakpoint === 'xxs' || breakpoint === 'xs';
-
     layouts[breakpoint] = baseLayout.map(item => {
-      const isKpi = KPI_WIDGET_IDS.includes(item.i);
-
-      if (isMobileBreakpoint && isKpi) {
-        // KPIs: 2 colunas, altura reduzida
-        const w = Math.max(1, Math.floor(cols / 2));
-        const h = 4; // Altura menor para mobile
-        const newItem = {
-          ...item,
-          w,
-          h,
-          x: currentX,
-          y: currentY,
-        };
-        currentX += w;
-        if (currentX >= cols) {
-          currentX = 0;
-          currentY += h;
-        }
-        return newItem;
-      }
-
-      // Widgets normais: coluna única
-      const w = Math.min(item.w, cols);
-      if (currentX !== 0) {
-        currentX = 0;
-        currentY += 4; // Reset row after KPIs
-      }
       const newItem = {
         ...item,
-        w,
+        w: cols,
         x: 0,
         y: currentY,
       };
@@ -69,8 +62,6 @@ function generateResponsiveLayouts(baseLayout: Layout[]): Record<string, Layout[
       return newItem;
     });
   });
-
-  layouts.lg = baseLayout;
 
   return layouts;
 }
@@ -96,6 +87,55 @@ function useWidth() {
   return { width, ref };
 }
 
+// Componente para renderizar os KPIs com CSS Grid fluido
+const FluidKPIGrid: React.FC<{
+  activeKpis: string[];
+  data: DashboardData;
+  loading: boolean;
+  isMobile: boolean;
+}> = ({ activeKpis, data, loading, isMobile }) => {
+  return (
+    <div
+      className="w-full"
+      style={{
+        display: 'grid',
+        gridTemplateColumns: isMobile
+          ? 'repeat(auto-fit, minmax(150px, 1fr))'
+          : 'repeat(auto-fit, minmax(220px, 1fr))',
+        gap: isMobile ? '8px' : '16px',
+      }}
+    >
+      {activeKpis.map((key) => {
+        const widget = WIDGETS[key];
+        if (!widget) return null;
+        const Component = widget.component;
+
+        return (
+          <motion.div
+            key={key}
+            initial={{ opacity: 0, y: 20, scale: 0.95 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
+            className="h-full"
+          >
+            <div className={`h-full w-full rounded-2xl overflow-hidden flex flex-col transition-all duration-300 
+              bg-white/70 backdrop-blur-xl border border-white/60 
+              shadow-[0_8px_32px_-8px_rgba(0,0,0,0.08),0_4px_16px_-4px_rgba(99,102,241,0.08)]
+              hover:shadow-[0_16px_48px_-12px_rgba(0,0,0,0.12),0_8px_24px_-8px_rgba(99,102,241,0.15)]
+              hover:bg-white/90 hover:border-indigo-100/60`}
+              style={{ minHeight: isMobile ? '140px' : '160px' }}
+            >
+              <div className="flex-1 h-full w-full overflow-hidden">
+                <Component data={data} loading={loading} />
+              </div>
+            </div>
+          </motion.div>
+        );
+      })}
+    </div>
+  );
+};
+
 const Dashboard: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [data, setData] = useState<DashboardData | null>(null);
@@ -103,17 +143,27 @@ const Dashboard: React.FC = () => {
   const opsView = useHasPermission('ops', 'view');
   const isMobile = useIsMobile();
 
-  const defaultLayouts = useMemo(() => generateResponsiveLayouts(DEFAULT_LAYOUT as Layout[]), []);
+  const defaultLayouts = useMemo(() => generateResponsiveLayouts(NON_KPI_LAYOUT as Layout[]), []);
 
-  const [layouts, setLayouts] = useLocalStorageState<Record<string, Layout[]>>('revo_dashboard_layout_v5', {
+  const [layouts, setLayouts] = useLocalStorageState<Record<string, Layout[]>>('revo_dashboard_layout_v6', {
     defaultValue: defaultLayouts
   });
   const [isEditing, setIsEditing] = useState(false);
-  const [activeWidgets, setActiveWidgets] = useLocalStorageState<string[]>('revo_dashboard_active_widgets_v5', {
+  const [activeWidgets, setActiveWidgets] = useLocalStorageState<string[]>('revo_dashboard_active_widgets_v6', {
     defaultValue: DEFAULT_LAYOUT.map(l => l.i)
   });
 
   const { width, ref: containerRef } = useWidth();
+
+  // Separar KPIs ativos dos outros widgets
+  const activeKpis = useMemo(() =>
+    activeWidgets.filter(id => KPI_WIDGET_IDS.includes(id)),
+    [activeWidgets]
+  );
+  const activeNonKpiWidgets = useMemo(() =>
+    activeWidgets.filter(id => !KPI_WIDGET_IDS.includes(id)),
+    [activeWidgets]
+  );
 
   useEffect(() => {
     let mounted = true;
@@ -160,8 +210,8 @@ const Dashboard: React.FC = () => {
     rowHeight: isMobile ? 28 : 32,
     layouts: layouts,
     onLayoutChange: handleLayoutChange,
-    isDraggable: isEditing && !isMobile, // Desativar drag em mobile
-    isResizable: isEditing && !isMobile, // Desativar resize em mobile
+    isDraggable: isEditing && !isMobile,
+    isResizable: isEditing && !isMobile,
     margin: (isMobile ? [8, 8] : [16, 16]) as [number, number],
     containerPadding: [0, 0] as [number, number],
     draggableHandle: ".drag-handle",
@@ -288,36 +338,51 @@ const Dashboard: React.FC = () => {
           )}
         </AnimatePresence>
 
-        <div ref={containerRef} className="w-full">
-          <Responsive {...gridProps}>
-            {activeWidgets.map((key) => {
-              const widget = WIDGETS[key];
-              if (!widget) return null;
-              const Component = widget.component;
+        {/* KPIs com CSS Grid fluido - adaptação perfeita */}
+        {activeKpis.length > 0 && (
+          <div className={isMobile ? 'mb-4' : 'mb-6'}>
+            <FluidKPIGrid
+              activeKpis={activeKpis}
+              data={data}
+              loading={loading}
+              isMobile={isMobile}
+            />
+          </div>
+        )}
 
-              return (
-                <div key={key} className="relative group h-full">
-                  <div className={`h-full w-full rounded-2xl overflow-hidden flex flex-col transition-all duration-300 
-                    bg-white/70 backdrop-blur-xl border border-white/60 
-                    shadow-[0_8px_32px_-8px_rgba(0,0,0,0.08),0_4px_16px_-4px_rgba(99,102,241,0.08)]
-                    hover:shadow-[0_16px_48px_-12px_rgba(0,0,0,0.12),0_8px_24px_-8px_rgba(99,102,241,0.15)]
-                    hover:bg-white/90 hover:border-indigo-100/60`}>
+        {/* Outros widgets com react-grid-layout */}
+        {activeNonKpiWidgets.length > 0 && (
+          <div ref={containerRef} className="w-full">
+            <Responsive {...gridProps}>
+              {activeNonKpiWidgets.map((key) => {
+                const widget = WIDGETS[key];
+                if (!widget) return null;
+                const Component = widget.component;
 
-                    {isEditing && (
-                      <div className="drag-handle absolute top-3 right-3 z-50 p-2 rounded-xl bg-white/90 text-slate-400 hover:text-indigo-600 cursor-move opacity-0 group-hover:opacity-100 transition-all duration-200 shadow-lg border border-slate-100 hover:border-indigo-200">
-                        <GripHorizontal size={16} />
+                return (
+                  <div key={key} className="relative group h-full">
+                    <div className={`h-full w-full rounded-2xl overflow-hidden flex flex-col transition-all duration-300 
+                      bg-white/70 backdrop-blur-xl border border-white/60 
+                      shadow-[0_8px_32px_-8px_rgba(0,0,0,0.08),0_4px_16px_-4px_rgba(99,102,241,0.08)]
+                      hover:shadow-[0_16px_48px_-12px_rgba(0,0,0,0.12),0_8px_24px_-8px_rgba(99,102,241,0.15)]
+                      hover:bg-white/90 hover:border-indigo-100/60`}>
+
+                      {isEditing && (
+                        <div className="drag-handle absolute top-3 right-3 z-50 p-2 rounded-xl bg-white/90 text-slate-400 hover:text-indigo-600 cursor-move opacity-0 group-hover:opacity-100 transition-all duration-200 shadow-lg border border-slate-100 hover:border-indigo-200">
+                          <GripHorizontal size={16} />
+                        </div>
+                      )}
+
+                      <div className="flex-1 h-full w-full overflow-hidden">
+                        <Component data={data} loading={loading} />
                       </div>
-                    )}
-
-                    <div className="flex-1 h-full w-full overflow-hidden">
-                      <Component data={data} loading={loading} />
                     </div>
                   </div>
-                </div>
-              );
-            })}
-          </Responsive>
-        </div>
+                );
+              })}
+            </Responsive>
+          </div>
+        )}
       </div>
     </div>
   );
