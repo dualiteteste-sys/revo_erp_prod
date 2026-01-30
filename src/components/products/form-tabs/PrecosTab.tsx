@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Loader2, Plus, Save, Trash2 } from 'lucide-react';
 import { useToast } from '@/contexts/ToastProvider';
+import { useNumericField } from '@/hooks/useNumericField';
 import { listTabelasPreco, type TabelaPrecoRow } from '@/services/pricing';
 import { deleteFaixaPreco, listFaixasPreco, upsertFaixaPreco, type FaixaPrecoRow } from '@/services/pricingTiers';
 
@@ -13,7 +14,6 @@ type EditableFaixa = {
   min_qtd: number;
   max_qtd: number | null;
   preco_unitario: number;
-  preco_unitario_raw?: string;
   isNew?: boolean;
 };
 
@@ -22,8 +22,80 @@ function toNumber(v: any): number {
   return Number.isFinite(n) ? n : 0;
 }
 
-function formatMoneyPtBr(n: number): string {
-  return new Intl.NumberFormat('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(Number.isFinite(n) ? n : 0);
+type FaixaRowProps = {
+  row: EditableFaixa;
+  idx: number;
+  loading: boolean;
+  updateRow: (idx: number, patch: Partial<EditableFaixa>) => void;
+  handleSaveRow: (idx: number) => Promise<void>;
+  handleDeleteRow: (idx: number) => Promise<void>;
+};
+
+function FaixaRow({ row, idx, loading, updateRow, handleSaveRow, handleDeleteRow }: FaixaRowProps) {
+  const precoField = useNumericField(row.preco_unitario ?? 0, (value) => updateRow(idx, { preco_unitario: value ?? 0 }));
+
+  return (
+    <tr>
+      <td className="px-4 py-2">
+        <input
+          type="number"
+          className="w-full p-2 border rounded text-sm text-right"
+          value={row.min_qtd}
+          min="0.001"
+          step="any"
+          onChange={(e) => updateRow(idx, { min_qtd: toNumber(e.target.value) })}
+          disabled={loading}
+        />
+      </td>
+      <td className="px-4 py-2">
+        <input
+          type="number"
+          className="w-full p-2 border rounded text-sm text-right"
+          value={row.max_qtd ?? ''}
+          min="0.001"
+          step="any"
+          onChange={(e) => updateRow(idx, { max_qtd: e.target.value === '' ? null : toNumber(e.target.value) })}
+          disabled={loading}
+          placeholder="(sem limite)"
+        />
+      </td>
+      <td className="px-4 py-2">
+        <div className="relative">
+          <span className="absolute inset-y-0 left-0 flex items-center pl-2 text-xs text-gray-500">R$</span>
+          <input
+            type="text"
+            inputMode="numeric"
+            className="w-full p-2 border rounded text-sm text-right pl-8"
+            value={precoField.value}
+            onChange={precoField.onChange}
+            disabled={loading}
+          />
+        </div>
+      </td>
+      <td className="px-4 py-2 text-right">
+        <div className="inline-flex gap-2">
+          <button
+            type="button"
+            className="px-3 py-2 rounded-lg border border-gray-200 bg-white hover:bg-gray-50 text-sm font-semibold flex items-center gap-2"
+            onClick={() => void handleSaveRow(idx)}
+            disabled={loading}
+          >
+            <Save size={16} />
+            Salvar
+          </button>
+          <button
+            type="button"
+            className="px-3 py-2 rounded-lg border border-red-200 bg-white hover:bg-red-50 text-sm font-semibold text-red-700 flex items-center gap-2"
+            onClick={() => void handleDeleteRow(idx)}
+            disabled={loading}
+          >
+            <Trash2 size={16} />
+            Remover
+          </button>
+        </div>
+      </td>
+    </tr>
+  );
 }
 
 export default function PrecosTab({ produtoId }: Props) {
@@ -64,7 +136,6 @@ export default function PrecosTab({ produtoId }: Props) {
           min_qtd: Number(r.min_qtd),
           max_qtd: r.max_qtd == null ? null : Number(r.max_qtd),
           preco_unitario: Number(r.preco_unitario),
-          preco_unitario_raw: formatMoneyPtBr(Number(r.preco_unitario) || 0),
         }))
       );
     } catch (e: any) {
@@ -88,7 +159,6 @@ export default function PrecosTab({ produtoId }: Props) {
         min_qtd: 1,
         max_qtd: null,
         preco_unitario: 0,
-        preco_unitario_raw: formatMoneyPtBr(0),
         isNew: true,
       },
     ]);
@@ -223,72 +293,15 @@ export default function PrecosTab({ produtoId }: Props) {
               </thead>
               <tbody className="divide-y divide-gray-200">
                 {faixas.map((r, idx) => (
-                  <tr key={r.id ?? `new-${idx}`}>
-                    <td className="px-4 py-2">
-                      <input
-                        type="number"
-                        className="w-full p-2 border rounded text-sm text-right"
-                        value={r.min_qtd}
-                        min="0.001"
-                        step="any"
-                        onChange={(e) => updateRow(idx, { min_qtd: toNumber(e.target.value) })}
-                        disabled={loading}
-                      />
-                    </td>
-                    <td className="px-4 py-2">
-                      <input
-                        type="number"
-                        className="w-full p-2 border rounded text-sm text-right"
-                        value={r.max_qtd ?? ''}
-                        min="0.001"
-                        step="any"
-                        onChange={(e) => updateRow(idx, { max_qtd: e.target.value === '' ? null : toNumber(e.target.value) })}
-                        disabled={loading}
-                        placeholder="(sem limite)"
-                      />
-                    </td>
-                    <td className="px-4 py-2">
-                      <div className="relative">
-                        <span className="absolute inset-y-0 left-0 flex items-center pl-2 text-xs text-gray-500">R$</span>
-                        <input
-                          type="text"
-                          inputMode="numeric"
-                          className="w-full p-2 border rounded text-sm text-right pl-8"
-                          value={r.preco_unitario_raw ?? formatMoneyPtBr(r.preco_unitario || 0)}
-                          onChange={(e) => {
-                            const nextRaw = e.target.value;
-                            const digits = nextRaw.replace(/\\D/g, '');
-                            const numberValue = digits ? parseInt(digits, 10) / 100 : 0;
-                            updateRow(idx, { preco_unitario: numberValue, preco_unitario_raw: nextRaw });
-                          }}
-                          onBlur={() => updateRow(idx, { preco_unitario_raw: formatMoneyPtBr(r.preco_unitario || 0) })}
-                          disabled={loading}
-                        />
-                      </div>
-                    </td>
-                    <td className="px-4 py-2 text-right">
-                      <div className="inline-flex gap-2">
-                        <button
-                          type="button"
-                          className="px-3 py-2 rounded-lg border border-gray-200 bg-white hover:bg-gray-50 text-sm font-semibold flex items-center gap-2"
-                          onClick={() => void handleSaveRow(idx)}
-                          disabled={loading}
-                        >
-                          <Save size={16} />
-                          Salvar
-                        </button>
-                        <button
-                          type="button"
-                          className="px-3 py-2 rounded-lg border border-red-200 bg-white hover:bg-red-50 text-sm font-semibold text-red-700 flex items-center gap-2"
-                          onClick={() => void handleDeleteRow(idx)}
-                          disabled={loading}
-                        >
-                          <Trash2 size={16} />
-                          Remover
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
+                  <FaixaRow
+                    key={r.id ?? `new-${idx}`}
+                    row={r}
+                    idx={idx}
+                    loading={loading}
+                    updateRow={updateRow}
+                    handleSaveRow={handleSaveRow}
+                    handleDeleteRow={handleDeleteRow}
+                  />
                 ))}
               </tbody>
             </table>
