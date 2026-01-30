@@ -109,6 +109,11 @@ Leia:
 - `MANUAL-CONTEXTO-CODEX.md` (padrões de UI/UX e decisões de produto)
 - `docs/checklist-estado-da-arte-gaps.md` (pontos recorrentes de UX/React Hooks)
 
+### 5.3.1 Mexeu em campos de valores (moeda/preço)
+
+Leia:
+- `docs/frontend/inputs-monetarios.md` (padrão “digita sem vírgula” via `useNumericField`)
+
 ### 5.4 Mexeu em E2E / gates
 
 Leia:

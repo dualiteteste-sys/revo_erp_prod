@@ -6,17 +6,18 @@ import {
     ShoppingCart,
     DollarSign,
     Menu,
-    User,
+    LayoutGrid,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { MobileMenuSheet } from './MobileMenuSheet';
+import { MobileAppsGrid } from './MobileAppsGrid';
 
 interface NavItem {
     id: string;
     label: string;
     icon: React.ElementType;
     href?: string;
-    action?: 'menu' | 'profile';
+    action?: 'menu' | 'apps';
 }
 
 const NAV_ITEMS: NavItem[] = [
@@ -24,7 +25,7 @@ const NAV_ITEMS: NavItem[] = [
     { id: 'vendas', label: 'Vendas', icon: ShoppingCart, href: '/app/vendas/pedidos' },
     { id: 'financeiro', label: 'Financeiro', icon: DollarSign, href: '/app/financeiro/tesouraria' },
     { id: 'menu', label: 'Mais', icon: Menu, action: 'menu' },
-    { id: 'profile', label: 'Perfil', icon: User, href: '/app/configuracoes' },
+    { id: 'apps', label: 'Ícones', icon: LayoutGrid, action: 'apps' },
 ];
 
 interface MobileBottomNavProps {
@@ -40,6 +41,7 @@ export function MobileBottomNav({ className, onOpenSettings }: MobileBottomNavPr
     const navigate = useNavigate();
     const location = useLocation();
     const [isMenuOpen, setIsMenuOpen] = useState(false);
+    const [isAppsOpen, setIsAppsOpen] = useState(false);
 
     const isActive = (item: NavItem): boolean => {
         if (item.action) return false;
@@ -57,8 +59,8 @@ export function MobileBottomNav({ className, onOpenSettings }: MobileBottomNavPr
     const handleItemClick = (item: NavItem) => {
         if (item.action === 'menu') {
             setIsMenuOpen(true);
-        } else if (item.action === 'profile') {
-            onOpenSettings?.();
+        } else if (item.action === 'apps') {
+            setIsAppsOpen(true);
         } else if (item.href) {
             navigate(item.href);
         }
@@ -135,13 +137,23 @@ export function MobileBottomNav({ className, onOpenSettings }: MobileBottomNavPr
                 </div>
             </nav>
 
-            {/* Menu completo via Sheet */}
+            {/* Menu Lista (Sheet) */}
             <MobileMenuSheet
                 open={isMenuOpen}
                 onOpenChange={setIsMenuOpen}
                 onNavigate={(href: string) => {
                     navigate(href);
                     setIsMenuOpen(false);
+                }}
+            />
+
+            {/* Menu Grade (Springboard) */}
+            <MobileAppsGrid
+                open={isAppsOpen}
+                onOpenChange={setIsAppsOpen}
+                onNavigate={(href: string) => {
+                    navigate(href);
+                    setIsAppsOpen(false);
                 }}
             />
         </>

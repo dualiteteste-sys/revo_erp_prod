@@ -6,6 +6,11 @@ Este documento existe para que qualquer pessoa (ou um novo “contexto” de IA)
 
 Antes de qualquer coisa, leia `AGENTS.md` (raiz). Ele é a “constituição” do projeto: invariantes, DoD, gatilhos e links para os demais docs.
 
+## Padrões de inputs (valores monetários)
+
+Para qualquer campo de preço/valor (moeda), siga o padrão “sem vírgula” (digit-only) e leia:
+- `docs/frontend/inputs-monetarios.md`
+
 ## 1) Regras de ouro (não negociar)
 
 1) **Schema do banco só muda via migration versionada** (`supabase/migrations/*`).

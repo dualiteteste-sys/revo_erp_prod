@@ -253,15 +253,17 @@ const Dashboard: React.FC = () => {
               </motion.div>
             )}
 
-            <Button
-              variant={isEditing ? "default" : "outline"}
-              size="sm"
-              onClick={() => setIsEditing(!isEditing)}
-              className={`gap-2 transition-all duration-300 ${isEditing ? 'bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-700 hover:to-violet-700 shadow-lg shadow-indigo-500/30 border-0' : 'bg-white/80 backdrop-blur hover:bg-white hover:shadow-md border-slate-200'}`}
-            >
-              {isEditing ? <Check size={16} /> : <Settings2 size={16} />}
-              {isEditing ? 'Concluir' : 'Personalizar'}
-            </Button>
+            {!isMobile && (
+              <Button
+                variant={isEditing ? "default" : "outline"}
+                size="sm"
+                onClick={() => setIsEditing(!isEditing)}
+                className={`gap-2 transition-all duration-300 ${isEditing ? 'bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-700 hover:to-violet-700 shadow-lg shadow-indigo-500/30 border-0' : 'bg-white/80 backdrop-blur hover:bg-white hover:shadow-md border-slate-200'}`}
+              >
+                {isEditing ? <Check size={16} /> : <Settings2 size={16} />}
+                {isEditing ? 'Concluir' : 'Personalizar'}
+              </Button>
+            )}
 
             {isEditing && (
               <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }}>
