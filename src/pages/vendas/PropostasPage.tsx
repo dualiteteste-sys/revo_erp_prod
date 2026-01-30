@@ -4,7 +4,7 @@ import { seedVendas, type VendaPedido } from '@/services/vendas';
 import { FileSignature, Loader2, PlusCircle, Search } from 'lucide-react';
 import Modal from '@/components/ui/Modal';
 import PedidosVendasTable from '@/components/vendas/PedidosVendasTable';
-import { PedidoVendaMobileCard } from '@/components/Vendas/PedidoVendaMobileCard';
+import { PedidoVendaMobileCard } from '@/components/vendas/PedidoVendaMobileCard';
 import { ResponsiveTable } from '@/components/ui/ResponsiveTable';
 import PedidoVendaFormPanel from '@/components/vendas/PedidoVendaFormPanel';
 import Pagination from '@/components/ui/Pagination';

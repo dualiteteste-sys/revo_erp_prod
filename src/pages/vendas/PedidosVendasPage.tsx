@@ -4,7 +4,7 @@ import { VendaPedido, seedVendas } from '@/services/vendas';
 import { Loader2, PlusCircle, Search, ShoppingCart } from 'lucide-react';
 import Modal from '@/components/ui/Modal';
 import PedidosVendasTable from '@/components/vendas/PedidosVendasTable';
-import { PedidoVendaMobileCard } from '@/components/Vendas/PedidoVendaMobileCard';
+import { PedidoVendaMobileCard } from '@/components/vendas/PedidoVendaMobileCard';
 import { ResponsiveTable } from '@/components/ui/ResponsiveTable';
 import PedidoVendaFormPanel from '@/components/vendas/PedidoVendaFormPanel';
 import Select from '@/components/ui/forms/Select';
