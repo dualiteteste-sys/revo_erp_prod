@@ -140,7 +140,6 @@ const Dashboard: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [data, setData] = useState<DashboardData | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const opsView = useHasPermission('ops', 'view');
   const isMobile = useIsMobile();
 
   const defaultLayouts = useMemo(() => generateResponsiveLayouts(NON_KPI_LAYOUT as Layout[]), []);

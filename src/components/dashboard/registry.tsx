@@ -1,20 +1,18 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
-    DollarSign, Users, ShoppingCart, TrendingUp, BarChart3, Activity, List, PieChart,
-    Calendar, AlertTriangle, Zap, Server, Trophy, FileText, ArrowRight, ArrowUp, ArrowDown,
-    Wallet, Target, Clock, Settings, Check
+    DollarSign, Users, ShoppingCart, TrendingUp,
+    Calendar, Zap, Server, Trophy, FileText, ArrowUp, ArrowDown,
+    Target, Clock, Check
 } from 'lucide-react';
-import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, AreaChart, Area, CartesianGrid, ComposedChart, Line, Cell, Legend, ReferenceLine } from 'recharts';
+import { ResponsiveContainer, XAxis, YAxis, Tooltip, CartesianGrid, ComposedChart, Line, ReferenceLine } from 'recharts';
 import KPICard from './KPICard';
 import GraficoFaturamento from './GraficoFaturamento';
 import AtividadesRecentes from './AtividadesRecentes';
 import GraficoVendas from './GraficoVendas';
 import RankingCategorias from './RankingCategorias';
-import GraficoPagarReceber from './GraficoPagarReceber';
-import { getMainDashboardData, getFinanceiroFluxoCaixaCentered, FinanceiroFluxoCaixaCenteredItem } from '@/services/mainDashboard';
+import { getMainDashboardData, getFinanceiroFluxoCaixaCentered } from '@/services/mainDashboard';
 import { formatCurrency } from '@/lib/utils';
-import { Layout } from 'react-grid-layout';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { cn } from '@/lib/utils';
