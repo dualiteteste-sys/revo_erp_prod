@@ -111,8 +111,8 @@ export default function MovimentacoesTable({ movimentacoes, onEdit, onDelete }: 
               <td className="px-6 py-4">
                 <div className="text-sm text-gray-900 font-medium">{mov.descricao}</div>
                 <div className="text-xs text-gray-500">
-                    {mov.categoria && <span className="mr-2 bg-gray-100 px-1 rounded">{mov.categoria}</span>}
-                    {mov.documento_ref && <span>Doc: {mov.documento_ref}</span>}
+                  {mov.categoria && <span className="mr-2 bg-gray-100 px-1 rounded">{mov.categoria}</span>}
+                  {mov.documento_ref && <span>Doc: {mov.documento_ref}</span>}
                 </div>
               </td>
               <td className="px-6 py-4 text-right text-sm text-green-600 font-medium">
@@ -126,21 +126,21 @@ export default function MovimentacoesTable({ movimentacoes, onEdit, onDelete }: 
               </td>
               <td className="px-6 py-4 text-center">
                 {mov.conciliado ? (
-                    <CheckCircle size={16} className="text-green-500 mx-auto" title="Conciliado" />
+                  <span title="Conciliado"><CheckCircle size={16} className="text-green-500 mx-auto" /></span>
                 ) : (
-                    <Circle size={16} className="text-gray-300 mx-auto" title="Pendente" />
+                  <span title="Pendente"><Circle size={16} className="text-gray-300 mx-auto" /></span>
                 )}
               </td>
               <td className="px-6 py-4 text-right">
                 {!mov.conciliado && (
-                    <div className="flex justify-end gap-2">
+                  <div className="flex justify-end gap-2">
                     <button onClick={() => onEdit(mov)} className="text-blue-600 hover:text-blue-800 p-1">
-                        <Edit size={16} />
+                      <Edit size={16} />
                     </button>
                     <button onClick={() => onDelete(mov)} className="text-red-600 hover:text-red-800 p-1">
-                        <Trash2 size={16} />
-                  </button>
-                    </div>
+                      <Trash2 size={16} />
+                    </button>
+                  </div>
                 )}
               </td>
             </tr>

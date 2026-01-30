@@ -2,6 +2,8 @@ import React, { useMemo, useState } from 'react';
 import { useServices } from '@/hooks/useServices';
 import * as svc from '@/services/services';
 import ServicesTable from '@/components/services/ServicesTable';
+import { ServiceMobileCard } from '@/components/services/ServiceMobileCard';
+import { ResponsiveTable } from '@/components/ui/ResponsiveTable';
 import ServiceFormPanel from '@/components/services/ServiceFormPanel';
 import { useToast } from '@/contexts/ToastProvider';
 import { FileUp, Loader2, Search, Wrench, DatabaseBackup, Plus } from 'lucide-react';
@@ -44,7 +46,7 @@ export default function ServicesPage() {
     setSortBy,
     refresh,
   } = useServices();
-  
+
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [selected, setSelected] = useState<svc.Service | null>(null);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
@@ -102,14 +104,14 @@ export default function ServicesPage() {
     if (!serviceToDelete) return;
     setIsDeleting(true);
     try {
-        await svc.deleteService(serviceToDelete.id);
-        addToast('Serviço removido', 'success');
-        refresh();
-        setIsDeleteModalOpen(false);
-    } catch(e: any) {
-        addToast(e.message || 'Erro ao remover serviço.', 'error');
+      await svc.deleteService(serviceToDelete.id);
+      addToast('Serviço removido', 'success');
+      refresh();
+      setIsDeleteModalOpen(false);
+    } catch (e: any) {
+      addToast(e.message || 'Erro ao remover serviço.', 'error');
     } finally {
-        setIsDeleting(false);
+      setIsDeleting(false);
     }
   }
 
@@ -316,18 +318,36 @@ export default function ServicesPage() {
               ]}
             />
             <div className="flex-1 min-h-0 overflow-auto">
-              <ServicesTable
-                services={services}
-                onEdit={handleOpenForm}
-                onDelete={openDeleteModal}
-                onClone={handleClone}
-                sortBy={sortBy}
-                onSort={handleSort}
-                selectedIds={bulk.selectedIds}
-                allSelected={bulk.allSelected}
-                someSelected={bulk.someSelected}
-                onToggleSelect={(id) => bulk.toggle(id)}
-                onToggleSelectAll={() => bulk.toggleAll(bulk.allIds)}
+              <ResponsiveTable
+                data={services}
+                getItemId={(s) => s.id}
+                loading={loading}
+                tableComponent={
+                  <ServicesTable
+                    services={services}
+                    onEdit={handleOpenForm}
+                    onDelete={openDeleteModal}
+                    onClone={handleClone}
+                    sortBy={sortBy}
+                    onSort={handleSort}
+                    selectedIds={bulk.selectedIds}
+                    allSelected={bulk.allSelected}
+                    someSelected={bulk.someSelected}
+                    onToggleSelect={(id) => bulk.toggle(id)}
+                    onToggleSelectAll={() => bulk.toggleAll(bulk.allIds)}
+                  />
+                }
+                renderMobileCard={(service) => (
+                  <ServiceMobileCard
+                    key={service.id}
+                    service={service}
+                    onEdit={() => handleOpenForm(service)}
+                    onDelete={() => openDeleteModal(service)}
+                    onClone={() => handleClone(service)}
+                    selected={bulk.selectedIds.has(service.id)}
+                    onToggleSelect={(id) => bulk.toggle(id)}
+                  />
+                )}
               />
             </div>
           </>
@@ -362,7 +382,7 @@ export default function ServicesPage() {
           refresh();
         }}
       />
-      
+
       <ConfirmationModal
         isOpen={isDeleteModalOpen}
         onClose={() => setIsDeleteModalOpen(false)}

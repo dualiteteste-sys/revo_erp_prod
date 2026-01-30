@@ -2,14 +2,14 @@ import { callRpc } from '@/lib/api';
 import { faker } from '@faker-js/faker';
 import { getPartners } from './partners';
 
-export type StatusCobranca = 
-  | 'pendente_emissao' 
-  | 'emitida' 
-  | 'registrada' 
-  | 'enviada' 
-  | 'liquidada' 
-  | 'baixada' 
-  | 'cancelada' 
+export type StatusCobranca =
+  | 'pendente_emissao'
+  | 'emitida'
+  | 'registrada'
+  | 'enviada'
+  | 'liquidada'
+  | 'baixada'
+  | 'cancelada'
   | 'erro';
 
 export type TipoCobranca = 'boleto' | 'pix' | 'carne' | 'link_pagamento' | 'outro';
@@ -37,6 +37,8 @@ export type CobrancaBancaria = {
   codigo_barras?: string | null;
   pix_qr_code?: string | null;
   url_pagamento?: string | null;
+  carteira_codigo?: string | null;
+  observacoes?: string | null;
   eventos?: CobrancaEvento[];
 };
 
@@ -51,6 +53,7 @@ export type CobrancaEvento = {
 
 export type CobrancaPayload = Partial<Omit<CobrancaBancaria, 'id' | 'cliente_nome' | 'conta_nome' | 'eventos'>> & {
   id?: string;
+  cliente_nome?: string;
 };
 
 export type CobrancaSummary = {
@@ -137,21 +140,21 @@ export async function getCobrancasSummary(startVenc?: Date | null, endVenc?: Dat
 }
 
 export async function seedCobrancas(): Promise<void> {
-  const { data: partners } = await getPartners({ 
-    page: 1, 
-    pageSize: 100, 
-    searchTerm: '', 
-    filterType: 'cliente', 
-    sortBy: { column: 'nome', ascending: true } 
+  const { data: partners } = await getPartners({
+    page: 1,
+    pageSize: 100,
+    searchTerm: '',
+    filterType: 'cliente',
+    sortBy: { column: 'nome', ascending: true }
   });
-  
+
   if (partners.length === 0) throw new Error('Crie clientes antes de gerar cobranças.');
 
   const promises = Array.from({ length: 5 }).map(() => {
     const partner = faker.helpers.arrayElement(partners);
     const status = faker.helpers.arrayElement(['pendente_emissao', 'emitida', 'liquidada']) as StatusCobranca;
     const valor = parseFloat(faker.finance.amount(50, 2000, 2));
-    
+
     const payload: CobrancaPayload = {
       cliente_id: partner.id,
       descricao: `Cobrança Ref. ${faker.commerce.productName()}`,

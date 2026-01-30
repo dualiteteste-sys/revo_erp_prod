@@ -275,7 +275,7 @@ export default function IndustriaAuditTrailPanel({ ordemId, tables, entityLabels
 
       setUserNames((prev) => ({ ...prev, ...next }));
     } catch (e) {
-      logger.warn('[AuditLogs] Falha ao hidratar nomes de usuários', e);
+      logger.warn('[AuditLogs] Falha ao hidratar nomes de usuários', { error: e as Error });
     }
   };
 
@@ -317,7 +317,7 @@ export default function IndustriaAuditTrailPanel({ ordemId, tables, entityLabels
         : 'Sistema';
     };
     const resolveEntity = (r: AuditLogRow) => labels[r.table_name] || r.table_name;
-    const resolveChanges = (r: AuditLogRow) => buildHumanSummary(r, labels, 2).text;
+    const resolveChanges = (r: AuditLogRow) => buildHumanSummary(r, labels as Record<string, string>, 2).text;
 
     return sortRows(
       filteredRows,
@@ -487,7 +487,7 @@ export default function IndustriaAuditTrailPanel({ ordemId, tables, entityLabels
                 : 'Sistema';
               const entityLabel = labels[r.table_name] || r.table_name;
               const opLabel = labelOperation(r.operation);
-              const summary = buildHumanSummary(r, labels, 2);
+              const summary = buildHumanSummary(r, labels as Record<string, string>, 2);
               const opClass =
                 r.operation === 'INSERT'
                   ? 'bg-green-100 text-green-800'

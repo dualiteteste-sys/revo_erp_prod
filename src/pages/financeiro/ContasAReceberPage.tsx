@@ -8,6 +8,8 @@ import ListPaginationBar from '@/components/ui/ListPaginationBar';
 import ConfirmationModal from '@/components/ui/ConfirmationModal';
 import Modal from '@/components/ui/Modal';
 import ContasAReceberTable from '@/components/financeiro/contas-a-receber/ContasAReceberTable';
+import { ContaAReceberMobileCard } from '@/components/financeiro/contas-a-receber/ContaAReceberMobileCard';
+import { ResponsiveTable } from '@/components/ui/ResponsiveTable';
 import ContasAReceberFormPanel from '@/components/financeiro/contas-a-receber/ContasAReceberFormPanel';
 import ContasAReceberSummary from '@/components/financeiro/contas-a-receber/ContasAReceberSummary';
 import BaixaRapidaModal from '@/components/financeiro/common/BaixaRapidaModal';
@@ -201,21 +203,21 @@ const ContasAReceberPage: React.FC = () => {
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-3xl font-bold text-gray-800">Contas a Receber</h1>
         <div className="flex items-center gap-2">
-            {enableSeed ? (
-              <Button
-                variant="secondary"
-                onClick={handleSeed}
-                disabled={isSeeding || loading}
-                className="gap-2"
-              >
-                {isSeeding ? <Loader2 className="animate-spin" size={18} /> : <DatabaseBackup size={18} />}
-                Popular Dados
-              </Button>
-            ) : null}
-            <Button onClick={() => handleOpenForm()} className="gap-2">
-              <PlusCircle size={18} />
-              Nova Conta
+          {enableSeed ? (
+            <Button
+              variant="secondary"
+              onClick={handleSeed}
+              disabled={isSeeding || loading}
+              className="gap-2"
+            >
+              {isSeeding ? <Loader2 className="animate-spin" size={18} /> : <DatabaseBackup size={18} />}
+              Popular Dados
             </Button>
+          ) : null}
+          <Button onClick={() => handleOpenForm()} className="gap-2">
+            <PlusCircle size={18} />
+            Nova Conta
+          </Button>
         </div>
       </div>
 
@@ -285,15 +287,33 @@ const ContasAReceberPage: React.FC = () => {
               {searchTerm && <p className="text-sm">Tente ajustar sua busca.</p>}
             </div>
           ) : (
-            <ContasAReceberTable
-              contas={contas}
-              onEdit={handleOpenForm}
-              onReceive={handleReceive}
-              onCancel={handleOpenCancel}
-              onReverse={handleOpenEstorno}
-              onDelete={handleOpenDeleteModal}
-              sortBy={sortBy}
-              onSort={handleSort}
+            <ResponsiveTable
+              data={contas}
+              getItemId={(c) => c.id}
+              loading={loading}
+              tableComponent={
+                <ContasAReceberTable
+                  contas={contas}
+                  onEdit={handleOpenForm}
+                  onReceive={handleReceive}
+                  onCancel={handleOpenCancel}
+                  onReverse={handleOpenEstorno}
+                  onDelete={handleOpenDeleteModal}
+                  sortBy={sortBy}
+                  onSort={handleSort}
+                />
+              }
+              renderMobileCard={(conta) => (
+                <ContaAReceberMobileCard
+                  key={conta.id}
+                  conta={conta}
+                  onEdit={() => handleOpenForm(conta)}
+                  onReceive={() => handleReceive(conta)}
+                  onCancel={() => handleOpenCancel(conta)}
+                  onReverse={() => handleOpenEstorno(conta)}
+                  onDelete={() => handleOpenDeleteModal(conta)}
+                />
+              )}
             />
           )}
         </div>

@@ -12,7 +12,7 @@ import AtividadesRecentes from './AtividadesRecentes';
 import GraficoVendas from './GraficoVendas';
 import RankingCategorias from './RankingCategorias';
 import GraficoPagarReceber from './GraficoPagarReceber';
-import { getMainDashboardData, getFinanceiroFluxoCaixaCentered, FinanceiroFluxoCaixaCenteredItem } from '@/services/mainDashboard';
+import { getMainDashboardData, getFinanceiroFluxoCaixaCentered } from '@/services/mainDashboard';
 import { formatCurrency } from '@/lib/utils';
 import { Layout } from 'react-grid-layout';
 import { Button } from '@/components/ui/button';
@@ -849,6 +849,6 @@ export const DEFAULT_LAYOUT = [
 
     { i: 'top-sellers', x: 0, y: 15, w: 4, h: 9 },
     { i: 'activities', x: 4, y: 15, w: 4, h: 9 },
-    { i: 'shortcuts', x: 8, y: 15, w: 4, h: 5 },
-    { i: 'system-health', x: 8, y: 20, w: 4, h: 4 },
+    { i: 'shortcuts', x: 8, y: 15, w: 4, h: 6 },
+    { i: 'system-health', x: 8, y: 21, w: 4, h: 3 },
 ];

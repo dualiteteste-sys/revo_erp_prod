@@ -6,6 +6,8 @@ import { useDebounce } from '@/hooks/useDebounce';
 import Modal from '@/components/ui/Modal';
 import Select from '@/components/ui/forms/Select';
 import BomsTable from '@/components/industria/boms/BomsTable';
+import { BomMobileCard } from '@/components/industria/boms/BomMobileCard';
+import { ResponsiveTable } from '@/components/ui/ResponsiveTable';
 import BomFormPanel from '@/components/industria/boms/BomFormPanel';
 import { useToast } from '@/contexts/ToastProvider';
 import { useSearchParams } from 'react-router-dom';
@@ -192,11 +194,27 @@ export default function BomsPage() {
             <Loader2 className="animate-spin text-blue-600 w-10 h-10" />
           </div>
         ) : (
-          <BomsTable
-            boms={boms}
-            onEdit={handleEdit}
-            onClone={handleClone}
-            onDelete={handleDelete}
+          <ResponsiveTable
+            data={boms}
+            getItemId={(b) => b.id}
+            loading={loading}
+            tableComponent={
+              <BomsTable
+                boms={boms}
+                onEdit={handleEdit}
+                onClone={handleClone}
+                onDelete={handleDelete}
+              />
+            }
+            renderMobileCard={(bom) => (
+              <BomMobileCard
+                key={bom.id}
+                bom={bom}
+                onEdit={() => handleEdit(bom)}
+                onClone={() => handleClone(bom)}
+                onDelete={() => handleDelete(bom)}
+              />
+            )}
           />
         )}
       </div>

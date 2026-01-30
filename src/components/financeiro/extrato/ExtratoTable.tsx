@@ -130,9 +130,9 @@ export default function ExtratoTable({ lancamentos }: Props) {
                 </td>
                 <td className="px-6 py-4 text-center">
                   {item.conciliado ? (
-                    <CheckCircle size={16} className="text-green-500 mx-auto" title="Conciliado" />
+                    <span title="Conciliado"><CheckCircle size={16} className="text-green-500 mx-auto" /></span>
                   ) : (
-                    <Circle size={16} className="text-gray-300 mx-auto" title="Pendente" />
+                    <span title="Pendente"><Circle size={16} className="text-gray-300 mx-auto" /></span>
                   )}
                 </td>
                 <td className="px-6 py-4 text-sm text-gray-500">

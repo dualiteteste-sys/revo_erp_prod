@@ -6,6 +6,8 @@ import { useDebounce } from '@/hooks/useDebounce';
 import Modal from '@/components/ui/Modal';
 import Select from '@/components/ui/forms/Select';
 import RoteirosTable from '@/components/industria/roteiros/RoteirosTable';
+import { RoteiroMobileCard } from '@/components/industria/roteiros/RoteiroMobileCard';
+import { ResponsiveTable } from '@/components/ui/ResponsiveTable';
 import RoteiroFormPanel from '@/components/industria/roteiros/RoteiroFormPanel';
 import { useToast } from '@/contexts/ToastProvider';
 import { useSearchParams } from 'react-router-dom';
@@ -208,11 +210,27 @@ export default function RoteirosPage() {
             <Loader2 className="animate-spin text-blue-600 w-10 h-10" />
           </div>
         ) : (
-          <RoteirosTable
-            roteiros={roteiros}
-            onEdit={handleEdit}
-            onClone={handleClone}
-            onDelete={handleDelete}
+          <ResponsiveTable
+            data={roteiros}
+            getItemId={(r) => r.id}
+            loading={loading}
+            tableComponent={
+              <RoteirosTable
+                roteiros={roteiros}
+                onEdit={handleEdit}
+                onClone={handleClone}
+                onDelete={handleDelete}
+              />
+            }
+            renderMobileCard={(roteiro) => (
+              <RoteiroMobileCard
+                key={roteiro.id}
+                roteiro={roteiro}
+                onEdit={() => handleEdit(roteiro)}
+                onClone={() => handleClone(roteiro)}
+                onDelete={() => handleDelete(roteiro)}
+              />
+            )}
           />
         )}
       </div>

@@ -5,6 +5,8 @@ import { Loader2 } from 'lucide-react';
 import { useDebounce } from '@/hooks/useDebounce';
 import Modal from '@/components/ui/Modal';
 import CentrosTrabalhoTable from '@/components/industria/centros-trabalho/CentrosTrabalhoTable';
+import { CentroTrabalhoMobileCard } from '@/components/industria/centros-trabalho/CentroTrabalhoMobileCard';
+import { ResponsiveTable } from '@/components/ui/ResponsiveTable';
 import CentroTrabalhoFormPanel from '@/components/industria/centros-trabalho/CentroTrabalhoFormPanel';
 import { useToast } from '@/contexts/ToastProvider';
 import { useSearchParams } from 'react-router-dom';
@@ -65,7 +67,7 @@ export default function CentrosTrabalhoPage() {
       next.delete('focus');
       setSearchParams(next, { replace: true });
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
@@ -181,12 +183,27 @@ export default function CentrosTrabalhoPage() {
             <Loader2 className="animate-spin text-blue-600 w-10 h-10" />
           </div>
         ) : (
-          <CentrosTrabalhoTable
-            centros={centros}
-            onEdit={handleEdit}
-            onClone={handleClone}
-            onDelete={handleDelete}
-            highlightCentroId={highlightCentroId}
+          <ResponsiveTable
+            data={centros}
+            getItemId={(c) => c.id}
+            loading={loading}
+            tableComponent={
+              <CentrosTrabalhoTable
+                centros={centros}
+                onEdit={handleEdit}
+                onClone={handleClone}
+                onDelete={handleDelete}
+                highlightCentroId={highlightCentroId}
+              />
+            }
+            renderMobileCard={(centro) => (
+              <CentroTrabalhoMobileCard
+                key={centro.id}
+                centro={centro}
+                onEdit={() => handleEdit(centro)}
+                onDelete={() => handleDelete(centro)}
+              />
+            )}
           />
         )}
       </div>

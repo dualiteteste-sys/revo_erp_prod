@@ -8,6 +8,8 @@ import Pagination from '../../components/ui/Pagination';
 import ConfirmationModal from '../../components/ui/ConfirmationModal';
 import Modal from '../../components/ui/Modal';
 import PartnersTable from '../../components/partners/PartnersTable';
+import { PartnerMobileCard } from '../../components/partners/PartnerMobileCard';
+import { ResponsiveTable } from '../../components/ui/ResponsiveTable';
 import PartnerFormPanel from '../../components/partners/PartnerFormPanel';
 import Select from '@/components/ui/forms/Select';
 import PageHeader from '@/components/ui/PageHeader';
@@ -424,18 +426,36 @@ const PartnersPage: React.FC = () => {
               ]}
             />
             <div className="flex-1 min-h-0 overflow-auto">
-              <PartnersTable
-                partners={partners}
-                onEdit={handleOpenForm}
-                onDelete={handleOpenDeleteModal}
-                onRestore={handleRestore}
-                sortBy={sortBy}
-                onSort={handleSort}
-                selectedIds={bulk.selectedIds}
-                allSelected={bulk.allSelected}
-                someSelected={bulk.someSelected}
-                onToggleSelect={(id) => bulk.toggle(id)}
-                onToggleSelectAll={() => bulk.toggleAll(bulk.allIds)}
+              <ResponsiveTable
+                data={partners}
+                getItemId={(p) => p.id}
+                loading={loading}
+                tableComponent={
+                  <PartnersTable
+                    partners={partners}
+                    onEdit={handleOpenForm}
+                    onDelete={handleOpenDeleteModal}
+                    onRestore={handleRestore}
+                    sortBy={sortBy}
+                    onSort={handleSort}
+                    selectedIds={bulk.selectedIds}
+                    allSelected={bulk.allSelected}
+                    someSelected={bulk.someSelected}
+                    onToggleSelect={(id) => bulk.toggle(id)}
+                    onToggleSelectAll={() => bulk.toggleAll(bulk.allIds)}
+                  />
+                }
+                renderMobileCard={(partner) => (
+                  <PartnerMobileCard
+                    key={partner.id}
+                    partner={partner}
+                    onEdit={() => handleOpenForm(partner)}
+                    onDelete={() => handleOpenDeleteModal(partner)}
+                    onRestore={() => handleRestore(partner)}
+                    selected={bulk.selectedIds.has(partner.id)}
+                    onToggleSelect={(id) => bulk.toggle(id)}
+                  />
+                )}
               />
             </div>
           </>
