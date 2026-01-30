@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Search, ChevronRight, X } from 'lucide-react';
+import { Search, ChevronRight } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { menuConfig, MenuItem } from '@/config/menuConfig';
 import {
@@ -106,13 +106,6 @@ export function MobileMenuSheet({
                 <SheetHeader className="p-4 pb-0">
                     <div className="flex items-center justify-between mb-4">
                         <SheetTitle className="text-lg font-semibold">Menu</SheetTitle>
-                        <button
-                            onClick={() => onOpenChange(false)}
-                            className="p-2 -mr-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
-                            aria-label="Fechar menu"
-                        >
-                            <X className="w-5 h-5 text-gray-500" />
-                        </button>
                     </div>
 
                     {/* Campo de busca */}
@@ -154,6 +147,7 @@ export function MobileMenuSheet({
                                             'flex items-center w-full px-3 py-3',
                                             'rounded-xl transition-colors',
                                             'hover:bg-gray-100 dark:hover:bg-gray-800',
+                                            'active:bg-gray-200 dark:active:bg-gray-700', // Feedback de toque mais forte
                                             'text-left group'
                                         )}
                                         whileTap={{ scale: 0.98 }}
@@ -207,6 +201,7 @@ export function MobileMenuSheet({
                                                                     'flex items-center w-full px-3 py-2.5',
                                                                     'rounded-lg transition-colors',
                                                                     'hover:bg-gray-100 dark:hover:bg-gray-800',
+                                                                    'active:bg-gray-200 dark:active:bg-gray-700',
                                                                     'text-left'
                                                                 )}
                                                                 whileTap={{ scale: 0.98 }}
