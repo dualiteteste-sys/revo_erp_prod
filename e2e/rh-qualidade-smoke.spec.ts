@@ -388,7 +388,7 @@ test('RH & Qualidade: navegação e render sem erros de console', async ({ page 
   await expect(page.getByText('Dashboard RH & Qualidade')).toBeVisible();
 
   await page.goto('/app/rh/colaboradores');
-  await expect(page.getByText('Colaboradores')).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Colaboradores' })).toBeVisible();
   await expect(page.getByText('Ana Silva')).toBeVisible();
 
   await page.goto('/app/rh/cargos');

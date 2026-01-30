@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Search, ChevronRight, X } from 'lucide-react';
+import { Search, ChevronRight } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { menuConfig, MenuItem } from '@/config/menuConfig';
 import {
@@ -106,13 +106,6 @@ export function MobileMenuSheet({
                 <SheetHeader className="p-4 pb-0">
                     <div className="flex items-center justify-between mb-4">
                         <SheetTitle className="text-lg font-semibold">Menu</SheetTitle>
-                        <button
-                            onClick={() => onOpenChange(false)}
-                            className="p-2 -mr-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
-                            aria-label="Fechar menu"
-                        >
-                            <X className="w-5 h-5 text-gray-500" />
-                        </button>
                     </div>
 
                     {/* Campo de busca */}
@@ -153,7 +146,10 @@ export function MobileMenuSheet({
                                         className={cn(
                                             'flex items-center w-full px-3 py-3',
                                             'rounded-xl transition-colors',
-                                            'hover:bg-gray-100 dark:hover:bg-gray-800',
+                                            'text-slate-700 dark:text-slate-200', // Normal: Cinza Escuro
+                                            'hover:bg-slate-100 dark:hover:bg-slate-800',
+                                            'active:bg-slate-900 dark:active:bg-slate-100', // Active: Fundo Preto (White em dark)
+                                            'active:text-white dark:active:text-slate-900', // Active: Texto Branco (Preto em dark)
                                             'text-left group'
                                         )}
                                         whileTap={{ scale: 0.98 }}
@@ -171,7 +167,7 @@ export function MobileMenuSheet({
                                         </div>
 
                                         {/* Nome */}
-                                        <span className="flex-1 font-medium text-gray-900 dark:text-gray-100">
+                                        <span className="flex-1 font-medium">
                                             {item.name}
                                         </span>
 
@@ -206,13 +202,17 @@ export function MobileMenuSheet({
                                                                 className={cn(
                                                                     'flex items-center w-full px-3 py-2.5',
                                                                     'rounded-lg transition-colors',
-                                                                    'hover:bg-gray-100 dark:hover:bg-gray-800',
-                                                                    'text-left'
+                                                                    'text-slate-600 dark:text-slate-300',
+                                                                    'hover:bg-slate-100 dark:hover:bg-slate-800',
+                                                                    'active:bg-slate-900 dark:active:bg-slate-100',
+                                                                    'active:text-white dark:active:text-slate-900',
+                                                                    'text-left group'
                                                                 )}
                                                                 whileTap={{ scale: 0.98 }}
                                                             >
-                                                                <ChildIcon className="w-4 h-4 mr-3 text-gray-500" />
-                                                                <span className="text-sm text-gray-600 dark:text-gray-300">
+                                                                {/* Ícone muda de cor no active via group-active */}
+                                                                <ChildIcon className="w-4 h-4 mr-3 text-slate-400 group-active:text-white dark:text-slate-500 dark:group-active:text-slate-800" />
+                                                                <span className="text-sm font-medium">
                                                                     {child.name}
                                                                 </span>
                                                             </motion.button>

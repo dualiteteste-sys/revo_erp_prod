@@ -13,12 +13,17 @@ type EditableFaixa = {
   min_qtd: number;
   max_qtd: number | null;
   preco_unitario: number;
+  preco_unitario_raw?: string;
   isNew?: boolean;
 };
 
 function toNumber(v: any): number {
   const n = Number(v);
   return Number.isFinite(n) ? n : 0;
+}
+
+function formatMoneyPtBr(n: number): string {
+  return new Intl.NumberFormat('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(Number.isFinite(n) ? n : 0);
 }
 
 export default function PrecosTab({ produtoId }: Props) {
@@ -59,6 +64,7 @@ export default function PrecosTab({ produtoId }: Props) {
           min_qtd: Number(r.min_qtd),
           max_qtd: r.max_qtd == null ? null : Number(r.max_qtd),
           preco_unitario: Number(r.preco_unitario),
+          preco_unitario_raw: formatMoneyPtBr(Number(r.preco_unitario) || 0),
         }))
       );
     } catch (e: any) {
@@ -82,6 +88,7 @@ export default function PrecosTab({ produtoId }: Props) {
         min_qtd: 1,
         max_qtd: null,
         preco_unitario: 0,
+        preco_unitario_raw: formatMoneyPtBr(0),
         isNew: true,
       },
     ]);
@@ -247,12 +254,14 @@ export default function PrecosTab({ produtoId }: Props) {
                           type="text"
                           inputMode="numeric"
                           className="w-full p-2 border rounded text-sm text-right pl-8"
-                          value={new Intl.NumberFormat('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(r.preco_unitario || 0)}
+                          value={r.preco_unitario_raw ?? formatMoneyPtBr(r.preco_unitario || 0)}
                           onChange={(e) => {
-                            const digits = e.target.value.replace(/\\D/g, '');
+                            const nextRaw = e.target.value;
+                            const digits = nextRaw.replace(/\\D/g, '');
                             const numberValue = digits ? parseInt(digits, 10) / 100 : 0;
-                            updateRow(idx, { preco_unitario: numberValue });
+                            updateRow(idx, { preco_unitario: numberValue, preco_unitario_raw: nextRaw });
                           }}
+                          onBlur={() => updateRow(idx, { preco_unitario_raw: formatMoneyPtBr(r.preco_unitario || 0) })}
                           disabled={loading}
                         />
                       </div>
@@ -289,4 +298,3 @@ export default function PrecosTab({ produtoId }: Props) {
     </div>
   );
 }
-

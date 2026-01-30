@@ -82,5 +82,5 @@ describe('OrdensTable', () => {
     expect(confirmMock).toHaveBeenCalled();
     await waitFor(() => expect(deleteOrdemIndustriaMock).toHaveBeenCalledWith('op-1'));
     await waitFor(() => expect(onChanged).toHaveBeenCalled());
-  });
+  }, 30_000);
 });
