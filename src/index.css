@@ -20,6 +20,7 @@
 body {
     @apply bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50;
     @apply bg-background text-foreground;
+    overflow-x: hidden; /* Prevent horizontal scroll on mobile */
 }
 
 @layer utilities {
