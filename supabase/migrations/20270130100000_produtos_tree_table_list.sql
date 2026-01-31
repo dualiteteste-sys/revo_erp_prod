@@ -2,7 +2,7 @@
 -- Objetivo: Paginar por pais, expandir/contrair variações, e permitir busca por variação sem perder agrupamento.
 -- "Estado da Arte": RPC-first, multi-tenant, SECURITY DEFINER, sem acesso direto a tabelas no frontend.
 
-begin;
+
 
 -- 1) Listar/paginar somente produtos "pai" (produto_pai_id IS NULL), com children_count.
 create or replace function public.produtos_parents_count_for_current_user(
@@ -174,5 +174,5 @@ begin
 end;
 $$;
 
-commit;
+
 
