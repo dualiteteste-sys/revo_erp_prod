@@ -87,7 +87,13 @@ export default function CrmPage() {
         />
       </div>
 
-      <Modal isOpen={isFormOpen} onClose={() => setIsFormOpen(false)} title={selectedDeal ? 'Editar Oportunidade' : 'Nova Oportunidade'} size="lg">
+      <Modal
+        isOpen={isFormOpen}
+        onClose={() => setIsFormOpen(false)}
+        title={selectedDeal ? 'Editar Oportunidade' : 'Nova Oportunidade'}
+        size="lg"
+        containerClassName="min-w-[60vw]"
+      >
         <DealFormPanel 
             deal={selectedDeal} 
             funilId="" // Will rely on backend default or existing deal data

@@ -211,7 +211,7 @@ export default function ConciliacaoRegrasPanel({ contas, selectedContaId, setSel
       </div>
 
       <Modal isOpen={isOpen} onClose={() => setIsOpen(false)} title="Nova regra de conciliação">
-        <div className="space-y-4">
+        <div className="p-6 space-y-4">
           <Select
             label="Tipo de lançamento"
             value={(draft.tipo_lancamento as any) || 'debito'}

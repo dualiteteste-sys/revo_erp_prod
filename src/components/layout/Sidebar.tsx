@@ -25,10 +25,10 @@ interface SidebarProps {
   setActiveItem: (href: string) => void;
 }
 
-const Sidebar: React.FC<SidebarProps> = ({ 
-  isCollapsed, 
-  setIsCollapsed, 
-  onOpenSettings, 
+const Sidebar: React.FC<SidebarProps> = ({
+  isCollapsed,
+  setIsCollapsed,
+  onOpenSettings,
   onOpenCreateCompanyModal,
   activeItem,
   setActiveItem
@@ -67,7 +67,7 @@ const Sidebar: React.FC<SidebarProps> = ({
     setOpenGroup(findParentGroup(activeItem));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeItem]);
-  
+
   const handleMouseEnterItem = (e: React.MouseEvent, item: MenuItem) => {
     if (timerRef.current) {
       clearTimeout(timerRef.current);
@@ -132,8 +132,8 @@ const Sidebar: React.FC<SidebarProps> = ({
     >
       <GlassCard className="h-full min-h-0 flex flex-col p-4">
         {/* HEADER */}
-        <div className={`h-[88px] flex-shrink-0 flex items-center ${isCollapsed ? 'justify-center' : 'px-0'}`}>
-          <RevoLogo className="h-8 w-auto text-gray-800" />
+        <div className="h-[88px] flex-shrink-0 flex items-center justify-center">
+          <RevoLogo className="h-10 w-auto text-gray-800" />
         </div>
         <div className="px-0 py-4 border-y border-white/20">
           <CompanySwitcher isCollapsed={isCollapsed} onOpenCreateCompanyModal={onOpenCreateCompanyModal} />
@@ -152,9 +152,9 @@ const Sidebar: React.FC<SidebarProps> = ({
                 className="space-y-4 pt-4 flex flex-col items-center"
               >
                 {visibleMenu.map((item) => (
-                  <li 
-                    key={item.name} 
-                    className="relative" 
+                  <li
+                    key={item.name}
+                    className="relative"
                     onMouseEnter={(e) => handleMouseEnterItem(e, item)}
                     onMouseLeave={handleMouseLeaveItem}
                   >
@@ -191,36 +191,36 @@ const Sidebar: React.FC<SidebarProps> = ({
             )}
           </AnimatePresence>
         </nav>
-        
+
         {/* FOOTER */}
         <div className="flex-shrink-0 pt-4 mt-4 border-t border-white/20 flex items-center justify-center">
-            <SidebarSwitch 
-                isChecked={!isCollapsed} 
-                onToggle={() => {
-                    setIsCollapsed(!isCollapsed);
-                    setActiveSubmenu(null);
-                }}
-            />
-            <AnimatePresence>
-                {!isCollapsed && (
-                    <motion.span
-                        initial={{ opacity: 0, width: 0 }}
-                        animate={{ opacity: 1, width: 'auto', marginLeft: '12px' }}
-                        exit={{ opacity: 0, width: 0, marginLeft: 0 }}
-                        transition={{ duration: 0.2 }}
-                        className="text-sm text-slate-600 whitespace-nowrap overflow-hidden"
-                    >
-                        Recolher Menu
-                    </motion.span>
-                )}
-            </AnimatePresence>
+          <SidebarSwitch
+            isChecked={!isCollapsed}
+            onToggle={() => {
+              setIsCollapsed(!isCollapsed);
+              setActiveSubmenu(null);
+            }}
+          />
+          <AnimatePresence>
+            {!isCollapsed && (
+              <motion.span
+                initial={{ opacity: 0, width: 0 }}
+                animate={{ opacity: 1, width: 'auto', marginLeft: '12px' }}
+                exit={{ opacity: 0, width: 0, marginLeft: 0 }}
+                transition={{ duration: 0.2 }}
+                className="text-sm text-slate-600 whitespace-nowrap overflow-hidden"
+              >
+                Recolher Menu
+              </motion.span>
+            )}
+          </AnimatePresence>
         </div>
       </GlassCard>
 
       <AnimatePresence>
         {activeSubmenu && isCollapsed && (
-          <FloatingSubmenu 
-            item={activeSubmenu.item} 
+          <FloatingSubmenu
+            item={activeSubmenu.item}
             position={activeSubmenu.position}
             onMouseEnter={handleSubmenuEnter}
             onMouseLeave={handleSubmenuLeave}
