@@ -32,7 +32,7 @@ import { saveProduct } from '@/services/products';
 
 interface Props {
   vendaId: string | null;
-  onSaveSuccess: () => void;
+  onSaveSuccess: (opts?: { keepOpen?: boolean }) => void;
   onClose: () => void;
   mode?: 'erp' | 'pdv';
   onFinalizePdv?: (pedidoId: string) => Promise<void>;
@@ -80,6 +80,14 @@ export default function PedidoVendaFormPanel({ vendaId, onSaveSuccess, onClose, 
   const isLocked = formData.status !== 'orcamento';
   const freteProps = useNumericField(formData.frete, (v) => handleHeaderChange('frete', v));
   const descontoProps = useNumericField(formData.desconto, (v) => handleHeaderChange('desconto', v));
+  const comissaoProps = useNumericField(formData.comissao_percent, (v) => {
+    if (v === null) {
+      handleHeaderChange('comissao_percent', null);
+      return;
+    }
+    const clamped = Math.max(0, Math.min(100, Number(v) || 0));
+    handleHeaderChange('comissao_percent', clamped);
+  });
   const canDiscountQuery = useHasPermission('vendas', 'discount');
   const canDiscount = !!canDiscountQuery.data;
   const skuInputRef = useRef<HTMLInputElement>(null);
@@ -422,6 +430,7 @@ export default function PedidoVendaFormPanel({ vendaId, onSaveSuccess, onClose, 
       } else {
         addToast('Pedido salvo.', 'success');
       }
+      onSaveSuccess({ keepOpen: !formData.id });
       return saved.id;
     } catch (e: any) {
       addToast(e.message, 'error');
@@ -916,11 +925,12 @@ export default function PedidoVendaFormPanel({ vendaId, onSaveSuccess, onClose, 
           <div className="sm:col-span-2">
             <Input
               label="Comissão (%)"
-              type="number"
-              value={String(formData.comissao_percent ?? 0)}
-              onChange={(e) => handleHeaderChange('comissao_percent', e.target.value)}
+              type="text"
+              inputMode="numeric"
+              placeholder="0,00"
+              endAdornment="%"
               disabled={isLocked}
-              placeholder="0"
+              {...comissaoProps}
             />
           </div>
           <div className="sm:col-span-2">
@@ -1117,11 +1127,14 @@ export default function PedidoVendaFormPanel({ vendaId, onSaveSuccess, onClose, 
                       {String((item as any).produto_unidade || '').toUpperCase() === 'KG' ? (
                         <div className="flex items-center gap-2">
                           <input
-                            type="number"
-                            value={(qtyUnitMode[item.id] === 'g' ? Number(item.quantidade || 0) * 1000 : item.quantidade) as any}
+                            type="text"
+                            inputMode="decimal"
+                            value={String(qtyUnitMode[item.id] === 'g' ? Number(item.quantidade || 0) * 1000 : Number(item.quantidade || 0))}
                             onChange={(e) => {
-                              const raw = parseFloat(e.target.value);
-                              const n = Number.isFinite(raw) ? raw : 0;
+                              const raw = e.target.value.trim();
+                              if (!raw) return;
+                              const parsed = parseFloat(raw.replace(',', '.'));
+                              const n = Number.isFinite(parsed) ? parsed : 0;
                               const qtyKg = qtyUnitMode[item.id] === 'g' ? n / 1000 : n;
                               handleUpdateItem(item.id, 'quantidade', qtyKg);
                             }}
@@ -1144,9 +1157,15 @@ export default function PedidoVendaFormPanel({ vendaId, onSaveSuccess, onClose, 
                       ) : (
                         <div className="flex items-center gap-2">
                           <input
-                            type="number"
-                            value={item.quantidade}
-                            onChange={e => handleUpdateItem(item.id, 'quantidade', parseFloat(e.target.value))}
+                            type="text"
+                            inputMode="decimal"
+                            value={String(Number(item.quantidade || 0))}
+                            onChange={(e) => {
+                              const raw = e.target.value.trim();
+                              if (!raw) return;
+                              const parsed = parseFloat(raw.replace(',', '.'));
+                              handleUpdateItem(item.id, 'quantidade', parsed);
+                            }}
                             disabled={isLocked}
                             className="w-full text-right p-1 border rounded text-sm"
                             min="0.001"

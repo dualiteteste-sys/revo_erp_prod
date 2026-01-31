@@ -22,7 +22,7 @@ const CompanySwitcher: React.FC<CompanySwitcherProps> = ({ isCollapsed, onOpenCr
   if (isCollapsed) {
     return (
       <div className="w-16 h-16 flex items-center justify-center flex-shrink-0">
-        <RevoLogo className="h-8 w-auto text-gray-800" />
+        <RevoLogo className="h-10 w-auto text-gray-800" />
       </div>
     );
   }

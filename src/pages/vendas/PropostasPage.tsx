@@ -54,9 +54,9 @@ export default function PropostasPage() {
     setSelectedId(null);
   };
 
-  const handleSuccess = () => {
+  const handleSuccess = (opts?: { keepOpen?: boolean }) => {
     refresh();
-    if (!selectedId) handleClose();
+    if (!selectedId && !opts?.keepOpen) handleClose();
   };
 
   const handleSeed = async () => {

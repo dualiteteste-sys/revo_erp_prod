@@ -14,9 +14,60 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  changes:
+    name: Detect changes
+    runs-on: ubuntu-latest
+    outputs:
+      db: ${{ steps.filter.outputs.db }}
+      landing_only: ${{ steps.landing_only.outputs.landing_only }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Paths filter
+        id: filter
+        uses: dorny/paths-filter@v3
+        with:
+          filters: |
+            db:
+              - 'supabase/migrations/**'
+              - 'supabase/functions/**'
+              - 'scripts/**'
+              - '.github/workflows/release-gate-dev.yml'
+      - name: Determine landing-only change
+        id: landing_only
+        run: |
+          set -euo pipefail
+          git fetch --no-tags origin "${GITHUB_BASE_REF:-dev}" --depth=1 || true
+          base="origin/${GITHUB_BASE_REF:-dev}"
+          head="${GITHUB_SHA}"
+          files="$(git diff --name-only "$base" "$head" || true)"
+          if [[ -z "$files" ]]; then
+            echo "landing_only=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          landing_ok=1
+          while IFS= read -r f; do
+            [[ -z "$f" ]] && continue
+            case "$f" in
+              src/components/landing/*|src/components/landing/**|src/components/ui/RevoLogo.tsx|public/*|public/**|index.html)
+                ;;
+              *)
+                landing_ok=0
+                break
+                ;;
+            esac
+          done <<< "$files"
+
+          if [[ "$landing_ok" == "1" ]]; then
+            echo "landing_only=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "landing_only=false" >> "$GITHUB_OUTPUT"
+          fi
+
   release-gate-dev:
     name: Release Gate (dev)
     runs-on: ubuntu-latest
+    needs: [changes]
 
     steps:
       - uses: actions/checkout@v4
@@ -32,6 +83,22 @@ jobs:
       - name: Install dependencies
         run: yarn install --immutable
 
+      - name: Determine risk level
+        id: risk
+        if: github.event_name == 'pull_request'
+        env:
+          LABELS_JSON: ${{ toJson(github.event.pull_request.labels.*.name) }}
+        run: |
+          set -euo pipefail
+          labels="${LABELS_JSON:-[]}"
+          if echo "$labels" | grep -q '"risk:high"'; then
+            echo "level=high" >> "$GITHUB_OUTPUT"
+          elif echo "$labels" | grep -q '"risk:low"'; then
+            echo "level=low" >> "$GITHUB_OUTPUT"
+          else
+            echo "level=auto" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Build + bundle budget
         env:
           CI: true
@@ -41,25 +108,35 @@ jobs:
         run: yarn test --run
 
       - name: Install Playwright (Chromium)
+        if: needs.changes.outputs.landing_only != 'true' || steps.risk.outputs.level == 'high'
         run: npx playwright install --with-deps chromium
 
       - name: E2E gate (all)
+        if: needs.changes.outputs.landing_only != 'true' || steps.risk.outputs.level == 'high'
         env:
           CI: true
         run: yarn test:e2e:gate:all
 
       - name: Install PostgreSQL client (psql)
+        if: needs.changes.outputs.db == 'true'
         run: |
           set -euo pipefail
           sudo apt-get update
           sudo apt-get install -y postgresql-client
 
       - name: Install Supabase CLI
+        if: needs.changes.outputs.db == 'true'
         uses: supabase/setup-cli@v1
         with:
           version: latest
 
       - name: Verify migrations + RG-03 DB asserts (local)
+        if: needs.changes.outputs.db == 'true'
         run: |
           set -euo pipefail
           yarn verify:migrations:rg03
+
+      - name: Landing fast gate note
+        if: needs.changes.outputs.landing_only == 'true'
+        run: |
+          echo "[GATE] Landing-only change detected — skipping E2E and DB verify to reduce CI time."

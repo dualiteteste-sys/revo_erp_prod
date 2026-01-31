@@ -201,7 +201,7 @@ export default function ImportarExtratoModal({ isOpen, onClose, onImport, contaC
     deriveDefaultMapping({ targetKeys: TARGET_KEYS, sourceKeys: [], synonyms: FIELD_SYNONYMS }),
   );
   const [hasCustomMapping, setHasCustomMapping] = useState(false);
-  const [dedupeStrategy, setDedupeStrategy] = useState<DedupeStrategy>('first');
+  const [dedupeStrategy, setDedupeStrategy] = useState<DedupeStrategy>('none');
   const [forceUppercase, setForceUppercase] = useState(false);
   const [previewSort, setPreviewSort] = useState<SortState<'line' | 'data' | 'descricao' | 'valor' | 'tipo' | 'doc' | 'errors'>>({
     column: 'data',
@@ -313,7 +313,10 @@ export default function ImportarExtratoModal({ isOpen, onClose, onImport, contaC
       const valorAbs = valorNum === null ? null : Math.abs(valorNum);
       if (valorAbs !== null && valorAbs <= 0) errors.push('valor deve ser > 0');
 
-      const raw = dataISO && valorNum !== null ? `${dataISO}|${descricao}|${valorNum}|${doc ?? ''}` : null;
+      // `hash_importacao` precisa ser idempotente (reimportar o MESMO extrato não duplica),
+      // mas também precisa permitir duas linhas idênticas no MESMO extrato (ex.: duas tarifas iguais).
+      // A linha/ordem do arquivo é o discriminador mínimo e estável dentro do extrato.
+      const raw = dataISO && valorNum !== null ? `${dataISO}|${descricao}|${valorNum}|${doc ?? ''}|${r.line}` : null;
       const dedupeKey = raw ? hashString(raw) : null;
 
       const payload: ImportarExtratoPayload | null =

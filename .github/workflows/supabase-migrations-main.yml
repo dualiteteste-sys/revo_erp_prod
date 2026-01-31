@@ -14,10 +14,76 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  changes:
+    name: Detect changes
+    runs-on: ubuntu-latest
+    outputs:
+      db: ${{ steps.filter.outputs.db }}
+      app: ${{ steps.filter.outputs.app }}
+      landing_only: ${{ steps.landing_only.outputs.landing_only }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Paths filter
+        id: filter
+        uses: dorny/paths-filter@v3
+        with:
+          filters: |
+            db:
+              - 'supabase/migrations/**'
+              - 'supabase/functions/**'
+              - 'scripts/**'
+              - '.github/workflows/supabase-migrations-main.yml'
+            app:
+              - 'src/**'
+              - 'public/**'
+              - 'index.html'
+              - 'vite.config.ts'
+              - 'tailwind.config.js'
+              - 'package.json'
+              - 'yarn.lock'
+              - '.yarnrc.yml'
+              - '.yarn/**'
+              - '.github/workflows/supabase-migrations-main.yml'
+      - name: Determine landing-only change
+        id: landing_only
+        run: |
+          set -euo pipefail
+          # landing-only = changes restricted to landing assets/components and static public assets.
+          # This allows a faster gate (build + unit) without full E2E/migrations.
+          git fetch --no-tags origin "${GITHUB_BASE_REF:-main}" --depth=1 || true
+          base="origin/${GITHUB_BASE_REF:-main}"
+          head="${GITHUB_SHA}"
+          files="$(git diff --name-only "$base" "$head" || true)"
+          if [[ -z "$files" ]]; then
+            echo "landing_only=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          landing_ok=1
+          while IFS= read -r f; do
+            [[ -z "$f" ]] && continue
+            case "$f" in
+              src/components/landing/*|src/components/landing/**|src/components/ui/RevoLogo.tsx|public/*|public/**|index.html)
+                ;;
+              *)
+                landing_ok=0
+                break
+                ;;
+            esac
+          done <<< "$files"
+
+          if [[ "$landing_ok" == "1" ]]; then
+            echo "landing_only=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "landing_only=false" >> "$GITHUB_OUTPUT"
+          fi
+
   verify-migrations:
     name: Verify Migrations (Clean Slate)
     runs-on: ubuntu-latest
     timeout-minutes: 35
+    needs: [changes]
+    if: needs.changes.outputs.db == 'true'
 
     steps:
       - name: Checkout repository
@@ -126,6 +192,9 @@ jobs:
   release-gate:
     name: Release Gate (Unit + E2E)
     runs-on: ubuntu-latest
+    # If DB changed, run verify-migrations first so we "fail fast" and don't spend 1h in E2E.
+    needs: [changes, verify-migrations]
+    if: needs.changes.outputs.app == 'true' && (needs.changes.outputs.db != 'true' || needs.verify-migrations.result == 'success')
 
     steps:
       - uses: actions/checkout@v4
@@ -141,13 +210,53 @@ jobs:
       - name: Install dependencies
         run: yarn install --immutable
 
+      - name: Determine risk level
+        id: risk
+        if: github.event_name == 'pull_request'
+        env:
+          LABELS_JSON: ${{ toJson(github.event.pull_request.labels.*.name) }}
+        run: |
+          set -euo pipefail
+          # Default is "auto" (paths-based). Labels can override:
+          # - risk:low  -> fast gate allowed (when landing_only)
+          # - risk:high -> force full gate even for landing-only
+          labels="${LABELS_JSON:-[]}"
+          if echo "$labels" | grep -q '"risk:high"'; then
+            echo "level=high" >> "$GITHUB_OUTPUT"
+          elif echo "$labels" | grep -q '"risk:low"'; then
+            echo "level=low" >> "$GITHUB_OUTPUT"
+          else
+            echo "level=auto" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Cache Playwright browsers
+        if: needs.changes.outputs.landing_only != 'true' || steps.risk.outputs.level == 'high'
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-playwright-${{ hashFiles('yarn.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-playwright-
+
       - name: Install Playwright (Chromium)
+        if: needs.changes.outputs.landing_only != 'true' || steps.risk.outputs.level == 'high'
         run: npx playwright install --with-deps chromium
 
-      - name: Release check (CI)
+      - name: Release check (CI) — full
+        if: needs.changes.outputs.landing_only != 'true' || steps.risk.outputs.level == 'high'
         env:
           CI: true
         run: yarn release:check:ci
+
+      - name: Release check (CI) — landing fast gate
+        if: needs.changes.outputs.landing_only == 'true' && steps.risk.outputs.level != 'high'
+        env:
+          CI: true
+        run: |
+          set -euo pipefail
+          yarn verify:bundle
+          yarn test --run
+          yarn build
 
   deploy-prod:
     name: Deploy to Production

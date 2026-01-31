@@ -10,8 +10,8 @@ const Footer: React.FC = () => {
           <div>
             <h3 className="text-xs font-semibold tracking-wider uppercase text-slate-500">Produtos</h3>
             <ul className="mt-4 space-y-2">
-              <li><Link to="/" className="text-sm text-slate-700 hover:text-slate-900">REVO ERP</Link></li>
-              <li><Link to="/revo-fluxo" className="text-sm text-slate-700 hover:text-slate-900">REVO Fluxo</Link></li>
+              <li><Link to="/" className="text-base text-slate-500 hover:text-slate-900">Ultria ERP</Link></li>
+              <li><Link to="/revo-fluxo" className="text-base text-slate-500 hover:text-slate-900">Ultria Fluxo</Link></li>
             </ul>
           </div>
           <div>
@@ -39,8 +39,8 @@ const Footer: React.FC = () => {
           </div>
         </div>
         <div className="mt-12 border-t border-slate-200 pt-8 flex flex-col md:flex-row justify-between items-center">
-          <RevoLogo className="h-7 w-auto text-slate-900" />
-          <p className="mt-4 md:mt-0 text-sm text-slate-500">&copy; 2026 REVO ERP. Todos os direitos reservados.</p>
+          <RevoLogo className="h-12 w-auto text-slate-900" />
+          <p className="mt-4 md:mt-0 text-sm text-slate-500">&copy; 2026 Ultria. Todos os direitos reservados.</p>
         </div>
       </div>
     </footer>

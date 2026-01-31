@@ -1,5 +1,5 @@
 import React, { useCallback, useMemo, useState } from 'react';
-import { useProducts } from '../../hooks/useProducts';
+import { useProductsTree } from '../../hooks/useProductsTree';
 import { useToast } from '../../contexts/ToastProvider';
 import ProductsTable from '../../components/products/ProductsTable';
 import { ProductMobileCard } from '../../components/products/ProductMobileCard';
@@ -24,8 +24,10 @@ import PageShell from '@/components/ui/PageShell';
 import PageCard from '@/components/ui/PageCard';
 import EmptyState from '@/components/ui/EmptyState';
 import { uiMessages } from '@/lib/ui/messages';
+import { useAuth } from '@/contexts/AuthProvider';
 
 const ProductsPage: React.FC = () => {
+  const { activeEmpresa } = useAuth();
   const enableSeed = isSeedEnabled();
   const permCreate = useHasPermission('produtos', 'create');
   const permUpdate = useHasPermission('produtos', 'update');
@@ -36,7 +38,8 @@ const ProductsPage: React.FC = () => {
   const canDelete = !!permDelete.data;
 
   const {
-    products,
+    rows,
+    parents,
     loading,
     error,
     count,
@@ -45,14 +48,15 @@ const ProductsPage: React.FC = () => {
     searchTerm,
     filterStatus,
     sortBy,
+    expandedParentIds,
+    toggleParentExpanded,
+    highlightedChildIds,
     setPage,
     setPageSize,
     setSearchTerm,
     setFilterStatus,
     setSortBy,
-    saveProduct,
-    deleteProduct,
-  } = useProducts();
+  } = useProductsTree();
   const { addToast } = useToast();
 
   const [isFormOpen, setIsFormOpen] = useState(false);
@@ -66,10 +70,10 @@ const ProductsPage: React.FC = () => {
   const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false);
   const [bulkLoading, setBulkLoading] = useState(false);
 
-  const bulk = useBulkSelection(products, (p) => p.id);
+  const bulk = useBulkSelection(parents, (p) => p.id);
   const selectedProducts = useMemo(
-    () => products.filter((p) => bulk.selectedIds.has(p.id)),
-    [products, bulk.selectedIds]
+    () => parents.filter((p) => bulk.selectedIds.has(p.id)),
+    [parents, bulk.selectedIds]
   );
 
   const refreshList = useCallback(() => {
@@ -77,7 +81,7 @@ const ProductsPage: React.FC = () => {
     setSearchTerm('');
   }, [setPage, setSearchTerm]);
 
-  const handleOpenForm = async (product: productsService.Product | null = null) => {
+  const handleOpenForm = async (product: { id: string } | null = null) => {
     const needsUpdate = !!product?.id;
     if (!permsLoading && needsUpdate && !canUpdate) {
       addToast('Você não tem permissão para editar produtos.', 'warning');
@@ -117,8 +121,23 @@ const ProductsPage: React.FC = () => {
     handleCloseForm();
   };
 
-  const handleOpenDeleteModal = (product: productsService.Product) => {
-    setProductToDelete(product);
+  const handleOpenDeleteModal = (product: { id: string }) => {
+    const row = rows.find((r) => r.id === product.id);
+    const minimal = row
+      ? ({
+          id: row.id,
+          nome: row.nome,
+          sku: row.sku,
+          slug: (row as any).slug ?? null,
+          status: row.status as any,
+          preco_venda: row.preco_venda as any,
+          unidade: row.unidade as any,
+          created_at: row.created_at as any,
+          updated_at: row.updated_at as any,
+        } as productsService.Product)
+      : null;
+
+    setProductToDelete(minimal ?? null);
     setIsDeleteModalOpen(true);
   };
 
@@ -135,7 +154,7 @@ const ProductsPage: React.FC = () => {
     }
     setIsDeleting(true);
     try {
-      await deleteProduct(productToDelete.id);
+      await productsService.deleteProductById(productToDelete.id);
       addToast('Produto excluído com sucesso!', 'success');
       handleCloseDeleteModal();
     } catch (e: any) {
@@ -145,14 +164,11 @@ const ProductsPage: React.FC = () => {
     }
   };
 
-  const handleSort = (column: keyof productsService.Product) => {
-    setSortBy(prev => ({
-      column,
-      ascending: prev.column === column ? !prev.ascending : true,
-    }));
+  const handleSort = () => {
+    setSortBy((prev) => ({ column: 'nome', ascending: !prev.ascending }));
   };
 
-  const handleClone = async (product: productsService.Product) => {
+  const handleClone = async (product: { id: string }) => {
     if (!product.id) return;
     if (!permsLoading && !canCreate) {
       addToast('Você não tem permissão para clonar produtos.', 'warning');
@@ -189,7 +205,7 @@ const ProductsPage: React.FC = () => {
     }
     setBulkLoading(true);
     try {
-      const results = await Promise.allSettled(selectedProducts.map((p) => deleteProduct(p.id)));
+      const results = await Promise.allSettled(selectedProducts.map((p) => productsService.deleteProductById(p.id)));
       const ok = results.filter((r) => r.status === 'fulfilled').length;
       const fail = results.length - ok;
       if (ok) addToast(`${ok} produto(s) excluído(s).`, 'success');
@@ -217,7 +233,7 @@ const ProductsPage: React.FC = () => {
               downloadCsv({
                 filename: 'produtos.csv',
                 headers: ['Nome', 'SKU', 'Status', 'Preço', 'Unidade'],
-                rows: products.map((p: any) => [
+                rows: parents.map((p: any) => [
                   p.nome || '',
                   p.sku || '',
                   p.status || p.ativo || '',
@@ -226,7 +242,7 @@ const ProductsPage: React.FC = () => {
                 ]),
               });
             }}
-            disabled={loading || products.length === 0}
+            disabled={loading || parents.length === 0}
             variant="secondary"
             className="gap-2"
             title="Exportar a lista atual"
@@ -306,13 +322,13 @@ const ProductsPage: React.FC = () => {
   return (
     <PageShell header={header} filters={filters} footer={footer}>
       <PageCard className="flex flex-col flex-1 min-h-0">
-        {loading && products.length === 0 ? (
+        {loading && parents.length === 0 ? (
           <div className="h-96 flex items-center justify-center">
             <Loader2 className="animate-spin text-blue-500" size={32} />
           </div>
         ) : error ? (
           <div className="h-96 flex items-center justify-center text-red-500">{error}</div>
-        ) : products.length === 0 ? (
+        ) : parents.length === 0 ? (
           <EmptyState
             icon={<Package size={48} />}
             title="Nenhum produto encontrado"
@@ -344,17 +360,20 @@ const ProductsPage: React.FC = () => {
             />
             <div className="flex-1 min-h-0 overflow-auto">
               <ResponsiveTable
-                data={products}
+                data={parents}
                 getItemId={(p) => p.id}
                 loading={loading}
                 tableComponent={
                   <ProductsTable
-                    products={products}
+                    rows={rows}
                     onEdit={(p) => handleOpenForm(p)}
-                    onDelete={handleOpenDeleteModal}
-                    onClone={handleClone}
-                    sortBy={sortBy}
-                    onSort={handleSort}
+                    onDelete={(p) => handleOpenDeleteModal(p)}
+                    onClone={(p) => handleClone(p)}
+                    sortBy={{ column: 'nome', ascending: sortBy.ascending }}
+                    onSort={() => handleSort()}
+                    expandedParentIds={expandedParentIds}
+                    onToggleExpand={toggleParentExpanded}
+                    highlightedChildIds={highlightedChildIds}
                     selectedIds={bulk.selectedIds}
                     allSelected={bulk.allSelected}
                     someSelected={bulk.someSelected}
@@ -365,7 +384,7 @@ const ProductsPage: React.FC = () => {
                 renderMobileCard={(product) => (
                   <ProductMobileCard
                     key={product.id}
-                    product={product}
+                    product={product as any}
                     onEdit={() => handleOpenForm(product)}
                     onDelete={() => handleOpenDeleteModal(product)}
                     onClone={() => handleClone(product)}
@@ -393,7 +412,10 @@ const ProductsPage: React.FC = () => {
             product={selectedProduct}
             onSaveSuccess={handleSaveSuccess}
             onClose={handleCloseForm}
-            saveProduct={saveProduct}
+            saveProduct={async (payload) => {
+              if (!activeEmpresa?.id) throw new Error('Nenhuma empresa ativa selecionada.');
+              return productsService.saveProduct(payload, activeEmpresa.id);
+            }}
           />
         )}
       </Modal>
@@ -401,7 +423,10 @@ const ProductsPage: React.FC = () => {
       <ImportProductsCsvModal
         isOpen={isImportOpen}
         onClose={() => setIsImportOpen(false)}
-        importFn={saveProduct}
+        importFn={async (payload) => {
+          if (!activeEmpresa?.id) throw new Error('Nenhuma empresa ativa selecionada.');
+          return productsService.saveProduct(payload, activeEmpresa.id);
+        }}
         deleteFn={(id) => productsService.deleteProductById(id)}
         onImported={() => {
           setIsImportOpen(false);

@@ -23,10 +23,87 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  changes:
+    name: Detect changes
+    runs-on: ubuntu-latest
+    outputs:
+      landing_only: ${{ steps.landing_only.outputs.landing_only }}
+      ci_only: ${{ steps.ci_only.outputs.ci_only }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Determine landing-only change
+        id: landing_only
+        run: |
+          set -euo pipefail
+          # landing-only = changes restricted to landing assets/components and static public assets.
+          # If true, we can run a fast gate here (bundle + unit + build) and skip full E2E.
+          # NOTE: For push events, we approximate "base" as origin/dev.
+          git fetch --no-tags origin dev --depth=1 || true
+          base="origin/dev"
+          head="${GITHUB_SHA}"
+          files="$(git diff --name-only "$base" "$head" || true)"
+          if [[ -z "$files" ]]; then
+            echo "landing_only=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          landing_ok=1
+          while IFS= read -r f; do
+            [[ -z "$f" ]] && continue
+            case "$f" in
+              src/components/landing/*|src/components/landing/**|src/components/ui/RevoLogo.tsx|public/*|public/**|index.html)
+                ;;
+              *)
+                landing_ok=0
+                break
+                ;;
+            esac
+          done <<< "$files"
+
+          if [[ "$landing_ok" == "1" ]]; then
+            echo "landing_only=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "landing_only=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Determine CI-only change
+        id: ci_only
+        run: |
+          set -euo pipefail
+          # ci-only = changes restricted to CI/docs scaffolding (no app/runtime behavior).
+          git fetch --no-tags origin dev --depth=1 || true
+          base="origin/dev"
+          head="${GITHUB_SHA}"
+          files="$(git diff --name-only "$base" "$head" || true)"
+          if [[ -z "$files" ]]; then
+            echo "ci_only=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          ok=1
+          while IFS= read -r f; do
+            [[ -z "$f" ]] && continue
+            case "$f" in
+              .github/*|.github/**|docs/*|docs/**|README.md|LICENSE|.gitignore)
+                ;;
+              *)
+                ok=0
+                break
+                ;;
+            esac
+          done <<< "$files"
+
+          if [[ "$ok" == "1" ]]; then
+            echo "ci_only=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "ci_only=false" >> "$GITHUB_OUTPUT"
+          fi
+
   unit-tests:
     name: Unit tests
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    needs: [changes]
     steps:
       - uses: actions/checkout@v4
 
@@ -53,7 +130,23 @@ jobs:
       - name: Install dependencies
         run: yarn install --immutable
 
+      - name: CI-only change — skip tests
+        if: needs.changes.outputs.ci_only == 'true' && github.event_name != 'workflow_dispatch'
+        run: |
+          echo "[GATE] CI/docs-only change detected — skipping unit tests and E2E."
+
+      - name: Fast gate (landing-only)
+        if: needs.changes.outputs.ci_only != 'true' && needs.changes.outputs.landing_only == 'true' && github.event_name != 'workflow_dispatch'
+        env:
+          CI: true
+        run: |
+          set -euo pipefail
+          yarn verify:bundle
+          yarn test --run
+          yarn build
+
       - name: Unit tests
+        if: needs.changes.outputs.ci_only != 'true' && (needs.changes.outputs.landing_only != 'true' || github.event_name == 'workflow_dispatch')
         env:
           CI: true
         run: yarn test --run
@@ -63,6 +156,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 60
     needs: [unit-tests]
+    if: needs.changes.outputs.ci_only != 'true' && (needs.changes.outputs.landing_only != 'true' || github.event_name == 'workflow_dispatch')
     env:
       E2E_SUITE: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.suite || 'all' }}
     strategy:
