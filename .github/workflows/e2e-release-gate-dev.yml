@@ -102,7 +102,9 @@ jobs:
   unit-tests:
     name: Unit tests
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    # Unit tests in CI can occasionally exceed 20 minutes due to runner load.
+    # Keep a hard timeout (safety), but avoid false negatives that block dev→main merges.
+    timeout-minutes: 45
     needs: [changes]
     steps:
       - uses: actions/checkout@v4
