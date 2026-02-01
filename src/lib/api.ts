@@ -8,7 +8,7 @@ import { getLastRequestId } from "@/lib/requestId";
 import { withRetry } from "@/lib/retry";
 import { logRpcMetric, maybeLogFirstValue } from "@/lib/metrics";
 
-type RpcArgs = Record<string, any>;
+type RpcArgs = Record<string, unknown>;
 
 let activeEmpresaRecoveryInFlight: Promise<boolean> | null = null;
 const ops403LogDedupe = new Map<string, number>();
