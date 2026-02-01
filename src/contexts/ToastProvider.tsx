@@ -37,12 +37,12 @@ const ToastContext = createContext<ToastContextType | undefined>(undefined);
 export const ToastProvider = ({ children }: { children: ReactNode }) => {
   // In unit tests we don't need real toasts/animations and they can keep the
   // process alive (timers / rAF via framer-motion). Use a no-op provider.
+  // IMPORTANT: this file is imported in the browser (Vite). Avoid `process.*`
+  // which is undefined in browser builds and breaks E2E/production runtime.
   const IS_TEST_ENV =
-    (typeof import.meta !== 'undefined' &&
-      typeof (import.meta as any).env !== 'undefined' &&
-      (import.meta as any).env.MODE === 'test') ||
-    process.env.NODE_ENV === 'test' ||
-    Boolean(process.env.VITEST);
+    typeof import.meta !== 'undefined' &&
+    typeof (import.meta as any).env !== 'undefined' &&
+    (((import.meta as any).env.MODE as string | undefined) === 'test' || Boolean((import.meta as any).env.VITEST));
 
   if (IS_TEST_ENV) {
     const addToast = () => {};
