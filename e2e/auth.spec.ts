@@ -10,7 +10,10 @@ test('should allow user to log in and view products', async ({ page }) => {
         const url = route.request().url();
         if (
           url.includes('/rest/v1/rpc/empresas_list_for_current_user') ||
-          url.includes('/rest/v1/rpc/active_empresa_get_for_current_user')
+          url.includes('/rest/v1/rpc/active_empresa_get_for_current_user') ||
+          url.includes('/rest/v1/rpc/produtos_parents_count_for_current_user') ||
+          url.includes('/rest/v1/rpc/produtos_parents_list_for_current_user') ||
+          url.includes('/rest/v1/rpc/produtos_variantes_list_for_current_user')
         ) {
           await route.fallback();
           return;
@@ -168,25 +171,32 @@ test('should allow user to log in and view products', async ({ page }) => {
       });
     });
 
-    // Mock Products List RPC
-    await page.route('**/rest/v1/rpc/produtos_list_for_current_user', async route => {
-        await route.fulfill({
-            json: [
-                {
-                    id: 'prod-1',
-                    nome: 'Produto E2E',
-                    sku: 'SKU-E2E',
-                    preco_venda: 100,
-                    status: 'ativo'
-                }
-            ]
-        });
-    });
+    // Mock Products (tree) RPCs
+    await page.route('**/rest/v1/rpc/produtos_parents_list_for_current_user', async route => {
+	        await route.fulfill({
+	            json: [
+	                {
+	                    id: 'prod-1',
+	                    nome: 'Produto E2E',
+	                    sku: 'SKU-E2E',
+	                    preco_venda: 100,
+	                    unidade: 'UN',
+	                    status: 'ativo',
+	                    children_count: 0,
+	                    created_at: new Date().toISOString(),
+	                    updated_at: new Date().toISOString()
+	                }
+	            ]
+	        });
+	    });
 
-    // Mock Products Count RPC
-    await page.route('**/rest/v1/rpc/produtos_count_for_current_user', async route => {
-        await route.fulfill({ json: 1 });
-    });
+	    await page.route('**/rest/v1/rpc/produtos_parents_count_for_current_user', async route => {
+	        await route.fulfill({ json: 1 });
+	    });
+
+	    await page.route('**/rest/v1/rpc/produtos_variantes_list_for_current_user', async route => {
+	        await route.fulfill({ json: [] });
+	    });
 
     // Go to login page
     await page.goto('/auth/login');
@@ -216,15 +226,18 @@ test('auto-seleciona empresa quando empresa ativa está ausente', async ({ page 
             await route.fulfill({ status: 204, body: '' });
             return;
         }
-        const url = route.request().url();
-        if (
-          url.includes('/rest/v1/rpc/empresas_list_for_current_user') ||
-          url.includes('/rest/v1/rpc/active_empresa_get_for_current_user')
-        ) {
-          await route.fallback();
-          return;
-        }
-        await route.fulfill({ json: [] });
+	        const url = route.request().url();
+	        if (
+	          url.includes('/rest/v1/rpc/empresas_list_for_current_user') ||
+	          url.includes('/rest/v1/rpc/active_empresa_get_for_current_user') ||
+	          url.includes('/rest/v1/rpc/produtos_parents_count_for_current_user') ||
+	          url.includes('/rest/v1/rpc/produtos_parents_list_for_current_user') ||
+	          url.includes('/rest/v1/rpc/produtos_variantes_list_for_current_user')
+	        ) {
+	          await route.fallback();
+	          return;
+	        }
+	        await route.fulfill({ json: [] });
     });
 
     // Mock Supabase Auth endpoints
@@ -357,22 +370,29 @@ test('auto-seleciona empresa quando empresa ativa está ausente', async ({ page 
       });
     });
 
-    await page.route('**/rest/v1/rpc/produtos_list_for_current_user', async route => {
-        await route.fulfill({
-            json: [
-                {
-                    id: 'prod-1',
-                    nome: 'Produto E2E',
-                    sku: 'SKU-E2E',
-                    preco_venda: 100,
-                    status: 'ativo'
-                }
-            ]
-        });
-    });
-    await page.route('**/rest/v1/rpc/produtos_count_for_current_user', async route => {
-        await route.fulfill({ json: 1 });
-    });
+	    await page.route('**/rest/v1/rpc/produtos_parents_list_for_current_user', async route => {
+	        await route.fulfill({
+	            json: [
+	                {
+	                    id: 'prod-1',
+	                    nome: 'Produto E2E',
+	                    sku: 'SKU-E2E',
+	                    preco_venda: 100,
+	                    unidade: 'UN',
+	                    status: 'ativo',
+	                    children_count: 0,
+	                    created_at: new Date().toISOString(),
+	                    updated_at: new Date().toISOString()
+	                }
+	            ]
+	        });
+	    });
+	    await page.route('**/rest/v1/rpc/produtos_parents_count_for_current_user', async route => {
+	        await route.fulfill({ json: 1 });
+	    });
+	    await page.route('**/rest/v1/rpc/produtos_variantes_list_for_current_user', async route => {
+	        await route.fulfill({ json: [] });
+	    });
 
     await page.goto('/auth/login');
     await page.getByPlaceholder('seu@email.com').fill('test@example.com');

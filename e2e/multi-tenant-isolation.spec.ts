@@ -83,11 +83,11 @@ test('não reaproveita cache de dados entre empresas (produtos)', async ({ page 
     await route.fulfill({ status: 204, body: '' });
   });
 
-  await page.route('**/rest/v1/rpc/produtos_count_for_current_user', async (route) => {
+  await page.route('**/rest/v1/rpc/produtos_parents_count_for_current_user', async (route) => {
     await route.fulfill({ json: currentEmpresa === 'empresa-1' ? 1 : 1 });
   });
 
-  await page.route('**/rest/v1/rpc/produtos_list_for_current_user', async (route) => {
+  await page.route('**/rest/v1/rpc/produtos_parents_list_for_current_user', async (route) => {
     const rows =
       currentEmpresa === 'empresa-1'
         ? [
@@ -95,12 +95,12 @@ test('não reaproveita cache de dados entre empresas (produtos)', async ({ page 
               id: 'prod-a',
               nome: 'Produto A',
               sku: 'A',
-              slug: null,
               status: 'ativo',
               preco_venda: 10,
               unidade: 'UNID',
               created_at: new Date().toISOString(),
               updated_at: new Date().toISOString(),
+              children_count: 0,
             },
           ]
         : [
@@ -108,15 +108,19 @@ test('não reaproveita cache de dados entre empresas (produtos)', async ({ page 
               id: 'prod-b',
               nome: 'Produto B',
               sku: 'B',
-              slug: null,
               status: 'ativo',
               preco_venda: 20,
               unidade: 'UNID',
               created_at: new Date().toISOString(),
               updated_at: new Date().toISOString(),
+              children_count: 0,
             },
           ];
     await route.fulfill({ json: rows });
+  });
+
+  await page.route('**/rest/v1/rpc/produtos_variantes_list_for_current_user', async (route) => {
+    await route.fulfill({ json: [] });
   });
 
   // Subscription guard (passa)
@@ -148,8 +152,9 @@ test('não reaproveita cache de dados entre empresas (produtos)', async ({ page 
       url.includes('/rest/v1/rpc/empresas_list_for_current_user') ||
       url.includes('/rest/v1/rpc/active_empresa_get_for_current_user') ||
       url.includes('/rest/v1/rpc/set_active_empresa_for_current_user') ||
-      url.includes('/rest/v1/rpc/produtos_count_for_current_user') ||
-      url.includes('/rest/v1/rpc/produtos_list_for_current_user')
+      url.includes('/rest/v1/rpc/produtos_parents_count_for_current_user') ||
+      url.includes('/rest/v1/rpc/produtos_parents_list_for_current_user') ||
+      url.includes('/rest/v1/rpc/produtos_variantes_list_for_current_user')
     ) {
       await route.fallback();
       return;
