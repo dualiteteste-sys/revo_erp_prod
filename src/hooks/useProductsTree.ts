@@ -86,6 +86,12 @@ export function useProductsTree() {
     })),
   });
 
+  const variantsSnapshotKey = useMemo(() => {
+    const idsKey = expandedIds.join('|');
+    const dataKey = variantsQueries.map((q) => q.dataUpdatedAt ?? 0).join('|');
+    return `${idsKey}::${dataKey}`;
+  }, [expandedIds, variantsQueries]);
+
   const variantsByParentId = useMemo(() => {
     const map = new Map<string, ProductVariantRow[]>();
     for (let i = 0; i < expandedIds.length; i++) {
@@ -94,7 +100,25 @@ export function useProductsTree() {
       if (q?.data) map.set(parentId, q.data);
     }
     return map;
-  }, [expandedIds, variantsQueries]);
+    // NOTE: variantsQueries is referentially unstable; use a stable snapshot key to avoid render loops.
+  }, [expandedIds, variantsSnapshotKey]);
+
+  // Quando buscar por uma variação, realçar o(s) filho(s) por um curto período.
+  const highlightMatchesKey = useMemo(() => {
+    const term = debouncedSearchTerm?.trim().toLowerCase() ?? '';
+    if (!term) return '';
+
+    const matches: string[] = [];
+    for (const variants of variantsByParentId.values()) {
+      for (const v of variants) {
+        const nome = (v.nome ?? '').toLowerCase();
+        const sku = (v.sku ?? '').toLowerCase();
+        if (nome.includes(term) || sku.includes(term)) matches.push(v.id);
+      }
+    }
+    matches.sort();
+    return matches.join('|');
+  }, [debouncedSearchTerm, variantsByParentId]);
 
   // Quando buscar por uma variação, realçar o(s) filho(s) por um curto período.
   useEffect(() => {
@@ -103,22 +127,13 @@ export function useProductsTree() {
       setHighlightedChildIds(new Set());
       return;
     }
+    if (!highlightMatchesKey) return;
 
-    const matches = new Set<string>();
-    for (const variants of variantsByParentId.values()) {
-      for (const v of variants) {
-        const nome = (v.nome ?? '').toLowerCase();
-        const sku = (v.sku ?? '').toLowerCase();
-        if (nome.includes(term) || sku.includes(term)) matches.add(v.id);
-      }
-    }
-
-    if (matches.size === 0) return;
-
+    const matches = new Set(highlightMatchesKey.split('|'));
     setHighlightedChildIds(matches);
     const t = window.setTimeout(() => setHighlightedChildIds(new Set()), 2000);
     return () => window.clearTimeout(t);
-  }, [debouncedSearchTerm, variantsByParentId]);
+  }, [debouncedSearchTerm, highlightMatchesKey]);
 
   const flatRows: ProductsTreeRow[] = useMemo(() => {
     const parents = parentsQuery.data?.data ?? [];

@@ -7,12 +7,22 @@ export default defineConfig({
     testDir: './e2e',
     fullyParallel: true,
     forbidOnly: !!process.env.CI,
-    retries: process.env.CI ? 2 : 0,
+    // CI must never hang indefinitely; prefer failing fast over burning 1h+ runner time.
+    retries: process.env.CI ? 1 : 0,
     workers: process.env.CI ? 1 : undefined,
-    reporter: 'html',
+    // HTML reporter is great locally; in CI we want real-time progress and clearer "last test".
+    reporter: process.env.CI ? 'line' : 'html',
+    // Ensure any accidental waits don't keep the runner alive for hours.
+    timeout: process.env.CI ? 60_000 : 30_000,
+    expect: {
+        timeout: process.env.CI ? 10_000 : 5_000,
+    },
     use: {
         baseURL,
         trace: 'on-first-retry',
+        // Avoid indefinite hangs caused by missing timeouts in helpers.
+        actionTimeout: process.env.CI ? 20_000 : 0,
+        navigationTimeout: process.env.CI ? 30_000 : 0,
     },
 
     /* Configure projects for major browsers */

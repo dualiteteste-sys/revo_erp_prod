@@ -19,6 +19,13 @@ const ops403Dedupe = new Map<string, number>();
 const OPS403_DEDUPE_MS = 10_000;
 const opsAppErrorsDedupe = new Map<string, number>();
 const OPS_APP_ERRORS_DEDUPE_MS = 10_000;
+const IS_TEST_ENV =
+  // Vitest (Vite-powered) sets MODE=test
+  import.meta.env.MODE === "test" ||
+  // Some setups expose VITEST=true
+  import.meta.env.VITEST === "true" ||
+  // Fallback for node test runners
+  (typeof process !== "undefined" && Boolean((process as any).env?.VITEST));
 
 function classifyOps403(code: string | null, message: string): string {
   const msg = String(message || "").toLowerCase();
@@ -41,6 +48,7 @@ async function logOps403FetchBestEffort(input: {
   headers: Headers;
 }) {
   try {
+    if (IS_TEST_ENV) return;
     const now = Date.now();
     const key = `${input.rpcFn}|${input.route ?? ""}|${input.code ?? ""}|${input.message}`;
     const last = ops403Dedupe.get(key) ?? 0;
@@ -84,6 +92,7 @@ async function logOpsAppErrorFetchBestEffort(input: {
   headers: Headers;
 }) {
   try {
+    if (IS_TEST_ENV) return;
     const now = Date.now();
     const key = `${input.source}|${input.method}|${input.status}|${input.code ?? ""}|${input.route ?? ""}|${input.url.split("?")[0]}|${input.message}`;
     const last = opsAppErrorsDedupe.get(key) ?? 0;
@@ -125,9 +134,10 @@ async function logOpsAppErrorFetchBestEffort(input: {
  */
 export const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey, {
   auth: {
-    persistSession: true,
-    autoRefreshToken: true,
-    detectSessionInUrl: true,
+    // In unit tests, avoid background timers/session persistence that can keep the process alive.
+    persistSession: IS_TEST_ENV ? false : true,
+    autoRefreshToken: IS_TEST_ENV ? false : true,
+    detectSessionInUrl: IS_TEST_ENV ? false : true,
   },
   global: {
     fetch: async (input, init) => {
