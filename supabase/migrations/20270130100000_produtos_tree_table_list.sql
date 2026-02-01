@@ -2,6 +2,12 @@
 -- Objetivo: Paginar por pais, expandir/contrair variações, e permitir busca por variação sem perder agrupamento.
 -- "Estado da Arte": RPC-first, multi-tenant, SECURITY DEFINER, sem acesso direto a tabelas no frontend.
 
+-- NOTE (CI Clean Slate):
+-- A função `produtos_variantes_list_for_current_user(uuid)` já existe em migrações anteriores com outro `RETURNS TABLE`.
+-- `CREATE OR REPLACE FUNCTION` não permite alterar o return type (erro 42P13).
+-- Para manter o histórico de migrações e permitir clean-slate, fazemos DROP explícito antes do CREATE.
+drop function if exists public.produtos_variantes_list_for_current_user(uuid);
+
 
 
 -- 1) Listar/paginar somente produtos "pai" (produto_pai_id IS NULL), com children_count.
@@ -173,6 +179,5 @@ begin
   order by p.nome;
 end;
 $$;
-
 
 
