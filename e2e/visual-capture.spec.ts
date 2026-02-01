@@ -11,7 +11,8 @@ test('QA+-02: captura visual (artefatos) — landing + login', async ({ page }) 
   await ensureDir(outDir);
 
   await page.goto('/');
-  await expect(page.getByRole('link', { name: 'REVO ERP', exact: true })).toBeVisible();
+  // Rebranding/variações de markup: valida pelo CTA "Entrar" (link ou botão).
+  await expect(page.locator('a:has-text("Entrar"), button:has-text("Entrar")').first()).toBeVisible();
   await page.waitForTimeout(250);
   await page.screenshot({ path: path.join(outDir, 'landing.png'), fullPage: true });
 

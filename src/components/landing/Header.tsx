@@ -33,10 +33,10 @@ const Header: React.FC<HeaderProps> = ({ onLoginClick }) => {
 
   const handleLinkClick = (href: string) => {
     if (href.startsWith('#')) {
-        const element = document.querySelector(href);
-        if (element) {
-            element.scrollIntoView({ behavior: 'smooth' });
-        }
+      const element = document.querySelector(href);
+      if (element) {
+        element.scrollIntoView({ behavior: 'smooth' });
+      }
     } else {
       navigate(href);
     }
@@ -46,17 +46,16 @@ const Header: React.FC<HeaderProps> = ({ onLoginClick }) => {
   return (
     <>
       <header
-        className={`fixed top-0 left-0 right-0 z-40 transition-all duration-300 ${
-          isScrolled ? 'bg-white/70 backdrop-blur-xl border-b border-slate-200/60' : 'bg-transparent'
-        }`}
+        className={`fixed top-0 left-0 right-0 z-40 transition-all duration-300 ${isScrolled ? 'bg-white/70 backdrop-blur-xl border-b border-slate-200/60' : 'bg-transparent'
+          }`}
       >
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between h-16">
-            <div className="flex-shrink-0 flex items-center gap-3">
-              <Link to="/" aria-label="REVO ERP Home">
-                <RevoLogo className="h-7 w-auto text-gray-900" />
+          <div className="flex items-center justify-between h-20">
+            <div className="flex-shrink-0 flex h-full items-center gap-3">
+              <Link to="/" aria-label="Ultria Home">
+                <RevoLogo className="h-12 w-auto text-gray-900" />
               </Link>
-              <div className="flex items-center">
+              <div className="flex h-full items-end pb-5">
                 <span className="hidden sm:inline-flex items-center gap-2 rounded-full bg-blue-600/10 text-blue-700 px-3 py-1 text-xs font-semibold ring-1 ring-blue-600/20">
                   <span className="inline-flex h-2 w-2 rounded-full bg-blue-600" aria-hidden="true" />
                   Versão beta
@@ -73,14 +72,14 @@ const Header: React.FC<HeaderProps> = ({ onLoginClick }) => {
                 </button>
                 <AnimatePresence>
                   {isProductsMenuOpen && (
-                    <motion.div 
+                    <motion.div
                       initial={{ opacity: 0, y: -10 }}
                       animate={{ opacity: 1, y: 0 }}
                       exit={{ opacity: 0, y: -10 }}
                       className="absolute top-full mt-2 w-56 rounded-2xl bg-white shadow-xl ring-1 ring-black/5 p-2"
                     >
-                      <Link to="/" className="block px-3 py-2 rounded-xl text-sm text-slate-700 hover:bg-slate-50">REVO ERP</Link>
-                      <Link to="/revo-fluxo" className="block px-3 py-2 rounded-xl text-sm text-slate-700 hover:bg-slate-50">REVO Fluxo</Link>
+                      <Link to="/" className="block px-3 py-2 rounded-xl text-sm text-slate-700 hover:bg-slate-50">Ultria</Link>
+                      <Link to="/revo-fluxo" className="block px-3 py-2 rounded-xl text-sm text-slate-700 hover:bg-slate-50">Ultria Fluxo</Link>
                     </motion.div>
                   )}
                 </AnimatePresence>
@@ -136,8 +135,8 @@ const Header: React.FC<HeaderProps> = ({ onLoginClick }) => {
               <div className="px-3 py-2">
                 <h3 className="text-xs font-semibold text-slate-500 tracking-wide">Produtos</h3>
                 <div className="mt-2 space-y-1">
-                  <Link to="/" className="block px-3 py-2 rounded-xl text-base font-medium text-slate-800 hover:bg-slate-50">REVO ERP</Link>
-                  <Link to="/revo-fluxo" className="block px-3 py-2 rounded-xl text-base font-medium text-slate-800 hover:bg-slate-50">REVO Fluxo</Link>
+                  <Link to="/" className="block px-3 py-2 rounded-xl text-base font-medium text-slate-800 hover:bg-slate-50">Ultria</Link>
+                  <Link to="/revo-fluxo" className="block px-3 py-2 rounded-xl text-base font-medium text-slate-800 hover:bg-slate-50">Ultria Fluxo</Link>
                 </div>
               </div>
               {navLinks.map((link) => (

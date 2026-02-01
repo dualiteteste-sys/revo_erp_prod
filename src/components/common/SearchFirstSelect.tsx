@@ -52,6 +52,7 @@ export default function SearchFirstSelect({
 
   const inputRef = useRef<HTMLInputElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const searchSeqRef = useRef(0);
 
   const debouncedQuery = useDebounce(query, 300);
 
@@ -62,6 +63,14 @@ export default function SearchFirstSelect({
       setQuery('');
     }
   }, [value, initialLabel]);
+
+  useEffect(() => {
+    if (disabled) {
+      setOpen(false);
+      setHits([]);
+      setLoading(false);
+    }
+  }, [disabled]);
 
   useEffect(() => {
     const handleDocClick = (e: MouseEvent) => {
@@ -111,17 +120,22 @@ export default function SearchFirstSelect({
         return;
       }
       if (value) return;
+      if (disabled) return;
+      const seq = ++searchSeqRef.current;
       setLoading(true);
       try {
         const res = await search(q, limit);
+        if (seq !== searchSeqRef.current) return;
         setHits(res);
-        setOpen(true);
+        if (inputRef.current && document.activeElement === inputRef.current) {
+          setOpen(true);
+        }
       } finally {
-        setLoading(false);
+        if (seq === searchSeqRef.current) setLoading(false);
       }
     };
     void doSearch();
-  }, [debouncedQuery, minChars, limit, search, value]);
+  }, [debouncedQuery, disabled, minChars, limit, search, value]);
 
   const showCreateRow = useMemo(() => {
     if (!onCreate || !createLabel) return false;
@@ -152,7 +166,12 @@ export default function SearchFirstSelect({
               className="px-4 py-3 text-left hover:bg-blue-50 flex flex-col border-b border-gray-50 last:border-0 transition-colors"
               onMouseDown={(e) => {
                 e.preventDefault();
+                // invalida buscas pendentes que poderiam reabrir a lista após seleção
+                searchSeqRef.current++;
                 onSelect(h);
+                setHits([]);
+                setQuery('');
+                setLoading(false);
                 setOpen(false);
               }}
             >
@@ -175,7 +194,11 @@ export default function SearchFirstSelect({
               className="w-full px-4 py-3 text-left hover:bg-blue-50 flex items-center gap-3 transition-colors"
               onMouseDown={(e) => {
                 e.preventDefault();
+                searchSeqRef.current++;
                 onCreate?.({ q });
+                setHits([]);
+                setQuery('');
+                setLoading(false);
                 setOpen(false);
               }}
             >
@@ -234,6 +257,13 @@ export default function SearchFirstSelect({
           onFocus={() => {
             if (query.trim().length >= minChars && (hits.length > 0 || showCreateRow)) setOpen(true);
           }}
+          onKeyDown={(e) => {
+            if (e.key === 'Escape') {
+              e.preventDefault();
+              e.stopPropagation();
+              setOpen(false);
+            }
+          }}
           disabled={disabled}
         />
         {loading ? (
@@ -246,4 +276,3 @@ export default function SearchFirstSelect({
     </div>
   );
 }
-

@@ -5,7 +5,11 @@ import { getLastRequestId } from "@/lib/requestId";
 import { getRecentNetworkErrors } from "@/lib/telemetry/networkErrors";
 import { getLastUserAction, setupLastUserActionTracking } from "@/lib/telemetry/lastUserAction";
 
-type AnyFunction = (...args: any[]) => any;
+type AnyFunction = (...args: unknown[]) => unknown;
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
 
 function safeToString(value: unknown) {
   try {
@@ -35,12 +39,17 @@ export function setupGlobalErrorHandlers() {
       if (now - last < DEDUPE_WINDOW_MS) return;
       recentlySent.set(key, now);
 
-      const safe = sanitizeLogData({ message: params.message, context: params.context ?? {} }) as any;
+      const safe = sanitizeLogData({ message: params.message, context: params.context ?? {} });
+      const safeObj = isRecord(safe) ? safe : null;
+      const safeMessage = safeObj?.message;
+      const safeContextRaw = safeObj?.context;
+      const safeContext = isRecord(safeContextRaw) ? safeContextRaw : {};
+
       void supabase.rpc("log_app_event", {
         p_level: "error",
         p_event: params.event,
-        p_message: String(safe?.message ?? params.message),
-        p_context: (safe?.context ?? {}) as any,
+        p_message: String(typeof safeMessage === "string" ? safeMessage : params.message),
+        p_context: safeContext,
         p_source: "ui",
       });
     } catch {
@@ -137,7 +146,7 @@ export function setupGlobalErrorHandlers() {
   const originalConsoleWarn = console.warn.bind(console);
 
   console.error = ((...args: unknown[]) => {
-    const safeArgs = sanitizeLogData(args) as any;
+    const safeArgs = sanitizeLogData(args);
     trySendOpsSystemError({
       source: "console.error",
       message: safeToString(args[0]),
@@ -154,12 +163,12 @@ export function setupGlobalErrorHandlers() {
       context: { args: (Array.isArray(safeArgs) ? safeArgs : []).slice(0, 5) },
     });
     logger.error("[console.error]", args[0], { args: safeArgs });
-    if (!isProd) originalConsoleError(...(args as any[]));
+    if (!isProd) originalConsoleError(...args);
   }) as AnyFunction;
 
   console.warn = ((...args: unknown[]) => {
-    logger.warn("[console.warn]", { args: sanitizeLogData(args) as any });
-    if (!isProd) originalConsoleWarn(...(args as any[]));
+    logger.warn("[console.warn]", { args: sanitizeLogData(args) });
+    if (!isProd) originalConsoleWarn(...args);
   }) as AnyFunction;
 
   const originalAlert = window.alert?.bind(window);
