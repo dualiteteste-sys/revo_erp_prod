@@ -118,10 +118,6 @@ as $$
 $$;
 
 -- 2) Variantes: incluir resumo de atributos para diferenciar rapidamente (ex.: "Cor: Azul • Tam: G").
--- Nota: esta migração altera o retorno da função para incluir `atributos_summary`.
--- Como Postgres não permite mudar `RETURNS TABLE(...)` via CREATE OR REPLACE quando a rowtype muda,
--- fazemos DROP + CREATE (seguro porque o nome/contrato é usado somente pela app).
-drop function if exists public.produtos_variantes_list_for_current_user(uuid);
 create or replace function public.produtos_variantes_list_for_current_user(p_produto_pai_id uuid)
 returns table(
   id uuid,
@@ -177,5 +173,6 @@ begin
   order by p.nome;
 end;
 $$;
+
 
 
