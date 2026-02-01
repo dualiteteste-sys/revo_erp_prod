@@ -100,10 +100,17 @@ jobs:
           fi
 
   unit-tests:
-    name: Unit tests
+    name: Unit tests (shard ${{ matrix.shard }}/${{ matrix.total }})
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    # Unit tests were taking too long in CI when run as a single job.
+    # We shard them to keep the gate fast without reducing coverage.
+    timeout-minutes: 35
     needs: [changes]
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3, 4, 5, 6, 7, 8]
+        total: [8]
     steps:
       - uses: actions/checkout@v4
 
@@ -142,14 +149,14 @@ jobs:
         run: |
           set -euo pipefail
           yarn verify:bundle
-          yarn test --run
+          yarn vitest --run --shard=${{ matrix.shard }}/${{ matrix.total }}
           yarn build
 
       - name: Unit tests
         if: needs.changes.outputs.ci_only != 'true' && (needs.changes.outputs.landing_only != 'true' || github.event_name == 'workflow_dispatch')
         env:
           CI: true
-        run: yarn test --run
+        run: yarn vitest --run --shard=${{ matrix.shard }}/${{ matrix.total }}
 
   e2e-release-gate:
     name: E2E gate (all) [shard ${{ matrix.shard }}/${{ matrix.total }}]

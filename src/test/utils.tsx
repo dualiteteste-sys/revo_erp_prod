@@ -7,13 +7,48 @@ import { ToastProvider } from '../contexts/ToastProvider';
 import { ConfirmProvider } from '../contexts/ConfirmProvider';
 import { SupabaseProvider } from '../providers/SupabaseProvider';
 
-const createTestQueryClient = () => new QueryClient({
+const _testQueryClients = new Set<QueryClient>();
+
+export function cleanupTestQueryClients() {
+    for (const qc of _testQueryClients) {
+        try {
+            qc.cancelQueries();
+            qc.cancelMutations?.();
+        } catch {
+            // best-effort
+        }
+        try {
+            qc.getQueryCache().clear();
+            qc.getMutationCache().clear();
+            qc.clear();
+        } catch {
+            // best-effort
+        }
+    }
+    _testQueryClients.clear();
+}
+
+const createTestQueryClient = () => {
+    const qc = new QueryClient({
     defaultOptions: {
         queries: {
             retry: false, // Turn off retries for testing
+            // Avoid timers that keep the process alive after tests finish.
+            gcTime: Infinity,
+            staleTime: Infinity,
+            refetchOnWindowFocus: false,
+            refetchOnReconnect: false,
+            refetchOnMount: false,
+        },
+        mutations: {
+            gcTime: Infinity,
+            retry: false,
         },
     },
-});
+    });
+    _testQueryClients.add(qc);
+    return qc;
+};
 
 interface ExtendedRenderOptions extends Omit<RenderOptions, 'wrapper'> {
     route?: string;
@@ -76,6 +111,7 @@ export function renderWithProviders(
 
     return {
         user: undefined, // Setup userEvent if needed later
+        queryClient,
         ...render(ui, { wrapper: Wrapper, ...renderOptions }),
     };
 }

@@ -1,4 +1,4 @@
-import { http, HttpResponse, passthrough } from 'msw';
+import { http, HttpResponse } from 'msw';
 import { supabaseUrl } from '../../lib/supabaseClient';
 
 export const handlers = [
@@ -173,9 +173,12 @@ export const handlers = [
         });
     }),
 
-    // Catch-all for debugging
+    // Catch-all: tests must never hit real network.
     http.all('*', async ({ request }) => {
         console.log('[MSW] Unhandled request:', request.method, request.url);
-        return passthrough();
+        return HttpResponse.json(
+            { error: 'Unhandled request', method: request.method, url: request.url },
+            { status: 500 }
+        );
     }),
 ];

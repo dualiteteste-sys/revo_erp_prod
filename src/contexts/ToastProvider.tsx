@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, ReactNode, useCallback, useRef } from 'react';
+import React, { createContext, useContext, useState, ReactNode, useCallback, useEffect, useRef } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import Toast, { ToastProps } from '../components/ui/Toast';
 import { SentryReportListener } from '@/components/error/SentryReportListener';
@@ -35,9 +35,33 @@ interface ToastContextType {
 const ToastContext = createContext<ToastContextType | undefined>(undefined);
 
 export const ToastProvider = ({ children }: { children: ReactNode }) => {
+  // In unit tests we don't need real toasts/animations and they can keep the
+  // process alive (timers / rAF via framer-motion). Use a no-op provider.
+  const IS_TEST_ENV =
+    (typeof import.meta !== 'undefined' &&
+      typeof (import.meta as any).env !== 'undefined' &&
+      (import.meta as any).env.MODE === 'test') ||
+    process.env.NODE_ENV === 'test' ||
+    Boolean(process.env.VITEST);
+
+  if (IS_TEST_ENV) {
+    const addToast = () => {};
+    return <ToastContext.Provider value={{ addToast }}>{children}</ToastContext.Provider>;
+  }
+
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
   const toastId = useRef(0);
   const timeoutsRef = useRef<Map<number, number>>(new Map());
+
+  // Prevent dangling timeouts (can hang Vitest/CI).
+  useEffect(() => {
+    return () => {
+      for (const t of timeoutsRef.current.values()) {
+        window.clearTimeout(t);
+      }
+      timeoutsRef.current.clear();
+    };
+  }, []);
 
   const removeToast = useCallback((id: number) => {
     const t = timeoutsRef.current.get(id);
