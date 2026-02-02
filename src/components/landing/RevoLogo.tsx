@@ -1,12 +1,15 @@
 import React from 'react';
 
-const RevoLogo: React.FC<React.ImgHTMLAttributes<HTMLImageElement>> = (props) => (
-  <img
-    src="/ultria-logo.png"
-    alt="Ultria"
-    {...props}
-    className={props.className || "h-8 w-auto"}
-  />
-);
+type RevoLogoVariant = 'full' | 'icon';
+
+type RevoLogoProps = React.ImgHTMLAttributes<HTMLImageElement> & {
+  variant?: RevoLogoVariant;
+};
+
+const RevoLogo: React.FC<RevoLogoProps> = ({ variant = 'full', className, ...rest }) => {
+  const src = variant === 'icon' ? '/ultria-logo.png' : '/ultria-logo-full.png';
+
+  return <img src={src} alt="Ultria" {...rest} className={className || 'h-8 w-auto'} />;
+};
 
 export default RevoLogo;
