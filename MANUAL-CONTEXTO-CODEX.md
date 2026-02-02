@@ -24,6 +24,17 @@ Objetivo: quando uma nova janela de contexto for aberta, este documento deve ser
 - Qualquer ajuste que envolva banco/Supabase deve virar migration em `supabase/migrations/*` (nada de ajuste manual “só em prod”).
 - O ciclo padrão é: **commit → push em `dev` → Actions verdes → merge para `main` → Actions verdes**.
 
+### 3.1.0 `main` só via PR vindo de `dev`
+
+- **Regra:** `main` só recebe mudanças via **Pull Request `dev → main`**.
+- **Proibido:** merge direto de `feature/* → main`, hotfix direto em `main`, force-push em `main`.
+- **Motivo:** reduz drift entre ambientes e garante que o que foi validado em `dev` é o que chega em PROD.
+- **Como blindar (GitHub Branch Protection):**
+  - Exigir PR antes de merge.
+  - Exigir checks verdes.
+  - Exigir branch “up to date” antes de merge.
+  - Desabilitar force pushes e deletions em `main` (inclusive para admins, quando possível).
+
 ### 3.1.1 Branch `dev` é permanente (nunca excluir)
 
 - A branch `dev` é **long-lived** e serve como trilho de integração antes de `main`. **Nunca excluir** a branch `dev`.
