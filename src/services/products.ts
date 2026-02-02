@@ -109,7 +109,23 @@ export async function saveProduct(productData: ProductPayload, empresaId: string
     }
   } catch (error: any) {
     console.error('[RPC] [SAVE_PRODUCT] error:', error);
-    throw new Error(error.message || 'Não foi possível salvar o produto.');
+    const msg = String(error?.message ?? '');
+    const code = String(error?.code ?? '');
+    // UX "estado da arte": se SKU já existe, sugerir automaticamente o próximo e orientar o usuário.
+    if ((code === '23505' || /duplicate key/i.test(msg)) && /idx_produtos_empresa_sku_unique/i.test(msg)) {
+      const currentSku = String(normalizedPayload?.sku ?? '').trim();
+      try {
+        const suggested = await callRpc<string>('produtos_sku_suggest_next_for_current_user', {
+          p_current_sku: currentSku,
+          p_width: 3,
+        } as any);
+        const nice = suggested && suggested !== currentSku ? ` Sugestão: ${suggested}.` : '';
+        throw new Error(`SKU já existe nesta empresa.${nice} Altere o SKU e tente novamente.`);
+      } catch {
+        throw new Error('SKU já existe nesta empresa. Altere o SKU e tente novamente.');
+      }
+    }
+    throw new Error(msg || 'Não foi possível salvar o produto.');
   }
 }
 

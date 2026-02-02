@@ -304,7 +304,7 @@ begin
     payload->>'codigo_enquadramento_legal_ipi',
     payload->>'ex_tipi',
     payload->>'observacoes_internas',
-    payload->>'sku',
+    nullif(trim(payload->>'sku'), ''),
     payload->>'gtin',
     payload->>'descricao',
     nullif(payload->>'cfop_padrao',''),
@@ -527,4 +527,3 @@ $function$;
 select pg_notify('pgrst', 'reload schema');
 
 COMMIT;
-
