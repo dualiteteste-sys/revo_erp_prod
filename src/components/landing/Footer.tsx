@@ -39,7 +39,7 @@ const Footer: React.FC = () => {
           </div>
         </div>
         <div className="mt-12 border-t border-slate-200 pt-8 flex flex-col md:flex-row justify-between items-center">
-          <RevoLogo className="h-12 w-auto text-slate-900" />
+          <RevoLogo className="h-11 w-auto scale-95 text-slate-900" />
           <p className="mt-4 md:mt-0 text-sm text-slate-500">&copy; 2026 Ultria. Todos os direitos reservados.</p>
         </div>
       </div>

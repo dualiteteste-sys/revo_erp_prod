@@ -53,7 +53,7 @@ const Header: React.FC<HeaderProps> = ({ onLoginClick }) => {
           <div className="flex items-center justify-between h-20">
             <div className="flex-shrink-0 flex h-full items-center gap-3">
               <Link to="/" aria-label="Ultria Home">
-                <RevoLogo className="h-12 w-auto text-gray-900" />
+                <RevoLogo className="h-11 w-auto scale-95 text-gray-900" />
               </Link>
               <div className="flex h-full items-end pb-5">
                 <span className="hidden sm:inline-flex items-center gap-2 rounded-full bg-blue-600/10 text-blue-700 px-3 py-1 text-xs font-semibold ring-1 ring-blue-600/20">
