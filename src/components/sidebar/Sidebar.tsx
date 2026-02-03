@@ -110,7 +110,7 @@ const Sidebar: React.FC<SidebarProps> = ({ isCollapsed, setIsCollapsed, onOpenSe
       <GlassCard className="h-full flex flex-col p-4">
         {/* HEADER */}
         <div className={`h-[88px] flex-shrink-0 flex items-center ${isCollapsed ? 'justify-center' : 'px-0'}`}>
-          <RevoLogo className="h-8 w-auto text-gray-800" />
+          <RevoLogo className="h-10 w-auto scale-95 text-gray-800" />
         </div>
         <div className="px-0 py-4 border-y border-white/20">
           <CompanySwitcher isCollapsed={isCollapsed} onOpenCreateCompanyModal={onOpenCreateCompanyModal} />

@@ -13,7 +13,7 @@ const AuthLayout = () => {
       >
         <div className="bg-white border border-gray-200 rounded-2xl shadow-lg p-8">
           <div className="flex justify-center mb-8">
-            <RevoLogo className="h-8 w-auto text-gray-800" />
+            <RevoLogo className="h-10 w-auto scale-95 text-gray-800" />
           </div>
           <Outlet />
         </div>

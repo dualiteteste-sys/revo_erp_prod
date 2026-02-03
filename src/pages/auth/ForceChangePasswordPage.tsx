@@ -109,7 +109,7 @@ export default function ForceChangePasswordPage() {
       >
         <div className="bg-glass-200 backdrop-blur-xl border border-white/30 rounded-3xl shadow-glass-lg p-8">
           <div className="flex justify-center mb-6">
-            <RevoLogo className="h-8 w-auto text-gray-800" />
+            <RevoLogo className="h-10 w-auto scale-95 text-gray-800" />
           </div>
 
           <h1 className="text-2xl font-bold text-center text-gray-800 mb-2">Trocar senha no primeiro acesso</h1>
@@ -159,4 +159,3 @@ export default function ForceChangePasswordPage() {
     </div>
   );
 }
-
