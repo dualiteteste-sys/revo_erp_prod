@@ -44,11 +44,6 @@ export const ToastProvider = ({ children }: { children: ReactNode }) => {
     typeof (import.meta as any).env !== 'undefined' &&
     (((import.meta as any).env.MODE as string | undefined) === 'test' || Boolean((import.meta as any).env.VITEST));
 
-  if (IS_TEST_ENV) {
-    const addToast = () => {};
-    return <ToastContext.Provider value={{ addToast }}>{children}</ToastContext.Provider>;
-  }
-
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
   const toastId = useRef(0);
   const timeoutsRef = useRef<Map<number, number>>(new Map());
@@ -73,6 +68,7 @@ export const ToastProvider = ({ children }: { children: ReactNode }) => {
   }, []);
 
   const addToast = useCallback((message: string, type: ToastType, titleOrOptions?: string | ToastOptions) => {
+    if (IS_TEST_ENV) return;
     const id = toastId.current++;
     const options: ToastOptions =
       typeof titleOrOptions === 'string'
@@ -94,7 +90,11 @@ export const ToastProvider = ({ children }: { children: ReactNode }) => {
       removeToast(id);
     }, durationMs);
     timeoutsRef.current.set(id, t);
-  }, [removeToast]);
+  }, [IS_TEST_ENV, removeToast]);
+
+  if (IS_TEST_ENV) {
+    return <ToastContext.Provider value={{ addToast }}>{children}</ToastContext.Provider>;
+  }
 
   return (
     <ToastContext.Provider value={{ addToast }}>

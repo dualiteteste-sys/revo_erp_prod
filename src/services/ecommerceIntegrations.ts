@@ -1,12 +1,16 @@
 import { callRpc } from '@/lib/api';
 
-export type EcommerceProvider = 'meli' | 'shopee';
+export type EcommerceProvider = 'meli' | 'shopee' | 'woo';
 
 export type EcommerceConnectionConfig = {
   import_orders?: boolean;
   sync_stock?: boolean;
   push_tracking?: boolean;
   safe_mode?: boolean;
+  store_url?: string;
+  deposito_id?: string;
+  base_tabela_preco_id?: string;
+  price_percent_default?: number;
   [key: string]: unknown;
 };
 
@@ -93,4 +97,16 @@ export async function getEcommerceHealthSummary(): Promise<EcommerceHealthSummar
 
 export async function getEcommerceConnectionDiagnostics(provider: EcommerceProvider): Promise<EcommerceConnectionDiagnostics> {
   return callRpc<EcommerceConnectionDiagnostics>('ecommerce_connection_diagnostics', { p_provider: provider });
+}
+
+export async function setWooConnectionSecrets(params: {
+  ecommerceId: string;
+  consumerKey: string;
+  consumerSecret: string;
+}): Promise<void> {
+  await callRpc('ecommerce_woo_set_secrets', {
+    p_ecommerce_id: params.ecommerceId,
+    p_consumer_key: params.consumerKey,
+    p_consumer_secret: params.consumerSecret,
+  });
 }

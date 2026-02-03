@@ -13,6 +13,7 @@ import {
   getEcommerceConnectionDiagnostics,
   getEcommerceHealthSummary,
   listEcommerceConnections,
+  setWooConnectionSecrets,
   upsertEcommerceConnection,
   updateEcommerceConnectionConfig,
   type EcommerceHealthSummary,
@@ -21,17 +22,21 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Switch } from '@/components/ui/switch';
 import { listEcommerceProductMappings, upsertEcommerceProductMapping, type EcommerceProductMappingRow } from '@/services/ecommerceCatalog';
 import Input from '@/components/ui/forms/Input';
+import Select from '@/components/ui/forms/Select';
 import RoadmapButton from '@/components/roadmap/RoadmapButton';
 import ResizableSortableTh, { type SortState } from '@/components/ui/table/ResizableSortableTh';
 import TableColGroup from '@/components/ui/table/TableColGroup';
 import { useTableColumnWidths, type TableColumnWidthDef } from '@/components/ui/table/useTableColumnWidths';
 import { sortRows, toggleSort } from '@/components/ui/table/sortUtils';
+import { listDepositos } from '@/services/suprimentos';
+import { listTabelasPreco } from '@/services/pricing';
 
-type Provider = 'meli' | 'shopee';
+type Provider = 'meli' | 'shopee' | 'woo';
 
 const providerLabels: Record<Provider, string> = {
   meli: 'Mercado Livre',
   shopee: 'Shopee',
+  woo: 'WooCommerce',
 };
 
 function statusBadge(status?: string | null) {
@@ -74,6 +79,12 @@ export default function MarketplaceIntegrationsPage() {
   const [mappings, setMappings] = useState<EcommerceProductMappingRow[]>([]);
   const [savingMapId, setSavingMapId] = useState<string | null>(null);
   const [mappingsSort, setMappingsSort] = useState<SortState<'produto' | 'sku' | 'anuncio'>>({ column: 'produto', direction: 'asc' });
+  const [wooConsumerKey, setWooConsumerKey] = useState('');
+  const [wooConsumerSecret, setWooConsumerSecret] = useState('');
+  const [wooSavingSecrets, setWooSavingSecrets] = useState(false);
+  const [wooDepositos, setWooDepositos] = useState<Array<{ id: string; nome: string }>>([]);
+  const [wooTabelasPreco, setWooTabelasPreco] = useState<Array<{ id: string; nome: string }>>([]);
+  const [wooOptionsLoading, setWooOptionsLoading] = useState(false);
 
   const mappingsColumns: TableColumnWidthDef[] = [
     { id: 'produto', defaultWidth: 320, minWidth: 220 },
@@ -120,6 +131,34 @@ export default function MarketplaceIntegrationsPage() {
   useEffect(() => {
     void fetchAll();
   }, [fetchAll]);
+
+  useEffect(() => {
+    if (!configOpen || !activeConnection) return;
+    if (activeConnection.provider !== 'woo') return;
+
+    let cancelled = false;
+    setWooOptionsLoading(true);
+    void Promise.all([listDepositos({ onlyActive: true }), listTabelasPreco({ q: null })])
+      .then(([deps, tabs]) => {
+        if (cancelled) return;
+        setWooDepositos(deps.map((d) => ({ id: d.id, nome: d.nome })));
+        setWooTabelasPreco(tabs.map((t) => ({ id: t.id, nome: t.nome })));
+      })
+      .catch((e: any) => {
+        if (cancelled) return;
+        addToast(e?.message || 'Falha ao carregar depósitos/tabelas de preço.', 'error');
+        setWooDepositos([]);
+        setWooTabelasPreco([]);
+      })
+      .finally(() => {
+        if (cancelled) return;
+        setWooOptionsLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [activeConnection, addToast, configOpen]);
 
   const byProvider = useMemo(() => {
     const map = new Map<string, EcommerceConnection>();
@@ -180,6 +219,8 @@ export default function MarketplaceIntegrationsPage() {
     if (!conn) return;
     setActiveConnection(conn);
     setDiagnostics(null);
+    setWooConsumerKey('');
+    setWooConsumerSecret('');
     setConfigOpen(true);
   };
 
@@ -190,6 +231,27 @@ export default function MarketplaceIntegrationsPage() {
 
     setTestingProvider(provider);
     try {
+      if (provider === 'woo') {
+        const storeUrl = String(activeConnection.config?.store_url ?? '').trim();
+        if (!storeUrl) {
+          addToast('Informe a URL da loja antes de testar.', 'warning');
+          return;
+        }
+        if (!wooConsumerKey.trim() || !wooConsumerSecret.trim()) {
+          addToast('Informe o Consumer Key/Secret para testar a conexão.', 'warning');
+          return;
+        }
+
+        const { data, error } = await supabase.functions.invoke('woocommerce-test-connection', {
+          body: { store_url: storeUrl, consumer_key: wooConsumerKey.trim(), consumer_secret: wooConsumerSecret.trim() },
+        });
+        if (error) throw error;
+        const ok = (data as any)?.ok === true;
+        setDiagnostics((data as any) ?? null);
+        addToast(ok ? 'Conexão WooCommerce OK.' : 'Conexão WooCommerce falhou. Veja os detalhes.', ok ? 'success' : 'error');
+        return;
+      }
+
       const diag = await getEcommerceConnectionDiagnostics(provider);
       setDiagnostics(diag as any);
       if (diag.status === 'connected' && diag.has_token && !diag.token_expired) {
@@ -208,6 +270,10 @@ export default function MarketplaceIntegrationsPage() {
   const handleAuthorize = async () => {
     if (!activeConnection) return;
     const provider = activeConnection.provider as Provider;
+    if (provider === 'woo') {
+      addToast('WooCommerce não usa OAuth. Informe a URL e as chaves e use “Salvar credenciais”.', 'info');
+      return;
+    }
     if (!supabase) {
       addToast('Supabase client indisponível.', 'error');
       return;
@@ -254,6 +320,35 @@ export default function MarketplaceIntegrationsPage() {
       addToast(e?.message || 'Falha ao salvar configurações.', 'error');
     } finally {
       setSavingConfig(false);
+    }
+  };
+
+  const handleSaveWooSecrets = async () => {
+    if (!activeConnection || activeConnection.provider !== 'woo') return;
+    if (!canManage) {
+      addToast('Sem permissão para gerenciar integrações.', 'warning');
+      return;
+    }
+    if (wooSavingSecrets) return;
+
+    const consumerKey = wooConsumerKey.trim();
+    const consumerSecret = wooConsumerSecret.trim();
+    if (!consumerKey || !consumerSecret) {
+      addToast('Informe o Consumer Key e Consumer Secret.', 'warning');
+      return;
+    }
+
+    setWooSavingSecrets(true);
+    try {
+      await setWooConnectionSecrets({ ecommerceId: activeConnection.id, consumerKey, consumerSecret });
+      addToast('Credenciais salvas.', 'success');
+      setWooConsumerKey('');
+      setWooConsumerSecret('');
+      await fetchAll();
+    } catch (e: any) {
+      addToast(e?.message || 'Falha ao salvar credenciais.', 'error');
+    } finally {
+      setWooSavingSecrets(false);
     }
   };
 
@@ -410,7 +505,7 @@ export default function MarketplaceIntegrationsPage() {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        {(['meli', 'shopee'] as Provider[]).map((provider) => {
+        {(['meli', 'shopee', 'woo'] as Provider[]).map((provider) => {
           const conn = byProvider.get(provider);
           const busy = busyProvider === provider;
           return (
@@ -529,66 +624,229 @@ export default function MarketplaceIntegrationsPage() {
 
               <GlassCard className="p-3">
                 <div className="text-sm font-medium text-gray-900">1) Conectar</div>
-                <div className="mt-1 text-xs text-gray-600">
-                  Clique em “Autorizar no canal” para conectar. Ao voltar, use “Testar conexão” para validar (token/expiração/erro).
-                </div>
-                <div className="mt-3 flex flex-wrap items-center gap-2">
-                  <Button
-                    variant="outline"
-                    className="gap-2"
-                    onClick={() => void handleAuthorize()}
-                    disabled={!canManage || testingProvider === (activeConnection.provider as Provider)}
-                    title={canManage ? 'Abrir autorização do canal' : 'Sem permissão'}
-                  >
-                    <Link2 size={16} />
-                    {testingProvider === (activeConnection.provider as Provider) ? 'Aguarde…' : 'Autorizar no canal'}
-                  </Button>
-                  <Button
-                    variant="outline"
-                    className="gap-2"
-                    onClick={() => void handleTestConnection()}
-                    disabled={testingProvider === (activeConnection.provider as Provider)}
-                  >
-                    <RefreshCw size={16} />
-                    {testingProvider === (activeConnection.provider as Provider) ? 'Testando…' : 'Testar conexão'}
-                  </Button>
-                  <div className="text-xs text-gray-500">
-                    Status atual: <span className="font-medium text-gray-700">{(diagnostics?.status ?? activeConnection.status) || '—'}</span>
-                  </div>
-                </div>
-                {diagnostics ? (
-                  <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
-                    <div className="rounded-lg bg-white/70 border border-gray-100 p-2">
-                      <div className="text-gray-500">Conta</div>
-                      <div className="font-medium text-gray-800">{diagnostics.external_account_id || '—'}</div>
+                {activeConnection.provider === 'woo' ? (
+                  <>
+                    <div className="mt-1 text-xs text-gray-600">
+                      No WooCommerce, a autenticação é feita via <span className="font-medium">Consumer Key/Secret</span> (Woo → Configurações → Avançado →
+                      REST API). As credenciais ficam salvas no servidor (não aparecem novamente).
                     </div>
-                    <div className="rounded-lg bg-white/70 border border-gray-100 p-2">
-                      <div className="text-gray-500">Token</div>
-                      <div className="font-medium text-gray-800">
-                        {diagnostics.has_token
-                          ? diagnostics.token_expired
-                            ? 'Expirado'
-                            : diagnostics.token_expires_soon
-                              ? `Expira em breve${typeof diagnostics.token_expires_in_days === 'number' ? ` (${diagnostics.token_expires_in_days}d)` : ''}`
-                              : 'OK'
-                          : 'Ausente'}
+
+                    <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <Input
+                        label="URL da loja"
+                        value={String(activeConnection.config?.store_url ?? '')}
+                        placeholder="https://sualoja.com.br"
+                        onChange={(e) =>
+                          setActiveConnection((prev) =>
+                            prev ? { ...prev, config: { ...(prev.config ?? {}), store_url: (e.target as HTMLInputElement).value } } : prev,
+                          )
+                        }
+                      />
+                      <div />
+                      <Input
+                        label="Consumer Key"
+                        value={wooConsumerKey}
+                        placeholder="ck_..."
+                        onChange={(e) => setWooConsumerKey((e.target as HTMLInputElement).value)}
+                      />
+                      <Input
+                        label="Consumer Secret"
+                        value={wooConsumerSecret}
+                        placeholder="cs_..."
+                        onChange={(e) => setWooConsumerSecret((e.target as HTMLInputElement).value)}
+                      />
+                    </div>
+
+                    <div className="mt-3 flex flex-wrap items-center gap-2">
+                      <Button
+                        variant="outline"
+                        className="gap-2"
+                        onClick={() => void handleSaveWooSecrets()}
+                        disabled={!canManage || wooSavingSecrets}
+                        title={canManage ? 'Salvar credenciais' : 'Sem permissão'}
+                      >
+                        <Link2 size={16} />
+                        {wooSavingSecrets ? 'Salvando…' : 'Salvar credenciais'}
+                      </Button>
+                      <Button
+                        variant="outline"
+                        className="gap-2"
+                        onClick={() => void handleTestConnection()}
+                        disabled={testingProvider === 'woo'}
+                      >
+                        <RefreshCw size={16} />
+                        {testingProvider === 'woo' ? 'Testando…' : 'Testar conexão'}
+                      </Button>
+                      <div className="text-xs text-gray-500">
+                        Status atual: <span className="font-medium text-gray-700">{(diagnostics?.status ?? activeConnection.status) || '—'}</span>
                       </div>
                     </div>
-                    <div className="rounded-lg bg-white/70 border border-gray-100 p-2">
-                      <div className="text-gray-500">Último sync</div>
-                      <div className="font-medium text-gray-800">
-                        {diagnostics.last_sync_at ? new Date(diagnostics.last_sync_at).toLocaleString('pt-BR') : '—'}
+
+                    {diagnostics ? (
+                      <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+                        <div className="rounded-lg bg-white/70 border border-gray-100 p-2">
+                          <div className="text-gray-500">Loja</div>
+                          <div className="font-medium text-gray-800 truncate" title={diagnostics.store_url || ''}>
+                            {diagnostics.store_url || activeConnection.config?.store_url || '—'}
+                          </div>
+                        </div>
+                        <div className="rounded-lg bg-white/70 border border-gray-100 p-2">
+                          <div className="text-gray-500">Conectividade</div>
+                          <div className="font-medium text-gray-800">{diagnostics.ok ? 'OK' : 'Falhou'}</div>
+                        </div>
+                        <div className="rounded-lg bg-white/70 border border-gray-100 p-2 sm:col-span-2">
+                          <div className="text-gray-500">Mensagem</div>
+                          <div className="font-medium text-gray-800 truncate" title={diagnostics.message || ''}>
+                            {diagnostics.message || '—'}
+                          </div>
+                        </div>
+                      </div>
+                    ) : null}
+                  </>
+                ) : (
+                  <>
+                    <div className="mt-1 text-xs text-gray-600">
+                      Clique em “Autorizar no canal” para conectar. Ao voltar, use “Testar conexão” para validar (token/expiração/erro).
+                    </div>
+                    <div className="mt-3 flex flex-wrap items-center gap-2">
+                      <Button
+                        variant="outline"
+                        className="gap-2"
+                        onClick={() => void handleAuthorize()}
+                        disabled={!canManage || testingProvider === (activeConnection.provider as Provider)}
+                        title={canManage ? 'Abrir autorização do canal' : 'Sem permissão'}
+                      >
+                        <Link2 size={16} />
+                        {testingProvider === (activeConnection.provider as Provider) ? 'Aguarde…' : 'Autorizar no canal'}
+                      </Button>
+                      <Button
+                        variant="outline"
+                        className="gap-2"
+                        onClick={() => void handleTestConnection()}
+                        disabled={testingProvider === (activeConnection.provider as Provider)}
+                      >
+                        <RefreshCw size={16} />
+                        {testingProvider === (activeConnection.provider as Provider) ? 'Testando…' : 'Testar conexão'}
+                      </Button>
+                      <div className="text-xs text-gray-500">
+                        Status atual:{' '}
+                        <span className="font-medium text-gray-700">{(diagnostics?.status ?? activeConnection.status) || '—'}</span>
                       </div>
                     </div>
-                    <div className="rounded-lg bg-white/70 border border-gray-100 p-2">
-                      <div className="text-gray-500">Erro</div>
-                      <div className="font-medium text-gray-800 truncate" title={diagnostics.last_error || ''}>
-                        {diagnostics.last_error || '—'}
+                    {diagnostics ? (
+                      <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+                        <div className="rounded-lg bg-white/70 border border-gray-100 p-2">
+                          <div className="text-gray-500">Conta</div>
+                          <div className="font-medium text-gray-800">{diagnostics.external_account_id || '—'}</div>
+                        </div>
+                        <div className="rounded-lg bg-white/70 border border-gray-100 p-2">
+                          <div className="text-gray-500">Token</div>
+                          <div className="font-medium text-gray-800">
+                            {diagnostics.has_token
+                              ? diagnostics.token_expired
+                                ? 'Expirado'
+                                : diagnostics.token_expires_soon
+                                  ? `Expira em breve${typeof diagnostics.token_expires_in_days === 'number' ? ` (${diagnostics.token_expires_in_days}d)` : ''}`
+                                  : 'OK'
+                              : 'Ausente'}
+                          </div>
+                        </div>
+                        <div className="rounded-lg bg-white/70 border border-gray-100 p-2">
+                          <div className="text-gray-500">Último sync</div>
+                          <div className="font-medium text-gray-800">
+                            {diagnostics.last_sync_at ? new Date(diagnostics.last_sync_at).toLocaleString('pt-BR') : '—'}
+                          </div>
+                        </div>
+                        <div className="rounded-lg bg-white/70 border border-gray-100 p-2">
+                          <div className="text-gray-500">Erro</div>
+                          <div className="font-medium text-gray-800 truncate" title={diagnostics.last_error || ''}>
+                            {diagnostics.last_error || '—'}
+                          </div>
+                        </div>
                       </div>
-                    </div>
-                  </div>
-                ) : null}
+                    ) : null}
+                  </>
+                )}
               </GlassCard>
+
+              {activeConnection.provider === 'woo' ? (
+                <GlassCard className="p-3">
+                  <div className="text-sm font-medium text-gray-900">1.1) Configuração Woo</div>
+                  <div className="mt-1 text-xs text-gray-600">
+                    Defina a base do estoque e da precificação para publicação no WooCommerce. Você pode ajustar manualmente por produto/lote depois (fase posterior).
+                  </div>
+
+                  <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <Select
+                      label="Depósito (estoque)"
+                      name="woo_deposito_id"
+                      value={String(activeConnection.config?.deposito_id ?? '')}
+                      disabled={wooOptionsLoading}
+                      onChange={(e) =>
+                        setActiveConnection((prev) =>
+                          prev
+                            ? { ...prev, config: { ...(prev.config ?? {}), deposito_id: (e.target as HTMLSelectElement).value || null } }
+                            : prev,
+                        )
+                      }
+                    >
+                      <option value="">{wooOptionsLoading ? 'Carregando…' : 'Selecionar…'}</option>
+                      {wooDepositos.map((d) => (
+                        <option key={d.id} value={d.id}>
+                          {d.nome}
+                        </option>
+                      ))}
+                    </Select>
+
+                    <Select
+                      label="Tabela de preço (base)"
+                      name="woo_base_tabela_preco_id"
+                      value={String(activeConnection.config?.base_tabela_preco_id ?? '')}
+                      disabled={wooOptionsLoading}
+                      onChange={(e) =>
+                        setActiveConnection((prev) =>
+                          prev
+                            ? { ...prev, config: { ...(prev.config ?? {}), base_tabela_preco_id: (e.target as HTMLSelectElement).value || null } }
+                            : prev,
+                        )
+                      }
+                    >
+                      <option value="">{wooOptionsLoading ? 'Carregando…' : 'Selecionar…'}</option>
+                      {wooTabelasPreco.map((t) => (
+                        <option key={t.id} value={t.id}>
+                          {t.nome}
+                        </option>
+                      ))}
+                    </Select>
+
+                    <Input
+                      label="Ajuste padrão de preço (%)"
+                      type="number"
+                      inputMode="decimal"
+                      value={String(activeConnection.config?.price_percent_default ?? '')}
+                      placeholder="Ex.: 10"
+                      onChange={(e) =>
+                        setActiveConnection((prev) =>
+                          prev
+                            ? {
+                                ...prev,
+                                config: {
+                                  ...(prev.config ?? {}),
+                                  price_percent_default: (e.target as HTMLInputElement).value === ''
+                                    ? null
+                                    : Number((e.target as HTMLInputElement).value),
+                                },
+                              }
+                            : prev,
+                        )
+                      }
+                    />
+                    <div className="text-xs text-gray-500 leading-relaxed self-end">
+                      Ex.: 10 = +10%. Use 0 para sem ajuste. Valores negativos são permitidos.
+                    </div>
+                  </div>
+                </GlassCard>
+              ) : null}
 
               <div className="space-y-3">
                 <div className="text-sm font-medium text-gray-900">2) Ativar recursos</div>
