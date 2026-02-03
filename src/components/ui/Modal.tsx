@@ -14,6 +14,8 @@ interface ModalProps {
   children: React.ReactNode;
   title: string;
   size?: ModalSize;
+  closeOnBackdropClick?: boolean;
+  closeOnEscape?: boolean;
   containerClassName?: string;
   overlayClassName?: string;
   headerClassName?: string;
@@ -62,6 +64,8 @@ const Modal: React.FC<ModalProps> = ({
   children,
   title,
   size = '7xl',
+  closeOnBackdropClick = false,
+  closeOnEscape = false,
   containerClassName,
   overlayClassName,
   headerClassName,
@@ -100,6 +104,7 @@ const Modal: React.FC<ModalProps> = ({
       if (!isOpen) return;
 
       if (e.key === 'Escape') {
+        if (!closeOnEscape) return;
         e.preventDefault();
         onCloseRef.current();
         return;
@@ -134,7 +139,7 @@ const Modal: React.FC<ModalProps> = ({
       previouslyFocused.current?.focus?.();
       previouslyFocused.current = null;
     };
-  }, [isOpen]);
+  }, [isOpen, closeOnEscape]);
 
   if (typeof document === 'undefined') return null;
 
@@ -155,6 +160,7 @@ const Modal: React.FC<ModalProps> = ({
             !isMobile && overlayClassName,
           )}
           onMouseDown={(e) => {
+            if (!closeOnBackdropClick) return;
             // clique no backdrop fecha (sem fechar ao clicar dentro do modal)
             if (e.target === overlayRef.current) onCloseRef.current();
           }}
