@@ -10,7 +10,7 @@ const RevoLogo: React.FC<RevoLogoProps> = ({ variant = 'full', className, ...res
   const src = variant === 'icon' ? '/ultria-logo.png' : '/ultria-logo-full.png';
 
   // Default size tuned for app
-  return <img src={src} alt="Ultria" {...rest} className={className || 'h-10 w-auto scale-95'} />;
+  return <img src={src} alt="Ultria" {...rest} className={className || 'h-10 w-auto scale-90'} />;
 };
 
 export default RevoLogo;
