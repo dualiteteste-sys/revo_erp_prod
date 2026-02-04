@@ -207,6 +207,11 @@ export default function MarketplaceIntegrationsPage() {
     try {
       await disconnectEcommerceConnection(conn.id);
       addToast('Integração desconectada.', 'success');
+      if (activeConnection?.id === conn.id) {
+        setConfigOpen(false);
+        setActiveConnection(null);
+        setDiagnostics(null);
+      }
       await fetchAll();
     } catch (e: any) {
       addToast(e?.message || 'Falha ao desconectar.', 'error');
@@ -511,8 +516,8 @@ export default function MarketplaceIntegrationsPage() {
           const busy = busyProvider === provider;
           return (
             <GlassCard key={provider} className="p-4">
-              <div className="flex items-start justify-between gap-2">
-                <div>
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
+                <div className="min-w-0">
                   <div className="flex items-center gap-2">
                     <div className="text-lg font-semibold text-gray-900">{providerLabels[provider]}</div>
                     {statusBadge(conn?.status)}
@@ -530,12 +535,12 @@ export default function MarketplaceIntegrationsPage() {
                   ) : null}
                 </div>
 
-                <div className="flex items-center gap-2">
+                <div className="flex w-full flex-wrap items-center justify-start gap-2 sm:w-auto sm:justify-end">
                   {conn ? (
                     <>
                       <Button
                         variant="outline"
-                        className="gap-2"
+                        className="gap-2 whitespace-nowrap"
                         disabled={loading || busy}
                         onClick={() => openConfig(provider)}
                         title="Configurar recursos"
@@ -545,18 +550,18 @@ export default function MarketplaceIntegrationsPage() {
                       </Button>
                       <Button
                         variant="outline"
-                        className="gap-2"
+                        className="gap-2 whitespace-nowrap"
                         disabled={!canManage || loading || busy}
                         onClick={() => void handleDisconnect(provider)}
                         title={canManage ? 'Desconectar' : 'Sem permissão'}
                       >
                         <Unlink size={16} />
-                        Desconectar
+                        {busy ? 'Desconectando…' : 'Desconectar'}
                       </Button>
                     </>
                   ) : (
                     <Button
-                      className="gap-2"
+                      className="gap-2 whitespace-nowrap"
                       disabled={!canManage || loading || busy}
                       onClick={() => void handleConnect(provider)}
                       title={canManage ? 'Iniciar conexão' : 'Sem permissão'}
