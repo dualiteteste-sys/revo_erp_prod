@@ -239,7 +239,7 @@ export default function SystemErrorsPage() {
   const mailtoHref = useMemo(() => {
     if (!sendRow) return "#";
     const body = buildDevMessage(sendRow, { userEmail: sendEmail.trim() || undefined, userNote: sendNote.trim() || undefined });
-    const subject = `Revo ERP Beta — Erro no Sistema (${sendRow.source})`;
+    const subject = `Ultria ERP Beta — Erro no Sistema (${sendRow.source})`;
     return `mailto:bugs@revo.tec.br?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
   }, [sendRow, sendEmail, sendNote]);
 

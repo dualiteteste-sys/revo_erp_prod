@@ -578,7 +578,7 @@ export default function MarketplaceIntegrationsPage() {
               <div className="mt-4 text-sm text-gray-700">
                 <div className="font-medium">Recursos</div>
                 <div className="mt-1 text-xs text-gray-500">
-                  Ative somente o que você quer que o Revo execute automaticamente. O resto fica “manual”.
+                  Ative somente o que você quer que a Ultria execute automaticamente. O resto fica “manual”.
                 </div>
                 <ul className="mt-3 grid grid-cols-1 gap-2 text-sm">
                   <li className="flex items-center justify-between">
@@ -858,12 +858,12 @@ export default function MarketplaceIntegrationsPage() {
 
               <GlassCard className="p-3">
                 <div className="text-sm font-medium text-gray-900">2) Ativar recursos</div>
-                <div className="flex items-center justify-between gap-3">
-                  <div>
-                    <div className="text-sm font-medium text-gray-800">Importar pedidos</div>
-                    <div className="text-xs text-gray-500">Cria pedidos no Revo com canal=marketplace.</div>
-                  </div>
-                  <Switch
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <div className="text-sm font-medium text-gray-800">Importar pedidos</div>
+                      <div className="text-xs text-gray-500">Cria pedidos no Ultria ERP com canal=marketplace.</div>
+                    </div>
+                    <Switch
                     checked={!!activeConnection.config?.import_orders}
                     onCheckedChange={(checked) =>
                       setActiveConnection((prev) => (prev ? { ...prev, config: { ...(prev.config ?? {}), import_orders: checked } } : prev))
@@ -914,7 +914,7 @@ export default function MarketplaceIntegrationsPage() {
               <GlassCard className="p-3">
                 <div className="text-sm font-medium text-gray-900">3) Mapear produtos (recomendado)</div>
                 <div className="mt-1 text-xs text-gray-600">
-                  Para importar itens corretamente, mapeie cada produto do Revo com o ID do anúncio no canal.
+                  Para importar itens corretamente, mapeie cada produto do Ultria ERP com o ID do anúncio no canal.
                 </div>
                 <div className="mt-3 flex justify-end">
 	                  <Button

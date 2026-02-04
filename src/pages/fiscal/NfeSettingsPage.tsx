@@ -639,7 +639,7 @@ export default function NfeSettingsPage({ onEmitenteSaved, onNumeracaoSaved }: P
 	              <div>
 	                <h2 className="text-lg font-bold text-slate-900">Provedor (Focus NF-e)</h2>
 	                <p className="text-sm text-slate-600 mt-1">
-	                  Sem segredos aqui. Tokens ficam na Focus; o Revo recebe atualizações via webhook (Edge Function).
+	                  Sem segredos aqui. Tokens ficam na Focus; a Ultria recebe atualizações via webhook (Edge Function).
 	                </p>
 	              </div>
 	              <Button onClick={handleSaveConfig} disabled={saving || !config || !canAdmin}>

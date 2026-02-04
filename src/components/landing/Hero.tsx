@@ -126,7 +126,7 @@ const Hero: React.FC = () => {
             <GlassCard className="relative rounded-[28px] overflow-hidden bg-glass-200">
               <img
                 src="/landing/hero-dashboard.png"
-                alt="Prévia do dashboard do Revo ERP"
+                alt="Prévia do dashboard do Ultria ERP"
                 className="block w-full h-auto"
                 loading="lazy"
               />

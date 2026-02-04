@@ -173,7 +173,7 @@ const NfeEmissaoSettings: React.FC = () => {
               className="w-full p-3 bg-gray-50 border border-gray-200 rounded-lg text-gray-700"
             />
             <p className="mt-2 text-xs text-gray-500">
-              Configure o webhook no painel da Focus para que o Revo receba os eventos de processamento.
+              Configure o webhook no painel da Focus para que a Ultria receba os eventos de processamento.
             </p>
           </div>
 
