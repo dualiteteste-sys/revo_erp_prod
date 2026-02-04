@@ -513,6 +513,8 @@ export default function MarketplaceIntegrationsPage() {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         {(['meli', 'shopee', 'woo'] as Provider[]).map((provider) => {
           const conn = byProvider.get(provider);
+          const isDisconnected = String(conn?.status ?? '').toLowerCase() === 'disconnected';
+          const hasConnection = !!conn && !isDisconnected;
           const busy = busyProvider === provider;
           return (
             <GlassCard key={provider} className="p-4">
@@ -536,7 +538,7 @@ export default function MarketplaceIntegrationsPage() {
                 </div>
 
                 <div className="flex w-full flex-wrap items-center justify-start gap-2 sm:w-auto sm:justify-end">
-                  {conn ? (
+                  {hasConnection ? (
                     <>
                       <Button
                         variant="outline"
