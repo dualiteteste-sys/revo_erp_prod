@@ -5,10 +5,28 @@ import { getPartners } from './partners';
 
 export type ContaAReceber = {
   id: string;
+  empresa_id?: string | null;
   status: string;
+  descricao?: string | null;
+  observacoes?: string | null;
+
+  cliente_id?: string | null;
+  cliente_nome?: string | null;
+
   valor?: number | null;
   data_vencimento?: string | null;
-  cliente_nome?: string;
+
+  data_pagamento?: string | null;
+  valor_pago?: number | null;
+
+  centro_de_custo_id?: string | null;
+  centro_custo?: string | null;
+
+  origem_tipo?: string | null;
+  origem_id?: string | null;
+
+  created_at?: string | null;
+  updated_at?: string | null;
 } & Record<string, unknown>;
 
 export type ContaAReceberPayload = Partial<ContaAReceber>;
