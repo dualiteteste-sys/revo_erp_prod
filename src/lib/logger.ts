@@ -8,6 +8,10 @@ interface LogContext {
     [key: string]: any;
 }
 
+function isRecord(value: unknown): value is Record<string, any> {
+    return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
 const originalConsole = {
     info: console.info.bind(console),
     warn: console.warn.bind(console),
@@ -36,7 +40,8 @@ class Logger {
     }
 
     info(message: string, context?: LogContext) {
-        const safeContext = sanitizeLogData(context ?? {});
+        const safeRaw = sanitizeLogData(context ?? {});
+        const safeContext = isRecord(safeRaw) ? safeRaw : undefined;
         if (this.isDev) {
             originalConsole.info(`[INFO] ${message}`, safeContext || "");
         }
@@ -51,7 +56,8 @@ class Logger {
     }
 
     warn(message: string, context?: LogContext) {
-        const safeContext = sanitizeLogData(context ?? {});
+        const safeRaw = sanitizeLogData(context ?? {});
+        const safeContext = isRecord(safeRaw) ? safeRaw : undefined;
         if (this.isDev) {
             originalConsole.warn(`[WARN] ${message}`, safeContext || "");
         }
@@ -64,7 +70,8 @@ class Logger {
     }
 
     error(message: string, error?: any, context?: LogContext) {
-        const safeContext = sanitizeLogData(context ?? {});
+        const safeRaw = sanitizeLogData(context ?? {});
+        const safeContext = isRecord(safeRaw) ? safeRaw : undefined;
         if (this.isDev) {
             originalConsole.error(`[ERROR] ${message}`, error || "", safeContext || "");
         }
@@ -72,7 +79,7 @@ class Logger {
         const eventId = Sentry.captureException(error || new Error(message), {
             extra: {
                 message,
-                ...(safeContext as any),
+                ...(safeContext ?? {}),
             },
         });
 

@@ -152,14 +152,15 @@ export default function CompraFormPanel({ compraId, onSaveSuccess, onClose }: Pr
   };
 
   const handleAddItem = async (item: any) => {
-    let currentId = formData.id;
+    let currentId: string | undefined = formData.id ?? undefined;
     if (!currentId) {
-      currentId = await handleSaveHeader();
-      if (!currentId) return;
+      const createdId = await handleSaveHeader();
+      if (!createdId) return;
+      currentId = createdId;
     }
 
     try {
-      await manageCompraItem(currentId!, null, item.id, 1, item.preco_venda || 0, 'upsert');
+      await manageCompraItem(currentId, null, item.id, 1, item.preco_venda || 0, 'upsert');
       await loadDetails(currentId); // Reload to get updated totals and items
       addToast('Item adicionado.', 'success');
     } catch (e: any) {
@@ -215,13 +216,13 @@ export default function CompraFormPanel({ compraId, onSaveSuccess, onClose }: Pr
       addToast('Pedido recebido e estoque atualizado!', 'success');
       onSaveSuccess();
 
-      const wantConta = await confirm({
-        title: 'Gerar Conta a Pagar',
-        description: 'Deseja gerar automaticamente uma Conta a Pagar a partir desta compra recebida?',
-        confirmText: 'Gerar agora',
-        cancelText: 'Agora não',
-        variant: 'default',
-      });
+	      const wantConta = await confirm({
+	        title: 'Gerar Conta a Pagar',
+	        description: 'Deseja gerar automaticamente uma Conta a Pagar a partir desta compra recebida?',
+	        confirmText: 'Gerar agora',
+	        cancelText: 'Agora não',
+	        variant: 'primary',
+	      });
       if (!wantConta) return;
       setParcelamentoOpen(true);
     } catch (e: any) {
@@ -325,8 +326,9 @@ export default function CompraFormPanel({ compraId, onSaveSuccess, onClose }: Pr
 
     let currentId = formData.id;
     if (!currentId) {
-      currentId = await handleSaveHeader();
-      if (!currentId) return;
+      const savedId = await handleSaveHeader();
+      if (!savedId) return;
+      currentId = savedId;
     }
 
     setSugestaoLoading(true);
@@ -382,15 +384,15 @@ export default function CompraFormPanel({ compraId, onSaveSuccess, onClose }: Pr
         <Section title="Dados do Pedido" description="Informações do fornecedor e datas.">
           <div className="sm:col-span-4">
             <label className="block text-sm font-medium text-gray-700 mb-1">Fornecedor</label>
-            <SupplierAutocomplete
-              value={formData.fornecedor_id || null}
-              initialName={formData.fornecedor_nome}
-              onChange={(id, name) => {
-                handleHeaderChange('fornecedor_id', id);
-                if (name) handleHeaderChange('fornecedor_nome', name);
-              }}
-              disabled={isLocked}
-            />
+	            <SupplierAutocomplete
+	              value={formData.fornecedor_id || null}
+	              initialName={formData.fornecedor_nome ?? undefined}
+	              onChange={(id, name) => {
+	                handleHeaderChange('fornecedor_id', id);
+	                if (name) handleHeaderChange('fornecedor_nome' as any, name);
+	              }}
+	              disabled={isLocked}
+	            />
           </div>
           <Select label="Status" name="status" value={formData.status} onChange={e => handleHeaderChange('status', e.target.value)} disabled={isLocked} className="sm:col-span-2">
             <option value="rascunho">Rascunho</option>

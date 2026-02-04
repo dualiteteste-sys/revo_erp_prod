@@ -1,10 +1,21 @@
 import React, { useState, useEffect } from 'react';
-import { Product, ProductInsert, ProductUpdate } from '../../hooks/useProducts';
 import { Loader2 } from 'lucide-react';
 
+export type LegacyProductFormData = {
+  name: string;
+  sku: string;
+  price_cents: number;
+  unit: string;
+  active: boolean;
+};
+
+export type LegacyProduct = LegacyProductFormData & { id?: string };
+export type LegacyProductInsert = LegacyProductFormData;
+export type LegacyProductUpdate = LegacyProductFormData & { id: string };
+
 interface ProductFormProps {
-  product?: Product | null;
-  onSave: (data: ProductInsert | ProductUpdate) => Promise<void>;
+  product?: LegacyProduct | null;
+  onSave: (data: LegacyProductInsert | LegacyProductUpdate) => Promise<void>;
   onCancel: () => void;
   isSaving: boolean;
 }
@@ -60,6 +71,7 @@ const ProductForm: React.FC<ProductFormProps> = ({ product, onSave, onCancel, is
     }
 
     const formData = {
+      ...(product?.id ? { id: product.id } : {}),
       name: name.trim(),
       sku: sku.trim(),
       price_cents: priceInCents,

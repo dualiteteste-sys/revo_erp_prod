@@ -74,11 +74,11 @@ const ProductFormPanel: React.FC<ProductFormPanelProps> = ({ product, initialVal
     return Object.keys(errors).length > 0;
   }, [isSaving, errors]);
 
-  const handleFormChange = (field: keyof ProductFormData, value: any) => {
+  const handleFormChange = (field: any, value: any) => {
     setFormData(prev => ({ ...prev, [field]: value }));
   };
 
-  const isService = useMemo(() => formData.tipo === 'servico', [formData.tipo]);
+  const isService = useMemo(() => String((formData as any).tipo ?? '') === 'servico', [formData.tipo]);
 
   const visibleTabs = useMemo(() => {
     if (isService) {

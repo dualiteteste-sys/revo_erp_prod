@@ -171,7 +171,6 @@ export default function CommandPalette() {
   return (
     <CommandDialog open={open} onOpenChange={setOpen}>
       <CommandInput
-        // @ts-expect-error ref typing from cmdk
         ref={inputRef as any}
         placeholder="Buscar páginas… (Ctrl/Cmd + K)"
         value={query}

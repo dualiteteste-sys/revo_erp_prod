@@ -65,7 +65,7 @@ function categoryLabel(category: SupportNotification['category']) {
 export default function SuportePage() {
   const { session, activeEmpresa } = useAuth();
   const userId = session?.user?.id || '';
-  const userEmail = session?.user?.email || '';
+  const userEmail = (session as any)?.user?.email || '';
   const { addToast } = useToast();
   const [loading, setLoading] = useState(true);
   const [onboarding, setOnboarding] = useState<ChecksRpc | null>(null);

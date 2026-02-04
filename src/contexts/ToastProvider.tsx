@@ -113,23 +113,29 @@ export const ToastProvider = ({ children }: { children: ReactNode }) => {
                   exit={{ opacity: 0, x: 50, scale: 0.9 }}
                   transition={{ duration: 0.3, ease: 'easeOut' }}
                 >
-                  <Toast
-                    type={toast.type}
-                    title={toast.title}
-                    message={toast.message}
-                    actionLabel={toast.action?.label}
-                    actionAriaLabel={toast.action?.ariaLabel}
-                    onAction={toast.action ? async () => {
-                      try {
-                        await toast.action.onClick();
-                      } finally {
-                        removeToast(toast.id);
+                    <Toast
+                      type={toast.type}
+                      title={toast.title}
+                      message={toast.message}
+                      actionLabel={toast.action?.label}
+                      actionAriaLabel={toast.action?.ariaLabel}
+                      onAction={
+                        toast.action
+                          ? async () => {
+                              const action = toast.action;
+                              if (!action) return;
+                              try {
+                                await action.onClick();
+                              } finally {
+                                removeToast(toast.id);
+                              }
+                            }
+                          : undefined
                       }
-                    } : undefined}
-                    onClose={() => removeToast(toast.id)}
-                  />
-                </motion.div>
-              ))}
+                      onClose={() => removeToast(toast.id)}
+                    />
+                  </motion.div>
+                ))}
             </AnimatePresence>
           </div>,
           document.body,

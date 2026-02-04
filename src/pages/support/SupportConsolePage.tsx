@@ -57,10 +57,10 @@ export default function SupportConsolePage() {
     };
   }, []);
 
-  useEffect(() => {
-    if (!canView) return;
-    let mounted = true;
-    (async () => {
+	  useEffect(() => {
+	    if (!canView) return;
+	    let mounted = true;
+	    (async () => {
       setLoading(true);
       try {
         const data = await listSupportTicketsAsStaff(queryParams);
@@ -73,10 +73,10 @@ export default function SupportConsolePage() {
         if (mounted) setLoading(false);
       }
     })();
-    return () => {
-      mounted = false;
-    };
-  }, [canView, queryParams, toast]);
+	    return () => {
+	      mounted = false;
+	    };
+	  }, [canView, queryParams, addToast]);
 
   async function handleSetStatus(ticketId: string, nextStatus: SupportTicketStatus) {
     try {
@@ -88,13 +88,16 @@ export default function SupportConsolePage() {
     }
   }
 
-  return (
-    <PageShell>
-      <PageHeader
-        title="Suporte — Console (equipe)"
-        subtitle="Triagem e acompanhamento de tickets por empresa (uso interno)."
-        icon={<ShieldAlert className="h-5 w-5" />}
-      />
+	  return (
+	    <PageShell
+	      header={
+	        <PageHeader
+	          title="Suporte — Console (equipe)"
+	          description="Triagem e acompanhamento de tickets por empresa (uso interno)."
+	          icon={<ShieldAlert className="h-5 w-5" />}
+	        />
+	      }
+	    >
 
       {!canView && (
         <PageCard className="rounded-2xl">
@@ -190,6 +193,6 @@ export default function SupportConsolePage() {
           </div>
         </PageCard>
       )}
-    </PageShell>
-  );
+	    </PageShell>
+	  );
 }

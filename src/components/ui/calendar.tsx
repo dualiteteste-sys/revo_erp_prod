@@ -23,21 +23,22 @@ function getMonthLabel(monthIndex: number) {
   return label.charAt(0).toUpperCase() + label.slice(1)
 }
 
-function Calendar({
-  className,
-  classNames,
-  showOutsideDays = true,
-  onMonthYearOpenChange,
-  ...props
-}: CalendarWithMonthYearProps) {
-  const [internalMonth, setInternalMonth] = React.useState<Date>(() => {
-    const initial =
-      props.month ??
-      (props.selected instanceof Date ? props.selected : undefined) ??
-      props.defaultMonth ??
-      new Date()
-    return startOfMonth(initial)
-  })
+	function Calendar({
+	  className,
+	  classNames,
+	  showOutsideDays = true,
+	  onMonthYearOpenChange,
+	  ...props
+	}: CalendarWithMonthYearProps) {
+	  const [internalMonth, setInternalMonth] = React.useState<Date>(() => {
+	    const selected = (props as any).selected;
+	    const initial =
+	      props.month ??
+	      (selected instanceof Date ? selected : undefined) ??
+	      props.defaultMonth ??
+	      new Date()
+	    return startOfMonth(initial)
+	  })
 
   const displayedMonth = props.month ? startOfMonth(props.month) : internalMonth
 

@@ -21,13 +21,20 @@ export interface NcmResult {
   descricao: string;
 }
 
+const HTTP_RETRY = {
+  maxAttempts: 3,
+  baseDelayMs: 300,
+  maxDelayMs: 4000,
+  shouldRetry: isRetryableHttpError,
+} as const;
+
 export const searchNcm = async (query: string): Promise<NcmResult[]> => {
   const q = (query ?? '').trim();
   if (q.length < 2) return [];
   const { data } = await withRetry(
     async () =>
       http.get<NcmResult[] | NcmResult>(`https://brasilapi.com.br/api/ncm/v1?search=${encodeURIComponent(q)}`),
-    { maxAttempts: 3, shouldRetry: isRetryableHttpError }
+    HTTP_RETRY
   );
 
   const rawData = Array.isArray(data) ? data : [data].filter(Boolean);
@@ -41,7 +48,7 @@ export const fetchNcmByCode = async (code: string): Promise<NcmResult | null> =>
   try {
     const { data } = await withRetry(
       async () => http.get<NcmResult>(`https://brasilapi.com.br/api/ncm/v1/${cleanCode}`),
-      { maxAttempts: 3, shouldRetry: isRetryableHttpError }
+      HTTP_RETRY
     );
     return data ?? null;
   } catch {
@@ -83,7 +90,7 @@ export const fetchCnpjData = async (cnpj: string): Promise<Partial<CnpjData>> =>
     try {
       const { data } = await withRetry(
         async () => http.get<CnpjData>(`https://brasilapi.com.br/api/cnpj/v1/${cleanedCnpj}`),
-        { maxAttempts: 3, shouldRetry: isRetryableHttpError }
+        HTTP_RETRY
       );
       return data;
     } catch (error: any) {
@@ -119,7 +126,7 @@ export const fetchCepData = async (cep: string): Promise<Partial<CepData>> => {
   try {
     const { data } = await withRetry(
       async () => http.get<CepData>(`https://viacep.com.br/ws/${cleanedCep}/json/`),
-      { maxAttempts: 3, shouldRetry: isRetryableHttpError }
+      HTTP_RETRY
     );
     if (data.erro) {
       throw new Error('CEP não encontrado.');

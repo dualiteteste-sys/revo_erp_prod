@@ -43,7 +43,7 @@ export const useFeatureFlags = (): FeatureFlags => {
       });
 
     } catch (error) {
-      logger.warn('[FeatureFlags] Falha ao buscar flags', error);
+      logger.warn('[FeatureFlags] Falha ao buscar flags', { error });
       setFlags({ revo_send_enabled: false, nfe_emissao_enabled: false, refetch: async () => fetchFlags(empresaId) });
     } finally {
       setLoading(false);

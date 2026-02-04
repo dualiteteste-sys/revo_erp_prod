@@ -33,7 +33,7 @@ const Select = React.forwardRef<HTMLSelectElement, SelectProps>(
           name={name}
           ref={ref}
           {...props}
-          className={cn(selectVariants({ uiSize: uiSize ?? 'default' }), props.className)}
+          className={cn(selectVariants({ uiSize: uiSize ?? 'default' }), className)}
         >
           {children}
         </select>

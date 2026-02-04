@@ -33,7 +33,7 @@ export async function provisionEmpresa(input: ProvisionEmpresaInput): Promise<Em
   console.log('[ONBOARD] hasJWT:', hasJWT, 'input:', input);
   if (!hasJWT) throw new Error('NO_SESSION: usuário não autenticado.');
 
-  const { data, error } = await supabase.rpc('provision_empresa_for_current_user', {
+  const { data, error } = await (supabase as any).rpc('provision_empresa_for_current_user', {
     p_razao_social: input.razao_social,
     p_fantasia: input.fantasia,
     p_email: input.email ?? null,

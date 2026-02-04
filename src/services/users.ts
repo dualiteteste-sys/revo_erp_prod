@@ -6,14 +6,15 @@
 
 import { supabase } from "@/lib/supabaseClient";
 import type { UsersFilters, UserRole, UserStatus } from "@/features/users/types";
+import { callRpc } from "@/lib/api";
 
 /** Modelo exibido na UI */
 export type ListedUser = {
   user_id: string;
-  email: string | null;
+  email: string;
   name: string | null;
-  role: string | null;
-  status: string;
+  role: UserRole;
+  status: UserStatus;
   invited_at: string | null;
   last_sign_in_at: string | null;
 };
@@ -26,8 +27,7 @@ function siteUrl(): string {
   return (import.meta as any)?.env?.VITE_SITE_URL || window.location.origin;
 }
 async function getCurrentEmpresaId(): Promise<string> {
-  const { data, error } = await supabase.rpc("current_empresa_id");
-  if (error) throw error;
+  const data = await callRpc<any>("current_empresa_id", {});
   const id = typeof data === "string" ? data : (data?.id ?? data);
   if (!id) throw new Error("NO_ACTIVE_TENANT");
   return id;
@@ -54,25 +54,14 @@ export async function listUsers(
   const p_status = arrOrNull<UserStatus>(filters?.status) as any;
   const p_role = arrOrNull<UserRole>(filters?.role) as any;
 
-  const { data, error } = await supabase.rpc("list_users_for_current_empresa_v2", {
-    p_limit,
-    p_offset,
-    p_q,
-    p_status,
-    p_role,
-  });
-
-  if (error) {
-    console.error("[USERS] rpc list_users_for_current_empresa_v2 error", error);
-    throw new Error(error.message || "Falha ao listar usuários.");
-  }
+  const data = await callRpc<any[]>("list_users_for_current_empresa_v2", { p_limit, p_offset, p_q, p_status, p_role });
 
   return (data ?? []).map((row: any) => ({
     user_id: row.user_id,
-    email: row.email ?? null,
+    email: row.email ?? "",
     name: row.name ?? null,
-    role: row.role ?? null,
-    status: row.status ?? "ACTIVE",
+    role: (row.role ?? "VIEWER") as UserRole,
+    status: (row.status ?? "ACTIVE") as UserStatus,
     invited_at: row.invited_at ?? null,
     last_sign_in_at: row.last_sign_in_at ?? null,
   }));
@@ -83,17 +72,7 @@ export async function countUsers(filters: UsersFilters): Promise<number> {
   const p_status = arrOrNull<UserStatus>(filters?.status) as any;
   const p_role = arrOrNull<UserRole>(filters?.role) as any;
 
-  const { data, error } = await supabase.rpc("count_users_for_current_empresa", {
-    p_q,
-    p_status,
-    p_role,
-  });
-
-  if (error) {
-    console.error("[USERS] rpc count_users_for_current_empresa error", error);
-    throw new Error(error.message || "Falha ao contar usuários.");
-  }
-
+  const data = await callRpc<any>("count_users_for_current_empresa", { p_q, p_status, p_role });
   const n = typeof data === "number" ? data : Number(data ?? 0);
   return Number.isFinite(n) ? n : 0;
 }
@@ -101,48 +80,24 @@ export async function countUsers(filters: UsersFilters): Promise<number> {
 /* ==================== Ações de usuário (RPCs) ==================== */
 export async function deactivateUser(userId: string): Promise<void> {
   console.log("[RPC][DEACTIVATE] deactivate_user_for_current_empresa", { userId });
-  const { error } = await supabase.rpc("deactivate_user_for_current_empresa", { p_user_id: userId });
-  if (error) {
-    console.error("[RPC][DEACTIVATE] error", error);
-    throw new Error(error.message || "Falha ao desativar usuário.");
-  }
+  await callRpc("deactivate_user_for_current_empresa", { p_user_id: userId });
 }
 
 export async function reactivateUser(userId: string): Promise<void> {
   console.log("[RPC][REACTIVATE] reactivate_user_for_current_empresa", { userId });
-  const { error } = await supabase.rpc("reactivate_user_for_current_empresa", { p_user_id: userId });
-  if (error) {
-    console.error("[RPC][REACTIVATE] error", error);
-    throw new Error(error.message || "Falha ao reativar usuário.");
-  }
+  await callRpc("reactivate_user_for_current_empresa", { p_user_id: userId });
 }
 
 export async function updateUserRole(userId: string, role: UserRole): Promise<void> {
   const normalized = normalizeRoleForDb(role);
   console.log("[RPC][UPDATE_ROLE] update_user_role_for_current_empresa", { userId, role: normalized });
-  const { error } = await supabase.rpc("update_user_role_for_current_empresa", {
-    p_role: normalized,
-    p_user_id: userId,
-  });
-  if (error) {
-    console.error("[RPC][UPDATE_ROLE] error", error);
-    throw new Error(error.message || "Falha ao atualizar papel do usuário.");
-  }
+  await callRpc("update_user_role_for_current_empresa", { p_role: normalized, p_user_id: userId });
 }
 
 export async function removePendingInvite(userId: string): Promise<number> {
   console.log("[RPC][DELETE_INVITE] delete_pending_invitation", { userId });
-  const { data, error } = await supabase.rpc("delete_pending_invitation", { p_user_id: userId });
-  if (error) {
-    console.error("[RPC][DELETE_INVITE] error", error);
-    const message =
-      (error as any)?.hint ||
-      (error as any)?.details ||
-      (error as any)?.message ||
-      "Erro ao remover convite.";
-    throw new Error(message);
-  }
-  const removed = typeof data === "number" ? data : 0;
+  const data = await callRpc<any>("delete_pending_invitation", { p_user_id: userId });
+  const removed = typeof data === "number" ? data : Number(data ?? 0);
   console.log("[RPC][DELETE_INVITE] ok", { removed });
   return removed;
 }

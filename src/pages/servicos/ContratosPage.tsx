@@ -480,20 +480,24 @@ export default function ContratosPage() {
 
       if (rule) {
         setBillingRule(rule as BillingRuleRow);
-      } else {
-        const start = row.data_inicio ? String(row.data_inicio) : '';
-        const first = start ? `${start.slice(0, 7)}-01` : `${new Date().toISOString().slice(0, 7)}-01`;
-        setBillingRule({
-          id: '',
-          contrato_id: row.id,
-          tipo: 'mensal',
-          ativo: true,
-          valor_mensal: Number(row.valor_mensal ?? 0),
-          dia_vencimento: 5,
-          primeira_competencia: first,
-          centro_de_custo_id: null,
-        });
-      }
+	      } else {
+	        const start = row.data_inicio ? String(row.data_inicio) : '';
+	        const first = start ? `${start.slice(0, 7)}-01` : `${new Date().toISOString().slice(0, 7)}-01`;
+	        const nowIso = new Date().toISOString();
+	        setBillingRule({
+	          id: '',
+	          empresa_id: '',
+	          contrato_id: row.id,
+	          tipo: 'mensal',
+	          ativo: true,
+	          valor_mensal: Number(row.valor_mensal ?? 0),
+	          dia_vencimento: 5,
+	          primeira_competencia: first,
+	          centro_de_custo_id: null,
+	          created_at: nowIso,
+	          updated_at: nowIso,
+	        });
+	      }
 
       const sch = await listScheduleByContratoId(row.id, 24);
       setSchedule((sch ?? []) as BillingScheduleRow[]);
@@ -768,20 +772,20 @@ export default function ContratosPage() {
 
   const copyLastLink = async () => {
     if (!lastPortalLink) return;
-    try {
-      await navigator.clipboard.writeText(lastPortalLink);
-      addToast('Link copiado.', 'success');
-    } catch {
-      addToast('Não foi possível copiar automaticamente. Selecione e copie manualmente.', 'warn');
-    }
-  };
+	    try {
+	      await navigator.clipboard.writeText(lastPortalLink);
+	      addToast('Link copiado.', 'success');
+	    } catch {
+	      addToast('Não foi possível copiar automaticamente. Selecione e copie manualmente.', 'warning');
+	    }
+	  };
 
   const saveBillingRule = async () => {
-    if (!form.id || !billingRule) return;
-    if (billingRule.tipo !== 'mensal') {
-      addToast('Por enquanto, apenas regra mensal está habilitada.', 'warn');
-      return;
-    }
+	    if (!form.id || !billingRule) return;
+	    if (billingRule.tipo !== 'mensal') {
+	      addToast('Por enquanto, apenas regra mensal está habilitada.', 'warning');
+	      return;
+	    }
 
     const valor = Number(billingRule.valor_mensal ?? 0);
     if (Number.isNaN(valor) || valor < 0) {
@@ -801,15 +805,15 @@ export default function ContratosPage() {
 
     setBillingActionLoading(true);
     try {
-      const payload = {
-        contrato_id: form.id,
-        tipo: 'mensal',
-        ativo: billingRule.ativo !== false,
-        valor_mensal: valor,
-        dia_vencimento: dia,
-        primeira_competencia: comp,
-        centro_de_custo_id: billingRule.centro_de_custo_id || null,
-      };
+	      const payload = {
+	        contrato_id: form.id,
+	        tipo: 'mensal' as const,
+	        ativo: billingRule.ativo !== false,
+	        valor_mensal: valor,
+	        dia_vencimento: dia,
+	        primeira_competencia: comp,
+	        centro_de_custo_id: billingRule.centro_de_custo_id || null,
+	      };
       const savedRule = await upsertBillingRule(payload);
       setBillingRule(savedRule as BillingRuleRow);
       addToast('Regra de faturamento salva.', 'success');
@@ -823,7 +827,7 @@ export default function ContratosPage() {
   const persistBillingRuleForActions = async (): Promise<boolean> => {
     if (!form.id || !billingRule) return false;
     if (billingRule.tipo !== 'mensal') {
-      addToast('Por enquanto, apenas regra mensal está habilitada.', 'warn');
+      addToast('Por enquanto, apenas regra mensal está habilitada.', 'warning');
       return false;
     }
 
@@ -932,11 +936,11 @@ export default function ContratosPage() {
     try {
       if (!(await persistBillingRuleForActions())) return;
       const res = await recalcMensalFuture({ contratoId: form.id, from: new Date().toISOString().slice(0, 10) });
-      if (res.reason === 'nao_mensal') {
-        addToast('Recalcular futuro aplica-se apenas a regras mensais.', 'warn');
-      } else {
-        addToast(`Agenda mensal recalculada. Atualizados: ${res.updated}`, 'success');
-      }
+	      if (res.reason === 'nao_mensal') {
+	        addToast('Recalcular futuro aplica-se apenas a regras mensais.', 'warning');
+	      } else {
+	        addToast(`Agenda mensal recalculada. Atualizados: ${res.updated}`, 'success');
+	      }
       await loadBilling({ id: form.id, valor_mensal: Number(form.valor_mensal ?? 0), data_inicio: form.data_inicio || null });
     } catch (e: any) {
       addToast(e?.message || 'Falha ao recalcular agenda futura.', 'error');
@@ -986,10 +990,10 @@ export default function ContratosPage() {
                 : `Canceladas: ${res.scheduleCancelled} agendas futuras.`;
             addToast(msg, 'success');
           }
-        } catch (e: any) {
-          addToast(e?.message || 'Contrato salvo, mas falhou ao cancelar agenda/títulos futuros.', 'warn');
-        }
-      }
+	        } catch (e: any) {
+	          addToast(e?.message || 'Contrato salvo, mas falhou ao cancelar agenda/títulos futuros.', 'warning');
+	        }
+	      }
 
       addToast('Contrato salvo.', 'success');
       await load();

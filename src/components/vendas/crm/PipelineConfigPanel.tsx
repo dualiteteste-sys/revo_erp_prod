@@ -47,7 +47,8 @@ export default function PipelineConfigPanel(props: { onChanged?: () => void }) {
 
   const addRow = () => {
     if (!funilId) return;
-    const nextOrder = (ordered.at(-1)?.ordem ?? 0) + 1;
+    const last = ordered.length > 0 ? ordered[ordered.length - 1] : undefined;
+    const nextOrder = (last?.ordem ?? 0) + 1;
     const tempId = `temp-${Math.random().toString(16).slice(2)}`;
     setRows((prev) => [
       ...prev,
@@ -262,4 +263,3 @@ export default function PipelineConfigPanel(props: { onChanged?: () => void }) {
     </div>
   );
 }
-

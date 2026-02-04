@@ -2,7 +2,6 @@ import { useState, useEffect, useCallback } from 'react';
 import { useDebounce } from './useDebounce';
 import * as osService from '../services/os';
 import { useAuth } from '../contexts/AuthProvider';
-import { Database } from '@/types/database.types';
 
 export const useOs = () => {
   const { activeEmpresa, userId } = useAuth();
@@ -14,7 +13,7 @@ export const useOs = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const debouncedSearchTerm = useDebounce(searchTerm, 500);
 
-  const [filterStatus, setFilterStatus] = useState<Database['public']['Enums']['status_os'] | null>(null);
+  const [filterStatus, setFilterStatus] = useState<osService.status_os | null>(null);
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
   const [onlyMine, setOnlyMine] = useState(false);

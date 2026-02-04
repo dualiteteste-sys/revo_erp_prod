@@ -291,22 +291,22 @@ const ColaboradorFormPanel: React.FC<ColaboradorFormPanelProps> = ({ colaborador
         const currentById = new Map(current.map((c: any) => [c.competencia_id, c]));
 
         const requiredIds = new Set(cargo.competencias.map((c) => c.competencia_id));
-        const required = cargo.competencias.map((req) => {
-          const existing = currentById.get(req.competencia_id);
-          const nivelAtual = existing?.nivel_atual ?? 0;
-          const nivelRequerido = req.nivel_requerido ?? 0;
-          return {
-            competencia_id: req.competencia_id,
-            nome: req.nome,
-            tipo: req.tipo,
-            nivel_requerido: nivelRequerido,
-            nivel_atual: nivelAtual,
-            gap: nivelAtual - nivelRequerido,
-            obrigatorio: !!req.obrigatorio,
-            data_avaliacao: existing?.data_avaliacao ?? null,
-            origem: existing?.origem ?? null,
-          };
-        });
+	        const required = cargo.competencias.map((req) => {
+	          const existing = currentById.get(req.competencia_id);
+	          const nivelAtual = existing?.nivel_atual ?? 0;
+	          const nivelRequerido = req.nivel_requerido ?? 0;
+	          return {
+	            competencia_id: req.competencia_id,
+	            nome: req.nome ?? '',
+	            tipo: req.tipo ?? '',
+	            nivel_requerido: nivelRequerido,
+	            nivel_atual: nivelAtual,
+	            gap: nivelAtual - nivelRequerido,
+	            obrigatorio: !!req.obrigatorio,
+	            data_avaliacao: existing?.data_avaliacao ?? null,
+	            origem: existing?.origem ?? null,
+	          };
+	        });
 
         const extras = current.filter((c: any) => !requiredIds.has(c.competencia_id));
         setFormData((prev) => ({ ...prev, competencias: [...required, ...extras] }));
@@ -428,13 +428,13 @@ const ColaboradorFormPanel: React.FC<ColaboradorFormPanelProps> = ({ colaborador
       addToast('Você não tem permissão para encerrar afastamentos.', 'warning');
       return;
     }
-    const ok = await confirm({
-      title: 'Encerrar afastamento',
-      description: `Encerrar afastamento (${afast.tipo.replace(/_/g, ' ')}) de ${new Date(afast.data_inicio).toLocaleDateString('pt-BR')}?`,
-      confirmText: 'Encerrar',
-      cancelText: 'Cancelar',
-      variant: 'default',
-    });
+	    const ok = await confirm({
+	      title: 'Encerrar afastamento',
+	      description: `Encerrar afastamento (${afast.tipo.replace(/_/g, ' ')}) de ${new Date(afast.data_inicio).toLocaleDateString('pt-BR')}?`,
+	      confirmText: 'Encerrar',
+	      cancelText: 'Cancelar',
+	      variant: 'primary',
+	    });
     if (!ok) return;
     try {
       await encerrarAfastamento(afast.id, new Date().toISOString().slice(0, 10));

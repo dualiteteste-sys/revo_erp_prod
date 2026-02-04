@@ -6,7 +6,7 @@ import { uploadCompanyLogo, deleteCompanyLogo } from '../../../services/company'
 import { useAuth } from '../../../contexts/AuthProvider';
 import LogoCropperModal from './LogoCropperModal';
 import { getCroppedImg } from '../../../lib/imageUtils';
-import { Area } from 'react-easy-crop/types';
+import type { Area } from 'react-easy-crop';
 import { useSupabase } from '@/providers/SupabaseProvider';
 
 const LOGO_BUCKET = 'company_logos';

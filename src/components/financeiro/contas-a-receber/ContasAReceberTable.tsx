@@ -81,8 +81,12 @@ const ContasAReceberTable: React.FC<ContasAReceberTableProps> = ({
               >
                 <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{conta.descricao}</td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{conta.cliente_nome || '-'}</td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{new Date(conta.data_vencimento).toLocaleDateString('pt-BR')}</td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 font-semibold">{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(conta.valor)}</td>
+	                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+	                  {conta.data_vencimento ? new Date(conta.data_vencimento).toLocaleDateString('pt-BR') : '—'}
+	                </td>
+	                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 font-semibold">
+	                  {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Number(conta.valor ?? 0))}
+	                </td>
                 <td className="px-6 py-4 whitespace-nowrap">
                   <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${statusConfig[conta.status]?.color || 'bg-gray-100 text-gray-800'}`}>
                     {statusConfig[conta.status]?.label || conta.status}

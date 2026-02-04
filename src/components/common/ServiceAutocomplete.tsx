@@ -114,18 +114,13 @@ export default function ServiceAutocomplete({
   };
 
   const handleCreateSuccess = (savedProduct: any) => {
-    // Map savedProduct to Service format if needed, or just use it
-    // Service type usually has id, descricao, codigo, preco_venda, unidade
-    const newService: Service = {
-      id: savedProduct.id,
-      descricao: savedProduct.nome,
-      codigo: savedProduct.codigo,
-      preco_venda: savedProduct.preco_venda,
-      unidade: savedProduct.unidade,
-      tipo: 'servico'
-    };
-
-    handleSelect(newService);
+    // O retorno do ProductFormPanel não é 1:1 com o tipo Service; aqui só precisamos
+    // selecionar o item criado e manter a UX fluida.
+    const created = savedProduct as Service;
+    setQuery((created as any).descricao ?? (savedProduct as any).nome ?? '');
+    onChange((created as any).id ?? savedProduct.id, created);
+    setOpen(false);
+    setResults([]);
     setIsCreateModalOpen(false);
     addToast('Serviço criado e selecionado!', 'success');
   };

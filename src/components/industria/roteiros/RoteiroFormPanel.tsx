@@ -79,7 +79,7 @@ export default function RoteiroFormPanel({ roteiroId, initialData, onSaveSuccess
 
   const handleProductSelect = (item: any) => {
     handleHeaderChange('produto_id', item.id);
-    handleHeaderChange('produto_nome', item.descricao);
+	    handleHeaderChange('produto_nome' as any, item.descricao);
   };
 
   const handleSaveHeader = async () => {

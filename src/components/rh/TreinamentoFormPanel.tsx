@@ -35,6 +35,8 @@ interface TreinamentoFormPanelProps {
   onClose: () => void;
 }
 
+type TreinamentoFormState = TreinamentoPayload & { participantes?: TreinamentoParticipante[] };
+
 function labelOperation(op: string) {
   if (op === 'INSERT') return 'Criado';
   if (op === 'UPDATE') return 'Atualizado';
@@ -63,7 +65,7 @@ const TreinamentoFormPanel: React.FC<TreinamentoFormPanelProps> = ({ treinamento
   const { activeEmpresaId } = useAuth();
   const { confirm } = useConfirm();
   const [isSaving, setIsSaving] = useState(false);
-  const [formData, setFormData] = useState<TreinamentoPayload>({});
+  const [formData, setFormData] = useState<TreinamentoFormState>({});
   const [activeTab, setActiveTab] = useState<'dados' | 'participantes' | 'anexos' | 'historico'>('dados');
   
   // Participantes state
@@ -795,9 +797,9 @@ const TreinamentoFormPanel: React.FC<TreinamentoFormPanelProps> = ({ treinamento
 
             <div className="space-y-3">
               <AnimatePresence>
-                {formData.participantes?.map((part) => (
-                  <motion.div 
-                    key={part.id}
+	                {formData.participantes?.map((part: TreinamentoParticipante) => (
+	                  <motion.div 
+	                    key={part.id}
                     initial={{ opacity: 0, y: -10 }}
                     animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0, x: -20 }}
@@ -819,9 +821,13 @@ const TreinamentoFormPanel: React.FC<TreinamentoFormPanelProps> = ({ treinamento
                     </div>
 
                     <div className="flex items-center gap-2">
-                        {part.eficacia_avaliada && <CheckCircle size={18} className="text-green-500" title="Eficácia Avaliada" />}
-                        {part.nota_final !== null && <span className="text-sm font-bold text-gray-700">Nota: {part.nota_final}</span>}
-                    </div>
+	                        {part.eficacia_avaliada ? (
+	                          <span title="Eficácia Avaliada">
+	                            <CheckCircle size={18} className="text-green-500" />
+	                          </span>
+	                        ) : null}
+	                        {part.nota_final !== null && <span className="text-sm font-bold text-gray-700">Nota: {part.nota_final}</span>}
+	                    </div>
 
                     <div className="min-w-[220px] text-sm text-gray-600">
                       {part.validade_ate ? (

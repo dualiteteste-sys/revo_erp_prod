@@ -43,12 +43,12 @@ export default function MediaTab({ produtoId, empresaId }: Props) {
   assertUuid(produtoId, "produtoId");
   assertUuid(empresaId, "empresaId");
 
-  const loadImages = useCallback(async () => {
-    setLoading(true);
-    try {
-      const { data, error } = await supabase.rpc("produto_imagens_list_for_current_user", {
-        p_produto_id: produtoId,
-      });
+	  const loadImages = useCallback(async () => {
+	    setLoading(true);
+	    try {
+	      const { data, error } = await (supabase as any).rpc("produto_imagens_list_for_current_user", {
+	        p_produto_id: produtoId,
+	      });
 
       if (error) throw error;
       setImagens((data as Imagem[]) ?? []);
@@ -95,14 +95,14 @@ export default function MediaTab({ produtoId, empresaId }: Props) {
 
       const uploadPromises = acceptedFiles.map(async (file, idx) => {
         try {
-          const { key } = await uploadProductImage(empresaId, produtoId, file);
+	          const { key } = await uploadProductImage(empresaId, produtoId, file);
 
-          const { error: insErr } = await supabase.rpc("produto_imagens_insert_for_current_user", {
-            p_produto_id: produtoId,
-            p_url: key,
-            p_ordem: baseOrder + idx,
-            p_principal: imagens.length === 0 && idx === 0,
-          });
+	          const { error: insErr } = await (supabase as any).rpc("produto_imagens_insert_for_current_user", {
+	            p_produto_id: produtoId,
+	            p_url: key,
+	            p_ordem: baseOrder + idx,
+	            p_principal: imagens.length === 0 && idx === 0,
+	          });
           if (insErr) throw insErr;
 
         } catch (uploadError: any) {

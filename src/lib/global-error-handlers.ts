@@ -45,7 +45,7 @@ export function setupGlobalErrorHandlers() {
       const safeContextRaw = safeObj?.context;
       const safeContext = isRecord(safeContextRaw) ? safeContextRaw : {};
 
-      void supabase.rpc("log_app_event", {
+      void (supabase as unknown as { rpc: (fn: string, args?: Record<string, unknown>) => Promise<unknown> }).rpc("log_app_event", {
         p_level: "error",
         p_event: params.event,
         p_message: String(typeof safeMessage === "string" ? safeMessage : params.message),

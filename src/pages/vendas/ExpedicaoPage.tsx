@@ -137,7 +137,7 @@ export default function ExpedicaoPage() {
       tracking_code: row.tracking_code || '',
       data_envio: row.data_envio || '',
       data_entrega: row.data_entrega || '',
-      observacoes: row.observacoes || '',
+      observacoes: (row as any).observacoes || '',
     });
     setSelectedExpedicaoId(row.expedicao_id);
     setIsOpen(true);

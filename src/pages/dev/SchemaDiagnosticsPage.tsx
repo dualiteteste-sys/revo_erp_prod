@@ -102,36 +102,39 @@ export default function SchemaDiagnosticsPage() {
   };
 
   return (
-    <PageShell>
-      <PageHeader
-        title="Diagnóstico de Schema / RPC"
-        description="Ferramentas internas para investigar drift, cache do PostgREST e migrations aplicadas."
-        actions={
-          <div className="flex items-center gap-2">
-            <Button variant="outline" onClick={load} className="gap-2" disabled={loading}>
-              <RefreshCw size={16} />
-              Atualizar
-            </Button>
-            <Button variant="secondary" onClick={handleReload} className="gap-2" disabled={reloading}>
-              <Wrench size={16} />
-              {reloading ? 'Recarregando…' : 'Recarregar cache RPC'}
-            </Button>
-            <Button variant="outline" onClick={handleCopy} className="gap-2" disabled={!data}>
-              <Copy size={16} />
-              Copiar JSON
-            </Button>
-            <Button
-              variant="outline"
-              onClick={() => data && downloadJson(`schema-diagnostics-${new Date().toISOString().slice(0, 19)}.json`, data)}
-              className="gap-2"
-              disabled={!data}
-            >
-              <Download size={16} />
-              Baixar
-            </Button>
-          </div>
-        }
-      />
+    <PageShell
+      header={
+        <PageHeader
+          title="Diagnóstico de Schema / RPC"
+          description="Ferramentas internas para investigar drift, cache do PostgREST e migrations aplicadas."
+          actions={
+            <div className="flex items-center gap-2">
+              <Button variant="outline" onClick={load} className="gap-2" disabled={loading}>
+                <RefreshCw size={16} />
+                Atualizar
+              </Button>
+              <Button variant="secondary" onClick={handleReload} className="gap-2" disabled={reloading}>
+                <Wrench size={16} />
+                {reloading ? 'Recarregando…' : 'Recarregar cache RPC'}
+              </Button>
+              <Button variant="outline" onClick={handleCopy} className="gap-2" disabled={!data}>
+                <Copy size={16} />
+                Copiar JSON
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() => data && downloadJson(`schema-diagnostics-${new Date().toISOString().slice(0, 19)}.json`, data)}
+                className="gap-2"
+                disabled={!data}
+              >
+                <Download size={16} />
+                Baixar
+              </Button>
+            </div>
+          }
+        />
+      }
+    >
 
       <PageCard className="space-y-4">
         {loading ? (

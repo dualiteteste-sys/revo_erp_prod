@@ -7,7 +7,6 @@ import Section from '../ui/forms/Section';
 import Input from '../ui/forms/Input';
 import Select from '../ui/forms/Select';
 import TextArea from '../ui/forms/TextArea';
-import { Database } from '@/types/database.types';
 import OsFormItems from './OsFormItems';
 import { useNumericField } from '@/hooks/useNumericField';
 import ClientAutocomplete from '../common/ClientAutocomplete';
@@ -31,13 +30,15 @@ import TableColGroup from '@/components/ui/table/TableColGroup';
 import { useTableColumnWidths, type TableColumnWidthDef } from '@/components/ui/table/useTableColumnWidths';
 import { sortRows, toggleSort } from '@/components/ui/table/sortUtils';
 
+type OsStatus = 'orcamento' | 'aberta' | 'concluida' | 'cancelada';
+
 interface OsFormPanelProps {
   os: OrdemServicoDetails | null;
   onSaveSuccess: (savedOs: OrdemServicoDetails) => void;
   onClose: () => void;
 }
 
-const statusOptions: { value: Database['public']['Enums']['status_os']; label: string }[] = [
+const statusOptions: { value: OsStatus; label: string }[] = [
     { value: 'orcamento', label: 'Orçamento' },
     { value: 'aberta', label: 'Aberta' },
     { value: 'concluida', label: 'Concluída' },
@@ -271,12 +272,14 @@ const OsFormPanel: React.FC<OsFormPanelProps> = ({ os, onSaveSuccess, onClose })
     const descricao = formData.descricao ?? '';
     const status = osStatusLabel(String(formData.status ?? ''));
     const cliente = clientDetails?.nome ?? clientName ?? '';
-    return template
-      .replaceAll('{{os_numero}}', String(numero))
-      .replaceAll('{{os_descricao}}', String(descricao))
-      .replaceAll('{{os_status_label}}', String(status))
-      .replaceAll('{{cliente_nome}}', String(cliente))
-      .replaceAll('{{portal_url}}', portalUrl || '');
+    const replaceToken = (s: string, token: string, value: string) => s.split(token).join(value);
+    return [
+      ['{{os_numero}}', String(numero)],
+      ['{{os_descricao}}', String(descricao)],
+      ['{{os_status_label}}', String(status)],
+      ['{{cliente_nome}}', String(cliente)],
+      ['{{portal_url}}', portalUrl || ''],
+    ].reduce((acc, [token, value]) => replaceToken(acc, token, value), template);
   };
 
   useEffect(() => {
@@ -537,7 +540,7 @@ const OsFormPanel: React.FC<OsFormPanelProps> = ({ os, onSaveSuccess, onClose })
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [formData.id]);
 
-  const statusOs = (formData.status as any) as Database['public']['Enums']['status_os'] | undefined;
+  const statusOs = (formData.status as any) as OsStatus | undefined;
   const canGenerateConta = !!formData.id && statusOs === 'concluida';
 
   const defaultVencimento = useMemo(() => {
@@ -662,16 +665,16 @@ const OsFormPanel: React.FC<OsFormPanelProps> = ({ os, onSaveSuccess, onClose })
       return;
     }
 
-    const ok = await confirm({
-      title: 'Registrar recebimento',
-      description: `Deseja marcar esta conta como paga hoje? Valor: ${new Intl.NumberFormat('pt-BR', {
-        style: 'currency',
-        currency: 'BRL',
-      }).format(contaReceber.valor || 0)}.`,
-      confirmText: 'Registrar recebimento',
-      cancelText: 'Cancelar',
-      variant: 'default',
-    });
+	    const ok = await confirm({
+	      title: 'Registrar recebimento',
+	      description: `Deseja marcar esta conta como paga hoje? Valor: ${new Intl.NumberFormat('pt-BR', {
+	        style: 'currency',
+	        currency: 'BRL',
+	      }).format(contaReceber.valor || 0)}.`,
+	      confirmText: 'Registrar recebimento',
+	      cancelText: 'Cancelar',
+	      variant: 'primary',
+	    });
     if (!ok) return;
 
     setIsReceivingConta(true);
@@ -1178,13 +1181,13 @@ const OsFormPanel: React.FC<OsFormPanelProps> = ({ os, onSaveSuccess, onClose })
                 <ThumbsUp size={18} />
                 Aprovar
               </Button>
-              <Button
-                type="button"
-                variant="danger"
-                onClick={() => openDecideDialog('rejected')}
-                disabled={readOnly || !permManage.data || !formData.id}
-                className="gap-2"
-              >
+	              <Button
+	                type="button"
+	                variant="destructive"
+	                onClick={() => openDecideDialog('rejected')}
+	                disabled={readOnly || !permManage.data || !formData.id}
+	                className="gap-2"
+	              >
                 <ThumbsDown size={18} />
                 Reprovar
               </Button>
@@ -1673,11 +1676,11 @@ const OsFormPanel: React.FC<OsFormPanelProps> = ({ os, onSaveSuccess, onClose })
             </Button>
             <Button
               type="button"
-              variant={orcamentoDecisao === 'approved' ? 'default' : 'danger'}
-              onClick={handleDecidirOrcamento}
-              disabled={orcamentoDeciding}
-              className="gap-2"
-            >
+	              variant={orcamentoDecisao === 'approved' ? 'default' : 'destructive'}
+	              onClick={handleDecidirOrcamento}
+	              disabled={orcamentoDeciding}
+	              className="gap-2"
+	            >
               {orcamentoDeciding ? <Loader2 className="animate-spin" size={18} /> : orcamentoDecisao === 'approved' ? <ThumbsUp size={18} /> : <ThumbsDown size={18} />}
               {orcamentoDecisao === 'approved' ? 'Aprovar' : 'Reprovar'}
             </Button>

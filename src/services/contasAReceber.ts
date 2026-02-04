@@ -3,9 +3,13 @@ import { Database } from '@/types/database.types';
 import { faker } from '@faker-js/faker';
 import { getPartners } from './partners';
 
-export type ContaAReceber = Database['public']['Tables']['contas_a_receber']['Row'] & {
-    cliente_nome?: string;
-};
+export type ContaAReceber = {
+  id: string;
+  status: string;
+  valor?: number | null;
+  data_vencimento?: string | null;
+  cliente_nome?: string;
+} & Record<string, unknown>;
 
 export type ContaAReceberPayload = Partial<ContaAReceber>;
 
@@ -60,28 +64,28 @@ export async function listContasAReceber(options: {
     const { page, pageSize, searchTerm, status, sortBy, startDate, endDate } = options;
     const offset = (page - 1) * pageSize;
     
-    try {
-        const count = await callRpc<number>('count_contas_a_receber_v2', {
-            p_q: searchTerm || null,
-            p_status: status as any || null,
-            p_start_date: startDate ? startDate.toISOString().split('T')[0] : null,
-            p_end_date: endDate ? endDate.toISOString().split('T')[0] : null,
-        });
+	    try {
+	        const count = await callRpc<number>('count_contas_a_receber_v2', {
+	            p_q: searchTerm || null,
+	            p_status: status || null,
+	            p_start_date: startDate ? startDate.toISOString().split('T')[0] : null,
+	            p_end_date: endDate ? endDate.toISOString().split('T')[0] : null,
+	        });
 
         if (Number(count) === 0) {
             return { data: [], count: 0 };
         }
 
-        const data = await callRpc<ContaAReceber[]>('list_contas_a_receber_v2', {
-            p_limit: pageSize,
-            p_offset: offset,
-            p_q: searchTerm || null,
-            p_status: status as any || null,
-            p_start_date: startDate ? startDate.toISOString().split('T')[0] : null,
-            p_end_date: endDate ? endDate.toISOString().split('T')[0] : null,
-            p_order_by: sortBy.column,
-            p_order_dir: sortBy.ascending ? 'asc' : 'desc',
-        });
+	        const data = await callRpc<ContaAReceber[]>('list_contas_a_receber_v2', {
+	            p_limit: pageSize,
+	            p_offset: offset,
+	            p_q: searchTerm || null,
+	            p_status: status || null,
+	            p_start_date: startDate ? startDate.toISOString().split('T')[0] : null,
+	            p_end_date: endDate ? endDate.toISOString().split('T')[0] : null,
+	            p_order_by: sortBy.column,
+	            p_order_dir: sortBy.ascending ? 'asc' : 'desc',
+	        });
 
         return { data: data ?? [], count: Number(count) };
     } catch (error) {
@@ -225,16 +229,16 @@ export async function seedContasAReceber(): Promise<void> {
         dataVencimento = faker.date.recent({ days: 30 });
     }
 
-    const payload: ContaAReceberPayload = {
-      cliente_id: partner.id,
-      descricao: `Venda de ${faker.commerce.productName()}`,
-      valor: valor,
-      data_vencimento: dataVencimento.toISOString().split('T')[0],
-      status: status as any,
-      observacoes: 'Gerado automaticamente',
-      data_pagamento: status === 'pago' ? faker.date.recent({ days: 5 }).toISOString().split('T')[0] : undefined,
-      valor_pago: status === 'pago' ? valor : undefined,
-    };
+	    const payload: ContaAReceberPayload = {
+	      cliente_id: partner.id,
+	      descricao: `Venda de ${faker.commerce.productName()}`,
+	      valor: valor,
+	      data_vencimento: dataVencimento.toISOString().split('T')[0],
+	      status,
+	      observacoes: 'Gerado automaticamente',
+	      data_pagamento: status === 'pago' ? faker.date.recent({ days: 5 }).toISOString().split('T')[0] : undefined,
+	      valor_pago: status === 'pago' ? valor : undefined,
+	    };
     return saveContaAReceber(payload);
   });
   await Promise.all(promises);

@@ -84,7 +84,7 @@ export function useLogsQuery(initialFilters: LogsFilters = {}) {
 
     try {
       const params = mapFiltersToParams(filtersRef.current, null);
-      const { data, error } = await supabase.rpc('list_events_for_current_user', params);
+      const { data, error } = await (supabase as any).rpc('list_events_for_current_user', params);
 
       if (error) {
         console.error('[RPC][LOGS][ERROR] list_events_for_current_user', error);
@@ -119,7 +119,7 @@ export function useLogsQuery(initialFilters: LogsFilters = {}) {
 
     try {
       const params = mapFiltersToParams(filtersRef.current, state.cursorAfter);
-      const { data, error } = await supabase.rpc('list_events_for_current_user', params);
+      const { data, error } = await (supabase as any).rpc('list_events_for_current_user', params);
 
       if (error) {
         console.error('[RPC][LOGS][ERROR][MORE] list_events_for_current_user', error);

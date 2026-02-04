@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useMemo, useRef, useCallback } from 'react';
-import { Responsive, Layout } from 'react-grid-layout';
+import { Responsive } from 'react-grid-layout';
+import type { Layout, ResponsiveLayouts } from 'react-grid-layout';
 import useLocalStorageState from 'use-local-storage-state';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Settings2, RotateCcw, Plus, X, GripHorizontal, Check } from 'lucide-react';
@@ -26,8 +27,8 @@ const NON_KPI_LAYOUT = DEFAULT_LAYOUT.filter(item => !KPI_WIDGET_IDS.includes(it
   y: item.y - 5, // Ajusta Y pois KPIs são renderizados separadamente
 }));
 
-function generateResponsiveLayouts(baseLayout: Layout[]): Record<string, Layout[]> {
-  const layouts: Record<string, Layout[]> = {};
+function generateResponsiveLayouts(baseLayout: Layout): ResponsiveLayouts {
+  const layouts: ResponsiveLayouts = {};
 
   Object.keys(COLS).forEach(breakpoint => {
     const cols = COLS[breakpoint as keyof typeof COLS];
@@ -142,9 +143,9 @@ const Dashboard: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const isMobile = useIsMobile();
 
-  const defaultLayouts = useMemo(() => generateResponsiveLayouts(NON_KPI_LAYOUT as Layout[]), []);
+  const defaultLayouts = useMemo(() => generateResponsiveLayouts(NON_KPI_LAYOUT as Layout), []);
 
-  const [layouts, setLayouts] = useLocalStorageState<Record<string, Layout[]>>('revo_dashboard_layout_v6', {
+  const [layouts, setLayouts] = useLocalStorageState<ResponsiveLayouts>('revo_dashboard_layout_v6', {
     defaultValue: defaultLayouts
   });
   const [isEditing, setIsEditing] = useState(false);
@@ -182,7 +183,7 @@ const Dashboard: React.FC = () => {
     return () => { mounted = false; };
   }, []);
 
-  const handleLayoutChange = useCallback((currentLayout: Layout[], allLayouts: Record<string, Layout[]>) => {
+  const handleLayoutChange = useCallback((_currentLayout: Layout, allLayouts: ResponsiveLayouts) => {
     setLayouts(allLayouts);
   }, [setLayouts]);
 

@@ -321,42 +321,44 @@ export default function CondicoesPagamentoPage() {
             <table className="min-w-full divide-y divide-gray-200">
               <TableColGroup widths={widths} columns={columns} />
               <thead className="bg-gray-50 sticky top-0 z-10">
-                <tr>
-                  <ResizableSortableTh
-                    id="nome"
-                    width={widths.nome}
-                    onResizeStart={startResize('nome')}
-                    sort={sort}
-                    onSort={(id) => setSort((s) => toggleSort(s, id))}
-                  >
-                    Nome
-                  </ResizableSortableTh>
-                  <ResizableSortableTh
-                    id="condicao"
-                    width={widths.condicao}
-                    onResizeStart={startResize('condicao')}
-                    sort={sort}
-                    onSort={(id) => setSort((s) => toggleSort(s, id))}
-                  >
-                    Condição
-                  </ResizableSortableTh>
-                  <ResizableSortableTh
-                    id="tipo"
-                    width={widths.tipo}
-                    onResizeStart={startResize('tipo')}
-                    sort={sort}
-                    onSort={(id) => setSort((s) => toggleSort(s, id))}
-                  >
-                    Tipo
-                  </ResizableSortableTh>
-                  <ResizableSortableTh id="origem" width={widths.origem} onResizeStart={startResize('origem')} sort={sort} onSort={(id) => setSort((s) => toggleSort(s, id))}>
-                    Origem
-                  </ResizableSortableTh>
-                  <ResizableSortableTh id="status" width={widths.status} onResizeStart={startResize('status')} sort={sort} onSort={(id) => setSort((s) => toggleSort(s, id))}>
-                    Status
-                  </ResizableSortableTh>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 w-[180px]">Ações</th>
-                </tr>
+	                <tr>
+	                  <ResizableSortableTh
+	                    columnId="nome"
+	                    label="Nome"
+	                    onResizeStart={startResize}
+	                    sort={sort}
+	                    onSort={(id) => setSort((s) => toggleSort(s, id))}
+	                  />
+	                  <ResizableSortableTh
+	                    columnId="condicao"
+	                    label="Condição"
+	                    onResizeStart={startResize}
+	                    sort={sort}
+	                    onSort={(id) => setSort((s) => toggleSort(s, id))}
+	                  />
+	                  <ResizableSortableTh
+	                    columnId="tipo"
+	                    label="Tipo"
+	                    onResizeStart={startResize}
+	                    sort={sort}
+	                    onSort={(id) => setSort((s) => toggleSort(s, id))}
+	                  />
+	                  <ResizableSortableTh
+	                    columnId="origem"
+	                    label="Origem"
+	                    onResizeStart={startResize}
+	                    sort={sort}
+	                    onSort={(id) => setSort((s) => toggleSort(s, id))}
+	                  />
+	                  <ResizableSortableTh
+	                    columnId="status"
+	                    label="Status"
+	                    onResizeStart={startResize}
+	                    sort={sort}
+	                    onSort={(id) => setSort((s) => toggleSort(s, id))}
+	                  />
+	                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 w-[180px]">Ações</th>
+	                </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
                 {sorted.map((r) => {

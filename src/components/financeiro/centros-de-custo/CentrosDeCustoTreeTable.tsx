@@ -61,11 +61,13 @@ export default function CentrosDeCustoTreeTable(props: CentrosDeCustoTreeTablePr
   });
 
   const { ordered, hasChildren } = useMemo(() => {
-    const byId = new Map<string, CentroDeCustoListItem>();
-    const children = new Map<string, CentroDeCustoListItem[]>();
-    for (const c of centros) {
-      byId.set(c.id, c);
-    }
+    const sortState: SortState<'codigo_nome' | 'categoria' | 'status'> =
+      sort ?? { column: 'codigo_nome', direction: 'asc' };
+	    const byId = new Map<string, CentroDeCustoListItem>();
+	    const children = new Map<string, CentroDeCustoListItem[]>();
+	    for (const c of centros) {
+	      byId.set(c.id, c);
+	    }
     for (const c of centros) {
       if (!c.parent_id) continue;
       const arr = children.get(c.parent_id) ?? [];
@@ -73,25 +75,25 @@ export default function CentrosDeCustoTreeTable(props: CentrosDeCustoTreeTablePr
       children.set(c.parent_id, arr);
     }
 
-    const compareRows = (a: CentroDeCustoListItem, b: CentroDeCustoListItem) => {
-      if (sort.column === 'categoria') {
-        const ta = TIPO_LABEL[a.tipo] ?? String(a.tipo ?? '');
-        const tb = TIPO_LABEL[b.tipo] ?? String(b.tipo ?? '');
-        const base = ta.localeCompare(tb, 'pt-BR', { sensitivity: 'base' });
-        return sort.direction === 'asc' ? base : -base;
-      }
+	    const compareRows = (a: CentroDeCustoListItem, b: CentroDeCustoListItem) => {
+	      if (sortState.column === 'categoria') {
+	        const ta = TIPO_LABEL[a.tipo] ?? String(a.tipo ?? '');
+	        const tb = TIPO_LABEL[b.tipo] ?? String(b.tipo ?? '');
+	        const base = ta.localeCompare(tb, 'pt-BR', { sensitivity: 'base' });
+	        return sortState.direction === 'asc' ? base : -base;
+	      }
 
-      if (sort.column === 'status') {
-        const base = Number(Boolean(a.ativo)) - Number(Boolean(b.ativo));
-        return sort.direction === 'asc' ? base : -base;
-      }
+	      if (sortState.column === 'status') {
+	        const base = Number(Boolean(a.ativo)) - Number(Boolean(b.ativo));
+	        return sortState.direction === 'asc' ? base : -base;
+	      }
 
-      // codigo_nome (default)
-      const cc = compareCodigo(a.codigo, b.codigo);
-      if (cc !== 0) return sort.direction === 'asc' ? cc : -cc;
-      const nn = String(a.nome ?? '').localeCompare(String(b.nome ?? ''), 'pt-BR', { numeric: true, sensitivity: 'base' });
-      return sort.direction === 'asc' ? nn : -nn;
-    };
+	      // codigo_nome (default)
+	      const cc = compareCodigo(a.codigo, b.codigo);
+	      if (cc !== 0) return sortState.direction === 'asc' ? cc : -cc;
+	      const nn = String(a.nome ?? '').localeCompare(String(b.nome ?? ''), 'pt-BR', { numeric: true, sensitivity: 'base' });
+	      return sortState.direction === 'asc' ? nn : -nn;
+	    };
 
     for (const arr of children.values()) {
       arr.sort(compareRows);

@@ -188,11 +188,10 @@ export default function BomSelector({ ordemId, produtoId, tipoOrdem, openOnMount
                           </span>
                         );
                       })()}
-                      {(tipoOrdem === 'beneficiamento' ? bom.padrao_para_beneficiamento : bom.padrao_para_producao) && (
+                    {(tipoOrdem === 'beneficiamento' ? bom.padrao_para_beneficiamento : bom.padrao_para_producao) && (
                         <span className="text-xs bg-green-100 text-green-800 px-2 py-0.5 rounded-full">Padrão</span>
                       )}
                     </div>
-                    <p className="text-sm text-gray-600">{bom.descricao}</p>
                     <p className="text-xs text-gray-500 mt-1">Produto: {bom.produto_nome}</p>
                   </div>
                   <div className="flex gap-2">

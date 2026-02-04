@@ -2,7 +2,6 @@ import React, { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { OrdemServico } from '@/services/os';
 import { Edit, Trash2, GripVertical, MoreHorizontal, CalendarClock, Paperclip, CheckCircle2, XCircle, ClipboardCheck, ArrowUpRight, UserRound } from 'lucide-react';
-import { Database } from '@/types/database.types';
 import { Droppable, Draggable } from '@hello-pangea/dnd';
 import {
   DropdownMenu,
@@ -20,7 +19,7 @@ interface OsTableProps {
   onEdit: (os: OrdemServico) => void;
   onDelete: (os: OrdemServico) => void;
   onOpenAgenda: () => void;
-  onSetStatus: (os: OrdemServico, next: Database['public']['Enums']['status_os']) => void;
+  onSetStatus: (os: OrdemServico, next: OsStatus) => void;
   sortBy: { column: keyof OrdemServico; ascending: boolean };
   onSort: (column: keyof OrdemServico) => void;
   canUpdate?: boolean;
@@ -29,7 +28,8 @@ interface OsTableProps {
   busyOsId?: string | null;
 }
 
-const statusConfig: Record<Database['public']['Enums']['status_os'], { label: string; color: string }> = {
+type OsStatus = 'orcamento' | 'aberta' | 'concluida' | 'cancelada';
+const statusConfig: Record<OsStatus, { label: string; color: string }> = {
   orcamento: { label: 'Orçamento', color: 'bg-gray-100 text-gray-800' },
   aberta: { label: 'Aberta', color: 'bg-blue-100 text-blue-800' },
   concluida: { label: 'Concluída', color: 'bg-green-100 text-green-800' },
@@ -73,8 +73,8 @@ const OsTable: React.FC<OsTableProps> = ({ serviceOrders, onEdit, onDelete, onOp
                   <div className="text-xs text-gray-500">O.S. #{os.numero}</div>
                   <div className="font-semibold text-gray-900">{os.cliente_nome || 'Sem cliente'}</div>
                 </div>
-                <span className={`px-2 py-1 text-xs font-semibold rounded-full ${statusConfig[os.status].color}`}>{statusConfig[os.status].label}</span>
-              </div>
+	                <span className={`px-2 py-1 text-xs font-semibold rounded-full ${statusConfig[os.status as OsStatus].color}`}>{statusConfig[os.status as OsStatus].label}</span>
+	              </div>
 
               <div className="mt-2 text-sm text-gray-600">{os.descricao || '—'}</div>
               {tecnicoNome ? (

@@ -161,7 +161,7 @@ export default function ImportProductsCsvModal(props: {
     if (!isOpen) return;
     setMapping((current) => {
       if (hasCustomMapping) return sanitizeMapping(current, sourceKeys);
-      const saved = loadSavedMapping<FieldMapping>(MAPPING_STORAGE_KEY, TARGET_KEYS);
+      const saved = loadSavedMapping<TargetFieldKey>(MAPPING_STORAGE_KEY, TARGET_KEYS);
       const derived = deriveDefaultMapping({ targetKeys: TARGET_KEYS, sourceKeys, synonyms: FIELD_SYNONYMS });
       return sanitizeMapping({ ...derived, ...(saved ?? {}) } as FieldMapping, sourceKeys);
     });
@@ -492,13 +492,13 @@ export default function ImportProductsCsvModal(props: {
                 <Button
                   type="button"
                   variant="secondary"
-                  onClick={() => {
-                    setHasCustomMapping(false);
-                    const saved = loadSavedMapping<FieldMapping>(MAPPING_STORAGE_KEY, TARGET_KEYS);
-                    const derived = deriveDefaultMapping({ targetKeys: TARGET_KEYS, sourceKeys, synonyms: FIELD_SYNONYMS });
-                    setMapping(sanitizeMapping({ ...derived, ...(saved ?? {}) } as FieldMapping, sourceKeys));
-                  }}
-                >
+	                  onClick={() => {
+	                    setHasCustomMapping(false);
+	                    const saved = loadSavedMapping<TargetFieldKey>(MAPPING_STORAGE_KEY, TARGET_KEYS);
+	                    const derived = deriveDefaultMapping({ targetKeys: TARGET_KEYS, sourceKeys, synonyms: FIELD_SYNONYMS });
+	                    setMapping(sanitizeMapping({ ...derived, ...(saved ?? {}) } as FieldMapping, sourceKeys));
+	                  }}
+	                >
                   Recalcular automático
                 </Button>
               </div>

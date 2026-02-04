@@ -32,7 +32,7 @@ export async function traceAction<T>(
     const durationMs = Date.now() - startedAt;
     void (async () => {
       try {
-        await supabase.rpc('log_app_trace', {
+        await (supabase as unknown as { rpc: (fn: string, args?: Record<string, unknown>) => Promise<unknown> }).rpc('log_app_trace', {
           p_action: action,
           p_status: ok ? 'ok' : 'error',
           p_duration_ms: durationMs,

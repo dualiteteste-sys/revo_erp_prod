@@ -121,15 +121,15 @@ export default function ColaboradoresPage() {
       return;
     }
     const nextAtivo = !colab.ativo;
-    const ok = await confirm({
-      title: nextAtivo ? 'Reativar colaborador' : 'Inativar colaborador',
-      description: nextAtivo
-        ? `Deseja reativar ${colab.nome}?`
-        : `Deseja inativar ${colab.nome}? Ele não aparecerá como ativo em seleções e indicadores.`,
-      confirmText: nextAtivo ? 'Reativar' : 'Inativar',
-      cancelText: 'Cancelar',
-      variant: nextAtivo ? 'default' : 'danger',
-    });
+	    const ok = await confirm({
+	      title: nextAtivo ? 'Reativar colaborador' : 'Inativar colaborador',
+	      description: nextAtivo
+	        ? `Deseja reativar ${colab.nome}?`
+	        : `Deseja inativar ${colab.nome}? Ele não aparecerá como ativo em seleções e indicadores.`,
+	      confirmText: nextAtivo ? 'Reativar' : 'Inativar',
+	      cancelText: 'Cancelar',
+	      variant: nextAtivo ? 'primary' : 'danger',
+	    });
     if (!ok) return;
 
     try {

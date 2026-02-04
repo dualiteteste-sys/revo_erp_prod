@@ -65,18 +65,18 @@ const PricingCard: React.FC<PricingCardProps> = ({
   const displayCents = isYearly ? yearlyPerMonthCents : plan.amount_cents;
   const isCompact = density === 'compact';
 
-  const cardVariants = {
-    initial: { opacity: 0, y: 50 },
-    animate: {
-      opacity: 1,
-      y: 0,
-      transition: {
-        duration: 0.5,
-        delay: index * 0.15,
-        ease: 'easeOut',
-      },
-    },
-  };
+	  const cardVariants = {
+	    initial: { opacity: 0, y: 50 },
+	    animate: {
+	      opacity: 1,
+	      y: 0,
+	      transition: {
+	        duration: 0.5,
+	        delay: index * 0.15,
+	        ease: [0.16, 1, 0.3, 1] as [number, number, number, number],
+	      },
+	    },
+	  };
 
   return (
     <motion.div

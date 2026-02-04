@@ -38,8 +38,7 @@ if (!('IntersectionObserver' in globalThis)) {
     unobserve(_target: Element) {}
   }
 
-  // @ts-expect-error - test environment polyfill
-  globalThis.IntersectionObserver = IntersectionObserverMock;
+  (globalThis as any).IntersectionObserver = IntersectionObserverMock;
 }
 
 beforeAll(() => server.listen({ onUnhandledRequest: 'error' }));

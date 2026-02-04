@@ -53,7 +53,7 @@ export default function RegistrarInspecaoModal({ operacao, tipo, isOpen, onClose
     useEffect(() => {
         if (!isOpen || !operacao) return;
         const defaultQty = Math.max(
-            operacao.quantidade_transferida ?? operacao.quantidade_produzida ?? 0,
+            operacao.quantidade_transferida ?? (operacao as any).quantidade_produzida ?? 0,
             0
         );
         setForm({
@@ -130,7 +130,7 @@ export default function RegistrarInspecaoModal({ operacao, tipo, isOpen, onClose
                         <div className="font-semibold mb-1">Operação {operacao.sequencia} · {operacao.centro_trabalho_nome}</div>
                         <div className="flex flex-wrap gap-4">
                             <span><strong>Planejado:</strong> {operacao.quantidade_planejada}</span>
-                            <span><strong>Produzido:</strong> {operacao.quantidade_produzida}</span>
+                            <span><strong>Produzido:</strong> {Number((operacao as any).quantidade_produzida ?? 0)}</span>
                             <span><strong>Transferido:</strong> {operacao.quantidade_transferida ?? 0}</span>
                         </div>
                     </div>

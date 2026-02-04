@@ -26,7 +26,7 @@ export function useEnsureEmpresaAtiva(
       }
 
       // FIX: Standardized parameter name to p_razao_social to match backend RPC signature
-      const { data, error } = await supabase.rpc('bootstrap_empresa_for_current_user', {
+      const { data, error } = await (supabase as any).rpc('bootstrap_empresa_for_current_user', {
         p_razao_social: nomeEmpresa || null,
         p_fantasia: fantasiaEmpresa || null,
       });
@@ -36,10 +36,10 @@ export function useEnsureEmpresaAtiva(
         return;
       }
 
-      const empresaId = data?.[0]?.empresa_id as string | undefined;
+      const empresaId = (data as any)?.[0]?.empresa_id as string | undefined;
       if (empresaId) {
         localStorage.setItem('empresa_id', empresaId);
-        console.log('[RPC][bootstrap_empresa_for_current_user][OK]', empresaId, data?.[0]?.status);
+        console.log('[RPC][bootstrap_empresa_for_current_user][OK]', empresaId, (data as any)?.[0]?.status);
       } else {
         console.warn('[RPC] bootstrap retornou sem empresa_id.');
       }
