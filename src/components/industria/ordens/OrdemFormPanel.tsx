@@ -184,7 +184,8 @@ export default function OrdemFormPanel({
     }
   };
 
-  const handleHeaderChange = (field: keyof OrdemPayload, value: any) => {
+  type OrdemFormData = Partial<OrdemIndustriaDetails>;
+  const handleHeaderChange = <K extends keyof OrdemFormData>(field: K, value: OrdemFormData[K]) => {
     setFormData(prev => ({ ...prev, [field]: value }));
   };
 
@@ -248,7 +249,7 @@ export default function OrdemFormPanel({
         tipo_ordem: formData.tipo_ordem,
         produto_final_id: formData.produto_final_id,
         quantidade_planejada: formData.quantidade_planejada,
-        unidade: formData.unidade ? String(formData.unidade).trim().toUpperCase() : null,
+        unidade: formData.unidade ? String(formData.unidade).trim().toUpperCase() : undefined,
         cliente_id: formData.cliente_id,
         usa_material_cliente: usaMaterialCliente,
         material_cliente_id: materialClienteId,
@@ -320,14 +321,15 @@ export default function OrdemFormPanel({
       addToast('Você não tem permissão para editar esta ordem.', 'error');
       return;
     }
-    let currentId = formData.id;
+    let currentId: string | undefined = formData.id ?? undefined;
     if (!currentId) {
-      currentId = await handleSaveHeader();
-      if (!currentId) return;
+      const createdId = await handleSaveHeader();
+      if (!createdId) return;
+      currentId = createdId;
     }
 
     try {
-      await manageComponente(currentId!, null, item.id, 1, 'un', 'upsert');
+      await manageComponente(currentId, null, item.id, 1, 'un', 'upsert');
       await loadDetails(currentId);
       addToast('Componente adicionado.', 'success');
     } catch (e: any) {
@@ -524,7 +526,7 @@ export default function OrdemFormPanel({
     if (isLockedEffective) return;
     setIsGeneratingExecucao(true);
     try {
-      let currentId = formData.id;
+      let currentId: string | null = formData.id ?? null;
       if (!currentId) {
         currentId = await handleSaveHeader();
         if (!currentId) return;
@@ -702,13 +704,13 @@ export default function OrdemFormPanel({
                       <button
                         type="button"
                         onClick={() => {
-                          handleHeaderChange('produto_final_id', null);
-                          handleHeaderChange('produto_nome', null);
+                          handleHeaderChange('produto_final_id', undefined);
+                          handleHeaderChange('produto_nome', undefined);
                           handleHeaderChange('usa_material_cliente', false);
-                          handleHeaderChange('material_cliente_id', null);
-                          handleHeaderChange('material_cliente_nome', null);
-                          handleHeaderChange('material_cliente_codigo', null);
-                          handleHeaderChange('material_cliente_unidade', null);
+                          handleHeaderChange('material_cliente_id', undefined);
+                          handleHeaderChange('material_cliente_nome', undefined);
+                          handleHeaderChange('material_cliente_codigo', undefined);
+                          handleHeaderChange('material_cliente_unidade', undefined);
                         }}
                         className="text-xs font-bold text-blue-700 hover:text-blue-900 hover:underline whitespace-nowrap"
                       >
@@ -761,7 +763,7 @@ export default function OrdemFormPanel({
                   label="Unidade"
                   name="unidade"
                   value={formData.unidade || ''}
-                  onChange={(sigla) => handleHeaderChange('unidade', sigla)}
+                  onChange={(sigla) => handleHeaderChange('unidade', sigla ?? undefined)}
                   disabled={isHeaderLocked || hasOrigemNfe}
                 />
               </div>
@@ -771,7 +773,7 @@ export default function OrdemFormPanel({
                 </label>
                 <ClientAutocomplete
                   value={formData.cliente_id || null}
-                  initialName={formData.cliente_nome}
+                  initialName={formData.cliente_nome ?? undefined}
                   onChange={(id, name) => {
                     handleHeaderChange('cliente_id', id);
                     if (name) handleHeaderChange('cliente_nome', name);
@@ -846,7 +848,13 @@ export default function OrdemFormPanel({
             {(!isWizard || wizardStep >= 1) && (
             <Section title="Programação" description="Prazos e status.">
               <div className="sm:col-span-2">
-                <Select label="Status" name="status" value={formData.status} onChange={e => handleHeaderChange('status', e.target.value)} disabled={isLockedEffective}>
+                <Select
+                  label="Status"
+                  name="status"
+                  value={formData.status ?? 'rascunho'}
+                  onChange={(e) => handleHeaderChange('status', e.target.value as any)}
+                  disabled={isLockedEffective}
+                >
                   <option value="rascunho">Rascunho</option>
                   <option value="planejada">Planejada</option>
                   <option value="em_programacao">Em Programação</option>
@@ -968,7 +976,7 @@ export default function OrdemFormPanel({
                     disabled={isExecucaoGerada || isLockedEffective}
                     onEnsureOrder={ensureOrderSaved}
                     onApplied={async (bom, appliedOrdemId) => {
-                      const label = bom.codigo ? `${bom.codigo} (v${bom.versao})` : bom.descricao || 'Ficha técnica aplicada';
+                      const label = bom.codigo ? `${bom.codigo} (v${bom.versao})` : `Ficha técnica (v${bom.versao})`;
                       handleHeaderChange('bom_aplicado_id', bom.id);
                       handleHeaderChange('bom_aplicado_desc', label);
                       try {

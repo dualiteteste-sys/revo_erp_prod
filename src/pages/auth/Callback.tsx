@@ -50,7 +50,7 @@ export default function Callback() {
         let lastErr: any = null;
 
         for (let i = 0; i < RETRIES_MS.length; i++) {
-          const { error } = await supabase.rpc(
+          const { error } = await (supabase as any).rpc(
             "secure_bootstrap_empresa_for_current_user",
             {
               p_razao_social: empresaNome || "Empresa sem Nome",
@@ -89,7 +89,7 @@ export default function Callback() {
           const planSlug = (localStorage.getItem("pending_plan_slug") ?? "").trim();
           const cycle = (localStorage.getItem("pending_plan_cycle") ?? "").trim() || "monthly";
           if (planSlug) {
-            const { data: trialRes, error: trialErr } = await supabase.rpc(
+            const { data: trialRes, error: trialErr } = await (supabase as any).rpc(
               "billing_start_trial_for_current_user",
               { p_plan_slug: planSlug, p_billing_cycle: cycle },
             );

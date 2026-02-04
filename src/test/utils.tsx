@@ -13,7 +13,7 @@ export function cleanupTestQueryClients() {
     for (const qc of _testQueryClients) {
         try {
             qc.cancelQueries();
-            qc.cancelMutations?.();
+            (qc as any).cancelMutations?.();
         } catch {
             // best-effort
         }

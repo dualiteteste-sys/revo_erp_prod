@@ -165,7 +165,7 @@ export default function UpdatePasswordPage() {
 
       if (empresaId) {
         console.log("[RPC] accept_invite_for_current_user", empresaId);
-        const { error: rpcErr } = await supabase.rpc("accept_invite_for_current_user", {
+        const { error: rpcErr } = await (supabase as any).rpc("accept_invite_for_current_user", {
           p_empresa_id: empresaId,
         });
         if (rpcErr && !String(rpcErr.message ?? "").includes("INVITE_NOT_FOUND")) {

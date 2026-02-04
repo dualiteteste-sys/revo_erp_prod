@@ -45,14 +45,14 @@ export default function OnboardingStepModal({ isOpen, onClose, empresaId, step, 
   const selectedConta = useMemo(() => contas.find((c) => c.id === selectedContaId) ?? null, [contas, selectedContaId]);
 
   const loadContas = useCallback(async () => {
-    setLoading(true);
-    try {
-      const { data, error } = await supabase.rpc('financeiro_contas_correntes_list', {
-        p_q: null,
-        p_ativo: true,
-        p_limit: 200,
-        p_offset: 0,
-      });
+	    setLoading(true);
+	    try {
+	      const { data, error } = await (supabase as any).rpc('financeiro_contas_correntes_list', {
+	        p_q: null,
+	        p_ativo: true,
+	        p_limit: 200,
+	        p_offset: 0,
+	      });
       if (error) throw error;
       const rows = (data ?? []) as unknown as ContaCorrente[];
       setContas(rows);

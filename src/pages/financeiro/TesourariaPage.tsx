@@ -104,13 +104,13 @@ export default function TesourariaPage() {
 
   const handleSetPadrao = async (conta: ContaCorrente, para: 'pagamentos' | 'recebimentos') => {
     const label = para === 'pagamentos' ? 'Pagamentos' : 'Recebimentos';
-    const ok = await confirm({
-      title: `Definir padrão para ${label}`,
-      description: `Deseja definir "${conta.nome}" como conta padrão para ${label.toLowerCase()}?`,
-      confirmText: 'Definir como padrão',
-      cancelText: 'Cancelar',
-      variant: 'default',
-    });
+	    const ok = await confirm({
+	      title: `Definir padrão para ${label}`,
+	      description: `Deseja definir "${conta.nome}" como conta padrão para ${label.toLowerCase()}?`,
+	      confirmText: 'Definir como padrão',
+	      cancelText: 'Cancelar',
+	      variant: 'primary',
+	    });
     if (!ok) return;
 
     try {

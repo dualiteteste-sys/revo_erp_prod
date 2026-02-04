@@ -24,7 +24,7 @@ function formatMoneyBRL(n: number | null | undefined): string {
 }
 
 function downloadCsv(filename: string, headers: string[], rows: string[][]) {
-  const escape = (s: string) => `"${String(s ?? '').replaceAll('"', '""')}"`;
+  const escape = (s: string) => `"${String(s ?? '').split('"').join('""')}"`;
   const csv = [headers.map(escape).join(';'), ...rows.map((r) => r.map(escape).join(';'))].join('\n');
   const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
   const url = URL.createObjectURL(blob);

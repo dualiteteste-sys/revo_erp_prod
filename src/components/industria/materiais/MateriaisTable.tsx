@@ -115,9 +115,9 @@ export default function MateriaisTable({ materiais, onEdit, onDelete }: Props) {
               </td>
               <td className="px-6 py-4 text-center">
                 {item.ativo ? (
-                  <CheckCircle size={18} className="text-green-500 mx-auto" title="Ativo" />
+                  <CheckCircle size={18} className="text-green-500 mx-auto" />
                 ) : (
-                  <XCircle size={18} className="text-gray-400 mx-auto" title="Inativo" />
+                  <XCircle size={18} className="text-gray-400 mx-auto" />
                 )}
               </td>
               <td className="px-6 py-4 text-right">

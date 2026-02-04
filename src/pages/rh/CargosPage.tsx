@@ -97,15 +97,15 @@ export default function CargosPage() {
       return;
     }
     const nextAtivo = !cargo.ativo;
-    const ok = await confirm({
-      title: nextAtivo ? 'Reativar cargo' : 'Inativar cargo',
-      description: nextAtivo
-        ? `Deseja reativar o cargo "${cargo.nome}"?`
-        : `Deseja inativar o cargo "${cargo.nome}"? Ele ficará indisponível para novos colaboradores.`,
-      confirmText: nextAtivo ? 'Reativar' : 'Inativar',
-      cancelText: 'Cancelar',
-      variant: nextAtivo ? 'default' : 'danger',
-    });
+	    const ok = await confirm({
+	      title: nextAtivo ? 'Reativar cargo' : 'Inativar cargo',
+	      description: nextAtivo
+	        ? `Deseja reativar o cargo "${cargo.nome}"?`
+	        : `Deseja inativar o cargo "${cargo.nome}"? Ele ficará indisponível para novos colaboradores.`,
+	      confirmText: nextAtivo ? 'Reativar' : 'Inativar',
+	      cancelText: 'Cancelar',
+	      variant: nextAtivo ? 'primary' : 'danger',
+	    });
     if (!ok) return;
 
     try {

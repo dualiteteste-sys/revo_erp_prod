@@ -1053,14 +1053,15 @@ export default function ProducaoFormPanel({
     </>
   );
 }
-  const checkEntregaBlocked = (ordem: OrdemProducaoDetails | null): { blocked: boolean; reason?: string } => {
-    if (!ordem) return { blocked: false };
-    if (!ordem.operacoes || ordem.operacoes.length === 0) return { blocked: false };
-    const pendente = ordem.operacoes.some(op => {
-      if (!op.require_if) return false;
-      if (op.if_status === 'aprovada') return false;
-      return true;
-    });
+	  const checkEntregaBlocked = (ordem: OrdemProducaoDetails | null): { blocked: boolean; reason?: string } => {
+	    if (!ordem) return { blocked: false };
+	    const operacoes = ((ordem as any).operacoes as any[] | undefined) ?? [];
+	    if (operacoes.length === 0) return { blocked: false };
+	    const pendente = operacoes.some((op: any) => {
+	      if (!op.require_if) return false;
+	      if (op.if_status === 'aprovada') return false;
+	      return true;
+	    });
     if (pendente) {
       return {
         blocked: true,

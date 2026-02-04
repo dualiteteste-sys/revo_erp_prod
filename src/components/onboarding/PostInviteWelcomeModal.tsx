@@ -38,7 +38,10 @@ export default function PostInviteWelcomeModal({ isOpen, onClose }: Props) {
   const [checks, setChecks] = useState<OnboardingCheck[]>([]);
 
   const empresaId = activeEmpresa?.id ?? null;
-  const empresaNome = useMemo(() => activeEmpresa?.fantasia ?? activeEmpresa?.razao_social ?? 'sua empresa', [activeEmpresa]);
+  const empresaNome = useMemo(
+    () => activeEmpresa?.nome_fantasia ?? activeEmpresa?.nome_razao_social ?? 'sua empresa',
+    [activeEmpresa],
+  );
 
   const progress = useMemo(() => {
     const total = checks.length;
@@ -200,4 +203,3 @@ export default function PostInviteWelcomeModal({ isOpen, onClose }: Props) {
     </Modal>
   );
 }
-

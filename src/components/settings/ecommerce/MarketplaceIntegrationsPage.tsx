@@ -32,6 +32,7 @@ import { listDepositos } from '@/services/suprimentos';
 import { listTabelasPreco } from '@/services/pricing';
 
 type Provider = 'meli' | 'shopee' | 'woo';
+type CatalogProvider = Exclude<Provider, 'woo'>;
 
 const providerLabels: Record<Provider, string> = {
   meli: 'Mercado Livre',
@@ -74,7 +75,7 @@ export default function MarketplaceIntegrationsPage() {
   const [syncingOrders, setSyncingOrders] = useState<Provider | null>(null);
   const [mappingsOpen, setMappingsOpen] = useState(false);
   const [mappingsLoading, setMappingsLoading] = useState(false);
-  const [mappingsProvider, setMappingsProvider] = useState<Provider>('meli');
+  const [mappingsProvider, setMappingsProvider] = useState<CatalogProvider>('meli');
   const [mappingsQuery, setMappingsQuery] = useState('');
   const [mappings, setMappings] = useState<EcommerceProductMappingRow[]>([]);
   const [savingMapId, setSavingMapId] = useState<string | null>(null);
@@ -353,7 +354,7 @@ export default function MarketplaceIntegrationsPage() {
   };
 
   const loadMappings = useCallback(
-    async (provider: Provider, q?: string) => {
+    async (provider: CatalogProvider, q?: string) => {
       setMappingsLoading(true);
       try {
         const rows = await listEcommerceProductMappings({ provider, q: q ?? '', limit: 50, offset: 0 });
@@ -368,7 +369,7 @@ export default function MarketplaceIntegrationsPage() {
     [addToast],
   );
 
-  const openMappings = async (provider: Provider) => {
+  const openMappings = async (provider: CatalogProvider) => {
     if (!canManage) {
       addToast('Sem permissão para gerenciar integrações.', 'warning');
       return;
@@ -611,7 +612,7 @@ export default function MarketplaceIntegrationsPage() {
       </div>
 
       <Dialog open={configOpen} onOpenChange={(v) => setConfigOpen(v)}>
-        <DialogContent className="max-w-xl">
+        <DialogContent className="max-w-3xl max-h-[85vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Assistente de integração</DialogTitle>
           </DialogHeader>
@@ -782,13 +783,13 @@ export default function MarketplaceIntegrationsPage() {
                       name="woo_deposito_id"
                       value={String(activeConnection.config?.deposito_id ?? '')}
                       disabled={wooOptionsLoading}
-                      onChange={(e) =>
-                        setActiveConnection((prev) =>
-                          prev
-                            ? { ...prev, config: { ...(prev.config ?? {}), deposito_id: (e.target as HTMLSelectElement).value || null } }
-                            : prev,
-                        )
-                      }
+	                      onChange={(e) =>
+	                        setActiveConnection((prev) =>
+	                          prev
+	                            ? { ...prev, config: { ...(prev.config ?? {}), deposito_id: (e.target as HTMLSelectElement).value || undefined } }
+	                            : prev,
+	                        )
+	                      }
                     >
                       <option value="">{wooOptionsLoading ? 'Carregando…' : 'Selecionar…'}</option>
                       {wooDepositos.map((d) => (
@@ -803,13 +804,13 @@ export default function MarketplaceIntegrationsPage() {
                       name="woo_base_tabela_preco_id"
                       value={String(activeConnection.config?.base_tabela_preco_id ?? '')}
                       disabled={wooOptionsLoading}
-                      onChange={(e) =>
-                        setActiveConnection((prev) =>
-                          prev
-                            ? { ...prev, config: { ...(prev.config ?? {}), base_tabela_preco_id: (e.target as HTMLSelectElement).value || null } }
-                            : prev,
-                        )
-                      }
+	                      onChange={(e) =>
+	                        setActiveConnection((prev) =>
+	                          prev
+	                            ? { ...prev, config: { ...(prev.config ?? {}), base_tabela_preco_id: (e.target as HTMLSelectElement).value || undefined } }
+	                            : prev,
+	                        )
+	                      }
                     >
                       <option value="">{wooOptionsLoading ? 'Carregando…' : 'Selecionar…'}</option>
                       {wooTabelasPreco.map((t) => (
@@ -831,13 +832,13 @@ export default function MarketplaceIntegrationsPage() {
                             ? {
                                 ...prev,
                                 config: {
-                                  ...(prev.config ?? {}),
-                                  price_percent_default: (e.target as HTMLInputElement).value === ''
-                                    ? null
-                                    : Number((e.target as HTMLInputElement).value),
-                                },
-                              }
-                            : prev,
+	                                  ...(prev.config ?? {}),
+	                                  price_percent_default: (e.target as HTMLInputElement).value === ''
+	                                    ? undefined
+	                                    : Number((e.target as HTMLInputElement).value),
+	                                },
+	                              }
+	                            : prev,
                         )
                       }
                     />
@@ -848,7 +849,7 @@ export default function MarketplaceIntegrationsPage() {
                 </GlassCard>
               ) : null}
 
-              <div className="space-y-3">
+              <GlassCard className="p-3">
                 <div className="text-sm font-medium text-gray-900">2) Ativar recursos</div>
                 <div className="flex items-center justify-between gap-3">
                   <div>
@@ -901,7 +902,7 @@ export default function MarketplaceIntegrationsPage() {
                     }
                   />
                 </div>
-              </div>
+              </GlassCard>
 
               <GlassCard className="p-3">
                 <div className="text-sm font-medium text-gray-900">3) Mapear produtos (recomendado)</div>
@@ -909,13 +910,20 @@ export default function MarketplaceIntegrationsPage() {
                   Para importar itens corretamente, mapeie cada produto do Revo com o ID do anúncio no canal.
                 </div>
                 <div className="mt-3 flex justify-end">
-                  <Button
-                    variant="outline"
-                    className="gap-2"
-                    disabled={!canManage}
-                    onClick={() => void openMappings(activeConnection.provider as Provider)}
-                    title={canManage ? 'Abrir mapeamento' : 'Sem permissão'}
-                  >
+	                  <Button
+	                    variant="outline"
+	                    className="gap-2"
+	                    disabled={!canManage}
+	                    onClick={() => {
+	                      const p = activeConnection.provider as Provider;
+	                      if (p === 'woo') {
+	                        addToast('Mapeamento de produtos ainda não está disponível para WooCommerce.', 'info');
+	                        return;
+	                      }
+	                      void openMappings(p);
+	                    }}
+	                    title={canManage ? 'Abrir mapeamento' : 'Sem permissão'}
+	                  >
                     <SettingsIcon size={16} />
                     Abrir mapeamento
                   </Button>

@@ -47,7 +47,7 @@ export function useEmpresaRole() {
         const normalized = normalize(rpcRole);
         if (normalized) return normalized;
       } catch (rpcError) {
-        logger.warn('[RBAC] Falha ao carregar role via RPC current_empresa_role()', rpcError, { activeEmpresaId, userId });
+        logger.warn('[RBAC] Falha ao carregar role via RPC current_empresa_role()', { error: rpcError, activeEmpresaId, userId });
       }
       return null;
     },

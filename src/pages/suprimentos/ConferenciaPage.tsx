@@ -338,15 +338,15 @@ export default function ConferenciaPage() {
                 addToast(result.message, 'warning');
                 return;
             }
-            if (result.status === 'concluido') {
-                addToast(result.message, 'success');
-                const syncStatus = result.materiais_cliente_sync?.status;
-                if (syncStatus && syncStatus !== 'ok') {
-                    showMateriaisClienteSyncToast(result.materiais_cliente_sync);
-                }
-                // Recarrega para atualizar o status e habilitar os botões
-                loadData(id);
-            } else {
+	            if (result.status === 'concluido') {
+	                addToast(result.message, 'success');
+	                const sync = result.materiais_cliente_sync;
+	                if (sync?.status && sync.status !== 'ok') {
+	                    showMateriaisClienteSyncToast(sync);
+	                }
+	                // Recarrega para atualizar o status e habilitar os botões
+	                loadData(id);
+	            } else {
                 addToast(result.message, 'warning');
                 loadData(id);
             }
@@ -685,11 +685,11 @@ export default function ConferenciaPage() {
                 </div>
                 <div className="ml-auto">
                     {!isLocked && (
-                        <button
-                            onClick={handleFinalizar}
-                            disabled={finalizing}
-                            className={`bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700 font-medium flex items-center gap-2 ${finalizing ? 'opacity-50 cursor-not-allowed' : ''}`}
-                        >
+	                        <button
+	                            onClick={() => void handleFinalizar()}
+	                            disabled={finalizing}
+	                            className={`bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700 font-medium flex items-center gap-2 ${finalizing ? 'opacity-50 cursor-not-allowed' : ''}`}
+	                        >
                             {finalizing ? <Loader2 className="animate-spin" size={20} /> : <CheckCircle size={20} />}
                             Finalizar Recebimento
                         </button>

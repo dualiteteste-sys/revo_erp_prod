@@ -55,11 +55,11 @@ export default function FeatureFlagsPage() {
           <p className="mt-2 text-gray-600">
             Chaves por empresa para ativar/desativar recursos (com trilha em auditoria).
           </p>
-          {empresaId ? (
-            <div className="mt-2 text-xs text-gray-500">
-              Empresa ativa: <span className="font-medium">{activeEmpresa?.fantasia || activeEmpresa?.razao_social || empresaId}</span>
-            </div>
-          ) : null}
+	          {empresaId ? (
+	            <div className="mt-2 text-xs text-gray-500">
+	              Empresa ativa: <span className="font-medium">{activeEmpresa?.nome_fantasia || activeEmpresa?.nome_razao_social || empresaId}</span>
+	            </div>
+	          ) : null}
         </div>
 
         <div className="flex items-center gap-2">

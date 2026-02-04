@@ -20,10 +20,7 @@ type Props = {
 const schema = z.object({
   email: z.string().email({ message: "Formato de e-mail inválido." }),
   password: z.string().min(8, { message: "Senha precisa ter pelo menos 8 caracteres." }),
-  role: z.enum(["OWNER", "ADMIN", "MEMBER", "FINANCE", "OPS", "VIEWER"], {
-    required_error: "Selecione um papel.",
-    invalid_type_error: "Papel inválido.",
-  }),
+  role: z.enum(["OWNER", "ADMIN", "MEMBER", "FINANCE", "OPS", "VIEWER"]),
 });
 
 export default function CreateUserManualDialog({

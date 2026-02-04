@@ -14,7 +14,7 @@ import { ResponsiveTable } from '@/components/ui/ResponsiveTable';
 import OsFormPanel from '@/components/os/OsFormPanel';
 import Select from '@/components/ui/forms/Select';
 import OsKanbanModal from '@/components/os/kanban/OsKanbanModal';
-import { Database } from '@/types/database.types';
+type OsStatus = 'orcamento' | 'aberta' | 'concluida' | 'cancelada';
 import PageHeader from '@/components/ui/PageHeader';
 import SearchField from '@/components/ui/forms/SearchField';
 import { Button } from '@/components/ui/button';
@@ -146,9 +146,9 @@ const OSPage: React.FC = () => {
     }
   };
 
-  const handleSetStatus = async (os: osService.OrdemServico, next: Database['public']['Enums']['status_os']) => {
+  const handleSetStatus = async (os: osService.OrdemServico, next: OsStatus) => {
     if (statusUpdatingId === os.id) return;
-    const labelMap: Record<Database['public']['Enums']['status_os'], string> = {
+    const labelMap: Record<OsStatus, string> = {
       orcamento: 'Orçamento',
       aberta: 'Aberta',
       concluida: 'Concluída',
@@ -169,7 +169,7 @@ const OSPage: React.FC = () => {
             : `Deseja cancelar a O.S. nº ${os.numero}?`,
         confirmText: next === 'concluida' ? 'Concluir' : 'Cancelar',
         cancelText: 'Voltar',
-        variant: next === 'cancelada' ? 'danger' : 'default',
+        variant: next === 'cancelada' ? 'danger' : 'primary',
       });
       if (!ok) return;
     }
@@ -275,7 +275,7 @@ const OSPage: React.FC = () => {
         />
         <Select
           value={filterStatus || ''}
-          onChange={(e) => setFilterStatus(e.target.value as Database['public']['Enums']['status_os'] || null)}
+          onChange={(e) => setFilterStatus((e.target.value as OsStatus) || null)}
           className="min-w-[200px]"
         >
           <option value="">Todos os status</option>

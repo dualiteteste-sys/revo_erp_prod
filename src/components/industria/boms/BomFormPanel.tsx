@@ -155,7 +155,7 @@ export default function BomFormPanel({ bomId, initialData, onSaveSuccess, onClos
       return saved.id;
     } catch (e: any) {
       addToast(e.message, 'error');
-      return null;
+      return undefined;
     } finally {
       setIsSaving(false);
     }

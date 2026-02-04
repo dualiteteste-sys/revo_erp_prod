@@ -529,7 +529,7 @@ export default function OperadoresPage() {
                   </div>
 
                   <div className="bg-gray-50 px-5 py-3 text-xs text-gray-600 flex items-center justify-between">
-                    <span>{activeEmpresa?.fantasia || activeEmpresa?.razao_social || 'Empresa'}</span>
+	                    <span>{activeEmpresa?.nome_fantasia || activeEmpresa?.nome_razao_social || 'Empresa'}</span>
                     <span>{new Date().getFullYear()}</span>
                   </div>
                 </div>
@@ -547,7 +547,7 @@ export default function OperadoresPage() {
                       )}
                     </div>
                     <p className="text-sm font-semibold text-center">
-                      {activeEmpresa?.fantasia || activeEmpresa?.razao_social || 'Empresa'}
+	                      {activeEmpresa?.nome_fantasia || activeEmpresa?.nome_razao_social || 'Empresa'}
                     </p>
                     <p className="text-[11px] text-gray-300 mt-1">Credencial de acesso ao chão de fábrica</p>
                   </div>

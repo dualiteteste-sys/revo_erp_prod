@@ -201,12 +201,12 @@ export default function OpsRlsInventoryPage() {
       }
       const content = JSON.stringify(snap, null, 2);
       const blob = new Blob([content], { type: 'application/json;charset=utf-8' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      const stamp = new Date(snap.created_at).toISOString().replaceAll(':', '-');
-      a.href = url;
-      a.download = `rls_inventory_snapshot_${stamp}_${snap.id}.json`;
-      document.body.appendChild(a);
+	      const url = URL.createObjectURL(blob);
+	      const a = document.createElement('a');
+	      const stamp = new Date(snap.created_at).toISOString().split(':').join('-');
+	      a.href = url;
+	      a.download = `rls_inventory_snapshot_${stamp}_${snap.id}.json`;
+	      document.body.appendChild(a);
       a.click();
       a.remove();
       URL.revokeObjectURL(url);

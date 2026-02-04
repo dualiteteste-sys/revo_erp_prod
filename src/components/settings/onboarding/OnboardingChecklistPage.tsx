@@ -58,11 +58,11 @@ export default function OnboardingChecklistPage() {
           <p className="mt-2 text-gray-600">
             Checklist guiado por empresa para reduzir retrabalho. <b>Não bloqueia</b> o uso do sistema.
           </p>
-          {empresaId ? (
-            <div className="mt-2 text-xs text-gray-500">
-              Empresa ativa: <span className="font-medium">{activeEmpresa?.fantasia || activeEmpresa?.razao_social || empresaId}</span>
-            </div>
-          ) : null}
+	          {empresaId ? (
+	            <div className="mt-2 text-xs text-gray-500">
+	              Empresa ativa: <span className="font-medium">{activeEmpresa?.nome_fantasia || activeEmpresa?.nome_razao_social || empresaId}</span>
+	            </div>
+	          ) : null}
         </div>
 
         <div className="flex items-center gap-2">

@@ -15,11 +15,13 @@ const CompanySettingsForm: React.FC<Props> = ({ onSaved }) => {
   const { activeEmpresa, refreshEmpresas } = useAuth();
   const { addToast } = useToast();
 
-  // Extend EmpresaUpdate to include form-specific fields
-  interface CompanyFormState extends EmpresaUpdate {
-    razao_social?: string;
-    fantasia?: string;
-  }
+	  // Extend EmpresaUpdate to include form-specific fields
+	  interface CompanyFormState extends EmpresaUpdate {
+	    razao_social?: string;
+	    fantasia?: string;
+	    inscr_estadual?: string | null;
+	    inscr_municipal?: string | null;
+	  }
 
   const [formData, setFormData] = useState<CompanyFormState | null>(null);
   const [initialData, setInitialData] = useState<CompanyFormState | null>(null);
@@ -96,23 +98,21 @@ const CompanySettingsForm: React.FC<Props> = ({ onSaved }) => {
 
     setLoading(true);
 
-    const finalPayload: EmpresaUpdate = {
-      nome_razao_social: formData.razao_social?.trim() || null,
-      nome_fantasia: formData.fantasia?.trim() || null,
-      cnpj: formData.cnpj?.replace(/\D/g, '') || null,
-      endereco_cep: formData.endereco_cep?.replace(/\D/g, '') || null,
-      endereco_logradouro: formData.endereco_logradouro?.trim() || null,
-      endereco_numero: formData.endereco_numero?.trim() || null,
-      endereco_complemento: formData.endereco_complemento?.trim() || null,
-      endereco_bairro: formData.endereco_bairro?.trim() || null,
-      endereco_cidade: formData.endereco_cidade?.trim() || null,
-      endereco_uf: formData.endereco_uf?.trim() || null,
-      telefone: formData.telefone?.replace(/\D/g, '') || null,
-      email: formData.email?.trim() || null,
-      logotipo_url: formData.logotipo_url ?? null,
-      inscr_estadual: formData.inscr_estadual ?? null,
-      inscr_municipal: formData.inscr_municipal ?? null,
-    };
+	    const finalPayload: EmpresaUpdate = {
+	      nome_razao_social: formData.razao_social?.trim() || undefined,
+	      nome_fantasia: formData.fantasia?.trim() || null,
+	      cnpj: formData.cnpj?.replace(/\D/g, '') || null,
+	      endereco_cep: formData.endereco_cep?.replace(/\D/g, '') || null,
+	      endereco_logradouro: formData.endereco_logradouro?.trim() || null,
+	      endereco_numero: formData.endereco_numero?.trim() || null,
+	      endereco_complemento: formData.endereco_complemento?.trim() || null,
+	      endereco_bairro: formData.endereco_bairro?.trim() || null,
+	      endereco_cidade: formData.endereco_cidade?.trim() || null,
+	      endereco_uf: formData.endereco_uf?.trim() || null,
+	      telefone: formData.telefone?.replace(/\D/g, '') || null,
+	      email: formData.email?.trim() || null,
+	      logotipo_url: formData.logotipo_url ?? null,
+	    };
 
     try {
       const updatedCompany = await updateCompany(finalPayload);

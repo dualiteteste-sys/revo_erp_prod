@@ -34,7 +34,7 @@ async function logMetric(event: string, message: string, context: Record<string,
   metricsSent += 1;
 
   try {
-    await supabase.rpc('log_app_event', {
+    await (supabase as unknown as { rpc: (fn: string, args?: Record<string, unknown>) => Promise<unknown> }).rpc('log_app_event', {
       p_level: 'info',
       p_event: event,
       p_message: message,
@@ -74,4 +74,3 @@ export function maybeLogFirstValue() {
 
   void logMetric('metric.first_value', 'First value', { value_ms: valueMs });
 }
-

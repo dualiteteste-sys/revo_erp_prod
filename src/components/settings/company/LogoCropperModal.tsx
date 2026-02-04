@@ -1,6 +1,6 @@
 import React, { useState, useCallback } from 'react';
 import Cropper from 'react-easy-crop';
-import { Point, Area } from 'react-easy-crop/types';
+import type { Point, Area } from 'react-easy-crop';
 import Modal from '../../ui/Modal';
 import { Loader2 } from 'lucide-react';
 

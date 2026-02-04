@@ -131,7 +131,8 @@ export default function OperacoesGrid({ ordemId, highlightOperacaoId, canOperate
 
     const handleTransferConfirm = async () => {
         if (!transferOp) return;
-        const disponivel = Math.max(transferOp.quantidade_produzida - (transferOp.quantidade_transferida || 0), 0);
+        const quantidadeProduzida = Number((transferOp as any)?.quantidade_produzida ?? 0);
+        const disponivel = Math.max(quantidadeProduzida - (transferOp.quantidade_transferida || 0), 0);
         if (transferQty <= 0) {
             addToast('Informe uma quantidade válida para transferir.', 'error');
             return;
@@ -159,7 +160,8 @@ export default function OperacoesGrid({ ordemId, highlightOperacaoId, canOperate
             addToast('Você não tem permissão para transferir.', 'error');
             return;
         }
-        const disponivel = Math.max(op.quantidade_produzida - (op.quantidade_transferida || 0), 0);
+        const quantidadeProduzida = Number((op as any)?.quantidade_produzida ?? 0);
+        const disponivel = Math.max(quantidadeProduzida - (op.quantidade_transferida || 0), 0);
         setTransferOp(op);
         setTransferQty(disponivel);
     };
@@ -231,7 +233,7 @@ export default function OperacoesGrid({ ordemId, highlightOperacaoId, canOperate
                     </thead>
                     <tbody className="bg-white divide-y divide-gray-200">
                         {operacoes.map((op) => {
-                            const producao = op.quantidade_produzida || 0;
+                            const producao = Number((op as any)?.quantidade_produzida ?? 0);
                             const transferida = op.quantidade_transferida || 0;
                             const disponivelTransferencia = producao - transferida;
                             const ipLiberado = !op.require_ip || op.ip_status === 'aprovada';
@@ -261,7 +263,9 @@ export default function OperacoesGrid({ ordemId, highlightOperacaoId, canOperate
                                         </span>
                                     </td>
                                     <td className="px-3 py-2 whitespace-nowrap text-sm text-gray-900 text-right">{op.quantidade_planejada}</td>
-                                    <td className="px-3 py-2 whitespace-nowrap text-sm text-gray-900 text-right">{op.quantidade_produzida}</td>
+                                    <td className="px-3 py-2 whitespace-nowrap text-sm text-gray-900 text-right">
+                                        {Number((op as any)?.quantidade_produzida ?? 0)}
+                                    </td>
                                     <td className="px-3 py-2 whitespace-nowrap text-sm text-red-600 text-right">{op.quantidade_refugo}</td>
                                     <td className="px-3 py-2 whitespace-nowrap text-sm text-gray-500 text-right">{op.quantidade_transferida}</td>
                                     <td className="px-3 py-2 whitespace-nowrap text-sm text-gray-900 text-right">{disponivelTransferencia}</td>
@@ -495,9 +499,15 @@ export default function OperacoesGrid({ ordemId, highlightOperacaoId, canOperate
                 >
                     <div className="p-6 space-y-4">
                         <div className="bg-blue-50 border border-blue-100 text-blue-800 p-3 rounded-md text-sm flex flex-wrap gap-4">
-                            <div><strong>Produzido:</strong> {transferOp.quantidade_produzida}</div>
+                            <div><strong>Produzido:</strong> {Number((transferOp as any)?.quantidade_produzida ?? 0)}</div>
                             <div><strong>Transferido:</strong> {transferOp.quantidade_transferida}</div>
-                            <div><strong>Disponível:</strong> {Math.max(transferOp.quantidade_produzida - (transferOp.quantidade_transferida || 0), 0)}</div>
+                            <div>
+                                <strong>Disponível:</strong>{' '}
+                                {Math.max(
+                                    Number((transferOp as any)?.quantidade_produzida ?? 0) - (transferOp.quantidade_transferida || 0),
+                                    0,
+                                )}
+                            </div>
                         </div>
 
                         <div>

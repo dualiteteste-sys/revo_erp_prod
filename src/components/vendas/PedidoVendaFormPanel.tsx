@@ -359,7 +359,7 @@ export default function PedidoVendaFormPanel({ vendaId, onSaveSuccess, onClose, 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [formData.id, (formData.itens || []).length]);
 
-  const handleHeaderChange = (field: keyof VendaPayload, value: any) => {
+  const handleHeaderChange = (field: keyof VendaPayload | 'cliente_nome', value: any) => {
     setFormData(prev => ({ ...prev, [field]: value }));
   };
 
@@ -448,8 +448,9 @@ export default function PedidoVendaFormPanel({ vendaId, onSaveSuccess, onClose, 
 
     let currentId = formData.id;
     if (!currentId) {
-      currentId = await handleSaveHeader();
-      if (!currentId) return;
+      const savedId = await handleSaveHeader();
+      if (!savedId) return;
+      currentId = savedId;
     }
 
     try {
@@ -711,13 +712,13 @@ export default function PedidoVendaFormPanel({ vendaId, onSaveSuccess, onClose, 
       addToast('Pedido concluído e estoque baixado.', 'success');
       onSaveSuccess();
 
-      const wantTitles = await confirm({
-        title: 'Gerar títulos (contas a receber)',
-        description: 'Deseja gerar automaticamente os títulos (parcelas) de Contas a Receber para este pedido?',
-        confirmText: 'Gerar agora',
-        cancelText: 'Agora não',
-        variant: 'default',
-      });
+	      const wantTitles = await confirm({
+	        title: 'Gerar títulos (contas a receber)',
+	        description: 'Deseja gerar automaticamente os títulos (parcelas) de Contas a Receber para este pedido?',
+	        confirmText: 'Gerar agora',
+	        cancelText: 'Agora não',
+	        variant: 'primary',
+	      });
       if (wantTitles) setParcelamentoOpen(true);
     } catch (e: any) {
       addToast(e?.message || 'Falha ao concluir pedido.', 'error');

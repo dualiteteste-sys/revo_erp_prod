@@ -513,7 +513,7 @@ export default function PcpDashboardPage() {
 
     setApsLoading(true);
     try {
-      await setOperacaoApsLock(operacaoId, nextLocked, reason || null);
+	      await setOperacaoApsLock(operacaoId, nextLocked, reason || undefined);
       addToast(nextLocked ? 'Operação bloqueada para APS.' : 'Operação desbloqueada.', 'success');
       if (apsModal.ctId) {
         await loadData();
@@ -595,16 +595,17 @@ export default function PcpDashboardPage() {
     }>();
 
     carga.forEach(item => {
-      const entry = map.get(item.centro_trabalho_id) || {
-        id: item.centro_trabalho_id,
-        nome: item.centro_trabalho_nome,
-        totalCapacidade: 0,
-        totalCarga: 0,
-        totalSetup: 0,
-        totalProducao: 0,
-        totalExecucao: 0,
-        dias: []
-      };
+	      const entry = map.get(item.centro_trabalho_id) || {
+	        id: item.centro_trabalho_id,
+	        nome: item.centro_trabalho_nome,
+	        totalCapacidade: 0,
+	        totalCarga: 0,
+	        totalSetup: 0,
+	        totalProducao: 0,
+	        totalExecucao: 0,
+	        dias: [] as PcpCargaCapacidade[],
+	        ratio: 0,
+	      };
       entry.totalCapacidade += item.capacidade_horas;
       entry.totalCarga += item.carga_total_horas;
       entry.totalSetup += item.carga_setup_horas;

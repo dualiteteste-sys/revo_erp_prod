@@ -174,7 +174,7 @@ export async function callRpc<T = unknown>(fn: string, args: RpcArgs = {}): Prom
   return withRetry(
     async (attempt) => {
       const startedAt = performance.now();
-      const { data, error, status } = await supabase.rpc(fn, args);
+      const { data, error, status } = await (supabase as any).rpc(fn, args);
       const durationMs = performance.now() - startedAt;
 
       if (!error) {
@@ -199,7 +199,7 @@ export async function callRpc<T = unknown>(fn: string, args: RpcArgs = {}): Prom
         recoveryOk = recovered;
         if (recovered) {
           const startedAt2 = performance.now();
-          const retryRes = await supabase.rpc(fn, args);
+          const retryRes = await (supabase as any).rpc(fn, args);
           const durationMs2 = performance.now() - startedAt2;
           if (!retryRes.error) {
             logRpcMetric({ fn, ok: true, status: retryRes.status, durationMs: durationMs2, attempt: attempt + 0.1 });

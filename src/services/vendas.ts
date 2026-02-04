@@ -173,15 +173,18 @@ export async function seedVendas(): Promise<void> {
     });
     
     // Adiciona à lista para ser usado imediatamente
-    eligibleClients.push({
-      id: newClient.id,
-      nome: newClient.nome,
-      tipo: newClient.tipo,
-      doc_unico: newClient.doc_unico,
-      created_at: newClient.created_at,
-      updated_at: newClient.updated_at
-    });
-  }
+	    eligibleClients.push({
+	      id: newClient.id,
+	      nome: newClient.nome,
+	      tipo: newClient.tipo,
+	      doc_unico: newClient.doc_unico,
+	      email: (newClient as any).email ?? null,
+	      telefone: (newClient as any).telefone ?? null,
+	      deleted_at: null,
+	      created_at: newClient.created_at,
+	      updated_at: newClient.updated_at
+	    });
+	  }
 
   // 3. Gerar 5 Pedidos
   for (let i = 0; i < 5; i++) {

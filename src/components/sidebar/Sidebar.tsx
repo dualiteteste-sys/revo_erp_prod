@@ -1,5 +1,5 @@
 import React, { useState, useRef } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence, type Variants } from 'framer-motion';
 import GlassCard from '../ui/GlassCard';
 import { menuConfig, MenuItem } from '../../config/menuConfig';
 import SidebarGroup from '../sidebar/SidebarGroup';
@@ -12,7 +12,7 @@ import RevoLogo from '../landing/RevoLogo';
 const sidebarVariants = {
   expanded: { width: 320, transition: { type: 'spring', stiffness: 300, damping: 30 } },
   collapsed: { width: 128, transition: { type: 'spring', stiffness: 300, damping: 30 } }
-};
+} satisfies Variants;
 
 interface SidebarProps {
   isCollapsed: boolean;

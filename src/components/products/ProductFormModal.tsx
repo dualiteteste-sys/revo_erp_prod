@@ -2,13 +2,13 @@ import React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X } from 'lucide-react';
 import ProductForm from './ProductForm';
-import { Product, ProductInsert, ProductUpdate } from '../../hooks/useProducts';
+import type { LegacyProduct, LegacyProductInsert, LegacyProductUpdate } from './ProductForm';
 
 interface ProductFormModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSave: (data: ProductInsert | ProductUpdate) => Promise<void>;
-  product: Product | null;
+  onSave: (data: LegacyProductInsert | LegacyProductUpdate) => Promise<void>;
+  product: LegacyProduct | null;
   isSaving: boolean;
 }
 

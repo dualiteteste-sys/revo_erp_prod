@@ -86,20 +86,18 @@ export default function ClientAutocomplete({ value, onChange, placeholder, disab
     }
   };
 
-  const handleCreateSuccess = (savedPartner: any) => {
-    const newHit: ClientHit = {
-      id: savedPartner.id,
-      label: savedPartner.nome || 'Novo Cliente',
-      nome: savedPartner.nome || 'Novo Cliente',
-      doc_unico: savedPartner.doc_unico || '',
-      cidade: savedPartner.enderecos?.[0]?.cidade || '',
-      uf: savedPartner.enderecos?.[0]?.uf || '',
-    };
+	  const handleCreateSuccess = (savedPartner: any) => {
+	    const newHit: ClientHit = {
+	      id: savedPartner.id,
+	      label: savedPartner.nome || 'Novo Cliente',
+	      nome: savedPartner.nome || 'Novo Cliente',
+	      doc_unico: savedPartner.doc_unico || '',
+	    };
 
-    handleSelect(newHit);
-    setIsCreateModalOpen(false);
-    addToast('Cliente criado e selecionado!', 'success');
-  };
+	    handleSelect(newHit);
+	    setIsCreateModalOpen(false);
+	    addToast('Cliente criado e selecionado!', 'success');
+	  };
 
   return (
     <div className={`relative flex gap-2 ${className || ''}`} ref={ref}>

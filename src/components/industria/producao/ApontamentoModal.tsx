@@ -72,7 +72,7 @@ export default function ApontamentoModal({ isOpen, onClose, operacao, onSuccess 
 
     const saldoRestante = useMemo(() => {
         const max = operacao.quantidade_planejada ?? 0;
-        return Math.max(max - operacao.quantidade_produzida - operacao.quantidade_refugo, 0);
+        return Math.max(max - ((operacao as any).quantidade_produzida ?? 0) - operacao.quantidade_refugo, 0);
     }, [operacao]);
 
     const loadMotivos = () => {
@@ -117,7 +117,8 @@ export default function ApontamentoModal({ isOpen, onClose, operacao, onSuccess 
             addToast('Informe o motivo do refugo.', 'error');
             return;
         }
-        const maxDisponivel = operacao.quantidade_planejada - operacao.quantidade_produzida - operacao.quantidade_refugo;
+        const maxDisponivel =
+            operacao.quantidade_planejada - (((operacao as any).quantidade_produzida ?? 0) as number) - operacao.quantidade_refugo;
         if (qtdBoa + qtdRefugo > maxDisponivel && maxDisponivel > 0) {
             addToast(`Quantidade ultrapassa o planejado restante (${maxDisponivel}).`, 'error');
             return;
@@ -180,7 +181,7 @@ export default function ApontamentoModal({ isOpen, onClose, operacao, onSuccess 
             <div className="space-y-6 p-6">
                 <div className="bg-blue-50 border border-blue-100 text-blue-800 p-3 rounded-md text-sm flex flex-wrap gap-4">
                     <div><strong>Planejado:</strong> {operacao.quantidade_planejada}</div>
-                    <div><strong>Produzido:</strong> {operacao.quantidade_produzida}</div>
+                    <div><strong>Produzido:</strong> {(operacao as any).quantidade_produzida ?? 0}</div>
                     <div><strong>Refugo:</strong> {operacao.quantidade_refugo}</div>
                     <div><strong>Saldo disponível:</strong> {saldoRestante}</div>
                 </div>

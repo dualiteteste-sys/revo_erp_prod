@@ -21,7 +21,7 @@ export function useHasPermission(module: string, action: string) {
   const query = useQuery({
     queryKey: ['permission', module, action],
     queryFn: async () => {
-      const { data, error } = await supabase.rpc('has_permission_for_current_user', {
+      const { data, error } = await (supabase as any).rpc('has_permission_for_current_user', {
         p_module: module,
         p_action: action,
       });

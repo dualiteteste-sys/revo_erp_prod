@@ -241,9 +241,9 @@ export default function IndustriaDashboardPage() {
         { id: 'op', type: 'number', getValue: (o: OrdemIndustria) => o.numero ?? 0 },
         { id: 'cliente', type: 'string', getValue: (o: OrdemIndustria) => o.cliente_nome ?? '' },
         { id: 'nfCliente', type: 'number', getValue: (o: OrdemIndustria) => o.total_entregue ?? 0 },
-        { id: 'nf', type: 'string', getValue: (o: OrdemIndustria) => o.numero_nf || o.documento_ref || '' },
+        { id: 'nf', type: 'string', getValue: (o: OrdemIndustria) => o.numero_nf || (o as any).documento_ref || '' },
         { id: 'pedido', type: 'string', getValue: (o: OrdemIndustria) => o.pedido_numero ?? '' },
-        { id: 'entrada', type: 'date', getValue: (o: OrdemIndustria) => o.created_at || o.data_prevista_inicio || '' },
+        { id: 'entrada', type: 'date', getValue: (o: OrdemIndustria) => o.created_at || (o as any).data_prevista_inicio || '' },
         { id: 'saldo', type: 'number', getValue: (o: OrdemIndustria) => Math.max((o.quantidade_planejada ?? 0) - (o.total_entregue ?? 0), 0) },
       ] as const
     );
@@ -557,9 +557,9 @@ export default function IndustriaDashboardPage() {
                 {benefTopSorted.map((o) => {
                   const saldo = Math.max((o.quantidade_planejada ?? 0) - (o.total_entregue ?? 0), 0);
                   const qtdeCaixas = o.qtde_caixas ?? '—';
-                  const nfNumero = o.numero_nf || o.documento_ref || '—';
+                  const nfNumero = o.numero_nf || (o as any).documento_ref || '—';
                   const pedidoNumero = o.pedido_numero || '—';
-                  const dataEntrada = o.created_at || o.data_prevista_inicio || '';
+                  const dataEntrada = o.created_at || (o as any).data_prevista_inicio || '';
                   return (
                     <tr
                       key={o.id}

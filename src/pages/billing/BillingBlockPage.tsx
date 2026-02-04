@@ -34,9 +34,9 @@ const BillingBlockPage: React.FC<BillingBlockPageProps> = ({ subscription }) => 
               <AlertTriangle className="w-10 h-10 text-red-600" />
             </div>
           </div>
-          <p className="text-sm font-semibold text-gray-700 mb-2">
-            Empresa: {activeEmpresa?.fantasia || activeEmpresa?.razao_social}
-          </p>
+	          <p className="text-sm font-semibold text-gray-700 mb-2">
+	            Empresa: {activeEmpresa?.nome_fantasia || activeEmpresa?.nome_razao_social}
+	          </p>
           <h1 className="text-3xl font-bold text-gray-800 mb-4">Acesso Suspenso</h1>
           <p className="text-gray-600 text-lg mb-8">
             {message} Por favor, atualize seus dados de pagamento para reativar o acesso.

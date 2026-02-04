@@ -60,7 +60,14 @@ export default function ApontamentoExecucaoModal({
     if (action !== 'concluir') return;
     setLoadingMotivos(true);
     getMotivosRefugo()
-      .then((rows) => setMotivos((rows || []).map((r) => ({ id: r.id, nome: r.nome }))))
+      .then((rows) =>
+        setMotivos(
+          (rows || []).map((r: any) => ({
+            id: r.id,
+            nome: r.nome ?? r.descricao ?? r.titulo ?? String(r.id),
+          })),
+        ),
+      )
       .catch(() => setMotivos([]))
       .finally(() => setLoadingMotivos(false));
   }, [open, action]);
@@ -74,13 +81,13 @@ export default function ApontamentoExecucaoModal({
         action,
         Number.isFinite(qtdBoas) ? qtdBoas : 0,
         Number.isFinite(qtdRefugadas) ? qtdRefugadas : 0,
-        (qtdRefugadas ?? 0) > 0 ? (motivoRefugo || null) : null,
-        observacoes || null,
+        (qtdRefugadas ?? 0) > 0 ? (motivoRefugo || undefined) : undefined,
+        observacoes || undefined,
         {
-          motivoRefugoId: (qtdRefugadas ?? 0) > 0 ? (motivoRefugoId || null) : null,
-          lote: action === 'concluir' ? (lote || null) : null,
-          custoUnitario: action === 'concluir' ? (custoUnitario > 0 ? custoUnitario : null) : null,
-        }
+          motivoRefugoId: (qtdRefugadas ?? 0) > 0 ? (motivoRefugoId || undefined) : undefined,
+          lote: action === 'concluir' ? (lote || undefined) : undefined,
+          custoUnitario: action === 'concluir' ? (custoUnitario > 0 ? custoUnitario : undefined) : undefined,
+        },
       );
       addToast(action === 'pausar' ? 'Operação pausada.' : 'Operação concluída.', 'success');
       onSuccess();
@@ -98,11 +105,11 @@ export default function ApontamentoExecucaoModal({
   return (
     <Modal isOpen={open} onClose={onClose} title={title} size="md">
       <QuickScanModal
-        open={scanOpen}
+        isOpen={scanOpen}
         onClose={() => setScanOpen(false)}
         title="Escanear lote/etiqueta"
-        description="Use a câmera ou leitor para preencher o lote."
-        onScanned={(value) => {
+        helper="Use a câmera ou leitor para preencher o lote."
+        onResult={(value: string) => {
           setLote(value);
           setScanOpen(false);
         }}

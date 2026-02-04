@@ -121,14 +121,14 @@ export function ContaAReceberMobileCard({
                             <span className={cn('px-2 py-0.5 text-xs font-medium rounded-full', status.color)}>
                                 {status.label}
                             </span>
-                        </div>
-                        <span className="text-sm font-semibold text-gray-900">
-                            {formatCurrency(conta.valor)}
-                        </span>
-                    </div>
-                </div>
-            </div>
-        </motion.div>
+	                        </div>
+	                        <span className="text-sm font-semibold text-gray-900">
+	                            {formatCurrency(Number(conta.valor ?? 0))}
+	                        </span>
+	                    </div>
+	                </div>
+	            </div>
+	        </motion.div>
     );
 }
 

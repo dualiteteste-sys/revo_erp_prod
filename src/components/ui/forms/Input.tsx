@@ -23,7 +23,9 @@ const inputVariants = cva(
   },
 );
 
-interface InputProps extends React.InputHTMLAttributes<HTMLInputElement>, VariantProps<typeof inputVariants> {
+interface InputProps
+  extends Omit<React.InputHTMLAttributes<HTMLInputElement>, 'size'>,
+    VariantProps<typeof inputVariants> {
   label?: React.ReactNode;
   startAdornment?: React.ReactNode;
   endAdornment?: React.ReactNode;
@@ -32,13 +34,27 @@ interface InputProps extends React.InputHTMLAttributes<HTMLInputElement>, Varian
 }
 
 const Input = React.forwardRef<HTMLInputElement, InputProps>(
-  ({ label, name, className, startAdornment, endAdornment, helperText, error, ...props }, ref) => {
+  (
+    {
+      label,
+      name,
+      className,
+      startAdornment,
+      endAdornment,
+      helperText,
+      error,
+      size,
+      state: stateProp,
+      ...inputProps
+    },
+    ref,
+  ) => {
     const startPadding = startAdornment ? 'pl-12' : 'pl-3';
     const endPadding = endAdornment ? 'pr-12' : 'pr-3';
-    const state = error ? 'error' : 'default';
+    const state = error ? 'error' : (stateProp ?? 'default');
 
-    const isDate = props.type === 'date';
-    const valueStr = typeof props.value === 'string' ? props.value : '';
+    const isDate = inputProps.type === 'date';
+    const valueStr = typeof inputProps.value === 'string' ? inputProps.value : '';
     const dateValue = React.useMemo(() => {
       if (!isDate) return null;
       const s = (valueStr || '').slice(0, 10);
@@ -65,9 +81,9 @@ const Input = React.forwardRef<HTMLInputElement, InputProps>(
           currentTarget: { value: next, name },
         } as unknown as React.ChangeEvent<HTMLInputElement>;
 
-        props.onChange?.(syntheticEvent);
+        inputProps.onChange?.(syntheticEvent);
       },
-      [name, props],
+      [name, inputProps.onChange],
     );
 
     return (
@@ -84,15 +100,15 @@ const Input = React.forwardRef<HTMLInputElement, InputProps>(
               <DatePicker
                 value={dateValue}
                 onChange={handleDateChange}
-                placeholder={props.placeholder || 'Selecione uma data'}
-                disabled={props.disabled}
-                required={props.required}
+                placeholder={inputProps.placeholder || 'Selecione uma data'}
+                disabled={inputProps.disabled}
+                required={inputProps.required}
                 className="w-full"
                 triggerClassName={cn(
-                  inputVariants({ size: props.size ?? 'default', state }),
+                  inputVariants({ size: size ?? 'default', state }),
                   startPadding,
                   endPadding,
-                  props.className,
+                  className,
                 )}
               />
             </>
@@ -107,13 +123,13 @@ const Input = React.forwardRef<HTMLInputElement, InputProps>(
                 ref={ref}
                 id={name}
                 name={name}
-                {...props}
+                {...inputProps}
                 aria-invalid={!!error}
                 className={cn(
-                  inputVariants({ size: props.size ?? 'default', state }),
+                  inputVariants({ size: size ?? 'default', state }),
                   startPadding,
                   endPadding,
-                  props.className,
+                  className,
                 )}
               />
               {endAdornment && (

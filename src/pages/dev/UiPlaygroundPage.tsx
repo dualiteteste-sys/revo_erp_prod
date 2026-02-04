@@ -14,11 +14,14 @@ export default function UiPlaygroundPage() {
   const [nativeValue, setNativeValue] = useState<string>("")
 
   return (
-    <PageShell>
-      <PageHeader
-        title="UI Playground"
-        subtitle="Componentes isolados para validação rápida (DEV)"
-      />
+    <PageShell
+      header={
+        <PageHeader
+          title="UI Playground"
+          description="Componentes isolados para validação rápida (DEV)"
+        />
+      }
+    >
 
       <div className="grid gap-6 md:grid-cols-2">
         <GlassCard className="p-6">
@@ -47,4 +50,3 @@ export default function UiPlaygroundPage() {
     </PageShell>
   )
 }
-

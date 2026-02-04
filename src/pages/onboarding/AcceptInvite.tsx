@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/lib/supabaseClient";
+import { callRpc } from "@/lib/api";
 import { Loader2, CheckCircle, AlertTriangle } from "lucide-react";
 import { motion } from "framer-motion";
 import GlassCard from "@/components/ui/GlassCard";
@@ -80,16 +81,13 @@ export default function AcceptInvite() {
         setMessage("Confirmando seu convite na empresa...");
 
         console.log("[RPC][ACCEPT_INVITE] start", { empresaId });
-        const { data, error } = await supabase.rpc("accept_invite_for_current_user", {
-          p_empresa_id: empresaId,
-        });
-
-        if (error) {
-          console.error("[RPC][ACCEPT_INVITE] error", error);
-          setState("error");
-          setMessage("Não foi possível confirmar o convite. Verifique se você está logado com o e-mail correto.");
-          return;
-        }
+	        const data = await callRpc<any>("accept_invite_for_current_user", { p_empresa_id: empresaId });
+	        if (!data) {
+	          console.error("[RPC][ACCEPT_INVITE] error", data);
+	          setState("error");
+	          setMessage("Não foi possível confirmar o convite. Verifique se você está logado com o e-mail correto.");
+	          return;
+	        }
 
         console.log("[RPC][ACCEPT_INVITE] ok", data);
         setState("done");

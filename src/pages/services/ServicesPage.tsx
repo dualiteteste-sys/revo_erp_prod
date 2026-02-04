@@ -134,17 +134,17 @@ export default function ServicesPage() {
     }
   }
 
-  async function handleClone(s: svc.Service) {
-    try {
-      addToast('Clonando serviço...', 'info');
-      const clone = await svc.cloneService(s.id);
-      addToast('Serviço clonado!');
-      refresh();
-      handleOpenForm(clone);
-    } catch (e: any) {
-      addToast(e.message || 'Erro ao clonar serviço', 'error');
-    }
-  }
+	  async function handleClone(s: svc.Service) {
+	    try {
+	      addToast('Clonando serviço...', 'info');
+	      const clone = await svc.cloneService(s.id);
+	      addToast('Serviço clonado!', 'success');
+	      refresh();
+	      handleOpenForm(clone);
+	    } catch (e: any) {
+	      addToast(e.message || 'Erro ao clonar serviço', 'error');
+	    }
+	  }
 
   const handleSort = (column: keyof svc.Service) => {
     setSortBy(prev => ({
