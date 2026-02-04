@@ -59,11 +59,11 @@ export function ReportIssueDialog({ open, onOpenChange, sentryEventId }: Props) 
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-xl rounded-2xl">
-        <DialogHeader>
-          <DialogTitle>O ERP Revo Beta encontrou um erro</DialogTitle>
+        <DialogContent className="max-w-xl rounded-2xl">
+          <DialogHeader>
+          <DialogTitle>O Ultria ERP Beta encontrou um erro</DialogTitle>
           <DialogDescription>
-            O ERP Revo Beta encontrou um erro que precisa ser resolvido pelos desenvolvedores. Gostaria de enviar e aguardar 1 dia útil para correção?
+            O Ultria ERP Beta encontrou um erro que precisa ser resolvido pelos desenvolvedores. Gostaria de enviar e aguardar 1 dia útil para correção?
             Não inclua senhas nem dados sensíveis.
           </DialogDescription>
         </DialogHeader>

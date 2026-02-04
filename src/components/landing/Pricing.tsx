@@ -32,7 +32,7 @@ type CompareRow = {
 const STATIC_PLANS: Plan[] = [
   {
     slug: "essencial",
-    title: "Revo Essencial",
+    title: "Ultria Essencial",
     monthlyAmountCents: 14900,
     features: [
       "Comércio + Serviços (o essencial, sem complicação)",
@@ -47,7 +47,7 @@ const STATIC_PLANS: Plan[] = [
   },
   {
     slug: "pro",
-    title: "Revo Pro",
+    title: "Ultria Pro",
     monthlyAmountCents: 24900,
     features: [
       "Tudo do Essencial",
@@ -61,7 +61,7 @@ const STATIC_PLANS: Plan[] = [
   },
   {
     slug: "max",
-    title: "Revo Max",
+    title: "Ultria Max",
     monthlyAmountCents: 39000,
     features: [
       "Tudo do Pro",
@@ -74,7 +74,7 @@ const STATIC_PLANS: Plan[] = [
   },
   {
     slug: "industria",
-    title: "Revo Indústria",
+    title: "Ultria Indústria",
     monthlyAmountCents: 59000,
     features: [
       "Tudo do Pro + pacote completo Indústria",
@@ -88,7 +88,7 @@ const STATIC_PLANS: Plan[] = [
   },
   {
     slug: "scale",
-    title: "Revo Scale",
+    title: "Ultria Scale",
     monthlyAmountCents: 99000,
     features: [
       "Tudo do Indústria",

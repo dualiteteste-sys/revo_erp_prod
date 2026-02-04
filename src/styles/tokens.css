@@ -25,8 +25,8 @@
   --ring: 221 83% 53%;
   --radius: 0.5rem;
 
-  /* Revo specifics (não-HSL) */
-  --revo-filled-text: #292c37;
+  /* Ultria specifics (não-HSL) */
+  --ultria-filled-text: #292c37;
 
   /* Glass */
   --glass-50: rgba(255, 255, 255, 0.05);
