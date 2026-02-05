@@ -1,5 +1,5 @@
 import Stripe from "stripe";
-import { createClient } from "@supabase/supabase-js";
+import { createClient } from "jsr:@supabase/supabase-js@2";
 
 function buildCorsHeaders(req: Request) {
   const origin = req.headers.get("origin") || "";
@@ -95,4 +95,3 @@ Deno.serve(async (req) => {
     return cors(req, 500, { error: "internal_error", detail: String(e) });
   }
 });
-

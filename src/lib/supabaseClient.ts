@@ -6,15 +6,6 @@ import { recordNetworkError } from "@/lib/telemetry/networkErrors";
 import { getLastUserAction } from "@/lib/telemetry/lastUserAction";
 import { buildOpsAppErrorFingerprint } from "@/lib/telemetry/opsAppErrorsFingerprint";
 
-export const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || "https://lrfwiaekipwkjkzvcnfd.supabase.co";
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxyZndpYWVraXB3a2prenZjbmZkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjA4OTQwNzEsImV4cCI6MjA3NjQ3MDA3MX0.BnDwDZpWV62D_kPJb6ZtOzeRxgTPSQncqja332rxCYk";
-
-if (!supabaseUrl || !supabaseAnonKey) {
-  throw new Error(
-    "Supabase URL or Anon Key are missing from environment variables. Check your .env file."
-  );
-}
-
 const rawFetch = globalThis.fetch.bind(globalThis);
 const ops403Dedupe = new Map<string, number>();
 const OPS403_DEDUPE_MS = 10_000;
@@ -27,6 +18,22 @@ const IS_TEST_ENV =
   import.meta.env.VITEST === "true" ||
   // Fallback for node test runners
   (typeof process !== "undefined" && Boolean((process as any).env?.VITEST));
+
+const envSupabaseUrl = (import.meta.env.VITE_SUPABASE_URL ?? "").trim();
+const envSupabaseAnonKey = (import.meta.env.VITE_SUPABASE_ANON_KEY ?? "").trim();
+
+// Estado da arte:
+// - Nada de fallback hardcoded em PROD.
+// - Em testes unitários (Vitest), permitimos placeholders para não bloquear o runner;
+//   chamadas de rede são mockadas/evitadas e o objetivo aqui é só não quebrar import.
+export const supabaseUrl = IS_TEST_ENV ? (envSupabaseUrl || "http://localhost:54321") : envSupabaseUrl;
+const supabaseAnonKey = IS_TEST_ENV ? (envSupabaseAnonKey || "test_anon_key") : envSupabaseAnonKey;
+
+if (!supabaseUrl || !supabaseAnonKey) {
+  throw new Error(
+    "Supabase env ausente: defina VITE_SUPABASE_URL e VITE_SUPABASE_ANON_KEY (ex.: em .env.local / CI secrets).",
+  );
+}
 
 function classifyOps403(code: string | null, message: string): string {
   const msg = String(message || "").toLowerCase();

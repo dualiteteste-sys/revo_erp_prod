@@ -1,4 +1,4 @@
-import React, { useRef, useState, useEffect } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   EstoqueDeposito,
   EstoqueMovimento,
@@ -24,8 +24,10 @@ import VirtualizedTableBody from '@/components/ui/VirtualizedTableBody';
 import ResizableSortableTh, { type SortState } from '@/components/ui/table/ResizableSortableTh';
 import TableColGroup from '@/components/ui/table/TableColGroup';
 import { useTableColumnWidths, type TableColumnWidthDef } from '@/components/ui/table/useTableColumnWidths';
+import { useAuth } from '@/contexts/AuthProvider';
 
 export default function EstoquePage() {
+  const { activeEmpresaId } = useAuth();
   const [produtos, setProdutos] = useState<EstoquePosicao[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -56,7 +58,38 @@ export default function EstoquePage() {
   const selectedDeposito = depositos.find((d) => d.id === depositoId) ?? depositos.find((d) => d.is_default) ?? null;
   const [sort, setSort] = useState<SortState<string>>({ column: 'nome', direction: 'asc' });
 
+  const lastEmpresaIdRef = useRef<string | null>(activeEmpresaId);
+  const empresaChanged = lastEmpresaIdRef.current !== activeEmpresaId;
+
+  useEffect(() => {
+    lastEmpresaIdRef.current = activeEmpresaId;
+  }, [activeEmpresaId]);
+
+  useEffect(() => {
+    // Multi-tenant safety: evitar reaproveitar estado do tenant anterior.
+    setProdutos([]);
+    setDepositos([]);
+    setDepositoId(null);
+    setSelectedProduto(null);
+    setIsMovimentoOpen(false);
+    setIsKardexOpen(false);
+    setKardexData([]);
+    setLoadingKardex(false);
+    setIsInventarioOpen(false);
+
+    if (!activeEmpresaId) {
+      setLoading(false);
+      return;
+    }
+    setLoading(true);
+  }, [activeEmpresaId]);
+
   const fetchDepositos = async () => {
+    if (!activeEmpresaId) {
+      setDepositos([]);
+      setDepositoId(null);
+      return;
+    }
     if (!canUseV2) {
       setDepositos([]);
       setDepositoId(null);
@@ -81,6 +114,11 @@ export default function EstoquePage() {
   };
 
   const fetchEstoque = async () => {
+    if (!activeEmpresaId) {
+      setProdutos([]);
+      setLoading(false);
+      return;
+    }
     setLoading(true);
     try {
       const data = canUseV2
@@ -100,11 +138,11 @@ export default function EstoquePage() {
 
   useEffect(() => {
     fetchDepositos();
-  }, [canUseV2]);
+  }, [activeEmpresaId, canUseV2]);
 
   useEffect(() => {
     fetchEstoque();
-  }, [debouncedSearch, showBaixoEstoque, depositoId, canUseV2]);
+  }, [activeEmpresaId, debouncedSearch, showBaixoEstoque, depositoId, canUseV2]);
 
   useEffect(() => {
     const produto = searchParams.get('produto');
@@ -220,10 +258,13 @@ export default function EstoquePage() {
 
   const statusOrder: Record<string, number> = { zerado: 0, baixo: 1, ok: 2 };
 
+  const effectiveLoading = !!activeEmpresaId && (loading || empresaChanged);
+  const effectiveProdutos = empresaChanged ? [] : produtos;
+
   const sortedProdutos = React.useMemo(() => {
     const dir = sort?.direction === 'desc' ? -1 : 1;
     const col = sort?.column || 'nome';
-    const rows = [...produtos];
+    const rows = [...effectiveProdutos];
 
     rows.sort((a, b) => {
       if (col === 'saldo') {
@@ -244,7 +285,7 @@ export default function EstoquePage() {
     });
 
     return rows;
-  }, [produtos, sort]);
+  }, [effectiveProdutos, sort]);
 
   const handleSort = (column: string) => {
     setSort((prev) => {
@@ -252,6 +293,10 @@ export default function EstoquePage() {
       return { column, direction: prev.direction === 'asc' ? 'desc' : 'asc' };
     });
   };
+
+  if (!activeEmpresaId) {
+    return <div className="p-4 text-gray-600">Selecione uma empresa para ver o estoque.</div>;
+  }
 
   return (
     <div className="p-4">
@@ -358,7 +403,7 @@ export default function EstoquePage() {
                 />
               </tr>
             </thead>
-            {loading ? (
+            {effectiveLoading ? (
               <tbody className="bg-white divide-y divide-gray-200">
                 <tr>
                   <td colSpan={4} className="p-8 text-center">
@@ -366,7 +411,7 @@ export default function EstoquePage() {
                   </td>
                 </tr>
               </tbody>
-            ) : produtos.length === 0 ? (
+            ) : effectiveProdutos.length === 0 ? (
               <tbody className="bg-white divide-y divide-gray-200">
                 <tr>
                   <td colSpan={4} className="p-8 text-center">

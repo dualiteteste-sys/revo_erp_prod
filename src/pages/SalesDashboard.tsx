@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { BarChart3, DollarSign, ShoppingCart, Users } from 'lucide-react';
 import KPICard from '../components/dashboard/KPICard';
 import SalesLineChart from '../components/sales-dashboard/SalesLineChart';
@@ -11,6 +11,7 @@ import { Loader2 } from 'lucide-react';
 import { getVendasDashboardStats, type VendasDashboardStats } from '@/services/salesDashboard';
 import { useToast } from '@/contexts/ToastProvider';
 import { callRpc } from '@/lib/api';
+import { useAuth } from '@/contexts/AuthProvider';
 
 function formatCurrency(value: number) {
   return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Number(value || 0));
@@ -30,6 +31,7 @@ type Preset = '7d' | '30d' | '90d' | 'this_month' | 'last_month' | 'ytd' | 'cust
 
 export default function SalesDashboard() {
   const { addToast } = useToast();
+  const { activeEmpresaId } = useAuth();
 
   const [preset, setPreset] = useState<Preset>('30d');
   const [startDate, setStartDate] = useState(() => dateToISO(new Date(Date.now() - 30 * 86400000)));
@@ -43,12 +45,48 @@ export default function SalesDashboard() {
 
   const [vendedores, setVendedores] = useState<Array<{ id: string; nome: string }>>([]);
 
+  const lastEmpresaIdRef = useRef<string | null>(activeEmpresaId);
+  const empresaChanged = lastEmpresaIdRef.current !== activeEmpresaId;
+
   useEffect(() => {
-    // Lista vendedores para filtro (se não existir, o filtro funciona como "Todos")
-    callRpc<Array<{ id: string; nome: string }>>('vendedores_list_for_current_empresa', { p_limit: 500 })
-      .then((data) => setVendedores((data || []) as any))
-      .catch(() => setVendedores([]));
-  }, []);
+    lastEmpresaIdRef.current = activeEmpresaId;
+  }, [activeEmpresaId]);
+
+  useEffect(() => {
+    // Multi-tenant safety: evitar reaproveitar estado do tenant anterior.
+    setVendedores([]);
+    setVendedorId('');
+    setStats(null);
+    setPrevStats(null);
+
+    if (!activeEmpresaId) {
+      setLoading(false);
+      return;
+    }
+    setLoading(true);
+  }, [activeEmpresaId]);
+
+  useEffect(() => {
+    let cancelled = false;
+    async function run() {
+      if (!activeEmpresaId) {
+        setVendedores([]);
+        return;
+      }
+      try {
+        // Lista vendedores para filtro (se não existir, o filtro funciona como "Todos")
+        const data = await callRpc<Array<{ id: string; nome: string }>>('vendedores_list_for_current_empresa', { p_limit: 500 });
+        if (!cancelled) setVendedores(data || []);
+      } catch {
+        if (!cancelled) setVendedores([]);
+      }
+    }
+
+    void run();
+    return () => {
+      cancelled = true;
+    };
+  }, [activeEmpresaId]);
 
   useEffect(() => {
     const now = new Date();
@@ -93,6 +131,12 @@ export default function SalesDashboard() {
   useEffect(() => {
     let cancelled = false;
     async function run() {
+      if (!activeEmpresaId) {
+        setStats(null);
+        setPrevStats(null);
+        setLoading(false);
+        return;
+      }
       setLoading(true);
       try {
         const start = new Date(startDate);
@@ -136,7 +180,7 @@ export default function SalesDashboard() {
       cancelled = true;
       clearTimeout(t);
     };
-  }, [addToast, canal, endDate, startDate, vendedorId]);
+  }, [activeEmpresaId, addToast, canal, endDate, startDate, vendedorId]);
 
   const kpis = useMemo(() => {
     const curr = stats?.kpis;
@@ -201,6 +245,8 @@ export default function SalesDashboard() {
   const topProdutos = useMemo(() => {
     return (stats?.top_produtos || []).map((p) => ({ name: p.nome || '—', value: Number(p.total || 0) }));
   }, [stats]);
+
+  const effectiveLoading = !!activeEmpresaId && (loading || empresaChanged);
 
   return (
     <div className="p-1">
@@ -270,7 +316,11 @@ export default function SalesDashboard() {
         </div>
       </div>
 
-      {loading ? (
+      {!activeEmpresaId ? (
+        <div className="h-56 flex items-center justify-center text-gray-600">
+          Selecione uma empresa para ver o painel.
+        </div>
+      ) : effectiveLoading ? (
         <div className="h-56 flex items-center justify-center">
           <Loader2 className="animate-spin text-blue-600" size={32} />
         </div>

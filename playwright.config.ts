@@ -2,6 +2,10 @@ import { defineConfig, devices } from '@playwright/test';
 
 const baseURL = process.env.PLAYWRIGHT_BASE_URL || 'http://127.0.0.1:5173';
 const shouldUseWebServer = !process.env.PLAYWRIGHT_BASE_URL;
+const webServerCommand =
+  process.platform === 'win32'
+    ? 'yarn dev --host 127.0.0.1 --port 5173'
+    : 'VITE_SUPABASE_URL=$VITE_SUPABASE_URL VITE_SUPABASE_ANON_KEY=$VITE_SUPABASE_ANON_KEY yarn dev --host 127.0.0.1 --port 5173';
 
 export default defineConfig({
     testDir: './e2e',
@@ -44,7 +48,7 @@ export default defineConfig({
     /* Run your local dev server before starting the tests */
     webServer: shouldUseWebServer
       ? {
-          command: 'yarn dev --host 127.0.0.1 --port 5173',
+          command: webServerCommand,
           url: baseURL,
           reuseExistingServer: !process.env.CI,
           timeout: 120 * 1000,

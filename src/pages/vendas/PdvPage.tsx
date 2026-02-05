@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { DoorClosed, DoorOpen, Loader2, PlusCircle, Printer, Search, Store, Wallet } from 'lucide-react';
 import Modal from '@/components/ui/Modal';
 import { useToast } from '@/contexts/ToastProvider';
@@ -26,6 +26,7 @@ import { useOnboardingGate } from '@/contexts/OnboardingGateContext';
 import { ActionLockedError, runWithActionLock } from '@/lib/actionLock';
 import { useBillingGate } from '@/hooks/useBillingGate';
 import RoadmapButton from '@/components/roadmap/RoadmapButton';
+import { useAuth } from '@/contexts/AuthProvider';
 
 type PdvRow = {
   id: string;
@@ -101,6 +102,7 @@ export default function PdvPage() {
   const { addToast } = useToast();
   const { ensure } = useOnboardingGate();
   const billing = useBillingGate();
+  const { loading: authLoading, activeEmpresaId } = useAuth();
 
   const [loading, setLoading] = useState(true);
   const [rows, setRows] = useState<PdvRow[]>([]);
@@ -134,9 +136,34 @@ export default function PdvPage() {
   ];
   const { widths, startResize } = useTableColumnWidths({ tableId: 'vendas:pdv', columns });
 
-  const refreshQueued = () => setQueuedIds(getQueuedPdvFinalizeIds());
+  const lastEmpresaIdRef = useRef<string | null>(activeEmpresaId);
+  const empresaChanged = lastEmpresaIdRef.current !== activeEmpresaId;
 
-  async function load() {
+  useEffect(() => {
+    lastEmpresaIdRef.current = activeEmpresaId;
+  }, [activeEmpresaId]);
+
+  const refreshQueued = useCallback(() => setQueuedIds(getQueuedPdvFinalizeIds()), []);
+
+  const caixaIdRef = useRef<string>(caixaId);
+  useEffect(() => {
+    caixaIdRef.current = caixaId;
+  }, [caixaId]);
+
+  const contaCorrenteIdRef = useRef<string>(contaCorrenteId);
+  useEffect(() => {
+    contaCorrenteIdRef.current = contaCorrenteId;
+  }, [contaCorrenteId]);
+
+  const load = useCallback(async () => {
+    if (!activeEmpresaId) {
+      setRows([]);
+      setContas([]);
+      setContaCorrenteId('');
+      setCaixas([]);
+      setLoading(false);
+      return;
+    }
     setLoading(true);
     try {
       const [{ data: contaData }, pdvData, caixasData] = await Promise.all([
@@ -148,9 +175,9 @@ export default function PdvPage() {
       setContas(contaData);
       setCaixas(caixasData || []);
       if (typeof window !== 'undefined') {
-        window.localStorage.setItem('pdv:caixaId', caixaId || '');
+        window.localStorage.setItem('pdv:caixaId', caixaIdRef.current || '');
       }
-      if (!caixaId && (caixasData || []).length > 0) {
+      if (!caixaIdRef.current && (caixasData || []).length > 0) {
         const preferred = (caixasData || []).find((c) => c.sessao_id) || (caixasData || [])[0];
         if (preferred) {
           setCaixaId(preferred.id);
@@ -159,7 +186,10 @@ export default function PdvPage() {
       }
       // MVP friendly: se não há nenhum caixa aberto, abre automaticamente o caixa selecionado (saldo 0).
       // Isso evita fricção no PDV e mantém os fluxos/E2E do "happy path" estáveis.
-      const selectedAfter = (caixasData || []).find((c) => c.id === (caixaId || '')) || (caixasData || []).find((c) => c.sessao_id) || (caixasData || [])[0];
+      const selectedAfter =
+        (caixasData || []).find((c) => c.id === (caixaIdRef.current || '')) ||
+        (caixasData || []).find((c) => c.sessao_id) ||
+        (caixasData || [])[0];
       const hasAnyOpen = (caixasData || []).some((c) => !!c.sessao_id);
       if (selectedAfter && !hasAnyOpen && !selectedAfter.sessao_id) {
         try {
@@ -172,7 +202,7 @@ export default function PdvPage() {
           // sem permissão/feature: segue com UX manual (modal de abrir caixa ao finalizar)
         }
       }
-      if (!contaCorrenteId && contaData.length > 0) {
+      if (!contaCorrenteIdRef.current && contaData.length > 0) {
         const padrao = contaData.find((c) => c.padrao_para_recebimentos) || contaData[0];
         setContaCorrenteId(padrao.id);
       }
@@ -183,13 +213,35 @@ export default function PdvPage() {
     } finally {
       setLoading(false);
     }
-  }
+  }, [activeEmpresaId, addToast]);
+
+  useEffect(() => {
+    // Multi-tenant safety: evitar reaproveitar estado do tenant anterior.
+    setRows([]);
+    setContas([]);
+    setContaCorrenteId('');
+    setCaixas([]);
+    setCaixaId('');
+    setIsCaixaModalOpen(false);
+    setFinalizingId(null);
+    setIsFormOpen(false);
+    setSelectedId(null);
+    setReceiptVenda(null);
+    setIsReceiptOpen(false);
+    setQueuedIds(new Set());
+    if (typeof window !== 'undefined') window.localStorage.removeItem('pdv:caixaId');
+
+    if (!activeEmpresaId) {
+      setLoading(false);
+      return;
+    }
+    setLoading(true);
+  }, [activeEmpresaId]);
 
   useEffect(() => {
     void load();
     refreshQueued();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [load, refreshQueued]);
 
   useEffect(() => {
     const onOnline = async () => {
@@ -201,17 +253,19 @@ export default function PdvPage() {
     };
     window.addEventListener('online', onOnline);
     return () => window.removeEventListener('online', onOnline);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [addToast, load, refreshQueued]);
+
+  const effectiveLoading = !!activeEmpresaId && (loading || empresaChanged);
+  const effectiveRows = empresaChanged ? [] : rows;
 
   const filteredRows = useMemo(() => {
     const q = search.trim().toLowerCase();
-    return rows.filter((r) => {
+    return effectiveRows.filter((r) => {
       if (statusFilter !== 'all' && String(r.status) !== statusFilter) return false;
       if (!q) return true;
       return String(r.numero).includes(q);
     });
-  }, [rows, search, statusFilter]);
+  }, [effectiveRows, search, statusFilter]);
 
   const sortedRows = useMemo(() => {
     return sortRows(
@@ -409,6 +463,18 @@ export default function PdvPage() {
     document.body.appendChild(iframe);
   };
 
+  if (authLoading) {
+    return (
+      <div className="flex justify-center h-full items-center">
+        <Loader2 className="animate-spin text-blue-600 w-10 h-10" />
+      </div>
+    );
+  }
+
+  if (!activeEmpresaId) {
+    return <div className="p-4 text-gray-600">Selecione uma empresa para acessar o PDV.</div>;
+  }
+
   return (
     <div className="p-1 h-full flex flex-col">
       <div className="flex justify-between items-center mb-6 flex-shrink-0">
@@ -580,7 +646,7 @@ export default function PdvPage() {
         <CsvExportDialog
           filename="pdv.csv"
           rows={filteredRows}
-          disabled={loading}
+          disabled={effectiveLoading}
           columns={[
             { key: 'numero', label: 'Número', getValue: (r) => r.numero },
             { key: 'data', label: 'Data', getValue: (r) => r.data_emissao },
@@ -591,13 +657,13 @@ export default function PdvPage() {
       </div>
 
       <div className="bg-white rounded-lg shadow overflow-hidden flex-grow flex flex-col">
-        {loading ? (
+        {effectiveLoading ? (
           <div className="flex justify-center h-64 items-center">
             <Loader2 className="animate-spin text-blue-600 w-10 h-10" />
           </div>
         ) : filteredRows.length === 0 ? (
           <div className="flex justify-center h-64 items-center text-gray-500">
-            {rows.length === 0 ? (
+            {effectiveRows.length === 0 ? (
               <div className="text-center space-y-2">
                 <div>Nenhuma venda PDV ainda.</div>
                 <button onClick={openNew} className="px-4 py-2 rounded-lg bg-blue-600 text-white font-bold hover:bg-blue-700">

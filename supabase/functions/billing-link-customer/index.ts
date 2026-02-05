@@ -1,5 +1,5 @@
 import Stripe from "stripe";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { createClient } from "jsr:@supabase/supabase-js@2";
 import { buildCorsHeaders } from "../_shared/cors.ts";
 
 function json(corsHeaders: Record<string, string>, status: number, body: unknown) {

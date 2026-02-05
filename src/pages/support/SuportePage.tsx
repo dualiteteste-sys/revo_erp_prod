@@ -64,6 +64,7 @@ function categoryLabel(category: SupportNotification['category']) {
 
 export default function SuportePage() {
   const { session, activeEmpresa } = useAuth();
+  const activeEmpresaId = activeEmpresa?.id ?? null;
   const userId = session?.user?.id || '';
   const userEmail = (session as any)?.user?.email || '';
   const { addToast } = useToast();
@@ -88,6 +89,18 @@ export default function SuportePage() {
   const [ticketRequesterEmail, setTicketRequesterEmail] = useState<string>(userEmail || '');
 
   useEffect(() => {
+    // Multi-tenant safety: evitar reaproveitar estado do tenant anterior.
+    setOnboarding(null);
+    setPdv(null);
+    setEcommerceHealth(null);
+    setEcommerceDiagnostics(null);
+    setEcommerceError(null);
+
+    if (!activeEmpresaId) {
+      setLoading(false);
+      return;
+    }
+
     let mounted = true;
     (async () => {
       setLoading(true);
@@ -128,7 +141,7 @@ export default function SuportePage() {
     return () => {
       mounted = false;
     };
-  }, []);
+  }, [activeEmpresaId]);
 
   const refreshMyTickets = useCallback(async () => {
     setTicketsLoading(true);
@@ -471,7 +484,9 @@ export default function SuportePage() {
           </p>
         </div>
 
-        {loading ? (
+        {!activeEmpresaId ? (
+          <div className="text-sm text-gray-600">Selecione uma empresa para ver o diagnóstico.</div>
+        ) : loading ? (
           <div className="flex items-center gap-3 text-sm text-gray-600">
             <Loader2 className="animate-spin" size={18} />
             Carregando diagnóstico…

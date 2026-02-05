@@ -137,7 +137,15 @@ export default function ServicesPage() {
       const ok = results.filter((r) => r.status === 'fulfilled').length;
       const fail = results.length - ok;
       if (ok) addToast(`${ok} serviço(s) removido(s).`, 'success');
-      if (fail) addToast(`${fail} falha(s) ao remover.`, 'warning');
+      if (fail) {
+        const messages = results
+          .filter((r): r is PromiseRejectedResult => r.status === 'rejected')
+          .map((r) => (r.reason as any)?.message)
+          .filter((m): m is string => typeof m === 'string' && m.trim().length > 0);
+        const unique = Array.from(new Set(messages));
+        if (unique.length === 1) addToast(unique[0], 'warning');
+        else addToast(`${fail} falha(s) ao remover. Alguns serviços podem estar em uso; marque como “inativo”.`, 'warning');
+      }
       bulk.clear();
       setBulkDeleteOpen(false);
       refresh();

@@ -6,6 +6,8 @@
   - `Verify Migrations (dev)`
   - `E2E Release Gate (dev)`
 - [ ] Se este PR “encostou” no Supabase (qualquer coisa): existe migration em `supabase/migrations/*` e ela foi verificada no CI
+- [ ] Se este PR adiciona dependência/API externa: checklist e gate em `docs/policies/POLITICA_DE_APIS_EXTERNAS.md`
+- [ ] (Múltiplos agentes) Branch/PR segue `docs/policies/POLITICA_COLABORACAO_AGENTES.md` (branch própria → PR para `dev`; `main` só via PR `dev→main`)
 - [ ] (Opcional) Labels de risco aplicados quando necessário (`risk:high`/`risk:low`) — ver `docs/ci/risk-based-gates.md`
 
 ## Guias rápidos / Roadmap (RG-02)

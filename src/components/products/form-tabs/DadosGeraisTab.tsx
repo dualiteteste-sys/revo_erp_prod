@@ -11,6 +11,7 @@ import FiscalFields from '../form-sections/FiscalFields';
 import PackagingFields from '../form-sections/PackagingFields';
 import { listProdutoGrupos, ProdutoGrupo } from '../../../services/produtoGrupos';
 import { listUnidades, UnidadeMedida } from '../../../services/unidades';
+import ProdutoCodigoBarrasSection from '../barcodes/ProdutoCodigoBarrasSection';
 
 const tipoProdutoOptions: { value: tipo_produto; label: string }[] = [
   { value: 'simples', label: 'SP - Simples' },
@@ -46,6 +47,9 @@ const DadosGeraisTab: React.FC<DadosGeraisTabProps> = ({ data, onChange, errors,
   const precoVendaProps = useNumericField(data.preco_venda, (value) => onChange('preco_venda', value));
   const estoqueMinProps = useNumericField(data.estoque_min, (value) => onChange('estoque_min', value));
   const estoqueMaxProps = useNumericField(data.estoque_max, (value) => onChange('estoque_max', value));
+
+  const barcodeProdutoId = !isService && data.id ? (data.produto_pai_id ? data.produto_pai_id : data.id) : null;
+  const barcodeVarianteId = !isService && data.produto_pai_id ? (data.id ?? null) : null;
 
   const [grupos, setGrupos] = useState<ProdutoGrupo[]>([]);
   const [unidades, setUnidades] = useState<UnidadeMedida[]>([]);
@@ -156,6 +160,16 @@ const DadosGeraisTab: React.FC<DadosGeraisTabProps> = ({ data, onChange, errors,
           placeholder={`Detalhes do ${isService ? 'serviço' : 'produto'}, características, etc.`}
         />
       </Section>
+
+      {!isService ? (
+        <ProdutoCodigoBarrasSection
+          produtoId={barcodeProdutoId}
+          varianteId={barcodeVarianteId}
+          produtoNome={data.nome ?? null}
+          sku={data.sku ?? null}
+          precoVenda={data.preco_venda ?? null}
+        />
+      ) : null}
 
       <FiscalFields data={data} onChange={onChange} />
 
