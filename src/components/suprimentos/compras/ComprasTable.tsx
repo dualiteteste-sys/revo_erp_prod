@@ -5,6 +5,7 @@ import ResizableSortableTh, { type SortState } from '@/components/ui/table/Resiz
 import TableColGroup from '@/components/ui/table/TableColGroup';
 import { useTableColumnWidths, type TableColumnWidthDef } from '@/components/ui/table/useTableColumnWidths';
 import { sortRows, toggleSort } from '@/components/ui/table/sortUtils';
+import { openInNewTabBestEffort, shouldIgnoreRowDoubleClickEvent } from '@/components/ui/table/rowDoubleClick';
 
 interface Props {
   orders: CompraPedido[];
@@ -98,7 +99,14 @@ export default function ComprasTable({ orders, onEdit }: Props) {
         </thead>
         <tbody className="bg-white divide-y divide-gray-200">
           {sortedOrders.map(order => (
-            <tr key={order.id} className="hover:bg-gray-50">
+            <tr
+              key={order.id}
+              className="hover:bg-gray-50"
+              onDoubleClick={(e) => {
+                if (shouldIgnoreRowDoubleClickEvent(e)) return;
+                openInNewTabBestEffort(`/app/suprimentos/compras?open=${encodeURIComponent(order.id)}`, () => onEdit(order));
+              }}
+            >
               <td className="px-6 py-4 text-sm font-medium text-gray-900">#{order.numero}</td>
               <td className="px-6 py-4 text-sm text-gray-700">{order.fornecedor_nome}</td>
               <td className="px-6 py-4 text-sm text-gray-500">{new Date(order.data_emissao).toLocaleDateString('pt-BR')}</td>

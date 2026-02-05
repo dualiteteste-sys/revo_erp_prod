@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useContasPagar } from '@/hooks/useContasPagar';
 import { useToast } from '@/contexts/ToastProvider';
 import * as financeiroService from '@/services/financeiro';
@@ -19,6 +19,7 @@ import DatePicker from '@/components/ui/DatePicker';
 import ErrorAlert from '@/components/ui/ErrorAlert';
 import { Button } from '@/components/ui/button';
 import { isSeedEnabled } from '@/utils/seed';
+import { useSearchParams } from 'react-router-dom';
 
 const ContasPagarPage: React.FC = () => {
   const enableSeed = isSeedEnabled();
@@ -61,6 +62,7 @@ const ContasPagarPage: React.FC = () => {
   const [contaToPay, setContaToPay] = useState<financeiroService.ContaPagar | null>(null);
   const [isEstornoOpen, setIsEstornoOpen] = useState(false);
   const [contaToReverse, setContaToReverse] = useState<financeiroService.ContaPagar | null>(null);
+  const [searchParams, setSearchParams] = useSearchParams();
 
   const handleOpenForm = async (conta: financeiroService.ContaPagar | null = null) => {
     if (conta?.id) {
@@ -81,6 +83,19 @@ const ContasPagarPage: React.FC = () => {
       setIsFormOpen(true);
     }
   };
+
+  useEffect(() => {
+    const contaId = searchParams.get('contaId');
+    if (!contaId) return;
+
+    void (async () => {
+      await handleOpenForm({ id: contaId } as any);
+      const next = new URLSearchParams(searchParams);
+      next.delete('contaId');
+      setSearchParams(next, { replace: true });
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const handleCloseForm = () => {
     setIsFormOpen(false);
