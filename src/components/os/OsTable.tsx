@@ -13,6 +13,9 @@ import {
 import ResizableSortableTh, { type SortState } from '@/components/ui/table/ResizableSortableTh';
 import TableColGroup from '@/components/ui/table/TableColGroup';
 import { useTableColumnWidths, type TableColumnWidthDef } from '@/components/ui/table/useTableColumnWidths';
+import { openInNewTabBestEffort, shouldIgnoreRowDoubleClickEvent } from '@/components/ui/table/rowDoubleClick';
+import { isPlainLeftClick } from '@/components/ui/links/isPlainLeftClick';
+import { useDeferredAction } from '@/components/ui/hooks/useDeferredAction';
 
 interface OsTableProps {
   serviceOrders: OrdemServico[];
@@ -37,6 +40,7 @@ const statusConfig: Record<OsStatus, { label: string; color: string }> = {
 };
 
 const OsTable: React.FC<OsTableProps> = ({ serviceOrders, onEdit, onDelete, onOpenAgenda, onSetStatus, sortBy, onSort, canUpdate = true, canManage = false, canDelete = true, busyOsId }) => {
+  const { schedule: scheduleEdit, cancel: cancelScheduledEdit } = useDeferredAction(180);
   const formatDate = (value?: string | null) => (value ? new Date(value).toLocaleDateString('pt-BR') : '—');
   const formatTime = (value?: string | null) => (value ? String(value).slice(0, 5) : '');
   const [isMobile, setIsMobile] = useState(() => (typeof window !== 'undefined' ? window.innerWidth < 768 : false));
@@ -201,6 +205,7 @@ const OsTable: React.FC<OsTableProps> = ({ serviceOrders, onEdit, onDelete, onOp
                     <AnimatePresence>
                         {serviceOrders.map((os, index) => {
                           const busy = !!busyOsId && busyOsId === os.id;
+                          const href = `/app/ordens-de-servico?osId=${encodeURIComponent(os.id)}`;
                           return (
                             <Draggable key={os.id} draggableId={os.id} index={index} isDragDisabled={!canUpdate || busy}>
                                 {(provided, snapshot) => (
@@ -212,6 +217,12 @@ const OsTable: React.FC<OsTableProps> = ({ serviceOrders, onEdit, onDelete, onOp
                                         exit={{ opacity: 0 }}
                                         transition={{ duration: 0.3 }}
                                         className={`hover:bg-gray-50 ${snapshot.isDragging ? 'bg-blue-50 shadow-lg' : ''}`}
+                                        onDoubleClick={(e) => {
+                                          if (busy) return;
+                                          if (shouldIgnoreRowDoubleClickEvent(e)) return;
+                                          cancelScheduledEdit();
+                                          openInNewTabBestEffort(href, () => onEdit(os));
+                                        }}
                                     >
                                         <td
                                           className={`px-2 py-4 whitespace-nowrap text-sm text-gray-400 ${canUpdate ? 'cursor-grab' : 'cursor-default opacity-50'}`}
@@ -221,13 +232,51 @@ const OsTable: React.FC<OsTableProps> = ({ serviceOrders, onEdit, onDelete, onOp
                                         </td>
                                         <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{os.numero}</td>
                                         <td className="px-6 py-4 whitespace-normal">
-                                            { os.cliente_nome && (
-                                                <span className="text-sm font-semibold text-gray-800 mb-1 break-words">
+                                            {os.cliente_nome ? (
+                                              <a
+                                                href={href}
+                                                className="text-sm font-semibold text-gray-800 mb-1 break-words hover:underline underline-offset-2 inline-block"
+                                                onClick={(e) => {
+                                                  if (busy) return;
+                                                  if (!isPlainLeftClick(e)) return;
+                                                  e.preventDefault();
+                                                  scheduleEdit(() => onEdit(os));
+                                                }}
+                                                onDoubleClick={(e) => {
+                                                  if (busy) return;
+                                                  e.preventDefault();
+                                                  e.stopPropagation();
+                                                  cancelScheduledEdit();
+                                                  openInNewTabBestEffort(href, () => onEdit(os));
+                                                }}
+                                              >
                                                 {os.cliente_nome}
-                                                </span>
-                                            )}
+                                              </a>
+                                            ) : null}
                                             <p className="text-sm text-gray-500 break-words">
-                                                {os.descricao || '-'}
+                                                {os.descricao ? (
+                                                  <a
+                                                    href={href}
+                                                    className="hover:underline underline-offset-2"
+                                                    onClick={(e) => {
+                                                      if (busy) return;
+                                                      if (!isPlainLeftClick(e)) return;
+                                                      e.preventDefault();
+                                                      scheduleEdit(() => onEdit(os));
+                                                    }}
+                                                    onDoubleClick={(e) => {
+                                                      if (busy) return;
+                                                      e.preventDefault();
+                                                      e.stopPropagation();
+                                                      cancelScheduledEdit();
+                                                      openInNewTabBestEffort(href, () => onEdit(os));
+                                                    }}
+                                                  >
+                                                    {os.descricao}
+                                                  </a>
+                                                ) : (
+                                                  '-'
+                                                )}
                                             </p>
                                             {((os as any).tecnico_nome || (os as any).tecnico) ? (
                                               <div className="mt-1 flex items-center gap-1 text-xs text-gray-600">

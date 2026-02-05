@@ -5,6 +5,9 @@ import ResizableSortableTh, { type SortState } from '@/components/ui/table/Resiz
 import TableColGroup from '@/components/ui/table/TableColGroup';
 import { useTableColumnWidths, type TableColumnWidthDef } from '@/components/ui/table/useTableColumnWidths';
 import { sortRows, toggleSort } from '@/components/ui/table/sortUtils';
+import { openInNewTabBestEffort, shouldIgnoreRowDoubleClickEvent } from '@/components/ui/table/rowDoubleClick';
+import { isPlainLeftClick } from '@/components/ui/links/isPlainLeftClick';
+import { useDeferredAction } from '@/components/ui/hooks/useDeferredAction';
 
 interface Props {
   materiais: MaterialClienteListItem[];
@@ -13,6 +16,7 @@ interface Props {
 }
 
 export default function MateriaisTable({ materiais, onEdit, onDelete }: Props) {
+  const { schedule: scheduleEdit, cancel: cancelScheduledEdit } = useDeferredAction(180);
   const columns: TableColumnWidthDef[] = [
     { id: 'cliente', defaultWidth: 320, minWidth: 220 },
     { id: 'produto', defaultWidth: 360, minWidth: 240 },
@@ -93,11 +97,35 @@ export default function MateriaisTable({ materiais, onEdit, onDelete }: Props) {
         </thead>
         <tbody className="bg-white divide-y divide-gray-200">
           {sortedMateriais.map(item => (
-            <tr key={item.id} className="hover:bg-gray-50 transition-colors">
+            <tr
+              key={item.id}
+              className="hover:bg-gray-50 transition-colors"
+              onDoubleClick={(e) => {
+                if (shouldIgnoreRowDoubleClickEvent(e as any)) return;
+                cancelScheduledEdit();
+                openInNewTabBestEffort(`/app/industria/materiais-cliente?open=${encodeURIComponent(item.id)}`, () => onEdit(item));
+              }}
+            >
               <td className="px-6 py-4">
                 <div className="flex items-center gap-2">
                   <User size={16} className="text-gray-400" />
-                  <span className="text-sm font-medium text-gray-900">{item.cliente_nome}</span>
+                  <a
+                    href={`/app/industria/materiais-cliente?open=${encodeURIComponent(item.id)}`}
+                    className="text-sm font-medium text-gray-900 hover:underline underline-offset-2"
+                    onClick={(e) => {
+                      if (!isPlainLeftClick(e)) return;
+                      e.preventDefault();
+                      scheduleEdit(() => onEdit(item));
+                    }}
+                    onDoubleClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      cancelScheduledEdit();
+                      openInNewTabBestEffort(`/app/industria/materiais-cliente?open=${encodeURIComponent(item.id)}`, () => onEdit(item));
+                    }}
+                  >
+                    {item.cliente_nome}
+                  </a>
                 </div>
               </td>
               <td className="px-6 py-4">

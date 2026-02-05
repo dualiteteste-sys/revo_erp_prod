@@ -43,6 +43,19 @@ export default function BomsPage() {
     setSearchParams(next, { replace: true });
   }, [searchParams, setSearchParams]);
 
+  // Deep-link: /app/industria/boms?open=<bomId>
+  useEffect(() => {
+    const openId = searchParams.get('open');
+    if (!openId) return;
+    setSelectedId(openId);
+    setInitialFormData(null);
+    setIsFormOpen(true);
+    const next = new URLSearchParams(searchParams);
+    next.delete('open');
+    setSearchParams(next, { replace: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const fetchBoms = async () => {
     setLoading(true);
     try {

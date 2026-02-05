@@ -6,6 +6,9 @@ import ResizableSortableTh, { type SortState } from '@/components/ui/table/Resiz
 import TableColGroup from '@/components/ui/table/TableColGroup';
 import { useTableColumnWidths, type TableColumnWidthDef } from '@/components/ui/table/useTableColumnWidths';
 import { sortRows, toggleSort } from '@/components/ui/table/sortUtils';
+import { openInNewTabBestEffort, shouldIgnoreRowDoubleClickEvent } from '@/components/ui/table/rowDoubleClick';
+import { isPlainLeftClick } from '@/components/ui/links/isPlainLeftClick';
+import { useDeferredAction } from '@/components/ui/hooks/useDeferredAction';
 
 interface Props {
   orders: OrdemProducao[];
@@ -28,6 +31,7 @@ const formatStatus = (status: string) => {
 };
 
 export default function ProducaoTable({ orders, onEdit, onDelete }: Props) {
+  const { schedule: scheduleEdit, cancel: cancelScheduledEdit } = useDeferredAction(180);
   const columns: TableColumnWidthDef[] = [
     { id: 'numero', defaultWidth: 140, minWidth: 110 },
     { id: 'produto', defaultWidth: 360, minWidth: 220 },
@@ -127,8 +131,34 @@ export default function ProducaoTable({ orders, onEdit, onDelete }: Props) {
         </thead>
         <tbody className="bg-white divide-y divide-gray-200">
           {sortedOrders.map(order => (
-            <tr key={order.id} className="hover:bg-gray-50 transition-colors">
-              <td className="px-6 py-4 text-sm font-medium text-gray-900">{formatOrderNumber(order.numero)}</td>
+            <tr
+              key={order.id}
+              className="hover:bg-gray-50 transition-colors"
+              onDoubleClick={(e) => {
+                if (shouldIgnoreRowDoubleClickEvent(e as any)) return;
+                cancelScheduledEdit();
+                openInNewTabBestEffort(`/app/industria/producao?open=${encodeURIComponent(order.id)}`, () => onEdit(order));
+              }}
+            >
+              <td className="px-6 py-4 text-sm font-medium text-gray-900">
+                <a
+                  href={`/app/industria/producao?open=${encodeURIComponent(order.id)}`}
+                  className="hover:underline underline-offset-2"
+                  onClick={(e) => {
+                    if (!isPlainLeftClick(e)) return;
+                    e.preventDefault();
+                    scheduleEdit(() => onEdit(order));
+                  }}
+                  onDoubleClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    cancelScheduledEdit();
+                    openInNewTabBestEffort(`/app/industria/producao?open=${encodeURIComponent(order.id)}`, () => onEdit(order));
+                  }}
+                >
+                  {formatOrderNumber(order.numero)}
+                </a>
+              </td>
               <td className="px-6 py-4">
                 <div className="flex items-center gap-2">
                   <Package size={16} className="text-gray-400" />

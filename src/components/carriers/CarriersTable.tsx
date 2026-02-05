@@ -6,6 +6,9 @@ import { cnpjMask, cpfMask } from '../../lib/masks';
 import ResizableSortableTh, { type SortState } from '@/components/ui/table/ResizableSortableTh';
 import TableColGroup from '@/components/ui/table/TableColGroup';
 import { useTableColumnWidths, type TableColumnWidthDef } from '@/components/ui/table/useTableColumnWidths';
+import { openInNewTabBestEffort, shouldIgnoreRowDoubleClickEvent } from '@/components/ui/table/rowDoubleClick';
+import { isPlainLeftClick } from '@/components/ui/links/isPlainLeftClick';
+import { useDeferredAction } from '@/components/ui/hooks/useDeferredAction';
 
 interface CarriersTableProps {
   carriers: CarrierListItem[];
@@ -32,6 +35,8 @@ const CarriersTable: React.FC<CarriersTableProps> = ({
   onToggleSelect,
   onToggleSelectAll,
 }) => {
+  const { schedule: scheduleEdit, cancel: cancelScheduledEdit } = useDeferredAction(180);
+
   const columns: TableColumnWidthDef[] = [
     ...(onToggleSelect ? [{ id: 'select', defaultWidth: 56, minWidth: 56, maxWidth: 56, resizable: false }] : []),
     { id: 'nome', defaultWidth: 340, minWidth: 220 },
@@ -87,7 +92,9 @@ const CarriersTable: React.FC<CarriersTableProps> = ({
         </thead>
         <motion.tbody layout className="bg-white divide-y divide-gray-200">
           <AnimatePresence>
-            {carriers.map((carrier) => (
+            {carriers.map((carrier) => {
+              const href = `/app/carriers?open=${encodeURIComponent(carrier.id)}`;
+              return (
               <motion.tr
                 key={carrier.id}
                 layout
@@ -96,6 +103,11 @@ const CarriersTable: React.FC<CarriersTableProps> = ({
                 exit={{ opacity: 0 }}
                 transition={{ duration: 0.2 }}
                 className="hover:bg-gray-50 transition-colors"
+                onDoubleClick={(e) => {
+                  if (shouldIgnoreRowDoubleClickEvent(e)) return;
+                  cancelScheduledEdit();
+                  openInNewTabBestEffort(href, () => onEdit(carrier));
+                }}
               >
                 {onToggleSelect ? (
                   <td className="px-4 py-4 whitespace-nowrap">
@@ -119,7 +131,25 @@ const CarriersTable: React.FC<CarriersTableProps> = ({
                       )}
                     </div>
                     <div className="ml-4">
-                      <div className="text-sm font-medium text-gray-900">{carrier.nome}</div>
+                      <div className="text-sm font-medium text-gray-900">
+                        <a
+                          href={href}
+                          className="hover:underline underline-offset-2"
+                          onClick={(e) => {
+                            if (!isPlainLeftClick(e)) return;
+                            e.preventDefault();
+                            scheduleEdit(() => onEdit(carrier));
+                          }}
+                          onDoubleClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            cancelScheduledEdit();
+                            openInNewTabBestEffort(href, () => onEdit(carrier));
+                          }}
+                        >
+                          {carrier.nome}
+                        </a>
+                      </div>
                       {carrier.codigo && <div className="text-xs text-gray-500">Cód: {carrier.codigo}</div>}
                     </div>
                   </div>
@@ -173,7 +203,8 @@ const CarriersTable: React.FC<CarriersTableProps> = ({
                   </div>
                 </td>
               </motion.tr>
-            ))}
+              );
+            })}
           </AnimatePresence>
         </motion.tbody>
       </table>

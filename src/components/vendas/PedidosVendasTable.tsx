@@ -5,10 +5,14 @@ import ResizableSortableTh, { type SortState } from '@/components/ui/table/Resiz
 import TableColGroup from '@/components/ui/table/TableColGroup';
 import { useTableColumnWidths, type TableColumnWidthDef } from '@/components/ui/table/useTableColumnWidths';
 import { sortRows, toggleSort } from '@/components/ui/table/sortUtils';
+import { openInNewTabBestEffort, shouldIgnoreRowDoubleClickEvent } from '@/components/ui/table/rowDoubleClick';
+import { isPlainLeftClick } from '@/components/ui/links/isPlainLeftClick';
+import { useDeferredAction } from '@/components/ui/hooks/useDeferredAction';
 
 interface Props {
   orders: VendaPedido[];
   onEdit: (order: VendaPedido) => void;
+  basePath?: string;
 }
 
 const statusColors: Record<string, string> = {
@@ -18,7 +22,9 @@ const statusColors: Record<string, string> = {
   cancelado: 'bg-red-100 text-red-800',
 };
 
-export default function PedidosVendasTable({ orders, onEdit }: Props) {
+export default function PedidosVendasTable({ orders, onEdit, basePath = '/app/vendas/pedidos' }: Props) {
+  const { schedule: scheduleEdit, cancel: cancelScheduledEdit } = useDeferredAction(180);
+
   const columns: TableColumnWidthDef[] = [
     { id: 'numero', defaultWidth: 120, minWidth: 90 },
     { id: 'cliente', defaultWidth: 420, minWidth: 200 },
@@ -98,9 +104,36 @@ export default function PedidosVendasTable({ orders, onEdit }: Props) {
           </tr>
         </thead>
         <tbody className="bg-white divide-y divide-gray-200">
-          {sortedOrders.map(order => (
-            <tr key={order.id} className="hover:bg-gray-50 transition-colors">
-              <td className="px-6 py-4 text-sm font-medium text-gray-900">{order.numero}</td>
+          {sortedOrders.map(order => {
+            const href = `${basePath}?open=${encodeURIComponent(order.id)}`;
+            return (
+            <tr
+              key={order.id}
+              className="hover:bg-gray-50 transition-colors"
+              onDoubleClick={(e) => {
+                if (shouldIgnoreRowDoubleClickEvent(e)) return;
+                openInNewTabBestEffort(href, () => onEdit(order));
+              }}
+            >
+              <td className="px-6 py-4 text-sm font-medium text-gray-900">
+                <a
+                  href={href}
+                  className="hover:underline underline-offset-2"
+                  onClick={(e) => {
+                    if (!isPlainLeftClick(e)) return;
+                    e.preventDefault();
+                    scheduleEdit(() => onEdit(order));
+                  }}
+                  onDoubleClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    cancelScheduledEdit();
+                    openInNewTabBestEffort(href, () => onEdit(order));
+                  }}
+                >
+                  {order.numero}
+                </a>
+              </td>
               <td className="px-6 py-4 text-sm text-gray-700">{order.cliente_nome || '-'}</td>
               <td className="px-6 py-4 text-sm text-gray-500">{new Date(order.data_emissao).toLocaleDateString('pt-BR')}</td>
               <td className="px-6 py-4 text-sm font-semibold text-gray-700 text-right">
@@ -121,7 +154,8 @@ export default function PedidosVendasTable({ orders, onEdit }: Props) {
                 </button>
               </td>
             </tr>
-          ))}
+            );
+          })}
           {sortedOrders.length === 0 && (
             <tr>
               <td colSpan={6} className="px-6 py-12 text-center text-gray-500">Nenhum pedido de venda encontrado.</td>

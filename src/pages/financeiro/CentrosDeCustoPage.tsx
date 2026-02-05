@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useAuth } from '@/contexts/AuthProvider';
 import { useToast } from '@/contexts/ToastProvider';
 import * as centrosDeCustoService from '@/services/centrosDeCusto';
@@ -11,11 +11,18 @@ import Select from '@/components/ui/forms/Select';
 import { Button } from '@/components/ui/button';
 import { isSeedEnabled } from '@/utils/seed';
 import CentrosDeCustoBulkCreateModal from '@/components/financeiro/centros-de-custo/CentrosDeCustoBulkCreateModal';
+import { useConfirm } from '@/contexts/ConfirmProvider';
+import { useSearchParams } from 'react-router-dom';
+import { useEditLock } from '@/components/ui/hooks/useEditLock';
 
 const CentrosDeCustoPage: React.FC = () => {
   const enableSeed = isSeedEnabled();
   const { activeEmpresa } = useAuth();
   const { addToast } = useToast();
+  const { confirm } = useConfirm();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const openId = searchParams.get('open');
+  const editLock = useEditLock('financeiro:centros-de-custo');
 
   const [allCentros, setAllCentros] = useState<centrosDeCustoService.CentroDeCustoListItem[]>([]);
   const [loading, setLoading] = useState(false);
@@ -26,6 +33,7 @@ const CentrosDeCustoPage: React.FC = () => {
 
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [selectedCentro, setSelectedCentro] = useState<centrosDeCustoService.CentroDeCusto | null>(null);
+  const [editingId, setEditingId] = useState<string | null>(null);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [centroToDelete, setCentroToDelete] = useState<centrosDeCustoService.CentroDeCustoListItem | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -59,6 +67,13 @@ const CentrosDeCustoPage: React.FC = () => {
     void refresh();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeEmpresa, filterStatus, filterTipo]);
+
+  const clearOpenParam = useCallback(() => {
+    if (!openId) return;
+    const next = new URLSearchParams(searchParams);
+    next.delete('open');
+    setSearchParams(next, { replace: true });
+  }, [openId, searchParams, setSearchParams]);
 
   const normalizedSearch = useMemo(() => searchTerm.trim().toLowerCase(), [searchTerm]);
   const centros = useMemo(() => {
@@ -107,17 +122,35 @@ const CentrosDeCustoPage: React.FC = () => {
     });
   }, [centros]);
 
-  const handleOpenForm = async (centro: centrosDeCustoService.CentroDeCustoListItem | null = null) => {
+  const handleOpenForm = useCallback(async (centro: centrosDeCustoService.CentroDeCustoListItem | null = null) => {
     if (centro?.id) {
+      const claimed = await editLock.claim(centro.id, {
+        confirmConflict: async () =>
+          confirm({
+            title: 'Este centro de custo já está aberto em outra aba',
+            description: 'Para evitar edição concorrente, abra em apenas uma aba. Deseja abrir mesmo assim nesta aba?',
+            confirmText: 'Abrir mesmo assim',
+            cancelText: 'Cancelar',
+            variant: 'danger',
+          }),
+      });
+      if (!claimed) {
+        clearOpenParam();
+        return;
+      }
+
       setIsFetchingDetails(true);
       setIsFormOpen(true);
       setSelectedCentro(null);
+      setEditingId(centro.id);
       try {
         const details = await centrosDeCustoService.getCentroDeCustoDetails(centro.id);
         setSelectedCentro(details);
       } catch (e: any) {
         addToast(e.message, 'error');
         setIsFormOpen(false);
+        editLock.release(centro.id);
+        setEditingId(null);
       } finally {
         setIsFetchingDetails(false);
       }
@@ -125,12 +158,21 @@ const CentrosDeCustoPage: React.FC = () => {
       setSelectedCentro(null);
       setIsFormOpen(true);
     }
-  };
+  }, [addToast, clearOpenParam, confirm, editLock]);
 
   const handleCloseForm = () => {
     setIsFormOpen(false);
     setSelectedCentro(null);
+    clearOpenParam();
+    if (editingId) editLock.release(editingId);
+    setEditingId(null);
   };
+
+  useEffect(() => {
+    if (!openId) return;
+    if (isFormOpen) return;
+    void handleOpenForm({ id: openId } as any);
+  }, [handleOpenForm, isFormOpen, openId]);
 
   const handleSaveSuccess = () => {
     void refresh();

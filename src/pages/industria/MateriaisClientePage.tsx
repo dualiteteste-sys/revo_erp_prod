@@ -14,7 +14,7 @@ import ListPaginationBar from '@/components/ui/ListPaginationBar';
 import ImportarXmlSuprimentosModal from '@/components/industria/materiais/ImportarXmlSuprimentosModal';
 import { listRecebimentos, setRecebimentoClassificacao, Recebimento } from '@/services/recebimento';
 import ClientAutocomplete from '@/components/common/ClientAutocomplete';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { logger } from '@/lib/logger';
 import { Button } from '@/components/ui/button';
 import { isSeedEnabled } from '@/utils/seed';
@@ -37,6 +37,7 @@ export default function MateriaisClientePage() {
   const [isSeeding, setIsSeeding] = useState(false);
   const [isImportOpen, setIsImportOpen] = useState(false);
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [isClassificarOpen, setIsClassificarOpen] = useState(false);
   const [recebimentosPendentes, setRecebimentosPendentes] = useState<Recebimento[]>([]);
   const [loadingRecebimentos, setLoadingRecebimentos] = useState(false);
@@ -66,6 +67,18 @@ export default function MateriaisClientePage() {
   useEffect(() => {
     fetchMateriais();
   }, [debouncedSearch, activeFilter, page, pageSize]);
+
+  // Deep-link: /app/industria/materiais-cliente?open=<materialId>
+  useEffect(() => {
+    const openId = searchParams.get('open');
+    if (!openId) return;
+    setSelectedId(openId);
+    setIsFormOpen(true);
+    const next = new URLSearchParams(searchParams);
+    next.delete('open');
+    setSearchParams(next, { replace: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const handleNew = () => {
     setSelectedId(null);

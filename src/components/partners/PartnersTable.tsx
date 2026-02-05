@@ -9,6 +9,7 @@ import TableColGroup from '@/components/ui/table/TableColGroup';
 import { useTableColumnWidths, type TableColumnWidthDef } from '@/components/ui/table/useTableColumnWidths';
 import { openInNewTabBestEffort, shouldIgnoreRowDoubleClickEvent } from '@/components/ui/table/rowDoubleClick';
 import { isPlainLeftClick } from '@/components/ui/links/isPlainLeftClick';
+import { useDeferredAction } from '@/components/ui/hooks/useDeferredAction';
 
 interface PartnersTableProps {
   partners: PartnerListItem[];
@@ -43,24 +44,7 @@ const PartnersTable: React.FC<PartnersTableProps> = ({
   onToggleSelect,
   onToggleSelectAll,
 }) => {
-  const editClickTimeoutRef = React.useRef<number | null>(null);
-  const scheduleEdit = (fn: () => void) => {
-    if (typeof window === 'undefined') {
-      fn();
-      return;
-    }
-    if (editClickTimeoutRef.current) window.clearTimeout(editClickTimeoutRef.current);
-    editClickTimeoutRef.current = window.setTimeout(() => {
-      editClickTimeoutRef.current = null;
-      fn();
-    }, 180);
-  };
-  const cancelScheduledEdit = () => {
-    if (typeof window === 'undefined') return;
-    if (!editClickTimeoutRef.current) return;
-    window.clearTimeout(editClickTimeoutRef.current);
-    editClickTimeoutRef.current = null;
-  };
+  const { schedule: scheduleEdit, cancel: cancelScheduledEdit } = useDeferredAction(180);
 
   const columns: TableColumnWidthDef[] = [
     ...(onToggleSelect ? [{ id: 'select', defaultWidth: 56, minWidth: 56, maxWidth: 56, resizable: false }] : []),

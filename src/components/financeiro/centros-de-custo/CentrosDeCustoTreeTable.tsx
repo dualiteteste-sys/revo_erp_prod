@@ -5,6 +5,9 @@ import type { CentroDeCustoListItem, TipoCentroCusto } from '@/services/centrosD
 import ResizableSortableTh, { type SortState } from '@/components/ui/table/ResizableSortableTh';
 import TableColGroup from '@/components/ui/table/TableColGroup';
 import { useTableColumnWidths, type TableColumnWidthDef } from '@/components/ui/table/useTableColumnWidths';
+import { openInNewTabBestEffort, shouldIgnoreRowDoubleClickEvent } from '@/components/ui/table/rowDoubleClick';
+import { isPlainLeftClick } from '@/components/ui/links/isPlainLeftClick';
+import { useDeferredAction } from '@/components/ui/hooks/useDeferredAction';
 
 interface CentrosDeCustoTreeTableProps {
   centros: CentroDeCustoListItem[];
@@ -46,6 +49,7 @@ function compareCodigo(a: string | null, b: string | null): number {
 
 export default function CentrosDeCustoTreeTable(props: CentrosDeCustoTreeTableProps) {
   const { centros, expandedIds, onToggleExpand, onExpandAll, onCollapseAll, onEdit, onDelete } = props;
+  const { schedule: scheduleEdit, cancel: cancelScheduledEdit } = useDeferredAction(180);
 
   const columns: TableColumnWidthDef[] = [
     { id: 'codigo_nome', defaultWidth: 620, minWidth: 280 },
@@ -198,6 +202,7 @@ export default function CentrosDeCustoTreeTable(props: CentrosDeCustoTreeTablePr
               const open = expandedIds.has(centro.id);
               const isRoot = isSystemRootLike(centro);
               const indent = Math.max(0, (centro.nivel ?? 1) - 1) * 18;
+              const href = `/app/financeiro/centros-de-custo?open=${encodeURIComponent(centro.id)}`;
 
               return (
                 <motion.tr
@@ -208,6 +213,11 @@ export default function CentrosDeCustoTreeTable(props: CentrosDeCustoTreeTablePr
                   exit={{ opacity: 0 }}
                   transition={{ duration: 0.15 }}
                   className={isRoot ? 'bg-blue-50/40' : 'hover:bg-gray-50'}
+                  onDoubleClick={(e) => {
+                    if (isRoot) return;
+                    if (shouldIgnoreRowDoubleClickEvent(e)) return;
+                    openInNewTabBestEffort(href, () => onEdit(centro));
+                  }}
                 >
                   <td className="px-6 py-3 text-sm font-medium text-gray-900">
                     <div className="flex items-center gap-2" style={{ paddingLeft: `${indent}px` }}>
@@ -226,11 +236,33 @@ export default function CentrosDeCustoTreeTable(props: CentrosDeCustoTreeTablePr
 
                       {kids ? (open ? <FolderOpen size={16} className="text-gray-600" /> : <Folder size={16} className="text-gray-600" />) : null}
 
-                      <span className={isRoot ? 'font-semibold text-blue-900' : ''}>
-                        {centro.codigo ? <span className="font-mono">{centro.codigo}</span> : <span className="font-mono text-gray-400">—</span>}
-                        <span className="mx-2 text-gray-300">/</span>
-                        {centro.nome}
-                      </span>
+                      {isRoot ? (
+                        <span className="font-semibold text-blue-900">
+                          {centro.codigo ? <span className="font-mono">{centro.codigo}</span> : <span className="font-mono text-gray-400">—</span>}
+                          <span className="mx-2 text-gray-300">/</span>
+                          {centro.nome}
+                        </span>
+                      ) : (
+                        <a
+                          href={href}
+                          className="hover:underline underline-offset-2"
+                          onClick={(e) => {
+                            if (!isPlainLeftClick(e)) return;
+                            e.preventDefault();
+                            scheduleEdit(() => onEdit(centro));
+                          }}
+                          onDoubleClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            cancelScheduledEdit();
+                            openInNewTabBestEffort(href, () => onEdit(centro));
+                          }}
+                        >
+                          {centro.codigo ? <span className="font-mono">{centro.codigo}</span> : <span className="font-mono text-gray-400">—</span>}
+                          <span className="mx-2 text-gray-300">/</span>
+                          {centro.nome}
+                        </a>
+                      )}
                     </div>
                   </td>
 

@@ -8,6 +8,7 @@ import TableColGroup from '@/components/ui/table/TableColGroup';
 import { useTableColumnWidths, type TableColumnWidthDef } from '@/components/ui/table/useTableColumnWidths';
 import { openInNewTabBestEffort, shouldIgnoreRowDoubleClickEvent } from '@/components/ui/table/rowDoubleClick';
 import { isPlainLeftClick } from '@/components/ui/links/isPlainLeftClick';
+import { useDeferredAction } from '@/components/ui/hooks/useDeferredAction';
 
 interface ContasAReceberTableProps {
   contas: ContaAReceber[];
@@ -37,24 +38,7 @@ const ContasAReceberTable: React.FC<ContasAReceberTableProps> = ({
   sortBy,
   onSort,
 }) => {
-  const editClickTimeoutRef = React.useRef<number | null>(null);
-  const scheduleEdit = (fn: () => void) => {
-    if (typeof window === 'undefined') {
-      fn();
-      return;
-    }
-    if (editClickTimeoutRef.current) window.clearTimeout(editClickTimeoutRef.current);
-    editClickTimeoutRef.current = window.setTimeout(() => {
-      editClickTimeoutRef.current = null;
-      fn();
-    }, 180);
-  };
-  const cancelScheduledEdit = () => {
-    if (typeof window === 'undefined') return;
-    if (!editClickTimeoutRef.current) return;
-    window.clearTimeout(editClickTimeoutRef.current);
-    editClickTimeoutRef.current = null;
-  };
+  const { schedule: scheduleEdit, cancel: cancelScheduledEdit } = useDeferredAction(180);
 
   const columns: TableColumnWidthDef[] = [
     { id: 'descricao', defaultWidth: 320, minWidth: 220 },

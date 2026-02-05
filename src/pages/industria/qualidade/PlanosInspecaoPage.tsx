@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { Loader2, PlusCircle, RefreshCcw, ClipboardCheck } from 'lucide-react';
 import { useDebounce } from '@/hooks/useDebounce';
 import { useToast } from '@/contexts/ToastProvider';
@@ -13,16 +13,28 @@ import { useConfirm } from '@/contexts/ConfirmProvider';
 import { Button } from '@/components/ui/button';
 import PageHeader from '@/components/ui/PageHeader';
 import SearchField from '@/components/ui/forms/SearchField';
+import { useSearchParams } from 'react-router-dom';
+import { useEditLock } from '@/components/ui/hooks/useEditLock';
 
 export default function PlanosInspecaoPage() {
   const { addToast } = useToast();
   const { confirm } = useConfirm();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const openId = searchParams.get('open');
+  const editLock = useEditLock('industria:qualidade:planos-inspecao');
   const [planos, setPlanos] = useState<PlanoInspecao[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const debouncedSearch = useDebounce(search, 400);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
+
+  const clearOpenParam = useCallback(() => {
+    if (!openId) return;
+    const next = new URLSearchParams(searchParams);
+    next.delete('open');
+    setSearchParams(next, { replace: true });
+  }, [openId, searchParams, setSearchParams]);
 
   const loadPlanos = async () => {
     setLoading(true);
@@ -46,10 +58,37 @@ export default function PlanosInspecaoPage() {
     setIsModalOpen(true);
   };
 
-  const handleEdit = (id: string) => {
+  const handleEdit = useCallback(async (id: string) => {
+    const claimed = await editLock.claim(id, {
+      confirmConflict: async () =>
+        confirm({
+          title: 'Este plano já está aberto em outra aba',
+          description: 'Para evitar edição concorrente, abra em apenas uma aba. Deseja abrir mesmo assim nesta aba?',
+          confirmText: 'Abrir mesmo assim',
+          cancelText: 'Cancelar',
+          variant: 'danger',
+        }),
+    });
+    if (!claimed) {
+      clearOpenParam();
+      return;
+    }
     setEditingId(id);
     setIsModalOpen(true);
-  };
+  }, [clearOpenParam, confirm, editLock]);
+
+  const handleCloseModal = useCallback(() => {
+    setIsModalOpen(false);
+    clearOpenParam();
+    if (editingId) editLock.release(editingId);
+    setEditingId(null);
+  }, [clearOpenParam, editLock, editingId]);
+
+  useEffect(() => {
+    if (!openId) return;
+    if (isModalOpen) return;
+    void handleEdit(openId);
+  }, [handleEdit, isModalOpen, openId]);
 
   const handleDelete = async (id: string) => {
     const ok = await confirm({
@@ -105,7 +144,7 @@ export default function PlanosInspecaoPage() {
 
       <PlanoInspecaoFormModal
         isOpen={isModalOpen}
-        onClose={() => setIsModalOpen(false)}
+        onClose={handleCloseModal}
         planoId={editingId}
         onSaved={loadPlanos}
       />

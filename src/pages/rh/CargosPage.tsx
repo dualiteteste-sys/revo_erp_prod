@@ -1,4 +1,4 @@
-import React, { useMemo, useState, useEffect } from 'react';
+import React, { useCallback, useMemo, useState, useEffect } from 'react';
 import { listCargos, setCargoAtivo, Cargo, getCargoDetails, CargoDetails, seedCargos } from '@/services/rh';
 import { Briefcase, DatabaseBackup, LayoutGrid, List, PlusCircle } from 'lucide-react';
 import GlassCard from '@/components/ui/GlassCard';
@@ -14,6 +14,8 @@ import { useConfirm } from '@/contexts/ConfirmProvider';
 import CargosTable from '@/components/rh/CargosTable';
 import { useHasPermission } from '@/hooks/useHasPermission';
 import { isSeedEnabled } from '@/utils/seed';
+import { useSearchParams } from 'react-router-dom';
+import { useEditLock } from '@/components/ui/hooks/useEditLock';
 
 export default function CargosPage() {
   const enableSeed = isSeedEnabled();
@@ -23,9 +25,13 @@ export default function CargosPage() {
   const debouncedSearch = useDebounce(search, 500);
   const { addToast } = useToast();
   const { confirm } = useConfirm();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const openId = searchParams.get('open');
+  const editLock = useEditLock('rh:cargos');
   
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [selectedCargo, setSelectedCargo] = useState<CargoDetails | null>(null);
+  const [editingCargoId, setEditingCargoId] = useState<string | null>(null);
   const [loadingDetails, setLoadingDetails] = useState(false);
   const [isSeeding, setIsSeeding] = useState(false);
   const [viewMode, setViewMode] = useState<'cards' | 'table'>('table');
@@ -62,20 +68,56 @@ export default function CargosPage() {
     fetchCargos();
   }, [debouncedSearch, statusFilter]);
 
-  const handleEdit = async (id: string) => {
+  const clearOpenParam = useCallback(() => {
+    if (!openId) return;
+    const next = new URLSearchParams(searchParams);
+    next.delete('open');
+    setSearchParams(next, { replace: true });
+  }, [openId, searchParams, setSearchParams]);
+
+  const closeForm = useCallback(() => {
+    setIsFormOpen(false);
+    clearOpenParam();
+    if (editingCargoId) editLock.release(editingCargoId);
+    setEditingCargoId(null);
+  }, [clearOpenParam, editLock, editingCargoId]);
+
+  const handleEdit = useCallback(async (id: string) => {
+    const claimed = await editLock.claim(id, {
+      confirmConflict: async () =>
+        confirm({
+          title: 'Este cargo já está aberto em outra aba',
+          description: 'Para evitar edição concorrente, abra em apenas uma aba. Deseja abrir mesmo assim nesta aba?',
+          confirmText: 'Abrir mesmo assim',
+          cancelText: 'Cancelar',
+          variant: 'danger',
+        }),
+    });
+    if (!claimed) {
+      clearOpenParam();
+      return;
+    }
+
     setLoadingDetails(true);
     setIsFormOpen(true);
     setSelectedCargo(null);
+    setEditingCargoId(id);
     try {
       const details = await getCargoDetails(id);
       setSelectedCargo(details);
     } catch (error) {
       addToast((error as any)?.message || 'Erro ao carregar cargo.', 'error');
-      setIsFormOpen(false);
+      closeForm();
     } finally {
       setLoadingDetails(false);
     }
-  };
+  }, [addToast, clearOpenParam, closeForm, confirm, editLock]);
+
+  useEffect(() => {
+    if (!openId) return;
+    if (isFormOpen) return;
+    void handleEdit(openId);
+  }, [handleEdit, isFormOpen, openId]);
 
   const handleNew = () => {
     if (!permsLoading && !canCreate) {
@@ -87,7 +129,7 @@ export default function CargosPage() {
   };
 
   const handleSaveSuccess = () => {
-    setIsFormOpen(false);
+    closeForm();
     fetchCargos();
   };
 
@@ -324,13 +366,13 @@ export default function CargosPage() {
         </>
       )}
 
-      <Modal isOpen={isFormOpen} onClose={() => setIsFormOpen(false)} title={selectedCargo ? 'Editar Cargo' : 'Novo Cargo'}>
+      <Modal isOpen={isFormOpen} onClose={closeForm} title={selectedCargo ? 'Editar Cargo' : 'Novo Cargo'}>
         {loadingDetails ? (
           <div className="flex justify-center items-center h-64">
             <Loader2 className="animate-spin text-blue-600 w-8 h-8" />
           </div>
         ) : (
-          <CargoFormPanel cargo={selectedCargo} onSaveSuccess={handleSaveSuccess} onClose={() => setIsFormOpen(false)} />
+          <CargoFormPanel cargo={selectedCargo} onSaveSuccess={handleSaveSuccess} onClose={closeForm} />
         )}
       </Modal>
     </div>

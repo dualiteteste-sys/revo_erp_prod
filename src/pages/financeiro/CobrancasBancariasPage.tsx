@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { useCobrancas } from '@/hooks/useCobrancas';
 import { useToast } from '@/contexts/ToastProvider';
+import { useConfirm } from '@/contexts/ConfirmProvider';
 import * as cobrancasService from '@/services/cobrancas';
 import { Loader2, PlusCircle, Search, Landmark, DatabaseBackup, X } from 'lucide-react';
 import Pagination from '@/components/ui/Pagination';
@@ -16,6 +17,8 @@ import Select from '@/components/ui/forms/Select';
 import DatePicker from '@/components/ui/DatePicker';
 import { Button } from '@/components/ui/button';
 import { isSeedEnabled } from '@/utils/seed';
+import { useSearchParams } from 'react-router-dom';
+import { useEditLock } from '@/components/ui/hooks/useEditLock';
 
 export default function CobrancasBancariasPage() {
   const enableSeed = isSeedEnabled();
@@ -40,15 +43,50 @@ export default function CobrancasBancariasPage() {
     refresh,
   } = useCobrancas();
   const { addToast } = useToast();
+  const { confirm } = useConfirm();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const openId = searchParams.get('open');
+  const editLock = useEditLock('financeiro:cobrancas');
 
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [selectedCobranca, setSelectedCobranca] = useState<cobrancasService.CobrancaBancaria | null>(null);
+  const [editingId, setEditingId] = useState<string | null>(null);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [cobrancaToDelete, setCobrancaToDelete] = useState<cobrancasService.CobrancaBancaria | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
   const [isSeeding, setIsSeeding] = useState(false);
 
-  const handleOpenForm = (cobranca: cobrancasService.CobrancaBancaria | null = null) => {
+  const clearOpenParam = useCallback(() => {
+    if (!openId) return;
+    const next = new URLSearchParams(searchParams);
+    next.delete('open');
+    setSearchParams(next, { replace: true });
+  }, [openId, searchParams, setSearchParams]);
+
+  const openWithLock = useCallback(async (id: string) => {
+    const claimed = await editLock.claim(id, {
+      confirmConflict: async () =>
+        confirm({
+          title: 'Esta cobrança já está aberta em outra aba',
+          description: 'Para evitar edição concorrente, abra em apenas uma aba. Deseja abrir mesmo assim nesta aba?',
+          confirmText: 'Abrir mesmo assim',
+          cancelText: 'Cancelar',
+          variant: 'danger',
+        }),
+    });
+    if (!claimed) {
+      clearOpenParam();
+      return false;
+    }
+    setEditingId(id);
+    return true;
+  }, [clearOpenParam, confirm, editLock]);
+
+  const handleOpenForm = async (cobranca: cobrancasService.CobrancaBancaria | null = null) => {
+    if (cobranca?.id) {
+      const ok = await openWithLock(cobranca.id);
+      if (!ok) return;
+    }
     setSelectedCobranca(cobranca);
     setIsFormOpen(true);
   };
@@ -56,6 +94,9 @@ export default function CobrancasBancariasPage() {
   const handleCloseForm = () => {
     setIsFormOpen(false);
     setSelectedCobranca(null);
+    clearOpenParam();
+    if (editingId) editLock.release(editingId);
+    setEditingId(null);
   };
 
   const handleSaveSuccess = () => {
@@ -105,6 +146,17 @@ export default function CobrancasBancariasPage() {
     setStartVenc(null);
     setEndVenc(null);
   };
+
+  useEffect(() => {
+    if (!openId) return;
+    if (isFormOpen) return;
+    void (async () => {
+      const ok = await openWithLock(openId);
+      if (!ok) return;
+      setSelectedCobranca({ id: openId } as any);
+      setIsFormOpen(true);
+    })();
+  }, [isFormOpen, openId, openWithLock]);
 
   return (
     <div className="p-1 min-h-full flex flex-col">

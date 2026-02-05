@@ -5,6 +5,9 @@ import ResizableSortableTh, { type SortState } from '@/components/ui/table/Resiz
 import TableColGroup from '@/components/ui/table/TableColGroup';
 import { useTableColumnWidths, type TableColumnWidthDef } from '@/components/ui/table/useTableColumnWidths';
 import { sortRows, toggleSort } from '@/components/ui/table/sortUtils';
+import { openInNewTabBestEffort, shouldIgnoreRowDoubleClickEvent } from '@/components/ui/table/rowDoubleClick';
+import { isPlainLeftClick } from '@/components/ui/links/isPlainLeftClick';
+import { useDeferredAction } from '@/components/ui/hooks/useDeferredAction';
 
 interface Props {
   centros: CentroTrabalho[];
@@ -16,6 +19,7 @@ interface Props {
 
 export default function CentrosTrabalhoTable({ centros, onEdit, onClone, onDelete, highlightCentroId }: Props) {
   const [menuId, setMenuId] = useState<string | null>(null);
+  const { schedule: scheduleEdit, cancel: cancelScheduledEdit } = useDeferredAction(180);
 
   const columns: TableColumnWidthDef[] = [
     { id: 'nome', defaultWidth: 360, minWidth: 220 },
@@ -98,13 +102,37 @@ export default function CentrosTrabalhoTable({ centros, onEdit, onClone, onDelet
         <tbody className="bg-white divide-y divide-gray-200">
           {sortedCentros.map(centro => {
             const isHighlighted = highlightCentroId === centro.id;
+            const href = `/app/industria/centros-trabalho?open=${encodeURIComponent(centro.id)}`;
             return (
             <tr
               key={centro.id}
               className={`transition-colors ${isHighlighted ? 'bg-amber-50/70 ring-1 ring-amber-200' : 'hover:bg-gray-50'}`}
+              onDoubleClick={(e) => {
+                if (shouldIgnoreRowDoubleClickEvent(e as any)) return;
+                cancelScheduledEdit();
+                openInNewTabBestEffort(href, () => onEdit(centro));
+              }}
             >
               <td className="px-6 py-4">
-                <div className="text-sm font-medium text-gray-900">{centro.nome}</div>
+                <div className="text-sm font-medium text-gray-900">
+                  <a
+                    href={href}
+                    className="hover:underline underline-offset-2"
+                    onClick={(e) => {
+                      if (!isPlainLeftClick(e)) return;
+                      e.preventDefault();
+                      scheduleEdit(() => onEdit(centro));
+                    }}
+                    onDoubleClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      cancelScheduledEdit();
+                      openInNewTabBestEffort(href, () => onEdit(centro));
+                    }}
+                  >
+                    {centro.nome}
+                  </a>
+                </div>
                 {centro.descricao && <div className="text-xs text-gray-500">{centro.descricao}</div>}
               </td>
               <td className="px-6 py-4 text-sm text-gray-600">{centro.codigo || '-'}</td>

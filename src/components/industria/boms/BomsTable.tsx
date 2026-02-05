@@ -5,6 +5,9 @@ import ResizableSortableTh, { type SortState } from '@/components/ui/table/Resiz
 import TableColGroup from '@/components/ui/table/TableColGroup';
 import { useTableColumnWidths, type TableColumnWidthDef } from '@/components/ui/table/useTableColumnWidths';
 import { sortRows, toggleSort } from '@/components/ui/table/sortUtils';
+import { openInNewTabBestEffort, shouldIgnoreRowDoubleClickEvent } from '@/components/ui/table/rowDoubleClick';
+import { isPlainLeftClick } from '@/components/ui/links/isPlainLeftClick';
+import { useDeferredAction } from '@/components/ui/hooks/useDeferredAction';
 
 interface Props {
   boms: BomListItem[];
@@ -21,6 +24,7 @@ const tipoMeta = (tipo?: string | null) => {
 
 export default function BomsTable({ boms, onEdit, onClone, onDelete }: Props) {
   const [menuId, setMenuId] = useState<string | null>(null);
+  const { schedule: scheduleEdit, cancel: cancelScheduledEdit } = useDeferredAction(180);
 
   const columns: TableColumnWidthDef[] = [
     { id: 'produto', defaultWidth: 360, minWidth: 220 },
@@ -102,11 +106,35 @@ export default function BomsTable({ boms, onEdit, onClone, onDelete }: Props) {
         </thead>
         <tbody className="bg-white divide-y divide-gray-200">
           {sortedBoms.map(bom => (
-            <tr key={bom.id} className="hover:bg-gray-50 transition-colors">
+            <tr
+              key={bom.id}
+              className="hover:bg-gray-50 transition-colors"
+              onDoubleClick={(e) => {
+                if (shouldIgnoreRowDoubleClickEvent(e as any)) return;
+                cancelScheduledEdit();
+                openInNewTabBestEffort(`/app/industria/boms?open=${encodeURIComponent(bom.id)}`, () => onEdit(bom));
+              }}
+            >
               <td className="px-6 py-4">
                 <div className="flex items-center gap-2">
                   <Package size={16} className="text-gray-400" />
-                  <span className="text-sm text-gray-900 font-medium">{bom.produto_nome}</span>
+                  <a
+                    href={`/app/industria/boms?open=${encodeURIComponent(bom.id)}`}
+                    className="text-sm text-gray-900 font-medium hover:underline underline-offset-2"
+                    onClick={(e) => {
+                      if (!isPlainLeftClick(e)) return;
+                      e.preventDefault();
+                      scheduleEdit(() => onEdit(bom));
+                    }}
+                    onDoubleClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      cancelScheduledEdit();
+                      openInNewTabBestEffort(`/app/industria/boms?open=${encodeURIComponent(bom.id)}`, () => onEdit(bom));
+                    }}
+                  >
+                    {bom.produto_nome}
+                  </a>
                 </div>
               </td>
               <td className="px-6 py-4 text-sm text-gray-600">

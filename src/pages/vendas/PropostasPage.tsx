@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { useVendas } from '@/hooks/useVendas';
 import { seedVendas, type VendaPedido } from '@/services/vendas';
 import { FileSignature, Loader2, PlusCircle, Search } from 'lucide-react';
@@ -11,6 +11,9 @@ import Pagination from '@/components/ui/Pagination';
 import ListPaginationBar from '@/components/ui/ListPaginationBar';
 import { useToast } from '@/contexts/ToastProvider';
 import { SeedButton } from '@/components/common/SeedButton';
+import { useSearchParams } from 'react-router-dom';
+import { useConfirm } from '@/contexts/ConfirmProvider';
+import { useEditLock } from '@/components/ui/hooks/useEditLock';
 
 export default function PropostasPage() {
   const {
@@ -29,9 +32,14 @@ export default function PropostasPage() {
     refresh,
   } = useVendas();
   const { addToast } = useToast();
+  const { confirm } = useConfirm();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const openId = searchParams.get('open');
+  const editLock = useEditLock('vendas:propostas');
 
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [editingId, setEditingId] = useState<string | null>(null);
   const [isSeeding, setIsSeeding] = useState(false);
 
   useEffect(() => {
@@ -45,19 +53,54 @@ export default function PropostasPage() {
   };
 
   const handleEdit = (order: VendaPedido) => {
-    setSelectedId(order.id);
-    setIsFormOpen(true);
+    void openWithLock(order.id);
   };
 
-  const handleClose = () => {
+  const clearOpenParam = useCallback(() => {
+    if (!openId) return;
+    const next = new URLSearchParams(searchParams);
+    next.delete('open');
+    setSearchParams(next, { replace: true });
+  }, [openId, searchParams, setSearchParams]);
+
+  const handleClose = useCallback(() => {
     setIsFormOpen(false);
     setSelectedId(null);
-  };
+    clearOpenParam();
+    if (editingId) editLock.release(editingId);
+    setEditingId(null);
+  }, [clearOpenParam, editLock, editingId]);
+
+  const openWithLock = useCallback(async (id: string) => {
+    const claimed = await editLock.claim(id, {
+      confirmConflict: async () =>
+        confirm({
+          title: 'Esta proposta já está aberta em outra aba',
+          description: 'Para evitar edição concorrente, abra em apenas uma aba. Deseja abrir mesmo assim nesta aba?',
+          confirmText: 'Abrir mesmo assim',
+          cancelText: 'Cancelar',
+          variant: 'danger',
+        }),
+    });
+    if (!claimed) {
+      clearOpenParam();
+      return;
+    }
+    setEditingId(id);
+    setSelectedId(id);
+    setIsFormOpen(true);
+  }, [clearOpenParam, confirm, editLock]);
 
   const handleSuccess = (opts?: { keepOpen?: boolean }) => {
     refresh();
     if (!selectedId && !opts?.keepOpen) handleClose();
   };
+
+  useEffect(() => {
+    if (!openId) return;
+    if (isFormOpen) return;
+    void openWithLock(openId);
+  }, [isFormOpen, openId, openWithLock]);
 
   const handleSeed = async () => {
     setIsSeeding(true);
@@ -122,7 +165,7 @@ export default function PropostasPage() {
               data={orders}
               getItemId={(o) => o.id}
               loading={loading}
-              tableComponent={<PedidosVendasTable orders={orders} onEdit={handleEdit} />}
+              tableComponent={<PedidosVendasTable orders={orders} onEdit={handleEdit} basePath="/app/vendas/propostas" />}
               renderMobileCard={(order) => (
                 <PedidoVendaMobileCard
                   key={order.id}

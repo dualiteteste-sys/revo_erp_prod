@@ -30,6 +30,7 @@ export default function CentrosTrabalhoPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const [pendingHighlightTerm, setPendingHighlightTerm] = useState<string | null>(null);
   const [highlightCentroId, setHighlightCentroId] = useState<string | null>(null);
+  const [pendingOpenId, setPendingOpenId] = useState<string | null>(null);
 
   // Deep-link: /app/industria/centros-trabalho?new=1
   useEffect(() => {
@@ -40,6 +41,32 @@ export default function CentrosTrabalhoPage() {
     next.delete('new');
     setSearchParams(next, { replace: true });
   }, [searchParams, setSearchParams]);
+
+  // Deep-link: /app/industria/centros-trabalho?open=<centroId>
+  // Observação: o form exige objeto completo (não busca por ID), então aguardamos o list carregar para encontrar o item.
+  useEffect(() => {
+    const openId = searchParams.get('open');
+    if (!openId) return;
+    setPendingOpenId(openId);
+    const next = new URLSearchParams(searchParams);
+    next.delete('open');
+    setSearchParams(next, { replace: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    if (!pendingOpenId) return;
+    if (loading) return;
+    const found = centros.find((c) => c.id === pendingOpenId) ?? null;
+    if (!found) {
+      addToast('Centro de trabalho não encontrado para abrir.', 'error');
+      setPendingOpenId(null);
+      return;
+    }
+    setSelectedCentro(found);
+    setIsFormOpen(true);
+    setPendingOpenId(null);
+  }, [pendingOpenId, loading, centros, addToast]);
 
   const fetchCentros = async () => {
     setLoading(true);

@@ -1,10 +1,13 @@
 import React, { useMemo, useState } from 'react';
 import { Movimentacao } from '@/services/treasury';
-import { Edit, Trash2, ArrowUpRight, ArrowDownLeft, CheckCircle, Circle } from 'lucide-react';
+import { Edit, Trash2, CheckCircle, Circle } from 'lucide-react';
 import ResizableSortableTh, { type SortState } from '@/components/ui/table/ResizableSortableTh';
 import TableColGroup from '@/components/ui/table/TableColGroup';
 import { useTableColumnWidths, type TableColumnWidthDef } from '@/components/ui/table/useTableColumnWidths';
 import { sortRows, toggleSort } from '@/components/ui/table/sortUtils';
+import { openInNewTabBestEffort, shouldIgnoreRowDoubleClickEvent } from '@/components/ui/table/rowDoubleClick';
+import { isPlainLeftClick } from '@/components/ui/links/isPlainLeftClick';
+import { useDeferredAction } from '@/components/ui/hooks/useDeferredAction';
 
 interface Props {
   movimentacoes: Movimentacao[];
@@ -13,6 +16,8 @@ interface Props {
 }
 
 export default function MovimentacoesTable({ movimentacoes, onEdit, onDelete }: Props) {
+  const { schedule: scheduleEdit, cancel: cancelScheduledEdit } = useDeferredAction(180);
+
   const columns: TableColumnWidthDef[] = [
     { id: 'data', defaultWidth: 160, minWidth: 140 },
     { id: 'descricao', defaultWidth: 520, minWidth: 240 },
@@ -103,13 +108,46 @@ export default function MovimentacoesTable({ movimentacoes, onEdit, onDelete }: 
           </tr>
         </thead>
         <tbody className="bg-white divide-y divide-gray-200">
-          {sortedMovs.map(mov => (
-            <tr key={mov.id} className="hover:bg-gray-50">
+          {sortedMovs.map((mov) => {
+            const href = `/app/financeiro/tesouraria?tab=movimentos&open=${encodeURIComponent(mov.id)}`;
+            const canEdit = !mov.conciliado;
+            return (
+              <tr
+                key={mov.id}
+                className="hover:bg-gray-50"
+                onDoubleClick={(e) => {
+                  if (!canEdit) return;
+                  if (shouldIgnoreRowDoubleClickEvent(e)) return;
+                  openInNewTabBestEffort(href, () => onEdit(mov));
+                }}
+              >
               <td className="px-6 py-4 text-sm text-gray-900 whitespace-nowrap">
                 {new Date(mov.data_movimento).toLocaleDateString('pt-BR')}
               </td>
               <td className="px-6 py-4">
-                <div className="text-sm text-gray-900 font-medium">{mov.descricao}</div>
+                <div className="text-sm text-gray-900 font-medium">
+                  {canEdit ? (
+                    <a
+                      href={href}
+                      className="hover:underline underline-offset-2"
+                      onClick={(e) => {
+                        if (!isPlainLeftClick(e)) return;
+                        e.preventDefault();
+                        scheduleEdit(() => onEdit(mov));
+                      }}
+                      onDoubleClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        cancelScheduledEdit();
+                        openInNewTabBestEffort(href, () => onEdit(mov));
+                      }}
+                    >
+                      {mov.descricao}
+                    </a>
+                  ) : (
+                    mov.descricao
+                  )}
+                </div>
                 <div className="text-xs text-gray-500">
                   {mov.categoria && <span className="mr-2 bg-gray-100 px-1 rounded">{mov.categoria}</span>}
                   {mov.documento_ref && <span>Doc: {mov.documento_ref}</span>}
@@ -144,7 +182,8 @@ export default function MovimentacoesTable({ movimentacoes, onEdit, onDelete }: 
                 )}
               </td>
             </tr>
-          ))}
+            );
+          })}
           {sortedMovs.length === 0 && (
             <tr>
               <td colSpan={7} className="px-6 py-12 text-center text-gray-500">Nenhuma movimentação no período.</td>

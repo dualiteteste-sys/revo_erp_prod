@@ -44,6 +44,19 @@ export default function RoteirosPage() {
     setSearchParams(next, { replace: true });
   }, [searchParams, setSearchParams]);
 
+  // Deep-link: /app/industria/roteiros?open=<roteiroId>
+  useEffect(() => {
+    const openId = searchParams.get('open');
+    if (!openId) return;
+    setSelectedId(openId);
+    setInitialFormData(null);
+    setIsFormOpen(true);
+    const next = new URLSearchParams(searchParams);
+    next.delete('open');
+    setSearchParams(next, { replace: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const fetchRoteiros = async () => {
     setLoading(true);
     try {
