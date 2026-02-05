@@ -1,8 +1,9 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { BarChart2, Loader2 } from 'lucide-react';
 import { useToast } from '@/contexts/ToastProvider';
 import { listVendas, type VendaPedido } from '@/services/vendas';
 import { getRelatoriosVendasTotais } from '@/services/vendasReadModels';
+import { useAuth } from '@/contexts/AuthProvider';
 
 type Totais = {
   pedidos: number;
@@ -17,12 +18,40 @@ type Totais = {
 
 export default function RelatoriosVendasPage() {
   const { addToast } = useToast();
+  const { activeEmpresaId } = useAuth();
   const [loading, setLoading] = useState(true);
   const [orders, setOrders] = useState<VendaPedido[]>([]);
   const [pdvTotal, setPdvTotal] = useState(0);
   const [devolucoesTotal, setDevolucoesTotal] = useState(0);
 
-  async function load() {
+  const lastEmpresaIdRef = useRef<string | null>(activeEmpresaId);
+  const empresaChanged = lastEmpresaIdRef.current !== activeEmpresaId;
+
+  useEffect(() => {
+    lastEmpresaIdRef.current = activeEmpresaId;
+  }, [activeEmpresaId]);
+
+  useEffect(() => {
+    // Multi-tenant safety: evitar reaproveitar estado do tenant anterior.
+    setOrders([]);
+    setPdvTotal(0);
+    setDevolucoesTotal(0);
+
+    if (!activeEmpresaId) {
+      setLoading(false);
+      return;
+    }
+    setLoading(true);
+  }, [activeEmpresaId]);
+
+  const load = useCallback(async () => {
+    if (!activeEmpresaId) {
+      setOrders([]);
+      setPdvTotal(0);
+      setDevolucoesTotal(0);
+      setLoading(false);
+      return;
+    }
     setLoading(true);
     try {
       const [all, totals] = await Promise.all([listVendas({ search: '', status: undefined, limit: 500, offset: 0 }), getRelatoriosVendasTotais()]);
@@ -37,12 +66,13 @@ export default function RelatoriosVendasPage() {
     } finally {
       setLoading(false);
     }
-  }
+  }, [activeEmpresaId, addToast]);
 
   useEffect(() => {
     void load();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [load]);
+
+  const effectiveLoading = !!activeEmpresaId && (loading || empresaChanged);
 
   const totais: Totais = useMemo(() => {
     const t: Totais = {
@@ -89,7 +119,11 @@ export default function RelatoriosVendasPage() {
       </div>
 
       <div className="bg-white rounded-lg shadow p-4 flex-grow">
-        {loading ? (
+        {!activeEmpresaId ? (
+          <div className="flex justify-center h-64 items-center text-gray-600">
+            Selecione uma empresa para ver os relatórios.
+          </div>
+        ) : effectiveLoading ? (
           <div className="flex justify-center h-64 items-center">
             <Loader2 className="animate-spin text-blue-600 w-10 h-10" />
           </div>
