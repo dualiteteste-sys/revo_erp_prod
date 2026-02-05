@@ -5,6 +5,9 @@ import { Edit, Trash2, AlertTriangle } from 'lucide-react';
 import ResizableSortableTh, { type SortState } from '@/components/ui/table/ResizableSortableTh';
 import TableColGroup from '@/components/ui/table/TableColGroup';
 import { useTableColumnWidths, type TableColumnWidthDef } from '@/components/ui/table/useTableColumnWidths';
+import { openInNewTabBestEffort, shouldIgnoreRowDoubleClickEvent } from '@/components/ui/table/rowDoubleClick';
+import { isPlainLeftClick } from '@/components/ui/links/isPlainLeftClick';
+import { useDeferredAction } from '@/components/ui/hooks/useDeferredAction';
 
 interface SalesGoalsTableProps {
   goals: SalesGoal[];
@@ -37,6 +40,8 @@ const ProgressBar: React.FC<{ value: number }> = ({ value }) => {
 };
 
 const SalesGoalsTable: React.FC<SalesGoalsTableProps> = ({ goals, onEdit, onDelete, sortBy, onSort }) => {
+  const { schedule: scheduleEdit, cancel: cancelScheduledEdit } = useDeferredAction(180);
+
   const columns: TableColumnWidthDef[] = [
     { id: 'vendedor_nome', defaultWidth: 240, minWidth: 200 },
     { id: 'data_inicio', defaultWidth: 220, minWidth: 200 },
@@ -88,8 +93,31 @@ const SalesGoalsTable: React.FC<SalesGoalsTableProps> = ({ goals, onEdit, onDele
                 exit={{ opacity: 0 }}
                 transition={{ duration: 0.3 }}
                 className="hover:bg-gray-50"
+                onDoubleClick={(e) => {
+                  if (shouldIgnoreRowDoubleClickEvent(e)) return;
+                  const href = `/app/vendas/metas?open=${encodeURIComponent(goal.id)}`;
+                  openInNewTabBestEffort(href, () => onEdit(goal));
+                }}
               >
-                <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{goal.vendedor_nome}</td>
+                <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                  <a
+                    href={`/app/vendas/metas?open=${encodeURIComponent(goal.id)}`}
+                    className="hover:underline underline-offset-2"
+                    onClick={(e) => {
+                      if (!isPlainLeftClick(e)) return;
+                      e.preventDefault();
+                      scheduleEdit(() => onEdit(goal));
+                    }}
+                    onDoubleClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      cancelScheduledEdit();
+                      openInNewTabBestEffort(`/app/vendas/metas?open=${encodeURIComponent(goal.id)}`, () => onEdit(goal));
+                    }}
+                  >
+                    {goal.vendedor_nome}
+                  </a>
+                </td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{`${formatDate(goal.data_inicio)} - ${formatDate(goal.data_fim)}`}</td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 font-semibold">{formatCurrency(goal.valor_meta)}</td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 font-semibold">{formatCurrency(goal.valor_realizado)}</td>

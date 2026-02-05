@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { useSalesGoals } from '@/hooks/useSalesGoals';
 import { useToast } from '@/contexts/ToastProvider';
+import { useConfirm } from '@/contexts/ConfirmProvider';
 import * as salesGoalsService from '@/services/salesGoals';
 import { AlertTriangle, Loader2, PlusCircle, Search, Target } from 'lucide-react';
 import Pagination from '@/components/ui/Pagination';
@@ -11,6 +12,8 @@ import SalesGoalsTable from '@/components/sales-goals/SalesGoalsTable';
 import SalesGoalFormPanel from '@/components/sales-goals/SalesGoalFormPanel';
 import Select from '@/components/ui/forms/Select';
 import { SeedButton } from '@/components/common/SeedButton';
+import { useSearchParams } from 'react-router-dom';
+import { useEditLock } from '@/components/ui/hooks/useEditLock';
 
 const SalesGoalsPage: React.FC = () => {
   const {
@@ -31,39 +34,78 @@ const SalesGoalsPage: React.FC = () => {
     refresh,
   } = useSalesGoals();
   const { addToast } = useToast();
+  const { confirm } = useConfirm();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const openId = searchParams.get('open');
+  const editLock = useEditLock('vendas:metas');
 
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [selectedGoal, setSelectedGoal] = useState<salesGoalsService.SalesGoal | null>(null);
+  const [editingGoalId, setEditingGoalId] = useState<string | null>(null);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [goalToDelete, setGoalToDelete] = useState<salesGoalsService.SalesGoal | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
   const [isFetchingDetails, setIsFetchingDetails] = useState(false);
   const [isSeeding, setIsSeeding] = useState(false);
 
-  const handleOpenForm = async (goal: salesGoalsService.SalesGoal | null = null) => {
+  const clearOpenParam = useCallback(() => {
+    if (!openId) return;
+    const next = new URLSearchParams(searchParams);
+    next.delete('open');
+    setSearchParams(next, { replace: true });
+  }, [openId, searchParams, setSearchParams]);
+
+  const handleOpenForm = useCallback(async (goal: salesGoalsService.SalesGoal | null = null) => {
     if (goal?.id) {
+      const claimed = await editLock.claim(goal.id, {
+        confirmConflict: async () =>
+          confirm({
+            title: 'Esta meta já está aberta em outra aba',
+            description: 'Para evitar edição concorrente, abra em apenas uma aba. Deseja abrir mesmo assim nesta aba?',
+            confirmText: 'Abrir mesmo assim',
+            cancelText: 'Cancelar',
+            variant: 'danger',
+          }),
+      });
+      if (!claimed) {
+        clearOpenParam();
+        return;
+      }
+
       setIsFetchingDetails(true);
       setIsFormOpen(true);
       setSelectedGoal(null);
+      setEditingGoalId(goal.id);
       try {
         const details = await salesGoalsService.getSalesGoalDetails(goal.id);
         setSelectedGoal(details);
       } catch (e: any) {
         addToast(e.message, 'error');
         setIsFormOpen(false);
+        editLock.release(goal.id);
+        setEditingGoalId(null);
       } finally {
         setIsFetchingDetails(false);
       }
-    } else {
-      setSelectedGoal(null);
-      setIsFormOpen(true);
-    }
-  };
+      } else {
+        setSelectedGoal(null);
+        setIsFormOpen(true);
+      }
+  }, [addToast, clearOpenParam, confirm, editLock]);
 
-  const handleCloseForm = () => {
+  const handleCloseForm = useCallback(() => {
     setIsFormOpen(false);
     setSelectedGoal(null);
-  };
+    clearOpenParam();
+    if (editingGoalId) editLock.release(editingGoalId);
+    setEditingGoalId(null);
+  }, [clearOpenParam, editLock, editingGoalId]);
+
+  useEffect(() => {
+    if (!openId) return;
+    if (isFormOpen) return;
+    void handleOpenForm({ id: openId } as any);
+  }, [handleOpenForm, isFormOpen, openId]);
 
   const handleSaveSuccess = () => {
     refresh();

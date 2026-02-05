@@ -6,6 +6,9 @@ import type { Colaborador } from '@/services/rh';
 import ResizableSortableTh, { type SortState as UiSortState } from '@/components/ui/table/ResizableSortableTh';
 import TableColGroup from '@/components/ui/table/TableColGroup';
 import { useTableColumnWidths, type TableColumnWidthDef } from '@/components/ui/table/useTableColumnWidths';
+import { openInNewTabBestEffort, shouldIgnoreRowDoubleClickEvent } from '@/components/ui/table/rowDoubleClick';
+import { isPlainLeftClick } from '@/components/ui/links/isPlainLeftClick';
+import { useDeferredAction } from '@/components/ui/hooks/useDeferredAction';
 
 type SortState = { column: keyof Colaborador; ascending: boolean };
 
@@ -28,6 +31,8 @@ export default function ColaboradoresTable({
   canEdit = true,
   canToggleAtivo = true,
 }: ColaboradoresTableProps) {
+  const { schedule: scheduleEdit, cancel: cancelScheduledEdit } = useDeferredAction(180);
+
   const columns: TableColumnWidthDef[] = [
     { id: 'nome', defaultWidth: 300, minWidth: 220 },
     { id: 'cargo_nome', defaultWidth: 220, minWidth: 180 },
@@ -60,17 +65,46 @@ export default function ColaboradoresTable({
         </thead>
         <motion.tbody layout className="bg-white divide-y divide-gray-200">
           <AnimatePresence>
-            {colaboradores.map((c) => (
-              <motion.tr
-                key={c.id}
-                layout
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                transition={{ duration: 0.2 }}
-                className="hover:bg-gray-50"
-              >
-                <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{c.nome}</td>
+            {colaboradores.map((c) => {
+              const href = `/app/rh/colaboradores?open=${encodeURIComponent(c.id)}`;
+              return (
+                <motion.tr
+                  key={c.id}
+                  layout
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  transition={{ duration: 0.2 }}
+                  className="hover:bg-gray-50"
+                  onDoubleClick={(e) => {
+                    if (!canEdit) return;
+                    if (shouldIgnoreRowDoubleClickEvent(e)) return;
+                    openInNewTabBestEffort(href, () => onEdit(c));
+                  }}
+                >
+                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                    {canEdit ? (
+                      <a
+                        href={href}
+                        className="hover:underline underline-offset-2"
+                        onClick={(e) => {
+                          if (!isPlainLeftClick(e)) return;
+                          e.preventDefault();
+                          scheduleEdit(() => onEdit(c));
+                        }}
+                        onDoubleClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          cancelScheduledEdit();
+                          openInNewTabBestEffort(href, () => onEdit(c));
+                        }}
+                      >
+                        {c.nome}
+                      </a>
+                    ) : (
+                      c.nome
+                    )}
+                  </td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{c.cargo_nome || '—'}</td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{c.email || '—'}</td>
                 <td className="px-6 py-4 whitespace-nowrap">
@@ -117,7 +151,8 @@ export default function ColaboradoresTable({
                   </div>
                 </td>
               </motion.tr>
-            ))}
+              );
+            })}
           </AnimatePresence>
         </motion.tbody>
       </table>

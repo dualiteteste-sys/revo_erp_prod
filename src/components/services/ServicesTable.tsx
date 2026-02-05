@@ -7,6 +7,9 @@ import { formatCurrency } from '@/lib/utils';
 import ResizableSortableTh, { type SortState } from '@/components/ui/table/ResizableSortableTh';
 import TableColGroup from '@/components/ui/table/TableColGroup';
 import { useTableColumnWidths, type TableColumnWidthDef } from '@/components/ui/table/useTableColumnWidths';
+import { openInNewTabBestEffort, shouldIgnoreRowDoubleClickEvent } from '@/components/ui/table/rowDoubleClick';
+import { isPlainLeftClick } from '@/components/ui/links/isPlainLeftClick';
+import { useDeferredAction } from '@/components/ui/hooks/useDeferredAction';
 
 type Props = {
   services: Service[];
@@ -35,6 +38,8 @@ export default function ServicesTable({
   onToggleSelect,
   onToggleSelectAll,
 }: Props) {
+  const { schedule: scheduleEdit, cancel: cancelScheduledEdit } = useDeferredAction(180);
+
   const columns: TableColumnWidthDef[] = [
     ...(onToggleSelect ? [{ id: 'select', defaultWidth: 56, minWidth: 56, maxWidth: 56, resizable: false }] : []),
     { id: 'descricao', defaultWidth: 360, minWidth: 220 },
@@ -83,8 +88,18 @@ export default function ServicesTable({
           </tr>
         </thead>
         <tbody className="bg-white divide-y divide-gray-200">
-          {services.map((s) => (
-            <tr key={s.id}>
+          {services.map((s) => {
+            const href = `/app/services?open=${encodeURIComponent(s.id)}`;
+            return (
+            <tr
+              key={s.id}
+              className="hover:bg-gray-50"
+              onDoubleClick={(e) => {
+                if (shouldIgnoreRowDoubleClickEvent(e)) return;
+                cancelScheduledEdit();
+                openInNewTabBestEffort(href, () => onEdit(s));
+              }}
+            >
               {onToggleSelect ? (
                 <td className="px-4 py-4 whitespace-nowrap">
                   <input
@@ -96,7 +111,25 @@ export default function ServicesTable({
                   />
                 </td>
               ) : null}
-              <td className="px-6 py-4 text-sm text-gray-900">{s.descricao}</td>
+              <td className="px-6 py-4 text-sm text-gray-900">
+                <a
+                  href={href}
+                  className="hover:underline underline-offset-2"
+                  onClick={(e) => {
+                    if (!isPlainLeftClick(e)) return;
+                    e.preventDefault();
+                    scheduleEdit(() => onEdit(s));
+                  }}
+                  onDoubleClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    cancelScheduledEdit();
+                    openInNewTabBestEffort(href, () => onEdit(s));
+                  }}
+                >
+                  {s.descricao}
+                </a>
+              </td>
               <td className="px-6 py-4 text-sm text-gray-500">{s.codigo || '—'}</td>
               <td className="px-6 py-4 text-sm text-gray-500">{s.preco_venda ? formatCurrency(Math.round(Number(s.preco_venda) * 100)) : '—'}</td>
               <td className="px-6 py-4 text-sm text-gray-500">{s.unidade ?? '—'}</td>
@@ -143,7 +176,8 @@ export default function ServicesTable({
                 </div>
               </td>
             </tr>
-          ))}
+            );
+          })}
           {services.length === 0 && (
             <tr>
               <td colSpan={onToggleSelect ? 7 : 6} className="px-6 py-16 text-center text-gray-400">

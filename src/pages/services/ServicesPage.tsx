@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useServices } from '@/hooks/useServices';
 import * as svc from '@/services/services';
 import ServicesTable from '@/components/services/ServicesTable';
@@ -23,6 +23,7 @@ import EmptyState from '@/components/ui/EmptyState';
 import { uiMessages } from '@/lib/ui/messages';
 import { useHasPermission } from '@/hooks/useHasPermission';
 import ImportServicesCsvModal from '@/components/services/ImportServicesCsvModal';
+import { useSearchParams } from 'react-router-dom';
 
 export default function ServicesPage() {
   const enableSeed = isSeedEnabled();
@@ -57,6 +58,7 @@ export default function ServicesPage() {
   const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false);
   const [bulkLoading, setBulkLoading] = useState(false);
   const [isImportOpen, setIsImportOpen] = useState(false);
+  const [searchParams, setSearchParams] = useSearchParams();
   const { addToast } = useToast();
 
   const bulk = useBulkSelection(services, (s) => s.id);
@@ -84,6 +86,18 @@ export default function ServicesPage() {
       setIsFormOpen(true);
     }
   };
+
+  useEffect(() => {
+    const openId = searchParams.get('open');
+    if (!openId) return;
+    void (async () => {
+      await handleOpenForm({ id: openId } as any);
+      const next = new URLSearchParams(searchParams);
+      next.delete('open');
+      setSearchParams(next, { replace: true });
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const handleCloseForm = () => {
     setIsFormOpen(false);

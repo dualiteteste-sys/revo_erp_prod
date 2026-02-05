@@ -7,6 +7,9 @@ import ResizableSortableTh, { type SortState } from '@/components/ui/table/Resiz
 import TableColGroup from '@/components/ui/table/TableColGroup';
 import { useTableColumnWidths, type TableColumnWidthDef } from '@/components/ui/table/useTableColumnWidths';
 import { sortRows, toggleSort } from '@/components/ui/table/sortUtils';
+import { openInNewTabBestEffort, shouldIgnoreRowDoubleClickEvent } from '@/components/ui/table/rowDoubleClick';
+import { isPlainLeftClick } from '@/components/ui/links/isPlainLeftClick';
+import { useDeferredAction } from '@/components/ui/hooks/useDeferredAction';
 
 interface Props {
   cobrancas: CobrancaBancaria[];
@@ -26,6 +29,8 @@ const statusConfig: Record<string, { label: string; color: string }> = {
 };
 
 export default function CobrancasTable({ cobrancas, onEdit, onDelete }: Props) {
+  const { schedule: scheduleEdit, cancel: cancelScheduledEdit } = useDeferredAction(180);
+
   const columns: TableColumnWidthDef[] = [
     { id: 'documento', defaultWidth: 320, minWidth: 220 },
     { id: 'cliente', defaultWidth: 320, minWidth: 220 },
@@ -114,6 +119,7 @@ export default function CobrancasTable({ cobrancas, onEdit, onDelete }: Props) {
               const isFinal = ['liquidada', 'baixada', 'cancelada'].includes(String(cobranca.status));
               const isOverdue = isValidDate && !isFinal && venc.getTime() < today.getTime();
 
+              const href = `/app/financeiro/cobrancas?open=${encodeURIComponent(cobranca.id)}`;
               return (
               <motion.tr
                 key={cobranca.id}
@@ -122,11 +128,31 @@ export default function CobrancasTable({ cobrancas, onEdit, onDelete }: Props) {
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
                 className={`hover:bg-gray-50 transition-colors ${isOverdue ? 'bg-orange-50/40' : ''}`}
+                onDoubleClick={(e) => {
+                  if (shouldIgnoreRowDoubleClickEvent(e)) return;
+                  openInNewTabBestEffort(href, () => onEdit(cobranca));
+                }}
               >
                 <td className="px-6 py-4">
                   <div className="flex items-center gap-2">
                     {cobranca.tipo_cobranca === 'boleto' ? <Barcode size={16} className="text-gray-400" /> : <FileText size={16} className="text-gray-400" />}
-                    <span className="text-sm font-medium text-gray-900">{cobranca.documento_ref || 'S/N'}</span>
+                    <a
+                      href={href}
+                      className="text-sm font-medium text-gray-900 hover:underline underline-offset-2"
+                      onClick={(e) => {
+                        if (!isPlainLeftClick(e)) return;
+                        e.preventDefault();
+                        scheduleEdit(() => onEdit(cobranca));
+                      }}
+                      onDoubleClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        cancelScheduledEdit();
+                        openInNewTabBestEffort(href, () => onEdit(cobranca));
+                      }}
+                    >
+                      {cobranca.documento_ref || 'S/N'}
+                    </a>
                   </div>
                   <div className="text-xs text-gray-500 ml-6">{cobranca.descricao}</div>
                 </td>

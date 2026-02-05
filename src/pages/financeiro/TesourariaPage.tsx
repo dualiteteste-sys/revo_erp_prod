@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useContasCorrentes, useMovimentacoes, useExtratos } from '@/hooks/useTesouraria';
 import { useToast } from '@/contexts/ToastProvider';
 import { useConfirm } from '@/contexts/ConfirmProvider';
@@ -13,7 +13,7 @@ import ExtratosTable from '@/components/financeiro/tesouraria/ExtratosTable';
 import ImportarExtratoModal from '@/components/financeiro/tesouraria/ImportarExtratoModal';
 import ConciliacaoDrawer from '@/components/financeiro/tesouraria/ConciliacaoDrawer';
 import ConciliacaoRegrasPanel from '@/components/financeiro/tesouraria/ConciliacaoRegrasPanel';
-import { ContaCorrente, Movimentacao, ExtratoItem, deleteContaCorrente, deleteMovimentacao, importarExtrato, conciliarExtrato, desconciliarExtrato, setContaCorrentePadrao, listMovimentacoes } from '@/services/treasury';
+import { ContaCorrente, Movimentacao, ExtratoItem, deleteContaCorrente, deleteMovimentacao, importarExtrato, conciliarExtrato, desconciliarExtrato, setContaCorrentePadrao, listMovimentacoes, getContaCorrente, getMovimentacao } from '@/services/treasury';
 import ConfirmationModal from '@/components/ui/ConfirmationModal';
 import DatePicker from '@/components/ui/DatePicker';
 import Toggle from '@/components/ui/forms/Toggle';
@@ -21,11 +21,19 @@ import { Button } from '@/components/ui/button';
 import { scoreExtratoToMovimentacao } from '@/lib/conciliacao/matching';
 import Pagination from '@/components/ui/Pagination';
 import ListPaginationBar from '@/components/ui/ListPaginationBar';
+import { useSearchParams } from 'react-router-dom';
+import { useEditLock } from '@/components/ui/hooks/useEditLock';
 
 export default function TesourariaPage() {
   const [activeTab, setActiveTab] = useState<'contas' | 'movimentos' | 'conciliacao' | 'regras'>('contas');
   const { addToast } = useToast();
   const { confirm } = useConfirm();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const tabFromQuery = searchParams.get('tab');
+  const openId = searchParams.get('open');
+  const contasEditLock = useEditLock('financeiro:tesouraria:contas');
+  const movEditLock = useEditLock('financeiro:tesouraria:movimentacoes');
+
   const [busyExtratoId, setBusyExtratoId] = useState<string | null>(null);
   const [bulkConciliando, setBulkConciliando] = useState(false);
   const [bulkThreshold, setBulkThreshold] = useState(85);
@@ -41,6 +49,7 @@ export default function TesourariaPage() {
 
   const [isContaFormOpen, setIsContaFormOpen] = useState(false);
   const [selectedConta, setSelectedConta] = useState<ContaCorrente | null>(null);
+  const [editingContaId, setEditingContaId] = useState<string | null>(null);
   const [contaToDelete, setContaToDelete] = useState<ContaCorrente | null>(null);
 
   // --- Shared State (Movimentos & Extratos) ---
@@ -57,6 +66,7 @@ export default function TesourariaPage() {
 
   const [isMovFormOpen, setIsMovFormOpen] = useState(false);
   const [selectedMov, setSelectedMov] = useState<Movimentacao | null>(null);
+  const [editingMovId, setEditingMovId] = useState<string | null>(null);
   const [movToDelete, setMovToDelete] = useState<Movimentacao | null>(null);
 
   // --- Extratos State ---
@@ -79,14 +89,147 @@ export default function TesourariaPage() {
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
   const [conciliacaoItem, setConciliacaoItem] = useState<ExtratoItem | null>(null);
 
+  const clearOpenParam = useCallback(() => {
+    if (!openId) return;
+    const next = new URLSearchParams(searchParams);
+    next.delete('open');
+    setSearchParams(next, { replace: true });
+  }, [openId, searchParams, setSearchParams]);
+
+  const handleEditConta = useCallback(async (c: ContaCorrente) => {
+    const claimed = await contasEditLock.claim(c.id, {
+      confirmConflict: async () =>
+        confirm({
+          title: 'Esta conta já está aberta em outra aba',
+          description: 'Para evitar edição concorrente, abra em apenas uma aba. Deseja abrir mesmo assim nesta aba?',
+          confirmText: 'Abrir mesmo assim',
+          cancelText: 'Cancelar',
+          variant: 'danger',
+        }),
+    });
+    if (!claimed) {
+      clearOpenParam();
+      return;
+    }
+
+    setSelectedConta(c);
+    setEditingContaId(c.id);
+    setIsContaFormOpen(true);
+  }, [clearOpenParam, confirm, contasEditLock]);
+
+  const closeContaForm = useCallback(() => {
+    setIsContaFormOpen(false);
+    setSelectedConta(null);
+    clearOpenParam();
+    if (editingContaId) contasEditLock.release(editingContaId);
+    setEditingContaId(null);
+  }, [clearOpenParam, contasEditLock, editingContaId]);
+
+  const handleEditMov = useCallback(async (m: Movimentacao) => {
+    // movimento conciliado não pode ser editado
+    if (m.conciliado) return;
+
+    const claimed = await movEditLock.claim(m.id, {
+      confirmConflict: async () =>
+        confirm({
+          title: 'Esta movimentação já está aberta em outra aba',
+          description: 'Para evitar edição concorrente, abra em apenas uma aba. Deseja abrir mesmo assim nesta aba?',
+          confirmText: 'Abrir mesmo assim',
+          cancelText: 'Cancelar',
+          variant: 'danger',
+        }),
+    });
+    if (!claimed) {
+      clearOpenParam();
+      return;
+    }
+
+    setSelectedMov(m);
+    setEditingMovId(m.id);
+    setIsMovFormOpen(true);
+  }, [clearOpenParam, confirm, movEditLock]);
+
+  const closeMovForm = useCallback(() => {
+    setIsMovFormOpen(false);
+    setSelectedMov(null);
+    clearOpenParam();
+    if (editingMovId) movEditLock.release(editingMovId);
+    setEditingMovId(null);
+  }, [clearOpenParam, editingMovId, movEditLock]);
+
+  const setTab = useCallback((nextTab: 'contas' | 'movimentos' | 'conciliacao' | 'regras') => {
+    // evita modais/locks "perdidos" ao trocar de aba
+    closeContaForm();
+    closeMovForm();
+    setConciliacaoItem(null);
+    setIsImportModalOpen(false);
+    setActiveTab(nextTab);
+    const next = new URLSearchParams(searchParams);
+    next.set('tab', nextTab);
+    next.delete('open');
+    setSearchParams(next, { replace: true });
+  }, [closeContaForm, closeMovForm, searchParams, setSearchParams]);
+
+  useEffect(() => {
+    if (!tabFromQuery) return;
+    if (tabFromQuery !== 'contas' && tabFromQuery !== 'movimentos' && tabFromQuery !== 'conciliacao' && tabFromQuery !== 'regras') return;
+    if (activeTab === tabFromQuery) return;
+    setActiveTab(tabFromQuery);
+  }, [activeTab, tabFromQuery]);
+
+  const resolvedTab = useMemo(() => {
+    if (tabFromQuery === 'contas' || tabFromQuery === 'movimentos' || tabFromQuery === 'conciliacao' || tabFromQuery === 'regras') {
+      return tabFromQuery;
+    }
+    return activeTab;
+  }, [activeTab, tabFromQuery]);
+
+  useEffect(() => {
+    if (!openId) return;
+    if (resolvedTab === 'contas') {
+      if (isContaFormOpen && (selectedConta?.id ?? null) === openId) return;
+      void (async () => {
+        try {
+          const conta = await getContaCorrente(openId);
+          setSelectedContaId(conta.id);
+          await handleEditConta(conta);
+        } catch (e: any) {
+          addToast(e?.message || 'Não foi possível abrir a conta.', 'error');
+          clearOpenParam();
+        }
+      })();
+      return;
+    }
+
+    if (resolvedTab === 'movimentos') {
+      if (isMovFormOpen && (selectedMov?.id ?? null) === openId) return;
+      void (async () => {
+        try {
+          const mov = await getMovimentacao(openId);
+          setSelectedContaId(mov.conta_corrente_id);
+          await handleEditMov(mov);
+        } catch (e: any) {
+          addToast(e?.message || 'Não foi possível abrir a movimentação.', 'error');
+          clearOpenParam();
+        }
+      })();
+    }
+  }, [
+    addToast,
+    clearOpenParam,
+    handleEditConta,
+    handleEditMov,
+    isContaFormOpen,
+    isMovFormOpen,
+    openId,
+    resolvedTab,
+    selectedConta?.id,
+    selectedMov?.id,
+  ]);
+
   // --- Handlers Contas ---
   const handleNewConta = () => {
     setSelectedConta(null);
-    setIsContaFormOpen(true);
-  };
-
-  const handleEditConta = (c: ContaCorrente) => {
-    setSelectedConta(c);
     setIsContaFormOpen(true);
   };
 
@@ -129,11 +272,6 @@ export default function TesourariaPage() {
         return;
     }
     setSelectedMov(null);
-    setIsMovFormOpen(true);
-  };
-
-  const handleEditMov = (m: Movimentacao) => {
-    setSelectedMov(m);
     setIsMovFormOpen(true);
   };
 
@@ -303,25 +441,25 @@ export default function TesourariaPage() {
         
         <div className="flex bg-gray-100 p-1 rounded-lg">
             <button
-                onClick={() => setActiveTab('contas')}
+                onClick={() => setTab('contas')}
                 className={`px-4 py-2 rounded-md text-sm font-medium transition-all ${activeTab === 'contas' ? 'bg-white shadow text-blue-600' : 'text-gray-600 hover:text-gray-800'}`}
             >
                 Contas Correntes
             </button>
             <button
-                onClick={() => setActiveTab('movimentos')}
+                onClick={() => setTab('movimentos')}
                 className={`px-4 py-2 rounded-md text-sm font-medium transition-all ${activeTab === 'movimentos' ? 'bg-white shadow text-blue-600' : 'text-gray-600 hover:text-gray-800'}`}
             >
                 Movimentações
             </button>
             <button
-                onClick={() => setActiveTab('conciliacao')}
+                onClick={() => setTab('conciliacao')}
                 className={`px-4 py-2 rounded-md text-sm font-medium transition-all ${activeTab === 'conciliacao' ? 'bg-white shadow text-blue-600' : 'text-gray-600 hover:text-gray-800'}`}
             >
                 Conciliação
             </button>
             <button
-                onClick={() => setActiveTab('regras')}
+                onClick={() => setTab('regras')}
                 className={`px-4 py-2 rounded-md text-sm font-medium transition-all ${activeTab === 'regras' ? 'bg-white shadow text-blue-600' : 'text-gray-600 hover:text-gray-800'}`}
             >
                 Regras
@@ -553,20 +691,20 @@ export default function TesourariaPage() {
       )}
 
       {/* Modals */}
-      <Modal isOpen={isContaFormOpen} onClose={() => setIsContaFormOpen(false)} title={selectedConta ? 'Editar Conta' : 'Nova Conta'}>
+      <Modal isOpen={isContaFormOpen} onClose={closeContaForm} title={selectedConta ? 'Editar Conta' : 'Nova Conta'}>
         <ContaCorrenteFormPanel 
             conta={selectedConta} 
-            onSaveSuccess={() => { setIsContaFormOpen(false); refreshContas(); }} 
-            onClose={() => setIsContaFormOpen(false)} 
+            onSaveSuccess={() => { closeContaForm(); refreshContas(); }} 
+            onClose={closeContaForm} 
         />
       </Modal>
 
-      <Modal isOpen={isMovFormOpen} onClose={() => setIsMovFormOpen(false)} title={selectedMov ? 'Editar Movimentação' : 'Nova Movimentação'}>
+      <Modal isOpen={isMovFormOpen} onClose={closeMovForm} title={selectedMov ? 'Editar Movimentação' : 'Nova Movimentação'}>
         <MovimentacaoFormPanel 
             movimentacao={selectedMov} 
             contaCorrenteId={selectedContaId!}
-            onSaveSuccess={() => { setIsMovFormOpen(false); refreshMov(); refreshContas(); }} 
-            onClose={() => setIsMovFormOpen(false)} 
+            onSaveSuccess={() => { closeMovForm(); refreshMov(); refreshContas(); }} 
+            onClose={closeMovForm} 
         />
       </Modal>
 

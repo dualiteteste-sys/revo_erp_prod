@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useVendas } from '@/hooks/useVendas';
 import { VendaPedido, seedVendas } from '@/services/vendas';
 import { Loader2, PlusCircle, Search, ShoppingCart } from 'lucide-react';
@@ -12,11 +12,13 @@ import Pagination from '@/components/ui/Pagination';
 import { useToast } from '@/contexts/ToastProvider';
 import { SeedButton } from '@/components/common/SeedButton';
 import CsvExportDialog from '@/components/ui/CsvExportDialog';
-import { useLocation } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import PageHeader from '@/components/ui/PageHeader';
 import { Button } from '@/components/ui/button';
 import PageShell from '@/components/ui/PageShell';
 import PageCard from '@/components/ui/PageCard';
+import { useConfirm } from '@/contexts/ConfirmProvider';
+import { useEditLock } from '@/components/ui/hooks/useEditLock';
 
 export default function PedidosVendasPage() {
   const {
@@ -36,6 +38,9 @@ export default function PedidosVendasPage() {
   } = useVendas();
   const { addToast } = useToast();
   const location = useLocation();
+  const navigate = useNavigate();
+  const { confirm } = useConfirm();
+  const editLock = useEditLock('vendas:pedidos');
 
   const openFromQuery = useMemo(() => {
     const params = new URLSearchParams(location.search);
@@ -44,7 +49,44 @@ export default function PedidosVendasPage() {
 
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [editingId, setEditingId] = useState<string | null>(null);
   const [isSeeding, setIsSeeding] = useState(false);
+
+  const clearOpenParam = useCallback(() => {
+    const params = new URLSearchParams(location.search);
+    if (!params.has('open')) return;
+    params.delete('open');
+    const search = params.toString();
+    navigate({ pathname: location.pathname, search: search ? `?${search}` : '' }, { replace: true });
+  }, [location.pathname, location.search, navigate]);
+
+  const closeForm = useCallback(() => {
+    setIsFormOpen(false);
+    setSelectedId(null);
+    clearOpenParam();
+    if (editingId) editLock.release(editingId);
+    setEditingId(null);
+  }, [clearOpenParam, editLock, editingId]);
+
+  const openWithLock = useCallback(async (id: string) => {
+    const claimed = await editLock.claim(id, {
+      confirmConflict: async () =>
+        confirm({
+          title: 'Este pedido já está aberto em outra aba',
+          description: 'Para evitar edição concorrente, abra em apenas uma aba. Deseja abrir mesmo assim nesta aba?',
+          confirmText: 'Abrir mesmo assim',
+          cancelText: 'Cancelar',
+          variant: 'danger',
+        }),
+    });
+    if (!claimed) {
+      clearOpenParam();
+      return;
+    }
+    setEditingId(id);
+    setSelectedId(id);
+    setIsFormOpen(true);
+  }, [clearOpenParam, confirm, editLock]);
 
   const handleNew = () => {
     setSelectedId(null);
@@ -52,13 +94,11 @@ export default function PedidosVendasPage() {
   };
 
   const handleEdit = (order: VendaPedido) => {
-    setSelectedId(order.id);
-    setIsFormOpen(true);
+    void openWithLock(order.id);
   };
 
   const handleClose = () => {
-    setIsFormOpen(false);
-    setSelectedId(null);
+    closeForm();
   };
 
   const handleSuccess = () => {
@@ -68,10 +108,8 @@ export default function PedidosVendasPage() {
 
   useEffect(() => {
     if (!openFromQuery) return;
-    setSelectedId(openFromQuery);
-    setIsFormOpen(true);
-    // Não limpa query automaticamente para permitir refresh/back
-  }, [openFromQuery]);
+    void openWithLock(openFromQuery);
+  }, [openFromQuery, openWithLock]);
 
   const handleSeed = async () => {
     setIsSeeding(true);

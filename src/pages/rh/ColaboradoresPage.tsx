@@ -1,4 +1,4 @@
-import React, { useMemo, useState, useEffect } from 'react';
+import React, { useCallback, useMemo, useState, useEffect } from 'react';
 import {
   listCargos,
   listColaboradores,
@@ -24,6 +24,8 @@ import { useConfirm } from '@/contexts/ConfirmProvider';
 import ColaboradoresTable from '@/components/rh/ColaboradoresTable';
 import { useHasPermission } from '@/hooks/useHasPermission';
 import { isSeedEnabled } from '@/utils/seed';
+import { useSearchParams } from 'react-router-dom';
+import { useEditLock } from '@/components/ui/hooks/useEditLock';
 
 export default function ColaboradoresPage() {
   const enableSeed = isSeedEnabled();
@@ -33,9 +35,13 @@ export default function ColaboradoresPage() {
   const debouncedSearch = useDebounce(search, 500);
   const { addToast } = useToast();
   const { confirm } = useConfirm();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const openId = searchParams.get('open');
+  const editLock = useEditLock('rh:colaboradores');
   
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [selectedColaborador, setSelectedColaborador] = useState<ColaboradorDetails | null>(null);
+  const [editingColaboradorId, setEditingColaboradorId] = useState<string | null>(null);
   const [loadingDetails, setLoadingDetails] = useState(false);
   const [isSeeding, setIsSeeding] = useState(false);
   const [viewMode, setViewMode] = useState<'cards' | 'table'>('table');
@@ -74,6 +80,20 @@ export default function ColaboradoresPage() {
     fetchColaboradores();
   }, [debouncedSearch, cargoFilter, statusFilter]);
 
+  const clearOpenParam = useCallback(() => {
+    if (!openId) return;
+    const next = new URLSearchParams(searchParams);
+    next.delete('open');
+    setSearchParams(next, { replace: true });
+  }, [openId, searchParams, setSearchParams]);
+
+  const closeForm = useCallback(() => {
+    setIsFormOpen(false);
+    clearOpenParam();
+    if (editingColaboradorId) editLock.release(editingColaboradorId);
+    setEditingColaboradorId(null);
+  }, [clearOpenParam, editLock, editingColaboradorId]);
+
   useEffect(() => {
     const loadCargos = async () => {
       try {
@@ -86,20 +106,42 @@ export default function ColaboradoresPage() {
     loadCargos();
   }, []);
 
-  const handleEdit = async (id: string) => {
+  const handleEdit = useCallback(async (id: string) => {
+    const claimed = await editLock.claim(id, {
+      confirmConflict: async () =>
+        confirm({
+          title: 'Este colaborador já está aberto em outra aba',
+          description: 'Para evitar edição concorrente, abra em apenas uma aba. Deseja abrir mesmo assim nesta aba?',
+          confirmText: 'Abrir mesmo assim',
+          cancelText: 'Cancelar',
+          variant: 'danger',
+        }),
+    });
+    if (!claimed) {
+      clearOpenParam();
+      return;
+    }
+
     setLoadingDetails(true);
     setIsFormOpen(true);
     setSelectedColaborador(null);
+    setEditingColaboradorId(id);
     try {
       const details = await getColaboradorDetails(id);
       setSelectedColaborador(details);
     } catch (error) {
       addToast((error as any)?.message || 'Erro ao carregar colaborador.', 'error');
-      setIsFormOpen(false);
+      closeForm();
     } finally {
       setLoadingDetails(false);
     }
-  };
+  }, [addToast, clearOpenParam, closeForm, confirm, editLock]);
+
+  useEffect(() => {
+    if (!openId) return;
+    if (isFormOpen) return;
+    void handleEdit(openId);
+  }, [handleEdit, isFormOpen, openId]);
 
   const handleNew = () => {
     if (!permsLoading && !canCreate) {
@@ -111,7 +153,7 @@ export default function ColaboradoresPage() {
   };
 
   const handleSaveSuccess = () => {
-    setIsFormOpen(false);
+    closeForm();
     fetchColaboradores();
   };
 
@@ -378,13 +420,13 @@ export default function ColaboradoresPage() {
         </>
       )}
 
-      <Modal isOpen={isFormOpen} onClose={() => setIsFormOpen(false)} title={selectedColaborador ? 'Editar Colaborador' : 'Novo Colaborador'}>
+      <Modal isOpen={isFormOpen} onClose={closeForm} title={selectedColaborador ? 'Editar Colaborador' : 'Novo Colaborador'}>
         {loadingDetails ? (
           <div className="flex justify-center items-center h-64">
             <Loader2 className="animate-spin text-blue-600 w-8 h-8" />
           </div>
         ) : (
-          <ColaboradorFormPanel colaborador={selectedColaborador} onSaveSuccess={handleSaveSuccess} onClose={() => setIsFormOpen(false)} />
+          <ColaboradorFormPanel colaborador={selectedColaborador} onSaveSuccess={handleSaveSuccess} onClose={closeForm} />
         )}
       </Modal>
     </div>

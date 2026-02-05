@@ -106,7 +106,13 @@ export default function ExtratosTable({ extratos, onConciliate, onUnconciliate, 
               <td className="px-6 py-4 text-sm">
                 {item.conciliado && item.movimentacao_id ? (
                     <div className="flex flex-col">
-                        <span className="font-medium text-gray-800">{item.movimentacao_descricao}</span>
+                        <a
+                          href={`/app/financeiro/tesouraria?tab=movimentos&open=${encodeURIComponent(item.movimentacao_id)}`}
+                          className="font-medium text-gray-800 hover:underline underline-offset-2"
+                          title="Abrir movimentação"
+                        >
+                          {item.movimentacao_descricao}
+                        </a>
                         <span className="text-xs text-gray-500">
                             {new Date(item.movimentacao_data!).toLocaleDateString('pt-BR')} • 
                             R$ {new Intl.NumberFormat('pt-BR', { style: 'decimal', minimumFractionDigits: 2 }).format(item.movimentacao_valor!)}

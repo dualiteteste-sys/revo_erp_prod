@@ -5,6 +5,9 @@ import ResizableSortableTh, { type SortState } from '@/components/ui/table/Resiz
 import TableColGroup from '@/components/ui/table/TableColGroup';
 import { useTableColumnWidths, type TableColumnWidthDef } from '@/components/ui/table/useTableColumnWidths';
 import { sortRows, toggleSort } from '@/components/ui/table/sortUtils';
+import { openInNewTabBestEffort, shouldIgnoreRowDoubleClickEvent } from '@/components/ui/table/rowDoubleClick';
+import { isPlainLeftClick } from '@/components/ui/links/isPlainLeftClick';
+import { useDeferredAction } from '@/components/ui/hooks/useDeferredAction';
 
 interface Props {
   planos: PlanoInspecao[];
@@ -13,6 +16,8 @@ interface Props {
 }
 
 export default function PlanosInspecaoTable({ planos, onEdit, onDelete }: Props) {
+  const { schedule: scheduleEdit, cancel: cancelScheduledEdit } = useDeferredAction(180);
+
   const columns: TableColumnWidthDef[] = [
     { id: 'plano', defaultWidth: 300, minWidth: 220 },
     { id: 'produto', defaultWidth: 320, minWidth: 220 },
@@ -119,11 +124,36 @@ export default function PlanosInspecaoTable({ planos, onEdit, onDelete }: Props)
           </tr>
         </thead>
         <tbody className="divide-y divide-gray-100 bg-white">
-          {sortedPlanos.map(plano => (
-            <tr key={plano.id}>
+          {sortedPlanos.map((plano) => {
+            const href = `/app/industria/qualidade/planos?open=${encodeURIComponent(plano.id)}`;
+            return (
+            <tr
+              key={plano.id}
+              onDoubleClick={(e) => {
+                if (shouldIgnoreRowDoubleClickEvent(e)) return;
+                openInNewTabBestEffort(href, () => onEdit(plano.id));
+              }}
+              className="hover:bg-gray-50"
+            >
               <td className="px-4 py-3">
                 <div className="flex flex-col">
-                  <span className="font-semibold text-gray-800">{plano.nome}</span>
+                  <a
+                    href={href}
+                    className="font-semibold text-gray-800 hover:underline underline-offset-2"
+                    onClick={(e) => {
+                      if (!isPlainLeftClick(e)) return;
+                      e.preventDefault();
+                      scheduleEdit(() => onEdit(plano.id));
+                    }}
+                    onDoubleClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      cancelScheduledEdit();
+                      openInNewTabBestEffort(href, () => onEdit(plano.id));
+                    }}
+                  >
+                    {plano.nome}
+                  </a>
                   <div className="text-xs text-gray-500 flex items-center gap-2 mt-1">
                     <span className={`px-2 py-0.5 rounded-full text-[11px] font-semibold ${plano.tipo === 'IF' ? 'bg-purple-100 text-purple-700' : 'bg-blue-100 text-blue-700'}`}>
                       {plano.tipo}
@@ -170,7 +200,8 @@ export default function PlanosInspecaoTable({ planos, onEdit, onDelete }: Props)
                 </button>
               </td>
             </tr>
-          ))}
+            );
+          })}
         </tbody>
       </table>
     </div>

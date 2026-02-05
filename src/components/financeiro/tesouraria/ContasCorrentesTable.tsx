@@ -6,6 +6,9 @@ import ResizableSortableTh, { type SortState } from '@/components/ui/table/Resiz
 import TableColGroup from '@/components/ui/table/TableColGroup';
 import { useTableColumnWidths, type TableColumnWidthDef } from '@/components/ui/table/useTableColumnWidths';
 import { sortRows, toggleSort } from '@/components/ui/table/sortUtils';
+import { openInNewTabBestEffort, shouldIgnoreRowDoubleClickEvent } from '@/components/ui/table/rowDoubleClick';
+import { isPlainLeftClick } from '@/components/ui/links/isPlainLeftClick';
+import { useDeferredAction } from '@/components/ui/hooks/useDeferredAction';
 
 interface Props {
   contas: ContaCorrente[];
@@ -23,6 +26,8 @@ const getIcon = (tipo: string) => {
 };
 
 export default function ContasCorrentesTable({ contas, onEdit, onDelete, onSetPadrao }: Props) {
+  const { schedule: scheduleEdit, cancel: cancelScheduledEdit } = useDeferredAction(180);
+
   const columns: TableColumnWidthDef[] = [
     { id: 'nome_banco', defaultWidth: 420, minWidth: 220 },
     { id: 'agencia_conta', defaultWidth: 320, minWidth: 200 },
@@ -112,14 +117,40 @@ export default function ContasCorrentesTable({ contas, onEdit, onDelete, onSetPa
         </thead>
         <tbody className="bg-white divide-y divide-gray-200">
           {sortedContas.map(conta => (
-            <tr key={conta.id} className="hover:bg-gray-50">
+            <tr
+              key={conta.id}
+              className="hover:bg-gray-50"
+              onDoubleClick={(e) => {
+                if (shouldIgnoreRowDoubleClickEvent(e)) return;
+                const href = `/app/financeiro/tesouraria?tab=contas&open=${encodeURIComponent(conta.id)}`;
+                openInNewTabBestEffort(href, () => onEdit(conta));
+              }}
+            >
               <td className="px-6 py-4">
                 <div className="flex items-center gap-3">
                   <div className="p-2 bg-gray-100 rounded-lg">
                     {getIcon(conta.tipo_conta)}
                   </div>
                   <div>
-                    <div className="font-medium text-gray-900">{conta.nome}</div>
+                    <div className="font-medium text-gray-900">
+                      <a
+                        href={`/app/financeiro/tesouraria?tab=contas&open=${encodeURIComponent(conta.id)}`}
+                        className="hover:underline underline-offset-2"
+                        onClick={(e) => {
+                          if (!isPlainLeftClick(e)) return;
+                          e.preventDefault();
+                          scheduleEdit(() => onEdit(conta));
+                        }}
+                        onDoubleClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          cancelScheduledEdit();
+                          openInNewTabBestEffort(`/app/financeiro/tesouraria?tab=contas&open=${encodeURIComponent(conta.id)}`, () => onEdit(conta));
+                        }}
+                      >
+                        {conta.nome}
+                      </a>
+                    </div>
                     <div className="text-xs text-gray-500 capitalize">{conta.tipo_conta}</div>
                   </div>
                 </div>

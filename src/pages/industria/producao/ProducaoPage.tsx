@@ -42,6 +42,18 @@ export default function ProducaoPage() {
     setSearchParams(next, { replace: true });
   }, [searchParams, setSearchParams]);
 
+  // Deep-link: /app/industria/producao?open=<ordemId>
+  useEffect(() => {
+    const openId = searchParams.get('open');
+    if (!openId) return;
+    setSelectedId(openId);
+    setIsFormOpen(true);
+    const next = new URLSearchParams(searchParams);
+    next.delete('open');
+    setSearchParams(next, { replace: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   // Deep-link/share: persist view/status in URL when present, without forcing it.
   useEffect(() => {
     const urlView = searchParams.get('view');

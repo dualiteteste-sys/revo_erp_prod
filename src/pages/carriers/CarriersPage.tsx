@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useCarriers } from '../../hooks/useCarriers';
 import { useToast } from '../../contexts/ToastProvider';
 import * as carriersService from '../../services/carriers';
@@ -18,6 +18,7 @@ import { useBulkSelection } from '@/hooks/useBulkSelection';
 import BulkActionsBar from '@/components/ui/BulkActionsBar';
 import { useHasPermission } from '@/hooks/useHasPermission';
 import ImportCarriersCsvModal from '@/components/carriers/ImportCarriersCsvModal';
+import { useSearchParams } from 'react-router-dom';
 
 const CarriersPage: React.FC = () => {
   const enableSeed = isSeedEnabled();
@@ -53,6 +54,7 @@ const CarriersPage: React.FC = () => {
   const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false);
   const [bulkLoading, setBulkLoading] = useState(false);
   const [isImportOpen, setIsImportOpen] = useState(false);
+  const [searchParams, setSearchParams] = useSearchParams();
 
   const bulk = useBulkSelection(carriers, (c) => c.id);
   const selectedCarriers = useMemo(
@@ -79,6 +81,18 @@ const CarriersPage: React.FC = () => {
       setIsFormOpen(true);
     }
   };
+
+  useEffect(() => {
+    const openId = searchParams.get('open');
+    if (!openId) return;
+    void (async () => {
+      await handleOpenForm({ id: openId } as any);
+      const next = new URLSearchParams(searchParams);
+      next.delete('open');
+      setSearchParams(next, { replace: true });
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const handleCloseForm = () => {
     setIsFormOpen(false);
