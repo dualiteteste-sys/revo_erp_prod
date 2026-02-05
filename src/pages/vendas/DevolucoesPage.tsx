@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Loader2, PlusCircle, Undo2 } from 'lucide-react';
 import Modal from '@/components/ui/Modal';
 import { useToast } from '@/contexts/ToastProvider';
@@ -9,6 +9,7 @@ import ResizableSortableTh, { type SortState } from '@/components/ui/table/Resiz
 import TableColGroup from '@/components/ui/table/TableColGroup';
 import { useTableColumnWidths, type TableColumnWidthDef } from '@/components/ui/table/useTableColumnWidths';
 import { sortRows, toggleSort } from '@/components/ui/table/sortUtils';
+import { useAuth } from '@/contexts/AuthProvider';
 
 type ItemState = {
   produto_id: string;
@@ -29,6 +30,7 @@ const emptyForm: FormState = { pedido_id: '', motivo: '', conta_corrente_id: '',
 
 export default function DevolucoesPage() {
   const { addToast } = useToast();
+  const { loading: authLoading, activeEmpresaId } = useAuth();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const idempotencyKeyRef = useRef<string | null>(null);
@@ -57,6 +59,13 @@ export default function DevolucoesPage() {
   const { widths: listWidths, startResize: startResizeList } = useTableColumnWidths({ tableId: 'vendas:devolucoes', columns: listColumns });
   const { widths: itensWidths, startResize: startResizeItens } = useTableColumnWidths({ tableId: 'vendas:devolucoes:itens', columns: itensColumns });
 
+  const lastEmpresaIdRef = useRef<string | null>(activeEmpresaId);
+  const empresaChanged = lastEmpresaIdRef.current !== activeEmpresaId;
+
+  useEffect(() => {
+    lastEmpresaIdRef.current = activeEmpresaId;
+  }, [activeEmpresaId]);
+
   const newIdempotencyKey = () => {
     try {
       // @ts-ignore
@@ -67,7 +76,14 @@ export default function DevolucoesPage() {
     }
   };
 
-  async function load() {
+  const load = useCallback(async () => {
+    if (!activeEmpresaId) {
+      setRows([]);
+      setOrders([]);
+      setContas([]);
+      setLoading(false);
+      return;
+    }
     setLoading(true);
     try {
       const [devs, ord, cc] = await Promise.all([
@@ -89,12 +105,32 @@ export default function DevolucoesPage() {
     } finally {
       setLoading(false);
     }
-  }
+  }, [activeEmpresaId, addToast, form.conta_corrente_id]);
+
+  useEffect(() => {
+    // Multi-tenant safety: evitar reaproveitar estado do tenant anterior.
+    setRows([]);
+    setOrders([]);
+    setContas([]);
+    setIsOpen(false);
+    setForm(emptyForm);
+    setLoadingPedido(false);
+    setSaving(false);
+    idempotencyKeyRef.current = null;
+
+    if (!activeEmpresaId) {
+      setLoading(false);
+      return;
+    }
+    setLoading(true);
+  }, [activeEmpresaId]);
 
   useEffect(() => {
     void load();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [load]);
+
+  const effectiveLoading = !!activeEmpresaId && (loading || empresaChanged);
+  const effectiveRows = empresaChanged ? [] : rows;
 
   const orderById = useMemo(() => {
     const map = new Map<string, VendaPedido>();
@@ -104,7 +140,7 @@ export default function DevolucoesPage() {
 
   const sortedRows = useMemo(() => {
     return sortRows(
-      rows,
+      effectiveRows,
       sort as any,
       [
         { id: 'data', type: 'date', getValue: (r) => (r as any).data_devolucao ?? null },
@@ -113,7 +149,7 @@ export default function DevolucoesPage() {
         { id: 'valor', type: 'number', getValue: (r) => Number((r as any).valor_total ?? 0) },
       ] as const
     );
-  }, [orderById, rows, sort]);
+  }, [effectiveRows, orderById, sort]);
 
   const sortedItens = useMemo(() => {
     const base = form.itens.map((item, index) => ({ item, index }));
@@ -204,6 +240,18 @@ export default function DevolucoesPage() {
     }
   };
 
+  if (authLoading) {
+    return (
+      <div className="flex justify-center h-full items-center">
+        <Loader2 className="animate-spin text-blue-600 w-10 h-10" />
+      </div>
+    );
+  }
+
+  if (!activeEmpresaId) {
+    return <div className="p-4 text-gray-600">Selecione uma empresa para ver devoluções.</div>;
+  }
+
   return (
     <div className="p-1 h-full flex flex-col">
       <div className="flex justify-between items-center mb-6 flex-shrink-0">
@@ -223,11 +271,11 @@ export default function DevolucoesPage() {
       </div>
 
       <div className="bg-white rounded-lg shadow overflow-hidden flex-grow flex flex-col">
-        {loading ? (
+        {effectiveLoading ? (
           <div className="flex justify-center h-64 items-center">
             <Loader2 className="animate-spin text-blue-600 w-10 h-10" />
           </div>
-        ) : rows.length === 0 ? (
+        ) : effectiveRows.length === 0 ? (
           <div className="flex justify-center h-64 items-center text-gray-500">Nenhuma devolução cadastrada.</div>
         ) : (
           <div className="overflow-auto">
