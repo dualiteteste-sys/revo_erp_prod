@@ -14,10 +14,15 @@ interface SidebarGroupProps {
   onOpenSettings: () => void;
 }
 
+function isPlainLeftClick(e: React.MouseEvent): boolean {
+  return e.button === 0 && !e.metaKey && !e.ctrlKey && !e.shiftKey && !e.altKey;
+}
+
 const SidebarGroup: React.FC<SidebarGroupProps> = ({ item, activeItem, setActiveItem, isOpen, setOpenGroup, onOpenSettings }) => {
   const { signOut } = useAuth();
   const isGroupActive = item.children?.some(child => child.href === activeItem) ?? false;
   const isDirectlyActive = activeItem === item.href && !item.children;
+  const href = item.href && item.href !== '#' ? item.href : null;
 
   const handleGroupClick = () => {
     if (item.name === 'Configurações') {
@@ -39,24 +44,46 @@ const SidebarGroup: React.FC<SidebarGroupProps> = ({ item, activeItem, setActive
 
   return (
     <li>
-      <button
-        onClick={handleGroupClick}
-        className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-colors duration-200 text-left ${
-          isDirectlyActive
-            ? 'bg-blue-600 text-white font-medium'
-            : isGroupActive
-            ? 'bg-blue-200/85 text-blue-700 font-semibold'
-            : 'text-gray-700 hover:bg-white/20'
-        }`}
-      >
-        <item.icon size={20} className="flex-shrink-0" />
-        <span className="flex-1">{item.name}</span>
-        {item.children && (
-          <motion.div animate={{ rotate: isOpen ? 0 : -90 }} transition={{ duration: 0.2 }}>
-            <ChevronDown size={16} />
-          </motion.div>
-        )}
-      </button>
+      {item.children || item.name === 'Sair' || !href ? (
+        <button
+          onClick={handleGroupClick}
+          className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-colors duration-200 text-left ${
+            isDirectlyActive
+              ? 'bg-blue-600 text-white font-medium'
+              : isGroupActive
+              ? 'bg-blue-200/85 text-blue-700 font-semibold'
+              : 'text-gray-700 hover:bg-white/20'
+          }`}
+        >
+          <item.icon size={20} className="flex-shrink-0" />
+          <span className="flex-1">{item.name}</span>
+          {item.children && (
+            <motion.div animate={{ rotate: isOpen ? 0 : -90 }} transition={{ duration: 0.2 }}>
+              <ChevronDown size={16} />
+            </motion.div>
+          )}
+        </button>
+      ) : (
+        <a
+          href={href}
+          onClick={(e) => {
+            if (!isPlainLeftClick(e)) return;
+            e.preventDefault();
+            if (item.name === 'Configurações') {
+              onOpenSettings();
+              return;
+            }
+            setActiveItem(href);
+            setOpenGroup(null);
+          }}
+          className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-colors duration-200 text-left ${
+            isDirectlyActive ? 'bg-blue-600 text-white font-medium' : 'text-gray-700 hover:bg-white/20'
+          }`}
+        >
+          <item.icon size={20} className="flex-shrink-0" />
+          <span className="flex-1">{item.name}</span>
+        </a>
+      )}
       <AnimatePresence>
         {isOpen && item.children && (
           <motion.div
