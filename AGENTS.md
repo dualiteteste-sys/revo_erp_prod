@@ -138,6 +138,11 @@ Leia:
 Leia:
 - `docs/policies/POLITICA_DE_APIS_EXTERNAS.md`
 
+### 5.8 Mexeu em fluxo de branches/PR/CI com múltiplos agentes
+
+Leia:
+- `docs/policies/POLITICA_COLABORACAO_AGENTES.md`
+
 ## 6) Índice de documentos (não duplicar)
 
 - Regras de ouro / ambientes / branches: `docs/contexto-projeto-excelencia.md`
@@ -147,6 +152,7 @@ Leia:
 - Alinhamento DEV↔PROD: `docs/supabase-prod-alignment.md`
 - Sanitização periódica: `docs/checklist-estado-da-arte-gaps.md`
 - Política de APIs externas (nova dependência): `docs/policies/POLITICA_DE_APIS_EXTERNAS.md`
+- Política de colaboração (múltiplos agentes): `docs/policies/POLITICA_COLABORACAO_AGENTES.md`
 - Roadmap de excelência (9/10): `CHECKLIST-ESTADO-DA-ARTE-9-10.md`
  - Manual do projeto (contexto amplo, UI/UX, produto): `MANUAL-CONTEXTO-CODEX.md`
 

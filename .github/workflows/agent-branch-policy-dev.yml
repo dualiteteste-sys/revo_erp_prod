@@ -1,0 +1,54 @@
+name: Agent Branch Policy (dev)
+
+on:
+  pull_request:
+    branches: [dev]
+    types: [opened, reopened, synchronize, ready_for_review]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: agent-branch-policy-dev-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  enforce:
+    name: Validate branch naming (advisory)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Validate head branch (advisory)
+        run: |
+          set -euo pipefail
+          base_ref="${{ github.base_ref }}"
+          head_ref="${{ github.head_ref }}"
+
+          echo "base_ref=$base_ref"
+          echo "head_ref=$head_ref"
+
+          if [[ "$base_ref" != "dev" ]]; then
+            echo "::warning::Este check é apenas informativo e só se aplica a PRs para dev."
+            exit 0
+          fi
+
+          if [[ "$head_ref" == "dev" || "$head_ref" == "main" ]]; then
+            echo "::error::Política do Revo: agentes não devem trabalhar direto em dev/main. Crie uma branch própria e abra PR para dev."
+            exit 1
+          fi
+
+          # Recomendação: ai/<agent-id>/<tipo>-<slug>
+          # Para evitar quebrar branches legadas (feat/*, fix/*, etc.), este gate é:
+          # - estrito apenas quando o prefixo for ai/
+          # - warning caso não seja ai/
+          if [[ "$head_ref" == ai/* ]]; then
+            if [[ ! "$head_ref" =~ ^ai/[a-z0-9-]+/(feat|fix|docs|chore|refactor|test|ci|perf|hotfix)-[a-z0-9][a-z0-9-]*$ ]]; then
+              echo "::error::Branch ai/* fora do padrão. Use: ai/<agent-id>/<tipo>-<slug> (ver docs/policies/POLITICA_COLABORACAO_AGENTES.md)."
+              exit 1
+            fi
+            echo "OK: branch ai/* no padrão."
+            exit 0
+          fi
+
+          echo "::warning::Branch não usa o padrão ai/<agent-id>/<tipo>-<slug>. Recomenda-se migrar para reduzir colisões (ver docs/policies/POLITICA_COLABORACAO_AGENTES.md)."
+          exit 0
+

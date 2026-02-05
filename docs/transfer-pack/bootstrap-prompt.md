@@ -14,7 +14,11 @@ Você está no repo do **Revo ERP**.
    - `docs/supabase-prod-alignment.md`
    - `docs/deploy.md`
 4) Não inclua segredos no código. Use apenas nomes e placeholders.
-5) Não faça push/merge para `main` sem comando explícito. Trabalhe em `dev`.
+5) Fluxo com múltiplos agentes:
+   - trabalhe em uma branch própria (`ai/<agent-id>/<tipo>-<slug>`),
+   - abra PR para `dev`,
+   - `main` só via PR `dev→main`.
+   - Leia `docs/policies/POLITICA_COLABORACAO_AGENTES.md` quando o trabalho envolver branches/PR/CI.
 6) Antes de concluir:
    - rode `yarn release:check` (ou garanta CI verde),
    - garanta console/network limpos no fluxo alterado,
@@ -23,4 +27,3 @@ Você está no repo do **Revo ERP**.
 Se algo não puder ser validado agora, marque como **RISCO** e escreva como validar.
 
 ---
-
