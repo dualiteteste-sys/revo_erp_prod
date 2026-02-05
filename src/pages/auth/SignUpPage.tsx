@@ -88,7 +88,7 @@ const SignUpPage: React.FC = () => {
       exit={{ opacity: 0 }}
     >
       <h2 className="text-2xl font-bold text-center text-gray-800 mb-2">Crie sua conta</h2>
-      <p className="text-center text-gray-600 mb-6">Comece a usar o REVO ERP hoje mesmo.</p>
+      <p className="text-center text-gray-600 mb-6">Comece a usar o Ultria ERP hoje mesmo.</p>
       
       <form onSubmit={handleSignUp} className="space-y-4">
         <div>

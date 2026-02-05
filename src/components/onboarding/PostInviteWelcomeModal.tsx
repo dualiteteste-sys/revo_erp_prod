@@ -99,7 +99,7 @@ export default function PostInviteWelcomeModal({ isOpen, onClose }: Props) {
     <Modal
       isOpen={isOpen}
       onClose={handleClose}
-      title="Bem-vindo(a) ao REVO"
+      title="Bem-vindo(a) à Ultria"
       size="3xl"
       glassClassName="bg-white/65"
     >

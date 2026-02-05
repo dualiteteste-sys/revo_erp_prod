@@ -49,7 +49,7 @@ const RevoFluxoPage: React.FC = () => {
                             transition={{ duration: 0.6, delay: 0.2 }}
                             className="text-4xl md:text-5xl font-extrabold text-gray-900 tracking-tight"
                         >
-                            Automatize seu contas a pagar e a receber com o <span className="text-blue-600">REVO Fluxo.</span>
+                            Automatize seu contas a pagar e a receber com o <span className="text-blue-600">Ultria Fluxo.</span>
                         </motion.h1>
                         <motion.p
                             initial={{ opacity: 0, y: 20 }}
@@ -69,7 +69,7 @@ const RevoFluxoPage: React.FC = () => {
                                 href="/#pricing"
                                 className="px-8 py-3 bg-blue-600 text-white font-semibold rounded-lg shadow-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-transform transform hover:scale-105"
                             >
-                                Experimente o REVO Fluxo
+                                Experimente o Ultria Fluxo
                             </a>
                         </motion.div>
                         <motion.div
@@ -130,7 +130,7 @@ const RevoFluxoPage: React.FC = () => {
                                 transition={{ duration: 0.6 }}
                                 className="bg-white rounded-2xl shadow-xl border-2 border-blue-500 p-8 w-full max-w-sm"
                             >
-                                <h3 className="text-2xl font-bold text-gray-900">REVO Fluxo</h3>
+                                <h3 className="text-2xl font-bold text-gray-900">Ultria Fluxo</h3>
                                 <p className="mt-4">
                                     <span className="text-5xl font-extrabold text-gray-900">R$ 49</span>
                                     <span className="text-gray-500"> /mês</span>
@@ -146,7 +146,7 @@ const RevoFluxoPage: React.FC = () => {
                                     href="/#pricing"
                                     className="w-full mt-10 px-8 py-3 bg-blue-600 text-white font-semibold rounded-lg shadow-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-transform transform hover:scale-105 block"
                                 >
-                                    Ativar o REVO Fluxo
+                                    Ativar o Ultria Fluxo
                                 </a>
                             </motion.div>
                         </div>

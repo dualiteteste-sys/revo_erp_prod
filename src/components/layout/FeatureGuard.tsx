@@ -43,7 +43,7 @@ const FeatureGuard: React.FC<FeatureGuardProps> = ({ feature, children }) => {
   }
 
   const featureNameMap = {
-    revo_send_enabled: 'REVO Send',
+    revo_send_enabled: 'Ultria Send',
     nfe_emissao_enabled: 'Emissão de NF-e',
   };
 

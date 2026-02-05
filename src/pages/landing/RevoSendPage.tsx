@@ -37,7 +37,7 @@ const RevoSendPage: React.FC = () => {
         const data = await callRpc<AddonPublic[]>('addons_public_list_active_by_slug', { p_slug: 'REVO_SEND' });
         setAddons((data || []).filter((a) => a?.active));
       } catch (e: any) {
-        addToast('Não foi possível carregar os planos do REVO Send.', 'error');
+        addToast('Não foi possível carregar os planos do Ultria Send.', 'error');
         setAddons([]);
       }
       setLoading(false);
@@ -91,9 +91,9 @@ const RevoSendPage: React.FC = () => {
   ];
 
   const faqs = [
-    { question: 'O REVO Send funciona sem o REVO ERP?', answer: 'Não, o REVO Send é um módulo adicional e requer uma assinatura ativa do REVO ERP para funcionar, pois está totalmente integrado com a gestão de pedidos e estoque.' },
+    { question: 'O Ultria Send funciona sem o Ultria ERP?', answer: 'Não, o Ultria Send é um módulo adicional e requer uma assinatura ativa do Ultria ERP para funcionar, pois está totalmente integrado com a gestão de pedidos e estoque.' },
     { question: 'Quais transportadoras estão integradas?', answer: 'Atualmente, temos integração com Correios, Jadlog, Azul Cargo Express, e estamos constantemente adicionando novas transportadoras à plataforma.' },
-    { question: 'Como funciona a cobrança?', answer: 'A cobrança do REVO Send é adicionada à sua fatura mensal do REVO ERP. Os valores dos fretes são pagos diretamente às transportadoras ou através da sua conta de integração.' },
+    { question: 'Como funciona a cobrança?', answer: 'A cobrança do Ultria Send é adicionada à sua fatura mensal do Ultria ERP. Os valores dos fretes são pagos diretamente às transportadoras ou através da sua conta de integração.' },
   ];
 
   const monthlyPlan = addons.find(a => a.billing_cycle === 'monthly');
@@ -111,7 +111,7 @@ const RevoSendPage: React.FC = () => {
             transition={{ duration: 0.6 }}
             className="text-4xl md:text-6xl font-extrabold text-gray-900"
           >
-            REVO Send: Automação de Entregas para seu E-commerce
+            Ultria Send: Automação de Entregas para seu E-commerce
           </motion.h1>
           <motion.p 
             initial={{ opacity: 0, y: 20 }}
@@ -119,7 +119,7 @@ const RevoSendPage: React.FC = () => {
             transition={{ duration: 0.6, delay: 0.2 }}
             className="mt-6 text-lg md:text-xl text-gray-600"
           >
-            Calcule fretes, imprima etiquetas em lote e gerencie suas entregas de forma inteligente. Tudo integrado ao seu REVO ERP.
+            Calcule fretes, imprima etiquetas em lote e gerencie suas entregas de forma inteligente. Tudo integrado ao seu Ultria ERP.
           </motion.p>
           <motion.div 
             initial={{ opacity: 0, y: 20 }}
@@ -160,7 +160,7 @@ const RevoSendPage: React.FC = () => {
       <section className="py-20 bg-white">
         <div className="max-w-7xl mx-auto px-4">
           <h2 className="text-3xl font-extrabold text-gray-900 text-center mb-12">Planos e Preços</h2>
-          <p className="text-center text-lg text-gray-600 -mt-8 mb-12">Um módulo adicional para potencializar seu REVO ERP.</p>
+          <p className="text-center text-lg text-gray-600 -mt-8 mb-12">Um módulo adicional para potencializar seu Ultria ERP.</p>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-2xl mx-auto">
             {loading ? (
                 Array.from({length: 2}).map((_, i) => <div key={i} className="rounded-2xl p-8 shadow-lg bg-gray-100 animate-pulse h-80"></div>)
@@ -184,7 +184,7 @@ const RevoSendPage: React.FC = () => {
                             disabled={!!checkoutLoading}
                             className="w-full mt-8 py-3 rounded-lg font-semibold bg-blue-100 text-blue-700 hover:bg-blue-200 disabled:opacity-50"
                         >
-                            {checkoutLoading === addon.id ? <Loader2 className="animate-spin mx-auto"/> : 'Ativar REVO Send'}
+                            {checkoutLoading === addon.id ? <Loader2 className="animate-spin mx-auto"/> : 'Ativar Ultria Send'}
                         </button>
                     </div>
                 ))
