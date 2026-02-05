@@ -75,6 +75,12 @@ Objetivo: quando uma nova janela de contexto for aberta, este documento deve ser
   - impedir drift entre VERIFY e PROD (comparação strict de schema)
   - impedir chamadas para RPC/Edge Functions inexistentes (coverage)
 
+### 3.6 APIs externas / novas dependências (gate de segurança)
+
+Regra: sempre que a tarefa envolver **integrar/instalar API/SDK/lib externa (nova dependência)**, é obrigatório seguir a política:
+
+- `docs/policies/POLITICA_DE_APIS_EXTERNAS.md`
+
 ## 4) Padrões de qualidade (“Estado da Arte”)
 
 ### 4.1 UX e fluxos resilientes
