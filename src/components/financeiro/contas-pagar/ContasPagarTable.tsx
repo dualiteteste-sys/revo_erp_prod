@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import ResizableSortableTh, { type SortState } from '@/components/ui/table/ResizableSortableTh';
 import TableColGroup from '@/components/ui/table/TableColGroup';
 import { useTableColumnWidths, type TableColumnWidthDef } from '@/components/ui/table/useTableColumnWidths';
+import { openInNewTabBestEffort, shouldIgnoreRowDoubleClickEvent } from '@/components/ui/table/rowDoubleClick';
 
 interface ContasPagarTableProps {
   contas: ContaPagar[];
@@ -80,6 +81,12 @@ const ContasPagarTable: React.FC<ContasPagarTableProps> = ({
                 exit={{ opacity: 0 }}
                 transition={{ duration: 0.3 }}
                 className="hover:bg-gray-50"
+                onDoubleClick={(e) => {
+                  if (shouldIgnoreRowDoubleClickEvent(e)) return;
+                  openInNewTabBestEffort(`/app/financeiro/contas-a-pagar?contaId=${encodeURIComponent(conta.id)}`, () =>
+                    onEdit(conta)
+                  );
+                }}
               >
                 <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{conta.descricao}</td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{conta.fornecedor_nome || '-'}</td>

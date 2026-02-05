@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useProductsTree } from '../../hooks/useProductsTree';
 import { useToast } from '../../contexts/ToastProvider';
 import ProductsTable from '../../components/products/ProductsTable';
@@ -25,6 +25,7 @@ import PageCard from '@/components/ui/PageCard';
 import EmptyState from '@/components/ui/EmptyState';
 import { uiMessages } from '@/lib/ui/messages';
 import { useAuth } from '@/contexts/AuthProvider';
+import { useSearchParams } from 'react-router-dom';
 
 const ProductsPage: React.FC = () => {
   const { activeEmpresa } = useAuth();
@@ -69,6 +70,7 @@ const ProductsPage: React.FC = () => {
   const [isImportOpen, setIsImportOpen] = useState(false);
   const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false);
   const [bulkLoading, setBulkLoading] = useState(false);
+  const [searchParams, setSearchParams] = useSearchParams();
 
   const bulk = useBulkSelection(parents, (p) => p.id);
   const selectedProducts = useMemo(
@@ -111,6 +113,18 @@ const ProductsPage: React.FC = () => {
       setIsFormOpen(true);
     }
   };
+
+  useEffect(() => {
+    const openId = searchParams.get('open');
+    if (!openId) return;
+    void (async () => {
+      await handleOpenForm({ id: openId });
+      const next = new URLSearchParams(searchParams);
+      next.delete('open');
+      setSearchParams(next, { replace: true });
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const handleCloseForm = () => {
     setIsFormOpen(false);

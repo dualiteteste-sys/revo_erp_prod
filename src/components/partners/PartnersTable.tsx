@@ -7,6 +7,7 @@ import { documentMask } from '@/lib/masks';
 import ResizableSortableTh, { type SortState } from '@/components/ui/table/ResizableSortableTh';
 import TableColGroup from '@/components/ui/table/TableColGroup';
 import { useTableColumnWidths, type TableColumnWidthDef } from '@/components/ui/table/useTableColumnWidths';
+import { openInNewTabBestEffort, shouldIgnoreRowDoubleClickEvent } from '@/components/ui/table/rowDoubleClick';
 
 interface PartnersTableProps {
   partners: PartnerListItem[];
@@ -97,6 +98,10 @@ const PartnersTable: React.FC<PartnersTableProps> = ({
                 exit={{ opacity: 0 }}
                 transition={{ duration: 0.3 }}
                 className="hover:bg-gray-50"
+                onDoubleClick={(e) => {
+                  if (shouldIgnoreRowDoubleClickEvent(e)) return;
+                  openInNewTabBestEffort(`/app/partners?open=${encodeURIComponent(partner.id)}`, () => onEdit(partner));
+                }}
               >
                 {onToggleSelect ? (
                   <td className="px-4 py-4 whitespace-nowrap">

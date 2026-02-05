@@ -5,6 +5,7 @@ import ResizableSortableTh, { type SortState } from '@/components/ui/table/Resiz
 import TableColGroup from '@/components/ui/table/TableColGroup';
 import { useTableColumnWidths, type TableColumnWidthDef } from '@/components/ui/table/useTableColumnWidths';
 import type { ProductsTreeRow } from '@/hooks/useProductsTree';
+import { openInNewTabBestEffort, shouldIgnoreRowDoubleClickEvent } from '@/components/ui/table/rowDoubleClick';
 
 interface ProductsTableProps {
   rows: ProductsTreeRow[];
@@ -115,6 +116,10 @@ const ProductsTable: React.FC<ProductsTableProps> = ({
                   'hover:bg-gray-50',
                   isHighlighted ? 'bg-blue-50/70' : '',
                 ].join(' ')}
+                onDoubleClick={(e) => {
+                  if (shouldIgnoreRowDoubleClickEvent(e)) return;
+                  openInNewTabBestEffort(`/app/products?open=${encodeURIComponent(row.id)}`, () => onEdit({ id: row.id }));
+                }}
               >
                 {onToggleSelect ? (
                   <td className="px-4 py-4 whitespace-nowrap">

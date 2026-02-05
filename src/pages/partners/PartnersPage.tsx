@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { usePartners } from '../../hooks/usePartners';
 import { useToast } from '../../contexts/ToastProvider';
 import * as partnersService from '../../services/partners';
@@ -25,6 +25,7 @@ import PageCard from '@/components/ui/PageCard';
 import EmptyState from '@/components/ui/EmptyState';
 import { uiMessages } from '@/lib/ui/messages';
 import ImportPartnersCsvModal from '@/components/partners/ImportPartnersCsvModal';
+import { useSearchParams } from 'react-router-dom';
 
 const PartnersPage: React.FC = () => {
   const enableSeed = isSeedEnabled();
@@ -67,6 +68,7 @@ const PartnersPage: React.FC = () => {
   const [isSeeding, setIsSeeding] = useState(false);
   const [bulkLoading, setBulkLoading] = useState(false);
   const [isImportOpen, setIsImportOpen] = useState(false);
+  const [searchParams, setSearchParams] = useSearchParams();
 
   const bulk = useBulkSelection(partners, (p) => p.id);
   const selectedPartners = useMemo(
@@ -108,6 +110,19 @@ const PartnersPage: React.FC = () => {
       setIsFormOpen(true);
     }
   };
+
+  useEffect(() => {
+    const openId = searchParams.get('open');
+    if (!openId) return;
+
+    void (async () => {
+      await handleOpenForm({ id: openId } as any);
+      const next = new URLSearchParams(searchParams);
+      next.delete('open');
+      setSearchParams(next, { replace: true });
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const handleCloseForm = () => {
     setIsFormOpen(false);
