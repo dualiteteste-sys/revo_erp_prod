@@ -3,6 +3,8 @@ import { callRpc } from "@/lib/api";
 export type OpsAppErrorRow = {
   id: string;
   created_at: string;
+  last_seen_at?: string | null;
+  occurrences?: number | null;
   empresa_id: string | null;
   user_id: string | null;
   source: string;

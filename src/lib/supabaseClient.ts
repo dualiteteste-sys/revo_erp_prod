@@ -4,6 +4,7 @@ import { logger } from "@/lib/logger";
 import { newRequestId } from "@/lib/requestId";
 import { recordNetworkError } from "@/lib/telemetry/networkErrors";
 import { getLastUserAction } from "@/lib/telemetry/lastUserAction";
+import { buildOpsAppErrorFingerprint } from "@/lib/telemetry/opsAppErrorsFingerprint";
 
 export const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || "https://lrfwiaekipwkjkzvcnfd.supabase.co";
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxyZndpYWVraXB3a2prenZjbmZkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjA4OTQwNzEsImV4cCI6MjA3NjQ3MDA3MX0.BnDwDZpWV62D_kPJb6ZtOzeRxgTPSQncqja332rxCYk";
@@ -94,7 +95,14 @@ async function logOpsAppErrorFetchBestEffort(input: {
   try {
     if (IS_TEST_ENV) return;
     const now = Date.now();
-    const key = `${input.source}|${input.method}|${input.status}|${input.code ?? ""}|${input.route ?? ""}|${input.url.split("?")[0]}|${input.message}`;
+    const key = buildOpsAppErrorFingerprint({
+      route: input.route,
+      code: input.code,
+      httpStatus: input.status,
+      url: input.url,
+      method: input.method,
+      message: input.message,
+    });
     const last = opsAppErrorsDedupe.get(key) ?? 0;
     if (now - last < OPS_APP_ERRORS_DEDUPE_MS) return;
     opsAppErrorsDedupe.set(key, now);
@@ -112,7 +120,7 @@ async function logOpsAppErrorFetchBestEffort(input: {
       p_http_status: input.status,
       p_code: input.code ?? "",
       p_response_text: input.responseText ?? "",
-      p_fingerprint: `${input.source}|${input.route ?? ""}|${input.code ?? ""}|${input.status}|${input.url.split("?")[0]}|${input.message}`.slice(0, 500),
+      p_fingerprint: key,
     };
 
     const headers = new Headers(input.headers);
