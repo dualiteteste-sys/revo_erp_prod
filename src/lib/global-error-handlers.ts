@@ -4,6 +4,7 @@ import { sanitizeLogData } from "@/lib/sanitizeLog";
 import { getLastRequestId } from "@/lib/requestId";
 import { getRecentNetworkErrors } from "@/lib/telemetry/networkErrors";
 import { getLastUserAction, setupLastUserActionTracking } from "@/lib/telemetry/lastUserAction";
+import { buildOpsAppErrorFingerprint } from "@/lib/telemetry/opsAppErrorsFingerprint";
 
 type AnyFunction = (...args: unknown[]) => unknown;
 
@@ -25,6 +26,7 @@ export function setupGlobalErrorHandlers() {
   if (typeof window === "undefined") return;
 
   const recentlySent = new Map<string, number>();
+  const recentlySentOps = new Map<string, number>();
   const DEDUPE_WINDOW_MS = 10_000;
 
   setupLastUserActionTracking();
@@ -72,16 +74,19 @@ export function setupGlobalErrorHandlers() {
       const recentNet = getRecentNetworkErrors();
       const lastNet = recentNet[0] ?? null;
 
-      const fingerprint = [
-        params.source,
-        route ?? "",
-        params.hintCode ?? "",
-        (lastNet?.status ?? "").toString(),
-        (lastNet?.url ?? "").split("?")[0],
-        params.message,
-      ]
-        .join("|")
-        .slice(0, 500);
+      const fingerprint = buildOpsAppErrorFingerprint({
+        route,
+        code: params.hintCode,
+        httpStatus: lastNet?.status ?? null,
+        url: lastNet?.url ?? null,
+        method: lastNet?.method ?? null,
+        message: params.message,
+      });
+
+      const now = Date.now();
+      const last = recentlySentOps.get(fingerprint) ?? 0;
+      if (now - last < DEDUPE_WINDOW_MS) return;
+      recentlySentOps.set(fingerprint, now);
 
       void (supabase as any).rpc("ops_app_errors_log_v1", {
         p_source: params.source,

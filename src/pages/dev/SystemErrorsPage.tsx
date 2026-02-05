@@ -122,7 +122,7 @@ export default function SystemErrorsPage() {
       rows,
       sort as any,
       [
-        { id: "when", type: "date", getValue: (r: OpsAppErrorRow) => r.created_at ?? "" },
+        { id: "when", type: "date", getValue: (r: OpsAppErrorRow) => r.last_seen_at ?? r.created_at ?? "" },
         { id: "source", type: "string", getValue: (r: OpsAppErrorRow) => r.source ?? "" },
         { id: "route", type: "string", getValue: (r: OpsAppErrorRow) => r.route ?? "" },
         { id: "message", type: "string", getValue: (r: OpsAppErrorRow) => r.message ?? "" },
@@ -442,7 +442,15 @@ export default function SystemErrorsPage() {
                           aria-label="Selecionar item"
                         />
                       </td>
-                      <td className="p-3 text-slate-700">{formatDateTimeBR(r.created_at)}</td>
+                      <td className="p-3 text-slate-700">
+                        <div>{formatDateTimeBR(r.last_seen_at ?? r.created_at)}</div>
+                        {r.occurrences && r.occurrences > 1 ? (
+                          <div className="mt-1 text-xs text-slate-500">{r.occurrences} ocorrências</div>
+                        ) : null}
+                        {r.last_seen_at && r.last_seen_at !== r.created_at ? (
+                          <div className="mt-1 text-xs text-slate-500">1ª: {formatDateTimeBR(r.created_at)}</div>
+                        ) : null}
+                      </td>
                       <td className="p-3 font-mono text-slate-800 break-all">{r.source}</td>
                       <td className="p-3 font-mono text-slate-700 break-all">{r.route ?? "—"}</td>
                       <td className="p-3 text-slate-900">
