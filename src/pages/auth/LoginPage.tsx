@@ -63,7 +63,7 @@ const LoginPage: React.FC = () => {
       exit={{ opacity: 0 }}
     >
       <h2 className="text-2xl font-bold text-center text-gray-800 mb-2">Bem-vindo de volta!</h2>
-      <p className="text-center text-gray-600 mb-6">Faça login para acessar o REVO ERP.</p>
+      <p className="text-center text-gray-600 mb-6">Faça login para acessar o Ultria ERP.</p>
       
       <form onSubmit={handleLogin} className="space-y-4">
         <div>

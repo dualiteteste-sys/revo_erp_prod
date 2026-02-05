@@ -4,7 +4,7 @@ const RevoComprasLogo: React.FC<React.SVGProps<SVGSVGElement>> = (props) => (
   <svg
     viewBox="0 0 230 40"
     xmlns="http://www.w3.org/2000/svg"
-    aria-label="REVO Compras Logo"
+    aria-label="Ultria Compras Logo"
     {...props}
   >
     <text
@@ -16,7 +16,7 @@ const RevoComprasLogo: React.FC<React.SVGProps<SVGSVGElement>> = (props) => (
       fill="currentColor"
       letterSpacing="0.5"
     >
-      REVO
+      ULTRIA
     </text>
     <text
       x="95"

@@ -74,7 +74,7 @@ export const HELP_CATALOG: HelpEntry[] = [
     match: '/app/suporte',
     title: 'Guia Rápido de Suporte (Tickets + Diagnóstico)',
     whatIs:
-      'Suporte é o “central de ajuda” do REVO: diagnóstico guiado (sem console) + abertura de ticket com contexto automático (empresa, request-id, checks) para resolver rápido.',
+      'Suporte é a “central de ajuda” da Ultria: diagnóstico guiado (sem console) + abertura de ticket com contexto automático (empresa, request-id, checks) para resolver rápido.',
     steps: [
       'Comece pelos cards “Diagnóstico guiado” (Onboarding / PDV / Integrações) e conclua o que estiver como “Faltando”.',
       'Se o problema persistir, gere o “Pacote de diagnóstico” e copie o request-id (quando existir).',
