@@ -12,6 +12,7 @@ import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
 import { useIsMobile } from '@/hooks/useIsMobile';
+import { useAuth } from '@/contexts/AuthProvider';
 import 'react-grid-layout/css/styles.css';
 import 'react-resizable/css/styles.css';
 
@@ -138,10 +139,19 @@ const FluidKPIGrid: React.FC<{
 };
 
 const Dashboard: React.FC = () => {
+  const { activeEmpresaId } = useAuth();
+
   const [loading, setLoading] = useState(true);
   const [data, setData] = useState<DashboardData | null>(null);
   const [error, setError] = useState<string | null>(null);
   const isMobile = useIsMobile();
+
+  const lastEmpresaIdRef = useRef<string | null>(activeEmpresaId);
+  const empresaChanged = lastEmpresaIdRef.current !== activeEmpresaId;
+
+  useEffect(() => {
+    lastEmpresaIdRef.current = activeEmpresaId;
+  }, [activeEmpresaId]);
 
   const defaultLayouts = useMemo(() => generateResponsiveLayouts(NON_KPI_LAYOUT as Layout), []);
 
@@ -166,8 +176,27 @@ const Dashboard: React.FC = () => {
   );
 
   useEffect(() => {
+    // Multi-tenant safety: evitar reaproveitar estado do tenant anterior.
+    setData(null);
+    setError(null);
+    if (!activeEmpresaId) {
+      setLoading(false);
+      return;
+    }
+    setLoading(true);
+  }, [activeEmpresaId]);
+
+  useEffect(() => {
     let mounted = true;
     (async () => {
+      if (!activeEmpresaId) {
+        if (mounted) {
+          setData(null);
+          setError(null);
+          setLoading(false);
+        }
+        return;
+      }
       setLoading(true);
       setError(null);
       try {
@@ -181,7 +210,7 @@ const Dashboard: React.FC = () => {
       }
     })();
     return () => { mounted = false; };
-  }, []);
+  }, [activeEmpresaId]);
 
   const handleLayoutChange = useCallback((_currentLayout: Layout, allLayouts: ResponsiveLayouts) => {
     setLayouts(allLayouts);
@@ -220,6 +249,9 @@ const Dashboard: React.FC = () => {
     width: width,
     useCSSTransforms: true,
   }), [layouts, isEditing, width, handleLayoutChange, isMobile]);
+
+  const effectiveLoading = !!activeEmpresaId && (loading || empresaChanged);
+  const effectiveData = empresaChanged ? null : data;
 
   return (
     <div className={`min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/30 to-indigo-50/40 ${isMobile ? 'p-3 space-y-4' : 'p-6 space-y-6'}`}>
@@ -340,20 +372,26 @@ const Dashboard: React.FC = () => {
           )}
         </AnimatePresence>
 
+        {!activeEmpresaId && (
+          <div className="p-4 rounded-2xl bg-white/70 backdrop-blur-xl border border-white/60 text-gray-600 text-sm shadow-[0_8px_32px_-8px_rgba(0,0,0,0.08)]">
+            Selecione uma empresa para ver o dashboard.
+          </div>
+        )}
+
         {/* KPIs com CSS Grid fluido - adaptação perfeita */}
-        {activeKpis.length > 0 && (
+        {!!activeEmpresaId && activeKpis.length > 0 && (
           <div className={isMobile ? 'mb-4' : 'mb-6'}>
             <FluidKPIGrid
               activeKpis={activeKpis}
-              data={data}
-              loading={loading}
+              data={effectiveData as any}
+              loading={effectiveLoading}
               isMobile={isMobile}
             />
           </div>
         )}
 
         {/* Outros widgets com react-grid-layout */}
-        {activeNonKpiWidgets.length > 0 && (
+        {!!activeEmpresaId && activeNonKpiWidgets.length > 0 && (
           <div ref={containerRef} className="w-full">
             <Responsive {...gridProps}>
               {activeNonKpiWidgets.map((key) => {
@@ -376,7 +414,7 @@ const Dashboard: React.FC = () => {
                       )}
 
                       <div className="flex-1 h-full w-full overflow-hidden">
-                        <Component data={data} loading={loading} />
+                        <Component data={effectiveData} loading={effectiveLoading} />
                       </div>
                     </div>
                   </div>
