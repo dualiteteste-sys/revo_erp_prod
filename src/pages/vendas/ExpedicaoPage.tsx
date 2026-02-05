@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { AlertTriangle, CheckCircle2, Clock3, Loader2, PlusCircle, ScanLine, Search, Truck } from 'lucide-react';
 import Modal from '@/components/ui/Modal';
 import { useToast } from '@/contexts/ToastProvider';
@@ -19,6 +19,7 @@ import {
 } from '@/services/vendasMvp';
 import CsvExportDialog from '@/components/ui/CsvExportDialog';
 import QuickScanModal from '@/components/ui/QuickScanModal';
+import { useAuth } from '@/contexts/AuthProvider';
 
 type FormState = {
   pedido_id: string;
@@ -40,6 +41,7 @@ const emptyForm: FormState = {
 
 export default function ExpedicaoPage() {
   const { addToast } = useToast();
+  const { loading: authLoading, activeEmpresaId } = useAuth();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [rows, setRows] = useState<ExpedicaoSlaRow[]>([]);
@@ -68,16 +70,25 @@ export default function ExpedicaoPage() {
   ];
   const { widths, startResize } = useTableColumnWidths({ tableId: 'vendas:expedicao', columns });
 
+  const lastEmpresaIdRef = useRef<string | null>(activeEmpresaId);
+  const empresaChanged = lastEmpresaIdRef.current !== activeEmpresaId;
+
+  useEffect(() => {
+    lastEmpresaIdRef.current = activeEmpresaId;
+  }, [activeEmpresaId]);
+
+  const effectiveRows = empresaChanged ? [] : rows;
+
   const filteredRows = useMemo(() => {
     const q = search.trim().toLowerCase();
-    return rows.filter((r) => {
+    return effectiveRows.filter((r) => {
       if (statusFilter !== 'all' && r.status !== statusFilter) return false;
       if (onlyOverdue && !r.overdue) return false;
       if (!q) return true;
       const hay = `${r.pedido_numero ?? ''} ${r.cliente_nome ?? ''} ${r.tracking_code ?? ''}`.toLowerCase();
       return hay.includes(q);
     });
-  }, [rows, search, statusFilter, onlyOverdue]);
+  }, [effectiveRows, search, statusFilter, onlyOverdue]);
 
   const sortedRows = useMemo(() => {
     return sortRows(
@@ -94,6 +105,13 @@ export default function ExpedicaoPage() {
   }, [filteredRows, sort]);
 
   async function load() {
+    if (!activeEmpresaId) {
+      setRows([]);
+      setOrders([]);
+      setStats(null);
+      setLoading(false);
+      return;
+    }
     setLoading(true);
     try {
       const [exp, ord, st] = await Promise.all([
@@ -115,13 +133,46 @@ export default function ExpedicaoPage() {
   }
 
   useEffect(() => {
-    void load();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+    // Multi-tenant safety: evitar reaproveitar estado do tenant anterior.
+    setRows([]);
+    setOrders([]);
+    setStats(null);
+    setSelectedExpedicaoId(null);
+    setEventos([]);
+    setIsOpen(false);
+    setForm(emptyForm);
+    setSaving(false);
+    setIsScanOpen(false);
+
+    if (!activeEmpresaId) {
+      setLoading(false);
+      return;
+    }
+    setLoading(true);
+  }, [activeEmpresaId]);
+
   useEffect(() => {
     void load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [slaHours]);
+  }, [activeEmpresaId]);
+  useEffect(() => {
+    void load();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeEmpresaId, slaHours]);
+
+  const effectiveLoading = !!activeEmpresaId && (loading || empresaChanged);
+
+  if (authLoading) {
+    return (
+      <div className="flex justify-center h-full items-center">
+        <Loader2 className="animate-spin text-blue-600 w-10 h-10" />
+      </div>
+    );
+  }
+
+  if (!activeEmpresaId) {
+    return <div className="p-4 text-gray-600">Selecione uma empresa para ver expedições.</div>;
+  }
 
   const openNew = () => {
     setForm(emptyForm);
@@ -336,7 +387,7 @@ export default function ExpedicaoPage() {
         <CsvExportDialog
           filename="expedicoes.csv"
           rows={filteredRows}
-          disabled={loading}
+          disabled={effectiveLoading}
           columns={[
             { key: 'pedido', label: 'Pedido', getValue: (r) => r.pedido_numero ?? '' },
             { key: 'cliente', label: 'Cliente', getValue: (r) => r.cliente_nome ?? '' },
@@ -351,13 +402,13 @@ export default function ExpedicaoPage() {
       </div>
 
       <div className="bg-white rounded-lg shadow overflow-hidden flex-grow flex flex-col">
-        {loading ? (
+        {effectiveLoading ? (
           <div className="flex justify-center h-64 items-center">
             <Loader2 className="animate-spin text-blue-600 w-10 h-10" />
           </div>
         ) : filteredRows.length === 0 ? (
           <div className="flex justify-center h-64 items-center text-gray-500">
-            {rows.length === 0 ? (
+            {effectiveRows.length === 0 ? (
               <div className="text-center space-y-2">
                 <div>Nenhuma expedição cadastrada.</div>
                 <button onClick={openNew} className="px-4 py-2 rounded-lg bg-blue-600 text-white font-bold hover:bg-blue-700">
