@@ -246,12 +246,18 @@ jobs:
         if: needs.changes.outputs.landing_only != 'true' || steps.risk.outputs.level == 'high'
         env:
           CI: true
+          # Evita crash do app em runtime (supabaseClient lança erro quando env está ausente).
+          # Preferimos DEV para PRs (não apontar testes para PROD).
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL_DEV || secrets.VITE_SUPABASE_URL_PROD || 'https://example.com' }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY_DEV || secrets.VITE_SUPABASE_ANON_KEY_PROD || 'ci_dummy_anon_key' }}
         run: yarn release:check:ci
 
       - name: Release check (CI) — landing fast gate
         if: needs.changes.outputs.landing_only == 'true' && steps.risk.outputs.level != 'high'
         env:
           CI: true
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL_DEV || secrets.VITE_SUPABASE_URL_PROD || 'https://example.com' }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY_DEV || secrets.VITE_SUPABASE_ANON_KEY_PROD || 'ci_dummy_anon_key' }}
         run: |
           set -euo pipefail
           yarn verify:bundle
