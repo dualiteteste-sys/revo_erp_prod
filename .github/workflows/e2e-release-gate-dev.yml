@@ -205,6 +205,11 @@ jobs:
       - name: E2E gate (all)
         env:
           CI: true
+          # E2E sobe o Vite dev server e importa `src/lib/supabaseClient.ts`,
+          # que falha hard se VITE_SUPABASE_* não existir.
+          # Preferimos secrets do DEV; se não existirem, usamos placeholders só para destravar o gate.
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL_DEV || 'https://example.com' }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY_DEV || 'ci_dummy_anon_key' }}
         run: |
           set -euo pipefail
           case "${E2E_SUITE}" in
