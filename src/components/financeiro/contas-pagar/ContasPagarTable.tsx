@@ -7,6 +7,7 @@ import ResizableSortableTh, { type SortState } from '@/components/ui/table/Resiz
 import TableColGroup from '@/components/ui/table/TableColGroup';
 import { useTableColumnWidths, type TableColumnWidthDef } from '@/components/ui/table/useTableColumnWidths';
 import { openInNewTabBestEffort, shouldIgnoreRowDoubleClickEvent } from '@/components/ui/table/rowDoubleClick';
+import { isPlainLeftClick } from '@/components/ui/links/isPlainLeftClick';
 
 interface ContasPagarTableProps {
   contas: ContaPagar[];
@@ -36,6 +37,25 @@ const ContasPagarTable: React.FC<ContasPagarTableProps> = ({
   sortBy,
   onSort,
 }) => {
+  const editClickTimeoutRef = React.useRef<number | null>(null);
+  const scheduleEdit = (fn: () => void) => {
+    if (typeof window === 'undefined') {
+      fn();
+      return;
+    }
+    if (editClickTimeoutRef.current) window.clearTimeout(editClickTimeoutRef.current);
+    editClickTimeoutRef.current = window.setTimeout(() => {
+      editClickTimeoutRef.current = null;
+      fn();
+    }, 180);
+  };
+  const cancelScheduledEdit = () => {
+    if (typeof window === 'undefined') return;
+    if (!editClickTimeoutRef.current) return;
+    window.clearTimeout(editClickTimeoutRef.current);
+    editClickTimeoutRef.current = null;
+  };
+
   const columns: TableColumnWidthDef[] = [
     { id: 'descricao', defaultWidth: 320, minWidth: 220 },
     { id: 'fornecedor_nome', defaultWidth: 260, minWidth: 200 },
@@ -72,23 +92,41 @@ const ContasPagarTable: React.FC<ContasPagarTableProps> = ({
         </thead>
         <motion.tbody layout className="bg-white divide-y divide-gray-200">
           <AnimatePresence>
-            {contas.map((conta) => (
-              <motion.tr
-                key={conta.id}
-                layout
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                transition={{ duration: 0.3 }}
-                className="hover:bg-gray-50"
-                onDoubleClick={(e) => {
-                  if (shouldIgnoreRowDoubleClickEvent(e)) return;
-                  openInNewTabBestEffort(`/app/financeiro/contas-a-pagar?contaId=${encodeURIComponent(conta.id)}`, () =>
-                    onEdit(conta)
-                  );
-                }}
-              >
-                <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{conta.descricao}</td>
+            {contas.map((conta) => {
+              const href = `/app/financeiro/contas-a-pagar?contaId=${encodeURIComponent(conta.id)}`;
+              return (
+                <motion.tr
+                  key={conta.id}
+                  layout
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  transition={{ duration: 0.3 }}
+                  className="hover:bg-gray-50"
+                  onDoubleClick={(e) => {
+                    if (shouldIgnoreRowDoubleClickEvent(e)) return;
+                    openInNewTabBestEffort(href, () => onEdit(conta));
+                  }}
+                >
+                <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                  <a
+                    href={href}
+                    className="hover:underline underline-offset-2"
+                    onClick={(e) => {
+                      if (!isPlainLeftClick(e)) return;
+                      e.preventDefault();
+                      scheduleEdit(() => onEdit(conta));
+                    }}
+                    onDoubleClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      cancelScheduledEdit();
+                      openInNewTabBestEffort(href, () => onEdit(conta));
+                    }}
+                  >
+                    {conta.descricao}
+                  </a>
+                </td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{conta.fornecedor_nome || '-'}</td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{new Date(conta.data_vencimento).toLocaleDateString('pt-BR')}</td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 font-semibold">{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(conta.valor_total)}</td>
@@ -164,7 +202,8 @@ const ContasPagarTable: React.FC<ContasPagarTableProps> = ({
                   </div>
                 </td>
               </motion.tr>
-            ))}
+              );
+            })}
           </AnimatePresence>
         </motion.tbody>
       </table>

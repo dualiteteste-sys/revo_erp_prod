@@ -3,6 +3,7 @@ import { Loader2, Plus, RefreshCw, Wand2 } from 'lucide-react';
 import { useToast } from '@/contexts/ToastProvider';
 import { ensureAtributo, generateVariantes, listAtributos, listVariantes, type AtributoRow, type VariantRow } from '@/services/productVariants';
 import { openInNewTabBestEffort, shouldIgnoreRowDoubleClickEvent } from '@/components/ui/table/rowDoubleClick';
+import { isPlainLeftClick } from '@/components/ui/links/isPlainLeftClick';
 
 type Props = {
   produtoId: string | null | undefined;
@@ -298,7 +299,9 @@ export default function VariacoesTab({ produtoId, produtoPaiId, skuBase }: Props
           <div className="text-gray-900 font-semibold">Variações existentes</div>
           <div className="text-sm text-gray-600">{variantes.length}</div>
         </div>
-        <div className="text-xs text-gray-500 mt-1">Dica: dê duplo clique em uma variação para abrir a edição em outra aba.</div>
+        <div className="text-xs text-gray-500 mt-1">
+          Dica: duplo clique (ou ctrl/cmd+clique / botão do meio) para abrir a variação em outra aba.
+        </div>
 
         {loading ? (
           <div className="mt-4 text-sm text-gray-600 flex items-center gap-2">
@@ -319,23 +322,38 @@ export default function VariacoesTab({ produtoId, produtoPaiId, skuBase }: Props
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200">
-                {variantes.map((v) => (
-                  <tr
-                    key={v.id}
-                    className="hover:bg-gray-50 cursor-pointer"
-                    onDoubleClick={(e) => {
-                      if (shouldIgnoreRowDoubleClickEvent(e)) return;
-                      openInNewTabBestEffort(`/app/products?open=${encodeURIComponent(v.id)}`);
-                    }}
-                  >
-                    <td className="px-4 py-3 text-sm text-gray-900">{v.nome}</td>
+                {variantes.map((v) => {
+                  const href = `/app/products?open=${encodeURIComponent(v.id)}`;
+                  return (
+                    <tr
+                      key={v.id}
+                      className="hover:bg-gray-50 cursor-pointer"
+                      onDoubleClick={(e) => {
+                        if (shouldIgnoreRowDoubleClickEvent(e)) return;
+                        openInNewTabBestEffort(href);
+                      }}
+                    >
+                    <td className="px-4 py-3 text-sm text-gray-900">
+                      <a
+                        href={href}
+                        className="hover:underline underline-offset-2"
+                        onClick={(e) => {
+                          if (!isPlainLeftClick(e)) return;
+                          e.preventDefault();
+                          openInNewTabBestEffort(href);
+                        }}
+                      >
+                        {v.nome}
+                      </a>
+                    </td>
                     <td className="px-4 py-3 text-sm text-gray-600 font-mono">{v.sku || '—'}</td>
                     <td className="px-4 py-3 text-sm text-gray-600">{v.unidade}</td>
                     <td className="px-4 py-3 text-sm text-gray-900 text-right">
                       {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Number(v.preco_venda || 0))}
                     </td>
-                  </tr>
-                ))}
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>

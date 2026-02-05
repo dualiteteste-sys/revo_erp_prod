@@ -2,15 +2,12 @@ import React from 'react';
 import { Lock } from 'lucide-react';
 import { MenuItem } from '../../config/menuConfig';
 import { useHasPermission } from '@/hooks/useHasPermission';
+import { isPlainLeftClick } from '@/components/ui/links/isPlainLeftClick';
 
 interface SidebarItemProps {
   item: MenuItem;
   isActive: boolean;
   onClick: (href: string) => void;
-}
-
-function isPlainLeftClick(e: React.MouseEvent): boolean {
-  return e.button === 0 && !e.metaKey && !e.ctrlKey && !e.shiftKey && !e.altKey;
 }
 
 const SidebarItem: React.FC<SidebarItemProps> = ({ item, isActive, onClick }) => {

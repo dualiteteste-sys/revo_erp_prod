@@ -2,16 +2,13 @@ import React from 'react';
 import { motion } from 'framer-motion';
 import { MenuItem } from '../../config/menuConfig';
 import { useNavigate } from 'react-router-dom';
+import { isPlainLeftClick } from '@/components/ui/links/isPlainLeftClick';
 
 interface FloatingSubmenuProps {
   item: MenuItem;
   position: { top: number; left: number };
   onMouseEnter: () => void;
   onMouseLeave: () => void;
-}
-
-function isPlainLeftClick(e: React.MouseEvent): boolean {
-  return e.button === 0 && !e.metaKey && !e.ctrlKey && !e.shiftKey && !e.altKey;
 }
 
 const FloatingSubmenu: React.FC<FloatingSubmenuProps> = ({ item, position, onMouseEnter, onMouseLeave }) => {

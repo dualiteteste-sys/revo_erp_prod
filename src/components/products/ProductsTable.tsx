@@ -6,6 +6,7 @@ import TableColGroup from '@/components/ui/table/TableColGroup';
 import { useTableColumnWidths, type TableColumnWidthDef } from '@/components/ui/table/useTableColumnWidths';
 import type { ProductsTreeRow } from '@/hooks/useProductsTree';
 import { openInNewTabBestEffort, shouldIgnoreRowDoubleClickEvent } from '@/components/ui/table/rowDoubleClick';
+import { isPlainLeftClick } from '@/components/ui/links/isPlainLeftClick';
 
 interface ProductsTableProps {
   rows: ProductsTreeRow[];
@@ -40,6 +41,25 @@ const ProductsTable: React.FC<ProductsTableProps> = ({
   onToggleSelect,
   onToggleSelectAll,
 }) => {
+  const editClickTimeoutRef = React.useRef<number | null>(null);
+  const scheduleEdit = (fn: () => void) => {
+    if (typeof window === 'undefined') {
+      fn();
+      return;
+    }
+    if (editClickTimeoutRef.current) window.clearTimeout(editClickTimeoutRef.current);
+    editClickTimeoutRef.current = window.setTimeout(() => {
+      editClickTimeoutRef.current = null;
+      fn();
+    }, 180);
+  };
+  const cancelScheduledEdit = () => {
+    if (typeof window === 'undefined') return;
+    if (!editClickTimeoutRef.current) return;
+    window.clearTimeout(editClickTimeoutRef.current);
+    editClickTimeoutRef.current = null;
+  };
+
   const columns: TableColumnWidthDef[] = [
     ...(onToggleSelect ? [{ id: 'select', defaultWidth: 56, minWidth: 56, maxWidth: 56, resizable: false }] : []),
     { id: 'nome', defaultWidth: 360, minWidth: 220 },
@@ -103,6 +123,7 @@ const ProductsTable: React.FC<ProductsTableProps> = ({
               const sku = row.sku ?? '';
               const nome = row.nome ?? '';
               const atributosSummary = isVariant ? (row.atributos_summary ?? null) : null;
+              const href = `/app/products?open=${encodeURIComponent(row.id)}`;
 
               return (
               <motion.tr
@@ -118,7 +139,7 @@ const ProductsTable: React.FC<ProductsTableProps> = ({
                 ].join(' ')}
                 onDoubleClick={(e) => {
                   if (shouldIgnoreRowDoubleClickEvent(e)) return;
-                  openInNewTabBestEffort(`/app/products?open=${encodeURIComponent(row.id)}`, () => onEdit({ id: row.id }));
+                  openInNewTabBestEffort(href, () => onEdit({ id: row.id }));
                 }}
               >
                 {onToggleSelect ? (
@@ -158,7 +179,23 @@ const ProductsTable: React.FC<ProductsTableProps> = ({
                       ) : null}
 
                       <div className="flex items-center gap-2">
-                        <span className={isVariant ? 'text-gray-900' : ''}>{nome}</span>
+                        <a
+                          href={href}
+                          className={[isVariant ? 'text-gray-900' : '', 'hover:underline underline-offset-2'].join(' ')}
+                          onClick={(e) => {
+                            if (!isPlainLeftClick(e)) return;
+                            e.preventDefault();
+                            scheduleEdit(() => onEdit({ id: row.id }));
+                          }}
+                          onDoubleClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            cancelScheduledEdit();
+                            openInNewTabBestEffort(href, () => onEdit({ id: row.id }));
+                          }}
+                        >
+                          {nome}
+                        </a>
 
                         {hasChildren ? (
                           <>

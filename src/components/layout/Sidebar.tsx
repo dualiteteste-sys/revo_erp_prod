@@ -10,10 +10,7 @@ import { useAuth } from '../../contexts/AuthProvider';
 import RevoLogo from '../landing/RevoLogo';
 import { useEmpresaFeatures } from '@/hooks/useEmpresaFeatures';
 import { filterMenuByFeatures } from '@/utils/menu/filterMenuByFeatures';
-
-function isPlainLeftClick(e: React.MouseEvent): boolean {
-  return e.button === 0 && !e.metaKey && !e.ctrlKey && !e.shiftKey && !e.altKey;
-}
+import { isPlainLeftClick } from '@/components/ui/links/isPlainLeftClick';
 
 const sidebarVariants: Variants = {
   expanded: { width: 320, transition: { type: 'spring', stiffness: 300, damping: 30 } },

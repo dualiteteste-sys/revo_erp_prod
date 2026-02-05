@@ -4,6 +4,7 @@ import { ChevronDown } from 'lucide-react';
 import { MenuItem } from '../../config/menuConfig';
 import SidebarItem from './SidebarItem';
 import { useAuth } from '../../contexts/AuthProvider';
+import { isPlainLeftClick } from '@/components/ui/links/isPlainLeftClick';
 
 interface SidebarGroupProps {
   item: MenuItem;
@@ -12,10 +13,6 @@ interface SidebarGroupProps {
   isOpen: boolean;
   setOpenGroup: (name: string | null) => void;
   onOpenSettings: () => void;
-}
-
-function isPlainLeftClick(e: React.MouseEvent): boolean {
-  return e.button === 0 && !e.metaKey && !e.ctrlKey && !e.shiftKey && !e.altKey;
 }
 
 const SidebarGroup: React.FC<SidebarGroupProps> = ({ item, activeItem, setActiveItem, isOpen, setOpenGroup, onOpenSettings }) => {
