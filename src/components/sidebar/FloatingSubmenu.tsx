@@ -10,6 +10,10 @@ interface FloatingSubmenuProps {
   onMouseLeave: () => void;
 }
 
+function isPlainLeftClick(e: React.MouseEvent): boolean {
+  return e.button === 0 && !e.metaKey && !e.ctrlKey && !e.shiftKey && !e.altKey;
+}
+
 const FloatingSubmenu: React.FC<FloatingSubmenuProps> = ({ item, position, onMouseEnter, onMouseLeave }) => {
   const navigate = useNavigate();
   if (!item.children) return null;
@@ -32,6 +36,7 @@ const FloatingSubmenu: React.FC<FloatingSubmenuProps> = ({ item, position, onMou
             <a
               href={child.href}
               onClick={(e) => {
+                if (!isPlainLeftClick(e)) return; // permite middle-click / ctrl+click abrir nova aba
                 e.preventDefault();
                 if (child.href && child.href !== '#') navigate(child.href);
               }}

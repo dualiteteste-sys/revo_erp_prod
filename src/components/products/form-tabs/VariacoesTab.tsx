@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { Loader2, Plus, RefreshCw, Wand2 } from 'lucide-react';
 import { useToast } from '@/contexts/ToastProvider';
 import { ensureAtributo, generateVariantes, listAtributos, listVariantes, type AtributoRow, type VariantRow } from '@/services/productVariants';
+import { openInNewTabBestEffort, shouldIgnoreRowDoubleClickEvent } from '@/components/ui/table/rowDoubleClick';
 
 type Props = {
   produtoId: string | null | undefined;
@@ -297,6 +298,7 @@ export default function VariacoesTab({ produtoId, produtoPaiId, skuBase }: Props
           <div className="text-gray-900 font-semibold">Variações existentes</div>
           <div className="text-sm text-gray-600">{variantes.length}</div>
         </div>
+        <div className="text-xs text-gray-500 mt-1">Dica: dê duplo clique em uma variação para abrir a edição em outra aba.</div>
 
         {loading ? (
           <div className="mt-4 text-sm text-gray-600 flex items-center gap-2">
@@ -318,7 +320,14 @@ export default function VariacoesTab({ produtoId, produtoPaiId, skuBase }: Props
               </thead>
               <tbody className="divide-y divide-gray-200">
                 {variantes.map((v) => (
-                  <tr key={v.id}>
+                  <tr
+                    key={v.id}
+                    className="hover:bg-gray-50 cursor-pointer"
+                    onDoubleClick={(e) => {
+                      if (shouldIgnoreRowDoubleClickEvent(e)) return;
+                      openInNewTabBestEffort(`/app/products?open=${encodeURIComponent(v.id)}`);
+                    }}
+                  >
                     <td className="px-4 py-3 text-sm text-gray-900">{v.nome}</td>
                     <td className="px-4 py-3 text-sm text-gray-600 font-mono">{v.sku || '—'}</td>
                     <td className="px-4 py-3 text-sm text-gray-600">{v.unidade}</td>
@@ -335,4 +344,3 @@ export default function VariacoesTab({ produtoId, produtoPaiId, skuBase }: Props
     </div>
   );
 }
-

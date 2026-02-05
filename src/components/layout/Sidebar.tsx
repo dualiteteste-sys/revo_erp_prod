@@ -11,6 +11,10 @@ import RevoLogo from '../landing/RevoLogo';
 import { useEmpresaFeatures } from '@/hooks/useEmpresaFeatures';
 import { filterMenuByFeatures } from '@/utils/menu/filterMenuByFeatures';
 
+function isPlainLeftClick(e: React.MouseEvent): boolean {
+  return e.button === 0 && !e.metaKey && !e.ctrlKey && !e.shiftKey && !e.altKey;
+}
+
 const sidebarVariants: Variants = {
   expanded: { width: 320, transition: { type: 'spring', stiffness: 300, damping: 30 } },
   collapsed: { width: 128, transition: { type: 'spring', stiffness: 300, damping: 30 } }
@@ -158,13 +162,28 @@ const Sidebar: React.FC<SidebarProps> = ({
                     onMouseEnter={(e) => handleMouseEnterItem(e, item)}
                     onMouseLeave={handleMouseLeaveItem}
                   >
-                    <motion.div
-                      className={`w-14 h-14 rounded-full flex items-center justify-center shadow-lg cursor-pointer transition-all duration-200 hover:brightness-110 bg-gradient-to-br ${item.gradient ?? 'from-slate-500 to-slate-600'}`}
-                      onClick={(e) => handleCollapsedClick(e, item)}
-                      whileHover={{ scale: 1.1, y: -2 }}
-                    >
-                      <item.icon size={24} className="text-white" />
-                    </motion.div>
+                    {item.children || !item.href || item.href === '#' ? (
+                      <motion.div
+                        className={`w-14 h-14 rounded-full flex items-center justify-center shadow-lg cursor-pointer transition-all duration-200 hover:brightness-110 bg-gradient-to-br ${item.gradient ?? 'from-slate-500 to-slate-600'}`}
+                        onClick={(e) => handleCollapsedClick(e, item)}
+                        whileHover={{ scale: 1.1, y: -2 }}
+                      >
+                        <item.icon size={24} className="text-white" />
+                      </motion.div>
+                    ) : (
+                      <motion.a
+                        href={item.href}
+                        className={`w-14 h-14 rounded-full flex items-center justify-center shadow-lg cursor-pointer transition-all duration-200 hover:brightness-110 bg-gradient-to-br ${item.gradient ?? 'from-slate-500 to-slate-600'}`}
+                        onClick={(e) => {
+                          if (!isPlainLeftClick(e)) return;
+                          e.preventDefault();
+                          handleCollapsedClick(e, item);
+                        }}
+                        whileHover={{ scale: 1.1, y: -2 }}
+                      >
+                        <item.icon size={24} className="text-white" />
+                      </motion.a>
+                    )}
                   </li>
                 ))}
               </motion.ul>
