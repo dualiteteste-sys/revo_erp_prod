@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Download, Loader2, Percent, Search } from 'lucide-react';
 import { useToast } from '@/contexts/ToastProvider';
 import { listVendedores, type Vendedor } from '@/services/vendedores';
@@ -8,6 +8,7 @@ import TableColGroup from '@/components/ui/table/TableColGroup';
 import { useTableColumnWidths, type TableColumnWidthDef } from '@/components/ui/table/useTableColumnWidths';
 import { sortRows, toggleSort } from '@/components/ui/table/sortUtils';
 import Input from '@/components/ui/forms/Input';
+import { useAuth } from '@/contexts/AuthProvider';
 
 type VendaComissaoRow = {
   id: string;
@@ -39,6 +40,7 @@ function downloadCsv(filename: string, headers: string[], rows: string[][]) {
 
 export default function ComissoesPage() {
   const { addToast } = useToast();
+  const { loading: authLoading, activeEmpresaId } = useAuth();
   const [loading, setLoading] = useState(true);
   const [rows, setRows] = useState<VendaComissaoRow[]>([]);
   const [vendedores, setVendedores] = useState<Vendedor[]>([]);
@@ -68,7 +70,20 @@ export default function ComissoesPage() {
   const { widths: resumoWidths, startResize: startResizeResumo } = useTableColumnWidths({ tableId: 'vendas:comissoes:resumo', columns: resumoColumns });
   const { widths: detailsWidths, startResize: startResizeDetails } = useTableColumnWidths({ tableId: 'vendas:comissoes:detalhes', columns: detailsColumns });
 
+  const lastEmpresaIdRef = useRef<string | null>(activeEmpresaId);
+  const empresaChanged = lastEmpresaIdRef.current !== activeEmpresaId;
+
+  useEffect(() => {
+    lastEmpresaIdRef.current = activeEmpresaId;
+  }, [activeEmpresaId]);
+
   async function load() {
+    if (!activeEmpresaId) {
+      setRows([]);
+      setVendedores([]);
+      setLoading(false);
+      return;
+    }
     setLoading(true);
     try {
       const [data, vend] = await Promise.all([listVendasComissoes({ limit: 500 }), listVendedores(undefined, false)]);
@@ -84,9 +99,23 @@ export default function ComissoesPage() {
   }
 
   useEffect(() => {
+    // Multi-tenant safety: evitar reaproveitar estado do tenant anterior.
+    setRows([]);
+    setVendedores([]);
+    if (!activeEmpresaId) {
+      setLoading(false);
+      return;
+    }
+    setLoading(true);
+  }, [activeEmpresaId]);
+
+  useEffect(() => {
     void load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [activeEmpresaId]);
+
+  const effectiveLoading = !!activeEmpresaId && (loading || empresaChanged);
+  const effectiveRows = empresaChanged ? [] : rows;
 
   const vendedorById = useMemo(() => {
     const map = new Map<string, Vendedor>();
@@ -96,7 +125,7 @@ export default function ComissoesPage() {
 
   const filteredRows = useMemo(() => {
     const q = search.trim().toLowerCase();
-    return rows.filter((r) => {
+    return effectiveRows.filter((r) => {
       if (vendedorFilter !== 'all' && r.vendedor_id !== vendedorFilter) return false;
       if (statusFilter !== 'all' && r.status !== statusFilter) return false;
       if (startDate && String(r.data_emissao) < startDate) return false;
@@ -105,7 +134,7 @@ export default function ComissoesPage() {
       const vendedorNome = r.vendedor_id ? (vendedorById.get(r.vendedor_id)?.nome || '') : '';
       return `${r.numero} ${vendedorNome}`.toLowerCase().includes(q);
     });
-  }, [rows, search, vendedorFilter, statusFilter, startDate, endDate, vendedorById]);
+  }, [effectiveRows, search, vendedorFilter, statusFilter, startDate, endDate, vendedorById]);
 
   const resumo = useMemo(() => {
     const map = new Map<string, { vendedor: Vendedor; totalVendas: number; totalComissao: number; pedidos: number }>();
@@ -158,6 +187,18 @@ export default function ComissoesPage() {
       ] as const
     );
   }, [detailsSort, filteredRows, vendedorById]);
+
+  if (authLoading) {
+    return (
+      <div className="flex justify-center h-full items-center">
+        <Loader2 className="animate-spin text-blue-600 w-10 h-10" />
+      </div>
+    );
+  }
+
+  if (!activeEmpresaId) {
+    return <div className="p-4 text-gray-600">Selecione uma empresa para ver comissões.</div>;
+  }
 
   return (
     <div className="p-1 h-full flex flex-col">
@@ -249,13 +290,13 @@ export default function ComissoesPage() {
       </div>
 
       <div className="bg-white rounded-lg shadow overflow-hidden flex-grow flex flex-col">
-        {loading ? (
+        {effectiveLoading ? (
           <div className="flex justify-center h-64 items-center">
             <Loader2 className="animate-spin text-blue-600 w-10 h-10" />
           </div>
         ) : resumo.length === 0 ? (
           <div className="flex justify-center h-64 items-center text-gray-500">
-            {rows.length === 0 ? 'Nenhum pedido com vendedor atribuído ainda.' : 'Nenhum resultado para os filtros.'}
+            {effectiveRows.length === 0 ? 'Nenhum pedido com vendedor atribuído ainda.' : 'Nenhum resultado para os filtros.'}
           </div>
         ) : (
           <div className="overflow-auto">
