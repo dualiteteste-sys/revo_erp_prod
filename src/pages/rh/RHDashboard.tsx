@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { getDashboardStats, RHDashboardStats, seedRhData, getTrainingCompliance, type TrainingComplianceResponse } from '@/services/rh';
 import { Loader2, Users, Briefcase, AlertTriangle, GraduationCap, TrendingDown, DollarSign, DatabaseBackup } from 'lucide-react';
 import GlassCard from '@/components/ui/GlassCard';
@@ -12,9 +12,11 @@ import { useHasPermission } from '@/hooks/useHasPermission';
 import { isSeedEnabled } from '@/utils/seed';
 import { useNavigate } from 'react-router-dom';
 import ErrorAlert from '@/components/ui/ErrorAlert';
+import { useAuth } from '@/contexts/AuthProvider';
 
 export default function RHDashboard() {
   const navigate = useNavigate();
+  const { activeEmpresaId } = useAuth();
   const enableSeed = isSeedEnabled();
   const [stats, setStats] = useState<RHDashboardStats | null>(null);
   const [compliance, setCompliance] = useState<TrainingComplianceResponse | null>(null);
@@ -23,10 +25,36 @@ export default function RHDashboard() {
   const [loadError, setLoadError] = useState<string | null>(null);
   const { addToast } = useToast();
 
+  const lastEmpresaIdRef = useRef<string | null>(activeEmpresaId);
+  const empresaChanged = lastEmpresaIdRef.current !== activeEmpresaId;
+
+  useEffect(() => {
+    lastEmpresaIdRef.current = activeEmpresaId;
+  }, [activeEmpresaId]);
+
   const permManage = useHasPermission('rh', 'manage');
   const canManage = !permManage.isLoading && permManage.data;
 
-  const fetchStats = async () => {
+  useEffect(() => {
+    // Multi-tenant safety: evitar reaproveitar estado do tenant anterior.
+    setStats(null);
+    setCompliance(null);
+    setLoadError(null);
+    if (!activeEmpresaId) {
+      setLoading(false);
+      return;
+    }
+    setLoading(true);
+  }, [activeEmpresaId]);
+
+  const fetchStats = useCallback(async () => {
+    if (!activeEmpresaId) {
+      setStats(null);
+      setCompliance(null);
+      setLoadError(null);
+      setLoading(false);
+      return;
+    }
     setLoading(true);
     setLoadError(null);
     try {
@@ -46,11 +74,11 @@ export default function RHDashboard() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [activeEmpresaId, addToast]);
 
   useEffect(() => {
-    fetchStats();
-  }, []);
+    void fetchStats();
+  }, [fetchStats]);
 
   const handleSeed = async () => {
     if (!canManage) {
@@ -69,7 +97,17 @@ export default function RHDashboard() {
     }
   };
 
-  if (loading) {
+  const effectiveLoading = !!activeEmpresaId && (loading || empresaChanged);
+
+  if (!activeEmpresaId) {
+    return (
+      <div className="p-6 text-gray-600">
+        Selecione uma empresa para ver o dashboard de RH.
+      </div>
+    );
+  }
+
+  if (effectiveLoading) {
     return (
       <div className="flex justify-center h-full items-center">
         <Loader2 className="animate-spin text-blue-600 w-12 h-12" />
