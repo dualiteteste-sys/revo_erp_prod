@@ -102,6 +102,10 @@ jobs:
       - name: Build + bundle budget
         env:
           CI: true
+          # "verify:bundle" roda build em modo production e exige VITE_SUPABASE_*.
+          # Preferimos secrets do DEV; se não existirem, usamos placeholders só para destravar o build/CI.
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL_DEV || 'https://example.com' }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY_DEV || 'ci_dummy_anon_key' }}
         run: yarn verify:bundle
 
       - name: Unit tests

@@ -29,13 +29,13 @@ jobs:
       - name: Build
         env:
           CI: true
-          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL_DEV }}
-          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY_DEV }}
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL_DEV || 'https://example.supabase.co' }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY_DEV || 'ci_dummy_anon_key' }}
         run: yarn build
 
       - name: Lighthouse CI
         env:
           CI: true
-          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL_DEV }}
-          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY_DEV }}
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL_DEV || 'https://example.supabase.co' }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY_DEV || 'ci_dummy_anon_key' }}
         run: npx -y @lhci/cli@0.14.0 autorun --config=./lighthouserc.cjs
