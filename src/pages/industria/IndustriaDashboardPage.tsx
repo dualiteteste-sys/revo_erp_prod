@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback, useMemo } from 'react';
+import React, { useEffect, useState, useCallback, useMemo, useRef } from 'react';
 import { getDashboardStats, DashboardStats, listOrdens, type OrdemIndustria } from '@/services/industria';
 import { AlertCircle, CheckCircle, Factory, RefreshCw, Activity, Eye, ShieldAlert } from 'lucide-react';
 import GlassCard from '@/components/ui/GlassCard';
@@ -12,9 +12,11 @@ import ResizableSortableTh, { type SortState } from '@/components/ui/table/Resiz
 import TableColGroup from '@/components/ui/table/TableColGroup';
 import { useTableColumnWidths, type TableColumnWidthDef } from '@/components/ui/table/useTableColumnWidths';
 import { sortRows, toggleSort } from '@/components/ui/table/sortUtils';
+import { useAuth } from '@/contexts/AuthProvider';
 
 export default function IndustriaDashboardPage() {
   const navigate = useNavigate();
+  const { activeEmpresaId } = useAuth();
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -26,6 +28,31 @@ export default function IndustriaDashboardPage() {
   const [benefError, setBenefError] = useState<string | null>(null);
   const [atrasosSort, setAtrasosSort] = useState<SortState<'tipo' | 'ordem' | 'cliente' | 'prev' | 'status'>>({ column: 'prev', direction: 'asc' });
   const [benefSort, setBenefSort] = useState<SortState<'itens' | 'caixas' | 'op' | 'cliente' | 'nfCliente' | 'nf' | 'pedido' | 'entrada' | 'saldo'>>({ column: 'saldo', direction: 'desc' });
+
+  const lastEmpresaIdRef = useRef<string | null>(activeEmpresaId);
+  const empresaChanged = lastEmpresaIdRef.current !== activeEmpresaId;
+
+  useEffect(() => {
+    lastEmpresaIdRef.current = activeEmpresaId;
+  }, [activeEmpresaId]);
+
+  useEffect(() => {
+    // Multi-tenant safety: evitar reaproveitar estado do tenant anterior.
+    setStats(null);
+    setError(null);
+    setProdOrders([]);
+    setProdError(null);
+    setProdLoading(false);
+    setBenefOrders([]);
+    setBenefError(null);
+    setBenefLoading(false);
+
+    if (!activeEmpresaId) {
+      setLoading(false);
+      return;
+    }
+    setLoading(true);
+  }, [activeEmpresaId]);
 
   const atrasosColumns: TableColumnWidthDef[] = [
     { id: 'tipo', defaultWidth: 90, minWidth: 80 },
@@ -56,6 +83,12 @@ export default function IndustriaDashboardPage() {
   });
 
   const fetchStats = useCallback(async () => {
+    if (!activeEmpresaId) {
+      setStats(null);
+      setError(null);
+      setLoading(false);
+      return;
+    }
     setLoading(true);
     setError(null);
     try {
@@ -70,9 +103,15 @@ export default function IndustriaDashboardPage() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [activeEmpresaId]);
 
   const fetchBenefOrdens = useCallback(async () => {
+    if (!activeEmpresaId) {
+      setBenefOrders([]);
+      setBenefError(null);
+      setBenefLoading(false);
+      return;
+    }
     setBenefLoading(true);
     setBenefError(null);
     try {
@@ -84,9 +123,15 @@ export default function IndustriaDashboardPage() {
     } finally {
       setBenefLoading(false);
     }
-  }, []);
+  }, [activeEmpresaId]);
 
   const fetchProdOrdens = useCallback(async () => {
+    if (!activeEmpresaId) {
+      setProdOrders([]);
+      setProdError(null);
+      setProdLoading(false);
+      return;
+    }
     setProdLoading(true);
     setProdError(null);
     try {
@@ -98,7 +143,7 @@ export default function IndustriaDashboardPage() {
     } finally {
       setProdLoading(false);
     }
-  }, []);
+  }, [activeEmpresaId]);
 
   useEffect(() => {
     fetchStats();
@@ -318,8 +363,21 @@ export default function IndustriaDashboardPage() {
     ]
   };
 
+  const effectiveLoading = !!activeEmpresaId && (loading || empresaChanged);
+
+  if (!activeEmpresaId) {
+    return (
+      <div className="p-1 space-y-6">
+        <div>
+          <h1 className="text-3xl font-bold text-gray-800">Dashboard Industrial</h1>
+          <p className="text-gray-600 text-sm mt-1">Selecione uma empresa para ver os dados.</p>
+        </div>
+      </div>
+    );
+  }
+
   // UI de Carregamento (Skeleton)
-  if (loading) {
+  if (effectiveLoading) {
     return (
       <div className="p-1 space-y-6 animate-pulse">
         <div className="h-8 w-64 bg-gray-200 rounded mb-2"></div>
