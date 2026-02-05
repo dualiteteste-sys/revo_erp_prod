@@ -372,12 +372,12 @@ const ContasPagarPage: React.FC = () => {
             ? `Confirmar pagamento da conta "${contaToPay.descricao}".`
             : 'Confirmar pagamento.'
         }
-        defaultValor={
+        defaultValor={Number(contaToPay?.saldo ?? (
           Number(contaToPay?.valor_total || 0) +
           Number(contaToPay?.multa || 0) +
           Number(contaToPay?.juros || 0) -
           Number(contaToPay?.desconto || 0)
-        }
+        )) || 0}
         confirmLabel="Registrar pagamento"
         onConfirm={async ({ contaCorrenteId, dataISO, valor }) => {
           if (!contaToPay?.id) return;
