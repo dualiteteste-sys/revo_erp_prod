@@ -2,10 +2,23 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import { fileURLToPath, URL } from 'node:url'
+import { loadEnv } from 'vite'
 
 import { sentryVitePlugin } from "@sentry/vite-plugin";
 
 export default defineConfig(({ command, mode }) => ({
+  ...(command === 'build' && mode === 'production'
+    ? (() => {
+        const env = loadEnv(mode, process.cwd(), '');
+        const missing: string[] = [];
+        if (!String(env.VITE_SUPABASE_URL ?? '').trim()) missing.push('VITE_SUPABASE_URL');
+        if (!String(env.VITE_SUPABASE_ANON_KEY ?? '').trim()) missing.push('VITE_SUPABASE_ANON_KEY');
+        if (missing.length) {
+          throw new Error(`Missing required env vars for production build: ${missing.join(', ')}`);
+        }
+        return {};
+      })()
+    : {}),
   plugins: [
     react(),
     // Sentry plugin can slow down local/test workflows; keep it only for production builds.
