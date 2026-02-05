@@ -8,6 +8,7 @@ import ResizableSortableTh, { type SortState } from '@/components/ui/table/Resiz
 import TableColGroup from '@/components/ui/table/TableColGroup';
 import { useTableColumnWidths, type TableColumnWidthDef } from '@/components/ui/table/useTableColumnWidths';
 import { openInNewTabBestEffort, shouldIgnoreRowDoubleClickEvent } from '@/components/ui/table/rowDoubleClick';
+import { isPlainLeftClick } from '@/components/ui/links/isPlainLeftClick';
 
 interface PartnersTableProps {
   partners: PartnerListItem[];
@@ -42,6 +43,25 @@ const PartnersTable: React.FC<PartnersTableProps> = ({
   onToggleSelect,
   onToggleSelectAll,
 }) => {
+  const editClickTimeoutRef = React.useRef<number | null>(null);
+  const scheduleEdit = (fn: () => void) => {
+    if (typeof window === 'undefined') {
+      fn();
+      return;
+    }
+    if (editClickTimeoutRef.current) window.clearTimeout(editClickTimeoutRef.current);
+    editClickTimeoutRef.current = window.setTimeout(() => {
+      editClickTimeoutRef.current = null;
+      fn();
+    }, 180);
+  };
+  const cancelScheduledEdit = () => {
+    if (typeof window === 'undefined') return;
+    if (!editClickTimeoutRef.current) return;
+    window.clearTimeout(editClickTimeoutRef.current);
+    editClickTimeoutRef.current = null;
+  };
+
   const columns: TableColumnWidthDef[] = [
     ...(onToggleSelect ? [{ id: 'select', defaultWidth: 56, minWidth: 56, maxWidth: 56, resizable: false }] : []),
     { id: 'nome', defaultWidth: 360, minWidth: 220 },
@@ -89,20 +109,22 @@ const PartnersTable: React.FC<PartnersTableProps> = ({
         </thead>
         <motion.tbody layout className="bg-white divide-y divide-gray-200">
           <AnimatePresence>
-            {partners.map((partner) => (
-              <motion.tr
-                key={partner.id}
-                layout
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                transition={{ duration: 0.3 }}
-                className="hover:bg-gray-50"
-                onDoubleClick={(e) => {
-                  if (shouldIgnoreRowDoubleClickEvent(e)) return;
-                  openInNewTabBestEffort(`/app/partners?open=${encodeURIComponent(partner.id)}`, () => onEdit(partner));
-                }}
-              >
+            {partners.map((partner) => {
+              const href = `/app/partners?open=${encodeURIComponent(partner.id)}`;
+              return (
+                <motion.tr
+                  key={partner.id}
+                  layout
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  transition={{ duration: 0.3 }}
+                  className="hover:bg-gray-50"
+                  onDoubleClick={(e) => {
+                    if (shouldIgnoreRowDoubleClickEvent(e)) return;
+                    openInNewTabBestEffort(href, () => onEdit(partner));
+                  }}
+                >
                 {onToggleSelect ? (
                   <td className="px-4 py-4 whitespace-nowrap">
                     <input
@@ -114,7 +136,25 @@ const PartnersTable: React.FC<PartnersTableProps> = ({
                     />
                   </td>
                 ) : null}
-                <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{partner.nome}</td>
+                <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                  <a
+                    href={href}
+                    className="hover:underline underline-offset-2"
+                    onClick={(e) => {
+                      if (!isPlainLeftClick(e)) return;
+                      e.preventDefault();
+                      scheduleEdit(() => onEdit(partner));
+                    }}
+                    onDoubleClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      cancelScheduledEdit();
+                      openInNewTabBestEffort(href, () => onEdit(partner));
+                    }}
+                  >
+                    {partner.nome}
+                  </a>
+                </td>
                 <td className="px-6 py-4 whitespace-nowrap">
                   <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
                     partner.tipo === 'cliente' ? 'bg-blue-100 text-blue-800' :
@@ -173,7 +213,8 @@ const PartnersTable: React.FC<PartnersTableProps> = ({
                   </div>
                 </td>
               </motion.tr>
-            ))}
+              );
+            })}
           </AnimatePresence>
         </motion.tbody>
       </table>

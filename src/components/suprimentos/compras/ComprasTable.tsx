@@ -6,6 +6,7 @@ import TableColGroup from '@/components/ui/table/TableColGroup';
 import { useTableColumnWidths, type TableColumnWidthDef } from '@/components/ui/table/useTableColumnWidths';
 import { sortRows, toggleSort } from '@/components/ui/table/sortUtils';
 import { openInNewTabBestEffort, shouldIgnoreRowDoubleClickEvent } from '@/components/ui/table/rowDoubleClick';
+import { isPlainLeftClick } from '@/components/ui/links/isPlainLeftClick';
 
 interface Props {
   orders: CompraPedido[];
@@ -20,6 +21,25 @@ const statusColors: Record<string, string> = {
 };
 
 export default function ComprasTable({ orders, onEdit }: Props) {
+  const editClickTimeoutRef = React.useRef<number | null>(null);
+  const scheduleEdit = (fn: () => void) => {
+    if (typeof window === 'undefined') {
+      fn();
+      return;
+    }
+    if (editClickTimeoutRef.current) window.clearTimeout(editClickTimeoutRef.current);
+    editClickTimeoutRef.current = window.setTimeout(() => {
+      editClickTimeoutRef.current = null;
+      fn();
+    }, 180);
+  };
+  const cancelScheduledEdit = () => {
+    if (typeof window === 'undefined') return;
+    if (!editClickTimeoutRef.current) return;
+    window.clearTimeout(editClickTimeoutRef.current);
+    editClickTimeoutRef.current = null;
+  };
+
   const columns: TableColumnWidthDef[] = [
     { id: 'numero', defaultWidth: 120, minWidth: 90 },
     { id: 'fornecedor', defaultWidth: 420, minWidth: 200 },
@@ -98,16 +118,36 @@ export default function ComprasTable({ orders, onEdit }: Props) {
           </tr>
         </thead>
         <tbody className="bg-white divide-y divide-gray-200">
-          {sortedOrders.map(order => (
-            <tr
-              key={order.id}
-              className="hover:bg-gray-50"
-              onDoubleClick={(e) => {
-                if (shouldIgnoreRowDoubleClickEvent(e)) return;
-                openInNewTabBestEffort(`/app/suprimentos/compras?open=${encodeURIComponent(order.id)}`, () => onEdit(order));
-              }}
-            >
-              <td className="px-6 py-4 text-sm font-medium text-gray-900">#{order.numero}</td>
+          {sortedOrders.map((order) => {
+            const href = `/app/suprimentos/compras?open=${encodeURIComponent(order.id)}`;
+            return (
+              <tr
+                key={order.id}
+                className="hover:bg-gray-50"
+                onDoubleClick={(e) => {
+                  if (shouldIgnoreRowDoubleClickEvent(e)) return;
+                  openInNewTabBestEffort(href, () => onEdit(order));
+                }}
+              >
+              <td className="px-6 py-4 text-sm font-medium text-gray-900">
+                <a
+                  href={href}
+                  className="hover:underline underline-offset-2"
+                  onClick={(e) => {
+                    if (!isPlainLeftClick(e)) return;
+                    e.preventDefault();
+                    scheduleEdit(() => onEdit(order));
+                  }}
+                  onDoubleClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    cancelScheduledEdit();
+                    openInNewTabBestEffort(href, () => onEdit(order));
+                  }}
+                >
+                  #{order.numero}
+                </a>
+              </td>
               <td className="px-6 py-4 text-sm text-gray-700">{order.fornecedor_nome}</td>
               <td className="px-6 py-4 text-sm text-gray-500">{new Date(order.data_emissao).toLocaleDateString('pt-BR')}</td>
               <td className="px-6 py-4 text-sm font-semibold text-gray-700">
@@ -123,8 +163,9 @@ export default function ComprasTable({ orders, onEdit }: Props) {
                   {order.status === 'recebido' ? <Eye size={18} /> : <Edit size={18} />}
                 </button>
               </td>
-            </tr>
-          ))}
+              </tr>
+            );
+          })}
           {sortedOrders.length === 0 && (
             <tr>
               <td colSpan={6} className="px-6 py-12 text-center text-gray-500">Nenhum pedido de compra encontrado.</td>
