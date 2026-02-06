@@ -11,7 +11,8 @@ export type ProductsTreeRow =
 export const PRODUCTS_TREE_KEYS = {
   all: ['productsTree'] as const,
   parents: (filters: any) => [...PRODUCTS_TREE_KEYS.all, 'parents', filters] as const,
-  variants: (parentId: string) => [...PRODUCTS_TREE_KEYS.all, 'variants', parentId] as const,
+  variants: (parentId: string, empresaId?: string | null) =>
+    [...PRODUCTS_TREE_KEYS.all, 'variants', empresaId ?? 'no-empresa', parentId] as const,
 };
 
 export function useProductsTree() {
@@ -79,7 +80,7 @@ export function useProductsTree() {
 
   const variantsQueries = useQueries({
     queries: expandedIds.map((parentId) => ({
-      queryKey: PRODUCTS_TREE_KEYS.variants(parentId),
+      queryKey: PRODUCTS_TREE_KEYS.variants(parentId, activeEmpresa?.id),
       queryFn: () => listVariantsForParent(parentId),
       enabled: !!activeEmpresa && expandedParentIds.has(parentId),
       staleTime: 30_000,
