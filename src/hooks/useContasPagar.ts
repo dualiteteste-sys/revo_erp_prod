@@ -1,10 +1,13 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useDebounce } from './useDebounce';
 import * as financeiroService from '../services/financeiro';
 import { useAuth } from '../contexts/AuthProvider';
 
 export const useContasPagar = () => {
     const { activeEmpresa } = useAuth();
+    const empresaId = activeEmpresa?.id ?? null;
+    const lastEmpresaIdRef = useRef<string | null>(empresaId);
+    const fetchTokenRef = useRef(0);
     const [contas, setContas] = useState<financeiroService.ContaPagar[]>([]);
     const [summary, setSummary] = useState<financeiroService.ContasPagarSummary>({
         total_pendente: 0, // Mantendo compatibilidade se a UI usar nomes antigos, mas o serviço retorna abertas/vencidas/etc
@@ -32,12 +35,43 @@ export const useContasPagar = () => {
         ascending: true,
     });
 
+    useEffect(() => {
+        const prev = lastEmpresaIdRef.current;
+        if (prev === empresaId) return;
+
+        // Multi-tenant safety: limpar imediatamente o estado ao trocar de empresa.
+        setContas([]);
+        setSummary({
+            total_pendente: 0,
+            abertas: 0,
+            parciais: 0,
+            pagas: 0,
+            vencidas: 0,
+        } as any);
+        setError(null);
+        setCount(0);
+        setPage(1);
+        setLoading(false);
+
+        lastEmpresaIdRef.current = empresaId;
+    }, [empresaId]);
+
     const fetchContas = useCallback(async () => {
         if (!activeEmpresa) {
             setContas([]);
+            setSummary({
+                total_pendente: 0,
+                abertas: 0,
+                parciais: 0,
+                pagas: 0,
+                vencidas: 0,
+            } as any);
             setCount(0);
             return;
         }
+
+        const token = ++fetchTokenRef.current;
+        const empresaIdSnapshot = activeEmpresa.id;
         setLoading(true);
         setError(null);
         try {
@@ -53,14 +87,18 @@ export const useContasPagar = () => {
                 }),
                 financeiroService.getContasPagarSummary(filterStartDate, filterEndDate),
             ]);
+            if (token !== fetchTokenRef.current) return;
+            if (empresaIdSnapshot !== (activeEmpresa?.id ?? null)) return;
             setContas(data);
             setCount(count);
             setSummary(summaryData);
         } catch (e: any) {
+            if (token !== fetchTokenRef.current) return;
             setError(e.message);
             setContas([]);
             setCount(0);
         } finally {
+            if (token !== fetchTokenRef.current) return;
             setLoading(false);
         }
     }, [page, pageSize, debouncedSearchTerm, filterStatus, filterStartDate, filterEndDate, sortBy, activeEmpresa]);

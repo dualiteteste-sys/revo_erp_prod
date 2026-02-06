@@ -70,10 +70,9 @@ const ContasAReceberPage: React.FC = () => {
   const handledContaIdRef = useRef(false);
 
   useEffect(() => {
-    lastEmpresaIdRef.current = activeEmpresaId;
-  }, [activeEmpresaId]);
+    const prevEmpresaId = lastEmpresaIdRef.current;
+    if (prevEmpresaId === activeEmpresaId) return;
 
-  useEffect(() => {
     // Multi-tenant safety: evitar reaproveitar estado do tenant anterior.
     setIsFormOpen(false);
     setSelectedConta(null);
@@ -88,6 +87,20 @@ const ContasAReceberPage: React.FC = () => {
     setIsCanceling(false);
     setIsEstornoOpen(false);
     setContaToReverse(null);
+
+    const contaId = searchParams.get('contaId');
+    if (contaId) {
+      const next = new URLSearchParams(searchParams);
+      next.delete('contaId');
+      setSearchParams(next, { replace: true });
+    }
+
+    if (prevEmpresaId && activeEmpresaId) {
+      addToast('Empresa alterada. Recarregando contas a receber…', 'info');
+    }
+
+    lastEmpresaIdRef.current = activeEmpresaId;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeEmpresaId]);
 
   useEffect(() => {
