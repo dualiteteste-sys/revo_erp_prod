@@ -22,6 +22,7 @@ interface ContaAReceberMobileCardProps {
 
 const statusConfig: Record<string, { label: string; color: string }> = {
     pendente: { label: 'Pendente', color: 'bg-yellow-100 text-yellow-700' },
+    parcial: { label: 'Parcial', color: 'bg-blue-100 text-blue-700' },
     pago: { label: 'Pago', color: 'bg-green-100 text-green-700' },
     vencido: { label: 'Vencido', color: 'bg-red-100 text-red-700' },
     cancelado: { label: 'Cancelado', color: 'bg-gray-100 text-gray-600' },
@@ -45,8 +46,8 @@ export function ContaAReceberMobileCard({
     onDelete,
 }: ContaAReceberMobileCardProps): React.ReactElement {
     const status = statusConfig[conta.status] || { label: conta.status, color: 'bg-gray-100 text-gray-700' };
-    const canReceive = conta.status === 'pendente' || conta.status === 'vencido';
-    const canReverse = conta.status === 'pago';
+    const canReceive = conta.status === 'pendente' || conta.status === 'vencido' || conta.status === 'parcial';
+    const canReverse = conta.status === 'pago' || conta.status === 'parcial';
     const canCancel = conta.status === 'pendente' || conta.status === 'vencido';
 
     return (
