@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useVendas } from '@/hooks/useVendas';
 import { seedVendas, type VendaPedido } from '@/services/vendas';
 import { FileSignature, Loader2, PlusCircle, Search } from 'lucide-react';
@@ -14,8 +14,10 @@ import { SeedButton } from '@/components/common/SeedButton';
 import { useSearchParams } from 'react-router-dom';
 import { useConfirm } from '@/contexts/ConfirmProvider';
 import { useEditLock } from '@/components/ui/hooks/useEditLock';
+import { useAuth } from '@/contexts/AuthProvider';
 
 export default function PropostasPage() {
+  const { loading: authLoading, activeEmpresaId } = useAuth();
   const {
     orders,
     totalCount,
@@ -36,6 +38,10 @@ export default function PropostasPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const openId = searchParams.get('open');
   const editLock = useEditLock('vendas:propostas');
+
+  const lastEmpresaIdRef = useRef<string | null>(activeEmpresaId);
+  const empresaChanged = lastEmpresaIdRef.current !== activeEmpresaId;
+  const lastHandledOpenRef = useRef<string | null>(null);
 
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -71,6 +77,27 @@ export default function PropostasPage() {
     setEditingId(null);
   }, [clearOpenParam, editLock, editingId]);
 
+  const resetTenantLocalState = useCallback(() => {
+    setIsFormOpen(false);
+    setSelectedId(null);
+    if (editingId) editLock.release(editingId);
+    setEditingId(null);
+  }, [editLock, editingId]);
+
+  useEffect(() => {
+    const prevEmpresaId = lastEmpresaIdRef.current;
+    if (prevEmpresaId === activeEmpresaId) return;
+
+    // Multi-tenant safety: evitar reaproveitar estado do tenant anterior.
+    resetTenantLocalState();
+    lastHandledOpenRef.current = null;
+
+    // Se trocou de empresa com deep-link ativo, não reaproveitar o `open=` no novo tenant.
+    if (prevEmpresaId && activeEmpresaId && openId) clearOpenParam();
+
+    lastEmpresaIdRef.current = activeEmpresaId;
+  }, [activeEmpresaId, clearOpenParam, openId, resetTenantLocalState]);
+
   const openWithLock = useCallback(async (id: string) => {
     const claimed = await editLock.claim(id, {
       confirmConflict: async () =>
@@ -99,8 +126,11 @@ export default function PropostasPage() {
   useEffect(() => {
     if (!openId) return;
     if (isFormOpen) return;
+    if (authLoading || !activeEmpresaId || empresaChanged) return;
+    if (lastHandledOpenRef.current === openId) return;
+    lastHandledOpenRef.current = openId;
     void openWithLock(openId);
-  }, [isFormOpen, openId, openWithLock]);
+  }, [activeEmpresaId, authLoading, empresaChanged, isFormOpen, openId, openWithLock]);
 
   const handleSeed = async () => {
     setIsSeeding(true);
@@ -115,6 +145,23 @@ export default function PropostasPage() {
     }
   };
 
+  const effectiveLoading = !!activeEmpresaId && (loading || empresaChanged);
+  const effectiveError = empresaChanged ? null : error;
+  const effectiveOrders = empresaChanged ? [] : orders;
+  const effectiveTotalCount = empresaChanged ? 0 : totalCount;
+
+  if (authLoading) {
+    return (
+      <div className="flex justify-center h-full items-center">
+        <Loader2 className="animate-spin text-blue-600 w-10 h-10" />
+      </div>
+    );
+  }
+
+  if (!activeEmpresaId) {
+    return <div className="p-4 text-gray-600">Selecione uma empresa para ver propostas comerciais.</div>;
+  }
+
   return (
     <div className="p-1 min-h-full flex flex-col">
       <div className="flex justify-between items-center mb-6 flex-shrink-0">
@@ -125,9 +172,10 @@ export default function PropostasPage() {
           <p className="text-gray-600 text-sm mt-1">Orçamentos (status “orcamento”) antes da aprovação.</p>
         </div>
         <div className="flex items-center gap-2">
-          <SeedButton onSeed={handleSeed} isSeeding={isSeeding} disabled={loading} />
+          <SeedButton onSeed={handleSeed} isSeeding={isSeeding} disabled={effectiveLoading} />
           <button
             onClick={handleNew}
+            disabled={effectiveLoading}
             className="flex items-center gap-2 bg-blue-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-blue-700 transition-colors"
           >
             <PlusCircle size={20} />
@@ -154,18 +202,18 @@ export default function PropostasPage() {
 
       <div className="bg-white rounded-lg shadow overflow-hidden flex-grow flex flex-col">
         <div className="flex-grow overflow-auto">
-          {loading ? (
+          {effectiveLoading ? (
             <div className="flex justify-center h-64 items-center">
               <Loader2 className="animate-spin text-blue-600 w-10 h-10" />
             </div>
-          ) : error ? (
-            <div className="flex justify-center h-64 items-center text-red-500">{error}</div>
+          ) : effectiveError ? (
+            <div className="flex justify-center h-64 items-center text-red-500">{effectiveError}</div>
           ) : (
             <ResponsiveTable
-              data={orders}
+              data={effectiveOrders}
               getItemId={(o) => o.id}
-              loading={loading}
-              tableComponent={<PedidosVendasTable orders={orders} onEdit={handleEdit} basePath="/app/vendas/propostas" />}
+              loading={effectiveLoading}
+              tableComponent={<PedidosVendasTable orders={effectiveOrders} onEdit={handleEdit} basePath="/app/vendas/propostas" />}
               renderMobileCard={(order) => (
                 <PedidoVendaMobileCard
                   key={order.id}
@@ -176,11 +224,11 @@ export default function PropostasPage() {
             />
           )}
         </div>
-        {totalCount > 0 ? (
+        {effectiveTotalCount > 0 ? (
           <ListPaginationBar innerClassName="px-3 sm:px-4">
             <Pagination
               currentPage={page}
-              totalCount={totalCount}
+              totalCount={effectiveTotalCount}
               pageSize={pageSize}
               onPageChange={setPage}
               onPageSizeChange={(next) => {
