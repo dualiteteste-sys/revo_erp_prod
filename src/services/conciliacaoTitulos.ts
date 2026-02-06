@@ -61,6 +61,19 @@ export async function conciliarExtratoComTitulo(params: {
   return { movimentacaoId };
 }
 
+export async function conciliarExtratoComTituloParcial(params: {
+  extratoId: string;
+  tipo: ConciliacaoTituloTipo;
+  tituloId: string;
+}): Promise<{ movimentacaoId: string }> {
+  const movimentacaoId = await callRpc<string>('financeiro_conciliacao_conciliar_extrato_com_titulo_parcial', {
+    p_extrato_id: params.extratoId,
+    p_tipo: params.tipo,
+    p_titulo_id: params.tituloId,
+  });
+  return { movimentacaoId };
+}
+
 export async function conciliarExtratoComTitulosLote(params: {
   extratoId: string;
   tipo: ConciliacaoTituloTipo;
