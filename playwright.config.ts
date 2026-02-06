@@ -2,10 +2,10 @@ import { defineConfig, devices } from '@playwright/test';
 
 const baseURL = process.env.PLAYWRIGHT_BASE_URL || 'http://127.0.0.1:5173';
 const shouldUseWebServer = !process.env.PLAYWRIGHT_BASE_URL;
-const webServerCommand =
-  process.platform === 'win32'
-    ? 'yarn dev --host 127.0.0.1 --port 5173'
-    : 'VITE_SUPABASE_URL=$VITE_SUPABASE_URL VITE_SUPABASE_ANON_KEY=$VITE_SUPABASE_ANON_KEY yarn dev --host 127.0.0.1 --port 5173';
+// Não "repassar" VITE_* explicitamente na linha de comando:
+// - quando o env não está setado, isso sobrescreve `.env.local` com string vazia e quebra os E2E locais.
+// - no CI, os `VITE_*` já são fornecidos via `env:` do job.
+const webServerCommand = 'yarn dev --host 127.0.0.1 --port 5173';
 
 export default defineConfig({
     testDir: './e2e',
