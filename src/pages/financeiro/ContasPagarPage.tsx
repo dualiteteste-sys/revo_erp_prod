@@ -410,7 +410,7 @@ const ContasPagarPage: React.FC = () => {
             <Loader2 className="animate-spin text-blue-600" size={48} />
           </div>
         ) : (
-          <ContasPagarFormPanel conta={selectedConta} onSaveSuccess={handleSaveSuccess} onClose={handleCloseForm} />
+          <ContasPagarFormPanel conta={selectedConta} onSaveSuccess={handleSaveSuccess} onMutate={refresh} onClose={handleCloseForm} />
         )}
       </Modal>
 

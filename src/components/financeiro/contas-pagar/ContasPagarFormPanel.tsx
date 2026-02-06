@@ -1,6 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { Loader2, Save } from 'lucide-react';
-import { ContaPagar, getContaPagarDetails, saveContaPagar, ContaPagarPayload } from '@/services/financeiro';
+import {
+  ContaPagar,
+  ContaPagarPagamento,
+  estornarContaPagarPagamento,
+  getContaPagarDetails,
+  listContaPagarPagamentos,
+  saveContaPagar,
+  ContaPagarPayload,
+} from '@/services/financeiro';
 import { getPartnerDetails } from '@/services/partners';
 import { useToast } from '@/contexts/ToastProvider';
 import Section from '@/components/ui/forms/Section';
@@ -14,6 +22,7 @@ import MeioPagamentoDropdown from '@/components/common/MeioPagamentoDropdown';
 import { Switch } from '@/components/ui/switch';
 import RecorrenciaApplyScopeDialog from '@/components/financeiro/recorrencias/RecorrenciaApplyScopeDialog';
 import ParcelamentoDialog from '@/components/financeiro/parcelamento/ParcelamentoDialog';
+import EstornoRecebimentoModal from '@/components/financeiro/common/EstornoRecebimentoModal';
 import {
   applyRecorrenciaUpdate,
   generateRecorrencia,
@@ -27,6 +36,7 @@ import { createParcelamentoContasPagar } from '@/services/financeiroParcelamento
 interface ContasPagarFormPanelProps {
   conta: Partial<ContaPagar> | null;
   onSaveSuccess: (savedConta?: ContaPagar) => void;
+  onMutate?: () => void;
   onClose: () => void;
 }
 
@@ -35,13 +45,18 @@ const statusOptions = [
   { value: 'cancelada', label: 'Cancelada' },
 ];
 
-const ContasPagarFormPanel: React.FC<ContasPagarFormPanelProps> = ({ conta, onSaveSuccess, onClose }) => {
+const ContasPagarFormPanel: React.FC<ContasPagarFormPanelProps> = ({ conta, onSaveSuccess, onMutate, onClose }) => {
   const { addToast } = useToast();
   const [isSaving, setIsSaving] = useState(false);
   const [formData, setFormData] = useState<Partial<ContaPagarPayload>>({});
   const [fornecedorName, setFornecedorName] = useState('');
   const isPagoOuParcial = formData.status === 'paga' || formData.status === 'parcial';
   const isEditing = !!conta?.id;
+
+  const [pagamentos, setPagamentos] = useState<ContaPagarPagamento[]>([]);
+  const [isLoadingPagamentos, setIsLoadingPagamentos] = useState(false);
+  const [isEstornoPagamentoOpen, setIsEstornoPagamentoOpen] = useState(false);
+  const [pagamentoToReverse, setPagamentoToReverse] = useState<ContaPagarPagamento | null>(null);
 
   const [recApplyOpen, setRecApplyOpen] = useState(false);
   const [recApplyScope, setRecApplyScope] = useState<FinanceiroRecorrenciaApplyScope>('single');
@@ -102,6 +117,31 @@ const ContasPagarFormPanel: React.FC<ContasPagarFormPanelProps> = ({ conta, onSa
       setParcelarCondicao('1x');
     }
   }, [conta]);
+
+  useEffect(() => {
+    const contaId = String(conta?.id || '');
+    if (!contaId) {
+      setPagamentos([]);
+      return;
+    }
+
+    let cancelled = false;
+    void (async () => {
+      setIsLoadingPagamentos(true);
+      try {
+        const list = await listContaPagarPagamentos(contaId);
+        if (!cancelled) setPagamentos(list);
+      } catch (e: any) {
+        if (!cancelled) addToast(e?.message || 'Erro ao carregar pagamentos.', 'error');
+      } finally {
+        if (!cancelled) setIsLoadingPagamentos(false);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [addToast, conta?.id]);
 
   const handleFormChange = (field: keyof ContaPagarPayload, value: any) => {
     setFormData(prev => ({ ...prev, [field]: value }));
@@ -477,9 +517,127 @@ const ContasPagarFormPanel: React.FC<ContasPagarFormPanelProps> = ({ conta, onSa
             </div>
           </div>
 
-          <TextArea label="Observações" name="observacoes" value={formData.observacoes || ''} onChange={e => handleFormChange('observacoes', e.target.value)} rows={3} className="sm:col-span-6" />
-        </Section>
+	          <TextArea label="Observações" name="observacoes" value={formData.observacoes || ''} onChange={e => handleFormChange('observacoes', e.target.value)} rows={3} className="sm:col-span-6" />
+	        </Section>
+
+	        {isEditing ? (
+	          <Section title="Pagamentos / retiradas" description="Histórico de pagamentos parciais e estornos (por evento).">
+	            {isLoadingPagamentos ? (
+	              <div className="sm:col-span-6 flex items-center gap-2 text-sm text-gray-600">
+	                <Loader2 className="animate-spin" size={16} />
+	                Carregando pagamentos...
+	              </div>
+	            ) : pagamentos.length === 0 ? (
+	              <div className="sm:col-span-6 text-sm text-gray-600">Nenhum pagamento registrado ainda.</div>
+	            ) : (
+	              <div className="sm:col-span-6 overflow-x-auto">
+	                <table className="min-w-[820px] w-full divide-y divide-gray-200">
+	                  <thead className="bg-gray-50">
+	                    <tr>
+	                      <th className="px-4 py-2 text-left text-xs font-semibold text-gray-700">Data</th>
+	                      <th className="px-4 py-2 text-right text-xs font-semibold text-gray-700">Valor</th>
+	                      <th className="px-4 py-2 text-left text-xs font-semibold text-gray-700">Conta</th>
+	                      <th className="px-4 py-2 text-left text-xs font-semibold text-gray-700">Status</th>
+	                      <th className="px-4 py-2 text-left text-xs font-semibold text-gray-700">Observações</th>
+	                      <th className="px-4 py-2 text-right text-xs font-semibold text-gray-700">Ações</th>
+	                    </tr>
+	                  </thead>
+	                  <tbody className="bg-white divide-y divide-gray-200">
+	                    {pagamentos.map((p) => {
+	                      const canReverse = !p.estornado && !p.movimentacao_conciliada;
+	                      const statusLabel = p.estornado ? 'Estornado' : 'Pago';
+	                      const statusClass = p.estornado ? 'bg-gray-100 text-gray-800' : 'bg-green-100 text-green-800';
+	                      return (
+	                        <tr key={p.id} className="hover:bg-gray-50">
+	                          <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-700">
+	                            {new Date(p.data_pagamento).toLocaleDateString('pt-BR')}
+	                          </td>
+	                          <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-700 text-right font-semibold">
+	                            {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Number(p.valor || 0))}
+	                          </td>
+	                          <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-600">{p.conta_corrente_nome || '-'}</td>
+	                          <td className="px-4 py-2 whitespace-nowrap">
+	                            <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${statusClass}`}>
+	                              {statusLabel}
+	                              {p.movimentacao_conciliada ? ' • conciliado' : ''}
+	                            </span>
+	                          </td>
+	                          <td className="px-4 py-2 text-sm text-gray-600">{p.estorno_motivo || p.observacoes || '-'}</td>
+	                          <td className="px-4 py-2 whitespace-nowrap text-right text-sm">
+	                            <button
+	                              type="button"
+	                              onClick={() => {
+	                                setPagamentoToReverse(p);
+	                                setIsEstornoPagamentoOpen(true);
+	                              }}
+	                              disabled={!canReverse || isSaving}
+	                              className="rounded-md border border-gray-300 bg-white py-1.5 px-3 text-xs font-medium text-gray-700 shadow-sm hover:bg-gray-50 disabled:opacity-50"
+	                              title={
+	                                p.movimentacao_conciliada
+	                                  ? 'Movimentação conciliada: desfaça a conciliação para estornar.'
+	                                  : p.estornado
+	                                    ? 'Pagamento já estornado.'
+	                                    : 'Estornar este pagamento.'
+	                              }
+	                            >
+	                              Estornar
+	                            </button>
+	                          </td>
+	                        </tr>
+	                      );
+	                    })}
+	                  </tbody>
+	                </table>
+	              </div>
+	            )}
+	          </Section>
+	        ) : null}
       </div>
+
+      <EstornoRecebimentoModal
+        isOpen={isEstornoPagamentoOpen}
+        onClose={() => {
+          setIsEstornoPagamentoOpen(false);
+          setPagamentoToReverse(null);
+        }}
+        title="Estornar pagamento"
+        description={
+          pagamentoToReverse?.valor
+            ? `Estornar o pagamento de ${new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Number(pagamentoToReverse.valor || 0))}?`
+            : 'Estornar pagamento?'
+        }
+        confirmLabel="Estornar"
+        defaultContaTipo="pagamentos"
+        onConfirm={async ({ contaCorrenteId, dataISO, motivo }) => {
+          if (!pagamentoToReverse?.id) return;
+          setIsSaving(true);
+          try {
+            const updated = await estornarContaPagarPagamento({
+              pagamentoId: pagamentoToReverse.id,
+              dataEstorno: dataISO,
+              contaCorrenteId,
+              motivo,
+            });
+            addToast('Estorno registrado com sucesso!', 'success');
+
+            const nextContaId = String((updated as any)?.id ?? conta?.id ?? '');
+            if (nextContaId) {
+              const list = await listContaPagarPagamentos(nextContaId);
+              setPagamentos(list);
+            }
+            setFormData((prev) => ({ ...prev, ...updated }));
+            onMutate?.();
+
+            setIsEstornoPagamentoOpen(false);
+            setPagamentoToReverse(null);
+          } catch (e: any) {
+            addToast(e?.message || 'Erro ao estornar pagamento.', 'error');
+            throw e;
+          } finally {
+            setIsSaving(false);
+          }
+        }}
+      />
       <footer className="flex-shrink-0 p-4 flex justify-end items-center border-t border-white/20">
         <div className="flex gap-3">
           <button type="button" onClick={onClose} className="rounded-md border border-gray-300 bg-white py-2 px-4 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50">Cancelar</button>
