@@ -83,6 +83,7 @@ export type ImportarExtratoPayload = {
   tipo_lancamento: 'credito' | 'debito';
   valor: number;
   saldo_apos_lancamento?: number;
+  sequencia_importacao?: number;
   identificador_banco?: string;
   hash_importacao?: string;
   linha_bruta?: string;
