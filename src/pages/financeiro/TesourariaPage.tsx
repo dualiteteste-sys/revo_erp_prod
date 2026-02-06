@@ -13,7 +13,7 @@ import ExtratosTable from '@/components/financeiro/tesouraria/ExtratosTable';
 import ImportarExtratoModal from '@/components/financeiro/tesouraria/ImportarExtratoModal';
 import ConciliacaoDrawer from '@/components/financeiro/tesouraria/ConciliacaoDrawer';
 import ConciliacaoRegrasPanel from '@/components/financeiro/tesouraria/ConciliacaoRegrasPanel';
-import { ContaCorrente, Movimentacao, ExtratoItem, deleteContaCorrente, deleteMovimentacao, importarExtrato, conciliarExtrato, desconciliarExtrato, setContaCorrentePadrao, listMovimentacoes, getContaCorrente, getMovimentacao } from '@/services/treasury';
+import { ContaCorrente, Movimentacao, ExtratoItem, deleteContaCorrente, deleteMovimentacao, importarExtrato, conciliarExtrato, reverterConciliacaoExtrato, setContaCorrentePadrao, listMovimentacoes, getContaCorrente, getMovimentacao } from '@/services/treasury';
 import ConfirmationModal from '@/components/ui/ConfirmationModal';
 import DatePicker from '@/components/ui/DatePicker';
 import Toggle from '@/components/ui/forms/Toggle';
@@ -351,6 +351,7 @@ export default function TesourariaPage() {
         setConciliacaoItem(null);
         refreshExtrato();
         refreshMov(); // Update movements list too
+        refreshContas();
     } catch (e: any) {
         addToast(e.message, 'error');
     } finally {
@@ -360,9 +361,9 @@ export default function TesourariaPage() {
 
   const handleUnconciliate = async (item: ExtratoItem) => {
     const ok = await confirm({
-      title: 'Desfazer conciliação',
-      description: 'Desfazer a conciliação deste lançamento?',
-      confirmText: 'Desfazer',
+      title: 'Reverter conciliação',
+      description: 'Isso removerá o vínculo do extrato. Se a movimentação tiver sido gerada pela conciliação, ela também será removida (e o saldo voltará ao estado anterior).',
+      confirmText: 'Reverter',
       cancelText: 'Cancelar',
       variant: 'danger',
     });
@@ -370,10 +371,17 @@ export default function TesourariaPage() {
     if (busyExtratoId) return;
     setBusyExtratoId(item.id);
     try {
-        await desconciliarExtrato(item.id);
-        addToast('Conciliação desfeita.', 'success');
+        const res = await reverterConciliacaoExtrato(item.id);
+        if (res.kind === 'deleted_movimentacao') {
+          addToast(res.message || 'Conciliação revertida e movimentação removida.', 'success');
+        } else if (res.kind === 'unlinked_only') {
+          addToast(res.message || 'Vínculo removido. A movimentação foi mantida.', 'warning');
+        } else {
+          addToast(res.message || 'Nada para reverter.', 'info');
+        }
         refreshExtrato();
         refreshMov();
+        refreshContas();
     } catch (e: any) {
         addToast(e.message, 'error');
     } finally {

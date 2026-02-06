@@ -295,23 +295,24 @@ export default function ConciliacaoDrawer({ isOpen, onClose, extratoItem, contaC
     }
   };
 
-  const handleCreateFromRule = async (rule: ConciliacaoRegra) => {
-    if (!extratoItem) return;
-    if (creatingFromRuleId) return;
-    setCreatingFromRuleId(rule.id);
-    try {
-      const newMov = await saveMovimentacao({
-        conta_corrente_id: contaCorrenteId,
-        data_movimento: extratoItem.data_lancamento,
-        tipo_mov: extratoItem.tipo_lancamento === 'credito' ? 'entrada' : 'saida',
-        valor: extratoItem.valor,
-        descricao: rule.descricao_override || extratoItem.descricao,
-        documento_ref: extratoItem.documento_ref,
-        origem_tipo: `conciliacao_regra:${rule.id}`,
-        categoria: rule.categoria,
-        centro_custo: rule.centro_custo,
-        observacoes: rule.observacoes || 'Gerado via regra de conciliação',
-      });
+	  const handleCreateFromRule = async (rule: ConciliacaoRegra) => {
+	    if (!extratoItem) return;
+	    if (creatingFromRuleId) return;
+	    setCreatingFromRuleId(rule.id);
+	    try {
+	      const newMov = await saveMovimentacao({
+	        conta_corrente_id: contaCorrenteId,
+	        data_movimento: extratoItem.data_lancamento,
+	        tipo_mov: extratoItem.tipo_lancamento === 'credito' ? 'entrada' : 'saida',
+	        valor: extratoItem.valor,
+	        descricao: rule.descricao_override || extratoItem.descricao,
+	        documento_ref: extratoItem.documento_ref,
+	        origem_tipo: `tesouraria_conciliacao_extrato:regra:${rule.id}`,
+	        origem_id: extratoItem.id,
+	        categoria: rule.categoria,
+	        centro_custo: rule.centro_custo,
+	        observacoes: rule.observacoes || 'Gerado via regra de conciliação',
+	      });
       await onConciliate(newMov.id);
       addToast('Movimentação criada e conciliada (regra).', 'success');
       onClose();
@@ -322,20 +323,21 @@ export default function ConciliacaoDrawer({ isOpen, onClose, extratoItem, contaC
     }
   };
 
-  const handleCreateAndConciliate = async () => {
-    if (!extratoItem) return;
-    setIsCreating(true);
-    try {
-      const newMov = await saveMovimentacao({
-        conta_corrente_id: contaCorrenteId,
-        data_movimento: extratoItem.data_lancamento,
-        tipo_mov: extratoItem.tipo_lancamento === 'credito' ? 'entrada' : 'saida',
-        valor: extratoItem.valor,
-        descricao: extratoItem.descricao,
-        documento_ref: extratoItem.documento_ref,
-        origem_tipo: 'conciliacao_automatica',
-        observacoes: 'Gerado via conciliação bancária'
-      });
+	  const handleCreateAndConciliate = async () => {
+	    if (!extratoItem) return;
+	    setIsCreating(true);
+	    try {
+	      const newMov = await saveMovimentacao({
+	        conta_corrente_id: contaCorrenteId,
+	        data_movimento: extratoItem.data_lancamento,
+	        tipo_mov: extratoItem.tipo_lancamento === 'credito' ? 'entrada' : 'saida',
+	        valor: extratoItem.valor,
+	        descricao: extratoItem.descricao,
+	        documento_ref: extratoItem.documento_ref,
+	        origem_tipo: 'tesouraria_conciliacao_extrato',
+	        origem_id: extratoItem.id,
+	        observacoes: 'Gerado via conciliação bancária'
+	      });
       
       await onConciliate(newMov.id);
       addToast('Movimentação criada e conciliada!', 'success');
