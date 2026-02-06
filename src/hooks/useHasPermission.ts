@@ -4,6 +4,12 @@ import { useAuth } from '@/contexts/AuthProvider';
 import { logger } from '@/lib/logger';
 import { useEmpresaRole } from '@/hooks/useEmpresaRole';
 
+export const PERMISSION_KEYS = {
+  all: ['permission'] as const,
+  check: (params: { module: string; action: string; empresaId: string; userId: string }) =>
+    [...PERMISSION_KEYS.all, 'check', params] as const,
+};
+
 /**
  * Checks if the current user has a specific permission.
  * This hook calls a Supabase RPC function and caches the result.
@@ -13,13 +19,16 @@ import { useEmpresaRole } from '@/hooks/useEmpresaRole';
  */
 export function useHasPermission(module: string, action: string) {
   const supabase = useSupabase();
-  const { session } = useAuth();
+  const { session, userId, activeEmpresaId } = useAuth();
   const empresaRoleQuery = useEmpresaRole();
 
-  const canCheck = !!session && !!module && !!action && empresaRoleQuery.isFetched;
+  const canCheck = !!session && !!userId && !!activeEmpresaId && !!module && !!action && empresaRoleQuery.isFetched;
 
   const query = useQuery({
-    queryKey: ['permission', module, action],
+    // Include tenant/user in cache key to avoid cross-empresa reuse.
+    queryKey: canCheck
+      ? PERMISSION_KEYS.check({ module, action, empresaId: activeEmpresaId, userId })
+      : PERMISSION_KEYS.all,
     queryFn: async () => {
       const { data, error } = await (supabase as any).rpc('has_permission_for_current_user', {
         p_module: module,
