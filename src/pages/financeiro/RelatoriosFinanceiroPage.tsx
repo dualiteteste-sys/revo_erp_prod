@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { BarChart3, CalendarDays, FileText, Loader2, RefreshCw, TrendingDown, TrendingUp, Wallet } from 'lucide-react';
 import ReactECharts from 'echarts-for-react';
 
@@ -7,6 +7,7 @@ import GlassCard from '@/components/ui/GlassCard';
 import Input from '@/components/ui/forms/Input';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/contexts/ToastProvider';
+import { useAuth } from '@/contexts/AuthProvider';
 import ResizableSortableTh, { type SortState } from '@/components/ui/table/ResizableSortableTh';
 import TableColGroup from '@/components/ui/table/TableColGroup';
 import { useTableColumnWidths, type TableColumnWidthDef } from '@/components/ui/table/useTableColumnWidths';
@@ -61,6 +62,7 @@ function toDateOrNull(value: string): Date | null {
 
 export default function RelatoriosFinanceiroPage() {
   const { addToast } = useToast();
+  const { loading: authLoading, activeEmpresaId } = useAuth();
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [startDate, setStartDate] = useState<string>('');
@@ -71,6 +73,9 @@ export default function RelatoriosFinanceiroPage() {
   const [dreCentroId, setDreCentroId] = useState<string | null>(null);
   const [dreCentroName, setDreCentroName] = useState<string>('');
   const [dreSort, setDreSort] = useState<SortState<'categoria' | 'receitas' | 'despesas' | 'resultado'> | null>(null);
+  const lastEmpresaIdRef = useRef<string | null>(activeEmpresaId);
+  const empresaChanged = lastEmpresaIdRef.current !== activeEmpresaId;
+  const fetchTokenRef = useRef(0);
 
   const dreColumns: TableColumnWidthDef[] = [
     { id: 'categoria', defaultWidth: 360, minWidth: 220 },
@@ -83,23 +88,57 @@ export default function RelatoriosFinanceiroPage() {
     columns: dreColumns,
   });
 
-  const fetchData = useCallback(async () => {
+  useEffect(() => {
+    const prevEmpresaId = lastEmpresaIdRef.current;
+    if (prevEmpresaId === activeEmpresaId) return;
+
+    // Multi-tenant safety: evitar reaproveitar estado do tenant anterior.
+    setStartDate('');
+    setEndDate('');
+    setData(null);
+    setPorCentro([]);
+    setDre(null);
+    setDreCentroId(null);
+    setDreCentroName('');
+    setDreSort(null);
     setLoading(true);
-    try {
-      const start = toDateOrNull(startDate);
-      const end = toDateOrNull(endDate);
-      const [resumoRes, centrosRes] = await Promise.allSettled([
-        getFinanceiroRelatoriosResumo({ startDate: start, endDate: end }),
-        listFinanceiroPorCentroCusto({ startDate: start, endDate: end }),
-      ]);
+
+    // invalida fetches anteriores
+    fetchTokenRef.current += 1;
+
+    if (prevEmpresaId && activeEmpresaId) {
+      addToast('Empresa alterada. Recarregando relatórios do Financeiro…', 'info');
+    }
+
+    lastEmpresaIdRef.current = activeEmpresaId;
+  }, [activeEmpresaId, addToast]);
+
+  const fetchData = useCallback(async () => {
+    if (authLoading || !activeEmpresaId) return;
+    if (lastEmpresaIdRef.current !== activeEmpresaId) return;
+
+    const token = ++fetchTokenRef.current;
+    const empresaSnapshot = activeEmpresaId;
+    setLoading(true);
+      try {
+        const start = toDateOrNull(startDate);
+        const end = toDateOrNull(endDate);
+        const [resumoRes, centrosRes] = await Promise.allSettled([
+          getFinanceiroRelatoriosResumo({ startDate: start, endDate: end }),
+          listFinanceiroPorCentroCusto({ startDate: start, endDate: end }),
+        ]);
 
       if (resumoRes.status === 'fulfilled') {
+        if (token !== fetchTokenRef.current) return;
+        if (empresaSnapshot !== lastEmpresaIdRef.current) return;
         setData(resumoRes.value);
       } else {
         throw resumoRes.reason;
       }
 
       if (centrosRes.status === 'fulfilled') {
+        if (token !== fetchTokenRef.current) return;
+        if (empresaSnapshot !== lastEmpresaIdRef.current) return;
         setPorCentro(centrosRes.value ?? []);
       } else {
         // Não bloqueia a tela inteira se o relatório por centro falhar.
@@ -107,19 +146,25 @@ export default function RelatoriosFinanceiroPage() {
       }
       try {
         const dreResult = await getFinanceiroDreSimplificada({ startDate: start, endDate: end, centroDeCustoId: dreCentroId });
+        if (token !== fetchTokenRef.current) return;
+        if (empresaSnapshot !== lastEmpresaIdRef.current) return;
         setDre(dreResult);
       } catch {
         setDre(null);
       }
     } catch (e: any) {
+      if (token !== fetchTokenRef.current) return;
+      if (empresaSnapshot !== lastEmpresaIdRef.current) return;
       addToast(e?.message || 'Falha ao carregar relatórios do Financeiro.', 'error');
       setData(null);
       setPorCentro([]);
       setDre(null);
     } finally {
+      if (token !== fetchTokenRef.current) return;
+      if (empresaSnapshot !== lastEmpresaIdRef.current) return;
       setLoading(false);
     }
-  }, [addToast, endDate, startDate, dreCentroId]);
+  }, [activeEmpresaId, addToast, authLoading, endDate, startDate, dreCentroId]);
 
   useEffect(() => {
     void fetchData();
@@ -225,6 +270,18 @@ export default function RelatoriosFinanceiroPage() {
     const filename = `financeiro_relatorios_${data.periodo.inicio}_${data.periodo.fim}.csv`;
     downloadTextFile(filename, csv, 'text/csv;charset=utf-8');
   };
+
+  if (authLoading || empresaChanged) {
+    return (
+      <div className="flex justify-center h-full items-center">
+        <Loader2 className="animate-spin text-blue-600 w-10 h-10" />
+      </div>
+    );
+  }
+
+  if (!activeEmpresaId) {
+    return <div className="p-4 text-gray-600">Selecione uma empresa para ver relatórios do Financeiro.</div>;
+  }
 
   return (
     <div className="p-1 h-full flex flex-col gap-4">
