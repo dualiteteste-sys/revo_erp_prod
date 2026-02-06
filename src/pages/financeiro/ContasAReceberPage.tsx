@@ -177,7 +177,13 @@ const ContasAReceberPage: React.FC = () => {
 
   const handleReceive = async (conta: contasAReceberService.ContaAReceber) => {
     if (!conta?.id) return;
-    setContaToReceive(conta);
+    try {
+      const details = await contasAReceberService.getContaAReceberDetails(conta.id);
+      setContaToReceive({ ...conta, ...(details as any) });
+    } catch (e: any) {
+      addToast(e?.message || 'Não foi possível carregar os detalhes do título.', 'error');
+      setContaToReceive(conta);
+    }
     setIsBaixaOpen(true);
   };
 
@@ -292,6 +298,7 @@ const ContasAReceberPage: React.FC = () => {
         >
           <option value="">Todos os status</option>
           <option value="pendente">Pendente</option>
+          <option value="parcial">Parcial</option>
           <option value="pago">Pago</option>
           <option value="vencido">Vencido</option>
           <option value="cancelado">Cancelado</option>
@@ -391,7 +398,7 @@ const ContasAReceberPage: React.FC = () => {
             <Loader2 className="animate-spin text-blue-600" size={48} />
           </div>
         ) : (
-          <ContasAReceberFormPanel conta={selectedConta} onSaveSuccess={handleSaveSuccess} onClose={handleCloseForm} />
+          <ContasAReceberFormPanel conta={selectedConta} onSaveSuccess={handleSaveSuccess} onMutate={refresh} onClose={handleCloseForm} />
         )}
       </Modal>
 
@@ -404,7 +411,7 @@ const ContasAReceberPage: React.FC = () => {
             ? `Confirmar recebimento da conta "${contaToReceive.descricao}".`
             : 'Confirmar recebimento.'
         }
-        defaultValor={Number(contaToReceive?.valor || 0)}
+        defaultValor={Math.max(0, Number(contaToReceive?.valor ?? 0) - Number(contaToReceive?.valor_pago ?? 0))}
         confirmLabel="Registrar recebimento"
         onConfirm={async ({ contaCorrenteId, dataISO, valor }) => {
           if (!contaToReceive?.id) return;

@@ -23,6 +23,7 @@ interface ContasAReceberTableProps {
 
 const statusConfig: Record<string, { label: string; color: string }> = {
   pendente: { label: 'Pendente', color: 'bg-yellow-100 text-yellow-800' },
+  parcial: { label: 'Parcial', color: 'bg-blue-100 text-blue-800' },
   pago: { label: 'Pago', color: 'bg-green-100 text-green-800' },
   vencido: { label: 'Vencido', color: 'bg-red-100 text-red-800' },
   cancelado: { label: 'Cancelado', color: 'bg-gray-100 text-gray-800' },
@@ -110,12 +111,12 @@ const ContasAReceberTable: React.FC<ContasAReceberTableProps> = ({
                   </a>
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{conta.cliente_nome || '-'}</td>
-	                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-	                  {conta.data_vencimento ? new Date(conta.data_vencimento).toLocaleDateString('pt-BR') : '—'}
-	                </td>
-	                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 font-semibold">
-	                  {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Number(conta.valor ?? 0))}
-	                </td>
+                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                  {conta.data_vencimento ? new Date(conta.data_vencimento).toLocaleDateString('pt-BR') : '—'}
+                </td>
+                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 font-semibold">
+                  {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Number(conta.valor ?? 0))}
+                </td>
                 <td className="px-6 py-4 whitespace-nowrap">
                   <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${statusConfig[conta.status]?.color || 'bg-gray-100 text-gray-800'}`}>
                     {statusConfig[conta.status]?.label || conta.status}
@@ -123,7 +124,7 @@ const ContasAReceberTable: React.FC<ContasAReceberTableProps> = ({
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                   <div className="flex items-center justify-end gap-4">
-                    {onReceive && (conta.status === 'pendente' || conta.status === 'vencido') ? (
+                    {onReceive && (conta.status === 'pendente' || conta.status === 'vencido' || conta.status === 'parcial') ? (
                       <Button
                         type="button"
                         variant="ghost"
@@ -136,7 +137,7 @@ const ContasAReceberTable: React.FC<ContasAReceberTableProps> = ({
                         <CheckCircle2 size={18} />
                       </Button>
                     ) : null}
-                    {onReverse && conta.status === 'pago' ? (
+                    {onReverse && (conta.status === 'pago' || conta.status === 'parcial') ? (
                       <Button
                         type="button"
                         variant="ghost"
