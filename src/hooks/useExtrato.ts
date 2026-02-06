@@ -1,10 +1,12 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useDebounce } from './useDebounce';
 import * as extratoService from '../services/extrato';
 import { useAuth } from '../contexts/AuthProvider';
 
 export const useExtrato = (initialContaId?: string | null) => {
   const { activeEmpresa } = useAuth();
+  const empresaId = activeEmpresa?.id ?? null;
+  const lastEmpresaIdRef = useRef<string | null>(empresaId);
   const [lancamentos, setLancamentos] = useState<extratoService.ExtratoLancamento[]>([]);
   const [summary, setSummary] = useState<extratoService.ExtratoSummary | null>(null);
   const [loading, setLoading] = useState(false);
@@ -21,6 +23,21 @@ export const useExtrato = (initialContaId?: string | null) => {
 
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(50);
+
+  useEffect(() => {
+    const prevEmpresaId = lastEmpresaIdRef.current;
+    if (prevEmpresaId === empresaId) return;
+
+    // Multi-tenant safety: limpar imediatamente o estado do hook ao trocar de empresa.
+    setLancamentos([]);
+    setSummary(null);
+    setError(null);
+    setCount(0);
+    setPage(1);
+    setLoading(false);
+
+    lastEmpresaIdRef.current = empresaId;
+  }, [empresaId]);
 
   const fetchExtrato = useCallback(async () => {
     if (!activeEmpresa) {

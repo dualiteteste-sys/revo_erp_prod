@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useContasCorrentes, useMovimentacoes, useExtratos } from '@/hooks/useTesouraria';
 import { useToast } from '@/contexts/ToastProvider';
 import { useConfirm } from '@/contexts/ConfirmProvider';
@@ -23,8 +23,10 @@ import Pagination from '@/components/ui/Pagination';
 import ListPaginationBar from '@/components/ui/ListPaginationBar';
 import { useSearchParams } from 'react-router-dom';
 import { useEditLock } from '@/components/ui/hooks/useEditLock';
+import { useAuth } from '@/contexts/AuthProvider';
 
 export default function TesourariaPage() {
+  const { loading: authLoading, activeEmpresaId } = useAuth();
   const [activeTab, setActiveTab] = useState<'contas' | 'movimentos' | 'conciliacao' | 'regras'>('contas');
   const { addToast } = useToast();
   const { confirm } = useConfirm();
@@ -37,6 +39,9 @@ export default function TesourariaPage() {
   const [busyExtratoId, setBusyExtratoId] = useState<string | null>(null);
   const [bulkConciliando, setBulkConciliando] = useState(false);
   const [bulkThreshold, setBulkThreshold] = useState(85);
+
+  const lastEmpresaIdRef = useRef<string | null>(activeEmpresaId);
+  const empresaChanged = lastEmpresaIdRef.current !== activeEmpresaId;
 
   // --- Contas State ---
   const {
@@ -156,6 +161,31 @@ export default function TesourariaPage() {
     if (editingMovId) movEditLock.release(editingMovId);
     setEditingMovId(null);
   }, [clearOpenParam, editingMovId, movEditLock]);
+
+  useEffect(() => {
+    const prevEmpresaId = lastEmpresaIdRef.current;
+    if (prevEmpresaId === activeEmpresaId) return;
+
+    // Multi-tenant safety: evitar reaproveitar estado do tenant anterior.
+    closeContaForm();
+    closeMovForm();
+    setContaToDelete(null);
+    setMovToDelete(null);
+    setSelectedContaId(null);
+    setConciliacaoItem(null);
+    setIsImportModalOpen(false);
+    setBusyExtratoId(null);
+    setBulkConciliando(false);
+    setBulkThreshold(85);
+
+    if (prevEmpresaId && activeEmpresaId) {
+      addToast('Empresa alterada. Recarregando tesouraria…', 'info');
+    }
+
+    lastEmpresaIdRef.current = activeEmpresaId;
+  }, [activeEmpresaId, addToast, closeContaForm, closeMovForm]);
+
+  const holdUi = authLoading || !activeEmpresaId || empresaChanged;
 
   const setTab = useCallback((nextTab: 'contas' | 'movimentos' | 'conciliacao' | 'regras') => {
     // evita modais/locks "perdidos" ao trocar de aba
@@ -429,7 +459,11 @@ export default function TesourariaPage() {
     }
   };
 
-  return (
+  return holdUi ? (
+    <div className="p-4 min-h-full flex items-center justify-center">
+      <Loader2 className="animate-spin text-blue-500" size={32} />
+    </div>
+  ) : (
     <div className="p-1 h-full flex flex-col">
       <div className="flex justify-between items-center mb-6 flex-shrink-0">
         <div>
