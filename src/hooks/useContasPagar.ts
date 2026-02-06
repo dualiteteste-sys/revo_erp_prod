@@ -88,7 +88,7 @@ export const useContasPagar = () => {
                 financeiroService.getContasPagarSummary(filterStartDate, filterEndDate),
             ]);
             if (token !== fetchTokenRef.current) return;
-            if (empresaIdSnapshot !== (activeEmpresa?.id ?? null)) return;
+            if (empresaIdSnapshot !== lastEmpresaIdRef.current) return;
             setContas(data);
             setCount(count);
             setSummary(summaryData);
