@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { getCompetencyMatrix, MatrixRow, listCargos, Cargo, listPlanosAcaoCompetencias, upsertPlanoAcaoCompetencia, type PlanoAcaoCompetencia } from '@/services/rh';
 import { Loader2, Filter, AlertCircle, TrendingUp, TrendingDown, Minus, Grid } from 'lucide-react';
 import GlassCard from '@/components/ui/GlassCard';
@@ -13,9 +13,11 @@ import { useHasPermission } from '@/hooks/useHasPermission';
 import ResizableSortableTh from '@/components/ui/table/ResizableSortableTh';
 import TableColGroup from '@/components/ui/table/TableColGroup';
 import { useTableColumnWidths, type TableColumnWidthDef } from '@/components/ui/table/useTableColumnWidths';
+import { useAuth } from '@/contexts/AuthProvider';
 
 export default function MatrizCompetenciasPage() {
   const { addToast } = useToast();
+  const { loading: authLoading, activeEmpresaId } = useAuth();
   const [matrixData, setMatrixData] = useState<MatrixRow[]>([]);
   const [cargos, setCargos] = useState<Cargo[]>([]);
   const [selectedCargo, setSelectedCargo] = useState<string>('');
@@ -40,8 +42,17 @@ export default function MatrizCompetenciasPage() {
   const permManage = useHasPermission('rh', 'manage');
   const canManage = !permManage.isLoading && !!permManage.data;
 
+  const lastEmpresaIdRef = useRef<string | null>(activeEmpresaId);
+  const empresaChanged = lastEmpresaIdRef.current !== activeEmpresaId;
+  const effectiveLoading = empresaChanged;
+  const effectiveMatrixData = empresaChanged ? [] : matrixData;
+
   useEffect(() => {
     const loadFilters = async () => {
+      if (!activeEmpresaId || empresaChanged) {
+        setCargos([]);
+        return;
+      }
       try {
         const data = await listCargos(undefined, true); // Only active cargos
         setCargos(data);
@@ -50,10 +61,16 @@ export default function MatrizCompetenciasPage() {
       }
     };
     loadFilters();
-  }, [addToast]);
+  }, [activeEmpresaId, addToast, empresaChanged]);
 
   useEffect(() => {
     const fetchMatrix = async () => {
+      if (!activeEmpresaId || empresaChanged) {
+        setMatrixData([]);
+        setPlanos([]);
+        setLoading(false);
+        return;
+      }
       setLoading(true);
       try {
         const [data, plans] = await Promise.all([
@@ -69,19 +86,44 @@ export default function MatrizCompetenciasPage() {
       }
     };
     fetchMatrix();
-  }, [selectedCargo, addToast]);
+  }, [activeEmpresaId, empresaChanged, selectedCargo, addToast]);
+
+  useEffect(() => {
+    const prevEmpresaId = lastEmpresaIdRef.current;
+    if (prevEmpresaId === activeEmpresaId) return;
+
+    // Multi-tenant safety: evitar reaproveitar estado do tenant anterior.
+    setMatrixData([]);
+    setCargos([]);
+    setSelectedCargo('');
+    setPlanos([]);
+    setPlanModal(null);
+    setPlanSaving(false);
+    setPlanStatus('aberto');
+    setPlanPrioridade(2);
+    setPlanDueDate('');
+    setPlanResponsavel('');
+    setPlanNotas('');
+
+    if (prevEmpresaId && activeEmpresaId) {
+      addToast('Empresa alterada. Recarregando matriz de competências…', 'info');
+    }
+
+    setLoading(!!activeEmpresaId);
+    lastEmpresaIdRef.current = activeEmpresaId;
+  }, [activeEmpresaId, addToast]);
 
   // Extract all unique competencies to build columns
   const allCompetencies = React.useMemo(() => {
     const comps = new Map<string, { id: string; nome: string; tipo: string }>();
-    matrixData.forEach((row) => {
+    effectiveMatrixData.forEach((row) => {
       const competencias = Array.isArray(row.competencias) ? row.competencias : [];
       competencias.forEach((c) => {
         comps.set(c.id, { id: c.id, nome: c.nome, tipo: c.tipo });
       });
     });
     return Array.from(comps.values()).sort((a, b) => a.nome.localeCompare(b.nome));
-  }, [matrixData]);
+  }, [effectiveMatrixData]);
 
   const planosByKey = React.useMemo(() => {
     const map = new Map<string, PlanoAcaoCompetencia>();
@@ -218,6 +260,10 @@ export default function MatrizCompetenciasPage() {
     }
   };
 
+  if (authLoading) return <div className="flex justify-center p-12"><Loader2 className="animate-spin text-blue-600" /></div>;
+  if (!activeEmpresaId) return <div className="p-12 text-center text-gray-600">Selecione uma empresa para ver a matriz de competências.</div>;
+  if (effectiveLoading) return <div className="flex justify-center p-12"><Loader2 className="animate-spin text-blue-600" /></div>;
+
   return (
     <div className="p-1 h-full flex flex-col gap-6">
       <PageHeader
@@ -245,7 +291,7 @@ export default function MatrizCompetenciasPage() {
         <div className="flex-grow flex justify-center items-center">
           <Loader2 className="animate-spin text-blue-600 w-10 h-10" />
         </div>
-      ) : matrixData.length === 0 ? (
+      ) : effectiveMatrixData.length === 0 ? (
         <div className="flex-grow flex flex-col items-center justify-center text-gray-500">
           <AlertCircle size={48} className="mb-4 text-gray-300" />
           <p className="text-lg">Nenhum dado encontrado.</p>
@@ -284,7 +330,7 @@ export default function MatrizCompetenciasPage() {
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-100">
-                {matrixData.map(row => (
+                {effectiveMatrixData.map(row => (
                   <tr key={row.colaborador_id} className="hover:bg-gray-50/50 transition-colors">
                     <td className="p-4 whitespace-nowrap border-r border-gray-200 sticky left-0 bg-white z-10 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)]">
                       <div className="font-semibold text-gray-800">{row.colaborador_nome}</div>

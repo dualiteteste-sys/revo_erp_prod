@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo, useState, useEffect } from 'react';
+import React, { useCallback, useMemo, useRef, useState, useEffect } from 'react';
 import {
   listCargos,
   listColaboradores,
@@ -26,9 +26,11 @@ import { useHasPermission } from '@/hooks/useHasPermission';
 import { isSeedEnabled } from '@/utils/seed';
 import { useSearchParams } from 'react-router-dom';
 import { useEditLock } from '@/components/ui/hooks/useEditLock';
+import { useAuth } from '@/contexts/AuthProvider';
 
 export default function ColaboradoresPage() {
   const enableSeed = isSeedEnabled();
+  const { loading: authLoading, activeEmpresaId } = useAuth();
   const [colaboradores, setColaboradores] = useState<Colaborador[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -38,6 +40,10 @@ export default function ColaboradoresPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const openId = searchParams.get('open');
   const editLock = useEditLock('rh:colaboradores');
+  const lastEmpresaIdRef = useRef<string | null>(activeEmpresaId);
+  const empresaChanged = lastEmpresaIdRef.current !== activeEmpresaId;
+  const effectiveLoading = empresaChanged;
+  const effectiveColaboradores = empresaChanged ? [] : colaboradores;
   
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [selectedColaborador, setSelectedColaborador] = useState<ColaboradorDetails | null>(null);
@@ -58,12 +64,13 @@ export default function ColaboradoresPage() {
   const canManage = permManage.data;
 
   const colaboradoresFiltered = useMemo(() => {
-    if (statusFilter === 'inativos') return colaboradores.filter((c) => !c.ativo);
-    if (statusFilter === 'ativos') return colaboradores.filter((c) => c.ativo);
-    return colaboradores;
-  }, [colaboradores, statusFilter]);
+    if (statusFilter === 'inativos') return effectiveColaboradores.filter((c) => !c.ativo);
+    if (statusFilter === 'ativos') return effectiveColaboradores.filter((c) => c.ativo);
+    return effectiveColaboradores;
+  }, [effectiveColaboradores, statusFilter]);
 
   const fetchColaboradores = async () => {
+    if (!activeEmpresaId || empresaChanged) return;
     setLoading(true);
     try {
       const ativoOnly = statusFilter === 'ativos';
@@ -77,8 +84,9 @@ export default function ColaboradoresPage() {
   };
 
   useEffect(() => {
+    if (!activeEmpresaId || empresaChanged) return;
     fetchColaboradores();
-  }, [debouncedSearch, cargoFilter, statusFilter]);
+  }, [activeEmpresaId, empresaChanged, debouncedSearch, cargoFilter, statusFilter]);
 
   const clearOpenParam = useCallback(() => {
     if (!openId) return;
@@ -90,12 +98,16 @@ export default function ColaboradoresPage() {
   const closeForm = useCallback(() => {
     setIsFormOpen(false);
     clearOpenParam();
-    if (editingColaboradorId) editLock.release(editingColaboradorId);
+    editLock.release();
     setEditingColaboradorId(null);
-  }, [clearOpenParam, editLock, editingColaboradorId]);
+  }, [clearOpenParam, editLock]);
 
   useEffect(() => {
     const loadCargos = async () => {
+      if (!activeEmpresaId || empresaChanged) {
+        setCargos([]);
+        return;
+      }
       try {
         const data = await listCargos(undefined, true);
         setCargos(data);
@@ -104,7 +116,35 @@ export default function ColaboradoresPage() {
       }
     };
     loadCargos();
-  }, []);
+  }, [activeEmpresaId, empresaChanged]);
+
+  useEffect(() => {
+    const prevEmpresaId = lastEmpresaIdRef.current;
+    if (prevEmpresaId === activeEmpresaId) return;
+
+    // Multi-tenant safety: evitar reaproveitar estado do tenant anterior.
+    editLock.release();
+    setColaboradores([]);
+    setCargos([]);
+    setLoadingDetails(false);
+    setSelectedColaborador(null);
+    setEditingColaboradorId(null);
+    setIsFormOpen(false);
+    setIsSeeding(false);
+
+    if (openId) {
+      const next = new URLSearchParams(searchParams);
+      next.delete('open');
+      setSearchParams(next, { replace: true });
+    }
+
+    if (prevEmpresaId && activeEmpresaId) {
+      addToast('Empresa alterada. Recarregando colaboradores…', 'info');
+    }
+
+    setLoading(!!activeEmpresaId);
+    lastEmpresaIdRef.current = activeEmpresaId;
+  }, [activeEmpresaId, addToast, editLock, openId, searchParams, setSearchParams]);
 
   const handleEdit = useCallback(async (id: string) => {
     const claimed = await editLock.claim(id, {
@@ -139,9 +179,10 @@ export default function ColaboradoresPage() {
 
   useEffect(() => {
     if (!openId) return;
+    if (!activeEmpresaId || empresaChanged) return;
     if (isFormOpen) return;
     void handleEdit(openId);
-  }, [handleEdit, isFormOpen, openId]);
+  }, [activeEmpresaId, empresaChanged, handleEdit, isFormOpen, openId]);
 
   const handleNew = () => {
     if (!permsLoading && !canCreate) {
@@ -198,6 +239,10 @@ export default function ColaboradoresPage() {
     });
     return data;
   }, [colaboradoresFiltered, sortBy]);
+
+  if (authLoading) return <div className="flex justify-center p-12"><Loader2 className="animate-spin text-blue-600" /></div>;
+  if (!activeEmpresaId) return <div className="p-12 text-center text-gray-600">Selecione uma empresa para ver os colaboradores.</div>;
+  if (effectiveLoading) return <div className="flex justify-center p-12"><Loader2 className="animate-spin text-blue-600" /></div>;
 
   const onSort = (column: keyof Colaborador) => {
     setSortBy((prev) => ({ column, ascending: prev.column === column ? !prev.ascending : true }));
