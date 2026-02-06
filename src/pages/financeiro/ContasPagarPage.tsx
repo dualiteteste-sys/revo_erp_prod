@@ -71,10 +71,9 @@ const ContasPagarPage: React.FC = () => {
   const handledContaIdRef = useRef(false);
 
   useEffect(() => {
-    lastEmpresaIdRef.current = activeEmpresaId;
-  }, [activeEmpresaId]);
+    const prevEmpresaId = lastEmpresaIdRef.current;
+    if (prevEmpresaId === activeEmpresaId) return;
 
-  useEffect(() => {
     // Multi-tenant safety: evitar reaproveitar estado do tenant anterior.
     setIsFormOpen(false);
     setSelectedConta(null);
@@ -90,6 +89,20 @@ const ContasPagarPage: React.FC = () => {
     setContaToPay(null);
     setIsEstornoOpen(false);
     setContaToReverse(null);
+
+    const contaId = searchParams.get('contaId');
+    if (contaId) {
+      const next = new URLSearchParams(searchParams);
+      next.delete('contaId');
+      setSearchParams(next, { replace: true });
+    }
+
+    if (prevEmpresaId && activeEmpresaId) {
+      addToast('Empresa alterada. Recarregando contas a pagar…', 'info');
+    }
+
+    lastEmpresaIdRef.current = activeEmpresaId;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeEmpresaId]);
 
   const handleOpenForm = async (conta: financeiroService.ContaPagar | null = null) => {

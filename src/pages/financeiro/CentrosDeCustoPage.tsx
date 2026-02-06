@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useAuth } from '@/contexts/AuthProvider';
 import { useToast } from '@/contexts/ToastProvider';
 import * as centrosDeCustoService from '@/services/centrosDeCusto';
@@ -17,12 +17,15 @@ import { useEditLock } from '@/components/ui/hooks/useEditLock';
 
 const CentrosDeCustoPage: React.FC = () => {
   const enableSeed = isSeedEnabled();
-  const { activeEmpresa } = useAuth();
+  const { activeEmpresa, activeEmpresaId, loading: authLoading } = useAuth();
   const { addToast } = useToast();
   const { confirm } = useConfirm();
   const [searchParams, setSearchParams] = useSearchParams();
   const openId = searchParams.get('open');
   const editLock = useEditLock('financeiro:centros-de-custo');
+
+  const lastEmpresaIdRef = useRef<string | null>(activeEmpresaId);
+  const empresaChanged = lastEmpresaIdRef.current !== activeEmpresaId;
 
   const [allCentros, setAllCentros] = useState<centrosDeCustoService.CentroDeCustoListItem[]>([]);
   const [loading, setLoading] = useState(false);
@@ -41,6 +44,45 @@ const CentrosDeCustoPage: React.FC = () => {
   const [isSeeding, setIsSeeding] = useState(false);
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
   const [isBulkOpen, setIsBulkOpen] = useState(false);
+
+  useEffect(() => {
+    const prevEmpresaId = lastEmpresaIdRef.current;
+    if (prevEmpresaId === activeEmpresaId) return;
+
+    // Multi-tenant safety: evitar reaproveitar estado do tenant anterior.
+    setAllCentros([]);
+    setLoading(false);
+    setError(null);
+    setSearchTerm('');
+    setFilterStatus(null);
+    setFilterTipo(null);
+    setIsFormOpen(false);
+    setSelectedCentro(null);
+    setIsDeleteModalOpen(false);
+    setCentroToDelete(null);
+    setIsDeleting(false);
+    setIsFetchingDetails(false);
+    setIsSeeding(false);
+    setExpandedIds(new Set());
+    setIsBulkOpen(false);
+
+    if (editingId) editLock.release(editingId);
+    setEditingId(null);
+
+    const open = searchParams.get('open');
+    if (open) {
+      const next = new URLSearchParams(searchParams);
+      next.delete('open');
+      setSearchParams(next, { replace: true });
+    }
+
+    if (prevEmpresaId && activeEmpresaId) {
+      addToast('Empresa alterada. Recarregando centros de custo…', 'info');
+    }
+
+    lastEmpresaIdRef.current = activeEmpresaId;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeEmpresaId]);
 
   const refresh = async () => {
     if (!activeEmpresa) {
@@ -216,6 +258,18 @@ const CentrosDeCustoPage: React.FC = () => {
       setIsSeeding(false);
     }
   };
+
+  if (authLoading || empresaChanged) {
+    return (
+      <div className="flex justify-center h-full items-center">
+        <Loader2 className="animate-spin text-blue-600 w-10 h-10" />
+      </div>
+    );
+  }
+
+  if (!activeEmpresaId) {
+    return <div className="p-4 text-gray-600">Selecione uma empresa para ver centros de custo.</div>;
+  }
 
   return (
     <div className="p-1 min-h-full flex flex-col">
