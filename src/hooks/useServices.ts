@@ -1,10 +1,11 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useDebounce } from './useDebounce';
 import * as servicesService from '../services/services';
 import { useAuth } from '../contexts/AuthProvider';
 
 export const useServices = () => {
-  const { activeEmpresa } = useAuth();
+  const { activeEmpresaId, activeEmpresa } = useAuth();
+  const empresaId = activeEmpresaId ?? activeEmpresa?.id ?? null;
   const [services, setServices] = useState<servicesService.Service[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -22,12 +23,29 @@ export const useServices = () => {
     ascending: true,
   });
 
+  const lastEmpresaIdRef = useRef<string | null>(empresaId);
+  const empresaChanged = lastEmpresaIdRef.current !== empresaId;
+
+  useEffect(() => {
+    const prevEmpresaId = lastEmpresaIdRef.current;
+    if (prevEmpresaId === empresaId) return;
+
+    // Multi-tenant safety: evitar reaproveitar estado do tenant anterior.
+    setServices([]);
+    setCount(0);
+    setError(null);
+    setPage(1);
+    setLoading(!!empresaId);
+
+    lastEmpresaIdRef.current = empresaId;
+  }, [empresaId]);
+
   const fetchServices = useCallback(async () => {
-    if (!activeEmpresa) {
-        setServices([]);
-        setCount(0);
-        return;
-    }
+    if (!empresaId || empresaChanged) {
+	        setServices([]);
+	        setCount(0);
+	        return;
+	    }
     setLoading(true);
     setError(null);
     try {
@@ -55,7 +73,7 @@ export const useServices = () => {
     } finally {
       setLoading(false);
     }
-  }, [page, pageSize, debouncedSearchTerm, sortBy, activeEmpresa, statusFilter]);
+  }, [page, pageSize, debouncedSearchTerm, sortBy, empresaChanged, empresaId, statusFilter]);
 
   useEffect(() => {
     fetchServices();
