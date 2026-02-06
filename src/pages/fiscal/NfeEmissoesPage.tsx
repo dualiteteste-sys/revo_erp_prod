@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import PageHeader from '@/components/ui/PageHeader';
 import GlassCard from '@/components/ui/GlassCard';
 import Modal from '@/components/ui/Modal';
@@ -89,11 +89,13 @@ function formatDate(value: string | null | undefined) {
 
 export default function NfeEmissoesPage() {
   const supabase = useSupabase() as any;
-  const { activeEmpresa } = useAuth();
+  const { loading: authLoading, activeEmpresaId, activeEmpresa } = useAuth();
   const { addToast } = useToast();
   const features = useEmpresaFeatures();
 
-  const empresaId = activeEmpresa?.id;
+  const empresaId = activeEmpresaId ?? activeEmpresa?.id ?? null;
+  const lastEmpresaIdRef = useRef<string | null>(empresaId);
+  const empresaChanged = lastEmpresaIdRef.current !== empresaId;
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -136,8 +138,47 @@ export default function NfeEmissoesPage() {
 
   const canShow = useMemo(() => !!empresaId, [empresaId]);
 
+  useEffect(() => {
+    const prevEmpresaId = lastEmpresaIdRef.current;
+    if (prevEmpresaId === empresaId) return;
+
+    // Multi-tenant safety: evitar reaproveitar estado do tenant anterior.
+    setRows([]);
+    setPreviewOpen(false);
+    setPreviewLoading(false);
+    setPreviewErrors([]);
+    setPreviewWarnings([]);
+    setPreviewXml('');
+    setAuditOpen(false);
+    setAuditLoading(false);
+    setAuditItems([]);
+    setAuditEmissaoId(null);
+    setIsModalOpen(false);
+    setEditing(null);
+    setFormAmbiente('homologacao');
+    setFormFrete('');
+    setFormNaturezaOperacao('');
+    setFormDestinatarioId(null);
+    setFormDestinatarioName(undefined);
+    setItems([]);
+    setProductToAddId(null);
+    setProductToAddName(undefined);
+    setDraftErrors([]);
+
+    if (prevEmpresaId && empresaId) {
+      addToast('Empresa alterada. Recarregando NF-e…', 'info');
+    }
+
+    setLoading(!!empresaId);
+    lastEmpresaIdRef.current = empresaId;
+  }, [addToast, empresaId]);
+
+  const effectiveLoading = empresaChanged;
+  const effectiveRows = empresaChanged ? [] : rows;
+
   const fetchList = useCallback(async () => {
     if (!empresaId) return;
+    if (empresaChanged) return;
     setLoading(true);
     try {
       const data = await fiscalNfeEmissoesList({
@@ -175,24 +216,24 @@ export default function NfeEmissoesPage() {
     } finally {
       setLoading(false);
     }
-  }, [addToast, empresaId, search, statusFilter]);
+  }, [addToast, empresaChanged, empresaId, search, statusFilter]);
 
   useEffect(() => {
-    if (!empresaId) return;
+    if (!empresaId || empresaChanged) return;
     void fetchList();
-  }, [empresaId, fetchList]);
+  }, [empresaChanged, empresaId, fetchList]);
 
   const totals = useMemo(() => {
-    const total = rows.length;
-    const rascunhos = rows.filter((r) => r.status === 'rascunho').length;
-    const autorizadas = rows.filter((r) => r.status === 'autorizada').length;
-    const pendentes = rows.filter((r) => ['enfileirada', 'processando'].includes(r.status)).length;
+    const total = effectiveRows.length;
+    const rascunhos = effectiveRows.filter((r) => r.status === 'rascunho').length;
+    const autorizadas = effectiveRows.filter((r) => r.status === 'autorizada').length;
+    const pendentes = effectiveRows.filter((r) => ['enfileirada', 'processando'].includes(r.status)).length;
     return { total, rascunhos, autorizadas, pendentes };
-  }, [rows]);
+  }, [effectiveRows]);
 
   const sortedRows = useMemo(() => {
     return sortRows(
-      rows,
+      effectiveRows,
       sort as any,
       [
         { id: 'status', type: 'string', getValue: (r) => STATUS_LABEL[r.status] || r.status },
@@ -202,7 +243,7 @@ export default function NfeEmissoesPage() {
         { id: 'atualizado', type: 'date', getValue: (r) => r.updated_at ?? null },
       ] as const
     );
-  }, [rows, sort]);
+  }, [effectiveRows, sort]);
 
   const openNew = async () => {
     setEditing(null);
@@ -531,12 +572,28 @@ export default function NfeEmissoesPage() {
     }
   };
 
+  if (authLoading) {
+    return (
+      <div className="flex justify-center p-12">
+        <Loader2 className="animate-spin text-blue-600" />
+      </div>
+    );
+  }
+
   if (!canShow) {
     return (
       <div className="p-6">
         <GlassCard className="p-6">
           <p className="text-sm text-slate-700">Selecione uma empresa ativa para visualizar as NF-e.</p>
         </GlassCard>
+      </div>
+    );
+  }
+
+  if (effectiveLoading) {
+    return (
+      <div className="flex justify-center p-12">
+        <Loader2 className="animate-spin text-blue-600" />
       </div>
     );
   }
@@ -622,7 +679,7 @@ export default function NfeEmissoesPage() {
           <div className="h-56 flex items-center justify-center">
             <Loader2 className="animate-spin text-blue-600" size={32} />
           </div>
-        ) : rows.length === 0 ? (
+        ) : effectiveRows.length === 0 ? (
           <div className="h-56 flex flex-col items-center justify-center text-center text-gray-500 p-4">
             <Receipt size={48} className="mb-3" />
             <p className="font-semibold text-lg">Nenhuma NF-e encontrada.</p>

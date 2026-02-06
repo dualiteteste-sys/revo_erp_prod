@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import PageHeader from '@/components/ui/PageHeader';
 import GlassCard from '@/components/ui/GlassCard';
 import { Button } from '@/components/ui/button';
@@ -69,14 +69,16 @@ type Props = {
 
 export default function NfeSettingsPage({ onEmitenteSaved, onNumeracaoSaved }: Props) {
   const supabase = useSupabase() as any;
-  const { activeEmpresa } = useAuth();
+  const { loading: authLoading, activeEmpresaId, activeEmpresa } = useAuth();
   const { addToast } = useToast();
   const features = useEmpresaFeatures();
   const empresaRoleQuery = useEmpresaRole();
   const canAdmin = empresaRoleQuery.isFetched && roleAtLeast(empresaRoleQuery.data, 'admin');
 
-  const empresaId = activeEmpresa?.id;
+  const empresaId = activeEmpresaId ?? activeEmpresa?.id ?? null;
   const webhookUrl = `${(import.meta as any).env?.VITE_SUPABASE_URL}/functions/v1/focusnfe-webhook`;
+  const lastEmpresaIdRef = useRef<string | null>(empresaId);
+  const empresaChanged = lastEmpresaIdRef.current !== empresaId;
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -93,12 +95,41 @@ export default function NfeSettingsPage({ onEmitenteSaved, onNumeracaoSaved }: P
   const [numeracao, setNumeracao] = useState<NfeNumeracao | null>(null);
   const [newSerie, setNewSerie] = useState<string>('');
 
+  useEffect(() => {
+    const prevEmpresaId = lastEmpresaIdRef.current;
+    if (prevEmpresaId === empresaId) return;
+
+    // Multi-tenant safety: evitar reaproveitar estado do tenant anterior.
+    setNfeEnabled(false);
+    setConfig(null);
+    setEmitente(null);
+    setNumeracoes([]);
+    setNumeracao(null);
+    setNewSerie('');
+    setSaving(false);
+    setSavingFlag(false);
+    setSavingEmitente(false);
+    setSavingNumeracao(false);
+    setUploadingCert(false);
+    setDeletingCert(false);
+
+    if (prevEmpresaId && empresaId) {
+      addToast('Empresa alterada. Recarregando configurações da NF-e…', 'info');
+    }
+
+    setLoading(!!empresaId);
+    lastEmpresaIdRef.current = empresaId;
+  }, [addToast, empresaId]);
+
+  const effectiveLoading = empresaChanged;
+
   const canShow = useMemo(() => !!empresaId, [empresaId]);
 
   const digitsOnly = (v: string | null | undefined) => (v || '').toString().replace(/\D/g, '');
 
   const fetchData = useCallback(async () => {
     if (!empresaId) return;
+    if (empresaChanged) return;
     setLoading(true);
     try {
       const [flags, cfgFocusRow, emitRow, numsRows] = await Promise.all([
@@ -191,12 +222,12 @@ export default function NfeSettingsPage({ onEmitenteSaved, onNumeracaoSaved }: P
     } finally {
       setLoading(false);
     }
-  }, [addToast, empresaId, supabase]);
+  }, [addToast, empresaChanged, empresaId, supabase]);
 
   useEffect(() => {
-    if (!empresaId) return;
+    if (!empresaId || empresaChanged) return;
     void fetchData();
-  }, [empresaId, fetchData]);
+  }, [empresaChanged, empresaId, fetchData]);
 
   const handleSaveFlag = async () => {
     if (!empresaId) return;
@@ -373,12 +404,28 @@ export default function NfeSettingsPage({ onEmitenteSaved, onNumeracaoSaved }: P
     }
   };
 
+  if (authLoading) {
+    return (
+      <div className="flex justify-center p-12">
+        <Loader2 className="animate-spin text-blue-600" />
+      </div>
+    );
+  }
+
   if (!canShow) {
     return (
       <div className="p-6">
         <GlassCard className="p-6">
           <p className="text-sm text-slate-700">Selecione uma empresa ativa para configurar a NF-e.</p>
         </GlassCard>
+      </div>
+    );
+  }
+
+  if (effectiveLoading) {
+    return (
+      <div className="flex justify-center p-12">
+        <Loader2 className="animate-spin text-blue-600" />
       </div>
     );
   }
