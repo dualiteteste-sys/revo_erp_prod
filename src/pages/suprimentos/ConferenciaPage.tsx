@@ -29,6 +29,7 @@ import TableColGroup from '@/components/ui/table/TableColGroup';
 import { useTableColumnWidths, type TableColumnWidthDef } from '@/components/ui/table/useTableColumnWidths';
 import { sortRows, toggleSort } from '@/components/ui/table/sortUtils';
 import { useEmpresaFeatures } from '@/hooks/useEmpresaFeatures';
+import { useAuth } from '@/contexts/AuthProvider';
 
 export default function ConferenciaPage() {
     const { id } = useParams<{ id: string }>();
@@ -36,6 +37,7 @@ export default function ConferenciaPage() {
     const location = useLocation();
     const { addToast } = useToast();
     const { confirm } = useConfirm();
+    const { loading: authLoading, activeEmpresaId } = useAuth();
     const features = useEmpresaFeatures();
     const canMaterialCliente = !features.loading && features.industria_enabled;
 
@@ -71,6 +73,49 @@ export default function ConferenciaPage() {
     const rowRefs = useRef<Record<string, HTMLTableRowElement | null>>({});
     const [sort, setSort] = useState<SortState<string>>({ column: 'produto_xml', direction: 'asc' });
     const [obSort, setObSort] = useState<SortState<string>>({ column: 'produto_xml', direction: 'asc' });
+
+    const lastEmpresaIdRef = useRef<string | null>(activeEmpresaId);
+    const empresaChanged = lastEmpresaIdRef.current !== activeEmpresaId;
+
+    useEffect(() => {
+        const prevEmpresaId = lastEmpresaIdRef.current;
+        if (prevEmpresaId === activeEmpresaId) return;
+
+        // Multi-tenant safety: evitar reaproveitar estado do tenant anterior.
+        setRecebimento(null);
+        setItens([]);
+        setSaving(null);
+        lastSavePromiseRef.current = null;
+        setFinalizing(false);
+        setIsClassificacaoOpen(false);
+        setClassificacao('estoque_proprio');
+        setClassificacaoClienteId(null);
+        setClassificacaoClienteNome(undefined);
+        setClassificando(false);
+        setResolvendoSugestao(false);
+        setIsCreateClienteOpen(false);
+        setSyncingMateriaisCliente(false);
+        setShowItens(true);
+        setIsGerarObOpen(false);
+        setGerarObPedido('');
+        setGerarObSelecionados({});
+        setGerarObLoading(false);
+        setSavingCustos(false);
+        setIsScanOpen(false);
+        setHighlightItemId(null);
+        rowRefs.current = {};
+
+        if (prevEmpresaId && activeEmpresaId) {
+            addToast('Empresa alterada. Selecione um recebimento novamente.', 'info');
+            navigate('/app/suprimentos/recebimentos', { replace: true });
+        }
+
+        setLoading(!!activeEmpresaId);
+        lastEmpresaIdRef.current = activeEmpresaId;
+    }, [activeEmpresaId, addToast, navigate]);
+
+    const effectiveLoading = !!activeEmpresaId && (loading || empresaChanged);
+    const effectiveItens = empresaChanged ? [] : itens;
 
     const itensColumns: TableColumnWidthDef[] = [
         { id: 'produto_xml', defaultWidth: 380, minWidth: 240 },
@@ -113,7 +158,7 @@ export default function ConferenciaPage() {
 
     const sortedItens = useMemo(() => {
         return sortRows(
-            itens,
+            effectiveItens,
             sort as any,
             [
                 { id: 'produto_xml', type: 'string', getValue: (i) => i.fiscal_nfe_import_items?.xprod ?? '' },
@@ -123,10 +168,10 @@ export default function ConferenciaPage() {
                 { id: 'status', type: 'string', getValue: (i) => String(i.status ?? '') },
             ] as const
         );
-    }, [itens, sort]);
+    }, [effectiveItens, sort]);
 
     const sortedGerarObItens = useMemo(() => {
-        const base = itens.map((it) => {
+        const base = effectiveItens.map((it) => {
             const qty = (it.quantidade_conferida && it.quantidade_conferida > 0) ? it.quantidade_conferida : it.quantidade_xml;
             const disabled = !it.produto_id;
             return { it, qty, disabled };
@@ -140,11 +185,13 @@ export default function ConferenciaPage() {
                 { id: 'qtd', type: 'number', getValue: (r) => Number(r.qty ?? 0) },
             ] as const
         );
-    }, [itens, obSort]);
+    }, [effectiveItens, obSort]);
 
     useEffect(() => {
-        if (id) loadData(id);
-    }, [id]);
+        if (!id) return;
+        if (!activeEmpresaId || empresaChanged) return;
+        loadData(id);
+    }, [activeEmpresaId, empresaChanged, id]);
 
     const detailsViewParam = useMemo(() => new URLSearchParams(location.search).get('view') === 'details', [location.search]);
 
@@ -661,7 +708,9 @@ export default function ConferenciaPage() {
         }
     };
 
-    if (loading) return <div className="flex justify-center p-12"><Loader2 className="animate-spin text-blue-600" /></div>;
+    if (authLoading) return <div className="flex justify-center p-12"><Loader2 className="animate-spin text-blue-600" /></div>;
+    if (!activeEmpresaId) return <div className="p-12 text-center text-gray-600">Selecione uma empresa para conferir recebimentos.</div>;
+    if (effectiveLoading) return <div className="flex justify-center p-12"><Loader2 className="animate-spin text-blue-600" /></div>;
     if (!recebimento) return <div className="p-12 text-center">Recebimento não encontrado.</div>;
 
     const isConcluido = recebimento.status === 'concluido';
