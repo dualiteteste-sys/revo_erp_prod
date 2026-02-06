@@ -18,7 +18,7 @@ type Totais = {
 
 export default function RelatoriosVendasPage() {
   const { addToast } = useToast();
-  const { activeEmpresaId } = useAuth();
+  const { loading: authLoading, activeEmpresaId } = useAuth();
   const [loading, setLoading] = useState(true);
   const [orders, setOrders] = useState<VendaPedido[]>([]);
   const [pdvTotal, setPdvTotal] = useState(0);
@@ -26,6 +26,7 @@ export default function RelatoriosVendasPage() {
 
   const lastEmpresaIdRef = useRef<string | null>(activeEmpresaId);
   const empresaChanged = lastEmpresaIdRef.current !== activeEmpresaId;
+  const fetchTokenRef = useRef(0);
 
   useEffect(() => {
     lastEmpresaIdRef.current = activeEmpresaId;
@@ -52,18 +53,27 @@ export default function RelatoriosVendasPage() {
       setLoading(false);
       return;
     }
+
+    const token = ++fetchTokenRef.current;
+    const empresaSnapshot = activeEmpresaId;
     setLoading(true);
     try {
       const [all, totals] = await Promise.all([listVendas({ search: '', status: undefined, limit: 500, offset: 0 }), getRelatoriosVendasTotais()]);
+      if (token !== fetchTokenRef.current) return;
+      if (empresaSnapshot !== lastEmpresaIdRef.current) return;
       setOrders(all);
       setPdvTotal(totals.pdvTotal);
       setDevolucoesTotal(totals.devolucoesTotal);
     } catch (e: any) {
+      if (token !== fetchTokenRef.current) return;
+      if (empresaSnapshot !== lastEmpresaIdRef.current) return;
       addToast(e.message || 'Falha ao carregar relatórios.', 'error');
       setOrders([]);
       setPdvTotal(0);
       setDevolucoesTotal(0);
     } finally {
+      if (token !== fetchTokenRef.current) return;
+      if (empresaSnapshot !== lastEmpresaIdRef.current) return;
       setLoading(false);
     }
   }, [activeEmpresaId, addToast]);
@@ -73,19 +83,22 @@ export default function RelatoriosVendasPage() {
   }, [load]);
 
   const effectiveLoading = !!activeEmpresaId && (loading || empresaChanged);
+  const effectiveOrders = empresaChanged ? [] : orders;
+  const effectivePdvTotal = empresaChanged ? 0 : pdvTotal;
+  const effectiveDevolucoesTotal = empresaChanged ? 0 : devolucoesTotal;
 
   const totais: Totais = useMemo(() => {
     const t: Totais = {
-      pedidos: orders.length,
+      pedidos: effectiveOrders.length,
       total: 0,
       orcamentos: 0,
       aprovados: 0,
       concluidos: 0,
       cancelados: 0,
-      pdvTotal,
-      devolucoesTotal,
+      pdvTotal: effectivePdvTotal,
+      devolucoesTotal: effectiveDevolucoesTotal,
     };
-    for (const o of orders) {
+    for (const o of effectiveOrders) {
       t.total += Number(o.total_geral || 0);
       if (o.status === 'orcamento') t.orcamentos += 1;
       if (o.status === 'aprovado') t.aprovados += 1;
@@ -93,7 +106,7 @@ export default function RelatoriosVendasPage() {
       if (o.status === 'cancelado') t.cancelados += 1;
     }
     return t;
-  }, [orders, pdvTotal, devolucoesTotal]);
+  }, [effectiveOrders, effectivePdvTotal, effectiveDevolucoesTotal]);
 
   const cards = [
     { label: 'Pedidos (todos)', value: String(totais.pedidos) },
@@ -119,7 +132,11 @@ export default function RelatoriosVendasPage() {
       </div>
 
       <div className="bg-white rounded-lg shadow p-4 flex-grow">
-        {!activeEmpresaId ? (
+        {authLoading ? (
+          <div className="flex justify-center h-64 items-center">
+            <Loader2 className="animate-spin text-blue-600 w-10 h-10" />
+          </div>
+        ) : !activeEmpresaId ? (
           <div className="flex justify-center h-64 items-center text-gray-600">
             Selecione uma empresa para ver os relatórios.
           </div>
