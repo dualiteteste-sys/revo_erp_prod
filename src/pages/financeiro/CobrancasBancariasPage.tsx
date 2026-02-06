@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useCobrancas } from '@/hooks/useCobrancas';
 import { useToast } from '@/contexts/ToastProvider';
 import { useConfirm } from '@/contexts/ConfirmProvider';
@@ -19,8 +19,10 @@ import { Button } from '@/components/ui/button';
 import { isSeedEnabled } from '@/utils/seed';
 import { useSearchParams } from 'react-router-dom';
 import { useEditLock } from '@/components/ui/hooks/useEditLock';
+import { useAuth } from '@/contexts/AuthProvider';
 
 export default function CobrancasBancariasPage() {
+  const { loading: authLoading, activeEmpresaId } = useAuth();
   const enableSeed = isSeedEnabled();
   const {
     cobrancas,
@@ -48,6 +50,9 @@ export default function CobrancasBancariasPage() {
   const openId = searchParams.get('open');
   const editLock = useEditLock('financeiro:cobrancas');
 
+  const lastEmpresaIdRef = useRef<string | null>(activeEmpresaId);
+  const empresaChanged = lastEmpresaIdRef.current !== activeEmpresaId;
+
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [selectedCobranca, setSelectedCobranca] = useState<cobrancasService.CobrancaBancaria | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -55,6 +60,35 @@ export default function CobrancasBancariasPage() {
   const [cobrancaToDelete, setCobrancaToDelete] = useState<cobrancasService.CobrancaBancaria | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
   const [isSeeding, setIsSeeding] = useState(false);
+
+  useEffect(() => {
+    const prevEmpresaId = lastEmpresaIdRef.current;
+    if (prevEmpresaId === activeEmpresaId) return;
+
+    // Multi-tenant safety: evitar reaproveitar estado do tenant anterior.
+    setIsFormOpen(false);
+    setSelectedCobranca(null);
+    setIsDeleteModalOpen(false);
+    setCobrancaToDelete(null);
+    setIsDeleting(false);
+    setIsSeeding(false);
+    if (editingId) editLock.release(editingId);
+    setEditingId(null);
+
+    const open = searchParams.get('open');
+    if (open) {
+      const next = new URLSearchParams(searchParams);
+      next.delete('open');
+      setSearchParams(next, { replace: true });
+    }
+
+    if (prevEmpresaId && activeEmpresaId) {
+      addToast('Empresa alterada. Recarregando cobranças…', 'info');
+    }
+
+    lastEmpresaIdRef.current = activeEmpresaId;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeEmpresaId]);
 
   const clearOpenParam = useCallback(() => {
     if (!openId) return;
@@ -150,13 +184,32 @@ export default function CobrancasBancariasPage() {
   useEffect(() => {
     if (!openId) return;
     if (isFormOpen) return;
+    if (authLoading || !activeEmpresaId || empresaChanged) return;
     void (async () => {
       const ok = await openWithLock(openId);
       if (!ok) return;
       setSelectedCobranca({ id: openId } as any);
       setIsFormOpen(true);
     })();
-  }, [isFormOpen, openId, openWithLock]);
+  }, [activeEmpresaId, authLoading, empresaChanged, isFormOpen, openId, openWithLock]);
+
+  const effectiveLoading = !!activeEmpresaId && (loading || empresaChanged);
+  const effectiveError = empresaChanged ? null : error;
+  const effectiveCobrancas = empresaChanged ? [] : cobrancas;
+  const effectiveCount = empresaChanged ? 0 : count;
+  const canShowSummary = !empresaChanged && !!summary;
+
+  if (authLoading) {
+    return (
+      <div className="flex justify-center h-full items-center">
+        <Loader2 className="animate-spin text-blue-600 w-10 h-10" />
+      </div>
+    );
+  }
+
+  if (!activeEmpresaId) {
+    return <div className="p-4 text-gray-600">Selecione uma empresa para ver cobranças bancárias.</div>;
+  }
 
   return (
     <div className="p-1 min-h-full flex flex-col">
@@ -181,7 +234,7 @@ export default function CobrancasBancariasPage() {
         </div>
       </div>
 
-      <CobrancasSummary summary={summary} />
+      {canShowSummary ? <CobrancasSummary summary={summary} /> : null}
 
       <div className="mt-6 mb-4 flex flex-wrap gap-4 items-end">
         <div className="relative flex-grow max-w-xs">
@@ -238,13 +291,13 @@ export default function CobrancasBancariasPage() {
 
       <div className="bg-white rounded-lg shadow overflow-hidden flex flex-col flex-1 min-h-0">
         <div className="flex-1 min-h-0 overflow-auto">
-          {loading && cobrancas.length === 0 ? (
+          {effectiveLoading && effectiveCobrancas.length === 0 ? (
             <div className="h-96 flex items-center justify-center">
               <Loader2 className="animate-spin text-blue-500" size={32} />
             </div>
-          ) : error ? (
-            <div className="h-96 flex items-center justify-center text-red-500">{error}</div>
-          ) : cobrancas.length === 0 ? (
+          ) : effectiveError ? (
+            <div className="h-96 flex items-center justify-center text-red-500">{effectiveError}</div>
+          ) : effectiveCobrancas.length === 0 ? (
             <div className="h-96 flex flex-col items-center justify-center text-gray-500">
               <Landmark size={48} className="mb-4 opacity-20" />
               <p>Nenhuma cobrança encontrada.</p>
@@ -252,12 +305,12 @@ export default function CobrancasBancariasPage() {
             </div>
           ) : (
             <ResponsiveTable
-              data={cobrancas}
+              data={effectiveCobrancas}
               getItemId={(c) => c.id}
-              loading={loading}
+              loading={effectiveLoading}
               tableComponent={
                 <CobrancasTable
-                  cobrancas={cobrancas}
+                  cobrancas={effectiveCobrancas}
                   onEdit={handleOpenForm}
                   onDelete={handleOpenDeleteModal}
                 />
@@ -275,11 +328,11 @@ export default function CobrancasBancariasPage() {
         </div>
       </div>
 
-      {count > 0 ? (
+      {effectiveCount > 0 ? (
         <ListPaginationBar className="mt-4" innerClassName="px-3 sm:px-4">
           <Pagination
             currentPage={page}
-            totalCount={count}
+            totalCount={effectiveCount}
             pageSize={pageSize}
             onPageChange={setPage}
             onPageSizeChange={(next) => {
