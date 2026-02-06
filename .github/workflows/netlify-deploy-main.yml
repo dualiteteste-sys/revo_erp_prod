@@ -78,4 +78,4 @@ jobs:
           NETLIFY_SITE_ID: ${{ secrets.NETLIFY_SITE_ID_PROD }}
         run: |
           set -euo pipefail
-          npx -y netlify-cli@17.41.1 deploy --dir dist --prod --site "$NETLIFY_SITE_ID" --message "deploy(prod) ${GITHUB_SHA}"
+          npx -y netlify-cli@17 deploy --dir dist --prod --site "$NETLIFY_SITE_ID" --message "deploy(prod) ${GITHUB_SHA}"
