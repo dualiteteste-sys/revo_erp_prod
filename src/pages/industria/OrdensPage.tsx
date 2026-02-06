@@ -268,7 +268,6 @@ export default function OrdensPage() {
 
   if (authLoading) return <div className="flex justify-center p-12"><Loader2 className="animate-spin text-blue-600" /></div>;
   if (!activeEmpresaId) return <div className="p-12 text-center text-gray-600">Selecione uma empresa para ver as ordens.</div>;
-  if (effectiveLoading) return <div className="flex justify-center p-12"><Loader2 className="animate-spin text-blue-600" /></div>;
 
   const handleDraftTipoChange = (nextTipo: 'industrializacao' | 'beneficiamento') => {
     if (selectedId) return; // só para novas ordens
@@ -370,15 +369,15 @@ export default function OrdensPage() {
       <div className="flex-grow overflow-hidden">
         {viewMode === 'list' ? (
           <div className="bg-white rounded-lg shadow overflow-hidden h-full overflow-y-auto">
-            {loading ? (
+            {effectiveLoading ? (
               <div className="flex justify-center h-64 items-center">
                 <Loader2 className="animate-spin text-blue-600 w-10 h-10" />
               </div>
             ) : (
               <ResponsiveTable
-                data={orders}
+                data={effectiveOrders}
                 getItemId={(o) => o.id}
-                loading={loading}
+                loading={effectiveLoading}
                 tableComponent={
                   <OrdensTable orders={effectiveOrders} onEdit={handleEdit} onClone={handleClone} onChanged={handleSuccess} />
                 }
