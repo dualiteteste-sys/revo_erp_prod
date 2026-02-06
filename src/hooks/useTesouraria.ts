@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useDebounce } from './useDebounce';
 import * as treasuryService from '../services/treasury';
 import { useAuth } from '../contexts/AuthProvider';
@@ -21,12 +21,19 @@ export const TESOURARIA_KEYS = {
 
 export const useContasCorrentes = () => {
   const { activeEmpresa } = useAuth();
+  const empresaId = activeEmpresa?.id ?? null;
+  const lastEmpresaIdRef = useRef<string | null>(empresaId);
+  const empresaChanged = lastEmpresaIdRef.current !== empresaId;
 
   const [searchTerm, setSearchTerm] = useState('');
   const debouncedSearchTerm = useDebounce(searchTerm, 500);
   const [filterAtivo, setFilterAtivo] = useState<boolean | null>(true);
   const [page, setPage] = useState(1);
   const [pageSize] = useState(20);
+
+  useEffect(() => {
+    lastEmpresaIdRef.current = empresaId;
+  }, [empresaId]);
 
   const queryOptions = {
     page,
@@ -36,13 +43,14 @@ export const useContasCorrentes = () => {
   };
 
   const { data, isLoading, isError, error: queryError, refetch } = useQuery({
-    queryKey: TESOURARIA_KEYS.contas.list({ ...queryOptions, empresaId: activeEmpresa?.id }),
+    queryKey: TESOURARIA_KEYS.contas.list({ ...queryOptions, empresaId }),
     queryFn: () => {
       if (!activeEmpresa) return { data: [], count: 0 };
       return treasuryService.listContasCorrentes(queryOptions);
     },
-    placeholderData: keepPreviousData,
-    enabled: !!activeEmpresa,
+    // Multi-tenant safety: evitar exibir "keep previous data" ao trocar de empresa.
+    placeholderData: empresaChanged ? undefined : keepPreviousData,
+    enabled: !!empresaId,
   });
 
   return {
@@ -63,6 +71,9 @@ export const useContasCorrentes = () => {
 
 export const useMovimentacoes = (contaCorrenteId: string | null) => {
   const { activeEmpresa } = useAuth();
+  const empresaId = activeEmpresa?.id ?? null;
+  const lastEmpresaIdRef = useRef<string | null>(empresaId);
+  const empresaChanged = lastEmpresaIdRef.current !== empresaId;
 
   const [searchTerm, setSearchTerm] = useState('');
   const debouncedSearchTerm = useDebounce(searchTerm, 500);
@@ -71,6 +82,10 @@ export const useMovimentacoes = (contaCorrenteId: string | null) => {
   const [tipoMov, setTipoMov] = useState<'entrada' | 'saida' | null>(null);
   const [page, setPage] = useState(1);
   const [pageSize] = useState(50);
+
+  useEffect(() => {
+    lastEmpresaIdRef.current = empresaId;
+  }, [empresaId]);
 
   const queryOptions = {
     contaCorrenteId: contaCorrenteId!,
@@ -83,13 +98,14 @@ export const useMovimentacoes = (contaCorrenteId: string | null) => {
   };
 
   const { data, isLoading, isError, error: queryError, refetch } = useQuery({
-    queryKey: TESOURARIA_KEYS.movimentacoes.list({ ...queryOptions, empresaId: activeEmpresa?.id }),
+    queryKey: TESOURARIA_KEYS.movimentacoes.list({ ...queryOptions, empresaId }),
     queryFn: () => {
       if (!activeEmpresa || !contaCorrenteId) return { data: [], count: 0 };
       return treasuryService.listMovimentacoes(queryOptions);
     },
-    placeholderData: keepPreviousData,
-    enabled: !!activeEmpresa && !!contaCorrenteId,
+    // Multi-tenant safety: evitar exibir "keep previous data" ao trocar de empresa.
+    placeholderData: empresaChanged ? undefined : keepPreviousData,
+    enabled: !!empresaId && !!contaCorrenteId,
   });
 
   return {
@@ -114,6 +130,9 @@ export const useMovimentacoes = (contaCorrenteId: string | null) => {
 
 export const useExtratos = (contaCorrenteId: string | null) => {
   const { activeEmpresa } = useAuth();
+  const empresaId = activeEmpresa?.id ?? null;
+  const lastEmpresaIdRef = useRef<string | null>(empresaId);
+  const empresaChanged = lastEmpresaIdRef.current !== empresaId;
 
   const [searchTerm, setSearchTerm] = useState('');
   const debouncedSearchTerm = useDebounce(searchTerm, 500);
@@ -122,6 +141,10 @@ export const useExtratos = (contaCorrenteId: string | null) => {
   const [filterConciliado, setFilterConciliado] = useState<boolean | null>(false); // false = apenas pendentes
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(50);
+
+  useEffect(() => {
+    lastEmpresaIdRef.current = empresaId;
+  }, [empresaId]);
 
   const queryOptions = {
     contaCorrenteId: contaCorrenteId!,
@@ -134,13 +157,14 @@ export const useExtratos = (contaCorrenteId: string | null) => {
   };
 
   const { data, isLoading, isError, error: queryError, refetch } = useQuery({
-    queryKey: TESOURARIA_KEYS.extratos.list({ ...queryOptions, empresaId: activeEmpresa?.id }),
+    queryKey: TESOURARIA_KEYS.extratos.list({ ...queryOptions, empresaId }),
     queryFn: () => {
       if (!activeEmpresa || !contaCorrenteId) return { data: [], count: 0 };
       return treasuryService.listExtratos(queryOptions);
     },
-    placeholderData: keepPreviousData,
-    enabled: !!activeEmpresa && !!contaCorrenteId,
+    // Multi-tenant safety: evitar exibir "keep previous data" ao trocar de empresa.
+    placeholderData: empresaChanged ? undefined : keepPreviousData,
+    enabled: !!empresaId && !!contaCorrenteId,
   });
 
   return {
