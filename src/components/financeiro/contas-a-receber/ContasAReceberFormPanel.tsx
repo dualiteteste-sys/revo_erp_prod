@@ -1,6 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { Loader2, Save } from 'lucide-react';
-import { ContaAReceber, getContaAReceberDetails, saveContaAReceber } from '@/services/contasAReceber';
+import {
+  ContaAReceber,
+  ContaAReceberRecebimento,
+  estornarContaAReceberRecebimento,
+  getContaAReceberDetails,
+  listContaAReceberRecebimentos,
+  saveContaAReceber,
+} from '@/services/contasAReceber';
 import { getPartnerDetails } from '@/services/partners';
 import { useToast } from '@/contexts/ToastProvider';
 import Section from '@/components/ui/forms/Section';
@@ -13,6 +20,7 @@ import CentroDeCustoDropdown from '@/components/common/CentroDeCustoDropdown';
 import { Switch } from '@/components/ui/switch';
 import RecorrenciaApplyScopeDialog from '@/components/financeiro/recorrencias/RecorrenciaApplyScopeDialog';
 import ParcelamentoDialog from '@/components/financeiro/parcelamento/ParcelamentoDialog';
+import EstornoRecebimentoModal from '@/components/financeiro/common/EstornoRecebimentoModal';
 import {
   applyRecorrenciaUpdate,
   generateRecorrencia,
@@ -26,6 +34,7 @@ import { createParcelamentoContasAReceber } from '@/services/financeiroParcelame
 interface ContasAReceberFormPanelProps {
   conta: Partial<ContaAReceber> | null;
   onSaveSuccess: (savedConta?: ContaAReceber) => void;
+  onMutate?: () => void;
   onClose: () => void;
 }
 
@@ -35,13 +44,18 @@ const statusOptions = [
   { value: 'cancelado', label: 'Cancelado' },
 ];
 
-const ContasAReceberFormPanel: React.FC<ContasAReceberFormPanelProps> = ({ conta, onSaveSuccess, onClose }) => {
+const ContasAReceberFormPanel: React.FC<ContasAReceberFormPanelProps> = ({ conta, onSaveSuccess, onMutate, onClose }) => {
   const { addToast } = useToast();
   const [isSaving, setIsSaving] = useState(false);
   const [formData, setFormData] = useState<Partial<ContaAReceber>>({});
   const [clienteName, setClienteName] = useState('');
-  const isPago = formData.status === 'pago';
+  const isPagoOuParcial = formData.status === 'pago' || formData.status === 'parcial';
   const isEditing = !!conta?.id;
+
+  const [recebimentos, setRecebimentos] = useState<ContaAReceberRecebimento[]>([]);
+  const [isLoadingRecebimentos, setIsLoadingRecebimentos] = useState(false);
+  const [isEstornoRecebimentoOpen, setIsEstornoRecebimentoOpen] = useState(false);
+  const [recebimentoToReverse, setRecebimentoToReverse] = useState<ContaAReceberRecebimento | null>(null);
 
   const [recApplyOpen, setRecApplyOpen] = useState(false);
   const [recApplyScope, setRecApplyScope] = useState<FinanceiroRecorrenciaApplyScope>('single');
@@ -83,6 +97,31 @@ const ContasAReceberFormPanel: React.FC<ContasAReceberFormPanelProps> = ({ conta
       setParcelarCondicao('1x');
     }
   }, [conta]);
+
+  useEffect(() => {
+    const contaId = String(conta?.id || '');
+    if (!contaId) {
+      setRecebimentos([]);
+      return;
+    }
+
+    let cancelled = false;
+    void (async () => {
+      setIsLoadingRecebimentos(true);
+      try {
+        const list = await listContaAReceberRecebimentos(contaId);
+        if (!cancelled) setRecebimentos(list);
+      } catch (e: any) {
+        if (!cancelled) addToast(e?.message || 'Erro ao carregar recebimentos.', 'error');
+      } finally {
+        if (!cancelled) setIsLoadingRecebimentos(false);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [addToast, conta?.id]);
 
   const handleFormChange = (field: keyof ContaAReceber | 'centro_de_custo_id', value: any) => {
     setFormData((prev: Partial<ContaAReceber>) => ({ ...(prev as any), [field]: value } as any));
@@ -306,9 +345,10 @@ const ContasAReceberFormPanel: React.FC<ContasAReceberFormPanelProps> = ({ conta
             value={formData.status || 'pendente'}
             onChange={e => handleFormChange('status', e.target.value as any)}
             className="sm:col-span-3"
-            disabled={isPago}
+            disabled={isPagoOuParcial}
           >
-            {isPago ? <option value="pago">Pago (registrado)</option> : null}
+            {isPagoOuParcial && formData.status === 'pago' ? <option value="pago">Pago (registrado)</option> : null}
+            {isPagoOuParcial && formData.status === 'parcial' ? <option value="parcial">Parcial (registrado)</option> : null}
             {statusOptions.map(opt => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
           </Select>
         </Section>
@@ -413,19 +453,144 @@ const ContasAReceberFormPanel: React.FC<ContasAReceberFormPanelProps> = ({ conta
             Para registrar recebimento (e manter a Tesouraria/caixa consistente), use a ação <span className="font-medium">Registrar recebimento</span> na listagem.
           </div>
           <Input label="Data de Recebimento" name="data_pagamento" type="date" value={formData.data_pagamento?.split('T')[0] || ''} disabled className="sm:col-span-3" />
-          <Input label="Valor Recebido" name="valor_pago" startAdornment="R$" inputMode="numeric" value={new Intl.NumberFormat('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(formData.valor_pago || 0)} disabled className="sm:col-span-3" />
+          <Input
+            label="Valor Recebido"
+            name="valor_pago"
+            startAdornment="R$"
+            inputMode="numeric"
+            value={new Intl.NumberFormat('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(formData.valor_pago || 0)}
+            disabled
+            className="sm:col-span-3"
+          />
           <TextArea label="Observações" name="observacoes" value={formData.observacoes || ''} onChange={e => handleFormChange('observacoes', e.target.value)} rows={3} className="sm:col-span-6" />
         </Section>
-      </div>
-      <footer className="flex-shrink-0 p-4 flex justify-end items-center border-t border-white/20">
-        <div className="flex gap-3">
-          <button type="button" onClick={onClose} className="rounded-md border border-gray-300 bg-white py-2 px-4 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50">Cancelar</button>
-          <button onClick={handleSave} disabled={isSaving} className="flex items-center gap-2 bg-blue-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50">
-            {isSaving ? <Loader2 className="animate-spin" size={20} /> : <Save size={20} />}
-            Salvar Conta
-          </button>
-        </div>
-      </footer>
+
+	        {isEditing ? (
+	          <Section title="Recebimentos" description="Histórico de recebimentos parciais e estornos (por evento).">
+	            {isLoadingRecebimentos ? (
+	              <div className="sm:col-span-6 flex items-center gap-2 text-sm text-gray-600">
+	                <Loader2 className="animate-spin" size={16} />
+	                Carregando recebimentos...
+	              </div>
+	            ) : recebimentos.length === 0 ? (
+	              <div className="sm:col-span-6 text-sm text-gray-600">Nenhum recebimento registrado ainda.</div>
+	            ) : (
+	              <div className="sm:col-span-6 overflow-x-auto">
+	                <table className="min-w-[820px] w-full divide-y divide-gray-200">
+	                  <thead className="bg-gray-50">
+	                    <tr>
+	                      <th className="px-4 py-2 text-left text-xs font-semibold text-gray-700">Data</th>
+	                      <th className="px-4 py-2 text-right text-xs font-semibold text-gray-700">Valor</th>
+	                      <th className="px-4 py-2 text-left text-xs font-semibold text-gray-700">Conta</th>
+	                      <th className="px-4 py-2 text-left text-xs font-semibold text-gray-700">Status</th>
+	                      <th className="px-4 py-2 text-left text-xs font-semibold text-gray-700">Observações</th>
+	                      <th className="px-4 py-2 text-right text-xs font-semibold text-gray-700">Ações</th>
+	                    </tr>
+	                  </thead>
+	                  <tbody className="bg-white divide-y divide-gray-200">
+	                    {recebimentos.map((r) => {
+	                      const canReverse = !r.estornado && !r.movimentacao_conciliada;
+	                      const statusLabel = r.estornado ? 'Estornado' : 'Recebido';
+	                      const statusClass = r.estornado ? 'bg-gray-100 text-gray-800' : 'bg-green-100 text-green-800';
+	                      return (
+	                        <tr key={r.id} className="hover:bg-gray-50">
+	                          <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-700">
+	                            {new Date(r.data_recebimento).toLocaleDateString('pt-BR')}
+	                          </td>
+	                          <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-700 text-right font-semibold">
+	                            {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Number(r.valor || 0))}
+	                          </td>
+	                          <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-600">{r.conta_corrente_nome || '-'}</td>
+	                          <td className="px-4 py-2 whitespace-nowrap">
+	                            <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${statusClass}`}>
+	                              {statusLabel}
+	                              {r.movimentacao_conciliada ? ' • conciliado' : ''}
+	                            </span>
+	                          </td>
+	                          <td className="px-4 py-2 text-sm text-gray-600">{r.estorno_motivo || r.observacoes || '-'}</td>
+	                          <td className="px-4 py-2 whitespace-nowrap text-right text-sm">
+	                            <button
+	                              type="button"
+	                              onClick={() => {
+	                                setRecebimentoToReverse(r);
+	                                setIsEstornoRecebimentoOpen(true);
+	                              }}
+	                              disabled={!canReverse || isSaving}
+	                              className="rounded-md border border-gray-300 bg-white py-1.5 px-3 text-xs font-medium text-gray-700 shadow-sm hover:bg-gray-50 disabled:opacity-50"
+	                              title={
+	                                r.movimentacao_conciliada
+	                                  ? 'Movimentação conciliada: desfaça a conciliação para estornar.'
+	                                  : r.estornado
+	                                    ? 'Recebimento já estornado.'
+	                                    : 'Estornar este recebimento.'
+	                              }
+	                            >
+	                              Estornar
+	                            </button>
+	                          </td>
+	                        </tr>
+	                      );
+	                    })}
+	                  </tbody>
+	                </table>
+	              </div>
+	            )}
+	          </Section>
+	        ) : null}
+	      </div>
+
+	      <EstornoRecebimentoModal
+	        isOpen={isEstornoRecebimentoOpen}
+	        onClose={() => {
+	          setIsEstornoRecebimentoOpen(false);
+	          setRecebimentoToReverse(null);
+	        }}
+	        title="Estornar recebimento"
+	        description={
+	          recebimentoToReverse?.valor
+	            ? `Estornar o recebimento de ${new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Number(recebimentoToReverse.valor || 0))}?`
+	            : 'Estornar recebimento?'
+	        }
+	        confirmLabel="Estornar"
+	        onConfirm={async ({ contaCorrenteId, dataISO, motivo }) => {
+	          if (!recebimentoToReverse?.id) return;
+	          setIsSaving(true);
+	          try {
+	            const updated = await estornarContaAReceberRecebimento({
+	              recebimentoId: recebimentoToReverse.id,
+	              dataEstorno: dataISO,
+	              contaCorrenteId,
+	              motivo,
+	            });
+	            addToast('Estorno registrado com sucesso!', 'success');
+
+	            const nextContaId = String((updated as any)?.id ?? conta?.id ?? '');
+	            if (nextContaId) {
+	              const list = await listContaAReceberRecebimentos(nextContaId);
+	              setRecebimentos(list);
+	            }
+	            setFormData((prev) => ({ ...prev, ...updated }));
+	            onMutate?.();
+
+	            setIsEstornoRecebimentoOpen(false);
+	            setRecebimentoToReverse(null);
+	          } catch (e: any) {
+	            addToast(e?.message || 'Erro ao estornar recebimento.', 'error');
+	            throw e;
+	          } finally {
+	            setIsSaving(false);
+	          }
+	        }}
+	      />
+	      <footer className="flex-shrink-0 p-4 flex justify-end items-center border-t border-white/20">
+	        <div className="flex gap-3">
+	          <button type="button" onClick={onClose} className="rounded-md border border-gray-300 bg-white py-2 px-4 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50">Cancelar</button>
+	          <button onClick={handleSave} disabled={isSaving} className="flex items-center gap-2 bg-blue-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50">
+	            {isSaving ? <Loader2 className="animate-spin" size={20} /> : <Save size={20} />}
+	            Salvar Conta
+	          </button>
+	        </div>
+	      </footer>
     </div>
   );
 };

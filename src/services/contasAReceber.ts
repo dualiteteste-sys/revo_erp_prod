@@ -37,6 +37,60 @@ export type ContasAReceberSummary = {
     total_vencido: number;
 };
 
+function getErrorMessage(error: unknown): string | null {
+  if (error instanceof Error) return error.message;
+  if (!error || typeof error !== 'object') return null;
+  if (!('message' in error)) return null;
+  const message = (error as Record<string, unknown>).message;
+  return typeof message === 'string' ? message : null;
+}
+
+export type ContaAReceberRecebimento = {
+  id: string;
+  data_recebimento: string;
+  valor: number;
+  conta_corrente_id: string;
+  conta_corrente_nome: string | null;
+  observacoes: string | null;
+  estornado: boolean;
+  estornado_at: string | null;
+  estorno_motivo: string | null;
+  movimentacao_id: string | null;
+  movimentacao_conciliada: boolean;
+  created_at: string;
+};
+
+export async function listContaAReceberRecebimentos(contaAReceberId: string): Promise<ContaAReceberRecebimento[]> {
+  try {
+    const data = await callRpc<ContaAReceberRecebimento[]>('financeiro_conta_a_receber_recebimentos_list', {
+      p_conta_a_receber_id: contaAReceberId,
+    });
+    return data || [];
+  } catch (error: unknown) {
+    console.error('[SERVICE][LIST_CONTA_A_RECEBER_RECEBIMENTOS]', error);
+    throw new Error(getErrorMessage(error) || 'Não foi possível carregar os recebimentos.');
+  }
+}
+
+export async function estornarContaAReceberRecebimento(params: {
+  recebimentoId: string;
+  dataEstorno?: string | null;
+  contaCorrenteId?: string | null;
+  motivo?: string | null;
+}): Promise<ContaAReceber> {
+  try {
+    return await callRpc<ContaAReceber>('financeiro_conta_a_receber_recebimento_estornar', {
+      p_recebimento_id: params.recebimentoId,
+      p_data_estorno: params.dataEstorno ?? null,
+      p_conta_corrente_id: params.contaCorrenteId ?? null,
+      p_motivo: params.motivo ?? null,
+    });
+  } catch (error: unknown) {
+    console.error('[SERVICE][ESTORNAR_CONTA_A_RECEBER_RECEBIMENTO]', error);
+    throw new Error(getErrorMessage(error) || 'Erro ao estornar o recebimento.');
+  }
+}
+
 export async function getContaAReceberFromOs(osId: string): Promise<string | null> {
   try {
     const result = await callRpc<string | null>('financeiro_conta_a_receber_from_os_get', { p_os_id: osId });
