@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AlertTriangle, CheckCircle2, Clock3, Loader2, PlusCircle, ScanLine, Search, Truck } from 'lucide-react';
 import Modal from '@/components/ui/Modal';
 import { useToast } from '@/contexts/ToastProvider';
@@ -72,6 +72,8 @@ export default function ExpedicaoPage() {
 
   const lastEmpresaIdRef = useRef<string | null>(activeEmpresaId);
   const empresaChanged = lastEmpresaIdRef.current !== activeEmpresaId;
+  const loadTokenRef = useRef(0);
+  const actionTokenRef = useRef(0);
 
   useEffect(() => {
     lastEmpresaIdRef.current = activeEmpresaId;
@@ -104,8 +106,12 @@ export default function ExpedicaoPage() {
     );
   }, [filteredRows, sort]);
 
-  async function load() {
-    if (!activeEmpresaId) {
+  const load = useCallback(async () => {
+    const token = ++loadTokenRef.current;
+    const empresaSnapshot = activeEmpresaId;
+
+    if (authLoading) return;
+    if (!empresaSnapshot) {
       setRows([]);
       setOrders([]);
       setStats(null);
@@ -119,21 +125,27 @@ export default function ExpedicaoPage() {
         listVendas({ search: '', status: undefined, limit: 500, offset: 0 }),
         getExpedicaoSlaStats({ slaHours }),
       ]);
+      if (token !== loadTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
       setRows(exp);
       setOrders(ord);
       setStats(st);
     } catch (e: any) {
+      if (token !== loadTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
       addToast(e.message || 'Falha ao carregar expedições.', 'error');
       setRows([]);
       setOrders([]);
       setStats(null);
     } finally {
+      if (token !== loadTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
       setLoading(false);
     }
-  }
+  }, [activeEmpresaId, addToast, authLoading, slaHours, statusFilter]);
 
   useEffect(() => {
     // Multi-tenant safety: evitar reaproveitar estado do tenant anterior.
+    loadTokenRef.current += 1;
+    actionTokenRef.current += 1;
+
     setRows([]);
     setOrders([]);
     setStats(null);
@@ -153,12 +165,7 @@ export default function ExpedicaoPage() {
 
   useEffect(() => {
     void load();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeEmpresaId]);
-  useEffect(() => {
-    void load();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeEmpresaId, slaHours]);
+  }, [load]);
 
   const effectiveLoading = !!activeEmpresaId && (loading || empresaChanged);
 
@@ -222,8 +229,8 @@ export default function ExpedicaoPage() {
     const pedidoNumero = onlyDigits ? Number(onlyDigits) : NaN;
     const found =
       Number.isFinite(pedidoNumero) && pedidoNumero > 0
-        ? rows.find((r) => Number(r.pedido_numero) === pedidoNumero)
-        : rows.find((r) => (r.tracking_code || '').toLowerCase().includes(value.toLowerCase()));
+        ? effectiveRows.find((r) => Number(r.pedido_numero) === pedidoNumero)
+        : effectiveRows.find((r) => (r.tracking_code || '').toLowerCase().includes(value.toLowerCase()));
 
     if (found) {
       openEdit(found);
@@ -236,16 +243,22 @@ export default function ExpedicaoPage() {
   useEffect(() => {
     if (!isOpen || !selectedExpedicaoId) return;
     (async () => {
+      const token = ++actionTokenRef.current;
+      const empresaSnapshot = activeEmpresaId;
       try {
         const ev = await listExpedicaoEventos(selectedExpedicaoId);
+        if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
         setEventos(ev);
       } catch {
+        if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
         setEventos([]);
       }
     })();
-  }, [isOpen, selectedExpedicaoId]);
+  }, [activeEmpresaId, isOpen, selectedExpedicaoId]);
 
   const save = async () => {
+    const token = ++actionTokenRef.current;
+    const empresaSnapshot = activeEmpresaId;
     if (!form.pedido_id) {
       addToast('Selecione um pedido.', 'error');
       return;
@@ -260,9 +273,11 @@ export default function ExpedicaoPage() {
         data_entrega: form.data_entrega || null,
         observacoes: form.observacoes.trim() || null,
       } as any);
+      if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
       addToast('Expedição salva.', 'success');
       try {
         const ev = await listExpedicaoEventos(saved.id);
+        if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
         setSelectedExpedicaoId(saved.id);
         setEventos(ev);
       } catch {
@@ -270,8 +285,10 @@ export default function ExpedicaoPage() {
       }
       await load();
     } catch (e: any) {
+      if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
       addToast(e.message || 'Falha ao salvar expedição.', 'error');
     } finally {
+      if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
       setSaving(false);
     }
   };
