@@ -138,6 +138,8 @@ export default function PdvPage() {
 
   const lastEmpresaIdRef = useRef<string | null>(activeEmpresaId);
   const empresaChanged = lastEmpresaIdRef.current !== activeEmpresaId;
+  const loadTokenRef = useRef(0);
+  const actionTokenRef = useRef(0);
 
   useEffect(() => {
     lastEmpresaIdRef.current = activeEmpresaId;
@@ -156,7 +158,11 @@ export default function PdvPage() {
   }, [contaCorrenteId]);
 
   const load = useCallback(async () => {
-    if (!activeEmpresaId) {
+    const token = ++loadTokenRef.current;
+    const empresaSnapshot = activeEmpresaId;
+
+    if (authLoading) return;
+    if (!empresaSnapshot) {
       setRows([]);
       setContas([]);
       setContaCorrenteId('');
@@ -171,6 +177,8 @@ export default function PdvPage() {
         listPdvPedidos({ limit: 200 }),
         listPdvCaixas().catch(() => [] as PdvCaixaRow[]),
       ]);
+
+      if (token !== loadTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
 
       setContas(contaData);
       setCaixas(caixasData || []);
@@ -192,9 +200,12 @@ export default function PdvPage() {
         (caixasData || [])[0];
       const hasAnyOpen = (caixasData || []).some((c) => !!c.sessao_id);
       if (selectedAfter && !hasAnyOpen && !selectedAfter.sessao_id) {
+        if (token !== loadTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
         try {
           await openPdvCaixa({ caixaId: selectedAfter.id, saldoInicial: 0 });
+          if (token !== loadTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
           const refreshed = await listPdvCaixas().catch(() => [] as PdvCaixaRow[]);
+          if (token !== loadTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
           setCaixas(refreshed);
           setCaixaId(selectedAfter.id);
           if (typeof window !== 'undefined') window.localStorage.setItem('pdv:caixaId', selectedAfter.id);
@@ -208,21 +219,31 @@ export default function PdvPage() {
       }
       setRows((pdvData || []) as any);
     } catch (e: any) {
+      if (token !== loadTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
       addToast(e.message || 'Falha ao carregar PDV.', 'error');
       setRows([]);
     } finally {
+      if (token !== loadTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
       setLoading(false);
     }
-  }, [activeEmpresaId, addToast]);
+  }, [activeEmpresaId, addToast, authLoading]);
 
   useEffect(() => {
     // Multi-tenant safety: evitar reaproveitar estado do tenant anterior.
+    loadTokenRef.current += 1;
+    actionTokenRef.current += 1;
+
     setRows([]);
     setContas([]);
     setContaCorrenteId('');
     setCaixas([]);
     setCaixaId('');
     setIsCaixaModalOpen(false);
+    setCaixaMode('open');
+    setSaldoInicial(0);
+    setSaldoFinal(0);
+    setCaixaObs('');
+    setCaixaBusy(false);
     setFinalizingId(null);
     setIsFormOpen(false);
     setSelectedId(null);
@@ -245,7 +266,10 @@ export default function PdvPage() {
 
   useEffect(() => {
     const onOnline = async () => {
+      const token = ++actionTokenRef.current;
+      const empresaSnapshot = activeEmpresaId;
       const { ok, failed } = await flushPdvFinalizeQueue();
+      if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
       refreshQueued();
       if (ok > 0) addToast(`Sincronizado: ${ok} PDV(s).`, 'success');
       if (failed > 0) addToast(`Não foi possível sincronizar ${failed} PDV(s).`, 'warning');
@@ -253,7 +277,7 @@ export default function PdvPage() {
     };
     window.addEventListener('online', onOnline);
     return () => window.removeEventListener('online', onOnline);
-  }, [addToast, load, refreshQueued]);
+  }, [activeEmpresaId, addToast, load, refreshQueued]);
 
   const effectiveLoading = !!activeEmpresaId && (loading || empresaChanged);
   const effectiveRows = empresaChanged ? [] : rows;
@@ -300,6 +324,9 @@ export default function PdvPage() {
   };
 
   const handleFinalize = async (pedidoId: string) => {
+    const token = ++actionTokenRef.current;
+    const empresaSnapshot = activeEmpresaId;
+
     if (!billing.ensureCanWrite({ actionLabel: 'Finalizar PDV' })) return;
     const gate = await ensure(['tesouraria.contas_correntes']);
     if (!gate.ok) return;
@@ -329,19 +356,24 @@ export default function PdvPage() {
     setFinalizingId(pedidoId);
     try {
       await runWithActionLock(lockKey, async () => {
+        if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
         await finalizePdv({ pedidoId, contaCorrenteId, estoqueEnabled: true, caixaId: effectiveCaixaId });
       });
+      if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
       addToast('PDV finalizado (financeiro + estoque).', 'success');
       try {
         const venda = await getVendaDetails(pedidoId);
+        if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
         setReceiptVenda(venda);
         setIsReceiptOpen(true);
       } catch {
         // fallback: não bloqueia o fluxo se não conseguir carregar detalhes
       }
       await load();
+      if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
       refreshQueued();
     } catch (e: any) {
+      if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
       if (e instanceof ActionLockedError) {
         addToast('Já estamos finalizando este PDV. Aguarde alguns segundos.', 'info');
       } else if (e instanceof PdvQueuedError) {
@@ -351,12 +383,16 @@ export default function PdvPage() {
         addToast(e.message || 'Falha ao finalizar PDV.', 'error');
       }
     } finally {
+      if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
       setFinalizingId(null);
     }
   };
 
   const handleSyncNow = async () => {
+    const token = ++actionTokenRef.current;
+    const empresaSnapshot = activeEmpresaId;
     const { ok, failed } = await flushPdvFinalizeQueue();
+    if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
     refreshQueued();
     if (ok > 0) addToast(`Sincronizado: ${ok} PDV(s).`, 'success');
     if (failed > 0) addToast(`Não foi possível sincronizar ${failed} PDV(s).`, 'warning');
@@ -372,6 +408,9 @@ export default function PdvPage() {
   };
 
   const handleConfirmCaixa = async () => {
+    const token = ++actionTokenRef.current;
+    const empresaSnapshot = activeEmpresaId;
+
     if (!caixaId) {
       addToast('Selecione um caixa.', 'warning');
       return;
@@ -381,21 +420,29 @@ export default function PdvPage() {
     try {
       if (caixaMode === 'open') {
         await openPdvCaixa({ caixaId, saldoInicial: Number(saldoInicial || 0) });
+        if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
         addToast('Caixa aberto.', 'success');
       } else {
         const res = await closePdvCaixa({ caixaId, saldoFinal: saldoFinal ? Number(saldoFinal) : null, observacoes: caixaObs || null });
+        if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
         addToast(`Caixa fechado. Vendas: ${formatMoneyBRL(res.total_vendas)}.`, 'success');
       }
+      if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
       setIsCaixaModalOpen(false);
       await load();
     } catch (e: any) {
+      if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
       addToast(e?.message || 'Falha ao atualizar caixa.', 'error');
     } finally {
+      if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
       setCaixaBusy(false);
     }
   };
 
   const handleEstornar = async (pedidoId: string) => {
+    const token = ++actionTokenRef.current;
+    const empresaSnapshot = activeEmpresaId;
+
     if (!billing.ensureCanWrite({ actionLabel: 'Estornar PDV' })) return;
     const gate = await ensure(['tesouraria.contas_correntes']);
     if (!gate.ok) return;
@@ -408,27 +455,35 @@ export default function PdvPage() {
     setFinalizingId(pedidoId);
     try {
       await runWithActionLock(lockKey, async () => {
+        if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
         await estornarPdv({ pedidoId, contaCorrenteId });
       });
+      if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
       addToast('PDV estornado (financeiro + estoque).', 'success');
       await load();
     } catch (e: any) {
+      if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
       if (e instanceof ActionLockedError) {
         addToast('Já estamos estornando este PDV. Aguarde alguns segundos.', 'info');
       } else {
         addToast(e.message || 'Falha ao estornar PDV.', 'error');
       }
     } finally {
+      if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
       setFinalizingId(null);
     }
   };
 
   const handleOpenReceipt = async (pedidoId: string) => {
+    const token = ++actionTokenRef.current;
+    const empresaSnapshot = activeEmpresaId;
     try {
       const venda = await getVendaDetails(pedidoId);
+      if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
       setReceiptVenda(venda);
       setIsReceiptOpen(true);
     } catch (e: any) {
+      if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
       addToast(e?.message || 'Falha ao abrir comprovante.', 'error');
     }
   };
