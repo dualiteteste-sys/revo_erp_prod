@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useContasAReceber } from '@/hooks/useContasAReceber';
 import { useToast } from '@/contexts/ToastProvider';
 import * as contasAReceberService from '@/services/contasAReceber';
@@ -20,8 +20,10 @@ import { Button } from '@/components/ui/button';
 import { useSearchParams } from 'react-router-dom';
 import DatePicker from '@/components/ui/DatePicker';
 import { isSeedEnabled } from '@/utils/seed';
+import { useAuth } from '@/contexts/AuthProvider';
 
 const ContasAReceberPage: React.FC = () => {
+  const { loading: authLoading, activeEmpresaId } = useAuth();
   const enableSeed = isSeedEnabled();
   const {
     contas,
@@ -63,9 +65,41 @@ const ContasAReceberPage: React.FC = () => {
   const [isEstornoOpen, setIsEstornoOpen] = useState(false);
   const [contaToReverse, setContaToReverse] = useState<contasAReceberService.ContaAReceber | null>(null);
 
+  const lastEmpresaIdRef = useRef<string | null>(activeEmpresaId);
+  const empresaChanged = lastEmpresaIdRef.current !== activeEmpresaId;
+  const handledContaIdRef = useRef(false);
+
   useEffect(() => {
+    lastEmpresaIdRef.current = activeEmpresaId;
+  }, [activeEmpresaId]);
+
+  useEffect(() => {
+    // Multi-tenant safety: evitar reaproveitar estado do tenant anterior.
+    setIsFormOpen(false);
+    setSelectedConta(null);
+    setIsDeleteModalOpen(false);
+    setContaToDelete(null);
+    setIsDeleting(false);
+    setIsFetchingDetails(false);
+    setIsBaixaOpen(false);
+    setContaToReceive(null);
+    setIsCancelOpen(false);
+    setContaToCancel(null);
+    setIsCanceling(false);
+    setIsEstornoOpen(false);
+    setContaToReverse(null);
+  }, [activeEmpresaId]);
+
+  useEffect(() => {
+    if (handledContaIdRef.current) return;
+    if (authLoading || !activeEmpresaId || empresaChanged) return;
+
     const contaId = searchParams.get('contaId');
-    if (!contaId) return;
+    if (!contaId) {
+      handledContaIdRef.current = true;
+      return;
+    }
+    handledContaIdRef.current = true;
 
     void (async () => {
       setIsFetchingDetails(true);
@@ -84,8 +118,7 @@ const ContasAReceberPage: React.FC = () => {
         setSearchParams(next, { replace: true });
       }
     })();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [addToast, authLoading, activeEmpresaId, empresaChanged, searchParams, setSearchParams]);
 
   const handleOpenForm = async (conta: contasAReceberService.ContaAReceber | null = null) => {
     if (conta?.id) {
@@ -198,6 +231,24 @@ const ContasAReceberPage: React.FC = () => {
     }
   };
 
+  const effectiveLoading = !!activeEmpresaId && (loading || empresaChanged);
+  const effectiveError = empresaChanged ? null : error;
+  const effectiveContas = empresaChanged ? [] : contas;
+  const effectiveCount = empresaChanged ? 0 : count;
+  const canShowSummary = !empresaChanged && !!summary;
+
+  if (authLoading) {
+    return (
+      <div className="flex justify-center h-full items-center">
+        <Loader2 className="animate-spin text-blue-600 w-10 h-10" />
+      </div>
+    );
+  }
+
+  if (!activeEmpresaId) {
+    return <div className="p-4 text-gray-600">Selecione uma empresa para ver contas a receber.</div>;
+  }
+
   return (
     <div className="p-1 min-h-full flex flex-col">
       <div className="flex justify-between items-center mb-6">
@@ -207,7 +258,7 @@ const ContasAReceberPage: React.FC = () => {
             <Button
               variant="secondary"
               onClick={handleSeed}
-              disabled={isSeeding || loading}
+              disabled={isSeeding || effectiveLoading}
               className="gap-2"
             >
               {isSeeding ? <Loader2 className="animate-spin" size={18} /> : <DatabaseBackup size={18} />}
@@ -221,7 +272,7 @@ const ContasAReceberPage: React.FC = () => {
         </div>
       </div>
 
-      <ContasAReceberSummary summary={summary} />
+      {canShowSummary ? <ContasAReceberSummary summary={summary} /> : null}
 
       <div className="mt-6 mb-4 flex flex-wrap gap-4 items-end">
         <div className="relative flex-grow max-w-xs">
@@ -274,13 +325,13 @@ const ContasAReceberPage: React.FC = () => {
 
       <div className="bg-white rounded-lg shadow overflow-hidden flex flex-col flex-1 min-h-0">
         <div className="flex-1 min-h-0 overflow-auto">
-          {loading && contas.length === 0 ? (
+          {effectiveLoading && effectiveContas.length === 0 ? (
             <div className="h-96 flex items-center justify-center">
               <Loader2 className="animate-spin text-blue-500" size={32} />
             </div>
-          ) : error ? (
-            <div className="h-96 flex items-center justify-center text-red-500">{error}</div>
-          ) : contas.length === 0 ? (
+          ) : effectiveError ? (
+            <div className="h-96 flex items-center justify-center text-red-500">{effectiveError}</div>
+          ) : effectiveContas.length === 0 ? (
             <div className="h-96 flex flex-col items-center justify-center text-gray-500">
               <TrendingUp size={48} className="mb-4" />
               <p>Nenhuma conta a receber encontrada.</p>
@@ -288,12 +339,12 @@ const ContasAReceberPage: React.FC = () => {
             </div>
           ) : (
             <ResponsiveTable
-              data={contas}
+              data={effectiveContas}
               getItemId={(c) => c.id}
-              loading={loading}
+              loading={effectiveLoading}
               tableComponent={
                 <ContasAReceberTable
-                  contas={contas}
+                  contas={effectiveContas}
                   onEdit={handleOpenForm}
                   onReceive={handleReceive}
                   onCancel={handleOpenCancel}
@@ -319,11 +370,11 @@ const ContasAReceberPage: React.FC = () => {
         </div>
       </div>
 
-      {count > 0 ? (
+      {effectiveCount > 0 ? (
         <ListPaginationBar className="mt-4" innerClassName="px-3 sm:px-4">
           <Pagination
             currentPage={page}
-            totalCount={count}
+            totalCount={effectiveCount}
             pageSize={pageSize}
             onPageChange={setPage}
             onPageSizeChange={(next) => {

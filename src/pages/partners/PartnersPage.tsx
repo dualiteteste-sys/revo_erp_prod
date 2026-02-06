@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { usePartners } from '../../hooks/usePartners';
 import { useToast } from '../../contexts/ToastProvider';
 import * as partnersService from '../../services/partners';
@@ -26,8 +26,10 @@ import EmptyState from '@/components/ui/EmptyState';
 import { uiMessages } from '@/lib/ui/messages';
 import ImportPartnersCsvModal from '@/components/partners/ImportPartnersCsvModal';
 import { useSearchParams } from 'react-router-dom';
+import { useAuth } from '@/contexts/AuthProvider';
 
 const PartnersPage: React.FC = () => {
+  const { loading: authLoading, activeEmpresaId } = useAuth();
   const enableSeed = isSeedEnabled();
   const permCreate = useHasPermission('partners', 'create');
   const permUpdate = useHasPermission('partners', 'update');
@@ -54,34 +56,70 @@ const PartnersPage: React.FC = () => {
     setFilterType,
     setStatusFilter,
     setSortBy,
-    refresh,
-  } = usePartners();
-  const { addToast } = useToast();
+	    refresh,
+	  } = usePartners();
+	  const { addToast } = useToast();
 
-  const [isFormOpen, setIsFormOpen] = useState(false);
-  const [selectedPartner, setSelectedPartner] = useState<partnersService.PartnerDetails | null>(null);
-  const [initialFormValues, setInitialFormValues] = useState<Partial<partnersService.PartnerDetails> | undefined>(undefined);
-  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+	  const lastEmpresaIdRef = useRef<string | null>(activeEmpresaId);
+	  const empresaChanged = lastEmpresaIdRef.current !== activeEmpresaId;
+	  const handledOpenRef = useRef(false);
+
+	  const [isFormOpen, setIsFormOpen] = useState(false);
+	  const [selectedPartner, setSelectedPartner] = useState<partnersService.PartnerDetails | null>(null);
+	  const [initialFormValues, setInitialFormValues] = useState<Partial<partnersService.PartnerDetails> | undefined>(undefined);
+	  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [partnerToDelete, setPartnerToDelete] = useState<partnersService.PartnerListItem | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
   const [isFetchingDetails, setIsFetchingDetails] = useState(false);
   const [isSeeding, setIsSeeding] = useState(false);
-  const [bulkLoading, setBulkLoading] = useState(false);
-  const [isImportOpen, setIsImportOpen] = useState(false);
-  const [searchParams, setSearchParams] = useSearchParams();
+	  const [bulkLoading, setBulkLoading] = useState(false);
+	  const [isImportOpen, setIsImportOpen] = useState(false);
+	  const [searchParams, setSearchParams] = useSearchParams();
 
-  const bulk = useBulkSelection(partners, (p) => p.id);
-  const selectedPartners = useMemo(
-    () => partners.filter((p) => bulk.selectedIds.has(p.id)),
-    [partners, bulk.selectedIds]
-  );
-  const hasSelectedActive = selectedPartners.some((p) => !p.deleted_at);
-  const hasSelectedInactive = selectedPartners.some((p) => !!p.deleted_at);
+	  const effectiveLoading = !!activeEmpresaId && (loading || empresaChanged);
+	  const effectiveError = empresaChanged ? null : error;
+	  const effectivePartners = empresaChanged ? [] : partners;
+	  const effectiveCount = empresaChanged ? 0 : count;
 
-  const handleOpenForm = async (
-    partner: partnersService.PartnerListItem | null = null,
-    initialValues?: Partial<partnersService.PartnerDetails>
-  ) => {
+	  const bulk = useBulkSelection(effectivePartners, (p) => p.id);
+	  const selectedPartners = useMemo(
+	    () => effectivePartners.filter((p) => bulk.selectedIds.has(p.id)),
+	    [effectivePartners, bulk.selectedIds]
+	  );
+	  const hasSelectedActive = selectedPartners.some((p) => !p.deleted_at);
+	  const hasSelectedInactive = selectedPartners.some((p) => !!p.deleted_at);
+
+	  useEffect(() => {
+	    const prevEmpresaId = lastEmpresaIdRef.current;
+	    if (prevEmpresaId === activeEmpresaId) return;
+
+	    // Multi-tenant safety: evitar reaproveitar estado do tenant anterior.
+	    setIsFormOpen(false);
+	    setSelectedPartner(null);
+	    setInitialFormValues(undefined);
+	    setIsDeleteModalOpen(false);
+	    setPartnerToDelete(null);
+	    setIsDeleting(false);
+	    setIsFetchingDetails(false);
+	    setBulkLoading(false);
+	    setIsImportOpen(false);
+	    bulk.clear();
+	    handledOpenRef.current = false;
+
+	    const openId = searchParams.get('open');
+	    if (prevEmpresaId && activeEmpresaId && openId) {
+	      const next = new URLSearchParams(searchParams);
+	      next.delete('open');
+	      setSearchParams(next, { replace: true });
+	    }
+
+	    lastEmpresaIdRef.current = activeEmpresaId;
+	  }, [activeEmpresaId, bulk, searchParams, setSearchParams]);
+
+	  const handleOpenForm = async (
+	    partner: partnersService.PartnerListItem | null = null,
+	    initialValues?: Partial<partnersService.PartnerDetails>
+	  ) => {
     const needsUpdate = !!partner?.id;
     if (!permsLoading && needsUpdate && !canUpdate) {
       addToast('Você não tem permissão para editar parceiros.', 'warning');
@@ -108,21 +146,47 @@ const PartnersPage: React.FC = () => {
     } else {
       setSelectedPartner(null);
       setIsFormOpen(true);
-    }
-  };
+	    }
+	  };
 
-  useEffect(() => {
-    const openId = searchParams.get('open');
-    if (!openId) return;
+	  useEffect(() => {
+	    if (handledOpenRef.current) return;
+	    if (authLoading || !activeEmpresaId || empresaChanged) return;
 
-    void (async () => {
-      await handleOpenForm({ id: openId } as any);
-      const next = new URLSearchParams(searchParams);
-      next.delete('open');
-      setSearchParams(next, { replace: true });
-    })();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+	    const openId = searchParams.get('open');
+	    if (!openId) {
+	      handledOpenRef.current = true;
+	      return;
+	    }
+	    handledOpenRef.current = true;
+
+	    if (!permsLoading && !canUpdate) {
+	      addToast('Você não tem permissão para editar parceiros.', 'warning');
+	      const next = new URLSearchParams(searchParams);
+	      next.delete('open');
+	      setSearchParams(next, { replace: true });
+	      return;
+	    }
+
+	    void (async () => {
+	      setIsFetchingDetails(true);
+	      setIsFormOpen(true);
+	      setSelectedPartner(null);
+	      setInitialFormValues(undefined);
+	      try {
+	        const details = await partnersService.getPartnerDetails(openId);
+	        setSelectedPartner(details);
+	      } catch (e: any) {
+	        addToast(e?.message || 'Erro ao abrir o parceiro.', 'error');
+	        setIsFormOpen(false);
+	      } finally {
+	        setIsFetchingDetails(false);
+	        const next = new URLSearchParams(searchParams);
+	        next.delete('open');
+	        setSearchParams(next, { replace: true });
+	      }
+	    })();
+	  }, [addToast, authLoading, activeEmpresaId, canUpdate, empresaChanged, permsLoading, searchParams, setSearchParams]);
 
   const handleCloseForm = () => {
     setIsFormOpen(false);
@@ -257,63 +321,67 @@ const PartnersPage: React.FC = () => {
     }
   };
 
-  const headerActions = useMemo(() => {
-    return (
-      <>
-        <Button
-          onClick={() => {
-            downloadCsv({
-              filename: 'clientes-fornecedores.csv',
-              headers: ['Nome', 'Tipo', 'Documento', 'Email', 'Telefone', 'Status'],
-              rows: partners.map((p: any) => [
-                p.nome || '',
-                p.tipo || '',
-                p.documento || p.cnpj || p.cpf || '',
-                p.email || '',
+	  const headerActions = useMemo(() => {
+	    return (
+	      <>
+	        <Button
+	          onClick={() => {
+	            downloadCsv({
+	              filename: 'clientes-fornecedores.csv',
+	              headers: ['Nome', 'Tipo', 'Documento', 'Email', 'Telefone', 'Status'],
+	              rows: effectivePartners.map((p: any) => [
+	                p.nome || '',
+	                p.tipo || '',
+	                p.documento || p.cnpj || p.cpf || '',
+	                p.email || '',
                 p.telefone || '',
                 p.ativo === false ? 'Inativo' : 'Ativo',
-              ]),
-            });
-          }}
-          disabled={loading || partners.length === 0}
-          variant="secondary"
-          title="Exportar a lista atual"
-          className="gap-2"
+	              ]),
+	            });
+	          }}
+	          disabled={effectiveLoading || effectivePartners.length === 0}
+	          variant="secondary"
+	          title="Exportar a lista atual"
+	          className="gap-2"
         >
           <FileDown size={18} />
           Exportar CSV
         </Button>
 
-        <Button
-          onClick={() => setIsImportOpen(true)}
-          variant="secondary"
-          className="gap-2"
-          disabled={permsLoading || !canCreate}
-          title={!canCreate ? 'Sem permissão para importar' : 'Importar clientes/fornecedores por CSV/XLSX'}
-        >
-          <FileUp size={18} />
+	        <Button
+	          onClick={() => setIsImportOpen(true)}
+	          variant="secondary"
+	          className="gap-2"
+	          disabled={effectiveLoading || permsLoading || !canCreate}
+	          title={!canCreate ? 'Sem permissão para importar' : 'Importar clientes/fornecedores por CSV/XLSX'}
+	        >
+	          <FileUp size={18} />
           Importar CSV/XLSX
         </Button>
 
-        {enableSeed ? (
-          <Button
-            onClick={handleSeedPartners}
-            disabled={isSeeding || loading || permsLoading || !canCreate}
-            title={!canCreate ? 'Sem permissão para popular dados' : undefined}
-            variant="secondary"
-            className="gap-2"
+	        {enableSeed ? (
+	          <Button
+	            onClick={handleSeedPartners}
+	            disabled={isSeeding || effectiveLoading || permsLoading || !canCreate}
+	            title={!canCreate ? 'Sem permissão para popular dados' : undefined}
+	            variant="secondary"
+	            className="gap-2"
           >
             {isSeeding ? <Loader2 className="animate-spin" size={18} /> : <DatabaseBackup size={18} />}
             Popular dados
           </Button>
         ) : null}
 
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button className="gap-2" disabled={permsLoading || !canCreate} title={!canCreate ? 'Sem permissão para criar' : undefined}>
-              <Plus size={18} />
-              Novo
-            </Button>
+	        <DropdownMenu>
+	          <DropdownMenuTrigger asChild>
+	            <Button
+	              className="gap-2"
+	              disabled={effectiveLoading || permsLoading || !canCreate}
+	              title={!canCreate ? 'Sem permissão para criar' : undefined}
+	            >
+	              <Plus size={18} />
+	              Novo
+	            </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
             <DropdownMenuItem onClick={() => handleOpenForm(null, { tipo: 'cliente' })}>
@@ -329,10 +397,10 @@ const PartnersPage: React.FC = () => {
         </DropdownMenu>
       </>
     );
-  }, [enableSeed, handleSeedPartners, handleOpenForm, isSeeding, loading, partners, permsLoading, canCreate]);
+	  }, [effectiveLoading, effectivePartners, enableSeed, handleSeedPartners, handleOpenForm, isSeeding, permsLoading, canCreate]);
 
-  const formTitle = useMemo(() => {
-    if (selectedPartner) return 'Editar Cliente/Fornecedor';
+	  const formTitle = useMemo(() => {
+	    if (selectedPartner) return 'Editar Cliente/Fornecedor';
     if (initialFormValues?.tipo === 'fornecedor') return 'Novo Fornecedor';
     if (initialFormValues?.tipo === 'ambos') return 'Novo Cliente/Fornecedor';
     return 'Novo Cliente';
@@ -381,10 +449,10 @@ const PartnersPage: React.FC = () => {
     </div>
   );
 
-  const footer = count > 0 ? (
+  const footer = effectiveCount > 0 ? (
     <Pagination
       currentPage={page}
-      totalCount={count}
+      totalCount={effectiveCount}
       pageSize={pageSize}
       onPageChange={setPage}
       onPageSizeChange={(next) => {
@@ -394,16 +462,28 @@ const PartnersPage: React.FC = () => {
     />
   ) : null;
 
+  if (authLoading) {
+    return (
+      <div className="flex justify-center h-full items-center">
+        <Loader2 className="animate-spin text-blue-600 w-10 h-10" />
+      </div>
+    );
+  }
+
+  if (!activeEmpresaId) {
+    return <div className="p-4 text-gray-600">Selecione uma empresa para ver clientes e fornecedores.</div>;
+  }
+
   return (
     <PageShell header={header} filters={filters} footer={footer}>
       <PageCard className="flex flex-col flex-1 min-h-0">
-        {loading && partners.length === 0 ? (
+        {effectiveLoading && effectivePartners.length === 0 ? (
           <div className="h-96 flex items-center justify-center">
             <Loader2 className="animate-spin text-blue-500" size={32} />
           </div>
-        ) : error ? (
-          <div className="h-96 flex items-center justify-center text-red-500">{error}</div>
-        ) : partners.length === 0 ? (
+        ) : effectiveError ? (
+          <div className="h-96 flex items-center justify-center text-red-500">{effectiveError}</div>
+        ) : effectivePartners.length === 0 ? (
           <EmptyState
             icon={<Users2 size={48} />}
             title="Nenhum cliente ou fornecedor encontrado"
@@ -439,18 +519,18 @@ const PartnersPage: React.FC = () => {
                   disabled: bulkLoading || permsLoading || !canUpdate || !hasSelectedInactive,
                 },
               ]}
-            />
-            <div className="flex-1 min-h-0 overflow-auto">
-              <ResponsiveTable
-                data={partners}
-                getItemId={(p) => p.id}
-                loading={loading}
-                tableComponent={
-                  <PartnersTable
-                    partners={partners}
-                    onEdit={handleOpenForm}
-                    onDelete={handleOpenDeleteModal}
-                    onRestore={handleRestore}
+	            />
+	            <div className="flex-1 min-h-0 overflow-auto">
+	              <ResponsiveTable
+	                data={effectivePartners}
+	                getItemId={(p) => p.id}
+	                loading={effectiveLoading}
+	                tableComponent={
+	                  <PartnersTable
+	                    partners={effectivePartners}
+	                    onEdit={handleOpenForm}
+	                    onDelete={handleOpenDeleteModal}
+	                    onRestore={handleRestore}
                     sortBy={sortBy}
                     onSort={handleSort}
                     selectedIds={bulk.selectedIds}
@@ -459,20 +539,20 @@ const PartnersPage: React.FC = () => {
                     onToggleSelect={(id) => bulk.toggle(id)}
                     onToggleSelectAll={() => bulk.toggleAll(bulk.allIds)}
                   />
-                }
-                renderMobileCard={(partner) => (
-                  <PartnerMobileCard
-                    key={partner.id}
-                    partner={partner}
-                    onEdit={() => handleOpenForm(partner)}
-                    onDelete={() => handleOpenDeleteModal(partner)}
-                    onRestore={() => handleRestore(partner)}
-                    selected={bulk.selectedIds.has(partner.id)}
-                    onToggleSelect={(id) => bulk.toggle(id)}
-                  />
-                )}
-              />
-            </div>
+	                }
+	                renderMobileCard={(partner) => (
+	                  <PartnerMobileCard
+	                    key={partner.id}
+	                    partner={partner}
+	                    onEdit={() => handleOpenForm(partner)}
+	                    onDelete={() => handleOpenDeleteModal(partner)}
+	                    onRestore={() => handleRestore(partner)}
+	                    selected={bulk.selectedIds.has(partner.id)}
+	                    onToggleSelect={(id) => bulk.toggle(id)}
+	                  />
+	                )}
+	              />
+	            </div>
           </>
         )}
       </PageCard>
@@ -492,10 +572,10 @@ const PartnersPage: React.FC = () => {
         )}
       </Modal>
 
-      <ImportPartnersCsvModal
-        isOpen={isImportOpen}
-        onClose={() => setIsImportOpen(false)}
-        importFn={(payload) => partnersService.savePartner(payload)}
+	      <ImportPartnersCsvModal
+	        isOpen={isImportOpen}
+	        onClose={() => setIsImportOpen(false)}
+	        importFn={(payload) => partnersService.savePartner(payload)}
         deleteFn={(id) => partnersService.deletePartner(id)}
         onImported={() => {
           setIsImportOpen(false);

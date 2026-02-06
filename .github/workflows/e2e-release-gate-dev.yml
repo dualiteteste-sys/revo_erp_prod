@@ -139,6 +139,9 @@ jobs:
         if: needs.changes.outputs.ci_only != 'true' && needs.changes.outputs.landing_only == 'true' && github.event_name != 'workflow_dispatch'
         env:
           CI: true
+          # "verify:bundle"/build exigem VITE_SUPABASE_* (mesmo com Supabase mockado no E2E).
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL_DEV || 'https://example.com' }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY_DEV || 'ci_dummy_anon_key' }}
         run: |
           set -euo pipefail
           yarn verify:bundle

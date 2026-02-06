@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useProductsTree } from '../../hooks/useProductsTree';
 import { useToast } from '../../contexts/ToastProvider';
 import ProductsTable from '../../components/products/ProductsTable';
@@ -28,7 +28,7 @@ import { useAuth } from '@/contexts/AuthProvider';
 import { useSearchParams } from 'react-router-dom';
 
 const ProductsPage: React.FC = () => {
-  const { activeEmpresa } = useAuth();
+  const { loading: authLoading, activeEmpresaId, activeEmpresa } = useAuth();
   const enableSeed = isSeedEnabled();
   const permCreate = useHasPermission('produtos', 'create');
   const permUpdate = useHasPermission('produtos', 'update');
@@ -72,11 +72,48 @@ const ProductsPage: React.FC = () => {
   const [bulkLoading, setBulkLoading] = useState(false);
   const [searchParams, setSearchParams] = useSearchParams();
 
-  const bulk = useBulkSelection(parents, (p) => p.id);
+  const lastEmpresaIdRef = useRef<string | null>(activeEmpresaId);
+  const empresaChanged = lastEmpresaIdRef.current !== activeEmpresaId;
+  const handledOpenRef = useRef(false);
+
+  const effectiveLoading = !!activeEmpresaId && (loading || empresaChanged);
+  const effectiveError = empresaChanged ? null : error;
+  const effectiveRows = empresaChanged ? [] : rows;
+  const effectiveParents = empresaChanged ? [] : parents;
+  const effectiveCount = empresaChanged ? 0 : count;
+
+  const bulk = useBulkSelection(effectiveParents, (p) => p.id);
   const selectedProducts = useMemo(
-    () => parents.filter((p) => bulk.selectedIds.has(p.id)),
-    [parents, bulk.selectedIds]
+    () => effectiveParents.filter((p) => bulk.selectedIds.has(p.id)),
+    [effectiveParents, bulk.selectedIds]
   );
+
+  useEffect(() => {
+    const prevEmpresaId = lastEmpresaIdRef.current;
+    if (prevEmpresaId === activeEmpresaId) return;
+
+    // Multi-tenant safety: evitar reaproveitar estado do tenant anterior.
+    setIsFormOpen(false);
+    setSelectedProduct(null);
+    setIsDeleteModalOpen(false);
+    setProductToDelete(null);
+    setIsDeleting(false);
+    setIsFetchingDetails(false);
+    setIsImportOpen(false);
+    setBulkDeleteOpen(false);
+    setBulkLoading(false);
+    bulk.clear();
+    handledOpenRef.current = false;
+
+    const openId = searchParams.get('open');
+    if (prevEmpresaId && activeEmpresaId && openId) {
+      const next = new URLSearchParams(searchParams);
+      next.delete('open');
+      setSearchParams(next, { replace: true });
+    }
+
+    lastEmpresaIdRef.current = activeEmpresaId;
+  }, [activeEmpresaId, bulk, searchParams, setSearchParams]);
 
   const refreshList = useCallback(() => {
     setPage(1);
@@ -115,16 +152,47 @@ const ProductsPage: React.FC = () => {
   };
 
   useEffect(() => {
+    if (handledOpenRef.current) return;
+    if (authLoading || !activeEmpresaId || empresaChanged) return;
+
     const openId = searchParams.get('open');
-    if (!openId) return;
-    void (async () => {
-      await handleOpenForm({ id: openId });
+    if (!openId) {
+      handledOpenRef.current = true;
+      return;
+    }
+    handledOpenRef.current = true;
+
+    if (!permsLoading && !canUpdate) {
+      addToast('Você não tem permissão para editar produtos.', 'warning');
       const next = new URLSearchParams(searchParams);
       next.delete('open');
       setSearchParams(next, { replace: true });
+      return;
+    }
+
+    void (async () => {
+      setIsFetchingDetails(true);
+      setIsFormOpen(true);
+      setSelectedProduct(null);
+      try {
+        const fullProduct = await productsService.getProductDetails(openId);
+        if (!fullProduct) {
+          addToast('Não é possível editar este produto legado. Por favor, crie um novo.', 'info');
+          setIsFormOpen(false);
+        } else {
+          setSelectedProduct(fullProduct);
+        }
+      } catch (e: any) {
+        addToast(e?.message || 'Erro ao abrir o produto.', 'error');
+        setIsFormOpen(false);
+      } finally {
+        setIsFetchingDetails(false);
+        const next = new URLSearchParams(searchParams);
+        next.delete('open');
+        setSearchParams(next, { replace: true });
+      }
     })();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [addToast, authLoading, activeEmpresaId, canUpdate, empresaChanged, permsLoading, searchParams, setSearchParams]);
 
   const handleCloseForm = () => {
     setIsFormOpen(false);
@@ -247,7 +315,7 @@ const ProductsPage: React.FC = () => {
               downloadCsv({
                 filename: 'produtos.csv',
                 headers: ['Nome', 'SKU', 'Status', 'Preço', 'Unidade'],
-                rows: parents.map((p: any) => [
+                rows: effectiveParents.map((p: any) => [
                   p.nome || '',
                   p.sku || '',
                   p.status || p.ativo || '',
@@ -256,7 +324,7 @@ const ProductsPage: React.FC = () => {
                 ]),
               });
             }}
-            disabled={loading || parents.length === 0}
+            disabled={effectiveLoading || effectiveParents.length === 0}
             variant="secondary"
             className="gap-2"
             title="Exportar a lista atual"
@@ -270,13 +338,14 @@ const ProductsPage: React.FC = () => {
             variant="secondary"
             className="gap-2"
             title="Importar produtos por CSV/XLSX"
+            disabled={effectiveLoading}
           >
             <FileUp size={18} />
             Importar CSV/XLSX
           </Button>
 
           {enableSeed ? (
-            <Button onClick={handleSeedProducts} disabled={isSeeding || loading} variant="secondary" className="gap-2">
+            <Button onClick={handleSeedProducts} disabled={isSeeding || effectiveLoading} variant="secondary" className="gap-2">
               {isSeeding ? <Loader2 className="animate-spin" size={18} /> : <DatabaseBackup size={18} />}
               Popular dados
             </Button>
@@ -285,7 +354,7 @@ const ProductsPage: React.FC = () => {
           <Button
             onClick={() => handleOpenForm()}
             className="gap-2"
-            disabled={permsLoading || !canCreate}
+            disabled={effectiveLoading || permsLoading || !canCreate}
             title={!canCreate ? 'Sem permissão para criar' : undefined}
           >
             <Plus size={18} />
@@ -320,10 +389,22 @@ const ProductsPage: React.FC = () => {
     </div>
   );
 
-  const footer = count > 0 ? (
+  if (authLoading) {
+    return (
+      <div className="flex justify-center h-full items-center">
+        <Loader2 className="animate-spin text-blue-600 w-10 h-10" />
+      </div>
+    );
+  }
+
+  if (!activeEmpresaId) {
+    return <div className="p-4 text-gray-600">Selecione uma empresa para ver produtos.</div>;
+  }
+
+  const footer = effectiveCount > 0 ? (
     <Pagination
       currentPage={page}
-      totalCount={count}
+      totalCount={effectiveCount}
       pageSize={pageSize}
       onPageChange={setPage}
       onPageSizeChange={(next) => {
@@ -336,13 +417,13 @@ const ProductsPage: React.FC = () => {
   return (
     <PageShell header={header} filters={filters} footer={footer}>
       <PageCard className="flex flex-col flex-1 min-h-0">
-        {loading && parents.length === 0 ? (
+        {effectiveLoading && effectiveParents.length === 0 ? (
           <div className="h-96 flex items-center justify-center">
             <Loader2 className="animate-spin text-blue-500" size={32} />
           </div>
-        ) : error ? (
-          <div className="h-96 flex items-center justify-center text-red-500">{error}</div>
-        ) : parents.length === 0 ? (
+        ) : effectiveError ? (
+          <div className="h-96 flex items-center justify-center text-red-500">{effectiveError}</div>
+        ) : effectiveParents.length === 0 ? (
           <EmptyState
             icon={<Package size={48} />}
             title="Nenhum produto encontrado"
@@ -374,12 +455,12 @@ const ProductsPage: React.FC = () => {
             />
             <div className="flex-1 min-h-0 overflow-auto">
               <ResponsiveTable
-                data={parents}
+                data={effectiveParents}
                 getItemId={(p) => p.id}
-                loading={loading}
+                loading={effectiveLoading}
                 tableComponent={
                   <ProductsTable
-                    rows={rows}
+                    rows={effectiveRows}
                     onEdit={(p) => handleOpenForm(p)}
                     onDelete={(p) => handleOpenDeleteModal(p)}
                     onClone={(p) => handleClone(p)}
