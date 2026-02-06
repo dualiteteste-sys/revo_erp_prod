@@ -10,6 +10,7 @@ import Select from '@/components/ui/forms/Select';
 import DatePicker from '@/components/ui/DatePicker';
 import { useToast } from '@/contexts/ToastProvider';
 import { useAuth } from '@/contexts/AuthProvider';
+import { formatDatePtBR } from '@/lib/dateDisplay';
 
 export default function ExtratoPage() {
   const { loading: authLoading, activeEmpresaId } = useAuth();
@@ -97,7 +98,7 @@ export default function ExtratoPage() {
     const csvContent = [
       headers.join(';'),
       ...lancamentos.map(l => [
-        new Date(l.data_lancamento).toLocaleDateString('pt-BR'),
+        formatDatePtBR(l.data_lancamento),
         l.conta_nome,
         `"${l.descricao}"`, // Escape quotes
         l.documento_ref || '',

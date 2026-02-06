@@ -2,14 +2,32 @@ import React, { useMemo, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ExtratoLancamento } from '@/services/extrato';
 import { formatCurrency } from '@/lib/utils';
-import { CheckCircle, Circle, Link2 } from 'lucide-react';
-import ResizableSortableTh, { type SortState } from '@/components/ui/table/ResizableSortableTh';
+import { CheckCircle, ChevronDown, ChevronRight, Circle, Link2 } from 'lucide-react';
+import ResizableSortableTh from '@/components/ui/table/ResizableSortableTh';
 import TableColGroup from '@/components/ui/table/TableColGroup';
 import { useTableColumnWidths, type TableColumnWidthDef } from '@/components/ui/table/useTableColumnWidths';
-import { sortRows, toggleSort } from '@/components/ui/table/sortUtils';
+import { formatDatePtBR } from '@/lib/dateDisplay';
 
 interface Props {
   lancamentos: ExtratoLancamento[];
+}
+
+type ExtratoDayGroup = {
+  dateISO: string; // YYYY-MM-DD
+  items: ExtratoLancamento[];
+  totalEntradas: number;
+  totalSaidas: number;
+  saldoInicial: number | null;
+  saldoFinal: number | null;
+};
+
+function round2(value: number): number {
+  return Math.round(value * 100) / 100;
+}
+
+function getDelta(item: ExtratoLancamento): number {
+  const valor = Number(item.valor ?? 0);
+  return item.tipo_lancamento === 'credito' ? valor : -valor;
 }
 
 export default function ExtratoTable({ lancamentos }: Props) {
@@ -24,22 +42,71 @@ export default function ExtratoTable({ lancamentos }: Props) {
   ];
   const { widths, startResize } = useTableColumnWidths({ tableId: 'financeiro:extrato:lancamentos', columns });
 
-  const [sort, setSort] = useState<SortState<string>>({ column: 'data', direction: 'desc' });
-  const sortedLancamentos = useMemo(() => {
-    return sortRows(
-      lancamentos,
-      sort as any,
-      [
-        { id: 'data', type: 'date', getValue: (l) => l.data_lancamento },
-        { id: 'conta', type: 'string', getValue: (l) => l.conta_nome ?? '' },
-        { id: 'descricao', type: 'string', getValue: (l) => l.descricao ?? '' },
-        { id: 'valor', type: 'number', getValue: (l) => l.valor ?? 0 },
-        { id: 'saldo', type: 'number', getValue: (l) => l.saldo_apos_lancamento ?? 0 },
-        { id: 'conc', type: 'boolean', getValue: (l) => Boolean(l.conciliado) },
-        { id: 'vinculo', type: 'string', getValue: (l) => l.movimentacao_descricao ?? '' },
-      ] as const
-    );
-  }, [lancamentos, sort]);
+  const [collapsedDays, setCollapsedDays] = useState<Record<string, boolean>>({});
+  const dayGroups = useMemo<ExtratoDayGroup[]>(() => {
+    const groups: ExtratoDayGroup[] = [];
+
+    for (const item of lancamentos) {
+      const dateISO = String(item.data_lancamento || '').slice(0, 10);
+      const last = groups.length > 0 ? groups[groups.length - 1] : undefined;
+      if (!last || last.dateISO !== dateISO) {
+        groups.push({
+          dateISO,
+          items: [item],
+          totalEntradas: item.tipo_lancamento === 'credito' ? Number(item.valor ?? 0) : 0,
+          totalSaidas: item.tipo_lancamento === 'debito' ? Number(item.valor ?? 0) : 0,
+          saldoInicial: null,
+          saldoFinal: null,
+        });
+      } else {
+        last.items.push(item);
+        if (item.tipo_lancamento === 'credito') last.totalEntradas += Number(item.valor ?? 0);
+        if (item.tipo_lancamento === 'debito') last.totalSaidas += Number(item.valor ?? 0);
+      }
+    }
+
+    let prevSaldoFinal: number | null = null;
+    for (const g of groups) {
+      g.totalEntradas = round2(g.totalEntradas);
+      g.totalSaidas = round2(g.totalSaidas);
+      const net = round2(g.totalEntradas - g.totalSaidas);
+
+      let saldoFinal: number | null = null;
+      let lastSaldoIdx: number | null = null;
+      for (let i = g.items.length - 1; i >= 0; i -= 1) {
+        const s = g.items[i]?.saldo_apos_lancamento;
+        if (s !== null && s !== undefined) {
+          saldoFinal = Number(s);
+          lastSaldoIdx = i;
+          break;
+        }
+      }
+
+      if (saldoFinal !== null && lastSaldoIdx !== null) {
+        let deltaAfter = 0;
+        for (let j = lastSaldoIdx + 1; j < g.items.length; j += 1) {
+          deltaAfter += getDelta(g.items[j]);
+        }
+        saldoFinal = round2(saldoFinal + deltaAfter);
+        g.saldoFinal = saldoFinal;
+        g.saldoInicial = round2(saldoFinal - net);
+        prevSaldoFinal = saldoFinal;
+        continue;
+      }
+
+      if (prevSaldoFinal !== null) {
+        g.saldoInicial = prevSaldoFinal;
+        g.saldoFinal = round2(prevSaldoFinal + net);
+        prevSaldoFinal = g.saldoFinal;
+        continue;
+      }
+
+      g.saldoInicial = null;
+      g.saldoFinal = null;
+    }
+
+    return groups;
+  }, [lancamentos]);
 
   return (
     <div className="overflow-x-auto">
@@ -50,105 +117,155 @@ export default function ExtratoTable({ lancamentos }: Props) {
             <ResizableSortableTh
               columnId="data"
               label="Data"
-              sort={sort as any}
-              onSort={(col) => setSort((prev) => toggleSort(prev as any, col))}
+              sortable={false}
               onResizeStart={startResize as any}
             />
             <ResizableSortableTh
               columnId="conta"
               label="Conta"
-              sort={sort as any}
-              onSort={(col) => setSort((prev) => toggleSort(prev as any, col))}
+              sortable={false}
               onResizeStart={startResize as any}
             />
             <ResizableSortableTh
               columnId="descricao"
               label="Descrição"
-              sort={sort as any}
-              onSort={(col) => setSort((prev) => toggleSort(prev as any, col))}
+              sortable={false}
               onResizeStart={startResize as any}
             />
             <ResizableSortableTh
               columnId="valor"
               label="Valor"
               align="right"
-              sort={sort as any}
-              onSort={(col) => setSort((prev) => toggleSort(prev as any, col))}
+              sortable={false}
               onResizeStart={startResize as any}
             />
             <ResizableSortableTh
               columnId="saldo"
               label="Saldo"
               align="right"
-              sort={sort as any}
-              onSort={(col) => setSort((prev) => toggleSort(prev as any, col))}
+              sortable={false}
               onResizeStart={startResize as any}
             />
             <ResizableSortableTh
               columnId="conc"
               label="Conc."
               align="center"
-              sort={sort as any}
-              onSort={(col) => setSort((prev) => toggleSort(prev as any, col))}
+              sortable={false}
               onResizeStart={startResize as any}
             />
             <ResizableSortableTh
               columnId="vinculo"
               label="Vínculo"
-              sort={sort as any}
-              onSort={(col) => setSort((prev) => toggleSort(prev as any, col))}
+              sortable={false}
               onResizeStart={startResize as any}
             />
           </tr>
         </thead>
         <tbody className="bg-white divide-y divide-gray-200">
           <AnimatePresence>
-            {sortedLancamentos.map((item) => (
-              <motion.tr
-                key={item.id}
-                layout
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                className="hover:bg-gray-50 transition-colors"
-              >
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                  {new Date(item.data_lancamento).toLocaleDateString('pt-BR')}
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
-                  {item.conta_nome}
-                </td>
-                <td className="px-6 py-4 text-sm text-gray-800">
-                  <div className="font-medium">{item.descricao}</div>
-                  {item.documento_ref && <div className="text-xs text-gray-500">Doc: {item.documento_ref}</div>}
-                </td>
-                <td className={`px-6 py-4 text-right text-sm font-bold ${item.tipo_lancamento === 'credito' ? 'text-green-600' : 'text-red-600'}`}>
-                  {item.tipo_lancamento === 'credito' ? '+' : '-'}{formatCurrency(item.valor * 100)}
-                </td>
-                <td className="px-6 py-4 text-right text-sm text-gray-700">
-                  {item.saldo_apos_lancamento !== null ? formatCurrency(item.saldo_apos_lancamento * 100) : '-'}
-                </td>
-                <td className="px-6 py-4 text-center">
-                  {item.conciliado ? (
-                    <span title="Conciliado"><CheckCircle size={16} className="text-green-500 mx-auto" /></span>
-                  ) : (
-                    <span title="Pendente"><Circle size={16} className="text-gray-300 mx-auto" /></span>
-                  )}
-                </td>
-                <td className="px-6 py-4 text-sm text-gray-500">
-                  {item.movimentacao_id ? (
-                    <div className="flex items-center gap-1 text-blue-600" title={item.movimentacao_descricao || 'Movimentação'}>
-                      <Link2 size={14} />
-                      <span className="truncate max-w-[150px]">{item.movimentacao_descricao || 'Vínculo'}</span>
-                    </div>
-                  ) : (
-                    <span className="text-gray-400 italic">-</span>
-                  )}
-                </td>
-              </motion.tr>
-            ))}
+            {dayGroups.map((g) => {
+              const isCollapsed = !!collapsedDays[g.dateISO];
+              return (
+                <React.Fragment key={`day-${g.dateISO}`}>
+                  <motion.tr
+                    layout
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
+                    className="bg-slate-50/70 hover:bg-slate-100/70"
+                  >
+                    <td colSpan={7} className="px-6 py-3">
+                      <button
+                        type="button"
+                        className="w-full flex items-center justify-between gap-4"
+                        onClick={() => setCollapsedDays((prev) => ({ ...prev, [g.dateISO]: !prev[g.dateISO] }))}
+                        title={isCollapsed ? 'Expandir dia' : 'Recolher dia'}
+                      >
+                        <div className="flex items-center gap-2 text-sm font-semibold text-gray-800">
+                          {isCollapsed ? <ChevronRight size={18} /> : <ChevronDown size={18} />}
+                          <span>{formatDatePtBR(g.dateISO)}</span>
+                        </div>
+
+                        <div className="flex flex-wrap items-center justify-end gap-x-6 gap-y-1 text-xs">
+                          <div className="text-green-700">
+                            Entradas: <span className="font-semibold">{formatCurrency(g.totalEntradas * 100)}</span>
+                          </div>
+                          <div className="text-red-700">
+                            Saídas: <span className="font-semibold">{formatCurrency(g.totalSaidas * 100)}</span>
+                          </div>
+                          <div className="text-gray-700">
+                            Saldo inicial:{' '}
+                            <span className="font-semibold">
+                              {g.saldoInicial !== null ? formatCurrency(g.saldoInicial * 100) : '—'}
+                            </span>
+                          </div>
+                          <div className="text-gray-900">
+                            Saldo final:{' '}
+                            <span className="font-semibold">
+                              {g.saldoFinal !== null ? formatCurrency(g.saldoFinal * 100) : '—'}
+                            </span>
+                          </div>
+                        </div>
+                      </button>
+                    </td>
+                  </motion.tr>
+
+                  {isCollapsed
+                    ? null
+                    : g.items.map((item) => (
+                        <motion.tr
+                          key={item.id}
+                          layout
+                          initial={{ opacity: 0 }}
+                          animate={{ opacity: 1 }}
+                          exit={{ opacity: 0 }}
+                          className="hover:bg-gray-50 transition-colors"
+                        >
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                            {formatDatePtBR(item.data_lancamento)}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{item.conta_nome}</td>
+                          <td className="px-6 py-4 text-sm text-gray-800">
+                            <div className="font-medium">{item.descricao}</div>
+                            {item.documento_ref ? <div className="text-xs text-gray-500">Doc: {item.documento_ref}</div> : null}
+                          </td>
+                          <td
+                            className={`px-6 py-4 text-right text-sm font-bold ${item.tipo_lancamento === 'credito' ? 'text-green-600' : 'text-red-600'}`}
+                          >
+                            {item.tipo_lancamento === 'credito' ? '+' : '-'}
+                            {formatCurrency(item.valor * 100)}
+                          </td>
+                          <td className="px-6 py-4 text-right text-sm text-gray-700">
+                            {item.saldo_apos_lancamento !== null ? formatCurrency(item.saldo_apos_lancamento * 100) : '-'}
+                          </td>
+                          <td className="px-6 py-4 text-center">
+                            {item.conciliado ? (
+                              <span title="Conciliado">
+                                <CheckCircle size={16} className="text-green-500 mx-auto" />
+                              </span>
+                            ) : (
+                              <span title="Pendente">
+                                <Circle size={16} className="text-gray-300 mx-auto" />
+                              </span>
+                            )}
+                          </td>
+                          <td className="px-6 py-4 text-sm text-gray-500">
+                            {item.movimentacao_id ? (
+                              <div className="flex items-center gap-1 text-blue-600" title={item.movimentacao_descricao || 'Movimentação'}>
+                                <Link2 size={14} />
+                                <span className="truncate max-w-[150px]">{item.movimentacao_descricao || 'Vínculo'}</span>
+                              </div>
+                            ) : (
+                              <span className="text-gray-400 italic">-</span>
+                            )}
+                          </td>
+                        </motion.tr>
+                      ))}
+                </React.Fragment>
+              );
+            })}
           </AnimatePresence>
-          {sortedLancamentos.length === 0 && (
+          {dayGroups.length === 0 && (
             <tr>
               <td colSpan={7} className="px-6 py-12 text-center text-gray-500">
                 Nenhum lançamento encontrado para os filtros selecionados.
