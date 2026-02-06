@@ -1,4 +1,4 @@
-import React, { useMemo, useState, useEffect } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { cancelarRecebimento, deleteRecebimento, listRecebimentoItens, listRecebimentos, Recebimento, type RecebimentoItem } from '@/services/recebimento';
 import { useNavigate } from 'react-router-dom';
 import { Loader2, PackageCheck, AlertTriangle, CheckCircle, Clock, FileText, Trash2, RotateCcw, TrendingDown } from 'lucide-react';
@@ -13,8 +13,10 @@ import ResizableSortableTh, { type SortState } from '@/components/ui/table/Resiz
 import TableColGroup from '@/components/ui/table/TableColGroup';
 import { useTableColumnWidths, type TableColumnWidthDef } from '@/components/ui/table/useTableColumnWidths';
 import { sortRows, toggleSort } from '@/components/ui/table/sortUtils';
+import { useAuth } from '@/contexts/AuthProvider';
 
 export default function RecebimentoListPage() {
+    const { loading: authLoading, activeEmpresaId } = useAuth();
     const [recebimentos, setRecebimentos] = useState<Recebimento[]>([]);
     const [loading, setLoading] = useState(true);
     const navigate = useNavigate();
@@ -56,11 +58,51 @@ export default function RecebimentoListPage() {
     const { widths: listWidths, startResize: startResizeList } = useTableColumnWidths({ tableId: 'suprimentos:recebimentos', columns: listColumns });
     const { widths: devWidths, startResize: startResizeDev } = useTableColumnWidths({ tableId: 'suprimentos:recebimentos:devolucao', columns: devColumns });
 
-    useEffect(() => {
-        loadData();
+    const lastEmpresaIdRef = useRef<string | null>(activeEmpresaId);
+    const empresaChanged = lastEmpresaIdRef.current !== activeEmpresaId;
+
+    const resetTenantLocalState = useCallback(() => {
+        setIsDeleteOpen(false);
+        setDeleting(false);
+        setToDelete(null);
+        setIsCancelOpen(false);
+        setCanceling(false);
+        setToCancel(null);
+        setCancelMotivo('');
+        setCreatingConta(false);
+
+        setIsDevolucaoOpen(false);
+        setDevolvendo(false);
+        setToDevolver(null);
+        setDevolucaoMotivo('');
+        setDevolucaoItens([]);
+        setDevolucaoQtd({});
+        setDepositos([]);
+        setDepositoId(null);
     }, []);
 
-    const loadData = async () => {
+    useEffect(() => {
+        const prevEmpresaId = lastEmpresaIdRef.current;
+        if (prevEmpresaId === activeEmpresaId) return;
+
+        // Multi-tenant safety: evitar reaproveitar estado do tenant anterior.
+        resetTenantLocalState();
+        setRecebimentos([]);
+        setLoading(!!activeEmpresaId);
+
+        lastEmpresaIdRef.current = activeEmpresaId;
+    }, [activeEmpresaId, resetTenantLocalState]);
+
+    const effectiveLoading = !!activeEmpresaId && (loading || empresaChanged);
+    const effectiveRecebimentos = empresaChanged ? [] : recebimentos;
+
+    const loadData = useCallback(async () => {
+        if (!activeEmpresaId) {
+            setRecebimentos([]);
+            setLoading(false);
+            return;
+        }
+
         setLoading(true);
         try {
             const data = await listRecebimentos();
@@ -70,11 +112,15 @@ export default function RecebimentoListPage() {
         } finally {
             setLoading(false);
         }
-    };
+    }, [activeEmpresaId]);
+
+    useEffect(() => {
+        loadData();
+    }, [loadData]);
 
     const sortedRecebimentos = useMemo(() => {
         return sortRows(
-            recebimentos,
+            effectiveRecebimentos,
             sort as any,
             [
                 { id: 'data', type: 'date', getValue: (r) => r.data_recebimento ?? null },
@@ -91,7 +137,7 @@ export default function RecebimentoListPage() {
                 { id: 'status', type: 'string', getValue: (r) => String(r.status ?? '') },
             ] as const
         );
-    }, [recebimentos, sort]);
+    }, [effectiveRecebimentos, sort]);
 
     const sortedDevolucaoItens = useMemo(() => {
         return sortRows(
@@ -129,6 +175,7 @@ export default function RecebimentoListPage() {
     };
 
     const openDevolucao = async (rec: Recebimento) => {
+        if (empresaChanged) return;
         setToDevolver(rec);
         setDevolucaoMotivo('');
         setDevolucaoQtd({});
@@ -235,6 +282,18 @@ export default function RecebimentoListPage() {
         }
     };
 
+    if (authLoading) {
+        return (
+            <div className="flex justify-center h-full items-center">
+                <Loader2 className="animate-spin text-blue-600 w-10 h-10" />
+            </div>
+        );
+    }
+
+    if (!activeEmpresaId) {
+        return <div className="p-4 text-gray-600">Selecione uma empresa para ver recebimentos.</div>;
+    }
+
     return (
         <div className="p-6 max-w-7xl mx-auto">
             <div className="flex justify-between items-center mb-6">
@@ -245,8 +304,8 @@ export default function RecebimentoListPage() {
                 <div className="flex gap-3">
                     <CsvExportDialog
                         filename="recebimentos.csv"
-                        rows={recebimentos}
-                        disabled={loading}
+                        rows={effectiveRecebimentos}
+                        disabled={effectiveLoading}
                         columns={[
                             { key: 'data', label: 'Data', getValue: (r) => r.data_recebimento },
                             { key: 'fornecedor', label: 'Fornecedor/Cliente', getValue: (r) => r.fiscal_nfe_imports?.emitente_nome || '' },
@@ -259,6 +318,7 @@ export default function RecebimentoListPage() {
                     />
                     <button
                         onClick={() => navigate('/app/suprimentos/recebimento-manual')}
+                        disabled={effectiveLoading}
                         className="bg-white border border-gray-300 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-50 transition-colors flex items-center gap-2 font-medium"
                     >
                         <FileText size={18} />
@@ -266,6 +326,7 @@ export default function RecebimentoListPage() {
                     </button>
                     <button
                         onClick={() => navigate('/app/nfe-input')}
+                        disabled={effectiveLoading}
                         className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2 font-bold shadow-sm"
                     >
                         <PackageCheck size={18} />
@@ -289,9 +350,9 @@ export default function RecebimentoListPage() {
                             </tr>
                         </thead>
                         <tbody className="bg-white divide-y divide-gray-200">
-                            {loading ? (
+                            {effectiveLoading ? (
                                 <tr><td colSpan={6} className="p-8 text-center"><Loader2 className="animate-spin mx-auto text-blue-500" /></td></tr>
-                            ) : recebimentos.length === 0 ? (
+                            ) : effectiveRecebimentos.length === 0 ? (
                                 <tr><td colSpan={6} className="p-8 text-center text-gray-500">Nenhum recebimento registrado.</td></tr>
                             ) : (
                                 sortedRecebimentos.map((rec) => (

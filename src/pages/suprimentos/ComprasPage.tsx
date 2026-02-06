@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { listCompras, CompraPedido } from '@/services/compras';
 import { PlusCircle, Search, ShoppingCart } from 'lucide-react';
 import { Loader2 } from 'lucide-react';
@@ -11,8 +11,10 @@ import CsvExportDialog from '@/components/ui/CsvExportDialog';
 import Pagination from '@/components/ui/Pagination';
 import ListPaginationBar from '@/components/ui/ListPaginationBar';
 import { useSearchParams } from 'react-router-dom';
+import { useAuth } from '@/contexts/AuthProvider';
 
 export default function ComprasPage() {
+  const { loading: authLoading, activeEmpresaId } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
   const [orders, setOrders] = useState<CompraPedido[]>([]);
   const [loading, setLoading] = useState(true);
@@ -26,7 +28,42 @@ export default function ComprasPage() {
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
 
-  const fetchOrders = async () => {
+  const lastEmpresaIdRef = useRef<string | null>(activeEmpresaId);
+  const empresaChanged = lastEmpresaIdRef.current !== activeEmpresaId;
+  const handledOpenRef = useRef(false);
+
+  const resetTenantLocalState = useCallback(() => {
+    setIsFormOpen(false);
+    setSelectedId(null);
+  }, []);
+
+  useEffect(() => {
+    const prevEmpresaId = lastEmpresaIdRef.current;
+    if (prevEmpresaId === activeEmpresaId) return;
+
+    resetTenantLocalState();
+    setOrders([]);
+    setTotalCount(0);
+    handledOpenRef.current = false;
+
+    const openId = searchParams.get('open');
+    if (prevEmpresaId && activeEmpresaId && openId) {
+      const next = new URLSearchParams(searchParams);
+      next.delete('open');
+      setSearchParams(next, { replace: true });
+    }
+
+    lastEmpresaIdRef.current = activeEmpresaId;
+  }, [activeEmpresaId, resetTenantLocalState, searchParams, setSearchParams]);
+
+  const fetchOrders = useCallback(async () => {
+    if (!activeEmpresaId) {
+      setOrders([]);
+      setTotalCount(0);
+      setLoading(false);
+      return;
+    }
+
     setLoading(true);
     try {
       const data = await listCompras({
@@ -45,22 +82,29 @@ export default function ComprasPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [activeEmpresaId, debouncedSearch, page, pageSize, statusFilter]);
 
   useEffect(() => {
     fetchOrders();
-  }, [debouncedSearch, statusFilter, page, pageSize]);
+  }, [fetchOrders]);
 
   useEffect(() => {
+    if (handledOpenRef.current) return;
+    if (authLoading || !activeEmpresaId || empresaChanged) return;
+
     const openId = searchParams.get('open');
-    if (!openId) return;
+    if (!openId) {
+      handledOpenRef.current = true;
+      return;
+    }
+    handledOpenRef.current = true;
+
     setSelectedId(openId);
     setIsFormOpen(true);
     const next = new URLSearchParams(searchParams);
     next.delete('open');
     setSearchParams(next, { replace: true });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [activeEmpresaId, authLoading, empresaChanged, searchParams, setSearchParams]);
 
   useEffect(() => {
     setPage(1);
@@ -86,6 +130,22 @@ export default function ComprasPage() {
     if (!selectedId) handleClose(); // Close if it was a new order, keep open if editing to show updates
   };
 
+  const effectiveLoading = !!activeEmpresaId && (loading || empresaChanged);
+  const effectiveOrders = empresaChanged ? [] : orders;
+  const effectiveTotalCount = empresaChanged ? 0 : totalCount;
+
+  if (authLoading) {
+    return (
+      <div className="flex justify-center h-full items-center">
+        <Loader2 className="animate-spin text-blue-600 w-10 h-10" />
+      </div>
+    );
+  }
+
+  if (!activeEmpresaId) {
+    return <div className="p-4 text-gray-600">Selecione uma empresa para ver ordens de compra.</div>;
+  }
+
   return (
     <div className="p-1 min-h-full flex flex-col">
       <div className="flex justify-between items-center mb-6">
@@ -96,8 +156,8 @@ export default function ComprasPage() {
         <div className="flex items-center gap-2">
           <CsvExportDialog
             filename="ordens-compra.csv"
-            rows={orders}
-            disabled={loading}
+            rows={effectiveOrders}
+            disabled={effectiveLoading}
             columns={[
               { key: 'numero', label: 'Número', getValue: (r) => r.numero },
               { key: 'fornecedor', label: 'Fornecedor', getValue: (r) => r.fornecedor_nome ?? '' },
@@ -108,6 +168,7 @@ export default function ComprasPage() {
           />
           <button
             onClick={handleNew}
+            disabled={effectiveLoading}
             className="flex items-center gap-2 bg-blue-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-blue-700 transition-colors"
           >
             <PlusCircle size={20} />
@@ -142,21 +203,21 @@ export default function ComprasPage() {
 
       <div className="bg-white rounded-lg shadow overflow-hidden flex flex-col flex-1 min-h-0 min-h-[400px]">
         <div className="flex-1 min-h-0 overflow-auto">
-          {loading ? (
+          {effectiveLoading ? (
             <div className="flex justify-center h-64 items-center">
               <Loader2 className="animate-spin text-blue-600 w-10 h-10" />
             </div>
           ) : (
-            <ComprasTable orders={orders} onEdit={handleEdit} />
+            <ComprasTable orders={effectiveOrders} onEdit={handleEdit} />
           )}
         </div>
       </div>
 
-      {totalCount > 0 ? (
+      {effectiveTotalCount > 0 ? (
         <ListPaginationBar className="mt-4" innerClassName="px-3 sm:px-4">
           <Pagination
             currentPage={page}
-            totalCount={totalCount}
+            totalCount={effectiveTotalCount}
             pageSize={pageSize}
             onPageChange={setPage}
             onPageSizeChange={(next) => {
