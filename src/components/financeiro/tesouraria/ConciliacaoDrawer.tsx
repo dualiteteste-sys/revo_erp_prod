@@ -190,6 +190,15 @@ export default function ConciliacaoDrawer({ isOpen, onClose, extratoItem, contaC
   const handleConciliarComTitulo = async (row: ConciliacaoTituloCandidate) => {
     if (!extratoItem) return;
     if (linkingId) return;
+    const extratoValor = Number(extratoItem.valor || 0);
+    const saldoTitulo = Number(row.saldo_aberto || 0);
+    if (Math.abs(extratoValor - saldoTitulo) > 0.01) {
+      addToast(
+        'Valor do extrato não confere com o saldo do título. Use busca manual e/ou crie movimentação.',
+        'error',
+      );
+      return;
+    }
     setLinkingId(row.titulo_id);
     try {
       await conciliarExtratoComTitulo({
@@ -332,7 +341,7 @@ export default function ConciliacaoDrawer({ isOpen, onClose, extratoItem, contaC
       >
         <div className="p-4 border-b flex justify-between items-center bg-gray-50">
           <h3 className="font-bold text-gray-800">Conciliar Lançamento</h3>
-          <button onClick={onClose} className="p-2 hover:bg-gray-200 rounded-full"><X size={20} /></button>
+          <button type="button" onClick={onClose} className="p-2 hover:bg-gray-200 rounded-full"><X size={20} /></button>
         </div>
 
         <div className="p-6 bg-blue-50 border-b border-blue-100">
@@ -585,6 +594,7 @@ export default function ConciliacaoDrawer({ isOpen, onClose, extratoItem, contaC
                 <div className="flex items-center gap-2">
                   {canAutoConciliate ? (
                     <button
+                      type="button"
                       onClick={() => void handleLink(bestCandidate.item.id)}
                       disabled={loading || !!linkingId}
                       className="text-emerald-700 text-xs font-semibold hover:underline disabled:opacity-60"
@@ -594,6 +604,7 @@ export default function ConciliacaoDrawer({ isOpen, onClose, extratoItem, contaC
                     </button>
                   ) : null}
                   <button
+                    type="button"
                     onClick={fetchSuggestions}
                     disabled={loading || !!linkingId}
                     className="text-blue-600 text-xs hover:underline disabled:opacity-60"
@@ -618,6 +629,7 @@ export default function ConciliacaoDrawer({ isOpen, onClose, extratoItem, contaC
                         {r.centro_custo ? <span> · Centro: {r.centro_custo}</span> : null}
                       </div>
                       <button
+                        type="button"
                         onClick={() => void handleCreateFromRule(r)}
                         disabled={!!linkingId || isCreating || creatingFromRuleId === r.id}
                         className="text-xs font-semibold text-emerald-700 hover:underline disabled:opacity-60"
@@ -635,6 +647,7 @@ export default function ConciliacaoDrawer({ isOpen, onClose, extratoItem, contaC
                 <div className="text-center py-8 text-gray-500 border-2 border-dashed rounded-lg">
                     <p>Nenhuma movimentação compatível encontrada.</p>
                     <button 
+                        type="button"
                         onClick={handleCreateAndConciliate}
                         disabled={isCreating}
                         className="mt-4 text-blue-600 font-semibold hover:underline flex items-center justify-center gap-1 mx-auto"
@@ -680,6 +693,7 @@ export default function ConciliacaoDrawer({ isOpen, onClose, extratoItem, contaC
                                   </div>
                                 ) : null}
                                 <button 
+                                    type="button"
                                     onClick={() => void handleLink(mov.id)}
                                     disabled={!!linkingId}
                                     className="w-full py-1.5 bg-blue-600 text-white rounded text-sm font-medium hover:bg-blue-700 flex items-center justify-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed"
@@ -695,6 +709,7 @@ export default function ConciliacaoDrawer({ isOpen, onClose, extratoItem, contaC
             {candidates.length > 0 && (
                  <div className="mt-6 pt-6 border-t">
                     <button 
+                        type="button"
                         onClick={handleCreateAndConciliate}
                         disabled={isCreating || !!linkingId}
                         className="w-full py-3 border-2 border-dashed border-gray-300 text-gray-600 rounded-lg hover:border-blue-400 hover:text-blue-600 transition-colors flex items-center justify-center gap-2"
