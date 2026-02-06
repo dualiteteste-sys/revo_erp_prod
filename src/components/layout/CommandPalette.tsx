@@ -1,8 +1,10 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { menuConfig } from '@/config/menuConfig';
-import { PlusCircle } from 'lucide-react';
+import { settingsMenuConfig } from '@/config/settingsMenuConfig';
+import { Lock, PlusCircle } from 'lucide-react';
 import { useEmpresaFeatures } from '@/hooks/useEmpresaFeatures';
+import { useHasPermission } from '@/hooks/useHasPermission';
 import { filterMenuByFeatures } from '@/utils/menu/filterMenuByFeatures';
 import {
   CommandDialog,
@@ -20,12 +22,27 @@ type PaletteItem = {
   label: string;
   href: string;
   Icon?: React.ElementType;
+  permission?: { domain: string; action: string };
 };
 
 type RecentEntry = Pick<PaletteItem, 'id' | 'group' | 'label' | 'href'>;
 
 const STORAGE_KEY = 'ui:commandPaletteRecents';
 const MAX_RECENTS = 8;
+
+function normalizeForSearch(s: string) {
+  return String(s || '')
+    .normalize('NFD')
+    .replace(/\p{Diacritic}/gu, '')
+    .toLowerCase();
+}
+
+function buildSearchValue(...parts: Array<string | undefined | null>) {
+  const raw = parts.filter(Boolean).join(' ').trim();
+  const normalized = normalizeForSearch(raw);
+  const compact = normalized.replace(/[^a-z0-9]+/g, ' ').trim();
+  return `${raw} ${normalized} ${compact}`.trim();
+}
 
 function flattenMenu(menu = menuConfig): PaletteItem[] {
   const items: PaletteItem[] = [];
@@ -40,6 +57,7 @@ function flattenMenu(menu = menuConfig): PaletteItem[] {
           label: child.name,
           href: child.href,
           Icon: child.icon,
+          permission: child.permission,
         });
       }
       continue;
@@ -52,7 +70,37 @@ function flattenMenu(menu = menuConfig): PaletteItem[] {
       label: group.name,
       href: group.href,
       Icon: group.icon,
+      permission: group.permission,
     });
+  }
+
+  return items;
+}
+
+function flattenSettingsMenu(): PaletteItem[] {
+  const items: PaletteItem[] = [];
+
+  for (const tab of settingsMenuConfig) {
+    const firstHref = tab.menu.find((m) => !!m.href && m.href !== '#')?.href || null;
+    if (firstHref) {
+      items.push({
+        id: `settings-tab:${tab.name}`,
+        group: 'Configurações',
+        label: tab.name,
+        href: firstHref,
+      });
+    }
+
+    for (const entry of tab.menu) {
+      if (!entry.href || entry.href === '#') continue;
+      items.push({
+        id: `settings:${tab.name}:${entry.name}`,
+        group: `Configurações · ${tab.name}`,
+        label: entry.name,
+        href: entry.href,
+        Icon: entry.icon,
+      });
+    }
   }
 
   return items;
@@ -94,6 +142,36 @@ function isEditableTarget(target: EventTarget | null) {
   return tag === 'input' || tag === 'textarea' || target.isContentEditable;
 }
 
+function PaletteCommandItem({ item, onSelect }: { item: PaletteItem; onSelect: () => void }) {
+  const perm = item.permission;
+  const permQuery = useHasPermission(perm?.domain ?? '', perm?.action ?? '');
+  const isLocked = !!perm && !permQuery.isLoading && !permQuery.data;
+  const isDisabled = !!perm && (permQuery.isLoading || isLocked);
+  const Icon = item.Icon;
+
+  return (
+    <CommandItem
+      key={item.href}
+      disabled={isDisabled}
+      onSelect={() => {
+        if (isDisabled) return;
+        onSelect();
+      }}
+      value={buildSearchValue(item.group, item.label)}
+      className={isDisabled ? 'cursor-not-allowed' : undefined}
+    >
+      {Icon ? <Icon className="mr-2 h-4 w-4 text-gray-500" /> : null}
+      <span className="text-sm">{item.label}</span>
+      {isLocked ? (
+        <span className="ml-auto inline-flex items-center gap-1 text-xs text-gray-500">
+          <Lock className="h-3 w-3" />
+          Sem permissão
+        </span>
+      ) : null}
+    </CommandItem>
+  );
+}
+
 export default function CommandPalette() {
   const navigate = useNavigate();
   const location = useLocation();
@@ -112,7 +190,7 @@ export default function CommandPalette() {
   }, [industria_enabled, servicos_enabled, loading]);
 
   const allItems = useMemo(
-    () => [...getActionItems({ industriaEnabled: industria_enabled }), ...flattenMenu(filteredMenu)],
+    () => [...getActionItems({ industriaEnabled: industria_enabled }), ...flattenMenu(filteredMenu), ...flattenSettingsMenu()],
     [filteredMenu, industria_enabled]
   );
 
@@ -195,19 +273,9 @@ export default function CommandPalette() {
 
         {groupedItems.map(([groupName, items]) => (
           <CommandGroup key={groupName} heading={groupName}>
-            {items.map((item) => {
-              const Icon = item.Icon;
-              return (
-                <CommandItem
-                  key={item.href}
-                  onSelect={() => handleSelect(item)}
-                  value={`${groupName} ${item.label}`}
-                >
-                  {Icon ? <Icon className="mr-2 h-4 w-4 text-gray-500" /> : null}
-                  <span className="text-sm">{item.label}</span>
-                </CommandItem>
-              );
-            })}
+            {items.map((item) => (
+              <PaletteCommandItem key={item.href} item={item} onSelect={() => handleSelect(item)} />
+            ))}
           </CommandGroup>
         ))}
       </CommandList>
