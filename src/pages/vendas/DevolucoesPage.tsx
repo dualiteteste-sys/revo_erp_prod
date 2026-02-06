@@ -34,6 +34,8 @@ export default function DevolucoesPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const idempotencyKeyRef = useRef<string | null>(null);
+  const loadTokenRef = useRef(0);
+  const pedidoTokenRef = useRef(0);
   const [rows, setRows] = useState<(Devolucao & { itens: any[] })[]>([]);
   const [orders, setOrders] = useState<VendaPedido[]>([]);
   const [contas, setContas] = useState<ContaCorrente[]>([]);
@@ -77,6 +79,7 @@ export default function DevolucoesPage() {
   };
 
   const load = useCallback(async () => {
+    if (authLoading || empresaChanged) return;
     if (!activeEmpresaId) {
       setRows([]);
       setOrders([]);
@@ -84,6 +87,8 @@ export default function DevolucoesPage() {
       setLoading(false);
       return;
     }
+    const token = ++loadTokenRef.current;
+    const empresaSnapshot = activeEmpresaId;
     setLoading(true);
     try {
       const [devs, ord, cc] = await Promise.all([
@@ -91,6 +96,8 @@ export default function DevolucoesPage() {
         listVendas({ search: '', status: 'concluido', limit: 500, offset: 0 }),
         listContasCorrentes({ page: 1, pageSize: 50, searchTerm: '', ativo: true }),
       ]);
+      if (token !== loadTokenRef.current) return;
+      if (empresaSnapshot !== lastEmpresaIdRef.current) return;
       setRows(devs as any);
       setOrders(ord);
       setContas(cc.data);
@@ -99,13 +106,17 @@ export default function DevolucoesPage() {
         setForm((s) => ({ ...s, conta_corrente_id: padrao.id }));
       }
     } catch (e: any) {
+      if (token !== loadTokenRef.current) return;
+      if (empresaSnapshot !== lastEmpresaIdRef.current) return;
       addToast(e.message || 'Falha ao carregar devoluções.', 'error');
       setRows([]);
       setOrders([]);
     } finally {
+      if (token !== loadTokenRef.current) return;
+      if (empresaSnapshot !== lastEmpresaIdRef.current) return;
       setLoading(false);
     }
-  }, [activeEmpresaId, addToast, form.conta_corrente_id]);
+  }, [activeEmpresaId, addToast, authLoading, empresaChanged, form.conta_corrente_id]);
 
   useEffect(() => {
     // Multi-tenant safety: evitar reaproveitar estado do tenant anterior.
@@ -117,6 +128,8 @@ export default function DevolucoesPage() {
     setLoadingPedido(false);
     setSaving(false);
     idempotencyKeyRef.current = null;
+    loadTokenRef.current += 1;
+    pedidoTokenRef.current += 1;
 
     if (!activeEmpresaId) {
       setLoading(false);
@@ -178,9 +191,14 @@ export default function DevolucoesPage() {
   };
 
   const loadPedidoItens = async (pedidoId: string) => {
+    if (authLoading || empresaChanged) return;
+    const token = ++pedidoTokenRef.current;
+    const empresaSnapshot = activeEmpresaId;
     setLoadingPedido(true);
     try {
       const venda: VendaDetails = await getVendaDetails(pedidoId);
+      if (token !== pedidoTokenRef.current) return;
+      if (empresaSnapshot !== lastEmpresaIdRef.current) return;
       const itens: ItemState[] = (venda.itens || []).map((it) => ({
         produto_id: it.produto_id,
         produto_nome: it.produto_nome || it.produto_id,
@@ -190,15 +208,20 @@ export default function DevolucoesPage() {
       }));
       setForm((s) => ({ ...s, pedido_id: pedidoId, itens }));
     } catch (e: any) {
+      if (token !== pedidoTokenRef.current) return;
+      if (empresaSnapshot !== lastEmpresaIdRef.current) return;
       addToast(e.message || 'Falha ao carregar itens do pedido.', 'error');
       setForm((s) => ({ ...s, pedido_id: pedidoId, itens: [] }));
     } finally {
+      if (token !== pedidoTokenRef.current) return;
+      if (empresaSnapshot !== lastEmpresaIdRef.current) return;
       setLoadingPedido(false);
     }
   };
 
   const save = async () => {
     if (saving) return;
+    if (authLoading || empresaChanged) return;
     if (!form.pedido_id) {
       addToast('Selecione um pedido.', 'error');
       return;
@@ -222,6 +245,7 @@ export default function DevolucoesPage() {
     }
 
     setSaving(true);
+    const empresaSnapshot = activeEmpresaId;
     try {
       const id = await createDevolucaoWithSideEffects({
         pedidoId: form.pedido_id,
@@ -230,12 +254,15 @@ export default function DevolucoesPage() {
         contaCorrenteId: form.conta_corrente_id,
         idempotencyKey: idempotencyKeyRef.current,
       });
+      if (empresaSnapshot !== lastEmpresaIdRef.current) return;
       addToast(`Devolução criada: ${id}`, 'success');
       close();
       await load();
     } catch (e: any) {
+      if (empresaSnapshot !== lastEmpresaIdRef.current) return;
       addToast(e.message || 'Falha ao criar devolução.', 'error');
     } finally {
+      if (empresaSnapshot !== lastEmpresaIdRef.current) return;
       setSaving(false);
     }
   };
