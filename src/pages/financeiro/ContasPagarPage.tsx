@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useContasPagar } from '@/hooks/useContasPagar';
 import { useToast } from '@/contexts/ToastProvider';
 import * as financeiroService from '@/services/financeiro';
@@ -20,8 +20,10 @@ import ErrorAlert from '@/components/ui/ErrorAlert';
 import { Button } from '@/components/ui/button';
 import { isSeedEnabled } from '@/utils/seed';
 import { useSearchParams } from 'react-router-dom';
+import { useAuth } from '@/contexts/AuthProvider';
 
 const ContasPagarPage: React.FC = () => {
+  const { loading: authLoading, activeEmpresaId } = useAuth();
   const enableSeed = isSeedEnabled();
   const {
     contas,
@@ -64,6 +66,32 @@ const ContasPagarPage: React.FC = () => {
   const [contaToReverse, setContaToReverse] = useState<financeiroService.ContaPagar | null>(null);
   const [searchParams, setSearchParams] = useSearchParams();
 
+  const lastEmpresaIdRef = useRef<string | null>(activeEmpresaId);
+  const empresaChanged = lastEmpresaIdRef.current !== activeEmpresaId;
+  const handledContaIdRef = useRef(false);
+
+  useEffect(() => {
+    lastEmpresaIdRef.current = activeEmpresaId;
+  }, [activeEmpresaId]);
+
+  useEffect(() => {
+    // Multi-tenant safety: evitar reaproveitar estado do tenant anterior.
+    setIsFormOpen(false);
+    setSelectedConta(null);
+    setIsDeleteModalOpen(false);
+    setContaToDelete(null);
+    setIsDeleting(false);
+    setIsCancelOpen(false);
+    setCanceling(false);
+    setContaToCancel(null);
+    setCancelMotivo('');
+    setIsFetchingDetails(false);
+    setIsBaixaOpen(false);
+    setContaToPay(null);
+    setIsEstornoOpen(false);
+    setContaToReverse(null);
+  }, [activeEmpresaId]);
+
   const handleOpenForm = async (conta: financeiroService.ContaPagar | null = null) => {
     if (conta?.id) {
       setIsFetchingDetails(true);
@@ -85,8 +113,15 @@ const ContasPagarPage: React.FC = () => {
   };
 
   useEffect(() => {
+    if (handledContaIdRef.current) return;
+    if (authLoading || !activeEmpresaId || empresaChanged) return;
+
     const contaId = searchParams.get('contaId');
-    if (!contaId) return;
+    if (!contaId) {
+      handledContaIdRef.current = true;
+      return;
+    }
+    handledContaIdRef.current = true;
 
     void (async () => {
       await handleOpenForm({ id: contaId } as any);
@@ -94,8 +129,7 @@ const ContasPagarPage: React.FC = () => {
       next.delete('contaId');
       setSearchParams(next, { replace: true });
     })();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [activeEmpresaId, authLoading, empresaChanged, handleOpenForm, searchParams, setSearchParams]);
 
   const handleCloseForm = () => {
     setIsFormOpen(false);
@@ -205,6 +239,23 @@ const ContasPagarPage: React.FC = () => {
     }
   };
 
+  const effectiveLoading = !!activeEmpresaId && (loading || empresaChanged);
+  const effectiveError = empresaChanged ? null : error;
+  const effectiveContas = empresaChanged ? [] : contas;
+  const canShowSummary = !empresaChanged && !!summary;
+
+  if (authLoading) {
+    return (
+      <div className="flex justify-center h-full items-center">
+        <Loader2 className="animate-spin text-blue-600 w-10 h-10" />
+      </div>
+    );
+  }
+
+  if (!activeEmpresaId) {
+    return <div className="p-4 text-gray-600">Selecione uma empresa para ver contas a pagar.</div>;
+  }
+
   return (
     <div className="p-1 min-h-full flex flex-col">
       <div className="flex justify-between items-center mb-6">
@@ -228,17 +279,17 @@ const ContasPagarPage: React.FC = () => {
         </div>
       </div>
 
-      {error ? (
+      {effectiveError ? (
         <div className="my-8">
           <ErrorAlert
             title="Erro ao carregar dados"
-            message={error}
+            message={effectiveError}
             onRetry={refresh}
           />
         </div>
       ) : (
         <>
-          <ContasPagarSummary summary={summary} />
+          {canShowSummary ? <ContasPagarSummary summary={summary} /> : null}
 
           <div className="mt-6 mb-4 flex flex-wrap gap-4 items-end">
             <div className="relative flex-grow max-w-xs">
@@ -293,11 +344,11 @@ const ContasPagarPage: React.FC = () => {
 
           <div className="bg-white rounded-lg shadow overflow-hidden flex flex-col flex-1 min-h-0">
             <div className="flex-1 min-h-0 overflow-auto">
-              {loading && contas.length === 0 ? (
+              {effectiveLoading && effectiveContas.length === 0 ? (
                 <div className="h-96 flex items-center justify-center">
                   <Loader2 className="animate-spin text-blue-500" size={32} />
                 </div>
-              ) : contas.length === 0 ? (
+              ) : effectiveContas.length === 0 ? (
                 <div className="h-96 flex flex-col items-center justify-center text-gray-500">
                   <TrendingDown size={48} className="mb-4" />
                   <p>Nenhuma conta a pagar encontrada.</p>
@@ -305,12 +356,12 @@ const ContasPagarPage: React.FC = () => {
                 </div>
               ) : (
                 <ResponsiveTable
-                  data={contas}
+                  data={effectiveContas}
                   getItemId={(c) => c.id}
-                  loading={loading}
+                  loading={effectiveLoading}
                   tableComponent={
                     <ContasPagarTable
-                      contas={contas}
+                      contas={effectiveContas}
                       onEdit={handleOpenForm}
                       onPay={handlePay}
                       onReverse={handleOpenReverse}
