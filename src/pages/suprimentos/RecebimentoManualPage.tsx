@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Loader2, Plus, Trash2, Save, ArrowLeft, Package } from 'lucide-react';
 import { useToast } from '@/contexts/ToastProvider';
@@ -11,6 +11,7 @@ import ClienteFornecedorAutocomplete from '@/components/common/ClienteFornecedor
 import ItemAutocomplete from '@/components/os/ItemAutocomplete';
 import UnidadeMedidaSelect from '@/components/common/UnidadeMedidaSelect';
 import { OsItemSearchResult } from '@/services/os';
+import { useAuth } from '@/contexts/AuthProvider';
 
 type ManualItem = {
   id: string; // temp id for UI
@@ -24,6 +25,7 @@ type ManualItem = {
 };
 
 export default function RecebimentoManualPage() {
+  const { loading: authLoading, activeEmpresaId } = useAuth();
   const navigate = useNavigate();
   const { addToast } = useToast();
   const [loading, setLoading] = useState(false);
@@ -37,6 +39,25 @@ export default function RecebimentoManualPage() {
 
   // Items Data
   const [items, setItems] = useState<ManualItem[]>([]);
+
+  const lastEmpresaIdRef = useRef<string | null>(activeEmpresaId);
+  const empresaChanged = lastEmpresaIdRef.current !== activeEmpresaId;
+
+  useEffect(() => {
+    const prevEmpresaId = lastEmpresaIdRef.current;
+    if (prevEmpresaId === activeEmpresaId) return;
+
+    // Multi-tenant safety: evitar reaproveitar estado do tenant anterior.
+    setLoading(false);
+    setEmitenteId(null);
+    setEmitenteNome('');
+    setNumeroNota('');
+    setSerieNota('');
+    setDataEmissao(new Date().toISOString().split('T')[0]);
+    setItems([]);
+
+    lastEmpresaIdRef.current = activeEmpresaId;
+  }, [activeEmpresaId]);
 
   const handleAddItem = () => {
     setItems(prev => [
@@ -72,6 +93,10 @@ export default function RecebimentoManualPage() {
   };
 
   const handleSave = async () => {
+    if (authLoading || !activeEmpresaId || empresaChanged) {
+      addToast('Selecione uma empresa ativa para continuar.', 'warning');
+      return;
+    }
     if (!emitenteId) {
       addToast('Selecione o Cliente/Fornecedor.', 'error');
       return;
@@ -150,6 +175,18 @@ export default function RecebimentoManualPage() {
     }
   };
 
+  if (authLoading) {
+    return (
+      <div className="flex justify-center h-full items-center">
+        <Loader2 className="animate-spin text-blue-600 w-10 h-10" />
+      </div>
+    );
+  }
+
+  if (!activeEmpresaId) {
+    return <div className="p-4 text-gray-600">Selecione uma empresa para registrar recebimento manual.</div>;
+  }
+
   return (
     <div className="p-1 h-full flex flex-col">
       <div className="flex items-center gap-4 mb-6">
@@ -207,6 +244,7 @@ export default function RecebimentoManualPage() {
             <h3 className="text-lg font-semibold text-gray-800">Itens do Documento</h3>
             <button 
               onClick={handleAddItem}
+              disabled={empresaChanged}
               className="flex items-center gap-2 text-sm font-medium text-blue-600 hover:bg-blue-50 px-3 py-2 rounded-lg transition-colors"
             >
               <Plus size={16} /> Adicionar Item
@@ -317,7 +355,9 @@ export default function RecebimentoManualPage() {
             {items.length === 0 && (
               <div className="text-center py-12 text-gray-400 border-2 border-dashed border-gray-200 rounded-xl">
                 <p>Nenhum item adicionado.</p>
-                <button onClick={handleAddItem} className="text-blue-600 hover:underline mt-2">Adicionar o primeiro item</button>
+                <button onClick={handleAddItem} disabled={empresaChanged} className="text-blue-600 hover:underline mt-2">
+                  Adicionar o primeiro item
+                </button>
               </div>
             )}
           </div>
@@ -333,7 +373,7 @@ export default function RecebimentoManualPage() {
         </button>
         <button 
           onClick={handleSave}
-          disabled={loading}
+          disabled={loading || empresaChanged}
           className="flex items-center gap-2 bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700 font-bold shadow-lg shadow-green-600/20 disabled:opacity-50"
         >
           {loading ? <Loader2 className="animate-spin" /> : <Save />}

@@ -1,4 +1,4 @@
-import React, { useMemo, useState, useEffect } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { 
   getRelatorioValorizacao, 
   getRelatorioBaixoEstoque, 
@@ -16,10 +16,12 @@ import ResizableSortableTh, { type SortState } from '@/components/ui/table/Resiz
 import TableColGroup from '@/components/ui/table/TableColGroup';
 import { useTableColumnWidths, type TableColumnWidthDef } from '@/components/ui/table/useTableColumnWidths';
 import { sortRows, toggleSort } from '@/components/ui/table/sortUtils';
+import { useAuth } from '@/contexts/AuthProvider';
 
 type ReportType = 'valorizacao' | 'baixo_estoque' | 'sugestao_compra';
 
 export default function RelatoriosPage() {
+  const { loading: authLoading, activeEmpresaId } = useAuth();
   const [activeReport, setActiveReport] = useState<ReportType>('valorizacao');
   const [loading, setLoading] = useState(false);
   const [search, setSearch] = useState('');
@@ -66,7 +68,35 @@ export default function RelatoriosPage() {
   const { widths: baixoWidths, startResize: startResizeBaixo } = useTableColumnWidths({ tableId: 'suprimentos:relatorios:baixo-estoque', columns: baixoColumns });
   const { widths: sugWidths, startResize: startResizeSug } = useTableColumnWidths({ tableId: 'suprimentos:relatorios:sugestao-compra', columns: sugColumns });
 
-  const fetchData = async () => {
+  const lastEmpresaIdRef = useRef<string | null>(activeEmpresaId);
+  const empresaChanged = lastEmpresaIdRef.current !== activeEmpresaId;
+
+  useEffect(() => {
+    const prevEmpresaId = lastEmpresaIdRef.current;
+    if (prevEmpresaId === activeEmpresaId) return;
+
+    // Multi-tenant safety: evitar reaproveitar estado do tenant anterior.
+    setValorizacaoData([]);
+    setBaixoEstoqueData([]);
+    setSugestaoCompraData([]);
+    setLoading(!!activeEmpresaId);
+
+    lastEmpresaIdRef.current = activeEmpresaId;
+  }, [activeEmpresaId]);
+
+  const effectiveLoading = !!activeEmpresaId && (loading || empresaChanged);
+  const effectiveValorizacaoData = empresaChanged ? [] : valorizacaoData;
+  const effectiveBaixoEstoqueData = empresaChanged ? [] : baixoEstoqueData;
+  const effectiveSugestaoCompraData = empresaChanged ? [] : sugestaoCompraData;
+
+  const fetchData = useCallback(async () => {
+    if (!activeEmpresaId) {
+      setValorizacaoData([]);
+      setBaixoEstoqueData([]);
+      setSugestaoCompraData([]);
+      setLoading(false);
+      return;
+    }
     setLoading(true);
     try {
       if (activeReport === 'valorizacao') {
@@ -84,11 +114,11 @@ export default function RelatoriosPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [activeEmpresaId, activeReport, debouncedSearch]);
 
   useEffect(() => {
     fetchData();
-  }, [activeReport, debouncedSearch]);
+  }, [fetchData]);
 
   const handlePrint = () => {
     window.print();
@@ -96,7 +126,7 @@ export default function RelatoriosPage() {
 
   const sortedValorizacao = useMemo(() => {
     return sortRows(
-      valorizacaoData,
+      effectiveValorizacaoData,
       valSort as any,
       [
         { id: 'produto', type: 'string', getValue: (i) => i.nome ?? '' },
@@ -108,11 +138,11 @@ export default function RelatoriosPage() {
         { id: 'classe', type: 'string', getValue: (i) => i.classe ?? '' },
       ] as const
     );
-  }, [valorizacaoData, valSort]);
+  }, [effectiveValorizacaoData, valSort]);
 
   const sortedBaixoEstoque = useMemo(() => {
     return sortRows(
-      baixoEstoqueData,
+      effectiveBaixoEstoqueData,
       baixoSort as any,
       [
         { id: 'produto', type: 'string', getValue: (i) => i.nome ?? '' },
@@ -123,11 +153,11 @@ export default function RelatoriosPage() {
         { id: 'fornecedor', type: 'string', getValue: (i) => i.fornecedor_nome ?? '' },
       ] as const
     );
-  }, [baixoEstoqueData, baixoSort]);
+  }, [effectiveBaixoEstoqueData, baixoSort]);
 
   const sortedSugestaoCompra = useMemo(() => {
     return sortRows(
-      sugestaoCompraData,
+      effectiveSugestaoCompraData,
       sugSort as any,
       [
         { id: 'produto', type: 'string', getValue: (i) => i.nome ?? '' },
@@ -142,7 +172,7 @@ export default function RelatoriosPage() {
         { id: 'fornecedor', type: 'string', getValue: (i) => i.fornecedor_nome ?? '' },
       ] as const
     );
-  }, [sugSort, sugestaoCompraData]);
+  }, [sugSort, effectiveSugestaoCompraData]);
 
   const handleExport = () => {
     let content = '';
@@ -150,7 +180,7 @@ export default function RelatoriosPage() {
 
     if (activeReport === 'valorizacao') {
       const headers = ['Produto', 'SKU', 'Unidade', 'Saldo', 'Custo Médio', 'Valor Total', 'Classe ABC'];
-      const rows = valorizacaoData.map(i => [
+      const rows = effectiveValorizacaoData.map(i => [
         `"${i.nome}"`, i.sku || '', i.unidade, i.saldo, 
         i.custo_medio.toFixed(2).replace('.', ','), 
         i.valor_total.toFixed(2).replace('.', ','), 
@@ -160,7 +190,7 @@ export default function RelatoriosPage() {
       filename = 'relatorio_valorizacao.csv';
     } else if (activeReport === 'baixo_estoque') {
       const headers = ['Produto', 'SKU', 'Unidade', 'Saldo', 'Mínimo', 'Máximo', 'Sugestão Compra', 'Fornecedor'];
-      const rows = baixoEstoqueData.map(i => [
+      const rows = effectiveBaixoEstoqueData.map(i => [
         `"${i.nome}"`, i.sku || '', i.unidade, i.saldo, 
         i.estoque_min || 0, i.estoque_max || 0, 
         i.sugestao_compra, `"${i.fornecedor_nome || ''}"`
@@ -182,7 +212,7 @@ export default function RelatoriosPage() {
         'Prev. recebimento',
         'Fornecedor',
       ];
-      const rows = sugestaoCompraData.map((i) =>
+      const rows = effectiveSugestaoCompraData.map((i) =>
         [
           `"${i.nome}"`,
           i.sku || '',
@@ -216,7 +246,7 @@ export default function RelatoriosPage() {
   const getAbcChartOption = () => {
     const counts = { A: 0, B: 0, C: 0 };
     let totalValue = 0;
-    valorizacaoData.forEach(i => {
+    effectiveValorizacaoData.forEach(i => {
       counts[i.classe]++;
       totalValue += i.valor_total;
     });
@@ -243,6 +273,18 @@ export default function RelatoriosPage() {
     };
   };
 
+  if (authLoading) {
+    return (
+      <div className="flex justify-center h-full items-center">
+        <Loader2 className="animate-spin text-blue-600 w-10 h-10" />
+      </div>
+    );
+  }
+
+  if (!activeEmpresaId) {
+    return <div className="p-4 text-gray-600">Selecione uma empresa para ver relatórios de suprimentos.</div>;
+  }
+
   return (
     <div className="p-1 h-full flex flex-col">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4 print:hidden">
@@ -253,10 +295,18 @@ export default function RelatoriosPage() {
           <p className="text-gray-600 text-sm mt-1">Análise de estoque e planejamento de compras.</p>
         </div>
         <div className="flex gap-2">
-          <button onClick={handleExport} className="flex items-center gap-2 bg-white border border-gray-300 text-gray-700 font-medium py-2 px-4 rounded-lg hover:bg-gray-50 transition-colors">
+          <button
+            onClick={handleExport}
+            disabled={effectiveLoading}
+            className="flex items-center gap-2 bg-white border border-gray-300 text-gray-700 font-medium py-2 px-4 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50"
+          >
             <Download size={18} /> Exportar
           </button>
-          <button onClick={handlePrint} className="flex items-center gap-2 bg-blue-600 text-white font-medium py-2 px-4 rounded-lg hover:bg-blue-700 transition-colors">
+          <button
+            onClick={handlePrint}
+            disabled={effectiveLoading}
+            className="flex items-center gap-2 bg-blue-600 text-white font-medium py-2 px-4 rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50"
+          >
             <Printer size={18} /> Imprimir
           </button>
         </div>
@@ -314,7 +364,7 @@ export default function RelatoriosPage() {
         <p className="text-sm text-gray-500">Gerado em: {new Date().toLocaleString('pt-BR')}</p>
       </div>
 
-      {loading ? (
+      {effectiveLoading ? (
         <div className="flex justify-center items-center h-64">
           <Loader2 className="animate-spin text-blue-600 w-12 h-12" />
         </div>
@@ -323,12 +373,12 @@ export default function RelatoriosPage() {
           {activeReport === 'valorizacao' && (
             <>
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 print:hidden">
-                    <GlassCard className="p-6 flex flex-col justify-center">
-                        <p className="text-gray-500 font-medium">Valor Total em Estoque</p>
-                        <h3 className="text-3xl font-bold text-blue-800 mt-2">
-                            {formatCurrency(valorizacaoData.reduce((acc, i) => acc + (i.valor_total * 100), 0))}
-                        </h3>
-                        <p className="text-sm text-gray-400 mt-1">{valorizacaoData.length} itens com saldo</p>
+                        <GlassCard className="p-6 flex flex-col justify-center">
+                            <p className="text-gray-500 font-medium">Valor Total em Estoque</p>
+                            <h3 className="text-3xl font-bold text-blue-800 mt-2">
+                            {formatCurrency(effectiveValorizacaoData.reduce((acc, i) => acc + (i.valor_total * 100), 0))}
+                            </h3>
+                        <p className="text-sm text-gray-400 mt-1">{effectiveValorizacaoData.length} itens com saldo</p>
                     </GlassCard>
                     <GlassCard className="lg:col-span-2 p-2 h-40">
                         <ReactECharts option={getAbcChartOption()} style={{ height: '100%', width: '100%' }} />
@@ -408,7 +458,7 @@ export default function RelatoriosPage() {
                                     <td className="px-4 py-2 text-gray-600">{item.fornecedor_nome || '-'}</td>
                                 </tr>
                             ))}
-                            {baixoEstoqueData.length === 0 && (
+                            {effectiveBaixoEstoqueData.length === 0 && (
                                 <tr>
                                     <td colSpan={6} className="p-8 text-center text-gray-500">
                                         <CheckCircle className="w-8 h-8 mx-auto mb-2 text-green-500" />
@@ -461,7 +511,7 @@ export default function RelatoriosPage() {
                         <td className="px-4 py-2 text-gray-600">{item.fornecedor_nome || '-'}</td>
                       </tr>
                     ))}
-                    {sugestaoCompraData.length === 0 && (
+                    {effectiveSugestaoCompraData.length === 0 && (
                       <tr>
                         <td colSpan={10} className="p-8 text-center text-gray-500">
                           <CheckCircle className="w-8 h-8 mx-auto mb-2 text-green-500" />
