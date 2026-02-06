@@ -40,6 +40,52 @@ export type ContasPagarSummary = {
     vencidas: number;
 };
 
+export type ContaPagarPagamento = {
+  id: string;
+  data_pagamento: string;
+  valor: number;
+  conta_corrente_id: string;
+  conta_corrente_nome: string | null;
+  observacoes: string | null;
+  estornado: boolean;
+  estornado_at: string | null;
+  estorno_motivo: string | null;
+  movimentacao_id: string | null;
+  movimentacao_conciliada: boolean;
+  created_at: string;
+};
+
+export async function listContaPagarPagamentos(contaPagarId: string): Promise<ContaPagarPagamento[]> {
+  try {
+    const data = await callRpc<ContaPagarPagamento[]>('financeiro_conta_pagar_pagamentos_list', {
+      p_conta_pagar_id: contaPagarId,
+    });
+    return data || [];
+  } catch (error: any) {
+    console.error('[SERVICE][LIST_CONTA_PAGAR_PAGAMENTOS]', error);
+    throw new Error(error.message || 'Não foi possível carregar os pagamentos.');
+  }
+}
+
+export async function estornarContaPagarPagamento(params: {
+  pagamentoId: string;
+  dataEstorno?: string | null;
+  contaCorrenteId?: string | null;
+  motivo?: string | null;
+}): Promise<ContaPagar> {
+  try {
+    return await callRpc<ContaPagar>('financeiro_conta_pagar_pagamento_estornar', {
+      p_pagamento_id: params.pagamentoId,
+      p_data_estorno: params.dataEstorno ?? null,
+      p_conta_corrente_id: params.contaCorrenteId ?? null,
+      p_motivo: params.motivo ?? null,
+    });
+  } catch (error: any) {
+    console.error('[SERVICE][ESTORNAR_CONTA_PAGAR_PAGAMENTO]', error);
+    throw new Error(error.message || 'Erro ao estornar o pagamento.');
+  }
+}
+
 export async function listContasPagar(options: {
     page: number;
     pageSize: number;
