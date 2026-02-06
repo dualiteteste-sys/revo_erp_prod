@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useServices } from '@/hooks/useServices';
 import * as svc from '@/services/services';
 import ServicesTable from '@/components/services/ServicesTable';
@@ -24,9 +24,11 @@ import { uiMessages } from '@/lib/ui/messages';
 import { useHasPermission } from '@/hooks/useHasPermission';
 import ImportServicesCsvModal from '@/components/services/ImportServicesCsvModal';
 import { useSearchParams } from 'react-router-dom';
+import { useAuth } from '@/contexts/AuthProvider';
 
 export default function ServicesPage() {
   const enableSeed = isSeedEnabled();
+  const { loading: authLoading, activeEmpresaId } = useAuth();
   const permCreate = useHasPermission('servicos', 'create');
   const permsLoading = permCreate.isLoading;
   const canCreate = !!permCreate.data;
@@ -67,6 +69,9 @@ export default function ServicesPage() {
     [services, bulk.selectedIds]
   );
 
+  const lastEmpresaIdRef = useRef<string | null>(activeEmpresaId);
+  const empresaChanged = lastEmpresaIdRef.current !== activeEmpresaId;
+
   const handleOpenForm = async (service: svc.Service | null = null) => {
     if (service?.id) {
       setIsFetchingDetails(true);
@@ -97,7 +102,39 @@ export default function ServicesPage() {
       setSearchParams(next, { replace: true });
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+	  }, []);
+
+  useEffect(() => {
+    const prevEmpresaId = lastEmpresaIdRef.current;
+    if (prevEmpresaId === activeEmpresaId) return;
+
+    // Multi-tenant safety: evitar reaproveitar estado do tenant anterior.
+    bulk.clear();
+    setIsFormOpen(false);
+    setSelected(null);
+    setIsDeleteModalOpen(false);
+    setServiceToDelete(null);
+    setIsDeleting(false);
+    setIsFetchingDetails(false);
+    setIsSeeding(false);
+    setBulkDeleteOpen(false);
+    setBulkLoading(false);
+    setIsImportOpen(false);
+
+    const openId = searchParams.get('open');
+    if (openId) {
+      const next = new URLSearchParams(searchParams);
+      next.delete('open');
+      setSearchParams(next, { replace: true });
+    }
+
+    if (prevEmpresaId && activeEmpresaId) {
+      addToast('Empresa alterada. Recarregando serviços…', 'info');
+    }
+
+    lastEmpresaIdRef.current = activeEmpresaId;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeEmpresaId]);
 
   const handleCloseForm = () => {
     setIsFormOpen(false);
@@ -194,6 +231,10 @@ export default function ServicesPage() {
     const inativos = services.filter(s => s.status === 'inativo').length;
     return { total, ativos, inativos };
   }, [services]);
+
+  if (authLoading) return <div className="flex justify-center p-12"><Loader2 className="animate-spin text-blue-600" /></div>;
+  if (!activeEmpresaId) return <div className="p-12 text-center text-gray-600">Selecione uma empresa para ver os serviços.</div>;
+  if (empresaChanged) return <div className="flex justify-center p-12"><Loader2 className="animate-spin text-blue-600" /></div>;
 
   const header = (
     <PageHeader
