@@ -4,7 +4,7 @@ import { X, Loader2, Link2, Plus } from 'lucide-react';
 import { ExtratoItem, Movimentacao, listMovimentacoes, saveMovimentacao } from '@/services/treasury';
 import { useToast } from '@/contexts/ToastProvider';
 import { listConciliacaoRegras, type ConciliacaoRegra } from '@/services/conciliacaoRegras';
-import { conciliarExtratoComTitulo, conciliarExtratoComTitulosLote, searchTitulosParaConciliacao, sugerirTitulosParaExtrato, type ConciliacaoTituloCandidate, type ConciliacaoTituloTipo } from '@/services/conciliacaoTitulos';
+import { conciliarExtratoComTitulo, conciliarExtratoComTituloParcial, conciliarExtratoComTitulosLote, searchTitulosParaConciliacao, sugerirTitulosParaExtrato, type ConciliacaoTituloCandidate, type ConciliacaoTituloTipo } from '@/services/conciliacaoTitulos';
 import { rankCandidates, scoreExtratoToMovimentacao, type MatchResult } from '@/lib/conciliacao/matching';
 import DatePicker from '@/components/ui/DatePicker';
 
@@ -38,6 +38,7 @@ export default function ConciliacaoDrawer({ isOpen, onClose, extratoItem, contaC
   const [titulosPage, setTitulosPage] = useState(1);
   const [titulosSelected, setTitulosSelected] = useState<Record<string, ConciliacaoTituloCandidate>>({});
   const [titulosBatchConciliando, setTitulosBatchConciliando] = useState(false);
+  const [titulosParcialConciliando, setTitulosParcialConciliando] = useState(false);
 
   useEffect(() => {
     if (isOpen && extratoItem) {
@@ -192,11 +193,14 @@ export default function ConciliacaoDrawer({ isOpen, onClose, extratoItem, contaC
     if (linkingId) return;
     const extratoValor = Number(extratoItem.valor || 0);
     const saldoTitulo = Number(row.saldo_aberto || 0);
-    if (Math.abs(extratoValor - saldoTitulo) > 0.01) {
-      addToast(
-        'Valor do extrato não confere com o saldo do título. Use busca manual e/ou crie movimentação.',
-        'error',
-      );
+    const diff = extratoValor - saldoTitulo;
+    if (Math.abs(diff) > 0.01) {
+      if (diff < 0) {
+        setTitulosSelected({ [row.titulo_id]: row });
+        addToast('Título tem saldo maior que o extrato. Use “Registrar parcial e conciliar”.', 'info');
+        return;
+      }
+      addToast('Valor do extrato é maior que o saldo do título. Selecione mais títulos ou crie movimentação/ajuste.', 'error');
       return;
     }
     setLinkingId(row.titulo_id);
@@ -232,6 +236,14 @@ export default function ConciliacaoDrawer({ isOpen, onClose, extratoItem, contaC
   const selectedTitulosArray = Object.values(titulosSelected);
   const selectedTitulosTotal = selectedTitulosArray.reduce((acc, t) => acc + Number(t.saldo_aberto || 0), 0);
   const selectedTitulosDiff = extratoItem ? Number(extratoItem.valor || 0) - selectedTitulosTotal : 0;
+  const extratoValor = extratoItem ? Number(extratoItem.valor || 0) : 0;
+  const isParcialCandidate =
+    !!extratoItem &&
+    selectedTitulosArray.length === 1 &&
+    (Number(selectedTitulosArray[0]?.saldo_aberto || 0) - extratoValor) > 0.01;
+  const titulosSuggestionsExact = extratoItem
+    ? (titulosSuggestions || []).filter((t) => Math.abs(Number(t.saldo_aberto || 0) - extratoValor) <= 0.01)
+    : (titulosSuggestions || []);
 
   const handleConciliarTitulosSelecionados = async () => {
     if (!extratoItem) return;
@@ -256,6 +268,29 @@ export default function ConciliacaoDrawer({ isOpen, onClose, extratoItem, contaC
       addToast(e?.message || 'Erro ao conciliar em lote.', 'error');
     } finally {
       setTitulosBatchConciliando(false);
+    }
+  };
+
+  const handleConciliarParcialSelecionado = async () => {
+    if (!extratoItem) return;
+    if (titulosParcialConciliando || titulosBatchConciliando || !!linkingId) return;
+    if (!isParcialCandidate) return;
+
+    const titulo = selectedTitulosArray[0];
+    setTitulosParcialConciliando(true);
+    try {
+      const { movimentacaoId } = await conciliarExtratoComTituloParcial({
+        extratoId: extratoItem.id,
+        tipo: tipoTitulo,
+        tituloId: titulo.titulo_id,
+      });
+      await onConciliate(movimentacaoId);
+      addToast(`${tipoTitulo === 'pagar' ? 'Pagamento' : 'Recebimento'} parcial registrado e extrato conciliado!`, 'success');
+      onClose();
+    } catch (e: any) {
+      addToast(e?.message || 'Erro ao registrar parcial e conciliar.', 'error');
+    } finally {
+      setTitulosParcialConciliando(false);
     }
   };
 
@@ -413,36 +448,64 @@ export default function ConciliacaoDrawer({ isOpen, onClose, extratoItem, contaC
                       </div>
                     </div>
 
-                    <button
-                      type="button"
-                      onClick={() => void handleConciliarTitulosSelecionados()}
-                      disabled={
-                        selectedTitulosArray.length === 0 ||
-                        titulosBatchConciliando ||
-                        !!linkingId ||
-                        Math.abs(selectedTitulosDiff) > 0.01
-                      }
-                      className="inline-flex items-center gap-2 rounded-md bg-emerald-600 px-3 py-2 text-sm font-medium text-white hover:bg-emerald-700 disabled:opacity-60"
-                    >
-                      {titulosBatchConciliando ? <Loader2 className="h-4 w-4 animate-spin" /> : <Link2 size={16} />}
-                      Conciliar selecionados
-                    </button>
-                  </div>
-                </div>
+	                    <button
+	                      type="button"
+	                      onClick={() => void handleConciliarTitulosSelecionados()}
+	                      disabled={
+	                        selectedTitulosArray.length === 0 ||
+	                        titulosBatchConciliando ||
+	                        !!linkingId ||
+	                        Math.abs(selectedTitulosDiff) > 0.01
+	                      }
+	                      className="inline-flex items-center gap-2 rounded-md bg-emerald-600 px-3 py-2 text-sm font-medium text-white hover:bg-emerald-700 disabled:opacity-60"
+	                    >
+	                      {titulosBatchConciliando ? <Loader2 className="h-4 w-4 animate-spin" /> : <Link2 size={16} />}
+	                      Conciliar selecionados
+	                    </button>
+	                  </div>
 
-                <div className="rounded-lg border bg-white p-3">
-                  <div className="text-xs font-bold uppercase text-gray-600 mb-2">Sugestões automáticas</div>
-                  {titulosLoading ? (
-                    <div className="flex items-center gap-2 text-xs text-gray-500"><Loader2 className="h-3 w-3 animate-spin" /> Buscando…</div>
-                  ) : titulosSuggestions.length === 0 ? (
-                    <div className="text-xs text-gray-500">Nenhuma sugestão encontrada.</div>
-                  ) : (
-                    <div className="space-y-2">
-                      {titulosSuggestions.map((t) => {
-                        const disabled = !!linkingId;
-                        const checked = !!titulosSelected[t.titulo_id];
-                        return (
-                          <div key={t.titulo_id} className="border rounded-lg p-3">
+                    {isParcialCandidate ? (
+                      <div className="mt-3 rounded-md border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">
+                        <div className="font-semibold">Parcial</div>
+                        <div className="mt-1">
+                          Título com saldo aberto maior que o extrato. Se confirmar, será registrado um{' '}
+                          <span className="font-semibold">{tipoTitulo === 'pagar' ? 'pagamento' : 'recebimento'}</span> parcial de{' '}
+                          <span className="font-semibold">R$ {extratoValor.toFixed(2)}</span> e o extrato ficará conciliado.
+                        </div>
+                        <div className="mt-2 flex items-center justify-between gap-2">
+                          <div>
+                            Restará em aberto:{' '}
+                            <span className="font-semibold">
+                              R$ {(Number(selectedTitulosArray[0].saldo_aberto || 0) - extratoValor).toFixed(2)}
+                            </span>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => void handleConciliarParcialSelecionado()}
+                            disabled={titulosParcialConciliando || titulosBatchConciliando || !!linkingId}
+                            className="inline-flex items-center gap-2 rounded-md bg-amber-700 px-3 py-2 text-sm font-medium text-white hover:bg-amber-800 disabled:opacity-60"
+                          >
+                            {titulosParcialConciliando ? <Loader2 className="h-4 w-4 animate-spin" /> : <Link2 size={16} />}
+                            Registrar parcial e conciliar
+                          </button>
+                        </div>
+                      </div>
+                    ) : null}
+	                </div>
+
+	                <div className="rounded-lg border bg-white p-3">
+	                  <div className="text-xs font-bold uppercase text-gray-600 mb-2">Sugestões automáticas</div>
+	                  {titulosLoading ? (
+	                    <div className="flex items-center gap-2 text-xs text-gray-500"><Loader2 className="h-3 w-3 animate-spin" /> Buscando…</div>
+	                  ) : titulosSuggestionsExact.length === 0 ? (
+	                    <div className="text-xs text-gray-500">Nenhuma sugestão exata encontrada.</div>
+	                  ) : (
+	                    <div className="space-y-2">
+	                      {titulosSuggestionsExact.map((t) => {
+	                        const disabled = !!linkingId;
+	                        const checked = !!titulosSelected[t.titulo_id];
+	                        return (
+	                          <div key={t.titulo_id} className="border rounded-lg p-3">
                             <div className="flex items-start justify-between gap-2">
                               <div className="flex items-start gap-2 min-w-0">
                                 <label className="pt-0.5">
