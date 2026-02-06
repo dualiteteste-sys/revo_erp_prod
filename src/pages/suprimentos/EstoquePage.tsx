@@ -27,7 +27,7 @@ import { useTableColumnWidths, type TableColumnWidthDef } from '@/components/ui/
 import { useAuth } from '@/contexts/AuthProvider';
 
 export default function EstoquePage() {
-  const { activeEmpresaId } = useAuth();
+  const { loading: authLoading, activeEmpresaId } = useAuth();
   const [produtos, setProdutos] = useState<EstoquePosicao[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -195,6 +195,10 @@ export default function EstoquePage() {
   };
 
   const handleExportEstoqueCsv = () => {
+    if (empresaChanged || loading) {
+      addToast('Aguarde carregar o estoque antes de exportar.', 'info');
+      return;
+    }
     if (produtos.length === 0) {
       addToast('Nada para exportar.', 'warning');
       return;
@@ -294,6 +298,13 @@ export default function EstoquePage() {
     });
   };
 
+  if (authLoading) {
+    return (
+      <div className="flex justify-center p-12">
+        <Loader2 className="animate-spin text-blue-600" />
+      </div>
+    );
+  }
   if (!activeEmpresaId) {
     return <div className="p-4 text-gray-600">Selecione uma empresa para ver o estoque.</div>;
   }
@@ -312,11 +323,12 @@ export default function EstoquePage() {
             type="button"
             variant="secondary"
             onClick={() => setIsInventarioOpen(true)}
+            disabled={effectiveLoading}
             className="gap-2"
           >
             Inventário cíclico
           </Button>
-          <Button type="button" variant="secondary" onClick={handleExportEstoqueCsv} className="gap-2">
+          <Button type="button" variant="secondary" onClick={handleExportEstoqueCsv} disabled={effectiveLoading} className="gap-2">
             <Download size={18} />
             Exportar CSV
           </Button>
