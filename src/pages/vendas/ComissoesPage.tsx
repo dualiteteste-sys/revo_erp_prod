@@ -72,6 +72,7 @@ export default function ComissoesPage() {
 
   const lastEmpresaIdRef = useRef<string | null>(activeEmpresaId);
   const empresaChanged = lastEmpresaIdRef.current !== activeEmpresaId;
+  const fetchTokenRef = useRef(0);
 
   useEffect(() => {
     lastEmpresaIdRef.current = activeEmpresaId;
@@ -84,16 +85,25 @@ export default function ComissoesPage() {
       setLoading(false);
       return;
     }
+
+    const token = ++fetchTokenRef.current;
+    const empresaSnapshot = activeEmpresaId;
     setLoading(true);
     try {
       const [data, vend] = await Promise.all([listVendasComissoes({ limit: 500 }), listVendedores(undefined, false)]);
+      if (token !== fetchTokenRef.current) return;
+      if (empresaSnapshot !== lastEmpresaIdRef.current) return;
       setRows((data || []) as any);
       setVendedores(vend);
     } catch (e: any) {
+      if (token !== fetchTokenRef.current) return;
+      if (empresaSnapshot !== lastEmpresaIdRef.current) return;
       addToast(e.message || 'Falha ao carregar comissões.', 'error');
       setRows([]);
       setVendedores([]);
     } finally {
+      if (token !== fetchTokenRef.current) return;
+      if (empresaSnapshot !== lastEmpresaIdRef.current) return;
       setLoading(false);
     }
   }
