@@ -9,10 +9,12 @@ import { useHasPermission } from '@/hooks/useHasPermission';
 import { supabase } from '@/lib/supabaseClient';
 import {
   type EcommerceConnection,
+  type EcommerceConnectionDiagnostics,
   disconnectEcommerceConnection,
   getEcommerceConnectionDiagnostics,
   getEcommerceHealthSummary,
   listEcommerceConnections,
+  normalizeEcommerceConfig,
   setWooConnectionSecrets,
   upsertEcommerceConnection,
   updateEcommerceConnectionConfig,
@@ -58,6 +60,14 @@ function defaultConfig() {
   };
 }
 
+function wooPendingReason(conn: EcommerceConnection | null, wooDiag: EcommerceConnectionDiagnostics | null) {
+  if (!conn) return null;
+  const storeUrl = String(conn.config?.store_url ?? '').trim();
+  if (!storeUrl) return 'Falta URL da loja';
+  if (!wooDiag?.has_token) return 'Faltam credenciais (Consumer Key/Secret)';
+  return null;
+}
+
 export default function MarketplaceIntegrationsPage() {
   const { addToast } = useToast();
   const permView = useHasPermission('ecommerce', 'view');
@@ -86,6 +96,7 @@ export default function MarketplaceIntegrationsPage() {
   const [wooDepositos, setWooDepositos] = useState<Array<{ id: string; nome: string }>>([]);
   const [wooTabelasPreco, setWooTabelasPreco] = useState<Array<{ id: string; nome: string }>>([]);
   const [wooOptionsLoading, setWooOptionsLoading] = useState(false);
+  const [wooDiag, setWooDiag] = useState<EcommerceConnectionDiagnostics | null>(null);
 
   const mappingsColumns: TableColumnWidthDef[] = [
     { id: 'produto', defaultWidth: 320, minWidth: 220 },
@@ -113,6 +124,18 @@ export default function MarketplaceIntegrationsPage() {
   const canView = !!permView.data;
   const canManage = !!permManage.data;
 
+  const refreshWooDiag = useCallback(async () => {
+    if (!canView) return null;
+    try {
+      const diag = await getEcommerceConnectionDiagnostics('woo');
+      setWooDiag(diag);
+      return diag;
+    } catch {
+      setWooDiag(null);
+      return null;
+    }
+  }, [canView]);
+
   const fetchAll = useCallback(async () => {
     if (!canView) return;
     setLoading(true);
@@ -120,14 +143,16 @@ export default function MarketplaceIntegrationsPage() {
       const [c, h] = await Promise.all([listEcommerceConnections(), getEcommerceHealthSummary()]);
       setConnections(c);
       setHealth(h);
+      void refreshWooDiag();
     } catch (e: any) {
       addToast(e?.message || 'Falha ao carregar integrações.', 'error');
       setConnections([]);
       setHealth(null);
+      setWooDiag(null);
     } finally {
       setLoading(false);
     }
-  }, [addToast, canView]);
+  }, [addToast, canView, refreshWooDiag]);
 
   useEffect(() => {
     void fetchAll();
@@ -228,6 +253,7 @@ export default function MarketplaceIntegrationsPage() {
     setWooConsumerKey('');
     setWooConsumerSecret('');
     setConfigOpen(true);
+    if (provider === 'woo') void refreshWooDiag();
   };
 
   const handleTestConnection = async () => {
@@ -318,7 +344,29 @@ export default function MarketplaceIntegrationsPage() {
     setSavingConfig(true);
     try {
       await updateEcommerceConnectionConfig(activeConnection.id, activeConnection.config ?? {});
-      addToast('Configurações salvas.', 'success');
+      if (activeConnection.provider === 'woo') {
+        const storeUrl = String(activeConnection.config?.store_url ?? '').trim();
+        const diag = await refreshWooDiag();
+        const hasSecrets = diag?.has_token === true;
+        const reason = wooPendingReason({ ...activeConnection, config: activeConnection.config ?? null }, diag ?? null);
+
+        const nextStatus = storeUrl && hasSecrets ? 'connected' : 'pending';
+        await upsertEcommerceConnection({
+          provider: 'woo',
+          nome: providerLabels.woo,
+          status: nextStatus,
+          external_account_id: activeConnection.external_account_id ?? null,
+          config: normalizeEcommerceConfig(activeConnection.config ?? {}),
+        });
+
+        if (nextStatus === 'connected') {
+          addToast('Integração conectada.', 'success');
+        } else {
+          addToast(`Integração salva, mas ainda pendente. ${reason ? `Motivo: ${reason}.` : ''}`.trim(), 'warning');
+        }
+      } else {
+        addToast('Configurações salvas.', 'success');
+      }
       setConfigOpen(false);
       setActiveConnection(null);
       await fetchAll();
@@ -350,6 +398,7 @@ export default function MarketplaceIntegrationsPage() {
       addToast('Credenciais salvas.', 'success');
       setWooConsumerKey('');
       setWooConsumerSecret('');
+      await refreshWooDiag();
       await fetchAll();
     } catch (e: any) {
       addToast(e?.message || 'Falha ao salvar credenciais.', 'error');
@@ -516,6 +565,7 @@ export default function MarketplaceIntegrationsPage() {
           const isDisconnected = String(conn?.status ?? '').toLowerCase() === 'disconnected';
           const hasConnection = !!conn && !isDisconnected;
           const busy = busyProvider === provider;
+          const pendingReason = provider === 'woo' ? wooPendingReason(conn ?? null, wooDiag) : null;
           return (
             <GlassCard key={provider} className="p-4">
               <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
@@ -527,6 +577,12 @@ export default function MarketplaceIntegrationsPage() {
                   <div className="mt-1 text-xs text-gray-500">
                     {conn?.external_account_id ? `Conta: ${conn.external_account_id}` : 'Sem conta vinculada'}
                   </div>
+                  {provider === 'woo' && pendingReason && String(conn?.status ?? '').toLowerCase() === 'pending' ? (
+                    <div className="mt-2 inline-flex items-center gap-2 text-xs text-amber-800 bg-amber-50 border border-amber-100 rounded-lg px-2 py-1">
+                      <AlertTriangle size={14} />
+                      <span>{pendingReason}</span>
+                    </div>
+                  ) : null}
                   {conn?.last_error ? (
                     <div className="mt-2 inline-flex items-center gap-2 text-xs text-red-700 bg-red-50 border border-red-100 rounded-lg px-2 py-1">
                       <AlertTriangle size={14} />
@@ -652,16 +708,45 @@ export default function MarketplaceIntegrationsPage() {
                       />
                       <div />
                       <Input
-                        label="Consumer Key"
+                        label={
+                          <div className="flex items-center justify-between gap-2">
+                            <span>Consumer Key</span>
+                            {wooDiag?.has_token ? (
+                              <span className="inline-flex items-center rounded-full bg-emerald-100 text-emerald-800 px-2 py-0.5 text-xs font-medium">
+                                Salvo
+                              </span>
+                            ) : null}
+                          </div>
+                        }
                         value={wooConsumerKey}
-                        placeholder="ck_..."
+                        placeholder={wooDiag?.has_token && !wooConsumerKey ? 'Salvo (mascarado)' : 'ck_...'}
                         onChange={(e) => setWooConsumerKey((e.target as HTMLInputElement).value)}
+                        helperText={
+                          wooDiag?.has_token && !wooConsumerKey
+                            ? 'Armazenado com segurança. Para substituir, cole uma nova chave.'
+                            : 'Cole a chave gerada no WooCommerce (ck_...).'
+                        }
                       />
                       <Input
-                        label="Consumer Secret"
+                        label={
+                          <div className="flex items-center justify-between gap-2">
+                            <span>Consumer Secret</span>
+                            {wooDiag?.has_token ? (
+                              <span className="inline-flex items-center rounded-full bg-emerald-100 text-emerald-800 px-2 py-0.5 text-xs font-medium">
+                                Salvo
+                              </span>
+                            ) : null}
+                          </div>
+                        }
                         value={wooConsumerSecret}
-                        placeholder="cs_..."
+                        placeholder={wooDiag?.has_token && !wooConsumerSecret ? 'Salvo (mascarado)' : 'cs_...'}
                         onChange={(e) => setWooConsumerSecret((e.target as HTMLInputElement).value)}
+                        type="password"
+                        helperText={
+                          wooDiag?.has_token && !wooConsumerSecret
+                            ? 'Armazenado com segurança. Para substituir, cole um novo segredo.'
+                            : 'Cole o secret gerado no WooCommerce (cs_...).'
+                        }
                       />
                     </div>
 
@@ -670,7 +755,7 @@ export default function MarketplaceIntegrationsPage() {
                         variant="outline"
                         className="gap-2"
                         onClick={() => void handleSaveWooSecrets()}
-                        disabled={!canManage || wooSavingSecrets}
+                        disabled={!canManage || wooSavingSecrets || !wooConsumerKey.trim() || !wooConsumerSecret.trim()}
                         title={canManage ? 'Salvar credenciais' : 'Sem permissão'}
                       >
                         <Link2 size={16} />
@@ -916,25 +1001,33 @@ export default function MarketplaceIntegrationsPage() {
                 <div className="mt-1 text-xs text-gray-600">
                   Para importar itens corretamente, mapeie cada produto do Ultria ERP com o ID do anúncio no canal.
                 </div>
-                <div className="mt-3 flex justify-end">
-	                  <Button
-	                    variant="outline"
-	                    className="gap-2"
-	                    disabled={!canManage}
-	                    onClick={() => {
-	                      const p = activeConnection.provider as Provider;
-	                      if (p === 'woo') {
-	                        addToast('Mapeamento de produtos ainda não está disponível para WooCommerce.', 'info');
-	                        return;
-	                      }
-	                      void openMappings(p);
-	                    }}
-	                    title={canManage ? 'Abrir mapeamento' : 'Sem permissão'}
-	                  >
-                    <SettingsIcon size={16} />
-                    Abrir mapeamento
-                  </Button>
-                </div>
+                {activeConnection.provider === 'woo' ? (
+                  <div className="mt-2 rounded-lg bg-gray-50 border border-gray-100 p-3 text-xs text-gray-600">
+                    <div className="font-medium text-gray-800">Em desenvolvimento</div>
+                    <div className="mt-1">
+                      O mapeamento de produtos para WooCommerce ainda não foi liberado. Assim que estiver pronto, o botão aparecerá aqui.
+                    </div>
+                  </div>
+                ) : (
+                  <div className="mt-3 flex justify-end">
+                    <Button
+                      variant="outline"
+                      className="gap-2"
+                      disabled={!canManage || String(activeConnection.status ?? '').toLowerCase() !== 'connected'}
+                      onClick={() => void openMappings(activeConnection.provider as CatalogProvider)}
+                      title={
+                        !canManage
+                          ? 'Sem permissão'
+                          : String(activeConnection.status ?? '').toLowerCase() !== 'connected'
+                            ? 'Conecte a integração para liberar o mapeamento'
+                            : 'Abrir mapeamento'
+                      }
+                    >
+                      <SettingsIcon size={16} />
+                      Abrir mapeamento
+                    </Button>
+                  </div>
+                )}
               </GlassCard>
 
               <div className="flex justify-end gap-2 pt-2">
