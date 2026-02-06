@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { listCentrosTrabalho, CentroTrabalho } from '@/services/industriaCentros';
 import { deleteOperador, listOperadores, OperadorPayload, OperadorRecord, upsertOperador } from '@/services/industriaOperadores';
 import { useToast } from '@/contexts/ToastProvider';
@@ -22,7 +22,7 @@ export default function OperadoresPage() {
   const [loading, setLoading] = useState(false);
   const [search, setSearch] = useState('');
   const [centros, setCentros] = useState<CentroTrabalho[]>([]);
-  const { activeEmpresa } = useAuth();
+  const { loading: authLoading, activeEmpresaId, activeEmpresa } = useAuth();
   const supabase = useSupabase();
 
   const [modalOpen, setModalOpen] = useState(false);
@@ -37,6 +37,36 @@ export default function OperadoresPage() {
   const [logoLoading, setLogoLoading] = useState(false);
   const [savingPrintPin, setSavingPrintPin] = useState(false);
   const [sort, setSort] = useState<SortState<'nome' | 'email' | 'centros' | 'status'>>({ column: 'nome', direction: 'asc' });
+  const lastEmpresaIdRef = useRef<string | null>(activeEmpresaId);
+  const empresaChanged = lastEmpresaIdRef.current !== activeEmpresaId;
+
+  useEffect(() => {
+    const prevEmpresaId = lastEmpresaIdRef.current;
+    if (prevEmpresaId === activeEmpresaId) return;
+
+    // Multi-tenant safety: evitar reaproveitar estado do tenant anterior.
+    setItems([]);
+    setCentros([]);
+    setModalOpen(false);
+    setForm({ nome: '', email: '', pin: randomPin(), centros_trabalho_ids: [], ativo: true });
+    setConfirmDeleteId(null);
+    setDeleting(false);
+    setPrintTarget(null);
+    setPrintPin('');
+    setLogoUrl(null);
+    setLogoLoading(false);
+    setSavingPrintPin(false);
+
+    if (prevEmpresaId && activeEmpresaId) {
+      addToast('Empresa alterada. Recarregando operadores…', 'info');
+    }
+
+    setLoading(!!activeEmpresaId);
+    lastEmpresaIdRef.current = activeEmpresaId;
+  }, [activeEmpresaId, addToast]);
+
+  const effectiveLoading = !!activeEmpresaId && (loading || empresaChanged);
+  const effectiveItems = empresaChanged ? [] : items;
 
   const columns: TableColumnWidthDef[] = [
     { id: 'nome', defaultWidth: 260, minWidth: 200 },
@@ -48,7 +78,7 @@ export default function OperadoresPage() {
   const { widths, startResize } = useTableColumnWidths({ tableId: 'industria:operadores:list', columns });
 
   const sortedItems = sortRows(
-    items,
+    effectiveItems,
     sort as any,
     [
       { id: 'nome', type: 'string', getValue: (r: OperadorRecord) => r.nome ?? '' },
@@ -63,6 +93,12 @@ export default function OperadoresPage() {
   );
 
   const loadData = async () => {
+    if (!activeEmpresaId || empresaChanged) {
+      setItems([]);
+      setCentros([]);
+      setLoading(false);
+      return;
+    }
     setLoading(true);
     try {
       const [ops, cts] = await Promise.all([
@@ -79,9 +115,10 @@ export default function OperadoresPage() {
   };
 
   useEffect(() => {
+    if (!activeEmpresaId || empresaChanged) return;
     loadData();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [activeEmpresaId, empresaChanged]);
 
   const handleSubmit = async () => {
     if (!form.nome.trim() || !form.pin) {
@@ -214,6 +251,10 @@ export default function OperadoresPage() {
     }
   }, [activeEmpresa?.logotipo_url, supabase]);
 
+  if (authLoading) return <div className="flex justify-center p-12"><Loader2 className="animate-spin text-blue-600" /></div>;
+  if (!activeEmpresaId) return <div className="p-12 text-center text-gray-600">Selecione uma empresa para ver os operadores.</div>;
+  if (effectiveLoading) return <div className="flex justify-center p-12"><Loader2 className="animate-spin text-blue-600" /></div>;
+
   return (
     <div className="p-6 space-y-4">
       <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
@@ -230,8 +271,8 @@ export default function OperadoresPage() {
             placeholder="Buscar por nome ou e-mail"
             className="border rounded-lg px-3 py-2 text-sm"
           />
-          <Button onClick={loadData} variant="outline" className="gap-2" disabled={loading}>
-            <RefreshCw size={16} className={loading ? 'animate-spin' : ''} />
+          <Button onClick={loadData} variant="outline" className="gap-2" disabled={effectiveLoading}>
+            <RefreshCw size={16} className={effectiveLoading ? 'animate-spin' : ''} />
             Atualizar
           </Button>
           <Button

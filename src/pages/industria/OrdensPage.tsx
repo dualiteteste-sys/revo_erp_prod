@@ -19,9 +19,11 @@ import ProducaoKanbanBoard from '@/components/industria/producao/ProducaoKanbanB
 import { logger } from '@/lib/logger';
 import { roleAtLeast, useEmpresaRole } from '@/hooks/useEmpresaRole';
 import RoadmapButton from '@/components/roadmap/RoadmapButton';
+import { useAuth } from '@/contexts/AuthProvider';
 
 export default function OrdensPage() {
   const { addToast } = useToast();
+  const { loading: authLoading, activeEmpresaId } = useAuth();
   const empresaRoleQuery = useEmpresaRole();
   const empresaRole = empresaRoleQuery.data;
   const canCreate = roleAtLeast(empresaRole, 'member');
@@ -42,10 +44,34 @@ export default function OrdensPage() {
   const [initialPrefill, setInitialPrefill] = useState<React.ComponentProps<typeof OrdemFormPanel>['initialPrefill']>();
   const [draftTipoOrdem, setDraftTipoOrdem] = useState<'industrializacao' | 'beneficiamento'>('industrializacao');
   const [kanbanRefresh, setKanbanRefresh] = useState(0);
+  const lastEmpresaIdRef = useRef<string | null>(activeEmpresaId);
+  const empresaChanged = lastEmpresaIdRef.current !== activeEmpresaId;
 
   const tipoOrdem = (searchParams.get('tipo') === 'beneficiamento' ? 'beneficiamento' : 'industrializacao') as
     | 'industrializacao'
     | 'beneficiamento';
+
+  useEffect(() => {
+    const prevEmpresaId = lastEmpresaIdRef.current;
+    if (prevEmpresaId === activeEmpresaId) return;
+
+    // Multi-tenant safety: evitar reaproveitar estado do tenant anterior.
+    setOrders([]);
+    setLoading(!!activeEmpresaId);
+    setIsFormOpen(false);
+    setSelectedId(null);
+    setInitialPrefill(undefined);
+    hasShownRpcHint.current = false;
+
+    if (prevEmpresaId && activeEmpresaId) {
+      addToast('Empresa alterada. Recarregando ordens…', 'info');
+    }
+
+    lastEmpresaIdRef.current = activeEmpresaId;
+  }, [activeEmpresaId, addToast]);
+
+  const effectiveLoading = !!activeEmpresaId && (loading || empresaChanged);
+  const effectiveOrders = empresaChanged ? [] : orders;
 
   const statusOptions = useMemo(() => {
     if (tipoOrdem === 'industrializacao') {
@@ -135,6 +161,11 @@ export default function OrdensPage() {
 
   const fetchOrders = async () => {
     if (viewMode === 'kanban') return; // Kanban fetches its own data
+    if (!activeEmpresaId || empresaChanged) {
+      setOrders([]);
+      setLoading(false);
+      return;
+    }
     setLoading(true);
     try {
       if (tipoOrdem === 'industrializacao') {
@@ -184,7 +215,7 @@ export default function OrdensPage() {
 
   useEffect(() => {
     fetchOrders();
-  }, [debouncedSearch, statusFilter, viewMode, tipoOrdem]);
+  }, [activeEmpresaId, empresaChanged, debouncedSearch, statusFilter, viewMode, tipoOrdem]);
 
   const handleNew = () => {
     if (empresaRoleQuery.isFetched && !canCreate) {
@@ -234,6 +265,10 @@ export default function OrdensPage() {
     if (viewMode === 'list') fetchOrders();
     if (viewMode === 'kanban') setKanbanRefresh(k => k + 1);
   };
+
+  if (authLoading) return <div className="flex justify-center p-12"><Loader2 className="animate-spin text-blue-600" /></div>;
+  if (!activeEmpresaId) return <div className="p-12 text-center text-gray-600">Selecione uma empresa para ver as ordens.</div>;
+  if (effectiveLoading) return <div className="flex justify-center p-12"><Loader2 className="animate-spin text-blue-600" /></div>;
 
   const handleDraftTipoChange = (nextTipo: 'industrializacao' | 'beneficiamento') => {
     if (selectedId) return; // só para novas ordens
@@ -345,7 +380,7 @@ export default function OrdensPage() {
                 getItemId={(o) => o.id}
                 loading={loading}
                 tableComponent={
-                  <OrdensTable orders={orders} onEdit={handleEdit} onClone={handleClone} onChanged={handleSuccess} />
+                  <OrdensTable orders={effectiveOrders} onEdit={handleEdit} onClone={handleClone} onChanged={handleSuccess} />
                 }
                 renderMobileCard={(order) => (
                   <OrdemIndustriaMobileCard
