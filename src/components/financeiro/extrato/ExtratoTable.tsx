@@ -7,6 +7,7 @@ import ResizableSortableTh, { type SortState } from '@/components/ui/table/Resiz
 import TableColGroup from '@/components/ui/table/TableColGroup';
 import { useTableColumnWidths, type TableColumnWidthDef } from '@/components/ui/table/useTableColumnWidths';
 import { sortRows, toggleSort } from '@/components/ui/table/sortUtils';
+import { formatDatePtBR } from '@/lib/dateDisplay';
 
 interface Props {
   lancamentos: ExtratoLancamento[];
@@ -112,9 +113,9 @@ export default function ExtratoTable({ lancamentos }: Props) {
                 exit={{ opacity: 0 }}
                 className="hover:bg-gray-50 transition-colors"
               >
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                  {new Date(item.data_lancamento).toLocaleDateString('pt-BR')}
-                </td>
+	                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+	                  {formatDatePtBR(item.data_lancamento)}
+	                </td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
                   {item.conta_nome}
                 </td>

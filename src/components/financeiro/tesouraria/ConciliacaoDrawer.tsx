@@ -7,6 +7,7 @@ import { listConciliacaoRegras, type ConciliacaoRegra } from '@/services/concili
 import { conciliarExtratoComTitulo, conciliarExtratoComTituloParcial, conciliarExtratoComTitulosLote, searchTitulosParaConciliacao, sugerirTitulosParaExtrato, type ConciliacaoTituloCandidate, type ConciliacaoTituloTipo } from '@/services/conciliacaoTitulos';
 import { rankCandidates, scoreExtratoToMovimentacao, type MatchResult } from '@/lib/conciliacao/matching';
 import DatePicker from '@/components/ui/DatePicker';
+import { formatDatePtBR } from '@/lib/dateDisplay';
 
 interface Props {
   isOpen: boolean;
@@ -387,10 +388,10 @@ export default function ConciliacaoDrawer({ isOpen, onClose, extratoItem, contaC
                     R$ {extratoItem?.valor.toFixed(2)}
                 </span>
             </div>
-            <div className="flex justify-between text-sm text-blue-800">
-                <span>{new Date(extratoItem!.data_lancamento).toLocaleDateString('pt-BR')}</span>
-                <span>Doc: {extratoItem?.documento_ref || '-'}</span>
-            </div>
+	            <div className="flex justify-between text-sm text-blue-800">
+	                <span>{formatDatePtBR(extratoItem!.data_lancamento)}</span>
+	                <span>Doc: {extratoItem?.documento_ref || '-'}</span>
+	            </div>
         </div>
 
         <div className="flex-1 overflow-y-auto p-4">
@@ -523,7 +524,7 @@ export default function ConciliacaoDrawer({ isOpen, onClose, extratoItem, contaC
                               </div>
                               <div className="text-right">
                                 <div className="text-sm font-bold text-gray-800">R$ {Number(t.saldo_aberto).toFixed(2)}</div>
-                                <div className="text-[11px] text-gray-500">Venc.: {new Date(t.data_vencimento).toLocaleDateString('pt-BR')}</div>
+	                                <div className="text-[11px] text-gray-500">Venc.: {formatDatePtBR(t.data_vencimento)}</div>
                               </div>
                             </div>
                             <div className="mt-2 flex items-center justify-between gap-2">
@@ -603,7 +604,7 @@ export default function ConciliacaoDrawer({ isOpen, onClose, extratoItem, contaC
                             </div>
                             <div className="text-right">
                               <div className="text-sm font-bold text-gray-800">R$ {Number(t.saldo_aberto).toFixed(2)}</div>
-                              <div className="text-[11px] text-gray-500">Venc.: {new Date(t.data_vencimento).toLocaleDateString('pt-BR')}</div>
+	                              <div className="text-[11px] text-gray-500">Venc.: {formatDatePtBR(t.data_vencimento)}</div>
                             </div>
                           </div>
                           <div className="mt-2 flex items-center justify-between">
@@ -733,7 +734,7 @@ export default function ConciliacaoDrawer({ isOpen, onClose, extratoItem, contaC
                                     </span>
                                 </div>
                                 <div className="flex justify-between items-center text-xs text-gray-500 mb-3">
-                                    <span>{new Date(mov.data_movimento).toLocaleDateString('pt-BR')}</span>
+	                                    <span>{formatDatePtBR(mov.data_movimento)}</span>
                                     <div className="flex items-center gap-2">
                                       <span className="bg-slate-100 text-slate-700 px-2 py-0.5 rounded-full">Score {score}</span>
                                       {isExactMatch && <span className="bg-green-100 text-green-800 px-2 py-0.5 rounded-full">Valor Exato</span>}

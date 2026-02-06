@@ -10,6 +10,7 @@ import Select from '@/components/ui/forms/Select';
 import DatePicker from '@/components/ui/DatePicker';
 import { useToast } from '@/contexts/ToastProvider';
 import { useAuth } from '@/contexts/AuthProvider';
+import { formatDatePtBR } from '@/lib/dateDisplay';
 
 export default function ExtratoPage() {
   const { loading: authLoading, activeEmpresaId } = useAuth();
@@ -94,14 +95,14 @@ export default function ExtratoPage() {
     }
 
     const headers = ['Data', 'Conta', 'Descrição', 'Documento', 'Tipo', 'Valor', 'Saldo', 'Conciliado', 'Vínculo'];
-    const csvContent = [
-      headers.join(';'),
-      ...lancamentos.map(l => [
-        new Date(l.data_lancamento).toLocaleDateString('pt-BR'),
-        l.conta_nome,
-        `"${l.descricao}"`, // Escape quotes
-        l.documento_ref || '',
-        l.tipo_lancamento === 'credito' ? 'Crédito' : 'Débito',
+	    const csvContent = [
+	      headers.join(';'),
+	      ...lancamentos.map(l => [
+	        formatDatePtBR(l.data_lancamento),
+	        l.conta_nome,
+	        `"${l.descricao}"`, // Escape quotes
+	        l.documento_ref || '',
+	        l.tipo_lancamento === 'credito' ? 'Crédito' : 'Débito',
         l.valor.toFixed(2).replace('.', ','),
         l.saldo_apos_lancamento ? l.saldo_apos_lancamento.toFixed(2).replace('.', ',') : '',
         l.conciliado ? 'Sim' : 'Não',
