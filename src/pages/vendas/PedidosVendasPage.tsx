@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useVendas } from '@/hooks/useVendas';
 import { VendaPedido, seedVendas } from '@/services/vendas';
 import { Loader2, PlusCircle, Search, ShoppingCart } from 'lucide-react';
@@ -19,8 +19,10 @@ import PageShell from '@/components/ui/PageShell';
 import PageCard from '@/components/ui/PageCard';
 import { useConfirm } from '@/contexts/ConfirmProvider';
 import { useEditLock } from '@/components/ui/hooks/useEditLock';
+import { useAuth } from '@/contexts/AuthProvider';
 
 export default function PedidosVendasPage() {
+  const { loading: authLoading, activeEmpresaId } = useAuth();
   const {
     orders,
     totalCount,
@@ -41,6 +43,10 @@ export default function PedidosVendasPage() {
   const navigate = useNavigate();
   const { confirm } = useConfirm();
   const editLock = useEditLock('vendas:pedidos');
+
+  const lastEmpresaIdRef = useRef<string | null>(activeEmpresaId);
+  const empresaChanged = lastEmpresaIdRef.current !== activeEmpresaId;
+  const lastHandledOpenRef = useRef<string | null>(null);
 
   const openFromQuery = useMemo(() => {
     const params = new URLSearchParams(location.search);
@@ -67,6 +73,27 @@ export default function PedidosVendasPage() {
     if (editingId) editLock.release(editingId);
     setEditingId(null);
   }, [clearOpenParam, editLock, editingId]);
+
+  const resetTenantLocalState = useCallback(() => {
+    setIsFormOpen(false);
+    setSelectedId(null);
+    if (editingId) editLock.release(editingId);
+    setEditingId(null);
+  }, [editLock, editingId]);
+
+  useEffect(() => {
+    const prevEmpresaId = lastEmpresaIdRef.current;
+    if (prevEmpresaId === activeEmpresaId) return;
+
+    // Multi-tenant safety: evitar reaproveitar estado do tenant anterior.
+    resetTenantLocalState();
+    lastHandledOpenRef.current = null;
+
+    // Se trocou de empresa com deep-link ativo, não reaproveitar o `open=` no novo tenant.
+    if (prevEmpresaId && activeEmpresaId && openFromQuery) clearOpenParam();
+
+    lastEmpresaIdRef.current = activeEmpresaId;
+  }, [activeEmpresaId, clearOpenParam, openFromQuery, resetTenantLocalState]);
 
   const openWithLock = useCallback(async (id: string) => {
     const claimed = await editLock.claim(id, {
@@ -108,8 +135,11 @@ export default function PedidosVendasPage() {
 
   useEffect(() => {
     if (!openFromQuery) return;
+    if (authLoading || !activeEmpresaId || empresaChanged) return;
+    if (lastHandledOpenRef.current === openFromQuery) return;
+    lastHandledOpenRef.current = openFromQuery;
     void openWithLock(openFromQuery);
-  }, [openFromQuery, openWithLock]);
+  }, [activeEmpresaId, authLoading, empresaChanged, openFromQuery, openWithLock]);
 
   const handleSeed = async () => {
     setIsSeeding(true);
@@ -125,6 +155,11 @@ export default function PedidosVendasPage() {
     }
   };
 
+  const effectiveLoading = !!activeEmpresaId && (loading || empresaChanged);
+  const effectiveError = empresaChanged ? null : error;
+  const effectiveOrders = empresaChanged ? [] : orders;
+  const effectiveTotalCount = empresaChanged ? 0 : totalCount;
+
   const header = (
     <PageHeader
       title="Pedidos de Venda"
@@ -134,8 +169,8 @@ export default function PedidosVendasPage() {
         <>
           <CsvExportDialog
             filename="pedidos-venda.csv"
-            rows={orders}
-            disabled={loading}
+            rows={effectiveOrders}
+            disabled={effectiveLoading}
             columns={[
               { key: 'numero', label: 'Número', getValue: (r) => r.numero },
               { key: 'cliente', label: 'Cliente', getValue: (r) => r.cliente_nome ?? '' },
@@ -147,8 +182,8 @@ export default function PedidosVendasPage() {
               { key: 'comissao', label: 'Comissão (%)', getValue: (r) => (r as any).comissao_percent ?? '' },
             ]}
           />
-          <SeedButton onSeed={handleSeed} isSeeding={isSeeding} disabled={loading} />
-          <Button onClick={handleNew} className="gap-2">
+          <SeedButton onSeed={handleSeed} isSeeding={isSeeding} disabled={effectiveLoading} />
+          <Button onClick={handleNew} className="gap-2" disabled={effectiveLoading}>
             <PlusCircle size={18} />
             Novo Pedido
           </Button>
@@ -183,10 +218,22 @@ export default function PedidosVendasPage() {
     </div>
   );
 
-  const footer = totalCount > 0 ? (
+  if (authLoading) {
+    return (
+      <div className="flex justify-center h-full items-center">
+        <Loader2 className="animate-spin text-blue-600 w-10 h-10" />
+      </div>
+    );
+  }
+
+  if (!activeEmpresaId) {
+    return <div className="p-4 text-gray-600">Selecione uma empresa para ver pedidos de venda.</div>;
+  }
+
+  const footer = effectiveTotalCount > 0 ? (
     <Pagination
       currentPage={page}
-      totalCount={totalCount}
+      totalCount={effectiveTotalCount}
       pageSize={pageSize}
       onPageChange={setPage}
       onPageSizeChange={(next) => {
@@ -200,18 +247,18 @@ export default function PedidosVendasPage() {
     <PageShell header={header} filters={filters} footer={footer}>
       <PageCard className="flex flex-col flex-1 min-h-0">
         <div className="flex-1 min-h-0 overflow-auto">
-          {loading ? (
+          {effectiveLoading ? (
             <div className="flex justify-center h-64 items-center">
               <Loader2 className="animate-spin text-blue-600 w-10 h-10" />
             </div>
-          ) : error ? (
-            <div className="flex justify-center h-64 items-center text-red-500">{error}</div>
+          ) : effectiveError ? (
+            <div className="flex justify-center h-64 items-center text-red-500">{effectiveError}</div>
           ) : (
             <ResponsiveTable
-              data={orders}
+              data={effectiveOrders}
               getItemId={(o) => o.id}
-              loading={loading}
-              tableComponent={<PedidosVendasTable orders={orders} onEdit={handleEdit} />}
+              loading={effectiveLoading}
+              tableComponent={<PedidosVendasTable orders={effectiveOrders} onEdit={handleEdit} />}
               renderMobileCard={(order) => (
                 <PedidoVendaMobileCard
                   key={order.id}
