@@ -4,6 +4,9 @@ import { useToast } from '@/contexts/ToastProvider';
 import { ensureAtributo, generateVariantes, listAtributos, listVariantes, type AtributoRow, type VariantRow } from '@/services/productVariants';
 import { openInNewTabBestEffort, shouldIgnoreRowDoubleClickEvent } from '@/components/ui/table/rowDoubleClick';
 import { isPlainLeftClick } from '@/components/ui/links/isPlainLeftClick';
+import Modal from '@/components/ui/Modal';
+import ProdutoCodigoBarrasSection from '@/components/products/barcodes/ProdutoCodigoBarrasSection';
+import { listProdutoCodigosBarras, type ProdutoCodigoBarrasListRow } from '@/services/produtosCodigosBarras';
 
 type Props = {
   produtoId: string | null | undefined;
@@ -23,11 +26,13 @@ export default function VariacoesTab({ produtoId, produtoPaiId, skuBase }: Props
   const [loading, setLoading] = useState(false);
   const [atributos, setAtributos] = useState<AtributoRow[]>([]);
   const [variantes, setVariantes] = useState<VariantRow[]>([]);
+  const [barcodes, setBarcodes] = useState<ProdutoCodigoBarrasListRow[]>([]);
   const [atributoId, setAtributoId] = useState<string>('');
   const [novoAtributoNome, setNovoAtributoNome] = useState('Cor');
   const [valoresRaw, setValoresRaw] = useState('');
   const [valoresTags, setValoresTags] = useState<string[]>([]);
   const [skuSuffixMode, setSkuSuffixMode] = useState<'slug' | 'num'>('slug');
+  const [barcodeVariant, setBarcodeVariant] = useState<VariantRow | null>(null);
 
   const canUse = !!produtoId && !produtoPaiId;
   const valores = useMemo(() => {
@@ -56,6 +61,12 @@ export default function VariacoesTab({ produtoId, produtoPaiId, skuBase }: Props
       ]);
       setAtributos(attrs ?? []);
       setVariantes(vars ?? []);
+      if (!produtoPaiId) {
+        const rows = await listProdutoCodigosBarras({ produtoPaiId: produtoId });
+        setBarcodes(rows ?? []);
+      } else {
+        setBarcodes([]);
+      }
       if (!atributoId) {
         const cor = (attrs ?? []).find((a) => a.nome.toLowerCase() === 'cor');
         if (cor) setAtributoId(cor.id);
@@ -66,6 +77,14 @@ export default function VariacoesTab({ produtoId, produtoPaiId, skuBase }: Props
       setLoading(false);
     }
   };
+
+  const barcodeByVariantId = useMemo(() => {
+    const m = new Map<string, ProdutoCodigoBarrasListRow>();
+    for (const row of barcodes) {
+      m.set(row.variante_id, row);
+    }
+    return m;
+  }, [barcodes]);
 
   useEffect(() => {
     void reload();
@@ -317,13 +336,22 @@ export default function VariacoesTab({ produtoId, produtoPaiId, skuBase }: Props
                 <tr>
                   <th className="px-4 py-2 text-left text-xs font-medium text-gray-500">Nome</th>
                   <th className="px-4 py-2 text-left text-xs font-medium text-gray-500">SKU</th>
+                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-500">Código de barras</th>
                   <th className="px-4 py-2 text-left text-xs font-medium text-gray-500">Unidade</th>
                   <th className="px-4 py-2 text-right text-xs font-medium text-gray-500">Preço</th>
+                  <th className="px-4 py-2 text-right text-xs font-medium text-gray-500">Ações</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200">
                 {variantes.map((v) => {
                   const href = `/app/products?open=${encodeURIComponent(v.id)}`;
+                  const bc = barcodeByVariantId.get(v.id);
+                  const effective = bc?.effective_barcode_value ?? null;
+                  const stateLabel = bc?.own_barcode_value
+                    ? 'Código próprio'
+                    : bc?.inherited_barcode_value
+                      ? 'Herdado do pai'
+                      : 'Sem código';
                   return (
                     <tr
                       key={v.id}
@@ -347,9 +375,26 @@ export default function VariacoesTab({ produtoId, produtoPaiId, skuBase }: Props
                       </a>
                     </td>
                     <td className="px-4 py-3 text-sm text-gray-600 font-mono">{v.sku || '—'}</td>
+                    <td className="px-4 py-3">
+                      <div className="text-xs font-mono text-gray-900 truncate max-w-[260px]">{effective || '—'}</div>
+                      <div className="text-[11px] text-gray-500 mt-1">{stateLabel}</div>
+                    </td>
                     <td className="px-4 py-3 text-sm text-gray-600">{v.unidade}</td>
                     <td className="px-4 py-3 text-sm text-gray-900 text-right">
                       {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Number(v.preco_venda || 0))}
+                    </td>
+                    <td className="px-4 py-3 text-right">
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          setBarcodeVariant(v);
+                        }}
+                        className="px-3 py-2 rounded-lg border border-gray-200 bg-white hover:bg-gray-50 text-sm font-semibold"
+                      >
+                        Definir
+                      </button>
                     </td>
                     </tr>
                   );
@@ -359,6 +404,25 @@ export default function VariacoesTab({ produtoId, produtoPaiId, skuBase }: Props
           </div>
         )}
       </div>
+
+      <Modal
+        isOpen={barcodeVariant != null}
+        onClose={() => setBarcodeVariant(null)}
+        title={barcodeVariant ? `Código de barras — ${barcodeVariant.nome}` : 'Código de barras'}
+        size="3xl"
+        closeOnEscape
+      >
+        <div className="p-4">
+          <ProdutoCodigoBarrasSection
+            produtoId={produtoId}
+            varianteId={barcodeVariant?.id ?? null}
+            produtoNome={barcodeVariant?.nome ?? null}
+            sku={barcodeVariant?.sku ?? null}
+            precoVenda={barcodeVariant?.preco_venda ?? null}
+            onChanged={() => void reload()}
+          />
+        </div>
+      </Modal>
     </div>
   );
 }
