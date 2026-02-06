@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useExtrato } from '@/hooks/useExtrato';
 import { useContasCorrentes } from '@/hooks/useTesouraria';
 import { Loader2, Search, FileSpreadsheet, X, Printer, Download } from 'lucide-react';
@@ -9,18 +9,25 @@ import ExtratoSummaryCards from '@/components/financeiro/extrato/ExtratoSummary'
 import Select from '@/components/ui/forms/Select';
 import DatePicker from '@/components/ui/DatePicker';
 import { useToast } from '@/contexts/ToastProvider';
+import { useAuth } from '@/contexts/AuthProvider';
+import { formatDatePtBR } from '@/lib/dateDisplay';
 
 export default function ExtratoPage() {
+  const { loading: authLoading, activeEmpresaId } = useAuth();
   const { contas } = useContasCorrentes();
   const [selectedContaId, setSelectedContaId] = useState<string>('');
   const { addToast } = useToast();
 
+  const lastEmpresaIdRef = useRef<string | null>(activeEmpresaId);
+  const empresaChanged = lastEmpresaIdRef.current !== activeEmpresaId;
+
   // Auto-select first account if none selected
   useEffect(() => {
+    if (!activeEmpresaId || empresaChanged) return;
     if (!selectedContaId && contas.length > 0) {
       setSelectedContaId(contas[0].id);
     }
-  }, [contas, selectedContaId]);
+  }, [activeEmpresaId, empresaChanged, contas, selectedContaId]);
 
   const {
     lancamentos,
@@ -59,6 +66,24 @@ export default function ExtratoPage() {
     setSearchTerm('');
   };
 
+  useEffect(() => {
+    const prevEmpresaId = lastEmpresaIdRef.current;
+    if (prevEmpresaId === activeEmpresaId) return;
+
+    // Multi-tenant safety: evitar reaproveitar estado do tenant anterior.
+    setSelectedContaId('');
+    setContaCorrenteId(null);
+    clearFilters();
+    setPage(1);
+
+    if (prevEmpresaId && activeEmpresaId) {
+      addToast('Empresa alterada. Recarregando extrato…', 'info');
+    }
+
+    lastEmpresaIdRef.current = activeEmpresaId;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeEmpresaId]);
+
   const handlePrint = () => {
     window.print();
   };
@@ -70,14 +95,14 @@ export default function ExtratoPage() {
     }
 
     const headers = ['Data', 'Conta', 'Descrição', 'Documento', 'Tipo', 'Valor', 'Saldo', 'Conciliado', 'Vínculo'];
-    const csvContent = [
-      headers.join(';'),
-      ...lancamentos.map(l => [
-        new Date(l.data_lancamento).toLocaleDateString('pt-BR'),
-        l.conta_nome,
-        `"${l.descricao}"`, // Escape quotes
-        l.documento_ref || '',
-        l.tipo_lancamento === 'credito' ? 'Crédito' : 'Débito',
+	    const csvContent = [
+	      headers.join(';'),
+	      ...lancamentos.map(l => [
+	        formatDatePtBR(l.data_lancamento),
+	        l.conta_nome,
+	        `"${l.descricao}"`, // Escape quotes
+	        l.documento_ref || '',
+	        l.tipo_lancamento === 'credito' ? 'Crédito' : 'Débito',
         l.valor.toFixed(2).replace('.', ','),
         l.saldo_apos_lancamento ? l.saldo_apos_lancamento.toFixed(2).replace('.', ',') : '',
         l.conciliado ? 'Sim' : 'Não',
@@ -94,6 +119,14 @@ export default function ExtratoPage() {
     link.click();
     document.body.removeChild(link);
   };
+
+  if (authLoading || !activeEmpresaId || empresaChanged) {
+    return (
+      <div className="p-1 min-h-full flex items-center justify-center">
+        <Loader2 className="animate-spin text-blue-500" size={32} />
+      </div>
+    );
+  }
 
   return (
     <div className="p-1 min-h-full flex flex-col">

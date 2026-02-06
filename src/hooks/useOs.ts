@@ -1,10 +1,11 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useDebounce } from './useDebounce';
 import * as osService from '../services/os';
 import { useAuth } from '../contexts/AuthProvider';
 
 export const useOs = () => {
-  const { activeEmpresa, userId } = useAuth();
+  const { activeEmpresaId, activeEmpresa, userId } = useAuth();
+  const empresaId = activeEmpresaId ?? activeEmpresa?.id ?? null;
   const [serviceOrders, setServiceOrders] = useState<osService.OrdemServico[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -23,12 +24,30 @@ export const useOs = () => {
     ascending: true,
   });
 
+  const lastEmpresaIdRef = useRef<string | null>(empresaId);
+  const empresaChanged = lastEmpresaIdRef.current !== empresaId;
+
+  useEffect(() => {
+    const prevEmpresaId = lastEmpresaIdRef.current;
+    if (prevEmpresaId === empresaId) return;
+
+    // Multi-tenant safety: evitar reaproveitar estado do tenant anterior.
+    setServiceOrders([]);
+    setCount(0);
+    setError(null);
+    setPage(1);
+    setSortBy({ column: 'ordem', ascending: true });
+    setLoading(!!empresaId);
+
+    lastEmpresaIdRef.current = empresaId;
+  }, [empresaId]);
+
   const fetchOs = useCallback(async () => {
-    if (!activeEmpresa) {
-        setServiceOrders([]);
-        setCount(0);
-        return;
-    }
+    if (!empresaId || empresaChanged) {
+	        setServiceOrders([]);
+	        setCount(0);
+	        return;
+	    }
     setLoading(true);
     setError(null);
     try {
@@ -52,7 +71,7 @@ export const useOs = () => {
     } finally {
       setLoading(false);
     }
-  }, [page, pageSize, debouncedSearchTerm, filterStatus, sortBy, activeEmpresa, onlyMine, userId]);
+  }, [page, pageSize, debouncedSearchTerm, filterStatus, sortBy, empresaChanged, empresaId, onlyMine, userId]);
 
   useEffect(() => {
     fetchOs();

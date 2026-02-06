@@ -5,6 +5,7 @@ import ResizableSortableTh, { type SortState } from '@/components/ui/table/Resiz
 import TableColGroup from '@/components/ui/table/TableColGroup';
 import { useTableColumnWidths, type TableColumnWidthDef } from '@/components/ui/table/useTableColumnWidths';
 import { sortRows, toggleSort } from '@/components/ui/table/sortUtils';
+import { formatDatePtBR } from '@/lib/dateDisplay';
 
 interface Props {
   extratos: ExtratoItem[];
@@ -92,10 +93,10 @@ export default function ExtratosTable({ extratos, onConciliate, onUnconciliate, 
             (() => {
               const isBusy = !!busyExtratoId && busyExtratoId === item.id;
               return (
-            <tr key={item.id} className={`hover:bg-gray-50 ${item.conciliado ? 'bg-green-50/30' : ''}`}>
-              <td className="px-6 py-4 text-sm text-gray-900 whitespace-nowrap">
-                {new Date(item.data_lancamento).toLocaleDateString('pt-BR')}
-              </td>
+	            <tr key={item.id} className={`hover:bg-gray-50 ${item.conciliado ? 'bg-green-50/30' : ''}`}>
+	              <td className="px-6 py-4 text-sm text-gray-900 whitespace-nowrap">
+	                {formatDatePtBR(item.data_lancamento)}
+	              </td>
               <td className="px-6 py-4">
                 <div className="text-sm text-gray-900 font-medium">{item.descricao}</div>
                 {item.documento_ref && <div className="text-xs text-gray-500">Doc: {item.documento_ref}</div>}
@@ -113,13 +114,13 @@ export default function ExtratosTable({ extratos, onConciliate, onUnconciliate, 
                         >
                           {item.movimentacao_descricao}
                         </a>
-                        <span className="text-xs text-gray-500">
-                            {new Date(item.movimentacao_data!).toLocaleDateString('pt-BR')} • 
-                            R$ {new Intl.NumberFormat('pt-BR', { style: 'decimal', minimumFractionDigits: 2 }).format(item.movimentacao_valor!)}
-                        </span>
-                    </div>
-                ) : (
-                    <span className="text-gray-400 text-xs italic">Pendente</span>
+	                        <span className="text-xs text-gray-500">
+	                            {formatDatePtBR(item.movimentacao_data)} • 
+	                            R$ {new Intl.NumberFormat('pt-BR', { style: 'decimal', minimumFractionDigits: 2 }).format(item.movimentacao_valor!)}
+	                        </span>
+	                    </div>
+	                ) : (
+	                    <span className="text-gray-400 text-xs italic">Pendente</span>
                 )}
               </td>
               <td className="px-6 py-4 text-center">

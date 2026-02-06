@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { DragDropContext, DropResult } from '@hello-pangea/dnd';
 import { useOs } from '@/hooks/useOs';
 import { useToast } from '@/contexts/ToastProvider';
@@ -50,7 +50,7 @@ const OSPage: React.FC = () => {
   const { confirm } = useConfirm();
   const navigate = useNavigate();
   const { ensure } = useOnboardingGate();
-  const { userId } = useAuth();
+  const { loading: authLoading, activeEmpresaId, userId } = useAuth();
   const permCreate = useHasPermission('os', 'create');
   const permUpdate = useHasPermission('os', 'update');
   const permDelete = useHasPermission('os', 'delete');
@@ -67,9 +67,42 @@ const OSPage: React.FC = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const [statusUpdatingId, setStatusUpdatingId] = useState<string | null>(null);
 
+  const lastEmpresaIdRef = useRef<string | null>(activeEmpresaId);
+  const empresaChanged = lastEmpresaIdRef.current !== activeEmpresaId;
+
+  useEffect(() => {
+    const prevEmpresaId = lastEmpresaIdRef.current;
+    if (prevEmpresaId === activeEmpresaId) return;
+
+    // Multi-tenant safety: evitar reaproveitar estado do tenant anterior.
+    setIsFormOpen(false);
+    setSelectedOs(null);
+    setIsDeleteModalOpen(false);
+    setOsToDelete(null);
+    setIsDeleting(false);
+    setIsFetchingDetails(false);
+    setIsKanbanModalOpen(false);
+    setStatusUpdatingId(null);
+
+    const osId = searchParams.get('osId');
+    if (osId) {
+      const next = new URLSearchParams(searchParams);
+      next.delete('osId');
+      setSearchParams(next, { replace: true });
+    }
+
+    if (prevEmpresaId && activeEmpresaId) {
+      addToast('Empresa alterada. Recarregando O.S.…', 'info');
+    }
+
+    lastEmpresaIdRef.current = activeEmpresaId;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeEmpresaId]);
+
   useEffect(() => {
     const osId = searchParams.get('osId');
     if (!osId) return;
+    if (!activeEmpresaId || empresaChanged) return;
 
     void (async () => {
       setIsFetchingDetails(true);
@@ -219,6 +252,10 @@ const OSPage: React.FC = () => {
       addToast(error.message || 'Falha ao reordenar.', 'error');
     }
   };
+
+  if (authLoading) return <div className="flex justify-center p-12"><Loader2 className="animate-spin text-blue-600" /></div>;
+  if (!activeEmpresaId) return <div className="p-12 text-center text-gray-600">Selecione uma empresa para ver as Ordens de Serviço.</div>;
+  if (empresaChanged) return <div className="flex justify-center p-12"><Loader2 className="animate-spin text-blue-600" /></div>;
 
   return (
     <div className="p-1 min-h-full flex flex-col">
