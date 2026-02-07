@@ -52,6 +52,7 @@ export default function CobrancasBancariasPage() {
 
   const lastEmpresaIdRef = useRef<string | null>(activeEmpresaId);
   const empresaChanged = lastEmpresaIdRef.current !== activeEmpresaId;
+  const actionTokenRef = useRef(0);
 
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [selectedCobranca, setSelectedCobranca] = useState<cobrancasService.CobrancaBancaria | null>(null);
@@ -74,6 +75,7 @@ export default function CobrancasBancariasPage() {
     setIsSeeding(false);
     if (editingId) editLock.release(editingId);
     setEditingId(null);
+    actionTokenRef.current += 1;
 
     const open = searchParams.get('open');
     if (open) {
@@ -98,6 +100,8 @@ export default function CobrancasBancariasPage() {
   }, [openId, searchParams, setSearchParams]);
 
   const openWithLock = useCallback(async (id: string) => {
+    const token = ++actionTokenRef.current;
+    const empresaSnapshot = activeEmpresaId;
     const claimed = await editLock.claim(id, {
       confirmConflict: async () =>
         confirm({
@@ -108,13 +112,20 @@ export default function CobrancasBancariasPage() {
           variant: 'danger',
         }),
     });
+
+    const stale = token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current;
+    if (stale) {
+      if (claimed) editLock.release(id);
+      return false;
+    }
+
     if (!claimed) {
       clearOpenParam();
       return false;
     }
     setEditingId(id);
     return true;
-  }, [clearOpenParam, confirm, editLock]);
+  }, [activeEmpresaId, clearOpenParam, confirm, editLock]);
 
   const handleOpenForm = async (cobranca: cobrancasService.CobrancaBancaria | null = null) => {
     if (cobranca?.id) {
@@ -150,28 +161,38 @@ export default function CobrancasBancariasPage() {
 
   const handleDelete = async () => {
     if (!cobrancaToDelete?.id) return;
+    const token = ++actionTokenRef.current;
+    const empresaSnapshot = activeEmpresaId;
     setIsDeleting(true);
     try {
       await cobrancasService.deleteCobranca(cobrancaToDelete.id);
+      if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
       addToast('Cobrança excluída com sucesso!', 'success');
       refresh();
       handleCloseDeleteModal();
     } catch (e: any) {
+      if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
       addToast(e.message || 'Erro ao excluir.', 'error');
     } finally {
+      if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
       setIsDeleting(false);
     }
   };
 
   const handleSeed = async () => {
+    const token = ++actionTokenRef.current;
+    const empresaSnapshot = activeEmpresaId;
     setIsSeeding(true);
     try {
       await cobrancasService.seedCobrancas();
+      if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
       addToast('5 Cobranças criadas com sucesso!', 'success');
       refresh();
     } catch (e: any) {
+      if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
       addToast(e.message || 'Erro ao popular dados.', 'error');
     } finally {
+      if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
       setIsSeeding(false);
     }
   };
@@ -186,8 +207,11 @@ export default function CobrancasBancariasPage() {
     if (isFormOpen) return;
     if (authLoading || !activeEmpresaId || empresaChanged) return;
     void (async () => {
+      const token = actionTokenRef.current;
+      const empresaSnapshot = activeEmpresaId;
       const ok = await openWithLock(openId);
       if (!ok) return;
+      if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
       setSelectedCobranca({ id: openId } as any);
       setIsFormOpen(true);
     })();
