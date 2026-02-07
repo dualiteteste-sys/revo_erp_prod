@@ -103,8 +103,10 @@ export default function ExtratoPage() {
         `"${l.descricao}"`, // Escape quotes
         l.documento_ref || '',
         l.tipo_lancamento === 'credito' ? 'Crédito' : 'Débito',
-        l.valor.toFixed(2).replace('.', ','),
-        l.saldo_apos_lancamento ? l.saldo_apos_lancamento.toFixed(2).replace('.', ',') : '',
+        (l.tipo_lancamento === 'debito' ? -Math.abs(l.valor) : Math.abs(l.valor)).toFixed(2).replace('.', ','),
+        l.saldo_apos_lancamento !== null && l.saldo_apos_lancamento !== undefined
+          ? l.saldo_apos_lancamento.toFixed(2).replace('.', ',')
+          : '',
         l.conciliado ? 'Sim' : 'Não',
         l.movimentacao_descricao || ''
       ].join(';'))

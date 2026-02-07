@@ -1,4 +1,5 @@
 import { callRpc } from '@/lib/api';
+import { logger } from '@/lib/logger';
 
 export type ExtratoLancamento = {
   id: string;
@@ -60,7 +61,7 @@ export async function listExtrato(options: {
     const count = Number(data[0].total_count);
     return { data, count };
   } catch (error: any) {
-    console.error('[SERVICE][LIST_EXTRATO]', error);
+    logger.error('[SERVICE][LIST_EXTRATO]', { error });
     throw new Error(error.message || 'Não foi possível listar o extrato.');
   }
 }
@@ -85,7 +86,7 @@ export async function getExtratoSummary(
         debitos_nao_conciliados: 0 
     };
   } catch (error: any) {
-    console.error('[SERVICE][GET_EXTRATO_SUMMARY]', error);
+    logger.error('[SERVICE][GET_EXTRATO_SUMMARY]', { error });
     throw new Error(error.message || 'Erro ao buscar resumo do extrato.');
   }
 }
