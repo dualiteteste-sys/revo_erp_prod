@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { CheckCircle2, FileText, Layers, Loader2, Save, Paperclip, Plus, Trash2, Send, ThumbsDown, ThumbsUp, ClipboardList, RefreshCw } from 'lucide-react';
 import { OrdemServicoDetails, saveOs, deleteOsItem, getOsDetails, OsItemSearchResult, addOsItem, listOsTecnicos, setOsTecnico, type OsTecnicoRow, getOsOrcamento, enviarOrcamento, decidirOrcamento, type OsOrcamentoSummary } from '@/services/os';
 import { getPartnerDetails, type PartnerDetails } from '@/services/partners';
@@ -49,7 +49,7 @@ const OsFormPanel: React.FC<OsFormPanelProps> = ({ os, onSaveSuccess, onClose })
   const { addToast } = useToast();
   const navigate = useNavigate();
   const { confirm } = useConfirm();
-  const { activeEmpresaId, userId } = useAuth();
+  const { activeEmpresaId, userId, loading: authLoading } = useAuth();
   const permCreate = useHasPermission('os', 'create');
   const permUpdate = useHasPermission('os', 'update');
   const permManage = useHasPermission('os', 'manage');
@@ -109,6 +109,13 @@ const OsFormPanel: React.FC<OsFormPanelProps> = ({ os, onSaveSuccess, onClose })
   const [commsRegistering, setCommsRegistering] = useState(false);
   const [commsSort, setCommsSort] = useState<SortState<string>>({ column: 'quando', direction: 'desc' });
   const [parcelasSort, setParcelasSort] = useState<SortState<string>>({ column: 'numero', direction: 'asc' });
+  const lastEmpresaIdRef = useRef<string | null>(activeEmpresaId ?? null);
+  const tenantVersionRef = useRef(0);
+  const empresaChanged = lastEmpresaIdRef.current !== (activeEmpresaId ?? null);
+
+  const isTenantStale = (tenantVersionSnapshot: number, empresaSnapshot: string | null) => {
+    return tenantVersionSnapshot !== tenantVersionRef.current || empresaSnapshot !== lastEmpresaIdRef.current;
+  };
 
   const commsColumns: TableColumnWidthDef[] = [
     { id: 'quando', defaultWidth: 220, minWidth: 200 },
@@ -167,6 +174,43 @@ const OsFormPanel: React.FC<OsFormPanelProps> = ({ os, onSaveSuccess, onClose })
   const custoRealProps = useNumericField((formData as any).custo_real, (value) => handleFormChange('custo_real' as any, value));
 
   useEffect(() => {
+    const prevEmpresaId = lastEmpresaIdRef.current;
+    const nextEmpresaId = activeEmpresaId ?? null;
+    if (prevEmpresaId === nextEmpresaId) return;
+
+    tenantVersionRef.current += 1;
+    setFormData({ status: 'orcamento', desconto_valor: 0, total_itens: 0, total_geral: 0, itens: [] });
+    setClientName('');
+    setClientDetails(null);
+    setNovoAnexo('');
+    setDocs([]);
+    setDocFile(null);
+    setDocTitulo('');
+    setDocDescricao('');
+    setContaReceberId(null);
+    setContaReceber(null);
+    setTecnicos([]);
+    setOrcamentoSummary(null);
+    setChecklist(null);
+    setTemplates([]);
+    setCommsTemplates([]);
+    setCommsLogs([]);
+    setParcelas([]);
+    setCommsDialogOpen(false);
+    setChecklistDialogOpen(false);
+    setOrcamentoSendDialogOpen(false);
+    setOrcamentoDecideDialogOpen(false);
+    setParcelasDialogOpen(false);
+    setIsContaDialogOpen(false);
+
+    if (prevEmpresaId && nextEmpresaId) {
+      addToast('Empresa alterada. Recarregando O.S.…', 'info');
+    }
+
+    lastEmpresaIdRef.current = nextEmpresaId;
+  }, [activeEmpresaId, addToast]);
+
+  useEffect(() => {
     if (os) {
       setFormData(os);
       setNovoAnexo('');
@@ -203,28 +247,37 @@ const OsFormPanel: React.FC<OsFormPanelProps> = ({ os, onSaveSuccess, onClose })
 
   useEffect(() => {
     if (formData.cliente_id) {
+      const tenantVersionSnapshot = tenantVersionRef.current;
+      const empresaSnapshot = activeEmpresaId ?? null;
       getPartnerDetails(String(formData.cliente_id)).then((partner) => {
+        if (isTenantStale(tenantVersionSnapshot, empresaSnapshot)) return;
         if (partner) setClientDetails(partner);
       });
     } else {
       setClientDetails(null);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [formData.cliente_id]);
+  }, [activeEmpresaId, formData.cliente_id]);
 
   const loadComms = async (osId: string) => {
+    const tenantVersionSnapshot = tenantVersionRef.current;
+    const empresaSnapshot = activeEmpresaId ?? null;
+    if (!empresaSnapshot || authLoading || empresaChanged) return;
     setCommsLoading(true);
     try {
       const [tpls, logs] = await Promise.all([
         listOsCommsTemplates({ canal: commsCanal, limit: 100 }),
         listOsCommsLogs(osId, 50),
       ]);
+      if (isTenantStale(tenantVersionSnapshot, empresaSnapshot)) return;
       setCommsTemplates(tpls ?? []);
       setCommsLogs(logs ?? []);
     } catch {
+      if (isTenantStale(tenantVersionSnapshot, empresaSnapshot)) return;
       setCommsTemplates([]);
       setCommsLogs([]);
     } finally {
+      if (isTenantStale(tenantVersionSnapshot, empresaSnapshot)) return;
       setCommsLoading(false);
     }
   };
@@ -357,15 +410,21 @@ const OsFormPanel: React.FC<OsFormPanelProps> = ({ os, onSaveSuccess, onClose })
   };
 
   const refreshOrcamento = async (osId: string) => {
+    const tenantVersionSnapshot = tenantVersionRef.current;
+    const empresaSnapshot = activeEmpresaId ?? null;
+    if (!empresaSnapshot || authLoading || empresaChanged) return;
     setOrcamentoLoading(true);
     try {
       const data = await getOsOrcamento(osId);
+      if (isTenantStale(tenantVersionSnapshot, empresaSnapshot)) return;
       setOrcamentoSummary(data);
       setOrcamentoClienteNome(data.cliente_nome || '');
       setOrcamentoObservacao(data.observacao || '');
     } catch (e: any) {
+      if (isTenantStale(tenantVersionSnapshot, empresaSnapshot)) return;
       setOrcamentoSummary(null);
     } finally {
+      if (isTenantStale(tenantVersionSnapshot, empresaSnapshot)) return;
       setOrcamentoLoading(false);
     }
   };
@@ -381,13 +440,19 @@ const OsFormPanel: React.FC<OsFormPanelProps> = ({ os, onSaveSuccess, onClose })
   }, [formData.id]);
 
   const refreshChecklist = async (osId: string) => {
+    const tenantVersionSnapshot = tenantVersionRef.current;
+    const empresaSnapshot = activeEmpresaId ?? null;
+    if (!empresaSnapshot || authLoading || empresaChanged) return;
     setChecklistLoading(true);
     try {
       const data = await getOsChecklist(osId);
+      if (isTenantStale(tenantVersionSnapshot, empresaSnapshot)) return;
       setChecklist(data);
     } catch {
+      if (isTenantStale(tenantVersionSnapshot, empresaSnapshot)) return;
       setChecklist(null);
     } finally {
+      if (isTenantStale(tenantVersionSnapshot, empresaSnapshot)) return;
       setChecklistLoading(false);
     }
   };
@@ -457,34 +522,41 @@ const OsFormPanel: React.FC<OsFormPanelProps> = ({ os, onSaveSuccess, onClose })
   };
 
   useEffect(() => {
-    if (!activeEmpresaId) return;
+    if (!activeEmpresaId || authLoading || empresaChanged) return;
     if (readOnly) return;
-    let cancelled = false;
+    const tenantVersionSnapshot = tenantVersionRef.current;
+    const empresaSnapshot = activeEmpresaId ?? null;
     void (async () => {
       setTecnicosLoading(true);
       try {
         const rows = await listOsTecnicos({ limit: 100 });
-        if (!cancelled) setTecnicos(rows ?? []);
+        if (isTenantStale(tenantVersionSnapshot, empresaSnapshot)) return;
+        setTecnicos(rows ?? []);
       } catch {
-        if (!cancelled) setTecnicos([]);
+        if (isTenantStale(tenantVersionSnapshot, empresaSnapshot)) return;
+        setTecnicos([]);
       } finally {
-        if (!cancelled) setTecnicosLoading(false);
+        if (isTenantStale(tenantVersionSnapshot, empresaSnapshot)) return;
+        setTecnicosLoading(false);
       }
     })();
-    return () => {
-      cancelled = true;
-    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeEmpresaId, readOnly]);
+  }, [activeEmpresaId, authLoading, empresaChanged, readOnly]);
 
   const loadDocs = async (osId: string) => {
+    const tenantVersionSnapshot = tenantVersionRef.current;
+    const empresaSnapshot = activeEmpresaId ?? null;
+    if (!empresaSnapshot || authLoading || empresaChanged) return;
     setIsDocsLoading(true);
     try {
       const data = await listOsDocs(osId);
+      if (isTenantStale(tenantVersionSnapshot, empresaSnapshot)) return;
       setDocs(data ?? []);
     } catch (e: any) {
+      if (isTenantStale(tenantVersionSnapshot, empresaSnapshot)) return;
       addToast(e?.message || 'Erro ao carregar anexos.', 'error');
     } finally {
+      if (isTenantStale(tenantVersionSnapshot, empresaSnapshot)) return;
       setIsDocsLoading(false);
     }
   };
@@ -499,22 +571,28 @@ const OsFormPanel: React.FC<OsFormPanelProps> = ({ os, onSaveSuccess, onClose })
   useEffect(() => {
     const osId = formData.id ? String(formData.id) : null;
     if (!osId) return;
+    if (!activeEmpresaId || authLoading || empresaChanged) return;
+    const tenantVersionSnapshot = tenantVersionRef.current;
+    const empresaSnapshot = activeEmpresaId ?? null;
 
     void (async () => {
       const id = await getContaAReceberFromOs(osId);
+      if (isTenantStale(tenantVersionSnapshot, empresaSnapshot)) return;
       setContaReceberId(id);
       setContaReceber(null);
       if (id) {
         try {
           const details = await getContaAReceberDetails(id);
+          if (isTenantStale(tenantVersionSnapshot, empresaSnapshot)) return;
           setContaReceber(details);
         } catch {
+          if (isTenantStale(tenantVersionSnapshot, empresaSnapshot)) return;
           setContaReceber(null);
         }
       }
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [formData.id]);
+  }, [activeEmpresaId, authLoading, empresaChanged, formData.id]);
 
   useEffect(() => {
     const osId = formData.id ? String(formData.id) : null;
@@ -522,23 +600,25 @@ const OsFormPanel: React.FC<OsFormPanelProps> = ({ os, onSaveSuccess, onClose })
       setParcelas([]);
       return;
     }
-    let cancelled = false;
+    if (!activeEmpresaId || authLoading || empresaChanged) return;
+    const tenantVersionSnapshot = tenantVersionRef.current;
+    const empresaSnapshot = activeEmpresaId ?? null;
     void (async () => {
       setParcelasLoading(true);
       try {
         const rows = await listOsParcelas(osId);
-        if (!cancelled) setParcelas(rows ?? []);
+        if (isTenantStale(tenantVersionSnapshot, empresaSnapshot)) return;
+        setParcelas(rows ?? []);
       } catch {
-        if (!cancelled) setParcelas([]);
+        if (isTenantStale(tenantVersionSnapshot, empresaSnapshot)) return;
+        setParcelas([]);
       } finally {
-        if (!cancelled) setParcelasLoading(false);
+        if (isTenantStale(tenantVersionSnapshot, empresaSnapshot)) return;
+        setParcelasLoading(false);
       }
     })();
-    return () => {
-      cancelled = true;
-    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [formData.id]);
+  }, [activeEmpresaId, authLoading, empresaChanged, formData.id]);
 
   const statusOs = (formData.status as any) as OsStatus | undefined;
   const canGenerateConta = !!formData.id && statusOs === 'concluida';
@@ -562,11 +642,16 @@ const OsFormPanel: React.FC<OsFormPanelProps> = ({ os, onSaveSuccess, onClose })
 
   const refreshParcelas = async () => {
     if (!formData.id) return;
+    if (!activeEmpresaId || authLoading || empresaChanged) return;
+    const tenantVersionSnapshot = tenantVersionRef.current;
+    const empresaSnapshot = activeEmpresaId ?? null;
     try {
       setParcelasLoading(true);
       const rows = await listOsParcelas(String(formData.id));
+      if (isTenantStale(tenantVersionSnapshot, empresaSnapshot)) return;
       setParcelas(rows ?? []);
     } finally {
+      if (isTenantStale(tenantVersionSnapshot, empresaSnapshot)) return;
       setParcelasLoading(false);
     }
   };
@@ -708,10 +793,15 @@ const OsFormPanel: React.FC<OsFormPanelProps> = ({ os, onSaveSuccess, onClose })
   }, [contaReceber]);
 
   const refreshOsData = async (osId: string) => {
+    if (!activeEmpresaId || authLoading || empresaChanged) return;
+    const tenantVersionSnapshot = tenantVersionRef.current;
+    const empresaSnapshot = activeEmpresaId ?? null;
     try {
         const updatedOs = await getOsDetails(osId);
+        if (isTenantStale(tenantVersionSnapshot, empresaSnapshot)) return;
         setFormData(updatedOs);
     } catch (error: any) {
+        if (isTenantStale(tenantVersionSnapshot, empresaSnapshot)) return;
         addToast("Erro ao atualizar dados da O.S.", "error");
     }
   };
