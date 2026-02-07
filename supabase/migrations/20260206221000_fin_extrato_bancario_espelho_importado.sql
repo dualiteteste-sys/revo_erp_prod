@@ -175,7 +175,9 @@ REVOKE ALL ON FUNCTION public.financeiro_extratos_bancarios_importar(uuid, jsonb
 GRANT EXECUTE ON FUNCTION public.financeiro_extratos_bancarios_importar(uuid, jsonb) TO authenticated, service_role;
 
 -- 3) RPC: listar como espelho (saldo por linha calculado quando necessário + ordem estável)
-CREATE OR REPLACE FUNCTION public.financeiro_extrato_bancario_list(
+DROP FUNCTION IF EXISTS public.financeiro_extrato_bancario_list(uuid, date, date, text, boolean, text, integer, integer);
+
+CREATE FUNCTION public.financeiro_extrato_bancario_list(
   p_conta_corrente_id uuid DEFAULT NULL,
   p_start_date date DEFAULT NULL,
   p_end_date date DEFAULT NULL,
