@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button';
 import { isSeedEnabled } from '@/utils/seed';
 import { readTabularImportFile, TABULAR_IMPORT_ACCEPT } from '@/lib/tabularImport';
 import { getFirst, parseCsv, type ParsedCsvRow } from '@/lib/csvImport';
+import { parseOfxExtrato } from '@/lib/extratoImport/ofx';
 import {
   deriveDefaultMapping,
   loadSavedMapping,
@@ -32,18 +33,19 @@ interface Props {
 
 type WizardStep = 0 | 1 | 2;
 
-type TargetFieldKey = 'data' | 'descricao' | 'valor' | 'documento';
+type TargetFieldKey = 'data' | 'descricao' | 'valor' | 'saldo' | 'documento';
 type FieldMapping = ImportFieldMapping<TargetFieldKey>;
 
 type DedupeStrategy = 'none' | 'first' | 'last';
 
 const MAPPING_STORAGE_KEY = 'revo:import_mapping:extrato:v1';
-const TARGET_KEYS: TargetFieldKey[] = ['data', 'descricao', 'valor', 'documento'];
+const TARGET_KEYS: TargetFieldKey[] = ['data', 'descricao', 'valor', 'saldo', 'documento'];
 
 const FIELD_SYNONYMS: Record<TargetFieldKey, string[]> = {
   data: ['data', 'dt', 'data_lancamento', 'data_movimento', 'dt_posted', 'dtposted'],
   descricao: ['descricao', 'descrição', 'historico', 'hist', 'lancamento', 'lançamento', 'memo', 'name'],
   valor: ['valor', 'vl', 'valor_lancamento', 'valor_movimento', 'trnamt', 'amount'],
+  saldo: ['saldo', 'balance', 'running_balance', 'runningbalance', 'saldo_apos', 'saldo_apos_lancamento', 'balance_after'],
   documento: ['documento', 'doc', 'documento_ref', 'num_documento', 'fitid', 'id', 'checknum'],
 };
 
@@ -53,6 +55,7 @@ type PreviewRow = {
   descricao: string;
   valor: number | null;
   tipo: 'credito' | 'debito' | null;
+  saldoApos?: number | null;
   documento?: string;
   errors: string[];
   payload: ImportarExtratoPayload | null;
@@ -98,52 +101,7 @@ const readFileAsText = (f: File): Promise<string> => {
   });
 };
 
-const parseOfxText = (text: string): ImportarExtratoPayload[] => {
-  const blocks = text.split(/<STMTTRN>/i).slice(1);
-  const itens: ImportarExtratoPayload[] = [];
-
-  for (let i = 0; i < blocks.length; i++) {
-    const b = blocks[i];
-    const dt = b.match(/<DTPOSTED>([^<\r\n]+)/i)?.[1]?.trim() ?? '';
-    const trntype = (b.match(/<TRNTYPE>([^<\r\n]+)/i)?.[1]?.trim() ?? '').toUpperCase();
-    const trnamtRaw = b.match(/<TRNAMT>([^<\r\n]+)/i)?.[1]?.trim() ?? '';
-    const fitid = b.match(/<FITID>([^<\r\n]+)/i)?.[1]?.trim() ?? '';
-    const checknum = b.match(/<CHECKNUM>([^<\r\n]+)/i)?.[1]?.trim() ?? '';
-    const name = b.match(/<NAME>([^<\r\n]+)/i)?.[1]?.trim() ?? '';
-    const memo = b.match(/<MEMO>([^<\r\n]+)/i)?.[1]?.trim() ?? '';
-
-    const dt8 = dt.match(/\d{8}/)?.[0] ?? '';
-    const dataISO = parseDateToISO(dt8);
-    const parsedAmount = parseMoney(trnamtRaw);
-    const descricao = (memo || name || 'Lançamento').trim();
-    const documento = (checknum || fitid || '').trim() || undefined;
-
-    if (!dataISO || parsedAmount === null) continue;
-
-    let signedAmount = parsedAmount;
-    if (trntype === 'DEBIT' && signedAmount > 0) signedAmount = -signedAmount;
-    if (trntype === 'CREDIT' && signedAmount < 0) signedAmount = Math.abs(signedAmount);
-
-    const tipo = signedAmount >= 0 ? 'credito' : 'debito';
-    const valorAbs = Math.abs(signedAmount);
-    if (valorAbs <= 0) continue;
-
-    const fitIdOrFallback = fitid || '';
-    const raw = `${dataISO}|${descricao}|${signedAmount}|${documento ?? ''}|${fitIdOrFallback}|${trntype}|${i + 1}`;
-    itens.push({
-      data_lancamento: dataISO,
-      descricao,
-      valor: valorAbs,
-      tipo_lancamento: tipo,
-      documento_ref: documento,
-      identificador_banco: fitid || `OFX-${hashString(raw)}-${i + 1}`,
-      hash_importacao: fitid ? hashString(`${dataISO}|${descricao}|${signedAmount}|${documento ?? ''}|${fitIdOrFallback}|${trntype}`) : hashString(raw),
-      linha_bruta: raw,
-    });
-  }
-
-  return itens;
-};
+// OFX: parser isolado em lib (inclui saldo derivado quando LEDGERBAL existir).
 
 function parseLegacyCsvText(text: string): ImportarExtratoPayload[] {
   const lines = text.split(/\r?\n/).filter((l) => l.trim());
@@ -176,6 +134,7 @@ function parseLegacyCsvText(text: string): ImportarExtratoPayload[] {
       descricao,
       valor: valorAbs,
       tipo_lancamento: tipo,
+      sequencia_importacao: i + 1,
       documento_ref: doc,
       identificador_banco: `CSV-${hashString(raw)}-${i + 1}`,
       hash_importacao: hashString(raw),
@@ -203,7 +162,7 @@ export default function ImportarExtratoModal({ isOpen, onClose, onImport, contaC
   const [hasCustomMapping, setHasCustomMapping] = useState(false);
   const [dedupeStrategy, setDedupeStrategy] = useState<DedupeStrategy>('none');
   const [forceUppercase, setForceUppercase] = useState(false);
-  const [previewSort, setPreviewSort] = useState<SortState<'line' | 'data' | 'descricao' | 'valor' | 'tipo' | 'doc' | 'errors'>>({
+  const [previewSort, setPreviewSort] = useState<SortState<'line' | 'data' | 'descricao' | 'valor' | 'saldo' | 'tipo' | 'doc' | 'errors'>>({
     column: 'data',
     direction: 'desc',
   });
@@ -223,6 +182,7 @@ export default function ImportarExtratoModal({ isOpen, onClose, onImport, contaC
     { id: 'data', defaultWidth: 140, minWidth: 120 },
     { id: 'descricao', defaultWidth: 360, minWidth: 220 },
     { id: 'valor', defaultWidth: 140, minWidth: 120 },
+    { id: 'saldo', defaultWidth: 150, minWidth: 130 },
     { id: 'tipo', defaultWidth: 120, minWidth: 110 },
     { id: 'doc', defaultWidth: 200, minWidth: 160 },
     { id: 'errors', defaultWidth: 520, minWidth: 260 },
@@ -298,11 +258,13 @@ export default function ImportarExtratoModal({ isOpen, onClose, onImport, contaC
       const rawDate = resolveField(row, 'data');
       const rawDescricao = maybeUpper(resolveField(row, 'descricao'), 'descricao');
       const rawValor = resolveField(row, 'valor');
+      const rawSaldo = resolveField(row, 'saldo');
       const rawDoc = resolveField(row, 'documento');
 
       const dataISO = parseDateToISO(rawDate || '');
       const descricao = (rawDescricao || '').trim();
       const valorNum = parseMoney(rawValor || '');
+      const saldoNum = parseMoney(rawSaldo || '');
       const doc = (rawDoc || '').trim() || undefined;
 
       if (!dataISO) errors.push('data inválida');
@@ -327,13 +289,15 @@ export default function ImportarExtratoModal({ isOpen, onClose, onImport, contaC
             descricao,
             valor: valorAbs,
             tipo_lancamento: tipo,
+            saldo_apos_lancamento: saldoNum === null ? undefined : saldoNum,
+            sequencia_importacao: r.line,
             documento_ref: doc,
             identificador_banco: `CSV-${dedupeKey}-${r.line}`,
             hash_importacao: dedupeKey ?? undefined,
             linha_bruta: JSON.stringify(row),
           };
 
-      return { line: r.line, data: dataISO, descricao, valor: valorAbs, tipo, documento: doc, errors, payload, dedupeKey };
+      return { line: r.line, data: dataISO, descricao, valor: valorAbs, tipo, saldoApos: saldoNum, documento: doc, errors, payload, dedupeKey };
     });
 
     const groups = new Map<string, PreviewRow[]>();
@@ -373,6 +337,7 @@ export default function ImportarExtratoModal({ isOpen, onClose, onImport, contaC
         { id: 'data', type: 'date', getValue: (r: PreviewRow) => r.data ?? '' },
         { id: 'descricao', type: 'string', getValue: (r: PreviewRow) => r.descricao ?? '' },
         { id: 'valor', type: 'number', getValue: (r: PreviewRow) => r.valor ?? NaN },
+        { id: 'saldo', type: 'number', getValue: (r: PreviewRow) => r.saldoApos ?? NaN },
         { id: 'tipo', type: 'string', getValue: (r: PreviewRow) => r.tipo ?? '' },
         { id: 'doc', type: 'string', getValue: (r: PreviewRow) => r.documento ?? '' },
         { id: 'errors', type: 'string', getValue: (r: PreviewRow) => r.errors.join('; ') ?? '' },
@@ -422,7 +387,7 @@ export default function ImportarExtratoModal({ isOpen, onClose, onImport, contaC
         const name = file.name.toLowerCase();
         if (name.endsWith('.ofx')) {
           const content = await readFileAsText(file);
-          itens = parseOfxText(content);
+          itens = parseOfxExtrato(content);
         } else if (name.endsWith('.txt')) {
           const content = await readFileAsText(file);
           itens = parseLegacyCsvText(content);
@@ -674,6 +639,7 @@ export default function ImportarExtratoModal({ isOpen, onClose, onImport, contaC
                       { key: 'data', label: 'Data', required: true },
                       { key: 'descricao', label: 'Descrição', required: true },
                       { key: 'valor', label: 'Valor (positivo/negativo)', required: true },
+                      { key: 'saldo', label: 'Saldo após o lançamento (opcional)', required: false },
                       { key: 'documento', label: 'Documento', required: false },
                     ] as const).map((f) => (
                       <tr key={f.key}>
@@ -764,6 +730,14 @@ export default function ImportarExtratoModal({ isOpen, onClose, onImport, contaC
                             className="px-3 py-2"
                           />
                           <ResizableSortableTh
+                            columnId="saldo"
+                            label="Saldo"
+                            sort={previewSort}
+                            onSort={(col) => setPreviewSort((prev) => toggleSort(prev as any, col))}
+                            onResizeStart={startPreviewResize}
+                            className="px-3 py-2"
+                          />
+                          <ResizableSortableTh
                             columnId="tipo"
                             label="Tipo"
                             sort={previewSort}
@@ -796,6 +770,7 @@ export default function ImportarExtratoModal({ isOpen, onClose, onImport, contaC
                             <td className="px-3 py-2">{r.data || '—'}</td>
                             <td className="px-3 py-2">{r.descricao || '—'}</td>
                             <td className="px-3 py-2">{typeof r.valor === 'number' ? r.valor.toFixed(2) : '—'}</td>
+                            <td className="px-3 py-2">{typeof r.saldoApos === 'number' ? r.saldoApos.toFixed(2) : '—'}</td>
                             <td className="px-3 py-2">{r.tipo || '—'}</td>
                             <td className="px-3 py-2">{r.documento || '—'}</td>
                             <td className="px-3 py-2 text-rose-700">{r.errors.join('; ') || '—'}</td>

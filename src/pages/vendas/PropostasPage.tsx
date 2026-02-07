@@ -42,6 +42,7 @@ export default function PropostasPage() {
   const lastEmpresaIdRef = useRef<string | null>(activeEmpresaId);
   const empresaChanged = lastEmpresaIdRef.current !== activeEmpresaId;
   const lastHandledOpenRef = useRef<string | null>(null);
+  const actionTokenRef = useRef(0);
 
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -89,6 +90,7 @@ export default function PropostasPage() {
     if (prevEmpresaId === activeEmpresaId) return;
 
     // Multi-tenant safety: evitar reaproveitar estado do tenant anterior.
+    actionTokenRef.current += 1;
     resetTenantLocalState();
     lastHandledOpenRef.current = null;
 
@@ -99,6 +101,9 @@ export default function PropostasPage() {
   }, [activeEmpresaId, clearOpenParam, openId, resetTenantLocalState]);
 
   const openWithLock = useCallback(async (id: string) => {
+    const token = ++actionTokenRef.current;
+    const empresaSnapshot = activeEmpresaId;
+
     const claimed = await editLock.claim(id, {
       confirmConflict: async () =>
         confirm({
@@ -113,10 +118,17 @@ export default function PropostasPage() {
       clearOpenParam();
       return;
     }
+
+    if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) {
+      editLock.release(id);
+      clearOpenParam();
+      return;
+    }
+
     setEditingId(id);
     setSelectedId(id);
     setIsFormOpen(true);
-  }, [clearOpenParam, confirm, editLock]);
+  }, [activeEmpresaId, clearOpenParam, confirm, editLock]);
 
   const handleSuccess = (opts?: { keepOpen?: boolean }) => {
     refresh();
@@ -133,14 +145,20 @@ export default function PropostasPage() {
   }, [activeEmpresaId, authLoading, empresaChanged, isFormOpen, openId, openWithLock]);
 
   const handleSeed = async () => {
+    const token = ++actionTokenRef.current;
+    const empresaSnapshot = activeEmpresaId;
+
     setIsSeeding(true);
     try {
       await seedVendas();
+      if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
       addToast('Pedidos criados com sucesso!', 'success');
       refresh();
     } catch (e: any) {
+      if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
       addToast(e.message || 'Erro ao popular dados.', 'error');
     } finally {
+      if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
       setIsSeeding(false);
     }
   };
