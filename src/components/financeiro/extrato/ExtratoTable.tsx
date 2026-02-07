@@ -25,9 +25,16 @@ function round2(value: number): number {
   return Math.round(value * 100) / 100;
 }
 
+function getSignedAmount(item: ExtratoLancamento): number {
+  const raw = Number(item.valor ?? 0);
+  if (!Number.isFinite(raw)) return 0;
+  if (raw < 0) return raw;
+  const abs = Math.abs(raw);
+  return item.tipo_lancamento === 'debito' ? -abs : abs;
+}
+
 function getDelta(item: ExtratoLancamento): number {
-  const valor = Number(item.valor ?? 0);
-  return item.tipo_lancamento === 'credito' ? valor : -valor;
+  return getSignedAmount(item);
 }
 
 export default function ExtratoTable({ lancamentos }: Props) {
@@ -48,20 +55,21 @@ export default function ExtratoTable({ lancamentos }: Props) {
 
     for (const item of lancamentos) {
       const dateISO = String(item.data_lancamento || '').slice(0, 10);
+      const signed = getSignedAmount(item);
       const last = groups.length > 0 ? groups[groups.length - 1] : undefined;
       if (!last || last.dateISO !== dateISO) {
         groups.push({
           dateISO,
           items: [item],
-          totalEntradas: item.tipo_lancamento === 'credito' ? Number(item.valor ?? 0) : 0,
-          totalSaidas: item.tipo_lancamento === 'debito' ? Number(item.valor ?? 0) : 0,
+          totalEntradas: signed > 0 ? signed : 0,
+          totalSaidas: signed < 0 ? Math.abs(signed) : 0,
           saldoInicial: null,
           saldoFinal: null,
         });
       } else {
         last.items.push(item);
-        if (item.tipo_lancamento === 'credito') last.totalEntradas += Number(item.valor ?? 0);
-        if (item.tipo_lancamento === 'debito') last.totalSaidas += Number(item.valor ?? 0);
+        if (signed > 0) last.totalEntradas += signed;
+        if (signed < 0) last.totalSaidas += Math.abs(signed);
       }
     }
 
@@ -232,8 +240,8 @@ export default function ExtratoTable({ lancamentos }: Props) {
                           <td
                             className={`px-6 py-4 text-right text-sm font-bold ${item.tipo_lancamento === 'credito' ? 'text-green-600' : 'text-red-600'}`}
                           >
-                            {item.tipo_lancamento === 'credito' ? '+' : '-'}
-                            {formatCurrency(item.valor * 100)}
+                            {getSignedAmount(item) >= 0 ? '+' : '-'}
+                            {formatCurrency(Math.abs(Number(item.valor ?? 0)) * 100)}
                           </td>
                           <td className="px-6 py-4 text-right text-sm text-gray-700">
                             {item.saldo_apos_lancamento !== null ? formatCurrency(item.saldo_apos_lancamento * 100) : '-'}
