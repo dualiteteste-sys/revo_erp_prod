@@ -1,10 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { DragDropContext, DropResult, Droppable } from '@hello-pangea/dnd';
 import { CrmKanbanData, CrmOportunidade, getCrmKanbanData, moveOportunidade, ensureDefaultPipeline } from '@/services/crm';
 import { useToast } from '@/contexts/ToastProvider';
 import { Loader2, Plus } from 'lucide-react';
 import CrmCard from './CrmCard';
 import { formatCurrency } from '@/lib/utils';
+import { useAuth } from '@/contexts/AuthProvider';
 
 interface Props {
   onEditDeal: (deal: CrmOportunidade) => void;
@@ -16,28 +17,67 @@ const CrmKanbanBoard: React.FC<Props> = ({ onEditDeal, onNewDeal, refreshTrigger
   const [data, setData] = useState<CrmKanbanData | null>(null);
   const [loading, setLoading] = useState(true);
   const { addToast } = useToast();
+  const { loading: authLoading, activeEmpresaId } = useAuth();
+  const lastEmpresaIdRef = useRef<string | null>(activeEmpresaId);
+  const empresaChanged = lastEmpresaIdRef.current !== activeEmpresaId;
+  const loadTokenRef = useRef(0);
+  const actionTokenRef = useRef(0);
+  const effectiveLoading = !!activeEmpresaId && (loading || empresaChanged);
+  const effectiveData = empresaChanged ? null : data;
 
-  const fetchData = async () => {
+  const fetchData = useCallback(async () => {
+    const token = ++loadTokenRef.current;
+    const empresaSnapshot = activeEmpresaId;
+
+    if (authLoading) return;
+    if (!empresaSnapshot) {
+      setData(null);
+      setLoading(false);
+      return;
+    }
+
     setLoading(true);
     try {
       let kanban = await getCrmKanbanData();
+      if (token !== loadTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
       if (!kanban || !kanban.funil_id) {
         await ensureDefaultPipeline();
+        if (token !== loadTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
         kanban = await getCrmKanbanData();
       }
+      if (token !== loadTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
       setData(kanban);
     } catch (error: any) {
+      if (token !== loadTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
       addToast('Erro ao carregar o funil.', 'error');
     } finally {
+      if (token !== loadTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
       setLoading(false);
     }
-  };
+  }, [activeEmpresaId, addToast, authLoading]);
 
   useEffect(() => {
-    fetchData();
-  }, [refreshTrigger]);
+    loadTokenRef.current += 1;
+    actionTokenRef.current += 1;
+    lastEmpresaIdRef.current = activeEmpresaId;
+    setData(null);
+
+    if (!activeEmpresaId) {
+      setLoading(false);
+      return;
+    }
+    setLoading(true);
+  }, [activeEmpresaId]);
+
+  useEffect(() => {
+    void fetchData();
+  }, [fetchData, refreshTrigger]);
 
   const onDragEnd = async (result: DropResult) => {
+    const token = ++actionTokenRef.current;
+    const empresaSnapshot = activeEmpresaId;
+
+    if (authLoading || !activeEmpresaId || empresaChanged) return;
     const { source, destination, draggableId } = result;
 
     if (!destination) return;
@@ -68,14 +108,16 @@ const CrmKanbanBoard: React.FC<Props> = ({ onEditDeal, onNewDeal, refreshTrigger
     setData({ ...data, etapas: newEtapas });
 
     try {
+      if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
       await moveOportunidade(draggableId, destination.droppableId);
     } catch (error: any) {
+      if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
       addToast('Falha ao mover oportunidade.', 'error');
-      fetchData(); // Revert
+      void fetchData(); // Revert
     }
   };
 
-  if (loading) {
+  if (authLoading) {
     return (
       <div className="flex items-center justify-center h-full">
         <Loader2 className="w-12 h-12 text-blue-500 animate-spin" />
@@ -83,12 +125,22 @@ const CrmKanbanBoard: React.FC<Props> = ({ onEditDeal, onNewDeal, refreshTrigger
     );
   }
 
-  if (!data || !data.etapas) return <div className="p-8 text-center text-gray-500">Nenhum funil encontrado.</div>;
+  if (!activeEmpresaId) return <div className="p-8 text-center text-gray-500">Selecione uma empresa para acessar o CRM.</div>;
+
+  if (effectiveLoading) {
+    return (
+      <div className="flex items-center justify-center h-full">
+        <Loader2 className="w-12 h-12 text-blue-500 animate-spin" />
+      </div>
+    );
+  }
+
+  if (!effectiveData || !effectiveData.etapas) return <div className="p-8 text-center text-gray-500">Nenhum funil encontrado.</div>;
 
   return (
     <DragDropContext onDragEnd={onDragEnd}>
       <div className="flex gap-4 h-full overflow-x-auto p-1 pb-4">
-        {data.etapas.map(col => {
+        {effectiveData.etapas.map(col => {
             const totalValue = col.oportunidades.reduce((acc, op) => acc + op.valor, 0);
             
             return (
