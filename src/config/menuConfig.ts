@@ -181,6 +181,7 @@ export const menuConfig: MenuItem[] = [
       { name: 'Erros no Sistema', icon: ShieldAlert, href: '/app/desenvolvedor/erros', permission: { domain: 'ops', action: 'view' } },
       { name: '403 (Empresa ativa)', icon: ShieldAlert, href: '/app/desenvolvedor/403', permission: { domain: 'ops', action: 'view' } },
       { name: 'Stripe: Dedupe', icon: ShieldAlert, href: '/app/desenvolvedor/stripe-dedupe', permission: { domain: 'ops', action: 'manage' } },
+      { name: 'Entitlements (Planos)', icon: ShieldAlert, href: '/app/desenvolvedor/entitlements', permission: { domain: 'ops', action: 'manage' } },
       { name: 'Inventário RLS', icon: Database, href: '/app/desenvolvedor/rls', permission: { domain: 'ops', action: 'view' } },
       { name: 'Backups', icon: Database, href: '/app/desenvolvedor/backups', permission: { domain: 'ops', action: 'view' } },
       { name: 'Backup por Empresa', icon: Database, href: '/app/desenvolvedor/backups-tenant', permission: { domain: 'ops', action: 'view' } },
