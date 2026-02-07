@@ -205,7 +205,6 @@ RETURNS TABLE (
   movimentacao_tipo text,
   movimentacao_descricao text,
   movimentacao_valor numeric,
-  sequencia_importacao integer,
   total_count bigint
 )
 LANGUAGE plpgsql
@@ -335,7 +334,6 @@ BEGIN
     o.movimentacao_tipo,
     o.movimentacao_descricao,
     o.movimentacao_valor,
-    o.sequencia_importacao,
     o.total_count
   FROM ordered o
   LEFT JOIN base b
