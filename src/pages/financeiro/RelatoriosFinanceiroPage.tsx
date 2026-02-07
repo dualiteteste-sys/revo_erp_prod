@@ -142,6 +142,8 @@ export default function RelatoriosFinanceiroPage() {
         setPorCentro(centrosRes.value ?? []);
       } else {
         // Não bloqueia a tela inteira se o relatório por centro falhar.
+        if (token !== fetchTokenRef.current) return;
+        if (empresaSnapshot !== lastEmpresaIdRef.current) return;
         setPorCentro([]);
       }
       try {
@@ -150,6 +152,8 @@ export default function RelatoriosFinanceiroPage() {
         if (empresaSnapshot !== lastEmpresaIdRef.current) return;
         setDre(dreResult);
       } catch {
+        if (token !== fetchTokenRef.current) return;
+        if (empresaSnapshot !== lastEmpresaIdRef.current) return;
         setDre(null);
       }
     } catch (e: any) {
