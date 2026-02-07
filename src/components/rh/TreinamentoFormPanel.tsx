@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Loader2, Save, Plus, Trash2, UserPlus, CheckCircle, XCircle, Edit, Paperclip, Download } from 'lucide-react';
 import {
   TreinamentoDetails,
@@ -62,7 +62,7 @@ function formatChangedFields(row: AuditLogRow): string {
 
 const TreinamentoFormPanel: React.FC<TreinamentoFormPanelProps> = ({ treinamento, onSaved, onClose }) => {
   const { addToast } = useToast();
-  const { activeEmpresaId } = useAuth();
+  const { activeEmpresaId, loading: authLoading } = useAuth();
   const { confirm } = useConfirm();
   const [isSaving, setIsSaving] = useState(false);
   const [formData, setFormData] = useState<TreinamentoFormState>({});
@@ -101,6 +101,10 @@ const TreinamentoFormPanel: React.FC<TreinamentoFormPanelProps> = ({ treinamento
   const [docFile, setDocFile] = useState<File | null>(null);
   const [docsSort, setDocsSort] = useState<SortState<string>>({ column: 'enviado', direction: 'desc' });
   const [auditSort, setAuditSort] = useState<SortState<string>>({ column: 'quando', direction: 'desc' });
+  const lastEmpresaIdRef = useRef<string | null>(activeEmpresaId ?? null);
+  const loadTokenRef = useRef(0);
+  const actionTokenRef = useRef(0);
+  const empresaChanged = lastEmpresaIdRef.current !== (activeEmpresaId ?? null);
 
   const docsColumns: TableColumnWidthDef[] = [
     { id: 'titulo', defaultWidth: 220, minWidth: 160 },
@@ -150,6 +154,29 @@ const TreinamentoFormPanel: React.FC<TreinamentoFormPanelProps> = ({ treinamento
   }, [auditRows, auditSort]);
 
   useEffect(() => {
+    const prevEmpresaId = lastEmpresaIdRef.current;
+    const nextEmpresaId = activeEmpresaId ?? null;
+    if (prevEmpresaId === nextEmpresaId) return;
+
+    loadTokenRef.current += 1;
+    actionTokenRef.current += 1;
+    setFormData({ status: 'planejado', tipo: 'interno' });
+    setColaboradores([]);
+    setSelectedColaboradorId('');
+    setEditingParticipante(null);
+    setAuditRows([]);
+    setDocs([]);
+    setLoadingAudit(false);
+    setLoadingDocs(false);
+    setUploadingDoc(false);
+    setDocTitulo('');
+    setDocDescricao('');
+    setDocFile(null);
+    setActiveTab('dados');
+    lastEmpresaIdRef.current = nextEmpresaId;
+  }, [activeEmpresaId]);
+
+  useEffect(() => {
     if (treinamento) {
       setFormData(treinamento);
     } else {
@@ -157,23 +184,32 @@ const TreinamentoFormPanel: React.FC<TreinamentoFormPanelProps> = ({ treinamento
     }
 
     const loadColaboradores = async () => {
+      if (authLoading || !activeEmpresaId || empresaChanged) return;
+      const token = ++loadTokenRef.current;
+      const empresaSnapshot = activeEmpresaId;
       try {
         const data = await listColaboradores(undefined, undefined, true);
+        if (token !== loadTokenRef.current) return;
+        if (empresaSnapshot !== lastEmpresaIdRef.current) return;
         setColaboradores(data);
       } catch (e) {
-        console.error(e);
+        if (token !== loadTokenRef.current) return;
+        if (empresaSnapshot !== lastEmpresaIdRef.current) return;
       }
     };
-    loadColaboradores();
-  }, [treinamento]);
+    void loadColaboradores();
+  }, [activeEmpresaId, authLoading, empresaChanged, treinamento]);
 
   useEffect(() => {
     const fetchAudit = async () => {
+      if (authLoading || !activeEmpresaId || empresaChanged) return;
       if (activeTab !== 'historico') return;
       if (!formData.id) {
         setAuditRows([]);
         return;
       }
+      const token = ++loadTokenRef.current;
+      const empresaSnapshot = activeEmpresaId;
       setLoadingAudit(true);
       try {
         const data = await listAuditLogsForTables(['rh_treinamentos', 'rh_treinamento_participantes', 'rh_docs'], 300);
@@ -201,35 +237,50 @@ const TreinamentoFormPanel: React.FC<TreinamentoFormPanelProps> = ({ treinamento
           return false;
         };
 
+        if (token !== loadTokenRef.current) return;
+        if (empresaSnapshot !== lastEmpresaIdRef.current) return;
         setAuditRows(data.filter(belongsToTreinamento));
       } catch (e: any) {
+        if (token !== loadTokenRef.current) return;
+        if (empresaSnapshot !== lastEmpresaIdRef.current) return;
         addToast(e?.message || 'Erro ao carregar histórico.', 'error');
       } finally {
+        if (token !== loadTokenRef.current) return;
+        if (empresaSnapshot !== lastEmpresaIdRef.current) return;
         setLoadingAudit(false);
       }
     };
     void fetchAudit();
-  }, [activeTab, formData.id, addToast]);
+  }, [activeEmpresaId, activeTab, addToast, authLoading, empresaChanged, formData.id]);
 
   useEffect(() => {
     const fetchDocs = async () => {
+      if (authLoading || !activeEmpresaId || empresaChanged) return;
       if (activeTab !== 'anexos') return;
       if (!formData.id) {
         setDocs([]);
         return;
       }
+      const token = ++loadTokenRef.current;
+      const empresaSnapshot = activeEmpresaId;
       setLoadingDocs(true);
       try {
         const data = await listRhDocs('treinamento', formData.id, false);
+        if (token !== loadTokenRef.current) return;
+        if (empresaSnapshot !== lastEmpresaIdRef.current) return;
         setDocs(data);
       } catch (e: any) {
+        if (token !== loadTokenRef.current) return;
+        if (empresaSnapshot !== lastEmpresaIdRef.current) return;
         addToast(e?.message || 'Erro ao carregar anexos.', 'error');
       } finally {
+        if (token !== loadTokenRef.current) return;
+        if (empresaSnapshot !== lastEmpresaIdRef.current) return;
         setLoadingDocs(false);
       }
     };
     void fetchDocs();
-  }, [activeTab, formData.id, addToast]);
+  }, [activeEmpresaId, activeTab, addToast, authLoading, empresaChanged, formData.id]);
 
   const handleFormChange = (field: keyof TreinamentoPayload, value: any) => {
     if (readOnly) return;
@@ -237,6 +288,7 @@ const TreinamentoFormPanel: React.FC<TreinamentoFormPanelProps> = ({ treinamento
   };
 
   const handleSave = async () => {
+    if (authLoading || !activeEmpresaId || empresaChanged) return;
     if (readOnly) {
       addToast('Você não tem permissão para salvar treinamentos.', 'warning');
       return;
@@ -247,20 +299,29 @@ const TreinamentoFormPanel: React.FC<TreinamentoFormPanelProps> = ({ treinamento
     }
 
     setIsSaving(true);
+    const token = ++actionTokenRef.current;
+    const empresaSnapshot = activeEmpresaId;
     try {
       const saved = await saveTreinamento(formData);
+      if (token !== actionTokenRef.current) return;
+      if (empresaSnapshot !== lastEmpresaIdRef.current) return;
       setFormData(saved); // Update with ID if created
       addToast('Treinamento salvo com sucesso!', 'success');
       onSaved(saved);
       setActiveTab('participantes');
     } catch (error: any) {
+      if (token !== actionTokenRef.current) return;
+      if (empresaSnapshot !== lastEmpresaIdRef.current) return;
       addToast(error.message, 'error');
     } finally {
+      if (token !== actionTokenRef.current) return;
+      if (empresaSnapshot !== lastEmpresaIdRef.current) return;
       setIsSaving(false);
     }
   };
 
   const handleAddParticipante = async () => {
+    if (authLoading || !activeEmpresaId || empresaChanged) return;
     if (!canManageParticipants) {
       addToast('Você não tem permissão para gerenciar participantes.', 'warning');
       return;
@@ -271,50 +332,77 @@ const TreinamentoFormPanel: React.FC<TreinamentoFormPanelProps> = ({ treinamento
     }
     if (!selectedColaboradorId) return;
 
+    const token = ++actionTokenRef.current;
+    const empresaSnapshot = activeEmpresaId;
     try {
       await manageParticipante(formData.id, selectedColaboradorId, 'add');
+      if (token !== actionTokenRef.current) return;
+      if (empresaSnapshot !== lastEmpresaIdRef.current) return;
       addToast('Participante adicionado.', 'success');
       const updated = await getTreinamentoDetails(formData.id);
+      if (token !== actionTokenRef.current) return;
+      if (empresaSnapshot !== lastEmpresaIdRef.current) return;
       setFormData(updated);
       setSelectedColaboradorId('');
     } catch (e: any) {
+      if (token !== actionTokenRef.current) return;
+      if (empresaSnapshot !== lastEmpresaIdRef.current) return;
       addToast(e.message, 'error');
     }
   };
 
   const handleRemoveParticipante = async (colaboradorId: string) => {
+    if (authLoading || !activeEmpresaId || empresaChanged) return;
     if (!canManageParticipants) {
       addToast('Você não tem permissão para gerenciar participantes.', 'warning');
       return;
     }
     if (!formData.id) return;
+    const token = ++actionTokenRef.current;
+    const empresaSnapshot = activeEmpresaId;
     try {
       await manageParticipante(formData.id, colaboradorId, 'remove');
+      if (token !== actionTokenRef.current) return;
+      if (empresaSnapshot !== lastEmpresaIdRef.current) return;
       addToast('Participante removido.', 'success');
       const updated = await getTreinamentoDetails(formData.id);
+      if (token !== actionTokenRef.current) return;
+      if (empresaSnapshot !== lastEmpresaIdRef.current) return;
       setFormData(updated);
     } catch (e: any) {
+      if (token !== actionTokenRef.current) return;
+      if (empresaSnapshot !== lastEmpresaIdRef.current) return;
       addToast(e.message, 'error');
     }
   };
 
   const handleUpdateParticipante = async (colaboradorId: string, data: any) => {
+    if (authLoading || !activeEmpresaId || empresaChanged) return;
     if (!canManageParticipants) {
       addToast('Você não tem permissão para gerenciar participantes.', 'warning');
       return;
     }
     if (!formData.id) return;
+    const token = ++actionTokenRef.current;
+    const empresaSnapshot = activeEmpresaId;
     try {
       await manageParticipante(formData.id, colaboradorId, 'update', data);
+      if (token !== actionTokenRef.current) return;
+      if (empresaSnapshot !== lastEmpresaIdRef.current) return;
       addToast('Participante atualizado.', 'success');
       const updated = await getTreinamentoDetails(formData.id);
+      if (token !== actionTokenRef.current) return;
+      if (empresaSnapshot !== lastEmpresaIdRef.current) return;
       setFormData(updated);
     } catch (e: any) {
+      if (token !== actionTokenRef.current) return;
+      if (empresaSnapshot !== lastEmpresaIdRef.current) return;
       addToast(e.message, 'error');
     }
   };
 
   const handleUploadDoc = async () => {
+    if (authLoading || !activeEmpresaId || empresaChanged) return;
     if (!activeEmpresaId) {
       addToast('Nenhuma empresa ativa encontrada.', 'error');
       return;
@@ -332,6 +420,8 @@ const TreinamentoFormPanel: React.FC<TreinamentoFormPanelProps> = ({ treinamento
       return;
     }
 
+    const token = ++actionTokenRef.current;
+    const empresaSnapshot = activeEmpresaId;
     setUploadingDoc(true);
     try {
       await uploadRhDoc({
@@ -342,29 +432,45 @@ const TreinamentoFormPanel: React.FC<TreinamentoFormPanelProps> = ({ treinamento
         descricao: docDescricao || null,
         file: docFile,
       });
+      if (token !== actionTokenRef.current) return;
+      if (empresaSnapshot !== lastEmpresaIdRef.current) return;
       addToast('Anexo enviado com sucesso.', 'success');
       setDocTitulo('');
       setDocDescricao('');
       setDocFile(null);
       const data = await listRhDocs('treinamento', formData.id, false);
+      if (token !== actionTokenRef.current) return;
+      if (empresaSnapshot !== lastEmpresaIdRef.current) return;
       setDocs(data);
     } catch (e: any) {
+      if (token !== actionTokenRef.current) return;
+      if (empresaSnapshot !== lastEmpresaIdRef.current) return;
       addToast(e?.message || 'Erro ao enviar anexo.', 'error');
     } finally {
+      if (token !== actionTokenRef.current) return;
+      if (empresaSnapshot !== lastEmpresaIdRef.current) return;
       setUploadingDoc(false);
     }
   };
 
   const handleDownloadDoc = async (doc: RhDoc) => {
+    if (authLoading || !activeEmpresaId || empresaChanged) return;
+    const token = ++actionTokenRef.current;
+    const empresaSnapshot = activeEmpresaId;
     try {
       const url = await createRhDocSignedUrl(doc.arquivo_path);
+      if (token !== actionTokenRef.current) return;
+      if (empresaSnapshot !== lastEmpresaIdRef.current) return;
       window.open(url, '_blank', 'noopener,noreferrer');
     } catch (e: any) {
+      if (token !== actionTokenRef.current) return;
+      if (empresaSnapshot !== lastEmpresaIdRef.current) return;
       addToast(e?.message || 'Erro ao baixar documento.', 'error');
     }
   };
 
   const handleDeleteDoc = async (doc: RhDoc) => {
+    if (authLoading || !activeEmpresaId || empresaChanged) return;
     if (!canDeleteDoc) {
       addToast('Você não tem permissão para excluir anexos.', 'warning');
       return;
@@ -378,14 +484,22 @@ const TreinamentoFormPanel: React.FC<TreinamentoFormPanelProps> = ({ treinamento
     });
     if (!ok) return;
 
+    const token = ++actionTokenRef.current;
+    const empresaSnapshot = activeEmpresaId;
     try {
       await deleteRhDoc({ id: doc.id, arquivoPath: doc.arquivo_path });
+      if (token !== actionTokenRef.current) return;
+      if (empresaSnapshot !== lastEmpresaIdRef.current) return;
       addToast('Anexo excluído.', 'success');
       if (formData.id) {
         const data = await listRhDocs('treinamento', formData.id, false);
+        if (token !== actionTokenRef.current) return;
+        if (empresaSnapshot !== lastEmpresaIdRef.current) return;
         setDocs(data);
       }
     } catch (e: any) {
+      if (token !== actionTokenRef.current) return;
+      if (empresaSnapshot !== lastEmpresaIdRef.current) return;
       addToast(e?.message || 'Erro ao excluir anexo.', 'error');
     }
   };
