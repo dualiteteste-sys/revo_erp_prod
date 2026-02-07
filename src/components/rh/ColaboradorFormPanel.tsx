@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Loader2, Save, AlertCircle, TrendingUp, TrendingDown, Minus, PlusCircle, GraduationCap, Paperclip, Download, Trash2, CalendarPlus } from 'lucide-react';
 import {
   ColaboradorDetails,
@@ -41,7 +41,7 @@ interface ColaboradorFormPanelProps {
 
 const ColaboradorFormPanel: React.FC<ColaboradorFormPanelProps> = ({ colaborador, onSaveSuccess, onClose }) => {
   const { addToast } = useToast();
-  const { activeEmpresaId } = useAuth();
+  const { activeEmpresaId, loading: authLoading } = useAuth();
   const { confirm } = useConfirm();
   const [isSaving, setIsSaving] = useState(false);
   const [formData, setFormData] = useState<ColaboradorPayload>({});
@@ -86,6 +86,10 @@ const ColaboradorFormPanel: React.FC<ColaboradorFormPanelProps> = ({ colaborador
   const [docsSort, setDocsSort] = useState<SortState<string>>({ column: 'criado', direction: 'desc' });
   const [treinSort, setTreinSort] = useState<SortState<string>>({ column: 'data', direction: 'desc' });
   const [auditSort, setAuditSort] = useState<SortState<string>>({ column: 'quando', direction: 'desc' });
+  const lastEmpresaIdRef = useRef<string | null>(activeEmpresaId ?? null);
+  const loadTokenRef = useRef(0);
+  const actionTokenRef = useRef(0);
+  const empresaChanged = lastEmpresaIdRef.current !== (activeEmpresaId ?? null);
 
   const afastColumns: TableColumnWidthDef[] = [
     { id: 'tipo', defaultWidth: 160, minWidth: 140 },
@@ -184,12 +188,52 @@ const ColaboradorFormPanel: React.FC<ColaboradorFormPanelProps> = ({ colaborador
   }, [auditRows, auditSort]);
 
   useEffect(() => {
+    const prevEmpresaId = lastEmpresaIdRef.current;
+    const nextEmpresaId = activeEmpresaId ?? null;
+    if (prevEmpresaId === nextEmpresaId) return;
+
+    loadTokenRef.current += 1;
+    actionTokenRef.current += 1;
+    setFormData({ ativo: true, competencias: [] });
+    setMappedCargoId(null);
+    setExtraCompetenciaId('');
+    setTreinamentos([]);
+    setAuditRows([]);
+    setAfastamentos([]);
+    setDocs([]);
+    setLoadingTreinamentos(false);
+    setLoadingAudit(false);
+    setLoadingAfastamentos(false);
+    setLoadingDocs(false);
+    setUploadingDoc(false);
+    setSavingAfastamento(false);
+    setDocTitulo('');
+    setDocDescricao('');
+    setDocFile(null);
+    setNovoAfastTipo('outros');
+    setNovoAfastMotivo('');
+    setNovoAfastInicio('');
+    setNovoAfastFim('');
+    setActiveTab('dados');
+
+    if (prevEmpresaId && nextEmpresaId) {
+      addToast('Empresa alterada. Recarregando colaborador…', 'info');
+    }
+    lastEmpresaIdRef.current = nextEmpresaId;
+  }, [activeEmpresaId, addToast]);
+
+  useEffect(() => {
     const loadData = async () => {
+      if (authLoading || !activeEmpresaId || empresaChanged) return;
+      const token = ++loadTokenRef.current;
+      const empresaSnapshot = activeEmpresaId;
       const [cargosData, compData] = await Promise.all([listCargos(undefined, true), listCompetencias()]);
+      if (token !== loadTokenRef.current) return;
+      if (empresaSnapshot !== lastEmpresaIdRef.current) return;
       setCargos(cargosData);
       setAllCompetencias(compData);
     };
-    loadData();
+    void loadData();
 
     if (colaborador) {
       setFormData(colaborador);
@@ -198,86 +242,122 @@ const ColaboradorFormPanel: React.FC<ColaboradorFormPanelProps> = ({ colaborador
     }
     setMappedCargoId(null);
     setExtraCompetenciaId('');
-  }, [colaborador]);
+  }, [activeEmpresaId, authLoading, colaborador, empresaChanged]);
 
   useEffect(() => {
     const fetchTreinamentos = async () => {
+      if (authLoading || !activeEmpresaId || empresaChanged) return;
       if (!colaborador?.id) {
         setTreinamentos([]);
         return;
       }
+      const token = ++loadTokenRef.current;
+      const empresaSnapshot = activeEmpresaId;
       setLoadingTreinamentos(true);
       try {
         const data = await listTreinamentosPorColaborador(colaborador.id);
+        if (token !== loadTokenRef.current) return;
+        if (empresaSnapshot !== lastEmpresaIdRef.current) return;
         setTreinamentos(data);
       } catch (e: any) {
+        if (token !== loadTokenRef.current) return;
+        if (empresaSnapshot !== lastEmpresaIdRef.current) return;
         addToast(e?.message || 'Erro ao carregar treinamentos do colaborador.', 'error');
       } finally {
+        if (token !== loadTokenRef.current) return;
+        if (empresaSnapshot !== lastEmpresaIdRef.current) return;
         setLoadingTreinamentos(false);
       }
     };
-    fetchTreinamentos();
-  }, [colaborador?.id, addToast]);
+    void fetchTreinamentos();
+  }, [activeEmpresaId, addToast, authLoading, colaborador?.id, empresaChanged]);
 
   useEffect(() => {
     const fetchAudit = async () => {
+      if (authLoading || !activeEmpresaId || empresaChanged) return;
       if (activeTab !== 'historico') return;
       if (!colaborador?.id) {
         setAuditRows([]);
         return;
       }
+      const token = ++loadTokenRef.current;
+      const empresaSnapshot = activeEmpresaId;
       setLoadingAudit(true);
       try {
         const data = await listAuditLogsForTables(['rh_colaboradores', 'rh_colaborador_competencias'], 300);
+        if (token !== loadTokenRef.current) return;
+        if (empresaSnapshot !== lastEmpresaIdRef.current) return;
         setAuditRows(data.filter((r) => r.record_id === colaborador.id));
       } catch (e: any) {
+        if (token !== loadTokenRef.current) return;
+        if (empresaSnapshot !== lastEmpresaIdRef.current) return;
         addToast(e?.message || 'Erro ao carregar histórico.', 'error');
       } finally {
+        if (token !== loadTokenRef.current) return;
+        if (empresaSnapshot !== lastEmpresaIdRef.current) return;
         setLoadingAudit(false);
       }
     };
-    fetchAudit();
-  }, [activeTab, colaborador?.id, addToast]);
+    void fetchAudit();
+  }, [activeEmpresaId, activeTab, addToast, authLoading, colaborador?.id, empresaChanged]);
 
   useEffect(() => {
     const fetchAfastamentos = async () => {
+      if (authLoading || !activeEmpresaId || empresaChanged) return;
       if (activeTab !== 'afastamentos') return;
       if (!colaborador?.id) {
         setAfastamentos([]);
         return;
       }
+      const token = ++loadTokenRef.current;
+      const empresaSnapshot = activeEmpresaId;
       setLoadingAfastamentos(true);
       try {
         const data = await listAfastamentos(colaborador.id);
+        if (token !== loadTokenRef.current) return;
+        if (empresaSnapshot !== lastEmpresaIdRef.current) return;
         setAfastamentos(data);
       } catch (e: any) {
+        if (token !== loadTokenRef.current) return;
+        if (empresaSnapshot !== lastEmpresaIdRef.current) return;
         addToast(e?.message || 'Erro ao carregar afastamentos.', 'error');
       } finally {
+        if (token !== loadTokenRef.current) return;
+        if (empresaSnapshot !== lastEmpresaIdRef.current) return;
         setLoadingAfastamentos(false);
       }
     };
-    fetchAfastamentos();
-  }, [activeTab, colaborador?.id, addToast]);
+    void fetchAfastamentos();
+  }, [activeEmpresaId, activeTab, addToast, authLoading, colaborador?.id, empresaChanged]);
 
   useEffect(() => {
     const fetchDocs = async () => {
+      if (authLoading || !activeEmpresaId || empresaChanged) return;
       if (activeTab !== 'anexos') return;
       if (!colaborador?.id) {
         setDocs([]);
         return;
       }
+      const token = ++loadTokenRef.current;
+      const empresaSnapshot = activeEmpresaId;
       setLoadingDocs(true);
       try {
         const data = await listRhDocs('colaborador', colaborador.id, false);
+        if (token !== loadTokenRef.current) return;
+        if (empresaSnapshot !== lastEmpresaIdRef.current) return;
         setDocs(data);
       } catch (e: any) {
+        if (token !== loadTokenRef.current) return;
+        if (empresaSnapshot !== lastEmpresaIdRef.current) return;
         addToast(e?.message || 'Erro ao carregar anexos.', 'error');
       } finally {
+        if (token !== loadTokenRef.current) return;
+        if (empresaSnapshot !== lastEmpresaIdRef.current) return;
         setLoadingDocs(false);
       }
     };
-    fetchDocs();
-  }, [activeTab, colaborador?.id, addToast]);
+    void fetchDocs();
+  }, [activeEmpresaId, activeTab, addToast, authLoading, colaborador?.id, empresaChanged]);
 
   useEffect(() => {
     const hydrateCompetenciasFromCargo = async () => {
@@ -286,7 +366,11 @@ const ColaboradorFormPanel: React.FC<ColaboradorFormPanelProps> = ({ colaborador
       if (mappedCargoId === cargoId) return;
 
       try {
+        const token = ++loadTokenRef.current;
+        const empresaSnapshot = activeEmpresaId ?? null;
         const cargo = await getCargoDetails(cargoId);
+        if (token !== loadTokenRef.current) return;
+        if (empresaSnapshot !== lastEmpresaIdRef.current) return;
         const current = formData.competencias || [];
         const currentById = new Map(current.map((c: any) => [c.competencia_id, c]));
 
@@ -400,6 +484,9 @@ const ColaboradorFormPanel: React.FC<ColaboradorFormPanelProps> = ({ colaborador
       return;
     }
     if (!colaborador?.id) return;
+    if (authLoading || !activeEmpresaId || empresaChanged) return;
+    const token = ++actionTokenRef.current;
+    const empresaSnapshot = activeEmpresaId;
     setSavingAfastamento(true);
     try {
       await addAfastamento({
@@ -409,16 +496,24 @@ const ColaboradorFormPanel: React.FC<ColaboradorFormPanelProps> = ({ colaborador
         dataInicio: novoAfastInicio || null,
         dataFim: novoAfastFim || null,
       });
+      if (token !== actionTokenRef.current) return;
+      if (empresaSnapshot !== lastEmpresaIdRef.current) return;
       addToast('Afastamento registrado.', 'success');
       setNovoAfastTipo('outros');
       setNovoAfastMotivo('');
       setNovoAfastInicio('');
       setNovoAfastFim('');
       const data = await listAfastamentos(colaborador.id);
+      if (token !== actionTokenRef.current) return;
+      if (empresaSnapshot !== lastEmpresaIdRef.current) return;
       setAfastamentos(data);
     } catch (e: any) {
+      if (token !== actionTokenRef.current) return;
+      if (empresaSnapshot !== lastEmpresaIdRef.current) return;
       addToast(e?.message || 'Erro ao registrar afastamento.', 'error');
     } finally {
+      if (token !== actionTokenRef.current) return;
+      if (empresaSnapshot !== lastEmpresaIdRef.current) return;
       setSavingAfastamento(false);
     }
   };
@@ -434,23 +529,36 @@ const ColaboradorFormPanel: React.FC<ColaboradorFormPanelProps> = ({ colaborador
 	      confirmText: 'Encerrar',
 	      cancelText: 'Cancelar',
 	      variant: 'primary',
-	    });
+    });
     if (!ok) return;
+    if (authLoading || !activeEmpresaId || empresaChanged) return;
+    const token = ++actionTokenRef.current;
+    const empresaSnapshot = activeEmpresaId;
     try {
       await encerrarAfastamento(afast.id, new Date().toISOString().slice(0, 10));
+      if (token !== actionTokenRef.current) return;
+      if (empresaSnapshot !== lastEmpresaIdRef.current) return;
       addToast('Afastamento encerrado.', 'success');
       if (colaborador?.id) {
         const data = await listAfastamentos(colaborador.id);
+        if (token !== actionTokenRef.current) return;
+        if (empresaSnapshot !== lastEmpresaIdRef.current) return;
         setAfastamentos(data);
       }
     } catch (e: any) {
+      if (token !== actionTokenRef.current) return;
+      if (empresaSnapshot !== lastEmpresaIdRef.current) return;
       addToast(e?.message || 'Erro ao encerrar afastamento.', 'error');
     }
   };
 
   const loadDocs = async () => {
-    if (!colaborador?.id) return;
+    if (!colaborador?.id || authLoading || !activeEmpresaId || empresaChanged) return;
+    const token = ++loadTokenRef.current;
+    const empresaSnapshot = activeEmpresaId;
     const data = await listRhDocs('colaborador', colaborador.id, false);
+    if (token !== loadTokenRef.current) return;
+    if (empresaSnapshot !== lastEmpresaIdRef.current) return;
     setDocs(data);
   };
 
@@ -459,11 +567,13 @@ const ColaboradorFormPanel: React.FC<ColaboradorFormPanelProps> = ({ colaborador
       addToast('Você não tem permissão para enviar anexos.', 'warning');
       return;
     }
-    if (!colaborador?.id || !activeEmpresaId || !docFile) return;
+    if (!colaborador?.id || !activeEmpresaId || !docFile || authLoading || empresaChanged) return;
     if (!docTitulo.trim()) {
       addToast('Informe o título do anexo.', 'warning');
       return;
     }
+    const token = ++actionTokenRef.current;
+    const empresaSnapshot = activeEmpresaId;
     setUploadingDoc(true);
     try {
       await uploadRhDoc({
@@ -474,23 +584,36 @@ const ColaboradorFormPanel: React.FC<ColaboradorFormPanelProps> = ({ colaborador
         descricao: docDescricao.trim() || null,
         file: docFile,
       });
+      if (token !== actionTokenRef.current) return;
+      if (empresaSnapshot !== lastEmpresaIdRef.current) return;
       addToast('Anexo enviado.', 'success');
       setDocTitulo('');
       setDocDescricao('');
       setDocFile(null);
       await loadDocs();
     } catch (e: any) {
+      if (token !== actionTokenRef.current) return;
+      if (empresaSnapshot !== lastEmpresaIdRef.current) return;
       addToast(e?.message || 'Erro ao enviar anexo.', 'error');
     } finally {
+      if (token !== actionTokenRef.current) return;
+      if (empresaSnapshot !== lastEmpresaIdRef.current) return;
       setUploadingDoc(false);
     }
   };
 
   const handleOpenDoc = async (doc: RhDoc) => {
+    if (authLoading || !activeEmpresaId || empresaChanged) return;
+    const token = ++actionTokenRef.current;
+    const empresaSnapshot = activeEmpresaId;
     try {
       const url = await createRhDocSignedUrl(doc.arquivo_path);
+      if (token !== actionTokenRef.current) return;
+      if (empresaSnapshot !== lastEmpresaIdRef.current) return;
       window.open(url, '_blank', 'noopener,noreferrer');
     } catch (e: any) {
+      if (token !== actionTokenRef.current) return;
+      if (empresaSnapshot !== lastEmpresaIdRef.current) return;
       addToast(e?.message || 'Erro ao abrir anexo.', 'error');
     }
   };
@@ -508,11 +631,18 @@ const ColaboradorFormPanel: React.FC<ColaboradorFormPanelProps> = ({ colaborador
       variant: 'danger',
     });
     if (!ok) return;
+    if (authLoading || !activeEmpresaId || empresaChanged) return;
+    const token = ++actionTokenRef.current;
+    const empresaSnapshot = activeEmpresaId;
     try {
       await deleteRhDoc({ id: doc.id, arquivoPath: doc.arquivo_path });
+      if (token !== actionTokenRef.current) return;
+      if (empresaSnapshot !== lastEmpresaIdRef.current) return;
       addToast('Anexo excluído.', 'success');
       await loadDocs();
     } catch (e: any) {
+      if (token !== actionTokenRef.current) return;
+      if (empresaSnapshot !== lastEmpresaIdRef.current) return;
       addToast(e?.message || 'Erro ao excluir anexo.', 'error');
     }
   };
