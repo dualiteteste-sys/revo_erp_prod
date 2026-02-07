@@ -116,7 +116,6 @@ export default function MovimentacoesTable({ movimentacoes, onEdit, onDelete }: 
                 key={mov.id}
                 className="hover:bg-gray-50"
                 onDoubleClick={(e) => {
-                  if (!canEdit) return;
                   if (shouldIgnoreRowDoubleClickEvent(e)) return;
                   openInNewTabBestEffort(href, () => onEdit(mov));
                 }}
@@ -126,27 +125,24 @@ export default function MovimentacoesTable({ movimentacoes, onEdit, onDelete }: 
               </td>
               <td className="px-6 py-4">
                 <div className="text-sm text-gray-900 font-medium">
-                  {canEdit ? (
-                    <a
-                      href={href}
-                      className="hover:underline underline-offset-2"
-                      onClick={(e) => {
-                        if (!isPlainLeftClick(e)) return;
-                        e.preventDefault();
-                        scheduleEdit(() => onEdit(mov));
-                      }}
-                      onDoubleClick={(e) => {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        cancelScheduledEdit();
-                        openInNewTabBestEffort(href, () => onEdit(mov));
-                      }}
-                    >
-                      {mov.descricao}
-                    </a>
-                  ) : (
-                    mov.descricao
-                  )}
+                  <a
+                    href={href}
+                    className={`underline-offset-2 ${canEdit ? 'hover:underline' : 'text-gray-900/90 hover:underline'}`}
+                    onClick={(e) => {
+                      if (!isPlainLeftClick(e)) return;
+                      e.preventDefault();
+                      scheduleEdit(() => onEdit(mov));
+                    }}
+                    onDoubleClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      cancelScheduledEdit();
+                      openInNewTabBestEffort(href, () => onEdit(mov));
+                    }}
+                    title={canEdit ? 'Editar movimentação' : 'Visualizar movimentação'}
+                  >
+                    {mov.descricao}
+                  </a>
                 </div>
                 <div className="text-xs text-gray-500">
                   {mov.categoria && <span className="mr-2 bg-gray-100 px-1 rounded">{mov.categoria}</span>}
