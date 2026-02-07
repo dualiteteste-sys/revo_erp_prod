@@ -46,6 +46,7 @@ const OpsRlsInventoryPage = lazyImport(() => import("../pages/dev/OpsRlsInventor
 const OpsBackupsPage = lazyImport(() => import("../pages/dev/OpsBackupsPage"));
 const OpsTenantBackupsPage = lazyImport(() => import("../pages/dev/OpsTenantBackupsPage"));
 const OpsStripeDedupePage = lazyImport(() => import("../pages/dev/OpsStripeDedupePage"));
+const OpsEntitlementsPage = lazyImport(() => import("../pages/dev/OpsEntitlementsPage"));
 const SupabaseDemoPage = lazyImport(() => import("../pages/tools/SupabaseDemoPage"));
 const SettingsPage = lazyImport(() => import("../pages/settings/SettingsPage"));
 
@@ -591,6 +592,14 @@ export const appRoutes: RouteObject[] = [
               element: (
                 <RequirePermission permission={{ domain: "ops", action: "manage" }}>
                   <Suspense fallback={<PageLoader />}><SupabaseDemoPage /></Suspense>
+                </RequirePermission>
+              ),
+            },
+            {
+              path: "desenvolvedor/entitlements",
+              element: (
+                <RequirePermission permission={{ domain: "ops", action: "manage" }}>
+                  <Suspense fallback={<PageLoader />}><OpsEntitlementsPage /></Suspense>
                 </RequirePermission>
               ),
             },
