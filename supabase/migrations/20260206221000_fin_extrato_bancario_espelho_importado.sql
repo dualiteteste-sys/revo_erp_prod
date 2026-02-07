@@ -30,7 +30,9 @@ CREATE INDEX IF NOT EXISTS idx_fin_extrato_empresa_cc_data_seq
   ON public.financeiro_extratos_bancarios (empresa_id, conta_corrente_id, data_lancamento, sequencia_importacao);
 
 -- 2) RPC: importar preservando ordem + saldo (quando existir) e dedupe idempotente por hash
-CREATE OR REPLACE FUNCTION public.financeiro_extratos_bancarios_importar(
+DROP FUNCTION IF EXISTS public.financeiro_extratos_bancarios_importar(uuid, jsonb);
+
+CREATE FUNCTION public.financeiro_extratos_bancarios_importar(
   p_conta_corrente_id uuid,
   p_itens jsonb
 )
