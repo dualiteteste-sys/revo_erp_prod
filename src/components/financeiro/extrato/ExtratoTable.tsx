@@ -50,6 +50,7 @@ export default function ExtratoTable({ lancamentos }: Props) {
   const { widths, startResize } = useTableColumnWidths({ tableId: 'financeiro:extrato:lancamentos', columns });
 
   const [collapsedDays, setCollapsedDays] = useState<Record<string, boolean>>({});
+  const [allCollapsed, setAllCollapsed] = useState(false);
   const dayGroups = useMemo<ExtratoDayGroup[]>(() => {
     const groups: ExtratoDayGroup[] = [];
 
@@ -116,11 +117,56 @@ export default function ExtratoTable({ lancamentos }: Props) {
     return groups;
   }, [lancamentos]);
 
+  const effectiveSaldoById = useMemo(() => {
+    const saldoMap: Record<string, number | null> = {};
+
+    for (const g of dayGroups) {
+      let running = g.saldoInicial;
+      for (const item of g.items) {
+        const saldoItem = item.saldo_apos_lancamento;
+        if (saldoItem !== null && saldoItem !== undefined) {
+          const normalized = round2(Number(saldoItem));
+          saldoMap[item.id] = normalized;
+          running = normalized;
+          continue;
+        }
+
+        if (running !== null) {
+          running = round2(running + getDelta(item));
+          saldoMap[item.id] = running;
+        } else {
+          saldoMap[item.id] = null;
+        }
+      }
+    }
+
+    return saldoMap;
+  }, [dayGroups]);
+
+  const toggleAllDays = () => {
+    const next = !allCollapsed;
+    const nextState: Record<string, boolean> = {};
+    for (const g of dayGroups) nextState[g.dateISO] = next;
+    setCollapsedDays(nextState);
+    setAllCollapsed(next);
+  };
+
   return (
     <div className="overflow-x-auto">
       <table className="min-w-full divide-y divide-gray-200">
         <TableColGroup columns={columns} widths={widths} />
         <thead className="bg-gray-50">
+          <tr>
+            <th colSpan={7} className="px-6 py-2 text-right">
+              <button
+                type="button"
+                onClick={toggleAllDays}
+                className="text-xs font-medium text-blue-700 hover:text-blue-800"
+              >
+                {allCollapsed ? 'Expandir todos os dias' : 'Recolher todos os dias'}
+              </button>
+            </th>
+          </tr>
           <tr>
             <ResizableSortableTh
               columnId="data"
@@ -186,7 +232,14 @@ export default function ExtratoTable({ lancamentos }: Props) {
                       <button
                         type="button"
                         className="w-full flex items-center justify-between gap-4"
-                        onClick={() => setCollapsedDays((prev) => ({ ...prev, [g.dateISO]: !prev[g.dateISO] }))}
+                        onClick={() => {
+                          const nextCollapsed = !isCollapsed;
+                          setCollapsedDays((prev) => ({ ...prev, [g.dateISO]: nextCollapsed }));
+                          const everyCollapsed = dayGroups.every((group) =>
+                            group.dateISO === g.dateISO ? nextCollapsed : !!collapsedDays[group.dateISO]
+                          );
+                          setAllCollapsed(everyCollapsed);
+                        }}
                         title={isCollapsed ? 'Expandir dia' : 'Recolher dia'}
                       >
                         <div className="flex items-center gap-2 text-sm font-semibold text-gray-800">
@@ -244,7 +297,9 @@ export default function ExtratoTable({ lancamentos }: Props) {
                             {formatCurrency(Math.abs(Number(item.valor ?? 0)) * 100)}
                           </td>
                           <td className="px-6 py-4 text-right text-sm text-gray-700">
-                            {item.saldo_apos_lancamento !== null ? formatCurrency(item.saldo_apos_lancamento * 100) : '-'}
+                            {effectiveSaldoById[item.id] !== null && effectiveSaldoById[item.id] !== undefined
+                              ? formatCurrency((effectiveSaldoById[item.id] as number) * 100)
+                              : '-'}
                           </td>
                           <td className="px-6 py-4 text-center">
                             {item.conciliado ? (

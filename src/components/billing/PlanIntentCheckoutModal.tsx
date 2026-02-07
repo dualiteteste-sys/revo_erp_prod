@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Loader2 } from "lucide-react";
@@ -81,7 +81,7 @@ function clearPendingPlanIntent() {
 }
 
 export function PlanIntentCheckoutModal() {
-  const { session, activeEmpresa, activeEmpresaId, refreshEmpresas } = useAuth();
+  const { session, activeEmpresa, activeEmpresaId, refreshEmpresas, loading: authLoading } = useAuth();
   const { subscription, loadingSubscription, refetchSubscription } = useSubscription();
   const { addToast } = useToast();
 
@@ -93,14 +93,33 @@ export function PlanIntentCheckoutModal() {
   const [razao, setRazao] = useState("");
   const [fantasia, setFantasia] = useState("");
   const [fetchingCnpj, setFetchingCnpj] = useState(false);
+  const requestTokenRef = useRef(0);
+  const lastEmpresaIdRef = useRef<string | null>(activeEmpresaId ?? null);
+  const empresaChanged = lastEmpresaIdRef.current !== (activeEmpresaId ?? null);
+
+  useEffect(() => {
+    const prevEmpresaId = lastEmpresaIdRef.current;
+    const nextEmpresaId = activeEmpresaId ?? null;
+    if (prevEmpresaId === nextEmpresaId) return;
+
+    requestTokenRef.current += 1;
+    setInlineError(null);
+    setStarting(false);
+    setFetchingCnpj(false);
+    setOpen(false);
+    setCnpj("");
+    setRazao("");
+    setFantasia("");
+    lastEmpresaIdRef.current = nextEmpresaId;
+  }, [activeEmpresaId]);
 
   useEffect(() => {
     if (!intent) return;
-    if (!session || !activeEmpresaId) return;
+    if (authLoading || !session || !activeEmpresaId || empresaChanged) return;
     if (loadingSubscription) return;
     if (subscription) return; // já tem assinatura
     setOpen(true);
-  }, [intent, session, activeEmpresaId, loadingSubscription, subscription]);
+  }, [authLoading, empresaChanged, intent, session, activeEmpresaId, loadingSubscription, subscription]);
 
   useEffect(() => {
     if (!open) return;
@@ -108,35 +127,47 @@ export function PlanIntentCheckoutModal() {
     setRazao((activeEmpresa as any)?.razao_social ?? (activeEmpresa as any)?.nome_razao_social ?? "");
     setFantasia((activeEmpresa as any)?.fantasia ?? (activeEmpresa as any)?.nome_fantasia ?? "");
     setCnpj(cnpjMask(String((activeEmpresa as any)?.cnpj ?? "")));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open]);
+  }, [activeEmpresa, activeEmpresaId, open]);
 
   const tryFetchCnpj = async () => {
+    if (!activeEmpresaId || empresaChanged) return;
     const cleaned = cnpj.replace(/\D/g, "");
     if (cleaned.length !== 14) return;
+    const token = ++requestTokenRef.current;
+    const empresaSnapshot = activeEmpresaId;
     setFetchingCnpj(true);
     try {
       const data = await fetchCnpjData(cleaned);
+      if (token !== requestTokenRef.current) return;
+      if (empresaSnapshot !== lastEmpresaIdRef.current) return;
       const rs = (data?.razao_social ?? "").trim();
       const nf = (data?.nome_fantasia ?? "").trim();
       if (rs) setRazao(rs);
       if (nf) setFantasia(nf);
       addToast("Dados do CNPJ preenchidos.", "success");
     } catch {
+      if (token !== requestTokenRef.current) return;
+      if (empresaSnapshot !== lastEmpresaIdRef.current) return;
       addToast("CNPJ não encontrado. Preencha Razão Social manualmente.", "warning");
     } finally {
+      if (token !== requestTokenRef.current) return;
+      if (empresaSnapshot !== lastEmpresaIdRef.current) return;
       setFetchingCnpj(false);
     }
   };
 
   const startCheckout = async () => {
-    if (!intent || !session) return;
+    if (!intent || !session || authLoading || !activeEmpresaId || empresaChanged) return;
+    const token = ++requestTokenRef.current;
+    const empresaSnapshot = activeEmpresaId;
     setStarting(true);
     setInlineError(null);
     try {
       let empresaId = activeEmpresa?.id ?? activeEmpresaId ?? null;
       if (!empresaId) {
         await refreshEmpresas();
+        if (token !== requestTokenRef.current) return;
+        if (empresaSnapshot !== lastEmpresaIdRef.current) return;
         empresaId = activeEmpresa?.id ?? activeEmpresaId ?? null;
       }
       if (!empresaId) {
@@ -174,10 +205,14 @@ export function PlanIntentCheckoutModal() {
       });
       if (error) throw error;
       if (!data?.url) throw new Error("URL de checkout não recebida.");
+      if (token !== requestTokenRef.current) return;
+      if (empresaSnapshot !== lastEmpresaIdRef.current) return;
 
       clearPendingPlanIntent();
       window.location.href = data.url;
     } catch (error: any) {
+      if (token !== requestTokenRef.current) return;
+      if (empresaSnapshot !== lastEmpresaIdRef.current) return;
       logger.error("[Billing][PlanIntent] Failed to start checkout", error, {
         planSlug: intent.planSlug,
         billingCycle: intent.billingCycle,
