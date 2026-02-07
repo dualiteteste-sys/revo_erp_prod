@@ -123,17 +123,17 @@ export default function ExtratosTable({ extratos, onConciliate, onUnconciliate, 
                   <span className="text-gray-400 text-xs italic">Pendente</span>
                 )}
               </td>
-              <td className="px-6 py-4 text-center">
-                {item.conciliado ? (
-                    <button 
-                        onClick={() => (isBusy ? undefined : onUnconciliate(item))}
-                        disabled={isBusy}
-                        className="text-red-500 hover:text-red-700 p-2 rounded-full hover:bg-red-50 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
-                        title="Desfazer Conciliação"
-                    >
-                        {isBusy ? <Loader2 className="animate-spin" size={18} /> : <Unlink size={18} />}
-                    </button>
-                ) : (
+	              <td className="px-6 py-4 text-center">
+	                {item.conciliado ? (
+	                    <button 
+	                        onClick={() => (isBusy ? undefined : onUnconciliate(item))}
+	                        disabled={isBusy}
+	                        className="text-red-500 hover:text-red-700 p-2 rounded-full hover:bg-red-50 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+	                        title="Reverter conciliação"
+	                    >
+	                        {isBusy ? <Loader2 className="animate-spin" size={18} /> : <Unlink size={18} />}
+	                    </button>
+	                ) : (
                     <button 
                         onClick={() => (isBusy ? undefined : onConciliate(item))}
                         disabled={isBusy}

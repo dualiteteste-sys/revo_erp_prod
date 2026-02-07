@@ -47,6 +47,7 @@ export default function PedidosVendasPage() {
   const lastEmpresaIdRef = useRef<string | null>(activeEmpresaId);
   const empresaChanged = lastEmpresaIdRef.current !== activeEmpresaId;
   const lastHandledOpenRef = useRef<string | null>(null);
+  const actionTokenRef = useRef(0);
 
   const openFromQuery = useMemo(() => {
     const params = new URLSearchParams(location.search);
@@ -86,6 +87,7 @@ export default function PedidosVendasPage() {
     if (prevEmpresaId === activeEmpresaId) return;
 
     // Multi-tenant safety: evitar reaproveitar estado do tenant anterior.
+    actionTokenRef.current += 1;
     resetTenantLocalState();
     lastHandledOpenRef.current = null;
 
@@ -96,6 +98,9 @@ export default function PedidosVendasPage() {
   }, [activeEmpresaId, clearOpenParam, openFromQuery, resetTenantLocalState]);
 
   const openWithLock = useCallback(async (id: string) => {
+    const token = ++actionTokenRef.current;
+    const empresaSnapshot = activeEmpresaId;
+
     const claimed = await editLock.claim(id, {
       confirmConflict: async () =>
         confirm({
@@ -110,10 +115,17 @@ export default function PedidosVendasPage() {
       clearOpenParam();
       return;
     }
+
+    if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) {
+      editLock.release(id);
+      clearOpenParam();
+      return;
+    }
+
     setEditingId(id);
     setSelectedId(id);
     setIsFormOpen(true);
-  }, [clearOpenParam, confirm, editLock]);
+  }, [activeEmpresaId, clearOpenParam, confirm, editLock]);
 
   const handleNew = () => {
     setSelectedId(null);
@@ -142,15 +154,20 @@ export default function PedidosVendasPage() {
   }, [activeEmpresaId, authLoading, empresaChanged, openFromQuery, openWithLock]);
 
   const handleSeed = async () => {
+    const token = ++actionTokenRef.current;
+    const empresaSnapshot = activeEmpresaId;
     setIsSeeding(true);
     try {
       await seedVendas();
+      if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
       addToast('5 Pedidos de Venda criados com sucesso!', 'success');
       refresh();
     } catch (e: any) {
+      if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
       console.error("Erro no seed de vendas:", e);
       addToast(e.message || 'Erro ao popular dados. Verifique se existem produtos cadastrados.', 'error');
     } finally {
+      if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
       setIsSeeding(false);
     }
   };

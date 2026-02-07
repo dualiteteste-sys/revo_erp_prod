@@ -83,6 +83,7 @@ export type ImportarExtratoPayload = {
   tipo_lancamento: 'credito' | 'debito';
   valor: number;
   saldo_apos_lancamento?: number;
+  sequencia_importacao?: number;
   identificador_banco?: string;
   hash_importacao?: string;
   linha_bruta?: string;
@@ -230,6 +231,18 @@ export async function conciliarExtrato(extratoId: string, movimentacaoId: string
 
 export async function desconciliarExtrato(extratoId: string): Promise<void> {
   return callRpc('financeiro_extratos_bancarios_desvincular', {
+    p_extrato_id: extratoId,
+  });
+}
+
+export type ReverterConciliacaoExtratoResult = {
+  kind: 'noop' | 'unlinked_only' | 'deleted_movimentacao';
+  message: string;
+  movimentacao_id?: string | null;
+};
+
+export async function reverterConciliacaoExtrato(extratoId: string): Promise<ReverterConciliacaoExtratoResult> {
+  return callRpc<ReverterConciliacaoExtratoResult>('financeiro_extratos_bancarios_reverter_conciliacao', {
     p_extrato_id: extratoId,
   });
 }
