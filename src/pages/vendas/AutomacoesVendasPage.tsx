@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Bot, Loader2, PlusCircle } from 'lucide-react';
 import Modal from '@/components/ui/Modal';
 import { useToast } from '@/contexts/ToastProvider';
@@ -14,6 +14,7 @@ import {
   validateAutomacaoConfig,
   type VendaAutomacao,
 } from '@/services/vendasMvp';
+import { useAuth } from '@/contexts/AuthProvider';
 
 type FormState = {
   id: string | null;
@@ -28,6 +29,7 @@ const emptyForm: FormState = { id: null, nome: '', gatilho: 'manual', enabled: t
 
 export default function AutomacoesVendasPage() {
   const { addToast } = useToast();
+  const { loading: authLoading, activeEmpresaId } = useAuth();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [running, setRunning] = useState(false);
@@ -44,10 +46,16 @@ export default function AutomacoesVendasPage() {
     { id: 'acoes', defaultWidth: 240, minWidth: 200 },
   ];
   const { widths, startResize } = useTableColumnWidths({ tableId: 'vendas:automacoes', columns });
+  const lastEmpresaIdRef = useRef<string | null>(activeEmpresaId);
+  const empresaChanged = lastEmpresaIdRef.current !== activeEmpresaId;
+  const loadTokenRef = useRef(0);
+  const actionTokenRef = useRef(0);
+  const effectiveLoading = loading || empresaChanged;
+  const effectiveRows = empresaChanged ? [] : rows;
 
   const sortedRows = useMemo(() => {
     return sortRows(
-      rows,
+      effectiveRows,
       sort as any,
       [
         { id: 'nome', type: 'string', getValue: (r) => r.nome ?? '' },
@@ -55,24 +63,54 @@ export default function AutomacoesVendasPage() {
         { id: 'ativa', type: 'boolean', getValue: (r) => Boolean(r.enabled) },
       ] as const
     );
-  }, [rows, sort]);
+  }, [effectiveRows, sort]);
 
   async function load() {
+    const token = ++loadTokenRef.current;
+    const empresaSnapshot = activeEmpresaId;
+
+    if (authLoading) return;
+    if (!empresaSnapshot) {
+      setRows([]);
+      setLoading(false);
+      return;
+    }
+
     setLoading(true);
     try {
-      setRows(await listAutomacoesVendas());
+      const data = await listAutomacoesVendas();
+      if (token !== loadTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
+      setRows(data);
     } catch (e: any) {
+      if (token !== loadTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
       addToast(e.message || 'Falha ao carregar automações.', 'error');
       setRows([]);
     } finally {
+      if (token !== loadTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
       setLoading(false);
     }
   }
 
   useEffect(() => {
+    loadTokenRef.current += 1;
+    actionTokenRef.current += 1;
+    lastEmpresaIdRef.current = activeEmpresaId;
+
+    setRows([]);
+    setIsOpen(false);
+    setForm(emptyForm);
+    setSaving(false);
+    setRunning(false);
+    setDeletingId(null);
+
+    if (!activeEmpresaId) {
+      setLoading(false);
+      return;
+    }
+
     void load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [activeEmpresaId]);
 
   const openNew = () => {
     setForm(emptyForm);
@@ -106,21 +144,27 @@ export default function AutomacoesVendasPage() {
   };
 
   const validate = async () => {
+    const token = ++actionTokenRef.current;
+    const empresaSnapshot = activeEmpresaId;
     const config = parseConfig();
     if (!config) return;
     try {
       const result = await validateAutomacaoConfig(config);
+      if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
       if (result.ok) {
         addToast('Config válida.', 'success');
       } else {
         addToast(`Config inválida: ${result.errors.join('; ')}`, 'error');
       }
     } catch (e: any) {
+      if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
       addToast(e.message || 'Falha ao validar config.', 'error');
     }
   };
 
   const save = async () => {
+    const token = ++actionTokenRef.current;
+    const empresaSnapshot = activeEmpresaId;
     if (!form.nome.trim()) {
       addToast('Informe o nome da automação.', 'error');
       return;
@@ -137,17 +181,22 @@ export default function AutomacoesVendasPage() {
         enabled: form.enabled,
         config,
       } as any);
+      if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
       addToast('Automação salva.', 'success');
       close();
       await load();
     } catch (e: any) {
+      if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
       addToast(e.message || 'Falha ao salvar automação.', 'error');
     } finally {
+      if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
       setSaving(false);
     }
   };
 
   const runNow = async () => {
+    const token = ++actionTokenRef.current;
+    const empresaSnapshot = activeEmpresaId;
     if (!form.id) {
       addToast('Salve a automação antes de executar.', 'warning');
       return;
@@ -163,6 +212,7 @@ export default function AutomacoesVendasPage() {
     setRunning(true);
     try {
       const valid = await validateAutomacaoConfig(config);
+      if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
       if (!valid.ok) {
         addToast(`Config inválida: ${valid.errors.join('; ')}`, 'error');
         return;
@@ -174,26 +224,46 @@ export default function AutomacoesVendasPage() {
         gatilho: 'manual',
         payload: { pedido_id: entityId },
       });
+      if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
       addToast('Automação enfileirada. O worker vai processar em até ~5 min.', 'success');
     } catch (e: any) {
+      if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
       addToast(e.message || 'Falha ao enfileirar automação.', 'error');
     } finally {
+      if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
       setRunning(false);
     }
   };
 
   const remove = async (id: string) => {
+    const token = ++actionTokenRef.current;
+    const empresaSnapshot = activeEmpresaId;
     setDeletingId(id);
     try {
       await deleteAutomacaoVendas(id);
+      if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
       addToast('Automação removida.', 'success');
       await load();
     } catch (e: any) {
+      if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
       addToast(e.message || 'Falha ao remover automação.', 'error');
     } finally {
+      if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
       setDeletingId(null);
     }
   };
+
+  if (authLoading) {
+    return (
+      <div className="flex justify-center h-full items-center">
+        <Loader2 className="animate-spin text-blue-600 w-10 h-10" />
+      </div>
+    );
+  }
+
+  if (!activeEmpresaId) {
+    return <div className="p-4 text-gray-600">Selecione uma empresa para ver automações de vendas.</div>;
+  }
 
   return (
     <div className="p-1 h-full flex flex-col">
@@ -214,11 +284,11 @@ export default function AutomacoesVendasPage() {
       </div>
 
       <div className="bg-white rounded-lg shadow overflow-hidden flex-grow flex flex-col">
-        {loading ? (
+        {effectiveLoading ? (
           <div className="flex justify-center h-64 items-center">
             <Loader2 className="animate-spin text-blue-600 w-10 h-10" />
           </div>
-        ) : rows.length === 0 ? (
+        ) : effectiveRows.length === 0 ? (
           <div className="flex justify-center h-64 items-center text-gray-500">Nenhuma automação cadastrada.</div>
         ) : (
           <div className="overflow-auto">
