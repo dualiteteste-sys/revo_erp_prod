@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Loader2, Save } from 'lucide-react';
 import {
   ContaAReceber,
@@ -30,6 +30,7 @@ import {
   type FinanceiroRecorrenciaFrequencia,
 } from '@/services/financeiroRecorrencias';
 import { createParcelamentoContasAReceber } from '@/services/financeiroParcelamento';
+import { useAuth } from '@/contexts/AuthProvider';
 
 interface ContasAReceberFormPanelProps {
   conta: Partial<ContaAReceber> | null;
@@ -46,6 +47,7 @@ const statusOptions = [
 
 const ContasAReceberFormPanel: React.FC<ContasAReceberFormPanelProps> = ({ conta, onSaveSuccess, onMutate, onClose }) => {
   const { addToast } = useToast();
+  const { loading: authLoading, activeEmpresaId } = useAuth();
   const [isSaving, setIsSaving] = useState(false);
   const [formData, setFormData] = useState<Partial<ContaAReceber>>({});
   const [clienteName, setClienteName] = useState('');
@@ -70,16 +72,47 @@ const ContasAReceberFormPanel: React.FC<ContasAReceberFormPanelProps> = ({ conta
   const [isParcelado, setIsParcelado] = useState(false);
   const [parcelarCondicao, setParcelarCondicao] = useState<string>('1x');
   const [parcelarOpen, setParcelarOpen] = useState(false);
+  const lastEmpresaIdRef = useRef<string | null>(activeEmpresaId);
+  const empresaChanged = lastEmpresaIdRef.current !== activeEmpresaId;
+  const actionTokenRef = useRef(0);
+  const isStaleAction = useCallback(
+    (token: number, empresaSnapshot: string | null) =>
+      token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current,
+    []
+  );
 
   const valorProps = useNumericField(formData.valor, (value) => handleFormChange('valor', value));
 
   useEffect(() => {
+    const prevEmpresaId = lastEmpresaIdRef.current;
+    if (prevEmpresaId === activeEmpresaId) return;
+    actionTokenRef.current += 1;
+    setIsSaving(false);
+    setIsLoadingRecebimentos(false);
+    setRecebimentos([]);
+    setParcelarOpen(false);
+    setRecApplyOpen(false);
+    setIsEstornoRecebimentoOpen(false);
+    setRecebimentoToReverse(null);
+    lastEmpresaIdRef.current = activeEmpresaId;
+  }, [activeEmpresaId]);
+
+  useEffect(() => {
+    if (authLoading || !activeEmpresaId || empresaChanged) return;
+    const token = ++actionTokenRef.current;
+    const empresaSnapshot = activeEmpresaId;
     if (conta) {
       setFormData(conta);
       if (conta.cliente_id) {
-        getPartnerDetails(conta.cliente_id).then(partner => {
-          if (partner) setClienteName(partner.nome);
-        });
+        getPartnerDetails(conta.cliente_id)
+          .then((partner) => {
+            if (isStaleAction(token, empresaSnapshot)) return;
+            if (partner) setClienteName(partner.nome);
+          })
+          .catch(() => {
+            if (isStaleAction(token, empresaSnapshot)) return;
+            setClienteName('');
+          });
       } else {
         setClienteName('');
       }
@@ -96,32 +129,35 @@ const ContasAReceberFormPanel: React.FC<ContasAReceberFormPanelProps> = ({ conta
       setIsParcelado(false);
       setParcelarCondicao('1x');
     }
-  }, [conta]);
+  }, [activeEmpresaId, authLoading, conta, empresaChanged, isStaleAction]);
 
   useEffect(() => {
     const contaId = String(conta?.id || '');
-    if (!contaId) {
+    if (authLoading || !activeEmpresaId || empresaChanged || !contaId) {
       setRecebimentos([]);
+      setIsLoadingRecebimentos(false);
       return;
     }
 
+    const token = ++actionTokenRef.current;
+    const empresaSnapshot = activeEmpresaId;
     let cancelled = false;
     void (async () => {
       setIsLoadingRecebimentos(true);
       try {
         const list = await listContaAReceberRecebimentos(contaId);
-        if (!cancelled) setRecebimentos(list);
+        if (!cancelled && !isStaleAction(token, empresaSnapshot)) setRecebimentos(list);
       } catch (e: any) {
-        if (!cancelled) addToast(e?.message || 'Erro ao carregar recebimentos.', 'error');
+        if (!cancelled && !isStaleAction(token, empresaSnapshot)) addToast(e?.message || 'Erro ao carregar recebimentos.', 'error');
       } finally {
-        if (!cancelled) setIsLoadingRecebimentos(false);
+        if (!cancelled && !isStaleAction(token, empresaSnapshot)) setIsLoadingRecebimentos(false);
       }
     })();
 
     return () => {
       cancelled = true;
     };
-  }, [addToast, conta?.id]);
+  }, [activeEmpresaId, addToast, authLoading, conta?.id, empresaChanged, isStaleAction]);
 
   const handleFormChange = (field: keyof ContaAReceber | 'centro_de_custo_id', value: any) => {
     setFormData((prev: Partial<ContaAReceber>) => ({ ...(prev as any), [field]: value } as any));
@@ -163,6 +199,8 @@ const ContasAReceberFormPanel: React.FC<ContasAReceberFormPanelProps> = ({ conta
       return;
     }
 
+    const token = ++actionTokenRef.current;
+    const empresaSnapshot = activeEmpresaId;
     const patch = buildRecorrenciaPatch();
     setIsSaving(true);
     try {
@@ -172,6 +210,7 @@ const ContasAReceberFormPanel: React.FC<ContasAReceberFormPanelProps> = ({ conta
         patch,
       });
 
+      if (isStaleAction(token, empresaSnapshot)) return;
       if (!result?.ok) {
         addToast('Não foi possível aplicar a alteração na recorrência.', 'error');
         return;
@@ -184,26 +223,36 @@ const ContasAReceberFormPanel: React.FC<ContasAReceberFormPanelProps> = ({ conta
       addToast(msg, 'success');
 
       const refreshed = await getContaAReceberDetails(String(conta?.id));
+      if (isStaleAction(token, empresaSnapshot)) return;
       onSaveSuccess(refreshed);
     } catch (e: any) {
+      if (isStaleAction(token, empresaSnapshot)) return;
       addToast(e?.message || 'Erro ao aplicar alteração na recorrência.', 'error');
     } finally {
+      if (isStaleAction(token, empresaSnapshot)) return;
       setIsSaving(false);
     }
   };
 
   const handleSave = async () => {
+    if (authLoading || !activeEmpresaId || empresaChanged) {
+      addToast('Aguarde a troca de empresa concluir para salvar.', 'info');
+      return;
+    }
     if (!formData.descricao || !formData.data_vencimento || !formData.valor) {
       addToast('Descrição, Data de Vencimento e Valor são obrigatórios.', 'error');
       return;
     }
 
     try {
+      const token = ++actionTokenRef.current;
+      const empresaSnapshot = activeEmpresaId;
       if (!isEditing && !isRecorrente && isParcelado) {
         if (!formData.cliente_id) {
           addToast('Cliente é obrigatório para parcelar.', 'error');
           return;
         }
+        if (isStaleAction(token, empresaSnapshot)) return;
         setParcelarOpen(true);
         return;
       }
@@ -231,12 +280,14 @@ const ContasAReceberFormPanel: React.FC<ContasAReceberFormPanelProps> = ({ conta
         };
 
         const rec = await upsertRecorrencia(payload);
+        if (isStaleAction(token, empresaSnapshot)) return;
         const gen = await generateRecorrencia({
           recorrenciaId: rec.id,
           until: hasEndDate ? (endDate || null) : null,
           max: Math.max(1, Math.min(240, Number(gerarN) || 12)),
         });
 
+        if (isStaleAction(token, empresaSnapshot)) return;
         addToast(`Recorrência criada. Contas geradas: ${gen.contas_geradas ?? 0}.`, 'success');
         onSaveSuccess();
         return;
@@ -250,14 +301,75 @@ const ContasAReceberFormPanel: React.FC<ContasAReceberFormPanelProps> = ({ conta
 
       setIsSaving(true);
       const savedConta = await saveContaAReceber(formData);
+      if (isStaleAction(token, empresaSnapshot)) return;
       addToast('Conta a receber salva com sucesso!', 'success');
       onSaveSuccess(savedConta);
     } catch (error: any) {
+      if (activeEmpresaId !== lastEmpresaIdRef.current) return;
       addToast(error.message, 'error');
     } finally {
+      if (activeEmpresaId !== lastEmpresaIdRef.current) return;
       setIsSaving(false);
     }
   };
+
+  const handleParcelamentoConfirm = useCallback(async ({ condicao, baseDateISO }: { condicao: string; baseDateISO: string }) => {
+    const clienteId = String(formData.cliente_id || '');
+    if (!clienteId) throw new Error('Cliente é obrigatório para parcelar.');
+
+    const token = ++actionTokenRef.current;
+    const empresaSnapshot = activeEmpresaId;
+    const res = await createParcelamentoContasAReceber({
+      clienteId,
+      descricao: String(formData.descricao || ''),
+      total: Number(formData.valor || 0),
+      condicao,
+      baseDateISO,
+      centroDeCustoId: ((formData as any).centro_de_custo_id ?? null) as any,
+      observacoes: ((formData as any).observacoes ?? null) as any,
+    });
+    if (isStaleAction(token, empresaSnapshot)) return;
+    if (!res?.ok) throw new Error('Não foi possível gerar as parcelas.');
+    addToast(`Parcelamento gerado: ${res.count ?? 0} título(s).`, 'success');
+    onSaveSuccess();
+    onClose();
+  }, [activeEmpresaId, addToast, formData, isStaleAction, onClose, onSaveSuccess]);
+
+  const handleEstornoConfirm = useCallback(async ({ contaCorrenteId, dataISO, motivo }: { contaCorrenteId: string | null; dataISO: string; motivo: string }) => {
+    if (!recebimentoToReverse?.id) return;
+    const token = ++actionTokenRef.current;
+    const empresaSnapshot = activeEmpresaId;
+    setIsSaving(true);
+    try {
+      const updated = await estornarContaAReceberRecebimento({
+        recebimentoId: recebimentoToReverse.id,
+        dataEstorno: dataISO,
+        contaCorrenteId,
+        motivo,
+      });
+      if (isStaleAction(token, empresaSnapshot)) return;
+      addToast('Estorno registrado com sucesso!', 'success');
+
+      const nextContaId = String((updated as any)?.id ?? conta?.id ?? '');
+      if (nextContaId) {
+        const list = await listContaAReceberRecebimentos(nextContaId);
+        if (isStaleAction(token, empresaSnapshot)) return;
+        setRecebimentos(list);
+      }
+      setFormData((prev) => ({ ...prev, ...updated }));
+      onMutate?.();
+
+      setIsEstornoRecebimentoOpen(false);
+      setRecebimentoToReverse(null);
+    } catch (e: any) {
+      if (isStaleAction(token, empresaSnapshot)) return;
+      addToast(e?.message || 'Erro ao estornar recebimento.', 'error');
+      throw e;
+    } finally {
+      if (isStaleAction(token, empresaSnapshot)) return;
+      setIsSaving(false);
+    }
+  }, [activeEmpresaId, addToast, conta?.id, isStaleAction, onMutate, recebimentoToReverse?.id]);
 
   return (
     <div className="flex flex-col h-full">
@@ -269,23 +381,7 @@ const ContasAReceberFormPanel: React.FC<ContasAReceberFormPanelProps> = ({ conta
         defaultCondicao={parcelarCondicao}
         defaultBaseDateISO={String(formData.data_vencimento || '').slice(0, 10) || new Date().toISOString().slice(0, 10)}
         confirmText="Gerar parcelas"
-        onConfirm={async ({ condicao, baseDateISO }) => {
-          const clienteId = String(formData.cliente_id || '');
-          if (!clienteId) throw new Error('Cliente é obrigatório para parcelar.');
-          const res = await createParcelamentoContasAReceber({
-            clienteId,
-            descricao: String(formData.descricao || ''),
-            total: Number(formData.valor || 0),
-            condicao,
-            baseDateISO,
-            centroDeCustoId: ((formData as any).centro_de_custo_id ?? null) as any,
-            observacoes: ((formData as any).observacoes ?? null) as any,
-          });
-          if (!res?.ok) throw new Error('Não foi possível gerar as parcelas.');
-          addToast(`Parcelamento gerado: ${res.count ?? 0} título(s).`, 'success');
-          onSaveSuccess();
-          onClose();
-        }}
+        onConfirm={handleParcelamentoConfirm}
       />
       <RecorrenciaApplyScopeDialog
         open={recApplyOpen}
@@ -552,40 +648,12 @@ const ContasAReceberFormPanel: React.FC<ContasAReceberFormPanelProps> = ({ conta
 	            : 'Estornar recebimento?'
 	        }
 	        confirmLabel="Estornar"
-	        onConfirm={async ({ contaCorrenteId, dataISO, motivo }) => {
-	          if (!recebimentoToReverse?.id) return;
-	          setIsSaving(true);
-	          try {
-	            const updated = await estornarContaAReceberRecebimento({
-	              recebimentoId: recebimentoToReverse.id,
-	              dataEstorno: dataISO,
-	              contaCorrenteId,
-	              motivo,
-	            });
-	            addToast('Estorno registrado com sucesso!', 'success');
-
-	            const nextContaId = String((updated as any)?.id ?? conta?.id ?? '');
-	            if (nextContaId) {
-	              const list = await listContaAReceberRecebimentos(nextContaId);
-	              setRecebimentos(list);
-	            }
-	            setFormData((prev) => ({ ...prev, ...updated }));
-	            onMutate?.();
-
-	            setIsEstornoRecebimentoOpen(false);
-	            setRecebimentoToReverse(null);
-	          } catch (e: any) {
-	            addToast(e?.message || 'Erro ao estornar recebimento.', 'error');
-	            throw e;
-	          } finally {
-	            setIsSaving(false);
-	          }
-	        }}
+	        onConfirm={handleEstornoConfirm}
 	      />
 	      <footer className="flex-shrink-0 p-4 flex justify-end items-center border-t border-white/20">
 	        <div className="flex gap-3">
 	          <button type="button" onClick={onClose} className="rounded-md border border-gray-300 bg-white py-2 px-4 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50">Cancelar</button>
-	          <button onClick={handleSave} disabled={isSaving} className="flex items-center gap-2 bg-blue-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50">
+	          <button onClick={handleSave} disabled={isSaving || authLoading || !activeEmpresaId || empresaChanged} className="flex items-center gap-2 bg-blue-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50">
 	            {isSaving ? <Loader2 className="animate-spin" size={20} /> : <Save size={20} />}
 	            Salvar Conta
 	          </button>
