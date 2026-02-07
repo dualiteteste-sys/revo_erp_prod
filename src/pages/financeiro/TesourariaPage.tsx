@@ -72,6 +72,7 @@ export default function TesourariaPage() {
   const [isMovFormOpen, setIsMovFormOpen] = useState(false);
   const [selectedMov, setSelectedMov] = useState<Movimentacao | null>(null);
   const [editingMovId, setEditingMovId] = useState<string | null>(null);
+  const [movReadOnly, setMovReadOnly] = useState(false);
   const [movToDelete, setMovToDelete] = useState<Movimentacao | null>(null);
 
   // --- Extratos State ---
@@ -131,22 +132,24 @@ export default function TesourariaPage() {
   }, [clearOpenParam, contasEditLock, editingContaId]);
 
   const handleEditMov = useCallback(async (m: Movimentacao) => {
-    // movimento conciliado não pode ser editado
-    if (m.conciliado) return;
+    const readOnly = Boolean(m.conciliado);
+    setMovReadOnly(readOnly);
 
-    const claimed = await movEditLock.claim(m.id, {
-      confirmConflict: async () =>
-        confirm({
-          title: 'Esta movimentação já está aberta em outra aba',
-          description: 'Para evitar edição concorrente, abra em apenas uma aba. Deseja abrir mesmo assim nesta aba?',
-          confirmText: 'Abrir mesmo assim',
-          cancelText: 'Cancelar',
-          variant: 'danger',
-        }),
-    });
-    if (!claimed) {
-      clearOpenParam();
-      return;
+    if (!readOnly) {
+      const claimed = await movEditLock.claim(m.id, {
+        confirmConflict: async () =>
+          confirm({
+            title: 'Esta movimentação já está aberta em outra aba',
+            description: 'Para evitar edição concorrente, abra em apenas uma aba. Deseja abrir mesmo assim nesta aba?',
+            confirmText: 'Abrir mesmo assim',
+            cancelText: 'Cancelar',
+            variant: 'danger',
+          }),
+      });
+      if (!claimed) {
+        clearOpenParam();
+        return;
+      }
     }
 
     setSelectedMov(m);
@@ -157,10 +160,11 @@ export default function TesourariaPage() {
   const closeMovForm = useCallback(() => {
     setIsMovFormOpen(false);
     setSelectedMov(null);
+    setMovReadOnly(false);
     clearOpenParam();
-    if (editingMovId) movEditLock.release(editingMovId);
+    if (editingMovId && !movReadOnly) movEditLock.release(editingMovId);
     setEditingMovId(null);
-  }, [clearOpenParam, editingMovId, movEditLock]);
+  }, [clearOpenParam, editingMovId, movEditLock, movReadOnly]);
 
   useEffect(() => {
     const prevEmpresaId = lastEmpresaIdRef.current;
@@ -301,6 +305,7 @@ export default function TesourariaPage() {
         addToast('Selecione uma conta corrente primeiro.', 'warning');
         return;
     }
+    setMovReadOnly(false);
     setSelectedMov(null);
     setIsMovFormOpen(true);
   };
@@ -375,7 +380,23 @@ export default function TesourariaPage() {
         if (res.kind === 'deleted_movimentacao') {
           addToast(res.message || 'Conciliação revertida e movimentação removida.', 'success');
         } else if (res.kind === 'unlinked_only') {
-          addToast(res.message || 'Vínculo removido. A movimentação foi mantida.', 'warning');
+          addToast(res.message || 'Vínculo removido. A movimentação foi mantida.', 'warning', {
+            title: 'Reversão parcial',
+            durationMs: 9000,
+            action: res.movimentacao_id
+              ? {
+                  label: 'Abrir movimentação',
+                  ariaLabel: 'Abrir movimentação para estornar ou ajustar',
+                  onClick: () => {
+                    const next = new URLSearchParams(searchParams);
+                    next.set('tab', 'movimentos');
+                    next.set('open', res.movimentacao_id!);
+                    setActiveTab('movimentos');
+                    setSearchParams(next);
+                  },
+                }
+              : undefined,
+          });
         } else {
           addToast(res.message || 'Nada para reverter.', 'info');
         }
@@ -741,12 +762,17 @@ export default function TesourariaPage() {
         />
       </Modal>
 
-      <Modal isOpen={isMovFormOpen} onClose={closeMovForm} title={selectedMov ? 'Editar Movimentação' : 'Nova Movimentação'}>
+      <Modal
+        isOpen={isMovFormOpen}
+        onClose={closeMovForm}
+        title={selectedMov ? (movReadOnly ? 'Movimentação (leitura)' : 'Editar Movimentação') : 'Nova Movimentação'}
+      >
         <MovimentacaoFormPanel 
             movimentacao={selectedMov} 
             contaCorrenteId={selectedContaId!}
             onSaveSuccess={() => { closeMovForm(); refreshMov(); refreshContas(); }} 
             onClose={closeMovForm} 
+            readOnly={movReadOnly}
         />
       </Modal>
 

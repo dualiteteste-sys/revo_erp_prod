@@ -13,11 +13,12 @@ import CentroDeCustoDropdown from '@/components/common/CentroDeCustoDropdown';
 interface Props {
   movimentacao: Movimentacao | null;
   contaCorrenteId: string;
+  readOnly?: boolean;
   onSaveSuccess: () => void;
   onClose: () => void;
 }
 
-export default function MovimentacaoFormPanel({ movimentacao, contaCorrenteId, onSaveSuccess, onClose }: Props) {
+export default function MovimentacaoFormPanel({ movimentacao, contaCorrenteId, readOnly, onSaveSuccess, onClose }: Props) {
   const { addToast } = useToast();
   const [isSaving, setIsSaving] = useState(false);
   const [formData, setFormData] = useState<MovimentacaoPayload>({
@@ -37,10 +38,15 @@ export default function MovimentacaoFormPanel({ movimentacao, contaCorrenteId, o
   }, [movimentacao]);
 
   const handleChange = (field: keyof MovimentacaoPayload, value: any) => {
+    if (readOnly) return;
     setFormData(prev => ({ ...prev, [field]: value }));
   };
 
   const handleSave = async () => {
+    if (readOnly) {
+      addToast('Esta movimentação não pode ser editada aqui.', 'info');
+      return;
+    }
     if (!formData.valor || formData.valor <= 0) {
       addToast('O valor deve ser maior que zero.', 'error');
       return;
@@ -65,6 +71,21 @@ export default function MovimentacaoFormPanel({ movimentacao, contaCorrenteId, o
   return (
     <div className="flex flex-col h-full">
       <div className="flex-grow p-6 overflow-y-auto scrollbar-styled">
+        {readOnly ? (
+          <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+            <div className="font-semibold">Movimentação em modo leitura</div>
+            <div className="mt-1">
+              Esta movimentação está conciliada ou foi gerada por outro fluxo. Para corrigir saldo/baixa, faça o estorno/ajuste no módulo de origem.
+            </div>
+            {(formData.origem_tipo || formData.origem_id) ? (
+              <div className="mt-2 text-xs text-amber-900/90">
+                <span className="font-medium">Origem:</span>{' '}
+                {formData.origem_tipo ?? '—'}
+                {formData.origem_id ? ` (${formData.origem_id})` : ''}
+              </div>
+            ) : null}
+          </div>
+        ) : null}
         <Section title="Dados da Movimentação" description="Registre uma entrada ou saída manual.">
           <div className="sm:col-span-2">
             <Select 
@@ -72,6 +93,7 @@ export default function MovimentacaoFormPanel({ movimentacao, contaCorrenteId, o
                 name="tipo" 
                 value={formData.tipo_mov} 
                 onChange={e => handleChange('tipo_mov', e.target.value)}
+                disabled={readOnly}
             >
                 <option value="entrada">Entrada (Crédito)</option>
                 <option value="saida">Saída (Débito)</option>
@@ -85,6 +107,7 @@ export default function MovimentacaoFormPanel({ movimentacao, contaCorrenteId, o
             inputMode="numeric"
             {...valorProps}
             className="sm:col-span-2"
+            disabled={readOnly}
           />
 
           <Input 
@@ -94,6 +117,7 @@ export default function MovimentacaoFormPanel({ movimentacao, contaCorrenteId, o
             value={formData.data_movimento || ''} 
             onChange={e => handleChange('data_movimento', e.target.value)} 
             className="sm:col-span-2" 
+            disabled={readOnly}
           />
 
           <Input 
@@ -103,6 +127,7 @@ export default function MovimentacaoFormPanel({ movimentacao, contaCorrenteId, o
             onChange={e => handleChange('descricao', e.target.value)} 
             required 
             className="sm:col-span-6" 
+            disabled={readOnly}
           />
 
           <Input 
@@ -112,6 +137,7 @@ export default function MovimentacaoFormPanel({ movimentacao, contaCorrenteId, o
             onChange={e => handleChange('categoria', e.target.value)} 
             className="sm:col-span-3" 
             placeholder="Ex: Tarifas, Ajustes, Suprimentos"
+            disabled={readOnly}
           />
 
           <div className="sm:col-span-3">
@@ -124,6 +150,7 @@ export default function MovimentacaoFormPanel({ movimentacao, contaCorrenteId, o
                 handleChange('centro_custo', name ?? null);
               }}
               placeholder="Selecionar…"
+              disabled={readOnly}
             />
             <div className="text-[11px] text-gray-500 mt-1">
               Usado em relatórios e auditoria. Se vazio, fica “sem centro”.
@@ -136,6 +163,7 @@ export default function MovimentacaoFormPanel({ movimentacao, contaCorrenteId, o
             value={formData.documento_ref || ''} 
             onChange={e => handleChange('documento_ref', e.target.value)} 
             className="sm:col-span-2" 
+            disabled={readOnly}
           />
 
           <TextArea 
@@ -145,17 +173,20 @@ export default function MovimentacaoFormPanel({ movimentacao, contaCorrenteId, o
             onChange={e => handleChange('observacoes', e.target.value)} 
             rows={3} 
             className="sm:col-span-6" 
+            disabled={readOnly}
           />
         </Section>
       </div>
 
       <footer className="flex-shrink-0 p-4 flex justify-end items-center border-t border-white/20 bg-gray-50">
         <div className="flex gap-3">
-          <Button variant="outline" onClick={onClose}>Cancelar</Button>
-          <Button onClick={handleSave} disabled={isSaving} className="gap-2">
-            {isSaving ? <Loader2 className="animate-spin" size={18} /> : <Save size={18} />}
-            Salvar
-          </Button>
+          <Button variant="outline" onClick={onClose}>{readOnly ? 'Fechar' : 'Cancelar'}</Button>
+          {!readOnly ? (
+            <Button onClick={handleSave} disabled={isSaving} className="gap-2">
+              {isSaving ? <Loader2 className="animate-spin" size={18} /> : <Save size={18} />}
+              Salvar
+            </Button>
+          ) : null}
         </div>
       </footer>
     </div>
