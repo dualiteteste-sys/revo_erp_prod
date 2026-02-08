@@ -15,6 +15,7 @@ import Input from '@/components/ui/forms/Input';
 import Select from '@/components/ui/forms/Select';
 import TextArea from '@/components/ui/forms/TextArea';
 import Toggle from '@/components/ui/forms/Toggle';
+import { useAuth } from '@/contexts/AuthProvider';
 
 interface Props {
   centro: CentroTrabalho | null;
@@ -24,6 +25,7 @@ interface Props {
 
 export default function CentroTrabalhoFormPanel({ centro, onSaveSuccess, onClose }: Props) {
   const { addToast } = useToast();
+  const { loading: authLoading, activeEmpresaId } = useAuth();
   const [isSaving, setIsSaving] = useState(false);
   const [calendarLoading, setCalendarLoading] = useState(false);
   const [apsConfigLoading, setApsConfigLoading] = useState(false);
@@ -35,6 +37,9 @@ export default function CentroTrabalhoFormPanel({ centro, onSaveSuccess, onClose
   const [calendarHours, setCalendarHours] = useState<number[]>(() => Array.from({ length: 7 }).map(() => 0));
   const [calendarDirty, setCalendarDirty] = useState(false);
   const [freezeDias, setFreezeDias] = useState<number>(0);
+  const lastEmpresaIdRef = React.useRef<string | null>(activeEmpresaId);
+  const empresaChanged = lastEmpresaIdRef.current !== activeEmpresaId;
+  const actionTokenRef = React.useRef(0);
 
   const DOW_LABELS = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
 
@@ -50,6 +55,17 @@ export default function CentroTrabalhoFormPanel({ centro, onSaveSuccess, onClose
   }, [centro]);
 
   useEffect(() => {
+    const prevEmpresaId = lastEmpresaIdRef.current;
+    if (prevEmpresaId === activeEmpresaId) return;
+    actionTokenRef.current += 1;
+    setIsSaving(false);
+    setCalendarLoading(false);
+    setApsConfigLoading(false);
+    lastEmpresaIdRef.current = activeEmpresaId;
+  }, [activeEmpresaId]);
+
+  useEffect(() => {
+    if (authLoading || !activeEmpresaId || empresaChanged) return;
     if (!centro?.id) {
       const base = Number(centro?.capacidade_horas_dia ?? formData.capacidade_horas_dia ?? 8) || 8;
       applyDefaultCalendar(base);
@@ -58,9 +74,12 @@ export default function CentroTrabalhoFormPanel({ centro, onSaveSuccess, onClose
       return;
     }
 
+    const token = ++actionTokenRef.current;
+    const empresaSnapshot = activeEmpresaId;
     setCalendarLoading(true);
     getCentroCalendarioSemanal(centro.id)
       .then((rows) => {
+        if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
         if (!rows?.length) {
           const base = Number(centro.capacidade_horas_dia ?? 8) || 8;
           applyDefaultCalendar(base);
@@ -75,17 +94,30 @@ export default function CentroTrabalhoFormPanel({ centro, onSaveSuccess, onClose
         setCalendarDirty(false);
       })
       .catch((e: any) => {
+        if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
         addToast(e?.message || 'Não foi possível carregar o calendário do centro.', 'error');
       })
-      .finally(() => setCalendarLoading(false));
+      .finally(() => {
+        if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
+        setCalendarLoading(false);
+      });
 
     setApsConfigLoading(true);
     getCentroApsConfig(centro.id)
-      .then((cfg) => setFreezeDias(Number(cfg?.freeze_dias ?? 0) || 0))
-      .catch((e: any) => addToast(e?.message || 'Não foi possível carregar as configurações APS.', 'error'))
-      .finally(() => setApsConfigLoading(false));
+      .then((cfg) => {
+        if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
+        setFreezeDias(Number(cfg?.freeze_dias ?? 0) || 0);
+      })
+      .catch((e: any) => {
+        if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
+        addToast(e?.message || 'Não foi possível carregar as configurações APS.', 'error');
+      })
+      .finally(() => {
+        if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
+        setApsConfigLoading(false);
+      });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [centro?.id]);
+  }, [activeEmpresaId, authLoading, centro?.id, empresaChanged]);
 
   const handleChange = (field: keyof CentroTrabalhoPayload, value: any) => {
     setFormData(prev => ({ ...prev, [field]: value }));
@@ -101,26 +133,36 @@ export default function CentroTrabalhoFormPanel({ centro, onSaveSuccess, onClose
   }, [formData.capacidade_horas_dia]);
 
   const handleSave = async () => {
+    if (authLoading || !activeEmpresaId || empresaChanged) {
+      addToast('Aguarde a troca de empresa concluir para salvar.', 'info');
+      return;
+    }
     if (!formData.nome) {
       addToast('O nome é obrigatório.', 'error');
       return;
     }
 
+    const token = ++actionTokenRef.current;
+    const empresaSnapshot = activeEmpresaId;
     setIsSaving(true);
     try {
       const saved = await saveCentroTrabalho(formData);
+      if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
       if (saved?.id) {
         await upsertCentroCalendarioSemanal(
           saved.id,
           calendarHours.map((capacidade_horas, dow) => ({ dow, capacidade_horas }))
         );
         await upsertCentroApsConfig(saved.id, freezeDias);
+        if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
       }
       addToast('Centro de trabalho salvo com sucesso!', 'success');
       onSaveSuccess();
     } catch (e: any) {
+      if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
       addToast(e.message, 'error');
     } finally {
+      if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
       setIsSaving(false);
     }
   };
@@ -314,7 +356,7 @@ export default function CentroTrabalhoFormPanel({ centro, onSaveSuccess, onClose
           </button>
           <button
             onClick={handleSave}
-            disabled={isSaving || calendarLoading || apsConfigLoading}
+            disabled={isSaving || calendarLoading || apsConfigLoading || authLoading || !activeEmpresaId || empresaChanged}
             className="flex items-center gap-2 bg-blue-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-blue-700 disabled:opacity-50"
           >
             {isSaving ? <Loader2 className="animate-spin" size={20} /> : <Save size={20} />}
