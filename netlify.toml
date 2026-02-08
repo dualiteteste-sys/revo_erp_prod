@@ -1,17 +1,17 @@
 [build]
-    command = "npm install && npm run build"
+  command = "corepack enable && yarn install --immutable && yarn build"
   publish = "dist"
   base = "/"
-  ignore = "false"  # Never skip build
-  force = "true"    # Force build even if no changes detected
+  # Skip Netlify-side build when commit doesn't touch frontend/runtime files.
+  # Note: GitHub Actions deploy pipeline remains the source of truth.
+  ignore = "bash scripts/netlify_ignore.sh"
 
 [build.environment]
-  NODE_VERSION = "18"
-  CI = "true"       # Ensure we're in CI mode
-  NETLIFY_BUILD_SKIP = "false"  # Never skip build
+  NODE_VERSION = "20"
+  CI = "true"
 
 [build.processing]
-  skip_processing = false  # Ensure processing is not skipped
+  skip_processing = false
 
 [dev]
   command = "vite"
