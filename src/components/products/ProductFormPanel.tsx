@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { AlertTriangle, Loader2, Save } from 'lucide-react';
 import { Database } from '../../types/database.types';
 import { useToast } from '../../contexts/ToastProvider';
@@ -11,6 +11,7 @@ import VariacoesTab from './form-tabs/VariacoesTab';
 import PrecosTab from './form-tabs/PrecosTab';
 import { normalizeProductPayload } from '@/services/products.normalize';
 import { validatePackaging } from '@/services/products.validate';
+import { useAuth } from '@/contexts/AuthProvider';
 
 export type ProductFormData = Partial<Database['public']['Tables']['produtos']['Row']>;
 
@@ -30,10 +31,14 @@ const tabs = ['Dados Gerais', 'Variações', 'Preço por Quantidade', 'Dados Com
 
 const ProductFormPanel: React.FC<ProductFormPanelProps> = ({ product, initialValues, onSaveSuccess, onClose, saveProduct }) => {
   const { addToast } = useToast();
+  const { loading: authLoading, activeEmpresaId } = useAuth();
   const [formData, setFormData] = useState<ProductFormData>({});
   const [activeTab, setActiveTab] = useState(tabs[0]);
   const [isSaving, setIsSaving] = useState(false);
   const [errors, setErrors] = useState<FormErrors>({});
+  const lastEmpresaIdRef = useRef<string | null>(activeEmpresaId);
+  const empresaChanged = lastEmpresaIdRef.current !== activeEmpresaId;
+  const actionTokenRef = useRef(0);
 
   useEffect(() => {
     if (product) {
@@ -59,6 +64,15 @@ const ProductFormPanel: React.FC<ProductFormPanelProps> = ({ product, initialVal
       setFormData({ ...base, ...(initialValues || {}) });
     }
   }, [product, initialValues]);
+
+  useEffect(() => {
+    const prevEmpresaId = lastEmpresaIdRef.current;
+    if (prevEmpresaId === activeEmpresaId) return;
+    actionTokenRef.current += 1;
+    setIsSaving(false);
+    setActiveTab(tabs[0]);
+    lastEmpresaIdRef.current = activeEmpresaId;
+  }, [activeEmpresaId]);
 
   useEffect(() => {
     const newErrors: FormErrors = {};
@@ -94,6 +108,10 @@ const ProductFormPanel: React.FC<ProductFormPanelProps> = ({ product, initialVal
   }, [visibleTabs, activeTab]);
 
   const handleSave = async () => {
+    if (authLoading || !activeEmpresaId || empresaChanged) {
+      addToast('Aguarde a troca de empresa concluir para salvar.', 'info');
+      return;
+    }
     if (Object.keys(errors).length > 0) {
       addToast('Por favor, corrija os erros no formulário.', 'warning');
       setActiveTab('Dados Gerais');
@@ -112,13 +130,17 @@ const ProductFormPanel: React.FC<ProductFormPanelProps> = ({ product, initialVal
       }
     }
 
+    const token = ++actionTokenRef.current;
+    const empresaSnapshot = activeEmpresaId;
     setIsSaving(true);
     try {
       const savedProduct = await saveProduct(formData);
+      if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
       addToast(`${isService ? 'Serviço' : 'Produto'} salvo com sucesso!`, 'success');
       setFormData(savedProduct);
       onSaveSuccess(savedProduct);
     } catch (error: any) {
+      if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
       console.error(error);
       if (error.code === 'CLIENT_VALIDATION') {
         addToast(error.message.replace('[VALIDATION] ', ''), 'warning');
@@ -127,6 +149,7 @@ const ProductFormPanel: React.FC<ProductFormPanelProps> = ({ product, initialVal
         addToast(error.message || `Erro ao salvar o ${isService ? 'serviço' : 'produto'}`, 'error');
       }
     } finally {
+      if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
       setIsSaving(false);
     }
   };
@@ -195,7 +218,7 @@ const ProductFormPanel: React.FC<ProductFormPanelProps> = ({ product, initialVal
           </button>
           <button
             onClick={handleSave}
-            disabled={isSaveDisabled}
+            disabled={isSaveDisabled || authLoading || !activeEmpresaId || empresaChanged}
             className="flex items-center gap-2 bg-blue-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-blue-700 transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed"
           >
             {isSaving ? <Loader2 className="animate-spin" size={20} /> : <Save size={20} />}
