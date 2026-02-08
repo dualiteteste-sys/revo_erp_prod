@@ -26,6 +26,17 @@ export const RolesList: React.FC<RolesListProps> = ({ selectedRoleId, onSelectRo
     return <div className="p-4 text-red-500">Erro ao carregar papéis.</div>;
   }
 
+  if ((roles ?? []).length === 0) {
+    return (
+      <aside className="w-full md:w-64 p-4 flex-shrink-0 bg-gray-50/50 rounded-2xl">
+        <h2 className="text-lg font-semibold text-gray-800 mb-2">Papéis</h2>
+        <p className="text-sm text-gray-600">
+          Nenhum papel foi carregado. Isso normalmente indica RBAC inconsistente (papel do usuário não reconhecido) ou drift de migrations.
+        </p>
+      </aside>
+    );
+  }
+
   return (
     <aside className="w-full md:w-64 p-4 flex-shrink-0 bg-gray-50/50 rounded-2xl">
       <h2 className="text-lg font-semibold text-gray-800 mb-4">Papéis</h2>
