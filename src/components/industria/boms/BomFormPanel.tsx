@@ -16,6 +16,7 @@ import ResizableSortableTh from '@/components/ui/table/ResizableSortableTh';
 import TableColGroup from '@/components/ui/table/TableColGroup';
 import { useTableColumnWidths, type TableColumnWidthDef } from '@/components/ui/table/useTableColumnWidths';
 import WizardStepper from '@/components/ui/WizardStepper';
+import { useAuth } from '@/contexts/AuthProvider';
 // ... existing imports
 
 // Inside the component return
@@ -30,10 +31,14 @@ interface Props {
 
 export default function BomFormPanel({ bomId, initialData, onSaveSuccess, onClose }: Props) {
   const { addToast } = useToast();
+  const { loading: authLoading, activeEmpresaId } = useAuth();
   const [loading, setLoading] = useState(!!bomId);
   const [isSaving, setIsSaving] = useState(false);
   const [activeTab, setActiveTab] = useState<'dados' | 'componentes'>('dados');
   const [unidades, setUnidades] = useState<UnidadeMedida[]>([]);
+  const lastEmpresaIdRef = React.useRef<string | null>(activeEmpresaId);
+  const empresaChanged = lastEmpresaIdRef.current !== activeEmpresaId;
+  const actionTokenRef = React.useRef(0);
   const bomColumns: TableColumnWidthDef[] = [
     { id: 'produto', defaultWidth: 360, minWidth: 240 },
     { id: 'qtd', defaultWidth: 140, minWidth: 120 },
@@ -57,10 +62,27 @@ export default function BomFormPanel({ bomId, initialData, onSaveSuccess, onClos
   });
 
   useEffect(() => {
+    const prevEmpresaId = lastEmpresaIdRef.current;
+    if (prevEmpresaId === activeEmpresaId) return;
+    actionTokenRef.current += 1;
+    setIsSaving(false);
+    setLoading(false);
+    setUnidades([]);
+    lastEmpresaIdRef.current = activeEmpresaId;
+  }, [activeEmpresaId]);
+
+  useEffect(() => {
+    if (authLoading || !activeEmpresaId || empresaChanged) return;
+    const token = ++actionTokenRef.current;
+    const empresaSnapshot = activeEmpresaId;
     // Fetch units
     listUnidades()
-      .then(setUnidades)
+      .then((rows) => {
+        if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
+        setUnidades(rows);
+      })
       .catch((e: any) => {
+        if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
         logger.error('[Indústria][BOM] Falha ao carregar unidades', e);
         addToast(e?.message || 'Erro ao carregar unidades.', 'error');
       });
@@ -90,20 +112,26 @@ export default function BomFormPanel({ bomId, initialData, onSaveSuccess, onClos
       });
       setLoading(false);
     }
-  }, [bomId, initialData]);
+  }, [activeEmpresaId, addToast, authLoading, bomId, empresaChanged, initialData]);
 
   const loadDetails = async (id?: string) => {
+    if (authLoading || !activeEmpresaId || empresaChanged) return;
+    const token = ++actionTokenRef.current;
+    const empresaSnapshot = activeEmpresaId;
     const targetId = id || bomId || formData.id;
     if (!targetId) return;
 
     try {
       const data = await getBomDetails(targetId);
+      if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
       setFormData(data);
     } catch (e) {
+      if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
       logger.error('[Indústria][BOM] Falha ao carregar BOM', e, { bomId: targetId });
       addToast('Erro ao carregar BOM.', 'error');
       onClose();
     } finally {
+      if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
       setLoading(false);
     }
   };
@@ -119,11 +147,17 @@ export default function BomFormPanel({ bomId, initialData, onSaveSuccess, onClos
   };
 
   const handleSaveHeader = async () => {
+    if (authLoading || !activeEmpresaId || empresaChanged) {
+      addToast('Aguarde a troca de empresa concluir para salvar.', 'info');
+      return;
+    }
     if (!formData.produto_final_id) {
       addToast('Selecione um produto final.', 'error');
       return;
     }
 
+    const token = ++actionTokenRef.current;
+    const empresaSnapshot = activeEmpresaId;
     setIsSaving(true);
     try {
       const payload: BomPayload = {
@@ -142,6 +176,7 @@ export default function BomFormPanel({ bomId, initialData, onSaveSuccess, onClos
       };
 
       const saved = await saveBom(payload);
+      if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return undefined;
       setFormData(prev => ({ ...prev, ...saved }));
 
       if (!formData.id) {
@@ -154,9 +189,11 @@ export default function BomFormPanel({ bomId, initialData, onSaveSuccess, onClos
       }
       return saved.id;
     } catch (e: any) {
+      if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return undefined;
       addToast(e.message, 'error');
       return undefined;
     } finally {
+      if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return undefined;
       setIsSaving(false);
     }
   };
@@ -168,6 +205,9 @@ export default function BomFormPanel({ bomId, initialData, onSaveSuccess, onClos
 
   // --- Componentes ---
   const handleAddComponente = async (item: any) => {
+    if (authLoading || !activeEmpresaId || empresaChanged) return;
+    const token = ++actionTokenRef.current;
+    const empresaSnapshot = activeEmpresaId;
     let currentId = formData.id;
     if (!currentId) {
       currentId = await handleSaveHeader();
@@ -178,27 +218,39 @@ export default function BomFormPanel({ bomId, initialData, onSaveSuccess, onClos
       // Default to 'un' or first available unit if 'un' doesn't exist, though backend defaults too?
       const defaultUnit = item.unidade || 'un';
       await manageBomComponente(currentId!, null, item.id, 1, defaultUnit, 0, true, null, 'upsert');
+      if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
       await loadDetails(currentId!);
+      if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
       addToast('Componente adicionado.', 'success');
     } catch (e: any) {
+      if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
       addToast(e.message, 'error');
     }
   };
 
   const handleRemoveComponente = async (componenteId: string) => {
+    if (authLoading || !activeEmpresaId || empresaChanged) return;
+    const token = ++actionTokenRef.current;
+    const empresaSnapshot = activeEmpresaId;
     const item = formData.componentes?.find(c => c.id === componenteId);
     if (!item) return;
 
     try {
       await manageBomComponente(formData.id!, componenteId, item.produto_id, 0, '', 0, false, null, 'delete');
+      if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
       await loadDetails(formData.id!);
+      if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
       addToast('Componente removido.', 'success');
     } catch (e: any) {
+      if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
       addToast(e.message, 'error');
     }
   };
 
   const handleUpdateComponente = async (componenteId: string, field: keyof BomComponente, value: any) => {
+    if (authLoading || !activeEmpresaId || empresaChanged) return;
+    const token = ++actionTokenRef.current;
+    const empresaSnapshot = activeEmpresaId;
     // Immediate local update for responsiveness
     setFormData(prev => ({
       ...prev,
@@ -232,7 +284,9 @@ export default function BomFormPanel({ bomId, initialData, onSaveSuccess, onClos
         updates.observacoes || null,
         'upsert'
       );
+      if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
     } catch (e: any) {
+      if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
       addToast(e.message, 'error');
     }
   };
@@ -471,7 +525,7 @@ export default function BomFormPanel({ bomId, initialData, onSaveSuccess, onClos
           </button>
           <button
             onClick={handlePrimarySaveClick}
-            disabled={isSaving}
+            disabled={isSaving || authLoading || !activeEmpresaId || empresaChanged}
             className="flex items-center gap-2 bg-blue-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-blue-700 disabled:opacity-50"
           >
             {isSaving ? <Loader2 className="animate-spin" size={20} /> : <Save size={20} />}
