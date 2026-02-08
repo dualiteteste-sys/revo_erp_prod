@@ -43,7 +43,8 @@ export default function UserPermissionOverrides({ userId }: { userId: string }) 
   const { widths, startResize } = useTableColumnWidths({ tableId: `users:permission-overrides:${userId}`, columns });
 
   const permissionsQuery = useQuery({
-    queryKey: ['rbac', 'permissions'],
+    queryKey: ['rbac', 'permissions', empresaId],
+    enabled: !!empresaId,
     queryFn: async () => {
       const rows = await callRpc<PermissionRow[]>('roles_permissions_list');
       return (rows || []).map((p) => ({ id: p.id, module: p.module, action: p.action as PermissionRow['action'] }));
@@ -142,6 +143,14 @@ export default function UserPermissionOverrides({ userId }: { userId: string }) 
     return (
       <div className="text-sm text-red-600">
         Falha ao carregar permissões específicas.
+      </div>
+    );
+  }
+
+  if (grouped.length === 0) {
+    return (
+      <div className="text-sm text-gray-600">
+        Nenhuma permissão disponível para override. Em geral isso acontece quando o usuário atual não tem <strong>roles:manage</strong> ou o RBAC está inconsistente.
       </div>
     );
   }

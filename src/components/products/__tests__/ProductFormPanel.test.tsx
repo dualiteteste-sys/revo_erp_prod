@@ -1,7 +1,6 @@
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import ProductFormPanel from '../ProductFormPanel';
-import { ToastProvider } from '../../../contexts/ToastProvider';
 import * as ProdutoGruposService from '../../../services/produtoGrupos';
 import * as UnidadesService from '../../../services/unidades';
 
@@ -21,6 +20,10 @@ vi.mock('@/services/products.normalize', () => ({
 }));
 vi.mock('@/services/products.validate', () => ({
     validatePackaging: () => [] // Returns empty array = Valid
+}));
+
+vi.mock('@/contexts/AuthProvider', () => ({
+    useAuth: () => ({ loading: false, activeEmpresaId: 'empresa-1' }),
 }));
 
 describe('ProductFormPanel (Integration)', () => {
@@ -47,18 +50,14 @@ describe('ProductFormPanel (Integration)', () => {
     });
 
     it('validates required name field before saving', async () => {
-        render(
-            <ToastProvider>
-                <ProductFormPanel {...defaultProps} />
-            </ToastProvider>
-        );
+        render(<ProductFormPanel {...defaultProps} />);
 
-        // Click Save without filling anything
-        const saveButton = screen.getByRole('button', { name: /Salvar Produto/i });
-        fireEvent.click(saveButton);
-
-        // Expect validation error (From Component Logic)
+        // Expect validation error (real-time validation)
         expect(await screen.findByText('O nome do produto é obrigatório.')).toBeInTheDocument();
+
+        // Save should be disabled while invalid
+        const saveButton = screen.getByRole('button', { name: /Salvar Produto/i });
+        expect(saveButton).toHaveAttribute('disabled');
 
         // Ensure saveProduct was NOT called
         expect(mockSaveProduct).not.toHaveBeenCalled();
@@ -68,11 +67,7 @@ describe('ProductFormPanel (Integration)', () => {
         const savedProductMock = { id: 'prod-1', nome: 'Produto Real' };
         mockSaveProduct.mockResolvedValue(savedProductMock);
 
-        render(
-            <ToastProvider>
-                <ProductFormPanel {...defaultProps} />
-            </ToastProvider>
-        );
+        render(<ProductFormPanel {...defaultProps} />);
 
         // Fill Name (Select by Label)
         // Note: The Label includes "*"
@@ -85,6 +80,7 @@ describe('ProductFormPanel (Integration)', () => {
 
         // Click save
         const saveButton = screen.getByRole('button', { name: /Salvar Produto/i });
+        await waitFor(() => expect(saveButton).not.toHaveAttribute('disabled'));
         fireEvent.click(saveButton);
 
         await waitFor(() => {
@@ -102,11 +98,7 @@ describe('ProductFormPanel (Integration)', () => {
         // Mock a service product
         const serviceProduct: any = { tipo: 'servico', nome: 'Serviço X', id: 'srv-1', empresa_id: 'emp-1' };
 
-        render(
-            <ToastProvider>
-                <ProductFormPanel {...defaultProps} product={serviceProduct} />
-            </ToastProvider>
-        );
+        render(<ProductFormPanel {...defaultProps} product={serviceProduct} />);
 
         // Verify "Salvar Serviço" button
         expect(screen.getByRole('button', { name: /Salvar Serviço/i })).toBeInTheDocument();
