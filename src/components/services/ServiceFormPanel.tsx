@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Loader2, Save } from 'lucide-react';
 import { Service, createService, updateService } from '@/services/services';
 import { useToast } from '@/contexts/ToastProvider';
@@ -8,6 +8,7 @@ import TextArea from '../ui/forms/TextArea';
 import { useNumericField } from '@/hooks/useNumericField';
 import { Button } from '@/components/ui/button';
 import UnidadeMedidaSelect from '@/components/common/UnidadeMedidaSelect';
+import { useAuth } from '@/contexts/AuthProvider';
 
 interface ServiceFormPanelProps {
   service: Partial<Service> | null;
@@ -19,9 +20,13 @@ type ServiceFormTab = 'geral' | 'fiscal' | 'descricao' | 'obs';
 
 const ServiceFormPanel: React.FC<ServiceFormPanelProps> = ({ service, onSaveSuccess, onClose }) => {
   const { addToast } = useToast();
+  const { loading: authLoading, activeEmpresaId } = useAuth();
   const [isSaving, setIsSaving] = useState(false);
   const [formData, setFormData] = useState<Partial<Service>>({});
   const [activeTab, setActiveTab] = useState<ServiceFormTab>('geral');
+  const lastEmpresaIdRef = useRef<string | null>(activeEmpresaId);
+  const empresaChanged = lastEmpresaIdRef.current !== activeEmpresaId;
+  const actionTokenRef = useRef(0);
 
   const precoVendaProps = useNumericField(
     typeof formData.preco_venda === 'number' ? formData.preco_venda : undefined,
@@ -37,11 +42,24 @@ const ServiceFormPanel: React.FC<ServiceFormPanelProps> = ({ service, onSaveSucc
     setActiveTab('geral');
   }, [service]);
 
+  useEffect(() => {
+    const prevEmpresaId = lastEmpresaIdRef.current;
+    if (prevEmpresaId === activeEmpresaId) return;
+    actionTokenRef.current += 1;
+    setIsSaving(false);
+    setActiveTab('geral');
+    lastEmpresaIdRef.current = activeEmpresaId;
+  }, [activeEmpresaId]);
+
   const handleFormChange = (field: keyof Service, value: any) => {
     setFormData(prev => ({ ...prev, [field]: value }));
   };
 
   const handleSave = async () => {
+    if (authLoading || !activeEmpresaId || empresaChanged) {
+      addToast('Aguarde a troca de empresa concluir para salvar.', 'info');
+      return;
+    }
     if (!formData.descricao) {
       addToast('A descrição é obrigatória.', 'error');
       return;
@@ -64,6 +82,8 @@ const ServiceFormPanel: React.FC<ServiceFormPanelProps> = ({ service, onSaveSucc
       }
     }
 
+    const token = ++actionTokenRef.current;
+    const empresaSnapshot = activeEmpresaId;
     setIsSaving(true);
     try {
       const payload: Partial<Service> = {
@@ -76,15 +96,19 @@ const ServiceFormPanel: React.FC<ServiceFormPanelProps> = ({ service, onSaveSucc
       let savedService: Service;
       if (payload.id) {
         savedService = await updateService(payload.id, payload);
+        if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
         addToast('Serviço atualizado com sucesso!', 'success');
       } else {
         savedService = await createService(payload);
+        if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
         addToast('Serviço criado com sucesso!', 'success');
       }
       onSaveSuccess(savedService);
     } catch (error: any) {
+      if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
       addToast(error.message, 'error');
     } finally {
+      if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
       setIsSaving(false);
     }
   };
@@ -243,7 +267,7 @@ const ServiceFormPanel: React.FC<ServiceFormPanelProps> = ({ service, onSaveSucc
           <Button type="button" variant="outline" onClick={onClose}>
             Cancelar
           </Button>
-          <Button type="button" onClick={handleSave} disabled={isSaving}>
+          <Button type="button" onClick={handleSave} disabled={isSaving || authLoading || !activeEmpresaId || empresaChanged}>
             {isSaving ? <Loader2 className="animate-spin" size={18} /> : <Save size={18} />}
             <span className="ml-2">Salvar</span>
           </Button>
