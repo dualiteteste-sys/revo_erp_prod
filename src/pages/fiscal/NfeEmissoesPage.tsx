@@ -8,7 +8,7 @@ import { useSupabase } from '@/providers/SupabaseProvider';
 import { useAuth } from '@/contexts/AuthProvider';
 import { useToast } from '@/contexts/ToastProvider';
 import { useEmpresaFeatures } from '@/hooks/useEmpresaFeatures';
-import { Copy, Eye, Loader2, Plus, Receipt, Search, Settings } from 'lucide-react';
+import { Ban, Copy, Eye, Loader2, Plus, Receipt, RefreshCw, Send, Search, Settings } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import ClientAutocomplete from '@/components/common/ClientAutocomplete';
 import ProductAutocomplete from '@/components/common/ProductAutocomplete';
@@ -23,6 +23,7 @@ import {
   fiscalNfeEmissaoItensList,
   fiscalNfeEmissoesList,
 } from '@/services/fiscalNfeEmissoes';
+import { runFiscalNfeFocusAction } from '@/services/fiscalNfeFocus';
 import { callRpc } from '@/lib/api';
 
 type AmbienteNfe = 'homologacao' | 'producao';
@@ -107,6 +108,7 @@ export default function NfeEmissoesPage() {
   const [auditLoading, setAuditLoading] = useState(false);
   const [auditItems, setAuditItems] = useState<any[]>([]);
   const [auditEmissaoId, setAuditEmissaoId] = useState<string | null>(null);
+  const [rowActionsLoading, setRowActionsLoading] = useState<Record<string, boolean>>({});
 
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
@@ -531,6 +533,62 @@ export default function NfeEmissoesPage() {
     }
   };
 
+  const setActionLoading = (emissaoId: string, action: 'emitir' | 'consultar' | 'cancelar', value: boolean) => {
+    const key = `${emissaoId}:${action}`;
+    setRowActionsLoading((prev) => {
+      if (value) return { ...prev, [key]: true };
+      const next = { ...prev };
+      delete next[key];
+      return next;
+    });
+  };
+
+  const isActionLoading = (emissaoId: string, action: 'emitir' | 'consultar' | 'cancelar') =>
+    !!rowActionsLoading[`${emissaoId}:${action}`];
+
+  const runProviderAction = async (row: NfeEmissao, action: 'emitir' | 'consultar' | 'cancelar') => {
+    if (!empresaId) return;
+
+    let justificativa: string | null = null;
+    if (action === 'cancelar') {
+      const reason = window.prompt('Informe a justificativa do cancelamento da NF-e:', 'Cancelamento solicitado pelo usuário.');
+      if (reason === null) return;
+      justificativa = reason.trim() || 'Cancelamento solicitado pelo usuário.';
+    }
+
+    if (action === 'emitir' && !features.nfe_emissao_enabled) {
+      addToast('Emissão está desativada. Ative em Fiscal → Configurações de NF-e.', 'warning');
+      return;
+    }
+
+    setActionLoading(row.id, action, true);
+    try {
+      const result = await runFiscalNfeFocusAction({
+        empresa_id: empresaId,
+        emissao_id: row.id,
+        action,
+        justificativa,
+      });
+
+      if (!result?.ok) {
+        addToast(result?.message || `Falha ao ${action} NF-e.`, 'error');
+      } else {
+        const defaultMessage =
+          action === 'emitir'
+            ? 'NF-e enviada para processamento.'
+            : action === 'consultar'
+              ? 'Status da NF-e atualizado.'
+              : 'Solicitação de cancelamento enviada.';
+        addToast(result?.message || defaultMessage, 'success');
+      }
+      await fetchList();
+    } catch (e: any) {
+      addToast(e?.message || `Erro ao ${action} NF-e.`, 'error');
+    } finally {
+      setActionLoading(row.id, action, false);
+    }
+  };
+
   if (!canShow) {
     return (
       <div className="p-6">
@@ -668,6 +726,39 @@ export default function NfeEmissoesPage() {
                         <button className="text-blue-600 hover:text-blue-900" onClick={() => void openEdit(row)} title="Abrir rascunho">
                           Abrir
                         </button>
+                        {(row.status === 'rascunho' || row.status === 'rejeitada' || row.status === 'erro') ? (
+                          <button
+                            className="inline-flex items-center gap-2 px-3 py-2 rounded-lg font-semibold bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-60 disabled:cursor-not-allowed"
+                            disabled={isActionLoading(row.id, 'emitir')}
+                            onClick={() => void runProviderAction(row, 'emitir')}
+                            title="Enviar NF-e para autorização na Focus"
+                          >
+                            {isActionLoading(row.id, 'emitir') ? <Loader2 className="animate-spin" size={16} /> : <Send size={16} />}
+                            Emitir
+                          </button>
+                        ) : null}
+                        {(row.status === 'enfileirada' || row.status === 'processando') ? (
+                          <button
+                            className="inline-flex items-center gap-2 px-3 py-2 rounded-lg font-semibold bg-amber-100 text-amber-800 hover:bg-amber-200 disabled:opacity-60 disabled:cursor-not-allowed"
+                            disabled={isActionLoading(row.id, 'consultar')}
+                            onClick={() => void runProviderAction(row, 'consultar')}
+                            title="Consultar status atualizado da NF-e na Focus"
+                          >
+                            {isActionLoading(row.id, 'consultar') ? <Loader2 className="animate-spin" size={16} /> : <RefreshCw size={16} />}
+                            Consultar
+                          </button>
+                        ) : null}
+                        {row.status === 'autorizada' ? (
+                          <button
+                            className="inline-flex items-center gap-2 px-3 py-2 rounded-lg font-semibold bg-rose-100 text-rose-800 hover:bg-rose-200 disabled:opacity-60 disabled:cursor-not-allowed"
+                            disabled={isActionLoading(row.id, 'cancelar')}
+                            onClick={() => void runProviderAction(row, 'cancelar')}
+                            title="Solicitar cancelamento da NF-e"
+                          >
+                            {isActionLoading(row.id, 'cancelar') ? <Loader2 className="animate-spin" size={16} /> : <Ban size={16} />}
+                            Cancelar
+                          </button>
+                        ) : null}
                         <button
                           className="inline-flex items-center gap-2 px-3 py-2 rounded-lg font-semibold bg-slate-100 text-slate-800 hover:bg-slate-200"
                           onClick={() => void openAudit(row.id)}

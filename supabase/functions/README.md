@@ -42,7 +42,13 @@ Abaixo está uma lista de todas as funções e seus respectivos endpoints e resp
 - **Método**: `POST` (aceita `GET/HEAD` para validação do endpoint no painel)
 - **Descrição**: Recebe webhooks da Focus NF-e e registra o evento de forma idempotente em `public.fiscal_nfe_webhook_events` (provider=`focusnfe`) para processamento assíncrono/reprocessamento seguro.
 
-### 7. `manual-create-user`
+### 7. `focusnfe-emissao`
+
+- **Endpoint**: `/focusnfe-emissao`
+- **Método**: `POST`
+- **Descrição**: Orquestra ações de emissão NF-e na Focus (`emitir`, `consultar`, `cancelar`) com validação de permissão, atualização de status em `public.fiscal_nfe_emissoes` e trilha de auditoria (`fiscal_nfe_provider_events` / `fiscal_nfe_provider_logs`).
+
+### 8. `manual-create-user`
 
 - **Endpoint**: `/manual-create-user`
 - **Método**: `POST`

@@ -16,14 +16,15 @@ function headersToJson(headers: Headers): Record<string, string> {
   return sanitizeHeaders(headers);
 }
 
+function digitsOnly(value: unknown): string {
+  return String(value ?? "").replace(/\D/g, "");
+}
+
 function getExpectedSecrets(): string[] {
-  // Lê os secrets em runtime (não em module-load) porque o Supabase Edge pode manter o isolate
-  // "quente" por algum tempo; assim mudanças em secrets passam a valer imediatamente.
   const WEBHOOK_SECRET = (Deno.env.get("FOCUSNFE_WEBHOOK_SECRET") ?? "").trim();
   const WEBHOOK_SECRET_HML = (Deno.env.get("FOCUSNFE_WEBHOOK_SECRET_HML") ?? "").trim();
   const WEBHOOK_SECRET_PROD = (Deno.env.get("FOCUSNFE_WEBHOOK_SECRET_PROD") ?? "").trim();
 
-  // Normaliza também segredos salvos com prefixo "Bearer " (erro comum ao configurar webhooks).
   const secrets = [WEBHOOK_SECRET, WEBHOOK_SECRET_HML, WEBHOOK_SECRET_PROD]
     .map((s) => extractBearerToken(s))
     .map((s) => s.trim())
@@ -49,7 +50,36 @@ function isAuthorized(req: Request): { ok: boolean; reason?: string } {
   return ok ? { ok: true } : { ok: false, reason: "INVALID_AUTHORIZATION" };
 }
 
-function extractMeta(payload: any): { eventType: string | null; focusRef: string | null } {
+function normalizeStatus(raw: unknown): string {
+  const status = String(raw ?? "").trim().toLowerCase();
+  if (!status) return "processando";
+  if (status.includes("autoriz")) return "autorizada";
+  if (status.includes("cancel")) return "cancelada";
+  if (status.includes("rejeit")) return "rejeitada";
+  if (status.includes("erro") || status.includes("deneg")) return "erro";
+  if (status.includes("fila") || status.includes("enfileir")) return "enfileirada";
+  if (status.includes("process") || status.includes("autorizacao")) return "processando";
+  return "processando";
+}
+
+function extractErrorMessage(payload: Record<string, unknown>): string | null {
+  const candidates = [
+    payload?.mensagem_sefaz,
+    payload?.motivo,
+    payload?.mensagem,
+    payload?.erro,
+    payload?.error,
+    payload?.detail,
+  ];
+
+  for (const value of candidates) {
+    const text = String(value ?? "").trim();
+    if (text) return text.slice(0, 900);
+  }
+  return null;
+}
+
+function extractMeta(payload: Record<string, unknown>): { eventType: string | null; focusRef: string | null; status: string | null } {
   const eventType = (payload?.tipo_evento ?? payload?.event ?? payload?.type ?? payload?.status ?? null) as string | null;
   const focusRef =
     (payload?.ref ??
@@ -59,16 +89,41 @@ function extractMeta(payload: any): { eventType: string | null; focusRef: string
       payload?.uuid ??
       payload?.id ??
       null) as string | null;
+  const status = (payload?.status ?? payload?.situacao ?? null) as string | null;
   return {
     eventType: eventType ? String(eventType) : null,
     focusRef: focusRef ? String(focusRef) : null,
+    status: status ? String(status) : null,
   };
+}
+
+async function resolveEmissaoByRef(admin: ReturnType<typeof createClient>, focusRef: string) {
+  const ref = String(focusRef ?? "").trim();
+  if (!ref) return null;
+  const refNoHyphen = ref.replace(/-/g, "");
+
+  const candidates = [ref, refNoHyphen].filter(Boolean);
+  for (const value of candidates) {
+    const byProviderRef = await admin
+      .from("fiscal_nfe_emissoes")
+      .select("id,empresa_id,payload,numero,serie,chave_acesso")
+      .eq("provider_ref", value)
+      .maybeSingle();
+    if (byProviderRef.data) return byProviderRef.data;
+
+    const byId = await admin
+      .from("fiscal_nfe_emissoes")
+      .select("id,empresa_id,payload,numero,serie,chave_acesso")
+      .eq("id", value)
+      .maybeSingle();
+    if (byId.data) return byId.data;
+  }
+  return null;
 }
 
 serve(async (req) => {
   const cors = buildCorsHeaders(req);
 
-  // Focus pode testar o endpoint no cadastro do webhook (GET/HEAD).
   if (req.method === "OPTIONS") return new Response(null, { status: 204, headers: cors });
   if (req.method === "GET" || req.method === "HEAD") {
     return json(200, { ok: true, provider: "focusnfe" }, cors);
@@ -83,7 +138,7 @@ serve(async (req) => {
   const requestId = getRequestId(req);
   const rawBody = await req.text();
 
-  let payload: any = {};
+  let payload: Record<string, unknown> = {};
   try {
     payload = rawBody ? JSON.parse(rawBody) : {};
   } catch {
@@ -97,22 +152,80 @@ serve(async (req) => {
     auth: { persistSession: false, autoRefreshToken: false },
   });
 
-  // Quando a integração estiver completa, vamos inferir empresa_id por "ref" (vínculo provider↔emissão).
-  // Por enquanto, armazenamos sem empresa_id e processamos depois via worker/reprocessamento.
+  const emissao = meta.focusRef ? await resolveEmissaoByRef(admin, meta.focusRef) : null;
+  const empresaId = emissao?.empresa_id ?? null;
+  const mappedStatus = normalizeStatus(meta.status ?? meta.eventType ?? null);
+  const lastError = extractErrorMessage(payload);
+
   await admin.from("fiscal_nfe_webhook_events").upsert(
     {
-      empresa_id: null,
+      empresa_id: empresaId,
       provider: "focusnfe",
       event_type: meta.eventType,
-      nfeio_id: meta.focusRef, // coluna legado; usamos como "provider_ref"
+      nfeio_id: meta.focusRef,
       dedupe_key: dedupeKey,
       request_id: requestId,
       headers: headersToJson(req.headers),
       payload: sanitizeForLog(payload),
       received_at: new Date().toISOString(),
+      processed_at: empresaId ? new Date().toISOString() : null,
+      process_attempts: empresaId ? 1 : 0,
+      last_error: empresaId ? null : "Emissão não encontrada para a referência do webhook.",
     },
     { onConflict: "provider,dedupe_key" },
   );
 
-  return json(200, { ok: true }, cors);
+  if (!emissao || !empresaId) {
+    return json(200, { ok: true, linked: false, request_id: requestId }, cors);
+  }
+
+  const nextPayload = {
+    ...(typeof emissao.payload === "object" && emissao.payload ? emissao.payload : {}),
+    focus_last_webhook: {
+      request_id: requestId,
+      received_at: new Date().toISOString(),
+      event_type: meta.eventType,
+      status: meta.status,
+      payload: sanitizeForLog(payload),
+    },
+  };
+
+  await admin
+    .from("fiscal_nfe_emissoes")
+    .update({
+      status: mappedStatus,
+      provider_slug: "FOCUSNFE",
+      provider_ref: meta.focusRef ?? emissao.id,
+      numero: Number(payload?.numero ?? emissao.numero ?? 0) || null,
+      serie: Number(payload?.serie ?? emissao.serie ?? 0) || null,
+      chave_acesso: String(payload?.chave_acesso ?? payload?.chave ?? emissao.chave_acesso ?? "") || null,
+      last_error: mappedStatus === "autorizada" ? null : lastError,
+      payload: nextPayload,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", emissao.id)
+    .eq("empresa_id", empresaId);
+
+  await admin.from("fiscal_nfe_nfeio_emissoes").upsert({
+    empresa_id: empresaId,
+    emissao_id: emissao.id,
+    ambiente: "homologacao",
+    nfeio_id: meta.focusRef ?? emissao.id,
+    provider_status: meta.status ?? meta.eventType ?? null,
+    response_payload: sanitizeForLog(payload),
+    last_sync_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  }, { onConflict: "emissao_id" });
+
+  await admin.from("fiscal_nfe_provider_logs").insert({
+    empresa_id: empresaId,
+    emissao_id: emissao.id,
+    provider: "focusnfe",
+    level: mappedStatus === "erro" || mappedStatus === "rejeitada" ? "error" : "info",
+    message: `Webhook Focus recebido: ${meta.eventType ?? meta.status ?? "evento"}`,
+    payload: sanitizeForLog(payload),
+    request_id: requestId,
+  });
+
+  return json(200, { ok: true, linked: true, emissao_id: emissao.id, status: mappedStatus, request_id: requestId }, cors);
 });
