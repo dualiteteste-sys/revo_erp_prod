@@ -29,6 +29,7 @@ import PartnerFormPanel from '@/components/partners/PartnerFormPanel';
 import ProductFormPanel, { type ProductFormData } from '@/components/products/ProductFormPanel';
 import { searchClients } from '@/services/clients';
 import { saveProduct } from '@/services/products';
+import { useAuth } from '@/contexts/AuthProvider';
 
 interface Props {
   vendaId: string | null;
@@ -61,6 +62,7 @@ function formatMoneyBRL(n: number | null | undefined): string {
 export default function PedidoVendaFormPanel({ vendaId, onSaveSuccess, onClose, mode = 'erp', onFinalizePdv }: Props) {
   const { addToast } = useToast();
   const { confirm } = useConfirm();
+  const { loading: authLoading, activeEmpresaId } = useAuth();
   const navigate = useNavigate();
   const [loading, setLoading] = useState(!!vendaId);
   const [isSaving, setIsSaving] = useState(false);
@@ -103,15 +105,40 @@ export default function PedidoVendaFormPanel({ vendaId, onSaveSuccess, onClose, 
   const [discountAudit, setDiscountAudit] = useState<DiscountAuditRow[]>([]);
   const [loadingDiscountAudit, setLoadingDiscountAudit] = useState(false);
   const [tabelasPreco, setTabelasPreco] = useState<TabelaPrecoRow[]>([]);
+  const lastEmpresaIdRef = useRef<string | null>(activeEmpresaId);
+  const empresaChanged = lastEmpresaIdRef.current !== activeEmpresaId;
+  const actionTokenRef = useRef(0);
 
   useEffect(() => {
+    const prevEmpresaId = lastEmpresaIdRef.current;
+    if (prevEmpresaId === activeEmpresaId) return;
+    actionTokenRef.current += 1;
+    setIsSaving(false);
+    setAddingSku(false);
+    setLoading(false);
+    setLoadingMarketplaceTimeline(false);
+    setLoadingDiscountAudit(false);
+    setMarketplaceTimeline([]);
+    setDiscountAudit([]);
+    setCondicoesPagamento([]);
+    setVendedores([]);
+    setTabelasPreco([]);
+    lastEmpresaIdRef.current = activeEmpresaId;
+  }, [activeEmpresaId]);
+
+  useEffect(() => {
+    if (authLoading || !activeEmpresaId || empresaChanged) return;
     let alive = true;
+    const token = ++actionTokenRef.current;
+    const empresaSnapshot = activeEmpresaId;
     (async () => {
       try {
         const rows = await searchCondicoesPagamento({ tipo: 'ambos', q: null, limit: 50 });
+        if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
         if (!alive) return;
         setCondicoesPagamento(rows ?? []);
       } catch {
+        if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
         if (!alive) return;
         setCondicoesPagamento([]);
       }
@@ -119,7 +146,7 @@ export default function PedidoVendaFormPanel({ vendaId, onSaveSuccess, onClose, 
     return () => {
       alive = false;
     };
-  }, []);
+  }, [activeEmpresaId, authLoading, empresaChanged]);
   const manualPriceItemIdsRef = useRef<Set<string>>(new Set());
   const [qtyUnitMode, setQtyUnitMode] = useState<Record<string, 'base' | 'g'>>({});
   const [marketplaceTimelineSort, setMarketplaceTimelineSort] = useState<SortState<string>>({
@@ -197,33 +224,44 @@ export default function PedidoVendaFormPanel({ vendaId, onSaveSuccess, onClose, 
 
   useEffect(() => {
     if (!vendaId) return;
+    if (authLoading || !activeEmpresaId || empresaChanged) return;
     void loadDetails({ id: vendaId, closeOnError: true });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [vendaId]);
+  }, [activeEmpresaId, authLoading, empresaChanged, vendaId]);
 
   useEffect(() => {
+    if (authLoading || !activeEmpresaId || empresaChanged) return;
+    const token = ++actionTokenRef.current;
+    const empresaSnapshot = activeEmpresaId;
     const load = async () => {
       try {
         const rows = await listTabelasPreco();
+        if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
         setTabelasPreco(rows ?? []);
       } catch {
+        if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
         setTabelasPreco([]);
       }
     };
     void load();
-  }, []);
+  }, [activeEmpresaId, authLoading, empresaChanged]);
 
   useEffect(() => {
+    if (authLoading || !activeEmpresaId || empresaChanged) return;
+    const token = ++actionTokenRef.current;
+    const empresaSnapshot = activeEmpresaId;
     // COM-01: vendedores para comissões (opcional)
     void (async () => {
       try {
         const data = await listVendedores(undefined, true);
+        if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
         setVendedores(data);
       } catch {
+        if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
         setVendedores([]);
       }
     })();
-  }, []);
+  }, [activeEmpresaId, authLoading, empresaChanged]);
 
   useEffect(() => {
     if (mode !== 'pdv') return;
@@ -245,6 +283,9 @@ export default function PedidoVendaFormPanel({ vendaId, onSaveSuccess, onClose, 
   }, [mode, canFinalizePdv, formData.id, formData.status, isSaving, addingSku]);
 
   const loadDetails = async (params?: { id?: string | null; closeOnError?: boolean; silent?: boolean }) => {
+    if (authLoading || !activeEmpresaId || empresaChanged) return false;
+    const token = ++actionTokenRef.current;
+    const empresaSnapshot = activeEmpresaId;
     const targetId = params?.id ?? vendaId ?? formData.id ?? null;
     if (!targetId) return false;
 
@@ -252,6 +293,7 @@ export default function PedidoVendaFormPanel({ vendaId, onSaveSuccess, onClose, 
       if (!params?.silent) setLoading(true);
 
       const data = await fetchVendaDetails(targetId);
+      if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return false;
       if (!data) {
         addToast('Pedido não encontrado (ou sem acesso).', 'error');
         if (params?.closeOnError) onClose();
@@ -264,21 +306,26 @@ export default function PedidoVendaFormPanel({ vendaId, onSaveSuccess, onClose, 
         setLoadingMarketplaceTimeline(true);
         try {
           const ev = await listMarketplaceOrderTimeline(data.id);
+          if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return false;
           setMarketplaceTimeline(ev ?? []);
         } catch {
+          if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return false;
           setMarketplaceTimeline([]);
         } finally {
+          if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return false;
           setLoadingMarketplaceTimeline(false);
         }
       } else {
         setMarketplaceTimeline([]);
       }
     } catch (e) {
+      if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return false;
       console.error(e);
       addToast('Erro ao carregar pedido.', 'error');
       if (params?.closeOnError) onClose();
       return false;
     } finally {
+      if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return false;
       if (!params?.silent) setLoading(false);
     }
     return true;
@@ -338,14 +385,20 @@ export default function PedidoVendaFormPanel({ vendaId, onSaveSuccess, onClose, 
   };
 
   const loadDiscountAudit = async (pedidoId: string) => {
+    if (authLoading || !activeEmpresaId || empresaChanged) return;
+    const token = ++actionTokenRef.current;
+    const empresaSnapshot = activeEmpresaId;
     setLoadingDiscountAudit(true);
     try {
       const rows = await listAuditLogsForTables(['vendas_pedidos', 'vendas_itens_pedido'], 300);
+      if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
       const items = (formData as any)?.itens || [];
       setDiscountAudit(buildDiscountAudit(rows, pedidoId, items));
     } catch {
+      if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
       setDiscountAudit([]);
     } finally {
+      if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
       setLoadingDiscountAudit(false);
     }
   };
@@ -364,6 +417,12 @@ export default function PedidoVendaFormPanel({ vendaId, onSaveSuccess, onClose, 
   };
 
   const handleSaveHeader = async () => {
+    if (authLoading || !activeEmpresaId || empresaChanged) {
+      addToast('Aguarde a troca de empresa concluir para salvar.', 'info');
+      return null;
+    }
+    const token = ++actionTokenRef.current;
+    const empresaSnapshot = activeEmpresaId;
     if (!canDiscount && toMoney(formData.desconto) > 0) {
       addToast('Você não tem permissão para aplicar desconto.', 'error');
       return null;
@@ -413,14 +472,17 @@ export default function PedidoVendaFormPanel({ vendaId, onSaveSuccess, onClose, 
         tabela_preco_id: (formData as any)?.tabela_preco_id ?? null,
       };
       const saved = await saveVenda(payload);
+      if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return null;
       setFormData(prev => ({ ...prev, ...saved }));
 
       const canal = (saved as any)?.canal ?? (formData as any)?.canal;
       if (canal === 'marketplace' && saved?.id) {
         try {
           const ev = await listMarketplaceOrderTimeline(saved.id);
+          if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return null;
           setMarketplaceTimeline(ev ?? []);
         } catch {
+          if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return null;
           setMarketplaceTimeline([]);
         }
       }
@@ -433,14 +495,19 @@ export default function PedidoVendaFormPanel({ vendaId, onSaveSuccess, onClose, 
       onSaveSuccess({ keepOpen: !formData.id });
       return saved.id;
     } catch (e: any) {
+      if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return null;
       addToast(e.message, 'error');
       return null;
     } finally {
+      if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return null;
       setIsSaving(false);
     }
   };
 
   const handleAddItem = async (item: any) => {
+    if (authLoading || !activeEmpresaId || empresaChanged) return;
+    const token = ++actionTokenRef.current;
+    const empresaSnapshot = activeEmpresaId;
     if (item.type !== 'product') {
         addToast('Apenas produtos podem ser adicionados a pedidos de venda.', 'warning');
         return;
@@ -461,7 +528,9 @@ export default function PedidoVendaFormPanel({ vendaId, onSaveSuccess, onClose, 
         fallbackPrecoUnitario: item.preco_venda ?? 0,
       });
       const precoUnit = Number(pricing.preco_unitario ?? item.preco_venda ?? 0);
+      if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
       await manageVendaItem(currentId!, null, item.id, 1, precoUnit, 0, 'add');
+      if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
       const refreshed = await loadDetails({ id: currentId, silent: true });
       if (!refreshed) {
         const preco = toMoney(precoUnit);
@@ -483,6 +552,7 @@ export default function PedidoVendaFormPanel({ vendaId, onSaveSuccess, onClose, 
       }
       addToast('Item adicionado.', 'success');
     } catch (e: any) {
+      if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
       addToast(e.message, 'error');
     }
   };
@@ -509,6 +579,7 @@ export default function PedidoVendaFormPanel({ vendaId, onSaveSuccess, onClose, 
   };
 
   const handleFinalizePdv = async () => {
+    if (authLoading || !activeEmpresaId || empresaChanged) return;
     if (!canFinalizePdv || !formData.id) return;
     if ((formData.itens?.length || 0) === 0) {
       addToast('Adicione ao menos 1 item para finalizar.', 'error');
@@ -523,27 +594,40 @@ export default function PedidoVendaFormPanel({ vendaId, onSaveSuccess, onClose, 
     });
     if (!ok) return;
 
+    const token = ++actionTokenRef.current;
+    const empresaSnapshot = activeEmpresaId;
     setIsSaving(true);
     try {
       await onFinalizePdv(formData.id);
+      if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
       onSaveSuccess();
       onClose();
     } finally {
+      if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
       setIsSaving(false);
     }
   };
 
   const handleRemoveItem = async (itemId: string, produtoId?: string | null) => {
+    if (authLoading || !activeEmpresaId || empresaChanged) return;
+    const token = ++actionTokenRef.current;
+    const empresaSnapshot = activeEmpresaId;
     try {
       await manageVendaItem(formData.id!, itemId, produtoId ?? null, 0, 0, 0, 'remove');
+      if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
       await loadDetails({ id: formData.id, silent: true });
+      if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
       addToast('Item removido.', 'success');
     } catch (e: any) {
+      if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
       addToast(e.message, 'error');
     }
   };
 
 	  const handleUpdateItem = async (itemId: string, field: string, value: number) => {
+      if (authLoading || !activeEmpresaId || empresaChanged) return;
+      const token = ++actionTokenRef.current;
+      const empresaSnapshot = activeEmpresaId;
 	    const item = formData.itens?.find(i => i.id === itemId);
 	    if (!item) return;
 
@@ -592,6 +676,7 @@ export default function PedidoVendaFormPanel({ vendaId, onSaveSuccess, onClose, 
 	        updates.preco_unitario = Number(pricing.preco_unitario ?? updates.preco_unitario);
 	      }
 	      await manageVendaItem(formData.id!, itemId, item.produto_id, updates.quantidade, updates.preco_unitario, updates.desconto, 'update');
+          if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
 	      // Atualização otimista
 	      setFormData(prev => ({
 	        ...prev,
@@ -603,11 +688,13 @@ export default function PedidoVendaFormPanel({ vendaId, onSaveSuccess, onClose, 
       }));
       // Recarregar totais no blur ou debounce seria ideal, aqui faremos reload completo ao salvar o cabeçalho novamente
 	    } catch (e: any) {
+          if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
 	      addToast(e.message, 'error');
 	    }
 	  };
 
   const handleAprovar = async () => {
+    if (authLoading || !activeEmpresaId || empresaChanged) return;
     const ok = await confirm({
       title: 'Aprovar pedido',
       description: 'Confirmar aprovação do pedido?',
@@ -616,19 +703,25 @@ export default function PedidoVendaFormPanel({ vendaId, onSaveSuccess, onClose, 
       variant: 'primary',
     });
     if (!ok) return;
+    const token = ++actionTokenRef.current;
+    const empresaSnapshot = activeEmpresaId;
     setIsSaving(true);
     try {
       await aprovarVenda(formData.id!);
+      if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
       addToast('Pedido aprovado com sucesso!', 'success');
       onSaveSuccess();
     } catch (e: any) {
+      if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
       addToast(e.message, 'error');
     } finally {
+      if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
       setIsSaving(false);
     }
   };
 
   const handleCancel = async () => {
+      if (authLoading || !activeEmpresaId || empresaChanged) return;
 	    const ok = await confirm({
 	      title: 'Cancelar pedido',
 	      description: 'Cancelar este pedido? Essa ação pode ser revertida apenas reabrindo um novo pedido.',
@@ -637,6 +730,8 @@ export default function PedidoVendaFormPanel({ vendaId, onSaveSuccess, onClose, 
 	      variant: 'danger',
 	    });
 	    if (!ok) return;
+      const token = ++actionTokenRef.current;
+      const empresaSnapshot = activeEmpresaId;
 	    setIsSaving(true);
 	    try {
 	      if (!formData.id) {
@@ -674,11 +769,14 @@ export default function PedidoVendaFormPanel({ vendaId, onSaveSuccess, onClose, 
 		      };
 
 	      await saveVenda(payload);
+          if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
 	      addToast('Pedido cancelado.', 'success');
 	      onSaveSuccess();
 	    } catch (e: any) {
+          if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
 	      addToast(e.message, 'error');
 	    } finally {
+          if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
 	      setIsSaving(false);
 	    }
 		  };
@@ -696,6 +794,7 @@ export default function PedidoVendaFormPanel({ vendaId, onSaveSuccess, onClose, 
   if (loading) return <div className="flex justify-center p-8"><Loader2 className="animate-spin" /></div>;
 
   const handleConcluir = async () => {
+    if (authLoading || !activeEmpresaId || empresaChanged) return;
     if (!formData.id) return;
     const ok = await confirm({
       title: 'Concluir pedido',
@@ -705,10 +804,14 @@ export default function PedidoVendaFormPanel({ vendaId, onSaveSuccess, onClose, 
       variant: 'primary',
     });
     if (!ok) return;
+    const token = ++actionTokenRef.current;
+    const empresaSnapshot = activeEmpresaId;
     setIsSaving(true);
     try {
       await concluirVendaPedido(formData.id);
+      if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
       await loadDetails();
+      if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
       addToast('Pedido concluído e estoque baixado.', 'success');
       onSaveSuccess();
 
@@ -721,8 +824,10 @@ export default function PedidoVendaFormPanel({ vendaId, onSaveSuccess, onClose, 
 	      });
       if (wantTitles) setParcelamentoOpen(true);
     } catch (e: any) {
+      if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
       addToast(e?.message || 'Falha ao concluir pedido.', 'error');
     } finally {
+      if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
       setIsSaving(false);
     }
   };
@@ -1369,7 +1474,7 @@ export default function PedidoVendaFormPanel({ vendaId, onSaveSuccess, onClose, 
           {mode !== 'pdv' && canConcluir && (
             <button
               onClick={handleConcluir}
-              disabled={isSaving}
+              disabled={isSaving || authLoading || !activeEmpresaId || empresaChanged}
               className="flex items-center gap-2 bg-indigo-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-indigo-700 disabled:opacity-50"
             >
               <PackageCheck size={20} /> Concluir (baixa estoque)
@@ -1378,7 +1483,7 @@ export default function PedidoVendaFormPanel({ vendaId, onSaveSuccess, onClose, 
           {formData.id && formData.status !== 'cancelado' && (
             <button
               onClick={handleCancel}
-              disabled={isSaving}
+              disabled={isSaving || authLoading || !activeEmpresaId || empresaChanged}
               className="flex items-center gap-2 bg-red-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-red-700 disabled:opacity-50"
             >
               <Ban size={20} /> Cancelar
@@ -1387,7 +1492,7 @@ export default function PedidoVendaFormPanel({ vendaId, onSaveSuccess, onClose, 
           {formData.id && !isLocked && (
             <button 
               onClick={handleAprovar} 
-              disabled={isSaving || (formData.itens?.length || 0) === 0}
+              disabled={isSaving || (formData.itens?.length || 0) === 0 || authLoading || !activeEmpresaId || empresaChanged}
               className="flex items-center gap-2 bg-green-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-green-700 disabled:opacity-50"
             >
               <CheckCircle size={20} /> Aprovar Venda
@@ -1396,7 +1501,7 @@ export default function PedidoVendaFormPanel({ vendaId, onSaveSuccess, onClose, 
           {canFinalizePdv && !isLocked && formData.id && (
             <button
               onClick={() => void handleFinalizePdv()}
-              disabled={isSaving || (formData.itens?.length || 0) === 0}
+              disabled={isSaving || (formData.itens?.length || 0) === 0 || authLoading || !activeEmpresaId || empresaChanged}
               className="flex items-center gap-2 bg-emerald-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-emerald-700 disabled:opacity-50"
               title="Atalho: F9"
             >
@@ -1406,7 +1511,7 @@ export default function PedidoVendaFormPanel({ vendaId, onSaveSuccess, onClose, 
           {!isLocked && (
             <button 
               onClick={handleSaveHeader} 
-              disabled={isSaving}
+              disabled={isSaving || authLoading || !activeEmpresaId || empresaChanged}
               className="flex items-center gap-2 bg-blue-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-blue-700 disabled:opacity-50"
             >
               {isSaving ? <Loader2 className="animate-spin" size={20} /> : <Save size={20} />}
