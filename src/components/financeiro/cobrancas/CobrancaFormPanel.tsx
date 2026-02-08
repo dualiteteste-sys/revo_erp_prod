@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Loader2, Save } from 'lucide-react';
 import { CobrancaBancaria, CobrancaPayload, getCobrancaDetails, saveCobranca } from '@/services/cobrancas';
 import { useToast } from '@/contexts/ToastProvider';
@@ -9,6 +9,7 @@ import TextArea from '@/components/ui/forms/TextArea';
 import ClientAutocomplete from '@/components/common/ClientAutocomplete';
 import { useNumericField } from '@/hooks/useNumericField';
 import { useContasCorrentes } from '@/hooks/useTesouraria';
+import { useAuth } from '@/contexts/AuthProvider';
 
 interface Props {
   cobranca: CobrancaBancaria | null;
@@ -16,46 +17,76 @@ interface Props {
   onClose: () => void;
 }
 
+const INITIAL_FORM_DATA: CobrancaPayload = {
+  status: 'pendente_emissao',
+  tipo_cobranca: 'boleto',
+  valor_original: 0,
+  valor_atual: 0,
+};
+
 export default function CobrancaFormPanel({ cobranca, onSaveSuccess, onClose }: Props) {
   const { addToast } = useToast();
+  const { loading: authLoading, activeEmpresaId } = useAuth();
   const [loading, setLoading] = useState(!!cobranca);
   const [isSaving, setIsSaving] = useState(false);
-  const [formData, setFormData] = useState<CobrancaPayload>({
-    status: 'pendente_emissao',
-    tipo_cobranca: 'boleto',
-    valor_original: 0,
-    valor_atual: 0,
-  });
+  const [formData, setFormData] = useState<CobrancaPayload>(INITIAL_FORM_DATA);
   const { contas } = useContasCorrentes(); // Para selecionar conta bancária
+  const lastEmpresaIdRef = useRef<string | null>(activeEmpresaId);
+  const empresaChanged = lastEmpresaIdRef.current !== activeEmpresaId;
+  const actionTokenRef = useRef(0);
 
   const valorOriginalProps = useNumericField(formData.valor_original, (v) => {
     setFormData(prev => ({ ...prev, valor_original: v || 0, valor_atual: v || 0 }));
   });
 
   useEffect(() => {
-    if (cobranca) {
-      loadDetails();
-    }
-  }, [cobranca]);
+    const prevEmpresaId = lastEmpresaIdRef.current;
+    if (prevEmpresaId === activeEmpresaId) return;
+    actionTokenRef.current += 1;
+    setIsSaving(false);
+    setFormData(INITIAL_FORM_DATA);
+    setLoading(!!cobranca);
+    lastEmpresaIdRef.current = activeEmpresaId;
+  }, [activeEmpresaId, cobranca]);
 
-  const loadDetails = async () => {
+  const loadDetails = useCallback(async (cobrancaId: string) => {
+    const token = ++actionTokenRef.current;
+    const empresaSnapshot = activeEmpresaId;
     try {
-      const data = await getCobrancaDetails(cobranca!.id);
+      const data = await getCobrancaDetails(cobrancaId);
+      if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
       setFormData(data);
     } catch (e) {
+      if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
       console.error(e);
       addToast('Erro ao carregar cobrança.', 'error');
       onClose();
     } finally {
+      if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
       setLoading(false);
     }
-  };
+  }, [activeEmpresaId, addToast, onClose]);
+
+  useEffect(() => {
+    if (authLoading || !activeEmpresaId || empresaChanged) return;
+    if (!cobranca?.id) {
+      setLoading(false);
+      setFormData(INITIAL_FORM_DATA);
+      return;
+    }
+    setLoading(true);
+    void loadDetails(cobranca.id);
+  }, [activeEmpresaId, authLoading, cobranca, empresaChanged, loadDetails]);
 
   const handleChange = (field: keyof CobrancaPayload, value: any) => {
     setFormData(prev => ({ ...prev, [field]: value }));
   };
 
   const handleSave = async () => {
+    if (authLoading || !activeEmpresaId || empresaChanged) {
+      addToast('Aguarde a troca de empresa concluir para salvar.', 'info');
+      return;
+    }
     if (!formData.cliente_id) {
       addToast('Selecione um cliente.', 'error');
       return;
@@ -69,14 +100,19 @@ export default function CobrancaFormPanel({ cobranca, onSaveSuccess, onClose }: 
       return;
     }
 
+    const token = ++actionTokenRef.current;
+    const empresaSnapshot = activeEmpresaId;
     setIsSaving(true);
     try {
       await saveCobranca(formData);
+      if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
       addToast('Cobrança salva com sucesso!', 'success');
       onSaveSuccess();
     } catch (e: any) {
+      if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
       addToast(e.message, 'error');
     } finally {
+      if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
       setIsSaving(false);
     }
   };
@@ -214,7 +250,7 @@ export default function CobrancaFormPanel({ cobranca, onSaveSuccess, onClose }: 
           </button>
           <button 
             onClick={handleSave} 
-            disabled={isSaving}
+            disabled={isSaving || loading || authLoading || !activeEmpresaId || empresaChanged}
             className="flex items-center gap-2 bg-blue-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-blue-700 disabled:opacity-50"
           >
             {isSaving ? <Loader2 className="animate-spin" size={20} /> : <Save size={20} />}

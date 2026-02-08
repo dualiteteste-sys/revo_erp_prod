@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { Loader2, ShieldCheck, ShieldX, MinusCircle } from 'lucide-react';
+import { Loader2 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthProvider';
 import { useToast } from '@/contexts/ToastProvider';
 import { callRpc } from '@/lib/api';
@@ -38,12 +38,13 @@ export default function UserPermissionOverrides({ userId }: { userId: string }) 
   const [savingKey, setSavingKey] = useState<string | null>(null);
   const columns: TableColumnWidthDef[] = [
     { id: 'module', defaultWidth: 240, minWidth: 200 },
-    ...ACTIONS.map((a) => ({ id: a, defaultWidth: 120, minWidth: 110, maxWidth: 240 })),
+    ...ACTIONS.map((a) => ({ id: a, defaultWidth: 150, minWidth: 140, maxWidth: 220 })),
   ];
   const { widths, startResize } = useTableColumnWidths({ tableId: `users:permission-overrides:${userId}`, columns });
 
   const permissionsQuery = useQuery({
-    queryKey: ['rbac', 'permissions'],
+    queryKey: ['rbac', 'permissions', empresaId],
+    enabled: !!empresaId,
     queryFn: async () => {
       const rows = await callRpc<PermissionRow[]>('roles_permissions_list');
       return (rows || []).map((p) => ({ id: p.id, module: p.module, action: p.action as PermissionRow['action'] }));
@@ -146,6 +147,14 @@ export default function UserPermissionOverrides({ userId }: { userId: string }) 
     );
   }
 
+  if (grouped.length === 0) {
+    return (
+      <div className="text-sm text-gray-600">
+        Nenhuma permissão disponível para override. Em geral isso acontece quando o usuário atual não tem <strong>roles:manage</strong> ou o RBAC está inconsistente.
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-3">
       <div className="text-sm text-gray-600">
@@ -189,45 +198,42 @@ export default function UserPermissionOverrides({ userId }: { userId: string }) 
 
                   const override = overridesByPermission.has(perm.id) ? overridesByPermission.get(perm.id)! : null;
                   const isSaving = savingKey === perm.id;
-
-                  const baseBtn =
-                    'inline-flex items-center justify-center gap-1 px-2 py-1 rounded-md border text-xs font-semibold transition-colors disabled:opacity-60';
-                  const allowActive = override === true;
-                  const denyActive = override === false;
+                  const value = override === null ? 'inherit' : override ? 'allow' : 'deny';
 
                   return (
                     <td key={action} className="p-3">
                       <div className="flex items-center justify-center gap-2">
-                        <button
-                          type="button"
+                        <select
+                          aria-label={`${module}-${action}-override`}
+                          value={value}
                           disabled={isSaving}
-                          onClick={() => setOverride(perm.id, true)}
-                          className={`${baseBtn} ${allowActive ? 'bg-emerald-600 text-white border-emerald-600' : 'bg-white text-emerald-700 border-emerald-200 hover:bg-emerald-50'}`}
-                          title="Permitir"
+                          onChange={async (event) => {
+                            const next = event.target.value;
+                            if (next === 'allow') {
+                              await setOverride(perm.id, true);
+                              return;
+                            }
+                            if (next === 'deny') {
+                              await setOverride(perm.id, false);
+                              return;
+                            }
+                            if (override !== null) {
+                              await clearOverride(perm.id);
+                            }
+                          }}
+                          className={`h-9 min-w-[126px] rounded-md border px-2 text-sm font-semibold transition-colors
+                            ${value === 'allow' ? 'border-emerald-300 bg-emerald-50 text-emerald-700' : ''}
+                            ${value === 'deny' ? 'border-red-300 bg-red-50 text-red-700' : ''}
+                            ${value === 'inherit' ? 'border-gray-300 bg-white text-gray-700' : ''}
+                            disabled:opacity-60`}
                         >
-                          {isSaving && allowActive ? <Loader2 className="h-3 w-3 animate-spin" /> : <ShieldCheck className="h-3 w-3" />}
-                          Permitir
-                        </button>
-                        <button
-                          type="button"
-                          disabled={isSaving}
-                          onClick={() => setOverride(perm.id, false)}
-                          className={`${baseBtn} ${denyActive ? 'bg-red-600 text-white border-red-600' : 'bg-white text-red-700 border-red-200 hover:bg-red-50'}`}
-                          title="Negar"
-                        >
-                          {isSaving && denyActive ? <Loader2 className="h-3 w-3 animate-spin" /> : <ShieldX className="h-3 w-3" />}
-                          Negar
-                        </button>
-                        <button
-                          type="button"
-                          disabled={isSaving || override === null}
-                          onClick={() => clearOverride(perm.id)}
-                          className={`${baseBtn} bg-white text-gray-700 border-gray-200 hover:bg-gray-50`}
-                          title="Voltar ao padrão do papel"
-                        >
-                          <MinusCircle className="h-3 w-3" />
-                          Limpar
-                        </button>
+                          <option value="inherit">Herdar</option>
+                          <option value="allow">Permitir</option>
+                          <option value="deny">Negar</option>
+                        </select>
+                        {isSaving && (
+                          <Loader2 className="h-4 w-4 animate-spin text-blue-600" />
+                        )}
                       </div>
                     </td>
                   );

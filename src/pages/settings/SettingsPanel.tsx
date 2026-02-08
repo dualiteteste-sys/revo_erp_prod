@@ -37,7 +37,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
         animate={{ scale: 1, y: 0 }}
         exit={{ scale: 0.95, y: 20 }}
         transition={{ duration: 0.3 }}
-        className="bg-glass-200 border border-white/20 rounded-3xl shadow-2xl w-full h-full max-w-7xl max-h-[95vh] flex flex-col relative"
+        className="bg-glass-200 border border-white/20 rounded-3xl shadow-2xl w-full h-full max-w-[96vw] max-h-[95vh] flex flex-col relative"
         onClick={(e) => e.stopPropagation()}
       >
         {canClose && (

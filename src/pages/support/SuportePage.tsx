@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Activity, AlertTriangle, Bell, CheckCircle2, Copy, Download, LifeBuoy, Loader2, Lock, RefreshCw, XCircle } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthProvider';
 import { callRpc } from '@/lib/api';
@@ -63,7 +63,7 @@ function categoryLabel(category: SupportNotification['category']) {
 }
 
 export default function SuportePage() {
-  const { session, activeEmpresa } = useAuth();
+  const { session, activeEmpresa, loading: authLoading } = useAuth();
   const activeEmpresaId = activeEmpresa?.id ?? null;
   const userId = session?.user?.id || '';
   const userEmail = (session as any)?.user?.email || '';
@@ -87,21 +87,45 @@ export default function SuportePage() {
   const [ticketSubject, setTicketSubject] = useState('');
   const [ticketMessage, setTicketMessage] = useState('');
   const [ticketRequesterEmail, setTicketRequesterEmail] = useState<string>(userEmail || '');
+  const lastEmpresaIdRef = useRef<string | null>(activeEmpresaId);
+  const tenantVersionRef = useRef(0);
+  const empresaChanged = lastEmpresaIdRef.current !== activeEmpresaId;
+
+  const isTenantStale = (tenantVersionSnapshot: number, empresaSnapshot: string | null) =>
+    tenantVersionSnapshot !== tenantVersionRef.current || empresaSnapshot !== lastEmpresaIdRef.current;
 
   useEffect(() => {
-    // Multi-tenant safety: evitar reaproveitar estado do tenant anterior.
+    const prevEmpresaId = lastEmpresaIdRef.current;
+    if (prevEmpresaId === activeEmpresaId) return;
+
+    tenantVersionRef.current += 1;
+    setLoading(!!activeEmpresaId);
     setOnboarding(null);
     setPdv(null);
     setEcommerceHealth(null);
     setEcommerceDiagnostics(null);
     setEcommerceError(null);
+    setNotifications([]);
+    setMyTickets([]);
+    setStaffAllowed(false);
+    setNotifLoading(false);
+    setTicketsLoading(false);
+    setPacking(false);
+    setTicketOpen(false);
+    setTicketSubject('');
+    setTicketMessage('');
+    setTicketRequesterEmail(userEmail || '');
 
-    if (!activeEmpresaId) {
+    lastEmpresaIdRef.current = activeEmpresaId;
+  }, [activeEmpresaId, userEmail]);
+
+  useEffect(() => {
+    if (authLoading || !activeEmpresaId || empresaChanged) {
       setLoading(false);
       return;
     }
-
-    let mounted = true;
+    const tenantVersionSnapshot = tenantVersionRef.current;
+    const empresaSnapshot = activeEmpresaId;
     (async () => {
       setLoading(true);
       try {
@@ -110,11 +134,11 @@ export default function SuportePage() {
           callRpc<any>('pdv_checks_for_current_empresa', {}),
         ]);
 
-        if (!mounted) return;
+        if (isTenantStale(tenantVersionSnapshot, empresaSnapshot)) return;
         setOnboarding((onb && typeof onb === 'object') ? (onb as ChecksRpc) : null);
         setPdv((pdvRes && typeof pdvRes === 'object') ? (pdvRes as ChecksRpc) : null);
       } catch {
-        if (!mounted) return;
+        if (isTenantStale(tenantVersionSnapshot, empresaSnapshot)) return;
         setOnboarding(null);
         setPdv(null);
       }
@@ -125,69 +149,79 @@ export default function SuportePage() {
           getEcommerceConnectionDiagnostics('meli'),
           getEcommerceConnectionDiagnostics('shopee'),
         ]);
-        if (!mounted) return;
+        if (isTenantStale(tenantVersionSnapshot, empresaSnapshot)) return;
         setEcommerceHealth(health);
         setEcommerceDiagnostics({ meli, shopee });
         setEcommerceError(null);
       } catch (e: any) {
-        if (!mounted) return;
+        if (isTenantStale(tenantVersionSnapshot, empresaSnapshot)) return;
         setEcommerceHealth(null);
         setEcommerceDiagnostics(null);
         setEcommerceError(e?.message || 'Sem permissão ou falha ao carregar integrações.');
       } finally {
-        if (mounted) setLoading(false);
+        if (isTenantStale(tenantVersionSnapshot, empresaSnapshot)) return;
+        setLoading(false);
       }
     })();
-    return () => {
-      mounted = false;
-    };
-  }, [activeEmpresaId]);
+  }, [activeEmpresaId, authLoading, empresaChanged]);
 
   const refreshMyTickets = useCallback(async () => {
+    if (authLoading || !activeEmpresaId || empresaChanged) return;
+    const tenantVersionSnapshot = tenantVersionRef.current;
+    const empresaSnapshot = activeEmpresaId;
     setTicketsLoading(true);
     try {
       const items = await listMySupportTickets({ limit: 5, offset: 0 });
+      if (isTenantStale(tenantVersionSnapshot, empresaSnapshot)) return;
       setMyTickets(Array.isArray(items) ? items : []);
     } catch {
+      if (isTenantStale(tenantVersionSnapshot, empresaSnapshot)) return;
       setMyTickets([]);
     } finally {
+      if (isTenantStale(tenantVersionSnapshot, empresaSnapshot)) return;
       setTicketsLoading(false);
     }
-  }, []);
+  }, [activeEmpresaId, authLoading, empresaChanged]);
 
   useEffect(() => {
-    refreshMyTickets();
+    void refreshMyTickets();
   }, [refreshMyTickets]);
 
   useEffect(() => {
-    let mounted = true;
+    if (authLoading || !activeEmpresaId || empresaChanged) return;
+    const tenantVersionSnapshot = tenantVersionRef.current;
+    const empresaSnapshot = activeEmpresaId;
     (async () => {
       try {
         const ok = await isOpsStaffForCurrentUser();
-        if (mounted) setStaffAllowed(!!ok);
+        if (isTenantStale(tenantVersionSnapshot, empresaSnapshot)) return;
+        setStaffAllowed(!!ok);
       } catch {
-        if (mounted) setStaffAllowed(false);
+        if (isTenantStale(tenantVersionSnapshot, empresaSnapshot)) return;
+        setStaffAllowed(false);
       }
     })();
-    return () => {
-      mounted = false;
-    };
-  }, []);
+  }, [activeEmpresaId, authLoading, empresaChanged]);
 
   const canViewNotifications = !!permSupportView.data;
 
   const refreshNotifications = useCallback(async () => {
-    if (!canViewNotifications) return;
+    if (!canViewNotifications || authLoading || !activeEmpresaId || empresaChanged) return;
+    const tenantVersionSnapshot = tenantVersionRef.current;
+    const empresaSnapshot = activeEmpresaId;
     setNotifLoading(true);
     try {
       const list = await listSupportNotifications({ onlyUnread: notifOnlyUnread, limit: 50, offset: 0 });
+      if (isTenantStale(tenantVersionSnapshot, empresaSnapshot)) return;
       setNotifications(Array.isArray(list) ? list : []);
     } catch {
+      if (isTenantStale(tenantVersionSnapshot, empresaSnapshot)) return;
       setNotifications([]);
     } finally {
+      if (isTenantStale(tenantVersionSnapshot, empresaSnapshot)) return;
       setNotifLoading(false);
     }
-  }, [canViewNotifications, notifOnlyUnread]);
+  }, [activeEmpresaId, authLoading, canViewNotifications, empresaChanged, notifOnlyUnread]);
 
   useEffect(() => {
     void refreshNotifications();

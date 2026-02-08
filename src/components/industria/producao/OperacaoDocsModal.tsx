@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import Modal from '@/components/ui/Modal';
 import Input from '@/components/ui/forms/Input';
 import TextArea from '@/components/ui/forms/TextArea';
@@ -23,7 +23,7 @@ export default function OperacaoDocsModal({
   onClose: () => void;
 }) {
   const { addToast } = useToast();
-  const { activeEmpresaId } = useAuth();
+  const { activeEmpresaId, loading: authLoading } = useAuth();
   const { confirm } = useConfirm();
   const [loading, setLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
@@ -32,6 +32,10 @@ export default function OperacaoDocsModal({
   const [descricao, setDescricao] = useState('');
   const [file, setFile] = useState<File | null>(null);
   const [docsSort, setDocsSort] = useState<SortState<string>>({ column: 'criado', direction: 'desc' });
+  const lastEmpresaIdRef = useRef<string | null>(activeEmpresaId ?? null);
+  const loadTokenRef = useRef(0);
+  const actionTokenRef = useRef(0);
+  const empresaChanged = lastEmpresaIdRef.current !== (activeEmpresaId ?? null);
 
   const docsColumns: TableColumnWidthDef[] = [
     { id: 'titulo', defaultWidth: 520, minWidth: 220 },
@@ -55,29 +59,62 @@ export default function OperacaoDocsModal({
     );
   }, [docs, docsSort]);
 
-  const canSubmit = useMemo(() => !!activeEmpresaId && !!operacaoId && !!titulo.trim() && !!file, [activeEmpresaId, operacaoId, titulo, file]);
+  const canSubmit = useMemo(
+    () => !!activeEmpresaId && !authLoading && !empresaChanged && !!operacaoId && !!titulo.trim() && !!file,
+    [activeEmpresaId, authLoading, empresaChanged, operacaoId, titulo, file]
+  );
+
+  useEffect(() => {
+    const prevEmpresaId = lastEmpresaIdRef.current;
+    const nextEmpresaId = activeEmpresaId ?? null;
+    if (prevEmpresaId === nextEmpresaId) return;
+
+    loadTokenRef.current += 1;
+    actionTokenRef.current += 1;
+    setDocs([]);
+    setTitulo('');
+    setDescricao('');
+    setFile(null);
+    setLoading(false);
+    setUploading(false);
+
+    if (prevEmpresaId && nextEmpresaId && open) {
+      addToast('Empresa alterada. Recarregando documentos da operação…', 'info');
+    }
+    lastEmpresaIdRef.current = nextEmpresaId;
+  }, [activeEmpresaId, addToast, open]);
 
   const load = async () => {
-    if (!operacaoId) return;
+    if (!operacaoId || authLoading || !activeEmpresaId || empresaChanged) return;
+    const token = ++loadTokenRef.current;
+    const empresaSnapshot = activeEmpresaId;
     setLoading(true);
     try {
       const data = await listOperacaoDocs(operacaoId, false);
+      if (token !== loadTokenRef.current) return;
+      if (empresaSnapshot !== lastEmpresaIdRef.current) return;
       setDocs(data);
     } catch (e: any) {
+      if (token !== loadTokenRef.current) return;
+      if (empresaSnapshot !== lastEmpresaIdRef.current) return;
       addToast(e.message || 'Falha ao carregar documentos.', 'error');
     } finally {
+      if (token !== loadTokenRef.current) return;
+      if (empresaSnapshot !== lastEmpresaIdRef.current) return;
       setLoading(false);
     }
   };
 
   useEffect(() => {
     if (!open) return;
-    load();
+    void load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, operacaoId]);
+  }, [open, operacaoId, activeEmpresaId, authLoading, empresaChanged]);
 
   const handleUpload = async () => {
-    if (!canSubmit || !file || !activeEmpresaId) return;
+    if (!canSubmit || !file || !activeEmpresaId || authLoading || empresaChanged) return;
+    const token = ++actionTokenRef.current;
+    const empresaSnapshot = activeEmpresaId;
     setUploading(true);
     try {
       await uploadOperacaoDoc({
@@ -87,28 +124,42 @@ export default function OperacaoDocsModal({
         descricao: descricao.trim() || null,
         file,
       });
+      if (token !== actionTokenRef.current) return;
+      if (empresaSnapshot !== lastEmpresaIdRef.current) return;
       addToast('Documento enviado. Nova versão registrada.', 'success');
       setTitulo('');
       setDescricao('');
       setFile(null);
       await load();
     } catch (e: any) {
+      if (token !== actionTokenRef.current) return;
+      if (empresaSnapshot !== lastEmpresaIdRef.current) return;
       addToast(e.message || 'Falha ao enviar documento.', 'error');
     } finally {
+      if (token !== actionTokenRef.current) return;
+      if (empresaSnapshot !== lastEmpresaIdRef.current) return;
       setUploading(false);
     }
   };
 
   const handleOpenDoc = async (doc: OperacaoDoc) => {
+    if (!activeEmpresaId || authLoading || empresaChanged) return;
+    const token = ++actionTokenRef.current;
+    const empresaSnapshot = activeEmpresaId;
     try {
       const url = await createOperacaoDocSignedUrl(doc.arquivo_path);
+      if (token !== actionTokenRef.current) return;
+      if (empresaSnapshot !== lastEmpresaIdRef.current) return;
       window.open(url, '_blank', 'noopener,noreferrer');
     } catch (e: any) {
+      if (token !== actionTokenRef.current) return;
+      if (empresaSnapshot !== lastEmpresaIdRef.current) return;
       addToast(e.message || 'Falha ao abrir documento.', 'error');
     }
   };
 
   const handleDeleteDoc = async (doc: OperacaoDoc) => {
+    if (!activeEmpresaId || authLoading || empresaChanged) return;
     const ok = await confirm({
       title: 'Excluir documento',
       description: `Excluir "${doc.titulo}" v${doc.versao}?`,
@@ -117,11 +168,17 @@ export default function OperacaoDocsModal({
       variant: 'danger',
     });
     if (!ok) return;
+    const token = ++actionTokenRef.current;
+    const empresaSnapshot = activeEmpresaId;
     try {
       await deleteOperacaoDoc({ id: doc.id, arquivoPath: doc.arquivo_path });
+      if (token !== actionTokenRef.current) return;
+      if (empresaSnapshot !== lastEmpresaIdRef.current) return;
       addToast('Documento excluído.', 'success');
       await load();
     } catch (e: any) {
+      if (token !== actionTokenRef.current) return;
+      if (empresaSnapshot !== lastEmpresaIdRef.current) return;
       addToast(e.message || 'Falha ao excluir documento.', 'error');
     }
   };

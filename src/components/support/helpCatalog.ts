@@ -137,6 +137,21 @@ export const HELP_CATALOG: HelpEntry[] = [
     commonMistakes: ['Reprocessar em massa sem entender a causa raiz.', 'Tratar DLQ como “lixeira” e ignorar por dias.'],
   },
   {
+    match: '/app/desenvolvedor/entitlements',
+    title: 'Guia Rápido — Entitlements por plano (Ultria)',
+    whatIs:
+      'Esta área é o “Console Ultria” para definir, globalmente, módulos e limites padrão por plano (ex.: Serviços/Indústria, max usuários, limite de NF-e). Ela afeta todos os tenants.',
+    steps: [
+      'Escolha o plano (ESSENCIAL/PRO/MAX/INDUSTRIA/SCALE).',
+      'Ajuste módulos (plano_mvp) e limites (max_users, max_nfe_monthly).',
+      'Clique em “Salvar” e valide o “Efetivo” (aplica via billing → entitlements).',
+      'Se precisar voltar ao padrão: use “Remover override”.',
+    ],
+    dependsOn: ['Permissão: Ops/Desenvolvedor (manage)'],
+    connectsWith: ['Billing (assinaturas)', 'Entitlements por empresa', 'Plan gating'],
+    commonMistakes: ['Ajustar limite sem alinhar com o pricing real.', 'Confundir RBAC (permissões de usuário) com entitlements (plano).'],
+  },
+  {
     match: '/app/desenvolvedor/logs',
     title: 'Guia Rápido de Logs',
     whatIs:

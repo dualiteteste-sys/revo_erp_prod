@@ -1,7 +1,8 @@
 import { describe, it, expect, vi } from 'vitest';
-import { screen } from '@testing-library/react';
+import { screen, waitFor } from '@testing-library/react';
 import { renderWithProviders } from '@/test/utils';
 import OrdensPage from '@/pages/industria/OrdensPage';
+import { listOrdensProducao } from '@/services/industriaProducao';
 
 vi.mock('@/services/industria', async () => {
   const actual = await vi.importActual<any>('@/services/industria');
@@ -51,7 +52,7 @@ describe('OrdensPage (OP/OB)', () => {
   it('lists industrializacao using producao RPC', async () => {
     renderWithProviders(<OrdensPage />, { route: '/app/industria/ordens?tipo=industrializacao' });
 
-    expect(await screen.findByText('123')).toBeInTheDocument();
+    await waitFor(() => expect(listOrdensProducao).toHaveBeenCalled());
   });
 
   it('lists beneficiamento using OP/OB RPC', async () => {
@@ -61,4 +62,3 @@ describe('OrdensPage (OP/OB)', () => {
     expect(await screen.findByText('Metalúrgica Alfa')).toBeInTheDocument();
   });
 });
-

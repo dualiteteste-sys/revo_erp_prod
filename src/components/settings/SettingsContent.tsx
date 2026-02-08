@@ -12,6 +12,7 @@ import AuditLogsPage from '@/components/settings/audit/AuditLogsPage';
 import OnboardingChecklistPage from '@/components/settings/onboarding/OnboardingChecklistPage';
 import FeatureFlagsPage from '@/components/settings/feature-flags/FeatureFlagsPage';
 import MarketplaceIntegrationsPage from '@/components/settings/ecommerce/MarketplaceIntegrationsPage';
+import UserProfilePage from '@/components/settings/user-profile/UserProfilePage';
 
 interface SettingsContentProps {
   activeItem: string;
@@ -30,6 +31,8 @@ const SettingsContent: React.FC<SettingsContentProps> = ({ activeItem }) => {
         return <UsersPage />;
       case 'Papéis e Permissões':
         return <RolesPage />;
+      case 'Perfil de Usuário':
+        return <UserProfilePage />;
       case 'Privacidade (LGPD)':
         return <PrivacyLgpdPage />;
       case 'Minha Assinatura':
