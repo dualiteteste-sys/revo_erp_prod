@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Loader2, Save } from 'lucide-react';
 import { savePartner, PartnerPayload, PartnerDetails, EnderecoPayload, ContatoPayload, findPartnerDuplicates } from '../../services/partners';
 import { useToast } from '../../contexts/ToastProvider';
@@ -11,6 +11,7 @@ import FinancialSection from './form-sections/FinancialSection';
 import { Pessoa } from '../../services/partners';
 import { isValidCpfOrCnpj } from '@/lib/masks';
 import { Button } from '@/components/ui/button';
+import { useAuth } from '@/contexts/AuthProvider';
 
 interface PartnerFormPanelProps {
   partner: PartnerDetails | null;
@@ -24,9 +25,13 @@ type PartnerFormTab = 'identificacao' | 'endereco' | 'contato' | 'financeiro' | 
 const PartnerFormPanel: React.FC<PartnerFormPanelProps> = ({ partner, initialValues, onSaveSuccess, onClose }) => {
   const { addToast } = useToast();
   const { confirm } = useConfirm();
+  const { loading: authLoading, activeEmpresaId } = useAuth();
   const [isSaving, setIsSaving] = useState(false);
   const [formData, setFormData] = useState<Partial<PartnerDetails>>({});
   const [activeTab, setActiveTab] = useState<PartnerFormTab>('identificacao');
+  const lastEmpresaIdRef = useRef<string | null>(activeEmpresaId);
+  const empresaChanged = lastEmpresaIdRef.current !== activeEmpresaId;
+  const actionTokenRef = useRef(0);
 
   useEffect(() => {
     if (partner) {
@@ -54,6 +59,15 @@ const PartnerFormPanel: React.FC<PartnerFormPanelProps> = ({ partner, initialVal
     setActiveTab('identificacao');
   }, [partner, initialValues]);
 
+  useEffect(() => {
+    const prevEmpresaId = lastEmpresaIdRef.current;
+    if (prevEmpresaId === activeEmpresaId) return;
+    actionTokenRef.current += 1;
+    setIsSaving(false);
+    setActiveTab('identificacao');
+    lastEmpresaIdRef.current = activeEmpresaId;
+  }, [activeEmpresaId]);
+
   const handlePessoaChange = (field: keyof Pessoa, value: any) => {
     setFormData(prev => ({ ...prev, [field]: value }));
   };
@@ -80,6 +94,11 @@ const PartnerFormPanel: React.FC<PartnerFormPanelProps> = ({ partner, initialVal
   };
 
   const handleSave = async () => {
+    if (authLoading || !activeEmpresaId || empresaChanged) {
+      addToast('Aguarde a troca de empresa concluir para salvar.', 'info');
+      return;
+    }
+
     if (!formData.nome) {
       addToast('O Nome/Razão Social é obrigatório.', 'error');
       return;
@@ -117,6 +136,9 @@ const PartnerFormPanel: React.FC<PartnerFormPanelProps> = ({ partner, initialVal
       return;
     }
 
+    const token = ++actionTokenRef.current;
+    const empresaSnapshot = activeEmpresaId;
+
     // Dedupe (não bloqueia por padrão): alerta caso e-mail/telefone já existam em outro parceiro
     try {
       const duplicates = await findPartnerDuplicates({
@@ -125,6 +147,7 @@ const PartnerFormPanel: React.FC<PartnerFormPanelProps> = ({ partner, initialVal
         telefone: telDigits || null,
         celular: celDigits || null,
       });
+      if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
       if (duplicates.length > 0) {
         const list = duplicates
           .slice(0, 5)
@@ -138,12 +161,14 @@ const PartnerFormPanel: React.FC<PartnerFormPanelProps> = ({ partner, initialVal
           cancelText: 'Revisar',
           variant: 'primary',
         });
+        if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
         if (!ok) {
           setActiveTab('contato');
           return;
         }
       }
     } catch {
+      if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
       // best-effort: não bloqueia o save
     }
     
@@ -158,12 +183,15 @@ const PartnerFormPanel: React.FC<PartnerFormPanelProps> = ({ partner, initialVal
       };
 
       const savedPartner = await savePartner(payload);
+      if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
       
       addToast('Salvo com sucesso!', 'success');
       onSaveSuccess(savedPartner);
     } catch (error: any) {
+      if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
       addToast(error.message, 'error');
     } finally {
+      if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
       setIsSaving(false);
     }
   };
@@ -231,7 +259,7 @@ const PartnerFormPanel: React.FC<PartnerFormPanelProps> = ({ partner, initialVal
       <footer className="flex-shrink-0 p-4 flex justify-end items-center border-t border-white/20">
         <div className="flex gap-3">
           <Button type="button" variant="outline" onClick={onClose}>Cancelar</Button>
-          <Button type="button" onClick={handleSave} disabled={isSaving}>
+          <Button type="button" onClick={handleSave} disabled={isSaving || authLoading || !activeEmpresaId || empresaChanged}>
             {isSaving ? <Loader2 className="animate-spin" size={18} /> : <Save size={18} />}
             <span className="ml-2">Salvar</span>
           </Button>
