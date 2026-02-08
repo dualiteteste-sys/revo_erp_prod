@@ -7,6 +7,7 @@ import Toggle from '@/components/ui/forms/Toggle';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/contexts/ToastProvider';
 import { MeioPagamentoAdminRow, MeioPagamentoTipo, upsertMeioPagamento } from '@/services/meiosPagamento';
+import { useAuth } from '@/contexts/AuthProvider';
 
 type Props = {
   open: boolean;
@@ -18,12 +19,16 @@ type Props = {
 
 export default function MeioPagamentoFormPanel({ open, onClose, initial, defaultTipo, onSaved }: Props) {
   const { addToast } = useToast();
+  const { loading: authLoading, activeEmpresaId } = useAuth();
   const isEdit = !!initial?.id;
 
   const [tipo, setTipo] = React.useState<MeioPagamentoTipo>(initial?.tipo ?? defaultTipo ?? 'pagamento');
   const [nome, setNome] = React.useState<string>(initial?.nome ?? '');
   const [ativo, setAtivo] = React.useState<boolean>(initial?.ativo ?? true);
   const [saving, setSaving] = React.useState(false);
+  const lastEmpresaIdRef = React.useRef<string | null>(activeEmpresaId);
+  const empresaChanged = lastEmpresaIdRef.current !== activeEmpresaId;
+  const actionTokenRef = React.useRef(0);
 
   React.useEffect(() => {
     if (!open) return;
@@ -32,9 +37,21 @@ export default function MeioPagamentoFormPanel({ open, onClose, initial, default
     setAtivo(initial?.ativo ?? true);
   }, [open, initial, defaultTipo]);
 
+  React.useEffect(() => {
+    const prevEmpresaId = lastEmpresaIdRef.current;
+    if (prevEmpresaId === activeEmpresaId) return;
+    actionTokenRef.current += 1;
+    setSaving(false);
+    lastEmpresaIdRef.current = activeEmpresaId;
+  }, [activeEmpresaId]);
+
   const canEdit = !initial?.is_system;
 
   const handleSubmit = async () => {
+    if (authLoading || !activeEmpresaId || empresaChanged) {
+      addToast('Aguarde a troca de empresa concluir para salvar.', 'info');
+      return;
+    }
     const clean = nome.trim();
     if (!clean) {
       addToast('Nome é obrigatório.', 'error');
@@ -45,15 +62,20 @@ export default function MeioPagamentoFormPanel({ open, onClose, initial, default
       return;
     }
 
+    const token = ++actionTokenRef.current;
+    const empresaSnapshot = activeEmpresaId;
     setSaving(true);
     try {
       await upsertMeioPagamento({ id: initial?.id ?? null, tipo, nome: clean, ativo });
+      if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
       addToast(isEdit ? 'Atualizado com sucesso!' : 'Criado com sucesso!', 'success');
       onSaved();
     } catch (e: any) {
+      if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
       const msg = String(e?.message || e || 'Erro ao salvar.');
       addToast(msg, 'error');
     } finally {
+      if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
       setSaving(false);
     }
   };
@@ -119,7 +141,7 @@ export default function MeioPagamentoFormPanel({ open, onClose, initial, default
             </button>
             <button
               onClick={handleSubmit}
-              disabled={saving}
+              disabled={saving || authLoading || !activeEmpresaId || empresaChanged}
               className="bg-blue-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-blue-700 disabled:opacity-50"
             >
               {saving ? 'Salvando…' : 'Salvar'}
