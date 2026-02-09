@@ -966,6 +966,11 @@ export default function PedidoVendaFormPanel({ vendaId, onSaveSuccess, onClose, 
             </span>
           </div>
         )}
+        {formData.status === 'aprovado' && (
+          <div className="mb-4 rounded-lg border border-green-200 bg-green-50 px-3 py-2 text-sm font-medium text-green-800">
+            Pedido aprovado com sucesso!
+          </div>
+        )}
 
         {isMarketplaceOrder && (
           <Section title="Marketplace" description="Histórico e eventos da integração">
