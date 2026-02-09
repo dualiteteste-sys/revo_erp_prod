@@ -225,7 +225,7 @@ export default function PedidoVendaFormPanel({ vendaId, onSaveSuccess, onClose, 
 
   useEffect(() => {
     if (!vendaId) return;
-    if (authLoading || !activeEmpresaId || empresaChanged) return;
+    if (!activeEmpresaId || empresaChanged) return;
     void loadDetails({ id: vendaId, closeOnError: true });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeEmpresaId, authLoading, empresaChanged, vendaId]);
@@ -284,7 +284,7 @@ export default function PedidoVendaFormPanel({ vendaId, onSaveSuccess, onClose, 
   }, [mode, canFinalizePdv, formData.id, formData.status, isSaving, addingSku]);
 
   const loadDetails = async (params?: { id?: string | null; closeOnError?: boolean; silent?: boolean }) => {
-    if (authLoading || !activeEmpresaId || empresaChanged) return false;
+    if (!activeEmpresaId || empresaChanged) return false;
     const token = ++actionTokenRef.current;
     const empresaSnapshot = activeEmpresaId;
     const targetId = params?.id ?? vendaId ?? formData.id ?? null;

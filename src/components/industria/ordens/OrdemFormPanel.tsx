@@ -578,7 +578,7 @@ export default function OrdemFormPanel({
   };
 
   const handleGerarExecucao = async () => {
-    if (authLoading || !activeEmpresaId || empresaChanged) return;
+    if (!activeEmpresaId || empresaChanged) return;
     if (!canEdit) {
       addToast('Você não tem permissão para gerar operações.', 'error');
       return;
