@@ -13,8 +13,11 @@ import { useState, useEffect, useCallback } from 'react';
  */
 export const useNumericField = (
   initialValue: number | null | undefined,
-  onChange: (value: number | null) => void
+  onChange: (value: number | null) => void,
+  options?: { allowNegative?: boolean }
 ) => {
+  const allowNegative = options?.allowNegative ?? false;
+
   const format = (num: number | null | undefined): string => {
     if (num === null || num === undefined) return '';
     return new Intl.NumberFormat('pt-BR', {
@@ -42,11 +45,17 @@ export const useNumericField = (
 
   const handleChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const rawValue = e.target.value;
-    
+    const isNegative = allowNegative && /^\s*-/.test(rawValue);
+
     // 1. Get only the digits from the input
     const digits = rawValue.replace(/\D/g, '');
-    
+
     if (digits === '') {
+      if (isNegative) {
+        setStringValue('-');
+        onChange(null);
+        return;
+      }
       setStringValue('');
       onChange(null);
       return;
@@ -54,15 +63,19 @@ export const useNumericField = (
 
     // 2. Convert the digits to a number (as cents)
     const numberValue = parseInt(digits, 10);
-    
+
+    const signedNumber = isNegative ? -(numberValue / 100) : numberValue / 100;
+
     // 3. Format it back to a currency string
-    const formattedValue = new Intl.NumberFormat('pt-BR', {
+    const formattedAbsValue = new Intl.NumberFormat('pt-BR', {
       minimumFractionDigits: 2,
     }).format(numberValue / 100);
 
+    const formattedValue = isNegative ? `-${formattedAbsValue}` : formattedAbsValue;
+
     setStringValue(formattedValue);
-    onChange(numberValue / 100);
-  }, [onChange]);
+    onChange(signedNumber);
+  }, [allowNegative, onChange]);
 
   return {
     value: stringValue,
