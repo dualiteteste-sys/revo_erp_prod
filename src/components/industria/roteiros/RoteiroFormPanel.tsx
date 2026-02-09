@@ -11,6 +11,7 @@ import ItemAutocomplete from '@/components/os/ItemAutocomplete';
 import RoteiroEtapasGrid from './RoteiroEtapasGrid';
 import { logger } from '@/lib/logger';
 import WizardStepper from '@/components/ui/WizardStepper';
+import { useAuth } from '@/contexts/AuthProvider';
 
 interface Props {
   roteiroId: string | null;
@@ -21,10 +22,14 @@ interface Props {
 
 export default function RoteiroFormPanel({ roteiroId, initialData, onSaveSuccess, onClose }: Props) {
   const { addToast } = useToast();
+  const { loading: authLoading, activeEmpresaId } = useAuth();
   const [loading, setLoading] = useState(!!roteiroId);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [activeTab, setActiveTab] = useState<'dados' | 'etapas'>('dados');
+  const lastEmpresaIdRef = React.useRef<string | null>(activeEmpresaId);
+  const empresaChanged = lastEmpresaIdRef.current !== activeEmpresaId;
+  const actionTokenRef = React.useRef(0);
 
   const INITIAL_DATA: Partial<RoteiroDetails> = {
     tipo_bom: 'producao',
@@ -38,6 +43,16 @@ export default function RoteiroFormPanel({ roteiroId, initialData, onSaveSuccess
   const [formData, setFormData] = useState<Partial<RoteiroDetails>>(INITIAL_DATA);
 
   useEffect(() => {
+    const prevEmpresaId = lastEmpresaIdRef.current;
+    if (prevEmpresaId === activeEmpresaId) return;
+    actionTokenRef.current += 1;
+    setLoading(false);
+    setIsSaving(false);
+    lastEmpresaIdRef.current = activeEmpresaId;
+  }, [activeEmpresaId]);
+
+  useEffect(() => {
+    if (authLoading || !activeEmpresaId || empresaChanged) return;
     if (roteiroId) {
       loadDetails(roteiroId, 'initial');
     } else if (initialData) {
@@ -45,9 +60,12 @@ export default function RoteiroFormPanel({ roteiroId, initialData, onSaveSuccess
     } else {
       setFormData(INITIAL_DATA);
     }
-  }, [roteiroId, initialData]);
+  }, [activeEmpresaId, authLoading, empresaChanged, initialData, roteiroId]);
 
   const loadDetails = async (idOverride?: string | null, behavior: 'initial' | 'refresh' = 'refresh') => {
+    if (authLoading || !activeEmpresaId || empresaChanged) return;
+    const token = ++actionTokenRef.current;
+    const empresaSnapshot = activeEmpresaId;
     const idToLoad = idOverride ?? roteiroId ?? formData?.id;
     if (!idToLoad) {
       setLoading(false);
@@ -56,12 +74,14 @@ export default function RoteiroFormPanel({ roteiroId, initialData, onSaveSuccess
     try {
       setLoadError(null);
       const data = await getRoteiroDetails(idToLoad);
+      if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
       if (data) {
         setFormData(data);
       } else {
         throw new Error('Roteiro não encontrado');
       }
     } catch (e) {
+      if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
       logger.error('[Indústria][Roteiro] Falha ao carregar roteiro', e, { roteiroId: idToLoad });
       const message = behavior === 'initial'
         ? 'Não foi possível abrir este roteiro. Tente recarregar.'
@@ -69,6 +89,7 @@ export default function RoteiroFormPanel({ roteiroId, initialData, onSaveSuccess
       setLoadError(message);
       addToast(message, 'error');
     } finally {
+      if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
       setLoading(false);
     }
   };
@@ -83,11 +104,17 @@ export default function RoteiroFormPanel({ roteiroId, initialData, onSaveSuccess
   };
 
   const handleSaveHeader = async () => {
+    if (authLoading || !activeEmpresaId || empresaChanged) {
+      addToast('Aguarde a troca de empresa concluir para salvar.', 'info');
+      return;
+    }
     if (!formData.produto_id) {
       addToast('Selecione um produto.', 'error');
       return;
     }
 
+    const token = ++actionTokenRef.current;
+    const empresaSnapshot = activeEmpresaId;
     setIsSaving(true);
     try {
       const versao = String(formData.versao ?? '').trim() || '1.0';
@@ -105,6 +132,7 @@ export default function RoteiroFormPanel({ roteiroId, initialData, onSaveSuccess
       };
 
       const saved = await saveRoteiro(payload);
+      if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return null;
       setFormData(prev => ({ ...prev, ...saved }));
 
       if (!formData.id) {
@@ -117,9 +145,11 @@ export default function RoteiroFormPanel({ roteiroId, initialData, onSaveSuccess
       onSaveSuccess();
       return saved.id;
     } catch (e: any) {
+      if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return null;
       addToast(e.message, 'error');
       return null;
     } finally {
+      if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return null;
       setIsSaving(false);
     }
   };
@@ -279,7 +309,7 @@ export default function RoteiroFormPanel({ roteiroId, initialData, onSaveSuccess
           </button>
           <button
             onClick={handlePrimarySaveClick}
-            disabled={isSaving}
+            disabled={isSaving || authLoading || !activeEmpresaId || empresaChanged}
             className="flex items-center gap-2 bg-blue-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-blue-700 disabled:opacity-50"
           >
             {isSaving ? <Loader2 className="animate-spin" size={20} /> : <Save size={20} />}
