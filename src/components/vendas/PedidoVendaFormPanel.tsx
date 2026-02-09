@@ -30,6 +30,7 @@ import ProductFormPanel, { type ProductFormData } from '@/components/products/Pr
 import { searchClients } from '@/services/clients';
 import { saveProduct } from '@/services/products';
 import { useAuth } from '@/contexts/AuthProvider';
+import { failOperation, startOperation, succeedOperation } from '@/lib/operationTelemetry';
 
 interface Props {
   vendaId: string | null;
@@ -450,6 +451,12 @@ export default function PedidoVendaFormPanel({ vendaId, onSaveSuccess, onClose, 
     }
 
     setIsSaving(true);
+    const saveSession = startOperation({
+      domain: 'vendas_pedido',
+      action: formData.id ? 'atualizar_cabecalho' : 'criar_cabecalho',
+      tenantId: activeEmpresaId,
+      entityId: formData.id ?? null,
+    });
     try {
       const clienteId = formData.cliente_id || (mode === 'pdv' ? await ensurePdvDefaultClienteId() : null);
       if (!clienteId) {
@@ -493,9 +500,16 @@ export default function PedidoVendaFormPanel({ vendaId, onSaveSuccess, onClose, 
         addToast('Pedido salvo.', 'success');
       }
       onSaveSuccess({ keepOpen: !formData.id });
+      succeedOperation(saveSession, { pedido_id: saved.id, status: saved.status ?? null });
       return saved.id;
     } catch (e: any) {
       if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return null;
+      failOperation(
+        saveSession,
+        e,
+        { pedido_id: formData.id ?? null, status: formData.status ?? null },
+        '[VENDAS][PEDIDO][SAVE][ERROR]'
+      );
       addToast(e.message, 'error');
       return null;
     } finally {
@@ -732,6 +746,12 @@ export default function PedidoVendaFormPanel({ vendaId, onSaveSuccess, onClose, 
 	    if (!ok) return;
       const token = ++actionTokenRef.current;
       const empresaSnapshot = activeEmpresaId;
+      const cancelSession = startOperation({
+        domain: 'vendas_pedido',
+        action: 'cancelar',
+        tenantId: activeEmpresaId,
+        entityId: formData.id ?? null,
+      });
 	    setIsSaving(true);
 	    try {
 	      if (!formData.id) {
@@ -770,10 +790,12 @@ export default function PedidoVendaFormPanel({ vendaId, onSaveSuccess, onClose, 
 
 	      await saveVenda(payload);
           if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
+          succeedOperation(cancelSession, { pedido_id: formData.id, status: 'cancelado' });
 	      addToast('Pedido cancelado.', 'success');
 	      onSaveSuccess();
 	    } catch (e: any) {
           if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
+          failOperation(cancelSession, e, { pedido_id: formData.id ?? null }, '[VENDAS][PEDIDO][CANCEL][ERROR]');
 	      addToast(e.message, 'error');
 	    } finally {
           if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
@@ -806,6 +828,12 @@ export default function PedidoVendaFormPanel({ vendaId, onSaveSuccess, onClose, 
     if (!ok) return;
     const token = ++actionTokenRef.current;
     const empresaSnapshot = activeEmpresaId;
+    const concludeSession = startOperation({
+      domain: 'vendas_pedido',
+      action: 'concluir',
+      tenantId: activeEmpresaId,
+      entityId: formData.id,
+    });
     setIsSaving(true);
     try {
       await concluirVendaPedido(formData.id);
@@ -814,6 +842,7 @@ export default function PedidoVendaFormPanel({ vendaId, onSaveSuccess, onClose, 
       if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
       addToast('Pedido concluído e estoque baixado.', 'success');
       onSaveSuccess();
+      succeedOperation(concludeSession, { pedido_id: formData.id, status: 'concluido' });
 
 	      const wantTitles = await confirm({
 	        title: 'Gerar títulos (contas a receber)',
@@ -825,6 +854,7 @@ export default function PedidoVendaFormPanel({ vendaId, onSaveSuccess, onClose, 
       if (wantTitles) setParcelamentoOpen(true);
     } catch (e: any) {
       if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
+      failOperation(concludeSession, e, { pedido_id: formData.id }, '[VENDAS][PEDIDO][CONCLUIR][ERROR]');
       addToast(e?.message || 'Falha ao concluir pedido.', 'error');
     } finally {
       if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
