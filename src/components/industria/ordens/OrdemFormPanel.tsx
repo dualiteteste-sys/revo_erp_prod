@@ -222,7 +222,7 @@ export default function OrdemFormPanel({
   };
 
 	  const handleSaveHeader = async () => {
-        if (!activeEmpresaId || empresaChanged) {
+        if (empresaChanged) {
           addToast('Aguarde a troca de empresa concluir para salvar.', 'info');
           return null;
         }
@@ -252,7 +252,7 @@ export default function OrdemFormPanel({
     }
 
         const token = ++actionTokenRef.current;
-        const empresaSnapshot = activeEmpresaId;
+        const empresaSnapshot = activeEmpresaId ?? null;
 	    setIsSaving(true);
 	    try {
 	      let materialClienteId = formData.material_cliente_id || null;
@@ -578,14 +578,14 @@ export default function OrdemFormPanel({
   };
 
   const handleGerarExecucao = async () => {
-    if (!activeEmpresaId || empresaChanged) return;
+    if (empresaChanged) return;
     if (!canEdit) {
       addToast('Você não tem permissão para gerar operações.', 'error');
       return;
     }
     if (isLockedEffective) return;
     const token = ++actionTokenRef.current;
-    const empresaSnapshot = activeEmpresaId;
+    const empresaSnapshot = activeEmpresaId ?? null;
     setIsGeneratingExecucao(true);
     try {
       let currentId: string | null = formData.id ?? null;

@@ -225,7 +225,7 @@ export default function PedidoVendaFormPanel({ vendaId, onSaveSuccess, onClose, 
 
   useEffect(() => {
     if (!vendaId) return;
-    if (!activeEmpresaId || empresaChanged) return;
+    if (empresaChanged) return;
     void loadDetails({ id: vendaId, closeOnError: true });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeEmpresaId, authLoading, empresaChanged, vendaId]);
@@ -284,9 +284,9 @@ export default function PedidoVendaFormPanel({ vendaId, onSaveSuccess, onClose, 
   }, [mode, canFinalizePdv, formData.id, formData.status, isSaving, addingSku]);
 
   const loadDetails = async (params?: { id?: string | null; closeOnError?: boolean; silent?: boolean }) => {
-    if (!activeEmpresaId || empresaChanged) return false;
+    if (empresaChanged) return false;
     const token = ++actionTokenRef.current;
-    const empresaSnapshot = activeEmpresaId;
+    const empresaSnapshot = activeEmpresaId ?? null;
     const targetId = params?.id ?? vendaId ?? formData.id ?? null;
     if (!targetId) return false;
 
@@ -708,7 +708,7 @@ export default function PedidoVendaFormPanel({ vendaId, onSaveSuccess, onClose, 
 	  };
 
   const handleAprovar = async () => {
-    if (authLoading || !activeEmpresaId || empresaChanged) return;
+    if (empresaChanged) return;
     const ok = await confirm({
       title: 'Aprovar pedido',
       description: 'Confirmar aprovação do pedido?',
@@ -718,7 +718,7 @@ export default function PedidoVendaFormPanel({ vendaId, onSaveSuccess, onClose, 
     });
     if (!ok) return;
     const token = ++actionTokenRef.current;
-    const empresaSnapshot = activeEmpresaId;
+    const empresaSnapshot = activeEmpresaId ?? null;
     setIsSaving(true);
     try {
       await aprovarVenda(formData.id!);
@@ -1528,7 +1528,7 @@ export default function PedidoVendaFormPanel({ vendaId, onSaveSuccess, onClose, 
           {formData.id && !isLocked && (
             <button 
               onClick={handleAprovar} 
-              disabled={isSaving || (formData.itens?.length || 0) === 0 || authLoading || !activeEmpresaId || empresaChanged}
+              disabled={isSaving || (formData.itens?.length || 0) === 0 || empresaChanged}
               className="flex items-center gap-2 bg-green-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-green-700 disabled:opacity-50"
             >
               <CheckCircle size={20} /> Aprovar Venda
