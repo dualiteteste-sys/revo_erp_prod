@@ -734,6 +734,16 @@ export default function PedidoVendaFormPanel({ vendaId, onSaveSuccess, onClose, 
       onSaveSuccess({ keepOpen: true });
     } catch (e: any) {
       if (empresaSnapshot !== lastEmpresaIdRef.current) return;
+      try {
+        const latest = await fetchVendaDetails(pedidoId);
+        if (latest?.status === 'aprovado' || latest?.status === 'concluido') {
+          addToast('Pedido aprovado com sucesso!', 'success');
+          onSaveSuccess({ keepOpen: true });
+          return;
+        }
+      } catch {
+        // no-op: keeps original error handling below
+      }
       addToast(e.message, 'error');
     } finally {
       if (empresaSnapshot !== lastEmpresaIdRef.current) return;
