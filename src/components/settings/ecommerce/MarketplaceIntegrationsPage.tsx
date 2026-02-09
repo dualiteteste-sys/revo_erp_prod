@@ -15,6 +15,7 @@ import {
   getEcommerceHealthSummary,
   listEcommerceConnections,
   normalizeEcommerceConfig,
+  resolveWooConnectionStatus,
   setWooConnectionSecrets,
   upsertEcommerceConnection,
   updateEcommerceConnectionConfig,
@@ -35,6 +36,7 @@ import { listTabelasPreco } from '@/services/pricing';
 
 type Provider = 'meli' | 'shopee' | 'woo';
 type CatalogProvider = Exclude<Provider, 'woo'>;
+const WOO_CREDENTIAL_MASK = '••••••••••••••••';
 
 const providerLabels: Record<Provider, string> = {
   meli: 'Mercado Livre',
@@ -103,6 +105,8 @@ export default function MarketplaceIntegrationsPage() {
   const [wooOptionsLoading, setWooOptionsLoading] = useState(false);
   const [wooDiag, setWooDiag] = useState<EcommerceConnectionDiagnostics | null>(null);
   const [wooDiagUnavailable, setWooDiagUnavailable] = useState(false);
+  const [wooEditingConsumerKey, setWooEditingConsumerKey] = useState(false);
+  const [wooEditingConsumerSecret, setWooEditingConsumerSecret] = useState(false);
 
   const mappingsColumns: TableColumnWidthDef[] = [
     { id: 'produto', defaultWidth: 320, minWidth: 220 },
@@ -261,6 +265,8 @@ export default function MarketplaceIntegrationsPage() {
     setDiagnostics(null);
     setWooConsumerKey('');
     setWooConsumerSecret('');
+    setWooEditingConsumerKey(false);
+    setWooEditingConsumerSecret(false);
     setConfigOpen(true);
     if (provider === 'woo') void refreshWooDiag();
   };
@@ -364,12 +370,12 @@ export default function MarketplaceIntegrationsPage() {
           diagUnavailableNow,
         );
 
-        const nextStatus =
-          storeUrl && hasSecrets
-            ? 'connected'
-            : diagUnavailableNow && String(activeConnection.status ?? '').toLowerCase() === 'connected'
-              ? 'connected'
-              : 'pending';
+        const nextStatus = resolveWooConnectionStatus({
+          storeUrl,
+          hasSecrets,
+          diagnosticsUnavailable: diagUnavailableNow,
+          previousStatus: activeConnection.status ?? null,
+        });
         await upsertEcommerceConnection({
           provider: 'woo',
           nome: providerLabels.woo,
@@ -419,10 +425,39 @@ export default function MarketplaceIntegrationsPage() {
     setWooSavingSecrets(true);
     try {
       await setWooConnectionSecrets({ ecommerceId: activeConnection.id, consumerKey, consumerSecret });
-      addToast('Credenciais salvas.', 'success');
       setWooConsumerKey('');
       setWooConsumerSecret('');
-      await refreshWooDiag();
+      setWooEditingConsumerKey(false);
+      setWooEditingConsumerSecret(false);
+      const diag = await refreshWooDiag();
+      const storeUrl = String(activeConnection.config?.store_url ?? '').trim();
+      const diagUnavailableNow = diag == null;
+      const nextStatus = resolveWooConnectionStatus({
+        storeUrl,
+        hasSecrets: true,
+        diagnosticsUnavailable: diagUnavailableNow,
+        previousStatus: activeConnection.status ?? null,
+      });
+
+      await upsertEcommerceConnection({
+        provider: 'woo',
+        nome: providerLabels.woo,
+        status: nextStatus,
+        external_account_id: activeConnection.external_account_id ?? null,
+        config: normalizeEcommerceConfig(activeConnection.config ?? {}),
+      });
+
+      setActiveConnection((prev) => (prev ? { ...prev, status: nextStatus } : prev));
+      if (nextStatus === 'connected') {
+        addToast('Credenciais salvas e integração conectada.', 'success');
+      } else {
+        const reason = wooPendingReason(
+          { ...activeConnection, config: activeConnection.config ?? null },
+          diag ?? null,
+          diagUnavailableNow,
+        );
+        addToast(`Credenciais salvas, mas a integração segue pendente. ${reason ? `Motivo: ${reason}.` : ''}`.trim(), 'warning');
+      }
       await fetchAll();
     } catch (e: any) {
       addToast(e?.message || 'Falha ao salvar credenciais.', 'error');
@@ -742,9 +777,26 @@ export default function MarketplaceIntegrationsPage() {
                             ) : null}
                           </div>
                         }
-                        value={wooConsumerKey}
+                        value={
+                          wooDiag?.has_token && !wooConsumerKey && !wooEditingConsumerKey
+                            ? WOO_CREDENTIAL_MASK
+                            : wooConsumerKey
+                        }
                         placeholder={wooDiag?.has_token && !wooConsumerKey ? 'Salvo (mascarado)' : 'ck_...'}
-                        onChange={(e) => setWooConsumerKey((e.target as HTMLInputElement).value)}
+                        onFocus={() => {
+                          if (wooDiag?.has_token && !wooConsumerKey && !wooEditingConsumerKey) {
+                            setWooEditingConsumerKey(true);
+                            setWooConsumerKey('');
+                          }
+                        }}
+                        onBlur={() => {
+                          if (!wooConsumerKey) setWooEditingConsumerKey(false);
+                        }}
+                        onChange={(e) => {
+                          setWooEditingConsumerKey(true);
+                          setWooConsumerKey((e.target as HTMLInputElement).value);
+                        }}
+                        type="password"
                         helperText={
                           wooDiag?.has_token && !wooConsumerKey
                             ? 'Armazenado com segurança. Para substituir, cole uma nova chave.'
@@ -762,9 +814,25 @@ export default function MarketplaceIntegrationsPage() {
                             ) : null}
                           </div>
                         }
-                        value={wooConsumerSecret}
+                        value={
+                          wooDiag?.has_token && !wooConsumerSecret && !wooEditingConsumerSecret
+                            ? WOO_CREDENTIAL_MASK
+                            : wooConsumerSecret
+                        }
                         placeholder={wooDiag?.has_token && !wooConsumerSecret ? 'Salvo (mascarado)' : 'cs_...'}
-                        onChange={(e) => setWooConsumerSecret((e.target as HTMLInputElement).value)}
+                        onFocus={() => {
+                          if (wooDiag?.has_token && !wooConsumerSecret && !wooEditingConsumerSecret) {
+                            setWooEditingConsumerSecret(true);
+                            setWooConsumerSecret('');
+                          }
+                        }}
+                        onBlur={() => {
+                          if (!wooConsumerSecret) setWooEditingConsumerSecret(false);
+                        }}
+                        onChange={(e) => {
+                          setWooEditingConsumerSecret(true);
+                          setWooConsumerSecret((e.target as HTMLInputElement).value);
+                        }}
                         type="password"
                         helperText={
                           wooDiag?.has_token && !wooConsumerSecret
