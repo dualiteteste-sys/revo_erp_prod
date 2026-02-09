@@ -284,6 +284,11 @@ export default function MovimentacoesTable({ movimentacoes, onEdit, onDelete }: 
                                 </a>
                               </div>
                               <div className="text-xs text-gray-500">
+                                {mov.origem_tipo === 'transferencia_interna' ? (
+                                  <span className="mr-2 rounded bg-blue-50 px-1.5 py-0.5 text-[11px] font-medium text-blue-700">
+                                    Transferência interna
+                                  </span>
+                                ) : null}
                                 {mov.categoria ? <span className="mr-2 bg-gray-100 px-1 rounded">{mov.categoria}</span> : null}
                                 {mov.documento_ref ? <span>Doc: {mov.documento_ref}</span> : null}
                               </div>
