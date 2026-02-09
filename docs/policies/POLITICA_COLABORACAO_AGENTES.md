@@ -85,4 +85,21 @@ concurrency:
 - [ ] PR aponta para `dev` (exceto PR `dev→main`)
 - [ ] CI relevante ficou ✅ (Release Gate / Verify Migrations / E2E Gate quando aplicável)
 - [ ] Sem segredos / sem drift de Supabase (DDL só via migration)
+- [ ] Preflight de efeitos colaterais preenchido conforme `docs/policies/PREFLIGHT_EFEITOS_COLATERAIS.md`
 
+## 7) Preflight de efeitos colaterais (obrigatório)
+
+Antes de qualquer implementação, todo agente deve preencher matriz de risco com:
+
+- risco funcional
+- risco de dados/contrato
+- risco de UI/UX
+- risco de cálculo (totais, ordenação, diferenças)
+- risco operacional (deploy/rollback/flags)
+
+Regra de execução:
+
+1) Definir risco -> mitigação -> teste obrigatório.
+2) Implementar somente após esse mapeamento.
+3) Anexar a matriz no PR.
+4) Se houver risco alto sem mitigação, pausar e alinhar antes de seguir.
