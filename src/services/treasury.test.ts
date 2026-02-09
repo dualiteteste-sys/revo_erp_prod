@@ -46,4 +46,76 @@ describe('treasury service', () => {
     });
     expect(result.movimentacao_saida_id).toBe('mov-out');
   });
+
+  it('normaliza valor na listagem de movimentações usando valor_entrada/valor_saida quando valor não vem no DTO', async () => {
+    callRpcMock.mockResolvedValueOnce([
+      {
+        id: 'mov-1',
+        data_movimento: '2026-02-09',
+        tipo_mov: 'entrada',
+        descricao: 'Recebimento',
+        documento_ref: null,
+        origem_tipo: null,
+        origem_id: null,
+        valor_entrada: 100.25,
+        valor_saida: 0,
+        saldo_acumulado: 350.25,
+        conciliado: false,
+        total_count: 2,
+      },
+      {
+        id: 'mov-2',
+        data_movimento: '2026-02-09',
+        tipo_mov: 'saida',
+        descricao: 'Pagamento',
+        documento_ref: null,
+        origem_tipo: null,
+        origem_id: null,
+        valor_entrada: 0,
+        valor_saida: '55.10',
+        saldo_acumulado: 295.15,
+        conciliado: false,
+        total_count: 2,
+      },
+    ]);
+
+    const { listMovimentacoes } = await import('./treasury');
+    const res = await listMovimentacoes({
+      contaCorrenteId: 'cc-1',
+      page: 1,
+      pageSize: 50,
+    });
+
+    expect(res.count).toBe(2);
+    expect(res.data[0].valor).toBe(100.25);
+    expect(res.data[1].valor).toBe(55.1);
+  });
+
+  it('mantém valor nulo quando DTO da movimentação vem sem campo monetário válido', async () => {
+    callRpcMock.mockResolvedValueOnce([
+      {
+        id: 'mov-x',
+        data_movimento: '2026-02-09',
+        tipo_mov: 'entrada',
+        descricao: 'Sem valor',
+        documento_ref: null,
+        origem_tipo: null,
+        origem_id: null,
+        valor_entrada: null,
+        valor_saida: undefined,
+        saldo_acumulado: 0,
+        conciliado: false,
+        total_count: 1,
+      },
+    ]);
+
+    const { listMovimentacoes } = await import('./treasury');
+    const res = await listMovimentacoes({
+      contaCorrenteId: 'cc-1',
+      page: 1,
+      pageSize: 50,
+    });
+
+    expect(res.data[0].valor).toBeNull();
+  });
 });

@@ -39,7 +39,7 @@ export type Movimentacao = {
   data_movimento: string;
   data_competencia: string | null;
   tipo_mov: 'entrada' | 'saida';
-  valor: number;
+  valor: number | null;
   descricao: string | null;
   documento_ref: string | null;
   origem_tipo: string | null;
@@ -188,8 +188,34 @@ export async function listMovimentacoes(options: {
     return { data: [], count: 0 };
   }
 
+  const toFiniteNumberOrNull = (value: unknown): number | null => {
+    if (value === null || value === undefined) return null;
+    const parsed = typeof value === 'number' ? value : Number(value);
+    return Number.isFinite(parsed) ? parsed : null;
+  };
+
+  const normalized = data.map((row) => {
+    const valorEntrada = toFiniteNumberOrNull(row.valor_entrada);
+    const valorSaida = toFiniteNumberOrNull(row.valor_saida);
+    const valorDireto = toFiniteNumberOrNull(row.valor);
+
+    let valor = valorDireto;
+    if (valor === null) {
+      if (valorEntrada !== null && valorEntrada > 0) valor = valorEntrada;
+      else if (valorSaida !== null && valorSaida > 0) valor = valorSaida;
+    }
+
+    return {
+      ...row,
+      valor,
+      valor_entrada: valorEntrada,
+      valor_saida: valorSaida,
+      saldo_acumulado: toFiniteNumberOrNull(row.saldo_acumulado),
+    };
+  });
+
   const count = Number(data[0].total_count);
-  return { data: data as Movimentacao[], count };
+  return { data: normalized as Movimentacao[], count };
 }
 
 export async function getMovimentacao(id: string): Promise<Movimentacao> {

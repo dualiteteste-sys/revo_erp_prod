@@ -477,6 +477,24 @@ export default function TesourariaPage() {
 
           let best: { id: string; score: number } | null = null;
           for (const mov of unconciliated) {
+            const movValor =
+              (typeof mov.valor === 'number' && Number.isFinite(mov.valor))
+                ? mov.valor
+                : (
+                  (typeof mov.valor_entrada === 'number' && Number.isFinite(mov.valor_entrada) && mov.valor_entrada > 0)
+                    ? mov.valor_entrada
+                    : (
+                      (typeof mov.valor_saida === 'number' && Number.isFinite(mov.valor_saida) && mov.valor_saida > 0)
+                        ? mov.valor_saida
+                        : null
+                    )
+                );
+            if (movValor === null) {
+              if (import.meta.env.DEV) {
+                console.error('[Tesouraria][AutoConciliacao] movimentação sem valor válido', { mov, extratoId: extratoItem.id });
+              }
+              continue;
+            }
             const { score } = scoreExtratoToMovimentacao({
               extratoDescricao: extratoItem.descricao || '',
               extratoDocumento: extratoItem.documento_ref,
@@ -484,7 +502,7 @@ export default function TesourariaPage() {
               extratoDataISO: extratoItem.data_lancamento,
               movDescricao: mov.descricao,
               movDocumento: mov.documento_ref,
-              movValor: mov.valor,
+              movValor,
               movDataISO: mov.data_movimento,
             });
             if (!best || score > best.score) best = { id: mov.id, score };
