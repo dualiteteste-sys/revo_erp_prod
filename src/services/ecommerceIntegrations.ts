@@ -110,3 +110,19 @@ export async function setWooConnectionSecrets(params: {
     p_consumer_secret: params.consumerSecret,
   });
 }
+
+export function resolveWooConnectionStatus(params: {
+  storeUrl?: string | null;
+  hasSecrets: boolean;
+  diagnosticsUnavailable: boolean;
+  previousStatus?: string | null;
+}): 'connected' | 'pending' {
+  const hasStoreUrl = String(params.storeUrl ?? '').trim().length > 0;
+  if (hasStoreUrl && params.hasSecrets) return 'connected';
+
+  if (params.diagnosticsUnavailable && String(params.previousStatus ?? '').toLowerCase() === 'connected') {
+    return 'connected';
+  }
+
+  return 'pending';
+}
