@@ -24,6 +24,14 @@ import {
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Switch } from '@/components/ui/switch';
 import { listEcommerceProductMappings, upsertEcommerceProductMapping, type EcommerceProductMappingRow } from '@/services/ecommerceCatalog';
+import {
+  cancelEcommerceImportJob,
+  enqueueEcommerceImportJob,
+  listEcommerceImportJobs,
+  retryEcommerceImportJob,
+  type EcommerceImportJob,
+  type EcommerceImportJobStatus,
+} from '@/services/ecommerceImportJobs';
 import Input from '@/components/ui/forms/Input';
 import Select from '@/components/ui/forms/Select';
 import RoadmapButton from '@/components/roadmap/RoadmapButton';
@@ -62,6 +70,16 @@ function defaultConfig() {
   };
 }
 
+function jobStatusBadge(status: EcommerceImportJobStatus) {
+  const base = 'inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium';
+  if (status === 'done') return <span className={`${base} bg-emerald-100 text-emerald-800`}>Concluído</span>;
+  if (status === 'processing') return <span className={`${base} bg-sky-100 text-sky-800`}>Processando</span>;
+  if (status === 'pending') return <span className={`${base} bg-amber-100 text-amber-800`}>Na fila</span>;
+  if (status === 'error' || status === 'dead') return <span className={`${base} bg-red-100 text-red-800`}>Falha</span>;
+  if (status === 'canceled') return <span className={`${base} bg-gray-100 text-gray-700`}>Cancelado</span>;
+  return <span className={`${base} bg-gray-100 text-gray-700`}>{status}</span>;
+}
+
 function wooPendingReason(
   conn: EcommerceConnection | null,
   wooDiag: EcommerceConnectionDiagnostics | null,
@@ -89,7 +107,14 @@ export default function MarketplaceIntegrationsPage() {
   const [busyProvider, setBusyProvider] = useState<Provider | null>(null);
   const [testingProvider, setTestingProvider] = useState<Provider | null>(null);
   const [diagnostics, setDiagnostics] = useState<Record<string, any> | null>(null);
-  const [syncingOrders, setSyncingOrders] = useState<Provider | null>(null);
+  const [queueingImportProvider, setQueueingImportProvider] = useState<Provider | null>(null);
+  const [jobsByProvider, setJobsByProvider] = useState<Record<Provider, EcommerceImportJob[]>>({
+    meli: [],
+    shopee: [],
+    woo: [],
+  });
+  const [jobsLoadingProvider, setJobsLoadingProvider] = useState<Provider | null>(null);
+  const [jobsActionId, setJobsActionId] = useState<string | null>(null);
   const [mappingsOpen, setMappingsOpen] = useState(false);
   const [mappingsLoading, setMappingsLoading] = useState(false);
   const [mappingsProvider, setMappingsProvider] = useState<CatalogProvider>('meli');
@@ -148,6 +173,33 @@ export default function MarketplaceIntegrationsPage() {
     }
   }, [canView]);
 
+  const loadProviderJobs = useCallback(
+    async (provider: Provider) => {
+      if (!canView) return;
+      setJobsLoadingProvider(provider);
+      try {
+        const jobs = await listEcommerceImportJobs({
+          provider,
+          kind: 'import_orders',
+          limit: 6,
+          offset: 0,
+        });
+        setJobsByProvider((prev) => ({ ...prev, [provider]: jobs }));
+      } catch {
+        setJobsByProvider((prev) => ({ ...prev, [provider]: [] }));
+      } finally {
+        setJobsLoadingProvider((prev) => (prev === provider ? null : prev));
+      }
+    },
+    [canView],
+  );
+
+  const loadAllProviderJobs = useCallback(async () => {
+    if (!canView) return;
+    const providers: Provider[] = ['meli', 'shopee', 'woo'];
+    await Promise.all(providers.map(async (provider) => loadProviderJobs(provider)));
+  }, [canView, loadProviderJobs]);
+
   const fetchAll = useCallback(async () => {
     if (!canView) return;
     setLoading(true);
@@ -156,16 +208,18 @@ export default function MarketplaceIntegrationsPage() {
       setConnections(c);
       setHealth(h);
       void refreshWooDiag();
+      void loadAllProviderJobs();
     } catch (e: any) {
       addToast(e?.message || 'Falha ao carregar integrações.', 'error');
       setConnections([]);
       setHealth(null);
       setWooDiag(null);
       setWooDiagUnavailable(false);
+      setJobsByProvider({ meli: [], shopee: [], woo: [] });
     } finally {
       setLoading(false);
     }
-  }, [addToast, canView, refreshWooDiag]);
+  }, [addToast, canView, loadAllProviderJobs, refreshWooDiag]);
 
   useEffect(() => {
     void fetchAll();
@@ -512,63 +566,55 @@ export default function MarketplaceIntegrationsPage() {
   };
 
   const handleImportOrdersNow = async (provider: Provider) => {
-    if (!supabase) {
-      addToast('Supabase client indisponível.', 'error');
-      return;
-    }
     if (!canManage) {
       addToast('Sem permissão para gerenciar integrações.', 'warning');
       return;
     }
-    if (syncingOrders) return;
+    if (queueingImportProvider) return;
 
-    setSyncingOrders(provider);
+    setQueueingImportProvider(provider);
     try {
-      const { data, error } = await supabase.functions.invoke('marketplaces-sync', {
-        body: { provider, action: 'import_orders' },
+      const res = await enqueueEcommerceImportJob({
+        provider,
+        kind: 'import_orders',
+        payload: {},
+        idempotencyKey: null,
       });
-      if (error) throw error;
-      const imported = (data as any)?.imported ?? 0;
-      const skipped = (data as any)?.skipped_items ?? 0;
-      addToast(`Importação concluída: ${imported} pedidos. Itens sem mapeamento: ${skipped}.`, 'success');
+      addToast(`Importação enfileirada (${res.status}). Acompanhe o progresso na lista abaixo.`, 'success');
+      await loadProviderJobs(provider);
       await fetchAll();
     } catch (e: any) {
-      const status = e?.context?.status ?? e?.status ?? null;
-      const rawBody = e?.context?.body ?? null;
-      let body: any = null;
-      if (rawBody) {
-        try {
-          body = typeof rawBody === 'string' ? JSON.parse(rawBody) : rawBody;
-        } catch {
-          body = rawBody;
-        }
-      }
-
-      if (status === 409 && body?.error === 'ALREADY_RUNNING') {
-        addToast('Já existe uma importação em andamento. Aguarde alguns instantes e tente novamente.', 'info');
-        return;
-      }
-
-      if (status === 503 && body?.error === 'CIRCUIT_OPEN') {
-        const retryAfter = body?.retry_after_seconds ? Number(body.retry_after_seconds) : null;
-        const minutes = retryAfter ? Math.max(1, Math.ceil(retryAfter / 60)) : null;
-        addToast(
-          `Integração temporariamente instável. Tente novamente${minutes ? ` em ~${minutes} min` : ''}. Se persistir, abra Dev → Saúde para ver filas/DLQ.`,
-          'warning',
-        );
-        return;
-      }
-
-      if (status === 429 && body?.error === 'RATE_LIMITED') {
-        const retryAfter = body?.retry_after_seconds ? Number(body.retry_after_seconds) : null;
-        const seconds = retryAfter ? Math.max(1, Math.ceil(retryAfter)) : null;
-        addToast(`Muitas tentativas em pouco tempo. Tente novamente${seconds ? ` em ~${seconds}s` : ''}.`, 'warning');
-        return;
-      }
-
-      addToast(e?.message || 'Falha ao importar pedidos.', 'error');
+      addToast(e?.message || 'Falha ao enfileirar importação.', 'error');
     } finally {
-      setSyncingOrders(null);
+      setQueueingImportProvider(null);
+    }
+  };
+
+  const handleCancelJob = async (provider: Provider, jobId: string) => {
+    if (!canManage || jobsActionId) return;
+    setJobsActionId(jobId);
+    try {
+      const ok = await cancelEcommerceImportJob(jobId);
+      addToast(ok ? 'Job cancelado.' : 'Job não pôde ser cancelado (talvez já finalizado).', ok ? 'success' : 'warning');
+      await loadProviderJobs(provider);
+    } catch (e: any) {
+      addToast(e?.message || 'Falha ao cancelar job.', 'error');
+    } finally {
+      setJobsActionId(null);
+    }
+  };
+
+  const handleRetryJob = async (provider: Provider, jobId: string) => {
+    if (!canManage || jobsActionId) return;
+    setJobsActionId(jobId);
+    try {
+      await retryEcommerceImportJob(jobId, 'manual_retry_from_ui');
+      addToast('Reprocessamento enfileirado com sucesso.', 'success');
+      await loadProviderJobs(provider);
+    } catch (e: any) {
+      addToast(e?.message || 'Falha ao reprocessar job.', 'error');
+    } finally {
+      setJobsActionId(null);
     }
   };
 
@@ -710,21 +756,83 @@ export default function MarketplaceIntegrationsPage() {
                   </li>
                 </ul>
 
-                {provider === 'meli' && conn?.status === 'connected' && conn?.config?.import_orders ? (
-                  <div className="mt-4 flex items-center justify-between gap-2">
-                    <div className="text-xs text-gray-500">
-                      Importa pedidos recentes e cria/atualiza `Pedidos de Venda` automaticamente.
+                {conn?.status === 'connected' && conn?.config?.import_orders ? (
+                  <div className="mt-4 space-y-3">
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="text-xs text-gray-500">Importação assíncrona: você pode enfileirar múltiplas execuções e acompanhar status.</div>
+                      <div className="flex items-center gap-2">
+                        <Button
+                          variant="outline"
+                          className="gap-2"
+                          disabled={!canManage || queueingImportProvider === provider}
+                          onClick={() => void handleImportOrdersNow(provider)}
+                          title={canManage ? 'Enfileirar importação' : 'Sem permissão'}
+                        >
+                          <RefreshCw size={16} />
+                          {queueingImportProvider === provider ? 'Enfileirando…' : 'Nova importação'}
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="gap-2"
+                          disabled={jobsLoadingProvider === provider}
+                          onClick={() => void loadProviderJobs(provider)}
+                        >
+                          Atualizar
+                        </Button>
+                      </div>
                     </div>
-                    <Button
-                      variant="outline"
-                      className="gap-2"
-                      disabled={!canManage || syncingOrders === 'meli'}
-                      onClick={() => void handleImportOrdersNow('meli')}
-                      title={canManage ? 'Importar agora' : 'Sem permissão'}
-                    >
-                      <RefreshCw size={16} />
-                      {syncingOrders === 'meli' ? 'Importando…' : 'Importar agora'}
-                    </Button>
+
+                    <div className="rounded-lg border border-gray-100 bg-white/70 p-2">
+                      {jobsLoadingProvider === provider ? (
+                        <div className="text-xs text-gray-500 px-1 py-2">Carregando jobs…</div>
+                      ) : jobsByProvider[provider].length === 0 ? (
+                        <div className="text-xs text-gray-500 px-1 py-2">Nenhuma importação encontrada para este canal.</div>
+                      ) : (
+                        <ul className="space-y-2">
+                          {jobsByProvider[provider].map((job) => (
+                            <li key={job.id} className="rounded border border-gray-100 bg-white px-2 py-2">
+                              <div className="flex flex-wrap items-center justify-between gap-2">
+                                <div className="flex items-center gap-2">
+                                  {jobStatusBadge(job.status)}
+                                  <span className="text-xs text-gray-500">{new Date(job.created_at).toLocaleString('pt-BR')}</span>
+                                </div>
+                                <div className="text-xs text-gray-500">
+                                  Itens: {job.items_total} | Falhas: {job.items_failed} | Tentativas: {job.attempts}/{job.max_attempts}
+                                </div>
+                              </div>
+                              {job.last_error ? (
+                                <div className="mt-1 text-xs text-red-700 truncate" title={job.last_error}>
+                                  {job.last_error}
+                                </div>
+                              ) : null}
+                              <div className="mt-2 flex items-center gap-2">
+                                {(job.status === 'pending' || job.status === 'processing') && (
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    disabled={!canManage || jobsActionId === job.id}
+                                    onClick={() => void handleCancelJob(provider, job.id)}
+                                  >
+                                    {jobsActionId === job.id ? 'Cancelando…' : 'Cancelar'}
+                                  </Button>
+                                )}
+                                {(job.status === 'error' || job.status === 'dead' || job.status === 'canceled') && (
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    disabled={!canManage || jobsActionId === job.id}
+                                    onClick={() => void handleRetryJob(provider, job.id)}
+                                  >
+                                    {jobsActionId === job.id ? 'Reenfileirando…' : 'Reprocessar'}
+                                  </Button>
+                                )}
+                              </div>
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                    </div>
                   </div>
                 ) : null}
               </div>
