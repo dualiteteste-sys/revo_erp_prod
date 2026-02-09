@@ -8,6 +8,7 @@ import { sortRows, toggleSort } from '@/components/ui/table/sortUtils';
 import { openInNewTabBestEffort, shouldIgnoreRowDoubleClickEvent } from '@/components/ui/table/rowDoubleClick';
 import { isPlainLeftClick } from '@/components/ui/links/isPlainLeftClick';
 import { useDeferredAction } from '@/components/ui/hooks/useDeferredAction';
+import { formatDatePtBR } from '@/lib/dateDisplay';
 
 interface Props {
   movimentacoes: Movimentacao[];
@@ -119,10 +120,10 @@ export default function MovimentacoesTable({ movimentacoes, onEdit, onDelete }: 
                   if (shouldIgnoreRowDoubleClickEvent(e)) return;
                   openInNewTabBestEffort(href, () => onEdit(mov));
                 }}
-              >
-              <td className="px-6 py-4 text-sm text-gray-900 whitespace-nowrap">
-                {new Date(mov.data_movimento).toLocaleDateString('pt-BR')}
-              </td>
+	              >
+	              <td className="px-6 py-4 text-sm text-gray-900 whitespace-nowrap">
+	                {formatDatePtBR(mov.data_movimento)}
+	              </td>
               <td className="px-6 py-4">
                 <div className="text-sm text-gray-900 font-medium">
                   <a
