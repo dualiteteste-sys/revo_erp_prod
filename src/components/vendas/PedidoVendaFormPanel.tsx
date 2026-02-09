@@ -285,7 +285,6 @@ export default function PedidoVendaFormPanel({ vendaId, onSaveSuccess, onClose, 
 
   const loadDetails = async (params?: { id?: string | null; closeOnError?: boolean; silent?: boolean }) => {
     if (empresaChanged) return false;
-    const token = ++actionTokenRef.current;
     const empresaSnapshot = activeEmpresaId ?? null;
     const targetId = params?.id ?? vendaId ?? formData.id ?? null;
     if (!targetId) return false;
@@ -294,7 +293,7 @@ export default function PedidoVendaFormPanel({ vendaId, onSaveSuccess, onClose, 
       if (!params?.silent) setLoading(true);
 
       const data = await fetchVendaDetails(targetId);
-      if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return false;
+      if (empresaSnapshot !== lastEmpresaIdRef.current) return false;
       if (!data) {
         addToast('Pedido não encontrado (ou sem acesso).', 'error');
         if (params?.closeOnError) onClose();
@@ -307,26 +306,26 @@ export default function PedidoVendaFormPanel({ vendaId, onSaveSuccess, onClose, 
         setLoadingMarketplaceTimeline(true);
         try {
           const ev = await listMarketplaceOrderTimeline(data.id);
-          if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return false;
+          if (empresaSnapshot !== lastEmpresaIdRef.current) return false;
           setMarketplaceTimeline(ev ?? []);
         } catch {
-          if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return false;
+          if (empresaSnapshot !== lastEmpresaIdRef.current) return false;
           setMarketplaceTimeline([]);
         } finally {
-          if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return false;
+          if (empresaSnapshot !== lastEmpresaIdRef.current) return false;
           setLoadingMarketplaceTimeline(false);
         }
       } else {
         setMarketplaceTimeline([]);
       }
     } catch (e) {
-      if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return false;
+      if (empresaSnapshot !== lastEmpresaIdRef.current) return false;
       console.error(e);
       addToast('Erro ao carregar pedido.', 'error');
       if (params?.closeOnError) onClose();
       return false;
     } finally {
-      if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return false;
+      if (empresaSnapshot !== lastEmpresaIdRef.current) return false;
       if (!params?.silent) setLoading(false);
     }
     return true;
@@ -520,7 +519,6 @@ export default function PedidoVendaFormPanel({ vendaId, onSaveSuccess, onClose, 
 
   const handleAddItem = async (item: any) => {
     if (authLoading || !activeEmpresaId || empresaChanged) return;
-    const token = ++actionTokenRef.current;
     const empresaSnapshot = activeEmpresaId;
     if (item.type !== 'product') {
         addToast('Apenas produtos podem ser adicionados a pedidos de venda.', 'warning');
@@ -542,9 +540,9 @@ export default function PedidoVendaFormPanel({ vendaId, onSaveSuccess, onClose, 
         fallbackPrecoUnitario: item.preco_venda ?? 0,
       });
       const precoUnit = Number(pricing.preco_unitario ?? item.preco_venda ?? 0);
-      if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
+      if (empresaSnapshot !== lastEmpresaIdRef.current) return;
       await manageVendaItem(currentId!, null, item.id, 1, precoUnit, 0, 'add');
-      if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
+      if (empresaSnapshot !== lastEmpresaIdRef.current) return;
       const refreshed = await loadDetails({ id: currentId, silent: true });
       if (!refreshed) {
         const preco = toMoney(precoUnit);
@@ -566,7 +564,7 @@ export default function PedidoVendaFormPanel({ vendaId, onSaveSuccess, onClose, 
       }
       addToast('Item adicionado.', 'success');
     } catch (e: any) {
-      if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
+      if (empresaSnapshot !== lastEmpresaIdRef.current) return;
       addToast(e.message, 'error');
     }
   };
@@ -966,12 +964,6 @@ export default function PedidoVendaFormPanel({ vendaId, onSaveSuccess, onClose, 
             </span>
           </div>
         )}
-        {formData.status === 'aprovado' && (
-          <div className="mb-4 rounded-lg border border-green-200 bg-green-50 px-3 py-2 text-sm font-medium text-green-800">
-            Pedido aprovado com sucesso!
-          </div>
-        )}
-
         {isMarketplaceOrder && (
           <Section title="Marketplace" description="Histórico e eventos da integração">
             {loadingMarketplaceTimeline ? (
