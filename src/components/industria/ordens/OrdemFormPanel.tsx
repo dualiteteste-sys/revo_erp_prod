@@ -586,9 +586,9 @@ export default function OrdemFormPanel({
     if (isLockedEffective) return;
     const token = ++actionTokenRef.current;
     const empresaSnapshot = activeEmpresaId ?? null;
+    let currentId: string | null = formData.id ?? null;
     setIsGeneratingExecucao(true);
     try {
-      let currentId: string | null = formData.id ?? null;
       if (!currentId) {
         currentId = await handleSaveHeader();
         if (!currentId) return;
@@ -602,6 +602,11 @@ export default function OrdemFormPanel({
       handleGoToExecucao(getExecucaoSearchTerm());
     } catch (e: any) {
       if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
+      if (currentId) {
+        await loadDetails(currentId);
+        handleGoToExecucao(getExecucaoSearchTerm());
+        return;
+      }
       addToast(e?.message || 'Não foi possível gerar operações.', 'error');
     } finally {
       if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;

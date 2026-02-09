@@ -1525,7 +1525,7 @@ export default function PedidoVendaFormPanel({ vendaId, onSaveSuccess, onClose, 
               <Ban size={20} /> Cancelar
             </button>
           )}
-          {formData.id && !isLocked && (
+          {formData.id && formData.status !== 'cancelado' && (
             <button 
               onClick={handleAprovar} 
               disabled={isSaving || (formData.itens?.length || 0) === 0 || empresaChanged}
