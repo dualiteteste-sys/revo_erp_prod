@@ -813,7 +813,7 @@ export default function PedidoVendaFormPanel({ vendaId, onSaveSuccess, onClose, 
     return !!formData.id && formData.status === 'aprovado';
   }, [formData.id, formData.status]);
 
-  if (loading) return <div className="flex justify-center p-8"><Loader2 className="animate-spin" /></div>;
+  const showLoadingBanner = loading;
 
   const handleConcluir = async () => {
     if (authLoading || !activeEmpresaId || empresaChanged) return;
@@ -908,6 +908,12 @@ export default function PedidoVendaFormPanel({ vendaId, onSaveSuccess, onClose, 
 
   return (
     <>
+      {showLoadingBanner && (
+        <div className="flex items-center gap-2 px-4 py-2 text-sm text-gray-600 border-b border-gray-200 bg-gray-50">
+          <Loader2 className="animate-spin" size={14} />
+          Carregando pedido...
+        </div>
+      )}
       <div className="flex flex-col h-full">
       <ParcelamentoDialog
         open={parcelamentoOpen}

@@ -222,7 +222,7 @@ export default function OrdemFormPanel({
   };
 
 	  const handleSaveHeader = async () => {
-        if (authLoading || !activeEmpresaId || empresaChanged) {
+        if (!activeEmpresaId || empresaChanged) {
           addToast('Aguarde a troca de empresa concluir para salvar.', 'info');
           return null;
         }
