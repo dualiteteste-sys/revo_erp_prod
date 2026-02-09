@@ -717,11 +717,17 @@ export default function PedidoVendaFormPanel({ vendaId, onSaveSuccess, onClose, 
       variant: 'primary',
     });
     if (!ok) return;
+    let pedidoId: string | undefined = formData.id ?? undefined;
+    if (!pedidoId) {
+      const createdId = await handleSaveHeader();
+      if (!createdId) return;
+      pedidoId = createdId;
+    }
     const token = ++actionTokenRef.current;
     const empresaSnapshot = activeEmpresaId ?? null;
     setIsSaving(true);
     try {
-      await aprovarVenda(formData.id!);
+      await aprovarVenda(pedidoId);
       if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
       addToast('Pedido aprovado com sucesso!', 'success');
       onSaveSuccess();
@@ -1525,7 +1531,7 @@ export default function PedidoVendaFormPanel({ vendaId, onSaveSuccess, onClose, 
               <Ban size={20} /> Cancelar
             </button>
           )}
-          {formData.id && formData.status !== 'cancelado' && (
+          {formData.status !== 'cancelado' && (
             <button 
               onClick={handleAprovar} 
               aria-label="Aprovar Venda"
