@@ -597,7 +597,6 @@ export default function OrdemFormPanel({
       const result = await gerarExecucaoOrdem(currentId, formData.roteiro_aplicado_id ?? null);
       if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
       await loadDetails(currentId);
-      if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
       addToast(`Operações geradas (${result.operacoes}).`, 'success');
       handleGoToExecucao(getExecucaoSearchTerm());
     } catch (e: any) {

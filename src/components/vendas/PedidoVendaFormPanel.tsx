@@ -1528,6 +1528,7 @@ export default function PedidoVendaFormPanel({ vendaId, onSaveSuccess, onClose, 
           {formData.id && formData.status !== 'cancelado' && (
             <button 
               onClick={handleAprovar} 
+              aria-label="Aprovar Venda"
               disabled={isSaving || (formData.itens?.length || 0) === 0 || empresaChanged}
               className="flex items-center gap-2 bg-green-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-green-700 disabled:opacity-50"
             >
