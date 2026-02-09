@@ -28,7 +28,11 @@ export default function ContaCorrenteFormPanel({ conta, onSaveSuccess, onClose }
     limite_credito: 0,
   });
 
-  const saldoInicialProps = useNumericField(formData.saldo_inicial, (v) => handleChange('saldo_inicial', v));
+  const saldoInicialProps = useNumericField(
+    formData.saldo_inicial,
+    (v) => handleChange('saldo_inicial', v),
+    { allowNegative: formData.permite_saldo_negativo === true }
+  );
   const limiteCreditoProps = useNumericField(formData.limite_credito, (v) => handleChange('limite_credito', v));
 
   useEffect(() => {
@@ -44,6 +48,11 @@ export default function ContaCorrenteFormPanel({ conta, onSaveSuccess, onClose }
   const handleSave = async () => {
     if (!formData.nome) {
       addToast('O nome da conta é obrigatório.', 'error');
+      return;
+    }
+
+    if (formData.permite_saldo_negativo !== true && (formData.saldo_inicial ?? 0) < 0) {
+      addToast('Saldo negativo não permitido. Ative a opção para permitir.', 'error');
       return;
     }
 
