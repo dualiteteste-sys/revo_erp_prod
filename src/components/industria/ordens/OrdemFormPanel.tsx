@@ -85,6 +85,7 @@ export default function OrdemFormPanel({
   const lastEmpresaIdRef = useRef<string | null>(activeEmpresaId);
   const empresaChanged = lastEmpresaIdRef.current !== activeEmpresaId;
   const actionTokenRef = useRef(0);
+  const detailsLoadTokenRef = useRef(0);
 
   const [formData, setFormData] = useState<Partial<OrdemIndustriaDetails>>({
     status: 'rascunho',
@@ -170,6 +171,7 @@ export default function OrdemFormPanel({
     const prevEmpresaId = lastEmpresaIdRef.current;
     if (prevEmpresaId === activeEmpresaId) return;
     actionTokenRef.current += 1;
+    detailsLoadTokenRef.current += 1;
     setLoading(false);
     setIsSaving(false);
     setIsGeneratingExecucao(false);
@@ -185,7 +187,7 @@ export default function OrdemFormPanel({
 
   const loadDetails = async (idOverride?: string) => {
     if (authLoading || !activeEmpresaId || empresaChanged) return;
-    const token = ++actionTokenRef.current;
+    const token = ++detailsLoadTokenRef.current;
     const empresaSnapshot = activeEmpresaId;
     // FIX: Use idOverride or formData.id if ordemId is null (newly created order)
     const idToLoad = idOverride || ordemId || formData.id;
@@ -193,15 +195,15 @@ export default function OrdemFormPanel({
 
     try {
       const data = await getOrdemDetails(idToLoad);
-      if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
+      if (token !== detailsLoadTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
       setFormData(data);
     } catch (e) {
-      if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
+      if (token !== detailsLoadTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
       logger.error('[Indústria][OP/OB] Falha ao carregar ordem', e, { ordemId: idToLoad });
       addToast('Erro ao carregar ordem.', 'error');
       if (ordemId) onClose();
     } finally {
-      if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
+      if (token !== detailsLoadTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
       setLoading(false);
     }
   };

@@ -108,11 +108,13 @@ export default function PedidoVendaFormPanel({ vendaId, onSaveSuccess, onClose, 
   const lastEmpresaIdRef = useRef<string | null>(activeEmpresaId);
   const empresaChanged = lastEmpresaIdRef.current !== activeEmpresaId;
   const actionTokenRef = useRef(0);
+  const detailsLoadTokenRef = useRef(0);
 
   useEffect(() => {
     const prevEmpresaId = lastEmpresaIdRef.current;
     if (prevEmpresaId === activeEmpresaId) return;
     actionTokenRef.current += 1;
+    detailsLoadTokenRef.current += 1;
     setIsSaving(false);
     setAddingSku(false);
     setLoading(false);
@@ -284,7 +286,7 @@ export default function PedidoVendaFormPanel({ vendaId, onSaveSuccess, onClose, 
 
   const loadDetails = async (params?: { id?: string | null; closeOnError?: boolean; silent?: boolean }) => {
     if (authLoading || !activeEmpresaId || empresaChanged) return false;
-    const token = ++actionTokenRef.current;
+    const token = ++detailsLoadTokenRef.current;
     const empresaSnapshot = activeEmpresaId;
     const targetId = params?.id ?? vendaId ?? formData.id ?? null;
     if (!targetId) return false;
@@ -293,7 +295,7 @@ export default function PedidoVendaFormPanel({ vendaId, onSaveSuccess, onClose, 
       if (!params?.silent) setLoading(true);
 
       const data = await fetchVendaDetails(targetId);
-      if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return false;
+      if (token !== detailsLoadTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return false;
       if (!data) {
         addToast('Pedido não encontrado (ou sem acesso).', 'error');
         if (params?.closeOnError) onClose();
@@ -306,26 +308,26 @@ export default function PedidoVendaFormPanel({ vendaId, onSaveSuccess, onClose, 
         setLoadingMarketplaceTimeline(true);
         try {
           const ev = await listMarketplaceOrderTimeline(data.id);
-          if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return false;
+          if (token !== detailsLoadTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return false;
           setMarketplaceTimeline(ev ?? []);
         } catch {
-          if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return false;
+          if (token !== detailsLoadTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return false;
           setMarketplaceTimeline([]);
         } finally {
-          if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return false;
+          if (token !== detailsLoadTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return false;
           setLoadingMarketplaceTimeline(false);
         }
       } else {
         setMarketplaceTimeline([]);
       }
     } catch (e) {
-      if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return false;
+      if (token !== detailsLoadTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return false;
       console.error(e);
       addToast('Erro ao carregar pedido.', 'error');
       if (params?.closeOnError) onClose();
       return false;
     } finally {
-      if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return false;
+      if (token !== detailsLoadTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return false;
       if (!params?.silent) setLoading(false);
     }
     return true;
