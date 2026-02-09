@@ -65,6 +65,24 @@ function diffDaysAbs(dateA: string, dateB: string): number {
   return Math.abs(Math.round((a.getTime() - b.getTime()) / ONE_DAY_MS));
 }
 
+function isSameTransferAssistMap(
+  left: Record<string, TransferAssistInfo>,
+  right: Record<string, TransferAssistInfo>,
+): boolean {
+  const leftKeys = Object.keys(left);
+  const rightKeys = Object.keys(right);
+  if (leftKeys.length !== rightKeys.length) return false;
+  for (const key of leftKeys) {
+    const leftItem = left[key];
+    const rightItem = right[key];
+    if (!rightItem) return false;
+    if (leftItem.kind !== rightItem.kind) return false;
+    if ((leftItem.movimentacaoId ?? null) !== (rightItem.movimentacaoId ?? null)) return false;
+    if ((leftItem.candidatesCount ?? null) !== (rightItem.candidatesCount ?? null)) return false;
+  }
+  return true;
+}
+
 export default function TesourariaPage() {
   const { loading: authLoading, activeEmpresaId } = useAuth();
   const [activeTab, setActiveTab] = useState<'contas' | 'movimentos' | 'conciliacao' | 'regras'>('contas');
@@ -136,6 +154,21 @@ export default function TesourariaPage() {
 
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
   const [conciliacaoItem, setConciliacaoItem] = useState<ExtratoItem | null>(null);
+  const extratoAssistKey = useMemo(
+    () =>
+      (extratos || [])
+        .map((item) =>
+          [
+            item.id,
+            item.conciliado ? '1' : '0',
+            item.movimentacao_id ?? '',
+            item.data_lancamento,
+            Number(item.valor ?? 0).toFixed(2),
+          ].join(':'),
+        )
+        .join('|'),
+    [extratos],
+  );
 
   const clearOpenParam = useCallback(() => {
     if (!openId) return;
@@ -475,7 +508,7 @@ export default function TesourariaPage() {
 
   useEffect(() => {
     if (activeTab !== 'conciliacao' || !selectedContaId || !extratos?.length) {
-      setTransferAssistByExtratoId({});
+      setTransferAssistByExtratoId((prev) => (Object.keys(prev).length === 0 ? prev : {}));
       return;
     }
 
@@ -487,7 +520,9 @@ export default function TesourariaPage() {
           .filter((date): date is Date => !!date);
 
         if (allDates.length === 0) {
-          if (!cancelled) setTransferAssistByExtratoId({});
+          if (!cancelled) {
+            setTransferAssistByExtratoId((prev) => (Object.keys(prev).length === 0 ? prev : {}));
+          }
           return;
         }
 
@@ -576,19 +611,23 @@ export default function TesourariaPage() {
           };
         }
 
-        if (!cancelled) setTransferAssistByExtratoId(assistMap);
+        if (!cancelled) {
+          setTransferAssistByExtratoId((prev) => (isSameTransferAssistMap(prev, assistMap) ? prev : assistMap));
+        }
       } catch (error) {
         if (import.meta.env.DEV) {
           console.error('[Tesouraria][TransferAssist] erro ao detectar correspondências internas.', error);
         }
-        if (!cancelled) setTransferAssistByExtratoId({});
+        if (!cancelled) {
+          setTransferAssistByExtratoId((prev) => (Object.keys(prev).length === 0 ? prev : {}));
+        }
       }
     })();
 
     return () => {
       cancelled = true;
     };
-  }, [activeTab, extratos, selectedContaId]);
+  }, [activeTab, extratoAssistKey, extratos, selectedContaId]);
 
   const handleQuickLinkTransfer = async (item: ExtratoItem, movimentacaoId: string) => {
     if (busyExtratoId || bulkConciliando) return;
