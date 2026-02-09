@@ -60,10 +60,15 @@ function defaultConfig() {
   };
 }
 
-function wooPendingReason(conn: EcommerceConnection | null, wooDiag: EcommerceConnectionDiagnostics | null) {
+function wooPendingReason(
+  conn: EcommerceConnection | null,
+  wooDiag: EcommerceConnectionDiagnostics | null,
+  wooDiagUnavailable: boolean,
+) {
   if (!conn) return null;
   const storeUrl = String(conn.config?.store_url ?? '').trim();
   if (!storeUrl) return 'Falta URL da loja';
+  if (wooDiagUnavailable) return 'Não foi possível validar credenciais agora (diagnóstico indisponível)';
   if (!wooDiag?.has_token) return 'Faltam credenciais (Consumer Key/Secret)';
   return null;
 }
@@ -97,6 +102,7 @@ export default function MarketplaceIntegrationsPage() {
   const [wooTabelasPreco, setWooTabelasPreco] = useState<Array<{ id: string; nome: string }>>([]);
   const [wooOptionsLoading, setWooOptionsLoading] = useState(false);
   const [wooDiag, setWooDiag] = useState<EcommerceConnectionDiagnostics | null>(null);
+  const [wooDiagUnavailable, setWooDiagUnavailable] = useState(false);
 
   const mappingsColumns: TableColumnWidthDef[] = [
     { id: 'produto', defaultWidth: 320, minWidth: 220 },
@@ -129,9 +135,11 @@ export default function MarketplaceIntegrationsPage() {
     try {
       const diag = await getEcommerceConnectionDiagnostics('woo');
       setWooDiag(diag);
+      setWooDiagUnavailable(false);
       return diag;
     } catch {
       setWooDiag(null);
+      setWooDiagUnavailable(true);
       return null;
     }
   }, [canView]);
@@ -149,6 +157,7 @@ export default function MarketplaceIntegrationsPage() {
       setConnections([]);
       setHealth(null);
       setWooDiag(null);
+      setWooDiagUnavailable(false);
     } finally {
       setLoading(false);
     }
@@ -348,9 +357,19 @@ export default function MarketplaceIntegrationsPage() {
         const storeUrl = String(activeConnection.config?.store_url ?? '').trim();
         const diag = await refreshWooDiag();
         const hasSecrets = diag?.has_token === true;
-        const reason = wooPendingReason({ ...activeConnection, config: activeConnection.config ?? null }, diag ?? null);
+        const diagUnavailableNow = diag == null;
+        const reason = wooPendingReason(
+          { ...activeConnection, config: activeConnection.config ?? null },
+          diag ?? null,
+          diagUnavailableNow,
+        );
 
-        const nextStatus = storeUrl && hasSecrets ? 'connected' : 'pending';
+        const nextStatus =
+          storeUrl && hasSecrets
+            ? 'connected'
+            : diagUnavailableNow && String(activeConnection.status ?? '').toLowerCase() === 'connected'
+              ? 'connected'
+              : 'pending';
         await upsertEcommerceConnection({
           provider: 'woo',
           nome: providerLabels.woo,
@@ -360,7 +379,12 @@ export default function MarketplaceIntegrationsPage() {
         });
 
         if (nextStatus === 'connected') {
-          addToast('Integração conectada.', 'success');
+          addToast(
+            diagUnavailableNow
+              ? 'Configuração salva. Conectividade mantida, mas o diagnóstico de credenciais está temporariamente indisponível.'
+              : 'Integração conectada.',
+            diagUnavailableNow ? 'warning' : 'success',
+          );
         } else {
           addToast(`Integração salva, mas ainda pendente. ${reason ? `Motivo: ${reason}.` : ''}`.trim(), 'warning');
         }
@@ -565,7 +589,7 @@ export default function MarketplaceIntegrationsPage() {
           const isDisconnected = String(conn?.status ?? '').toLowerCase() === 'disconnected';
           const hasConnection = !!conn && !isDisconnected;
           const busy = busyProvider === provider;
-          const pendingReason = provider === 'woo' ? wooPendingReason(conn ?? null, wooDiag) : null;
+          const pendingReason = provider === 'woo' ? wooPendingReason(conn ?? null, wooDiag, wooDiagUnavailable) : null;
           return (
             <GlassCard key={provider} className="p-4">
               <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
