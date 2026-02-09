@@ -61,6 +61,27 @@ export type MovimentacaoPayload = Partial<Omit<Movimentacao, 'id' | 'empresa_id'
   id?: string;
 };
 
+export type TransferenciaInternaPayload = {
+  conta_origem_id: string;
+  conta_destino_id: string;
+  valor: number;
+  data_movimento?: string;
+  descricao?: string | null;
+  documento_ref?: string | null;
+  centro_de_custo_id?: string | null;
+  observacoes?: string | null;
+};
+
+export type TransferenciaInternaResult = {
+  transferencia_id: string;
+  movimentacao_saida_id: string;
+  movimentacao_entrada_id: string;
+  conta_origem_id: string;
+  conta_destino_id: string;
+  valor: number;
+  data_movimento: string;
+};
+
 export type ExtratoItem = {
   id: string;
   data_lancamento: string;
@@ -181,6 +202,19 @@ export async function saveMovimentacao(payload: MovimentacaoPayload): Promise<Mo
 
 export async function deleteMovimentacao(id: string): Promise<void> {
   return callRpc('financeiro_movimentacoes_delete', { p_id: id });
+}
+
+export async function transferirEntreContas(payload: TransferenciaInternaPayload): Promise<TransferenciaInternaResult> {
+  return callRpc<TransferenciaInternaResult>('financeiro_transferencias_internas_criar', {
+    p_conta_origem_id: payload.conta_origem_id,
+    p_conta_destino_id: payload.conta_destino_id,
+    p_valor: payload.valor,
+    p_data_movimento: payload.data_movimento ?? null,
+    p_descricao: payload.descricao ?? null,
+    p_documento_ref: payload.documento_ref ?? null,
+    p_centro_de_custo_id: payload.centro_de_custo_id ?? null,
+    p_observacoes: payload.observacoes ?? null,
+  });
 }
 
 // --- Extratos & Conciliação ---
