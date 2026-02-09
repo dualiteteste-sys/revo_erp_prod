@@ -17,10 +17,21 @@ interface Props {
   onConciliate: (movimentacaoId: string) => Promise<void>;
 }
 
+type MovimentacaoCandidate = MatchResult<Movimentacao> & {
+  resolvedValor: number | null;
+  hasMissingCriticalValue: boolean;
+};
+
+function toFiniteMoneyOrNull(value: unknown): number | null {
+  if (value === null || value === undefined) return null;
+  const parsed = typeof value === 'number' ? value : Number(value);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
 export default function ConciliacaoDrawer({ isOpen, onClose, extratoItem, contaCorrenteId, onConciliate }: Props) {
   const { addToast } = useToast();
   const [mode, setMode] = useState<'movimentacoes' | 'titulos'>('titulos');
-  const [candidates, setCandidates] = useState<Array<MatchResult<Movimentacao>>>([]);
+  const [candidates, setCandidates] = useState<MovimentacaoCandidate[]>([]);
   const [loading, setLoading] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
   const [linkingId, setLinkingId] = useState<string | null>(null);
@@ -142,6 +153,31 @@ export default function ConciliacaoDrawer({ isOpen, onClose, extratoItem, contaC
       const unconciliated = data.filter(m => !m.conciliado);
       const ranked = rankCandidates(
         unconciliated.map((mov) => {
+          const resolvedValor =
+            toFiniteMoneyOrNull(mov.valor) ??
+            toFiniteMoneyOrNull(mov.valor_entrada) ??
+            toFiniteMoneyOrNull(mov.valor_saida);
+
+          if (resolvedValor === null) {
+            if (import.meta.env.DEV) {
+              console.error('[Conciliacao][Movimentacoes] valor ausente/invalid para conciliação.', {
+                movimentacao: mov,
+                field: 'valor',
+                value: (mov as any)?.valor,
+                valueType: typeof (mov as any)?.valor,
+                valor_entrada: (mov as any)?.valor_entrada,
+                valor_saida: (mov as any)?.valor_saida,
+                extrato_id: extratoItem.id,
+                conta_corrente_id: contaCorrenteId,
+              });
+            }
+            return {
+              item: mov,
+              score: 0,
+              reasons: [{ label: 'valor ausente/ inválido', points: 0 }],
+            };
+          }
+
           const { score, reasons } = scoreExtratoToMovimentacao({
             extratoDescricao: extratoItem.descricao || '',
             extratoDocumento: extratoItem.documento_ref,
@@ -149,12 +185,22 @@ export default function ConciliacaoDrawer({ isOpen, onClose, extratoItem, contaC
             extratoDataISO: extratoItem.data_lancamento,
             movDescricao: mov.descricao,
             movDocumento: mov.documento_ref,
-            movValor: mov.valor,
+            movValor: resolvedValor,
             movDataISO: mov.data_movimento,
           });
           return { item: mov, score, reasons };
         }),
-      );
+      ).map((candidate) => ({
+        ...candidate,
+        resolvedValor:
+          toFiniteMoneyOrNull(candidate.item.valor) ??
+          toFiniteMoneyOrNull(candidate.item.valor_entrada) ??
+          toFiniteMoneyOrNull(candidate.item.valor_saida),
+        hasMissingCriticalValue:
+          toFiniteMoneyOrNull(candidate.item.valor) === null &&
+          toFiniteMoneyOrNull(candidate.item.valor_entrada) === null &&
+          toFiniteMoneyOrNull(candidate.item.valor_saida) === null,
+      }));
 
       setCandidates(ranked);
     } catch (e: any) {
@@ -352,6 +398,12 @@ export default function ConciliacaoDrawer({ isOpen, onClose, extratoItem, contaC
   const handleLink = async (movId: string) => {
     if (!extratoItem) return;
     if (linkingId) return;
+    const target = candidates.find((candidate) => candidate.item.id === movId);
+    if (!target) return;
+    if (target.hasMissingCriticalValue || target.resolvedValor === null) {
+      addToast('Movimentação inválida para conciliação: valor ausente. Revise o lançamento antes de vincular.', 'error');
+      return;
+    }
     setLinkingId(movId);
     try {
       await onConciliate(movId);
@@ -365,7 +417,13 @@ export default function ConciliacaoDrawer({ isOpen, onClose, extratoItem, contaC
   if (!isOpen) return null;
 
   const bestCandidate = candidates[0] ?? null;
-  const canAutoConciliate = !!bestCandidate && bestCandidate.score >= 85;
+  const canAutoConciliate =
+    !!bestCandidate &&
+    bestCandidate.score >= 85 &&
+    !bestCandidate.hasMissingCriticalValue &&
+    bestCandidate.resolvedValor !== null;
+  const extratoValorDisplay = toFiniteMoneyOrNull(extratoItem?.valor);
+  const hasMissingExtratoValue = extratoValorDisplay === null;
 
   return (
     <div className="fixed inset-0 z-50 flex justify-end pointer-events-none">
@@ -387,13 +445,18 @@ export default function ConciliacaoDrawer({ isOpen, onClose, extratoItem, contaC
             <div className="flex justify-between items-start mb-2">
                 <span className="font-bold text-gray-800 text-lg">{extratoItem?.descricao}</span>
                 <span className={`font-bold text-lg ${extratoItem?.tipo_lancamento === 'credito' ? 'text-green-600' : 'text-red-600'}`}>
-                    R$ {extratoItem?.valor.toFixed(2)}
+                    {extratoValorDisplay === null ? '—' : `R$ ${extratoValorDisplay.toFixed(2)}`}
                 </span>
             </div>
             <div className="flex justify-between text-sm text-blue-800">
               <span>{formatDatePtBR(extratoItem!.data_lancamento)}</span>
               <span>Doc: {extratoItem?.documento_ref || '-'}</span>
             </div>
+            {hasMissingExtratoValue ? (
+              <div className="mt-2 text-xs font-medium text-red-700">
+                Lançamento de extrato sem valor válido. A conciliação está bloqueada até corrigir os dados.
+              </div>
+            ) : null}
         </div>
 
         <div className="flex-1 overflow-y-auto p-4">
@@ -660,7 +723,7 @@ export default function ConciliacaoDrawer({ isOpen, onClose, extratoItem, contaC
                     <button
                       type="button"
                       onClick={() => void handleLink(bestCandidate.item.id)}
-                      disabled={loading || !!linkingId}
+                      disabled={loading || !!linkingId || hasMissingExtratoValue}
                       className="text-emerald-700 text-xs font-semibold hover:underline disabled:opacity-60"
                       title="Conciliar automaticamente com a melhor sugestão (score alto)."
                     >
@@ -713,7 +776,7 @@ export default function ConciliacaoDrawer({ isOpen, onClose, extratoItem, contaC
                     <button 
                         type="button"
                         onClick={handleCreateAndConciliate}
-                        disabled={isCreating}
+                        disabled={isCreating || hasMissingExtratoValue}
                         className="mt-4 text-blue-600 font-semibold hover:underline flex items-center justify-center gap-1 mx-auto"
                     >
                         {isCreating ? <Loader2 className="animate-spin" size={16} /> : <Plus size={16} />}
@@ -723,14 +786,19 @@ export default function ConciliacaoDrawer({ isOpen, onClose, extratoItem, contaC
             ) : (
                 <div className="space-y-3">
                     {candidates.map(({ item: mov, score, reasons }) => {
-                        const isExactMatch = mov.valor === extratoItem?.valor;
+                        const resolvedValor =
+                          toFiniteMoneyOrNull(mov.valor) ??
+                          toFiniteMoneyOrNull(mov.valor_entrada) ??
+                          toFiniteMoneyOrNull(mov.valor_saida);
+                        const hasMissingValue = resolvedValor === null;
+                        const isExactMatch = !hasMissingValue && extratoValorDisplay !== null && resolvedValor === extratoValorDisplay;
                         const isLinking = linkingId === mov.id;
                         return (
                             <div key={mov.id} className={`p-3 border rounded-lg hover:border-blue-400 cursor-pointer transition-colors ${isExactMatch ? 'bg-green-50 border-green-200' : 'bg-white'}`}>
                                 <div className="flex justify-between items-start mb-1">
                                     <span className="font-medium text-gray-800">{mov.descricao}</span>
                                     <span className={`font-bold ${mov.tipo_mov === 'entrada' ? 'text-green-600' : 'text-red-600'}`}>
-                                        R$ {mov.valor.toFixed(2)}
+                                        {resolvedValor === null ? '—' : `R$ ${resolvedValor.toFixed(2)}`}
                                     </span>
                                 </div>
                                 <div className="flex justify-between items-center text-xs text-gray-500 mb-3">
@@ -755,10 +823,15 @@ export default function ConciliacaoDrawer({ isOpen, onClose, extratoItem, contaC
                                       ))}
                                   </div>
                                 ) : null}
+                                {hasMissingValue ? (
+                                  <div className="mb-3 text-xs font-medium text-red-700">
+                                    Movimentação inválida: valor ausente. Este item não pode ser conciliado.
+                                  </div>
+                                ) : null}
                                 <button 
                                     type="button"
                                     onClick={() => void handleLink(mov.id)}
-                                    disabled={!!linkingId}
+                                    disabled={!!linkingId || hasMissingValue || hasMissingExtratoValue}
                                     className="w-full py-1.5 bg-blue-600 text-white rounded text-sm font-medium hover:bg-blue-700 flex items-center justify-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed"
                                 >
                                     {isLinking ? <Loader2 className="animate-spin" size={14} /> : <Link2 size={14} />} Vincular
@@ -774,7 +847,7 @@ export default function ConciliacaoDrawer({ isOpen, onClose, extratoItem, contaC
                     <button 
                         type="button"
                         onClick={handleCreateAndConciliate}
-                        disabled={isCreating || !!linkingId}
+                        disabled={isCreating || !!linkingId || hasMissingExtratoValue}
                         className="w-full py-3 border-2 border-dashed border-gray-300 text-gray-600 rounded-lg hover:border-blue-400 hover:text-blue-600 transition-colors flex items-center justify-center gap-2"
                     >
                         {isCreating ? <Loader2 className="animate-spin" size={18} /> : <Plus size={18} />}
