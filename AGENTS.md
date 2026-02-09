@@ -142,6 +142,7 @@ Leia:
 
 Leia:
 - `docs/policies/POLITICA_COLABORACAO_AGENTES.md`
+- `docs/policies/PREFLIGHT_EFEITOS_COLATERAIS.md`
 
 ## 6) Índice de documentos (não duplicar)
 
@@ -153,6 +154,7 @@ Leia:
 - Sanitização periódica: `docs/checklist-estado-da-arte-gaps.md`
 - Política de APIs externas (nova dependência): `docs/policies/POLITICA_DE_APIS_EXTERNAS.md`
 - Política de colaboração (múltiplos agentes): `docs/policies/POLITICA_COLABORACAO_AGENTES.md`
+- Preflight anti-efeitos colaterais: `docs/policies/PREFLIGHT_EFEITOS_COLATERAIS.md`
 - Roadmap de excelência (9/10): `CHECKLIST-ESTADO-DA-ARTE-9-10.md`
  - Manual do projeto (contexto amplo, UI/UX, produto): `MANUAL-CONTEXTO-CODEX.md`
 

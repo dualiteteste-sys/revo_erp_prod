@@ -19,7 +19,11 @@ Você está no repo do **Revo ERP**.
    - abra PR para `dev`,
    - `main` só via PR `dev→main`.
    - Leia `docs/policies/POLITICA_COLABORACAO_AGENTES.md` quando o trabalho envolver branches/PR/CI.
-6) Antes de concluir:
+6) Antes de codar, preencha Preflight de Efeitos Colaterais:
+   - `docs/policies/PREFLIGHT_EFEITOS_COLATERAIS.md`
+   - mapeie risco -> mitigação -> teste -> evidência
+   - não usar fallback silencioso para mascarar erro crítico em financeiro
+7) Antes de concluir:
    - rode `yarn release:check` (ou garanta CI verde),
    - garanta console/network limpos no fluxo alterado,
    - execute validação anti-tenant-leak (duas abas) se o domínio for multi-tenant.

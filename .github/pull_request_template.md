@@ -21,6 +21,19 @@
 - [ ] Mudança crítica (auth/onboarding/financeiro/estoque/vendas): tem E2E/Smoke cobrindo happy path (e falha comum quando aplicável)
 - [ ] Mudança em service/RPC/shape de retorno: tem teste unitário de contrato/normalização
 
+## Preflight de efeitos colaterais (obrigatório)
+
+- [ ] Preflight preenchido conforme `docs/policies/PREFLIGHT_EFEITOS_COLATERAIS.md`
+- [ ] Para cada risco: definida mitigação + teste obrigatório + evidência
+- [ ] Não foi usado fallback monetário enganoso (ex.: `0,00` para dado desconhecido)
+- [ ] Fluxo crítico ficou seguro mesmo com dado ausente/inválido (bloqueio + mensagem clara)
+
+Preencha a matriz abaixo:
+
+| Risco | Severidade | Mitigação no código | Teste obrigatório | Evidência |
+|---|---|---|---|---|
+|  |  |  |  |  |
+
 ## O que foi mudado?
 
 Descreva em 3–6 bullets o que mudou e como validar.
