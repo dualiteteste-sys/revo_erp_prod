@@ -9,6 +9,7 @@ import ContasCorrentesTable from '@/components/financeiro/tesouraria/ContasCorre
 import ContaCorrenteFormPanel from '@/components/financeiro/tesouraria/ContaCorrenteFormPanel';
 import MovimentacoesTable from '@/components/financeiro/tesouraria/MovimentacoesTable';
 import MovimentacaoFormPanel from '@/components/financeiro/tesouraria/MovimentacaoFormPanel';
+import TransferenciaEntreContasFormPanel from '@/components/financeiro/tesouraria/TransferenciaEntreContasFormPanel';
 import ExtratosTable from '@/components/financeiro/tesouraria/ExtratosTable';
 import ImportarExtratoModal from '@/components/financeiro/tesouraria/ImportarExtratoModal';
 import ConciliacaoDrawer from '@/components/financeiro/tesouraria/ConciliacaoDrawer';
@@ -70,6 +71,7 @@ export default function TesourariaPage() {
   } = useMovimentacoes(selectedContaId);
 
   const [isMovFormOpen, setIsMovFormOpen] = useState(false);
+  const [isTransferFormOpen, setIsTransferFormOpen] = useState(false);
   const [selectedMov, setSelectedMov] = useState<Movimentacao | null>(null);
   const [editingMovId, setEditingMovId] = useState<string | null>(null);
   const [movReadOnly, setMovReadOnly] = useState(false);
@@ -173,6 +175,10 @@ export default function TesourariaPage() {
     setEditingMovId(null);
   }, [clearOpenParam, editingMovId, movEditLock, movReadOnly]);
 
+  const closeTransferForm = useCallback(() => {
+    setIsTransferFormOpen(false);
+  }, []);
+
   useEffect(() => {
     const prevEmpresaId = lastEmpresaIdRef.current;
     if (prevEmpresaId === activeEmpresaId) return;
@@ -180,6 +186,7 @@ export default function TesourariaPage() {
     // Multi-tenant safety: evitar reaproveitar estado do tenant anterior.
     closeContaForm();
     closeMovForm();
+    closeTransferForm();
     setContaToDelete(null);
     setMovToDelete(null);
     setSelectedContaId(null);
@@ -194,7 +201,7 @@ export default function TesourariaPage() {
     }
 
     lastEmpresaIdRef.current = activeEmpresaId;
-  }, [activeEmpresaId, addToast, closeContaForm, closeMovForm]);
+  }, [activeEmpresaId, addToast, closeContaForm, closeMovForm, closeTransferForm]);
 
   const holdUi = authLoading || !activeEmpresaId || empresaChanged;
 
@@ -202,6 +209,7 @@ export default function TesourariaPage() {
     // evita modais/locks "perdidos" ao trocar de aba
     closeContaForm();
     closeMovForm();
+    closeTransferForm();
     setConciliacaoItem(null);
     setIsImportModalOpen(false);
     setActiveTab(nextTab);
@@ -209,7 +217,7 @@ export default function TesourariaPage() {
     next.set('tab', nextTab);
     next.delete('open');
     setSearchParams(next, { replace: true });
-  }, [closeContaForm, closeMovForm, searchParams, setSearchParams]);
+  }, [closeContaForm, closeMovForm, closeTransferForm, searchParams, setSearchParams]);
 
   useEffect(() => {
     if (!tabFromQuery) return;
@@ -327,6 +335,14 @@ export default function TesourariaPage() {
     } catch (e: any) {
       addToast(e.message, 'error');
     }
+  };
+
+  const handleNewTransfer = () => {
+    if (contas.length < 2) {
+      addToast('Cadastre ao menos duas contas correntes para registrar transferências.', 'warning');
+      return;
+    }
+    setIsTransferFormOpen(true);
   };
 
   // --- Handlers Extratos ---
@@ -593,6 +609,15 @@ export default function TesourariaPage() {
                 </div>
 
                 <div className="md:col-span-3 flex justify-start md:justify-end">
+                  <div className="w-full md:w-auto flex gap-2">
+                    <Button
+                      onClick={handleNewTransfer}
+                      variant="outline"
+                      disabled={contas.length < 2}
+                      className="gap-2 w-full md:w-auto"
+                    >
+                      <ArrowRightLeft size={18} /> Transferir
+                    </Button>
                   <Button
                     onClick={handleNewMov}
                     disabled={!selectedContaId}
@@ -600,6 +625,7 @@ export default function TesourariaPage() {
                   >
                     <ArrowRightLeft size={18} /> Registrar Movimento
                   </Button>
+                  </div>
                 </div>
             </div>
 
@@ -780,6 +806,24 @@ export default function TesourariaPage() {
             onSaveSuccess={() => { closeMovForm(); refreshMov(); refreshContas(); }} 
             onClose={closeMovForm} 
             readOnly={movReadOnly}
+        />
+      </Modal>
+
+      <Modal
+        isOpen={isTransferFormOpen}
+        onClose={closeTransferForm}
+        title="Transferência entre contas"
+      >
+        <TransferenciaEntreContasFormPanel
+          contas={contas}
+          defaultContaOrigemId={selectedContaId}
+          onSaveSuccess={() => {
+            closeTransferForm();
+            refreshMov();
+            refreshExtrato();
+            refreshContas();
+          }}
+          onClose={closeTransferForm}
         />
       </Modal>
 
