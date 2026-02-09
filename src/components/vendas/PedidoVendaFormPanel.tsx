@@ -30,6 +30,7 @@ import ProductFormPanel, { type ProductFormData } from '@/components/products/Pr
 import { searchClients } from '@/services/clients';
 import { saveProduct } from '@/services/products';
 import { useAuth } from '@/contexts/AuthProvider';
+import { failOperation, startOperation, succeedOperation } from '@/lib/operationTelemetry';
 
 interface Props {
   vendaId: string | null;
@@ -224,7 +225,7 @@ export default function PedidoVendaFormPanel({ vendaId, onSaveSuccess, onClose, 
 
   useEffect(() => {
     if (!vendaId) return;
-    if (authLoading || !activeEmpresaId || empresaChanged) return;
+    if (empresaChanged) return;
     void loadDetails({ id: vendaId, closeOnError: true });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeEmpresaId, authLoading, empresaChanged, vendaId]);
@@ -283,9 +284,8 @@ export default function PedidoVendaFormPanel({ vendaId, onSaveSuccess, onClose, 
   }, [mode, canFinalizePdv, formData.id, formData.status, isSaving, addingSku]);
 
   const loadDetails = async (params?: { id?: string | null; closeOnError?: boolean; silent?: boolean }) => {
-    if (authLoading || !activeEmpresaId || empresaChanged) return false;
-    const token = ++actionTokenRef.current;
-    const empresaSnapshot = activeEmpresaId;
+    if (empresaChanged) return false;
+    const empresaSnapshot = activeEmpresaId ?? null;
     const targetId = params?.id ?? vendaId ?? formData.id ?? null;
     if (!targetId) return false;
 
@@ -293,7 +293,7 @@ export default function PedidoVendaFormPanel({ vendaId, onSaveSuccess, onClose, 
       if (!params?.silent) setLoading(true);
 
       const data = await fetchVendaDetails(targetId);
-      if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return false;
+      if (empresaSnapshot !== lastEmpresaIdRef.current) return false;
       if (!data) {
         addToast('Pedido não encontrado (ou sem acesso).', 'error');
         if (params?.closeOnError) onClose();
@@ -306,26 +306,26 @@ export default function PedidoVendaFormPanel({ vendaId, onSaveSuccess, onClose, 
         setLoadingMarketplaceTimeline(true);
         try {
           const ev = await listMarketplaceOrderTimeline(data.id);
-          if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return false;
+          if (empresaSnapshot !== lastEmpresaIdRef.current) return false;
           setMarketplaceTimeline(ev ?? []);
         } catch {
-          if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return false;
+          if (empresaSnapshot !== lastEmpresaIdRef.current) return false;
           setMarketplaceTimeline([]);
         } finally {
-          if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return false;
+          if (empresaSnapshot !== lastEmpresaIdRef.current) return false;
           setLoadingMarketplaceTimeline(false);
         }
       } else {
         setMarketplaceTimeline([]);
       }
     } catch (e) {
-      if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return false;
+      if (empresaSnapshot !== lastEmpresaIdRef.current) return false;
       console.error(e);
       addToast('Erro ao carregar pedido.', 'error');
       if (params?.closeOnError) onClose();
       return false;
     } finally {
-      if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return false;
+      if (empresaSnapshot !== lastEmpresaIdRef.current) return false;
       if (!params?.silent) setLoading(false);
     }
     return true;
@@ -450,6 +450,12 @@ export default function PedidoVendaFormPanel({ vendaId, onSaveSuccess, onClose, 
     }
 
     setIsSaving(true);
+    const saveSession = startOperation({
+      domain: 'vendas_pedido',
+      action: formData.id ? 'atualizar_cabecalho' : 'criar_cabecalho',
+      tenantId: activeEmpresaId,
+      entityId: formData.id ?? null,
+    });
     try {
       const clienteId = formData.cliente_id || (mode === 'pdv' ? await ensurePdvDefaultClienteId() : null);
       if (!clienteId) {
@@ -493,9 +499,16 @@ export default function PedidoVendaFormPanel({ vendaId, onSaveSuccess, onClose, 
         addToast('Pedido salvo.', 'success');
       }
       onSaveSuccess({ keepOpen: !formData.id });
+      succeedOperation(saveSession, { pedido_id: saved.id, status: saved.status ?? null });
       return saved.id;
     } catch (e: any) {
       if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return null;
+      failOperation(
+        saveSession,
+        e,
+        { pedido_id: formData.id ?? null, status: formData.status ?? null },
+        '[VENDAS][PEDIDO][SAVE][ERROR]'
+      );
       addToast(e.message, 'error');
       return null;
     } finally {
@@ -506,7 +519,6 @@ export default function PedidoVendaFormPanel({ vendaId, onSaveSuccess, onClose, 
 
   const handleAddItem = async (item: any) => {
     if (authLoading || !activeEmpresaId || empresaChanged) return;
-    const token = ++actionTokenRef.current;
     const empresaSnapshot = activeEmpresaId;
     if (item.type !== 'product') {
         addToast('Apenas produtos podem ser adicionados a pedidos de venda.', 'warning');
@@ -528,9 +540,9 @@ export default function PedidoVendaFormPanel({ vendaId, onSaveSuccess, onClose, 
         fallbackPrecoUnitario: item.preco_venda ?? 0,
       });
       const precoUnit = Number(pricing.preco_unitario ?? item.preco_venda ?? 0);
-      if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
+      if (empresaSnapshot !== lastEmpresaIdRef.current) return;
       await manageVendaItem(currentId!, null, item.id, 1, precoUnit, 0, 'add');
-      if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
+      if (empresaSnapshot !== lastEmpresaIdRef.current) return;
       const refreshed = await loadDetails({ id: currentId, silent: true });
       if (!refreshed) {
         const preco = toMoney(precoUnit);
@@ -552,7 +564,7 @@ export default function PedidoVendaFormPanel({ vendaId, onSaveSuccess, onClose, 
       }
       addToast('Item adicionado.', 'success');
     } catch (e: any) {
-      if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
+      if (empresaSnapshot !== lastEmpresaIdRef.current) return;
       addToast(e.message, 'error');
     }
   };
@@ -694,7 +706,7 @@ export default function PedidoVendaFormPanel({ vendaId, onSaveSuccess, onClose, 
 	  };
 
   const handleAprovar = async () => {
-    if (authLoading || !activeEmpresaId || empresaChanged) return;
+    if (empresaChanged) return;
     const ok = await confirm({
       title: 'Aprovar pedido',
       description: 'Confirmar aprovação do pedido?',
@@ -703,19 +715,36 @@ export default function PedidoVendaFormPanel({ vendaId, onSaveSuccess, onClose, 
       variant: 'primary',
     });
     if (!ok) return;
-    const token = ++actionTokenRef.current;
-    const empresaSnapshot = activeEmpresaId;
+    let pedidoId: string | undefined = formData.id ?? undefined;
+    if (!pedidoId) {
+      const createdId = await handleSaveHeader();
+      if (!createdId) return;
+      pedidoId = createdId;
+    }
+    const empresaSnapshot = activeEmpresaId ?? null;
     setIsSaving(true);
     try {
-      await aprovarVenda(formData.id!);
-      if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
+      await aprovarVenda(pedidoId);
+      if (empresaSnapshot !== lastEmpresaIdRef.current) return;
       addToast('Pedido aprovado com sucesso!', 'success');
-      onSaveSuccess();
+      await loadDetails({ id: pedidoId, silent: true });
+      if (empresaSnapshot !== lastEmpresaIdRef.current) return;
+      onSaveSuccess({ keepOpen: true });
     } catch (e: any) {
-      if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
+      if (empresaSnapshot !== lastEmpresaIdRef.current) return;
+      try {
+        const latest = await fetchVendaDetails(pedidoId);
+        if (latest?.status === 'aprovado' || latest?.status === 'concluido') {
+          addToast('Pedido aprovado com sucesso!', 'success');
+          onSaveSuccess({ keepOpen: true });
+          return;
+        }
+      } catch {
+        // no-op: keeps original error handling below
+      }
       addToast(e.message, 'error');
     } finally {
-      if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
+      if (empresaSnapshot !== lastEmpresaIdRef.current) return;
       setIsSaving(false);
     }
   };
@@ -732,6 +761,12 @@ export default function PedidoVendaFormPanel({ vendaId, onSaveSuccess, onClose, 
 	    if (!ok) return;
       const token = ++actionTokenRef.current;
       const empresaSnapshot = activeEmpresaId;
+      const cancelSession = startOperation({
+        domain: 'vendas_pedido',
+        action: 'cancelar',
+        tenantId: activeEmpresaId,
+        entityId: formData.id ?? null,
+      });
 	    setIsSaving(true);
 	    try {
 	      if (!formData.id) {
@@ -770,10 +805,12 @@ export default function PedidoVendaFormPanel({ vendaId, onSaveSuccess, onClose, 
 
 	      await saveVenda(payload);
           if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
+          succeedOperation(cancelSession, { pedido_id: formData.id, status: 'cancelado' });
 	      addToast('Pedido cancelado.', 'success');
 	      onSaveSuccess();
 	    } catch (e: any) {
           if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
+          failOperation(cancelSession, e, { pedido_id: formData.id ?? null }, '[VENDAS][PEDIDO][CANCEL][ERROR]');
 	      addToast(e.message, 'error');
 	    } finally {
           if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
@@ -791,7 +828,7 @@ export default function PedidoVendaFormPanel({ vendaId, onSaveSuccess, onClose, 
     return !!formData.id && formData.status === 'aprovado';
   }, [formData.id, formData.status]);
 
-  if (loading) return <div className="flex justify-center p-8"><Loader2 className="animate-spin" /></div>;
+  const showLoadingBanner = loading;
 
   const handleConcluir = async () => {
     if (authLoading || !activeEmpresaId || empresaChanged) return;
@@ -806,6 +843,12 @@ export default function PedidoVendaFormPanel({ vendaId, onSaveSuccess, onClose, 
     if (!ok) return;
     const token = ++actionTokenRef.current;
     const empresaSnapshot = activeEmpresaId;
+    const concludeSession = startOperation({
+      domain: 'vendas_pedido',
+      action: 'concluir',
+      tenantId: activeEmpresaId,
+      entityId: formData.id,
+    });
     setIsSaving(true);
     try {
       await concluirVendaPedido(formData.id);
@@ -814,6 +857,7 @@ export default function PedidoVendaFormPanel({ vendaId, onSaveSuccess, onClose, 
       if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
       addToast('Pedido concluído e estoque baixado.', 'success');
       onSaveSuccess();
+      succeedOperation(concludeSession, { pedido_id: formData.id, status: 'concluido' });
 
 	      const wantTitles = await confirm({
 	        title: 'Gerar títulos (contas a receber)',
@@ -825,6 +869,7 @@ export default function PedidoVendaFormPanel({ vendaId, onSaveSuccess, onClose, 
       if (wantTitles) setParcelamentoOpen(true);
     } catch (e: any) {
       if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
+      failOperation(concludeSession, e, { pedido_id: formData.id }, '[VENDAS][PEDIDO][CONCLUIR][ERROR]');
       addToast(e?.message || 'Falha ao concluir pedido.', 'error');
     } finally {
       if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
@@ -878,6 +923,12 @@ export default function PedidoVendaFormPanel({ vendaId, onSaveSuccess, onClose, 
 
   return (
     <>
+      {showLoadingBanner && (
+        <div className="flex items-center gap-2 px-4 py-2 text-sm text-gray-600 border-b border-gray-200 bg-gray-50">
+          <Loader2 className="animate-spin" size={14} />
+          Carregando pedido...
+        </div>
+      )}
       <div className="flex flex-col h-full">
       <ParcelamentoDialog
         open={parcelamentoOpen}
@@ -913,7 +964,6 @@ export default function PedidoVendaFormPanel({ vendaId, onSaveSuccess, onClose, 
             </span>
           </div>
         )}
-
         {isMarketplaceOrder && (
           <Section title="Marketplace" description="Histórico e eventos da integração">
             {loadingMarketplaceTimeline ? (
@@ -1489,10 +1539,11 @@ export default function PedidoVendaFormPanel({ vendaId, onSaveSuccess, onClose, 
               <Ban size={20} /> Cancelar
             </button>
           )}
-          {formData.id && !isLocked && (
+          {formData.status !== 'cancelado' && (
             <button 
               onClick={handleAprovar} 
-              disabled={isSaving || (formData.itens?.length || 0) === 0 || authLoading || !activeEmpresaId || empresaChanged}
+              aria-label="Aprovar Venda"
+              disabled={isSaving || empresaChanged}
               className="flex items-center gap-2 bg-green-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-green-700 disabled:opacity-50"
             >
               <CheckCircle size={20} /> Aprovar Venda
