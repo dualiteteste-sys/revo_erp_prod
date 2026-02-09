@@ -12,9 +12,25 @@ interface Props {
   onConciliate: (item: ExtratoItem) => void;
   onUnconciliate: (item: ExtratoItem) => void;
   busyExtratoId?: string | null;
+  transferAssistByExtratoId?: Record<
+    string,
+    {
+      kind: 'detected_unique' | 'detected_multiple' | 'conciliated_transfer';
+      movimentacaoId?: string;
+      candidatesCount?: number;
+    }
+  >;
+  onQuickLinkTransfer?: (item: ExtratoItem, movimentacaoId: string) => void;
 }
 
-export default function ExtratosTable({ extratos, onConciliate, onUnconciliate, busyExtratoId }: Props) {
+export default function ExtratosTable({
+  extratos,
+  onConciliate,
+  onUnconciliate,
+  busyExtratoId,
+  transferAssistByExtratoId,
+  onQuickLinkTransfer,
+}: Props) {
   const columns: TableColumnWidthDef[] = [
     { id: 'data', defaultWidth: 160, minWidth: 140 },
     { id: 'descricao', defaultWidth: 420, minWidth: 220 },
@@ -92,6 +108,12 @@ export default function ExtratosTable({ extratos, onConciliate, onUnconciliate, 
           {sortedExtratos.map(item => (
             (() => {
               const isBusy = !!busyExtratoId && busyExtratoId === item.id;
+              const transferAssist = transferAssistByExtratoId?.[item.id];
+              const hasQuickTransferAction =
+                !item.conciliado &&
+                transferAssist?.kind === 'detected_unique' &&
+                !!transferAssist.movimentacaoId &&
+                !!onQuickLinkTransfer;
               return (
                 <tr key={item.id} className={`hover:bg-gray-50 ${item.conciliado ? 'bg-green-50/30' : ''}`}>
                   <td className="px-6 py-4 text-sm text-gray-900 whitespace-nowrap">
@@ -118,31 +140,62 @@ export default function ExtratosTable({ extratos, onConciliate, onUnconciliate, 
                           {formatDatePtBR(item.movimentacao_data)} • R${' '}
                           {new Intl.NumberFormat('pt-BR', { style: 'decimal', minimumFractionDigits: 2 }).format(item.movimentacao_valor!)}
                         </span>
+                        {transferAssist?.kind === 'conciliated_transfer' ? (
+                          <span className="mt-1 inline-flex w-fit items-center rounded-full bg-emerald-100 px-2 py-0.5 text-[11px] font-semibold text-emerald-800">
+                            Conciliado por transferência interna
+                          </span>
+                        ) : null}
                     </div>
                 ) : (
-                  <span className="text-gray-400 text-xs italic">Pendente</span>
+                  <div className="flex flex-col gap-1">
+                    <span className="text-gray-400 text-xs italic">Pendente</span>
+                    {transferAssist?.kind === 'detected_unique' ? (
+                      <span className="inline-flex w-fit items-center rounded-full bg-blue-100 px-2 py-0.5 text-[11px] font-semibold text-blue-800">
+                        Transferência interna detectada
+                      </span>
+                    ) : null}
+                    {transferAssist?.kind === 'detected_multiple' ? (
+                      <span className="inline-flex w-fit items-center rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-semibold text-amber-800">
+                        Transferência interna detectada ({transferAssist.candidatesCount ?? 2} opções)
+                      </span>
+                    ) : null}
+                  </div>
                 )}
               </td>
 	              <td className="px-6 py-4 text-center">
 	                {item.conciliado ? (
-	                    <button 
-	                        onClick={() => (isBusy ? undefined : onUnconciliate(item))}
-	                        disabled={isBusy}
-	                        className="text-red-500 hover:text-red-700 p-2 rounded-full hover:bg-red-50 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
-	                        title="Reverter conciliação"
-	                    >
-	                        {isBusy ? <Loader2 className="animate-spin" size={18} /> : <Unlink size={18} />}
-	                    </button>
+                    <button
+                      onClick={() => (isBusy ? undefined : onUnconciliate(item))}
+                      disabled={isBusy}
+                      className="text-red-500 hover:text-red-700 p-2 rounded-full hover:bg-red-50 transition-colors disabled:opacity-60 disabled:cursor-not-allowed inline-flex items-center gap-1"
+                      title="Reverter conciliação"
+                    >
+                      {isBusy ? <Loader2 className="animate-spin" size={18} /> : <Unlink size={18} />}
+                      <span className="text-xs font-semibold">Desfazer</span>
+                    </button>
 	                ) : (
-                    <button 
+                    <div className="flex items-center justify-center gap-2">
+                      {hasQuickTransferAction ? (
+                        <button
+                          onClick={() => (isBusy ? undefined : onQuickLinkTransfer(item, transferAssist!.movimentacaoId!))}
+                          disabled={isBusy}
+                          className="text-emerald-700 hover:text-emerald-800 p-2 rounded-full hover:bg-emerald-50 transition-colors flex items-center gap-1 disabled:opacity-60 disabled:cursor-not-allowed"
+                          title="Vincular transferência detectada"
+                        >
+                          {isBusy ? <Loader2 className="animate-spin" size={18} /> : <Link2 size={18} />}
+                          <span className="text-xs font-semibold">Vincular transferência</span>
+                        </button>
+                      ) : null}
+                      <button
                         onClick={() => (isBusy ? undefined : onConciliate(item))}
                         disabled={isBusy}
                         className="text-blue-600 hover:text-blue-800 p-2 rounded-full hover:bg-blue-50 transition-colors flex items-center gap-1 mx-auto disabled:opacity-60 disabled:cursor-not-allowed"
                         title="Conciliar"
-                    >
+                      >
                         {isBusy ? <Loader2 className="animate-spin" size={18} /> : <Link2 size={18} />}
-                        <span className="text-xs font-semibold">Conciliar</span>
-                    </button>
+                        <span className="text-xs font-semibold">{hasQuickTransferAction ? 'Revisar' : 'Conciliar'}</span>
+                      </button>
+                    </div>
                 )}
               </td>
             </tr>

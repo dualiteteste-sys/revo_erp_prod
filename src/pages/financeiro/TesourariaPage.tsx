@@ -26,6 +26,63 @@ import { useSearchParams } from 'react-router-dom';
 import { useEditLock } from '@/components/ui/hooks/useEditLock';
 import { useAuth } from '@/contexts/AuthProvider';
 
+type TransferAssistInfo = {
+  kind: 'detected_unique' | 'detected_multiple' | 'conciliated_transfer';
+  movimentacaoId?: string;
+  candidatesCount?: number;
+};
+
+const ONE_DAY_MS = 24 * 60 * 60 * 1000;
+
+function toFiniteMoneyOrNull(value: unknown): number | null {
+  if (value === null || value === undefined) return null;
+  const parsed = typeof value === 'number' ? value : Number(value);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function resolveMovimentacaoValor(mov: Movimentacao): number | null {
+  return (
+    toFiniteMoneyOrNull(mov.valor) ??
+    toFiniteMoneyOrNull(mov.valor_entrada) ??
+    toFiniteMoneyOrNull(mov.valor_saida)
+  );
+}
+
+function isTransferenciaInterna(origemTipo: string | null | undefined): boolean {
+  return String(origemTipo || '').startsWith('transferencia_interna');
+}
+
+function parseIsoDate(dateIso: string): Date | null {
+  if (!dateIso) return null;
+  const date = new Date(`${dateIso.slice(0, 10)}T00:00:00`);
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
+function diffDaysAbs(dateA: string, dateB: string): number {
+  const a = parseIsoDate(dateA);
+  const b = parseIsoDate(dateB);
+  if (!a || !b) return Number.POSITIVE_INFINITY;
+  return Math.abs(Math.round((a.getTime() - b.getTime()) / ONE_DAY_MS));
+}
+
+function isSameTransferAssistMap(
+  left: Record<string, TransferAssistInfo>,
+  right: Record<string, TransferAssistInfo>,
+): boolean {
+  const leftKeys = Object.keys(left);
+  const rightKeys = Object.keys(right);
+  if (leftKeys.length !== rightKeys.length) return false;
+  for (const key of leftKeys) {
+    const leftItem = left[key];
+    const rightItem = right[key];
+    if (!rightItem) return false;
+    if (leftItem.kind !== rightItem.kind) return false;
+    if ((leftItem.movimentacaoId ?? null) !== (rightItem.movimentacaoId ?? null)) return false;
+    if ((leftItem.candidatesCount ?? null) !== (rightItem.candidatesCount ?? null)) return false;
+  }
+  return true;
+}
+
 export default function TesourariaPage() {
   const { loading: authLoading, activeEmpresaId } = useAuth();
   const [activeTab, setActiveTab] = useState<'contas' | 'movimentos' | 'conciliacao' | 'regras'>('contas');
@@ -40,6 +97,7 @@ export default function TesourariaPage() {
   const [busyExtratoId, setBusyExtratoId] = useState<string | null>(null);
   const [bulkConciliando, setBulkConciliando] = useState(false);
   const [bulkThreshold, setBulkThreshold] = useState(85);
+  const [transferAssistByExtratoId, setTransferAssistByExtratoId] = useState<Record<string, TransferAssistInfo>>({});
 
   const lastEmpresaIdRef = useRef<string | null>(activeEmpresaId);
   const empresaChanged = lastEmpresaIdRef.current !== activeEmpresaId;
@@ -96,6 +154,21 @@ export default function TesourariaPage() {
 
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
   const [conciliacaoItem, setConciliacaoItem] = useState<ExtratoItem | null>(null);
+  const extratoAssistKey = useMemo(
+    () =>
+      (extratos || [])
+        .map((item) =>
+          [
+            item.id,
+            item.conciliado ? '1' : '0',
+            item.movimentacao_id ?? '',
+            item.data_lancamento,
+            Number(item.valor ?? 0).toFixed(2),
+          ].join(':'),
+        )
+        .join('|'),
+    [extratos],
+  );
 
   const clearOpenParam = useCallback(() => {
     if (!openId) return;
@@ -430,6 +503,145 @@ export default function TesourariaPage() {
         addToast(e.message, 'error');
     } finally {
         setBusyExtratoId(null);
+    }
+  };
+
+  useEffect(() => {
+    if (activeTab !== 'conciliacao' || !selectedContaId || !extratos?.length) {
+      setTransferAssistByExtratoId((prev) => (Object.keys(prev).length === 0 ? prev : {}));
+      return;
+    }
+
+    let cancelled = false;
+    void (async () => {
+      try {
+        const allDates = extratos
+          .map((item) => parseIsoDate(item.data_lancamento))
+          .filter((date): date is Date => !!date);
+
+        if (allDates.length === 0) {
+          if (!cancelled) {
+            setTransferAssistByExtratoId((prev) => (Object.keys(prev).length === 0 ? prev : {}));
+          }
+          return;
+        }
+
+        const minDate = new Date(Math.min(...allDates.map((date) => date.getTime())));
+        minDate.setDate(minDate.getDate() - 3);
+        const maxDate = new Date(Math.max(...allDates.map((date) => date.getTime())));
+        maxDate.setDate(maxDate.getDate() + 3);
+
+        const { data: movWindow } = await listMovimentacoes({
+          contaCorrenteId: selectedContaId,
+          startDate: minDate,
+          endDate: maxDate,
+          tipoMov: null,
+          page: 1,
+          pageSize: 500,
+        });
+
+        const movementById = new Map<string, Movimentacao>();
+        for (const mov of movWindow) {
+          movementById.set(mov.id, mov);
+        }
+
+        const conciliatedMovIds = extratos
+          .filter((item) => item.conciliado && !!item.movimentacao_id)
+          .map((item) => item.movimentacao_id!)
+          .filter((movId) => !movementById.has(movId));
+
+        if (conciliatedMovIds.length > 0) {
+          const details = await Promise.all(
+            conciliatedMovIds.map(async (movId) => {
+              try {
+                return await getMovimentacao(movId);
+              } catch {
+                return null;
+              }
+            }),
+          );
+          for (const mov of details) {
+            if (mov) movementById.set(mov.id, mov);
+          }
+        }
+
+        const assistMap: Record<string, TransferAssistInfo> = {};
+
+        for (const item of extratos) {
+          if (item.conciliado && item.movimentacao_id) {
+            const linkedMov = movementById.get(item.movimentacao_id);
+            if (linkedMov && isTransferenciaInterna(linkedMov.origem_tipo)) {
+              assistMap[item.id] = {
+                kind: 'conciliated_transfer',
+                movimentacaoId: linkedMov.id,
+              };
+            }
+            continue;
+          }
+
+          const expectedType = item.tipo_lancamento === 'credito' ? 'entrada' : 'saida';
+          const candidates = (movWindow || []).filter((mov) => {
+            if (mov.conciliado) return false;
+            if (mov.tipo_mov !== expectedType) return false;
+            if (!isTransferenciaInterna(mov.origem_tipo)) return false;
+            const movValue = resolveMovimentacaoValor(mov);
+            if (movValue === null) return false;
+            if (Math.abs(movValue - Number(item.valor || 0)) > 0.01) return false;
+            const distanceDays = diffDaysAbs(item.data_lancamento, mov.data_movimento);
+            return distanceDays <= 2;
+          });
+
+          if (candidates.length === 0) continue;
+
+          const strictCandidates = candidates.filter(
+            (mov) => diffDaysAbs(item.data_lancamento, mov.data_movimento) <= 1,
+          );
+          if (strictCandidates.length === 1) {
+            assistMap[item.id] = {
+              kind: 'detected_unique',
+              movimentacaoId: strictCandidates[0].id,
+              candidatesCount: 1,
+            };
+            continue;
+          }
+
+          assistMap[item.id] = {
+            kind: 'detected_multiple',
+            candidatesCount: candidates.length,
+          };
+        }
+
+        if (!cancelled) {
+          setTransferAssistByExtratoId((prev) => (isSameTransferAssistMap(prev, assistMap) ? prev : assistMap));
+        }
+      } catch (error) {
+        if (import.meta.env.DEV) {
+          console.error('[Tesouraria][TransferAssist] erro ao detectar correspondências internas.', error);
+        }
+        if (!cancelled) {
+          setTransferAssistByExtratoId((prev) => (Object.keys(prev).length === 0 ? prev : {}));
+        }
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [activeTab, extratoAssistKey, extratos, selectedContaId]);
+
+  const handleQuickLinkTransfer = async (item: ExtratoItem, movimentacaoId: string) => {
+    if (busyExtratoId || bulkConciliando) return;
+    setBusyExtratoId(item.id);
+    try {
+      await conciliarExtrato(item.id, movimentacaoId);
+      addToast('Transferência interna vinculada e conciliada.', 'success');
+      refreshExtrato();
+      refreshMov();
+      refreshContas();
+    } catch (e: any) {
+      addToast(e?.message || 'Erro ao vincular transferência interna.', 'error');
+    } finally {
+      setBusyExtratoId(null);
     }
   };
 
@@ -774,6 +986,8 @@ export default function TesourariaPage() {
                         onConciliate={(item) => (busyExtratoId ? undefined : setConciliacaoItem(item))} 
                         onUnconciliate={handleUnconciliate}
                         busyExtratoId={busyExtratoId}
+                        transferAssistByExtratoId={transferAssistByExtratoId}
+                        onQuickLinkTransfer={handleQuickLinkTransfer}
                     />
                   </div>
                 )}
