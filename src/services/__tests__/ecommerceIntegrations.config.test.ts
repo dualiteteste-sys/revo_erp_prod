@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { normalizeEcommerceConfig } from '@/services/ecommerceIntegrations';
+import { normalizeEcommerceConfig, resolveWooConnectionStatus } from '@/services/ecommerceIntegrations';
 
 describe('normalizeEcommerceConfig', () => {
   it('applies safe defaults', () => {
@@ -31,3 +31,37 @@ describe('normalizeEcommerceConfig', () => {
   });
 });
 
+describe('resolveWooConnectionStatus', () => {
+  it('returns connected when store URL and secrets are present', () => {
+    expect(
+      resolveWooConnectionStatus({
+        storeUrl: 'https://loja.exemplo.com',
+        hasSecrets: true,
+        diagnosticsUnavailable: false,
+        previousStatus: 'pending',
+      }),
+    ).toBe('connected');
+  });
+
+  it('keeps connected when diagnostics are unavailable and previous status is connected', () => {
+    expect(
+      resolveWooConnectionStatus({
+        storeUrl: '',
+        hasSecrets: false,
+        diagnosticsUnavailable: true,
+        previousStatus: 'connected',
+      }),
+    ).toBe('connected');
+  });
+
+  it('returns pending when required data is missing', () => {
+    expect(
+      resolveWooConnectionStatus({
+        storeUrl: 'https://loja.exemplo.com',
+        hasSecrets: false,
+        diagnosticsUnavailable: false,
+        previousStatus: 'connected',
+      }),
+    ).toBe('pending');
+  });
+});
