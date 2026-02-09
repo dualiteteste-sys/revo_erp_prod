@@ -118,10 +118,17 @@ export default function TesourariaPage() {
       return;
     }
 
-    setSelectedConta(c);
-    setEditingContaId(c.id);
-    setIsContaFormOpen(true);
-  }, [clearOpenParam, confirm, contasEditLock]);
+    try {
+      const contaCompleta = await getContaCorrente(c.id);
+      setSelectedConta(contaCompleta);
+      setEditingContaId(c.id);
+      setIsContaFormOpen(true);
+    } catch (e: any) {
+      contasEditLock.release(c.id);
+      addToast(e?.message || 'Não foi possível carregar os detalhes da conta.', 'error');
+      clearOpenParam();
+    }
+  }, [addToast, clearOpenParam, confirm, contasEditLock]);
 
   const closeContaForm = useCallback(() => {
     setIsContaFormOpen(false);
