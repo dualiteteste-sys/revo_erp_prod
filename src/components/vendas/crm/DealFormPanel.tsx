@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { CheckCircle2, Loader2, Save, ShoppingCart, Trash2, XCircle } from 'lucide-react';
 import {
   CrmAtividade,
@@ -23,6 +23,7 @@ import TextArea from '@/components/ui/forms/TextArea';
 import ClientAutocomplete from '@/components/common/ClientAutocomplete';
 import { useNumericField } from '@/hooks/useNumericField';
 import { useNavigate } from 'react-router-dom';
+import { useAuth } from '@/contexts/AuthProvider';
 
 interface Props {
   deal: CrmOportunidade | null;
@@ -35,6 +36,7 @@ interface Props {
 export default function DealFormPanel({ deal, funilId, etapaId, onSaveSuccess, onClose }: Props) {
   const { addToast } = useToast();
   const { confirm } = useConfirm();
+  const { loading: authLoading, activeEmpresaId } = useAuth();
   const navigate = useNavigate();
   const [isSaving, setIsSaving] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -47,6 +49,9 @@ export default function DealFormPanel({ deal, funilId, etapaId, onSaveSuccess, o
   const [atividadeTitulo, setAtividadeTitulo] = useState('');
   const [atividadeDescricao, setAtividadeDescricao] = useState('');
   const [atividadeDueDate, setAtividadeDueDate] = useState('');
+  const lastEmpresaIdRef = useRef<string | null>(activeEmpresaId);
+  const empresaChanged = lastEmpresaIdRef.current !== activeEmpresaId;
+  const actionTokenRef = useRef(0);
   
   const [formData, setFormData] = useState<OportunidadePayload>({
     funil_id: funilId,
@@ -59,14 +64,35 @@ export default function DealFormPanel({ deal, funilId, etapaId, onSaveSuccess, o
   const valorProps = useNumericField(formData.valor, (v) => handleChange('valor', v));
 
   useEffect(() => {
+    const prevEmpresaId = lastEmpresaIdRef.current;
+    if (prevEmpresaId === activeEmpresaId) return;
+    actionTokenRef.current += 1;
+    setIsSaving(false);
+    setIsDeleting(false);
+    setIsConverting(false);
+    setAtividadeSaving(false);
+    setAtividadesLoading(false);
+    setAtividades([]);
+    setAtividadeTitulo('');
+    setAtividadeDescricao('');
+    setAtividadeDueDate('');
+    lastEmpresaIdRef.current = activeEmpresaId;
+  }, [activeEmpresaId]);
+
+  useEffect(() => {
     const init = async () => {
+        if (authLoading || !activeEmpresaId || empresaChanged) return;
+        const token = ++actionTokenRef.current;
+        const empresaSnapshot = activeEmpresaId;
         if (deal) {
+            if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
             setFormData(deal);
             setCurrentFunilId(deal.funil_id || funilId);
         } else {
             // If creating new, ensure we have a funil_id
             if (!funilId) {
                 const kanban = await getCrmKanbanData();
+                if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
                 if (kanban?.funil_id) {
                     setCurrentFunilId(kanban.funil_id);
                     setFormData(prev => ({ ...prev, funil_id: kanban.funil_id! }));
@@ -75,35 +101,44 @@ export default function DealFormPanel({ deal, funilId, etapaId, onSaveSuccess, o
         }
     };
     init();
-  }, [deal, funilId]);
+  }, [activeEmpresaId, authLoading, deal, empresaChanged, funilId]);
 
-  const loadAtividades = async (oportunidadeId: string) => {
+  const loadAtividades = async (oportunidadeId: string, token = ++actionTokenRef.current, empresaSnapshot = activeEmpresaId) => {
     setAtividadesLoading(true);
     try {
       const rows = await listAtividades(oportunidadeId);
+      if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
       setAtividades(rows || []);
     } catch (e: any) {
+      if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
       setAtividades([]);
       addToast(e.message || 'Erro ao carregar atividades.', 'error');
     } finally {
+      if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
       setAtividadesLoading(false);
     }
   };
 
   useEffect(() => {
-    if (!deal?.id) {
+    if (authLoading || !activeEmpresaId || empresaChanged || !deal?.id) {
       setAtividades([]);
       return;
     }
-    loadAtividades(deal.id);
+    const token = ++actionTokenRef.current;
+    const empresaSnapshot = activeEmpresaId;
+    loadAtividades(deal.id, token, empresaSnapshot);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [deal?.id]);
+  }, [activeEmpresaId, authLoading, deal?.id, empresaChanged]);
 
   const handleChange = (field: keyof OportunidadePayload, value: any) => {
     setFormData(prev => ({ ...prev, [field]: value }));
   };
 
   const handleSave = async () => {
+    if (authLoading || !activeEmpresaId || empresaChanged) {
+      addToast('Aguarde a troca de empresa concluir para salvar.', 'info');
+      return;
+    }
     if (!formData.titulo) {
       addToast('O título da oportunidade é obrigatório.', 'error');
       return;
@@ -114,19 +149,25 @@ export default function DealFormPanel({ deal, funilId, etapaId, onSaveSuccess, o
         return;
     }
 
+    const token = ++actionTokenRef.current;
+    const empresaSnapshot = activeEmpresaId;
     setIsSaving(true);
     try {
       await saveOportunidade(formData);
+      if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
       addToast('Oportunidade salva com sucesso!', 'success');
       onSaveSuccess();
     } catch (e: any) {
+      if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
       addToast(e.message, 'error');
     } finally {
+      if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
       setIsSaving(false);
     }
   };
 
   const handleDelete = async () => {
+    if (authLoading || !activeEmpresaId || empresaChanged) return;
     if (!deal?.id) return;
     const ok = await confirm({
       title: 'Excluir oportunidade',
@@ -136,18 +177,25 @@ export default function DealFormPanel({ deal, funilId, etapaId, onSaveSuccess, o
       variant: 'danger',
     });
     if (!ok) return;
+    const token = ++actionTokenRef.current;
+    const empresaSnapshot = activeEmpresaId;
     setIsDeleting(true);
     try {
         await deleteOportunidade(deal.id);
+        if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
         addToast('Oportunidade excluída.', 'success');
         onSaveSuccess();
     } catch(e: any) {
+        if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
         addToast(e.message, 'error');
+    } finally {
+        if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
         setIsDeleting(false);
     }
   };
 
   const handleAddAtividade = async () => {
+    if (authLoading || !activeEmpresaId || empresaChanged) return;
     if (!deal?.id) {
       addToast('Salve a oportunidade antes de adicionar atividades.', 'warning');
       return;
@@ -162,6 +210,8 @@ export default function DealFormPanel({ deal, funilId, etapaId, onSaveSuccess, o
       return;
     }
 
+    const token = ++actionTokenRef.current;
+    const empresaSnapshot = activeEmpresaId;
     setAtividadeSaving(true);
     try {
       await upsertAtividade({
@@ -171,29 +221,39 @@ export default function DealFormPanel({ deal, funilId, etapaId, onSaveSuccess, o
         descricao,
         due_at,
       });
+      if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
       setAtividadeTitulo('');
       setAtividadeDescricao('');
       setAtividadeDueDate('');
-      await loadAtividades(deal.id);
+      await loadAtividades(deal.id, token, empresaSnapshot);
+      if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
       addToast('Atividade adicionada.', 'success');
     } catch (e: any) {
+      if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
       addToast(e.message || 'Falha ao adicionar atividade.', 'error');
     } finally {
+      if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
       setAtividadeSaving(false);
     }
   };
 
   const toggleDone = async (row: CrmAtividade) => {
+    if (authLoading || !activeEmpresaId || empresaChanged) return;
     if (!deal?.id) return;
+    const token = ++actionTokenRef.current;
+    const empresaSnapshot = activeEmpresaId;
     try {
       await markAtividadeDone(row.id, !row.done_at);
-      await loadAtividades(deal.id);
+      if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
+      await loadAtividades(deal.id, token, empresaSnapshot);
     } catch (e: any) {
+      if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
       addToast(e.message || 'Falha ao atualizar atividade.', 'error');
     }
   };
 
   const removeAtividade = async (row: CrmAtividade) => {
+    if (authLoading || !activeEmpresaId || empresaChanged) return;
     if (!deal?.id) return;
     const ok = await confirm({
       title: 'Remover atividade',
@@ -203,16 +263,22 @@ export default function DealFormPanel({ deal, funilId, etapaId, onSaveSuccess, o
       variant: 'danger',
     });
     if (!ok) return;
+    const token = ++actionTokenRef.current;
+    const empresaSnapshot = activeEmpresaId;
     try {
       await deleteAtividade(row.id);
-      await loadAtividades(deal.id);
+      if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
+      await loadAtividades(deal.id, token, empresaSnapshot);
+      if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
       addToast('Atividade removida.', 'success');
     } catch (e: any) {
+      if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
       addToast(e.message || 'Falha ao remover atividade.', 'error');
     }
   };
 
   const handleConvertToPedido = async () => {
+    if (authLoading || !activeEmpresaId || empresaChanged) return;
     if (!deal?.id) {
       addToast('Salve a oportunidade antes de converter.', 'warning');
       return;
@@ -231,15 +297,20 @@ export default function DealFormPanel({ deal, funilId, etapaId, onSaveSuccess, o
     });
     if (!ok) return;
 
+    const token = ++actionTokenRef.current;
+    const empresaSnapshot = activeEmpresaId;
     setIsConverting(true);
     try {
       const pedidoId = await convertOportunidadeToPedido(deal.id);
+      if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
       addToast('Pedido criado. Abrindo…', 'success');
       onClose();
       navigate(`/app/vendas/pedidos?open=${pedidoId}`);
     } catch (e: any) {
+      if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
       addToast(e.message || 'Falha ao converter em pedido.', 'error');
     } finally {
+      if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
       setIsConverting(false);
     }
   };
@@ -449,7 +520,7 @@ export default function DealFormPanel({ deal, funilId, etapaId, onSaveSuccess, o
           </button>
           <button 
             onClick={handleSave} 
-            disabled={isSaving}
+            disabled={isSaving || authLoading || !activeEmpresaId || empresaChanged}
             className="flex items-center gap-2 bg-blue-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-blue-700 disabled:opacity-50"
           >
             {isSaving ? <Loader2 className="animate-spin" size={20} /> : <Save size={20} />}

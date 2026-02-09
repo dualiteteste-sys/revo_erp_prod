@@ -9,6 +9,7 @@ import Select from '@/components/ui/forms/Select';
 import Toggle from '@/components/ui/forms/Toggle';
 import { Button } from '@/components/ui/button';
 import { useHasPermission } from '@/hooks/useHasPermission';
+import { useAuth } from '@/contexts/AuthProvider';
 
 interface CompetenciaFormPanelProps {
   competencia: Competencia | null;
@@ -18,8 +19,12 @@ interface CompetenciaFormPanelProps {
 
 const CompetenciaFormPanel: React.FC<CompetenciaFormPanelProps> = ({ competencia, onSaveSuccess, onClose }) => {
   const { addToast } = useToast();
+  const { loading: authLoading, activeEmpresaId } = useAuth();
   const [isSaving, setIsSaving] = useState(false);
   const [formData, setFormData] = useState<CompetenciaPayload>({});
+  const lastEmpresaIdRef = React.useRef<string | null>(activeEmpresaId);
+  const empresaChanged = lastEmpresaIdRef.current !== activeEmpresaId;
+  const actionTokenRef = React.useRef(0);
 
   const permCreate = useHasPermission('rh', 'create');
   const permUpdate = useHasPermission('rh', 'update');
@@ -36,11 +41,23 @@ const CompetenciaFormPanel: React.FC<CompetenciaFormPanelProps> = ({ competencia
     }
   }, [competencia]);
 
+  useEffect(() => {
+    const prevEmpresaId = lastEmpresaIdRef.current;
+    if (prevEmpresaId === activeEmpresaId) return;
+    actionTokenRef.current += 1;
+    setIsSaving(false);
+    lastEmpresaIdRef.current = activeEmpresaId;
+  }, [activeEmpresaId]);
+
   const handleFormChange = (field: keyof CompetenciaPayload, value: any) => {
     setFormData(prev => ({ ...prev, [field]: value }));
   };
 
   const handleSave = async () => {
+    if (authLoading || !activeEmpresaId || empresaChanged) {
+      addToast('Aguarde a troca de empresa concluir para salvar.', 'info');
+      return;
+    }
     if (readOnly) {
       addToast('Você não tem permissão para salvar competências.', 'warning');
       return;
@@ -50,14 +67,19 @@ const CompetenciaFormPanel: React.FC<CompetenciaFormPanelProps> = ({ competencia
       return;
     }
 
+    const token = ++actionTokenRef.current;
+    const empresaSnapshot = activeEmpresaId;
     setIsSaving(true);
     try {
       await saveCompetencia(formData);
+      if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
       addToast('Competência salva com sucesso!', 'success');
       onSaveSuccess();
     } catch (error: any) {
+      if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
       addToast(error.message, 'error');
     } finally {
+      if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
       setIsSaving(false);
     }
   };
@@ -131,7 +153,7 @@ const CompetenciaFormPanel: React.FC<CompetenciaFormPanelProps> = ({ competencia
           <Button type="button" onClick={onClose} variant="outline">
             Cancelar
           </Button>
-          <Button onClick={handleSave} disabled={isSaving || permsLoading || !canSave} className="gap-2">
+          <Button onClick={handleSave} disabled={isSaving || permsLoading || !canSave || authLoading || !activeEmpresaId || empresaChanged} className="gap-2">
             {isSaving ? <Loader2 className="animate-spin" size={20} /> : <Save size={20} />}
             Salvar
           </Button>

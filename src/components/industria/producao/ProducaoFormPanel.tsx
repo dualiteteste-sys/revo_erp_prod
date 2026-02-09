@@ -32,6 +32,7 @@ import Modal from '@/components/ui/Modal';
 import { logger } from '@/lib/logger';
 import IndustriaAuditTrailPanel from '@/components/industria/audit/IndustriaAuditTrailPanel';
 import { roleAtLeast, useEmpresaRole } from '@/hooks/useEmpresaRole';
+import { useAuth } from '@/contexts/AuthProvider';
 
 interface Props {
   ordemId: string | null;
@@ -52,6 +53,7 @@ export default function ProducaoFormPanel({
 }: Props) {
   const { addToast } = useToast();
   const { confirm } = useConfirm();
+  const { loading: authLoading, activeEmpresaId } = useAuth();
   const empresaRoleQuery = useEmpresaRole();
   const empresaRole = empresaRoleQuery.data;
   // Enquanto o role não carregou, não travar o formulário (evita "race condition" de empresa/role).
@@ -72,6 +74,9 @@ export default function ProducaoFormPanel({
   const [wizardStep, setWizardStep] = useState<0 | 1 | 2>(0);
   const [showLiberarModal, setShowLiberarModal] = useState(false);
   const [isResetting, setIsResetting] = useState(false);
+  const lastEmpresaIdRef = useRef<string | null>(activeEmpresaId);
+  const empresaChanged = lastEmpresaIdRef.current !== activeEmpresaId;
+  const actionTokenRef = useRef(0);
 
   const [formData, setFormData] = useState<Partial<OrdemProducaoDetails>>({
     status: 'rascunho',
@@ -87,26 +92,49 @@ export default function ProducaoFormPanel({
   });
 
   useEffect(() => {
+    if (authLoading || !activeEmpresaId || empresaChanged) return;
+    const token = ++actionTokenRef.current;
+    const empresaSnapshot = activeEmpresaId;
     listUnidades()
-      .then(setUnidades)
+      .then((rows) => {
+        if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
+        setUnidades(rows);
+      })
       .catch((e: any) => {
+        if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
         logger.error('[Indústria][OP] Falha ao carregar unidades', e);
         addToast(e?.message || 'Erro ao carregar unidades.', 'error');
       });
-  }, []);
+  }, [activeEmpresaId, addToast, authLoading, empresaChanged]);
+
+  useEffect(() => {
+    const prevEmpresaId = lastEmpresaIdRef.current;
+    if (prevEmpresaId === activeEmpresaId) return;
+    actionTokenRef.current += 1;
+    setLoading(false);
+    setIsSaving(false);
+    setIsResetting(false);
+    setShowClosureModal(false);
+    setShowLiberarModal(false);
+    lastEmpresaIdRef.current = activeEmpresaId;
+  }, [activeEmpresaId]);
 
   useEffect(() => {
     if (ordemId) {
       loadDetails();
     }
-  }, [ordemId]);
+  }, [ordemId, activeEmpresaId, authLoading, empresaChanged]);
 
   const loadDetails = async (idOverride?: string) => {
+    if (authLoading || !activeEmpresaId || empresaChanged) return;
+    const token = ++actionTokenRef.current;
+    const empresaSnapshot = activeEmpresaId;
     const idToLoad = idOverride || ordemId || formData.id;
     if (!idToLoad) return;
 
     try {
       const data = await getOrdemProducaoDetails(idToLoad);
+      if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
       if (!data) {
         addToast('Ordem não encontrada (talvez tenha sido excluída).', 'error');
         if (ordemId) onClose();
@@ -116,10 +144,12 @@ export default function ProducaoFormPanel({
       const bloqueio = checkEntregaBlocked(data);
       setEntregaBloqueada(bloqueio);
     } catch (e) {
+      if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
       logger.error('[Indústria][OP] Falha ao carregar ordem', e, { ordemId: idToLoad });
       addToast('Erro ao carregar ordem.', 'error');
       if (ordemId) onClose();
     } finally {
+      if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
       setLoading(false);
     }
   };
@@ -134,6 +164,10 @@ export default function ProducaoFormPanel({
   };
 
   const handleSaveHeader = async () => {
+    if (authLoading || !activeEmpresaId || empresaChanged) {
+      addToast('Aguarde a troca de empresa concluir para salvar.', 'info');
+      return null;
+    }
     if (!canEdit) {
       addToast('Você não tem permissão para editar esta ordem.', 'error');
       return null;
@@ -151,6 +185,8 @@ export default function ProducaoFormPanel({
       return null;
     }
 
+    const token = ++actionTokenRef.current;
+    const empresaSnapshot = activeEmpresaId;
     setIsSaving(true);
     try {
       const payload: OrdemProducaoPayload = {
@@ -176,6 +212,7 @@ export default function ProducaoFormPanel({
       };
 
       const saved = await saveOrdemProducao(payload);
+      if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return null;
       setFormData(prev => ({ ...prev, ...saved }));
 
       if (!formData.id) {
@@ -187,14 +224,19 @@ export default function ProducaoFormPanel({
       onSaveSuccess();
       return saved.id;
     } catch (e: any) {
+      if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return null;
       addToast(e.message, 'error');
       return null;
     } finally {
+      if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return null;
       setIsSaving(false);
     }
   };
 
   const handleAddComponente = async (item: any) => {
+    if (authLoading || !activeEmpresaId || empresaChanged) return;
+    const token = ++actionTokenRef.current;
+    const empresaSnapshot = activeEmpresaId;
     let currentId = formData.id;
     if (!currentId) {
       const savedId = await handleSaveHeader();
@@ -210,24 +252,36 @@ export default function ProducaoFormPanel({
 
     try {
       await manageComponenteProducao(currentId, null, item.id, 1, 'un', 'upsert');
+      if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
       await loadDetails(currentId);
+      if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
       addToast('Componente adicionado.', 'success');
     } catch (e: any) {
+      if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
       addToast(e.message, 'error');
     }
   };
 
   const handleRemoveComponente = async (itemId: string) => {
+    if (authLoading || !activeEmpresaId || empresaChanged) return;
+    const token = ++actionTokenRef.current;
+    const empresaSnapshot = activeEmpresaId;
     try {
       await manageComponenteProducao(formData.id!, itemId, '', 0, '', 'delete');
+      if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
       await loadDetails(formData.id);
+      if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
       addToast('Componente removido.', 'success');
     } catch (e: any) {
+      if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
       addToast(e.message, 'error');
     }
   };
 
   const handleUpdateComponente = async (itemId: string, field: string, value: any) => {
+    if (authLoading || !activeEmpresaId || empresaChanged) return;
+    const token = ++actionTokenRef.current;
+    const empresaSnapshot = activeEmpresaId;
     const item = formData.componentes?.find(c => c.id === itemId);
     if (!item) return;
 
@@ -238,16 +292,21 @@ export default function ProducaoFormPanel({
 
     try {
       await manageComponenteProducao(formData.id!, itemId, item.produto_id, updates.quantidade_planejada, updates.unidade, 'upsert');
+      if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
       setFormData(prev => ({
         ...prev,
         componentes: prev.componentes?.map(c => c.id === itemId ? { ...c, ...updates } : c)
       }));
     } catch (e: any) {
+      if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
       addToast(e.message, 'error');
     }
   };
 
   const handleAddEntrega = async (data: any) => {
+    if (authLoading || !activeEmpresaId || empresaChanged) return;
+    const token = ++actionTokenRef.current;
+    const empresaSnapshot = activeEmpresaId;
     if (!formData.id) return;
     try {
       await registrarEntrega({
@@ -258,19 +317,28 @@ export default function ProducaoFormPanel({
         documento_ref: data.documento_ref,
         observacoes: data.observacoes
       });
+      if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
       await loadDetails(formData.id);
+      if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
       addToast('Entrega registrada com sucesso!', 'success');
     } catch (e: any) {
+      if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
       addToast('Erro ao registrar entrega: ' + e.message, 'error');
     }
   };
 
   const handleRemoveEntrega = async (entregaId: string) => {
+    if (authLoading || !activeEmpresaId || empresaChanged) return;
+    const token = ++actionTokenRef.current;
+    const empresaSnapshot = activeEmpresaId;
     try {
       await manageEntregaProducao(formData.id!, entregaId, null, null, undefined, undefined, 'delete');
+      if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
       await loadDetails(formData.id);
+      if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
       addToast('Entrega removida.', 'success');
     } catch (e: any) {
+      if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
       addToast(e.message, 'error');
     }
   };
@@ -309,6 +377,9 @@ export default function ProducaoFormPanel({
   };
 
   const doLiberar = async () => {
+    if (authLoading || !activeEmpresaId || empresaChanged) return;
+    const token = ++actionTokenRef.current;
+    const empresaSnapshot = activeEmpresaId;
     if (!formData.id) return;
     if (!formData.roteiro_aplicado_id) {
       addToast('A ordem precisa ter um roteiro aplicado para ser liberada.', 'error');
@@ -328,18 +399,23 @@ export default function ProducaoFormPanel({
 
       await gerarOperacoes(formData.id);
       await saveOrdemProducao({ ...formData, status: 'em_producao' });
+      if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
 
       addToast('Ordem liberada e operações geradas!', 'success');
       await loadDetails(formData.id);
+      if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
       setActiveTab('operacoes');
     } catch (e: any) {
+      if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
       addToast(e.message, 'error');
     } finally {
+      if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
       setIsSaving(false);
     }
   };
 
   const handleCriarRevisao = async () => {
+    if (authLoading || !activeEmpresaId || empresaChanged) return;
     if (!formData.id) return;
     const ok = await confirm({
       title: 'Criar revisão',
@@ -349,15 +425,20 @@ export default function ProducaoFormPanel({
       variant: 'primary',
     });
     if (!ok) return;
+    const token = ++actionTokenRef.current;
+    const empresaSnapshot = activeEmpresaId;
     setIsSaving(true);
     try {
       const cloned = await cloneOrdemProducao(formData.id);
+      if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
       addToast('Revisão criada.', 'success');
       onSaveSuccess();
       onOpenOrder?.(cloned.id);
     } catch (e: any) {
+      if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
       addToast(e?.message || 'Não foi possível criar a revisão.', 'error');
     } finally {
+      if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
       setIsSaving(false);
     }
   };
@@ -850,7 +931,7 @@ export default function ProducaoFormPanel({
                 setIsSaving(false);
               }
             }}
-            disabled={isSaving}
+            disabled={isSaving || authLoading || !activeEmpresaId || empresaChanged}
             className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 disabled:opacity-50"
           >
             Excluir OP
@@ -886,7 +967,7 @@ export default function ProducaoFormPanel({
                   setIsResetting(false);
                 }
               }}
-              disabled={isSaving || isResetting}
+              disabled={isSaving || isResetting || authLoading || !activeEmpresaId || empresaChanged}
               className="inline-flex items-center px-4 py-2 border border-amber-300 rounded-md shadow-sm text-sm font-medium text-amber-900 bg-amber-50 hover:bg-amber-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-amber-500 disabled:opacity-50"
             >
               Reverter OP
@@ -895,7 +976,7 @@ export default function ProducaoFormPanel({
 
           <button
             onClick={onClose}
-            disabled={isSaving}
+            disabled={isSaving || authLoading || !activeEmpresaId || empresaChanged}
             className="rounded-md border border-gray-300 bg-white py-2 px-4 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 disabled:opacity-50"
           >
             Fechar
@@ -905,7 +986,7 @@ export default function ProducaoFormPanel({
             <button
               type="button"
               onClick={handleCriarRevisao}
-              disabled={isSaving}
+              disabled={isSaving || authLoading || !activeEmpresaId || empresaChanged}
               className="inline-flex items-center px-4 py-2 border border-amber-200 rounded-md shadow-sm text-sm font-medium text-amber-900 bg-amber-50 hover:bg-amber-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-amber-500 disabled:opacity-50"
               title="Cria uma nova OP em rascunho para ajustar após a liberação."
             >
@@ -917,7 +998,7 @@ export default function ProducaoFormPanel({
           {formData.id && (formData.status === 'rascunho' || formData.status === 'planejada') && (
             <button
               onClick={() => setShowLiberarModal(true)}
-              disabled={isSaving || !canLiberar}
+              disabled={isSaving || !canLiberar || authLoading || !activeEmpresaId || empresaChanged}
               className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 disabled:opacity-50"
             >
               <Play size={20} className="mr-2" />
@@ -928,7 +1009,7 @@ export default function ProducaoFormPanel({
           {formData.id && (formData.status === 'em_producao' || (formData.status as any) === 'parcialmente_concluida') && (
             <button
               onClick={() => setShowClosureModal(true)}
-              disabled={isSaving || !canAdmin}
+              disabled={isSaving || !canAdmin || authLoading || !activeEmpresaId || empresaChanged}
               className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 disabled:opacity-50"
             >
               Encerrar Ordem (Backflush)
@@ -938,7 +1019,7 @@ export default function ProducaoFormPanel({
           {!isLockedEffective && canEdit && !isWizard && (
             <button
               onClick={handleSaveHeader}
-              disabled={isSaving}
+              disabled={isSaving || authLoading || !activeEmpresaId || empresaChanged}
               className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50"
             >
               <Save size={20} className="mr-2" />
@@ -972,7 +1053,7 @@ export default function ProducaoFormPanel({
               ) : (
                 <button
                   onClick={handleSaveHeader}
-                  disabled={isSaving}
+                  disabled={isSaving || authLoading || !activeEmpresaId || empresaChanged}
                   className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50"
                 >
                   <Save size={20} className="mr-2" />
@@ -1037,7 +1118,7 @@ export default function ProducaoFormPanel({
           </button>
           <button
             type="button"
-            disabled={isSaving || hasChecklistError || !canLiberar}
+            disabled={isSaving || hasChecklistError || !canLiberar || authLoading || !activeEmpresaId || empresaChanged}
             onClick={async () => {
               setShowLiberarModal(false);
               await doLiberar();

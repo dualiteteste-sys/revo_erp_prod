@@ -15,8 +15,11 @@ interface Props {
 
 export default function UnidadeFormPanel({ data, onSaveSuccess, onClose }: Props) {
     const { addToast } = useToast();
-    const { activeEmpresaId } = useAuth();
+    const { loading: authLoading, activeEmpresaId } = useAuth();
     const [isSaving, setIsSaving] = useState(false);
+    const lastEmpresaIdRef = React.useRef<string | null>(activeEmpresaId);
+    const empresaChanged = lastEmpresaIdRef.current !== activeEmpresaId;
+    const actionTokenRef = React.useRef(0);
 
     const [formData, setFormData] = useState<Partial<UnidadeMedida>>({
         ativo: true,
@@ -30,11 +33,23 @@ export default function UnidadeFormPanel({ data, onSaveSuccess, onClose }: Props
         }
     }, [data]);
 
+    useEffect(() => {
+        const prevEmpresaId = lastEmpresaIdRef.current;
+        if (prevEmpresaId === activeEmpresaId) return;
+        actionTokenRef.current += 1;
+        setIsSaving(false);
+        lastEmpresaIdRef.current = activeEmpresaId;
+    }, [activeEmpresaId]);
+
     const handleChange = (field: keyof UnidadeMedida, value: any) => {
         setFormData(prev => ({ ...prev, [field]: value }));
     };
 
     const handleSave = async () => {
+        if (authLoading || !activeEmpresaId || empresaChanged) {
+            addToast('Aguarde a troca de empresa concluir para salvar.', 'info');
+            return;
+        }
         if (!formData.sigla) {
             addToast('A sigla é obrigatória.', 'error');
             return;
@@ -44,6 +59,8 @@ export default function UnidadeFormPanel({ data, onSaveSuccess, onClose }: Props
             return;
         }
 
+        const token = ++actionTokenRef.current;
+        const empresaSnapshot = activeEmpresaId;
         setIsSaving(true);
         try {
             if (data?.id) {
@@ -52,6 +69,7 @@ export default function UnidadeFormPanel({ data, onSaveSuccess, onClose }: Props
                     descricao: formData.descricao,
                     ativo: formData.ativo
                 });
+                if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
                 addToast('Unidade atualizada com sucesso!', 'success');
             } else {
                 if (!activeEmpresaId) {
@@ -66,10 +84,12 @@ export default function UnidadeFormPanel({ data, onSaveSuccess, onClose }: Props
                     ativo: formData.ativo ?? true,
                     empresa_id: activeEmpresaId
                 });
+                if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
                 addToast('Unidade criada com sucesso!', 'success');
             }
             onSaveSuccess();
         } catch (e: any) {
+            if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
             if (e.message?.includes('violates unique constraint') || e.code === '23505') {
                 addToast('Já existe uma unidade com esta sigla.', 'error');
             } else {
@@ -77,6 +97,7 @@ export default function UnidadeFormPanel({ data, onSaveSuccess, onClose }: Props
                 console.error(e);
             }
         } finally {
+            if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
             setIsSaving(false);
         }
     };
@@ -140,7 +161,7 @@ export default function UnidadeFormPanel({ data, onSaveSuccess, onClose }: Props
                     {data?.empresa_id !== null && (
                         <button
                             onClick={handleSave}
-                            disabled={isSaving}
+                            disabled={isSaving || authLoading || !activeEmpresaId || empresaChanged}
                             className="flex items-center gap-2 bg-blue-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-blue-700 disabled:opacity-50"
                         >
                             {isSaving ? <Loader2 className="animate-spin" size={20} /> : <Save size={20} />}

@@ -12,6 +12,7 @@ import Select from '@/components/ui/forms/Select';
 import { OsItemSearchResult } from '@/services/os';
 import { listUnidades, UnidadeMedida } from '@/services/unidades';
 import { logger } from '@/lib/logger';
+import { useAuth } from '@/contexts/AuthProvider';
 
 interface Props {
   materialId: string | null;
@@ -21,6 +22,7 @@ interface Props {
 
 export default function MaterialFormPanel({ materialId, onSaveSuccess, onClose }: Props) {
   const { addToast } = useToast();
+  const { loading: authLoading, activeEmpresaId } = useAuth();
   const [loading, setLoading] = useState(!!materialId);
   const [isSaving, setIsSaving] = useState(false);
 
@@ -30,28 +32,54 @@ export default function MaterialFormPanel({ materialId, onSaveSuccess, onClose }
   });
 
   const [unidades, setUnidades] = useState<UnidadeMedida[]>([]);
+  const lastEmpresaIdRef = React.useRef<string | null>(activeEmpresaId);
+  const empresaChanged = lastEmpresaIdRef.current !== activeEmpresaId;
+  const actionTokenRef = React.useRef(0);
 
   useEffect(() => {
+    const prevEmpresaId = lastEmpresaIdRef.current;
+    if (prevEmpresaId === activeEmpresaId) return;
+    actionTokenRef.current += 1;
+    setIsSaving(false);
+    setLoading(!!materialId);
+    setFormData({ ativo: true, unidade: 'un' });
+    setUnidades([]);
+    lastEmpresaIdRef.current = activeEmpresaId;
+  }, [activeEmpresaId, materialId]);
+
+  useEffect(() => {
+    if (authLoading || !activeEmpresaId || empresaChanged) return;
+    const token = ++actionTokenRef.current;
+    const empresaSnapshot = activeEmpresaId;
     listUnidades()
-      .then(setUnidades)
+      .then((rows) => {
+        if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
+        setUnidades(rows);
+      })
       .catch((e: any) => {
+        if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
         logger.error('[Indústria][Materiais do Cliente] Falha ao carregar unidades', e);
         addToast(e?.message || 'Erro ao carregar unidades.', 'error');
       });
     if (materialId) {
-      loadDetails();
+      void loadDetails(materialId, token, empresaSnapshot);
+    } else {
+      setLoading(false);
     }
-  }, [materialId]);
+  }, [activeEmpresaId, addToast, authLoading, empresaChanged, materialId]);
 
-  const loadDetails = async () => {
+  const loadDetails = async (targetMaterialId: string, token: number, empresaSnapshot: string | null) => {
     try {
-      const data = await getMaterialClienteDetails(materialId!);
+      const data = await getMaterialClienteDetails(targetMaterialId);
+      if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
       setFormData(data);
     } catch (e) {
+      if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
       logger.error('[Indústria][Materiais do Cliente] Falha ao carregar material', e, { materialId });
       addToast('Erro ao carregar material.', 'error');
       onClose();
     } finally {
+      if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
       setLoading(false);
     }
   };
@@ -70,6 +98,10 @@ export default function MaterialFormPanel({ materialId, onSaveSuccess, onClose }
   };
 
   const handleSave = async () => {
+    if (authLoading || !activeEmpresaId || empresaChanged) {
+      addToast('Aguarde a troca de empresa concluir para salvar.', 'info');
+      return;
+    }
     if (!formData.cliente_id) {
       addToast('Selecione um cliente.', 'error');
       return;
@@ -79,6 +111,8 @@ export default function MaterialFormPanel({ materialId, onSaveSuccess, onClose }
       return;
     }
 
+    const token = ++actionTokenRef.current;
+    const empresaSnapshot = activeEmpresaId;
     setIsSaving(true);
     try {
       const payload: MaterialClientePayload = {
@@ -93,11 +127,14 @@ export default function MaterialFormPanel({ materialId, onSaveSuccess, onClose }
       };
 
       await saveMaterialCliente(payload);
+      if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
       addToast('Material salvo com sucesso!', 'success');
       onSaveSuccess();
     } catch (e: any) {
+      if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
       addToast(e.message, 'error');
     } finally {
+      if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
       setIsSaving(false);
     }
   };
@@ -187,7 +224,7 @@ export default function MaterialFormPanel({ materialId, onSaveSuccess, onClose }
           </button>
           <button
             onClick={handleSave}
-            disabled={isSaving}
+            disabled={isSaving || authLoading || !activeEmpresaId || empresaChanged}
             className="flex items-center gap-2 bg-blue-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-blue-700 disabled:opacity-50"
           >
             {isSaving ? <Loader2 className="animate-spin" size={20} /> : <Save size={20} />}

@@ -23,6 +23,7 @@ import { logger } from '@/lib/logger';
 import IndustriaAuditTrailPanel from '@/components/industria/audit/IndustriaAuditTrailPanel';
 import { roleAtLeast, useEmpresaRole } from '@/hooks/useEmpresaRole';
 import ImportarXmlSuprimentosModal from '@/components/industria/materiais/ImportarXmlSuprimentosModal';
+import { useAuth } from '@/contexts/AuthProvider';
 
 interface Props {
   ordemId: string | null;
@@ -63,6 +64,7 @@ export default function OrdemFormPanel({
 }: Props) {
   const { addToast } = useToast();
   const { confirm } = useConfirm();
+  const { loading: authLoading, activeEmpresaId } = useAuth();
   const navigate = useNavigate();
   const empresaRoleQuery = useEmpresaRole();
   const empresaRole = empresaRoleQuery.data;
@@ -80,6 +82,9 @@ export default function OrdemFormPanel({
   const highlightTimerRef = useRef<number | null>(null);
   const [wizardStep, setWizardStep] = useState<0 | 1 | 2>(0);
   const [showGerarExecucaoModal, setShowGerarExecucaoModal] = useState(false);
+  const lastEmpresaIdRef = useRef<string | null>(activeEmpresaId);
+  const empresaChanged = lastEmpresaIdRef.current !== activeEmpresaId;
+  const actionTokenRef = useRef(0);
 
   const [formData, setFormData] = useState<Partial<OrdemIndustriaDetails>>({
     status: 'rascunho',
@@ -162,24 +167,41 @@ export default function OrdemFormPanel({
   }, [initialPrefill, initialTipoOrdem, ordemId]);
 
   useEffect(() => {
+    const prevEmpresaId = lastEmpresaIdRef.current;
+    if (prevEmpresaId === activeEmpresaId) return;
+    actionTokenRef.current += 1;
+    setLoading(false);
+    setIsSaving(false);
+    setIsGeneratingExecucao(false);
+    setShowGerarExecucaoModal(false);
+    lastEmpresaIdRef.current = activeEmpresaId;
+  }, [activeEmpresaId]);
+
+  useEffect(() => {
     if (ordemId) {
       loadDetails();
     }
-  }, [ordemId]);
+  }, [ordemId, activeEmpresaId, authLoading, empresaChanged]);
 
   const loadDetails = async (idOverride?: string) => {
+    if (authLoading || !activeEmpresaId || empresaChanged) return;
+    const token = ++actionTokenRef.current;
+    const empresaSnapshot = activeEmpresaId;
     // FIX: Use idOverride or formData.id if ordemId is null (newly created order)
     const idToLoad = idOverride || ordemId || formData.id;
     if (!idToLoad) return;
 
     try {
       const data = await getOrdemDetails(idToLoad);
+      if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
       setFormData(data);
     } catch (e) {
+      if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
       logger.error('[Indústria][OP/OB] Falha ao carregar ordem', e, { ordemId: idToLoad });
       addToast('Erro ao carregar ordem.', 'error');
       if (ordemId) onClose();
     } finally {
+      if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
       setLoading(false);
     }
   };
@@ -200,6 +222,10 @@ export default function OrdemFormPanel({
   };
 
 	  const handleSaveHeader = async () => {
+        if (empresaChanged) {
+          addToast('Aguarde a troca de empresa concluir para salvar.', 'info');
+          return null;
+        }
 	    if (!canEdit) {
 	      addToast('Você não tem permissão para editar esta ordem.', 'error');
 	      return null;
@@ -225,6 +251,8 @@ export default function OrdemFormPanel({
       return null;
     }
 
+        const token = ++actionTokenRef.current;
+        const empresaSnapshot = activeEmpresaId ?? null;
 	    setIsSaving(true);
 	    try {
 	      let materialClienteId = formData.material_cliente_id || null;
@@ -272,6 +300,7 @@ export default function OrdemFormPanel({
       };
 
       const saved = await saveOrdem(payload);
+      if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return null;
       setFormData(prev => ({ ...prev, ...saved }));
 
       if (!formData.id) {
@@ -284,9 +313,11 @@ export default function OrdemFormPanel({
       onSaveSuccess();
       return saved.id;
     } catch (e: any) {
+      if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return null;
       addToast(e.message, 'error');
       return null;
     } finally {
+      if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return null;
       setIsSaving(false);
     }
   };
@@ -317,6 +348,7 @@ export default function OrdemFormPanel({
 
   // --- Componentes ---
   const handleAddComponente = async (item: any) => {
+    if (authLoading || !activeEmpresaId || empresaChanged) return;
     if (!canEdit) {
       addToast('Você não tem permissão para editar esta ordem.', 'error');
       return;
@@ -328,30 +360,42 @@ export default function OrdemFormPanel({
       currentId = createdId;
     }
 
+    const token = ++actionTokenRef.current;
+    const empresaSnapshot = activeEmpresaId;
     try {
       await manageComponente(currentId, null, item.id, 1, 'un', 'upsert');
+      if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
       await loadDetails(currentId);
+      if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
       addToast('Componente adicionado.', 'success');
     } catch (e: any) {
+      if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
       addToast(e.message, 'error');
     }
   };
 
   const handleRemoveComponente = async (itemId: string) => {
+    if (authLoading || !activeEmpresaId || empresaChanged) return;
     if (!canEdit) {
       addToast('Você não tem permissão para editar esta ordem.', 'error');
       return;
     }
+    const token = ++actionTokenRef.current;
+    const empresaSnapshot = activeEmpresaId;
     try {
       await manageComponente(formData.id!, itemId, '', 0, '', 'delete');
+      if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
       await loadDetails(formData.id);
+      if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
       addToast('Componente removido.', 'success');
     } catch (e: any) {
+      if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
       addToast(e.message, 'error');
     }
   };
 
-  const handleUpdateComponente = async (itemId: string, field: string, value: any) => {
+	  const handleUpdateComponente = async (itemId: string, field: string, value: any) => {
+    if (authLoading || !activeEmpresaId || empresaChanged) return;
     if (!canEdit) {
       addToast('Você não tem permissão para editar esta ordem.', 'error');
       return;
@@ -364,26 +408,33 @@ export default function OrdemFormPanel({
       unidade: field === 'unidade' ? value : item.unidade,
     };
 
+    const token = ++actionTokenRef.current;
+    const empresaSnapshot = activeEmpresaId;
     try {
       await manageComponente(formData.id!, itemId, item.produto_id, updates.quantidade_planejada, updates.unidade, 'upsert');
+      if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
       // Optimistic update
       setFormData(prev => ({
         ...prev,
         componentes: prev.componentes?.map(c => c.id === itemId ? { ...c, ...updates } : c)
       }));
     } catch (e: any) {
+      if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
       addToast(e.message, 'error');
     }
   };
 
   // --- Entregas ---
   const handleAddEntrega = async (data: Partial<OrdemEntrega>) => {
+    if (authLoading || !activeEmpresaId || empresaChanged) return;
     if (!canEdit) {
       addToast('Você não tem permissão para editar esta ordem.', 'error');
       return;
     }
     if (!formData.id) return;
     const doc = data.documento_ref ?? data.documento_entrega;
+    const token = ++actionTokenRef.current;
+    const empresaSnapshot = activeEmpresaId;
     await manageEntrega(
       formData.id,
       null,
@@ -394,20 +445,28 @@ export default function OrdemFormPanel({
       data.observacoes,
       'upsert'
     );
+    if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
     await loadDetails(formData.id);
+    if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
     addToast('Entrega registrada.', 'success');
   };
 
   const handleRemoveEntrega = async (entregaId: string) => {
+    if (authLoading || !activeEmpresaId || empresaChanged) return;
     if (!canEdit) {
       addToast('Você não tem permissão para editar esta ordem.', 'error');
       return;
     }
+    const token = ++actionTokenRef.current;
+    const empresaSnapshot = activeEmpresaId;
     try {
       await manageEntrega(formData.id!, entregaId, null, null, null, undefined, undefined, 'delete');
+      if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
       await loadDetails(formData.id);
+      if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
       addToast('Entrega removida.', 'success');
     } catch (e: any) {
+      if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
       addToast(e.message, 'error');
     }
   };
@@ -519,31 +578,43 @@ export default function OrdemFormPanel({
   };
 
   const handleGerarExecucao = async () => {
+    if (empresaChanged) return;
     if (!canEdit) {
       addToast('Você não tem permissão para gerar operações.', 'error');
       return;
     }
     if (isLockedEffective) return;
+    const token = ++actionTokenRef.current;
+    const empresaSnapshot = activeEmpresaId ?? null;
+    let currentId: string | null = formData.id ?? null;
     setIsGeneratingExecucao(true);
     try {
-      let currentId: string | null = formData.id ?? null;
       if (!currentId) {
         currentId = await handleSaveHeader();
         if (!currentId) return;
       }
 
       const result = await gerarExecucaoOrdem(currentId, formData.roteiro_aplicado_id ?? null);
+      if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
       await loadDetails(currentId);
       addToast(`Operações geradas (${result.operacoes}).`, 'success');
       handleGoToExecucao(getExecucaoSearchTerm());
     } catch (e: any) {
+      if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
+      if (currentId) {
+        await loadDetails(currentId);
+        handleGoToExecucao(getExecucaoSearchTerm());
+        return;
+      }
       addToast(e?.message || 'Não foi possível gerar operações.', 'error');
     } finally {
+      if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
       setIsGeneratingExecucao(false);
     }
   };
 
   const handleCriarRevisao = async () => {
+    if (authLoading || !activeEmpresaId || empresaChanged) return;
     if (!formData.id) return;
     const ok = await confirm({
       title: 'Criar revisão',
@@ -553,12 +624,16 @@ export default function OrdemFormPanel({
       variant: 'primary',
     });
     if (!ok) return;
+    const token = ++actionTokenRef.current;
+    const empresaSnapshot = activeEmpresaId;
     try {
       const cloned = await cloneOrdem(formData.id);
+      if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
       addToast('Revisão criada.', 'success');
       onSaveSuccess();
       onOpenOrder?.(cloned.id);
     } catch (e: any) {
+      if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
       addToast(e?.message || 'Não foi possível criar a revisão.', 'error');
     }
   };
@@ -1111,7 +1186,7 @@ export default function OrdemFormPanel({
           {!isLockedEffective && canEdit && !isWizard && (
             <button
               onClick={handleSaveHeader}
-              disabled={isSaving}
+              disabled={isSaving || authLoading || !activeEmpresaId || empresaChanged}
               className="flex items-center gap-2 bg-blue-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-blue-700 disabled:opacity-50"
             >
               {isSaving ? <Loader2 className="animate-spin" size={20} /> : <Save size={20} />}
@@ -1141,7 +1216,7 @@ export default function OrdemFormPanel({
               ) : (
                 <button
                   onClick={handleSaveHeader}
-                  disabled={isSaving}
+                  disabled={isSaving || authLoading || !activeEmpresaId || empresaChanged}
                   className="flex items-center gap-2 bg-blue-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-blue-700 disabled:opacity-50"
                 >
                   {isSaving ? <Loader2 className="animate-spin" size={20} /> : <Save size={20} />}

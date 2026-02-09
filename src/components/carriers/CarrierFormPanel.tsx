@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Loader2, Save, AlertCircle } from 'lucide-react';
 import { CarrierPayload, saveCarrier } from '../../services/carriers';
 import { useToast } from '../../contexts/ToastProvider';
@@ -9,6 +9,7 @@ import TextArea from '../ui/forms/TextArea';
 import Toggle from '../ui/forms/Toggle';
 import { cnpjMask, cpfMask, phoneMask, cepMask, isValidCNPJ, isValidCPF } from '../../lib/masks';
 import { UFS } from '../../lib/constants';
+import { useAuth } from '@/contexts/AuthProvider';
 
 interface CarrierFormPanelProps {
   carrier: CarrierPayload | null;
@@ -18,9 +19,13 @@ interface CarrierFormPanelProps {
 
 const CarrierFormPanel: React.FC<CarrierFormPanelProps> = ({ carrier, onSaveSuccess, onClose }) => {
   const { addToast } = useToast();
+  const { loading: authLoading, activeEmpresaId } = useAuth();
   const [isSaving, setIsSaving] = useState(false);
   const [formData, setFormData] = useState<CarrierPayload>({});
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const lastEmpresaIdRef = useRef<string | null>(activeEmpresaId);
+  const empresaChanged = lastEmpresaIdRef.current !== activeEmpresaId;
+  const actionTokenRef = useRef(0);
 
   useEffect(() => {
     if (carrier) {
@@ -39,6 +44,15 @@ const CarrierFormPanel: React.FC<CarrierFormPanelProps> = ({ carrier, onSaveSucc
     }
     setErrors({});
   }, [carrier]);
+
+  useEffect(() => {
+    const prevEmpresaId = lastEmpresaIdRef.current;
+    if (prevEmpresaId === activeEmpresaId) return;
+    actionTokenRef.current += 1;
+    setIsSaving(false);
+    setErrors({});
+    lastEmpresaIdRef.current = activeEmpresaId;
+  }, [activeEmpresaId]);
 
   const handleFormChange = (field: keyof CarrierPayload, value: any) => {
     setFormData(prev => ({ ...prev, [field]: value }));
@@ -99,19 +113,28 @@ const CarrierFormPanel: React.FC<CarrierFormPanelProps> = ({ carrier, onSaveSucc
   };
 
   const handleSave = async () => {
+    if (authLoading || !activeEmpresaId || empresaChanged) {
+      addToast('Aguarde a troca de empresa concluir para salvar.', 'info');
+      return;
+    }
     if (!validate()) {
       addToast('Verifique os erros no formulário.', 'warning');
       return;
     }
 
+    const token = ++actionTokenRef.current;
+    const empresaSnapshot = activeEmpresaId;
     setIsSaving(true);
     try {
       const savedCarrier = await saveCarrier(formData);
+      if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
       addToast('Transportadora salva com sucesso!', 'success');
       onSaveSuccess(savedCarrier);
     } catch (error: any) {
+      if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
       addToast(error.message, 'error');
     } finally {
+      if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
       setIsSaving(false);
     }
   };
@@ -345,7 +368,7 @@ const CarrierFormPanel: React.FC<CarrierFormPanelProps> = ({ carrier, onSaveSucc
           </button>
           <button 
             onClick={handleSave} 
-            disabled={isSaving} 
+            disabled={isSaving || authLoading || !activeEmpresaId || empresaChanged} 
             className="flex items-center gap-2 bg-blue-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
           >
             {isSaving ? <Loader2 className="animate-spin" size={20} /> : <Save size={20} />}

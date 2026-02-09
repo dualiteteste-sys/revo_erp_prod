@@ -27,6 +27,7 @@ import ResizableSortableTh, { type SortState } from '@/components/ui/table/Resiz
 import TableColGroup from '@/components/ui/table/TableColGroup';
 import { useTableColumnWidths, type TableColumnWidthDef } from '@/components/ui/table/useTableColumnWidths';
 import { sortRows, toggleSort } from '@/components/ui/table/sortUtils';
+import { useAuth } from '@/contexts/AuthProvider';
 
 interface CargoFormPanelProps {
   cargo: CargoDetails | null;
@@ -36,6 +37,7 @@ interface CargoFormPanelProps {
 
 const CargoFormPanel: React.FC<CargoFormPanelProps> = ({ cargo, onSaveSuccess, onClose }) => {
   const { addToast } = useToast();
+  const { loading: authLoading, activeEmpresaId } = useAuth();
   const [isSaving, setIsSaving] = useState(false);
   const [formData, setFormData] = useState<CargoPayload>({});
   const [availableCompetencias, setAvailableCompetencias] = useState<Competencia[]>([]);
@@ -102,13 +104,20 @@ const CargoFormPanel: React.FC<CargoFormPanelProps> = ({ cargo, onSaveSuccess, o
   const canSave = isEditing ? permUpdate.data : permCreate.data;
   const readOnly = !permsLoading && !canSave;
   const canManage = !permsLoading && !!permManage.data;
+  const lastEmpresaIdRef = React.useRef<string | null>(activeEmpresaId);
+  const empresaChanged = lastEmpresaIdRef.current !== activeEmpresaId;
+  const actionTokenRef = React.useRef(0);
 
   useEffect(() => {
+    const token = ++actionTokenRef.current;
+    const empresaSnapshot = activeEmpresaId;
     const loadCompetencias = async () => {
       try {
         const data = await listCompetencias();
+        if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
         setAvailableCompetencias(data);
       } catch (error) {
+        if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
         console.error(error);
       }
     };
@@ -117,8 +126,10 @@ const CargoFormPanel: React.FC<CargoFormPanelProps> = ({ cargo, onSaveSuccess, o
     const loadTreinamentos = async () => {
       try {
         const data = await listTreinamentos(undefined, undefined);
+        if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
         setAvailableTreinamentos(data);
       } catch {
+        if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
         setAvailableTreinamentos([]);
       }
     };
@@ -130,48 +141,75 @@ const CargoFormPanel: React.FC<CargoFormPanelProps> = ({ cargo, onSaveSuccess, o
       setFormData({ ativo: true, competencias: [] });
     }
     setActiveTab('dados');
-  }, [cargo]);
+  }, [activeEmpresaId, cargo]);
+
+  useEffect(() => {
+    const prevEmpresaId = lastEmpresaIdRef.current;
+    if (prevEmpresaId === activeEmpresaId) return;
+    actionTokenRef.current += 1;
+    setIsSaving(false);
+    setLoadingAudit(false);
+    setLoadingTreinReq(false);
+    setAuditRows([]);
+    setTreinamentosReq([]);
+    setSelectedCompId('');
+    setSelectedTreinamentoId('');
+    setTreinValidadeMeses('');
+    lastEmpresaIdRef.current = activeEmpresaId;
+  }, [activeEmpresaId]);
 
   useEffect(() => {
     const fetchAudit = async () => {
+      if (authLoading || !activeEmpresaId || empresaChanged) return;
       if (activeTab !== 'historico') return;
       if (!cargo?.id) {
         setAuditRows([]);
         return;
       }
+      const token = ++actionTokenRef.current;
+      const empresaSnapshot = activeEmpresaId;
       setLoadingAudit(true);
       try {
         const data = await listAuditLogsForTables(['rh_cargos', 'rh_cargo_competencias'], 300);
+        if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
         setAuditRows(data.filter((r) => r.record_id === cargo.id));
       } catch (e: any) {
+        if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
         addToast(e?.message || 'Erro ao carregar histórico.', 'error');
       } finally {
+        if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
         setLoadingAudit(false);
       }
     };
     fetchAudit();
-  }, [activeTab, cargo?.id, addToast]);
+  }, [activeEmpresaId, activeTab, addToast, authLoading, cargo?.id, empresaChanged]);
 
   useEffect(() => {
     const fetchReq = async () => {
+      if (authLoading || !activeEmpresaId || empresaChanged) return;
       if (activeTab !== 'treinamentos') return;
       if (!cargo?.id) {
         setTreinamentosReq([]);
         return;
       }
+      const token = ++actionTokenRef.current;
+      const empresaSnapshot = activeEmpresaId;
       setLoadingTreinReq(true);
       try {
         const data = await listCargoTreinamentos(cargo.id);
+        if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
         setTreinamentosReq(data);
       } catch (e: any) {
+        if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
         addToast(e?.message || 'Erro ao carregar trilha de treinamentos.', 'error');
         setTreinamentosReq([]);
       } finally {
+        if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
         setLoadingTreinReq(false);
       }
     };
     void fetchReq();
-  }, [activeTab, cargo?.id, addToast]);
+  }, [activeEmpresaId, activeTab, addToast, authLoading, cargo?.id, empresaChanged]);
 
   const handleFormChange = (field: keyof CargoPayload, value: any) => {
     setFormData(prev => ({ ...prev, [field]: value }));
@@ -271,6 +309,10 @@ const CargoFormPanel: React.FC<CargoFormPanelProps> = ({ cargo, onSaveSuccess, o
   };
 
   const handleSave = async () => {
+    if (authLoading || !activeEmpresaId || empresaChanged) {
+      addToast('Aguarde a troca de empresa concluir para salvar.', 'info');
+      return;
+    }
     if (readOnly) {
       addToast('Você não tem permissão para salvar cargos.', 'warning');
       return;
@@ -280,14 +322,19 @@ const CargoFormPanel: React.FC<CargoFormPanelProps> = ({ cargo, onSaveSuccess, o
       return;
     }
 
+    const token = ++actionTokenRef.current;
+    const empresaSnapshot = activeEmpresaId;
     setIsSaving(true);
     try {
       await saveCargo(formData);
+      if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
       addToast('Cargo salvo com sucesso!', 'success');
       onSaveSuccess();
     } catch (error: any) {
+      if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
       addToast(error.message, 'error');
     } finally {
+      if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
       setIsSaving(false);
     }
   };
@@ -727,7 +774,7 @@ const CargoFormPanel: React.FC<CargoFormPanelProps> = ({ cargo, onSaveSuccess, o
           <Button type="button" onClick={onClose} variant="outline">
             Cancelar
           </Button>
-          <Button onClick={handleSave} disabled={isSaving || permsLoading || !canSave} className="gap-2">
+          <Button onClick={handleSave} disabled={isSaving || permsLoading || !canSave || authLoading || !activeEmpresaId || empresaChanged} className="gap-2">
             {isSaving ? <Loader2 className="animate-spin" size={20} /> : <Save size={20} />}
             Salvar Cargo
           </Button>
