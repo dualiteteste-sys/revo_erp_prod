@@ -729,7 +729,9 @@ export default function PedidoVendaFormPanel({ vendaId, onSaveSuccess, onClose, 
       await aprovarVenda(pedidoId);
       if (empresaSnapshot !== lastEmpresaIdRef.current) return;
       addToast('Pedido aprovado com sucesso!', 'success');
-      onSaveSuccess();
+      await loadDetails({ id: pedidoId, silent: true });
+      if (empresaSnapshot !== lastEmpresaIdRef.current) return;
+      onSaveSuccess({ keepOpen: true });
     } catch (e: any) {
       if (empresaSnapshot !== lastEmpresaIdRef.current) return;
       addToast(e.message, 'error');
