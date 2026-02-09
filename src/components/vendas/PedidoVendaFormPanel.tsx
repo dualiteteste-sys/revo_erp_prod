@@ -723,19 +723,18 @@ export default function PedidoVendaFormPanel({ vendaId, onSaveSuccess, onClose, 
       if (!createdId) return;
       pedidoId = createdId;
     }
-    const token = ++actionTokenRef.current;
     const empresaSnapshot = activeEmpresaId ?? null;
     setIsSaving(true);
     try {
       await aprovarVenda(pedidoId);
-      if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
+      if (empresaSnapshot !== lastEmpresaIdRef.current) return;
       addToast('Pedido aprovado com sucesso!', 'success');
       onSaveSuccess();
     } catch (e: any) {
-      if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
+      if (empresaSnapshot !== lastEmpresaIdRef.current) return;
       addToast(e.message, 'error');
     } finally {
-      if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
+      if (empresaSnapshot !== lastEmpresaIdRef.current) return;
       setIsSaving(false);
     }
   };
