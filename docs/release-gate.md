@@ -10,6 +10,12 @@ Documento: `docs/ci/risk-based-gates.md`
 
 ## Rodar local (antes de PR)
 
+- Preflight de efeitos colaterais (obrigatório antes de codar):
+  - `docs/policies/PREFLIGHT_EFEITOS_COLATERAIS.md`
+  - preencher matriz `risco -> mitigação -> teste -> evidência`
+  - se houver risco alto sem mitigação, pausar implementação e alinhar
+  - proibição de fallback financeiro enganoso para valor desconhecido (ex.: `0,00`)
+
 - Release completo (unit + e2e + migrations):
   - `yarn release:check`
 
