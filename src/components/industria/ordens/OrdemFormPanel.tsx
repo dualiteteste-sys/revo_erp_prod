@@ -222,8 +222,12 @@ export default function OrdemFormPanel({
   };
 
 	  const handleSaveHeader = async () => {
-        if (empresaChanged) {
-          addToast('Aguarde a troca de empresa concluir para salvar.', 'info');
+        if (authLoading || !activeEmpresaId || empresaChanged) {
+          addToast('Aguarde a troca de contexto (login/empresa) concluir para salvar.', 'info');
+          return null;
+        }
+        if (isSaving) {
+          addToast('Salvamento já em andamento. Aguarde concluir.', 'info');
           return null;
         }
 	    if (!canEdit) {
@@ -578,7 +582,14 @@ export default function OrdemFormPanel({
   };
 
   const handleGerarExecucao = async () => {
-    if (empresaChanged) return;
+    if (authLoading || !activeEmpresaId || empresaChanged) {
+      addToast('Aguarde a troca de contexto (login/empresa) concluir para gerar operações.', 'info');
+      return;
+    }
+    if (isGeneratingExecucao) {
+      addToast('Geração de operações já em andamento.', 'info');
+      return;
+    }
     if (!canEdit) {
       addToast('Você não tem permissão para gerar operações.', 'error');
       return;
@@ -614,7 +625,14 @@ export default function OrdemFormPanel({
   };
 
   const handleCriarRevisao = async () => {
-    if (authLoading || !activeEmpresaId || empresaChanged) return;
+    if (authLoading || !activeEmpresaId || empresaChanged) {
+      addToast('Aguarde a troca de contexto (login/empresa) concluir para criar revisão.', 'info');
+      return;
+    }
+    if (!canEdit) {
+      addToast('Você não tem permissão para criar revisão.', 'error');
+      return;
+    }
     if (!formData.id) return;
     const ok = await confirm({
       title: 'Criar revisão',
