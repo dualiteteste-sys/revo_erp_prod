@@ -1694,7 +1694,7 @@ const OsFormPanel: React.FC<OsFormPanelProps> = ({ os, onSaveSuccess, onClose })
                 </div>
               ) : null}
             </div>
-            <Button type="button" onClick={handleUploadDoc} disabled={isUploadingDoc || readOnly} className="gap-2">
+            <Button type="button" onClick={handleUploadDoc} disabled={isUploadingDoc || readOnly || tenantMutationBlocked} className="gap-2">
               {isUploadingDoc ? <Loader2 className="animate-spin" size={18} /> : <Plus size={18} />}
               Enviar
             </Button>
@@ -1725,7 +1725,7 @@ const OsFormPanel: React.FC<OsFormPanelProps> = ({ os, onSaveSuccess, onClose })
                         <FileText size={16} />
                         Abrir
                       </Button>
-                      <Button type="button" variant="ghost" size="icon" className="text-rose-600 hover:text-rose-700" onClick={() => handleDeleteDoc(d)} disabled={readOnly}>
+                      <Button type="button" variant="ghost" size="icon" className="text-rose-600 hover:text-rose-700" onClick={() => handleDeleteDoc(d)} disabled={readOnly || tenantMutationBlocked}>
                         <Trash2 size={18} />
                       </Button>
                     </div>
