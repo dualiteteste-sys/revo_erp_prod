@@ -170,7 +170,7 @@ export async function listMovimentacoes(options: {
   searchTerm?: string;
   page: number;
   pageSize: number;
-}): Promise<{ data: Movimentacao[]; count: number }> {
+}): Promise<{ data: Movimentacao[]; count: number | null }> {
   const { contaCorrenteId, startDate, endDate, tipoMov, searchTerm, page, pageSize } = options;
   const offset = (page - 1) * pageSize;
 
@@ -214,7 +214,10 @@ export async function listMovimentacoes(options: {
     };
   });
 
-  const count = Number(data[0].total_count);
+  const countRaw = data[0]?.total_count ?? null;
+  const parsedCount = countRaw === null || countRaw === undefined ? null : Number(countRaw);
+  const count = parsedCount !== null && Number.isFinite(parsedCount) ? parsedCount : null;
+
   return { data: normalized as Movimentacao[], count };
 }
 
