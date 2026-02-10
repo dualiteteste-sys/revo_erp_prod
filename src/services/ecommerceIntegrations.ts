@@ -179,8 +179,5 @@ export function resolveWooConnectionStatus(params: {
 
 export function wooHasStoredCredentials(diagnostics: EcommerceConnectionDiagnostics | null): boolean {
   if (!diagnostics) return false;
-  if (diagnostics.has_consumer_key === true || diagnostics.has_consumer_secret === true) {
-    return diagnostics.has_consumer_key === true && diagnostics.has_consumer_secret === true;
-  }
-  return diagnostics.has_token === true;
+  return diagnostics.has_consumer_key === true && diagnostics.has_consumer_secret === true;
 }

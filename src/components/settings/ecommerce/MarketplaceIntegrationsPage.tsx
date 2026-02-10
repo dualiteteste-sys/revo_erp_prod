@@ -276,7 +276,11 @@ export default function MarketplaceIntegrationsPage() {
       const diag = await getEcommerceConnectionDiagnostics('woo');
       setWooDiag(diag);
       setWooDiagUnavailable(false);
-      setWooSecretsSavedHint(null);
+      // Only clear the optimistic hint once the backend confirms credentials are stored.
+      // This prevents the "Salvo" badge from flickering between save and diag refresh.
+      if (diag.has_consumer_key === true && diag.has_consumer_secret === true) {
+        setWooSecretsSavedHint(null);
+      }
       return diag;
     } catch {
       setWooDiag(null);
@@ -590,8 +594,19 @@ export default function MarketplaceIntegrationsPage() {
         const ok = (data as any)?.ok === true;
         setDiagnostics((data as any) ?? null);
         await refreshWooDiag();
+        if (ok) {
+          // The edge function already updated ecommerces.status in the DB via
+          // ecommerce_woo_record_connection_check. Reflect immediately in local
+          // state so the UI shows "Conectado" without waiting for fetchAll.
+          setActiveConnection((prev) => prev ? { ...prev, status: 'connected' } : prev);
+        }
         await fetchAll();
-        addToast(ok ? 'Conexão WooCommerce validada com credenciais salvas.' : 'Conexão WooCommerce falhou. Veja os detalhes.', ok ? 'success' : 'error');
+        addToast(
+          ok
+            ? 'Conexão WooCommerce validada com sucesso! ✅'
+            : `Conexão WooCommerce falhou. ${(data as any)?.message || 'Veja os detalhes.'}`,
+          ok ? 'success' : 'error',
+        );
         return;
       }
 
@@ -729,8 +744,7 @@ export default function MarketplaceIntegrationsPage() {
 
     setWooSavingSecrets(true);
     try {
-      let storeUrlForStatus = String(activeConnection.config?.store_url ?? '').trim();
-      const rawStoreUrl = storeUrlForStatus;
+      const rawStoreUrl = String(activeConnection.config?.store_url ?? '').trim();
       if (rawStoreUrl) {
         const normalized = normalizeWooStoreUrl(rawStoreUrl);
         if (!normalized.ok) {
@@ -740,9 +754,8 @@ export default function MarketplaceIntegrationsPage() {
         }
         setWooStoreUrlError(null);
         const { store_url } = await setWooStoreUrl({ ecommerceId: activeConnection.id, storeUrl: normalized.normalized });
-        storeUrlForStatus = store_url;
         setActiveConnection((prev) =>
-          prev ? { ...prev, config: { ...(prev.config ?? {}), store_url: store_url } } : prev,
+          prev ? { ...prev, config: { ...(prev.config ?? {}), store_url } } : prev,
         );
       }
 
@@ -752,24 +765,10 @@ export default function MarketplaceIntegrationsPage() {
       setWooConsumerSecret('');
       setWooEditingConsumerKey(false);
       setWooEditingConsumerSecret(false);
-      const nextStatus = resolveWooConnectionStatus({
-        storeUrl: storeUrlForStatus,
-        diagnostics: null,
-        diagnosticsUnavailable: false,
-        previousStatus: 'pending',
-      });
-
-      await upsertEcommerceConnection({
-        provider: 'woo',
-        nome: providerLabels.woo,
-        status: nextStatus,
-        external_account_id: activeConnection.external_account_id ?? null,
-        config: normalizeEcommerceConfig(activeConnection.config ?? {}),
-      });
-
-      setActiveConnection((prev) => (prev ? { ...prev, status: nextStatus } : prev));
+      // Don't resolve status here — credentials are saved but connectivity is unverified.
+      // The actual status will be determined by the edge function when "Testar conexão" is clicked.
       await refreshWooDiag();
-      addToast('Credenciais salvas. Agora clique em “Testar conexão” para validar e marcar como conectado.', 'success');
+      addToast('Credenciais salvas com sucesso! Clique em "Testar conexão" para validar.', 'success');
       await fetchAll();
     } catch (e: any) {
       addToast(e?.message || 'Falha ao salvar credenciais.', 'error');
@@ -1254,110 +1253,110 @@ export default function MarketplaceIntegrationsPage() {
                     </div>
 
                     <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-3">
-	                      <Input
-	                        label="URL da loja"
-	                        value={String(activeConnection.config?.store_url ?? '')}
-	                        placeholder="https://sualoja.com.br"
-	                        helperText={
-	                          wooStoreUrlError
-	                            ? wooStoreUrlError
-	                            : 'Aceita sem https:// e com subdiretório (ex.: exemplo.com/loja). Será normalizada.'
-	                        }
-	                        onChange={(e) =>
-	                          setActiveConnection((prev) =>
-	                            prev ? { ...prev, config: { ...(prev.config ?? {}), store_url: (e.target as HTMLInputElement).value } } : prev,
-	                          )
-	                        }
-	                        onBlur={() => {
-	                          const raw = String(activeConnection.config?.store_url ?? '');
-	                          const normalized = normalizeWooStoreUrl(raw);
-	                          if (!normalized.ok) {
-	                            setWooStoreUrlError(normalized.code === 'required' ? null : normalized.message);
-	                            return;
-	                          }
-	                          setWooStoreUrlError(null);
-	                          if (normalized.normalized !== raw.trim()) {
-	                            setActiveConnection((prev) =>
-	                              prev ? { ...prev, config: { ...(prev.config ?? {}), store_url: normalized.normalized } } : prev,
-	                            );
-	                          }
-	                        }}
-	                      />
-	                      <div />
-	                      <Input
-	                        label={
-	                          <div className="flex items-center justify-between gap-2">
-	                            <span>Consumer Key</span>
-	                            {wooHasConsumerKey ? (
-	                              <span className="inline-flex items-center rounded-full bg-emerald-100 text-emerald-800 px-2 py-0.5 text-xs font-medium">
-	                                Salvo
-	                              </span>
-	                            ) : null}
-	                          </div>
-	                        }
-	                        value={
-	                          wooHasConsumerKey && !wooConsumerKey && !wooEditingConsumerKey
-	                            ? WOO_CREDENTIAL_MASK
-	                            : wooConsumerKey
-	                        }
-	                        placeholder={wooHasConsumerKey && !wooConsumerKey ? 'Salvo (mascarado)' : 'ck_...'}
-	                        onFocus={() => {
-	                          if (wooHasConsumerKey && !wooConsumerKey && !wooEditingConsumerKey) {
-	                            setWooEditingConsumerKey(true);
-	                            setWooConsumerKey('');
-	                          }
-	                        }}
-	                        onBlur={() => {
-	                          if (!wooConsumerKey) setWooEditingConsumerKey(false);
-	                        }}
-	                        onChange={(e) => {
-	                          setWooEditingConsumerKey(true);
-	                          setWooConsumerKey((e.target as HTMLInputElement).value);
-	                        }}
-	                        type="password"
-	                        helperText={
-	                          wooHasConsumerKey && !wooConsumerKey
-	                            ? 'Armazenado com segurança. Para substituir, cole uma nova chave.'
-	                            : 'Cole a chave gerada no WooCommerce (ck_...).'
-	                        }
-	                      />
-	                      <Input
-	                        label={
-	                          <div className="flex items-center justify-between gap-2">
-	                            <span>Consumer Secret</span>
-	                            {wooHasConsumerSecret ? (
-	                              <span className="inline-flex items-center rounded-full bg-emerald-100 text-emerald-800 px-2 py-0.5 text-xs font-medium">
-	                                Salvo
-	                              </span>
-	                            ) : null}
-	                          </div>
-	                        }
-	                        value={
-	                          wooHasConsumerSecret && !wooConsumerSecret && !wooEditingConsumerSecret
-	                            ? WOO_CREDENTIAL_MASK
-	                            : wooConsumerSecret
-	                        }
-	                        placeholder={wooHasConsumerSecret && !wooConsumerSecret ? 'Salvo (mascarado)' : 'cs_...'}
-	                        onFocus={() => {
-	                          if (wooHasConsumerSecret && !wooConsumerSecret && !wooEditingConsumerSecret) {
-	                            setWooEditingConsumerSecret(true);
-	                            setWooConsumerSecret('');
-	                          }
-	                        }}
-	                        onBlur={() => {
-	                          if (!wooConsumerSecret) setWooEditingConsumerSecret(false);
-	                        }}
-	                        onChange={(e) => {
-	                          setWooEditingConsumerSecret(true);
-	                          setWooConsumerSecret((e.target as HTMLInputElement).value);
-	                        }}
-	                        type="password"
-	                        helperText={
-	                          wooHasConsumerSecret && !wooConsumerSecret
-	                            ? 'Armazenado com segurança. Para substituir, cole um novo segredo.'
-	                            : 'Cole o secret gerado no WooCommerce (cs_...).'
-	                        }
-	                      />
+                      <Input
+                        label="URL da loja"
+                        value={String(activeConnection.config?.store_url ?? '')}
+                        placeholder="https://sualoja.com.br"
+                        helperText={
+                          wooStoreUrlError
+                            ? wooStoreUrlError
+                            : 'Aceita sem https:// e com subdiretório (ex.: exemplo.com/loja). Será normalizada.'
+                        }
+                        onChange={(e) =>
+                          setActiveConnection((prev) =>
+                            prev ? { ...prev, config: { ...(prev.config ?? {}), store_url: (e.target as HTMLInputElement).value } } : prev,
+                          )
+                        }
+                        onBlur={() => {
+                          const raw = String(activeConnection.config?.store_url ?? '');
+                          const normalized = normalizeWooStoreUrl(raw);
+                          if (!normalized.ok) {
+                            setWooStoreUrlError(normalized.code === 'required' ? null : normalized.message);
+                            return;
+                          }
+                          setWooStoreUrlError(null);
+                          if (normalized.normalized !== raw.trim()) {
+                            setActiveConnection((prev) =>
+                              prev ? { ...prev, config: { ...(prev.config ?? {}), store_url: normalized.normalized } } : prev,
+                            );
+                          }
+                        }}
+                      />
+                      <div />
+                      <Input
+                        label={
+                          <div className="flex items-center justify-between gap-2">
+                            <span>Consumer Key</span>
+                            {wooHasConsumerKey ? (
+                              <span className="inline-flex items-center rounded-full bg-emerald-100 text-emerald-800 px-2 py-0.5 text-xs font-medium">
+                                Salvo
+                              </span>
+                            ) : null}
+                          </div>
+                        }
+                        value={
+                          wooHasConsumerKey && !wooConsumerKey && !wooEditingConsumerKey
+                            ? WOO_CREDENTIAL_MASK
+                            : wooConsumerKey
+                        }
+                        placeholder={wooHasConsumerKey && !wooConsumerKey ? 'Salvo (mascarado)' : 'ck_...'}
+                        onFocus={() => {
+                          if (wooHasConsumerKey && !wooConsumerKey && !wooEditingConsumerKey) {
+                            setWooEditingConsumerKey(true);
+                            setWooConsumerKey('');
+                          }
+                        }}
+                        onBlur={() => {
+                          if (!wooConsumerKey) setWooEditingConsumerKey(false);
+                        }}
+                        onChange={(e) => {
+                          setWooEditingConsumerKey(true);
+                          setWooConsumerKey((e.target as HTMLInputElement).value);
+                        }}
+                        type="password"
+                        helperText={
+                          wooHasConsumerKey && !wooConsumerKey
+                            ? 'Armazenado com segurança. Para substituir, cole uma nova chave.'
+                            : 'Cole a chave gerada no WooCommerce (ck_...).'
+                        }
+                      />
+                      <Input
+                        label={
+                          <div className="flex items-center justify-between gap-2">
+                            <span>Consumer Secret</span>
+                            {wooHasConsumerSecret ? (
+                              <span className="inline-flex items-center rounded-full bg-emerald-100 text-emerald-800 px-2 py-0.5 text-xs font-medium">
+                                Salvo
+                              </span>
+                            ) : null}
+                          </div>
+                        }
+                        value={
+                          wooHasConsumerSecret && !wooConsumerSecret && !wooEditingConsumerSecret
+                            ? WOO_CREDENTIAL_MASK
+                            : wooConsumerSecret
+                        }
+                        placeholder={wooHasConsumerSecret && !wooConsumerSecret ? 'Salvo (mascarado)' : 'cs_...'}
+                        onFocus={() => {
+                          if (wooHasConsumerSecret && !wooConsumerSecret && !wooEditingConsumerSecret) {
+                            setWooEditingConsumerSecret(true);
+                            setWooConsumerSecret('');
+                          }
+                        }}
+                        onBlur={() => {
+                          if (!wooConsumerSecret) setWooEditingConsumerSecret(false);
+                        }}
+                        onChange={(e) => {
+                          setWooEditingConsumerSecret(true);
+                          setWooConsumerSecret((e.target as HTMLInputElement).value);
+                        }}
+                        type="password"
+                        helperText={
+                          wooHasConsumerSecret && !wooConsumerSecret
+                            ? 'Armazenado com segurança. Para substituir, cole um novo segredo.'
+                            : 'Cole o secret gerado no WooCommerce (cs_...).'
+                        }
+                      />
                     </div>
 
                     <div className="mt-3 flex flex-wrap items-center gap-2">
@@ -1485,13 +1484,13 @@ export default function MarketplaceIntegrationsPage() {
                       name="woo_deposito_id"
                       value={String(activeConnection.config?.deposito_id ?? '')}
                       disabled={wooOptionsLoading}
-	                      onChange={(e) =>
-	                        setActiveConnection((prev) =>
-	                          prev
-	                            ? { ...prev, config: { ...(prev.config ?? {}), deposito_id: (e.target as HTMLSelectElement).value || undefined } }
-	                            : prev,
-	                        )
-	                      }
+                      onChange={(e) =>
+                        setActiveConnection((prev) =>
+                          prev
+                            ? { ...prev, config: { ...(prev.config ?? {}), deposito_id: (e.target as HTMLSelectElement).value || undefined } }
+                            : prev,
+                        )
+                      }
                     >
                       <option value="">{wooOptionsLoading ? 'Carregando…' : 'Selecionar…'}</option>
                       {wooDepositos.map((d) => (
@@ -1506,13 +1505,13 @@ export default function MarketplaceIntegrationsPage() {
                       name="woo_base_tabela_preco_id"
                       value={String(activeConnection.config?.base_tabela_preco_id ?? '')}
                       disabled={wooOptionsLoading}
-	                      onChange={(e) =>
-	                        setActiveConnection((prev) =>
-	                          prev
-	                            ? { ...prev, config: { ...(prev.config ?? {}), base_tabela_preco_id: (e.target as HTMLSelectElement).value || undefined } }
-	                            : prev,
-	                        )
-	                      }
+                      onChange={(e) =>
+                        setActiveConnection((prev) =>
+                          prev
+                            ? { ...prev, config: { ...(prev.config ?? {}), base_tabela_preco_id: (e.target as HTMLSelectElement).value || undefined } }
+                            : prev,
+                        )
+                      }
                     >
                       <option value="">{wooOptionsLoading ? 'Carregando…' : 'Selecionar…'}</option>
                       {wooTabelasPreco.map((t) => (
@@ -1532,15 +1531,15 @@ export default function MarketplaceIntegrationsPage() {
                         setActiveConnection((prev) =>
                           prev
                             ? {
-                                ...prev,
-                                config: {
-	                                  ...(prev.config ?? {}),
-	                                  price_percent_default: (e.target as HTMLInputElement).value === ''
-	                                    ? undefined
-	                                    : Number((e.target as HTMLInputElement).value),
-	                                },
-	                              }
-	                            : prev,
+                              ...prev,
+                              config: {
+                                ...(prev.config ?? {}),
+                                price_percent_default: (e.target as HTMLInputElement).value === ''
+                                  ? undefined
+                                  : Number((e.target as HTMLInputElement).value),
+                              },
+                            }
+                            : prev,
                         )
                       }
                     />
@@ -1553,12 +1552,12 @@ export default function MarketplaceIntegrationsPage() {
 
               <GlassCard className="p-3">
                 <div className="text-sm font-medium text-gray-900">2) Ativar recursos</div>
-                  <div className="flex items-center justify-between gap-3">
-                    <div>
-                      <div className="text-sm font-medium text-gray-800">Importar pedidos</div>
-                      <div className="text-xs text-gray-500">Cria pedidos no Ultria ERP com canal=marketplace.</div>
-                    </div>
-                    <Switch
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <div className="text-sm font-medium text-gray-800">Importar pedidos</div>
+                    <div className="text-xs text-gray-500">Cria pedidos no Ultria ERP com canal=marketplace.</div>
+                  </div>
+                  <Switch
                     checked={!!activeConnection.config?.import_orders}
                     onCheckedChange={(checked) =>
                       setActiveConnection((prev) => (prev ? { ...prev, config: { ...(prev.config ?? {}), import_orders: checked } } : prev))
@@ -1597,11 +1596,11 @@ export default function MarketplaceIntegrationsPage() {
                     onCheckedChange={(checked) =>
                       setActiveConnection((prev) => (prev
                         ? {
-                            ...prev,
-                            config: prev.provider === 'woo'
-                              ? { ...(prev.config ?? {}), sync_prices: checked }
-                              : { ...(prev.config ?? {}), push_tracking: checked },
-                          }
+                          ...prev,
+                          config: prev.provider === 'woo'
+                            ? { ...(prev.config ?? {}), sync_prices: checked }
+                            : { ...(prev.config ?? {}), push_tracking: checked },
+                        }
                         : prev))
                     }
                   />
@@ -1691,12 +1690,12 @@ export default function MarketplaceIntegrationsPage() {
                       setActiveConnection((prev) =>
                         prev
                           ? {
-                              ...prev,
-                              config: {
-                                ...(prev.config ?? {}),
-                                sync_interval_minutes: Math.min(1440, Math.max(5, Number((e.target as HTMLInputElement).value || 15))),
-                              },
-                            }
+                            ...prev,
+                            config: {
+                              ...(prev.config ?? {}),
+                              sync_interval_minutes: Math.min(1440, Math.max(5, Number((e.target as HTMLInputElement).value || 15))),
+                            },
+                          }
                           : prev,
                       )
                     }
