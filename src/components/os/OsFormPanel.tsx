@@ -178,6 +178,7 @@ const OsFormPanel: React.FC<OsFormPanelProps> = ({ os, onSaveSuccess, onClose })
   const isClosed = formData.status === 'concluida' || formData.status === 'cancelada';
   const stageReadOnly = isClosed && !permManage.data;
   const readOnly = permLoading || !canEdit || stageReadOnly;
+  const tenantMutationBlocked = !activeEmpresaId || authLoading || empresaChanged;
 
   const descontoProps = useNumericField(formData.desconto_valor, (value) => handleFormChange('desconto_valor', value));
   const custoEstimadoProps = useNumericField((formData as any).custo_estimado, (value) => handleFormChange('custo_estimado' as any, value));
@@ -1545,7 +1546,7 @@ const OsFormPanel: React.FC<OsFormPanelProps> = ({ os, onSaveSuccess, onClose })
               {clientDetails?.email ? <span className="text-gray-500"> • E-mail: {clientDetails.email}</span> : null}
             </div>
             <div className="flex flex-wrap gap-2">
-              <Button type="button" variant="outline" onClick={handleGeneratePortalLink} disabled={!formData.id || portalGenerating} className="gap-2">
+              <Button type="button" variant="outline" onClick={handleGeneratePortalLink} disabled={!formData.id || portalGenerating || tenantMutationBlocked} className="gap-2">
                 {portalGenerating ? <Loader2 className="animate-spin" size={18} /> : <FileText size={18} />}
                 Gerar link do portal
               </Button>
@@ -2062,7 +2063,7 @@ const OsFormPanel: React.FC<OsFormPanelProps> = ({ os, onSaveSuccess, onClose })
               <Button type="button" variant="outline" onClick={() => setCommsDialogOpen(false)} disabled={commsRegistering}>
                 Fechar
               </Button>
-              <Button type="button" onClick={handleRegisterComms} disabled={commsRegistering || !commsPreview.trim()} className="gap-2">
+              <Button type="button" onClick={handleRegisterComms} disabled={commsRegistering || !commsPreview.trim() || tenantMutationBlocked} className="gap-2">
                 {commsRegistering ? <Loader2 className="animate-spin" size={18} /> : <CheckCircle2 size={18} />}
                 Registrar envio
               </Button>
