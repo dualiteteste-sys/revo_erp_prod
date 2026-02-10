@@ -53,6 +53,7 @@ export default function ClienteFornecedorAutocomplete({
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const { addToast } = useToast();
   const ref = useRef<HTMLDivElement>(null);
+  const searchSeqRef = useRef(0);
 
   const debouncedQuery = useDebounce(query, 300);
 
@@ -78,17 +79,20 @@ export default function ClienteFornecedorAutocomplete({
     const search = async () => {
       if (authLoading || !activeEmpresaId) return;
       if (debouncedQuery.length < 2) {
+        searchSeqRef.current += 1;
         setHits([]);
         return;
       }
       if (value) return;
 
+      const seq = ++searchSeqRef.current;
       setLoading(true);
       try {
         const [clients, suppliers] = await Promise.all([
           searchClients(debouncedQuery, limit),
           searchSuppliers(debouncedQuery),
         ]);
+        if (seq !== searchSeqRef.current) return;
 
         const merged = uniqueById([
           ...(clients as ClientHit[]).map((h) => ({ id: h.id, label: h.label, nome: h.nome, doc_unico: h.doc_unico })),
@@ -98,10 +102,11 @@ export default function ClienteFornecedorAutocomplete({
         setHits(merged.slice(0, Math.max(1, limit)));
         setOpen(true);
       } catch (e) {
+        if (seq !== searchSeqRef.current) return;
         const msg = e instanceof Error ? e.message : String(e);
         logger.warn('[RPC][ERROR] cliente_fornecedor_autocomplete', { error: msg });
       } finally {
-        setLoading(false);
+        if (seq === searchSeqRef.current) setLoading(false);
       }
     };
     search();
