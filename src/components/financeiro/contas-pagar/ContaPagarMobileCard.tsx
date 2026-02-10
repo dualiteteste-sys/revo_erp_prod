@@ -18,6 +18,8 @@ interface ContaPagarMobileCardProps {
     onCancel?: (conta: ContaPagar) => void;
     onReverse?: (conta: ContaPagar) => void;
     onDelete: (conta: ContaPagar) => void;
+    selected?: boolean;
+    onToggleSelect?: (id: string) => void;
 }
 
 const statusConfig: Record<string, { label: string; color: string }> = {
@@ -43,6 +45,8 @@ export function ContaPagarMobileCard({
     onCancel,
     onReverse,
     onDelete,
+    selected,
+    onToggleSelect,
 }: ContaPagarMobileCardProps): React.ReactElement {
     const status = statusConfig[conta.status] || { label: conta.status, color: 'bg-gray-100 text-gray-700' };
     const canPay = conta.status === 'aberta' || conta.status === 'parcial';
@@ -51,10 +55,24 @@ export function ContaPagarMobileCard({
 
     return (
         <motion.div
-            className="bg-white rounded-xl border border-gray-100 p-4 transition-all duration-200 hover:border-gray-200 hover:shadow-sm"
+            className={cn(
+                'bg-white rounded-xl border p-4 transition-all duration-200',
+                selected
+                    ? 'border-blue-500 bg-blue-50/50 shadow-sm'
+                    : 'border-gray-100 hover:border-gray-200 hover:shadow-sm'
+            )}
             whileTap={{ scale: 0.98 }}
         >
             <div className="flex items-start gap-3">
+                {onToggleSelect && (
+                    <input
+                        type="checkbox"
+                        checked={selected}
+                        onChange={() => onToggleSelect(conta.id)}
+                        className="mt-1 h-5 w-5 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                        aria-label={`Selecionar ${conta.descricao || 'conta a pagar'}`}
+                    />
+                )}
                 <div className="flex-shrink-0 w-10 h-10 bg-gradient-to-br from-red-50 to-rose-50 rounded-lg flex items-center justify-center">
                     <CreditCard className="w-5 h-5 text-red-500" />
                 </div>

@@ -21,6 +21,9 @@ import { useSearchParams } from 'react-router-dom';
 import DatePicker from '@/components/ui/DatePicker';
 import { isSeedEnabled } from '@/utils/seed';
 import { useAuth } from '@/contexts/AuthProvider';
+import { useResultSetSelection } from '@/hooks/useResultSetSelection';
+import SelectionTotalizerBar from '@/components/financeiro/SelectionTotalizerBar';
+import { useFinanceiroSelectionTotals } from '@/hooks/useFinanceiroSelectionTotals';
 
 const ContasAReceberPage: React.FC = () => {
   const { loading: authLoading, activeEmpresaId } = useAuth();
@@ -256,6 +259,67 @@ const ContasAReceberPage: React.FC = () => {
   const effectiveCount = empresaChanged ? 0 : count;
   const canShowSummary = !empresaChanged && !!summary;
 
+  const pageIds = React.useMemo(() => effectiveContas.map((c) => c.id), [effectiveContas]);
+  const filterSignature = React.useMemo(() => {
+    return JSON.stringify({
+      q: searchTerm,
+      status: filterStatus,
+      start: filterStartDate ? filterStartDate.toISOString().slice(0, 10) : null,
+      end: filterEndDate ? filterEndDate.toISOString().slice(0, 10) : null,
+      sortBy,
+      count: effectiveCount,
+    });
+  }, [effectiveCount, filterEndDate, filterStartDate, filterStatus, searchTerm, sortBy]);
+
+  const selection = useResultSetSelection({
+    pageIds,
+    totalMatchingCount: effectiveCount,
+    filterSignature,
+    empresaId: activeEmpresaId,
+    onAutoReset: (reason) => {
+      if (reason === 'filters_changed') {
+        addToast('Seleção limpa porque os filtros mudaram.', 'info');
+      }
+    },
+  });
+
+  const selectedIdsOnPage = React.useMemo(() => {
+    return new Set(pageIds.filter((id) => selection.isSelected(id)));
+  }, [pageIds, selection]);
+
+  const totalsReq = React.useMemo(() => {
+    if (selection.selectedCount <= 0) return null;
+    return {
+      mode: selection.mode,
+      ids: selection.mode === 'explicit' ? Array.from(selection.selectedIds) : [],
+      excludedIds: selection.mode === 'all_matching' ? Array.from(selection.excludedIds) : [],
+      q: searchTerm || null,
+      status: filterStatus || null,
+      startDateISO: filterStartDate ? filterStartDate.toISOString().slice(0, 10) : null,
+      endDateISO: filterEndDate ? filterEndDate.toISOString().slice(0, 10) : null,
+    };
+  }, [filterEndDate, filterStartDate, filterStatus, searchTerm, selection]);
+
+  const totalsState = useFinanceiroSelectionTotals({
+    enabled: selection.selectedCount > 0,
+    request: totalsReq,
+    fetcher: (req) =>
+      contasAReceberService.getContasAReceberSelectionTotals({
+        mode: req.mode,
+        ids: req.ids,
+        excludedIds: req.excludedIds,
+        q: req.q,
+        status: req.status,
+        startDateISO: req.startDateISO,
+        endDateISO: req.endDateISO,
+      }),
+  });
+
+  useEffect(() => {
+    if (!totalsState.error) return;
+    addToast(totalsState.error, 'error');
+  }, [addToast, totalsState.error]);
+
   if (authLoading) {
     return (
       <div className="flex justify-center h-full items-center">
@@ -345,6 +409,21 @@ const ContasAReceberPage: React.FC = () => {
 
       <div className="bg-white rounded-lg shadow overflow-hidden flex flex-col flex-1 min-h-0">
         <div className="flex-1 min-h-0 overflow-auto">
+          <SelectionTotalizerBar
+            mode={selection.mode}
+            selectedCount={selection.selectedCount}
+            totalMatchingCount={effectiveCount}
+            loading={totalsState.loading}
+            totals={[
+              { key: 'valor', label: 'Valor', value: totalsState.data?.total_valor ?? null },
+              { key: 'recebido', label: 'Recebido', value: totalsState.data?.total_recebido ?? null },
+              { key: 'saldo', label: 'Saldo', value: totalsState.data?.total_saldo ?? null },
+              { key: 'vencido', label: 'Vencido', value: totalsState.data?.total_vencido ?? null },
+              { key: 'a_vencer', label: 'A vencer', value: totalsState.data?.total_a_vencer ?? null },
+            ]}
+            onSelectAllMatching={() => selection.selectAllMatching()}
+            onClear={() => selection.clear()}
+          />
           {effectiveLoading && effectiveContas.length === 0 ? (
             <div className="h-96 flex items-center justify-center">
               <Loader2 className="animate-spin text-blue-500" size={32} />
@@ -372,12 +451,19 @@ const ContasAReceberPage: React.FC = () => {
                   onDelete={handleOpenDeleteModal}
                   sortBy={sortBy}
                   onSort={handleSort}
+                  selectedIds={selectedIdsOnPage}
+                  allSelected={selection.allOnPageSelected}
+                  someSelected={selection.someOnPageSelected}
+                  onToggleSelect={selection.toggleOne}
+                  onToggleSelectAll={selection.togglePage}
                 />
               }
               renderMobileCard={(conta) => (
                 <ContaAReceberMobileCard
                   key={conta.id}
                   conta={conta}
+                  selected={selection.isSelected(conta.id)}
+                  onToggleSelect={selection.toggleOne}
                   onEdit={() => handleOpenForm(conta)}
                   onReceive={() => handleReceive(conta)}
                   onCancel={() => handleOpenCancel(conta)}
