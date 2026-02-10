@@ -1,4 +1,5 @@
 import { callRpc } from '@/lib/api';
+import { defaultMarketplaceConflictPolicy, defaultMarketplaceSyncDirection, type MarketplaceConflictPolicy, type MarketplaceSyncDirection } from '@/services/marketplaceFramework';
 
 export type EcommerceProvider = 'meli' | 'shopee' | 'woo';
 
@@ -8,6 +9,10 @@ export type EcommerceConnectionConfig = {
   sync_prices?: boolean;
   push_tracking?: boolean;
   safe_mode?: boolean;
+  sync_direction?: MarketplaceSyncDirection;
+  conflict_policy?: MarketplaceConflictPolicy;
+  auto_sync_enabled?: boolean;
+  sync_interval_minutes?: number;
   store_url?: string;
   deposito_id?: string;
   base_tabela_preco_id?: string;
@@ -40,11 +45,16 @@ export type EcommerceConnectionDiagnostics = {
   provider: EcommerceProvider;
   has_connection: boolean;
   status: string;
+  connection_status?: 'connected' | 'pending' | 'error';
+  error_message?: string | null;
+  last_verified_at?: string | null;
   external_account_id: string | null;
   connected_at: string | null;
   last_sync_at: string | null;
   last_error: string | null;
   has_token: boolean;
+  has_consumer_key?: boolean;
+  has_consumer_secret?: boolean;
   has_refresh_token: boolean;
   token_expires_at: string | null;
   token_expired: boolean;
@@ -59,7 +69,31 @@ export function normalizeEcommerceConfig(value: unknown): EcommerceConnectionCon
   const sync_prices = raw.sync_prices === true;
   const push_tracking = raw.push_tracking === true;
   const safe_mode = raw.safe_mode === false ? false : true;
-  return { ...raw, import_orders, sync_stock, sync_prices, push_tracking, safe_mode };
+  const sync_direction =
+    raw.sync_direction === 'erp_to_marketplace' || raw.sync_direction === 'marketplace_to_erp' || raw.sync_direction === 'bidirectional'
+      ? raw.sync_direction
+      : defaultMarketplaceSyncDirection();
+  const conflict_policy =
+    raw.conflict_policy === 'erp_wins' || raw.conflict_policy === 'marketplace_wins' || raw.conflict_policy === 'last_write_wins' || raw.conflict_policy === 'manual_review'
+      ? raw.conflict_policy
+      : defaultMarketplaceConflictPolicy();
+  const auto_sync_enabled = raw.auto_sync_enabled === true;
+  const sync_interval_minutes = Number.isFinite(Number(raw.sync_interval_minutes))
+    ? Math.min(1440, Math.max(5, Math.trunc(Number(raw.sync_interval_minutes))))
+    : 15;
+
+  return {
+    ...raw,
+    import_orders,
+    sync_stock,
+    sync_prices,
+    push_tracking,
+    safe_mode,
+    sync_direction,
+    conflict_policy,
+    auto_sync_enabled,
+    sync_interval_minutes,
+  };
 }
 
 export async function listEcommerceConnections(): Promise<EcommerceConnection[]> {
@@ -115,16 +149,31 @@ export async function setWooConnectionSecrets(params: {
 
 export function resolveWooConnectionStatus(params: {
   storeUrl?: string | null;
-  hasSecrets: boolean;
+  diagnostics: EcommerceConnectionDiagnostics | null;
   diagnosticsUnavailable: boolean;
   previousStatus?: string | null;
-}): 'connected' | 'pending' {
+}): 'connected' | 'pending' | 'error' {
   const hasStoreUrl = String(params.storeUrl ?? '').trim().length > 0;
-  if (hasStoreUrl && params.hasSecrets) return 'connected';
+  if (!hasStoreUrl) return 'pending';
 
-  if (params.diagnosticsUnavailable && String(params.previousStatus ?? '').toLowerCase() === 'connected') {
-    return 'connected';
+  const diagStatus = String(params.diagnostics?.connection_status ?? '').toLowerCase();
+  if (diagStatus === 'connected') return 'connected';
+  if (diagStatus === 'error') return 'error';
+  if (diagStatus === 'pending') return 'pending';
+
+  if (params.diagnosticsUnavailable) {
+    const previous = String(params.previousStatus ?? '').toLowerCase();
+    if (previous === 'connected') return 'connected';
+    if (previous === 'error') return 'error';
   }
 
   return 'pending';
+}
+
+export function wooHasStoredCredentials(diagnostics: EcommerceConnectionDiagnostics | null): boolean {
+  if (!diagnostics) return false;
+  if (diagnostics.has_consumer_key === true || diagnostics.has_consumer_secret === true) {
+    return diagnostics.has_consumer_key === true && diagnostics.has_consumer_secret === true;
+  }
+  return diagnostics.has_token === true;
 }

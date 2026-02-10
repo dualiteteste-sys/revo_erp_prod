@@ -19,8 +19,21 @@ import {
   setWooConnectionSecrets,
   upsertEcommerceConnection,
   updateEcommerceConnectionConfig,
+  wooHasStoredCredentials,
   type EcommerceHealthSummary,
 } from '@/services/ecommerceIntegrations';
+import {
+  MARKETPLACE_PROVIDER_DEFINITIONS,
+  MARKETPLACE_PROVIDER_IDS,
+  type MarketplaceConflictPolicy,
+  type MarketplaceProvider,
+  type MarketplaceSyncDirection,
+} from '@/services/marketplaceFramework';
+import {
+  listEcommerceSyncState,
+  upsertEcommerceSyncState,
+  type EcommerceSyncState,
+} from '@/services/ecommerceSyncState';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Switch } from '@/components/ui/switch';
 import { listEcommerceProductMappings, upsertEcommerceProductMapping, type EcommerceProductMappingRow } from '@/services/ecommerceCatalog';
@@ -46,7 +59,7 @@ import { listDepositos } from '@/services/suprimentos';
 import { listTabelasPreco } from '@/services/pricing';
 import { createRpcBurstGuard } from '@/components/settings/ecommerce/rpcBurstGuard';
 
-type Provider = 'meli' | 'shopee' | 'woo';
+type Provider = MarketplaceProvider;
 type CatalogProvider = Exclude<Provider, 'woo'>;
 type JobStatusFilter = EcommerceImportJobStatus | 'all';
 const WOO_CREDENTIAL_MASK = '••••••••••••••••';
@@ -54,11 +67,22 @@ const JOBS_PAGE_SIZE = 8;
 const JOBS_POLL_IDLE_MS = 30000;
 const JOBS_POLL_ACTIVE_MS = 10000;
 
-const providerLabels: Record<Provider, string> = {
-  meli: 'Mercado Livre',
-  shopee: 'Shopee',
-  woo: 'WooCommerce',
-};
+const providerLabels: Record<Provider, string> = Object.fromEntries(
+  MARKETPLACE_PROVIDER_IDS.map((provider) => [provider, MARKETPLACE_PROVIDER_DEFINITIONS[provider].label]),
+) as Record<Provider, string>;
+
+const syncDirectionOptions: Array<{ value: MarketplaceSyncDirection; label: string }> = [
+  { value: 'bidirectional', label: 'Bidirecional (ERP ⇄ Canal)' },
+  { value: 'erp_to_marketplace', label: 'Somente ERP → Canal' },
+  { value: 'marketplace_to_erp', label: 'Somente Canal → ERP' },
+];
+
+const conflictPolicyOptions: Array<{ value: MarketplaceConflictPolicy; label: string }> = [
+  { value: 'erp_wins', label: 'ERP prevalece (recomendado)' },
+  { value: 'marketplace_wins', label: 'Canal prevalece' },
+  { value: 'last_write_wins', label: 'Última atualização vence' },
+  { value: 'manual_review', label: 'Revisão manual (não sobrescrever)' },
+];
 
 function statusBadge(status?: string | null) {
   const s = (status || 'disconnected').toLowerCase();
@@ -76,6 +100,10 @@ function defaultConfig() {
     sync_prices: false,
     push_tracking: false,
     safe_mode: true,
+    sync_direction: 'bidirectional' as MarketplaceSyncDirection,
+    conflict_policy: 'erp_wins' as MarketplaceConflictPolicy,
+    auto_sync_enabled: false,
+    sync_interval_minutes: 15,
   };
 }
 
@@ -117,7 +145,9 @@ function wooPendingReason(
   const storeUrl = String(conn.config?.store_url ?? '').trim();
   if (!storeUrl) return 'Falta URL da loja';
   if (wooDiagUnavailable) return 'Não foi possível validar credenciais agora (diagnóstico indisponível)';
-  if (!wooDiag?.has_token) return 'Faltam credenciais (Consumer Key/Secret)';
+  if (!wooHasStoredCredentials(wooDiag)) return 'Faltam credenciais (Consumer Key/Secret)';
+  if (wooDiag?.connection_status === 'error') return wooDiag?.error_message || 'A verificação da conexão falhou';
+  if (wooDiag?.connection_status !== 'connected') return 'Conexão ainda não verificada';
   return null;
 }
 
@@ -178,6 +208,11 @@ export default function MarketplaceIntegrationsPage() {
   const [wooOptionsLoading, setWooOptionsLoading] = useState(false);
   const [wooDiag, setWooDiag] = useState<EcommerceConnectionDiagnostics | null>(null);
   const [wooDiagUnavailable, setWooDiagUnavailable] = useState(false);
+  const [syncStateByProvider, setSyncStateByProvider] = useState<Record<Provider, EcommerceSyncState | null>>({
+    meli: null,
+    shopee: null,
+    woo: null,
+  });
   const [wooEditingConsumerKey, setWooEditingConsumerKey] = useState(false);
   const [wooEditingConsumerSecret, setWooEditingConsumerSecret] = useState(false);
   const jobsPollHasActiveRef = useRef(false);
@@ -305,12 +340,24 @@ export default function MarketplaceIntegrationsPage() {
 
   const loadAllProviderJobs = useCallback(async () => {
     if (!canView) return false;
-    const providers: Provider[] = ['meli', 'shopee', 'woo'];
+    const providers: Provider[] = [...MARKETPLACE_PROVIDER_IDS];
     const all = await Promise.all(providers.map(async (provider) => loadProviderJobs(provider, { append: false, offset: 0 })));
     const hasActiveJobs = all.flat().some((job) => job.status === 'pending' || job.status === 'processing');
     jobsPollHasActiveRef.current = hasActiveJobs;
     return hasActiveJobs;
   }, [canView, loadProviderJobs]);
+
+  const loadSyncState = useCallback(async (provider?: Provider | null) => {
+    const rows = await listEcommerceSyncState(provider ?? null);
+    const next: Record<Provider, EcommerceSyncState | null> = { meli: null, shopee: null, woo: null };
+    for (const row of rows) {
+      if ((row.provider as Provider) in next) next[row.provider as Provider] = row;
+    }
+    setSyncStateByProvider((prev) => {
+      if (provider) return { ...prev, [provider]: next[provider] };
+      return next;
+    });
+  }, []);
 
   const fetchAll = useCallback(async () => {
     if (!canView) return;
@@ -319,20 +366,21 @@ export default function MarketplaceIntegrationsPage() {
       const [c, h] = await Promise.all([listEcommerceConnections(), getEcommerceHealthSummary()]);
       setConnections(c);
       setHealth(h);
-      await Promise.all([refreshWooDiag(), loadAllProviderJobs()]);
+      await Promise.all([refreshWooDiag(), loadAllProviderJobs(), loadSyncState()]);
     } catch (e: any) {
       addToast(e?.message || 'Falha ao carregar integrações.', 'error');
       setConnections([]);
       setHealth(null);
       setWooDiag(null);
       setWooDiagUnavailable(false);
+      setSyncStateByProvider({ meli: null, shopee: null, woo: null });
       setJobsByProvider({ meli: [], shopee: [], woo: [] });
       setJobsHasMoreByProvider({ meli: false, shopee: false, woo: false });
       setJobsOffsetByProvider({ meli: 0, shopee: 0, woo: 0 });
     } finally {
       setLoading(false);
     }
-  }, [addToast, canView, loadAllProviderJobs, refreshWooDiag]);
+  }, [addToast, canView, loadAllProviderJobs, loadSyncState, refreshWooDiag]);
 
   useEffect(() => {
     void fetchAll();
@@ -407,6 +455,14 @@ export default function MarketplaceIntegrationsPage() {
     return map;
   }, [connections]);
 
+  const syncSummaryLabel = useCallback((provider: Provider) => {
+    const row = syncStateByProvider[provider];
+    const direction = row?.direction ?? 'bidirectional';
+    if (direction === 'erp_to_marketplace') return 'ERP → Canal';
+    if (direction === 'marketplace_to_erp') return 'Canal → ERP';
+    return 'Bidirecional';
+  }, [syncStateByProvider]);
+
   const handleConnect = async (provider: Provider) => {
     if (!canManage) {
       addToast('Sem permissão para gerenciar integrações.', 'warning');
@@ -470,6 +526,7 @@ export default function MarketplaceIntegrationsPage() {
     setWooEditingConsumerKey(false);
     setWooEditingConsumerSecret(false);
     setConfigOpen(true);
+    void loadSyncState(provider);
     if (provider === 'woo') void refreshWooDiag();
   };
 
@@ -481,23 +538,19 @@ export default function MarketplaceIntegrationsPage() {
     setTestingProvider(provider);
     try {
       if (provider === 'woo') {
-        const storeUrl = String(activeConnection.config?.store_url ?? '').trim();
-        if (!storeUrl) {
-          addToast('Informe a URL da loja antes de testar.', 'warning');
+        if (!activeConnection.id) {
+          addToast('Conexão Woo inválida para teste.', 'error');
           return;
         }
-        if (!wooConsumerKey.trim() || !wooConsumerSecret.trim()) {
-          addToast('Informe o Consumer Key/Secret para testar a conexão.', 'warning');
-          return;
-        }
-
         const { data, error } = await supabase.functions.invoke('woocommerce-test-connection', {
-          body: { store_url: storeUrl, consumer_key: wooConsumerKey.trim(), consumer_secret: wooConsumerSecret.trim() },
+          body: { ecommerce_id: activeConnection.id },
         });
         if (error) throw error;
         const ok = (data as any)?.ok === true;
         setDiagnostics((data as any) ?? null);
-        addToast(ok ? 'Conexão WooCommerce OK.' : 'Conexão WooCommerce falhou. Veja os detalhes.', ok ? 'success' : 'error');
+        await refreshWooDiag();
+        await fetchAll();
+        addToast(ok ? 'Conexão WooCommerce validada com credenciais salvas.' : 'Conexão WooCommerce falhou. Veja os detalhes.', ok ? 'success' : 'error');
         return;
       }
 
@@ -560,21 +613,30 @@ export default function MarketplaceIntegrationsPage() {
 
     setSavingConfig(true);
     try {
-      await updateEcommerceConnectionConfig(activeConnection.id, activeConnection.config ?? {});
+      const normalizedConfig = normalizeEcommerceConfig(activeConnection.config ?? {});
+      await updateEcommerceConnectionConfig(activeConnection.id, normalizedConfig);
+      await upsertEcommerceSyncState({
+        ecommerceId: activeConnection.id,
+        entity: 'products',
+        direction: (normalizedConfig.sync_direction as MarketplaceSyncDirection | undefined) ?? 'bidirectional',
+        conflictPolicy: (normalizedConfig.conflict_policy as MarketplaceConflictPolicy | undefined) ?? 'erp_wins',
+        autoSyncEnabled: normalizedConfig.auto_sync_enabled === true,
+        syncIntervalMinutes: normalizedConfig.sync_interval_minutes ?? 15,
+      });
+      await loadSyncState(activeConnection.provider as Provider);
       if (activeConnection.provider === 'woo') {
-        const storeUrl = String(activeConnection.config?.store_url ?? '').trim();
+        const storeUrl = String(normalizedConfig.store_url ?? '').trim();
         const diag = await refreshWooDiag();
-        const hasSecrets = diag?.has_token === true;
         const diagUnavailableNow = diag == null;
         const reason = wooPendingReason(
-          { ...activeConnection, config: activeConnection.config ?? null },
+          { ...activeConnection, config: normalizedConfig ?? null },
           diag ?? null,
           diagUnavailableNow,
         );
 
         const nextStatus = resolveWooConnectionStatus({
           storeUrl,
-          hasSecrets,
+          diagnostics: diag ?? null,
           diagnosticsUnavailable: diagUnavailableNow,
           previousStatus: activeConnection.status ?? null,
         });
@@ -583,7 +645,7 @@ export default function MarketplaceIntegrationsPage() {
           nome: providerLabels.woo,
           status: nextStatus,
           external_account_id: activeConnection.external_account_id ?? null,
-          config: normalizeEcommerceConfig(activeConnection.config ?? {}),
+          config: normalizedConfig,
         });
 
         if (nextStatus === 'connected') {
@@ -631,14 +693,12 @@ export default function MarketplaceIntegrationsPage() {
       setWooConsumerSecret('');
       setWooEditingConsumerKey(false);
       setWooEditingConsumerSecret(false);
-      const diag = await refreshWooDiag();
       const storeUrl = String(activeConnection.config?.store_url ?? '').trim();
-      const diagUnavailableNow = diag == null;
       const nextStatus = resolveWooConnectionStatus({
         storeUrl,
-        hasSecrets: true,
-        diagnosticsUnavailable: diagUnavailableNow,
-        previousStatus: activeConnection.status ?? null,
+        diagnostics: null,
+        diagnosticsUnavailable: false,
+        previousStatus: 'pending',
       });
 
       await upsertEcommerceConnection({
@@ -650,16 +710,8 @@ export default function MarketplaceIntegrationsPage() {
       });
 
       setActiveConnection((prev) => (prev ? { ...prev, status: nextStatus } : prev));
-      if (nextStatus === 'connected') {
-        addToast('Credenciais salvas e integração conectada.', 'success');
-      } else {
-        const reason = wooPendingReason(
-          { ...activeConnection, config: activeConnection.config ?? null },
-          diag ?? null,
-          diagUnavailableNow,
-        );
-        addToast(`Credenciais salvas, mas a integração segue pendente. ${reason ? `Motivo: ${reason}.` : ''}`.trim(), 'warning');
-      }
+      await refreshWooDiag();
+      addToast('Credenciais salvas. Agora clique em “Testar conexão” para validar e marcar como conectado.', 'success');
       await fetchAll();
     } catch (e: any) {
       addToast(e?.message || 'Falha ao salvar credenciais.', 'error');
@@ -868,12 +920,14 @@ export default function MarketplaceIntegrationsPage() {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        {(['meli', 'shopee', 'woo'] as Provider[]).map((provider) => {
+        {MARKETPLACE_PROVIDER_IDS.map((provider) => {
           const conn = byProvider.get(provider);
           const isDisconnected = String(conn?.status ?? '').toLowerCase() === 'disconnected';
           const hasConnection = !!conn && !isDisconnected;
           const busy = busyProvider === provider;
           const pendingReason = provider === 'woo' ? wooPendingReason(conn ?? null, wooDiag, wooDiagUnavailable) : null;
+          const wooLastVerification = provider === 'woo' ? (wooDiag?.last_verified_at ?? null) : null;
+          const providerMeta = MARKETPLACE_PROVIDER_DEFINITIONS[provider];
           return (
             <GlassCard key={provider} className="p-4">
               <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
@@ -885,10 +939,19 @@ export default function MarketplaceIntegrationsPage() {
                   <div className="mt-1 text-xs text-gray-500">
                     {conn?.external_account_id ? `Conta: ${conn.external_account_id}` : 'Sem conta vinculada'}
                   </div>
+                  <div className="mt-1 text-xs text-gray-500">{providerMeta.summary}</div>
+                  <div className="mt-1 text-xs text-gray-500">
+                    Estratégia de sync: <span className="font-medium text-gray-700">{syncSummaryLabel(provider)}</span>
+                  </div>
                   {provider === 'woo' && pendingReason && String(conn?.status ?? '').toLowerCase() === 'pending' ? (
                     <div className="mt-2 inline-flex items-center gap-2 text-xs text-amber-800 bg-amber-50 border border-amber-100 rounded-lg px-2 py-1">
                       <AlertTriangle size={14} />
                       <span>{pendingReason}</span>
+                    </div>
+                  ) : null}
+                  {provider === 'woo' && wooLastVerification ? (
+                    <div className="mt-2 text-xs text-gray-500">
+                      Última verificação: {new Date(wooLastVerification).toLocaleString('pt-BR')}
                     </div>
                   ) : null}
                   {conn?.last_error ? (
@@ -1148,7 +1211,7 @@ export default function MarketplaceIntegrationsPage() {
                         label={
                           <div className="flex items-center justify-between gap-2">
                             <span>Consumer Key</span>
-                            {wooDiag?.has_token ? (
+                            {wooHasStoredCredentials(wooDiag) ? (
                               <span className="inline-flex items-center rounded-full bg-emerald-100 text-emerald-800 px-2 py-0.5 text-xs font-medium">
                                 Salvo
                               </span>
@@ -1156,13 +1219,13 @@ export default function MarketplaceIntegrationsPage() {
                           </div>
                         }
                         value={
-                          wooDiag?.has_token && !wooConsumerKey && !wooEditingConsumerKey
+                          wooHasStoredCredentials(wooDiag) && !wooConsumerKey && !wooEditingConsumerKey
                             ? WOO_CREDENTIAL_MASK
                             : wooConsumerKey
                         }
-                        placeholder={wooDiag?.has_token && !wooConsumerKey ? 'Salvo (mascarado)' : 'ck_...'}
+                        placeholder={wooHasStoredCredentials(wooDiag) && !wooConsumerKey ? 'Salvo (mascarado)' : 'ck_...'}
                         onFocus={() => {
-                          if (wooDiag?.has_token && !wooConsumerKey && !wooEditingConsumerKey) {
+                          if (wooHasStoredCredentials(wooDiag) && !wooConsumerKey && !wooEditingConsumerKey) {
                             setWooEditingConsumerKey(true);
                             setWooConsumerKey('');
                           }
@@ -1176,7 +1239,7 @@ export default function MarketplaceIntegrationsPage() {
                         }}
                         type="password"
                         helperText={
-                          wooDiag?.has_token && !wooConsumerKey
+                          wooHasStoredCredentials(wooDiag) && !wooConsumerKey
                             ? 'Armazenado com segurança. Para substituir, cole uma nova chave.'
                             : 'Cole a chave gerada no WooCommerce (ck_...).'
                         }
@@ -1185,7 +1248,7 @@ export default function MarketplaceIntegrationsPage() {
                         label={
                           <div className="flex items-center justify-between gap-2">
                             <span>Consumer Secret</span>
-                            {wooDiag?.has_token ? (
+                            {wooHasStoredCredentials(wooDiag) ? (
                               <span className="inline-flex items-center rounded-full bg-emerald-100 text-emerald-800 px-2 py-0.5 text-xs font-medium">
                                 Salvo
                               </span>
@@ -1193,13 +1256,13 @@ export default function MarketplaceIntegrationsPage() {
                           </div>
                         }
                         value={
-                          wooDiag?.has_token && !wooConsumerSecret && !wooEditingConsumerSecret
+                          wooHasStoredCredentials(wooDiag) && !wooConsumerSecret && !wooEditingConsumerSecret
                             ? WOO_CREDENTIAL_MASK
                             : wooConsumerSecret
                         }
-                        placeholder={wooDiag?.has_token && !wooConsumerSecret ? 'Salvo (mascarado)' : 'cs_...'}
+                        placeholder={wooHasStoredCredentials(wooDiag) && !wooConsumerSecret ? 'Salvo (mascarado)' : 'cs_...'}
                         onFocus={() => {
-                          if (wooDiag?.has_token && !wooConsumerSecret && !wooEditingConsumerSecret) {
+                          if (wooHasStoredCredentials(wooDiag) && !wooConsumerSecret && !wooEditingConsumerSecret) {
                             setWooEditingConsumerSecret(true);
                             setWooConsumerSecret('');
                           }
@@ -1213,7 +1276,7 @@ export default function MarketplaceIntegrationsPage() {
                         }}
                         type="password"
                         helperText={
-                          wooDiag?.has_token && !wooConsumerSecret
+                          wooHasStoredCredentials(wooDiag) && !wooConsumerSecret
                             ? 'Armazenado com segurança. Para substituir, cole um novo segredo.'
                             : 'Cole o secret gerado no WooCommerce (cs_...).'
                         }
@@ -1482,7 +1545,96 @@ export default function MarketplaceIntegrationsPage() {
               </GlassCard>
 
               <GlassCard className="p-3">
-                <div className="text-sm font-medium text-gray-900">3) Mapear produtos (recomendado)</div>
+                <div className="text-sm font-medium text-gray-900">3) Estratégia de sincronização</div>
+                <div className="mt-1 text-xs text-gray-600">
+                  Esta configuração prepara o comportamento padrão do conector para produtos/preço/estoque.
+                </div>
+                <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <Select
+                    label="Direção"
+                    name="sync_direction"
+                    value={String(activeConnection.config?.sync_direction ?? 'bidirectional')}
+                    onChange={(e) =>
+                      setActiveConnection((prev) =>
+                        prev
+                          ? { ...prev, config: { ...(prev.config ?? {}), sync_direction: (e.target as HTMLSelectElement).value as MarketplaceSyncDirection } }
+                          : prev,
+                      )
+                    }
+                  >
+                    {syncDirectionOptions.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </Select>
+
+                  <Select
+                    label="Conflito de atualização"
+                    name="conflict_policy"
+                    value={String(activeConnection.config?.conflict_policy ?? 'erp_wins')}
+                    onChange={(e) =>
+                      setActiveConnection((prev) =>
+                        prev
+                          ? { ...prev, config: { ...(prev.config ?? {}), conflict_policy: (e.target as HTMLSelectElement).value as MarketplaceConflictPolicy } }
+                          : prev,
+                      )
+                    }
+                  >
+                    {conflictPolicyOptions.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </Select>
+                </div>
+
+                <div className="mt-3 flex items-center justify-between gap-3">
+                  <div>
+                    <div className="text-sm font-medium text-gray-800">Sincronização automática</div>
+                    <div className="text-xs text-gray-500">Quando desativado, a operação é apenas manual por job.</div>
+                  </div>
+                  <Switch
+                    checked={activeConnection.config?.auto_sync_enabled === true}
+                    onCheckedChange={(checked) =>
+                      setActiveConnection((prev) => (prev ? { ...prev, config: { ...(prev.config ?? {}), auto_sync_enabled: checked } } : prev))
+                    }
+                  />
+                </div>
+
+                <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <Input
+                    label="Intervalo automático (minutos)"
+                    type="number"
+                    inputMode="numeric"
+                    min={5}
+                    max={1440}
+                    value={String(activeConnection.config?.sync_interval_minutes ?? 15)}
+                    onChange={(e) =>
+                      setActiveConnection((prev) =>
+                        prev
+                          ? {
+                              ...prev,
+                              config: {
+                                ...(prev.config ?? {}),
+                                sync_interval_minutes: Math.min(1440, Math.max(5, Number((e.target as HTMLInputElement).value || 15))),
+                              },
+                            }
+                          : prev,
+                      )
+                    }
+                    disabled={activeConnection.config?.auto_sync_enabled !== true}
+                  />
+                  <div className="text-xs text-gray-500 leading-relaxed self-end">
+                    Último sync efetivo: {syncStateByProvider[activeConnection.provider as Provider]?.last_success_at
+                      ? new Date(syncStateByProvider[activeConnection.provider as Provider]!.last_success_at as string).toLocaleString('pt-BR')
+                      : '—'}
+                  </div>
+                </div>
+              </GlassCard>
+
+              <GlassCard className="p-3">
+                <div className="text-sm font-medium text-gray-900">4) Mapear produtos (recomendado)</div>
                 <div className="mt-1 text-xs text-gray-600">
                   Para importar itens corretamente, mapeie cada produto do Ultria ERP com o ID do anúncio no canal.
                 </div>
