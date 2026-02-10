@@ -40,11 +40,16 @@ export type EcommerceConnectionDiagnostics = {
   provider: EcommerceProvider;
   has_connection: boolean;
   status: string;
+  connection_status?: 'connected' | 'pending' | 'error';
+  error_message?: string | null;
+  last_verified_at?: string | null;
   external_account_id: string | null;
   connected_at: string | null;
   last_sync_at: string | null;
   last_error: string | null;
   has_token: boolean;
+  has_consumer_key?: boolean;
+  has_consumer_secret?: boolean;
   has_refresh_token: boolean;
   token_expires_at: string | null;
   token_expired: boolean;
@@ -115,16 +120,31 @@ export async function setWooConnectionSecrets(params: {
 
 export function resolveWooConnectionStatus(params: {
   storeUrl?: string | null;
-  hasSecrets: boolean;
+  diagnostics: EcommerceConnectionDiagnostics | null;
   diagnosticsUnavailable: boolean;
   previousStatus?: string | null;
-}): 'connected' | 'pending' {
+}): 'connected' | 'pending' | 'error' {
   const hasStoreUrl = String(params.storeUrl ?? '').trim().length > 0;
-  if (hasStoreUrl && params.hasSecrets) return 'connected';
+  if (!hasStoreUrl) return 'pending';
 
-  if (params.diagnosticsUnavailable && String(params.previousStatus ?? '').toLowerCase() === 'connected') {
-    return 'connected';
+  const diagStatus = String(params.diagnostics?.connection_status ?? '').toLowerCase();
+  if (diagStatus === 'connected') return 'connected';
+  if (diagStatus === 'error') return 'error';
+  if (diagStatus === 'pending') return 'pending';
+
+  if (params.diagnosticsUnavailable) {
+    const previous = String(params.previousStatus ?? '').toLowerCase();
+    if (previous === 'connected') return 'connected';
+    if (previous === 'error') return 'error';
   }
 
   return 'pending';
+}
+
+export function wooHasStoredCredentials(diagnostics: EcommerceConnectionDiagnostics | null): boolean {
+  if (!diagnostics) return false;
+  if (diagnostics.has_consumer_key === true || diagnostics.has_consumer_secret === true) {
+    return diagnostics.has_consumer_key === true && diagnostics.has_consumer_secret === true;
+  }
+  return diagnostics.has_token === true;
 }
