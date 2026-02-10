@@ -373,6 +373,7 @@ const OsFormPanel: React.FC<OsFormPanelProps> = ({ os, onSaveSuccess, onClose })
 
   const handleGeneratePortalLink = async () => {
     if (!formData.id) return;
+    if (!canRunTenantMutation()) return;
     setPortalGenerating(true);
     try {
       const osId = String(formData.id);
@@ -402,6 +403,7 @@ const OsFormPanel: React.FC<OsFormPanelProps> = ({ os, onSaveSuccess, onClose })
 
   const handleRegisterComms = async () => {
     if (!formData.id) return;
+    if (!canRunTenantMutation()) return;
     if (!commsPreview.trim()) {
       addToast('Selecione um template para registrar.', 'warning');
       return;
