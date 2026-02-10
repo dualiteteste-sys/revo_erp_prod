@@ -22,6 +22,7 @@ export default function QuickScanModal({
   onClose,
 }: QuickScanModalProps) {
   const videoRef = useRef<HTMLVideoElement | null>(null);
+  const scanSessionRef = useRef(0);
   const [error, setError] = useState<string | null>(null);
   const [ready, setReady] = useState(false);
   const [manual, setManual] = useState('');
@@ -29,6 +30,7 @@ export default function QuickScanModal({
   useEffect(() => {
     if (!isOpen) return;
 
+    const session = ++scanSessionRef.current;
     setError(null);
     setReady(false);
     const reader = new BrowserMultiFormatReader();
@@ -38,15 +40,22 @@ export default function QuickScanModal({
       try {
         controls = await reader.decodeFromVideoDevice(undefined, videoRef.current!, (result, err, ctl) => {
           if (result) {
+            if (session !== scanSessionRef.current) return;
             ctl.stop();
             onResult(result.getText());
           }
           if (err && err.name !== 'NotFoundException') {
+            if (session !== scanSessionRef.current) return;
             setError(err.message ?? 'Falha ao ler o código.');
           }
         });
+        if (session !== scanSessionRef.current) {
+          controls?.stop();
+          return;
+        }
         setReady(true);
       } catch (err: any) {
+        if (session !== scanSessionRef.current) return;
         setError(err?.message || 'Não foi possível acessar a câmera. Verifique permissões/HTTPS.');
       }
     };
@@ -54,6 +63,7 @@ export default function QuickScanModal({
     void start();
 
     return () => {
+      scanSessionRef.current += 1;
       controls?.stop();
     };
   }, [isOpen, onResult]);
@@ -100,7 +110,12 @@ export default function QuickScanModal({
             />
             <Button
               type="button"
-              onClick={() => manual.trim() && onResult(manual.trim())}
+              onClick={() => {
+                const value = manual.trim();
+                if (!value) return;
+                onResult(value);
+              }}
+              disabled={!manual.trim()}
               className="shrink-0 rounded-xl"
               title="Usar o texto colado"
             >
@@ -116,4 +131,3 @@ export default function QuickScanModal({
     </Modal>
   );
 }
-
