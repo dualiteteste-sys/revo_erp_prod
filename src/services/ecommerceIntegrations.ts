@@ -5,6 +5,7 @@ export type EcommerceProvider = 'meli' | 'shopee' | 'woo';
 export type EcommerceConnectionConfig = {
   import_orders?: boolean;
   sync_stock?: boolean;
+  sync_prices?: boolean;
   push_tracking?: boolean;
   safe_mode?: boolean;
   store_url?: string;
@@ -55,9 +56,10 @@ export function normalizeEcommerceConfig(value: unknown): EcommerceConnectionCon
   const raw = value && typeof value === 'object' && !Array.isArray(value) ? (value as Record<string, unknown>) : {};
   const import_orders = raw.import_orders === false ? false : true;
   const sync_stock = raw.sync_stock === true;
+  const sync_prices = raw.sync_prices === true;
   const push_tracking = raw.push_tracking === true;
   const safe_mode = raw.safe_mode === false ? false : true;
-  return { ...raw, import_orders, sync_stock, push_tracking, safe_mode };
+  return { ...raw, import_orders, sync_stock, sync_prices, push_tracking, safe_mode };
 }
 
 export async function listEcommerceConnections(): Promise<EcommerceConnection[]> {

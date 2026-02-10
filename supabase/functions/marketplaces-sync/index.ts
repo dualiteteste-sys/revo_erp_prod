@@ -13,7 +13,7 @@ const MELI_CLIENT_ID = (Deno.env.get("MELI_CLIENT_ID") ?? "").trim();
 const MELI_CLIENT_SECRET = (Deno.env.get("MELI_CLIENT_SECRET") ?? "").trim();
 
 type Provider = "meli" | "shopee" | "woo";
-type Action = "import_orders";
+type Action = "import_orders" | "sync_stock" | "sync_prices";
 
 type Body = {
   provider?: Provider;
@@ -224,15 +224,114 @@ function buildWooOrdersUrl(params: {
   return u.toString();
 }
 
-async function wooFetchJson(url: string): Promise<{ ok: boolean; status: number; data: any }> {
+async function wooFetchJson(url: string, init?: RequestInit): Promise<{ ok: boolean; status: number; data: any }> {
   const resp = await fetch(url, {
+    ...(init ?? {}),
     headers: {
+      ...(init?.headers ?? {}),
       Accept: "application/json",
       "User-Agent": "UltriaERP/marketplaces-sync-woo",
     },
   });
   const data = await resp.json().catch(() => ({}));
   return { ok: resp.ok, status: resp.status, data };
+}
+
+function buildWooProductsUrl(params: {
+  storeUrl: string;
+  consumerKey: string;
+  consumerSecret: string;
+  page: number;
+  perPage?: number;
+}): string {
+  const u = new URL(`${params.storeUrl}/wp-json/wc/v3/products`);
+  u.searchParams.set("consumer_key", params.consumerKey);
+  u.searchParams.set("consumer_secret", params.consumerSecret);
+  u.searchParams.set("orderby", "id");
+  u.searchParams.set("order", "asc");
+  u.searchParams.set("per_page", String(params.perPage ?? 100));
+  u.searchParams.set("page", String(params.page));
+  return u.toString();
+}
+
+function buildWooProductsBatchUrl(params: {
+  storeUrl: string;
+  consumerKey: string;
+  consumerSecret: string;
+}): string {
+  const u = new URL(`${params.storeUrl}/wp-json/wc/v3/products/batch`);
+  u.searchParams.set("consumer_key", params.consumerKey);
+  u.searchParams.set("consumer_secret", params.consumerSecret);
+  return u.toString();
+}
+
+function normalizeSkuKey(value: unknown): string {
+  return String(value ?? "").trim().toLowerCase();
+}
+
+function toWooPrice(value: unknown): string {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return "0.00";
+  return n.toFixed(2);
+}
+
+function toWooStockQuantity(value: unknown): number {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return 0;
+  return Math.max(0, Math.trunc(n));
+}
+
+async function loadWooProductsBySku(params: {
+  storeUrl: string;
+  consumerKey: string;
+  consumerSecret: string;
+}) {
+  const productsBySku = new Map<string, any>();
+  let page = 1;
+  const perPage = 100;
+
+  while (true) {
+    const url = buildWooProductsUrl({
+      storeUrl: params.storeUrl,
+      consumerKey: params.consumerKey,
+      consumerSecret: params.consumerSecret,
+      page,
+      perPage,
+    });
+    const resp = await wooFetchJson(url);
+    if (!resp.ok) throw new Error(`WOO_PRODUCTS_LIST_FAILED:${resp.status}`);
+    const products = Array.isArray(resp.data) ? resp.data : [];
+    for (const product of products) {
+      const key = normalizeSkuKey(product?.sku);
+      if (key) productsBySku.set(key, product);
+    }
+    if (products.length < perPage) break;
+    page += 1;
+  }
+
+  return productsBySku;
+}
+
+async function loadProdutosForWooSync(params: {
+  admin: any;
+  empresaId: string;
+  kind: "sync_stock" | "sync_prices";
+}) {
+  const baseQuery = params.admin
+    .from("produtos")
+    .select("id,nome,sku,estoque_atual,preco_venda,ativo,controlar_estoque")
+    .eq("empresa_id", params.empresaId)
+    .eq("ativo", true)
+    .is("deleted_at", null)
+    .not("sku", "is", null);
+
+  if (params.kind === "sync_stock") {
+    baseQuery.eq("controlar_estoque", true);
+  }
+
+  const { data, error } = await baseQuery.limit(2000);
+  if (error) throw error;
+  return Array.isArray(data) ? data : [];
 }
 
 async function ensureWooBuyerAsPartner(admin: any, empresaId: string, order: any): Promise<string> {
@@ -738,6 +837,206 @@ async function processWooImportJobs(params: {
   };
 }
 
+async function processWooSyncJobs(params: {
+  admin: any;
+  ecommerceId: string;
+  empresaId: string;
+  storeUrl: string;
+  consumerKey: string;
+  consumerSecret: string;
+  kind: "sync_stock" | "sync_prices";
+}) {
+  const { admin, ecommerceId, empresaId, storeUrl, consumerKey, consumerSecret, kind } = params;
+  const { data: claimed } = await admin.rpc("ecommerce_import_jobs_claim", {
+    p_provider: "woo",
+    p_kind: kind,
+    p_limit: 1,
+    p_worker: `marketplaces-sync-woo-${kind}`,
+  });
+
+  const jobs = Array.isArray(claimed) ? claimed : [];
+  if (jobs.length === 0) {
+    return {
+      processed_jobs: 0,
+      updated_items: 0,
+      skipped_items: 0,
+      failed_items: 0,
+    };
+  }
+
+  const productsBySku = await loadWooProductsBySku({ storeUrl, consumerKey, consumerSecret });
+  const localProducts = await loadProdutosForWooSync({ admin, empresaId, kind });
+
+  let processedJobs = 0;
+  let updatedItems = 0;
+  let skippedItems = 0;
+  let failedItems = 0;
+  let hadErrors = false;
+  let lastError: string | null = null;
+
+  for (const job of jobs) {
+    const jobId = String(job.id);
+    const { data: run } = await admin.from("ecommerce_job_runs").insert({
+      empresa_id: empresaId,
+      job_id: jobId,
+      provider: "woo",
+      kind,
+      started_at: new Date().toISOString(),
+      meta: { source: "produtos", total_candidates: localProducts.length },
+    }).select("id").single();
+    const runId = run?.id ? String(run.id) : null;
+
+    try {
+      const updates: Array<Record<string, unknown>> = [];
+      for (const product of localProducts) {
+        const skuRaw = String(product?.sku ?? "").trim();
+        if (!skuRaw) {
+          skippedItems += 1;
+          await admin.from("ecommerce_job_items").insert({
+            empresa_id: empresaId,
+            job_id: jobId,
+            run_id: runId,
+            provider: "woo",
+            kind,
+            sku: null,
+            action: "skipped",
+            status: "skipped",
+            message: "Produto sem SKU",
+            context: sanitizeForLog({ produto_id: product?.id ?? null }),
+          });
+          continue;
+        }
+
+        const wooProduct = productsBySku.get(normalizeSkuKey(skuRaw));
+        if (!wooProduct?.id) {
+          skippedItems += 1;
+          await admin.from("ecommerce_job_items").insert({
+            empresa_id: empresaId,
+            job_id: jobId,
+            run_id: runId,
+            provider: "woo",
+            kind,
+            sku: skuRaw,
+            action: "skipped",
+            status: "skipped",
+            message: "SKU não encontrado no WooCommerce",
+            context: sanitizeForLog({ produto_id: product?.id ?? null }),
+          });
+          continue;
+        }
+
+        const payload: Record<string, unknown> = { id: Number(wooProduct.id) };
+        if (kind === "sync_stock") {
+          payload.manage_stock = true;
+          payload.stock_quantity = toWooStockQuantity(product?.estoque_atual);
+        } else {
+          payload.regular_price = toWooPrice(product?.preco_venda);
+        }
+        updates.push(payload);
+      }
+
+      const chunkSize = 50;
+      for (let index = 0; index < updates.length; index += chunkSize) {
+        const chunk = updates.slice(index, index + chunkSize);
+        const url = buildWooProductsBatchUrl({ storeUrl, consumerKey, consumerSecret });
+        const resp = await wooFetchJson(url, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ update: chunk }),
+        });
+        if (!resp.ok) throw new Error(`WOO_PRODUCTS_BATCH_FAILED:${resp.status}`);
+
+        const updated = Array.isArray(resp.data?.update) ? resp.data.update : [];
+        const updatedById = new Set(updated.map((item: any) => Number(item?.id)));
+        for (const item of chunk) {
+          const productId = Number(item?.id);
+          const matched = updatedById.has(productId);
+          if (matched) {
+            updatedItems += 1;
+            await admin.from("ecommerce_job_items").insert({
+              empresa_id: empresaId,
+              job_id: jobId,
+              run_id: runId,
+              provider: "woo",
+              kind,
+              external_id: String(productId),
+              sku: null,
+              action: "updated",
+              status: "updated",
+              message: null,
+              context: sanitizeForLog(item),
+            });
+          } else {
+            failedItems += 1;
+            await admin.from("ecommerce_job_items").insert({
+              empresa_id: empresaId,
+              job_id: jobId,
+              run_id: runId,
+              provider: "woo",
+              kind,
+              external_id: String(productId),
+              sku: null,
+              action: "failed",
+              status: "failed",
+              message: "WooCommerce não retornou item atualizado",
+              context: sanitizeForLog(item),
+            });
+          }
+        }
+      }
+
+      await admin.from("ecommerce_jobs").update({
+        status: "done",
+        locked_at: null,
+        locked_by: null,
+        last_error: null,
+        updated_at: new Date().toISOString(),
+      }).eq("id", jobId);
+      if (runId) {
+        await admin.from("ecommerce_job_runs").update({
+          ok: true,
+          finished_at: new Date().toISOString(),
+          meta: { kind, updated_items: updatedItems, skipped_items: skippedItems, failed_items: failedItems },
+        }).eq("id", runId);
+      }
+      processedJobs += 1;
+    } catch (jobErr: any) {
+      const message = jobErr?.message || "WOO_SYNC_JOB_FAILED";
+      hadErrors = true;
+      lastError = message;
+      await admin.from("ecommerce_jobs").update({
+        status: "error",
+        locked_at: null,
+        locked_by: null,
+        last_error: message,
+        updated_at: new Date().toISOString(),
+      }).eq("id", jobId);
+      if (runId) {
+        await admin.from("ecommerce_job_runs").update({
+          ok: false,
+          finished_at: new Date().toISOString(),
+          error: message,
+          meta: { kind },
+        }).eq("id", runId);
+      }
+    }
+  }
+
+  await admin.from("ecommerces").update({
+    last_sync_at: new Date().toISOString(),
+    last_error: hadErrors ? lastError : null,
+    status: hadErrors ? "error" : "connected",
+    updated_at: new Date().toISOString(),
+  }).eq("id", ecommerceId);
+
+  return {
+    processed_jobs: processedJobs,
+    updated_items: updatedItems,
+    skipped_items: skippedItems,
+    failed_items: failedItems,
+  };
+}
+
 serve(async (req) => {
   const cors = buildCorsHeaders(req);
   if (req.method === "OPTIONS") return new Response(null, { status: 204, headers: cors });
@@ -766,7 +1065,12 @@ serve(async (req) => {
   const since = toIsoOrNull(body.since) ?? null;
 
   if (provider !== "meli" && provider !== "shopee" && provider !== "woo") return json(400, { ok: false, error: "INVALID_PROVIDER" }, cors);
-  if (action !== "import_orders") return json(400, { ok: false, error: "INVALID_ACTION" }, cors);
+  if (action !== "import_orders" && action !== "sync_stock" && action !== "sync_prices") {
+    return json(400, { ok: false, error: "INVALID_ACTION" }, cors);
+  }
+  if (provider !== "woo" && action !== "import_orders") {
+    return json(400, { ok: false, error: "ACTION_NOT_SUPPORTED_FOR_PROVIDER" }, cors);
+  }
 
   if (provider === "shopee") return json(501, { ok: false, provider: "shopee", error: "NOT_IMPLEMENTED_YET" }, cors);
 
@@ -819,7 +1123,7 @@ serve(async (req) => {
     admin,
     empresaId,
     domain: "ecommerce",
-    action: "import_orders",
+    action,
     limit: 3,
     windowSeconds: 60,
   });
@@ -843,7 +1147,7 @@ serve(async (req) => {
     .select("id,dedupe_key,locked_at")
     .eq("empresa_id", empresaId)
     .eq("provider", provider)
-    .eq("kind", "import_orders")
+    .eq("kind", action)
     .eq("status", "processing")
     .gte("locked_at", inflightCutoff)
     .limit(1)
@@ -870,36 +1174,75 @@ serve(async (req) => {
     }
     const storeUrl = normalizeStoreUrl(rawStoreUrl);
     try {
-      const result = await processWooImportJobs({
+      if (action === "import_orders") {
+        const result = await processWooImportJobs({
+          admin,
+          userId,
+          ecommerceId,
+          empresaId,
+          storeUrl,
+          consumerKey: wooConsumerKey,
+          consumerSecret: wooConsumerSecret,
+          since,
+        });
+        await circuitBreakerRecord({ admin, empresaId, domain: "ecommerce", provider, ok: true });
+        await finopsTrackUsage({ admin, empresaId, source: "ecommerce", event: "woo.import_orders", count: result.imported_orders });
+        await finopsTrackUsage({ admin, empresaId, source: "ecommerce", event: "woo.job_run", count: result.processed_jobs });
+        return json(
+          200,
+          {
+            ok: true,
+            provider: "woo",
+            processed_jobs: result.processed_jobs,
+            imported: result.imported_orders,
+            total_items: result.total_items,
+            skipped_items: result.skipped_items,
+            failed_items: result.failed_items,
+          },
+          cors,
+        );
+      }
+      const syncResult = await processWooSyncJobs({
         admin,
-        userId,
         ecommerceId,
         empresaId,
         storeUrl,
         consumerKey: wooConsumerKey,
         consumerSecret: wooConsumerSecret,
-        since,
+        kind: action,
       });
       await circuitBreakerRecord({ admin, empresaId, domain: "ecommerce", provider, ok: true });
-      await finopsTrackUsage({ admin, empresaId, source: "ecommerce", event: "woo.import_orders", count: result.imported_orders });
-      await finopsTrackUsage({ admin, empresaId, source: "ecommerce", event: "woo.job_run", count: result.processed_jobs });
+      await finopsTrackUsage({
+        admin,
+        empresaId,
+        source: "ecommerce",
+        event: action === "sync_stock" ? "woo.sync_stock" : "woo.sync_prices",
+        count: syncResult.updated_items,
+      });
+      await finopsTrackUsage({ admin, empresaId, source: "ecommerce", event: "woo.job_run", count: syncResult.processed_jobs });
       return json(
         200,
         {
           ok: true,
           provider: "woo",
-          processed_jobs: result.processed_jobs,
-          imported: result.imported_orders,
-          total_items: result.total_items,
-          skipped_items: result.skipped_items,
-          failed_items: result.failed_items,
+          action,
+          processed_jobs: syncResult.processed_jobs,
+          updated: syncResult.updated_items,
+          skipped_items: syncResult.skipped_items,
+          failed_items: syncResult.failed_items,
         },
         cors,
       );
     } catch (err: any) {
       const message = err?.message || "WOO_IMPORT_FAILED";
       await circuitBreakerRecord({ admin, empresaId, domain: "ecommerce", provider, ok: false, error: message });
-      await finopsTrackUsage({ admin, empresaId, source: "ecommerce", event: "woo.import_failed", count: 1 });
+      await finopsTrackUsage({
+        admin,
+        empresaId,
+        source: "ecommerce",
+        event: action === "import_orders" ? "woo.import_failed" : "woo.sync_failed",
+        count: 1,
+      });
       return json(502, { ok: false, provider: "woo", error: message }, cors);
     }
   }

@@ -6,6 +6,7 @@ describe('normalizeEcommerceConfig', () => {
     expect(normalizeEcommerceConfig(null)).toEqual({
       import_orders: true,
       sync_stock: false,
+      sync_prices: false,
       push_tracking: false,
       safe_mode: true,
     });
@@ -15,6 +16,7 @@ describe('normalizeEcommerceConfig', () => {
     expect(normalizeEcommerceConfig({ import_orders: false, sync_stock: 'x', foo: 1 })).toEqual({
       import_orders: false,
       sync_stock: false,
+      sync_prices: false,
       push_tracking: false,
       safe_mode: true,
       foo: 1,
@@ -25,6 +27,7 @@ describe('normalizeEcommerceConfig', () => {
     expect(normalizeEcommerceConfig({ safe_mode: false })).toEqual({
       import_orders: true,
       sync_stock: false,
+      sync_prices: false,
       push_tracking: false,
       safe_mode: false,
     });
