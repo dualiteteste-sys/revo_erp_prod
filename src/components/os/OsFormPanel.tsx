@@ -118,6 +118,14 @@ const OsFormPanel: React.FC<OsFormPanelProps> = ({ os, onSaveSuccess, onClose })
     return tenantVersionSnapshot !== tenantVersionRef.current || empresaSnapshot !== lastEmpresaIdRef.current;
   };
 
+  const canRunTenantMutation = () => {
+    if (!activeEmpresaId || authLoading || empresaChanged) {
+      addToast('Aguarde a empresa ativa estabilizar para concluir esta ação.', 'info');
+      return false;
+    }
+    return true;
+  };
+
   const commsColumns: TableColumnWidthDef[] = [
     { id: 'quando', defaultWidth: 220, minWidth: 200 },
     { id: 'canal', defaultWidth: 140, minWidth: 120 },
@@ -659,6 +667,7 @@ const OsFormPanel: React.FC<OsFormPanelProps> = ({ os, onSaveSuccess, onClose })
 
   const handleGerarParcelas = async () => {
     if (!formData.id) return;
+    if (!canRunTenantMutation()) return;
     setIsGeneratingParcelas(true);
     const osId = String(formData.id);
     const parcelasSession = startOperation({
@@ -693,6 +702,7 @@ const OsFormPanel: React.FC<OsFormPanelProps> = ({ os, onSaveSuccess, onClose })
 
   const handleGerarContasPorParcelas = async () => {
     if (!formData.id) return;
+    if (!canRunTenantMutation()) return;
     if (parcelas.length === 0) {
       addToast('Gere as parcelas antes (ou use “Gerar Conta a Receber” para conta única).', 'warning');
       return;
@@ -734,6 +744,7 @@ const OsFormPanel: React.FC<OsFormPanelProps> = ({ os, onSaveSuccess, onClose })
 
   const handleCreateConta = async () => {
     if (!formData.id) return;
+    if (!canRunTenantMutation()) return;
     setIsCreatingConta(true);
     const osId = String(formData.id);
     const createContaSession = startOperation({
@@ -773,6 +784,7 @@ const OsFormPanel: React.FC<OsFormPanelProps> = ({ os, onSaveSuccess, onClose })
 
   const handleReceberContaAgora = async () => {
     if (!contaReceberId || !contaReceber) return;
+    if (!canRunTenantMutation()) return;
     if (contaReceber.status === 'pago' || contaReceber.status === 'cancelado') {
       handleOpenConta();
       return;
@@ -877,6 +889,7 @@ const OsFormPanel: React.FC<OsFormPanelProps> = ({ os, onSaveSuccess, onClose })
       addToast('Você não tem permissão para editar itens.', 'warning');
       return;
     }
+    if (!canRunTenantMutation()) return;
     const removeItemSession = startOperation(
       {
         domain: 'os',
@@ -979,6 +992,7 @@ const OsFormPanel: React.FC<OsFormPanelProps> = ({ os, onSaveSuccess, onClose })
       addToast('Você não tem permissão para editar itens.', 'warning');
       return;
     }
+    if (!canRunTenantMutation()) return;
     setIsAddingItem(true);
     const addItemSession = startOperation(
       {
@@ -1031,6 +1045,7 @@ const OsFormPanel: React.FC<OsFormPanelProps> = ({ os, onSaveSuccess, onClose })
       addToast('A descrição da O.S. é obrigatória.', 'error');
       return;
     }
+    if (!canRunTenantMutation()) return;
 
     setIsSaving(true);
     const saveSession = startOperation({
@@ -1091,6 +1106,7 @@ const OsFormPanel: React.FC<OsFormPanelProps> = ({ os, onSaveSuccess, onClose })
       addToast('Salve a O.S. antes de enviar o orçamento.', 'warning');
       return;
     }
+    if (!canRunTenantMutation()) return;
     setOrcamentoSending(true);
     const osId = String(formData.id);
     const enviarOrcamentoSession = startOperation({
@@ -1127,6 +1143,7 @@ const OsFormPanel: React.FC<OsFormPanelProps> = ({ os, onSaveSuccess, onClose })
 
   const handleDecidirOrcamento = async () => {
     if (!formData.id) return;
+    if (!canRunTenantMutation()) return;
     if (!permManage.data) {
       addToast('Você não tem permissão para aprovar/reprovar orçamento.', 'warning');
       return;
