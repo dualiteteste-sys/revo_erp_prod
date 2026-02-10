@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { PlanoCaracteristica, PlanoCaracteristicaPayload, upsertPlanoCaracteristica } from '@/services/industriaProducao';
 import { useToast } from '@/contexts/ToastProvider';
 import UnidadeMedidaSelect from '@/components/common/UnidadeMedidaSelect';
+import { useAuth } from '@/contexts/AuthProvider';
 
 interface Props {
   isOpen: boolean;
@@ -32,6 +33,7 @@ const defaultState: FormState = {
 
 export default function PlanoCaracteristicaModal({ isOpen, onClose, planoId, caracteristica, onSuccess }: Props) {
   const { addToast } = useToast();
+  const { loading: authLoading, activeEmpresaId } = useAuth();
   const [form, setForm] = useState<FormState>(defaultState);
   const [saving, setSaving] = useState(false);
 
@@ -56,6 +58,10 @@ export default function PlanoCaracteristicaModal({ isOpen, onClose, planoId, car
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (authLoading || !activeEmpresaId) {
+      addToast('Aguarde a troca de contexto (login/empresa) concluir para salvar.', 'info');
+      return;
+    }
     if (!form.descricao?.trim()) {
       addToast('Informe a descrição da característica.', 'error');
       return;
@@ -138,7 +144,7 @@ export default function PlanoCaracteristicaModal({ isOpen, onClose, planoId, car
           <Button type="button" variant="ghost" onClick={onClose} disabled={saving}>
             Cancelar
           </Button>
-          <Button type="submit" disabled={saving}>
+          <Button type="submit" disabled={saving || authLoading || !activeEmpresaId}>
             {saving ? 'Salvando...' : 'Salvar'}
           </Button>
         </div>
