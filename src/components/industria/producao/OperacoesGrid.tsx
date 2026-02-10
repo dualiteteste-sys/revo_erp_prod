@@ -20,6 +20,7 @@ import { useConfirm } from '@/contexts/ConfirmProvider';
 import ResizableSortableTh from '@/components/ui/table/ResizableSortableTh';
 import TableColGroup from '@/components/ui/table/TableColGroup';
 import { useTableColumnWidths, type TableColumnWidthDef } from '@/components/ui/table/useTableColumnWidths';
+import { useAuth } from '@/contexts/AuthProvider';
 
 interface Props {
     ordemId: string;
@@ -34,7 +35,10 @@ export default function OperacoesGrid({ ordemId, highlightOperacaoId, canOperate
     const [loading, setLoading] = useState(true);
     const { addToast } = useToast();
     const { confirm } = useConfirm();
+    const { loading: authLoading, activeEmpresaId } = useAuth();
     const tableRef = useRef<HTMLDivElement | null>(null);
+    const lastEmpresaIdRef = useRef<string | null>(activeEmpresaId);
+    const actionTokenRef = useRef(0);
     const btnSm = "h-8 px-3 text-xs";
     const btnPrimary = "bg-blue-600 text-white hover:bg-blue-700";
     const btnSecondary = "bg-gray-100 text-gray-800 hover:bg-gray-200";
@@ -69,9 +73,13 @@ export default function OperacoesGrid({ ordemId, highlightOperacaoId, canOperate
     const [menuOpId, setMenuOpId] = useState<string | null>(null);
 
     const loadData = async () => {
+        if (authLoading || !activeEmpresaId) return;
+        const token = ++actionTokenRef.current;
+        const empresaSnapshot = activeEmpresaId;
         setLoading(true);
         try {
             const data = await getOperacoes(ordemId);
+            if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
             setOperacoes(data);
             if (selectedOp) {
                 const refreshed = data.find(item => item.id === selectedOp.id);
@@ -86,16 +94,34 @@ export default function OperacoesGrid({ ordemId, highlightOperacaoId, canOperate
                 }
             }
         } catch (e: any) {
+            if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
             logger.error('[Indústria][Produção] Falha ao carregar operações', e, { ordemId });
             addToast('Erro ao carregar operações', 'error');
         } finally {
+            if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
             setLoading(false);
         }
     };
 
     useEffect(() => {
+        const prevEmpresaId = lastEmpresaIdRef.current;
+        if (prevEmpresaId === activeEmpresaId) return;
+        actionTokenRef.current += 1;
+        setLoading(false);
+        setMenuOpId(null);
+        setSelectedOp(null);
+        setIsApontamentoOpen(false);
+        setTransferOp(null);
+        setQaOp(null);
+        setInspectionOp(null);
+        setInspectionTipo(null);
+        setDocsOp(null);
+        lastEmpresaIdRef.current = activeEmpresaId;
+    }, [activeEmpresaId]);
+
+    useEffect(() => {
         loadData();
-    }, [ordemId]);
+    }, [ordemId, authLoading, activeEmpresaId]);
 
     useEffect(() => {
         if (!highlightOperacaoId) return;
@@ -105,6 +131,10 @@ export default function OperacoesGrid({ ordemId, highlightOperacaoId, canOperate
     }, [highlightOperacaoId, operacoes.length]);
 
     const handleEvento = async (op: OrdemOperacao, evento: 'iniciar' | 'pausar' | 'retomar' | 'concluir') => {
+        if (authLoading || !activeEmpresaId) {
+            addToast('Aguarde a troca de contexto (login/empresa) concluir para operar.', 'info');
+            return;
+        }
         if (!canOperate) {
             addToast('Você não tem permissão para executar ações nesta operação.', 'error');
             return;
@@ -120,16 +150,24 @@ export default function OperacoesGrid({ ordemId, highlightOperacaoId, canOperate
             if (!ok) return;
         }
 
+        const token = ++actionTokenRef.current;
+        const empresaSnapshot = activeEmpresaId;
         try {
             await registrarEventoOperacao(op.id, evento);
+            if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
             addToast(`Operação ${evento === 'iniciar' ? 'iniciada' : evento} com sucesso.`, 'success');
             loadData();
         } catch (e: any) {
+            if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
             addToast(e.message, 'error');
         }
     };
 
     const handleTransferConfirm = async () => {
+        if (authLoading || !activeEmpresaId) {
+            addToast('Aguarde a troca de contexto (login/empresa) concluir para transferir.', 'info');
+            return;
+        }
         if (!transferOp) return;
         const quantidadeProduzida = Number((transferOp as any)?.quantidade_produzida ?? 0);
         const disponivel = Math.max(quantidadeProduzida - (transferOp.quantidade_transferida || 0), 0);
@@ -142,15 +180,20 @@ export default function OperacoesGrid({ ordemId, highlightOperacaoId, canOperate
             return;
         }
         setTransferLoading(true);
+        const token = ++actionTokenRef.current;
+        const empresaSnapshot = activeEmpresaId;
         try {
             await transferirLoteOperacao(transferOp.id, transferQty);
+            if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
             addToast('Lote transferido.', 'success');
             setTransferOp(null);
             setTransferQty(0);
             loadData();
         } catch (e: any) {
+            if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
             addToast(e.message, 'error');
         } finally {
+            if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
             setTransferLoading(false);
         }
     };
@@ -393,6 +436,10 @@ export default function OperacoesGrid({ ordemId, highlightOperacaoId, canOperate
                                                 <button
                                                   className="w-full flex items-center gap-2 px-3 py-2 text-left hover:bg-gray-100"
                                                   onClick={async () => {
+                                                    if (authLoading || !activeEmpresaId) {
+                                                      addToast('Aguarde a troca de contexto (login/empresa) concluir para excluir.', 'info');
+                                                      return;
+                                                    }
                                                     setMenuOpId(null);
                                                     const ok = await confirm({
                                                       title: 'Excluir Operação',
@@ -402,11 +449,15 @@ export default function OperacoesGrid({ ordemId, highlightOperacaoId, canOperate
                                                       variant: 'warning',
                                                     });
                                                     if (!ok) return;
+                                                    const token = ++actionTokenRef.current;
+                                                    const empresaSnapshot = activeEmpresaId;
                                                     try {
                                                       await resetOperacaoProducao(op.id, false);
+                                                      if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
                                                       addToast('Operação excluída.', 'success');
                                                       loadData();
                                                     } catch (e: any) {
+                                                      if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
                                                       addToast(String(e?.message || 'Erro ao excluir operação.'), 'error');
                                                     }
                                                   }}
@@ -416,6 +467,10 @@ export default function OperacoesGrid({ ordemId, highlightOperacaoId, canOperate
                                                 <button
                                                   className="w-full flex items-center gap-2 px-3 py-2 text-left hover:bg-gray-100 text-red-700"
                                                   onClick={async () => {
+                                                    if (authLoading || !activeEmpresaId) {
+                                                      addToast('Aguarde a troca de contexto (login/empresa) concluir para resetar.', 'info');
+                                                      return;
+                                                    }
                                                     setMenuOpId(null);
                                                     const ok = await confirm({
                                                       title: 'Forçar reset (remove apontamentos)',
@@ -425,11 +480,15 @@ export default function OperacoesGrid({ ordemId, highlightOperacaoId, canOperate
                                                       variant: 'danger',
                                                     });
                                                     if (!ok) return;
+                                                    const token = ++actionTokenRef.current;
+                                                    const empresaSnapshot = activeEmpresaId;
                                                     try {
                                                       await resetOperacaoProducao(op.id, true);
+                                                      if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
                                                       addToast('Operação e apontamentos removidos.', 'success');
                                                       loadData();
                                                     } catch (e: any) {
+                                                      if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
                                                       addToast(String(e?.message || 'Erro ao forçar reset.'), 'error');
                                                     }
                                                   }}
