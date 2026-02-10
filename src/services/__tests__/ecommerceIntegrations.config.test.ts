@@ -9,6 +9,10 @@ describe('normalizeEcommerceConfig', () => {
       sync_prices: false,
       push_tracking: false,
       safe_mode: true,
+      sync_direction: 'bidirectional',
+      conflict_policy: 'erp_wins',
+      auto_sync_enabled: false,
+      sync_interval_minutes: 15,
     });
   });
 
@@ -19,6 +23,10 @@ describe('normalizeEcommerceConfig', () => {
       sync_prices: false,
       push_tracking: false,
       safe_mode: true,
+      sync_direction: 'bidirectional',
+      conflict_policy: 'erp_wins',
+      auto_sync_enabled: false,
+      sync_interval_minutes: 15,
       foo: 1,
     });
   });
@@ -30,6 +38,10 @@ describe('normalizeEcommerceConfig', () => {
       sync_prices: false,
       push_tracking: false,
       safe_mode: false,
+      sync_direction: 'bidirectional',
+      conflict_policy: 'erp_wins',
+      auto_sync_enabled: false,
+      sync_interval_minutes: 15,
     });
   });
 });
