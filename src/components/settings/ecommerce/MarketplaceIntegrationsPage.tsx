@@ -31,6 +31,7 @@ import {
   listEcommerceImportJobs,
   retryEcommerceImportJob,
   type EcommerceImportJob,
+  type EcommerceImportKind,
   type EcommerceImportJobDetail,
   type EcommerceImportJobStatus,
 } from '@/services/ecommerceImportJobs';
@@ -72,9 +73,17 @@ function defaultConfig() {
   return {
     import_orders: true,
     sync_stock: false,
+    sync_prices: false,
     push_tracking: false,
     safe_mode: true,
   };
+}
+
+function jobKindLabel(kind: EcommerceImportKind) {
+  if (kind === 'import_orders') return 'Importar pedidos';
+  if (kind === 'sync_stock') return 'Sincronizar estoque';
+  if (kind === 'sync_prices') return 'Sincronizar preços';
+  return kind;
 }
 
 function jobStatusBadge(status: EcommerceImportJobStatus) {
@@ -126,7 +135,7 @@ export default function MarketplaceIntegrationsPage() {
   const [busyProvider, setBusyProvider] = useState<Provider | null>(null);
   const [testingProvider, setTestingProvider] = useState<Provider | null>(null);
   const [diagnostics, setDiagnostics] = useState<Record<string, any> | null>(null);
-  const [queueingImportProvider, setQueueingImportProvider] = useState<Provider | null>(null);
+  const [queueingJobKey, setQueueingJobKey] = useState<string | null>(null);
   const [jobsByProvider, setJobsByProvider] = useState<Record<Provider, EcommerceImportJob[]>>({
     meli: [],
     shopee: [],
@@ -262,7 +271,7 @@ export default function MarketplaceIntegrationsPage() {
       try {
         const jobs = await listEcommerceImportJobs({
           provider,
-          kind: 'import_orders',
+          kind: null,
           status: status === 'all' ? null : status,
           limit: JOBS_PAGE_SIZE,
           offset,
@@ -735,37 +744,38 @@ export default function MarketplaceIntegrationsPage() {
     }
   };
 
-  const handleImportOrdersNow = async (provider: Provider) => {
+  const handleQueueJobNow = async (provider: Provider, kind: EcommerceImportKind) => {
     if (!canManage) {
       addToast('Sem permissão para gerenciar integrações.', 'warning');
       return;
     }
-    if (queueingImportProvider) return;
+    const actionKey = `${provider}:${kind}`;
+    if (queueingJobKey) return;
 
-    const runningJob = jobsByProvider[provider].find((job) => job.status === 'pending' || job.status === 'processing');
+    const runningJob = jobsByProvider[provider].find((job) => job.kind === kind && (job.status === 'pending' || job.status === 'processing'));
     if (runningJob) {
-      addToast('Já existe importação em andamento para este canal. Aguarde finalizar ou cancele o job atual.', 'info');
+      addToast(`Já existe job em andamento para "${jobKindLabel(kind)}". Aguarde finalizar ou cancele o job atual.`, 'info');
       return;
     }
 
-    setQueueingImportProvider(provider);
+    setQueueingJobKey(actionKey);
     try {
       const knownIds = new Set(jobsByProvider[provider].map((job) => job.id));
       const dedupeBucket = Math.floor(Date.now() / 10000);
       const res = await enqueueEcommerceImportJob({
         provider,
-        kind: 'import_orders',
+        kind,
         payload: {},
-        idempotencyKey: `manual-ui-import_orders-${provider}-${dedupeBucket}`,
+        idempotencyKey: `manual-ui-${kind}-${provider}-${dedupeBucket}`,
       });
       if (knownIds.has(res.job_id)) {
         addToast('Já havia um job equivalente na fila. Reutilizamos o mesmo enfileiramento.', 'info');
       } else {
-        addToast(`Importação enfileirada (${res.status}). Acompanhe o progresso na lista abaixo.`, 'success');
+        addToast(`Job "${jobKindLabel(kind)}" enfileirado (${res.status}). Acompanhe o progresso na lista abaixo.`, 'success');
       }
       if (provider === 'woo') {
         const { error } = await supabase.functions.invoke('marketplaces-sync', {
-          body: { provider: 'woo', action: 'import_orders' },
+          body: { provider: 'woo', action: kind },
         });
         if (error) {
           addToast('Job enfileirado. O worker não iniciou agora; a fila processará na próxima execução.', 'warning');
@@ -774,9 +784,9 @@ export default function MarketplaceIntegrationsPage() {
       await loadProviderJobs(provider, { append: false, offset: 0 });
       await fetchAll();
     } catch (e: any) {
-      addToast(e?.message || 'Falha ao enfileirar importação.', 'error');
+      addToast(e?.message || `Falha ao enfileirar "${jobKindLabel(kind)}".`, 'error');
     } finally {
-      setQueueingImportProvider(null);
+      setQueueingJobKey((prev) => (prev === actionKey ? null : prev));
     }
   };
 
@@ -944,26 +954,56 @@ export default function MarketplaceIntegrationsPage() {
                     <span className="text-xs text-gray-500">{conn?.config?.sync_stock ? 'Ativo' : 'Inativo'}</span>
                   </li>
                   <li className="flex items-center justify-between">
-                    <span>Atualizar rastreio/status</span>
-                    <span className="text-xs text-gray-500">{conn?.config?.push_tracking ? 'Ativo' : 'Inativo'}</span>
+                    <span>{conn?.provider === 'woo' ? 'Sincronizar preços' : 'Atualizar rastreio/status'}</span>
+                    <span className="text-xs text-gray-500">
+                      {conn?.provider === 'woo'
+                        ? ((conn?.config as any)?.sync_prices ? 'Ativo' : 'Inativo')
+                        : (conn?.config?.push_tracking ? 'Ativo' : 'Inativo')}
+                    </span>
                   </li>
                 </ul>
 
-                {conn?.status === 'connected' && conn?.config?.import_orders ? (
+                {conn?.status === 'connected' ? (
                   <div className="mt-4 space-y-3">
                     <div className="flex items-center justify-between gap-2">
-                      <div className="text-xs text-gray-500">Importação assíncrona: você pode enfileirar múltiplas execuções e acompanhar status.</div>
+                      <div className="text-xs text-gray-500">Execuções assíncronas: você pode enfileirar múltiplas operações e acompanhar status.</div>
                       <div className="flex items-center gap-2">
-                        <Button
-                          variant="outline"
-                          className="gap-2"
-                          disabled={!canManage || queueingImportProvider === provider}
-                          onClick={() => void handleImportOrdersNow(provider)}
-                          title={canManage ? 'Enfileirar importação' : 'Sem permissão'}
-                        >
-                          <RefreshCw size={16} />
-                          {queueingImportProvider === provider ? 'Enfileirando…' : 'Nova importação'}
-                        </Button>
+                        {conn?.config?.import_orders ? (
+                          <Button
+                            variant="outline"
+                            className="gap-2"
+                            disabled={!canManage || queueingJobKey === `${provider}:import_orders`}
+                            onClick={() => void handleQueueJobNow(provider, 'import_orders')}
+                            title={canManage ? 'Enfileirar importação de pedidos' : 'Sem permissão'}
+                          >
+                            <RefreshCw size={16} />
+                            {queueingJobKey === `${provider}:import_orders` ? 'Enfileirando…' : 'Importar pedidos'}
+                          </Button>
+                        ) : null}
+                        {provider === 'woo' && conn?.config?.sync_stock ? (
+                          <Button
+                            variant="outline"
+                            className="gap-2"
+                            disabled={!canManage || queueingJobKey === `${provider}:sync_stock`}
+                            onClick={() => void handleQueueJobNow(provider, 'sync_stock')}
+                            title={canManage ? 'Enfileirar sincronização de estoque' : 'Sem permissão'}
+                          >
+                            <RefreshCw size={16} />
+                            {queueingJobKey === `${provider}:sync_stock` ? 'Enfileirando…' : 'Sincronizar estoque'}
+                          </Button>
+                        ) : null}
+                        {provider === 'woo' && (conn?.config as any)?.sync_prices ? (
+                          <Button
+                            variant="outline"
+                            className="gap-2"
+                            disabled={!canManage || queueingJobKey === `${provider}:sync_prices`}
+                            onClick={() => void handleQueueJobNow(provider, 'sync_prices')}
+                            title={canManage ? 'Enfileirar sincronização de preços' : 'Sem permissão'}
+                          >
+                            <RefreshCw size={16} />
+                            {queueingJobKey === `${provider}:sync_prices` ? 'Enfileirando…' : 'Sincronizar preços'}
+                          </Button>
+                        ) : null}
                         <Button
                           variant="ghost"
                           size="sm"
@@ -1004,6 +1044,7 @@ export default function MarketplaceIntegrationsPage() {
                               <div className="flex flex-wrap items-center justify-between gap-2">
                                 <div className="flex items-center gap-2">
                                   {jobStatusBadge(job.status)}
+                                  <span className="text-xs text-gray-600">{jobKindLabel(job.kind)}</span>
                                   <span className="text-xs text-gray-500">{new Date(job.created_at).toLocaleString('pt-BR')}</span>
                                 </div>
                                 <div className="text-xs text-gray-500">
@@ -1400,13 +1441,28 @@ export default function MarketplaceIntegrationsPage() {
 
                 <div className="flex items-center justify-between gap-3">
                   <div>
-                    <div className="text-sm font-medium text-gray-800">Atualizar rastreio/status</div>
-                    <div className="text-xs text-gray-500">Reflete expedição (tracking/status) no canal.</div>
+                    <div className="text-sm font-medium text-gray-800">
+                      {activeConnection.provider === 'woo' ? 'Sincronizar preços' : 'Atualizar rastreio/status'}
+                    </div>
+                    <div className="text-xs text-gray-500">
+                      {activeConnection.provider === 'woo'
+                        ? 'Atualiza preço do WooCommerce pelo preço de venda no Ultria (por SKU).'
+                        : 'Reflete expedição (tracking/status) no canal.'}
+                    </div>
                   </div>
                   <Switch
-                    checked={!!activeConnection.config?.push_tracking}
+                    checked={activeConnection.provider === 'woo'
+                      ? !!(activeConnection.config as any)?.sync_prices
+                      : !!activeConnection.config?.push_tracking}
                     onCheckedChange={(checked) =>
-                      setActiveConnection((prev) => (prev ? { ...prev, config: { ...(prev.config ?? {}), push_tracking: checked } } : prev))
+                      setActiveConnection((prev) => (prev
+                        ? {
+                            ...prev,
+                            config: prev.provider === 'woo'
+                              ? { ...(prev.config ?? {}), sync_prices: checked }
+                              : { ...(prev.config ?? {}), push_tracking: checked },
+                          }
+                        : prev))
                     }
                   />
                 </div>
@@ -1432,9 +1488,9 @@ export default function MarketplaceIntegrationsPage() {
                 </div>
                 {activeConnection.provider === 'woo' ? (
                   <div className="mt-2 rounded-lg bg-gray-50 border border-gray-100 p-3 text-xs text-gray-600">
-                    <div className="font-medium text-gray-800">Em desenvolvimento</div>
+                    <div className="font-medium text-gray-800">Regra para WooCommerce</div>
                     <div className="mt-1">
-                      O mapeamento de produtos para WooCommerce ainda não foi liberado. Assim que estiver pronto, o botão aparecerá aqui.
+                      A sincronização usa SKU como chave. Garanta que o SKU do produto no Ultria seja igual ao SKU do produto no WooCommerce.
                     </div>
                   </div>
                 ) : (
@@ -1485,7 +1541,7 @@ export default function MarketplaceIntegrationsPage() {
       >
         <DialogContent className="max-w-4xl max-h-[85vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Detalhes da importação</DialogTitle>
+            <DialogTitle>Detalhes da execução</DialogTitle>
           </DialogHeader>
           {jobsDetailLoading ? (
             <div className="text-sm text-gray-600">Carregando detalhes…</div>
