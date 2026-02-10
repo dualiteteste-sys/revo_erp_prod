@@ -29,6 +29,7 @@ import ResizableSortableTh, { type SortState } from '@/components/ui/table/Resiz
 import TableColGroup from '@/components/ui/table/TableColGroup';
 import { useTableColumnWidths, type TableColumnWidthDef } from '@/components/ui/table/useTableColumnWidths';
 import { sortRows, toggleSort } from '@/components/ui/table/sortUtils';
+import { failOperation, startOperation, succeedOperation } from '@/lib/operationTelemetry';
 
 type OsStatus = 'orcamento' | 'aberta' | 'concluida' | 'cancelada';
 
@@ -659,8 +660,14 @@ const OsFormPanel: React.FC<OsFormPanelProps> = ({ os, onSaveSuccess, onClose })
   const handleGerarParcelas = async () => {
     if (!formData.id) return;
     setIsGeneratingParcelas(true);
+    const osId = String(formData.id);
+    const parcelasSession = startOperation({
+      domain: 'os',
+      action: 'gerar_parcelas',
+      tenantId: activeEmpresaId ?? null,
+      entityId: osId,
+    });
     try {
-      const osId = String(formData.id);
       await runWithActionLock(`os:parcelas:${osId}`, async () => {
         await generateOsParcelas({
           osId,
@@ -669,9 +676,11 @@ const OsFormPanel: React.FC<OsFormPanelProps> = ({ os, onSaveSuccess, onClose })
           baseDateISO: parcelasBaseDate || null,
         });
       });
+      succeedOperation(parcelasSession, { os_id: osId, condicao: parcelasCondicao || null });
       addToast('Parcelas geradas com sucesso!', 'success');
       await refreshParcelas();
     } catch (e: any) {
+      failOperation(parcelasSession, e, { os_id: osId, condicao: parcelasCondicao || null }, '[OS][PARCELAS][GERAR][ERROR]');
       if (e instanceof ActionLockedError) {
         addToast('Já estamos gerando parcelas desta OS. Aguarde alguns segundos.', 'info');
       } else {
@@ -689,8 +698,17 @@ const OsFormPanel: React.FC<OsFormPanelProps> = ({ os, onSaveSuccess, onClose })
       return;
     }
     setIsGeneratingContasParcelas(true);
+    const osId = String(formData.id);
+    const contasParcelasSession = startOperation(
+      {
+        domain: 'os',
+        action: 'gerar_contas_parcelas',
+        tenantId: activeEmpresaId ?? null,
+        entityId: osId,
+      },
+      { parcelas_total: parcelas.length }
+    );
     try {
-      const osId = String(formData.id);
       const contas = await runWithActionLock(`os:contas_parcelas:${osId}`, async () => {
         return await createContasAReceberFromOsParcelas(osId);
       });
@@ -698,10 +716,12 @@ const OsFormPanel: React.FC<OsFormPanelProps> = ({ os, onSaveSuccess, onClose })
         addToast('Nenhuma conta foi gerada (verifique se há parcelas canceladas).', 'warning');
         return;
       }
+      succeedOperation(contasParcelasSession, { os_id: osId, contas_total: contas.length });
       addToast(`${contas.length} conta(s) a receber gerada(s).`, 'success');
       setParcelasDialogOpen(false);
       navigate(`/app/financeiro/contas-a-receber?contaId=${encodeURIComponent(contas[0].id)}`);
     } catch (e: any) {
+      failOperation(contasParcelasSession, e, { os_id: osId }, '[OS][PARCELAS][CONTAS][ERROR]');
       if (e instanceof ActionLockedError) {
         addToast('Já estamos gerando contas desta OS. Aguarde alguns segundos.', 'info');
       } else {
@@ -715,8 +735,14 @@ const OsFormPanel: React.FC<OsFormPanelProps> = ({ os, onSaveSuccess, onClose })
   const handleCreateConta = async () => {
     if (!formData.id) return;
     setIsCreatingConta(true);
+    const osId = String(formData.id);
+    const createContaSession = startOperation({
+      domain: 'os',
+      action: 'gerar_conta_unica',
+      tenantId: activeEmpresaId ?? null,
+      entityId: osId,
+    });
     try {
-      const osId = String(formData.id);
       const conta = await runWithActionLock(`os:conta_unica:${osId}`, async () => {
         return await createContaAReceberFromOs({
           osId,
@@ -724,10 +750,12 @@ const OsFormPanel: React.FC<OsFormPanelProps> = ({ os, onSaveSuccess, onClose })
         });
       });
       setContaReceberId(conta.id);
+      succeedOperation(createContaSession, { os_id: osId, conta_id: conta.id });
       addToast('Conta a receber gerada com sucesso!', 'success');
       setIsContaDialogOpen(false);
       navigate(`/app/financeiro/contas-a-receber?contaId=${encodeURIComponent(conta.id)}`);
     } catch (e: any) {
+      failOperation(createContaSession, e, { os_id: osId }, '[OS][CONTA][CREATE][ERROR]');
       if (e instanceof ActionLockedError) {
         addToast('Já estamos gerando a conta desta OS. Aguarde alguns segundos.', 'info');
       } else {
@@ -763,6 +791,15 @@ const OsFormPanel: React.FC<OsFormPanelProps> = ({ os, onSaveSuccess, onClose })
     if (!ok) return;
 
     setIsReceivingConta(true);
+    const receberContaSession = startOperation(
+      {
+        domain: 'os',
+        action: 'receber_conta',
+        tenantId: activeEmpresaId ?? null,
+        entityId: formData.id ? String(formData.id) : null,
+      },
+      { conta_id: contaReceberId }
+    );
     try {
       const today = new Date().toISOString().slice(0, 10);
       const updated = await receberContaAReceber({
@@ -771,9 +808,11 @@ const OsFormPanel: React.FC<OsFormPanelProps> = ({ os, onSaveSuccess, onClose })
         valorPago: Number(contaReceber.valor || 0),
       });
       setContaReceber(updated);
+      succeedOperation(receberContaSession, { conta_id: contaReceberId, status: updated.status ?? null });
       addToast('Recebimento registrado com sucesso!', 'success');
       navigate(`/app/financeiro/contas-a-receber?contaId=${encodeURIComponent(contaReceberId)}`);
     } catch (e: any) {
+      failOperation(receberContaSession, e, { conta_id: contaReceberId }, '[OS][CONTA][RECEBER][ERROR]');
       addToast(e?.message || 'Erro ao registrar recebimento.', 'error');
     } finally {
       setIsReceivingConta(false);
@@ -838,11 +877,22 @@ const OsFormPanel: React.FC<OsFormPanelProps> = ({ os, onSaveSuccess, onClose })
       addToast('Você não tem permissão para editar itens.', 'warning');
       return;
     }
+    const removeItemSession = startOperation(
+      {
+        domain: 'os',
+        action: 'remover_item',
+        tenantId: activeEmpresaId ?? null,
+        entityId: formData.id ? String(formData.id) : null,
+      },
+      { item_id: itemId }
+    );
     try {
         await deleteOsItem(itemId);
         if(formData.id) await refreshOsData(formData.id);
+        succeedOperation(removeItemSession, { item_id: itemId });
         addToast('Item removido.', 'success');
     } catch (error: any) {
+        failOperation(removeItemSession, error, { item_id: itemId }, '[OS][ITEM][REMOVE][ERROR]');
         addToast(error.message, 'error');
     }
   };
@@ -930,6 +980,15 @@ const OsFormPanel: React.FC<OsFormPanelProps> = ({ os, onSaveSuccess, onClose })
       return;
     }
     setIsAddingItem(true);
+    const addItemSession = startOperation(
+      {
+        domain: 'os',
+        action: 'adicionar_item',
+        tenantId: activeEmpresaId ?? null,
+        entityId: formData.id ? String(formData.id) : null,
+      },
+      { item_id: item.id, item_type: item.type }
+    );
     try {
       let osToUpdate = formData;
   
@@ -953,9 +1012,10 @@ const OsFormPanel: React.FC<OsFormPanelProps> = ({ os, onSaveSuccess, onClose })
   
       const updatedOs = await getOsDetails(osId);
       setFormData(updatedOs);
-  
+      succeedOperation(addItemSession, { os_id: osId, item_id: item.id, item_type: item.type });
       addToast(`${item.type === 'service' ? 'Serviço' : 'Produto'} adicionado.`, 'success');
     } catch (error: any) {
+      failOperation(addItemSession, error, { item_id: item.id, item_type: item.type }, '[OS][ITEM][ADD][ERROR]');
       addToast(error.message || 'Falha ao adicionar item à Ordem de Serviço.', 'error');
     } finally {
       setIsAddingItem(false);
@@ -973,6 +1033,12 @@ const OsFormPanel: React.FC<OsFormPanelProps> = ({ os, onSaveSuccess, onClose })
     }
 
     setIsSaving(true);
+    const saveSession = startOperation({
+      domain: 'os',
+      action: formData.id ? 'atualizar' : 'criar',
+      tenantId: activeEmpresaId ?? null,
+      entityId: formData.id ? String(formData.id) : null,
+    });
     try {
       const savedOs = await saveOs(formData);
       const desiredTecnicoUserId = (formData as any).tecnico_user_id ?? null;
@@ -986,9 +1052,11 @@ const OsFormPanel: React.FC<OsFormPanelProps> = ({ os, onSaveSuccess, onClose })
       }
 
       const finalOs = await getOsDetails(String(savedOs.id));
+      succeedOperation(saveSession, { os_id: String(savedOs.id), status: finalOs.status ?? null });
       addToast('Ordem de Serviço salva com sucesso!', 'success');
       onSaveSuccess(finalOs);
     } catch (error: any) {
+      failOperation(saveSession, error, { os_id: formData.id ? String(formData.id) : null }, '[OS][SAVE][ERROR]');
       addToast(error.message, 'error');
     } finally {
       setIsSaving(false);
@@ -1024,16 +1092,24 @@ const OsFormPanel: React.FC<OsFormPanelProps> = ({ os, onSaveSuccess, onClose })
       return;
     }
     setOrcamentoSending(true);
+    const osId = String(formData.id);
+    const enviarOrcamentoSession = startOperation({
+      domain: 'os',
+      action: 'enviar_orcamento',
+      tenantId: activeEmpresaId ?? null,
+      entityId: osId,
+    });
     try {
-      const osId = String(formData.id);
       await runWithActionLock(`os:orcamento:send:${osId}`, async () => {
         await enviarOrcamento(osId, orcamentoMensagem.trim() ? orcamentoMensagem.trim() : null);
       });
+      succeedOperation(enviarOrcamentoSession, { os_id: osId });
       addToast('Orçamento marcado como enviado.', 'success');
       setOrcamentoSendDialogOpen(false);
       setOrcamentoMensagem('');
       await refreshOrcamento(osId);
     } catch (e: any) {
+      failOperation(enviarOrcamentoSession, e, { os_id: osId }, '[OS][ORCAMENTO][SEND][ERROR]');
       if (e instanceof ActionLockedError) {
         addToast('Já estamos enviando este orçamento. Aguarde alguns segundos.', 'info');
       } else {
@@ -1061,8 +1137,17 @@ const OsFormPanel: React.FC<OsFormPanelProps> = ({ os, onSaveSuccess, onClose })
       return;
     }
     setOrcamentoDeciding(true);
+    const osId = String(formData.id);
+    const decidirOrcamentoSession = startOperation(
+      {
+        domain: 'os',
+        action: 'decidir_orcamento',
+        tenantId: activeEmpresaId ?? null,
+        entityId: osId,
+      },
+      { decisao: orcamentoDecisao }
+    );
     try {
-      const osId = String(formData.id);
       await runWithActionLock(`os:orcamento:decide:${osId}`, async () => {
         await decidirOrcamento({
           osId,
@@ -1071,10 +1156,12 @@ const OsFormPanel: React.FC<OsFormPanelProps> = ({ os, onSaveSuccess, onClose })
           observacao: orcamentoObservacao.trim() ? orcamentoObservacao.trim() : null,
         });
       });
+      succeedOperation(decidirOrcamentoSession, { os_id: osId, decisao: orcamentoDecisao });
       addToast(orcamentoDecisao === 'approved' ? 'Orçamento aprovado.' : 'Orçamento reprovado.', 'success');
       setOrcamentoDecideDialogOpen(false);
       await refreshOrcamento(osId);
     } catch (e: any) {
+      failOperation(decidirOrcamentoSession, e, { os_id: osId, decisao: orcamentoDecisao }, '[OS][ORCAMENTO][DECIDE][ERROR]');
       if (e instanceof ActionLockedError) {
         addToast('Já estamos registrando uma decisão deste orçamento. Aguarde alguns segundos.', 'info');
       } else {
