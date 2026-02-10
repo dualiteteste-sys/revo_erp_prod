@@ -117,7 +117,7 @@ export const useMovimentacoes = (contaCorrenteId: string | null) => {
     loading: isLoading,
     fetching: isFetching,
     error: isError ? (queryError as Error).message : null,
-    count: data?.count ?? 0,
+    count: data?.count ?? null,
     page,
     pageSize,
     searchTerm,

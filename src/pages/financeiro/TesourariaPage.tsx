@@ -134,6 +134,11 @@ export default function TesourariaPage() {
     endDate: movEndDate, setEndDate: setMovEndDate,
   } = useMovimentacoes(selectedContaId);
 
+  const isMovCountKnown = typeof movCount === 'number' && Number.isFinite(movCount) && movCount >= 0;
+  const movHasNextPage = isMovCountKnown
+    ? movPage * movPageSize < (movCount as number)
+    : movimentacoes.length === movPageSize;
+
   const [isMovFormOpen, setIsMovFormOpen] = useState(false);
   const [isTransferFormOpen, setIsTransferFormOpen] = useState(false);
   const [selectedMov, setSelectedMov] = useState<Movimentacao | null>(null);
@@ -897,30 +902,34 @@ export default function TesourariaPage() {
                         Carregando página...
                       </div>
                     ) : null}
-                    <MovimentacoesTable 
-                        movimentacoes={movimentacoes} 
-                        onEdit={handleEditMov} 
-                        onDelete={setMovToDelete} 
-                    />
+                    <div className="pb-20">
+                      <MovimentacoesTable 
+                          movimentacoes={movimentacoes} 
+                          onEdit={handleEditMov} 
+                          onDelete={setMovToDelete} 
+                      />
+                    </div>
+
+                    {selectedContaId && (movimentacoes.length > 0 || movPage > 1 || fetchingMov) ? (
+                      <ListPaginationBar className="mt-0" innerClassName="px-3 sm:px-4">
+                        <Pagination
+                          currentPage={movPage}
+                          totalCount={isMovCountKnown ? (movCount as number) : null}
+                          itemsOnPage={movimentacoes.length}
+                          hasNextPage={movHasNextPage}
+                          pageSize={movPageSize}
+                          pageSizeOptions={[10, 25, 50, 100]}
+                          onPageChange={setMovPage}
+                          onPageSizeChange={(next) => {
+                            setMovPage(1);
+                            setMovPageSize(next);
+                          }}
+                        />
+                      </ListPaginationBar>
+                    ) : null}
                   </div>
                 )}
             </div>
-
-            {selectedContaId && movCount > 0 ? (
-              <ListPaginationBar sticky={false} className="mt-4" innerClassName="px-3 sm:px-4">
-                <Pagination
-                  currentPage={movPage}
-                  totalCount={movCount}
-                  pageSize={movPageSize}
-                  pageSizeOptions={[10, 25, 50, 100]}
-                  onPageChange={setMovPage}
-                  onPageSizeChange={(next) => {
-                    setMovPage(1);
-                    setMovPageSize(next);
-                  }}
-                />
-              </ListPaginationBar>
-            ) : null}
         </div>
       )}
 
