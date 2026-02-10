@@ -6,6 +6,7 @@ import Modal from '@/components/ui/Modal';
 import ProductFormPanel from '@/components/products/ProductFormPanel';
 import { saveProduct } from '@/services/products';
 import { useToast } from '@/contexts/ToastProvider';
+import { useAuth } from '@/contexts/AuthProvider';
 
 type Props = {
   value: string | null;
@@ -25,6 +26,7 @@ export default function ServiceAutocomplete({
   initialName
 }: Props) {
   const { addToast } = useToast();
+  const { loading: authLoading, activeEmpresaId } = useAuth();
   const [query, setQuery] = useState('');
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -58,6 +60,7 @@ export default function ServiceAutocomplete({
   // Busca serviços
   useEffect(() => {
     const search = async () => {
+      if (authLoading || !activeEmpresaId) return;
       // Não busca se a query for muito curta ou se for igual ao nome inicial (evita busca ao carregar form)
       if (debouncedQuery.length < 2) {
         setResults([]);
@@ -87,7 +90,7 @@ export default function ServiceAutocomplete({
     };
 
     search();
-  }, [debouncedQuery, value, initialName]);
+  }, [debouncedQuery, value, initialName, authLoading, activeEmpresaId]);
 
   const handleSelect = (service: Service) => {
     setQuery(service.descricao);
@@ -97,6 +100,7 @@ export default function ServiceAutocomplete({
   };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (authLoading || !activeEmpresaId) return;
     setQuery(e.target.value);
     if (value) {
       // Se o usuário altera o texto, limpamos a seleção anterior até que ele selecione novamente
@@ -108,7 +112,7 @@ export default function ServiceAutocomplete({
   };
 
   const handleFocus = () => {
-    if (query.length >= 2 && results.length > 0) {
+    if (!authLoading && !!activeEmpresaId && query.length >= 2 && results.length > 0) {
       setOpen(true);
     }
   };
@@ -139,10 +143,10 @@ export default function ServiceAutocomplete({
             value={query}
             onChange={handleInputChange}
             onFocus={handleFocus}
-            disabled={disabled}
+            disabled={disabled || authLoading || !activeEmpresaId}
           />
         </div>
-        {!disabled && (
+        {!disabled && !authLoading && !!activeEmpresaId && (
           <button
             onClick={() => setIsCreateModalOpen(true)}
             className="px-4 py-3 bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200 transition-colors flex-shrink-0 text-sm font-semibold whitespace-nowrap"
