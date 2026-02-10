@@ -9,9 +9,11 @@ function normalizeStoreUrl(input: string): string {
   const raw = (input || "").trim();
   if (!raw) throw new Error("store_url_required");
 
+  const withProtocol = /^https?:\/\//i.test(raw) ? raw : `https://${raw}`;
+
   let url: URL;
   try {
-    url = new URL(raw);
+    url = new URL(withProtocol);
   } catch {
     throw new Error("store_url_invalid");
   }
@@ -116,6 +118,39 @@ Deno.serve(async (req) => {
     const consumerSecret = String((secretRow as any)?.woo_consumer_secret || "");
     const auth = basicAuthHeader(consumerKey, consumerSecret);
 
+    // 1) Detect WordPress (without auth). This avoids confusing "credentials" errors when the URL isn't WP.
+    try {
+      const wpStartedAt = Date.now();
+      const wpRes = await fetch(`${storeUrl}/wp-json/`, {
+        method: "GET",
+        headers: {
+          "Accept": "application/json",
+          "User-Agent": "UltriaERP/woocommerce-test-connection",
+        },
+      });
+      // Some sites may protect wp-json with auth; in that case we still try Woo endpoints below.
+      if (!wpRes.ok && wpRes.status !== 401 && wpRes.status !== 403) {
+        const latencyMs = Date.now() - wpStartedAt;
+        await adminClient.rpc("ecommerce_woo_record_connection_check", {
+          p_ecommerce_id: context.ecommerce_id,
+          p_status: "error",
+          p_error: "WordPress/WooCommerce não detectado na URL informada (wp-json indisponível).",
+          p_http_status: wpRes.status,
+          p_endpoint: "/wp-json/",
+          p_latency_ms: latencyMs,
+        });
+        return errorJson(
+          "wordpress_not_detected",
+          "Não foi possível detectar WordPress/WooCommerce na URL informada. Verifique se a URL está correta e se o site responde em /wp-json/.",
+          cors,
+          400,
+          { status: wpRes.status, endpoint: "/wp-json/" },
+        );
+      }
+    } catch {
+      // Best-effort: if /wp-json/ is blocked by network rules we still try Woo endpoints below.
+    }
+
     // Prefer a lightweight endpoint that doesn't leak data.
     const endpoints = [
       "/wp-json/wc/v3/system_status",
@@ -135,9 +170,8 @@ Deno.serve(async (req) => {
           },
         });
 
-        const text = await res.text();
         if (!res.ok) {
-          lastError = { status: res.status, body: text.slice(0, 800) };
+          lastError = { status: res.status, endpoint: path };
           continue;
         }
 
@@ -170,7 +204,12 @@ Deno.serve(async (req) => {
     }
 
     const finalHttpStatus = typeof (lastError as any)?.status === "number" ? (lastError as any).status : null;
-    const finalMessage = "Não foi possível validar a conexão com o WooCommerce. Verifique URL/credenciais e permissões da chave.";
+    const finalMessage =
+      finalHttpStatus === 401 || finalHttpStatus === 403
+        ? "Credenciais inválidas ou sem permissão. Gere uma Consumer Key/Secret com acesso de leitura (ou leitura/escrita) e tente novamente."
+        : finalHttpStatus === 404
+          ? "WooCommerce não detectado (endpoint da API REST não encontrado). Verifique se o WooCommerce está ativo e se a API REST está habilitada."
+          : "Não foi possível validar a conexão com o WooCommerce. Verifique URL/credenciais e permissões da chave.";
     await adminClient.rpc("ecommerce_woo_record_connection_check", {
       p_ecommerce_id: context.ecommerce_id,
       p_status: "error",

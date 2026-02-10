@@ -147,6 +147,13 @@ export async function setWooConnectionSecrets(params: {
   });
 }
 
+export async function setWooStoreUrl(params: { ecommerceId: string; storeUrl: string }): Promise<{ store_url: string }> {
+  return callRpc<{ store_url: string }>('ecommerce_woo_set_store_url', {
+    p_ecommerce_id: params.ecommerceId,
+    p_store_url: params.storeUrl,
+  });
+}
+
 export function resolveWooConnectionStatus(params: {
   storeUrl?: string | null;
   diagnostics: EcommerceConnectionDiagnostics | null;
