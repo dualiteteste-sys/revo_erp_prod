@@ -26,6 +26,7 @@ export default function ClientAutocomplete({ value, onChange, placeholder, disab
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const { addToast } = useToast();
   const ref = useRef<HTMLDivElement>(null);
+  const searchSeqRef = useRef(0);
 
   const debouncedQuery = useDebounce(query, 300);
 
@@ -51,6 +52,7 @@ export default function ClientAutocomplete({ value, onChange, placeholder, disab
     const search = async () => {
       if (authLoading || !activeEmpresaId) return;
       if (debouncedQuery.length < 2) {
+        searchSeqRef.current += 1;
         setHits([]);
         return;
       }
@@ -60,16 +62,19 @@ export default function ClientAutocomplete({ value, onChange, placeholder, disab
         return;
       }
 
+      const seq = ++searchSeqRef.current;
       setLoading(true);
       try {
         const res = await searchClients(debouncedQuery, 20);
+        if (seq !== searchSeqRef.current) return;
         setHits(res);
         setOpen(true);
       } catch (e) {
+        if (seq !== searchSeqRef.current) return;
         const msg = e instanceof Error ? e.message : String(e);
         logger.warn('[RPC][ERROR] search_clients_for_current_user', { error: msg });
       } finally {
-        setLoading(false);
+        if (seq === searchSeqRef.current) setLoading(false);
       }
     };
     search();
