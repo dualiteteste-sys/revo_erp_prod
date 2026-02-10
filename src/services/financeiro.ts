@@ -40,6 +40,15 @@ export type ContasPagarSummary = {
     vencidas: number;
 };
 
+export type ContasPagarSelectionTotals = {
+  selected_count: number;
+  total_bruto: number;
+  total_pago: number;
+  total_saldo: number;
+  total_vencido: number;
+  total_a_vencer: number;
+};
+
 export type ContaPagarPagamento = {
   id: string;
   data_pagamento: string;
@@ -119,6 +128,40 @@ export async function listContasPagar(options: {
         console.error('[SERVICE][LIST_CONTAS_PAGAR]', error);
         throw new Error(error.message || 'Não foi possível listar as contas a pagar.');
     }
+}
+
+export async function getContasPagarSelectionTotals(params: {
+  mode: 'explicit' | 'all_matching';
+  ids: string[];
+  excludedIds: string[];
+  q: string | null;
+  status: string | null;
+  startDateISO: string | null;
+  endDateISO: string | null;
+}): Promise<ContasPagarSelectionTotals> {
+  try {
+    const data = await callRpc<Partial<ContasPagarSelectionTotals>>('financeiro_contas_pagar_selection_totals', {
+      p_mode: params.mode,
+      p_ids: params.ids.length ? params.ids : null,
+      p_excluded_ids: params.excludedIds.length ? params.excludedIds : null,
+      p_q: params.q || null,
+      p_status: params.status || null,
+      p_start_date: params.startDateISO,
+      p_end_date: params.endDateISO,
+    });
+    return {
+      selected_count: Number(data?.selected_count ?? 0),
+      total_bruto: Number(data?.total_bruto ?? 0),
+      total_pago: Number(data?.total_pago ?? 0),
+      total_saldo: Number(data?.total_saldo ?? 0),
+      total_vencido: Number(data?.total_vencido ?? 0),
+      total_a_vencer: Number(data?.total_a_vencer ?? 0),
+    };
+  } catch (error: unknown) {
+    console.error('[SERVICE][CONTAS_PAGAR_SELECTION_TOTALS]', error);
+    const msg = error instanceof Error ? error.message : null;
+    throw new Error(msg || 'Não foi possível calcular os totais da seleção.');
+  }
 }
 
 export async function getContaPagarDetails(id: string): Promise<ContaPagar> {
