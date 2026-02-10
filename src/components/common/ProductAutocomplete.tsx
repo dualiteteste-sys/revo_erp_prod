@@ -39,6 +39,7 @@ export default function ProductAutocomplete({ value, onChange, placeholder, disa
   const [loading, setLoading] = useState(false);
   const [hits, setHits] = useState<Hit[]>([]);
   const ref = useRef<HTMLDivElement>(null);
+  const searchSeqRef = useRef(0);
 
   const debouncedQuery = useDebounce(query, 250);
 
@@ -62,11 +63,13 @@ export default function ProductAutocomplete({ value, onChange, placeholder, disa
     const search = async () => {
       if (authLoading || !activeEmpresaId) return;
       if (debouncedQuery.length < 2) {
+        searchSeqRef.current += 1;
         setHits([]);
         return;
       }
       if (value) return;
 
+      const seq = ++searchSeqRef.current;
       setLoading(true);
       try {
         const res = await getProducts({
@@ -76,12 +79,14 @@ export default function ProductAutocomplete({ value, onChange, placeholder, disa
           status: 'ativo',
           sortBy: { column: 'nome', ascending: true },
         });
+        if (seq !== searchSeqRef.current) return;
         setHits((res.data || []).map(toHit));
         setOpen(true);
       } catch (error) {
+        if (seq !== searchSeqRef.current) return;
         logger.warn('[ProductAutocomplete] Falha ao buscar produtos', { error });
       } finally {
-        setLoading(false);
+        if (seq === searchSeqRef.current) setLoading(false);
       }
     };
     void search();
