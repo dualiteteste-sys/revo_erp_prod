@@ -66,6 +66,7 @@ export default function SearchFirstSelect({
 
   useEffect(() => {
     if (disabled) {
+      searchSeqRef.current += 1;
       setOpen(false);
       setHits([]);
       setLoading(false);
@@ -116,6 +117,7 @@ export default function SearchFirstSelect({
     const doSearch = async () => {
       const q = debouncedQuery.trim();
       if (q.length < minChars) {
+        searchSeqRef.current += 1;
         setHits([]);
         return;
       }
