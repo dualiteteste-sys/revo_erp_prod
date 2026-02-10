@@ -112,6 +112,7 @@ const OsFormPanel: React.FC<OsFormPanelProps> = ({ os, onSaveSuccess, onClose })
   const [parcelasSort, setParcelasSort] = useState<SortState<string>>({ column: 'numero', direction: 'asc' });
   const lastEmpresaIdRef = useRef<string | null>(activeEmpresaId ?? null);
   const tenantVersionRef = useRef(0);
+  const clientDetailsRequestRef = useRef(0);
   const empresaChanged = lastEmpresaIdRef.current !== (activeEmpresaId ?? null);
 
   const isTenantStale = (tenantVersionSnapshot: number, empresaSnapshot: string | null) => {
@@ -255,16 +256,30 @@ const OsFormPanel: React.FC<OsFormPanelProps> = ({ os, onSaveSuccess, onClose })
   }, [os]);
 
   useEffect(() => {
-    if (formData.cliente_id) {
-      const tenantVersionSnapshot = tenantVersionRef.current;
-      const empresaSnapshot = activeEmpresaId ?? null;
-      getPartnerDetails(String(formData.cliente_id)).then((partner) => {
-        if (isTenantStale(tenantVersionSnapshot, empresaSnapshot)) return;
-        if (partner) setClientDetails(partner);
-      });
-    } else {
+    const clienteId = formData.cliente_id ? String(formData.cliente_id) : null;
+    const requestId = ++clientDetailsRequestRef.current;
+    if (!clienteId) {
       setClientDetails(null);
+      return () => {
+        if (clientDetailsRequestRef.current === requestId) {
+          clientDetailsRequestRef.current += 1;
+        }
+      };
     }
+
+    const tenantVersionSnapshot = tenantVersionRef.current;
+    const empresaSnapshot = activeEmpresaId ?? null;
+    getPartnerDetails(clienteId).then((partner) => {
+      if (clientDetailsRequestRef.current !== requestId) return;
+      if (isTenantStale(tenantVersionSnapshot, empresaSnapshot)) return;
+      setClientDetails(partner ?? null);
+    });
+
+    return () => {
+      if (clientDetailsRequestRef.current === requestId) {
+        clientDetailsRequestRef.current += 1;
+      }
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeEmpresaId, formData.cliente_id]);
 
