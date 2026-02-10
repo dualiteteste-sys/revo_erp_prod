@@ -12,6 +12,7 @@ import { sortRows, toggleSort } from '@/components/ui/table/sortUtils';
 import { openInNewTabBestEffort, shouldIgnoreRowDoubleClickEvent } from '@/components/ui/table/rowDoubleClick';
 import { isPlainLeftClick } from '@/components/ui/links/isPlainLeftClick';
 import { useDeferredAction } from '@/components/ui/hooks/useDeferredAction';
+import { useAuth } from '@/contexts/AuthProvider';
 
 interface Props {
   orders: OrdemIndustria[];
@@ -38,6 +39,7 @@ const formatStatus = (status: string) => {
 export default function OrdensTable({ orders, onEdit, onClone, onChanged }: Props) {
   const { addToast } = useToast();
   const { confirm } = useConfirm();
+  const { loading: authLoading, activeEmpresaId } = useAuth();
   const [menuId, setMenuId] = useState<string | null>(null);
   const { schedule: scheduleEdit, cancel: cancelScheduledEdit } = useDeferredAction(180);
 
@@ -77,6 +79,10 @@ export default function OrdensTable({ orders, onEdit, onClone, onChanged }: Prop
 
   const handleDelete = async (order: OrdemIndustria) => {
     setMenuId(null);
+    if (authLoading || !activeEmpresaId) {
+      addToast('Aguarde a troca de contexto (login/empresa) concluir para excluir.', 'info');
+      return;
+    }
 
     const isOb = order.tipo_ordem === 'beneficiamento';
     const isOp = order.tipo_ordem === 'industrializacao';
