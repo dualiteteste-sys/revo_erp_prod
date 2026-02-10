@@ -27,6 +27,7 @@ export default function SupplierAutocomplete({ value, onChange, placeholder, dis
   const inputRef = useRef<HTMLInputElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const lastErrorToastAt = useRef<number>(0);
+  const searchSeqRef = useRef(0);
 
   const debouncedQuery = useDebounce(query, 300);
 
@@ -83,6 +84,7 @@ export default function SupplierAutocomplete({ value, onChange, placeholder, dis
       if (authLoading || !activeEmpresaId) return;
       const q = debouncedQuery.trim();
       if (q.length < 2) {
+        searchSeqRef.current += 1;
         setHits([]);
         setErrorText(null);
         setOpen(false);
@@ -92,13 +94,16 @@ export default function SupplierAutocomplete({ value, onChange, placeholder, dis
       if (value && query === initialName) return;
       if (value) return;
 
+      const seq = ++searchSeqRef.current;
       setLoading(true);
       setErrorText(null);
       try {
         const res = await searchSuppliers(q);
+        if (seq !== searchSeqRef.current) return;
         setHits(res);
         setOpen(true);
       } catch (e) {
+        if (seq !== searchSeqRef.current) return;
         console.error(e);
         setHits([]);
         setErrorText('Não foi possível buscar fornecedores agora. Tente novamente.');
@@ -109,7 +114,7 @@ export default function SupplierAutocomplete({ value, onChange, placeholder, dis
           addToast('Erro ao buscar fornecedores. Tente novamente.', 'error');
         }
       } finally {
-        setLoading(false);
+        if (seq === searchSeqRef.current) setLoading(false);
       }
     };
     void doSearch();
