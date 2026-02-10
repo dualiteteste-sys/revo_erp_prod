@@ -6,6 +6,7 @@ import Modal from '@/components/ui/Modal';
 import PartnerFormPanel from '@/components/partners/PartnerFormPanel';
 import { useToast } from '@/contexts/ToastProvider';
 import { logger } from '@/lib/logger';
+import { useAuth } from '@/contexts/AuthProvider';
 
 type Props = {
   value: string | null;
@@ -17,6 +18,7 @@ type Props = {
 };
 
 export default function ClientAutocomplete({ value, onChange, placeholder, disabled, className, initialName }: Props) {
+  const { loading: authLoading, activeEmpresaId } = useAuth();
   const [query, setQuery] = useState('');
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -47,6 +49,7 @@ export default function ClientAutocomplete({ value, onChange, placeholder, disab
 
   useEffect(() => {
     const search = async () => {
+      if (authLoading || !activeEmpresaId) return;
       if (debouncedQuery.length < 2) {
         setHits([]);
         return;
@@ -70,7 +73,7 @@ export default function ClientAutocomplete({ value, onChange, placeholder, disab
       }
     };
     search();
-  }, [debouncedQuery, value, initialName]);
+  }, [debouncedQuery, value, initialName, authLoading, activeEmpresaId]);
 
   const handleSelect = (hit: ClientHit) => {
     setQuery(hit.label);
@@ -79,6 +82,7 @@ export default function ClientAutocomplete({ value, onChange, placeholder, disab
   };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (authLoading || !activeEmpresaId) return;
     const newQuery = e.target.value;
     setQuery(newQuery);
     if (value) {
@@ -107,8 +111,8 @@ export default function ClientAutocomplete({ value, onChange, placeholder, disab
           placeholder={placeholder ?? 'Nome/CPF/CNPJ...'}
           value={query}
           onChange={handleInputChange}
-          onFocus={() => { if (query.length >= 2 && hits.length) setOpen(true); }}
-          disabled={disabled}
+          onFocus={() => { if (!authLoading && !!activeEmpresaId && query.length >= 2 && hits.length) setOpen(true); }}
+          disabled={disabled || authLoading || !activeEmpresaId}
         />
         {loading && <div className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-gray-500"><Loader2 className="animate-spin" size={16} /></div>}
 
@@ -141,7 +145,7 @@ export default function ClientAutocomplete({ value, onChange, placeholder, disab
         onClick={() => setIsCreateModalOpen(true)}
         className="flex-shrink-0 px-4 py-3 bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200 transition-colors text-sm font-semibold whitespace-nowrap"
         title="Criar um novo cadastro. Para cliente já cadastrado, digite no campo de busca ao lado."
-        disabled={disabled}
+        disabled={disabled || authLoading || !activeEmpresaId}
       >
         Criar Novo
       </button>
