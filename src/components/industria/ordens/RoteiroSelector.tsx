@@ -4,6 +4,7 @@ import { Loader2, FileText } from 'lucide-react';
 import { useToast } from '@/contexts/ToastProvider';
 import Modal from '@/components/ui/Modal';
 import { logger } from '@/lib/logger';
+import { useAuth } from '@/contexts/AuthProvider';
 
 const labelTipoRoteiro = (tipo?: string | null) => {
   if (tipo === 'beneficiamento') return { label: 'Beneficiamento', className: 'bg-purple-100 text-purple-800' };
@@ -27,8 +28,10 @@ export default function RoteiroSelector({ ordemId, produtoId, tipoBom, disabled,
     const [filterByProduct, setFilterByProduct] = useState(true);
     const [filterByTipo, setFilterByTipo] = useState(false);
     const { addToast } = useToast();
+    const { loading: authLoading, activeEmpresaId } = useAuth();
 
     const loadRoteiros = async () => {
+        if (authLoading || !activeEmpresaId) return;
         setLoading(true);
         try {
             const targetProdutoId = filterByProduct && produtoId ? produtoId : undefined;
@@ -47,9 +50,13 @@ export default function RoteiroSelector({ ordemId, produtoId, tipoBom, disabled,
         if (isOpen) {
             loadRoteiros();
         }
-  }, [isOpen, filterByProduct, filterByTipo, searchTerm]);
+  }, [isOpen, filterByProduct, filterByTipo, searchTerm, authLoading, activeEmpresaId]);
 
     const handleApply = (roteiro: RoteiroListItem) => {
+        if (authLoading || !activeEmpresaId) {
+            addToast('Aguarde a troca de contexto (login/empresa) concluir para selecionar roteiro.', 'info');
+            return;
+        }
         // No confirmation needed inside selector, parent (ProducaoFormPanel) usually handles "Apply" logic via saving header.
         // But consistency with BomSelector suggests we might want one.
         // For Roteiro, typically we just "Pick" it and then "Release" the order.
@@ -64,7 +71,7 @@ export default function RoteiroSelector({ ordemId, produtoId, tipoBom, disabled,
                 className={`flex items-center gap-2 text-sm font-medium px-3 py-2 rounded-lg transition-colors ${
                     disabled ? 'text-gray-400 cursor-not-allowed' : 'text-blue-600 hover:text-blue-800 hover:bg-blue-50'
                 }`}
-                disabled={!produtoId || !!disabled}
+                disabled={!produtoId || !!disabled || authLoading || !activeEmpresaId}
             >
                 <FileText size={16} /> Selecionar Roteiro
             </button>
