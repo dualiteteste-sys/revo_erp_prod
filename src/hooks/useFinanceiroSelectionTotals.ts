@@ -63,13 +63,16 @@ export function useFinanceiroSelectionTotals<T>(params: {
         setState({ loading: false, error: msg || 'Erro ao calcular totais.', data: null });
       }
     },
-    [params]
+    [params.fetcher]
   );
 
   useEffect(() => {
     if (!params.enabled || !normalizedRequest) {
       requestTokenRef.current++;
-      setState({ loading: false, error: null, data: null });
+      setState((prev) => {
+        if (!prev.loading && prev.error === null && prev.data === null) return prev;
+        return { loading: false, error: null, data: null };
+      });
       return;
     }
     if (!debouncedKey) return;
