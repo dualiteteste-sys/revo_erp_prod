@@ -81,7 +81,11 @@ export const useMovimentacoes = (contaCorrenteId: string | null) => {
   const [endDate, setEndDate] = useState<Date | null>(null);
   const [tipoMov, setTipoMov] = useState<'entrada' | 'saida' | null>(null);
   const [page, setPage] = useState(1);
-  const [pageSize] = useState(50);
+  const [pageSize, setPageSize] = useState(50);
+
+  useEffect(() => {
+    setPage(1);
+  }, [contaCorrenteId, debouncedSearchTerm, startDate, endDate, tipoMov]);
 
   useEffect(() => {
     lastEmpresaIdRef.current = empresaId;
@@ -97,7 +101,7 @@ export const useMovimentacoes = (contaCorrenteId: string | null) => {
     pageSize,
   };
 
-  const { data, isLoading, isError, error: queryError, refetch } = useQuery({
+  const { data, isLoading, isFetching, isError, error: queryError, refetch } = useQuery({
     queryKey: TESOURARIA_KEYS.movimentacoes.list({ ...queryOptions, empresaId }),
     queryFn: () => {
       if (!activeEmpresa || !contaCorrenteId) return { data: [], count: 0 };
@@ -111,6 +115,7 @@ export const useMovimentacoes = (contaCorrenteId: string | null) => {
   return {
     movimentacoes: data?.data ?? [],
     loading: isLoading,
+    fetching: isFetching,
     error: isError ? (queryError as Error).message : null,
     count: data?.count ?? 0,
     page,
@@ -120,6 +125,7 @@ export const useMovimentacoes = (contaCorrenteId: string | null) => {
     endDate,
     tipoMov,
     setPage,
+    setPageSize,
     setSearchTerm,
     setStartDate,
     setEndDate,

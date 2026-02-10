@@ -123,7 +123,13 @@ export default function TesourariaPage() {
   const {
     movimentacoes,
     loading: loadingMov,
+    fetching: fetchingMov,
     refresh: refreshMov,
+    count: movCount,
+    page: movPage,
+    pageSize: movPageSize,
+    setPage: setMovPage,
+    setPageSize: setMovPageSize,
     startDate: movStartDate, setStartDate: setMovStartDate,
     endDate: movEndDate, setEndDate: setMovEndDate,
   } = useMovimentacoes(selectedContaId);
@@ -834,8 +840,24 @@ export default function TesourariaPage() {
                 </div>
                 
                 <div className="md:col-span-5 min-w-0 flex flex-wrap gap-3">
-                    <DatePicker label="De" value={movStartDate} onChange={setMovStartDate} className="min-w-[11rem] flex-1" />
-                    <DatePicker label="Até" value={movEndDate} onChange={setMovEndDate} className="min-w-[11rem] flex-1" />
+                    <DatePicker
+                      label="De"
+                      value={movStartDate}
+                      onChange={(d) => {
+                        setMovStartDate(d);
+                        setMovPage(1);
+                      }}
+                      className="min-w-[11rem] flex-1"
+                    />
+                    <DatePicker
+                      label="Até"
+                      value={movEndDate}
+                      onChange={(d) => {
+                        setMovEndDate(d);
+                        setMovPage(1);
+                      }}
+                      className="min-w-[11rem] flex-1"
+                    />
                 </div>
 
                 <div className="md:col-span-3 flex justify-start md:justify-end">
@@ -863,12 +885,18 @@ export default function TesourariaPage() {
                 {!selectedContaId ? (
                     <div className="flex flex-col items-center justify-center h-64 text-gray-500">
                         <Landmark size={48} className="mb-4 opacity-20" />
-                        <p>Selecione uma conta corrente para visualizar o extrato.</p>
+                        <p>Selecione uma conta corrente para visualizar as movimentações.</p>
                     </div>
-                ) : loadingMov ? (
+                ) : loadingMov && movimentacoes.length === 0 ? (
                     <div className="flex justify-center h-64 items-center"><Loader2 className="animate-spin text-blue-600 w-10 h-10" /></div>
                 ) : (
-                  <div className="h-full overflow-auto">
+                  <div className="h-full overflow-auto relative">
+                    {fetchingMov ? (
+                      <div className="absolute right-3 top-3 z-10 inline-flex items-center gap-2 rounded-md border border-blue-100 bg-white/90 px-2 py-1 text-xs text-blue-700 shadow-sm">
+                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                        Carregando página...
+                      </div>
+                    ) : null}
                     <MovimentacoesTable 
                         movimentacoes={movimentacoes} 
                         onEdit={handleEditMov} 
@@ -877,6 +905,22 @@ export default function TesourariaPage() {
                   </div>
                 )}
             </div>
+
+            {selectedContaId && movCount > 0 ? (
+              <ListPaginationBar sticky={false} className="mt-4" innerClassName="px-3 sm:px-4">
+                <Pagination
+                  currentPage={movPage}
+                  totalCount={movCount}
+                  pageSize={movPageSize}
+                  pageSizeOptions={[10, 25, 50, 100]}
+                  onPageChange={setMovPage}
+                  onPageSizeChange={(next) => {
+                    setMovPage(1);
+                    setMovPageSize(next);
+                  }}
+                />
+              </ListPaginationBar>
+            ) : null}
         </div>
       )}
 
