@@ -945,6 +945,7 @@ const OsFormPanel: React.FC<OsFormPanelProps> = ({ os, onSaveSuccess, onClose })
       addToast('Você não tem permissão para anexar arquivos.', 'warning');
       return;
     }
+    if (!canRunTenantMutation()) return;
     const osId = formData.id ? String(formData.id) : null;
     if (!osId) {
       addToast('Salve a O.S. antes de anexar arquivos.', 'warning');
@@ -995,6 +996,7 @@ const OsFormPanel: React.FC<OsFormPanelProps> = ({ os, onSaveSuccess, onClose })
       addToast('Você não tem permissão para excluir anexos.', 'warning');
       return;
     }
+    if (!canRunTenantMutation()) return;
     const ok = await confirm({
       title: 'Excluir anexo',
       description: `Deseja excluir o anexo “${doc.titulo}”?`,
