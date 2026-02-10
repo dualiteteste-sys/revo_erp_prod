@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import Modal from '@/components/ui/Modal';
 import { Button } from '@/components/ui/button';
 import {
@@ -14,6 +14,7 @@ import ResizableSortableTh, { type SortState } from '@/components/ui/table/Resiz
 import TableColGroup from '@/components/ui/table/TableColGroup';
 import { useTableColumnWidths, type TableColumnWidthDef } from '@/components/ui/table/useTableColumnWidths';
 import { sortRows, toggleSort } from '@/components/ui/table/sortUtils';
+import { useAuth } from '@/contexts/AuthProvider';
 
 interface Props {
     operacao: OrdemOperacao | null;
@@ -38,11 +39,15 @@ const statusLabel: Record<StatusInspecaoQA, string> = {
 
 export default function OperacaoQaModal({ operacao, isOpen, onClose, onUpdated, onRequestInspection, refreshToken }: Props) {
     const { addToast } = useToast();
+    const { loading: authLoading, activeEmpresaId } = useAuth();
     const [requireIp, setRequireIp] = useState(false);
     const [requireIf, setRequireIf] = useState(false);
     const [inspecoes, setInspecoes] = useState<RegistroInspecao[]>([]);
     const [loadingInspecoes, setLoadingInspecoes] = useState(false);
+    const [updatingRequirements, setUpdatingRequirements] = useState(false);
     const [inspecoesSort, setInspecoesSort] = useState<SortState<string>>({ column: 'data', direction: 'desc' });
+    const actionTokenRef = useRef(0);
+    const empresaRef = useRef<string | null>(activeEmpresaId);
 
     const inspecoesColumns: TableColumnWidthDef[] = [
         { id: 'tipo', defaultWidth: 120, minWidth: 100 },
@@ -72,45 +77,68 @@ export default function OperacaoQaModal({ operacao, isOpen, onClose, onUpdated, 
     }, [inspecoes, inspecoesSort]);
 
     useEffect(() => {
+        empresaRef.current = activeEmpresaId;
+    }, [activeEmpresaId]);
+
+    useEffect(() => {
         if (operacao && isOpen) {
             setRequireIp(!!operacao.require_ip);
             setRequireIf(!!operacao.require_if);
             loadInspecoes(operacao.id);
         }
-    }, [operacao, isOpen]);
+    }, [operacao, isOpen, authLoading, activeEmpresaId]);
 
     useEffect(() => {
         if (operacao && isOpen) {
             loadInspecoes(operacao.id);
         }
-    }, [refreshToken, operacao, isOpen]);
+    }, [refreshToken, operacao, isOpen, authLoading, activeEmpresaId]);
 
     const loadInspecoes = async (operacaoId: string) => {
+        if (authLoading || !activeEmpresaId) return;
+        const token = ++actionTokenRef.current;
+        const empresaSnapshot = activeEmpresaId;
         setLoadingInspecoes(true);
         try {
             const data = await listarInspecoes(operacaoId);
+            if (token !== actionTokenRef.current || empresaSnapshot !== empresaRef.current) return;
             setInspecoes(data);
         } catch (e: any) {
+            if (token !== actionTokenRef.current || empresaSnapshot !== empresaRef.current) return;
             addToast(e.message, 'error');
         } finally {
+            if (token !== actionTokenRef.current || empresaSnapshot !== empresaRef.current) return;
             setLoadingInspecoes(false);
         }
     };
 
     const handleToggle = async (field: 'IP' | 'IF', value: boolean) => {
         if (!operacao) return;
+        if (authLoading || !activeEmpresaId) {
+            addToast('Aguarde a troca de contexto (login/empresa) concluir para atualizar requisitos.', 'info');
+            return;
+        }
+        if (updatingRequirements) return;
+        const token = ++actionTokenRef.current;
+        const empresaSnapshot = activeEmpresaId;
+        setUpdatingRequirements(true);
         try {
             await setOperacaoQARequirements(
                 operacao.id,
                 field === 'IP' ? value : requireIp,
                 field === 'IF' ? value : requireIf
             );
+            if (token !== actionTokenRef.current || empresaSnapshot !== empresaRef.current) return;
             addToast('Requisito atualizado.', 'success');
             setRequireIp(field === 'IP' ? value : requireIp);
             setRequireIf(field === 'IF' ? value : requireIf);
             onUpdated();
         } catch (e: any) {
+            if (token !== actionTokenRef.current || empresaSnapshot !== empresaRef.current) return;
             addToast(e.message, 'error');
+        } finally {
+            if (token !== actionTokenRef.current || empresaSnapshot !== empresaRef.current) return;
+            setUpdatingRequirements(false);
         }
     };
 
@@ -167,6 +195,7 @@ export default function OperacaoQaModal({ operacao, isOpen, onClose, onUpdated, 
                                     className="sr-only peer"
                                     checked={requireIp}
                                     onChange={(e) => handleToggle('IP', e.target.checked)}
+                                    disabled={authLoading || !activeEmpresaId || updatingRequirements}
                                 />
                                 <span className="w-10 h-5 bg-gray-200 rounded-full peer peer-checked:bg-blue-500 transition-all relative">
                                     <span className={`absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow transform transition ${requireIp ? 'translate-x-5' : ''}`} />
@@ -194,6 +223,7 @@ export default function OperacaoQaModal({ operacao, isOpen, onClose, onUpdated, 
                                     className="sr-only peer"
                                     checked={requireIf}
                                     onChange={(e) => handleToggle('IF', e.target.checked)}
+                                    disabled={authLoading || !activeEmpresaId || updatingRequirements}
                                 />
                                 <span className="w-10 h-5 bg-gray-200 rounded-full peer peer-checked:bg-blue-500 transition-all relative">
                                     <span className={`absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow transform transition ${requireIf ? 'translate-x-5' : ''}`} />
@@ -202,7 +232,7 @@ export default function OperacaoQaModal({ operacao, isOpen, onClose, onUpdated, 
                         </div>
                         {operacao && renderStatus('IF', requireIf, operacao.if_status, operacao.if_last_inspecao)}
                         {requireIf && (
-                            <Button size="sm" className="mt-2" onClick={() => onRequestInspection('IF')}>
+                            <Button size="sm" className="mt-2" onClick={() => onRequestInspection('IF')} disabled={authLoading || !activeEmpresaId || updatingRequirements}>
                                 <ClipboardCheck className="w-4 h-4 mr-2" />
                                 Registrar IF
                             </Button>

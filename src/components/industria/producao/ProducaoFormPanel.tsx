@@ -344,7 +344,17 @@ export default function ProducaoFormPanel({
   };
 
   const handleBomApplied = async (bom: any) => {
+    if (authLoading || !activeEmpresaId || empresaChanged) {
+      addToast('Aguarde a troca de contexto (login/empresa) concluir para aplicar BOM.', 'info');
+      return;
+    }
+    if (!canEdit) {
+      addToast('Você não tem permissão para editar esta ordem.', 'error');
+      return;
+    }
     if (!formData.id) return;
+    const token = ++actionTokenRef.current;
+    const empresaSnapshot = activeEmpresaId;
     try {
       const codigo = bom.codigo || '';
       const descricao = bom.descricao || '';
@@ -353,8 +363,11 @@ export default function ProducaoFormPanel({
         bom_aplicado_id: bom.id,
         bom_aplicado_desc: (codigo || '') + ' - ' + (descricao || '')
       });
+      if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
       await loadDetails(formData.id);
+      if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
     } catch (e: any) {
+      if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
       logger.error('[Indústria][OP] Falha ao salvar referência de BOM no cabeçalho', e, { ordemId: formData.id, bomId: bom?.id });
       addToast('BOM aplicada, mas erro ao salvar referência no cabeçalho.', 'warning');
       await loadDetails(formData.id);
@@ -362,16 +375,29 @@ export default function ProducaoFormPanel({
   };
 
   const handleRoteiroApplied = async (roteiro: any) => {
+    if (authLoading || !activeEmpresaId || empresaChanged) {
+      addToast('Aguarde a troca de contexto (login/empresa) concluir para aplicar roteiro.', 'info');
+      return;
+    }
+    if (!canEdit) {
+      addToast('Você não tem permissão para editar esta ordem.', 'error');
+      return;
+    }
     if (!formData.id) return;
+    const token = ++actionTokenRef.current;
+    const empresaSnapshot = activeEmpresaId;
     try {
       await saveOrdemProducao({
         ...formData,
         roteiro_aplicado_id: roteiro.id,
         roteiro_aplicado_desc: (roteiro.codigo || '') + ' - ' + (roteiro.descricao || '')
       });
+      if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
       await loadDetails(formData.id);
+      if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
       addToast('Roteiro vinculado com sucesso! Libere a OP para gerar as etapas.', 'success');
     } catch (e: any) {
+      if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
       addToast('Erro ao vincular roteiro: ' + e.message, 'error');
     }
   };

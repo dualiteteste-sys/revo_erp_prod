@@ -7,6 +7,7 @@ import Modal from '@/components/ui/Modal';
 import PartnerFormPanel from '@/components/partners/PartnerFormPanel';
 import { useToast } from '@/contexts/ToastProvider';
 import { logger } from '@/lib/logger';
+import { useAuth } from '@/contexts/AuthProvider';
 
 type PartnerHit = { id: string; label: string; nome: string; doc_unico: string | null };
 
@@ -44,6 +45,7 @@ export default function ClienteFornecedorAutocomplete({
   initialName,
   limit = 20,
 }: Props) {
+  const { loading: authLoading, activeEmpresaId } = useAuth();
   const [query, setQuery] = useState('');
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -51,6 +53,7 @@ export default function ClienteFornecedorAutocomplete({
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const { addToast } = useToast();
   const ref = useRef<HTMLDivElement>(null);
+  const searchSeqRef = useRef(0);
 
   const debouncedQuery = useDebounce(query, 300);
 
@@ -74,18 +77,22 @@ export default function ClienteFornecedorAutocomplete({
 
   useEffect(() => {
     const search = async () => {
+      if (authLoading || !activeEmpresaId) return;
       if (debouncedQuery.length < 2) {
+        searchSeqRef.current += 1;
         setHits([]);
         return;
       }
       if (value) return;
 
+      const seq = ++searchSeqRef.current;
       setLoading(true);
       try {
         const [clients, suppliers] = await Promise.all([
           searchClients(debouncedQuery, limit),
           searchSuppliers(debouncedQuery),
         ]);
+        if (seq !== searchSeqRef.current) return;
 
         const merged = uniqueById([
           ...(clients as ClientHit[]).map((h) => ({ id: h.id, label: h.label, nome: h.nome, doc_unico: h.doc_unico })),
@@ -95,14 +102,15 @@ export default function ClienteFornecedorAutocomplete({
         setHits(merged.slice(0, Math.max(1, limit)));
         setOpen(true);
       } catch (e) {
+        if (seq !== searchSeqRef.current) return;
         const msg = e instanceof Error ? e.message : String(e);
         logger.warn('[RPC][ERROR] cliente_fornecedor_autocomplete', { error: msg });
       } finally {
-        setLoading(false);
+        if (seq === searchSeqRef.current) setLoading(false);
       }
     };
     search();
-  }, [debouncedQuery, value, limit]);
+  }, [debouncedQuery, value, limit, authLoading, activeEmpresaId]);
 
   const handleSelect = (hit: PartnerHit) => {
     setQuery(hit.label);
@@ -111,6 +119,7 @@ export default function ClienteFornecedorAutocomplete({
   };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (authLoading || !activeEmpresaId) return;
     const newQuery = e.target.value;
     setQuery(newQuery);
     if (value) onChange(null);
@@ -137,9 +146,9 @@ export default function ClienteFornecedorAutocomplete({
           value={query}
           onChange={handleInputChange}
           onFocus={() => {
-            if (query.length >= 2 && hits.length) setOpen(true);
+            if (!authLoading && !!activeEmpresaId && query.length >= 2 && hits.length) setOpen(true);
           }}
-          disabled={disabled}
+          disabled={disabled || authLoading || !activeEmpresaId}
         />
 
         {loading && (
@@ -178,7 +187,7 @@ export default function ClienteFornecedorAutocomplete({
         onClick={() => setIsCreateModalOpen(true)}
         className="flex-shrink-0 px-4 py-3 bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200 transition-colors text-sm font-semibold whitespace-nowrap"
         title="Criar um novo cadastro. Para registro já cadastrado, digite no campo de busca ao lado."
-        disabled={disabled}
+        disabled={disabled || authLoading || !activeEmpresaId}
       >
         Criar Novo
       </button>
@@ -193,4 +202,3 @@ export default function ClienteFornecedorAutocomplete({
     </div>
   );
 }
-

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { getLotesDisponiveis, reservarEstoque, EstoqueLote } from '@/services/industriaProducao';
@@ -8,6 +8,7 @@ import { logger } from '@/lib/logger';
 import ResizableSortableTh from '@/components/ui/table/ResizableSortableTh';
 import TableColGroup from '@/components/ui/table/TableColGroup';
 import { useTableColumnWidths, type TableColumnWidthDef } from '@/components/ui/table/useTableColumnWidths';
+import { useAuth } from '@/contexts/AuthProvider';
 
 interface ReservaLotesModalProps {
     isOpen: boolean;
@@ -31,6 +32,7 @@ const ReservaLotesModal: React.FC<ReservaLotesModalProps> = ({
     onSuccess
 }) => {
     const { addToast } = useToast();
+    const { loading: authLoading, activeEmpresaId } = useAuth();
     const [loading, setLoading] = useState(false);
     const [submitting, setSubmitting] = useState(false);
     const [lotes, setLotes] = useState<EstoqueLote[]>([]);
@@ -42,23 +44,42 @@ const ReservaLotesModal: React.FC<ReservaLotesModalProps> = ({
         { id: 'reservar', defaultWidth: 200, minWidth: 160 },
     ];
     const { widths, startResize } = useTableColumnWidths({ tableId: `industria:reserva-lotes:${produtoId}`, columns });
+    const lastEmpresaIdRef = useRef<string | null>(activeEmpresaId);
+    const actionTokenRef = useRef(0);
+
+    useEffect(() => {
+        const prevEmpresaId = lastEmpresaIdRef.current;
+        if (prevEmpresaId === activeEmpresaId) return;
+        actionTokenRef.current += 1;
+        setLoading(false);
+        setSubmitting(false);
+        setLotes([]);
+        setSelectedQuantities({});
+        lastEmpresaIdRef.current = activeEmpresaId;
+    }, [activeEmpresaId]);
 
     useEffect(() => {
         if (isOpen && produtoId) {
             loadLotes();
             setSelectedQuantities({});
         }
-    }, [isOpen, produtoId]);
+    }, [isOpen, produtoId, authLoading, activeEmpresaId]);
 
     const loadLotes = async () => {
+        if (authLoading || !activeEmpresaId) return;
+        const token = ++actionTokenRef.current;
+        const empresaSnapshot = activeEmpresaId;
         try {
             setLoading(true);
             const data = await getLotesDisponiveis(produtoId);
+            if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
             setLotes(data);
         } catch (error) {
+            if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
             logger.error('[Indústria][Estoque] Falha ao carregar lotes disponíveis', error, { produtoId });
             addToast('Erro ao carregar lotes disponíveis.', 'error');
         } finally {
+            if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
             setLoading(false);
         }
     };
@@ -105,6 +126,13 @@ const ReservaLotesModal: React.FC<ReservaLotesModalProps> = ({
     };
 
     const handleSubmit = async () => {
+        if (submitting) return;
+        if (authLoading || !activeEmpresaId) {
+            addToast('Aguarde a troca de contexto (login/empresa) concluir para reservar.', 'info');
+            return;
+        }
+        const token = ++actionTokenRef.current;
+        const empresaSnapshot = activeEmpresaId;
         try {
             setSubmitting(true);
             const promises = Object.entries(selectedQuantities).map(([lote, qtd]) =>
@@ -117,13 +145,16 @@ const ReservaLotesModal: React.FC<ReservaLotesModalProps> = ({
             );
 
             await Promise.all(promises);
+            if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
             addToast('Reservas realizadas com sucesso!', 'success');
             onSuccess();
             onClose();
         } catch (error: any) {
+            if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
             logger.error('[Indústria][Estoque] Falha ao reservar lotes', error, { ordemId, componenteId, produtoId });
             addToast('Erro ao realizar reservas: ' + (error.message || 'Erro desconhecido'), 'error');
         } finally {
+            if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
             setSubmitting(false);
         }
     };
@@ -201,8 +232,8 @@ const ReservaLotesModal: React.FC<ReservaLotesModalProps> = ({
                 </div>
 
                 <div className="flex justify-end gap-2 mt-4">
-                    <Button variant="outline" onClick={onClose} disabled={submitting}>Cancelar</Button>
-                    <Button onClick={handleSubmit} disabled={submitting || totalSelected === 0}>
+                    <Button variant="outline" onClick={onClose} disabled={submitting || authLoading || !activeEmpresaId}>Cancelar</Button>
+                    <Button onClick={handleSubmit} disabled={submitting || authLoading || !activeEmpresaId || totalSelected === 0}>
                         {submitting ? <Loader2 className="animate-spin mr-2 h-4 w-4" /> : null}
                         Confirmar Reserva
                     </Button>

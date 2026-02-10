@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import Modal from '@/components/ui/Modal';
 import TextArea from '@/components/ui/forms/TextArea';
 import DecimalInput from '@/components/ui/forms/DecimalInput';
@@ -13,6 +13,7 @@ import {
 } from '@/services/industriaProducao';
 import { useToast } from '@/contexts/ToastProvider';
 import { logger } from '@/lib/logger';
+import { useAuth } from '@/contexts/AuthProvider';
 
 interface Props {
     operacao: OrdemOperacao | null;
@@ -39,8 +40,11 @@ const statusLabels: Record<StatusInspecaoQA, string> = {
 
 export default function RegistrarInspecaoModal({ operacao, tipo, isOpen, onClose, onSuccess }: Props) {
     const { addToast } = useToast();
+    const { loading: authLoading, activeEmpresaId } = useAuth();
     const [loading, setLoading] = useState(false);
     const [motivos, setMotivos] = useState<QualidadeMotivo[]>([]);
+    const actionTokenRef = useRef(0);
+    const empresaRef = useRef<string | null>(activeEmpresaId);
     const [form, setForm] = useState<FormState>({
         quantidade_inspecionada: 0,
         quantidade_aprovada: 0,
@@ -51,7 +55,14 @@ export default function RegistrarInspecaoModal({ operacao, tipo, isOpen, onClose
     });
 
     useEffect(() => {
+        empresaRef.current = activeEmpresaId;
+    }, [activeEmpresaId]);
+
+    useEffect(() => {
         if (!isOpen || !operacao) return;
+        if (authLoading || !activeEmpresaId) return;
+        const token = ++actionTokenRef.current;
+        const empresaSnapshot = activeEmpresaId;
         const defaultQty = Math.max(
             operacao.quantidade_transferida ?? (operacao as any).quantidade_produzida ?? 0,
             0
@@ -65,12 +76,16 @@ export default function RegistrarInspecaoModal({ operacao, tipo, isOpen, onClose
             observacoes: ''
         });
         getMotivosRefugo()
-          .then(setMotivos)
+          .then((rows) => {
+            if (token !== actionTokenRef.current || empresaSnapshot !== empresaRef.current) return;
+            setMotivos(rows);
+          })
           .catch((e: any) => {
+            if (token !== actionTokenRef.current || empresaSnapshot !== empresaRef.current) return;
             logger.error('[Indústria][QA] Falha ao carregar motivos de refugo', e, { operacaoId: operacao.id });
             addToast(e?.message || 'Erro ao carregar motivos de refugo.', 'error');
           });
-    }, [isOpen, operacao]);
+    }, [isOpen, operacao, authLoading, activeEmpresaId, addToast]);
 
     const handleChange = (field: keyof FormState, value: any) => {
         setForm(prev => ({ ...prev, [field]: value }));
@@ -78,6 +93,11 @@ export default function RegistrarInspecaoModal({ operacao, tipo, isOpen, onClose
 
     const handleSubmit = async () => {
         if (!operacao || !tipo) return;
+        if (loading) return;
+        if (authLoading || !activeEmpresaId) {
+            addToast('Aguarde a troca de contexto (login/empresa) concluir para registrar inspeção.', 'info');
+            return;
+        }
 
         if (form.quantidade_inspecionada <= 0) {
             addToast('Informe a quantidade inspecionada.', 'error');
@@ -95,6 +115,8 @@ export default function RegistrarInspecaoModal({ operacao, tipo, isOpen, onClose
         }
 
         setLoading(true);
+        const token = ++actionTokenRef.current;
+        const empresaSnapshot = activeEmpresaId;
         try {
             await registrarInspecao({
                 ordem_id: operacao.ordem_id,
@@ -107,12 +129,15 @@ export default function RegistrarInspecaoModal({ operacao, tipo, isOpen, onClose
                 motivo_refugo_id: form.motivo_refugo_id || undefined,
                 observacoes: form.observacoes
             });
+            if (token !== actionTokenRef.current || empresaSnapshot !== empresaRef.current) return;
             addToast(`Inspeção ${statusLabels[form.resultado]} registrada.`, 'success');
             onSuccess();
             onClose();
         } catch (e: any) {
+            if (token !== actionTokenRef.current || empresaSnapshot !== empresaRef.current) return;
             addToast(e.message, 'error');
         } finally {
+            if (token !== actionTokenRef.current || empresaSnapshot !== empresaRef.current) return;
             setLoading(false);
         }
     };
@@ -205,7 +230,7 @@ export default function RegistrarInspecaoModal({ operacao, tipo, isOpen, onClose
                     <Button variant="ghost" onClick={onClose} disabled={loading}>
                         Cancelar
                     </Button>
-                    <Button onClick={handleSubmit} disabled={loading}>
+                    <Button onClick={handleSubmit} disabled={loading || authLoading || !activeEmpresaId}>
                         {loading ? 'Registrando...' : 'Salvar Inspeção'}
                     </Button>
                 </div>
