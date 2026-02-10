@@ -19,6 +19,7 @@ import {
   setWooConnectionSecrets,
   upsertEcommerceConnection,
   updateEcommerceConnectionConfig,
+  wooHasStoredCredentials,
   type EcommerceHealthSummary,
 } from '@/services/ecommerceIntegrations';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -117,7 +118,9 @@ function wooPendingReason(
   const storeUrl = String(conn.config?.store_url ?? '').trim();
   if (!storeUrl) return 'Falta URL da loja';
   if (wooDiagUnavailable) return 'Não foi possível validar credenciais agora (diagnóstico indisponível)';
-  if (!wooDiag?.has_token) return 'Faltam credenciais (Consumer Key/Secret)';
+  if (!wooHasStoredCredentials(wooDiag)) return 'Faltam credenciais (Consumer Key/Secret)';
+  if (wooDiag?.connection_status === 'error') return wooDiag?.error_message || 'A verificação da conexão falhou';
+  if (wooDiag?.connection_status !== 'connected') return 'Conexão ainda não verificada';
   return null;
 }
 
@@ -481,23 +484,19 @@ export default function MarketplaceIntegrationsPage() {
     setTestingProvider(provider);
     try {
       if (provider === 'woo') {
-        const storeUrl = String(activeConnection.config?.store_url ?? '').trim();
-        if (!storeUrl) {
-          addToast('Informe a URL da loja antes de testar.', 'warning');
+        if (!activeConnection.id) {
+          addToast('Conexão Woo inválida para teste.', 'error');
           return;
         }
-        if (!wooConsumerKey.trim() || !wooConsumerSecret.trim()) {
-          addToast('Informe o Consumer Key/Secret para testar a conexão.', 'warning');
-          return;
-        }
-
         const { data, error } = await supabase.functions.invoke('woocommerce-test-connection', {
-          body: { store_url: storeUrl, consumer_key: wooConsumerKey.trim(), consumer_secret: wooConsumerSecret.trim() },
+          body: { ecommerce_id: activeConnection.id },
         });
         if (error) throw error;
         const ok = (data as any)?.ok === true;
         setDiagnostics((data as any) ?? null);
-        addToast(ok ? 'Conexão WooCommerce OK.' : 'Conexão WooCommerce falhou. Veja os detalhes.', ok ? 'success' : 'error');
+        await refreshWooDiag();
+        await fetchAll();
+        addToast(ok ? 'Conexão WooCommerce validada com credenciais salvas.' : 'Conexão WooCommerce falhou. Veja os detalhes.', ok ? 'success' : 'error');
         return;
       }
 
@@ -564,7 +563,6 @@ export default function MarketplaceIntegrationsPage() {
       if (activeConnection.provider === 'woo') {
         const storeUrl = String(activeConnection.config?.store_url ?? '').trim();
         const diag = await refreshWooDiag();
-        const hasSecrets = diag?.has_token === true;
         const diagUnavailableNow = diag == null;
         const reason = wooPendingReason(
           { ...activeConnection, config: activeConnection.config ?? null },
@@ -574,7 +572,7 @@ export default function MarketplaceIntegrationsPage() {
 
         const nextStatus = resolveWooConnectionStatus({
           storeUrl,
-          hasSecrets,
+          diagnostics: diag ?? null,
           diagnosticsUnavailable: diagUnavailableNow,
           previousStatus: activeConnection.status ?? null,
         });
@@ -631,14 +629,12 @@ export default function MarketplaceIntegrationsPage() {
       setWooConsumerSecret('');
       setWooEditingConsumerKey(false);
       setWooEditingConsumerSecret(false);
-      const diag = await refreshWooDiag();
       const storeUrl = String(activeConnection.config?.store_url ?? '').trim();
-      const diagUnavailableNow = diag == null;
       const nextStatus = resolveWooConnectionStatus({
         storeUrl,
-        hasSecrets: true,
-        diagnosticsUnavailable: diagUnavailableNow,
-        previousStatus: activeConnection.status ?? null,
+        diagnostics: null,
+        diagnosticsUnavailable: false,
+        previousStatus: 'pending',
       });
 
       await upsertEcommerceConnection({
@@ -650,16 +646,8 @@ export default function MarketplaceIntegrationsPage() {
       });
 
       setActiveConnection((prev) => (prev ? { ...prev, status: nextStatus } : prev));
-      if (nextStatus === 'connected') {
-        addToast('Credenciais salvas e integração conectada.', 'success');
-      } else {
-        const reason = wooPendingReason(
-          { ...activeConnection, config: activeConnection.config ?? null },
-          diag ?? null,
-          diagUnavailableNow,
-        );
-        addToast(`Credenciais salvas, mas a integração segue pendente. ${reason ? `Motivo: ${reason}.` : ''}`.trim(), 'warning');
-      }
+      await refreshWooDiag();
+      addToast('Credenciais salvas. Agora clique em “Testar conexão” para validar e marcar como conectado.', 'success');
       await fetchAll();
     } catch (e: any) {
       addToast(e?.message || 'Falha ao salvar credenciais.', 'error');
@@ -874,6 +862,7 @@ export default function MarketplaceIntegrationsPage() {
           const hasConnection = !!conn && !isDisconnected;
           const busy = busyProvider === provider;
           const pendingReason = provider === 'woo' ? wooPendingReason(conn ?? null, wooDiag, wooDiagUnavailable) : null;
+          const wooLastVerification = provider === 'woo' ? (wooDiag?.last_verified_at ?? null) : null;
           return (
             <GlassCard key={provider} className="p-4">
               <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
@@ -889,6 +878,11 @@ export default function MarketplaceIntegrationsPage() {
                     <div className="mt-2 inline-flex items-center gap-2 text-xs text-amber-800 bg-amber-50 border border-amber-100 rounded-lg px-2 py-1">
                       <AlertTriangle size={14} />
                       <span>{pendingReason}</span>
+                    </div>
+                  ) : null}
+                  {provider === 'woo' && wooLastVerification ? (
+                    <div className="mt-2 text-xs text-gray-500">
+                      Última verificação: {new Date(wooLastVerification).toLocaleString('pt-BR')}
                     </div>
                   ) : null}
                   {conn?.last_error ? (
@@ -1148,7 +1142,7 @@ export default function MarketplaceIntegrationsPage() {
                         label={
                           <div className="flex items-center justify-between gap-2">
                             <span>Consumer Key</span>
-                            {wooDiag?.has_token ? (
+                            {wooHasStoredCredentials(wooDiag) ? (
                               <span className="inline-flex items-center rounded-full bg-emerald-100 text-emerald-800 px-2 py-0.5 text-xs font-medium">
                                 Salvo
                               </span>
@@ -1156,13 +1150,13 @@ export default function MarketplaceIntegrationsPage() {
                           </div>
                         }
                         value={
-                          wooDiag?.has_token && !wooConsumerKey && !wooEditingConsumerKey
+                          wooHasStoredCredentials(wooDiag) && !wooConsumerKey && !wooEditingConsumerKey
                             ? WOO_CREDENTIAL_MASK
                             : wooConsumerKey
                         }
-                        placeholder={wooDiag?.has_token && !wooConsumerKey ? 'Salvo (mascarado)' : 'ck_...'}
+                        placeholder={wooHasStoredCredentials(wooDiag) && !wooConsumerKey ? 'Salvo (mascarado)' : 'ck_...'}
                         onFocus={() => {
-                          if (wooDiag?.has_token && !wooConsumerKey && !wooEditingConsumerKey) {
+                          if (wooHasStoredCredentials(wooDiag) && !wooConsumerKey && !wooEditingConsumerKey) {
                             setWooEditingConsumerKey(true);
                             setWooConsumerKey('');
                           }
@@ -1176,7 +1170,7 @@ export default function MarketplaceIntegrationsPage() {
                         }}
                         type="password"
                         helperText={
-                          wooDiag?.has_token && !wooConsumerKey
+                          wooHasStoredCredentials(wooDiag) && !wooConsumerKey
                             ? 'Armazenado com segurança. Para substituir, cole uma nova chave.'
                             : 'Cole a chave gerada no WooCommerce (ck_...).'
                         }
@@ -1185,7 +1179,7 @@ export default function MarketplaceIntegrationsPage() {
                         label={
                           <div className="flex items-center justify-between gap-2">
                             <span>Consumer Secret</span>
-                            {wooDiag?.has_token ? (
+                            {wooHasStoredCredentials(wooDiag) ? (
                               <span className="inline-flex items-center rounded-full bg-emerald-100 text-emerald-800 px-2 py-0.5 text-xs font-medium">
                                 Salvo
                               </span>
@@ -1193,13 +1187,13 @@ export default function MarketplaceIntegrationsPage() {
                           </div>
                         }
                         value={
-                          wooDiag?.has_token && !wooConsumerSecret && !wooEditingConsumerSecret
+                          wooHasStoredCredentials(wooDiag) && !wooConsumerSecret && !wooEditingConsumerSecret
                             ? WOO_CREDENTIAL_MASK
                             : wooConsumerSecret
                         }
-                        placeholder={wooDiag?.has_token && !wooConsumerSecret ? 'Salvo (mascarado)' : 'cs_...'}
+                        placeholder={wooHasStoredCredentials(wooDiag) && !wooConsumerSecret ? 'Salvo (mascarado)' : 'cs_...'}
                         onFocus={() => {
-                          if (wooDiag?.has_token && !wooConsumerSecret && !wooEditingConsumerSecret) {
+                          if (wooHasStoredCredentials(wooDiag) && !wooConsumerSecret && !wooEditingConsumerSecret) {
                             setWooEditingConsumerSecret(true);
                             setWooConsumerSecret('');
                           }
@@ -1213,7 +1207,7 @@ export default function MarketplaceIntegrationsPage() {
                         }}
                         type="password"
                         helperText={
-                          wooDiag?.has_token && !wooConsumerSecret
+                          wooHasStoredCredentials(wooDiag) && !wooConsumerSecret
                             ? 'Armazenado com segurança. Para substituir, cole um novo segredo.'
                             : 'Cole o secret gerado no WooCommerce (cs_...).'
                         }
