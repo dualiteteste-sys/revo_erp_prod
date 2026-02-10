@@ -18,6 +18,8 @@ interface ContaAReceberMobileCardProps {
     onCancel?: (conta: ContaAReceber) => void;
     onReverse?: (conta: ContaAReceber) => void;
     onDelete: (conta: ContaAReceber) => void;
+    selected?: boolean;
+    onToggleSelect?: (id: string) => void;
 }
 
 const statusConfig: Record<string, { label: string; color: string }> = {
@@ -44,6 +46,8 @@ export function ContaAReceberMobileCard({
     onCancel,
     onReverse,
     onDelete,
+    selected,
+    onToggleSelect,
 }: ContaAReceberMobileCardProps): React.ReactElement {
     const status = statusConfig[conta.status] || { label: conta.status, color: 'bg-gray-100 text-gray-700' };
     const canReceive = conta.status === 'pendente' || conta.status === 'vencido' || conta.status === 'parcial';
@@ -52,10 +56,24 @@ export function ContaAReceberMobileCard({
 
     return (
         <motion.div
-            className="bg-white rounded-xl border border-gray-100 p-4 transition-all duration-200 hover:border-gray-200 hover:shadow-sm"
+            className={cn(
+                'bg-white rounded-xl border p-4 transition-all duration-200',
+                selected
+                    ? 'border-blue-500 bg-blue-50/50 shadow-sm'
+                    : 'border-gray-100 hover:border-gray-200 hover:shadow-sm'
+            )}
             whileTap={{ scale: 0.98 }}
         >
             <div className="flex items-start gap-3">
+                {onToggleSelect && (
+                    <input
+                        type="checkbox"
+                        checked={selected}
+                        onChange={() => onToggleSelect(conta.id)}
+                        className="mt-1 h-5 w-5 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                        aria-label={`Selecionar ${conta.descricao || 'conta a receber'}`}
+                    />
+                )}
                 <div className="flex-shrink-0 w-10 h-10 bg-gradient-to-br from-emerald-50 to-green-50 rounded-lg flex items-center justify-center">
                     <DollarSign className="w-5 h-5 text-emerald-500" />
                 </div>

@@ -166,6 +166,48 @@ export async function listContasAReceber(options: {
     }
 }
 
+export type ContasAReceberSelectionTotals = {
+  selected_count: number;
+  total_valor: number;
+  total_recebido: number;
+  total_saldo: number;
+  total_vencido: number;
+  total_a_vencer: number;
+};
+
+export async function getContasAReceberSelectionTotals(params: {
+  mode: 'explicit' | 'all_matching';
+  ids: string[];
+  excludedIds: string[];
+  q: string | null;
+  status: string | null;
+  startDateISO: string | null;
+  endDateISO: string | null;
+}): Promise<ContasAReceberSelectionTotals> {
+  try {
+    const data = await callRpc<Partial<ContasAReceberSelectionTotals>>('financeiro_contas_a_receber_selection_totals', {
+      p_mode: params.mode,
+      p_ids: params.ids.length ? params.ids : null,
+      p_excluded_ids: params.excludedIds.length ? params.excludedIds : null,
+      p_q: params.q || null,
+      p_status: params.status || null,
+      p_start_date: params.startDateISO,
+      p_end_date: params.endDateISO,
+    });
+    return {
+      selected_count: Number(data?.selected_count ?? 0),
+      total_valor: Number(data?.total_valor ?? 0),
+      total_recebido: Number(data?.total_recebido ?? 0),
+      total_saldo: Number(data?.total_saldo ?? 0),
+      total_vencido: Number(data?.total_vencido ?? 0),
+      total_a_vencer: Number(data?.total_a_vencer ?? 0),
+    };
+  } catch (error: unknown) {
+    console.error('[SERVICE][CONTAS_RECEBER_SELECTION_TOTALS]', error);
+    throw new Error(getErrorMessage(error) || 'Não foi possível calcular os totais da seleção.');
+  }
+}
+
 export async function getContaAReceberDetails(id: string): Promise<ContaAReceber> {
     try {
         return await callRpc<ContaAReceber>('get_conta_a_receber_details', { p_id: id });

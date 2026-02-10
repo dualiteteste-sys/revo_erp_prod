@@ -19,6 +19,11 @@ interface ContasAReceberTableProps {
   onDelete: (conta: ContaAReceber) => void;
   sortBy: { column: string; ascending: boolean };
   onSort: (column: string) => void;
+  selectedIds?: Set<string>;
+  allSelected?: boolean;
+  someSelected?: boolean;
+  onToggleSelect?: (id: string) => void;
+  onToggleSelectAll?: () => void;
 }
 
 const statusConfig: Record<string, { label: string; color: string }> = {
@@ -38,6 +43,11 @@ const ContasAReceberTable: React.FC<ContasAReceberTableProps> = ({
   onDelete,
   sortBy,
   onSort,
+  selectedIds,
+  allSelected,
+  someSelected,
+  onToggleSelect,
+  onToggleSelectAll,
 }) => {
   const { schedule: scheduleEdit, cancel: cancelScheduledEdit } = useDeferredAction(180);
 
@@ -58,6 +68,20 @@ const ContasAReceberTable: React.FC<ContasAReceberTableProps> = ({
         <TableColGroup columns={columns} widths={widths} />
         <thead className="bg-gray-50">
           <tr>
+            {onToggleSelect ? (
+              <th scope="col" className="px-4 py-3">
+                <input
+                  type="checkbox"
+                  aria-label="Selecionar todos"
+                  checked={!!allSelected}
+                  ref={(el) => {
+                    if (el) el.indeterminate = !allSelected && !!someSelected;
+                  }}
+                  onChange={() => onToggleSelectAll?.()}
+                  className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-600"
+                />
+              </th>
+            ) : null}
             <ResizableSortableTh columnId="descricao" label="Descrição" sort={sort} onSort={onSort} onResizeStart={startResize} />
             <ResizableSortableTh columnId="cliente_nome" label="Cliente" sort={sort} onSort={onSort} onResizeStart={startResize} />
             <ResizableSortableTh columnId="data_vencimento" label="Vencimento" sort={sort} onSort={onSort} onResizeStart={startResize} />
@@ -77,6 +101,7 @@ const ContasAReceberTable: React.FC<ContasAReceberTableProps> = ({
           <AnimatePresence>
             {contas.map((conta) => {
               const href = `/app/financeiro/contas-a-receber?contaId=${encodeURIComponent(conta.id)}`;
+              const selected = !!selectedIds?.has(conta.id);
               return (
                 <motion.tr
                   key={conta.id}
@@ -85,12 +110,23 @@ const ContasAReceberTable: React.FC<ContasAReceberTableProps> = ({
                   animate={{ opacity: 1 }}
                   exit={{ opacity: 0 }}
                   transition={{ duration: 0.3 }}
-                  className="hover:bg-gray-50"
+                  className={['hover:bg-gray-50', selected ? 'bg-blue-50/70' : ''].join(' ')}
                   onDoubleClick={(e) => {
                     if (shouldIgnoreRowDoubleClickEvent(e)) return;
                     openInNewTabBestEffort(href, () => onEdit(conta));
                   }}
                 >
+                {onToggleSelect ? (
+                  <td className="px-4 py-4 whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
+                    <input
+                      type="checkbox"
+                      aria-label={`Selecionar ${conta.descricao || 'conta'}`}
+                      checked={selected}
+                      onChange={() => onToggleSelect(conta.id)}
+                      className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-600"
+                    />
+                  </td>
+                ) : null}
                 <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
                   <a
                     href={href}
