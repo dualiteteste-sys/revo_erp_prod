@@ -3,6 +3,7 @@ import { listMateriaisCliente, MaterialClienteListItem } from '@/services/indust
 import { useDebounce } from '@/hooks/useDebounce';
 import { Loader2, Search, Package } from 'lucide-react';
 import { logger } from '@/lib/logger';
+import { useAuth } from '@/contexts/AuthProvider';
 
 type Props = {
   clienteId?: string | null;
@@ -23,6 +24,7 @@ export default function MaterialClienteAutocomplete({
   placeholder,
   className 
 }: Props) {
+  const { loading: authLoading, activeEmpresaId } = useAuth();
   const [query, setQuery] = useState('');
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -54,7 +56,7 @@ export default function MaterialClienteAutocomplete({
   // Search effect
   useEffect(() => {
     const search = async () => {
-      if (disabled) return;
+      if (disabled || authLoading || !activeEmpresaId) return;
       
       // Don't search if query matches initial name (avoid search on load)
       if (value && query === initialName) return;
@@ -80,7 +82,7 @@ export default function MaterialClienteAutocomplete({
 
     const timer = setTimeout(search, 300);
     return () => clearTimeout(timer);
-  }, [debouncedQuery, clienteId, disabled, value, initialName]);
+  }, [debouncedQuery, clienteId, disabled, value, initialName, authLoading, activeEmpresaId]);
 
   const handleSelect = (item: MaterialClienteListItem) => {
     setQuery(item.nome_cliente || item.produto_nome);
@@ -89,6 +91,7 @@ export default function MaterialClienteAutocomplete({
   };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (authLoading || !activeEmpresaId) return;
     setQuery(e.target.value);
     if (value) {
       onChange(null); // Clear selection if user types
@@ -97,7 +100,7 @@ export default function MaterialClienteAutocomplete({
   };
 
   const handleFocus = () => {
-    if (!disabled && !open) {
+    if (!disabled && !authLoading && !!activeEmpresaId && !open) {
         // Trigger search on focus to show options if client is selected
         setQuery(prev => prev); 
         setOpen(true);
@@ -117,7 +120,7 @@ export default function MaterialClienteAutocomplete({
           value={query}
           onChange={handleInputChange}
           onFocus={handleFocus}
-          disabled={disabled}
+          disabled={disabled || authLoading || !activeEmpresaId}
         />
       </div>
       

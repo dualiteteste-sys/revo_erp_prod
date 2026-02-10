@@ -5,6 +5,7 @@ import { useToast } from '@/contexts/ToastProvider';
 import Modal from '@/components/ui/Modal';
 import { logger } from '@/lib/logger';
 import { useConfirm } from '@/contexts/ConfirmProvider';
+import { useAuth } from '@/contexts/AuthProvider';
 
 const labelTipoBom = (tipo?: string | null) => {
   if (tipo === 'beneficiamento') return { label: 'Beneficiamento', className: 'bg-purple-100 text-purple-800' };
@@ -38,6 +39,7 @@ export default function BomSelector({ ordemId, produtoId, tipoOrdem, openOnMount
   const [filterByTipo, setFilterByTipo] = useState(false);
   const { addToast } = useToast();
   const { confirm } = useConfirm();
+  const { loading: authLoading, activeEmpresaId } = useAuth();
 
   useEffect(() => {
     setResolvedOrdemId(ordemId);
@@ -50,6 +52,7 @@ export default function BomSelector({ ordemId, produtoId, tipoOrdem, openOnMount
   }, [openOnMount, resolvedOrdemId]);
 
   const ensureOrderBeforeOpen = async () => {
+    if (authLoading || !activeEmpresaId) return null;
     if (resolvedOrdemId) return resolvedOrdemId;
     if (!onEnsureOrder) return null;
     const id = await onEnsureOrder();
@@ -58,6 +61,7 @@ export default function BomSelector({ ordemId, produtoId, tipoOrdem, openOnMount
   };
 
   const loadBoms = async () => {
+    if (authLoading || !activeEmpresaId) return;
     setLoading(true);
     try {
       // Se filterByProduct for true, usa o produtoId recebido via prop.
@@ -76,9 +80,13 @@ export default function BomSelector({ ordemId, produtoId, tipoOrdem, openOnMount
 
   useEffect(() => {
     if (isOpen) loadBoms();
-  }, [isOpen, filterByProduct, filterByTipo, searchTerm]); // Recarrega ao mudar filtros
+  }, [isOpen, filterByProduct, filterByTipo, searchTerm, authLoading, activeEmpresaId]); // Recarrega ao mudar filtros
 
   const handleApply = async (bomId: string, mode: 'substituir' | 'adicionar') => {
+    if (authLoading || !activeEmpresaId) {
+      addToast('Aguarde a troca de contexto (login/empresa) concluir para aplicar BOM.', 'info');
+      return;
+    }
     const ok = await confirm({
       title: 'Aplicar BOM',
       description:
@@ -125,7 +133,7 @@ export default function BomSelector({ ordemId, produtoId, tipoOrdem, openOnMount
         className={`flex items-center gap-2 text-sm font-medium px-3 py-2 rounded-lg transition-colors ${
           disabled ? 'text-gray-400 cursor-not-allowed' : 'text-blue-600 hover:text-blue-800 hover:bg-blue-50'
         }`}
-        disabled={!!disabled || !produtoId}
+        disabled={!!disabled || !produtoId || authLoading || !activeEmpresaId}
       >
         <FileCog size={16} /> Aplicar BOM
       </button>

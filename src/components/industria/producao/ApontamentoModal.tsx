@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import Modal from '../../ui/Modal';
 import { Button } from '../../ui/button';
 import Input from '../../ui/forms/Input';
@@ -21,6 +21,7 @@ import ResizableSortableTh, { type SortState } from '@/components/ui/table/Resiz
 import TableColGroup from '@/components/ui/table/TableColGroup';
 import { useTableColumnWidths, type TableColumnWidthDef } from '@/components/ui/table/useTableColumnWidths';
 import { sortRows, toggleSort } from '@/components/ui/table/sortUtils';
+import { useAuth } from '@/contexts/AuthProvider';
 
 interface Props {
     isOpen: boolean;
@@ -32,6 +33,7 @@ interface Props {
 export default function ApontamentoModal({ isOpen, onClose, operacao, onSuccess }: Props) {
     const { addToast } = useToast();
     const { confirm } = useConfirm();
+    const { loading: authLoading, activeEmpresaId } = useAuth();
     const [loading, setLoading] = useState(false);
     const [qtdBoa, setQtdBoa] = useState(0);
     const [qtdRefugo, setQtdRefugo] = useState(0);
@@ -43,6 +45,8 @@ export default function ApontamentoModal({ isOpen, onClose, operacao, onSuccess 
     const [apontamentos, setApontamentos] = useState<any[]>([]);
     const [apontamentosLoading, setApontamentosLoading] = useState(false);
     const [apontamentosSort, setApontamentosSort] = useState<SortState<string>>({ column: 'data', direction: 'desc' });
+    const actionTokenRef = useRef(0);
+    const empresaRef = useRef<string | null>(activeEmpresaId);
 
     const apontamentosColumns: TableColumnWidthDef[] = [
         { id: 'data', defaultWidth: 220, minWidth: 200 },
@@ -75,24 +79,41 @@ export default function ApontamentoModal({ isOpen, onClose, operacao, onSuccess 
         return Math.max(max - ((operacao as any).quantidade_produzida ?? 0) - operacao.quantidade_refugo, 0);
     }, [operacao]);
 
+    useEffect(() => {
+        empresaRef.current = activeEmpresaId;
+    }, [activeEmpresaId]);
+
     const loadMotivos = () => {
+        if (authLoading || !activeEmpresaId) return;
+        const token = ++actionTokenRef.current;
+        const empresaSnapshot = activeEmpresaId;
         getMotivosRefugo()
-            .then(setMotivosRefugo)
+            .then((rows) => {
+                if (token !== actionTokenRef.current || empresaSnapshot !== empresaRef.current) return;
+                setMotivosRefugo(rows);
+            })
             .catch((err) => {
+                if (token !== actionTokenRef.current || empresaSnapshot !== empresaRef.current) return;
                 logger.error('[Indústria][Produção] Falha ao carregar motivos de refugo', err, { operacaoId: operacao.id });
                 addToast('Erro ao carregar motivos de refugo.', 'error');
             });
     };
 
     const loadApontamentos = async () => {
+        if (authLoading || !activeEmpresaId) return;
+        const token = ++actionTokenRef.current;
+        const empresaSnapshot = activeEmpresaId;
         setApontamentosLoading(true);
         try {
             const data = await listApontamentos(operacao.id);
+            if (token !== actionTokenRef.current || empresaSnapshot !== empresaRef.current) return;
             setApontamentos(data);
         } catch (err: any) {
+            if (token !== actionTokenRef.current || empresaSnapshot !== empresaRef.current) return;
             logger.error('[Indústria][Produção] Falha ao carregar apontamentos', err, { operacaoId: operacao.id });
             addToast(err?.message || 'Erro ao carregar apontamentos.', 'error');
         } finally {
+            if (token !== actionTokenRef.current || empresaSnapshot !== empresaRef.current) return;
             setApontamentosLoading(false);
         }
     };
@@ -106,9 +127,14 @@ export default function ApontamentoModal({ isOpen, onClose, operacao, onSuccess 
             setMotivoRefugoId('');
             setObservacoes('');
         }
-    }, [isOpen]);
+    }, [isOpen, authLoading, activeEmpresaId]);
 
     const handleSave = async () => {
+        if (loading) return;
+        if (authLoading || !activeEmpresaId) {
+            addToast('Aguarde a troca de contexto (login/empresa) concluir para apontar.', 'info');
+            return;
+        }
         if (qtdBoa <= 0 && qtdRefugo <= 0) {
             addToast('Informe uma quantidade boa ou refugo.', 'error');
             return;
@@ -125,6 +151,8 @@ export default function ApontamentoModal({ isOpen, onClose, operacao, onSuccess 
         }
 
         setLoading(true);
+        const token = ++actionTokenRef.current;
+        const empresaSnapshot = activeEmpresaId;
         try {
             // Find description for legacy field
             const motivoDesc = motivosRefugo.find(m => m.id === motivoRefugoId)?.descricao || '';
@@ -138,6 +166,7 @@ export default function ApontamentoModal({ isOpen, onClose, operacao, onSuccess 
                 finalizar,
                 motivoRefugoId
             );
+            if (token !== actionTokenRef.current || empresaSnapshot !== empresaRef.current) return;
             addToast('Apontamento realizado com sucesso!', 'success');
             onSuccess();
             loadApontamentos();
@@ -146,13 +175,19 @@ export default function ApontamentoModal({ isOpen, onClose, operacao, onSuccess 
             setMotivoRefugoId('');
             setObservacoes('');
         } catch (e: any) {
+            if (token !== actionTokenRef.current || empresaSnapshot !== empresaRef.current) return;
             addToast(e.message, 'error');
         } finally {
+            if (token !== actionTokenRef.current || empresaSnapshot !== empresaRef.current) return;
             setLoading(false);
         }
     };
 
     const handleDeleteApontamento = async (id: string) => {
+        if (authLoading || !activeEmpresaId) {
+            addToast('Aguarde a troca de contexto (login/empresa) concluir para excluir.', 'info');
+            return;
+        }
         const ok = await confirm({
             title: 'Excluir apontamento',
             description: 'Tem certeza que deseja excluir este apontamento? Esta ação não pode ser desfeita.',
@@ -161,12 +196,16 @@ export default function ApontamentoModal({ isOpen, onClose, operacao, onSuccess 
             variant: 'danger',
         });
         if (!ok) return;
+        const token = ++actionTokenRef.current;
+        const empresaSnapshot = activeEmpresaId;
         try {
             await deleteApontamento(id);
+            if (token !== actionTokenRef.current || empresaSnapshot !== empresaRef.current) return;
             addToast('Apontamento removido.', 'success');
             loadApontamentos();
             onSuccess();
         } catch (e: any) {
+            if (token !== actionTokenRef.current || empresaSnapshot !== empresaRef.current) return;
             addToast(e.message, 'error');
         }
     };
@@ -261,12 +300,12 @@ export default function ApontamentoModal({ isOpen, onClose, operacao, onSuccess 
                         />
                         Concluir operação após salvar
                     </label>
-                    <Button variant="ghost" onClick={onClose} disabled={loading}>
+                    <Button variant="ghost" onClick={onClose} disabled={loading || authLoading || !activeEmpresaId}>
                         Cancelar
                     </Button>
                     <Button
                         onClick={handleSave}
-                        disabled={loading}
+                        disabled={loading || authLoading || !activeEmpresaId}
                         className="bg-blue-600 hover:bg-blue-700 text-white"
                     >
                         {loading ? 'Salvando...' : 'Confirmar Apontamento'}
@@ -359,6 +398,7 @@ export default function ApontamentoModal({ isOpen, onClose, operacao, onSuccess 
                                             <button
                                                 onClick={() => handleDeleteApontamento(item.id)}
                                                 className="text-red-600 hover:text-red-800 inline-flex items-center gap-1 text-xs"
+                                                disabled={loading || authLoading || !activeEmpresaId}
                                             >
                                                 <Trash2 size={14} /> Excluir
                                             </button>

@@ -12,6 +12,7 @@ import { useConfirm } from '@/contexts/ConfirmProvider';
 import ResizableSortableTh from '@/components/ui/table/ResizableSortableTh';
 import TableColGroup from '@/components/ui/table/TableColGroup';
 import { useTableColumnWidths, type TableColumnWidthDef } from '@/components/ui/table/useTableColumnWidths';
+import { useAuth } from '@/contexts/AuthProvider';
 
 interface Props {
   roteiroId: string;
@@ -26,6 +27,7 @@ import DecimalInput from '@/components/ui/forms/DecimalInput';
 export default function RoteiroEtapasGrid({ roteiroId, etapas, onUpdate, readOnly }: Props) {
   const { addToast } = useToast();
   const { confirm } = useConfirm();
+  const { loading: authLoading, activeEmpresaId } = useAuth();
   const [centros, setCentros] = useState<CentroTrabalho[]>([]);
   const [localEtapas, setLocalEtapas] = useState<RoteiroEtapa[]>(etapas);
   const [isAdding, setIsAdding] = useState(false);
@@ -43,8 +45,9 @@ export default function RoteiroEtapasGrid({ roteiroId, etapas, onUpdate, readOnl
   }, [etapas]);
 
   useEffect(() => {
+    if (authLoading || !activeEmpresaId) return;
     listCentrosTrabalho(undefined, true).then(setCentros);
-  }, []);
+  }, [authLoading, activeEmpresaId]);
 
   const applyDefaultsFromCentro = (centroId: string) => {
     const centro = centros.find((c) => c.id === centroId);
@@ -92,6 +95,10 @@ export default function RoteiroEtapasGrid({ roteiroId, etapas, onUpdate, readOnl
   });
 
   const handleAdd = async () => {
+    if (authLoading || !activeEmpresaId) {
+      addToast('Aguarde a troca de contexto (login/empresa) concluir para adicionar etapa.', 'info');
+      return;
+    }
     if (!newEtapa.centro_trabalho_id) {
       addToast('Selecione um centro de trabalho.', 'error');
       return;
@@ -123,6 +130,10 @@ export default function RoteiroEtapasGrid({ roteiroId, etapas, onUpdate, readOnl
   };
 
   const handleRemove = async (id: string) => {
+    if (authLoading || !activeEmpresaId) {
+      addToast('Aguarde a troca de contexto (login/empresa) concluir para remover etapa.', 'info');
+      return;
+    }
     const ok = await confirm({
       title: 'Remover etapa',
       description: 'Remover esta etapa do roteiro?',
@@ -147,6 +158,7 @@ export default function RoteiroEtapasGrid({ roteiroId, etapas, onUpdate, readOnl
 
   // Persists to server (e.g. onBlur)
   const handlePersist = async (id: string) => {
+    if (authLoading || !activeEmpresaId) return;
     const etapa = localEtapas.find(e => e.id === id);
     if (!etapa) return;
 
@@ -170,6 +182,10 @@ export default function RoteiroEtapasGrid({ roteiroId, etapas, onUpdate, readOnl
 
   // Helper for checkbox which needs immediate persist
   const handleCheckboxUpdate = async (id: string, checked: boolean) => {
+    if (authLoading || !activeEmpresaId) {
+      addToast('Aguarde a troca de contexto (login/empresa) concluir para atualizar etapa.', 'info');
+      return;
+    }
     handleLocalUpdate(id, 'permitir_overlap', checked);
     // Find latest state effectively? No, utilize local update then persist
     // But since setState is async, we can't grab it immediately from localEtapas easily without useEffect or logic.

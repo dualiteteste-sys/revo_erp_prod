@@ -3,6 +3,7 @@ import { Loader2 } from 'lucide-react';
 import { useDebounce } from '@/hooks/useDebounce';
 import { getProducts, type Product } from '@/services/products';
 import { logger } from '@/lib/logger';
+import { useAuth } from '@/contexts/AuthProvider';
 
 type Hit = {
   id: string;
@@ -32,11 +33,13 @@ function toHit(p: Product): Hit {
 }
 
 export default function ProductAutocomplete({ value, onChange, placeholder, disabled, className, initialName }: Props) {
+  const { loading: authLoading, activeEmpresaId } = useAuth();
   const [query, setQuery] = useState('');
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [hits, setHits] = useState<Hit[]>([]);
   const ref = useRef<HTMLDivElement>(null);
+  const searchSeqRef = useRef(0);
 
   const debouncedQuery = useDebounce(query, 250);
 
@@ -58,12 +61,15 @@ export default function ProductAutocomplete({ value, onChange, placeholder, disa
 
   useEffect(() => {
     const search = async () => {
+      if (authLoading || !activeEmpresaId) return;
       if (debouncedQuery.length < 2) {
+        searchSeqRef.current += 1;
         setHits([]);
         return;
       }
       if (value) return;
 
+      const seq = ++searchSeqRef.current;
       setLoading(true);
       try {
         const res = await getProducts({
@@ -73,16 +79,18 @@ export default function ProductAutocomplete({ value, onChange, placeholder, disa
           status: 'ativo',
           sortBy: { column: 'nome', ascending: true },
         });
+        if (seq !== searchSeqRef.current) return;
         setHits((res.data || []).map(toHit));
         setOpen(true);
       } catch (error) {
+        if (seq !== searchSeqRef.current) return;
         logger.warn('[ProductAutocomplete] Falha ao buscar produtos', { error });
       } finally {
-        setLoading(false);
+        if (seq === searchSeqRef.current) setLoading(false);
       }
     };
     void search();
-  }, [debouncedQuery, value]);
+  }, [debouncedQuery, value, authLoading, activeEmpresaId]);
 
   const handleSelect = (hit: Hit) => {
     setQuery(hit.nome);
@@ -91,6 +99,7 @@ export default function ProductAutocomplete({ value, onChange, placeholder, disa
   };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (authLoading || !activeEmpresaId) return;
     const next = e.target.value;
     setQuery(next);
     if (value) onChange(null);
@@ -105,9 +114,9 @@ export default function ProductAutocomplete({ value, onChange, placeholder, disa
           value={query}
           onChange={handleInputChange}
           onFocus={() => {
-            if (query.length >= 2 && hits.length) setOpen(true);
+            if (!authLoading && !!activeEmpresaId && query.length >= 2 && hits.length) setOpen(true);
           }}
-          disabled={disabled}
+          disabled={disabled || authLoading || !activeEmpresaId}
         />
         {loading && (
           <div className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-gray-500">
@@ -148,4 +157,3 @@ export default function ProductAutocomplete({ value, onChange, placeholder, disa
     </div>
   );
 }
-

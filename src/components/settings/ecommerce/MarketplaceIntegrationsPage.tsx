@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Plug, RefreshCw, Settings as SettingsIcon, Unlink, Link2, AlertTriangle } from 'lucide-react';
 
 import PageHeader from '@/components/ui/PageHeader';
@@ -27,9 +27,11 @@ import { listEcommerceProductMappings, upsertEcommerceProductMapping, type Ecomm
 import {
   cancelEcommerceImportJob,
   enqueueEcommerceImportJob,
+  getEcommerceImportJob,
   listEcommerceImportJobs,
   retryEcommerceImportJob,
   type EcommerceImportJob,
+  type EcommerceImportJobDetail,
   type EcommerceImportJobStatus,
 } from '@/services/ecommerceImportJobs';
 import Input from '@/components/ui/forms/Input';
@@ -44,7 +46,9 @@ import { listTabelasPreco } from '@/services/pricing';
 
 type Provider = 'meli' | 'shopee' | 'woo';
 type CatalogProvider = Exclude<Provider, 'woo'>;
+type JobStatusFilter = EcommerceImportJobStatus | 'all';
 const WOO_CREDENTIAL_MASK = '••••••••••••••••';
+const JOBS_PAGE_SIZE = 8;
 
 const providerLabels: Record<Provider, string> = {
   meli: 'Mercado Livre',
@@ -80,6 +84,18 @@ function jobStatusBadge(status: EcommerceImportJobStatus) {
   return <span className={`${base} bg-gray-100 text-gray-700`}>{status}</span>;
 }
 
+function jobStatusFilterOptions() {
+  return [
+    { value: 'all', label: 'Todos' },
+    { value: 'pending', label: 'Na fila' },
+    { value: 'processing', label: 'Processando' },
+    { value: 'done', label: 'Concluído' },
+    { value: 'error', label: 'Falha' },
+    { value: 'dead', label: 'Dead letter' },
+    { value: 'canceled', label: 'Cancelado' },
+  ] as const;
+}
+
 function wooPendingReason(
   conn: EcommerceConnection | null,
   wooDiag: EcommerceConnectionDiagnostics | null,
@@ -113,8 +129,28 @@ export default function MarketplaceIntegrationsPage() {
     shopee: [],
     woo: [],
   });
+  const [jobsHasMoreByProvider, setJobsHasMoreByProvider] = useState<Record<Provider, boolean>>({
+    meli: false,
+    shopee: false,
+    woo: false,
+  });
+  const [jobsOffsetByProvider, setJobsOffsetByProvider] = useState<Record<Provider, number>>({
+    meli: 0,
+    shopee: 0,
+    woo: 0,
+  });
+  const [jobsStatusFilterByProvider, setJobsStatusFilterByProvider] = useState<Record<Provider, JobStatusFilter>>({
+    meli: 'all',
+    shopee: 'all',
+    woo: 'all',
+  });
   const [jobsLoadingProvider, setJobsLoadingProvider] = useState<Provider | null>(null);
   const [jobsActionId, setJobsActionId] = useState<string | null>(null);
+  const [jobsDetailOpen, setJobsDetailOpen] = useState(false);
+  const [jobsDetailLoading, setJobsDetailLoading] = useState(false);
+  const [selectedJobId, setSelectedJobId] = useState<string | null>(null);
+  const [selectedJobDetail, setSelectedJobDetail] = useState<EcommerceImportJobDetail | null>(null);
+  const [selectedJobProvider, setSelectedJobProvider] = useState<Provider | null>(null);
   const [mappingsOpen, setMappingsOpen] = useState(false);
   const [mappingsLoading, setMappingsLoading] = useState(false);
   const [mappingsProvider, setMappingsProvider] = useState<CatalogProvider>('meli');
@@ -132,6 +168,7 @@ export default function MarketplaceIntegrationsPage() {
   const [wooDiagUnavailable, setWooDiagUnavailable] = useState(false);
   const [wooEditingConsumerKey, setWooEditingConsumerKey] = useState(false);
   const [wooEditingConsumerSecret, setWooEditingConsumerSecret] = useState(false);
+  const jobsPollHasActiveRef = useRef(false);
 
   const mappingsColumns: TableColumnWidthDef[] = [
     { id: 'produto', defaultWidth: 320, minWidth: 220 },
@@ -174,30 +211,59 @@ export default function MarketplaceIntegrationsPage() {
   }, [canView]);
 
   const loadProviderJobs = useCallback(
-    async (provider: Provider) => {
-      if (!canView) return;
+    async (
+      provider: Provider,
+      options?: {
+        append?: boolean;
+        offset?: number;
+        status?: JobStatusFilter;
+      },
+    ): Promise<EcommerceImportJob[]> => {
+      if (!canView) return [];
+      const append = options?.append === true;
+      const offset = options?.offset ?? (append ? jobsOffsetByProvider[provider] : 0);
+      const status = options?.status ?? jobsStatusFilterByProvider[provider];
       setJobsLoadingProvider(provider);
       try {
         const jobs = await listEcommerceImportJobs({
           provider,
           kind: 'import_orders',
-          limit: 6,
-          offset: 0,
+          status: status === 'all' ? null : status,
+          limit: JOBS_PAGE_SIZE,
+          offset,
         });
-        setJobsByProvider((prev) => ({ ...prev, [provider]: jobs }));
+        setJobsByProvider((prev) => ({
+          ...prev,
+          [provider]: append ? [...prev[provider], ...jobs] : jobs,
+        }));
+        setJobsHasMoreByProvider((prev) => ({
+          ...prev,
+          [provider]: jobs.length === JOBS_PAGE_SIZE,
+        }));
+        setJobsOffsetByProvider((prev) => ({
+          ...prev,
+          [provider]: append ? offset + jobs.length : jobs.length,
+        }));
+        return jobs;
       } catch {
-        setJobsByProvider((prev) => ({ ...prev, [provider]: [] }));
+        if (!append) {
+          setJobsByProvider((prev) => ({ ...prev, [provider]: [] }));
+          setJobsHasMoreByProvider((prev) => ({ ...prev, [provider]: false }));
+          setJobsOffsetByProvider((prev) => ({ ...prev, [provider]: 0 }));
+        }
+        return [];
       } finally {
         setJobsLoadingProvider((prev) => (prev === provider ? null : prev));
       }
     },
-    [canView],
+    [canView, jobsOffsetByProvider, jobsStatusFilterByProvider],
   );
 
   const loadAllProviderJobs = useCallback(async () => {
     if (!canView) return;
     const providers: Provider[] = ['meli', 'shopee', 'woo'];
-    await Promise.all(providers.map(async (provider) => loadProviderJobs(provider)));
+    const all = await Promise.all(providers.map(async (provider) => loadProviderJobs(provider, { append: false, offset: 0 })));
+    jobsPollHasActiveRef.current = all.flat().some((job) => job.status === 'pending' || job.status === 'processing');
   }, [canView, loadProviderJobs]);
 
   const fetchAll = useCallback(async () => {
@@ -216,6 +282,8 @@ export default function MarketplaceIntegrationsPage() {
       setWooDiag(null);
       setWooDiagUnavailable(false);
       setJobsByProvider({ meli: [], shopee: [], woo: [] });
+      setJobsHasMoreByProvider({ meli: false, shopee: false, woo: false });
+      setJobsOffsetByProvider({ meli: 0, shopee: 0, woo: 0 });
     } finally {
       setLoading(false);
     }
@@ -224,6 +292,33 @@ export default function MarketplaceIntegrationsPage() {
   useEffect(() => {
     void fetchAll();
   }, [fetchAll]);
+
+  useEffect(() => {
+    if (!canView) return;
+    let cancelled = false;
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    let delay = 8000;
+
+    const schedule = () => {
+      timer = setTimeout(async () => {
+        if (cancelled) return;
+        await loadAllProviderJobs();
+        const hasActiveJobs = jobsPollHasActiveRef.current;
+        if (hasActiveJobs) {
+          delay = Math.min(delay * 2, 30000);
+        } else {
+          delay = 30000;
+        }
+        schedule();
+      }, delay);
+    };
+
+    schedule();
+    return () => {
+      cancelled = true;
+      if (timer) clearTimeout(timer);
+    };
+  }, [canView, loadAllProviderJobs]);
 
   useEffect(() => {
     if (!configOpen || !activeConnection) return;
@@ -565,6 +660,37 @@ export default function MarketplaceIntegrationsPage() {
     }
   };
 
+  const handleChangeJobsFilter = async (provider: Provider, status: JobStatusFilter) => {
+    setJobsStatusFilterByProvider((prev) => ({ ...prev, [provider]: status }));
+    setJobsOffsetByProvider((prev) => ({ ...prev, [provider]: 0 }));
+    await loadProviderJobs(provider, { append: false, offset: 0, status });
+  };
+
+  const handleLoadMoreJobs = async (provider: Provider) => {
+    if (jobsLoadingProvider || !jobsHasMoreByProvider[provider]) return;
+    await loadProviderJobs(provider, {
+      append: true,
+      offset: jobsOffsetByProvider[provider],
+      status: jobsStatusFilterByProvider[provider],
+    });
+  };
+
+  const handleOpenJobDetail = async (provider: Provider, jobId: string) => {
+    setSelectedJobId(jobId);
+    setSelectedJobProvider(provider);
+    setSelectedJobDetail(null);
+    setJobsDetailOpen(true);
+    setJobsDetailLoading(true);
+    try {
+      const detail = await getEcommerceImportJob(jobId, { runsLimit: 30, itemsLimit: 300 });
+      setSelectedJobDetail(detail);
+    } catch (e: any) {
+      addToast(e?.message || 'Falha ao carregar detalhes do job.', 'error');
+    } finally {
+      setJobsDetailLoading(false);
+    }
+  };
+
   const handleImportOrdersNow = async (provider: Provider) => {
     if (!canManage) {
       addToast('Sem permissão para gerenciar integrações.', 'warning');
@@ -572,16 +698,28 @@ export default function MarketplaceIntegrationsPage() {
     }
     if (queueingImportProvider) return;
 
+    const runningJob = jobsByProvider[provider].find((job) => job.status === 'pending' || job.status === 'processing');
+    if (runningJob) {
+      addToast('Já existe importação em andamento para este canal. Aguarde finalizar ou cancele o job atual.', 'info');
+      return;
+    }
+
     setQueueingImportProvider(provider);
     try {
+      const knownIds = new Set(jobsByProvider[provider].map((job) => job.id));
+      const dedupeBucket = Math.floor(Date.now() / 10000);
       const res = await enqueueEcommerceImportJob({
         provider,
         kind: 'import_orders',
         payload: {},
-        idempotencyKey: null,
+        idempotencyKey: `manual-ui-import_orders-${provider}-${dedupeBucket}`,
       });
-      addToast(`Importação enfileirada (${res.status}). Acompanhe o progresso na lista abaixo.`, 'success');
-      await loadProviderJobs(provider);
+      if (knownIds.has(res.job_id)) {
+        addToast('Já havia um job equivalente na fila. Reutilizamos o mesmo enfileiramento.', 'info');
+      } else {
+        addToast(`Importação enfileirada (${res.status}). Acompanhe o progresso na lista abaixo.`, 'success');
+      }
+      await loadProviderJobs(provider, { append: false, offset: 0 });
       await fetchAll();
     } catch (e: any) {
       addToast(e?.message || 'Falha ao enfileirar importação.', 'error');
@@ -596,7 +734,10 @@ export default function MarketplaceIntegrationsPage() {
     try {
       const ok = await cancelEcommerceImportJob(jobId);
       addToast(ok ? 'Job cancelado.' : 'Job não pôde ser cancelado (talvez já finalizado).', ok ? 'success' : 'warning');
-      await loadProviderJobs(provider);
+      await loadProviderJobs(provider, { append: false, offset: 0 });
+      if (selectedJobId === jobId) {
+        await handleOpenJobDetail(provider, jobId);
+      }
     } catch (e: any) {
       addToast(e?.message || 'Falha ao cancelar job.', 'error');
     } finally {
@@ -610,7 +751,7 @@ export default function MarketplaceIntegrationsPage() {
     try {
       await retryEcommerceImportJob(jobId, 'manual_retry_from_ui');
       addToast('Reprocessamento enfileirado com sucesso.', 'success');
-      await loadProviderJobs(provider);
+      await loadProviderJobs(provider, { append: false, offset: 0 });
     } catch (e: any) {
       addToast(e?.message || 'Falha ao reprocessar job.', 'error');
     } finally {
@@ -776,11 +917,27 @@ export default function MarketplaceIntegrationsPage() {
                           size="sm"
                           className="gap-2"
                           disabled={jobsLoadingProvider === provider}
-                          onClick={() => void loadProviderJobs(provider)}
+                          onClick={() => void loadProviderJobs(provider, { append: false, offset: 0 })}
                         >
                           Atualizar
                         </Button>
                       </div>
+                    </div>
+
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="text-xs text-gray-500">Filtrar histórico</div>
+                      <select
+                        className="h-8 rounded-md border border-gray-200 bg-white px-2 text-xs text-gray-700"
+                        value={jobsStatusFilterByProvider[provider]}
+                        onChange={(e) => void handleChangeJobsFilter(provider, (e.target.value as JobStatusFilter) || 'all')}
+                        disabled={jobsLoadingProvider === provider}
+                      >
+                        {jobStatusFilterOptions().map((option) => (
+                          <option key={option.value} value={option.value}>
+                            {option.label}
+                          </option>
+                        ))}
+                      </select>
                     </div>
 
                     <div className="rounded-lg border border-gray-100 bg-white/70 p-2">
@@ -807,6 +964,14 @@ export default function MarketplaceIntegrationsPage() {
                                 </div>
                               ) : null}
                               <div className="mt-2 flex items-center gap-2">
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => void handleOpenJobDetail(provider, job.id)}
+                                  disabled={jobsActionId === job.id}
+                                >
+                                  Detalhes
+                                </Button>
                                 {(job.status === 'pending' || job.status === 'processing') && (
                                   <Button
                                     variant="outline"
@@ -832,6 +997,18 @@ export default function MarketplaceIntegrationsPage() {
                           ))}
                         </ul>
                       )}
+                      {jobsHasMoreByProvider[provider] ? (
+                        <div className="pt-2">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => void handleLoadMoreJobs(provider)}
+                            disabled={jobsLoadingProvider === provider}
+                          >
+                            {jobsLoadingProvider === provider ? 'Carregando…' : 'Carregar mais'}
+                          </Button>
+                        </div>
+                      ) : null}
                     </div>
                   </div>
                 ) : null}
@@ -1238,6 +1415,104 @@ export default function MarketplaceIntegrationsPage() {
                   {savingConfig ? 'Salvando…' : 'Salvar'}
                 </Button>
               </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={jobsDetailOpen}
+        onOpenChange={(v) => {
+          setJobsDetailOpen(v);
+          if (!v) {
+            setSelectedJobId(null);
+            setSelectedJobProvider(null);
+            setSelectedJobDetail(null);
+          }
+        }}
+      >
+        <DialogContent className="max-w-4xl max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Detalhes da importação</DialogTitle>
+          </DialogHeader>
+          {jobsDetailLoading ? (
+            <div className="text-sm text-gray-600">Carregando detalhes…</div>
+          ) : !selectedJobDetail || !selectedJobId || !selectedJobProvider ? (
+            <div className="text-sm text-gray-600">Selecione um job para visualizar os detalhes.</div>
+          ) : (
+            <div className="space-y-4">
+              <div className="rounded-lg border border-gray-100 bg-white p-3">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div className="text-sm font-medium text-gray-800">
+                    {providerLabels[selectedJobProvider]} · Job {selectedJobId.slice(0, 8)}
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => void handleOpenJobDetail(selectedJobProvider, selectedJobId)}
+                    disabled={jobsDetailLoading}
+                  >
+                    Atualizar detalhe
+                  </Button>
+                </div>
+                <div className="mt-2 text-xs text-gray-500">
+                  Runs: {selectedJobDetail.runs.length} · Itens: {selectedJobDetail.items.length}
+                </div>
+              </div>
+
+              <GlassCard className="p-3">
+                <div className="text-sm font-medium text-gray-900">Execuções (runs)</div>
+                {selectedJobDetail.runs.length === 0 ? (
+                  <div className="mt-2 text-xs text-gray-500">Sem runs registradas.</div>
+                ) : (
+                  <ul className="mt-2 space-y-2">
+                    {selectedJobDetail.runs.map((run) => (
+                      <li key={run.id} className="rounded border border-gray-100 bg-white px-2 py-2">
+                        <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
+                          <span className={run.ok ? 'text-emerald-700' : 'text-red-700'}>{run.ok ? 'OK' : 'Falha'}</span>
+                          <span className="text-gray-500">
+                            {new Date(run.started_at).toLocaleString('pt-BR')}
+                            {run.finished_at ? ` → ${new Date(run.finished_at).toLocaleString('pt-BR')}` : ''}
+                          </span>
+                        </div>
+                        {run.error ? <div className="mt-1 text-xs text-red-700">{run.error}</div> : null}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </GlassCard>
+
+              <GlassCard className="p-3">
+                <div className="text-sm font-medium text-gray-900">Itens processados</div>
+                {selectedJobDetail.items.length === 0 ? (
+                  <div className="mt-2 text-xs text-gray-500">Sem itens detalhados neste job.</div>
+                ) : (
+                  <div className="mt-2 overflow-x-auto border rounded-lg bg-white">
+                    <table className="min-w-full divide-y divide-gray-200 text-xs">
+                      <thead className="bg-gray-50">
+                        <tr>
+                          <th className="px-2 py-2 text-left font-medium text-gray-600">Status</th>
+                          <th className="px-2 py-2 text-left font-medium text-gray-600">SKU</th>
+                          <th className="px-2 py-2 text-left font-medium text-gray-600">External ID</th>
+                          <th className="px-2 py-2 text-left font-medium text-gray-600">Mensagem</th>
+                          <th className="px-2 py-2 text-left font-medium text-gray-600">Data</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-100">
+                        {selectedJobDetail.items.map((item) => (
+                          <tr key={item.id}>
+                            <td className="px-2 py-2">{item.status}</td>
+                            <td className="px-2 py-2">{item.sku || '—'}</td>
+                            <td className="px-2 py-2">{item.external_id || '—'}</td>
+                            <td className="px-2 py-2">{item.message || '—'}</td>
+                            <td className="px-2 py-2">{new Date(item.created_at).toLocaleString('pt-BR')}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </GlassCard>
             </div>
           )}
         </DialogContent>

@@ -1,9 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { DragDropContext, DropResult } from '@hello-pangea/dnd';
 import { listOrdensProducao, updateStatusProducao, OrdemProducao, StatusProducao } from '@/services/industriaProducao';
 import { useToast } from '@/contexts/ToastProvider';
 import { Loader2 } from 'lucide-react';
 import IndustriaKanbanColumn from '../kanban/IndustriaKanbanColumn';
+import { useAuth } from '@/contexts/AuthProvider';
 
 const COLUMNS: { id: StatusProducao; title: string }[] = [
   { id: 'planejada', title: 'Planejada' },
@@ -25,26 +26,46 @@ type Props = {
 const ProducaoKanbanBoard: React.FC<Props> = ({ search, statusFilter, refreshToken, onOpenOrder, onCloneOrder }) => {
   const [items, setItems] = useState<OrdemProducao[]>([]);
   const [loading, setLoading] = useState(true);
+  const [syncing, setSyncing] = useState(false);
   const { addToast } = useToast();
+  const { loading: authLoading, activeEmpresaId } = useAuth();
+  const lastEmpresaIdRef = useRef<string | null>(activeEmpresaId);
+  const actionTokenRef = useRef(0);
 
   const fetchData = async () => {
+    if (authLoading || !activeEmpresaId) return;
+    const token = ++actionTokenRef.current;
+    const empresaSnapshot = activeEmpresaId;
     setLoading(true);
     try {
       const data = await listOrdensProducao(search, statusFilter || undefined);
+      if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
       setItems(data);
     } catch (error: any) {
+      if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
       addToast('Erro ao carregar o quadro.', 'error');
     } finally {
+      if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
       setLoading(false);
     }
   };
 
   useEffect(() => {
+    const prevEmpresaId = lastEmpresaIdRef.current;
+    if (prevEmpresaId === activeEmpresaId) return;
+    actionTokenRef.current += 1;
+    setSyncing(false);
+    setLoading(false);
+    lastEmpresaIdRef.current = activeEmpresaId;
+  }, [activeEmpresaId]);
+
+  useEffect(() => {
     fetchData();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [search, statusFilter, refreshToken]);
+  }, [search, statusFilter, refreshToken, authLoading, activeEmpresaId]);
 
   const onDragEnd = async (result: DropResult) => {
+    if (syncing || authLoading || !activeEmpresaId) return;
     const { source, destination, draggableId } = result;
 
     if (!destination) return;
@@ -68,16 +89,24 @@ const ProducaoKanbanBoard: React.FC<Props> = ({ search, statusFilter, refreshTok
     );
     setItems(updatedItems);
 
+    const token = ++actionTokenRef.current;
+    const empresaSnapshot = activeEmpresaId;
+    setSyncing(true);
     try {
       await updateStatusProducao(draggableId, newStatus, destination.index);
+      if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
       addToast(`OP movida para ${newStatus.replace(/_/g, ' ')}`, 'success');
     } catch (error: any) {
+      if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
       addToast('Falha ao atualizar status.', 'error');
       fetchData(); // Revert
+    } finally {
+      if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
+      setSyncing(false);
     }
   };
 
-  if (loading) {
+  if (loading || authLoading || !activeEmpresaId) {
     return (
       <div className="flex items-center justify-center h-full">
         <Loader2 className="w-12 h-12 text-blue-500 animate-spin" />

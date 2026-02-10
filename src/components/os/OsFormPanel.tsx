@@ -29,6 +29,7 @@ import ResizableSortableTh, { type SortState } from '@/components/ui/table/Resiz
 import TableColGroup from '@/components/ui/table/TableColGroup';
 import { useTableColumnWidths, type TableColumnWidthDef } from '@/components/ui/table/useTableColumnWidths';
 import { sortRows, toggleSort } from '@/components/ui/table/sortUtils';
+import { failOperation, startOperation, succeedOperation } from '@/lib/operationTelemetry';
 
 type OsStatus = 'orcamento' | 'aberta' | 'concluida' | 'cancelada';
 
@@ -111,10 +112,19 @@ const OsFormPanel: React.FC<OsFormPanelProps> = ({ os, onSaveSuccess, onClose })
   const [parcelasSort, setParcelasSort] = useState<SortState<string>>({ column: 'numero', direction: 'asc' });
   const lastEmpresaIdRef = useRef<string | null>(activeEmpresaId ?? null);
   const tenantVersionRef = useRef(0);
+  const clientDetailsRequestRef = useRef(0);
   const empresaChanged = lastEmpresaIdRef.current !== (activeEmpresaId ?? null);
 
   const isTenantStale = (tenantVersionSnapshot: number, empresaSnapshot: string | null) => {
     return tenantVersionSnapshot !== tenantVersionRef.current || empresaSnapshot !== lastEmpresaIdRef.current;
+  };
+
+  const canRunTenantMutation = () => {
+    if (!activeEmpresaId || authLoading || empresaChanged) {
+      addToast('Aguarde a empresa ativa estabilizar para concluir esta ação.', 'info');
+      return false;
+    }
+    return true;
   };
 
   const commsColumns: TableColumnWidthDef[] = [
@@ -168,6 +178,7 @@ const OsFormPanel: React.FC<OsFormPanelProps> = ({ os, onSaveSuccess, onClose })
   const isClosed = formData.status === 'concluida' || formData.status === 'cancelada';
   const stageReadOnly = isClosed && !permManage.data;
   const readOnly = permLoading || !canEdit || stageReadOnly;
+  const tenantMutationBlocked = !activeEmpresaId || authLoading || empresaChanged;
 
   const descontoProps = useNumericField(formData.desconto_valor, (value) => handleFormChange('desconto_valor', value));
   const custoEstimadoProps = useNumericField((formData as any).custo_estimado, (value) => handleFormChange('custo_estimado' as any, value));
@@ -211,6 +222,7 @@ const OsFormPanel: React.FC<OsFormPanelProps> = ({ os, onSaveSuccess, onClose })
   }, [activeEmpresaId, addToast]);
 
   useEffect(() => {
+    const requestId = ++clientDetailsRequestRef.current;
     if (os) {
       setFormData(os);
       setNovoAnexo('');
@@ -221,11 +233,17 @@ const OsFormPanel: React.FC<OsFormPanelProps> = ({ os, onSaveSuccess, onClose })
       setContaReceberId(null);
       setContaVencimento('');
       if (os.cliente_id) {
+        const tenantVersionSnapshot = tenantVersionRef.current;
+        const empresaSnapshot = activeEmpresaId ?? null;
         getPartnerDetails(os.cliente_id).then(partner => {
+          if (clientDetailsRequestRef.current !== requestId) return;
+          if (isTenantStale(tenantVersionSnapshot, empresaSnapshot)) return;
           if (partner) {
             setClientName(partner.nome);
             setClientDetails(partner);
+            return;
           }
+          setClientDetails(null);
         });
       } else {
         setClientName('');
@@ -243,19 +261,38 @@ const OsFormPanel: React.FC<OsFormPanelProps> = ({ os, onSaveSuccess, onClose })
       setContaReceberId(null);
       setContaVencimento('');
     }
-  }, [os]);
+    return () => {
+      if (clientDetailsRequestRef.current === requestId) {
+        clientDetailsRequestRef.current += 1;
+      }
+    };
+  }, [activeEmpresaId, os]);
 
   useEffect(() => {
-    if (formData.cliente_id) {
-      const tenantVersionSnapshot = tenantVersionRef.current;
-      const empresaSnapshot = activeEmpresaId ?? null;
-      getPartnerDetails(String(formData.cliente_id)).then((partner) => {
-        if (isTenantStale(tenantVersionSnapshot, empresaSnapshot)) return;
-        if (partner) setClientDetails(partner);
-      });
-    } else {
+    const clienteId = formData.cliente_id ? String(formData.cliente_id) : null;
+    const requestId = ++clientDetailsRequestRef.current;
+    if (!clienteId) {
       setClientDetails(null);
+      return () => {
+        if (clientDetailsRequestRef.current === requestId) {
+          clientDetailsRequestRef.current += 1;
+        }
+      };
     }
+
+    const tenantVersionSnapshot = tenantVersionRef.current;
+    const empresaSnapshot = activeEmpresaId ?? null;
+    getPartnerDetails(clienteId).then((partner) => {
+      if (clientDetailsRequestRef.current !== requestId) return;
+      if (isTenantStale(tenantVersionSnapshot, empresaSnapshot)) return;
+      setClientDetails(partner ?? null);
+    });
+
+    return () => {
+      if (clientDetailsRequestRef.current === requestId) {
+        clientDetailsRequestRef.current += 1;
+      }
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeEmpresaId, formData.cliente_id]);
 
@@ -349,6 +386,7 @@ const OsFormPanel: React.FC<OsFormPanelProps> = ({ os, onSaveSuccess, onClose })
 
   const handleGeneratePortalLink = async () => {
     if (!formData.id) return;
+    if (!canRunTenantMutation()) return;
     setPortalGenerating(true);
     try {
       const osId = String(formData.id);
@@ -378,6 +416,7 @@ const OsFormPanel: React.FC<OsFormPanelProps> = ({ os, onSaveSuccess, onClose })
 
   const handleRegisterComms = async () => {
     if (!formData.id) return;
+    if (!canRunTenantMutation()) return;
     if (!commsPreview.trim()) {
       addToast('Selecione um template para registrar.', 'warning');
       return;
@@ -658,9 +697,16 @@ const OsFormPanel: React.FC<OsFormPanelProps> = ({ os, onSaveSuccess, onClose })
 
   const handleGerarParcelas = async () => {
     if (!formData.id) return;
+    if (!canRunTenantMutation()) return;
     setIsGeneratingParcelas(true);
+    const osId = String(formData.id);
+    const parcelasSession = startOperation({
+      domain: 'os',
+      action: 'gerar_parcelas',
+      tenantId: activeEmpresaId ?? null,
+      entityId: osId,
+    });
     try {
-      const osId = String(formData.id);
       await runWithActionLock(`os:parcelas:${osId}`, async () => {
         await generateOsParcelas({
           osId,
@@ -669,9 +715,11 @@ const OsFormPanel: React.FC<OsFormPanelProps> = ({ os, onSaveSuccess, onClose })
           baseDateISO: parcelasBaseDate || null,
         });
       });
+      succeedOperation(parcelasSession, { os_id: osId, condicao: parcelasCondicao || null });
       addToast('Parcelas geradas com sucesso!', 'success');
       await refreshParcelas();
     } catch (e: any) {
+      failOperation(parcelasSession, e, { os_id: osId, condicao: parcelasCondicao || null }, '[OS][PARCELAS][GERAR][ERROR]');
       if (e instanceof ActionLockedError) {
         addToast('Já estamos gerando parcelas desta OS. Aguarde alguns segundos.', 'info');
       } else {
@@ -684,13 +732,23 @@ const OsFormPanel: React.FC<OsFormPanelProps> = ({ os, onSaveSuccess, onClose })
 
   const handleGerarContasPorParcelas = async () => {
     if (!formData.id) return;
+    if (!canRunTenantMutation()) return;
     if (parcelas.length === 0) {
       addToast('Gere as parcelas antes (ou use “Gerar Conta a Receber” para conta única).', 'warning');
       return;
     }
     setIsGeneratingContasParcelas(true);
+    const osId = String(formData.id);
+    const contasParcelasSession = startOperation(
+      {
+        domain: 'os',
+        action: 'gerar_contas_parcelas',
+        tenantId: activeEmpresaId ?? null,
+        entityId: osId,
+      },
+      { parcelas_total: parcelas.length }
+    );
     try {
-      const osId = String(formData.id);
       const contas = await runWithActionLock(`os:contas_parcelas:${osId}`, async () => {
         return await createContasAReceberFromOsParcelas(osId);
       });
@@ -698,10 +756,12 @@ const OsFormPanel: React.FC<OsFormPanelProps> = ({ os, onSaveSuccess, onClose })
         addToast('Nenhuma conta foi gerada (verifique se há parcelas canceladas).', 'warning');
         return;
       }
+      succeedOperation(contasParcelasSession, { os_id: osId, contas_total: contas.length });
       addToast(`${contas.length} conta(s) a receber gerada(s).`, 'success');
       setParcelasDialogOpen(false);
       navigate(`/app/financeiro/contas-a-receber?contaId=${encodeURIComponent(contas[0].id)}`);
     } catch (e: any) {
+      failOperation(contasParcelasSession, e, { os_id: osId }, '[OS][PARCELAS][CONTAS][ERROR]');
       if (e instanceof ActionLockedError) {
         addToast('Já estamos gerando contas desta OS. Aguarde alguns segundos.', 'info');
       } else {
@@ -714,9 +774,16 @@ const OsFormPanel: React.FC<OsFormPanelProps> = ({ os, onSaveSuccess, onClose })
 
   const handleCreateConta = async () => {
     if (!formData.id) return;
+    if (!canRunTenantMutation()) return;
     setIsCreatingConta(true);
+    const osId = String(formData.id);
+    const createContaSession = startOperation({
+      domain: 'os',
+      action: 'gerar_conta_unica',
+      tenantId: activeEmpresaId ?? null,
+      entityId: osId,
+    });
     try {
-      const osId = String(formData.id);
       const conta = await runWithActionLock(`os:conta_unica:${osId}`, async () => {
         return await createContaAReceberFromOs({
           osId,
@@ -724,10 +791,12 @@ const OsFormPanel: React.FC<OsFormPanelProps> = ({ os, onSaveSuccess, onClose })
         });
       });
       setContaReceberId(conta.id);
+      succeedOperation(createContaSession, { os_id: osId, conta_id: conta.id });
       addToast('Conta a receber gerada com sucesso!', 'success');
       setIsContaDialogOpen(false);
       navigate(`/app/financeiro/contas-a-receber?contaId=${encodeURIComponent(conta.id)}`);
     } catch (e: any) {
+      failOperation(createContaSession, e, { os_id: osId }, '[OS][CONTA][CREATE][ERROR]');
       if (e instanceof ActionLockedError) {
         addToast('Já estamos gerando a conta desta OS. Aguarde alguns segundos.', 'info');
       } else {
@@ -745,6 +814,7 @@ const OsFormPanel: React.FC<OsFormPanelProps> = ({ os, onSaveSuccess, onClose })
 
   const handleReceberContaAgora = async () => {
     if (!contaReceberId || !contaReceber) return;
+    if (!canRunTenantMutation()) return;
     if (contaReceber.status === 'pago' || contaReceber.status === 'cancelado') {
       handleOpenConta();
       return;
@@ -763,6 +833,15 @@ const OsFormPanel: React.FC<OsFormPanelProps> = ({ os, onSaveSuccess, onClose })
     if (!ok) return;
 
     setIsReceivingConta(true);
+    const receberContaSession = startOperation(
+      {
+        domain: 'os',
+        action: 'receber_conta',
+        tenantId: activeEmpresaId ?? null,
+        entityId: formData.id ? String(formData.id) : null,
+      },
+      { conta_id: contaReceberId }
+    );
     try {
       const today = new Date().toISOString().slice(0, 10);
       const updated = await receberContaAReceber({
@@ -771,9 +850,11 @@ const OsFormPanel: React.FC<OsFormPanelProps> = ({ os, onSaveSuccess, onClose })
         valorPago: Number(contaReceber.valor || 0),
       });
       setContaReceber(updated);
+      succeedOperation(receberContaSession, { conta_id: contaReceberId, status: updated.status ?? null });
       addToast('Recebimento registrado com sucesso!', 'success');
       navigate(`/app/financeiro/contas-a-receber?contaId=${encodeURIComponent(contaReceberId)}`);
     } catch (e: any) {
+      failOperation(receberContaSession, e, { conta_id: contaReceberId }, '[OS][CONTA][RECEBER][ERROR]');
       addToast(e?.message || 'Erro ao registrar recebimento.', 'error');
     } finally {
       setIsReceivingConta(false);
@@ -838,11 +919,23 @@ const OsFormPanel: React.FC<OsFormPanelProps> = ({ os, onSaveSuccess, onClose })
       addToast('Você não tem permissão para editar itens.', 'warning');
       return;
     }
+    if (!canRunTenantMutation()) return;
+    const removeItemSession = startOperation(
+      {
+        domain: 'os',
+        action: 'remover_item',
+        tenantId: activeEmpresaId ?? null,
+        entityId: formData.id ? String(formData.id) : null,
+      },
+      { item_id: itemId }
+    );
     try {
         await deleteOsItem(itemId);
         if(formData.id) await refreshOsData(formData.id);
+        succeedOperation(removeItemSession, { item_id: itemId });
         addToast('Item removido.', 'success');
     } catch (error: any) {
+        failOperation(removeItemSession, error, { item_id: itemId }, '[OS][ITEM][REMOVE][ERROR]');
         addToast(error.message, 'error');
     }
   };
@@ -852,6 +945,7 @@ const OsFormPanel: React.FC<OsFormPanelProps> = ({ os, onSaveSuccess, onClose })
       addToast('Você não tem permissão para anexar arquivos.', 'warning');
       return;
     }
+    if (!canRunTenantMutation()) return;
     const osId = formData.id ? String(formData.id) : null;
     if (!osId) {
       addToast('Salve a O.S. antes de anexar arquivos.', 'warning');
@@ -902,6 +996,7 @@ const OsFormPanel: React.FC<OsFormPanelProps> = ({ os, onSaveSuccess, onClose })
       addToast('Você não tem permissão para excluir anexos.', 'warning');
       return;
     }
+    if (!canRunTenantMutation()) return;
     const ok = await confirm({
       title: 'Excluir anexo',
       description: `Deseja excluir o anexo “${doc.titulo}”?`,
@@ -929,7 +1024,17 @@ const OsFormPanel: React.FC<OsFormPanelProps> = ({ os, onSaveSuccess, onClose })
       addToast('Você não tem permissão para editar itens.', 'warning');
       return;
     }
+    if (!canRunTenantMutation()) return;
     setIsAddingItem(true);
+    const addItemSession = startOperation(
+      {
+        domain: 'os',
+        action: 'adicionar_item',
+        tenantId: activeEmpresaId ?? null,
+        entityId: formData.id ? String(formData.id) : null,
+      },
+      { item_id: item.id, item_type: item.type }
+    );
     try {
       let osToUpdate = formData;
   
@@ -953,9 +1058,10 @@ const OsFormPanel: React.FC<OsFormPanelProps> = ({ os, onSaveSuccess, onClose })
   
       const updatedOs = await getOsDetails(osId);
       setFormData(updatedOs);
-  
+      succeedOperation(addItemSession, { os_id: osId, item_id: item.id, item_type: item.type });
       addToast(`${item.type === 'service' ? 'Serviço' : 'Produto'} adicionado.`, 'success');
     } catch (error: any) {
+      failOperation(addItemSession, error, { item_id: item.id, item_type: item.type }, '[OS][ITEM][ADD][ERROR]');
       addToast(error.message || 'Falha ao adicionar item à Ordem de Serviço.', 'error');
     } finally {
       setIsAddingItem(false);
@@ -971,8 +1077,15 @@ const OsFormPanel: React.FC<OsFormPanelProps> = ({ os, onSaveSuccess, onClose })
       addToast('A descrição da O.S. é obrigatória.', 'error');
       return;
     }
+    if (!canRunTenantMutation()) return;
 
     setIsSaving(true);
+    const saveSession = startOperation({
+      domain: 'os',
+      action: formData.id ? 'atualizar' : 'criar',
+      tenantId: activeEmpresaId ?? null,
+      entityId: formData.id ? String(formData.id) : null,
+    });
     try {
       const savedOs = await saveOs(formData);
       const desiredTecnicoUserId = (formData as any).tecnico_user_id ?? null;
@@ -986,9 +1099,11 @@ const OsFormPanel: React.FC<OsFormPanelProps> = ({ os, onSaveSuccess, onClose })
       }
 
       const finalOs = await getOsDetails(String(savedOs.id));
+      succeedOperation(saveSession, { os_id: String(savedOs.id), status: finalOs.status ?? null });
       addToast('Ordem de Serviço salva com sucesso!', 'success');
       onSaveSuccess(finalOs);
     } catch (error: any) {
+      failOperation(saveSession, error, { os_id: formData.id ? String(formData.id) : null }, '[OS][SAVE][ERROR]');
       addToast(error.message, 'error');
     } finally {
       setIsSaving(false);
@@ -1023,17 +1138,26 @@ const OsFormPanel: React.FC<OsFormPanelProps> = ({ os, onSaveSuccess, onClose })
       addToast('Salve a O.S. antes de enviar o orçamento.', 'warning');
       return;
     }
+    if (!canRunTenantMutation()) return;
     setOrcamentoSending(true);
+    const osId = String(formData.id);
+    const enviarOrcamentoSession = startOperation({
+      domain: 'os',
+      action: 'enviar_orcamento',
+      tenantId: activeEmpresaId ?? null,
+      entityId: osId,
+    });
     try {
-      const osId = String(formData.id);
       await runWithActionLock(`os:orcamento:send:${osId}`, async () => {
         await enviarOrcamento(osId, orcamentoMensagem.trim() ? orcamentoMensagem.trim() : null);
       });
+      succeedOperation(enviarOrcamentoSession, { os_id: osId });
       addToast('Orçamento marcado como enviado.', 'success');
       setOrcamentoSendDialogOpen(false);
       setOrcamentoMensagem('');
       await refreshOrcamento(osId);
     } catch (e: any) {
+      failOperation(enviarOrcamentoSession, e, { os_id: osId }, '[OS][ORCAMENTO][SEND][ERROR]');
       if (e instanceof ActionLockedError) {
         addToast('Já estamos enviando este orçamento. Aguarde alguns segundos.', 'info');
       } else {
@@ -1051,6 +1175,7 @@ const OsFormPanel: React.FC<OsFormPanelProps> = ({ os, onSaveSuccess, onClose })
 
   const handleDecidirOrcamento = async () => {
     if (!formData.id) return;
+    if (!canRunTenantMutation()) return;
     if (!permManage.data) {
       addToast('Você não tem permissão para aprovar/reprovar orçamento.', 'warning');
       return;
@@ -1061,8 +1186,17 @@ const OsFormPanel: React.FC<OsFormPanelProps> = ({ os, onSaveSuccess, onClose })
       return;
     }
     setOrcamentoDeciding(true);
+    const osId = String(formData.id);
+    const decidirOrcamentoSession = startOperation(
+      {
+        domain: 'os',
+        action: 'decidir_orcamento',
+        tenantId: activeEmpresaId ?? null,
+        entityId: osId,
+      },
+      { decisao: orcamentoDecisao }
+    );
     try {
-      const osId = String(formData.id);
       await runWithActionLock(`os:orcamento:decide:${osId}`, async () => {
         await decidirOrcamento({
           osId,
@@ -1071,10 +1205,12 @@ const OsFormPanel: React.FC<OsFormPanelProps> = ({ os, onSaveSuccess, onClose })
           observacao: orcamentoObservacao.trim() ? orcamentoObservacao.trim() : null,
         });
       });
+      succeedOperation(decidirOrcamentoSession, { os_id: osId, decisao: orcamentoDecisao });
       addToast(orcamentoDecisao === 'approved' ? 'Orçamento aprovado.' : 'Orçamento reprovado.', 'success');
       setOrcamentoDecideDialogOpen(false);
       await refreshOrcamento(osId);
     } catch (e: any) {
+      failOperation(decidirOrcamentoSession, e, { os_id: osId, decisao: orcamentoDecisao }, '[OS][ORCAMENTO][DECIDE][ERROR]');
       if (e instanceof ActionLockedError) {
         addToast('Já estamos registrando uma decisão deste orçamento. Aguarde alguns segundos.', 'info');
       } else {
@@ -1424,7 +1560,7 @@ const OsFormPanel: React.FC<OsFormPanelProps> = ({ os, onSaveSuccess, onClose })
               {clientDetails?.email ? <span className="text-gray-500"> • E-mail: {clientDetails.email}</span> : null}
             </div>
             <div className="flex flex-wrap gap-2">
-              <Button type="button" variant="outline" onClick={handleGeneratePortalLink} disabled={!formData.id || portalGenerating} className="gap-2">
+              <Button type="button" variant="outline" onClick={handleGeneratePortalLink} disabled={!formData.id || portalGenerating || tenantMutationBlocked} className="gap-2">
                 {portalGenerating ? <Loader2 className="animate-spin" size={18} /> : <FileText size={18} />}
                 Gerar link do portal
               </Button>
@@ -1558,7 +1694,7 @@ const OsFormPanel: React.FC<OsFormPanelProps> = ({ os, onSaveSuccess, onClose })
                 </div>
               ) : null}
             </div>
-            <Button type="button" onClick={handleUploadDoc} disabled={isUploadingDoc || readOnly} className="gap-2">
+            <Button type="button" onClick={handleUploadDoc} disabled={isUploadingDoc || readOnly || tenantMutationBlocked} className="gap-2">
               {isUploadingDoc ? <Loader2 className="animate-spin" size={18} /> : <Plus size={18} />}
               Enviar
             </Button>
@@ -1589,7 +1725,7 @@ const OsFormPanel: React.FC<OsFormPanelProps> = ({ os, onSaveSuccess, onClose })
                         <FileText size={16} />
                         Abrir
                       </Button>
-                      <Button type="button" variant="ghost" size="icon" className="text-rose-600 hover:text-rose-700" onClick={() => handleDeleteDoc(d)} disabled={readOnly}>
+                      <Button type="button" variant="ghost" size="icon" className="text-rose-600 hover:text-rose-700" onClick={() => handleDeleteDoc(d)} disabled={readOnly || tenantMutationBlocked}>
                         <Trash2 size={18} />
                       </Button>
                     </div>
@@ -1941,7 +2077,7 @@ const OsFormPanel: React.FC<OsFormPanelProps> = ({ os, onSaveSuccess, onClose })
               <Button type="button" variant="outline" onClick={() => setCommsDialogOpen(false)} disabled={commsRegistering}>
                 Fechar
               </Button>
-              <Button type="button" onClick={handleRegisterComms} disabled={commsRegistering || !commsPreview.trim()} className="gap-2">
+              <Button type="button" onClick={handleRegisterComms} disabled={commsRegistering || !commsPreview.trim() || tenantMutationBlocked} className="gap-2">
                 {commsRegistering ? <Loader2 className="animate-spin" size={18} /> : <CheckCircle2 size={18} />}
                 Registrar envio
               </Button>

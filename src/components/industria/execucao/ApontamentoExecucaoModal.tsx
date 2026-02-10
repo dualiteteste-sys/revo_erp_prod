@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import Modal from '@/components/ui/Modal';
 import Input from '@/components/ui/forms/Input';
 import TextArea from '@/components/ui/forms/TextArea';
@@ -9,6 +9,7 @@ import { Operacao, StatusOperacao, apontarExecucao } from '@/services/industriaE
 import { useToast } from '@/contexts/ToastProvider';
 import { getMotivosRefugo } from '@/services/industriaProducao';
 import QuickScanModal from '@/components/ui/QuickScanModal';
+import { useAuth } from '@/contexts/AuthProvider';
 
 type ApontamentoAction = 'pausar' | 'concluir';
 
@@ -26,6 +27,7 @@ export default function ApontamentoExecucaoModal({
   onSuccess: () => void;
 }) {
   const { addToast } = useToast();
+  const { loading: authLoading, activeEmpresaId } = useAuth();
   const [saving, setSaving] = useState(false);
   const [qtdBoas, setQtdBoas] = useState<number>(0);
   const [qtdRefugadas, setQtdRefugadas] = useState<number>(0);
@@ -37,6 +39,7 @@ export default function ApontamentoExecucaoModal({
   const [motivos, setMotivos] = useState<Array<{ id: string; nome: string }>>([]);
   const [loadingMotivos, setLoadingMotivos] = useState(false);
   const [scanOpen, setScanOpen] = useState(false);
+  const empresaRef = useRef<string | null>(activeEmpresaId);
 
   const title = useMemo(() => {
     const base = action === 'pausar' ? 'Apontar parada' : 'Apontar conclusão';
@@ -56,24 +59,49 @@ export default function ApontamentoExecucaoModal({
   }, [open]);
 
   useEffect(() => {
+    empresaRef.current = activeEmpresaId;
+  }, [activeEmpresaId]);
+
+  useEffect(() => {
     if (!open) return;
     if (action !== 'concluir') return;
+    if (authLoading || !activeEmpresaId) return;
+    const empresaSnapshot = activeEmpresaId;
+    let cancelled = false;
     setLoadingMotivos(true);
     getMotivosRefugo()
       .then((rows) =>
-        setMotivos(
+        {
+          if (cancelled || empresaSnapshot !== empresaRef.current) return;
+          setMotivos(
           (rows || []).map((r: any) => ({
             id: r.id,
             nome: r.nome ?? r.descricao ?? r.titulo ?? String(r.id),
           })),
-        ),
+        );
+        },
       )
-      .catch(() => setMotivos([]))
-      .finally(() => setLoadingMotivos(false));
-  }, [open, action]);
+      .catch(() => {
+        if (cancelled || empresaSnapshot !== empresaRef.current) return;
+        setMotivos([]);
+      })
+      .finally(() => {
+        if (cancelled || empresaSnapshot !== empresaRef.current) return;
+        setLoadingMotivos(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [open, action, authLoading, activeEmpresaId]);
 
   const handleConfirm = async () => {
     if (!operacao) return;
+    if (saving) return;
+    if (authLoading || !activeEmpresaId) {
+      addToast('Aguarde a troca de contexto (login/empresa) concluir para apontar.', 'info');
+      return;
+    }
+    const empresaSnapshot = activeEmpresaId;
     setSaving(true);
     try {
       await apontarExecucao(
@@ -89,12 +117,15 @@ export default function ApontamentoExecucaoModal({
           custoUnitario: action === 'concluir' ? (custoUnitario > 0 ? custoUnitario : undefined) : undefined,
         },
       );
+      if (empresaSnapshot !== empresaRef.current) return;
       addToast(action === 'pausar' ? 'Operação pausada.' : 'Operação concluída.', 'success');
       onSuccess();
       onClose();
     } catch (e: any) {
+      if (empresaSnapshot !== empresaRef.current) return;
       addToast(e?.message || 'Falha ao apontar.', 'error');
     } finally {
+      if (empresaSnapshot !== empresaRef.current) return;
       setSaving(false);
     }
   };
@@ -218,7 +249,7 @@ export default function ApontamentoExecucaoModal({
             type="button"
             onClick={onClose}
             className="px-4 py-2 border rounded hover:bg-gray-50 disabled:opacity-50"
-            disabled={saving}
+            disabled={saving || authLoading || !activeEmpresaId}
           >
             Cancelar
           </button>
@@ -226,7 +257,7 @@ export default function ApontamentoExecucaoModal({
             type="button"
             onClick={handleConfirm}
             className="px-4 py-2 rounded bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50 inline-flex items-center gap-2"
-            disabled={saving || !operacao || isLocked}
+            disabled={saving || authLoading || !activeEmpresaId || !operacao || isLocked}
             title={isLocked ? 'Operação concluída/cancelada não pode ser apontada.' : undefined}
           >
             {saving && <Loader2 className="animate-spin" size={16} />}
