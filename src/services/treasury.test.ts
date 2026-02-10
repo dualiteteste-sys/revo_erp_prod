@@ -91,6 +91,34 @@ describe('treasury service', () => {
     expect(res.data[1].valor).toBe(55.1);
   });
 
+  it('retorna count nulo quando a RPC não fornece total_count', async () => {
+    callRpcMock.mockResolvedValueOnce([
+      {
+        id: 'mov-1',
+        data_movimento: '2026-02-09',
+        tipo_mov: 'entrada',
+        descricao: 'Recebimento',
+        documento_ref: null,
+        origem_tipo: null,
+        origem_id: null,
+        valor: 10,
+        valor_entrada: 10,
+        valor_saida: 0,
+        saldo_acumulado: 10,
+        conciliado: false,
+      },
+    ]);
+
+    const { listMovimentacoes } = await import('./treasury');
+    const res = await listMovimentacoes({
+      contaCorrenteId: 'cc-1',
+      page: 1,
+      pageSize: 50,
+    });
+
+    expect(res.count).toBeNull();
+  });
+
   it('mantém valor nulo quando DTO da movimentação vem sem campo monetário válido', async () => {
     callRpcMock.mockResolvedValueOnce([
       {
