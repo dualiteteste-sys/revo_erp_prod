@@ -222,6 +222,7 @@ const OsFormPanel: React.FC<OsFormPanelProps> = ({ os, onSaveSuccess, onClose })
   }, [activeEmpresaId, addToast]);
 
   useEffect(() => {
+    const requestId = ++clientDetailsRequestRef.current;
     if (os) {
       setFormData(os);
       setNovoAnexo('');
@@ -232,11 +233,17 @@ const OsFormPanel: React.FC<OsFormPanelProps> = ({ os, onSaveSuccess, onClose })
       setContaReceberId(null);
       setContaVencimento('');
       if (os.cliente_id) {
+        const tenantVersionSnapshot = tenantVersionRef.current;
+        const empresaSnapshot = activeEmpresaId ?? null;
         getPartnerDetails(os.cliente_id).then(partner => {
+          if (clientDetailsRequestRef.current !== requestId) return;
+          if (isTenantStale(tenantVersionSnapshot, empresaSnapshot)) return;
           if (partner) {
             setClientName(partner.nome);
             setClientDetails(partner);
+            return;
           }
+          setClientDetails(null);
         });
       } else {
         setClientName('');
@@ -254,7 +261,12 @@ const OsFormPanel: React.FC<OsFormPanelProps> = ({ os, onSaveSuccess, onClose })
       setContaReceberId(null);
       setContaVencimento('');
     }
-  }, [os]);
+    return () => {
+      if (clientDetailsRequestRef.current === requestId) {
+        clientDetailsRequestRef.current += 1;
+      }
+    };
+  }, [activeEmpresaId, os]);
 
   useEffect(() => {
     const clienteId = formData.cliente_id ? String(formData.cliente_id) : null;
