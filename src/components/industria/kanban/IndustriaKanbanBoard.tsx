@@ -1,9 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { DragDropContext, DropResult } from '@hello-pangea/dnd';
 import { listOrdens, updateOrdemStatus, OrdemIndustria, StatusOrdem, TipoOrdemIndustria } from '@/services/industria';
 import { useToast } from '@/contexts/ToastProvider';
 import { Loader2 } from 'lucide-react';
 import IndustriaKanbanColumn from './IndustriaKanbanColumn';
+import { useAuth } from '@/contexts/AuthProvider';
 
 const COLUMNS_BY_TIPO: Record<TipoOrdemIndustria, { id: StatusOrdem; title: string }[]> = {
   beneficiamento: [
@@ -38,26 +39,46 @@ type Props = {
 const IndustriaKanbanBoard: React.FC<Props> = ({ tipoOrdem, search, refreshToken, onOpenOrder, onCloneOrder }) => {
   const [items, setItems] = useState<OrdemIndustria[]>([]);
   const [loading, setLoading] = useState(true);
+  const [syncing, setSyncing] = useState(false);
   const { addToast } = useToast();
+  const { loading: authLoading, activeEmpresaId } = useAuth();
+  const lastEmpresaIdRef = useRef<string | null>(activeEmpresaId);
+  const actionTokenRef = useRef(0);
 
   const fetchData = async () => {
+    if (authLoading || !activeEmpresaId) return;
+    const token = ++actionTokenRef.current;
+    const empresaSnapshot = activeEmpresaId;
     setLoading(true);
     try {
       const data = await listOrdens(search, tipoOrdem, undefined);
+      if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
       setItems(data);
     } catch (error: any) {
+      if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
       addToast('Erro ao carregar o quadro.', 'error');
     } finally {
+      if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
       setLoading(false);
     }
   };
 
   useEffect(() => {
+    const prevEmpresaId = lastEmpresaIdRef.current;
+    if (prevEmpresaId === activeEmpresaId) return;
+    actionTokenRef.current += 1;
+    setSyncing(false);
+    setLoading(false);
+    lastEmpresaIdRef.current = activeEmpresaId;
+  }, [activeEmpresaId]);
+
+  useEffect(() => {
     fetchData();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tipoOrdem, search, refreshToken]);
+  }, [tipoOrdem, search, refreshToken, authLoading, activeEmpresaId]);
 
   const onDragEnd = async (result: DropResult) => {
+    if (syncing || authLoading || !activeEmpresaId) return;
     const { source, destination, draggableId } = result;
 
     if (!destination) return;
@@ -81,13 +102,21 @@ const IndustriaKanbanBoard: React.FC<Props> = ({ tipoOrdem, search, refreshToken
     );
     setItems(updatedItems);
 
+    const token = ++actionTokenRef.current;
+    const empresaSnapshot = activeEmpresaId;
+    setSyncing(true);
     try {
       // We use index as priority for simplicity here, but in a real app we might calculate it better
       await updateOrdemStatus(draggableId, newStatus, destination.index);
+      if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
       addToast(`Ordem movida para ${newStatus.replace(/_/g, ' ')}`, 'success');
     } catch (error: any) {
+      if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
       addToast('Falha ao atualizar status.', 'error');
       fetchData(); // Revert
+    } finally {
+      if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
+      setSyncing(false);
     }
   };
 
@@ -96,6 +125,7 @@ const IndustriaKanbanBoard: React.FC<Props> = ({ tipoOrdem, search, refreshToken
   };
 
   const handleQuickStatus = async (order: OrdemIndustria, newStatus: StatusOrdem) => {
+    if (syncing || authLoading || !activeEmpresaId) return;
     if (order.status === newStatus) return;
     if (order.status === 'concluida' || order.status === 'cancelada') return;
     if (newStatus === 'concluida' || newStatus === 'cancelada') {
@@ -103,29 +133,46 @@ const IndustriaKanbanBoard: React.FC<Props> = ({ tipoOrdem, search, refreshToken
       return;
     }
     updateItem(order.id, { status: newStatus });
+    const token = ++actionTokenRef.current;
+    const empresaSnapshot = activeEmpresaId;
+    setSyncing(true);
     try {
       await updateOrdemStatus(order.id, newStatus, order.prioridade);
+      if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
       addToast(`Status atualizado para ${newStatus.replace(/_/g, ' ')}`, 'success');
     } catch (e: any) {
+      if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
       addToast('Falha ao atualizar status.', 'error');
       fetchData();
+    } finally {
+      if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
+      setSyncing(false);
     }
   };
 
   const handleQuickPriority = async (order: OrdemIndustria, delta: number) => {
+    if (syncing || authLoading || !activeEmpresaId) return;
     const next = Math.max(0, (order.prioridade ?? 0) + delta);
     if (next === order.prioridade) return;
     updateItem(order.id, { prioridade: next });
+    const token = ++actionTokenRef.current;
+    const empresaSnapshot = activeEmpresaId;
+    setSyncing(true);
     try {
       await updateOrdemStatus(order.id, order.status, next);
+      if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
       addToast('Prioridade atualizada.', 'success');
     } catch (e: any) {
+      if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
       addToast('Falha ao atualizar prioridade.', 'error');
       fetchData();
+    } finally {
+      if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
+      setSyncing(false);
     }
   };
 
-  if (loading) {
+  if (loading || authLoading || !activeEmpresaId) {
     return (
       <div className="flex items-center justify-center h-full">
         <Loader2 className="w-12 h-12 text-blue-500 animate-spin" />
