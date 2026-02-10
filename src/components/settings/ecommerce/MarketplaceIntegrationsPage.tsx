@@ -43,12 +43,15 @@ import { useTableColumnWidths, type TableColumnWidthDef } from '@/components/ui/
 import { sortRows, toggleSort } from '@/components/ui/table/sortUtils';
 import { listDepositos } from '@/services/suprimentos';
 import { listTabelasPreco } from '@/services/pricing';
+import { createRpcBurstGuard } from '@/components/settings/ecommerce/rpcBurstGuard';
 
 type Provider = 'meli' | 'shopee' | 'woo';
 type CatalogProvider = Exclude<Provider, 'woo'>;
 type JobStatusFilter = EcommerceImportJobStatus | 'all';
 const WOO_CREDENTIAL_MASK = '••••••••••••••••';
 const JOBS_PAGE_SIZE = 8;
+const JOBS_POLL_IDLE_MS = 30000;
+const JOBS_POLL_ACTIVE_MS = 10000;
 
 const providerLabels: Record<Provider, string> = {
   meli: 'Mercado Livre',
@@ -169,6 +172,10 @@ export default function MarketplaceIntegrationsPage() {
   const [wooEditingConsumerKey, setWooEditingConsumerKey] = useState(false);
   const [wooEditingConsumerSecret, setWooEditingConsumerSecret] = useState(false);
   const jobsPollHasActiveRef = useRef(false);
+  const jobsOffsetRef = useRef<Record<Provider, number>>({ meli: 0, shopee: 0, woo: 0 });
+  const jobsStatusFilterRef = useRef<Record<Provider, JobStatusFilter>>({ meli: 'all', shopee: 'all', woo: 'all' });
+  const rpcGuardRef = useRef(createRpcBurstGuard());
+  const guardToastShownRef = useRef<Record<string, boolean>>({});
 
   const mappingsColumns: TableColumnWidthDef[] = [
     { id: 'produto', defaultWidth: 320, minWidth: 220 },
@@ -196,8 +203,26 @@ export default function MarketplaceIntegrationsPage() {
   const canView = !!permView.data;
   const canManage = !!permManage.data;
 
+  useEffect(() => {
+    jobsOffsetRef.current = jobsOffsetByProvider;
+  }, [jobsOffsetByProvider]);
+
+  useEffect(() => {
+    jobsStatusFilterRef.current = jobsStatusFilterByProvider;
+  }, [jobsStatusFilterByProvider]);
+
   const refreshWooDiag = useCallback(async () => {
     if (!canView) return null;
+    const guard = rpcGuardRef.current.check('ecommerce_connection_diagnostics:woo');
+    if (!guard.allowed) {
+      if (!guardToastShownRef.current['ecommerce_connection_diagnostics:woo']) {
+        guardToastShownRef.current['ecommerce_connection_diagnostics:woo'] = true;
+        addToast('Diagnóstico Woo pausado temporariamente por proteção anti-loop. Tente novamente em alguns segundos.', 'warning');
+      }
+      setWooDiagUnavailable(true);
+      return null;
+    }
+    guardToastShownRef.current['ecommerce_connection_diagnostics:woo'] = false;
     try {
       const diag = await getEcommerceConnectionDiagnostics('woo');
       setWooDiag(diag);
@@ -208,7 +233,7 @@ export default function MarketplaceIntegrationsPage() {
       setWooDiagUnavailable(true);
       return null;
     }
-  }, [canView]);
+  }, [addToast, canView]);
 
   const loadProviderJobs = useCallback(
     async (
@@ -221,8 +246,18 @@ export default function MarketplaceIntegrationsPage() {
     ): Promise<EcommerceImportJob[]> => {
       if (!canView) return [];
       const append = options?.append === true;
-      const offset = options?.offset ?? (append ? jobsOffsetByProvider[provider] : 0);
-      const status = options?.status ?? jobsStatusFilterByProvider[provider];
+      const offset = options?.offset ?? (append ? jobsOffsetRef.current[provider] : 0);
+      const status = options?.status ?? jobsStatusFilterRef.current[provider];
+      const guardKey = `ecommerce_import_jobs_list:${provider}`;
+      const guard = rpcGuardRef.current.check(guardKey);
+      if (!guard.allowed) {
+        if (!guardToastShownRef.current[guardKey]) {
+          guardToastShownRef.current[guardKey] = true;
+          addToast(`Proteção anti-loop ativada para jobs de ${providerLabels[provider]}. Aguarde alguns segundos e tente novamente.`, 'warning');
+        }
+        return [];
+      }
+      guardToastShownRef.current[guardKey] = false;
       setJobsLoadingProvider(provider);
       try {
         const jobs = await listEcommerceImportJobs({
@@ -256,14 +291,16 @@ export default function MarketplaceIntegrationsPage() {
         setJobsLoadingProvider((prev) => (prev === provider ? null : prev));
       }
     },
-    [canView, jobsOffsetByProvider, jobsStatusFilterByProvider],
+    [addToast, canView],
   );
 
   const loadAllProviderJobs = useCallback(async () => {
-    if (!canView) return;
+    if (!canView) return false;
     const providers: Provider[] = ['meli', 'shopee', 'woo'];
     const all = await Promise.all(providers.map(async (provider) => loadProviderJobs(provider, { append: false, offset: 0 })));
-    jobsPollHasActiveRef.current = all.flat().some((job) => job.status === 'pending' || job.status === 'processing');
+    const hasActiveJobs = all.flat().some((job) => job.status === 'pending' || job.status === 'processing');
+    jobsPollHasActiveRef.current = hasActiveJobs;
+    return hasActiveJobs;
   }, [canView, loadProviderJobs]);
 
   const fetchAll = useCallback(async () => {
@@ -273,8 +310,7 @@ export default function MarketplaceIntegrationsPage() {
       const [c, h] = await Promise.all([listEcommerceConnections(), getEcommerceHealthSummary()]);
       setConnections(c);
       setHealth(h);
-      void refreshWooDiag();
-      void loadAllProviderJobs();
+      await Promise.all([refreshWooDiag(), loadAllProviderJobs()]);
     } catch (e: any) {
       addToast(e?.message || 'Falha ao carregar integrações.', 'error');
       setConnections([]);
@@ -297,23 +333,31 @@ export default function MarketplaceIntegrationsPage() {
     if (!canView) return;
     let cancelled = false;
     let timer: ReturnType<typeof setTimeout> | null = null;
-    let delay = 8000;
+    let errorStreak = 0;
 
-    const schedule = () => {
+    const schedule = (ms: number) => {
       timer = setTimeout(async () => {
         if (cancelled) return;
-        await loadAllProviderJobs();
-        const hasActiveJobs = jobsPollHasActiveRef.current;
-        if (hasActiveJobs) {
-          delay = Math.min(delay * 2, 30000);
-        } else {
-          delay = 30000;
+        if (typeof document !== 'undefined' && document.visibilityState !== 'visible') {
+          schedule(JOBS_POLL_IDLE_MS);
+          return;
         }
-        schedule();
-      }, delay);
+        if (!jobsPollHasActiveRef.current) {
+          schedule(JOBS_POLL_IDLE_MS);
+          return;
+        }
+        try {
+          const hasActiveJobs = await loadAllProviderJobs();
+          errorStreak = 0;
+          schedule(hasActiveJobs ? JOBS_POLL_ACTIVE_MS : JOBS_POLL_IDLE_MS);
+        } catch {
+          errorStreak = Math.min(errorStreak + 1, 4);
+          schedule(Math.min(JOBS_POLL_IDLE_MS * 2 ** errorStreak, 120000));
+        }
+      }, ms);
     };
 
-    schedule();
+    schedule(JOBS_POLL_IDLE_MS);
     return () => {
       cancelled = true;
       if (timer) clearTimeout(timer);
