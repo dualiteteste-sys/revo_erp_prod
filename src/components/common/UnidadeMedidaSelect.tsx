@@ -3,6 +3,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import Select from '@/components/ui/forms/Select';
 import { logger } from '@/lib/logger';
 import { listUnidades, type UnidadeMedida } from '@/services/unidades';
+import { useAuth } from '@/contexts/AuthProvider';
 
 type Props = {
   label?: React.ReactNode | null;
@@ -51,11 +52,13 @@ export default function UnidadeMedidaSelect({
   placeholder,
   allowEmpty = true,
 }: Props) {
+  const { loading: authLoading, activeEmpresaId } = useAuth();
   const [unidades, setUnidades] = useState<UnidadeMedida[] | null>(unidadesCache);
 
   useEffect(() => {
     let canceled = false;
     if (unidades) return;
+    if (authLoading || !activeEmpresaId) return;
 
     void getUnidadesCached()
       .then((rows) => {
@@ -70,7 +73,7 @@ export default function UnidadeMedidaSelect({
     return () => {
       canceled = true;
     };
-  }, [unidades]);
+  }, [unidades, authLoading, activeEmpresaId]);
 
   const normalizedValue = normalizeSigla(value);
 
@@ -89,7 +92,7 @@ export default function UnidadeMedidaSelect({
       name={name}
       value={normalizedValue ?? ''}
       onChange={(e) => onChange(normalizeSigla(e.target.value))}
-      disabled={disabled}
+      disabled={disabled || authLoading || !activeEmpresaId}
       required={required}
       uiSize={uiSize}
       className={className}
