@@ -17,9 +17,9 @@ import {
   normalizeEcommerceConfig,
   resolveWooConnectionStatus,
   setWooConnectionSecrets,
+  setWooStoreUrl,
   upsertEcommerceConnection,
   updateEcommerceConnectionConfig,
-  wooHasStoredCredentials,
   type EcommerceHealthSummary,
 } from '@/services/ecommerceIntegrations';
 import {
@@ -58,6 +58,7 @@ import { sortRows, toggleSort } from '@/components/ui/table/sortUtils';
 import { listDepositos } from '@/services/suprimentos';
 import { listTabelasPreco } from '@/services/pricing';
 import { createRpcBurstGuard } from '@/components/settings/ecommerce/rpcBurstGuard';
+import { normalizeWooStoreUrl } from '@/lib/ecommerce/wooStoreUrl';
 
 type Provider = MarketplaceProvider;
 type CatalogProvider = Exclude<Provider, 'woo'>;
@@ -144,8 +145,10 @@ function wooPendingReason(
   if (!conn) return null;
   const storeUrl = String(conn.config?.store_url ?? '').trim();
   if (!storeUrl) return 'Falta URL da loja';
-  if (wooDiagUnavailable) return 'Não foi possível validar credenciais agora (diagnóstico indisponível)';
-  if (!wooHasStoredCredentials(wooDiag)) return 'Faltam credenciais (Consumer Key/Secret)';
+  if (wooDiagUnavailable || !wooDiag) return 'Não foi possível validar credenciais agora (diagnóstico indisponível)';
+  const hasKey = wooDiag.has_consumer_key === true;
+  const hasSecret = wooDiag.has_consumer_secret === true;
+  if (!hasKey || !hasSecret) return 'Faltam credenciais (Consumer Key/Secret)';
   if (wooDiag?.connection_status === 'error') return wooDiag?.error_message || 'A verificação da conexão falhou';
   if (wooDiag?.connection_status !== 'connected') return 'Conexão ainda não verificada';
   return null;
@@ -203,6 +206,8 @@ export default function MarketplaceIntegrationsPage() {
   const [wooConsumerKey, setWooConsumerKey] = useState('');
   const [wooConsumerSecret, setWooConsumerSecret] = useState('');
   const [wooSavingSecrets, setWooSavingSecrets] = useState(false);
+  const [wooSecretsSavedHint, setWooSecretsSavedHint] = useState<{ hasKey: boolean; hasSecret: boolean } | null>(null);
+  const [wooStoreUrlError, setWooStoreUrlError] = useState<string | null>(null);
   const [wooDepositos, setWooDepositos] = useState<Array<{ id: string; nome: string }>>([]);
   const [wooTabelasPreco, setWooTabelasPreco] = useState<Array<{ id: string; nome: string }>>([]);
   const [wooOptionsLoading, setWooOptionsLoading] = useState(false);
@@ -271,6 +276,7 @@ export default function MarketplaceIntegrationsPage() {
       const diag = await getEcommerceConnectionDiagnostics('woo');
       setWooDiag(diag);
       setWooDiagUnavailable(false);
+      setWooSecretsSavedHint(null);
       return diag;
     } catch {
       setWooDiag(null);
@@ -525,10 +531,15 @@ export default function MarketplaceIntegrationsPage() {
     setWooConsumerSecret('');
     setWooEditingConsumerKey(false);
     setWooEditingConsumerSecret(false);
+    setWooSecretsSavedHint(null);
+    setWooStoreUrlError(null);
     setConfigOpen(true);
     void loadSyncState(provider);
     if (provider === 'woo') void refreshWooDiag();
   };
+
+  const wooHasConsumerKey = wooDiag?.has_consumer_key === true || wooSecretsSavedHint?.hasKey === true;
+  const wooHasConsumerSecret = wooDiag?.has_consumer_secret === true || wooSecretsSavedHint?.hasSecret === true;
 
   const handleTestConnection = async () => {
     if (!activeConnection) return;
@@ -542,10 +553,40 @@ export default function MarketplaceIntegrationsPage() {
           addToast('Conexão Woo inválida para teste.', 'error');
           return;
         }
+
+        const rawStoreUrl = String(activeConnection.config?.store_url ?? '');
+        const normalized = normalizeWooStoreUrl(rawStoreUrl);
+        if (!normalized.ok) {
+          setWooStoreUrlError(normalized.message);
+          addToast(normalized.message, 'warning');
+          return;
+        }
+        setWooStoreUrlError(null);
+
+        // Persistimos apenas a URL (normalizada) antes de testar, para manter backend como fonte de verdade
+        // sem gravar outras configuracoes do assistente por acidente.
+        const { store_url } = await setWooStoreUrl({ ecommerceId: activeConnection.id, storeUrl: normalized.normalized });
+        setActiveConnection((prev) =>
+          prev ? { ...prev, config: { ...(prev.config ?? {}), store_url: store_url } } : prev,
+        );
+        if (import.meta.env.DEV) {
+          console.debug('[Woo][TestConnection] using store_url', { ecommerce_id: activeConnection.id, store_url });
+        }
+
         const { data, error } = await supabase.functions.invoke('woocommerce-test-connection', {
           body: { ecommerce_id: activeConnection.id },
         });
-        if (error) throw error;
+        if (error) {
+          const bodyText = String((error as any)?.context?.body ?? '');
+          const parsed = bodyText ? (() => { try { return JSON.parse(bodyText); } catch { return null; } })() : null;
+          const msg = String(parsed?.message ?? error.message ?? '').trim();
+          if (msg) addToast(msg, 'error');
+          else addToast('Falha ao testar conexão WooCommerce.', 'error');
+          setDiagnostics(parsed ?? null);
+          await refreshWooDiag();
+          await fetchAll();
+          return;
+        }
         const ok = (data as any)?.ok === true;
         setDiagnostics((data as any) ?? null);
         await refreshWooDiag();
@@ -688,14 +729,31 @@ export default function MarketplaceIntegrationsPage() {
 
     setWooSavingSecrets(true);
     try {
+      let storeUrlForStatus = String(activeConnection.config?.store_url ?? '').trim();
+      const rawStoreUrl = storeUrlForStatus;
+      if (rawStoreUrl) {
+        const normalized = normalizeWooStoreUrl(rawStoreUrl);
+        if (!normalized.ok) {
+          setWooStoreUrlError(normalized.message);
+          addToast(normalized.message, 'warning');
+          return;
+        }
+        setWooStoreUrlError(null);
+        const { store_url } = await setWooStoreUrl({ ecommerceId: activeConnection.id, storeUrl: normalized.normalized });
+        storeUrlForStatus = store_url;
+        setActiveConnection((prev) =>
+          prev ? { ...prev, config: { ...(prev.config ?? {}), store_url: store_url } } : prev,
+        );
+      }
+
       await setWooConnectionSecrets({ ecommerceId: activeConnection.id, consumerKey, consumerSecret });
+      setWooSecretsSavedHint({ hasKey: true, hasSecret: true });
       setWooConsumerKey('');
       setWooConsumerSecret('');
       setWooEditingConsumerKey(false);
       setWooEditingConsumerSecret(false);
-      const storeUrl = String(activeConnection.config?.store_url ?? '').trim();
       const nextStatus = resolveWooConnectionStatus({
-        storeUrl,
+        storeUrl: storeUrlForStatus,
         diagnostics: null,
         diagnosticsUnavailable: false,
         previousStatus: 'pending',
@@ -1196,91 +1254,110 @@ export default function MarketplaceIntegrationsPage() {
                     </div>
 
                     <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-3">
-                      <Input
-                        label="URL da loja"
-                        value={String(activeConnection.config?.store_url ?? '')}
-                        placeholder="https://sualoja.com.br"
-                        onChange={(e) =>
-                          setActiveConnection((prev) =>
-                            prev ? { ...prev, config: { ...(prev.config ?? {}), store_url: (e.target as HTMLInputElement).value } } : prev,
-                          )
-                        }
-                      />
-                      <div />
-                      <Input
-                        label={
-                          <div className="flex items-center justify-between gap-2">
-                            <span>Consumer Key</span>
-                            {wooHasStoredCredentials(wooDiag) ? (
-                              <span className="inline-flex items-center rounded-full bg-emerald-100 text-emerald-800 px-2 py-0.5 text-xs font-medium">
-                                Salvo
-                              </span>
-                            ) : null}
-                          </div>
-                        }
-                        value={
-                          wooHasStoredCredentials(wooDiag) && !wooConsumerKey && !wooEditingConsumerKey
-                            ? WOO_CREDENTIAL_MASK
-                            : wooConsumerKey
-                        }
-                        placeholder={wooHasStoredCredentials(wooDiag) && !wooConsumerKey ? 'Salvo (mascarado)' : 'ck_...'}
-                        onFocus={() => {
-                          if (wooHasStoredCredentials(wooDiag) && !wooConsumerKey && !wooEditingConsumerKey) {
-                            setWooEditingConsumerKey(true);
-                            setWooConsumerKey('');
-                          }
-                        }}
-                        onBlur={() => {
-                          if (!wooConsumerKey) setWooEditingConsumerKey(false);
-                        }}
-                        onChange={(e) => {
-                          setWooEditingConsumerKey(true);
-                          setWooConsumerKey((e.target as HTMLInputElement).value);
-                        }}
-                        type="password"
-                        helperText={
-                          wooHasStoredCredentials(wooDiag) && !wooConsumerKey
-                            ? 'Armazenado com segurança. Para substituir, cole uma nova chave.'
-                            : 'Cole a chave gerada no WooCommerce (ck_...).'
-                        }
-                      />
-                      <Input
-                        label={
-                          <div className="flex items-center justify-between gap-2">
-                            <span>Consumer Secret</span>
-                            {wooHasStoredCredentials(wooDiag) ? (
-                              <span className="inline-flex items-center rounded-full bg-emerald-100 text-emerald-800 px-2 py-0.5 text-xs font-medium">
-                                Salvo
-                              </span>
-                            ) : null}
-                          </div>
-                        }
-                        value={
-                          wooHasStoredCredentials(wooDiag) && !wooConsumerSecret && !wooEditingConsumerSecret
-                            ? WOO_CREDENTIAL_MASK
-                            : wooConsumerSecret
-                        }
-                        placeholder={wooHasStoredCredentials(wooDiag) && !wooConsumerSecret ? 'Salvo (mascarado)' : 'cs_...'}
-                        onFocus={() => {
-                          if (wooHasStoredCredentials(wooDiag) && !wooConsumerSecret && !wooEditingConsumerSecret) {
-                            setWooEditingConsumerSecret(true);
-                            setWooConsumerSecret('');
-                          }
-                        }}
-                        onBlur={() => {
-                          if (!wooConsumerSecret) setWooEditingConsumerSecret(false);
-                        }}
-                        onChange={(e) => {
-                          setWooEditingConsumerSecret(true);
-                          setWooConsumerSecret((e.target as HTMLInputElement).value);
-                        }}
-                        type="password"
-                        helperText={
-                          wooHasStoredCredentials(wooDiag) && !wooConsumerSecret
-                            ? 'Armazenado com segurança. Para substituir, cole um novo segredo.'
-                            : 'Cole o secret gerado no WooCommerce (cs_...).'
-                        }
-                      />
+	                      <Input
+	                        label="URL da loja"
+	                        value={String(activeConnection.config?.store_url ?? '')}
+	                        placeholder="https://sualoja.com.br"
+	                        helperText={
+	                          wooStoreUrlError
+	                            ? wooStoreUrlError
+	                            : 'Aceita sem https:// e com subdiretório (ex.: exemplo.com/loja). Será normalizada.'
+	                        }
+	                        onChange={(e) =>
+	                          setActiveConnection((prev) =>
+	                            prev ? { ...prev, config: { ...(prev.config ?? {}), store_url: (e.target as HTMLInputElement).value } } : prev,
+	                          )
+	                        }
+	                        onBlur={() => {
+	                          const raw = String(activeConnection.config?.store_url ?? '');
+	                          const normalized = normalizeWooStoreUrl(raw);
+	                          if (!normalized.ok) {
+	                            setWooStoreUrlError(normalized.code === 'required' ? null : normalized.message);
+	                            return;
+	                          }
+	                          setWooStoreUrlError(null);
+	                          if (normalized.normalized !== raw.trim()) {
+	                            setActiveConnection((prev) =>
+	                              prev ? { ...prev, config: { ...(prev.config ?? {}), store_url: normalized.normalized } } : prev,
+	                            );
+	                          }
+	                        }}
+	                      />
+	                      <div />
+	                      <Input
+	                        label={
+	                          <div className="flex items-center justify-between gap-2">
+	                            <span>Consumer Key</span>
+	                            {wooHasConsumerKey ? (
+	                              <span className="inline-flex items-center rounded-full bg-emerald-100 text-emerald-800 px-2 py-0.5 text-xs font-medium">
+	                                Salvo
+	                              </span>
+	                            ) : null}
+	                          </div>
+	                        }
+	                        value={
+	                          wooHasConsumerKey && !wooConsumerKey && !wooEditingConsumerKey
+	                            ? WOO_CREDENTIAL_MASK
+	                            : wooConsumerKey
+	                        }
+	                        placeholder={wooHasConsumerKey && !wooConsumerKey ? 'Salvo (mascarado)' : 'ck_...'}
+	                        onFocus={() => {
+	                          if (wooHasConsumerKey && !wooConsumerKey && !wooEditingConsumerKey) {
+	                            setWooEditingConsumerKey(true);
+	                            setWooConsumerKey('');
+	                          }
+	                        }}
+	                        onBlur={() => {
+	                          if (!wooConsumerKey) setWooEditingConsumerKey(false);
+	                        }}
+	                        onChange={(e) => {
+	                          setWooEditingConsumerKey(true);
+	                          setWooConsumerKey((e.target as HTMLInputElement).value);
+	                        }}
+	                        type="password"
+	                        helperText={
+	                          wooHasConsumerKey && !wooConsumerKey
+	                            ? 'Armazenado com segurança. Para substituir, cole uma nova chave.'
+	                            : 'Cole a chave gerada no WooCommerce (ck_...).'
+	                        }
+	                      />
+	                      <Input
+	                        label={
+	                          <div className="flex items-center justify-between gap-2">
+	                            <span>Consumer Secret</span>
+	                            {wooHasConsumerSecret ? (
+	                              <span className="inline-flex items-center rounded-full bg-emerald-100 text-emerald-800 px-2 py-0.5 text-xs font-medium">
+	                                Salvo
+	                              </span>
+	                            ) : null}
+	                          </div>
+	                        }
+	                        value={
+	                          wooHasConsumerSecret && !wooConsumerSecret && !wooEditingConsumerSecret
+	                            ? WOO_CREDENTIAL_MASK
+	                            : wooConsumerSecret
+	                        }
+	                        placeholder={wooHasConsumerSecret && !wooConsumerSecret ? 'Salvo (mascarado)' : 'cs_...'}
+	                        onFocus={() => {
+	                          if (wooHasConsumerSecret && !wooConsumerSecret && !wooEditingConsumerSecret) {
+	                            setWooEditingConsumerSecret(true);
+	                            setWooConsumerSecret('');
+	                          }
+	                        }}
+	                        onBlur={() => {
+	                          if (!wooConsumerSecret) setWooEditingConsumerSecret(false);
+	                        }}
+	                        onChange={(e) => {
+	                          setWooEditingConsumerSecret(true);
+	                          setWooConsumerSecret((e.target as HTMLInputElement).value);
+	                        }}
+	                        type="password"
+	                        helperText={
+	                          wooHasConsumerSecret && !wooConsumerSecret
+	                            ? 'Armazenado com segurança. Para substituir, cole um novo segredo.'
+	                            : 'Cole o secret gerado no WooCommerce (cs_...).'
+	                        }
+	                      />
                     </div>
 
                     <div className="mt-3 flex flex-wrap items-center gap-2">
