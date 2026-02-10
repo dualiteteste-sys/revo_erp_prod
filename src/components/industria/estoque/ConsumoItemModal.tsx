@@ -1,10 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { getLotesDisponiveis, consumirEstoque, EstoqueLote } from '@/services/industriaProducao';
 import { useToast } from '@/contexts/ToastProvider';
 import { Loader2 } from 'lucide-react';
 import { logger } from '@/lib/logger';
+import { useAuth } from '@/contexts/AuthProvider';
 
 interface ConsumoItemModalProps {
     isOpen: boolean;
@@ -26,12 +27,27 @@ const ConsumoItemModal: React.FC<ConsumoItemModalProps> = ({
     onSuccess
 }) => {
     const { addToast } = useToast();
+    const { loading: authLoading, activeEmpresaId } = useAuth();
     const [loading, setLoading] = useState(false);
     const [submitting, setSubmitting] = useState(false);
     const [lotes, setLotes] = useState<EstoqueLote[]>([]);
 
     const [selectedLote, setSelectedLote] = useState<string>('');
     const [quantidade, setQuantidade] = useState<string>('');
+    const lastEmpresaIdRef = useRef<string | null>(activeEmpresaId);
+    const actionTokenRef = useRef(0);
+
+    useEffect(() => {
+        const prevEmpresaId = lastEmpresaIdRef.current;
+        if (prevEmpresaId === activeEmpresaId) return;
+        actionTokenRef.current += 1;
+        setLoading(false);
+        setSubmitting(false);
+        setLotes([]);
+        setSelectedLote('');
+        setQuantidade('');
+        lastEmpresaIdRef.current = activeEmpresaId;
+    }, [activeEmpresaId]);
 
     useEffect(() => {
         if (isOpen && produtoId) {
@@ -39,22 +55,35 @@ const ConsumoItemModal: React.FC<ConsumoItemModalProps> = ({
             setSelectedLote('');
             setQuantidade('');
         }
-    }, [isOpen, produtoId]);
+    }, [isOpen, produtoId, authLoading, activeEmpresaId]);
 
     const loadLotes = async () => {
+        if (authLoading || !activeEmpresaId) return;
+        const token = ++actionTokenRef.current;
+        const empresaSnapshot = activeEmpresaId;
         try {
             setLoading(true);
             const data = await getLotesDisponiveis(produtoId);
+            if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
             setLotes(data);
         } catch (error) {
+            if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
             addToast('Erro ao carregar lotes.', 'error');
         } finally {
+            if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
             setLoading(false);
         }
     };
 
     const handleSubmit = async () => {
+        if (submitting) return;
+        if (authLoading || !activeEmpresaId) {
+            addToast('Aguarde a troca de contexto (login/empresa) concluir para consumir.', 'info');
+            return;
+        }
         if (!selectedLote || !quantidade) return;
+        const token = ++actionTokenRef.current;
+        const empresaSnapshot = activeEmpresaId;
 
         try {
             setSubmitting(true);
@@ -65,13 +94,16 @@ const ConsumoItemModal: React.FC<ConsumoItemModalProps> = ({
                 quantidade: parseFloat(quantidade)
             });
 
+            if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
             addToast('Consumo realizado!', 'success');
             onSuccess();
             onClose();
         } catch (error: any) {
+            if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
             logger.error('[Indústria][Estoque] Falha ao consumir lote', error, { ordemId, componenteId, produtoId, lote: selectedLote });
             addToast('Erro ao consumir: ' + (error.message || 'Erro desconhecido'), 'error');
         } finally {
+            if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
             setSubmitting(false);
         }
     };
@@ -126,7 +158,7 @@ const ConsumoItemModal: React.FC<ConsumoItemModalProps> = ({
 
                 <div className="flex justify-end gap-2 mt-4">
                     <Button variant="outline" onClick={onClose}>Cancelar</Button>
-                    <Button onClick={handleSubmit} disabled={submitting || !selectedLote || !quantidade}>
+                    <Button onClick={handleSubmit} disabled={submitting || authLoading || !activeEmpresaId || !selectedLote || !quantidade}>
                         {submitting && <Loader2 className="animate-spin mr-2 h-4 w-4" />}
                         Confirmar Consumo
                     </Button>
