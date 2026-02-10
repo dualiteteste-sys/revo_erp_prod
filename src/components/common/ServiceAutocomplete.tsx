@@ -33,6 +33,7 @@ export default function ServiceAutocomplete({
   const [results, setResults] = useState<Service[]>([]);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
+  const searchSeqRef = useRef(0);
 
   const debouncedQuery = useDebounce(query, 300);
 
@@ -63,6 +64,7 @@ export default function ServiceAutocomplete({
       if (authLoading || !activeEmpresaId) return;
       // Não busca se a query for muito curta ou se for igual ao nome inicial (evita busca ao carregar form)
       if (debouncedQuery.length < 2) {
+        searchSeqRef.current += 1;
         setResults([]);
         return;
       }
@@ -71,6 +73,7 @@ export default function ServiceAutocomplete({
         return;
       }
 
+      const seq = ++searchSeqRef.current;
       setLoading(true);
       try {
         // Busca exclusiva na tabela de serviços
@@ -80,12 +83,14 @@ export default function ServiceAutocomplete({
           orderBy: 'descricao',
           orderDir: 'asc'
         });
+        if (seq !== searchSeqRef.current) return;
         setResults(data);
         setOpen(true);
       } catch (e) {
+        if (seq !== searchSeqRef.current) return;
         console.error('[ServiceAutocomplete] Erro ao buscar serviços', e);
       } finally {
-        setLoading(false);
+        if (seq === searchSeqRef.current) setLoading(false);
       }
     };
 
