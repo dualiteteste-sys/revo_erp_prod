@@ -763,6 +763,14 @@ export default function MarketplaceIntegrationsPage() {
       } else {
         addToast(`Importação enfileirada (${res.status}). Acompanhe o progresso na lista abaixo.`, 'success');
       }
+      if (provider === 'woo') {
+        const { error } = await supabase.functions.invoke('marketplaces-sync', {
+          body: { provider: 'woo', action: 'import_orders' },
+        });
+        if (error) {
+          addToast('Job enfileirado. O worker não iniciou agora; a fila processará na próxima execução.', 'warning');
+        }
+      }
       await loadProviderJobs(provider, { append: false, offset: 0 });
       await fetchAll();
     } catch (e: any) {
