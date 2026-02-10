@@ -4,6 +4,7 @@ import { searchSuppliers, SupplierHit } from '@/services/compras';
 import { useDebounce } from '@/hooks/useDebounce';
 import { Loader2 } from 'lucide-react';
 import { useToast } from '@/contexts/ToastProvider';
+import { useAuth } from '@/contexts/AuthProvider';
 
 type Props = {
   value: string | null;
@@ -16,6 +17,7 @@ type Props = {
 
 export default function SupplierAutocomplete({ value, onChange, placeholder, disabled, className, initialName }: Props) {
   const { addToast } = useToast();
+  const { loading: authLoading, activeEmpresaId } = useAuth();
   const [query, setQuery] = useState('');
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -78,6 +80,7 @@ export default function SupplierAutocomplete({ value, onChange, placeholder, dis
 
   useEffect(() => {
     const doSearch = async () => {
+      if (authLoading || !activeEmpresaId) return;
       const q = debouncedQuery.trim();
       if (q.length < 2) {
         setHits([]);
@@ -110,7 +113,7 @@ export default function SupplierAutocomplete({ value, onChange, placeholder, dis
       }
     };
     void doSearch();
-  }, [debouncedQuery, value, initialName, query]);
+  }, [debouncedQuery, value, initialName, query, authLoading, activeEmpresaId]);
 
   const handleSelect = (hit: SupplierHit) => {
     setQuery(hit.label);
@@ -119,6 +122,7 @@ export default function SupplierAutocomplete({ value, onChange, placeholder, dis
   };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (authLoading || !activeEmpresaId) return;
     const next = e.target.value;
     setQuery(next);
     if (value) onChange(null);
@@ -187,9 +191,9 @@ export default function SupplierAutocomplete({ value, onChange, placeholder, dis
           value={query}
           onChange={handleInputChange}
           onFocus={() => {
-            if (query.trim().length >= 2) setOpen(true);
+            if (!authLoading && !!activeEmpresaId && query.trim().length >= 2) setOpen(true);
           }}
-          disabled={disabled}
+          disabled={disabled || authLoading || !activeEmpresaId}
         />
         {loading ? (
           <div className="absolute right-3 top-1/2 -translate-y-1/2 text-blue-500">
