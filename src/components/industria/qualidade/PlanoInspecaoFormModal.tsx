@@ -23,6 +23,7 @@ import ResizableSortableTh, { type SortState } from '@/components/ui/table/Resiz
 import TableColGroup from '@/components/ui/table/TableColGroup';
 import { useTableColumnWidths, type TableColumnWidthDef } from '@/components/ui/table/useTableColumnWidths';
 import { sortRows, toggleSort } from '@/components/ui/table/sortUtils';
+import { useAuth } from '@/contexts/AuthProvider';
 
 interface Props {
   isOpen: boolean;
@@ -59,6 +60,7 @@ const defaultForm: PlanoFormState = {
 export default function PlanoInspecaoFormModal({ isOpen, onClose, planoId, onSaved }: Props) {
   const { addToast } = useToast();
   const { confirm } = useConfirm();
+  const { loading: authLoading, activeEmpresaId } = useAuth();
   const [form, setForm] = useState<PlanoFormState>(defaultForm);
   const [produtoSelecionado, setProdutoSelecionado] = useState<{ id: string; nome: string } | null>(null);
   const [roteiros, setRoteiros] = useState<RoteiroListItem[]>([]);
@@ -112,6 +114,7 @@ export default function PlanoInspecaoFormModal({ isOpen, onClose, planoId, onSav
   };
 
   const loadPlano = async (id: string, showSpinner: boolean) => {
+    if (authLoading || !activeEmpresaId) return;
     if (showSpinner) setLoading(true);
     try {
       const data = await getPlanoInspecao(id);
@@ -157,9 +160,10 @@ export default function PlanoInspecaoFormModal({ isOpen, onClose, planoId, onSav
     } else {
       resetState();
     }
-  }, [isOpen, planoId]);
+  }, [isOpen, planoId, authLoading, activeEmpresaId]);
 
   const fetchRoteiros = async (produtoId: string, selectedRoteiro?: string | null, selectedEtapa?: string | null) => {
+    if (authLoading || !activeEmpresaId) return;
     try {
       const data = await listRoteiros(undefined, produtoId, 'producao', true);
       setRoteiros(data);
@@ -176,6 +180,7 @@ export default function PlanoInspecaoFormModal({ isOpen, onClose, planoId, onSav
   };
 
   const fetchEtapas = async (roteiroId: string, etapaId?: string | null) => {
+    if (authLoading || !activeEmpresaId) return;
     try {
       const detalhes = await getRoteiroDetails(roteiroId);
       setEtapas(detalhes.etapas || []);
@@ -190,6 +195,10 @@ export default function PlanoInspecaoFormModal({ isOpen, onClose, planoId, onSav
   };
 
   const handleProductSelect = async (item: OsItemSearchResult) => {
+    if (authLoading || !activeEmpresaId) {
+      addToast('Aguarde a troca de contexto (login/empresa) concluir para selecionar produto.', 'info');
+      return;
+    }
     setProdutoSelecionado({ id: item.id, nome: item.descricao });
     setForm(prev => ({ ...prev, produto_id: item.id, roteiro_id: '', roteiro_etapa_id: '' }));
     setCaracteristicas([]); // keep same? characteristics remain; they refer to plan. On new plan no char yet.
@@ -197,6 +206,10 @@ export default function PlanoInspecaoFormModal({ isOpen, onClose, planoId, onSav
   };
 
   const handleRoteiroChange = async (value: string) => {
+    if (authLoading || !activeEmpresaId) {
+      addToast('Aguarde a troca de contexto (login/empresa) concluir para selecionar roteiro.', 'info');
+      return;
+    }
     setForm(prev => ({ ...prev, roteiro_id: value, roteiro_etapa_id: '' }));
     if (value) {
       await fetchEtapas(value);
@@ -206,6 +219,10 @@ export default function PlanoInspecaoFormModal({ isOpen, onClose, planoId, onSav
   };
 
   const handleSave = async () => {
+    if (authLoading || !activeEmpresaId) {
+      addToast('Aguarde a troca de contexto (login/empresa) concluir para salvar.', 'info');
+      return;
+    }
     if (!form.nome.trim()) {
       addToast('Informe o nome do plano.', 'error');
       return;
@@ -243,6 +260,10 @@ export default function PlanoInspecaoFormModal({ isOpen, onClose, planoId, onSav
   };
 
   const handleDeleteCaracteristica = async (caracteristicaId: string) => {
+    if (authLoading || !activeEmpresaId) {
+      addToast('Aguarde a troca de contexto (login/empresa) concluir para remover.', 'info');
+      return;
+    }
     const ok = await confirm({
       title: 'Remover característica',
       description: 'Remover esta característica do plano?',
@@ -272,6 +293,7 @@ export default function PlanoInspecaoFormModal({ isOpen, onClose, planoId, onSav
   };
 
   const handleCaracteristicaSuccess = async () => {
+    if (authLoading || !activeEmpresaId) return;
     if (form.id) {
       await loadPlano(form.id, false);
     }
@@ -402,7 +424,7 @@ export default function PlanoInspecaoFormModal({ isOpen, onClose, planoId, onSav
                   <Button variant="ghost" onClick={onClose}>
                     Fechar
                   </Button>
-                  <Button onClick={handleSave} disabled={saving || !produtoSelecionado}>
+                  <Button onClick={handleSave} disabled={saving || authLoading || !activeEmpresaId || !produtoSelecionado}>
                     {saving ? 'Salvando...' : 'Salvar Plano'}
                   </Button>
                 </div>
@@ -414,7 +436,7 @@ export default function PlanoInspecaoFormModal({ isOpen, onClose, planoId, onSav
                     <h3 className="text-sm font-semibold text-gray-800">Características do Plano</h3>
                     <p className="text-xs text-gray-500">Tolerâncias, instrumentos e observações.</p>
                   </div>
-                  <Button size="sm" onClick={() => openCaracteristicaModal()} disabled={!form.id}>
+                  <Button size="sm" onClick={() => openCaracteristicaModal()} disabled={authLoading || !activeEmpresaId || !form.id}>
                     <Plus className="w-4 h-4 mr-1" /> Nova Característica
                   </Button>
                 </div>
