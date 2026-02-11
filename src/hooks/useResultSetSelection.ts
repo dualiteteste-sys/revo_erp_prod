@@ -43,8 +43,11 @@ export function useResultSetSelection(params: {
   useLayoutEffect(() => {
     if (lastSignatureRef.current === params.filterSignature) return;
     lastSignatureRef.current = params.filterSignature;
-    autoReset('filters_changed');
-  }, [autoReset, params.filterSignature]);
+    // Avoid spamming UI notifications: only notify when we actually had a selection.
+    const hadSelection = mode === 'all_matching' || selectedIds.size > 0;
+    clearInternal();
+    if (hadSelection) params.onAutoReset?.('filters_changed');
+  }, [clearInternal, mode, params.filterSignature, params.onAutoReset, selectedIds.size]);
 
   const selectedCount = useMemo(() => {
     if (mode === 'explicit') return selectedIds.size;

@@ -87,11 +87,20 @@ describe('useResultSetSelection', () => {
     expect(result.current.selectedCount).toBe(0);
     expect(onAutoReset).toHaveBeenCalledWith('empresa_changed');
 
+    onAutoReset.mockClear();
+
     act(() => result.current.toggleOne('a'));
     expect(result.current.selectedCount).toBe(1);
 
     rerender({ empresaId: 'emp2', filterSignature: 'sig2' });
     expect(result.current.selectedCount).toBe(0);
+    expect(onAutoReset).toHaveBeenCalledTimes(1);
     expect(onAutoReset).toHaveBeenCalledWith('filters_changed');
+
+    // Com selecao ja limpa, mudanca de filtros nao deve disparar notificacao novamente (evita spam de toasts).
+    onAutoReset.mockClear();
+    rerender({ empresaId: 'emp2', filterSignature: 'sig3' });
+    expect(result.current.selectedCount).toBe(0);
+    expect(onAutoReset).not.toHaveBeenCalled();
   });
 });

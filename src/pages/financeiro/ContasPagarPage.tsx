@@ -268,9 +268,8 @@ const ContasPagarPage: React.FC = () => {
       start: filterStartDate ? filterStartDate.toISOString().slice(0, 10) : null,
       end: filterEndDate ? filterEndDate.toISOString().slice(0, 10) : null,
       sortBy,
-      count,
     });
-  }, [count, filterEndDate, filterStartDate, filterStatus, searchTerm, sortBy]);
+  }, [filterEndDate, filterStartDate, filterStatus, searchTerm, sortBy]);
 
   const selection = useResultSetSelection({
     pageIds,
