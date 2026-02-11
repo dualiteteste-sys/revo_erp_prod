@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ContaPagar } from '@/services/financeiro';
 import { CheckCircle2, Edit, Trash2, Ban, RotateCcw } from 'lucide-react';
@@ -33,6 +33,8 @@ const statusConfig: Record<string, { label: string; color: string }> = {
   cancelada: { label: 'Cancelada', color: 'bg-gray-100 text-gray-800' },
 };
 
+const brlFormatter = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' });
+
 const ContasPagarTable: React.FC<ContasPagarTableProps> = ({
   contas,
   onEdit,
@@ -50,15 +52,20 @@ const ContasPagarTable: React.FC<ContasPagarTableProps> = ({
 }) => {
   const { schedule: scheduleEdit, cancel: cancelScheduledEdit } = useDeferredAction(180);
 
-  const columns: TableColumnWidthDef[] = [
-    { id: 'descricao', defaultWidth: 320, minWidth: 220 },
-    { id: 'fornecedor_nome', defaultWidth: 260, minWidth: 200 },
-    { id: 'data_vencimento', defaultWidth: 160, minWidth: 140 },
-    { id: 'valor_total', defaultWidth: 170, minWidth: 150 },
-    { id: 'saldo', defaultWidth: 160, minWidth: 140 },
-    { id: 'status', defaultWidth: 140, minWidth: 120 },
-    { id: 'acoes', defaultWidth: 180, minWidth: 160 },
-  ];
+  const columns: TableColumnWidthDef[] = useMemo(() => {
+    const cols: TableColumnWidthDef[] = [];
+    if (onToggleSelect) cols.push({ id: 'select', defaultWidth: 56, minWidth: 56, maxWidth: 56, resizable: false });
+    cols.push(
+      { id: 'descricao', defaultWidth: 320, minWidth: 220 },
+      { id: 'fornecedor_nome', defaultWidth: 260, minWidth: 200 },
+      { id: 'data_vencimento', defaultWidth: 160, minWidth: 140 },
+      { id: 'valor_total', defaultWidth: 170, minWidth: 150 },
+      { id: 'saldo', defaultWidth: 160, minWidth: 140 },
+      { id: 'status', defaultWidth: 140, minWidth: 120 },
+      { id: 'acoes', defaultWidth: 180, minWidth: 160 }
+    );
+    return cols;
+  }, [onToggleSelect]);
   const { widths, startResize } = useTableColumnWidths({ tableId: 'financeiro:contas-pagar', columns });
   const sort: SortState<string> = sortBy ? { column: sortBy.column, direction: sortBy.ascending ? 'asc' : 'desc' } : null;
 
@@ -98,7 +105,7 @@ const ContasPagarTable: React.FC<ContasPagarTableProps> = ({
             />
           </tr>
         </thead>
-        <motion.tbody layout className="bg-white divide-y divide-gray-200">
+        <tbody className="bg-white divide-y divide-gray-200">
           <AnimatePresence>
             {contas.map((conta) => {
               const href = `/app/financeiro/contas-a-pagar?contaId=${encodeURIComponent(conta.id)}`;
@@ -106,7 +113,6 @@ const ContasPagarTable: React.FC<ContasPagarTableProps> = ({
               return (
                 <motion.tr
                   key={conta.id}
-                  layout
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
                   exit={{ opacity: 0 }}
@@ -128,10 +134,10 @@ const ContasPagarTable: React.FC<ContasPagarTableProps> = ({
                     />
                   </td>
                 ) : null}
-                <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                <td className="px-6 py-4 text-sm font-medium text-gray-900 overflow-hidden min-w-0">
                   <a
                     href={href}
-                    className="hover:underline underline-offset-2"
+                    className="hover:underline underline-offset-2 block truncate"
                     onClick={(e) => {
                       if (!isPlainLeftClick(e)) return;
                       e.preventDefault();
@@ -147,10 +153,18 @@ const ContasPagarTable: React.FC<ContasPagarTableProps> = ({
                     {conta.descricao}
                   </a>
                 </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{conta.fornecedor_nome || '-'}</td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{new Date(conta.data_vencimento).toLocaleDateString('pt-BR')}</td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 font-semibold">{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(conta.valor_total)}</td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(conta.saldo || 0)}</td>
+                <td className="px-6 py-4 text-sm text-gray-500 overflow-hidden min-w-0">
+                  <div className="truncate">{conta.fornecedor_nome || '-'}</div>
+                </td>
+                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                  {new Date(conta.data_vencimento).toLocaleDateString('pt-BR')}
+                </td>
+                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 font-semibold text-right">
+                  {brlFormatter.format(Number(conta.valor_total ?? 0))}
+                </td>
+                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 text-right">
+                  {brlFormatter.format(Number(conta.saldo ?? 0))}
+                </td>
                 <td className="px-6 py-4 whitespace-nowrap">
                   <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${statusConfig[conta.status]?.color || 'bg-gray-100 text-gray-800'}`}>
                     {statusConfig[conta.status]?.label || conta.status}
@@ -225,7 +239,7 @@ const ContasPagarTable: React.FC<ContasPagarTableProps> = ({
               );
             })}
           </AnimatePresence>
-        </motion.tbody>
+        </tbody>
       </table>
     </div>
   );

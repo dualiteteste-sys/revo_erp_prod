@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ContaAReceber } from '@/services/contasAReceber';
 import { CheckCircle2, Edit, Trash2, Ban, RotateCcw } from 'lucide-react';
@@ -34,6 +34,8 @@ const statusConfig: Record<string, { label: string; color: string }> = {
   cancelado: { label: 'Cancelado', color: 'bg-gray-100 text-gray-800' },
 };
 
+const brlFormatter = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' });
+
 const ContasAReceberTable: React.FC<ContasAReceberTableProps> = ({
   contas,
   onEdit,
@@ -51,14 +53,19 @@ const ContasAReceberTable: React.FC<ContasAReceberTableProps> = ({
 }) => {
   const { schedule: scheduleEdit, cancel: cancelScheduledEdit } = useDeferredAction(180);
 
-  const columns: TableColumnWidthDef[] = [
-    { id: 'descricao', defaultWidth: 320, minWidth: 220 },
-    { id: 'cliente_nome', defaultWidth: 260, minWidth: 200 },
-    { id: 'data_vencimento', defaultWidth: 160, minWidth: 140 },
-    { id: 'valor', defaultWidth: 170, minWidth: 150 },
-    { id: 'status', defaultWidth: 140, minWidth: 120 },
-    { id: 'acoes', defaultWidth: 180, minWidth: 160 },
-  ];
+  const columns: TableColumnWidthDef[] = useMemo(() => {
+    const cols: TableColumnWidthDef[] = [];
+    if (onToggleSelect) cols.push({ id: 'select', defaultWidth: 56, minWidth: 56, maxWidth: 56, resizable: false });
+    cols.push(
+      { id: 'descricao', defaultWidth: 320, minWidth: 220 },
+      { id: 'cliente_nome', defaultWidth: 260, minWidth: 200 },
+      { id: 'data_vencimento', defaultWidth: 160, minWidth: 140 },
+      { id: 'valor', defaultWidth: 170, minWidth: 150 },
+      { id: 'status', defaultWidth: 140, minWidth: 120 },
+      { id: 'acoes', defaultWidth: 180, minWidth: 160 }
+    );
+    return cols;
+  }, [onToggleSelect]);
   const { widths, startResize } = useTableColumnWidths({ tableId: 'financeiro:contas-receber', columns });
   const sort: SortState<string> = sortBy ? { column: sortBy.column, direction: sortBy.ascending ? 'asc' : 'desc' } : null;
 
@@ -97,7 +104,7 @@ const ContasAReceberTable: React.FC<ContasAReceberTableProps> = ({
             />
           </tr>
         </thead>
-        <motion.tbody layout className="bg-white divide-y divide-gray-200">
+        <tbody className="bg-white divide-y divide-gray-200">
           <AnimatePresence>
             {contas.map((conta) => {
               const href = `/app/financeiro/contas-a-receber?contaId=${encodeURIComponent(conta.id)}`;
@@ -105,7 +112,6 @@ const ContasAReceberTable: React.FC<ContasAReceberTableProps> = ({
               return (
                 <motion.tr
                   key={conta.id}
-                  layout
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
                   exit={{ opacity: 0 }}
@@ -127,10 +133,10 @@ const ContasAReceberTable: React.FC<ContasAReceberTableProps> = ({
                     />
                   </td>
                 ) : null}
-                <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                <td className="px-6 py-4 text-sm font-medium text-gray-900 overflow-hidden min-w-0">
                   <a
                     href={href}
-                    className="hover:underline underline-offset-2"
+                    className="hover:underline underline-offset-2 block truncate"
                     onClick={(e) => {
                       if (!isPlainLeftClick(e)) return;
                       e.preventDefault();
@@ -146,12 +152,14 @@ const ContasAReceberTable: React.FC<ContasAReceberTableProps> = ({
                     {conta.descricao}
                   </a>
                 </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{conta.cliente_nome || '-'}</td>
+                <td className="px-6 py-4 text-sm text-gray-500 overflow-hidden min-w-0">
+                  <div className="truncate">{conta.cliente_nome || '-'}</div>
+                </td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                   {conta.data_vencimento ? new Date(conta.data_vencimento).toLocaleDateString('pt-BR') : '—'}
                 </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 font-semibold">
-                  {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Number(conta.valor ?? 0))}
+                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 font-semibold text-right">
+                  {brlFormatter.format(Number(conta.valor ?? 0))}
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap">
                   <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${statusConfig[conta.status]?.color || 'bg-gray-100 text-gray-800'}`}>
@@ -227,7 +235,7 @@ const ContasAReceberTable: React.FC<ContasAReceberTableProps> = ({
               );
             })}
           </AnimatePresence>
-        </motion.tbody>
+        </tbody>
       </table>
     </div>
   );
