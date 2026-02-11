@@ -21,6 +21,7 @@ import {
   upsertEcommerceConnection,
   updateEcommerceConnectionConfig,
   type EcommerceHealthSummary,
+  type WooSecretsSaveResult,
 } from '@/services/ecommerceIntegrations';
 import {
   MARKETPLACE_PROVIDER_DEFINITIONS,
@@ -206,7 +207,7 @@ export default function MarketplaceIntegrationsPage() {
   const [wooConsumerKey, setWooConsumerKey] = useState('');
   const [wooConsumerSecret, setWooConsumerSecret] = useState('');
   const [wooSavingSecrets, setWooSavingSecrets] = useState(false);
-  const [wooSecretsSavedHint, setWooSecretsSavedHint] = useState<{ hasKey: boolean; hasSecret: boolean } | null>(null);
+  const [wooSecretsStoredSnapshot, setWooSecretsStoredSnapshot] = useState<WooSecretsSaveResult | null>(null);
   const [wooStoreUrlError, setWooStoreUrlError] = useState<string | null>(null);
   const [wooDepositos, setWooDepositos] = useState<Array<{ id: string; nome: string }>>([]);
   const [wooTabelasPreco, setWooTabelasPreco] = useState<Array<{ id: string; nome: string }>>([]);
@@ -276,10 +277,8 @@ export default function MarketplaceIntegrationsPage() {
       const diag = await getEcommerceConnectionDiagnostics('woo');
       setWooDiag(diag);
       setWooDiagUnavailable(false);
-      // Only clear the optimistic hint once the backend confirms credentials are stored.
-      // This prevents the "Salvo" badge from flickering between save and diag refresh.
       if (diag.has_consumer_key === true && diag.has_consumer_secret === true) {
-        setWooSecretsSavedHint(null);
+        setWooSecretsStoredSnapshot(null);
       }
       return diag;
     } catch {
@@ -535,15 +534,14 @@ export default function MarketplaceIntegrationsPage() {
     setWooConsumerSecret('');
     setWooEditingConsumerKey(false);
     setWooEditingConsumerSecret(false);
-    setWooSecretsSavedHint(null);
     setWooStoreUrlError(null);
     setConfigOpen(true);
     void loadSyncState(provider);
     if (provider === 'woo') void refreshWooDiag();
   };
 
-  const wooHasConsumerKey = wooDiag?.has_consumer_key === true || wooSecretsSavedHint?.hasKey === true;
-  const wooHasConsumerSecret = wooDiag?.has_consumer_secret === true || wooSecretsSavedHint?.hasSecret === true;
+  const wooHasConsumerKey = wooDiag?.has_consumer_key === true || wooSecretsStoredSnapshot?.has_consumer_key === true;
+  const wooHasConsumerSecret = wooDiag?.has_consumer_secret === true || wooSecretsStoredSnapshot?.has_consumer_secret === true;
 
   const handleTestConnection = async () => {
     if (!activeConnection) return;
@@ -686,7 +684,7 @@ export default function MarketplaceIntegrationsPage() {
         const diagUnavailableNow = diag == null;
         const reason = wooPendingReason(
           { ...activeConnection, config: normalizedConfig ?? null },
-          diag ?? null,
+          (diag ?? wooDiag ?? (wooSecretsStoredSnapshot as any) ?? null) as any,
           diagUnavailableNow,
         );
 
@@ -759,15 +757,31 @@ export default function MarketplaceIntegrationsPage() {
         );
       }
 
-      await setWooConnectionSecrets({ ecommerceId: activeConnection.id, consumerKey, consumerSecret });
-      setWooSecretsSavedHint({ hasKey: true, hasSecret: true });
+      const saved = await setWooConnectionSecrets({ ecommerceId: activeConnection.id, consumerKey, consumerSecret });
+      setWooSecretsStoredSnapshot(saved);
+      if (saved.has_consumer_key !== true || saved.has_consumer_secret !== true) {
+        addToast('O backend não confirmou a persistência das credenciais. Tente salvar novamente.', 'error');
+        return;
+      }
       setWooConsumerKey('');
       setWooConsumerSecret('');
       setWooEditingConsumerKey(false);
       setWooEditingConsumerSecret(false);
       // Don't resolve status here — credentials are saved but connectivity is unverified.
       // The actual status will be determined by the edge function when "Testar conexão" is clicked.
-      await refreshWooDiag();
+      setWooDiag((prev) =>
+        prev
+          ? {
+              ...prev,
+              has_consumer_key: true,
+              has_consumer_secret: true,
+              connection_status: 'pending',
+              last_verified_at: null,
+              error_message: null,
+            }
+          : prev,
+      );
+      void refreshWooDiag();
       addToast('Credenciais salvas com sucesso! Clique em "Testar conexão" para validar.', 'success');
       await fetchAll();
     } catch (e: any) {
@@ -982,7 +996,8 @@ export default function MarketplaceIntegrationsPage() {
           const isDisconnected = String(conn?.status ?? '').toLowerCase() === 'disconnected';
           const hasConnection = !!conn && !isDisconnected;
           const busy = busyProvider === provider;
-          const pendingReason = provider === 'woo' ? wooPendingReason(conn ?? null, wooDiag, wooDiagUnavailable) : null;
+          const pendingReason =
+            provider === 'woo' ? wooPendingReason(conn ?? null, (wooDiag ?? (wooSecretsStoredSnapshot as any) ?? null) as any, wooDiagUnavailable) : null;
           const wooLastVerification = provider === 'woo' ? (wooDiag?.last_verified_at ?? null) : null;
           const providerMeta = MARKETPLACE_PROVIDER_DEFINITIONS[provider];
           return (
