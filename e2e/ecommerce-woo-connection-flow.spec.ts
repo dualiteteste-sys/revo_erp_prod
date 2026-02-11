@@ -184,6 +184,54 @@ test('WooCommerce: salvar credenciais + testar conexão (sem estado stale ao tro
     });
   });
 
+  await page.route('**/rest/v1/rpc/ecommerce_connections_update_config', async (route) => {
+    await route.fulfill({ json: {} });
+  });
+
+  await page.route('**/rest/v1/rpc/ecommerce_sync_state_upsert', async (route) => {
+    await route.fulfill({
+      json: {
+        id: 'sync-state-1',
+        ecommerce_id: connectionIdByEmpresa[currentEmpresa],
+        provider: 'woo',
+        entity: 'products',
+        direction: 'bidirectional',
+        conflict_policy: 'erp_wins',
+        auto_sync_enabled: false,
+        sync_interval_minutes: 15,
+        cursor: null,
+        last_sync_at: null,
+        last_success_at: null,
+        last_error_at: null,
+        last_error: null,
+        updated_at: new Date().toISOString(),
+      },
+    });
+  });
+
+  await page.route('**/rest/v1/rpc/ecommerce_sync_state_list', async (route) => {
+    await route.fulfill({
+      json: [
+        {
+          id: 'sync-state-1',
+          ecommerce_id: connectionIdByEmpresa[currentEmpresa],
+          provider: 'woo',
+          entity: 'products',
+          direction: 'bidirectional',
+          conflict_policy: 'erp_wins',
+          auto_sync_enabled: false,
+          sync_interval_minutes: 15,
+          cursor: null,
+          last_sync_at: null,
+          last_success_at: null,
+          last_error_at: null,
+          last_error: null,
+          updated_at: new Date().toISOString(),
+        },
+      ],
+    });
+  });
+
   // Override global function mock so "Testar conexão" can be asserted deterministically.
   await page.route('**/functions/v1/woocommerce-test-connection', async (route) => {
     const req = route.request();
@@ -259,6 +307,12 @@ test('WooCommerce: salvar credenciais + testar conexão (sem estado stale ao tro
 
   await page.getByRole('button', { name: 'Testar conexão' }).click();
   await expect(page.getByText(/validada com sucesso/i)).toBeVisible();
+
+  // Bug fix regression test: clicar "Salvar" no modal não pode derrubar para "faltam credenciais".
+  await page.getByRole('button', { name: /^Salvar$/ }).click();
+  await expect(page.getByText('Assistente de integração')).not.toBeVisible();
+  await expect(page.locator('div', { hasText: 'WooCommerce' }).getByText('Conectado')).toBeVisible();
+  await expect(page.getByText(/Faltam credenciais/i)).not.toBeVisible();
 
   // Troca de empresa deve limpar estado e evitar usar `ecommerce_id` antigo.
   await page.getByRole('button', { name: 'Empresa A' }).click();
