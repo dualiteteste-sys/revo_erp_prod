@@ -296,10 +296,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   // Sync activeEmpresaId to sessionStorage for Header Injection (Tenant Leak fix)
   useEffect(() => {
-    if (typeof window !== "undefined" && activeEmpresaId) {
+    if (typeof window === "undefined") return;
+
+    // Security: never persist tenant context when there is no authenticated user in this runtime.
+    if (userId && activeEmpresaId) {
       sessionStorage.setItem("revo_active_empresa_id", activeEmpresaId);
+      return;
     }
-  }, [activeEmpresaId]);
+
+    sessionStorage.removeItem("revo_active_empresa_id");
+  }, [activeEmpresaId, userId]);
 
   // Tenant switch must be treated as a security boundary:
   // never allow cached data from tenant A to render while tenant B is active.

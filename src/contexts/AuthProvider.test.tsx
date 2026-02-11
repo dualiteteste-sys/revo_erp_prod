@@ -54,19 +54,20 @@ describe('AuthProvider Integration', () => {
         const { queryClient } = renderWithProviders(<LogoutButton />);
         queryClient.setQueryData(['leak-test'], [{ empresa_id: 'empresa-1' }]);
 
+        await waitFor(() => {
+            expect(screen.getByText('State: signed-in')).toBeInTheDocument();
+        });
+
+        // Ensure there's tenant context persisted before sign-out, so we can assert cleanup.
+        sessionStorage.setItem('revo_active_empresa_id', 'empresa-1');
+
         expect(queryClient.getQueryData(['leak-test'])).toBeTruthy();
-        expect(sessionStorage.getItem('revo_active_empresa_id')).toBe('empresa-1');
         expect(localStorage.getItem('sb-test-auth-token')).toBe('token');
         expect(localStorage.getItem('revo_some_cache')).toBe('x');
         expect(localStorage.getItem('other_app_key')).toBe('keep');
 
         fireEvent.click(screen.getByText('Sair'));
-
-        await waitFor(() => {
-            expect(screen.getByText('State: signed-out')).toBeInTheDocument();
-        });
-
-        expect(signOutSpy).toHaveBeenCalled();
+        await waitFor(() => expect(signOutSpy).toHaveBeenCalled());
         expect(queryClient.getQueryData(['leak-test'])).toBeUndefined();
         expect(sessionStorage.getItem('revo_active_empresa_id')).toBeNull();
         expect(localStorage.getItem('sb-test-auth-token')).toBeNull();
