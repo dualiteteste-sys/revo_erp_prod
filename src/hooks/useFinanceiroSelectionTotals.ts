@@ -32,10 +32,15 @@ export function useFinanceiroSelectionTotals<T>(params: {
   const debounceMs = params.debounceMs ?? 200;
   const [state, setState] = useState<HookState<T>>({ loading: false, error: null, data: null });
   const requestTokenRef = useRef(0);
+  const fetcherRef = useRef(params.fetcher);
   const requestCacheRef = useRef<{ key: string | null; request: SelectionTotalsRequest | null }>({
     key: null,
     request: null,
   });
+
+  useEffect(() => {
+    fetcherRef.current = params.fetcher;
+  }, [params.fetcher]);
 
   const normalized = useMemo(() => {
     if (!params.enabled || !params.request) return { key: null as string | null, request: null as SelectionTotalsRequest | null };
@@ -64,7 +69,7 @@ export function useFinanceiroSelectionTotals<T>(params: {
       const token = ++requestTokenRef.current;
       setState((prev) => ({ ...prev, loading: true, error: null }));
       try {
-        const data = await params.fetcher(req);
+        const data = await fetcherRef.current(req);
         if (token !== requestTokenRef.current) return;
         setState({ loading: false, error: null, data });
       } catch (e: unknown) {
@@ -73,7 +78,7 @@ export function useFinanceiroSelectionTotals<T>(params: {
         setState({ loading: false, error: msg || 'Erro ao calcular totais.', data: null });
       }
     },
-    [params.fetcher]
+    []
   );
 
   useEffect(() => {
