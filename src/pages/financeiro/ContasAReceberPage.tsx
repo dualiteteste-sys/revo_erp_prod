@@ -284,7 +284,7 @@ const ContasAReceberPage: React.FC = () => {
 
   const selectedIdsOnPage = React.useMemo(() => {
     return new Set(pageIds.filter((id) => selection.isSelected(id)));
-  }, [pageIds, selection]);
+  }, [pageIds, selection.excludedIds, selection.mode, selection.selectedIds]);
 
   const totalsReq = React.useMemo(() => {
     if (selection.selectedCount <= 0) return null;
@@ -298,7 +298,16 @@ const ContasAReceberPage: React.FC = () => {
       startDateISO: isAllMatching && filterStartDate ? filterStartDate.toISOString().slice(0, 10) : null,
       endDateISO: isAllMatching && filterEndDate ? filterEndDate.toISOString().slice(0, 10) : null,
     };
-  }, [filterEndDate, filterStartDate, filterStatus, searchTerm, selection]);
+  }, [
+    filterEndDate,
+    filterStartDate,
+    filterStatus,
+    searchTerm,
+    selection.excludedIds,
+    selection.mode,
+    selection.selectedCount,
+    selection.selectedIds,
+  ]);
 
   const totalsState = useFinanceiroSelectionTotals({
     enabled: selection.selectedCount > 0,
