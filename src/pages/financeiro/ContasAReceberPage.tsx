@@ -267,9 +267,8 @@ const ContasAReceberPage: React.FC = () => {
       start: filterStartDate ? filterStartDate.toISOString().slice(0, 10) : null,
       end: filterEndDate ? filterEndDate.toISOString().slice(0, 10) : null,
       sortBy,
-      count: effectiveCount,
     });
-  }, [effectiveCount, filterEndDate, filterStartDate, filterStatus, searchTerm, sortBy]);
+  }, [filterEndDate, filterStartDate, filterStatus, searchTerm, sortBy]);
 
   const selection = useResultSetSelection({
     pageIds,
