@@ -4,6 +4,21 @@ import { renderWithProviders } from '@/test/utils';
 import OrdensPage from '@/pages/industria/OrdensPage';
 import { listOrdensProducao } from '@/services/industriaProducao';
 
+vi.mock('@/contexts/AuthProvider', () => ({
+  useAuth: () => ({
+    loading: false,
+    activeEmpresaId: 'empresa-1',
+    session: null,
+    user: { id: 'user-1' },
+    signOut: vi.fn(),
+  }),
+}));
+
+vi.mock('@/hooks/useEmpresaRole', () => ({
+  roleAtLeast: () => true,
+  useEmpresaRole: () => ({ data: 'member', isFetched: true }),
+}));
+
 vi.mock('@/services/industria', async () => {
   const actual = await vi.importActual<any>('@/services/industria');
   return {
@@ -53,6 +68,7 @@ describe('OrdensPage (OP/OB)', () => {
     renderWithProviders(<OrdensPage />, { route: '/app/industria/ordens?tipo=industrializacao' });
 
     await waitFor(() => expect(listOrdensProducao).toHaveBeenCalled());
+    expect(await screen.findByText('123')).toBeInTheDocument();
   });
 
   it('lists beneficiamento using OP/OB RPC', async () => {
