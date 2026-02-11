@@ -8,9 +8,11 @@ type TotalLine = {
   value: number | null;
 };
 
+const brlFormatter = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' });
+
 function formatBRL(value: number | null): string {
   if (value === null || value === undefined) return '—';
-  return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Number(value));
+  return brlFormatter.format(Number(value));
 }
 
 export default function SelectionTotalizerBar(props: {
@@ -40,11 +42,11 @@ export default function SelectionTotalizerBar(props: {
 
   return (
     <div className="sticky top-0 z-20 mb-3 rounded-xl border border-slate-200 bg-white/90 backdrop-blur px-3 py-2 flex flex-wrap items-center justify-between gap-3">
-      <div className="text-sm text-slate-700">
+      <div className="text-sm text-slate-700 whitespace-nowrap">
         <span className="font-semibold">{selectionLabel}</span>
       </div>
 
-      <div className="flex flex-wrap items-center justify-end gap-3">
+      <div className="flex flex-wrap items-center justify-end gap-3 min-w-0">
         {props.loading ? (
           <span className="inline-flex items-center gap-2 text-xs text-slate-600">
             <Loader2 className="h-3.5 w-3.5 animate-spin" />
@@ -52,7 +54,7 @@ export default function SelectionTotalizerBar(props: {
           </span>
         ) : null}
 
-        <div className="flex flex-wrap items-center gap-3">
+        <div className="flex flex-wrap items-center gap-3 min-w-0">
           {props.totals.map((t) => (
             <div key={t.key} className="text-xs text-slate-600 whitespace-nowrap">
               <span className="font-medium text-slate-700">{t.label}:</span> {formatBRL(t.value)}

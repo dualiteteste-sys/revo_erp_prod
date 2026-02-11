@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useLayoutEffect, useMemo, useRef, useState } from 'react';
 
 export type ResultSetSelectionMode = 'explicit' | 'all_matching';
 
@@ -29,16 +29,18 @@ export function useResultSetSelection(params: {
       clearInternal();
       params.onAutoReset?.(reason);
     },
-    [clearInternal, params]
+    [clearInternal, params.onAutoReset]
   );
 
-  useEffect(() => {
+  // Use layout effects so the selection resets before paint when tenant/filters change.
+  // This avoids a one-frame "old selection" flash and prevents unnecessary totals RPC calls.
+  useLayoutEffect(() => {
     if (lastEmpresaIdRef.current === params.empresaId) return;
     lastEmpresaIdRef.current = params.empresaId;
     autoReset('empresa_changed');
   }, [autoReset, params.empresaId]);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (lastSignatureRef.current === params.filterSignature) return;
     lastSignatureRef.current = params.filterSignature;
     autoReset('filters_changed');
@@ -144,4 +146,3 @@ export function useResultSetSelection(params: {
     excludedIds,
   };
 }
-
