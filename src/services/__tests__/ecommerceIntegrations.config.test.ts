@@ -58,6 +58,17 @@ describe('resolveWooConnectionStatus', () => {
     ).toBe('connected');
   });
 
+  it('returns pending when store URL is missing (even if diagnostics says connected)', () => {
+    expect(
+      resolveWooConnectionStatus({
+        storeUrl: '',
+        diagnostics: { connection_status: 'connected' } as any,
+        diagnosticsUnavailable: false,
+        previousStatus: 'connected',
+      }),
+    ).toBe('pending');
+  });
+
   it('returns error when backend diagnostics says error', () => {
     expect(
       resolveWooConnectionStatus({
@@ -77,7 +88,7 @@ describe('resolveWooConnectionStatus', () => {
         diagnosticsUnavailable: true,
         previousStatus: 'connected',
       }),
-    ).toBe('connected');
+    ).toBe('pending');
   });
 
   it('returns pending when required data is missing', () => {

@@ -207,16 +207,16 @@ const ProductsPage: React.FC = () => {
     const row = rows.find((r) => r.id === product.id);
     const minimal = row
       ? ({
-          id: row.id,
-          nome: row.nome,
-          sku: row.sku,
-          slug: (row as any).slug ?? null,
-          status: row.status as any,
-          preco_venda: row.preco_venda as any,
-          unidade: row.unidade as any,
-          created_at: row.created_at as any,
-          updated_at: row.updated_at as any,
-        } as productsService.Product)
+        id: row.id,
+        nome: row.nome,
+        sku: row.sku,
+        slug: (row as any).slug ?? null,
+        status: row.status as any,
+        preco_venda: row.preco_venda as any,
+        unidade: row.unidade as any,
+        created_at: row.created_at as any,
+        updated_at: row.updated_at as any,
+      } as productsService.Product)
       : null;
 
     setProductToDelete(minimal ?? null);
@@ -309,7 +309,7 @@ const ProductsPage: React.FC = () => {
       description="Catálogo de produtos e configurações fiscais básicas."
       icon={<Package size={20} />}
       actions={
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
           <Button
             onClick={() => {
               downloadCsv({
@@ -366,21 +366,21 @@ const ProductsPage: React.FC = () => {
   );
 
   const filters = (
-    <div className="flex gap-4">
-      <div className="relative">
+    <div className="flex flex-wrap gap-3 sm:gap-4">
+      <div className="relative w-full sm:w-auto sm:flex-grow sm:max-w-sm">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={20} />
         <input
           type="text"
           placeholder="Buscar por nome ou SKU..."
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
-          className="w-full max-w-sm p-3 pl-10 border border-gray-300 rounded-lg"
+          className="w-full p-3 pl-10 border border-gray-300 rounded-lg"
         />
       </div>
       <Select
         value={filterStatus || ''}
         onChange={(e) => setFilterStatus((e.target.value as 'ativo' | 'inativo') || null)}
-        className="min-w-[200px]"
+        className="w-full sm:w-auto sm:min-w-[200px]"
       >
         <option value="">Todos os status</option>
         <option value="ativo">Ativo</option>

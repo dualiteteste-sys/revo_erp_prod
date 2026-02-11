@@ -139,12 +139,13 @@ export async function setWooConnectionSecrets(params: {
   ecommerceId: string;
   consumerKey: string;
   consumerSecret: string;
-}): Promise<void> {
-  await callRpc('ecommerce_woo_set_secrets', {
+}): Promise<WooSecretsSaveResult> {
+  const raw = await callRpc<any>('ecommerce_woo_set_secrets_v2', {
     p_ecommerce_id: params.ecommerceId,
     p_consumer_key: params.consumerKey,
     p_consumer_secret: params.consumerSecret,
   });
+  return normalizeWooSecretsSaveResult(raw);
 }
 
 export async function setWooStoreUrl(params: { ecommerceId: string; storeUrl: string }): Promise<{ store_url: string }> {
@@ -152,6 +153,28 @@ export async function setWooStoreUrl(params: { ecommerceId: string; storeUrl: st
     p_ecommerce_id: params.ecommerceId,
     p_store_url: params.storeUrl,
   });
+}
+
+export type WooSecretsSaveResult = {
+  has_consumer_key: boolean;
+  has_consumer_secret: boolean;
+  connection_status: 'connected' | 'pending' | 'error';
+  last_verified_at: string | null;
+  error_message: string | null;
+};
+
+function normalizeWooSecretsSaveResult(raw: unknown): WooSecretsSaveResult {
+  const obj = raw && typeof raw === 'object' && !Array.isArray(raw) ? (raw as Record<string, unknown>) : {};
+  const has_consumer_key = obj.has_consumer_key === true;
+  const has_consumer_secret = obj.has_consumer_secret === true;
+  const connection_status =
+    obj.connection_status === 'connected' || obj.connection_status === 'pending' || obj.connection_status === 'error'
+      ? (obj.connection_status as WooSecretsSaveResult['connection_status'])
+      : 'pending';
+  const last_verified_at = typeof obj.last_verified_at === 'string' && obj.last_verified_at.trim() ? String(obj.last_verified_at) : null;
+  const error_message = typeof obj.error_message === 'string' && obj.error_message.trim() ? String(obj.error_message) : null;
+
+  return { has_consumer_key, has_consumer_secret, connection_status, last_verified_at, error_message };
 }
 
 export function resolveWooConnectionStatus(params: {
@@ -167,12 +190,6 @@ export function resolveWooConnectionStatus(params: {
   if (diagStatus === 'connected') return 'connected';
   if (diagStatus === 'error') return 'error';
   if (diagStatus === 'pending') return 'pending';
-
-  if (params.diagnosticsUnavailable) {
-    const previous = String(params.previousStatus ?? '').toLowerCase();
-    if (previous === 'connected') return 'connected';
-    if (previous === 'error') return 'error';
-  }
 
   return 'pending';
 }

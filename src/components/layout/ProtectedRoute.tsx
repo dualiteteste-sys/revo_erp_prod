@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Building2, RefreshCcw } from 'lucide-react';
 
 const FullscreenLoading = ({ label }: { label?: string }) => (
-  <div className="w-screen h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50">
+  <div className="w-full h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50">
     <div className="flex flex-col items-center gap-4">
       <div className="w-16 h-16 border-4 border-blue-500 border-dashed rounded-full animate-spin" />
       <div className="text-sm text-slate-600">{label ?? 'Carregando…'}</div>
@@ -24,7 +24,7 @@ const SelectEmpresaGate = ({
   onReload: () => void;
 }) => {
   return (
-    <div className="w-screen h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 p-6">
+    <div className="w-full h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 p-6">
       <GlassCard className="w-full max-w-xl p-6">
         <div className="flex items-start justify-between gap-3">
           <div>
@@ -117,7 +117,7 @@ const ProtectedRoute = ({ children }: { children: JSX.Element }) => {
       />
     );
   }
-  
+
   return children;
 };
 

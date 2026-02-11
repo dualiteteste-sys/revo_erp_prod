@@ -23,7 +23,7 @@ export default function PageShell({
   stickyFooter = true,
 }: PageShellProps) {
   return (
-    <div className={cn('p-1 min-h-full flex flex-col', className)}>
+    <div className={cn('p-1 min-h-full flex flex-col overflow-x-hidden max-w-full', className)}>
       <div className="mb-6 flex-shrink-0">{header}</div>
       {summary ? <div className="mb-6 flex-shrink-0">{summary}</div> : null}
       {filters ? <div className="mb-4 flex-shrink-0">{filters}</div> : null}
