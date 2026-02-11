@@ -5,6 +5,7 @@ export type ConciliacaoTituloTipo = 'pagar' | 'receber';
 export type ConciliacaoTituloCandidate = {
   tipo: ConciliacaoTituloTipo;
   titulo_id: string;
+  pessoa_id: string;
   pessoa_nome: string;
   descricao: string | null;
   documento_ref: string | null;
@@ -85,4 +86,60 @@ export async function conciliarExtratoComTitulosLote(params: {
     p_titulo_ids: params.tituloIds,
   });
   return { movimentacaoId };
+}
+
+type ConciliacaoAlocacaoItem = { titulo_id: string; valor: number };
+
+type ConciliarExtratoAlocadoResponse =
+  | {
+      kind: 'ok';
+      movimentacao_ids: string[];
+      credito_id?: string | null;
+      diferenca?: number | null;
+      aplicado_total?: number | null;
+      extrato_valor?: number | null;
+    }
+  | {
+      kind: 'noop';
+      movimentacao_ids: string[];
+      message?: string | null;
+    };
+
+export async function conciliarExtratoComTitulosAlocados(params: {
+  extratoId: string;
+  tipo: ConciliacaoTituloTipo;
+  alocacoes: Array<{ tituloId: string; valor: number }>;
+  overpaymentMode: 'error' | 'credito_em_conta';
+  overpaymentPessoaId: string | null;
+  observacoes?: string | null;
+}): Promise<ConciliarExtratoAlocadoResponse> {
+  const alocacoes: ConciliacaoAlocacaoItem[] = (params.alocacoes || []).map((x) => ({
+    titulo_id: x.tituloId,
+    valor: x.valor,
+  }));
+
+  const res = await callRpc<any>('financeiro_conciliacao_conciliar_extrato_com_titulos_alocados', {
+    p_extrato_id: params.extratoId,
+    p_tipo: params.tipo,
+    p_alocacoes: alocacoes,
+    p_overpayment_mode: params.overpaymentMode,
+    p_overpayment_pessoa_id: params.overpaymentPessoaId,
+    p_observacoes: params.observacoes ?? null,
+  });
+
+  const kind = String(res?.kind || 'ok') as 'ok' | 'noop';
+  const movimentacao_ids = Array.isArray(res?.movimentacao_ids) ? (res.movimentacao_ids as string[]) : [];
+
+  if (kind === 'noop') {
+    return { kind: 'noop', movimentacao_ids, message: res?.message ?? null };
+  }
+
+  return {
+    kind: 'ok',
+    movimentacao_ids,
+    credito_id: res?.credito_id ?? null,
+    diferenca: typeof res?.diferenca === 'number' ? res.diferenca : res?.diferenca != null ? Number(res.diferenca) : null,
+    aplicado_total: typeof res?.aplicado_total === 'number' ? res.aplicado_total : res?.aplicado_total != null ? Number(res.aplicado_total) : null,
+    extrato_valor: typeof res?.extrato_valor === 'number' ? res.extrato_valor : res?.extrato_valor != null ? Number(res.extrato_valor) : null,
+  };
 }
