@@ -4,10 +4,12 @@ import { X, Loader2, Link2, Plus } from 'lucide-react';
 import { ExtratoItem, Movimentacao, listMovimentacoes, saveMovimentacao } from '@/services/treasury';
 import { useToast } from '@/contexts/ToastProvider';
 import { listConciliacaoRegras, type ConciliacaoRegra } from '@/services/conciliacaoRegras';
-import { conciliarExtratoComTitulo, conciliarExtratoComTituloParcial, conciliarExtratoComTitulosLote, searchTitulosParaConciliacao, sugerirTitulosParaExtrato, type ConciliacaoTituloCandidate, type ConciliacaoTituloTipo } from '@/services/conciliacaoTitulos';
+import { conciliarExtratoComTitulo, conciliarExtratoComTituloParcial, conciliarExtratoComTitulosAlocados, conciliarExtratoComTitulosLote, searchTitulosParaConciliacao, sugerirTitulosParaExtrato, type ConciliacaoTituloCandidate, type ConciliacaoTituloTipo } from '@/services/conciliacaoTitulos';
 import { rankCandidates, scoreExtratoToMovimentacao, type MatchResult } from '@/lib/conciliacao/matching';
 import DatePicker from '@/components/ui/DatePicker';
 import { formatDatePtBR } from '@/lib/dateDisplay';
+import { useNumericField } from '@/hooks/useNumericField';
+import { autoAllocateFifoByVencimento } from '@/lib/conciliacao/allocation';
 
 interface Props {
   isOpen: boolean;
@@ -26,6 +28,53 @@ function toFiniteMoneyOrNull(value: unknown): number | null {
   if (value === null || value === undefined) return null;
   const parsed = typeof value === 'number' ? value : Number(value);
   return Number.isFinite(parsed) ? parsed : null;
+}
+
+function formatBRL(value: number): string {
+  return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value);
+}
+
+function clampMoney(value: number, min: number, max: number): number {
+  const v = Math.round(value * 100) / 100;
+  return Math.min(max, Math.max(min, v));
+}
+
+function TituloAllocationRow(props: {
+  titulo: ConciliacaoTituloCandidate;
+  applied: number | null;
+  onChangeApplied: (value: number | null) => void;
+  disabled?: boolean;
+}) {
+  const saldo = Number(props.titulo.saldo_aberto || 0);
+  const field = useNumericField(props.applied ?? null, (v) => {
+    if (v === null) return props.onChangeApplied(null);
+    props.onChangeApplied(clampMoney(v, 0, saldo));
+  });
+
+  return (
+    <div className="flex flex-col gap-2 rounded-md border border-gray-200 bg-white p-3">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <div className="text-sm font-semibold text-gray-900 truncate">{props.titulo.pessoa_nome || '—'}</div>
+          <div className="mt-0.5 text-xs text-gray-600 truncate">{props.titulo.descricao || '—'}</div>
+          <div className="mt-1 text-[11px] text-gray-500">
+            Venc.: {formatDatePtBR(props.titulo.data_vencimento)} · Saldo: <span className="font-semibold">{formatBRL(saldo)}</span>
+          </div>
+        </div>
+        <div className="shrink-0 text-right">
+          <div className="text-[11px] uppercase font-semibold text-gray-500">Aplicar</div>
+          <input
+            type="text"
+            inputMode="numeric"
+            placeholder="0,00"
+            {...field}
+            disabled={props.disabled}
+            className="mt-1 w-[140px] rounded-md border border-gray-300 px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-60"
+          />
+        </div>
+      </div>
+    </div>
+  );
 }
 
 export default function ConciliacaoDrawer({ isOpen, onClose, extratoItem, contaCorrenteId, onConciliate }: Props) {
@@ -51,6 +100,11 @@ export default function ConciliacaoDrawer({ isOpen, onClose, extratoItem, contaC
   const [titulosSelected, setTitulosSelected] = useState<Record<string, ConciliacaoTituloCandidate>>({});
   const [titulosBatchConciliando, setTitulosBatchConciliando] = useState(false);
   const [titulosParcialConciliando, setTitulosParcialConciliando] = useState(false);
+  const [allocationOpen, setAllocationOpen] = useState(false);
+  const [allocations, setAllocations] = useState<Record<string, number | null>>({});
+  const [allocating, setAllocating] = useState(false);
+  const [createCreditoEmConta, setCreateCreditoEmConta] = useState(false);
+  const [creditoPessoaId, setCreditoPessoaId] = useState<string | null>(null);
 
   useEffect(() => {
     if (isOpen && extratoItem) {
@@ -66,6 +120,11 @@ export default function ConciliacaoDrawer({ isOpen, onClose, extratoItem, contaC
     setTitulosCount(0);
     setTitulosPage(1);
     setTitulosSelected({});
+    setAllocationOpen(false);
+    setAllocations({});
+    setAllocating(false);
+    setCreateCreditoEmConta(false);
+    setCreditoPessoaId(null);
 
     const date = new Date(extratoItem.data_lancamento);
     const start = new Date(date);
@@ -291,6 +350,101 @@ export default function ConciliacaoDrawer({ isOpen, onClose, extratoItem, contaC
   const titulosSuggestionsExact = extratoItem
     ? (titulosSuggestions || []).filter((t) => Math.abs(Number(t.saldo_aberto || 0) - extratoValor) <= 0.01)
     : (titulosSuggestions || []);
+
+  const appliedTotal = Object.values(allocations).reduce<number>(
+    (acc, v) => acc + (typeof v === 'number' && Number.isFinite(v) ? v : 0),
+    0
+  );
+  const allocationDiff = extratoItem ? Number(extratoItem.valor || 0) - appliedTotal : 0;
+
+  const distinctPessoaOptions = (() => {
+    const map = new Map<string, { id: string; nome: string }>();
+    for (const t of selectedTitulosArray) {
+      if (!t.pessoa_id) continue;
+      if (!map.has(t.pessoa_id)) map.set(t.pessoa_id, { id: t.pessoa_id, nome: t.pessoa_nome || '—' });
+    }
+    return Array.from(map.values()).sort((a, b) => a.nome.localeCompare(b.nome));
+  })();
+
+  const openAllocationWizard = () => {
+    if (!extratoItem) return;
+    if (selectedTitulosArray.length === 0) return;
+    const auto = autoAllocateFifoByVencimento({ titulos: selectedTitulosArray, total: extratoValor });
+    const next: Record<string, number | null> = {};
+    for (const t of selectedTitulosArray) {
+      next[t.titulo_id] = auto[t.titulo_id] ?? 0;
+    }
+    setAllocations(next);
+    setCreateCreditoEmConta(false);
+    if (distinctPessoaOptions.length === 1) setCreditoPessoaId(distinctPessoaOptions[0].id);
+    else setCreditoPessoaId(null);
+    setAllocationOpen(true);
+  };
+
+  const autoAllocateAgain = () => {
+    if (!extratoItem) return;
+    const auto = autoAllocateFifoByVencimento({ titulos: selectedTitulosArray, total: extratoValor });
+    setAllocations((prev) => {
+      const next: Record<string, number | null> = { ...prev };
+      for (const t of selectedTitulosArray) next[t.titulo_id] = auto[t.titulo_id] ?? 0;
+      return next;
+    });
+  };
+
+  const handleConciliarAlocado = async () => {
+    if (!extratoItem) return;
+    if (allocating || titulosBatchConciliando || titulosParcialConciliando || !!linkingId) return;
+
+    const alocacoes = selectedTitulosArray
+      .map((t) => ({ tituloId: t.titulo_id, valor: Number(allocations[t.titulo_id] || 0) }))
+      .filter((x) => Number.isFinite(x.valor) && x.valor > 0.0);
+
+    const total = alocacoes.reduce((acc, x) => acc + x.valor, 0);
+    const diff = extratoValor - total;
+
+    if (alocacoes.length === 0) {
+      addToast('Informe valores para aplicar em ao menos 1 título.', 'error');
+      return;
+    }
+    if (total - extratoValor > 0.01) {
+      addToast('Total aplicado maior que o valor do extrato. Ajuste os valores.', 'error');
+      return;
+    }
+    if (diff > 0.01 && (!createCreditoEmConta || !creditoPessoaId)) {
+      addToast('Existe sobra no extrato. Ative “Criar crédito em conta” e selecione a pessoa (ou ajuste a alocação).', 'error');
+      return;
+    }
+
+    setAllocating(true);
+    try {
+      const res = await conciliarExtratoComTitulosAlocados({
+        extratoId: extratoItem.id,
+        tipo: tipoTitulo,
+        alocacoes,
+        overpaymentMode: diff > 0.01 ? 'credito_em_conta' : 'error',
+        overpaymentPessoaId: diff > 0.01 ? creditoPessoaId : null,
+        observacoes: null,
+      });
+
+      const firstMov = res.movimentacao_ids?.[0] ?? null;
+      if (firstMov) {
+        await onConciliate(firstMov);
+      }
+
+      if (res.kind === 'noop') {
+        addToast(res.message || 'Extrato já estava conciliado.', 'info');
+      } else if (diff > 0.01) {
+        addToast('Conciliação concluída com crédito em conta (sobra).', 'success');
+      } else {
+        addToast('Conciliação concluída!', 'success');
+      }
+      onClose();
+    } catch (e: any) {
+      addToast(e?.message || 'Erro ao conciliar com alocação.', 'error');
+    } finally {
+      setAllocating(false);
+    }
+  };
 
   const handleConciliarTitulosSelecionados = async () => {
     if (!extratoItem) return;
@@ -553,6 +707,161 @@ export default function ConciliacaoDrawer({ isOpen, onClose, extratoItem, contaC
                           >
                             {titulosParcialConciliando ? <Loader2 className="h-4 w-4 animate-spin" /> : <Link2 size={16} />}
                             Registrar parcial e conciliar
+                          </button>
+                        </div>
+                      </div>
+                    ) : null}
+
+                    {selectedTitulosArray.length > 0 ? (
+                      <div className="mt-3 flex items-center justify-between gap-3">
+                        <button
+                          type="button"
+                          onClick={openAllocationWizard}
+                          disabled={titulosBatchConciliando || titulosParcialConciliando || allocating || !!linkingId}
+                          className="text-xs text-blue-700 hover:underline disabled:opacity-60"
+                        >
+                          Alocar pagamento (parcial/FIFO/crédito)
+                        </button>
+                        {allocationOpen ? (
+                          <button
+                            type="button"
+                            onClick={() => setAllocationOpen(false)}
+                            className="text-xs text-gray-600 hover:underline"
+                          >
+                            Fechar alocação
+                          </button>
+                        ) : null}
+                      </div>
+                    ) : null}
+
+                    {allocationOpen ? (
+                      <div className="mt-3 rounded-lg border border-blue-100 bg-blue-50/40 p-3">
+                        <div className="flex items-center justify-between gap-3">
+                          <div className="text-sm font-semibold text-gray-900">Alocação do pagamento</div>
+                          <button
+                            type="button"
+                            onClick={() => setAllocationOpen(false)}
+                            className="rounded-md p-1 text-gray-600 hover:bg-white/60"
+                            title="Fechar"
+                          >
+                            <X size={16} />
+                          </button>
+                        </div>
+
+                        <div className="mt-2 text-xs text-gray-700">
+                          <div>
+                            Total do extrato: <span className="font-semibold">{formatBRL(extratoValor)}</span>
+                            {' · '}
+                            Total aplicado: <span className="font-semibold">{formatBRL(appliedTotal)}</span>
+                            {' · '}
+                            Diferença:{' '}
+                            <span className={`font-semibold ${Math.abs(allocationDiff) <= 0.01 ? 'text-emerald-700' : 'text-rose-700'}`}>
+                              {formatBRL(allocationDiff)}
+                            </span>
+                          </div>
+                          <div className="mt-1 text-[11px] text-gray-500">
+                            Dica: use “Auto-alocar (FIFO)” para preencher os títulos mais antigos primeiro e depois ajuste manualmente.
+                          </div>
+                        </div>
+
+                        <div className="mt-3 flex items-center justify-between gap-2">
+                          <button
+                            type="button"
+                            onClick={autoAllocateAgain}
+                            disabled={allocating}
+                            className="text-xs rounded-md border border-blue-200 bg-white px-3 py-2 text-blue-700 hover:bg-blue-50 disabled:opacity-60"
+                          >
+                            Auto-alocar (FIFO por vencimento)
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setAllocations((prev) => Object.fromEntries(Object.keys(prev).map((k) => [k, 0])))}
+                            disabled={allocating}
+                            className="text-xs text-gray-600 hover:underline disabled:opacity-60"
+                          >
+                            Zerar valores
+                          </button>
+                        </div>
+
+                        <div className="mt-3 space-y-2">
+                          {selectedTitulosArray.map((t) => (
+                            <TituloAllocationRow
+                              key={t.titulo_id}
+                              titulo={t}
+                              applied={allocations[t.titulo_id] ?? 0}
+                              disabled={allocating}
+                              onChangeApplied={(v) => setAllocations((prev) => ({ ...prev, [t.titulo_id]: v }))}
+                            />
+                          ))}
+                        </div>
+
+                        {allocationDiff > 0.01 ? (
+                          <div className="mt-3 rounded-md border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">
+                            <div className="font-semibold">Sobra detectada</div>
+                            <div className="mt-1">
+                              O extrato tem <span className="font-semibold">{formatBRL(allocationDiff)}</span> a mais do que o total aplicado.
+                              Você pode criar um crédito “em conta” para usar depois.
+                            </div>
+
+                            <label className="mt-2 flex items-center gap-2">
+                              <input
+                                type="checkbox"
+                                checked={createCreditoEmConta}
+                                onChange={(e) => setCreateCreditoEmConta(e.target.checked)}
+                                disabled={allocating}
+                              />
+                              <span>Criar crédito em conta (sobra)</span>
+                            </label>
+
+                            {createCreditoEmConta ? (
+                              <div className="mt-2 flex flex-col gap-1">
+                                <div className="text-[11px] text-amber-800">Pessoa (cliente/fornecedor) do crédito</div>
+                                <select
+                                  value={creditoPessoaId || ''}
+                                  onChange={(e) => setCreditoPessoaId(e.target.value || null)}
+                                  disabled={allocating}
+                                  className="w-full rounded-md border border-amber-200 bg-white px-3 py-2 text-sm"
+                                >
+                                  <option value="">Selecione…</option>
+                                  {distinctPessoaOptions.map((p) => (
+                                    <option key={p.id} value={p.id}>
+                                      {p.nome}
+                                    </option>
+                                  ))}
+                                </select>
+                                {distinctPessoaOptions.length > 1 ? (
+                                  <div className="text-[11px] text-amber-800">
+                                    Dica: se você selecionou títulos de pessoas diferentes, escolha explicitamente para quem o crédito deve ficar.
+                                  </div>
+                                ) : null}
+                              </div>
+                            ) : null}
+                          </div>
+                        ) : null}
+
+                        <div className="mt-3 flex items-center justify-end gap-2">
+                          <button
+                            type="button"
+                            onClick={() => setAllocationOpen(false)}
+                            disabled={allocating}
+                            className="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 disabled:opacity-60"
+                          >
+                            Cancelar
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => void handleConciliarAlocado()}
+                            disabled={
+                              allocating ||
+                              !!linkingId ||
+                              appliedTotal <= 0 ||
+                              appliedTotal - extratoValor > 0.01 ||
+                              (allocationDiff > 0.01 && (!createCreditoEmConta || !creditoPessoaId))
+                            }
+                            className="inline-flex items-center gap-2 rounded-md bg-emerald-700 px-3 py-2 text-sm font-medium text-white hover:bg-emerald-800 disabled:opacity-60"
+                          >
+                            {allocating ? <Loader2 className="h-4 w-4 animate-spin" /> : <Link2 size={16} />}
+                            Conciliar com alocação
                           </button>
                         </div>
                       </div>
