@@ -57,21 +57,9 @@ const Hero: React.FC = () => {
                 transition={{ delay: 0.05, duration: 2, ease: [0.16, 1, 0.3, 1] }}
                 className="inline-block [transform-style:preserve-3d]"
               >
-                O ERP para empresários{' '}
-                <span className="bg-gradient-to-r from-blue-700 via-sky-500 to-indigo-600 bg-clip-text text-transparent">
-                  Diferentes.
-                </span>
-              </motion.div>
-              <br />
-              <motion.div
-                variants={line}
-                initial="hidden"
-                animate="show"
-                transition={{ delay: 0.32, duration: 2, ease: [0.16, 1, 0.3, 1] }}
-                className="inline-block [transform-style:preserve-3d]"
-              >
-                E empresas{' '}
-                <span className="bg-gradient-to-r from-indigo-700 via-sky-500 to-blue-700 bg-clip-text text-transparent">
+                O ERP para empresas
+                <br />
+                <span className="inline-block mt-[15px] bg-gradient-to-r from-indigo-700 via-sky-500 to-blue-700 bg-clip-text text-transparent">
                   DIFERENCIADAS.
                 </span>
               </motion.div>
@@ -82,13 +70,13 @@ const Hero: React.FC = () => {
               transition={{ duration: 0.6, delay: 0.45 }}
               className="mt-5 max-w-xl mx-auto lg:mx-0 text-base md:text-lg text-slate-700 leading-relaxed"
             >
-              Comece a operar em 3 minutos. Cadastros, Vendas, Financeiro, Indústria Forte, Serviços completos e Comércio Simples —
+              Comece a operar em 3 minutos. Cadastros, Vendas, Financeiro, Indústria Forte, Serviços completos e Comércio Completo —
               Primeiro uso guiado, UX moderna e upgrades por necessidade.
             </motion.p>
             <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6, delay: 0.65 }}
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.6, delay: 0.65 }}
               className="mt-8 flex justify-center lg:justify-start gap-3 flex-wrap"
             >
               <button
@@ -105,9 +93,9 @@ const Hero: React.FC = () => {
               </a>
             </motion.div>
             <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6, delay: 0.85 }}
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.6, delay: 0.85 }}
               className="mt-8 flex justify-center lg:justify-start items-center gap-4 text-slate-600 flex-wrap"
             >
               <span className="flex items-center gap-1.5"><CheckCircle size={16} className="text-emerald-600" /> Primeiro uso rápido</span>
