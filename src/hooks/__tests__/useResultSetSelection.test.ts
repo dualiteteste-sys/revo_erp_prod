@@ -103,4 +103,33 @@ describe('useResultSetSelection', () => {
     expect(result.current.selectedCount).toBe(0);
     expect(onAutoReset).not.toHaveBeenCalled();
   });
+
+  it('auto reset: mudanças rápidas de filtros notificam 1x', () => {
+    const onAutoReset = vi.fn();
+    const { result, rerender } = renderHook(
+      ({ filterSignature }) =>
+        useResultSetSelection({
+          pageIds: ['a', 'b'],
+          totalMatchingCount: 2,
+          filterSignature,
+          empresaId: 'emp',
+          onAutoReset,
+        }),
+      { initialProps: { filterSignature: 'sig1' } }
+    );
+
+    act(() => result.current.toggleOne('a'));
+    expect(result.current.selectedCount).toBe(1);
+
+    // Simula typing: múltiplas mudanças de filtro antes do estado "limpo" propagar.
+    act(() => {
+      rerender({ filterSignature: 'sig2' });
+      rerender({ filterSignature: 'sig3' });
+      rerender({ filterSignature: 'sig4' });
+    });
+
+    expect(onAutoReset).toHaveBeenCalledTimes(1);
+    expect(onAutoReset).toHaveBeenCalledWith('filters_changed');
+    expect(result.current.selectedCount).toBe(0);
+  });
 });
