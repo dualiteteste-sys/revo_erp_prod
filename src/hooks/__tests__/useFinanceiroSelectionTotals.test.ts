@@ -99,5 +99,50 @@ describe('useFinanceiroSelectionTotals', () => {
 
     vi.useRealTimers();
   });
-});
 
+  it('não refaz fetch quando apenas o fetcher muda (mesmo request)', async () => {
+    vi.useFakeTimers();
+    const fetcher1 = vi.fn(async () => ({ ok: true }));
+    const fetcher2 = vi.fn(async () => ({ ok: true }));
+
+    const baseRequest = {
+      mode: 'explicit' as const,
+      ids: ['a'],
+      excludedIds: [],
+      q: null,
+      status: null,
+      startDateISO: null,
+      endDateISO: null,
+    };
+
+    const { rerender } = renderHook(
+      ({ fetcher }) =>
+        useFinanceiroSelectionTotals({
+          enabled: true,
+          request: baseRequest,
+          fetcher,
+          debounceMs: 200,
+        }),
+      { initialProps: { fetcher: fetcher1 } }
+    );
+
+    await act(async () => {
+      vi.advanceTimersByTime(250);
+      await Promise.resolve();
+    });
+    expect(fetcher1).toHaveBeenCalledTimes(1);
+    expect(fetcher2).toHaveBeenCalledTimes(0);
+
+    // Troca só o fetcher: não deve disparar novo fetch automaticamente (evita flood em rerender).
+    rerender({ fetcher: fetcher2 });
+
+    await act(async () => {
+      vi.advanceTimersByTime(250);
+      await Promise.resolve();
+    });
+
+    expect(fetcher1).toHaveBeenCalledTimes(1);
+    expect(fetcher2).toHaveBeenCalledTimes(0);
+    vi.useRealTimers();
+  });
+});
