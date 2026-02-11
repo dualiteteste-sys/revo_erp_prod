@@ -115,7 +115,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       try {
         queryClient.cancelQueries();
-        (queryClient as any).cancelMutations?.();
       } catch {
         // best-effort
       }
@@ -171,8 +170,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (activeEmpresa) {
         Sentry.setContext("empresa", {
           id: activeEmpresa.id,
-          nome: (activeEmpresa as any)?.nome ?? null,
-          razao_social: (activeEmpresa as any)?.razao_social ?? null,
+          nome: activeEmpresa.nome_fantasia ?? activeEmpresa.nome_razao_social ?? null,
+          razao_social: activeEmpresa.nome_razao_social ?? null,
         });
       }
     } catch {
