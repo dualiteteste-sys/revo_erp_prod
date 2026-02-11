@@ -16,7 +16,6 @@ import {
   getEcommerceHealthSummary,
   listEcommerceConnections,
   normalizeEcommerceConfig,
-  resolveWooConnectionStatus,
   setWooConnectionSecrets,
   setWooStoreUrl,
   upsertEcommerceConnection,
@@ -702,43 +701,7 @@ export default function MarketplaceIntegrationsPage() {
         syncIntervalMinutes: normalizedConfig.sync_interval_minutes ?? 15,
       });
       await loadSyncState(activeConnection.provider as Provider);
-      if (activeConnection.provider === 'woo') {
-        const storeUrl = String(normalizedConfig.store_url ?? '').trim();
-        const diag = await refreshWooDiag();
-        const diagUnavailableNow = diag == null;
-        const reason = wooPendingReason(
-          { ...activeConnection, config: normalizedConfig ?? null },
-          (diag ?? wooDiag ?? (wooSecretsStoredSnapshot as any) ?? null) as any,
-          diagUnavailableNow,
-        );
-
-        const nextStatus = resolveWooConnectionStatus({
-          storeUrl,
-          diagnostics: diag ?? null,
-          diagnosticsUnavailable: diagUnavailableNow,
-          previousStatus: activeConnection.status ?? null,
-        });
-        await upsertEcommerceConnection({
-          provider: 'woo',
-          nome: providerLabels.woo,
-          status: nextStatus,
-          external_account_id: activeConnection.external_account_id ?? null,
-          config: normalizedConfig,
-        });
-
-        if (nextStatus === 'connected') {
-          addToast(
-            diagUnavailableNow
-              ? 'Configuração salva. Conectividade mantida, mas o diagnóstico de credenciais está temporariamente indisponível.'
-              : 'Integração conectada.',
-            diagUnavailableNow ? 'warning' : 'success',
-          );
-        } else {
-          addToast(`Integração salva, mas ainda pendente. ${reason ? `Motivo: ${reason}.` : ''}`.trim(), 'warning');
-        }
-      } else {
-        addToast('Configurações salvas.', 'success');
-      }
+      addToast('Configurações salvas.', 'success');
       setConfigOpen(false);
       setActiveConnection(null);
       await fetchAll();
