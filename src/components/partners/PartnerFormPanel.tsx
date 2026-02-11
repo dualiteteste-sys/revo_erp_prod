@@ -12,6 +12,7 @@ import { Pessoa } from '../../services/partners';
 import { isValidCpfOrCnpj } from '@/lib/masks';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/contexts/AuthProvider';
+import type { CompanyLookupResult } from '@/services/companyLookup';
 
 interface PartnerFormPanelProps {
   partner: PartnerDetails | null;
@@ -83,14 +84,123 @@ const PartnerFormPanel: React.FC<PartnerFormPanelProps> = ({ partner, initialVal
     setFormData(prev => ({ ...prev, contatos }));
   };
 
-  const handleCnpjDataFetched = (data: any) => {
-    setFormData(prev => ({
-      ...prev,
-      nome: data.razao_social || prev?.nome,
-      fantasia: data.nome_fantasia || prev?.fantasia,
-      email: data.email || prev?.email,
-      telefone: data.ddd_telefone_1 || prev?.telefone,
-    }));
+  const handleCnpjDataFetched = (data: CompanyLookupResult) => {
+    const snapshot = formData;
+    void (async () => {
+      const pessoaPatch: Partial<Pessoa> = {
+        nome: data.razao_social || undefined,
+        fantasia: data.nome_fantasia || undefined,
+        email: data.email || undefined,
+        telefone: data.telefone || undefined,
+        inscr_estadual: data.inscr_estadual || undefined,
+        inscr_municipal: data.inscr_municipal || undefined,
+      };
+
+      const enderecoPatch: Partial<EnderecoPayload> | null = data.endereco
+        ? {
+            logradouro: data.endereco.logradouro,
+            numero: data.endereco.numero,
+            complemento: data.endereco.complemento,
+            bairro: data.endereco.bairro,
+            cidade: data.endereco.cidade,
+            uf: data.endereco.uf,
+            cep: data.endereco.cep,
+            cidade_codigo: data.endereco.cidade_codigo_ibge,
+            pais: data.endereco.pais || 'Brasil',
+            pais_codigo: (data.endereco.pais_codigo || '1058').replace(/\D/g, ''),
+          }
+        : null;
+
+      const overwriteLabels: string[] = [];
+      const currentPessoa = snapshot as Partial<Pessoa>;
+      ([
+        ['nome', 'Nome / Razão social'],
+        ['fantasia', 'Fantasia'],
+        ['email', 'E-mail'],
+        ['telefone', 'Telefone'],
+        ['inscr_estadual', 'Inscrição Estadual'],
+        ['inscr_municipal', 'Inscrição Municipal'],
+      ] as const).forEach(([field, label]) => {
+        const nextVal = pessoaPatch[field];
+        const curVal = (currentPessoa as any)?.[field];
+        if (!nextVal) return;
+        if (!curVal) return;
+        if (String(curVal).trim() === String(nextVal).trim()) return;
+        overwriteLabels.push(label);
+      });
+
+      const primaryEndereco = (snapshot.enderecos || []).find((e) => e.tipo_endereco !== 'COBRANCA') || null;
+      if (enderecoPatch && primaryEndereco) {
+        ([
+          ['logradouro', 'Endereço (logradouro)'],
+          ['numero', 'Endereço (número)'],
+          ['complemento', 'Endereço (complemento)'],
+          ['bairro', 'Endereço (bairro)'],
+          ['cidade', 'Endereço (município)'],
+          ['uf', 'Endereço (UF)'],
+          ['cep', 'Endereço (CEP)'],
+          ['cidade_codigo', 'Código município (IBGE)'],
+          ['pais_codigo', 'Código país'],
+        ] as const).forEach(([field, label]) => {
+          const nextVal = (enderecoPatch as any)[field];
+          const curVal = (primaryEndereco as any)?.[field];
+          if (!nextVal) return;
+          if (!curVal) return;
+          if (String(curVal).trim() === String(nextVal).trim()) return;
+          overwriteLabels.push(label);
+        });
+      }
+
+      const shouldOverwrite =
+        overwriteLabels.length === 0
+          ? true
+          : await confirm({
+              title: 'Substituir dados já preenchidos?',
+              description: `Alguns campos já têm valor e serão substituídos pelos dados do CNPJ:\n\n• ${overwriteLabels.join(
+                '\n• ',
+              )}\n\nDeseja substituir?`,
+              confirmText: 'Substituir',
+              cancelText: 'Manter como está',
+              variant: 'warning',
+            });
+
+      setFormData((prev) => {
+        const apply = <T,>(cur: T | null | undefined, next: T | null | undefined) => {
+          if (next == null) return cur ?? null;
+          if (!cur) return next;
+          return shouldOverwrite ? next : cur;
+        };
+
+        const nextPessoa: Partial<Pessoa> = { ...prev };
+        (Object.keys(pessoaPatch) as Array<keyof Pessoa>).forEach((k) => {
+          (nextPessoa as any)[k] = apply((prev as any)[k], pessoaPatch[k] as any);
+        });
+
+        const nextEnderecos = [...(prev.enderecos || [])];
+        if (enderecoPatch) {
+          const idx = nextEnderecos.findIndex((e) => e.tipo_endereco !== 'COBRANCA');
+          if (idx === -1) {
+            nextEnderecos.push({ tipo_endereco: 'PRINCIPAL', ...enderecoPatch });
+          } else {
+            nextEnderecos[idx] = {
+              ...nextEnderecos[idx],
+              ...Object.fromEntries(
+                Object.entries(enderecoPatch).map(([k, v]) => [k, apply((nextEnderecos[idx] as any)[k], v as any)]),
+              ),
+            };
+          }
+        }
+
+        return {
+          ...prev,
+          ...nextPessoa,
+          enderecos: nextEnderecos,
+        };
+      });
+
+      if (!data.inscr_estadual) addToast('Inscrição Estadual não localizada automaticamente — preencha manualmente se necessário.', 'info');
+      if (!data.inscr_municipal) addToast('Inscrição Municipal não localizada automaticamente — preencha manualmente se necessário.', 'info');
+    })();
   };
 
   const handleSave = async () => {

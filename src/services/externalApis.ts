@@ -136,3 +136,34 @@ export const fetchCepData = async (cep: string): Promise<Partial<CepData>> => {
     throw new Error(error.message || 'Falha ao consultar o CEP.');
   }
 };
+
+// --- IBGE Municípios (BrasilAPI) ---
+export interface MunicipioIbge {
+  nome: string;
+  codigo_ibge: string;
+}
+
+const municipiosByUfCache = new Map<string, MunicipioIbge[]>();
+
+export const fetchMunicipiosByUf = async (uf: string): Promise<MunicipioIbge[]> => {
+  const cleanUf = String(uf || '').trim().toUpperCase();
+  if (!/^[A-Z]{2}$/.test(cleanUf)) return [];
+  const cached = municipiosByUfCache.get(cleanUf);
+  if (cached) return cached;
+
+  const { data } = await withRetry(
+    async () => http.get<Array<{ nome: string; codigo_ibge: string | number }>>(`https://brasilapi.com.br/api/ibge/municipios/v1/${cleanUf}`),
+    HTTP_RETRY,
+  );
+
+  const rows = Array.isArray(data) ? data : [];
+  const normalized: MunicipioIbge[] = rows
+    .map((r) => ({
+      nome: String(r?.nome || ''),
+      codigo_ibge: String(r?.codigo_ibge ?? '').replace(/\D/g, ''),
+    }))
+    .filter((r) => r.nome && r.codigo_ibge);
+
+  municipiosByUfCache.set(cleanUf, normalized);
+  return normalized;
+};
