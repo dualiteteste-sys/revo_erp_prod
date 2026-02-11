@@ -5,6 +5,7 @@ import PageHeader from '@/components/ui/PageHeader';
 import GlassCard from '@/components/ui/GlassCard';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/contexts/ToastProvider';
+import { useAuth } from '@/contexts/AuthProvider';
 import { useHasPermission } from '@/hooks/useHasPermission';
 import { supabase } from '@/lib/supabaseClient';
 import {
@@ -157,6 +158,7 @@ function wooPendingReason(
 
 export default function MarketplaceIntegrationsPage() {
   const { addToast } = useToast();
+  const { activeEmpresaId } = useAuth();
   const permView = useHasPermission('ecommerce', 'view');
   const permManage = useHasPermission('ecommerce', 'manage');
 
@@ -282,7 +284,6 @@ export default function MarketplaceIntegrationsPage() {
       }
       return diag;
     } catch {
-      setWooDiag(null);
       setWooDiagUnavailable(true);
       return null;
     }
@@ -394,6 +395,23 @@ export default function MarketplaceIntegrationsPage() {
   useEffect(() => {
     void fetchAll();
   }, [fetchAll]);
+
+  useEffect(() => {
+    if (!activeEmpresaId) return;
+    // Tenant safety: when switching companies, clear any per-connection UI state so we never
+    // reuse an `ecommerce_id` from another empresa (can cause P0002/403 and inconsistent UI).
+    setConfigOpen(false);
+    setActiveConnection(null);
+    setDiagnostics(null);
+    setWooConsumerKey('');
+    setWooConsumerSecret('');
+    setWooEditingConsumerKey(false);
+    setWooEditingConsumerSecret(false);
+    setWooStoreUrlError(null);
+    setWooSecretsStoredSnapshot(null);
+    rpcGuardRef.current = createRpcBurstGuard();
+    void fetchAll();
+  }, [activeEmpresaId, fetchAll]);
 
   useEffect(() => {
     if (!canView) return;
@@ -551,6 +569,11 @@ export default function MarketplaceIntegrationsPage() {
     setTestingProvider(provider);
     try {
       if (provider === 'woo') {
+        if (activeEmpresaId && activeConnection.empresa_id && activeConnection.empresa_id !== activeEmpresaId) {
+          addToast('Empresa ativa mudou. Recarregando integrações para evitar vazamento de contexto.', 'warning');
+          await fetchAll();
+          return;
+        }
         if (!activeConnection.id) {
           addToast('Conexão Woo inválida para teste.', 'error');
           return;
@@ -576,6 +599,7 @@ export default function MarketplaceIntegrationsPage() {
         }
 
         const { data, error } = await supabase.functions.invoke('woocommerce-test-connection', {
+          headers: activeEmpresaId ? { 'x-empresa-id': activeEmpresaId } : undefined,
           body: { ecommerce_id: activeConnection.id },
         });
         if (error) {
@@ -732,6 +756,11 @@ export default function MarketplaceIntegrationsPage() {
       return;
     }
     if (wooSavingSecrets) return;
+    if (activeEmpresaId && activeConnection.empresa_id && activeConnection.empresa_id !== activeEmpresaId) {
+      addToast('Empresa ativa mudou. Recarregando integrações para evitar vazamento de contexto.', 'warning');
+      await fetchAll();
+      return;
+    }
 
     const consumerKey = wooConsumerKey.trim();
     const consumerSecret = wooConsumerSecret.trim();
@@ -1395,7 +1424,10 @@ export default function MarketplaceIntegrationsPage() {
                         {testingProvider === 'woo' ? 'Testando…' : 'Testar conexão'}
                       </Button>
                       <div className="text-xs text-gray-500">
-                        Status atual: <span className="font-medium text-gray-700">{(diagnostics?.status ?? activeConnection.status) || '—'}</span>
+                        Status atual:{' '}
+                        <span className="font-medium text-gray-700">
+                          {(wooDiag?.connection_status ?? diagnostics?.status ?? activeConnection.status) || '—'}
+                        </span>
                       </div>
                     </div>
 
