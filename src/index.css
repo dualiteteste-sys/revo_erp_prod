@@ -17,6 +17,10 @@
   }
 }
 
+html {
+    overflow-x: hidden; /* Safety net — prevents html-level horizontal scroll (iOS Safari) */
+}
+
 body {
     @apply bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50;
     @apply bg-background text-foreground;

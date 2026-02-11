@@ -39,7 +39,7 @@ const OnboardingGuard = ({ children }: { children: JSX.Element }) => {
 
   if (loading) {
     return (
-      <div className="w-screen h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50">
+      <div className="w-full h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50">
         <div className="w-16 h-16 border-4 border-blue-500 border-dashed rounded-full animate-spin"></div>
       </div>
     );
@@ -47,7 +47,7 @@ const OnboardingGuard = ({ children }: { children: JSX.Element }) => {
 
   if (shouldRecover) {
     return (
-      <div className="w-screen h-screen flex items-center justify-center p-4 bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50">
+      <div className="w-full h-screen flex items-center justify-center p-4 bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50">
         <div className="max-w-md w-full text-center bg-white/70 backdrop-blur-xl border border-white/40 p-8 rounded-3xl shadow-lg">
           {failed ? (
             <>
@@ -88,7 +88,7 @@ const OnboardingGuard = ({ children }: { children: JSX.Element }) => {
       </div>
     );
   }
-  
+
   return children;
 };
 
