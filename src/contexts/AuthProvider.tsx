@@ -89,7 +89,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const bootRef = useRef(false);
   const resetRef = useRef(false);
-  const prevUserIdRef = useRef<string | null>(null);
   const prevActiveEmpresaIdRef = useRef<string | null>(null);
 
   const activeEmpresa = useMemo(() => {
@@ -286,15 +285,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const uid = sess?.user?.id ?? null;
       setUserId(uid);
       void refreshUserFlags(uid);
-
-      const prevUid = prevUserIdRef.current;
-      prevUserIdRef.current = uid;
-
-      // If user changes within the same runtime (multiple logins in the same browser tab),
-      // hard-reset caches to avoid cross-tenant/user stale data rendering.
-      if (event === "SIGNED_IN" && prevUid && prevUid !== uid) {
-        clearRuntimeStateBestEffort("user_changed_signed_in");
-      }
 
       // Reset bootRef on explicit sign out event to be safe
       if (event === 'SIGNED_OUT') {
