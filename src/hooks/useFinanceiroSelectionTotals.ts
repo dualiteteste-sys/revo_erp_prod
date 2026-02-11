@@ -32,22 +32,32 @@ export function useFinanceiroSelectionTotals<T>(params: {
   const debounceMs = params.debounceMs ?? 200;
   const [state, setState] = useState<HookState<T>>({ loading: false, error: null, data: null });
   const requestTokenRef = useRef(0);
+  const requestCacheRef = useRef<{ key: string | null; request: SelectionTotalsRequest | null }>({
+    key: null,
+    request: null,
+  });
 
-  const normalizedRequest = useMemo(() => {
-    if (!params.request) return null;
-    return {
+  const normalized = useMemo(() => {
+    if (!params.enabled || !params.request) return { key: null as string | null, request: null as SelectionTotalsRequest | null };
+    const req: SelectionTotalsRequest = {
       ...params.request,
       ids: stableArray(params.request.ids),
       excludedIds: stableArray(params.request.excludedIds),
     };
-  }, [params.request]);
+    return { key: JSON.stringify(req), request: req };
+  }, [params.enabled, params.request]);
 
-  const requestKey = useMemo(() => {
-    if (!params.enabled || !normalizedRequest) return null;
-    return JSON.stringify(normalizedRequest);
-  }, [normalizedRequest, params.enabled]);
+  const stableRequest = useMemo(() => {
+    if (!normalized.key || !normalized.request) {
+      requestCacheRef.current = { key: null, request: null };
+      return null;
+    }
+    if (requestCacheRef.current.key === normalized.key) return requestCacheRef.current.request;
+    requestCacheRef.current = { key: normalized.key, request: normalized.request };
+    return normalized.request;
+  }, [normalized.key, normalized.request]);
 
-  const debouncedKey = useDebounce(requestKey, debounceMs);
+  const debouncedKey = useDebounce(normalized.key, debounceMs);
 
   const fetchTotals = useCallback(
     async (req: SelectionTotalsRequest) => {
@@ -67,7 +77,7 @@ export function useFinanceiroSelectionTotals<T>(params: {
   );
 
   useEffect(() => {
-    if (!params.enabled || !normalizedRequest) {
+    if (!params.enabled || !stableRequest) {
       requestTokenRef.current++;
       setState((prev) => {
         if (!prev.loading && prev.error === null && prev.data === null) return prev;
@@ -76,8 +86,10 @@ export function useFinanceiroSelectionTotals<T>(params: {
       return;
     }
     if (!debouncedKey) return;
-    void fetchTotals(normalizedRequest);
-  }, [debouncedKey, fetchTotals, normalizedRequest, params.enabled]);
+    // Se a key ainda não estabilizou (debounce), aguarde para evitar floods e "loading infinito".
+    if (debouncedKey !== normalized.key) return;
+    void fetchTotals(stableRequest);
+  }, [debouncedKey, fetchTotals, normalized.key, params.enabled, stableRequest]);
 
   return state;
 }
