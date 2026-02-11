@@ -72,8 +72,27 @@ Deno.serve(async (req) => {
     const token = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : "";
     if (!token) return errorJson("not_signed_in", "Autenticação obrigatória.", cors, 401);
 
+    // Multi-tenant: Edge Functions must propagate tenant context to PostgREST/RPC calls.
+    // Tenant source of truth is the request header `x-empresa-id`.
+    const empresaId = (req.headers.get("x-empresa-id") ?? "").trim();
+    if (!empresaId) {
+      return errorJson(
+        "empresa_id_required",
+        "Header x-empresa-id é obrigatório para testar a conexão (tenant não identificado).",
+        cors,
+        400,
+      );
+    }
+    const requestId = (req.headers.get("x-revo-request-id") ?? "").trim();
+
     const userClient = createClient(supabaseUrl, supabaseAnonKey, {
-      global: { headers: { Authorization: `Bearer ${token}` } },
+      global: {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "x-empresa-id": empresaId,
+          ...(requestId ? { "x-revo-request-id": requestId } : {}),
+        },
+      },
       auth: { persistSession: false, autoRefreshToken: false },
     });
     const adminClient = createClient(supabaseUrl, supabaseServiceRoleKey, {
