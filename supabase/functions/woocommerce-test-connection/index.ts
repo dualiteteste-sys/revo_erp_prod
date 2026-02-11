@@ -72,18 +72,41 @@ Deno.serve(async (req) => {
     const token = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : "";
     if (!token) return errorJson("not_signed_in", "Autenticação obrigatória.", cors, 401);
 
-    // Multi-tenant: Edge Functions must propagate tenant context to PostgREST/RPC calls.
-    // Tenant source of truth is the request header `x-empresa-id`.
-    const empresaId = (req.headers.get("x-empresa-id") ?? "").trim();
-    if (!empresaId) {
-      return errorJson(
-        "empresa_id_required",
-        "Header x-empresa-id é obrigatório para testar a conexão (tenant não identificado).",
-        cors,
-        400,
-      );
-    }
     const requestId = (req.headers.get("x-revo-request-id") ?? "").trim();
+
+    // Base client (no tenant header yet): used only to validate JWT and resolve empresa ativa when header is missing.
+    const baseUserClient = createClient(supabaseUrl, supabaseAnonKey, {
+      global: {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          ...(requestId ? { "x-revo-request-id": requestId } : {}),
+        },
+      },
+      auth: { persistSession: false, autoRefreshToken: false },
+    });
+    const adminClient = createClient(supabaseUrl, supabaseServiceRoleKey, {
+      auth: { persistSession: false, autoRefreshToken: false },
+    });
+
+    const { data: userData, error: userErr } = await baseUserClient.auth.getUser();
+    if (userErr || !userData?.user) return errorJson("invalid_token", "Token inválido.", cors, 401);
+
+    // Multi-tenant: Edge Functions must propagate tenant context to PostgREST/RPC calls.
+    // Tenant source of truth is the request header `x-empresa-id`. When missing, we resolve the user's active empresa
+    // server-side (fail-closed if none), then proceed with a tenant-scoped client.
+    let empresaId = (req.headers.get("x-empresa-id") ?? "").trim();
+    if (!empresaId) {
+      const { data: activeEmpresaId, error: activeErr } = await baseUserClient.rpc("active_empresa_get_for_current_user", {});
+      if (activeErr || !activeEmpresaId) {
+        return errorJson(
+          "empresa_id_required",
+          "Tenant não identificado. Selecione uma empresa ativa e recarregue a página para testar a conexão.",
+          cors,
+          400,
+        );
+      }
+      empresaId = String(activeEmpresaId).trim();
+    }
 
     const userClient = createClient(supabaseUrl, supabaseAnonKey, {
       global: {
@@ -95,12 +118,6 @@ Deno.serve(async (req) => {
       },
       auth: { persistSession: false, autoRefreshToken: false },
     });
-    const adminClient = createClient(supabaseUrl, supabaseServiceRoleKey, {
-      auth: { persistSession: false, autoRefreshToken: false },
-    });
-
-    const { data: userData, error: userErr } = await userClient.auth.getUser();
-    if (userErr || !userData?.user) return errorJson("invalid_token", "Token inválido.", cors, 401);
 
     const payload = (await req.json().catch(() => ({}))) as Partial<TestRequest>;
     const ecommerceId = String(payload.ecommerce_id || "").trim();
