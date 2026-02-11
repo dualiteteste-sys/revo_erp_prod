@@ -17,6 +17,7 @@ export function useResultSetSelection(params: {
 
   const lastEmpresaIdRef = useRef<string | null>(params.empresaId);
   const lastSignatureRef = useRef<string>(params.filterSignature);
+  const filterResetNotifiedRef = useRef(false);
 
   const clearInternal = useCallback(() => {
     setMode('explicit');
@@ -41,12 +42,20 @@ export function useResultSetSelection(params: {
   }, [autoReset, params.empresaId]);
 
   useLayoutEffect(() => {
+    const hasSelection = mode === 'all_matching' || selectedIds.size > 0;
+    if (hasSelection) filterResetNotifiedRef.current = false;
+  }, [mode, selectedIds.size]);
+
+  useLayoutEffect(() => {
     if (lastSignatureRef.current === params.filterSignature) return;
     lastSignatureRef.current = params.filterSignature;
     // Avoid spamming UI notifications: only notify when we actually had a selection.
     const hadSelection = mode === 'all_matching' || selectedIds.size > 0;
     clearInternal();
-    if (hadSelection) params.onAutoReset?.('filters_changed');
+    if (hadSelection && !filterResetNotifiedRef.current) {
+      filterResetNotifiedRef.current = true;
+      params.onAutoReset?.('filters_changed');
+    }
   }, [clearInternal, mode, params.filterSignature, params.onAutoReset, selectedIds.size]);
 
   const selectedCount = useMemo(() => {
