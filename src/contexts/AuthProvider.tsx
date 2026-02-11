@@ -7,6 +7,7 @@ import React, {
   useRef,
   useState,
 } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { useSupabase } from "@/providers/SupabaseProvider";
 import { Database } from "@/types/database.types";
 import { logger } from "@/lib/logger";
@@ -38,14 +39,39 @@ type AuthContextType = {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+const IS_TEST_ENV =
+  import.meta.env.MODE === "test" ||
+  import.meta.env.VITEST === "true" ||
+  (typeof process !== "undefined" && Boolean((process as any).env?.VITEST));
+
 export function useAuth() {
   const ctx = useContext(AuthContext);
   if (!ctx) throw new Error("useAuth must be used within AuthProvider");
   return ctx;
 }
 
+function clearLocalAppStorageBestEffort() {
+  if (typeof window === "undefined") return;
+  try {
+    sessionStorage.clear();
+  } catch {
+    // best-effort
+  }
+  try {
+    const keys = Object.keys(localStorage);
+    for (const k of keys) {
+      if (k.startsWith("sb-") || k.startsWith("revo_") || k.startsWith("revoops_")) {
+        localStorage.removeItem(k);
+      }
+    }
+  } catch {
+    // best-effort
+  }
+}
+
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const supabase = useSupabase(); // SupabaseClient único da app
+  const queryClient = useQueryClient();
   const [session, setSession] = useState<Session>(null);
   const [userId, setUserId] = useState<string | null>(null);
   const [mustChangePassword, setMustChangePassword] = useState(false);
@@ -62,6 +88,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
 
   const bootRef = useRef(false);
+  const resetRef = useRef(false);
+  const prevActiveEmpresaIdRef = useRef<string | null>(null);
 
   const activeEmpresa = useMemo(() => {
     const found = empresas.find((e) => e.id === activeEmpresaId) || null;
@@ -74,6 +102,53 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
     return found;
   }, [empresas, activeEmpresaId]);
+
+  const clearRuntimeStateBestEffort = useCallback(
+    (reason: string) => {
+      if (resetRef.current) return;
+      resetRef.current = true;
+      try {
+        logger.warn("[AUTH][RESET] clearing runtime state", { reason });
+      } catch {
+        // noop
+      }
+
+      try {
+        queryClient.cancelQueries();
+        (queryClient as any).cancelMutations?.();
+      } catch {
+        // best-effort
+      }
+      try {
+        queryClient.getQueryCache().clear();
+        queryClient.getMutationCache().clear();
+        queryClient.clear();
+      } catch {
+        // best-effort
+      }
+
+      clearLocalAppStorageBestEffort();
+
+      // Ensure internal bootstraps don't reuse stale state.
+      bootRef.current = false;
+
+      // Reset local state (defensive).
+      setSession(null);
+      setUserId(null);
+      setMustChangePassword(false);
+      setPendingEmpresaId(null);
+
+      // Kill any remaining singleton/runtime state by forcing a full navigation (PROD only).
+      if (!IS_TEST_ENV && typeof window !== "undefined") {
+        try {
+          window.location.replace("/auth/login");
+        } catch {
+          // noop
+        }
+      }
+    },
+    [queryClient],
+  );
 
   useEffect(() => {
     try {
@@ -181,14 +256,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const signOut = useCallback(async () => {
-    await supabase.auth.signOut();
-    setSession(null);
-    setUserId(null);
-    // React Query cache clearing is handled by the query client, 
-    // but we can manually reset if needed.
-    // For now, just resetting local state refs.
-    bootRef.current = false;
-  }, [supabase]);
+    try {
+      await supabase.auth.signOut();
+    } finally {
+      clearRuntimeStateBestEffort("explicit_sign_out");
+    }
+  }, [supabase, clearRuntimeStateBestEffort]);
 
   // ===== Effects =====
 
@@ -215,24 +288,47 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       // Reset bootRef on explicit sign out event to be safe
       if (event === 'SIGNED_OUT') {
-        bootRef.current = false;
-        setMustChangePassword(false);
-        setPendingEmpresaId(null);
-        // [FIX] Clear session storage on sign out
-        if (typeof window !== "undefined") {
-          sessionStorage.removeItem("revo_active_empresa_id");
-        }
+        clearRuntimeStateBestEffort("auth_event_signed_out");
       }
     });
     return () => sub.subscription.unsubscribe();
-  }, [supabase, refreshUserFlags]);
+  }, [supabase, refreshUserFlags, clearRuntimeStateBestEffort]);
 
   // Sync activeEmpresaId to sessionStorage for Header Injection (Tenant Leak fix)
   useEffect(() => {
-    if (typeof window !== "undefined" && activeEmpresaId) {
+    if (typeof window === "undefined") return;
+
+    // Security: never persist tenant context when there is no authenticated user in this runtime.
+    if (userId && activeEmpresaId) {
       sessionStorage.setItem("revo_active_empresa_id", activeEmpresaId);
+      return;
     }
-  }, [activeEmpresaId]);
+
+    sessionStorage.removeItem("revo_active_empresa_id");
+  }, [activeEmpresaId, userId]);
+
+  // Tenant switch must be treated as a security boundary:
+  // never allow cached data from tenant A to render while tenant B is active.
+  useEffect(() => {
+    const prev = prevActiveEmpresaIdRef.current;
+    prevActiveEmpresaIdRef.current = activeEmpresaId ?? null;
+    if (!prev || !activeEmpresaId) return;
+    if (prev === activeEmpresaId) return;
+
+    try {
+      logger.warn("[AUTH][TENANT_SWITCH] clearing react-query cache", { from: prev, to: activeEmpresaId });
+    } catch {
+      // noop
+    }
+    try {
+      queryClient.cancelQueries();
+      queryClient.getQueryCache().clear();
+      queryClient.getMutationCache().clear();
+      queryClient.clear();
+    } catch {
+      // best-effort
+    }
+  }, [activeEmpresaId, queryClient]);
 
   // Bootstrap + carga de empresas no primeiro login
   useEffect(() => {
