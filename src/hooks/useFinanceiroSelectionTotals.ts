@@ -32,6 +32,7 @@ export function useFinanceiroSelectionTotals<T>(params: {
   const debounceMs = params.debounceMs ?? 200;
   const [state, setState] = useState<HookState<T>>({ loading: false, error: null, data: null });
   const requestTokenRef = useRef(0);
+  const lastIssuedKeyRef = useRef<string | null>(null);
   const fetcherRef = useRef(params.fetcher);
   const requestCacheRef = useRef<{ key: string | null; request: SelectionTotalsRequest | null }>({
     key: null,
@@ -84,6 +85,7 @@ export function useFinanceiroSelectionTotals<T>(params: {
   useEffect(() => {
     if (!params.enabled || !stableRequest) {
       requestTokenRef.current++;
+      lastIssuedKeyRef.current = null;
       setState((prev) => {
         if (!prev.loading && prev.error === null && prev.data === null) return prev;
         return { loading: false, error: null, data: null };
@@ -93,6 +95,10 @@ export function useFinanceiroSelectionTotals<T>(params: {
     if (!debouncedKey) return;
     // Se a key ainda não estabilizou (debounce), aguarde para evitar floods e "loading infinito".
     if (debouncedKey !== normalized.key) return;
+    // Dedupe hardening: mesmo que o componente rerendere em loop por algum motivo,
+    // nunca dispare mais de 1 fetch para a mesma key (previne tempestade de RPC).
+    if (lastIssuedKeyRef.current === debouncedKey) return;
+    lastIssuedKeyRef.current = debouncedKey;
     void fetchTotals(stableRequest);
   }, [debouncedKey, fetchTotals, normalized.key, params.enabled, stableRequest]);
 
