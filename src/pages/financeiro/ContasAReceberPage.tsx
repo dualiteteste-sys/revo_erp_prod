@@ -334,9 +334,9 @@ const ContasAReceberPage: React.FC = () => {
 
   return (
     <div className="p-1 min-h-full flex flex-col">
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-3xl font-bold text-gray-800">Contas a Receber</h1>
-        <div className="flex items-center gap-2">
+      <div className="flex flex-col gap-3 sm:flex-row sm:justify-between sm:items-center mb-6">
+        <h1 className="text-2xl sm:text-3xl font-bold text-gray-800">Contas a Receber</h1>
+        <div className="flex items-center gap-2 flex-wrap">
           {enableSeed ? (
             <Button
               variant="secondary"
@@ -357,21 +357,21 @@ const ContasAReceberPage: React.FC = () => {
 
       {canShowSummary ? <ContasAReceberSummary summary={summary} /> : null}
 
-      <div className="mt-6 mb-4 flex flex-wrap gap-4 items-end">
-        <div className="relative flex-grow max-w-xs">
+      <div className="mt-6 mb-4 flex flex-wrap gap-3 sm:gap-4 items-end">
+        <div className="relative w-full sm:w-auto sm:flex-grow sm:max-w-xs">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={20} />
           <input
             type="text"
             placeholder="Buscar por descrição ou cliente..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full max-w-xs p-3 pl-10 border border-gray-300 rounded-lg"
+            className="w-full p-3 pl-10 border border-gray-300 rounded-lg"
           />
         </div>
         <Select
           value={filterStatus || ''}
           onChange={(e) => setFilterStatus(e.target.value || null)}
-          className="min-w-[200px]"
+          className="w-full sm:w-auto sm:min-w-[200px]"
         >
           <option value="">Todos os status</option>
           <option value="pendente">Pendente (todas)</option>
@@ -381,19 +381,19 @@ const ContasAReceberPage: React.FC = () => {
           <option value="cancelado">Cancelado</option>
         </Select>
 
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-3 w-full sm:w-auto">
           <DatePicker
             label=""
             value={filterStartDate}
             onChange={setFilterStartDate}
-            className="w-[200px]"
+            className="w-full sm:w-[200px]"
           />
           <span className="text-gray-500 whitespace-nowrap px-1">até</span>
           <DatePicker
             label=""
             value={filterEndDate}
             onChange={setFilterEndDate}
-            className="w-[200px]"
+            className="w-full sm:w-[200px]"
           />
           {(filterStartDate || filterEndDate) && (
             <button

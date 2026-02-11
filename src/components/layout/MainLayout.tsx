@@ -23,6 +23,10 @@ import { useIsMobile } from '@/hooks/useIsMobile';
 import MobileBottomNav from './MobileBottomNav';
 import MobileTopBar from './MobileTopBar';
 
+const LayoutDebugOverlay = import.meta.env.DEV
+  ? React.lazy(() => import('@/components/dev/LayoutDebugOverlay'))
+  : null;
+
 const findActiveHref = (pathname: string): string => {
   for (const group of menuConfig) {
     if (group.children) {
@@ -199,6 +203,11 @@ const MainLayout: React.FC = () => {
             {/* Container principal - responsivo */}
             <div className={`h-screen flex ${isMobile ? 'flex-col' : 'p-4 gap-4'}`}>
               <CommandPalette />
+              {import.meta.env.DEV && LayoutDebugOverlay && (
+                <React.Suspense fallback={null}>
+                  <LayoutDebugOverlay />
+                </React.Suspense>
+              )}
               <OnboardingWizardModal
                 isOpen={isOnboardingWizardOpen}
                 mode="auto"
@@ -251,7 +260,7 @@ const MainLayout: React.FC = () => {
                   )}
 
                   <main
-                    className={`flex-1 overflow-y-auto scrollbar-styled flex flex-col min-h-0 ${isMobile ? 'px-4' : 'pr-2'}`}
+                    className={`flex-1 overflow-y-auto overflow-x-hidden scrollbar-styled flex flex-col min-h-0 ${isMobile ? 'px-4' : 'pr-2'}`}
                     tabIndex={0}
                     aria-label="Conteúdo principal"
                   >

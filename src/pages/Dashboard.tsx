@@ -102,7 +102,7 @@ const FluidKPIGrid: React.FC<{
       style={{
         display: 'grid',
         gridTemplateColumns: isMobile
-          ? 'repeat(auto-fit, minmax(150px, 1fr))'
+          ? 'repeat(2, 1fr)'
           : 'repeat(auto-fit, minmax(220px, 1fr))',
         gap: isMobile ? '8px' : '16px',
       }}
