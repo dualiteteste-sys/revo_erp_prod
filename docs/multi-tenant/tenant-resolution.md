@@ -108,6 +108,11 @@ Resultado esperado:
 1) Toda chamada ao backend deve carregar o header `x-empresa-id` quando há empresa ativa.
 2) Ao trocar de empresa ativa, invalidar caches (ex.: react-query) do tenant anterior.
 3) Evitar “fetch no mount” antes de `activeEmpresaId` estar disponível.
+4) Ao fazer logoff, executar “hard reset” do estado do app:
+   - `signOut()` do provider auth,
+   - limpar caches in-memory (react-query + stores),
+   - limpar caches persistidos (sessionStorage/localStorage) do app,
+   - navegar/recarregar para matar singletons do runtime.
 
 RISCO:
 - Cache no cliente pode “parecer vazamento”, mas se Network retorna dados errados, é vazamento real.
@@ -123,4 +128,3 @@ Antes de merge:
   - migration(s) tocadas,
   - query SQL de validação,
   - resultado do diagnóstico interno
-

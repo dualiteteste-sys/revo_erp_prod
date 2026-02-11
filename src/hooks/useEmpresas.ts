@@ -38,7 +38,8 @@ export function useEmpresas(userId: string | null) {
         },
         enabled: !!userId,
         staleTime: 1000 * 60 * 5, // 5 minutes
-        placeholderData: (prev) => prev,
+        // Security: never keep previous tenant/user data when userId is absent.
+        placeholderData: (prev) => (userId ? prev : []),
         retry: (failureCount, error) => isTransientNetworkError(error) && failureCount < 3,
         retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 8000),
     });
@@ -56,7 +57,8 @@ export function useActiveEmpresaId(userId: string | null) {
         },
         enabled: !!userId,
         staleTime: 1000 * 30,
-        placeholderData: (prev) => prev,
+        // Security: never keep previous tenant/user data when userId is absent.
+        placeholderData: (prev) => (userId ? prev : null),
         retry: (failureCount, error) => isTransientNetworkError(error) && failureCount < 3,
         retryDelay: (attemptIndex) => Math.min(750 * 2 ** attemptIndex, 6000),
     });
