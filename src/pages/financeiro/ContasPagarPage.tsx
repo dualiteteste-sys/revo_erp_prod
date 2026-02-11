@@ -289,14 +289,15 @@ const ContasPagarPage: React.FC = () => {
 
   const totalsReq = React.useMemo(() => {
     if (selection.selectedCount <= 0) return null;
+    const isAllMatching = selection.mode === 'all_matching';
     return {
       mode: selection.mode,
       ids: selection.mode === 'explicit' ? Array.from(selection.selectedIds) : [],
       excludedIds: selection.mode === 'all_matching' ? Array.from(selection.excludedIds) : [],
-      q: searchTerm || null,
-      status: filterStatus || null,
-      startDateISO: filterStartDate ? filterStartDate.toISOString().slice(0, 10) : null,
-      endDateISO: filterEndDate ? filterEndDate.toISOString().slice(0, 10) : null,
+      q: isAllMatching ? (searchTerm || null) : null,
+      status: isAllMatching ? (filterStatus || null) : null,
+      startDateISO: isAllMatching && filterStartDate ? filterStartDate.toISOString().slice(0, 10) : null,
+      endDateISO: isAllMatching && filterEndDate ? filterEndDate.toISOString().slice(0, 10) : null,
     };
   }, [filterEndDate, filterStartDate, filterStatus, searchTerm, selection]);
 
@@ -385,7 +386,7 @@ const ContasPagarPage: React.FC = () => {
               className="min-w-[180px]"
             >
               <option value="">Todos os status</option>
-              <option value="aberta">Em aberto</option>
+              <option value="aberta">Em aberto (todas)</option>
               <option value="vencidas">Vencidas</option>
               <option value="parcial">Parcial</option>
               <option value="paga">Paga</option>
