@@ -5,7 +5,7 @@ import Section from '../../ui/forms/Section';
 import Input from '../../ui/forms/Input';
 import Select from '../../ui/forms/Select';
 import { useToast } from '../../../contexts/ToastProvider';
-import { fetchCnpjData } from '../../../services/externalApis';
+import { lookupCompanyByCnpj, type CompanyLookupResult } from '@/services/companyLookup';
 import { AnimatePresence, motion } from 'framer-motion';
 import { documentMask } from '../../../lib/masks';
 
@@ -15,7 +15,7 @@ type TipoPessoa = Database['public']['Enums']['tipo_pessoa_enum'];
 interface IdentificationSectionProps {
   data: Partial<Pessoa>;
   onChange: (field: keyof Pessoa, value: any) => void;
-  onCnpjDataFetched: (data: any) => void;
+  onCnpjDataFetched: (data: CompanyLookupResult) => void;
 }
 
 const tipoPessoaOptions: { value: TipoPessoa; label: string }[] = [
@@ -40,7 +40,7 @@ const IdentificationSection: React.FC<IdentificationSectionProps> = ({ data, onC
     if (!data.doc_unico) return;
     setIsFetchingCnpj(true);
     try {
-      const apiData = await fetchCnpjData(data.doc_unico);
+      const apiData = await lookupCompanyByCnpj(data.doc_unico);
       onCnpjDataFetched(apiData);
       addToast('Dados do CNPJ preenchidos!', 'success');
     } catch (error: any) {
