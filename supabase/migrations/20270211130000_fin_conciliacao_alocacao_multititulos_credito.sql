@@ -589,6 +589,10 @@ grant execute on function public.financeiro_conciliacao_conciliar_extrato_com_ti
 -- 4) RPCs de busca/sugestão: incluir pessoa_id para permitir crédito em conta com vínculo auditável
 -- =============================================================================
 
+-- IMPORTANTE: adicionamos coluna no RETURNS TABLE (pessoa_id), o que altera o tipo de retorno.
+-- `CREATE OR REPLACE FUNCTION` não permite mudar return type (42P13), então precisamos dropar e recriar.
+drop function if exists public.financeiro_conciliacao_titulos_sugerir(uuid, int);
+
 create or replace function public.financeiro_conciliacao_titulos_sugerir(
   p_extrato_id uuid,
   p_limit int default 10
@@ -746,6 +750,9 @@ $$;
 revoke all on function public.financeiro_conciliacao_titulos_sugerir(uuid, int) from public, anon;
 grant execute on function public.financeiro_conciliacao_titulos_sugerir(uuid, int) to authenticated, service_role;
 
+-- Mesma regra: RETURNS TABLE mudou (pessoa_id).
+drop function if exists public.financeiro_conciliacao_titulos_search(text, numeric, date, date, text, int, int);
+
 create or replace function public.financeiro_conciliacao_titulos_search(
   p_tipo text, -- 'pagar' | 'receber'
   p_valor numeric default null,
@@ -863,4 +870,3 @@ grant execute on function public.financeiro_conciliacao_titulos_search(text, num
 
 notify pgrst, 'reload schema';
 commit;
-
