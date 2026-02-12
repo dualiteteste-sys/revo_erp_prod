@@ -609,7 +609,6 @@ Deno.serve(async (req) => {
   const masterKey = Deno.env.get("INTEGRATIONS_MASTER_KEY") ?? "";
   const workerKey = Deno.env.get("WOOCOMMERCE_WORKER_KEY") ?? "";
   if (!supabaseUrl || !anonKey || !serviceKey) return json(500, { ok: false, error: "ENV_NOT_CONFIGURED" }, cors);
-  if (!masterKey) return json(500, { ok: false, error: "MASTER_KEY_MISSING" }, cors);
 
   const authHeader = req.headers.get("Authorization") ?? "";
   const token = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : "";
@@ -632,6 +631,13 @@ Deno.serve(async (req) => {
   const body = (await req.json().catch(() => ({}))) as any;
   const action = String(body?.action ?? "").trim() as Action;
   if (!action) return json(400, { ok: false, error: "ACTION_REQUIRED" }, cors);
+  const needsMasterKey = action === "stores.create" ||
+    action === "stores.healthcheck" ||
+    action === "stores.webhooks.register" ||
+    action === "stores.products.search" ||
+    action === "stores.catalog.preview.import" ||
+    action === "stores.catalog.run.import";
+  if (needsMasterKey && !masterKey) return json(500, { ok: false, error: "MASTER_KEY_MISSING" }, cors);
 
   const headerEmpresaId = (req.headers.get("x-empresa-id") ?? "").trim();
   let empresaId = "";
@@ -735,11 +741,20 @@ Deno.serve(async (req) => {
       .maybeSingle();
     if (storeErr || !store?.id) return json(404, { ok: false, error: "STORE_NOT_FOUND" }, cors);
 
-    const aad = `${empresaId}:${storeId}`;
-    const consumerKey = await aesGcmDecryptFromString({ masterKey, ciphertext: String(store.consumer_key_enc), aad });
-    const consumerSecret = await aesGcmDecryptFromString({ masterKey, ciphertext: String(store.consumer_secret_enc), aad });
     const baseUrl = normalizeWooStoreUrl(String(store.base_url));
     const authMode = (String(store.auth_mode ?? "basic_https") as "basic_https" | "oauth1" | "querystring_fallback") || "basic_https";
+    const aad = `${empresaId}:${storeId}`;
+    let consumerKey = "";
+    let consumerSecret = "";
+    const needsWooCredentials = action === "stores.healthcheck" ||
+      action === "stores.webhooks.register" ||
+      action === "stores.products.search" ||
+      action === "stores.catalog.preview.import" ||
+      action === "stores.catalog.run.import";
+    if (needsWooCredentials) {
+      consumerKey = await aesGcmDecryptFromString({ masterKey, ciphertext: String(store.consumer_key_enc), aad });
+      consumerSecret = await aesGcmDecryptFromString({ masterKey, ciphertext: String(store.consumer_secret_enc), aad });
+    }
 
     if (action === "stores.healthcheck") {
       const { url, headers } = buildWooApiUrl({
