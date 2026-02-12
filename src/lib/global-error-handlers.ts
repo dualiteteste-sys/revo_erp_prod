@@ -7,8 +7,25 @@ import { getLastUserAction, setupLastUserActionTracking } from "@/lib/telemetry/
 import { buildOpsAppErrorFingerprint } from "@/lib/telemetry/opsAppErrorsFingerprint";
 import { getRoutePathname } from "@/lib/telemetry/routeSnapshot";
 import { getModalContextStackSnapshot } from "@/lib/telemetry/modalContextStack";
+import { recordConsoleRedEvent } from "@/lib/telemetry/consoleRedBuffer";
 
 type AnyFunction = (...args: unknown[]) => unknown;
+
+type SupabaseRpcErrorShape = {
+  code?: string | null;
+  message?: string | null;
+  details?: string | null;
+};
+
+type SupabaseRpcResultShape = {
+  data?: unknown;
+  error?: SupabaseRpcErrorShape | null;
+  status?: number;
+};
+
+type SupabaseRpcClient = {
+  rpc: (fn: string, args?: Record<string, unknown>) => Promise<SupabaseRpcResultShape>;
+};
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -24,14 +41,74 @@ function safeToString(value: unknown) {
   }
 }
 
+let lastOpsCollectorOkAt: number | null = null;
+let lastOpsCollectorErrorAt: number | null = null;
+let lastOpsCollectorErrorMessage: string | null = null;
+
+export function getOpsCollectorStatusSnapshot() {
+  return {
+    ok_at: lastOpsCollectorOkAt,
+    error_at: lastOpsCollectorErrorAt,
+    error_message: lastOpsCollectorErrorMessage,
+  };
+}
+
 export function setupGlobalErrorHandlers() {
   if (typeof window === "undefined") return;
+
+  const rpcClient = supabase as unknown as SupabaseRpcClient;
 
   const recentlySent = new Map<string, number>();
   const recentlySentOps = new Map<string, number>();
   const DEDUPE_WINDOW_MS = 10_000;
 
   setupLastUserActionTracking();
+
+  const logOpsAppErrorRpcBestEffort = async (
+    argsWithContext: Record<string, unknown>,
+    argsWithoutContext: Record<string, unknown>,
+  ) => {
+    try {
+      const res = await rpcClient.rpc("ops_app_errors_log_v1", argsWithContext);
+      if (!res?.error) {
+        lastOpsCollectorOkAt = Date.now();
+        return;
+      }
+
+      const code = String(res.error?.code ?? "");
+      const msg = String(res.error?.message ?? "");
+      const details = String(res.error?.details ?? "");
+
+      // Backward compatibility: se o backend ainda não tem p_context (drift DEV/PROD),
+      // o PostgREST devolve PGRST202/404. Re-tentamos sem p_context.
+      const missingArg =
+        code === "PGRST202" ||
+        (res?.status === 404 && /schema cache/i.test(details || msg)) ||
+        /p_context/i.test(details || msg);
+
+      if (!missingArg) {
+        lastOpsCollectorErrorAt = Date.now();
+        lastOpsCollectorErrorMessage = `${code || "RPC_ERROR"}: ${msg || "ops_app_errors_log_v1 falhou"}`.slice(0, 200);
+        return;
+      }
+
+      const retry = await rpcClient.rpc("ops_app_errors_log_v1", argsWithoutContext);
+      if (!retry?.error) {
+        lastOpsCollectorOkAt = Date.now();
+      } else {
+        const code2 = String(retry.error?.code ?? "");
+        const msg2 = String(retry.error?.message ?? "");
+        lastOpsCollectorErrorAt = Date.now();
+        lastOpsCollectorErrorMessage = `${code2 || "RPC_ERROR"}: ${msg2 || "ops_app_errors_log_v1 falhou (retry)"}`.slice(0, 200);
+      }
+    } catch (e: unknown) {
+      lastOpsCollectorErrorAt = Date.now();
+      lastOpsCollectorErrorMessage = String((e as { message?: unknown } | null)?.message || "ops_app_errors_log_v1 exception").slice(
+        0,
+        200,
+      );
+    }
+  };
 
   const trySendAppLog = (params: { event: string; message: string; context?: Record<string, unknown> }) => {
     try {
@@ -93,7 +170,7 @@ export function setupGlobalErrorHandlers() {
       if (now - last < DEDUPE_WINDOW_MS) return;
       recentlySentOps.set(fingerprint, now);
 
-      void (supabase as any).rpc("ops_app_errors_log_v1", {
+      const argsWithContext = {
         p_source: params.source,
         p_route: routeBase ?? "",
         p_last_action: lastAction?.label ?? "",
@@ -122,13 +199,22 @@ export function setupGlobalErrorHandlers() {
             : null,
           last_action_age_ms: lastAction?.ageMs ?? null,
         },
-      });
+      } as Record<string, unknown>;
+
+      const { p_context: _drop, ...argsWithoutContext } = argsWithContext;
+      void logOpsAppErrorRpcBestEffort(argsWithContext, argsWithoutContext);
     } catch {
       // best-effort
     }
   };
 
   window.addEventListener("error", (event) => {
+    recordConsoleRedEvent({
+      level: "error",
+      source: "window.error",
+      message: event.error || event.message,
+      stack: event?.error instanceof Error ? event.error.stack ?? event.error.message : null,
+    });
     trySendOpsSystemError({
       source: "window.error",
       message: safeToString(event.error || event.message),
@@ -151,6 +237,12 @@ export function setupGlobalErrorHandlers() {
   });
 
   window.addEventListener("unhandledrejection", (event) => {
+    recordConsoleRedEvent({
+      level: "error",
+      source: "unhandledrejection",
+      message: event.reason,
+      stack: event?.reason instanceof Error ? event.reason.stack ?? event.reason.message : null,
+    });
     trySendOpsSystemError({
       source: "unhandledrejection",
       message: safeToString(event.reason),
@@ -170,36 +262,58 @@ export function setupGlobalErrorHandlers() {
 
   const originalConsoleError = console.error.bind(console);
   const originalConsoleWarn = console.warn.bind(console);
+  let inConsoleOverride = false;
 
   console.error = ((...args: unknown[]) => {
-    const safeArgs = sanitizeLogData(args);
-    trySendOpsSystemError({
-      source: "console.error",
-      message: safeToString(args[0]),
-      stack: args[0] instanceof Error ? args[0].stack ?? args[0].message : null,
-      hintCode: (() => {
-        const raw = safeToString(args[0]);
-        const m = raw.match(/\b([A-Z0-9]{4,5}\d{0,2})\b/);
-        return m?.[1] ?? null;
-      })(),
-    });
-    trySendAppLog({
-      event: "console.error",
-      message: safeToString(args[0]),
-      context: { args: (Array.isArray(safeArgs) ? safeArgs : []).slice(0, 5) },
-    });
-    logger.error("[console.error]", args[0], { args: safeArgs });
-    if (!isProd) originalConsoleError(...args);
+    if (inConsoleOverride) {
+      if (!isProd) originalConsoleError(...args);
+      return;
+    }
+    inConsoleOverride = true;
+    try {
+      const safeArgs = sanitizeLogData(args);
+      recordConsoleRedEvent({
+        level: "error",
+        source: "console.error",
+        message: args[0],
+        stack: args[0] instanceof Error ? args[0].stack ?? args[0].message : null,
+      });
+      trySendOpsSystemError({
+        source: "console.error",
+        message: safeToString(args[0]),
+        stack: args[0] instanceof Error ? args[0].stack ?? args[0].message : null,
+        hintCode: (() => {
+          const raw = safeToString(args[0]);
+          const m = raw.match(/\b([A-Z0-9]{4,5}\d{0,2})\b/);
+          return m?.[1] ?? null;
+        })(),
+      });
+      trySendAppLog({
+        event: "console.error",
+        message: safeToString(args[0]),
+        context: { args: (Array.isArray(safeArgs) ? safeArgs : []).slice(0, 5) },
+      });
+      logger.error("[console.error]", args[0], { args: safeArgs });
+      if (!isProd) originalConsoleError(...args);
+    } finally {
+      inConsoleOverride = false;
+    }
   }) as AnyFunction;
 
   console.warn = ((...args: unknown[]) => {
+    recordConsoleRedEvent({
+      level: "warn",
+      source: "console.warn",
+      message: args[0],
+      stack: args[0] instanceof Error ? args[0].stack ?? args[0].message : null,
+    });
     logger.warn("[console.warn]", { args: sanitizeLogData(args) });
     if (!isProd) originalConsoleWarn(...args);
   }) as AnyFunction;
 
   const originalAlert = window.alert?.bind(window);
-  window.alert = ((message?: any) => {
+  window.alert = ((message?: unknown) => {
     logger.warn("[GLOBAL][alert blocked]", { message: safeToString(message) });
     if (!isProd && originalAlert) originalAlert(message);
-  }) as any;
+  }) as typeof window.alert;
 }

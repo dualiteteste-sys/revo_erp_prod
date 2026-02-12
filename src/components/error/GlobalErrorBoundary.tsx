@@ -7,6 +7,7 @@ import { getModalContextStackSnapshot } from "@/lib/telemetry/modalContextStack"
 import { getLastUserAction } from "@/lib/telemetry/lastUserAction";
 import { getNetworkTracesSnapshot } from "@/lib/telemetry/networkTraceBuffer";
 import { getBreadcrumbsSnapshot } from "@/lib/telemetry/breadcrumbsBuffer";
+import { getConsoleRedEventsSnapshot } from "@/lib/telemetry/consoleRedBuffer";
 
 interface Props {
     children: ReactNode;
@@ -19,6 +20,7 @@ type DiagnosticSnapshot = {
     last_user_action: { label: string; age_ms: number; route: string | null } | null;
     requests_recent: unknown[];
     breadcrumbs: unknown[];
+    console_red_events: unknown[];
     component_stack?: string | null;
 };
 
@@ -58,6 +60,7 @@ export class GlobalErrorBoundary extends Component<Props, State> {
             })(),
             requests_recent: getNetworkTracesSnapshot(),
             breadcrumbs: getBreadcrumbsSnapshot(),
+            console_red_events: getConsoleRedEventsSnapshot(),
             component_stack: errorInfo.componentStack ?? null,
         };
 

@@ -5,6 +5,7 @@ import { getModalContextStackSnapshot } from "@/lib/telemetry/modalContextStack"
 import { getLastUserAction } from "@/lib/telemetry/lastUserAction";
 import { getNetworkTracesSnapshot } from "@/lib/telemetry/networkTraceBuffer";
 import { getBreadcrumbsSnapshot } from "@/lib/telemetry/breadcrumbsBuffer";
+import { getConsoleRedEventsSnapshot } from "@/lib/telemetry/consoleRedBuffer";
 import { sanitizeLogData } from "@/lib/sanitizeLog";
 
 export type ErrorReportPayload = {
@@ -64,6 +65,7 @@ export async function sendErrorReport(payload: ErrorReportPayload) {
     last_user_action: liveAction ? { label: liveAction.label, age_ms: liveAction.ageMs, route: liveAction.route } : null,
     requests_recent: getNetworkTracesSnapshot(),
     breadcrumbs: getBreadcrumbsSnapshot(),
+    console_red_events: getConsoleRedEventsSnapshot(),
   };
 
   const body = {

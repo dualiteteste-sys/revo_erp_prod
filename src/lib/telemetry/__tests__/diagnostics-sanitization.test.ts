@@ -30,7 +30,13 @@ describe("diagnostic buffers sanitization", () => {
     recordBreadcrumb({
       type: "click",
       message: "Testar conexão",
-      data: { email: "user@empresa.com", token: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.aaa.bbb", phone: "+55 11 98888-7777" },
+      data: {
+        email: "user@empresa.com",
+        token: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.aaa.bbb",
+        phone: "+55 11 98888-7777",
+        url: "https://example.test/callback?access_token=abc123&refresh_token=def456",
+        auth: "Bearer super_secret_token_value",
+      },
     });
 
     const crumbs = getBreadcrumbsSnapshot();
@@ -38,5 +44,7 @@ describe("diagnostic buffers sanitization", () => {
     expect(JSON.stringify(b)).toContain("[REDACTED_EMAIL]");
     expect(JSON.stringify(b)).toContain("[REDACTED]");
     expect(JSON.stringify(b)).toContain("[REDACTED_PHONE]");
+    expect(JSON.stringify(b)).toContain("[REDACTED_PARAM]");
+    expect(JSON.stringify(b)).toContain("[REDACTED_BEARER]");
   });
 });

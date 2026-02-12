@@ -9,6 +9,7 @@ import { getRoutePathname } from "@/lib/telemetry/routeSnapshot";
 import { getModalContextStackSnapshot } from "@/lib/telemetry/modalContextStack";
 import { recordNetworkTrace } from "@/lib/telemetry/networkTraceBuffer";
 import { recordBreadcrumb } from "@/lib/telemetry/breadcrumbsBuffer";
+import { recordConsoleRedEvent } from "@/lib/telemetry/consoleRedBuffer";
 
 const rawFetch = globalThis.fetch.bind(globalThis);
 const ops403Dedupe = new Map<string, number>();
@@ -134,7 +135,7 @@ async function logOpsAppErrorFetchBestEffort(input: {
     opsAppErrorsDedupe.set(key, now);
 
     const endpoint = `${supabaseUrl.replace(/\/+$/, "")}/rest/v1/rpc/ops_app_errors_log_v1`;
-    const body = {
+    const bodyWithContext: Record<string, unknown> & { p_context: unknown } = {
       p_source: input.source,
       p_route: routeBase ?? "",
       p_last_action: input.lastAction ?? "",
@@ -162,12 +163,27 @@ async function logOpsAppErrorFetchBestEffort(input: {
           : null,
       },
     };
+    const { p_context: _drop, ...bodyWithoutContext } = bodyWithContext;
 
     const headers = new Headers(input.headers);
     if (!headers.has("Content-Type")) headers.set("Content-Type", "application/json");
     headers.set("x-revo-request-id", input.requestId);
 
-    await rawFetch(endpoint, { method: "POST", headers, body: JSON.stringify(body) });
+    const res = await rawFetch(endpoint, { method: "POST", headers, body: JSON.stringify(bodyWithContext) });
+    if (res.ok) return;
+
+    // Compat: se o backend ainda não tem p_context (drift), PostgREST devolve PGRST202/404.
+    if (res.status === 404) {
+      let txt = "";
+      try {
+        txt = await res.clone().text();
+      } catch {
+        txt = "";
+      }
+      if (/PGRST202/i.test(txt) || /schema cache/i.test(txt) || /p_context/i.test(txt)) {
+        await rawFetch(endpoint, { method: "POST", headers, body: JSON.stringify(bodyWithoutContext) });
+      }
+    }
   } catch {
     // best-effort
   }
@@ -297,6 +313,17 @@ export const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey, {
                     body: init?.body ?? null,
                   });
                 }
+
+                recordConsoleRedEvent({
+                  level: "error",
+                  source: isRpc ? "network.rpc" : "network.edge",
+                  message: msg,
+                  stack: responseText,
+                  http_status: res.status,
+                  code,
+                  url,
+                });
+
                 await logOpsAppErrorFetchBestEffort({
                   requestId,
                   url,
