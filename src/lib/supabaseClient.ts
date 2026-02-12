@@ -5,6 +5,8 @@ import { newRequestId } from "@/lib/requestId";
 import { recordNetworkError } from "@/lib/telemetry/networkErrors";
 import { getLastUserAction } from "@/lib/telemetry/lastUserAction";
 import { buildOpsAppErrorFingerprint } from "@/lib/telemetry/opsAppErrorsFingerprint";
+import { getRoutePathname } from "@/lib/telemetry/routeSnapshot";
+import { getModalContextStackSnapshot } from "@/lib/telemetry/modalContextStack";
 
 const rawFetch = globalThis.fetch.bind(globalThis);
 const ops403Dedupe = new Map<string, number>();
@@ -101,9 +103,12 @@ async function logOpsAppErrorFetchBestEffort(input: {
 }) {
   try {
     if (IS_TEST_ENV) return;
+    const routeBase = getRoutePathname() ?? input.route ?? null;
+    const modalStack = getModalContextStackSnapshot();
+    const activeModal = modalStack.length ? modalStack[modalStack.length - 1] : null;
     const now = Date.now();
     const key = buildOpsAppErrorFingerprint({
-      route: input.route,
+      route: routeBase,
       code: input.code,
       httpStatus: input.status,
       url: input.url,
@@ -117,7 +122,7 @@ async function logOpsAppErrorFetchBestEffort(input: {
     const endpoint = `${supabaseUrl.replace(/\/+$/, "")}/rest/v1/rpc/ops_app_errors_log_v1`;
     const body = {
       p_source: input.source,
-      p_route: input.route ?? "",
+      p_route: routeBase ?? "",
       p_last_action: input.lastAction ?? "",
       p_message: input.message,
       p_stack: "",
@@ -128,6 +133,20 @@ async function logOpsAppErrorFetchBestEffort(input: {
       p_code: input.code ?? "",
       p_response_text: input.responseText ?? "",
       p_fingerprint: key,
+      p_context: {
+        route_base: routeBase,
+        modal_context_stack: modalStack.map((m) => ({
+          kind: m.kind,
+          name: m.name,
+          logical_route: m.logicalRoute,
+          params: m.params,
+          opened_at: m.openedAt,
+          base_route_at_open: m.baseRouteAtOpen,
+        })),
+        modal_active: activeModal
+          ? { kind: activeModal.kind, name: activeModal.name, logical_route: activeModal.logicalRoute }
+          : null,
+      },
     };
 
     const headers = new Headers(input.headers);

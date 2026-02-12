@@ -18,6 +18,7 @@ export type OpsAppErrorRow = {
   code: string | null;
   response_text: string | null;
   fingerprint: string | null;
+  context?: Record<string, unknown> | null;
   status: "novo" | "investigando" | "corrigido" | "ignorado";
   resolved: boolean;
   resolved_at?: string | null;

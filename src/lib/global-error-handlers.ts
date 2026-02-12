@@ -5,6 +5,8 @@ import { getLastRequestId } from "@/lib/requestId";
 import { getRecentNetworkErrors } from "@/lib/telemetry/networkErrors";
 import { getLastUserAction, setupLastUserActionTracking } from "@/lib/telemetry/lastUserAction";
 import { buildOpsAppErrorFingerprint } from "@/lib/telemetry/opsAppErrorsFingerprint";
+import { getRoutePathname } from "@/lib/telemetry/routeSnapshot";
+import { getModalContextStackSnapshot } from "@/lib/telemetry/modalContextStack";
 
 type AnyFunction = (...args: unknown[]) => unknown;
 
@@ -69,13 +71,16 @@ export function setupGlobalErrorHandlers() {
       if (!supabase) return;
 
       const lastAction = getLastUserAction();
-      const route = lastAction?.route ?? (window.location?.pathname ?? null);
+      const routeBase = getRoutePathname() ?? (window.location?.pathname ?? null);
+      const modalStack = getModalContextStackSnapshot();
+      const activeModal = modalStack.length ? modalStack[modalStack.length - 1] : null;
+      const routeForFingerprint = `${routeBase ?? ""}${activeModal?.logicalRoute ? `::${activeModal.logicalRoute}` : activeModal?.name ? `::modal:${activeModal.name}` : ""}`;
       const requestId = getLastRequestId();
       const recentNet = getRecentNetworkErrors();
       const lastNet = recentNet[0] ?? null;
 
       const fingerprint = buildOpsAppErrorFingerprint({
-        route,
+        route: routeForFingerprint,
         code: params.hintCode,
         httpStatus: lastNet?.status ?? null,
         url: lastNet?.url ?? null,
@@ -90,7 +95,7 @@ export function setupGlobalErrorHandlers() {
 
       void (supabase as any).rpc("ops_app_errors_log_v1", {
         p_source: params.source,
-        p_route: route ?? "",
+        p_route: routeBase ?? "",
         p_last_action: lastAction?.label ?? "",
         p_message: params.message,
         p_stack: params.stack ?? "",
@@ -101,6 +106,22 @@ export function setupGlobalErrorHandlers() {
         p_code: params.hintCode ?? "",
         p_response_text: lastNet?.responseText ?? "",
         p_fingerprint: fingerprint,
+        p_context: {
+          route_base: routeBase,
+          full_context_string: routeForFingerprint || routeBase,
+          modal_context_stack: modalStack.map((m) => ({
+            kind: m.kind,
+            name: m.name,
+            logical_route: m.logicalRoute,
+            params: m.params,
+            opened_at: m.openedAt,
+            base_route_at_open: m.baseRouteAtOpen,
+          })),
+          modal_active: activeModal
+            ? { kind: activeModal.kind, name: activeModal.name, logical_route: activeModal.logicalRoute }
+            : null,
+          last_action_age_ms: lastAction?.ageMs ?? null,
+        },
       });
     } catch {
       // best-effort
