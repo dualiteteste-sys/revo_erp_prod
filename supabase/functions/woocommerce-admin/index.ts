@@ -676,8 +676,25 @@ Deno.serve(async (req) => {
 
   try {
     if (action === "stores.list") {
-      const { data, error } = await user.rpc("woocommerce_stores_list", {});
-      if (error) throw error;
+      const { data, error } = await svc
+        .from("integrations_woocommerce_store")
+        .select("id,base_url,auth_mode,status,last_healthcheck_at,created_at,updated_at")
+        .eq("empresa_id", empresaId)
+        .order("updated_at", { ascending: false });
+      if (error) {
+        await svc.from("woocommerce_sync_log").insert({
+          empresa_id: empresaId,
+          store_id: null,
+          level: "error",
+          message: "stores_list_failed",
+          meta: sanitizeForLog({
+            request_id: requestId,
+            action,
+            error: error.message ?? String(error),
+          }),
+        }).catch(() => null);
+        throw error;
+      }
       return json(200, { ok: true, stores: data ?? [] }, cors);
     }
 
