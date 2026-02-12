@@ -12,6 +12,7 @@ import { GlobalErrorBoundary } from "./components/error/GlobalErrorBoundary";
 import * as Sentry from "@sentry/react";
 import { ConfirmProvider } from "./contexts/ConfirmProvider";
 import { setupGlobalErrorHandlers } from "./lib/global-error-handlers";
+import { initRouteSnapshot } from "./lib/telemetry/routeSnapshot";
 
 Sentry.init({
   dsn: import.meta.env.VITE_SENTRY_DSN,
@@ -29,6 +30,7 @@ Sentry.init({
   replaysOnErrorSampleRate: 1.0, // If you're not already sampling the entire session, change the sample rate to 100% when sampling sessions where errors occur.
 });
 
+initRouteSnapshot(router);
 setupGlobalErrorHandlers();
 
 const queryClient = new QueryClient();
