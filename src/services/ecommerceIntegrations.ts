@@ -1,7 +1,7 @@
 import { callRpc } from '@/lib/api';
 import { defaultMarketplaceConflictPolicy, defaultMarketplaceSyncDirection, type MarketplaceConflictPolicy, type MarketplaceSyncDirection } from '@/services/marketplaceFramework';
 
-export type EcommerceProvider = 'meli' | 'shopee' | 'woo';
+export type EcommerceProvider = 'meli' | 'shopee';
 
 export type EcommerceConnectionConfig = {
   import_orders?: boolean;
@@ -53,8 +53,6 @@ export type EcommerceConnectionDiagnostics = {
   last_sync_at: string | null;
   last_error: string | null;
   has_token: boolean;
-  has_consumer_key?: boolean;
-  has_consumer_secret?: boolean;
   has_refresh_token: boolean;
   token_expires_at: string | null;
   token_expired: boolean;
@@ -133,68 +131,4 @@ export async function getEcommerceHealthSummary(): Promise<EcommerceHealthSummar
 
 export async function getEcommerceConnectionDiagnostics(provider: EcommerceProvider): Promise<EcommerceConnectionDiagnostics> {
   return callRpc<EcommerceConnectionDiagnostics>('ecommerce_connection_diagnostics', { p_provider: provider });
-}
-
-export async function setWooConnectionSecrets(params: {
-  ecommerceId: string;
-  consumerKey: string;
-  consumerSecret: string;
-}): Promise<WooSecretsSaveResult> {
-  const raw = await callRpc<any>('ecommerce_woo_set_secrets_v2', {
-    p_ecommerce_id: params.ecommerceId,
-    p_consumer_key: params.consumerKey,
-    p_consumer_secret: params.consumerSecret,
-  });
-  return normalizeWooSecretsSaveResult(raw);
-}
-
-export async function setWooStoreUrl(params: { ecommerceId: string; storeUrl: string }): Promise<{ store_url: string }> {
-  return callRpc<{ store_url: string }>('ecommerce_woo_set_store_url', {
-    p_ecommerce_id: params.ecommerceId,
-    p_store_url: params.storeUrl,
-  });
-}
-
-export type WooSecretsSaveResult = {
-  has_consumer_key: boolean;
-  has_consumer_secret: boolean;
-  connection_status: 'connected' | 'pending' | 'error';
-  last_verified_at: string | null;
-  error_message: string | null;
-};
-
-function normalizeWooSecretsSaveResult(raw: unknown): WooSecretsSaveResult {
-  const obj = raw && typeof raw === 'object' && !Array.isArray(raw) ? (raw as Record<string, unknown>) : {};
-  const has_consumer_key = obj.has_consumer_key === true;
-  const has_consumer_secret = obj.has_consumer_secret === true;
-  const connection_status =
-    obj.connection_status === 'connected' || obj.connection_status === 'pending' || obj.connection_status === 'error'
-      ? (obj.connection_status as WooSecretsSaveResult['connection_status'])
-      : 'pending';
-  const last_verified_at = typeof obj.last_verified_at === 'string' && obj.last_verified_at.trim() ? String(obj.last_verified_at) : null;
-  const error_message = typeof obj.error_message === 'string' && obj.error_message.trim() ? String(obj.error_message) : null;
-
-  return { has_consumer_key, has_consumer_secret, connection_status, last_verified_at, error_message };
-}
-
-export function resolveWooConnectionStatus(params: {
-  storeUrl?: string | null;
-  diagnostics: EcommerceConnectionDiagnostics | null;
-  diagnosticsUnavailable: boolean;
-  previousStatus?: string | null;
-}): 'connected' | 'pending' | 'error' {
-  const hasStoreUrl = String(params.storeUrl ?? '').trim().length > 0;
-  if (!hasStoreUrl) return 'pending';
-
-  const diagStatus = String(params.diagnostics?.connection_status ?? '').toLowerCase();
-  if (diagStatus === 'connected') return 'connected';
-  if (diagStatus === 'error') return 'error';
-  if (diagStatus === 'pending') return 'pending';
-
-  return 'pending';
-}
-
-export function wooHasStoredCredentials(diagnostics: EcommerceConnectionDiagnostics | null): boolean {
-  if (!diagnostics) return false;
-  return diagnostics.has_consumer_key === true && diagnostics.has_consumer_secret === true;
 }

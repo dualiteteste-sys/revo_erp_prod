@@ -1,6 +1,6 @@
 import { callRpc } from '@/lib/api';
 
-export type EcommerceImportProvider = 'meli' | 'shopee' | 'woo';
+export type EcommerceImportProvider = 'meli' | 'shopee';
 export type EcommerceImportKind = 'import_orders' | 'import_products' | 'sync_stock' | 'sync_prices';
 export type EcommerceImportJobStatus = 'pending' | 'processing' | 'done' | 'error' | 'dead' | 'canceled';
 

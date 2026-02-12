@@ -8,7 +8,7 @@ import {
 
 describe('marketplace framework registry', () => {
   it('has supported providers in deterministic order', () => {
-    expect(MARKETPLACE_PROVIDER_IDS).toEqual(['meli', 'shopee', 'woo']);
+    expect(MARKETPLACE_PROVIDER_IDS).toEqual(['meli', 'shopee']);
   });
 
   it('marks all current providers as bidirectional-capable', () => {

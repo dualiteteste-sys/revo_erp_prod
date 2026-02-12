@@ -1,4 +1,4 @@
-export type MarketplaceProvider = 'meli' | 'shopee' | 'woo';
+export type MarketplaceProvider = 'meli' | 'shopee';
 export type MarketplaceEntity = 'products' | 'orders' | 'stock' | 'prices';
 export type MarketplaceSyncDirection = 'erp_to_marketplace' | 'marketplace_to_erp' | 'bidirectional';
 export type MarketplaceConflictPolicy = 'erp_wins' | 'marketplace_wins' | 'last_write_wins' | 'manual_review';
@@ -42,20 +42,6 @@ export const MARKETPLACE_PROVIDER_DEFINITIONS: Record<MarketplaceProvider, Marke
     capabilities: {
       supportsOAuth: true,
       supportsApiKey: false,
-      supportsWebhooks: true,
-      supportsManualProductSync: true,
-      supportsAutomaticSync: true,
-      supportsBidirectionalSync: true,
-      supportedEntities: ['orders', 'products', 'stock', 'prices'],
-    },
-  },
-  woo: {
-    id: 'woo',
-    label: 'WooCommerce',
-    summary: 'REST API oficial via Consumer Key/Secret',
-    capabilities: {
-      supportsOAuth: false,
-      supportsApiKey: true,
       supportsWebhooks: true,
       supportsManualProductSync: true,
       supportsAutomaticSync: true,

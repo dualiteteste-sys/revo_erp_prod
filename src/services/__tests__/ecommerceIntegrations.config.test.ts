@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { normalizeEcommerceConfig, resolveWooConnectionStatus } from '@/services/ecommerceIntegrations';
+import { normalizeEcommerceConfig } from '@/services/ecommerceIntegrations';
 
 describe('normalizeEcommerceConfig', () => {
   it('applies safe defaults', () => {
@@ -43,62 +43,5 @@ describe('normalizeEcommerceConfig', () => {
       auto_sync_enabled: false,
       sync_interval_minutes: 15,
     });
-  });
-});
-
-describe('resolveWooConnectionStatus', () => {
-  it('returns connected when backend diagnostics says connected', () => {
-    expect(
-      resolveWooConnectionStatus({
-        storeUrl: 'https://loja.exemplo.com',
-        diagnostics: { connection_status: 'connected' } as any,
-        diagnosticsUnavailable: false,
-        previousStatus: 'pending',
-      }),
-    ).toBe('connected');
-  });
-
-  it('returns pending when store URL is missing (even if diagnostics says connected)', () => {
-    expect(
-      resolveWooConnectionStatus({
-        storeUrl: '',
-        diagnostics: { connection_status: 'connected' } as any,
-        diagnosticsUnavailable: false,
-        previousStatus: 'connected',
-      }),
-    ).toBe('pending');
-  });
-
-  it('returns error when backend diagnostics says error', () => {
-    expect(
-      resolveWooConnectionStatus({
-        storeUrl: 'https://loja.exemplo.com',
-        diagnostics: { connection_status: 'error' } as any,
-        diagnosticsUnavailable: false,
-        previousStatus: 'connected',
-      }),
-    ).toBe('error');
-  });
-
-  it('keeps connected when diagnostics are unavailable and previous status is connected', () => {
-    expect(
-      resolveWooConnectionStatus({
-        storeUrl: 'https://loja.exemplo.com',
-        diagnostics: null,
-        diagnosticsUnavailable: true,
-        previousStatus: 'connected',
-      }),
-    ).toBe('pending');
-  });
-
-  it('returns pending when required data is missing', () => {
-    expect(
-      resolveWooConnectionStatus({
-        storeUrl: 'https://loja.exemplo.com',
-        diagnostics: null,
-        diagnosticsUnavailable: false,
-        previousStatus: 'connected',
-      }),
-    ).toBe('pending');
   });
 });

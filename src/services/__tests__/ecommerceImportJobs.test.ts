@@ -22,7 +22,7 @@ describe('ecommerceImportJobs service', () => {
     callRpcMock.mockResolvedValue({ job_id: 'job-1', status: 'pending' });
 
     const res = await enqueueEcommerceImportJob({
-      provider: 'woo',
+      provider: 'meli',
       kind: 'import_orders',
       payload: { source: 'manual' },
       idempotencyKey: 'abc',
@@ -32,7 +32,7 @@ describe('ecommerceImportJobs service', () => {
 
     expect(res).toEqual({ job_id: 'job-1', status: 'pending' });
     expect(callRpcMock).toHaveBeenCalledWith('ecommerce_import_job_enqueue', {
-      p_provider: 'woo',
+      p_provider: 'meli',
       p_kind: 'import_orders',
       p_payload: { source: 'manual' },
       p_idempotency_key: 'abc',
