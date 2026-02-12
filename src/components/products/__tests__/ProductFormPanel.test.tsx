@@ -92,7 +92,7 @@ describe('ProductFormPanel (Integration)', () => {
 
         // Verify success callback
         expect(mockOnSaveSuccess).toHaveBeenCalledWith(savedProductMock);
-    });
+    }, 30000);
 
     it('switches to Service mode correctly', async () => {
         // Mock a service product

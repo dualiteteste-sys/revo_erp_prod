@@ -62,7 +62,9 @@ export default defineConfig({
       ? {
           command: webServerCommand,
           url: baseURL,
-          reuseExistingServer: !process.env.CI,
+          // Em ambientes com múltiplos agentes/processos (worktrees), reaproveitar servidor
+          // pode "grudar" em um Vite antigo com env diferente e quebrar o gate.
+          reuseExistingServer: false,
           timeout: 120 * 1000,
         }
       : undefined,

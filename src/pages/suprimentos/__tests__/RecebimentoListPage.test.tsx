@@ -1,7 +1,12 @@
 import { describe, it, expect, vi } from 'vitest';
-import { fireEvent, screen, waitFor } from '@testing-library/react';
-import { renderWithProviders } from '@/test/utils';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { MemoryRouter } from 'react-router-dom';
 import RecebimentoListPage from '@/pages/suprimentos/RecebimentoListPage';
+
+vi.mock('@/contexts/ToastProvider', () => ({
+  useToast: () => ({ addToast: vi.fn() }),
+  ToastProvider: ({ children }: { children: any }) => children,
+}));
 
 vi.mock('@/services/recebimento', async () => {
   const actual = await vi.importActual<any>('@/services/recebimento');
@@ -28,7 +33,11 @@ vi.mock('@/services/recebimento', async () => {
 
 describe('RecebimentoListPage', () => {
   it('opens cancel modal for concluido and calls cancelarRecebimento', async () => {
-    renderWithProviders(<RecebimentoListPage />);
+    render(
+      <MemoryRouter>
+        <RecebimentoListPage />
+      </MemoryRouter>,
+    );
 
     // Aguarda carregar listagem
     expect(await screen.findByText(/Recebimento de Mercadorias/i)).toBeInTheDocument();

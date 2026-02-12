@@ -273,9 +273,9 @@ test('Vendas: pedido (VEN-01/02) happy path (CRUD + itens + impostos básicos + 
   await expect
     .poll(async () => await hitButton.count(), { timeout: 20000 })
     .toBeGreaterThan(0);
-  // Alguns selects usam onMouseDown para selecionar (evita blur/re-render).
+  // Alguns autocompletes selecionam no `mousedown` e removem o dropdown imediatamente.
+  // Se dispararmos `mousedown` + `click`, o elemento pode desaparecer entre os dois e gerar timeout/flakiness.
   await hitButton.dispatchEvent('mousedown');
-  await hitButton.click({ force: true });
   await expect(page.getByText('Item adicionado.')).toBeVisible({ timeout: 20000 });
 
   // Aprovar

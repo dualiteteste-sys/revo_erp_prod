@@ -9,19 +9,19 @@ describe("diagnostic buffers sanitization", () => {
     recordNetworkTrace({
       request_id: "req1",
       kind: "rpc",
-      name: "ecommerce_woo_set_secrets_v2",
+      name: "ecommerce_connections_upsert",
       method: "POST",
-      url: "https://example.test/rest/v1/rpc/ecommerce_woo_set_secrets_v2?token=abc",
+      url: "https://example.test/rest/v1/rpc/ecommerce_connections_upsert?token=abc",
       status_code: 400,
       duration_ms: 123,
-      body: JSON.stringify({ p_consumer_key: "ck_x", p_consumer_secret: "cs_x", p_other: 1 }),
+      body: JSON.stringify({ p_api_key: "k_x", p_access_token: "t_x", p_other: 1 }),
       response_summary: "invalid credentials",
     });
 
     const traces = getNetworkTracesSnapshot();
     const last = traces.length ? traces[traces.length - 1] : undefined;
     expect(last?.payload_keys).toEqual(["p_other"]);
-    expect(last?.url).toBe("https://example.test/rest/v1/rpc/ecommerce_woo_set_secrets_v2");
+    expect(last?.url).toBe("https://example.test/rest/v1/rpc/ecommerce_connections_upsert");
   });
 
   it("breadcrumbs sanitizam emails/tokens/telefones", () => {
