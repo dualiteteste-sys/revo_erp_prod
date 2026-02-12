@@ -18,6 +18,8 @@ const JWT_RE = /^[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/;
 const STRIPE_KEY_RE = /\b([rs]k_(live|test)_[A-Za-z0-9]+)\b/;
 const PHONE_RE = /\b(?:\+?55\s?)?(?:\(?\d{2}\)?\s?)?\d{4,5}-?\d{4}\b/;
 const CPF_CNPJ_RE = /\b\d{11}\b|\b\d{14}\b/;
+const BEARER_RE = /\b(bearer)\s+[A-Za-z0-9._-]{10,}\b/i;
+const SENSITIVE_PARAM_RE = /([?&](?:access_token|refresh_token|token|secret|password|apikey|api_key)=)[^&\s#]+/gi;
 
 function truncate(s: string) {
   if (s.length <= MAX_STRING_LEN) return s;
@@ -28,6 +30,8 @@ function sanitizeString(raw: string) {
   let s = raw;
   if (JWT_RE.test(s)) return '[REDACTED_JWT]';
   if (STRIPE_KEY_RE.test(s)) s = s.replace(STRIPE_KEY_RE, '[REDACTED_STRIPE_KEY]');
+  if (BEARER_RE.test(s)) s = s.replace(BEARER_RE, '$1 [REDACTED_BEARER]');
+  if (SENSITIVE_PARAM_RE.test(s)) s = s.replace(SENSITIVE_PARAM_RE, '$1[REDACTED_PARAM]');
   if (EMAIL_RE.test(s)) s = s.replace(EMAIL_RE, '[REDACTED_EMAIL]');
   if (CPF_CNPJ_RE.test(s)) s = s.replace(CPF_CNPJ_RE, '[REDACTED_DOC]');
   if (PHONE_RE.test(s)) s = s.replace(PHONE_RE, '[REDACTED_PHONE]');
@@ -73,4 +77,3 @@ function sanitizeValue(value: unknown, depth: number, seen: WeakSet<object>): Js
 export function sanitizeLogData<T = unknown>(value: T): JsonLike {
   return sanitizeValue(value, 0, new WeakSet<object>());
 }
-

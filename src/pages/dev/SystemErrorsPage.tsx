@@ -19,6 +19,9 @@ import {
   type OpsAppErrorRow,
 } from "@/services/opsAppErrors";
 import { getOpsContextSnapshot } from "@/services/opsContext";
+import { getConsoleRedEventsSnapshot, countConsoleRedByCategory, type ConsoleRedEvent } from "@/lib/telemetry/consoleRedBuffer";
+import { triageErrorLike, type ErrorTriageCategory } from "@/lib/telemetry/errorTriage";
+import { getOpsCollectorStatusSnapshot } from "@/lib/global-error-handlers";
 
 function formatDateTimeBR(value?: string | null) {
   if (!value) return "—";
@@ -81,6 +84,8 @@ export default function SystemErrorsPage() {
   const [savingId, setSavingId] = useState<string | null>(null);
   const [bulkSaving, setBulkSaving] = useState(false);
   const [rows, setRows] = useState<OpsAppErrorRow[]>([]);
+  const [consoleEvents, setConsoleEvents] = useState<ConsoleRedEvent[]>(() => getConsoleRedEventsSnapshot());
+  const [triageTab, setTriageTab] = useState<ErrorTriageCategory>("SYSTEM");
   const [error, setError] = useState<string | null>(null);
   const [q, setQ] = useState("");
   const [statusFilter, setStatusFilter] = useState<"open" | OpsAppErrorRow["status"] | "all">("open");
@@ -132,10 +137,54 @@ export default function SystemErrorsPage() {
     );
   }, [rows, sort]);
 
-  const visibleIds = useMemo(() => sorted.map((r) => r.id), [sorted]);
+  const triageById = useMemo(() => {
+    const out = new Map<string, { category: ErrorTriageCategory; reason: string }>();
+    for (const r of rows) {
+      const triage = triageErrorLike({
+        message: r.message,
+        stack: r.response_text ?? null,
+        http_status: r.http_status ?? null,
+        code: r.code ?? null,
+        url: r.url ?? null,
+        source: r.source,
+      });
+      out.set(r.id, triage);
+    }
+    return out;
+  }, [rows]);
+
+  const sortedFiltered = useMemo(() => {
+    return sorted.filter((r) => (triageById.get(r.id)?.category ?? "UNKNOWN") === triageTab);
+  }, [sorted, triageById, triageTab]);
+
+  const consoleCounts = useMemo(() => countConsoleRedByCategory(), [consoleEvents]);
+  const systemCounts = useMemo(() => {
+    const out: Record<ErrorTriageCategory, number> = { CLIENT: 0, SYSTEM: 0, UNKNOWN: 0 };
+    for (const t of triageById.values()) out[t.category] += 1;
+    return out;
+  }, [triageById]);
+  const combinedCounts = useMemo(() => {
+    return {
+      CLIENT: (systemCounts.CLIENT ?? 0) + (consoleCounts.CLIENT ?? 0),
+      SYSTEM: (systemCounts.SYSTEM ?? 0) + (consoleCounts.SYSTEM ?? 0),
+      UNKNOWN: (systemCounts.UNKNOWN ?? 0) + (consoleCounts.UNKNOWN ?? 0),
+    };
+  }, [systemCounts, consoleCounts]);
+
+  const consoleFiltered = useMemo(() => {
+    return consoleEvents.filter((e) => e.triage.category === triageTab);
+  }, [consoleEvents, triageTab]);
+
+  const visibleIds = useMemo(() => sortedFiltered.map((r) => r.id), [sortedFiltered]);
   const visibleSelectedCount = useMemo(() => visibleIds.filter((id) => selectedSet.has(id)).length, [visibleIds, selectedSet]);
   const allVisibleSelected = visibleIds.length > 0 && visibleSelectedCount === visibleIds.length;
   const someVisibleSelected = visibleSelectedCount > 0 && visibleSelectedCount < visibleIds.length;
+
+  useEffect(() => {
+    const onConsole = () => setConsoleEvents(getConsoleRedEventsSnapshot());
+    window.addEventListener("revo:console_red_event", onConsole as any);
+    return () => window.removeEventListener("revo:console_red_event", onConsole as any);
+  }, []);
 
   const load = async () => {
     setLoading(true);
@@ -253,12 +302,50 @@ export default function SystemErrorsPage() {
           actions={
             <div className="flex items-center gap-2">
               <Button
+                variant="outline"
+                disabled={loading}
+                onClick={async () => {
+                  const token = (() => {
+                    try {
+                      return crypto.randomUUID().slice(0, 8);
+                    } catch {
+                      return Math.random().toString(16).slice(2, 10);
+                    }
+                  })();
+                  const msg = `[SELFTEST][ops_collector] ${token}`;
+                  console.error(msg);
+                  addToast("Self-test disparado. Verificando se aparece no painel…", "info");
+                  try {
+                    await new Promise((r) => setTimeout(r, 1500));
+                    const list = await listOpsAppErrors({ q: token, onlyOpen: false, statuses: null, limit: 5, offset: 0 });
+                    if ((list ?? []).some((x) => (x.message ?? "").includes(token))) {
+                      addToast("Self-test OK: coletor registrou e o painel encontrou o evento.", "success");
+                      await load();
+                    } else {
+                      const st = getOpsCollectorStatusSnapshot();
+                      addToast(
+                        `Self-test parcial: capturado localmente, mas não apareceu no sistema. Possível drift de migration/RPC. (${st.error_message ?? "sem detalhe"})`,
+                        "error",
+                      );
+                    }
+                  } catch (e: any) {
+                    addToast(e?.message || "Falha ao verificar self-test no backend.", "error");
+                  }
+                }}
+                className="gap-2"
+                title="Dispara um console.error controlado e tenta encontrá-lo no backend (valida pipeline)."
+              >
+                <ShieldAlert size={16} />
+                Self-test coletor
+              </Button>
+              <Button
                 variant="secondary"
                 onClick={async () => {
                   try {
                     const snap = await getOpsContextSnapshot();
-                    const sample = sorted.slice(0, 10);
-                    await navigator.clipboard.writeText(JSON.stringify({ snapshot: snap, sample }, null, 2));
+                    const sample = sortedFiltered.slice(0, 10);
+                    const consoleSample = consoleFiltered.slice(0, 10);
+                    await navigator.clipboard.writeText(JSON.stringify({ snapshot: snap, sample, console_sample: consoleSample }, null, 2));
                     addToast("Amostra (10) copiada para a área de transferência.", "success");
                   } catch (e: any) {
                     addToast(e?.message || "Falha ao copiar amostra.", "error");
@@ -350,9 +437,53 @@ export default function SystemErrorsPage() {
         </div>
       }
     >
+      {(() => {
+        const st = getOpsCollectorStatusSnapshot();
+        const show =
+          Boolean(st.error_message) &&
+          (st.ok_at == null || (st.error_at != null && st.ok_at != null && st.error_at > st.ok_at));
+        if (!show) return null;
+        return (
+          <PageCard className="border-amber-200 bg-amber-50">
+            <div className="text-sm text-amber-900">
+              <span className="font-semibold">Atenção:</span> coletor de erros parece inativo/instável. Último erro:{" "}
+              <span className="font-mono">{st.error_message}</span>
+            </div>
+            <div className="mt-1 text-xs text-amber-800">
+              Dica: isso costuma acontecer quando o frontend foi atualizado mas o Supabase (RPC/migration) ainda não foi aplicado em produção.
+            </div>
+          </PageCard>
+        );
+      })()}
+
+      <PageCard className="flex flex-wrap items-center justify-between gap-2">
+        <div className="text-sm text-slate-700">
+          Triagem:{" "}
+          <span className="font-semibold">
+            {triageTab === "SYSTEM" ? "Sistema" : triageTab === "CLIENT" ? "Cliente" : "Indeterminado"}
+          </span>
+          <span className="ml-2 text-xs text-slate-500">
+            (Sistema: {systemCounts[triageTab]} | Console: {consoleCounts[triageTab]} | Total: {combinedCounts[triageTab]})
+          </span>
+        </div>
+        <div className="flex items-center gap-2">
+          <Button variant={triageTab === "SYSTEM" ? "default" : "outline"} size="sm" onClick={() => setTriageTab("SYSTEM")}>
+            Sistema ({combinedCounts.SYSTEM})
+          </Button>
+          <Button variant={triageTab === "CLIENT" ? "default" : "outline"} size="sm" onClick={() => setTriageTab("CLIENT")}>
+            Cliente ({combinedCounts.CLIENT})
+          </Button>
+          <Button variant={triageTab === "UNKNOWN" ? "default" : "outline"} size="sm" onClick={() => setTriageTab("UNKNOWN")}>
+            Indeterminado ({combinedCounts.UNKNOWN})
+          </Button>
+        </div>
+      </PageCard>
+
       <PageCard className="space-y-3">
         <div className="text-xs text-slate-600">
-          Total: <span className="font-semibold text-slate-900">{total}</span>
+          Total (Sistema): <span className="font-semibold text-slate-900">{total}</span>{" "}
+          <span className="text-slate-400">•</span>{" "}
+          Console (sessão): <span className="font-semibold text-slate-900">{consoleEvents.length}</span>
         </div>
 
         {loading ? (
@@ -376,7 +507,7 @@ export default function SystemErrorsPage() {
                         onChange={(e) => toggleAllVisible(e.target.checked)}
                         className="h-4 w-4 rounded border-gray-300"
                         aria-label="Selecionar todos visíveis"
-                        disabled={sorted.length === 0}
+                        disabled={sortedFiltered.length === 0}
                       />
                     </th>
                     <ResizableSortableTh
@@ -431,7 +562,7 @@ export default function SystemErrorsPage() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100">
-                  {sorted.map((r) => (
+                  {sortedFiltered.map((r) => (
                     <tr key={r.id} className="hover:bg-gray-50">
                       <td className="p-3">
                         <input
@@ -464,6 +595,11 @@ export default function SystemErrorsPage() {
                       </td>
                       <td className="p-3 text-slate-900">
                         <div className="line-clamp-2">{r.message}</div>
+                        {(() => {
+                          const t = triageById.get(r.id);
+                          if (!t) return null;
+                          return <div className="mt-1 text-[11px] text-slate-500">Triage: {t.category} — {t.reason}</div>;
+                        })()}
                         {r.last_action ? (
                           <div className="mt-1 text-xs text-slate-500">Ação: {r.last_action}</div>
                         ) : null}
@@ -535,7 +671,7 @@ export default function SystemErrorsPage() {
                       </td>
                     </tr>
                   ))}
-                  {sorted.length === 0 && (
+                  {sortedFiltered.length === 0 && (
                     <tr>
                       <td className="p-6 text-center text-slate-500" colSpan={8}>
                         Nenhum erro encontrado.
@@ -547,6 +683,71 @@ export default function SystemErrorsPage() {
             </div>
           </div>
         )}
+      </PageCard>
+
+      <PageCard className="space-y-3">
+        <div className="text-sm font-semibold text-slate-800">Console vermelho (sessão atual)</div>
+        <div className="text-xs text-slate-600">
+          Captura automática de <span className="font-mono">console.error</span>, <span className="font-mono">console.warn</span>,{" "}
+          <span className="font-mono">window.error</span> e <span className="font-mono">unhandledrejection</span>. Buffer limitado a 200 eventos.
+        </div>
+
+        <div className="rounded-xl border border-gray-200 bg-white overflow-hidden">
+          <div className="max-h-[360px] overflow-auto">
+            <table className="min-w-full text-sm">
+              <thead className="bg-gray-50 text-gray-600 sticky top-0">
+                <tr>
+                  <th className="p-3 text-left w-[180px]">Quando</th>
+                  <th className="p-3 text-left w-[160px]">Fonte</th>
+                  <th className="p-3 text-left">Mensagem</th>
+                  <th className="p-3 text-left w-[220px]">Rota</th>
+                  <th className="p-3 text-left w-[140px]">Ações</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100">
+                {consoleFiltered.map((e) => (
+                  <tr key={e.id} className="hover:bg-gray-50">
+                    <td className="p-3 text-slate-700">{formatDateTimeBR(e.at)}</td>
+                    <td className="p-3 font-mono text-slate-800 break-all">{e.source}</td>
+                    <td className="p-3 text-slate-900">
+                      <div className="line-clamp-2">{e.message}</div>
+                      <div className="mt-1 text-[11px] text-slate-500">Triage: {e.triage.category} — {e.triage.reason}</div>
+                    </td>
+                    <td className="p-3 font-mono text-slate-700 break-all">{e.route_base ?? "—"}</td>
+                    <td className="p-3">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="gap-2"
+                        onClick={async () => {
+                          const text = [
+                            `Ao acessar ${e.route_base ?? "—"} estou com console: ${e.message}`,
+                            "",
+                            `triage: ${e.triage.category} (${e.triage.reason})`,
+                            "",
+                            e.stack ? `stack: ${e.stack}` : "",
+                          ].filter(Boolean).join("\n");
+                          await navigator.clipboard.writeText(text);
+                          addToast("Evento do console copiado.", "success");
+                        }}
+                      >
+                        <Copy size={14} />
+                        Copiar
+                      </Button>
+                    </td>
+                  </tr>
+                ))}
+                {consoleFiltered.length === 0 ? (
+                  <tr>
+                    <td className="p-6 text-center text-slate-500" colSpan={5}>
+                      Nenhum evento nesta categoria.
+                    </td>
+                  </tr>
+                ) : null}
+              </tbody>
+            </table>
+          </div>
+        </div>
       </PageCard>
 
       <Dialog open={sendOpen} onOpenChange={setSendOpen}>
