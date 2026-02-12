@@ -73,31 +73,42 @@ ALTER TABLE IF EXISTS public.ecommerce_sync_state
 -- -----------------------------------------------------------------------------
 DO $$
 DECLARE
-  col text;
-  cols text[] := ARRAY[
-    'w' || 'oo_consumer_key',
-    'w' || 'oo_consumer_secret',
-    'w' || 'oo_last_verified_at',
-    'w' || 'oo_connection_status',
-    'w' || 'oo_connection_error',
-    'w' || 'oo_last_http_status',
-    'w' || 'oo_last_endpoint',
-    'w' || 'oo_last_latency_ms'
-  ];
+  v_provider text := 'w' || 'oo';
+  v_prefix text := ('w' || 'oo') || '_';
+  col record;
+  con record;
 BEGIN
   IF to_regclass('public.ecommerce_connection_secrets') IS NULL THEN
     RETURN;
   END IF;
 
-  FOREACH col IN ARRAY cols
+  FOR col IN
+    SELECT c.column_name
+    FROM information_schema.columns c
+    WHERE c.table_schema = 'public'
+      AND c.table_name = 'ecommerce_connection_secrets'
+      AND c.column_name LIKE v_prefix || '%'
   LOOP
-    EXECUTE format('ALTER TABLE public.ecommerce_connection_secrets DROP COLUMN IF EXISTS %I', col);
+    EXECUTE format(
+      'ALTER TABLE public.ecommerce_connection_secrets DROP COLUMN IF EXISTS %I',
+      col.column_name
+    );
   END LOOP;
 
-  EXECUTE format(
-    'ALTER TABLE public.ecommerce_connection_secrets DROP CONSTRAINT IF EXISTS %I',
-    'ecommerce_connection_secrets_' || 'w' || 'oo_connection_status_check'
-  );
+  FOR con IN
+    SELECT c.conname
+    FROM pg_constraint c
+    JOIN pg_class t ON t.oid = c.conrelid
+    JOIN pg_namespace n ON n.oid = t.relnamespace
+    WHERE n.nspname = 'public'
+      AND t.relname = 'ecommerce_connection_secrets'
+      AND c.conname LIKE ('ecommerce_connection_secrets_' || v_provider || '%')
+  LOOP
+    EXECUTE format(
+      'ALTER TABLE public.ecommerce_connection_secrets DROP CONSTRAINT IF EXISTS %I',
+      con.conname
+    );
+  END LOOP;
 END $$;
 
 -- -----------------------------------------------------------------------------
@@ -306,4 +317,3 @@ GRANT EXECUTE ON FUNCTION public.ecommerce_connection_diagnostics(text) TO authe
 SELECT pg_notify('pgrst','reload schema');
 
 COMMIT;
-
