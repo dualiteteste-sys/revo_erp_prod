@@ -1,7 +1,20 @@
 import { defineConfig, devices } from '@playwright/test';
+import fs from 'node:fs';
+import path from 'node:path';
 
 const baseURL = process.env.PLAYWRIGHT_BASE_URL || 'http://127.0.0.1:5173';
 const shouldUseWebServer = !process.env.PLAYWRIGHT_BASE_URL;
+
+function envFileHasViteSupabaseKeys(): boolean {
+  const root = process.cwd();
+  const candidates = ['.env.local', '.env'].map((f) => path.join(root, f));
+  for (const file of candidates) {
+    if (!fs.existsSync(file)) continue;
+    const text = fs.readFileSync(file, 'utf8');
+    if (/\bVITE_SUPABASE_URL\s*=/.test(text) && /\bVITE_SUPABASE_ANON_KEY\s*=/.test(text)) return true;
+  }
+  return false;
+}
 
 function portFromBaseUrl(url: string): number {
   try {
@@ -17,7 +30,18 @@ function portFromBaseUrl(url: string): number {
 // Não "repassar" VITE_* explicitamente na linha de comando:
 // - quando o env não está setado, isso sobrescreve `.env.local` com string vazia e quebra os E2E locais.
 // - no CI, os `VITE_*` já são fornecidos via `env:` do job.
-const webServerCommand = `yarn dev --host 127.0.0.1 --port ${portFromBaseUrl(baseURL)}`;
+const shouldInjectViteSupabaseEnv =
+  !process.env.VITE_SUPABASE_URL &&
+  !process.env.VITE_SUPABASE_ANON_KEY &&
+  !envFileHasViteSupabaseKeys();
+
+// Local convenience: if no Supabase env is provided at all, inject safe placeholders so the app can boot
+// and Playwright can stub network calls. This is skipped when `.env(.local)` already defines the keys.
+const viteEnvPrefix = shouldInjectViteSupabaseEnv
+  ? 'VITE_SUPABASE_URL=http://127.0.0.1:54321 VITE_SUPABASE_ANON_KEY=e2e_dummy '
+  : '';
+
+const webServerCommand = `${viteEnvPrefix}yarn dev --host 127.0.0.1 --port ${portFromBaseUrl(baseURL)}`;
 
 export default defineConfig({
     testDir: './e2e',
