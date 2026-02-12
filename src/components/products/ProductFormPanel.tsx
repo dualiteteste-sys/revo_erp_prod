@@ -9,6 +9,7 @@ import SeoTab from './form-tabs/SeoTab';
 import OthersTab from './form-tabs/OthersTab';
 import VariacoesTab from './form-tabs/VariacoesTab';
 import PrecosTab from './form-tabs/PrecosTab';
+import WooCommerceChannelTab from './form-tabs/WooCommerceChannelTab';
 import { normalizeProductPayload } from '@/services/products.normalize';
 import { validatePackaging } from '@/services/products.validate';
 import { useAuth } from '@/contexts/AuthProvider';
@@ -27,7 +28,7 @@ interface ProductFormPanelProps {
   saveProduct: (formData: ProductFormData) => Promise<ProductFormData>;
 }
 
-const tabs = ['Dados Gerais', 'Variações', 'Preço por Quantidade', 'Dados Complementares', 'Mídia', 'SEO', 'Outros'];
+const tabs = ['Dados Gerais', 'Canais / WooCommerce', 'Variações', 'Preço por Quantidade', 'Dados Complementares', 'Mídia', 'SEO', 'Outros'];
 
 const ProductFormPanel: React.FC<ProductFormPanelProps> = ({ product, initialValues, onSaveSuccess, onClose, saveProduct }) => {
   const { addToast } = useToast();
@@ -160,6 +161,8 @@ const ProductFormPanel: React.FC<ProductFormPanelProps> = ({ product, initialVal
         return <DadosGeraisTab data={formData} onChange={handleFormChange} errors={errors} isService={isService} />;
       case 'Variações':
         return <VariacoesTab produtoId={formData.id} produtoPaiId={formData.produto_pai_id} skuBase={formData.sku} />;
+      case 'Canais / WooCommerce':
+        return <WooCommerceChannelTab data={formData} />;
       case 'Preço por Quantidade':
         return <PrecosTab produtoId={formData.id} />;
       case 'Outros':
