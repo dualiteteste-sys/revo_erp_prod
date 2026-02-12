@@ -11,6 +11,8 @@ import PlanGuard from "../components/layout/PlanGuard";
 // App Pages (Lazy Loaded)
 const Dashboard = lazyImport(() => import('../pages/Dashboard'));
 const ProductsPage = lazyImport(() => import('../pages/products/ProductsPage'));
+const WooCatalogRunPage = lazyImport(() => import('../pages/products/WooCatalogRunPage'));
+const WooCatalogImportPage = lazyImport(() => import('../pages/products/WooCatalogImportPage'));
 const PartnersPage = lazyImport(() => import('../pages/partners/PartnersPage'));
 const CarriersPage = lazyImport(() => import("../pages/carriers/CarriersPage"));
 const ServicesPage = lazyImport(() => import("../pages/services/ServicesPage"));
@@ -143,6 +145,22 @@ export const appRoutes: RouteObject[] = [
               element: (
                 <RequirePermission permission={{ domain: "produtos", action: "view" }}>
                   <Suspense fallback={<PageLoader />}><ProductsPage /></Suspense>
+                </RequirePermission>
+              ),
+            },
+            {
+              path: "products/woocommerce/catalog",
+              element: (
+                <RequirePermission permission={{ domain: "produtos", action: "view" }}>
+                  <Suspense fallback={<PageLoader />}><WooCatalogImportPage /></Suspense>
+                </RequirePermission>
+              ),
+            },
+            {
+              path: "products/woocommerce/runs/:runId",
+              element: (
+                <RequirePermission permission={{ domain: "produtos", action: "view" }}>
+                  <Suspense fallback={<PageLoader />}><WooCatalogRunPage /></Suspense>
                 </RequirePermission>
               ),
             },

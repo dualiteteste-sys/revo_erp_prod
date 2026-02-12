@@ -151,6 +151,8 @@ Agendamento real no GitHub Actions:
 - `docs/integrations/woocommerce-control-panel.md`
 - `docs/integrations/woocommerce-health-checks.md`
 - `docs/integrations/woocommerce-scheduler.md`
+- `docs/integrations/woocommerce-catalog.md`
+- `docs/integrations/woocommerce-catalog-runbook.md`
 
 ## Notas de segurança
 

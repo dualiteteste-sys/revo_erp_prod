@@ -157,6 +157,36 @@ export const HELP_CATALOG: HelpEntry[] = [
     ],
   },
   {
+    match: '/app/products/woocommerce/catalog',
+    title: 'Guia Rápido — Catálogo Woo (Importação)',
+    whatIs:
+      'Tela operacional para buscar produtos no WooCommerce, selecionar em massa, validar preview e iniciar uma execução rastreável de importação para o Revo.',
+    steps: [
+      'Selecione a loja Woo na tela de Produtos antes de abrir esta página.',
+      'Busque por nome/SKU, marque os itens desejados e rode o preview.',
+      'Revise blockers/warnings no preview e execute apenas quando estiver limpo.',
+      'Após iniciar, acompanhe em “Execução WooCommerce” e use “Reexecutar falhas” quando necessário.',
+    ],
+    dependsOn: ['Permissão: Produtos (view)', 'Loja Woo cadastrada e saudável'],
+    connectsWith: ['Produtos', 'Execução WooCommerce', 'Painel Dev WooCommerce'],
+    commonMistakes: ['Importar sem SKU definido no Woo.', 'Executar com blockers pendentes.', 'Ignorar falhas de mapeamento após a execução.'],
+  },
+  {
+    match: '/app/products/woocommerce/runs/',
+    title: 'Guia Rápido — Execução WooCommerce',
+    whatIs:
+      'Relatório operacional por run: progresso, itens concluídos/ignorados/com erro, hints de correção e atalho para reprocessar apenas falhas.',
+    steps: [
+      'Abra o run recém-criado para acompanhar o processamento.',
+      'Use “Atualizar” para polling manual quando necessário.',
+      'Se houver falhas, use “Reexecutar falhas” para novo run sem duplicar itens concluídos.',
+      'Quando o erro for de autenticação/mapeamento, corrija a causa e execute novamente.',
+    ],
+    dependsOn: ['Permissão: Produtos (view)', 'Run criado por ação de catálogo Woo'],
+    connectsWith: ['Produtos', 'Painel Dev WooCommerce', 'Saúde (Ops)'],
+    commonMistakes: ['Reexecutar tudo em vez de só falhas.', 'Ignorar códigos de erro/hint por item.', 'Fechar run sem validar contadores finais.'],
+  },
+  {
     match: '/app/desenvolvedor/entitlements',
     title: 'Guia Rápido — Entitlements por plano (Ultria)',
     whatIs:

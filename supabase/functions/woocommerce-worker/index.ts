@@ -3,7 +3,7 @@ import { buildCorsHeaders } from "../_shared/cors.ts";
 import { aesGcmDecryptFromString, timingSafeEqual } from "../_shared/crypto.ts";
 import { getRequestId } from "../_shared/request.ts";
 import { sanitizeForLog } from "../_shared/sanitize.ts";
-import { resolveWooError } from "../_shared/woocommerceErrors.ts";
+import { detectWooErrorCode, resolveWooError } from "../_shared/woocommerceErrors.ts";
 import {
   buildWooApiUrl,
   classifyWooHttpStatus,
@@ -19,7 +19,7 @@ type JobRow = {
   id: string;
   empresa_id: string;
   store_id: string;
-  type: "PRICE_SYNC" | "STOCK_SYNC" | "ORDER_RECONCILE" | "CATALOG_RECONCILE";
+  type: "PRICE_SYNC" | "STOCK_SYNC" | "ORDER_RECONCILE" | "CATALOG_RECONCILE" | "CATALOG_EXPORT" | "CATALOG_IMPORT";
   payload: any;
   attempts: number;
   max_attempts: number;
@@ -72,6 +72,10 @@ function toWooStockQuantity(value: unknown): number {
   const n = Number(value);
   if (!Number.isFinite(n)) return 0;
   return Math.max(0, Math.trunc(n));
+}
+
+function toWooStatusFromRevo(status: string): "publish" | "draft" {
+  return String(status ?? "").trim() === "ativo" ? "publish" : "draft";
 }
 
 function mapWooOrderStatus(order: any): "orcamento" | "aprovado" | "cancelado" {
@@ -202,6 +206,163 @@ async function findProductIdBySku(svc: any, empresaId: string, sku: string): Pro
     .is("deleted_at", null)
     .maybeSingle();
   return data?.id ? String(data.id) : null;
+}
+
+async function upsertListing(params: {
+  svc: any;
+  empresaId: string;
+  storeId: string;
+  revoProductId: string;
+  sku: string | null;
+  wooProductId: number | null;
+  wooVariationId: number | null;
+  listingStatus: "linked" | "unlinked" | "conflict" | "error";
+  touchPrice?: boolean;
+  touchStock?: boolean;
+  errorCode?: string | null;
+  errorHint?: string | null;
+}) {
+  const nowIso = new Date().toISOString();
+  await params.svc.from("woocommerce_listing").upsert({
+    empresa_id: params.empresaId,
+    store_id: params.storeId,
+    revo_product_id: params.revoProductId,
+    sku: params.sku,
+    woo_product_id: params.wooProductId,
+    woo_variation_id: params.wooVariationId,
+    listing_status: params.listingStatus,
+    last_sync_price_at: params.touchPrice ? nowIso : null,
+    last_sync_stock_at: params.touchStock ? nowIso : null,
+    last_error_code: params.errorCode ?? null,
+    last_error_hint: params.errorHint ?? null,
+  }, { onConflict: "store_id,revo_product_id" });
+}
+
+async function updateRunItemStatus(params: {
+  svc: any;
+  itemId: string;
+  empresaId: string;
+  storeId: string;
+  status: "DONE" | "ERROR" | "SKIPPED" | "RUNNING";
+  errorCode?: string | null;
+  hint?: string | null;
+  lastError?: string | null;
+}) {
+  await params.svc
+    .from("woocommerce_sync_run_item")
+    .update({
+      status: params.status,
+      error_code: params.errorCode ?? null,
+      hint: params.hint ?? null,
+      last_error: params.lastError ?? null,
+      last_error_at: params.status === "ERROR" ? new Date().toISOString() : null,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", params.itemId)
+    .eq("empresa_id", params.empresaId)
+    .eq("store_id", params.storeId);
+}
+
+async function refreshRunSummary(params: { svc: any; runId: string; empresaId: string; storeId: string }) {
+  const { data: items } = await params.svc
+    .from("woocommerce_sync_run_item")
+    .select("status")
+    .eq("run_id", params.runId)
+    .eq("empresa_id", params.empresaId)
+    .eq("store_id", params.storeId);
+  const rows = Array.isArray(items) ? items : [];
+  const planned = rows.length;
+  const done = rows.filter((row: any) => String(row.status) === "DONE").length;
+  const failed = rows.filter((row: any) => String(row.status) === "ERROR" || String(row.status) === "DEAD").length;
+  const skipped = rows.filter((row: any) => String(row.status) === "SKIPPED").length;
+  const running = rows.filter((row: any) => String(row.status) === "RUNNING" || String(row.status) === "QUEUED").length;
+  const runStatus = running > 0
+    ? "running"
+    : failed > 0 && done > 0
+    ? "partial"
+    : failed > 0
+    ? "error"
+    : "done";
+  await params.svc
+    .from("woocommerce_sync_run")
+    .update({
+      status: runStatus,
+      started_at: runStatus === "running" ? new Date().toISOString() : undefined,
+      finished_at: running > 0 ? null : new Date().toISOString(),
+      summary: {
+        planned,
+        updated: done,
+        skipped,
+        failed,
+      },
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", params.runId)
+    .eq("empresa_id", params.empresaId)
+    .eq("store_id", params.storeId);
+}
+
+async function createOrUpdateRevoProductFromWoo(params: {
+  svc: any;
+  empresaId: string;
+  woo: any;
+}) {
+  const sku = String(params.woo?.sku ?? "").trim();
+  if (!sku) throw new Error("WOO_IMPORT_SKU_MISSING");
+  const wooName = String(params.woo?.name ?? "").trim() || `Produto Woo ${String(params.woo?.id ?? "")}`;
+  const wooStatus = String(params.woo?.status ?? "").trim() === "publish" ? "ativo" : "inativo";
+  const wooPrice = Number(params.woo?.regular_price ?? params.woo?.price ?? 0) || 0;
+  const wooStock = Number(params.woo?.stock_quantity ?? 0) || 0;
+
+  const { data: existing } = await params.svc
+    .from("produtos")
+    .select("id")
+    .eq("empresa_id", params.empresaId)
+    .eq("sku", sku)
+    .is("deleted_at", null)
+    .maybeSingle();
+
+  if (existing?.id) {
+    await params.svc
+      .from("produtos")
+      .update({
+        nome: wooName,
+        status: wooStatus,
+        preco_venda: wooPrice,
+        estoque_atual: wooStock,
+        descricao: String(params.woo?.short_description ?? params.woo?.description ?? "").slice(0, 1500) || null,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("empresa_id", params.empresaId)
+      .eq("id", String(existing.id));
+    return { revoProductId: String(existing.id), created: false };
+  }
+
+  const insertPayload = {
+    empresa_id: params.empresaId,
+    tipo: "simples",
+    status: wooStatus,
+    nome: wooName,
+    pode_comprar: true,
+    pode_vender: true,
+    pode_produzir: false,
+    rastreio_lote: false,
+    rastreio_serial: false,
+    sku,
+    unidade: "un",
+    preco_venda: wooPrice,
+    moeda: "BRL",
+    icms_origem: 0,
+    tipo_embalagem: "outro",
+    controla_estoque: true,
+    controlar_lotes: false,
+    permitir_inclusao_vendas: true,
+    descricao: String(params.woo?.short_description ?? params.woo?.description ?? "").slice(0, 1500) || null,
+    estoque_atual: wooStock,
+  };
+  const { data: created, error } = await params.svc.from("produtos").insert(insertPayload).select("id").single();
+  if (error || !created?.id) throw error ?? new Error("WOO_IMPORT_CREATE_FAILED");
+  return { revoProductId: String(created.id), created: true };
 }
 
 async function upsertOrderIntoRevo(params: {
@@ -426,10 +587,11 @@ async function syncBySkus(params: {
   secrets: StoreSecrets;
   kind: "PRICE_SYNC" | "STOCK_SYNC";
   skus: string[];
-}): Promise<{ updated: number; skipped: number; failed: number }> {
+  runId?: string | null;
+}): Promise<{ updated: number; skipped: number; failed: number; perSku: Array<{ sku: string; status: "updated" | "skipped" | "failed"; error_code?: string | null; hint?: string | null; revo_product_id?: string | null; woo_product_id?: number | null; woo_variation_id?: number | null }> }> {
   const { svc, secrets, kind } = params;
   const skus = Array.from(new Set(params.skus.map((s) => String(s ?? "").trim()).filter(Boolean)));
-  if (skus.length === 0) return { updated: 0, skipped: 0, failed: 0 };
+  if (skus.length === 0) return { updated: 0, skipped: 0, failed: 0, perSku: [] };
 
   const { data: maps, error: mapErr } = await svc
     .from("woocommerce_product_map")
@@ -457,6 +619,7 @@ async function syncBySkus(params: {
   let updated = 0;
   let skipped = 0;
   let failed = 0;
+  const perSku: Array<{ sku: string; status: "updated" | "skipped" | "failed"; error_code?: string | null; hint?: string | null; revo_product_id?: string | null; woo_product_id?: number | null; woo_variation_id?: number | null }> = [];
 
   // Separate simple products vs variations (variations require different endpoint).
   const simpleUpdates: any[] = [];
@@ -471,6 +634,7 @@ async function syncBySkus(params: {
     const revo = productsBySku.get(sku);
     if (!revo) {
       skipped += 1;
+      perSku.push({ sku, status: "skipped", error_code: "WOO_MAPPING_MISSING", hint: "Produto não encontrado no Revo para o SKU informado." });
       continue;
     }
 
@@ -493,6 +657,14 @@ async function syncBySkus(params: {
         simpleUpdates.push({ id: productId, regular_price: regularPrice });
       }
     }
+
+    perSku.push({
+      sku,
+      status: "updated",
+      revo_product_id: revo?.id ? String(revo.id) : null,
+      woo_product_id: productId,
+      woo_variation_id: variationId || null,
+    });
   }
 
   const chunkSize = 50;
@@ -544,7 +716,73 @@ async function syncBySkus(params: {
     await svc.from("woocommerce_product_map").update({ last_synced_price_at: ts }).eq("empresa_id", secrets.empresaId).eq("store_id", secrets.storeId).in("sku", skus);
   }
 
-  return { updated, skipped, failed };
+  for (const sku of skus) {
+    if (!perSku.some((row) => row.sku === sku)) {
+      perSku.push({ sku, status: "skipped", error_code: "WOO_MAPPING_MISSING", hint: "SKU sem mapeamento para a loja." });
+    }
+  }
+
+  if (params.runId) {
+    const { data: runItems } = await svc
+      .from("woocommerce_sync_run_item")
+      .select("id,sku,revo_product_id,woo_product_id,woo_variation_id")
+      .eq("run_id", params.runId)
+      .eq("empresa_id", secrets.empresaId)
+      .eq("store_id", secrets.storeId);
+    const items = Array.isArray(runItems) ? runItems : [];
+    for (const item of items) {
+      const sku = String(item?.sku ?? "").trim();
+      const found = perSku.find((row) => row.sku === sku);
+      if (!found) continue;
+      if (found.status === "updated") {
+        await updateRunItemStatus({
+          svc,
+          itemId: String(item.id),
+          empresaId: secrets.empresaId,
+          storeId: secrets.storeId,
+          status: "DONE",
+        });
+        if (item?.revo_product_id) {
+          await upsertListing({
+            svc,
+            empresaId: secrets.empresaId,
+            storeId: secrets.storeId,
+            revoProductId: String(item.revo_product_id),
+            sku: sku || null,
+            wooProductId: Number(item?.woo_product_id ?? 0) || null,
+            wooVariationId: Number(item?.woo_variation_id ?? 0) || null,
+            listingStatus: "linked",
+            touchPrice: kind === "PRICE_SYNC",
+            touchStock: kind === "STOCK_SYNC",
+          });
+        }
+      } else if (found.status === "skipped") {
+        await updateRunItemStatus({
+          svc,
+          itemId: String(item.id),
+          empresaId: secrets.empresaId,
+          storeId: secrets.storeId,
+          status: "SKIPPED",
+          errorCode: found.error_code ?? null,
+          hint: found.hint ?? null,
+        });
+      } else {
+        await updateRunItemStatus({
+          svc,
+          itemId: String(item.id),
+          empresaId: secrets.empresaId,
+          storeId: secrets.storeId,
+          status: "ERROR",
+          errorCode: found.error_code ?? "WOO_UNEXPECTED",
+          hint: found.hint ?? null,
+          lastError: found.error_code ?? "Falha ao sincronizar SKU.",
+        });
+      }
+    }
+    await refreshRunSummary({ svc, runId: params.runId, empresaId: secrets.empresaId, storeId: secrets.storeId });
+  }
+
+  return { updated, skipped, failed, perSku };
 }
 
 async function reconcileRecentOrders(params: {
@@ -730,9 +968,309 @@ async function runWorkerBatch(params: {
         continue;
       }
 
+      if (j.type === "CATALOG_EXPORT") {
+        const runId = String(j.payload?.run_id ?? "").trim();
+        if (!runId) throw new Error("RUN_ID_REQUIRED");
+        await params.svc
+          .from("woocommerce_sync_run")
+          .update({ status: "running", started_at: new Date().toISOString(), updated_at: new Date().toISOString() })
+          .eq("id", runId)
+          .eq("empresa_id", secrets.empresaId)
+          .eq("store_id", secrets.storeId);
+
+        const { data: runItems } = await params.svc
+          .from("woocommerce_sync_run_item")
+          .select("id,sku,revo_product_id,woo_product_id,woo_variation_id,action,status")
+          .eq("run_id", runId)
+          .eq("empresa_id", secrets.empresaId)
+          .eq("store_id", secrets.storeId)
+          .in("status", ["QUEUED", "RUNNING"]);
+        const items = Array.isArray(runItems) ? runItems : [];
+
+        for (const item of items) {
+          const itemId = String(item.id);
+          const revoProductId = String(item?.revo_product_id ?? "").trim();
+          const sku = String(item?.sku ?? "").trim();
+          if (!revoProductId || !sku) {
+            await updateRunItemStatus({
+              svc: params.svc,
+              itemId,
+              empresaId: secrets.empresaId,
+              storeId: secrets.storeId,
+              status: "ERROR",
+              errorCode: "WOO_PREVIEW_BLOCKED",
+              hint: "Item sem SKU ou produto Revo vinculado.",
+              lastError: "RUN_ITEM_INVALID",
+            });
+            continue;
+          }
+
+          const { data: revoProduct } = await params.svc
+            .from("produtos")
+            .select("id,nome,descricao,status,preco_venda,estoque_atual")
+            .eq("empresa_id", secrets.empresaId)
+            .eq("id", revoProductId)
+            .is("deleted_at", null)
+            .maybeSingle();
+          if (!revoProduct?.id) {
+            await updateRunItemStatus({
+              svc: params.svc,
+              itemId,
+              empresaId: secrets.empresaId,
+              storeId: secrets.storeId,
+              status: "ERROR",
+              errorCode: "WOO_MAPPING_MISSING",
+              hint: "Produto Revo não encontrado.",
+              lastError: "REVO_PRODUCT_NOT_FOUND",
+            });
+            continue;
+          }
+
+          const basePayload = {
+            name: String(revoProduct.nome ?? "").trim() || `Produto ${sku}`,
+            sku,
+            regular_price: toWooPrice(revoProduct.preco_venda),
+            manage_stock: true,
+            stock_quantity: toWooStockQuantity(revoProduct.estoque_atual),
+            stock_status: toWooStockQuantity(revoProduct.estoque_atual) > 0 ? "instock" : "outofstock",
+            status: toWooStatusFromRevo(String(revoProduct.status ?? "")),
+            short_description: String(revoProduct.descricao ?? "").slice(0, 500) || undefined,
+          } as Record<string, unknown>;
+
+          try {
+            const action = String(item?.action ?? "").toUpperCase();
+            const wooProductId = Number(item?.woo_product_id ?? 0) || 0;
+            if (action === "CREATE" || !wooProductId) {
+              const createReq = buildWooApiUrl({
+                baseUrl: secrets.baseUrl,
+                path: "products",
+                authMode: secrets.authMode,
+                consumerKey: secrets.consumerKey,
+                consumerSecret: secrets.consumerSecret,
+                userAgent: "UltriaERP/woocommerce-worker",
+              });
+              const createResp = await withRetry(() => wooRequestJson({
+                url: createReq.url,
+                init: {
+                  method: "POST",
+                  headers: { ...createReq.headers, "Content-Type": "application/json" },
+                  body: JSON.stringify(basePayload),
+                },
+              }));
+              const createdWooProductId = Number(createResp.data?.id ?? 0) || 0;
+              if (!createdWooProductId) throw new Error("WOO_CREATE_NO_ID");
+              await params.svc.from("woocommerce_product_map").upsert({
+                empresa_id: secrets.empresaId,
+                store_id: secrets.storeId,
+                revo_product_id: revoProductId,
+                sku,
+                woo_product_id: createdWooProductId,
+                woo_variation_id: 0,
+                last_synced_price_at: new Date().toISOString(),
+                last_synced_stock_at: new Date().toISOString(),
+              }, { onConflict: "store_id,sku,woo_product_id,woo_variation_id" });
+              await upsertListing({
+                svc: params.svc,
+                empresaId: secrets.empresaId,
+                storeId: secrets.storeId,
+                revoProductId,
+                sku,
+                wooProductId: createdWooProductId,
+                wooVariationId: null,
+                listingStatus: "linked",
+                touchPrice: true,
+                touchStock: true,
+              });
+            } else {
+              const updateReq = buildWooApiUrl({
+                baseUrl: secrets.baseUrl,
+                path: `products/${wooProductId}`,
+                authMode: secrets.authMode,
+                consumerKey: secrets.consumerKey,
+                consumerSecret: secrets.consumerSecret,
+                userAgent: "UltriaERP/woocommerce-worker",
+              });
+              await withRetry(() => wooRequestJson({
+                url: updateReq.url,
+                init: {
+                  method: "PUT",
+                  headers: { ...updateReq.headers, "Content-Type": "application/json" },
+                  body: JSON.stringify(basePayload),
+                },
+              }));
+              await params.svc
+                .from("woocommerce_product_map")
+                .update({
+                  revo_product_id: revoProductId,
+                  last_synced_price_at: new Date().toISOString(),
+                  last_synced_stock_at: new Date().toISOString(),
+                })
+                .eq("empresa_id", secrets.empresaId)
+                .eq("store_id", secrets.storeId)
+                .eq("sku", sku);
+              await upsertListing({
+                svc: params.svc,
+                empresaId: secrets.empresaId,
+                storeId: secrets.storeId,
+                revoProductId,
+                sku,
+                wooProductId,
+                wooVariationId: Number(item?.woo_variation_id ?? 0) || null,
+                listingStatus: "linked",
+                touchPrice: true,
+                touchStock: true,
+              });
+            }
+
+            await updateRunItemStatus({
+              svc: params.svc,
+              itemId,
+              empresaId: secrets.empresaId,
+              storeId: secrets.storeId,
+              status: "DONE",
+            });
+          } catch (itemErr: any) {
+            const message = String(itemErr?.message ?? "CATALOG_EXPORT_ITEM_FAILED");
+            const resolved = resolveWooError(detectWooErrorCode(message));
+            await updateRunItemStatus({
+              svc: params.svc,
+              itemId,
+              empresaId: secrets.empresaId,
+              storeId: secrets.storeId,
+              status: "ERROR",
+              errorCode: resolved.code,
+              hint: resolved.hint,
+              lastError: message,
+            });
+          }
+        }
+
+        await refreshRunSummary({ svc: params.svc, runId, empresaId: secrets.empresaId, storeId: secrets.storeId });
+        await params.svc.rpc("woocommerce_sync_job_complete", { p_job_id: jobId, p_ok: true, p_error: null, p_next_run_at: null });
+        processed += 1;
+        results.push({ job_id: jobId, store_id: secrets.storeId, type: j.type, ok: true, run_id: runId });
+        continue;
+      }
+
+      if (j.type === "CATALOG_IMPORT") {
+        const runId = String(j.payload?.run_id ?? "").trim();
+        if (!runId) throw new Error("RUN_ID_REQUIRED");
+        await params.svc
+          .from("woocommerce_sync_run")
+          .update({ status: "running", started_at: new Date().toISOString(), updated_at: new Date().toISOString() })
+          .eq("id", runId)
+          .eq("empresa_id", secrets.empresaId)
+          .eq("store_id", secrets.storeId);
+
+        const { data: runItems } = await params.svc
+          .from("woocommerce_sync_run_item")
+          .select("id,sku,revo_product_id,woo_product_id,action,status")
+          .eq("run_id", runId)
+          .eq("empresa_id", secrets.empresaId)
+          .eq("store_id", secrets.storeId)
+          .in("status", ["QUEUED", "RUNNING"]);
+        const items = Array.isArray(runItems) ? runItems : [];
+
+        for (const item of items) {
+          const itemId = String(item.id);
+          const wooProductId = Number(item?.woo_product_id ?? 0) || 0;
+          if (!wooProductId) {
+            await updateRunItemStatus({
+              svc: params.svc,
+              itemId,
+              empresaId: secrets.empresaId,
+              storeId: secrets.storeId,
+              status: "ERROR",
+              errorCode: "WOO_PREVIEW_BLOCKED",
+              hint: "ID do produto Woo ausente.",
+              lastError: "WOO_PRODUCT_ID_REQUIRED",
+            });
+            continue;
+          }
+
+          try {
+            const reqWoo = buildWooApiUrl({
+              baseUrl: secrets.baseUrl,
+              path: `products/${wooProductId}`,
+              authMode: secrets.authMode,
+              consumerKey: secrets.consumerKey,
+              consumerSecret: secrets.consumerSecret,
+              userAgent: "UltriaERP/woocommerce-worker",
+            });
+            const wooResp = await withRetry(() => wooRequestJson({ url: reqWoo.url, init: { headers: reqWoo.headers } }));
+            const imported = await createOrUpdateRevoProductFromWoo({
+              svc: params.svc,
+              empresaId: secrets.empresaId,
+              woo: wooResp.data,
+            });
+            const sku = String(wooResp.data?.sku ?? "").trim() || null;
+            await params.svc.from("woocommerce_product_map").upsert({
+              empresa_id: secrets.empresaId,
+              store_id: secrets.storeId,
+              revo_product_id: imported.revoProductId,
+              sku,
+              woo_product_id: wooProductId,
+              woo_variation_id: 0,
+              last_synced_price_at: new Date().toISOString(),
+              last_synced_stock_at: new Date().toISOString(),
+            }, { onConflict: "store_id,sku,woo_product_id,woo_variation_id" });
+            await upsertListing({
+              svc: params.svc,
+              empresaId: secrets.empresaId,
+              storeId: secrets.storeId,
+              revoProductId: imported.revoProductId,
+              sku,
+              wooProductId,
+              wooVariationId: null,
+              listingStatus: "linked",
+              touchPrice: true,
+              touchStock: true,
+            });
+            await updateRunItemStatus({
+              svc: params.svc,
+              itemId,
+              empresaId: secrets.empresaId,
+              storeId: secrets.storeId,
+              status: "DONE",
+            });
+          } catch (itemErr: any) {
+            const message = String(itemErr?.message ?? "CATALOG_IMPORT_ITEM_FAILED");
+            const resolved = resolveWooError(detectWooErrorCode(message));
+            await updateRunItemStatus({
+              svc: params.svc,
+              itemId,
+              empresaId: secrets.empresaId,
+              storeId: secrets.storeId,
+              status: "ERROR",
+              errorCode: resolved.code,
+              hint: resolved.hint,
+              lastError: message,
+            });
+          }
+        }
+
+        await refreshRunSummary({ svc: params.svc, runId, empresaId: secrets.empresaId, storeId: secrets.storeId });
+        await params.svc.rpc("woocommerce_sync_job_complete", { p_job_id: jobId, p_ok: true, p_error: null, p_next_run_at: null });
+        processed += 1;
+        results.push({ job_id: jobId, store_id: secrets.storeId, type: j.type, ok: true, run_id: runId });
+        continue;
+      }
+
       if (j.type === "STOCK_SYNC" || j.type === "PRICE_SYNC") {
         const skus = Array.isArray(j.payload?.skus) ? j.payload.skus : [];
-        const r = await syncBySkus({ svc: params.svc, secrets, kind: j.type, skus });
+        const runId = String(j.payload?.run_id ?? "").trim() || null;
+        if (runId) {
+          await params.svc
+            .from("woocommerce_sync_run")
+            .update({ status: "running", started_at: new Date().toISOString(), updated_at: new Date().toISOString() })
+            .eq("id", runId)
+            .eq("empresa_id", secrets.empresaId)
+            .eq("store_id", secrets.storeId);
+        }
+        const r = await syncBySkus({ svc: params.svc, secrets, kind: j.type, skus, runId });
+        if (runId) {
+          await refreshRunSummary({ svc: params.svc, runId, empresaId: secrets.empresaId, storeId: secrets.storeId });
+        }
         await params.svc.rpc("woocommerce_sync_job_complete", { p_job_id: jobId, p_ok: true, p_error: null, p_next_run_at: null });
         processed += 1;
         results.push({ job_id: jobId, store_id: secrets.storeId, type: j.type, ok: true, ...r });

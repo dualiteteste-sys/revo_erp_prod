@@ -22,7 +22,37 @@ type Action =
   | "stores.pause"
   | "stores.unpause"
   | "stores.worker.run"
-  | "stores.jobs.requeue";
+  | "stores.jobs.requeue"
+  | "stores.products.search"
+  | "stores.catalog.preview.export"
+  | "stores.catalog.run.export"
+  | "stores.catalog.preview.sync_price"
+  | "stores.catalog.run.sync_price"
+  | "stores.catalog.preview.sync_stock"
+  | "stores.catalog.run.sync_stock"
+  | "stores.catalog.preview.import"
+  | "stores.catalog.run.import"
+  | "stores.runs.get"
+  | "stores.runs.list"
+  | "stores.runs.retry_failed"
+  | "stores.listings.by_products"
+  | "stores.listings.by_product"
+  | "stores.listings.link_by_sku"
+  | "stores.listings.unlink";
+
+type CatalogRunType = "EXPORT" | "IMPORT" | "SYNC_PRICE" | "SYNC_STOCK";
+type CatalogItemAction = "CREATE" | "UPDATE" | "SKIP" | "BLOCK";
+
+type CatalogPreviewItem = {
+  sku: string | null;
+  revo_product_id: string | null;
+  woo_product_id: number | null;
+  woo_variation_id: number | null;
+  action: CatalogItemAction;
+  warnings: string[];
+  blockers: string[];
+  diff: Record<string, unknown>;
+};
 
 function json(status: number, body: Record<string, unknown>, cors: Record<string, string>) {
   return new Response(JSON.stringify(body), {
@@ -215,6 +245,357 @@ async function workerInvoke(params: { supabaseUrl: string; workerKey: string; st
   });
   const data = await resp.json().catch(() => ({}));
   return { ok: resp.ok, status: resp.status, data };
+}
+
+function normalizeSku(input: unknown): string {
+  return String(input ?? "").trim();
+}
+
+function normalizeSkuKey(input: unknown): string {
+  return normalizeSku(input).toLowerCase();
+}
+
+function toWooStatusFromRevo(status: string | null | undefined): "publish" | "draft" {
+  return String(status ?? "").trim() === "ativo" ? "publish" : "draft";
+}
+
+function toWooPriceString(value: unknown): string {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return "0.00";
+  return n.toFixed(2);
+}
+
+function toWooStockInt(value: unknown): number {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return 0;
+  return Math.max(0, Math.trunc(n));
+}
+
+function diffValue(oldValue: unknown, newValue: unknown): { from: unknown; to: unknown } | null {
+  if (oldValue === newValue) return null;
+  return { from: oldValue ?? null, to: newValue ?? null };
+}
+
+function summarizePreview(items: CatalogPreviewItem[]) {
+  const summary = { create: 0, update: 0, skip: 0, block: 0 };
+  for (const item of items) {
+    if (item.action === "CREATE") summary.create += 1;
+    if (item.action === "UPDATE") summary.update += 1;
+    if (item.action === "SKIP") summary.skip += 1;
+    if (item.action === "BLOCK") summary.block += 1;
+  }
+  return summary;
+}
+
+async function loadRevoProductsForCatalog(params: {
+  svc: any;
+  empresaId: string;
+  revoProductIds: string[];
+  skus: string[];
+}) {
+  const ids = Array.from(new Set(params.revoProductIds.map((v) => String(v ?? "").trim()).filter(Boolean)));
+  const skus = Array.from(new Set(params.skus.map((v) => normalizeSku(v)).filter(Boolean)));
+  let query = params.svc
+    .from("produtos")
+    .select("id,nome,sku,status,preco_venda,estoque_atual,descricao,updated_at,produto_pai_id")
+    .eq("empresa_id", params.empresaId)
+    .is("deleted_at", null)
+    .limit(1000);
+
+  if (ids.length > 0) query = query.in("id", ids);
+  else if (skus.length > 0) query = query.in("sku", skus);
+
+  const { data, error } = await query;
+  if (error) throw error;
+  return Array.isArray(data) ? data : [];
+}
+
+async function loadStoreMapBySku(params: {
+  svc: any;
+  empresaId: string;
+  storeId: string;
+  skus: string[];
+}) {
+  const skus = Array.from(new Set(params.skus.map((v) => normalizeSku(v)).filter(Boolean)));
+  if (skus.length === 0) return [] as any[];
+  const { data, error } = await params.svc
+    .from("woocommerce_product_map")
+    .select("id,sku,revo_product_id,woo_product_id,woo_variation_id,last_synced_price_at,last_synced_stock_at")
+    .eq("empresa_id", params.empresaId)
+    .eq("store_id", params.storeId)
+    .in("sku", skus);
+  if (error) throw error;
+  return Array.isArray(data) ? data : [];
+}
+
+function buildExportPreview(params: {
+  products: any[];
+  mapRows: any[];
+  mode: "EXPORT" | "SYNC_PRICE" | "SYNC_STOCK";
+}) {
+  const mapBySku = new Map<string, any[]>();
+  for (const row of params.mapRows) {
+    const key = normalizeSkuKey(row?.sku);
+    if (!key) continue;
+    const list = mapBySku.get(key) ?? [];
+    list.push(row);
+    mapBySku.set(key, list);
+  }
+
+  const items: CatalogPreviewItem[] = [];
+  for (const product of params.products) {
+    const sku = normalizeSku(product?.sku);
+    const key = normalizeSkuKey(sku);
+    const mapped = key ? (mapBySku.get(key) ?? []) : [];
+    const blockers: string[] = [];
+    const warnings: string[] = [];
+    const diff: Record<string, unknown> = {};
+
+    if (!sku) blockers.push("SKU ausente no produto Revo.");
+    if (mapped.length > 1) blockers.push("SKU duplicado no vínculo Woo. Resolva conflitos antes de sincronizar.");
+
+    const map = mapped[0] ?? null;
+    const wooProductId = map ? Number(map.woo_product_id ?? 0) || null : null;
+    const wooVariationId = map ? Number(map.woo_variation_id ?? 0) || null : null;
+
+    const wantedPrice = toWooPriceString(product?.preco_venda);
+    const wantedStock = toWooStockInt(product?.estoque_atual);
+    if (params.mode !== "SYNC_STOCK") {
+      const d = diffValue(null, wantedPrice);
+      if (d) diff.regular_price = d;
+    }
+    if (params.mode !== "SYNC_PRICE") {
+      const d = diffValue(null, wantedStock);
+      if (d) diff.stock_quantity = d;
+    }
+
+    let action: CatalogItemAction = "SKIP";
+    if (blockers.length > 0) action = "BLOCK";
+    else if (!wooProductId && params.mode === "EXPORT") action = "CREATE";
+    else if (!wooProductId && params.mode !== "EXPORT") action = "BLOCK";
+    else action = "UPDATE";
+
+    if (!wooProductId && params.mode !== "EXPORT") {
+      blockers.push("Produto ainda não vinculado ao Woo para esta loja.");
+    }
+    if (wooVariationId) {
+      warnings.push("Item vinculado como variação. Será sincronizado no endpoint de variações.");
+    }
+
+    items.push({
+      sku: sku || null,
+      revo_product_id: String(product?.id ?? "") || null,
+      woo_product_id: wooProductId,
+      woo_variation_id: wooVariationId,
+      action,
+      warnings,
+      blockers,
+      diff,
+    });
+  }
+  return items;
+}
+
+function buildImportPreview(params: {
+  wooProducts: any[];
+  revoBySku: Map<string, any>;
+  mapBySku: Map<string, any[]>;
+}) {
+  const items: CatalogPreviewItem[] = [];
+  for (const woo of params.wooProducts) {
+    const sku = normalizeSku(woo?.sku);
+    const key = normalizeSkuKey(sku);
+    const warnings: string[] = [];
+    const blockers: string[] = [];
+    const diff: Record<string, unknown> = {};
+
+    if (!sku) blockers.push("Produto Woo sem SKU.");
+    const revo = key ? params.revoBySku.get(key) : null;
+    const mapped = key ? (params.mapBySku.get(key) ?? []) : [];
+    if (mapped.length > 1) blockers.push("SKU com múltiplos vínculos no map Woo.");
+
+    const dName = diffValue(revo?.nome ?? null, woo?.name ?? null);
+    if (dName) diff.nome = dName;
+    const dPrice = diffValue(revo?.preco_venda != null ? toWooPriceString(revo.preco_venda) : null, String(woo?.regular_price ?? "").trim() || null);
+    if (dPrice) diff.preco = dPrice;
+    const dStatus = diffValue(revo?.status ?? null, woo?.status === "publish" ? "ativo" : "inativo");
+    if (dStatus) diff.status = dStatus;
+
+    let action: CatalogItemAction = "SKIP";
+    if (blockers.length > 0) action = "BLOCK";
+    else if (revo) action = "UPDATE";
+    else action = "CREATE";
+
+    items.push({
+      sku: sku || null,
+      revo_product_id: revo?.id ? String(revo.id) : null,
+      woo_product_id: Number(woo?.id ?? 0) || null,
+      woo_variation_id: null,
+      action,
+      warnings,
+      blockers,
+      diff,
+    });
+  }
+  return items;
+}
+
+async function enqueueRunJob(params: {
+  user: any;
+  storeId: string;
+  runType: CatalogRunType;
+  payload: Record<string, unknown>;
+}) {
+  const jobType = params.runType === "EXPORT"
+    ? "CATALOG_EXPORT"
+    : params.runType === "IMPORT"
+    ? "CATALOG_IMPORT"
+    : params.runType === "SYNC_PRICE"
+    ? "PRICE_SYNC"
+    : "STOCK_SYNC";
+  const { data, error } = await params.user.rpc("woocommerce_sync_job_enqueue", {
+    p_store_id: params.storeId,
+    p_type: jobType,
+    p_payload: params.payload,
+    p_dedupe_key: `run:${String(params.payload?.run_id ?? "")}`,
+    p_next_run_at: new Date().toISOString(),
+  });
+  if (error) throw error;
+  return String(data ?? "");
+}
+
+async function createRunWithItems(params: {
+  svc: any;
+  empresaId: string;
+  storeId: string;
+  runType: CatalogRunType;
+  callerId: string;
+  options: Record<string, unknown>;
+  previewItems: CatalogPreviewItem[];
+}) {
+  const { data: run, error: runErr } = await params.svc
+    .from("woocommerce_sync_run")
+    .insert({
+      empresa_id: params.empresaId,
+      store_id: params.storeId,
+      type: params.runType,
+      status: "queued",
+      options: sanitizeForLog(params.options),
+      summary: {
+        planned: params.previewItems.length,
+        updated: 0,
+        skipped: 0,
+        failed: 0,
+      },
+      created_by: params.callerId,
+    })
+    .select("id,created_at")
+    .single();
+  if (runErr || !run?.id) throw runErr ?? new Error("RUN_CREATE_FAILED");
+
+  const rows = params.previewItems.map((item) => ({
+    run_id: run.id,
+    empresa_id: params.empresaId,
+    store_id: params.storeId,
+    sku: item.sku,
+    revo_product_id: item.revo_product_id,
+    woo_product_id: item.woo_product_id,
+    woo_variation_id: item.woo_variation_id,
+    action: item.action,
+    status: item.action === "BLOCK" ? "ERROR" : item.action === "SKIP" ? "SKIPPED" : "QUEUED",
+    error_code: item.blockers.length > 0 ? "WOO_PREVIEW_BLOCKED" : null,
+    hint: item.blockers.length > 0 ? item.blockers.join(" ") : null,
+    diff: sanitizeForLog({
+      warnings: item.warnings,
+      blockers: item.blockers,
+      diff: item.diff,
+    }),
+    last_error: item.blockers.length > 0 ? item.blockers.join(" ") : null,
+    last_error_at: item.blockers.length > 0 ? new Date().toISOString() : null,
+  }));
+  const { error: itemErr } = await params.svc.from("woocommerce_sync_run_item").insert(rows);
+  if (itemErr) throw itemErr;
+
+  return String(run.id);
+}
+
+async function fetchRunWithItems(params: {
+  svc: any;
+  empresaId: string;
+  storeId: string;
+  runId: string;
+  limitItems?: number;
+}) {
+  const { data: run, error: runErr } = await params.svc
+    .from("woocommerce_sync_run")
+    .select("id,type,status,options,summary,created_by,created_at,started_at,finished_at,updated_at")
+    .eq("id", params.runId)
+    .eq("empresa_id", params.empresaId)
+    .eq("store_id", params.storeId)
+    .maybeSingle();
+  if (runErr || !run?.id) return null;
+
+  const { data: items } = await params.svc
+    .from("woocommerce_sync_run_item")
+    .select("id,sku,revo_product_id,woo_product_id,woo_variation_id,action,status,error_code,hint,last_error,last_error_at,diff,created_at,updated_at")
+    .eq("run_id", params.runId)
+    .eq("empresa_id", params.empresaId)
+    .eq("store_id", params.storeId)
+    .order("updated_at", { ascending: false })
+    .limit(Math.max(1, Math.min(Number(params.limitItems ?? 300), 500)));
+
+  return { run, items: Array.isArray(items) ? items : [] };
+}
+
+async function listRuns(params: {
+  svc: any;
+  empresaId: string;
+  storeId: string;
+  limit: number;
+}) {
+  const { data, error } = await params.svc
+    .from("woocommerce_sync_run")
+    .select("id,type,status,summary,created_at,started_at,finished_at,updated_at")
+    .eq("empresa_id", params.empresaId)
+    .eq("store_id", params.storeId)
+    .order("created_at", { ascending: false })
+    .limit(params.limit);
+  if (error) throw error;
+  return Array.isArray(data) ? data : [];
+}
+
+async function upsertListingByMap(params: {
+  svc: any;
+  empresaId: string;
+  storeId: string;
+  revoProductId: string | null;
+  sku: string | null;
+  wooProductId: number | null;
+  wooVariationId: number | null;
+  listingStatus: "linked" | "unlinked" | "conflict" | "error";
+  lastErrorCode?: string | null;
+  lastErrorHint?: string | null;
+  touchPrice?: boolean;
+  touchStock?: boolean;
+}) {
+  const revoProductId = String(params.revoProductId ?? "").trim();
+  if (!revoProductId) return;
+  const nowIso = new Date().toISOString();
+  await params.svc
+    .from("woocommerce_listing")
+    .upsert({
+      empresa_id: params.empresaId,
+      store_id: params.storeId,
+      revo_product_id: revoProductId,
+      sku: params.sku,
+      woo_product_id: params.wooProductId,
+      woo_variation_id: params.wooVariationId,
+      listing_status: params.listingStatus,
+      last_sync_price_at: params.touchPrice ? nowIso : null,
+      last_sync_stock_at: params.touchStock ? nowIso : null,
+      last_error_code: params.lastErrorCode ?? null,
+      last_error_hint: params.lastErrorHint ?? null,
+    }, { onConflict: "store_id,revo_product_id" });
 }
 
 Deno.serve(async (req) => {
@@ -429,6 +810,55 @@ Deno.serve(async (req) => {
       return json(200, { ok: true, delivery_url: deliveryUrl, topics: created }, cors);
     }
 
+    if (action === "stores.products.search") {
+      const page = Math.max(1, Math.min(Number(body?.page ?? 1), 1000));
+      const perPage = Math.max(1, Math.min(Number(body?.per_page ?? 50), 100));
+      const q = String(body?.query ?? "").trim();
+      const statusFilter = String(body?.status ?? "").trim();
+      const query: Record<string, string> = {
+        page: String(page),
+        per_page: String(perPage),
+        orderby: "modified",
+        order: "desc",
+      };
+      if (q) query.search = q;
+      if (statusFilter) query.status = statusFilter;
+
+      const { url, headers } = buildWooApiUrl({
+        baseUrl,
+        path: "products",
+        authMode,
+        consumerKey,
+        consumerSecret,
+        query,
+        userAgent: "UltriaERP/woocommerce-admin",
+      });
+      const resp = await wooFetchJson(url, { headers });
+      if (!resp.ok) {
+        const classification = classifyWooHttpStatus(resp.status);
+        return json(502, {
+          ok: false,
+          error: "WOO_PRODUCTS_SEARCH_FAILED",
+          error_code: classification.code,
+          hint: classification.hint,
+          details: sanitizeForLog(resp.data),
+        }, cors);
+      }
+
+      const rows = (Array.isArray(resp.data) ? resp.data : []).map((row: any) => ({
+        id: Number(row?.id ?? 0) || null,
+        name: String(row?.name ?? "").trim() || null,
+        sku: String(row?.sku ?? "").trim() || null,
+        type: String(row?.type ?? "simple"),
+        status: String(row?.status ?? "").trim() || null,
+        price: String(row?.regular_price ?? row?.price ?? "").trim() || null,
+        stock_status: String(row?.stock_status ?? "").trim() || null,
+        updated_at: row?.date_modified_gmt ?? row?.date_modified ?? null,
+      }));
+
+      return json(200, { ok: true, page, per_page: perPage, rows }, cors);
+    }
+
     if (action === "stores.product_map.build") {
       const jobId = await user.rpc("woocommerce_sync_job_enqueue", {
         p_store_id: storeId,
@@ -454,6 +884,113 @@ Deno.serve(async (req) => {
         .limit(limit);
       if (error) throw error;
       return json(200, { ok: true, rows: data ?? [] }, cors);
+    }
+
+    if (action === "stores.listings.by_products") {
+      const ids = Array.isArray(body?.revo_product_ids)
+        ? body.revo_product_ids.map((id: any) => String(id ?? "").trim()).filter(Boolean)
+        : [];
+      if (ids.length === 0) return json(200, { ok: true, rows: [] }, cors);
+      const { data, error } = await svc
+        .from("woocommerce_listing")
+        .select("id,revo_product_id,sku,woo_product_id,woo_variation_id,listing_status,last_sync_price_at,last_sync_stock_at,last_error_code,last_error_hint,updated_at")
+        .eq("empresa_id", empresaId)
+        .eq("store_id", storeId)
+        .in("revo_product_id", ids);
+      if (error) throw error;
+      return json(200, { ok: true, rows: data ?? [] }, cors);
+    }
+
+    if (action === "stores.listings.by_product") {
+      const revoProductId = String(body?.revo_product_id ?? "").trim();
+      if (!revoProductId) return json(400, { ok: false, error: "REVO_PRODUCT_ID_REQUIRED" }, cors);
+      const { data, error } = await svc
+        .from("woocommerce_listing")
+        .select("id,revo_product_id,sku,woo_product_id,woo_variation_id,listing_status,last_sync_price_at,last_sync_stock_at,last_error_code,last_error_hint,updated_at")
+        .eq("empresa_id", empresaId)
+        .eq("store_id", storeId)
+        .eq("revo_product_id", revoProductId)
+        .maybeSingle();
+      if (error) throw error;
+      return json(200, { ok: true, listing: data ?? null }, cors);
+    }
+
+    if (action === "stores.listings.link_by_sku") {
+      const revoProductId = String(body?.revo_product_id ?? "").trim();
+      const sku = normalizeSku(body?.sku);
+      if (!revoProductId || !sku) return json(400, { ok: false, error: "REVO_PRODUCT_ID_AND_SKU_REQUIRED" }, cors);
+
+      const { data: maps, error: mapErr } = await svc
+        .from("woocommerce_product_map")
+        .select("sku,woo_product_id,woo_variation_id,revo_product_id")
+        .eq("empresa_id", empresaId)
+        .eq("store_id", storeId)
+        .eq("sku", sku);
+      if (mapErr) throw mapErr;
+      const rows = Array.isArray(maps) ? maps : [];
+      if (rows.length === 0) {
+        return json(404, { ok: false, error: "SKU_NOT_FOUND_IN_WOO_MAP" }, cors);
+      }
+      if (rows.length > 1) {
+        await upsertListingByMap({
+          svc,
+          empresaId,
+          storeId,
+          revoProductId,
+          sku,
+          wooProductId: null,
+          wooVariationId: null,
+          listingStatus: "conflict",
+          lastErrorCode: "WOO_DUPLICATE_SKU",
+          lastErrorHint: "SKU duplicado no Woo. Resolva o conflito no catálogo antes de vincular.",
+        });
+        return json(409, { ok: false, error: "WOO_DUPLICATE_SKU" }, cors);
+      }
+
+      const map = rows[0];
+      await svc
+        .from("woocommerce_product_map")
+        .update({ revo_product_id: revoProductId, updated_at: new Date().toISOString() })
+        .eq("empresa_id", empresaId)
+        .eq("store_id", storeId)
+        .eq("sku", sku);
+      await upsertListingByMap({
+        svc,
+        empresaId,
+        storeId,
+        revoProductId,
+        sku,
+        wooProductId: Number(map?.woo_product_id ?? 0) || null,
+        wooVariationId: Number(map?.woo_variation_id ?? 0) || null,
+        listingStatus: "linked",
+      });
+
+      return json(200, { ok: true, status: "linked" }, cors);
+    }
+
+    if (action === "stores.listings.unlink") {
+      const revoProductId = String(body?.revo_product_id ?? "").trim();
+      if (!revoProductId) return json(400, { ok: false, error: "REVO_PRODUCT_ID_REQUIRED" }, cors);
+      await svc
+        .from("woocommerce_listing")
+        .upsert({
+          empresa_id: empresaId,
+          store_id: storeId,
+          revo_product_id: revoProductId,
+          sku: null,
+          woo_product_id: null,
+          woo_variation_id: null,
+          listing_status: "unlinked",
+          last_error_code: null,
+          last_error_hint: null,
+        }, { onConflict: "store_id,revo_product_id" });
+      await svc
+        .from("woocommerce_product_map")
+        .update({ revo_product_id: null, updated_at: new Date().toISOString() })
+        .eq("empresa_id", empresaId)
+        .eq("store_id", storeId)
+        .eq("revo_product_id", revoProductId);
+      return json(200, { ok: true, status: "unlinked" }, cors);
     }
 
     if (action === "stores.sync.stock" || action === "stores.sync.price") {
@@ -494,8 +1031,253 @@ Deno.serve(async (req) => {
       return json(200, { ok: true, enqueued_job_id: jobId, worker }, cors);
     }
 
+    if (
+      action === "stores.catalog.preview.export" ||
+      action === "stores.catalog.preview.sync_price" ||
+      action === "stores.catalog.preview.sync_stock"
+    ) {
+      const revoProductIds = Array.isArray(body?.revo_product_ids) ? body.revo_product_ids : [];
+      const skus = Array.isArray(body?.skus) ? body.skus : [];
+      const products = await loadRevoProductsForCatalog({
+        svc,
+        empresaId,
+        revoProductIds,
+        skus,
+      });
+
+      const productSkus = products.map((p: any) => normalizeSku(p?.sku)).filter(Boolean);
+      const mapRows = await loadStoreMapBySku({
+        svc,
+        empresaId,
+        storeId,
+        skus: productSkus,
+      });
+      const mode: "EXPORT" | "SYNC_PRICE" | "SYNC_STOCK" = action === "stores.catalog.preview.export"
+        ? "EXPORT"
+        : action === "stores.catalog.preview.sync_price"
+        ? "SYNC_PRICE"
+        : "SYNC_STOCK";
+      const items = buildExportPreview({ products, mapRows, mode });
+      return json(200, {
+        ok: true,
+        mode,
+        summary: summarizePreview(items),
+        items,
+      }, cors);
+    }
+
+    if (
+      action === "stores.catalog.run.export" ||
+      action === "stores.catalog.run.sync_price" ||
+      action === "stores.catalog.run.sync_stock"
+    ) {
+      const mode: CatalogRunType = action === "stores.catalog.run.export"
+        ? "EXPORT"
+        : action === "stores.catalog.run.sync_price"
+        ? "SYNC_PRICE"
+        : "SYNC_STOCK";
+      const previewAction = action === "stores.catalog.run.export"
+        ? "stores.catalog.preview.export"
+        : action === "stores.catalog.run.sync_price"
+        ? "stores.catalog.preview.sync_price"
+        : "stores.catalog.preview.sync_stock";
+      const revoProductIds = Array.isArray(body?.revo_product_ids) ? body.revo_product_ids : [];
+      const skus = Array.isArray(body?.skus) ? body.skus : [];
+      const products = await loadRevoProductsForCatalog({ svc, empresaId, revoProductIds, skus });
+      const productSkus = products.map((p: any) => normalizeSku(p?.sku)).filter(Boolean);
+      const mapRows = await loadStoreMapBySku({ svc, empresaId, storeId, skus: productSkus });
+      const previewItems = buildExportPreview({
+        products,
+        mapRows,
+        mode: mode === "EXPORT" ? "EXPORT" : mode === "SYNC_PRICE" ? "SYNC_PRICE" : "SYNC_STOCK",
+      });
+      const runId = await createRunWithItems({
+        svc,
+        empresaId,
+        storeId,
+        runType: mode,
+        callerId,
+        options: {
+          source_action: previewAction,
+          options: sanitizeForLog(body?.options ?? {}),
+        },
+        previewItems,
+      });
+
+      const runnable = previewItems.filter((item) => item.action === "CREATE" || item.action === "UPDATE");
+      const runPayload: Record<string, unknown> = {
+        run_id: runId,
+        skus: runnable.map((item) => item.sku).filter(Boolean),
+        options: sanitizeForLog(body?.options ?? {}),
+      };
+      const enqueuedJobId = runnable.length > 0
+        ? await enqueueRunJob({ user, storeId, runType: mode, payload: runPayload })
+        : null;
+
+      if (runnable.length === 0) {
+        await svc
+          .from("woocommerce_sync_run")
+          .update({
+            status: "error",
+            started_at: new Date().toISOString(),
+            finished_at: new Date().toISOString(),
+            summary: {
+              planned: previewItems.length,
+              updated: 0,
+              skipped: previewItems.filter((item) => item.action === "SKIP").length,
+              failed: previewItems.filter((item) => item.action === "BLOCK").length,
+            },
+          })
+          .eq("id", runId)
+          .eq("empresa_id", empresaId)
+          .eq("store_id", storeId);
+      }
+
+      let worker: any = null;
+      if (workerKey && runnable.length > 0) worker = await workerInvoke({ supabaseUrl, workerKey, storeId, limit: 20 });
+      return json(200, {
+        ok: true,
+        run_id: runId,
+        enqueued_job_id: enqueuedJobId,
+        worker,
+        summary: summarizePreview(previewItems),
+      }, cors);
+    }
+
+    if (action === "stores.catalog.preview.import") {
+      const wooProductIds = Array.isArray(body?.woo_product_ids)
+        ? body.woo_product_ids.map((value: any) => Number(value)).filter((value: number) => Number.isFinite(value) && value > 0)
+        : [];
+      if (wooProductIds.length === 0) return json(400, { ok: false, error: "WOO_PRODUCT_IDS_REQUIRED" }, cors);
+
+      const wooProducts: any[] = [];
+      for (const wooProductId of wooProductIds) {
+        const { url, headers } = buildWooApiUrl({
+          baseUrl,
+          path: `products/${wooProductId}`,
+          authMode,
+          consumerKey,
+          consumerSecret,
+          userAgent: "UltriaERP/woocommerce-admin",
+        });
+        const resp = await wooFetchJson(url, { headers });
+        if (!resp.ok) {
+          const classification = classifyWooHttpStatus(resp.status);
+          return json(502, {
+            ok: false,
+            error: "WOO_IMPORT_PREVIEW_FAILED",
+            error_code: classification.code,
+            hint: classification.hint,
+            details: sanitizeForLog(resp.data),
+          }, cors);
+        }
+        wooProducts.push(resp.data);
+      }
+
+      const skus = wooProducts.map((woo) => normalizeSku(woo?.sku)).filter(Boolean);
+      const revoRows = await loadRevoProductsForCatalog({ svc, empresaId, revoProductIds: [], skus });
+      const mapRows = await loadStoreMapBySku({ svc, empresaId, storeId, skus });
+      const revoBySku = new Map<string, any>();
+      for (const row of revoRows) {
+        revoBySku.set(normalizeSkuKey(row?.sku), row);
+      }
+      const mapBySku = new Map<string, any[]>();
+      for (const row of mapRows) {
+        const key = normalizeSkuKey(row?.sku);
+        const list = mapBySku.get(key) ?? [];
+        list.push(row);
+        mapBySku.set(key, list);
+      }
+      const items = buildImportPreview({ wooProducts, revoBySku, mapBySku });
+      return json(200, { ok: true, mode: "IMPORT", summary: summarizePreview(items), items }, cors);
+    }
+
+    if (action === "stores.catalog.run.import") {
+      const wooProductIds = Array.isArray(body?.woo_product_ids)
+        ? body.woo_product_ids.map((value: any) => Number(value)).filter((value: number) => Number.isFinite(value) && value > 0)
+        : [];
+      if (wooProductIds.length === 0) return json(400, { ok: false, error: "WOO_PRODUCT_IDS_REQUIRED" }, cors);
+
+      const wooProducts: any[] = [];
+      for (const wooProductId of wooProductIds) {
+        const { url, headers } = buildWooApiUrl({
+          baseUrl,
+          path: `products/${wooProductId}`,
+          authMode,
+          consumerKey,
+          consumerSecret,
+          userAgent: "UltriaERP/woocommerce-admin",
+        });
+        const resp = await wooFetchJson(url, { headers });
+        if (!resp.ok) {
+          const classification = classifyWooHttpStatus(resp.status);
+          return json(502, {
+            ok: false,
+            error: "WOO_IMPORT_PREVIEW_FAILED",
+            error_code: classification.code,
+            hint: classification.hint,
+            details: sanitizeForLog(resp.data),
+          }, cors);
+        }
+        wooProducts.push(resp.data);
+      }
+
+      const skus = wooProducts.map((woo) => normalizeSku(woo?.sku)).filter(Boolean);
+      const revoRows = await loadRevoProductsForCatalog({ svc, empresaId, revoProductIds: [], skus });
+      const mapRows = await loadStoreMapBySku({ svc, empresaId, storeId, skus });
+      const revoBySku = new Map<string, any>();
+      for (const row of revoRows) revoBySku.set(normalizeSkuKey(row?.sku), row);
+      const mapBySku = new Map<string, any[]>();
+      for (const row of mapRows) {
+        const key = normalizeSkuKey(row?.sku);
+        const list = mapBySku.get(key) ?? [];
+        list.push(row);
+        mapBySku.set(key, list);
+      }
+      const previewItems = buildImportPreview({ wooProducts, revoBySku, mapBySku });
+      const runId = await createRunWithItems({
+        svc,
+        empresaId,
+        storeId,
+        runType: "IMPORT",
+        callerId,
+        options: {
+          woo_product_ids: wooProductIds,
+          options: sanitizeForLog(body?.options ?? {}),
+        },
+        previewItems,
+      });
+
+      const runnableWooIds = previewItems
+        .filter((item) => item.action === "CREATE" || item.action === "UPDATE")
+        .map((item) => Number(item.woo_product_id ?? 0))
+        .filter((value) => Number.isFinite(value) && value > 0);
+      const enqueuedJobId = runnableWooIds.length > 0
+        ? await enqueueRunJob({
+          user,
+          storeId,
+          runType: "IMPORT",
+          payload: {
+            run_id: runId,
+            woo_product_ids: runnableWooIds,
+            options: sanitizeForLog(body?.options ?? {}),
+          },
+        })
+        : null;
+
+      let worker: any = null;
+      if (workerKey && runnableWooIds.length > 0) worker = await workerInvoke({ supabaseUrl, workerKey, storeId, limit: 20 });
+      return json(200, {
+        ok: true,
+        run_id: runId,
+        enqueued_job_id: enqueuedJobId,
+        worker,
+        summary: summarizePreview(previewItems),
+      }, cors);
+    }
+
     if (action === "stores.status") {
-      const [events, jobs, logs, queued, running, errored, dead, mapQuality, orderTotal, orderLatest] = await Promise.all([
+      const [events, jobs, logs, queued, running, errored, dead, mapQuality, orderTotal, orderLatest, recentRuns] = await Promise.all([
         svc.from("woocommerce_webhook_event").select("id,process_status,received_at,topic,woo_resource_id,last_error,error_code").eq("empresa_id", empresaId).eq("store_id", storeId).order("received_at", { ascending: false }).limit(20),
         svc.from("woocommerce_sync_job").select("id,type,status,attempts,next_run_at,last_error,created_at").eq("empresa_id", empresaId).eq("store_id", storeId).order("created_at", { ascending: false }).limit(20),
         svc.from("woocommerce_sync_log").select("id,level,message,meta,created_at,job_id").eq("empresa_id", empresaId).eq("store_id", storeId).order("created_at", { ascending: false }).limit(50),
@@ -506,6 +1288,7 @@ Deno.serve(async (req) => {
         mapQualitySnapshot(svc, empresaId, storeId),
         countOrderMap(svc, empresaId, storeId),
         latestOrderMapRow(svc, empresaId, storeId),
+        svc.from("woocommerce_sync_run").select("id,type,status,summary,created_at,started_at,finished_at").eq("empresa_id", empresaId).eq("store_id", storeId).order("created_at", { ascending: false }).limit(5),
       ]);
 
       const statusContract = buildWooStoreStatusContract({
@@ -539,6 +1322,91 @@ Deno.serve(async (req) => {
         recommendations: statusContract.recommendations,
         recent_errors: statusContract.recent_errors,
         status_contract: statusContract,
+        recent_runs: recentRuns.data ?? [],
+      }, cors);
+    }
+
+    if (action === "stores.runs.list") {
+      const limit = Math.max(1, Math.min(Number(body?.limit ?? 30), 100));
+      const runs = await listRuns({ svc, empresaId, storeId, limit });
+      return json(200, { ok: true, runs }, cors);
+    }
+
+    if (action === "stores.runs.get") {
+      const runId = String(body?.run_id ?? "").trim();
+      if (!runId) return json(400, { ok: false, error: "RUN_ID_REQUIRED" }, cors);
+      const details = await fetchRunWithItems({
+        svc,
+        empresaId,
+        storeId,
+        runId,
+        limitItems: Number(body?.limit_items ?? 400),
+      });
+      if (!details) return json(404, { ok: false, error: "RUN_NOT_FOUND" }, cors);
+      return json(200, { ok: true, run: details.run, items: details.items }, cors);
+    }
+
+    if (action === "stores.runs.retry_failed") {
+      const runId = String(body?.run_id ?? "").trim();
+      if (!runId) return json(400, { ok: false, error: "RUN_ID_REQUIRED" }, cors);
+      const details = await fetchRunWithItems({
+        svc,
+        empresaId,
+        storeId,
+        runId,
+        limitItems: 1000,
+      });
+      if (!details) return json(404, { ok: false, error: "RUN_NOT_FOUND" }, cors);
+
+      const sourceRun = details.run as any;
+      const failedItems = details.items.filter((item: any) => String(item.status) === "ERROR" || String(item.status) === "DEAD");
+      if (failedItems.length === 0) {
+        return json(400, { ok: false, error: "RUN_HAS_NO_FAILED_ITEMS" }, cors);
+      }
+
+      const retryPreview: CatalogPreviewItem[] = failedItems.map((item: any) => ({
+        sku: item.sku ? String(item.sku) : null,
+        revo_product_id: item.revo_product_id ? String(item.revo_product_id) : null,
+        woo_product_id: item.woo_product_id != null ? Number(item.woo_product_id) || null : null,
+        woo_variation_id: item.woo_variation_id != null ? Number(item.woo_variation_id) || null : null,
+        action: (String(item.action ?? "UPDATE").toUpperCase() as CatalogItemAction),
+        warnings: [],
+        blockers: [],
+        diff: item.diff ?? {},
+      }));
+
+      const retryRunType = String(sourceRun?.type ?? "").trim() as CatalogRunType;
+      const newRunId = await createRunWithItems({
+        svc,
+        empresaId,
+        storeId,
+        runType: retryRunType,
+        callerId,
+        options: {
+          source_run_id: runId,
+          retry_only_failed: true,
+        },
+        previewItems: retryPreview,
+      });
+
+      const runPayload: Record<string, unknown> = {
+        run_id: newRunId,
+        skus: retryPreview.map((item) => item.sku).filter(Boolean),
+        woo_product_ids: retryPreview.map((item) => item.woo_product_id).filter((id) => Number(id) > 0),
+        source_run_id: runId,
+        retry_only_failed: true,
+      };
+      const enqueuedJobId = await enqueueRunJob({ user, storeId, runType: retryRunType, payload: runPayload });
+
+      let worker: any = null;
+      if (workerKey) worker = await workerInvoke({ supabaseUrl, workerKey, storeId, limit: 20 });
+      return json(200, {
+        ok: true,
+        run_id: newRunId,
+        source_run_id: runId,
+        enqueued_job_id: enqueuedJobId,
+        retried_items: retryPreview.length,
+        worker,
       }, cors);
     }
 

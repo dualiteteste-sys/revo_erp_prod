@@ -24,6 +24,7 @@ interface ProductsTableProps {
   someSelected?: boolean;
   onToggleSelect?: (id: string) => void;
   onToggleSelectAll?: () => void;
+  wooListingByProductId?: Map<string, { listing_status: string; last_error_code?: string | null; last_sync_price_at?: string | null; last_sync_stock_at?: string | null }>;
 }
 
 const ProductsTable: React.FC<ProductsTableProps> = ({
@@ -41,6 +42,7 @@ const ProductsTable: React.FC<ProductsTableProps> = ({
   someSelected,
   onToggleSelect,
   onToggleSelectAll,
+  wooListingByProductId,
 }) => {
   const { schedule: scheduleEdit, cancel: cancelScheduledEdit } = useDeferredAction(180);
 
@@ -51,6 +53,7 @@ const ProductsTable: React.FC<ProductsTableProps> = ({
     { id: 'preco_venda', defaultWidth: 160, minWidth: 140 },
     { id: 'unidade', defaultWidth: 140, minWidth: 110 },
     { id: 'status', defaultWidth: 140, minWidth: 120 },
+    { id: 'woo', defaultWidth: 150, minWidth: 130 },
     { id: 'acoes', defaultWidth: 160, minWidth: 120 },
   ];
 
@@ -85,6 +88,7 @@ const ProductsTable: React.FC<ProductsTableProps> = ({
             <ResizableSortableTh columnId="preco_venda" label="Preço" sortable={false} sort={sort} onSort={onSort as any} onResizeStart={startResize} />
             <ResizableSortableTh columnId="unidade" label="Unidade" sortable={false} sort={sort} onSort={onSort as any} onResizeStart={startResize} />
             <ResizableSortableTh columnId="status" label="Status" sortable={false} sort={sort} onSort={onSort as any} onResizeStart={startResize} />
+            <ResizableSortableTh columnId="woo" label="Woo" sortable={false} sort={sort} onSort={onSort as any} onResizeStart={startResize} />
             <ResizableSortableTh
               columnId="acoes"
               label={<span className="sr-only">Ações</span>}
@@ -108,6 +112,8 @@ const ProductsTable: React.FC<ProductsTableProps> = ({
               const nome = row.nome ?? '';
               const atributosSummary = isVariant ? (row.atributos_summary ?? null) : null;
               const href = `/app/products?open=${encodeURIComponent(row.id)}`;
+              const wooListing = isParent ? wooListingByProductId?.get(row.id) : undefined;
+              const wooStatus = String(wooListing?.listing_status ?? 'unlinked');
 
               return (
               <motion.tr
@@ -221,6 +227,32 @@ const ProductsTable: React.FC<ProductsTableProps> = ({
                   >
                     {row.status === 'ativo' ? 'Ativo' : 'Inativo'}
                   </span>
+                </td>
+                <td className="px-6 py-4 whitespace-nowrap">
+                  {isParent ? (
+                    <span
+                      title={wooListing?.last_error_code ? `Erro: ${wooListing.last_error_code}` : undefined}
+                      className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
+                        wooStatus === 'linked'
+                          ? 'bg-emerald-100 text-emerald-800'
+                          : wooStatus === 'conflict'
+                          ? 'bg-amber-100 text-amber-800'
+                          : wooStatus === 'error'
+                          ? 'bg-red-100 text-red-800'
+                          : 'bg-slate-100 text-slate-700'
+                      }`}
+                    >
+                      {wooStatus === 'linked'
+                        ? 'Vinculado'
+                        : wooStatus === 'conflict'
+                        ? 'Conflito'
+                        : wooStatus === 'error'
+                        ? 'Erro'
+                        : 'Não vinculado'}
+                    </span>
+                  ) : (
+                    <span className="text-xs text-slate-400">—</span>
+                  )}
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                   <div className="flex items-center justify-end gap-4">
