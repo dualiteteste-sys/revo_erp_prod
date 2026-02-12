@@ -112,3 +112,8 @@ export function countConsoleRedByCategory(): Record<ErrorTriageCategory, number>
   for (const ev of buffer) out[ev.triage.category] += 1;
   return out;
 }
+
+export function clearConsoleRedEvents() {
+  buffer.length = 0;
+  dedupe.clear();
+}
