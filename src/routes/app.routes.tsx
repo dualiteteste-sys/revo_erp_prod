@@ -47,6 +47,8 @@ const OpsBackupsPage = lazyImport(() => import("../pages/dev/OpsBackupsPage"));
 const OpsTenantBackupsPage = lazyImport(() => import("../pages/dev/OpsTenantBackupsPage"));
 const OpsStripeDedupePage = lazyImport(() => import("../pages/dev/OpsStripeDedupePage"));
 const OpsEntitlementsPage = lazyImport(() => import("../pages/dev/OpsEntitlementsPage"));
+const WooCommerceStoresPage = lazyImport(() => import("../pages/dev/WooCommerceStoresPage"));
+const WooCommerceStoreDetailPage = lazyImport(() => import("../pages/dev/WooCommerceStoreDetailPage"));
 const SupabaseDemoPage = lazyImport(() => import("../pages/tools/SupabaseDemoPage"));
 const SettingsPage = lazyImport(() => import("../pages/settings/SettingsPage"));
 
@@ -600,6 +602,22 @@ export const appRoutes: RouteObject[] = [
               element: (
                 <RequirePermission permission={{ domain: "ops", action: "manage" }}>
                   <Suspense fallback={<PageLoader />}><OpsEntitlementsPage /></Suspense>
+                </RequirePermission>
+              ),
+            },
+            {
+              path: "desenvolvedor/woocommerce",
+              element: (
+                <RequirePermission permission={{ domain: "ops", action: "manage" }}>
+                  <Suspense fallback={<PageLoader />}><WooCommerceStoresPage /></Suspense>
+                </RequirePermission>
+              ),
+            },
+            {
+              path: "desenvolvedor/woocommerce/:storeId",
+              element: (
+                <RequirePermission permission={{ domain: "ops", action: "manage" }}>
+                  <Suspense fallback={<PageLoader />}><WooCommerceStoreDetailPage /></Suspense>
                 </RequirePermission>
               ),
             },

@@ -3,6 +3,17 @@ import { buildCorsHeaders } from "../_shared/cors.ts";
 import { aesGcmDecryptFromString, timingSafeEqual } from "../_shared/crypto.ts";
 import { getRequestId } from "../_shared/request.ts";
 import { sanitizeForLog } from "../_shared/sanitize.ts";
+import { resolveWooError } from "../_shared/woocommerceErrors.ts";
+import {
+  buildWooApiUrl,
+  classifyWooHttpStatus,
+  computeBackoffMs,
+  normalizeWooStoreUrl,
+  parsePositiveIntEnv,
+  pickUniqueByStoreType,
+  type ClassifiedWooError,
+  type WooAuthMode,
+} from "../_shared/woocommerceHardening.ts";
 
 type JobRow = {
   id: string;
@@ -18,10 +29,27 @@ type StoreSecrets = {
   empresaId: string;
   storeId: string;
   baseUrl: string;
-  authMode: "basic_https" | "oauth1" | "querystring_fallback";
+  authMode: WooAuthMode;
   consumerKey: string;
   consumerSecret: string;
 };
+
+class WooRequestError extends Error {
+  status: number;
+  code: ClassifiedWooError["code"];
+  retryable: boolean;
+  pauseStore: boolean;
+  hint: string;
+
+  constructor(status: number, shape: ClassifiedWooError) {
+    super(`${shape.code}:${status}`);
+    this.status = status;
+    this.code = shape.code;
+    this.retryable = shape.retryable;
+    this.pauseStore = shape.pauseStore;
+    this.hint = shape.hint;
+  }
+}
 
 function json(status: number, body: Record<string, unknown>, cors: Record<string, string>) {
   return new Response(JSON.stringify(body), {
@@ -32,17 +60,6 @@ function json(status: number, body: Record<string, unknown>, cors: Record<string
 
 function sleep(ms: number) {
   return new Promise((r) => setTimeout(r, ms));
-}
-
-function normalizeStoreUrl(input: string): string {
-  const raw = String(input ?? "").trim();
-  if (!raw) throw new Error("STORE_URL_REQUIRED");
-  const withProto = /^https?:\/\//i.test(raw) ? raw : `https://${raw}`;
-  const u = new URL(withProto);
-  u.hash = "";
-  u.search = "";
-  u.pathname = u.pathname.replace(/\/+$/, "");
-  return u.toString();
 }
 
 function toWooPrice(value: unknown): string {
@@ -85,33 +102,6 @@ async function wooFetchJson(url: string, init?: RequestInit): Promise<{ ok: bool
   return { ok: resp.ok, status: resp.status, data, headers: resp.headers };
 }
 
-function buildWooApiUrl(params: {
-  baseUrl: string;
-  path: string;
-  authMode: StoreSecrets["authMode"];
-  consumerKey: string;
-  consumerSecret: string;
-  query?: Record<string, string>;
-}): { url: string; headers: Record<string, string> } {
-  const u = new URL(`${params.baseUrl}/wp-json/wc/v3/${params.path.replace(/^\/+/, "")}`);
-  for (const [k, v] of Object.entries(params.query ?? {})) u.searchParams.set(k, v);
-
-  const ck = params.consumerKey.trim();
-  const cs = params.consumerSecret.trim();
-  const headers: Record<string, string> = {};
-
-  if (params.authMode === "basic_https") {
-    headers.Authorization = `Basic ${btoa(`${ck}:${cs}`)}`;
-  } else if (params.authMode === "querystring_fallback") {
-    u.searchParams.set("consumer_key", ck);
-    u.searchParams.set("consumer_secret", cs);
-  } else {
-    // oauth1 not implemented (edge-safe placeholder)
-    headers.Authorization = `Basic ${btoa(`${ck}:${cs}`)}`;
-  }
-  return { url: u.toString(), headers };
-}
-
 async function withRetry<T>(fn: () => Promise<T>, maxAttempts = 3): Promise<T> {
   let lastErr: any = null;
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
@@ -119,11 +109,21 @@ async function withRetry<T>(fn: () => Promise<T>, maxAttempts = 3): Promise<T> {
       return await fn();
     } catch (e: any) {
       lastErr = e;
+      if (e instanceof WooRequestError && !e.retryable) throw e;
       const wait = Math.min(60_000, 500 * 2 ** (attempt - 1) + Math.floor(Math.random() * 250));
       await sleep(wait);
     }
   }
   throw lastErr ?? new Error("RETRY_FAILED");
+}
+
+async function wooRequestJson(params: {
+  url: string;
+  init?: RequestInit;
+}): Promise<{ status: number; data: any; headers: Headers }> {
+  const resp = await wooFetchJson(params.url, params.init);
+  if (resp.ok) return { status: resp.status, data: resp.data, headers: resp.headers };
+  throw new WooRequestError(resp.status, classifyWooHttpStatus(resp.status));
 }
 
 async function loadStoreSecrets(params: {
@@ -141,7 +141,7 @@ async function loadStoreSecrets(params: {
   if (String(store.status) !== "active") throw new Error("STORE_NOT_ACTIVE");
 
   const empresaId = String(store.empresa_id);
-  const baseUrl = normalizeStoreUrl(String(store.base_url));
+  const baseUrl = normalizeWooStoreUrl(String(store.base_url));
   const aad = `${empresaId}:${storeId}`;
   const consumerKey = await aesGcmDecryptFromString({ masterKey, ciphertext: String(store.consumer_key_enc), aad });
   const consumerSecret = await aesGcmDecryptFromString({ masterKey, ciphertext: String(store.consumer_secret_enc), aad });
@@ -150,7 +150,7 @@ async function loadStoreSecrets(params: {
     empresaId,
     storeId,
     baseUrl,
-    authMode: (String(store.auth_mode ?? "basic_https") as StoreSecrets["authMode"]) || "basic_https",
+    authMode: (String(store.auth_mode ?? "basic_https") as WooAuthMode) || "basic_https",
     consumerKey,
     consumerSecret,
   };
@@ -333,9 +333,9 @@ async function buildProductMap(params: { svc: any; secrets: StoreSecrets; }): Pr
       consumerKey: secrets.consumerKey,
       consumerSecret: secrets.consumerSecret,
       query: { per_page: String(perPage), page: String(page) },
+      userAgent: "UltriaERP/woocommerce-worker",
     });
-    const resp = await withRetry(() => wooFetchJson(url, { headers }));
-    if (!resp.ok) throw new Error(`WOO_PRODUCTS_LIST_FAILED:${resp.status}`);
+    const resp = await withRetry(() => wooRequestJson({ url, init: { headers } }));
     const products = Array.isArray(resp.data) ? resp.data : [];
     if (products.length === 0) break;
 
@@ -354,9 +354,9 @@ async function buildProductMap(params: { svc: any; secrets: StoreSecrets; }): Pr
             consumerKey: secrets.consumerKey,
             consumerSecret: secrets.consumerSecret,
             query: { per_page: String(perPage), page: String(vPage) },
+            userAgent: "UltriaERP/woocommerce-worker",
           });
-          const vr = await withRetry(() => wooFetchJson(v.url, { headers: v.headers }));
-          if (!vr.ok) throw new Error(`WOO_VARIATIONS_LIST_FAILED:${vr.status}`);
+          const vr = await withRetry(() => wooRequestJson({ url: v.url, init: { headers: v.headers } }));
           const vars = Array.isArray(vr.data) ? vr.data : [];
           if (vars.length === 0) break;
 
@@ -504,11 +504,14 @@ async function syncBySkus(params: {
       authMode: secrets.authMode,
       consumerKey: secrets.consumerKey,
       consumerSecret: secrets.consumerSecret,
+      userAgent: "UltriaERP/woocommerce-worker",
     });
     const resp = await withRetry(() =>
-      wooFetchJson(url, { method: "POST", headers: { ...headers, "Content-Type": "application/json" }, body: JSON.stringify({ update: chunk }) })
+      wooRequestJson({
+        url,
+        init: { method: "POST", headers: { ...headers, "Content-Type": "application/json" }, body: JSON.stringify({ update: chunk }) },
+      })
     );
-    if (!resp.ok) throw new Error(`WOO_PRODUCTS_BATCH_FAILED:${resp.status}`);
     updated += chunk.length;
   }
 
@@ -521,11 +524,14 @@ async function syncBySkus(params: {
         authMode: secrets.authMode,
         consumerKey: secrets.consumerKey,
         consumerSecret: secrets.consumerSecret,
+        userAgent: "UltriaERP/woocommerce-worker",
       });
       const resp = await withRetry(() =>
-        wooFetchJson(url, { method: "POST", headers: { ...headers, "Content-Type": "application/json" }, body: JSON.stringify({ update: chunk }) })
+        wooRequestJson({
+          url,
+          init: { method: "POST", headers: { ...headers, "Content-Type": "application/json" }, body: JSON.stringify({ update: chunk }) },
+        })
       );
-      if (!resp.ok) throw new Error(`WOO_VARIATIONS_BATCH_FAILED:${resp.status}`);
       updated += chunk.length;
     }
   }
@@ -541,12 +547,248 @@ async function syncBySkus(params: {
   return { updated, skipped, failed };
 }
 
-async function backoffNextRun(attempt: number): Promise<string> {
-  const baseMs = 30_000;
-  const maxMs = 60 * 60_000;
-  const factor = Math.min(maxMs, baseMs * 2 ** Math.max(0, attempt - 1));
-  const jitter = Math.floor(Math.random() * 2_000);
-  return new Date(Date.now() + factor + jitter).toISOString();
+async function reconcileRecentOrders(params: {
+  svc: any;
+  secrets: StoreSecrets;
+  payload: any;
+}): Promise<{ imported: number; scanned: number; since: string }> {
+  const since = String(params.payload?.since ?? new Date(Date.now() - 24 * 60 * 60_000).toISOString());
+  const maxPages = Math.max(1, Math.min(5, Number(params.payload?.max_pages ?? 2)));
+  const perPage = Math.max(1, Math.min(100, Number(params.payload?.per_page ?? 50)));
+  let imported = 0;
+  let scanned = 0;
+
+  for (let page = 1; page <= maxPages; page++) {
+    const listReq = buildWooApiUrl({
+      baseUrl: params.secrets.baseUrl,
+      path: "orders",
+      authMode: params.secrets.authMode,
+      consumerKey: params.secrets.consumerKey,
+      consumerSecret: params.secrets.consumerSecret,
+      query: {
+        per_page: String(perPage),
+        page: String(page),
+        orderby: "modified",
+        order: "desc",
+        after: since,
+      },
+      userAgent: "UltriaERP/woocommerce-worker",
+    });
+    const listResp = await withRetry(() => wooRequestJson({ url: listReq.url, init: { headers: listReq.headers } }));
+    const orders = Array.isArray(listResp.data) ? listResp.data : [];
+    if (orders.length === 0) break;
+
+    for (const order of orders) {
+      const orderId = Number(order?.id ?? 0) || 0;
+      if (!orderId) continue;
+      scanned += 1;
+
+      const fullReq = buildWooApiUrl({
+        baseUrl: params.secrets.baseUrl,
+        path: `orders/${orderId}`,
+        authMode: params.secrets.authMode,
+        consumerKey: params.secrets.consumerKey,
+        consumerSecret: params.secrets.consumerSecret,
+        userAgent: "UltriaERP/woocommerce-worker",
+      });
+      const fullResp = await withRetry(() => wooRequestJson({ url: fullReq.url, init: { headers: fullReq.headers } }));
+      await upsertOrderIntoRevo({
+        svc: params.svc,
+        empresaId: params.secrets.empresaId,
+        storeId: params.secrets.storeId,
+        order: fullResp.data,
+      });
+      imported += 1;
+    }
+
+    if (orders.length < perPage) break;
+  }
+
+  return { imported, scanned, since };
+}
+
+function backoffNextRun(attempt: number): string {
+  return new Date(Date.now() + computeBackoffMs(attempt)).toISOString();
+}
+
+async function pauseStoreForAuthFailure(params: {
+  svc: any;
+  secrets: StoreSecrets;
+  message: string;
+  hint: string;
+}) {
+  await params.svc
+    .from("integrations_woocommerce_store")
+    .update({ status: "paused", updated_at: new Date().toISOString() })
+    .eq("id", params.secrets.storeId)
+    .eq("empresa_id", params.secrets.empresaId);
+
+  await params.svc
+    .from("woocommerce_sync_job")
+    .update({
+      status: "error",
+      last_error: params.message,
+      next_run_at: new Date(Date.now() + 60 * 60_000).toISOString(),
+      lock_owner: null,
+      locked_at: null,
+    })
+    .eq("empresa_id", params.secrets.empresaId)
+    .eq("store_id", params.secrets.storeId)
+    .in("status", ["queued", "running", "error"]);
+
+  await params.svc.from("woocommerce_sync_log").insert({
+    empresa_id: params.secrets.empresaId,
+    store_id: params.secrets.storeId,
+    level: "error",
+    message: "store_paused_auth_failure",
+    meta: { error: params.message, hint: params.hint },
+  });
+}
+
+async function runWorkerBatch(params: {
+  svc: any;
+  masterKey: string;
+  storeId: string | null;
+  limit: number;
+  lockOwner: string;
+}) {
+  const { data: claimed, error: claimErr } = await params.svc.rpc("woocommerce_sync_jobs_claim", {
+    p_limit: params.limit,
+    p_store_id: params.storeId,
+    p_lock_owner: params.lockOwner,
+  });
+  if (claimErr) throw new Error(`CLAIM_FAILED:${claimErr.message}`);
+
+  const jobs: JobRow[] = Array.isArray(claimed) ? claimed : [];
+  const runnableJobs = pickUniqueByStoreType(jobs);
+  if (runnableJobs.length === 0) return { processed: 0, results: [] as any[] };
+
+  let processed = 0;
+  const results: any[] = [];
+
+  for (const j of runnableJobs) {
+    const jobId = String(j.id);
+    try {
+      const secrets = await loadStoreSecrets({ svc: params.svc, masterKey: params.masterKey, storeId: String(j.store_id) });
+
+      if (j.type === "CATALOG_RECONCILE") {
+        const r = await buildProductMap({ svc: params.svc, secrets });
+        await params.svc.from("woocommerce_sync_log").insert({
+          empresa_id: secrets.empresaId,
+          store_id: secrets.storeId,
+          job_id: jobId,
+          level: "info",
+          message: "product_map_built",
+          meta: sanitizeForLog(r),
+        });
+        await params.svc.rpc("woocommerce_sync_job_complete", { p_job_id: jobId, p_ok: true, p_error: null, p_next_run_at: null });
+        processed += 1;
+        results.push({ job_id: jobId, store_id: secrets.storeId, type: j.type, ok: true, ...r });
+        continue;
+      }
+
+      if (j.type === "ORDER_RECONCILE") {
+        const orderId = Number(j.payload?.order_id ?? 0) || 0;
+        if (orderId > 0) {
+          const { url, headers } = buildWooApiUrl({
+            baseUrl: secrets.baseUrl,
+            path: `orders/${orderId}`,
+            authMode: secrets.authMode,
+            consumerKey: secrets.consumerKey,
+            consumerSecret: secrets.consumerSecret,
+            userAgent: "UltriaERP/woocommerce-worker",
+          });
+          const resp = await withRetry(() => wooRequestJson({ url, init: { headers } }));
+          const { revoOrderId } = await upsertOrderIntoRevo({
+            svc: params.svc,
+            empresaId: secrets.empresaId,
+            storeId: secrets.storeId,
+            order: resp.data,
+          });
+
+          await params.svc.from("woocommerce_webhook_event").update({
+            processed_at: new Date().toISOString(),
+            process_status: "done",
+            last_error: null,
+            error_code: null,
+          }).eq("store_id", secrets.storeId).eq("woo_resource_id", orderId).eq("payload_hash", String(j.payload?.payload_hash ?? "")).in("process_status", ["queued", "dropped"]);
+
+          await params.svc.rpc("woocommerce_sync_job_complete", { p_job_id: jobId, p_ok: true, p_error: null, p_next_run_at: null });
+          processed += 1;
+          results.push({ job_id: jobId, store_id: secrets.storeId, type: j.type, ok: true, revo_order_id: revoOrderId });
+          continue;
+        }
+
+        const reconcile = await reconcileRecentOrders({
+          svc: params.svc,
+          secrets,
+          payload: j.payload ?? {},
+        });
+        await params.svc.rpc("woocommerce_sync_job_complete", { p_job_id: jobId, p_ok: true, p_error: null, p_next_run_at: null });
+        processed += 1;
+        results.push({ job_id: jobId, store_id: secrets.storeId, type: j.type, ok: true, reconcile });
+        continue;
+      }
+
+      if (j.type === "STOCK_SYNC" || j.type === "PRICE_SYNC") {
+        const skus = Array.isArray(j.payload?.skus) ? j.payload.skus : [];
+        const r = await syncBySkus({ svc: params.svc, secrets, kind: j.type, skus });
+        await params.svc.rpc("woocommerce_sync_job_complete", { p_job_id: jobId, p_ok: true, p_error: null, p_next_run_at: null });
+        processed += 1;
+        results.push({ job_id: jobId, store_id: secrets.storeId, type: j.type, ok: true, ...r });
+        continue;
+      }
+
+      throw new Error("JOB_TYPE_NOT_SUPPORTED");
+    } catch (e: any) {
+      const message = String(e?.message ?? "JOB_FAILED");
+      const attempt = Number(j.attempts ?? 1);
+      const nextRunAt = backoffNextRun(attempt);
+      const classification = e instanceof WooRequestError
+        ? { code: e.code, hint: e.hint, pauseStore: e.pauseStore }
+        : (() => {
+          const fallback = resolveWooError("WOO_UNEXPECTED");
+          return { code: fallback.code, hint: fallback.hint, pauseStore: fallback.pauseStore };
+        })();
+
+      await params.svc.rpc("woocommerce_sync_job_complete", {
+        p_job_id: jobId,
+        p_ok: false,
+        p_error: `${classification.code}:${message}`,
+        p_next_run_at: nextRunAt,
+      });
+
+      if (e instanceof WooRequestError && e.pauseStore) {
+        const secrets = await loadStoreSecrets({ svc: params.svc, masterKey: params.masterKey, storeId: String(j.store_id) });
+        await pauseStoreForAuthFailure({
+          svc: params.svc,
+          secrets,
+          message: `${classification.code}:${message}`,
+          hint: classification.hint,
+        });
+      }
+
+      await params.svc.from("woocommerce_sync_log").insert({
+        empresa_id: String(j.empresa_id),
+        store_id: String(j.store_id),
+        job_id: jobId,
+        level: "error",
+        message: "job_failed",
+        meta: sanitizeForLog({
+          type: j.type,
+          error: message,
+          code: classification.code,
+          hint: classification.hint,
+          attempts: Number(j.attempts ?? 0),
+          max_attempts: Number(j.max_attempts ?? 0),
+          next_run_at: nextRunAt,
+        }),
+      });
+      results.push({ job_id: jobId, store_id: String(j.store_id), type: j.type, ok: false, error: message, code: classification.code, hint: classification.hint });
+    }
+  }
+
+  return { processed, results };
 }
 
 Deno.serve(async (req) => {
@@ -575,85 +817,39 @@ Deno.serve(async (req) => {
   const body = (await req.json().catch(() => ({}))) as any;
   const storeId = body?.store_id ? String(body.store_id) : null;
   const limit = body?.limit != null ? Math.max(1, Math.min(20, Number(body.limit))) : 5;
+  const runScheduler = !!body?.scheduler;
+  const maxBatches = parsePositiveIntEnv(String(body?.max_batches ?? ""), 20);
+  const schedulerRetentionDays = parsePositiveIntEnv(Deno.env.get("WOOCOMMERCE_WEBHOOK_RETENTION_DAYS"), 14);
   const lockOwner = `woocommerce-worker:${requestId}`.slice(0, 60);
 
-  const { data: claimed, error: claimErr } = await svc.rpc("woocommerce_sync_jobs_claim", {
-    p_limit: limit,
-    p_store_id: storeId,
-    p_lock_owner: lockOwner,
-  });
-  if (claimErr) return json(500, { ok: false, error: "CLAIM_FAILED", details: claimErr.message }, cors);
-  const jobs: JobRow[] = Array.isArray(claimed) ? claimed : [];
-  if (jobs.length === 0) return json(200, { ok: true, processed_jobs: 0 }, cors);
+  const mergedResults: any[] = [];
+  let processedJobs = 0;
 
-  let processed = 0;
-  const results: any[] = [];
-
-  for (const j of jobs) {
-    const jobId = String(j.id);
-    try {
-      const secrets = await loadStoreSecrets({ svc, masterKey, storeId: String(j.store_id) });
-
-      if (j.type === "CATALOG_RECONCILE") {
-        const r = await buildProductMap({ svc, secrets });
-        await svc.from("woocommerce_sync_log").insert({
-          empresa_id: secrets.empresaId,
-          store_id: secrets.storeId,
-          job_id: jobId,
-          level: "info",
-          message: "product_map_built",
-          meta: sanitizeForLog(r),
-        });
-        await svc.rpc("woocommerce_sync_job_complete", { p_job_id: jobId, p_ok: true, p_error: null, p_next_run_at: null });
-        processed += 1;
-        results.push({ job_id: jobId, type: j.type, ok: true, ...r });
-        continue;
-      }
-
-      if (j.type === "ORDER_RECONCILE") {
-        const orderId = Number(j.payload?.order_id ?? 0) || 0;
-        if (!orderId) throw new Error("ORDER_ID_REQUIRED");
-        const { url, headers } = buildWooApiUrl({
-          baseUrl: secrets.baseUrl,
-          path: `orders/${orderId}`,
-          authMode: secrets.authMode,
-          consumerKey: secrets.consumerKey,
-          consumerSecret: secrets.consumerSecret,
-        });
-        const resp = await withRetry(() => wooFetchJson(url, { headers }));
-        if (!resp.ok) throw new Error(`WOO_ORDER_FETCH_FAILED:${resp.status}`);
-        const { revoOrderId } = await upsertOrderIntoRevo({ svc, empresaId: secrets.empresaId, storeId: secrets.storeId, order: resp.data });
-
-        // Mark any matching webhook event as processed (best-effort).
-        await svc.from("woocommerce_webhook_event").update({
-          processed_at: new Date().toISOString(),
-          process_status: "done",
-          last_error: null,
-        }).eq("store_id", secrets.storeId).eq("woo_resource_id", orderId).eq("payload_hash", String(j.payload?.payload_hash ?? "")).eq("process_status", "queued");
-
-        await svc.rpc("woocommerce_sync_job_complete", { p_job_id: jobId, p_ok: true, p_error: null, p_next_run_at: null });
-        processed += 1;
-        results.push({ job_id: jobId, type: j.type, ok: true, revo_order_id: revoOrderId });
-        continue;
-      }
-
-      if (j.type === "STOCK_SYNC" || j.type === "PRICE_SYNC") {
-        const skus = Array.isArray(j.payload?.skus) ? j.payload.skus : [];
-        const r = await syncBySkus({ svc, secrets, kind: j.type, skus });
-        await svc.rpc("woocommerce_sync_job_complete", { p_job_id: jobId, p_ok: true, p_error: null, p_next_run_at: null });
-        processed += 1;
-        results.push({ job_id: jobId, type: j.type, ok: true, ...r });
-        continue;
-      }
-
-      throw new Error("JOB_TYPE_NOT_SUPPORTED");
-    } catch (e: any) {
-      const message = e?.message || "JOB_FAILED";
-      const nextRunAt = await backoffNextRun(Number(j.attempts ?? 1));
-      await svc.rpc("woocommerce_sync_job_complete", { p_job_id: jobId, p_ok: false, p_error: message, p_next_run_at: nextRunAt });
-      results.push({ job_id: jobId, type: j.type, ok: false, error: message });
-    }
+  for (let i = 0; i < (runScheduler ? maxBatches : 1); i++) {
+    const batch = await runWorkerBatch({
+      svc,
+      masterKey,
+      storeId,
+      limit,
+      lockOwner,
+    });
+    if (batch.processed === 0) break;
+    processedJobs += batch.processed;
+    mergedResults.push(...batch.results);
   }
 
-  return json(200, { ok: true, processed_jobs: processed, results }, cors);
+  if (runScheduler) {
+    await svc.rpc("woocommerce_webhook_event_cleanup", {
+      p_store_id: storeId,
+      p_keep_days: schedulerRetentionDays,
+      p_limit: 200,
+    }).catch(() => null);
+  }
+
+  return json(200, {
+    ok: true,
+    processed_jobs: processedJobs,
+    scheduler: runScheduler ? { max_batches: maxBatches } : undefined,
+    results: mergedResults,
+  }, cors);
 });

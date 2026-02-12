@@ -7,6 +7,7 @@ Verifique:
 - A Consumer Key/Secret tem permissões de leitura/escrita conforme necessário.
 - O servidor/proxy/WAF não está removendo o header `Authorization` (quando `auth_mode=basic_https`).
 - Se `Authorization` for bloqueado, use `auth_mode=querystring_fallback` (somente server-side).
+- Em `401/403`, a store pode ser marcada como `paused`; rode `stores.healthcheck` após corrigir credenciais.
 
 ## Webhook não dispara ou não processa
 
@@ -22,6 +23,7 @@ Checklist:
 
 - Jobs são reprocessados automaticamente com backoff no `woocommerce-worker`.
 - Se o erro persistir, pause a store (`status=paused`) até estabilizar.
+- Garanta execução periódica do `woocommerce-scheduler` para drenar fila sem ação manual.
 
 ## SKU missing / SKU duplicado
 
@@ -34,4 +36,3 @@ Checklist:
 
 - Use `stores.sync.stock` / `stores.sync.price` com SKUs específicos para corrigir divergências pontuais.
 - Recomenda-se rodar `stores.product_map.build` após mudanças grandes de catálogo.
-
