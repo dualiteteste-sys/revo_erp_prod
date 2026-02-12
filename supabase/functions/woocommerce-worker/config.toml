@@ -1,0 +1,3 @@
+[functions.woocommerce-worker]
+verify_jwt = false
+
