@@ -1,3 +1,5 @@
+import { recordBreadcrumb } from "@/lib/telemetry/breadcrumbsBuffer";
+
 type ModalContextInput = {
   id?: string;
   kind?: string | null;
@@ -86,6 +88,11 @@ export function pushModalContext(input: ModalContextInput): string {
   };
 
   stack = [...stack, entry].slice(-STACK_LIMIT);
+  recordBreadcrumb({
+    type: "modal_open",
+    message: entry.name ?? entry.kind ?? "modal",
+    data: { kind: entry.kind, logicalRoute: entry.logicalRoute, baseRouteAtOpen: entry.baseRouteAtOpen },
+  });
   return id;
 }
 
@@ -113,7 +120,15 @@ export function updateModalContext(
 }
 
 export function popModalContext(id: string) {
+  const entry = stack.find((e) => e.id === id) ?? null;
   stack = stack.filter((e) => e.id !== id);
+  if (entry) {
+    recordBreadcrumb({
+      type: "modal_close",
+      message: entry.name ?? entry.kind ?? "modal",
+      data: { kind: entry.kind, logicalRoute: entry.logicalRoute, baseRouteAtOpen: entry.baseRouteAtOpen },
+    });
+  }
 }
 
 export function getModalContextStackSnapshot(): ModalContextEntry[] {

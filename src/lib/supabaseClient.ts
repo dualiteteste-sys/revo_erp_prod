@@ -7,6 +7,8 @@ import { getLastUserAction } from "@/lib/telemetry/lastUserAction";
 import { buildOpsAppErrorFingerprint } from "@/lib/telemetry/opsAppErrorsFingerprint";
 import { getRoutePathname } from "@/lib/telemetry/routeSnapshot";
 import { getModalContextStackSnapshot } from "@/lib/telemetry/modalContextStack";
+import { recordNetworkTrace } from "@/lib/telemetry/networkTraceBuffer";
+import { recordBreadcrumb } from "@/lib/telemetry/breadcrumbsBuffer";
 
 const rawFetch = globalThis.fetch.bind(globalThis);
 const ops403Dedupe = new Map<string, number>();
@@ -35,6 +37,18 @@ if (!supabaseUrl || !supabaseAnonKey) {
   throw new Error(
     "Supabase env ausente: defina VITE_SUPABASE_URL e VITE_SUPABASE_ANON_KEY (ex.: em .env.local / CI secrets).",
   );
+}
+
+function getNetworkSubject(url: string, isRpc: boolean, isEdgeFn: boolean): { kind: "rpc" | "edge"; name: string; label: string } | null {
+  if (!isRpc && !isEdgeFn) return null;
+  if (isRpc) {
+    const m = url.match(/\/rest\/v1\/rpc\/([^/?#]+)/);
+    const name = m?.[1] ? decodeURIComponent(m[1]) : "rpc";
+    return { kind: "rpc", name, label: `rpc:${name}` };
+  }
+  const m = url.match(/\/functions\/v1\/([^/?#]+)/);
+  const name = m?.[1] ? decodeURIComponent(m[1]) : "fn";
+  return { kind: "edge", name, label: `fn:${name}` };
 }
 
 function classifyOps403(code: string | null, message: string): string {
@@ -181,11 +195,13 @@ export const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey, {
       const isRpc = /\/rest\/v1\/rpc\//.test(url);
       const isEdgeFn = /\/functions\/v1\//.test(url);
       const isRest = /\/rest\/v1\//.test(url);
+      const subject = getNetworkSubject(url, isRpc, isEdgeFn);
       const timeoutMs = method === "GET" || method === "HEAD"
         ? 30000
         : isRpc || isEdgeFn
           ? 60000
           : 45000;
+      const startedAtMs = Date.now();
 
       try {
         const headers = new Headers(init?.headers ?? (input instanceof Request ? input.headers : undefined));
@@ -210,6 +226,19 @@ export const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey, {
 
         try {
           const res = await fetch(input as any, { ...(init ?? {}), headers, signal: controller.signal });
+          const durationMs = Date.now() - startedAtMs;
+          if ((isRpc || isEdgeFn) && res.ok && subject) {
+            recordNetworkTrace({
+              request_id: requestId,
+              kind: subject.kind,
+              name: subject.name,
+              method,
+              url,
+              status_code: res.status,
+              duration_ms: durationMs,
+              body: init?.body ?? null,
+            });
+          }
 
           if (!res.ok && (isRpc || isEdgeFn)) {
             try {
@@ -224,6 +253,12 @@ export const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey, {
                 isRpc,
                 isEdgeFn,
                 responseText,
+              });
+
+              recordBreadcrumb({
+                type: "network",
+                message: `${subject?.label ?? "network"} → ${res.status}`,
+                data: { request_id: requestId, status_code: res.status },
               });
 
               // Erros de rede (RPC/Edge) aparecem em vermelho no console do navegador,
@@ -246,15 +281,22 @@ export const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey, {
                 const route = typeof window !== "undefined" ? (window.location?.pathname ?? null) : null;
                 const lastAction = getLastUserAction();
 
-                const subject = (() => {
-                  if (isRpc) {
-                    const m = url.match(/\/rest\/v1\/rpc\/([^/?#]+)/);
-                    return m?.[1] ? `rpc:${decodeURIComponent(m[1])}` : "rpc";
-                  }
-                  const m = url.match(/\/functions\/v1\/([^/?#]+)/);
-                  return m?.[1] ? `fn:${decodeURIComponent(m[1])}` : "fn";
-                })();
-                const msg = `${subject}: ${msgRaw}`;
+                const msg = `${subject?.label ?? "network"}: ${msgRaw}`;
+
+                if (subject) {
+                  recordNetworkTrace({
+                    request_id: requestId,
+                    kind: subject.kind,
+                    name: subject.name,
+                    method,
+                    url,
+                    status_code: res.status,
+                    duration_ms: durationMs,
+                    error_code: code,
+                    response_summary: msgRaw,
+                    body: init?.body ?? null,
+                  });
+                }
                 await logOpsAppErrorFetchBestEffort({
                   requestId,
                   url,

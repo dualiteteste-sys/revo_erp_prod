@@ -3,18 +3,32 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { useToast } from "@/contexts/ToastProvider";
 import { sendErrorReport } from "@/services/errorReport";
 import { supabase } from "@/lib/supabaseClient";
+import { sanitizeLogData } from "@/lib/sanitizeLog";
 
 type Props = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   sentryEventId: string | null;
+  error?: Error | null;
+  diagnosticSnapshot?: unknown | null;
 };
 
-export function ReportIssueDialog({ open, onOpenChange, sentryEventId }: Props) {
+function safeJsonPreview(value: unknown) {
+  try {
+    const sanitized = sanitizeLogData(value);
+    const text = JSON.stringify(sanitized, null, 2);
+    return text.length <= 6000 ? text : `${text.slice(0, 6000)}\n…(truncado)`;
+  } catch {
+    return "—";
+  }
+}
+
+export function ReportIssueDialog({ open, onOpenChange, sentryEventId, error, diagnosticSnapshot }: Props) {
   const { addToast } = useToast();
   const [userMessage, setUserMessage] = useState("");
   const [email, setEmail] = useState<string>("");
   const [submitting, setSubmitting] = useState(false);
+  const [showDiagnostics, setShowDiagnostics] = useState(false);
 
   const canSubmit = useMemo(() => {
     return Boolean(sentryEventId) && userMessage.trim().length >= 6 && !submitting;
@@ -24,6 +38,7 @@ export function ReportIssueDialog({ open, onOpenChange, sentryEventId }: Props) 
     if (!open) return;
     setSubmitting(false);
     setUserMessage("");
+    setShowDiagnostics(false);
     void (async () => {
       try {
         const { data } = await supabase.auth.getUser();
@@ -44,6 +59,12 @@ export function ReportIssueDialog({ open, onOpenChange, sentryEventId }: Props) 
         sentry_event_id: sentryEventId,
         user_message: userMessage.trim(),
         user_email: email.trim() || null,
+        client_error: {
+          name: error?.name ?? null,
+          message: error?.message ?? null,
+          stack: error?.stack ?? null,
+        },
+        diagnostic_snapshot: diagnosticSnapshot ?? null,
       });
       addToast("Relatório enviado. Obrigado!", "success");
       onOpenChange(false);
@@ -89,6 +110,21 @@ export function ReportIssueDialog({ open, onOpenChange, sentryEventId }: Props) 
               placeholder="ex: voce@empresa.com"
               className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-600/30"
             />
+          </div>
+
+          <div className="pt-1">
+            <button
+              type="button"
+              className="text-xs font-semibold text-slate-600 hover:text-slate-800 underline"
+              onClick={() => setShowDiagnostics((v) => !v)}
+            >
+              {showDiagnostics ? "Ocultar diagnóstico" : "Ver diagnóstico (sanitizado)"}
+            </button>
+            {showDiagnostics ? (
+              <pre className="mt-2 max-h-56 overflow-auto rounded-xl bg-slate-50 border border-slate-200 p-3 text-[11px] text-slate-700 whitespace-pre-wrap break-words">
+                {safeJsonPreview({ event_id: sentryEventId, error, diagnostic: diagnosticSnapshot })}
+              </pre>
+            ) : null}
           </div>
         </div>
 

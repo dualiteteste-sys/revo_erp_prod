@@ -1,3 +1,5 @@
+import { recordBreadcrumb } from "@/lib/telemetry/breadcrumbsBuffer";
+
 type RouterLocationLike = { pathname: string };
 type RouterStateLike = { location: RouterLocationLike };
 
@@ -15,7 +17,12 @@ function normalizePathname(value: string | null): string | null {
 }
 
 export function setRoutePathnameSnapshot(pathname: string | null) {
-  routePathnameSnapshot = normalizePathname(pathname);
+  const next = normalizePathname(pathname);
+  const prev = routePathnameSnapshot;
+  routePathnameSnapshot = next;
+  if (next && next !== prev) {
+    recordBreadcrumb({ type: "nav", message: next, data: { pathname: next } });
+  }
 }
 
 export function getRoutePathnameSnapshot(): string | null {
