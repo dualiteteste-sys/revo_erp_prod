@@ -119,6 +119,7 @@ Deno.serve(async (req) => {
     }
 
     const payload = await req.json().catch(() => null) as any;
+    const errorId = String(payload?.error_id ?? "").trim();
     const sentryEventId = String(payload?.sentry_event_id ?? "").trim();
     const userMessage = String(payload?.user_message ?? "").trim();
     const userEmail = (payload?.user_email ? String(payload.user_email).trim() : "") || user.email || "";
@@ -170,6 +171,7 @@ Deno.serve(async (req) => {
     }
 
     const issueBody = [
+      errorId ? `**Error id:** \`${errorId}\`` : null,
       `**Sentry event id:** \`${sentryEventId}\``,
       ``,
       `**User message:**`,
@@ -184,9 +186,10 @@ Deno.serve(async (req) => {
       "```json",
       JSON.stringify(recentNetworkErrors, null, 2),
       "```",
-    ].join("\n");
+    ].filter(Boolean).join("\n");
 
     const emailText = [
+      errorId ? `Error id: ${errorId}` : null,
       `Sentry event id: ${sentryEventId}`,
       ``,
       `User message:`,
@@ -199,7 +202,7 @@ Deno.serve(async (req) => {
       ``,
       `Recent network errors (sanitized):`,
       JSON.stringify(recentNetworkErrors, null, 2),
-    ].join("\n");
+    ].filter(Boolean).join("\n");
 
     const githubLabels = String(Deno.env.get("GITHUB_ISSUE_LABELS") ?? "bug").split(",").map((s) => s.trim()).filter(Boolean);
 

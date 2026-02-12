@@ -1,3 +1,5 @@
+import { recordBreadcrumb } from "@/lib/telemetry/breadcrumbsBuffer";
+
 type LastUserAction = {
   at: number;
   route: string | null;
@@ -54,6 +56,7 @@ export function setupLastUserActionTracking() {
         route: window.location?.pathname ?? null,
         label,
       };
+      recordBreadcrumb({ type: "click", message: label, data: { route: lastAction.route } });
     },
     { capture: true }
   );
