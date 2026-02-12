@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Loader2, Link2, RefreshCw, Unlink2 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthProvider';
 import { useToast } from '@/contexts/ToastProvider';
 import { listWooStores } from '@/services/woocommerceControlPanel';
@@ -183,15 +182,12 @@ export default function WooCommerceChannelTab({ data }: Props) {
 
       <div className="flex flex-wrap items-center gap-2">
         <Button variant="secondary" onClick={() => void refresh()} disabled={loading || !canUse} className="gap-2">
-          {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
-          Atualizar
+          {loading ? 'Atualizando...' : 'Atualizar'}
         </Button>
         <Button variant="secondary" onClick={() => void onLink()} disabled={loading || !canUse} className="gap-2">
-          <Link2 className="h-4 w-4" />
           Vincular por SKU
         </Button>
         <Button variant="secondary" onClick={() => void onUnlink()} disabled={loading || !canUse} className="gap-2">
-          <Unlink2 className="h-4 w-4" />
           Desvincular
         </Button>
         <Button onClick={() => void syncSingle('price')} disabled={loading || !canUse}>Sincronizar preço</Button>

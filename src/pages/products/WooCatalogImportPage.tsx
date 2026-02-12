@@ -1,5 +1,4 @@
 import { useMemo, useState } from 'react';
-import { Loader2, Search } from 'lucide-react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthProvider';
 import { useToast } from '@/contexts/ToastProvider';
@@ -94,8 +93,7 @@ export default function WooCatalogImportPage() {
             className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
           />
           <Button variant="secondary" onClick={onSearch} className="gap-2" disabled={loading || !storeId || !activeEmpresaId}>
-            {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
-            Buscar
+            {loading ? 'Buscando...' : 'Buscar'}
           </Button>
         </div>
 

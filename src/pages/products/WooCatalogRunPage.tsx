@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
-import { Loader2, RefreshCw, RotateCcw } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthProvider';
 import { useToast } from '@/contexts/ToastProvider';
 import PageHeader from '@/components/ui/PageHeader';
@@ -75,11 +74,9 @@ export default function WooCatalogRunPage() {
             <div className="flex items-center gap-2">
               <Button variant="secondary" onClick={() => navigate(-1)}>Voltar</Button>
               <Button variant="secondary" className="gap-2" onClick={() => void load()} disabled={loading}>
-                <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
-                Atualizar
+                {loading ? 'Atualizando...' : 'Atualizar'}
               </Button>
               <Button className="gap-2" onClick={retryFailed} disabled={loading || !shouldAllowRetryFailed(data?.items ?? [])}>
-                <RotateCcw className="h-4 w-4" />
                 Reexecutar falhas
               </Button>
             </div>
@@ -92,7 +89,7 @@ export default function WooCatalogRunPage() {
           <div className="text-sm text-slate-600">Informe loja e execução para visualizar este relatório.</div>
         ) : loading && !data ? (
           <div className="flex h-40 items-center justify-center">
-            <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
+            <span className="text-sm text-slate-600">Carregando execução...</span>
           </div>
         ) : (
           <>

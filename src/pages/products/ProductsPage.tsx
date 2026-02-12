@@ -6,7 +6,7 @@ import { ProductMobileCard } from '../../components/products/ProductMobileCard';
 import { ResponsiveTable } from '../../components/ui/ResponsiveTable';
 import Pagination from '../../components/ui/Pagination';
 import DeleteProductModal from '../../components/products/DeleteProductModal';
-import { Loader2, Search, Package, DatabaseBackup, Plus, FileDown, FileUp, ExternalLink } from 'lucide-react';
+import { Loader2, Search, Package, DatabaseBackup, Plus, FileDown, FileUp } from 'lucide-react';
 import Modal from '../../components/ui/Modal';
 import ProductFormPanel from '../../components/products/ProductFormPanel';
 import * as productsService from '../../services/products';
@@ -377,7 +377,6 @@ const ProductsPage: React.FC = () => {
             className="gap-2"
             disabled={!wooStoreId || effectiveLoading}
           >
-            <ExternalLink size={18} />
             Catálogo Woo
           </Button>
 

@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useState } from 'react';
-import { AlertTriangle, CheckCircle2, Loader2, PlayCircle, Search } from 'lucide-react';
 import Modal from '@/components/ui/Modal';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/contexts/ToastProvider';
@@ -226,8 +225,7 @@ export default function WooBulkCatalogWizard(props: Props) {
                     className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
                   />
                   <Button variant="secondary" onClick={loadWooRows} disabled={loading} className="gap-2">
-                    {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
-                    Buscar
+                    {loading ? 'Carregando...' : 'Buscar'}
                   </Button>
                 </div>
                 <div className="max-h-52 overflow-auto rounded-md border border-slate-200">
@@ -288,7 +286,6 @@ export default function WooBulkCatalogWizard(props: Props) {
 
         {step === 3 ? (
           <div className="flex flex-1 flex-col items-center justify-center gap-3 rounded-lg border border-emerald-200 bg-emerald-50 p-6 text-center">
-            <CheckCircle2 className="h-10 w-10 text-emerald-600" />
             <h3 className="text-lg font-semibold text-emerald-800">Execução iniciada</h3>
             <p className="text-sm text-emerald-700">Acompanhe o progresso na tela de execução.</p>
           </div>
@@ -304,14 +301,12 @@ export default function WooBulkCatalogWizard(props: Props) {
             ) : null}
             {step === 1 ? (
               <Button onClick={runPreview} disabled={loading || selectedCount === 0} className="gap-2">
-                {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
-                Validar e preview
+                {loading ? 'Carregando...' : 'Validar e preview'}
               </Button>
             ) : null}
             {step === 2 ? (
               <Button onClick={executeRun} disabled={loading || hasBlockers} className="gap-2">
-                {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : hasBlockers ? <AlertTriangle className="h-4 w-4" /> : <PlayCircle className="h-4 w-4" />}
-                Executar
+                {loading ? 'Executando...' : hasBlockers ? 'Bloqueado' : 'Executar'}
               </Button>
             ) : null}
           </div>
