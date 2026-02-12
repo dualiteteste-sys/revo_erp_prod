@@ -452,7 +452,16 @@ export default function SystemErrorsPage() {
                         ) : null}
                       </td>
                       <td className="p-3 font-mono text-slate-800 break-all">{r.source}</td>
-                      <td className="p-3 font-mono text-slate-700 break-all">{r.route ?? "—"}</td>
+                      <td className="p-3 font-mono text-slate-700 break-all">
+                        <div>{r.route ?? "—"}</div>
+                        {(() => {
+                          const ctx = (r as any).context ?? null;
+                          const modal = ctx?.modal_active ?? null;
+                          const name = typeof modal?.name === "string" ? modal.name : "";
+                          if (!name) return null;
+                          return <div className="mt-1 text-[11px] text-slate-500">Modal: {name}</div>;
+                        })()}
+                      </td>
                       <td className="p-3 text-slate-900">
                         <div className="line-clamp-2">{r.message}</div>
                         {r.last_action ? (
