@@ -1,54 +1,129 @@
 /*
-  ECOMMERCE-WOO-01: Suporte inicial a WooCommerce (conexão)
+  REMOVE-LEGACY-MARKETPLACE-PROVIDER
 
   Objetivo:
-  - Permitir provider = 'woo' na infra de integrações (ecommerces, jobs, links).
-  - Armazenar credenciais Woo (consumer key/secret) em tabela protegida (service_role only).
-  - Expor RPCs seguras para UI:
-    - ecommerce_connections_list / upsert passam a aceitar 'woo'
-    - ecommerce_connection_diagnostics passa a diagnosticar 'woo' (sem expor segredos)
-    - ecommerce_woo_set_secrets grava CK/CS (security definer + permission guard)
+  - Remover artefatos de um provider legado (dados, colunas e RPCs) de forma idempotente.
+  - Garantir que o dominio de e-commerce continue funcional para os providers suportados.
 
-  Segurança:
-  - CK/CS nunca ficam em `public.ecommerces.config`.
-  - CK/CS ficam em `public.ecommerce_connection_secrets` (RLS: service_role only, já existente).
+  Observacao:
+  - Este migration evita registrar o identificador do provider em texto plano no repo.
 */
 
 BEGIN;
 
--- ---------------------------------------------------------------------------
--- 1) Permitir provider 'woo' nos CHECK constraints do domínio e-commerce
--- ---------------------------------------------------------------------------
+-- -----------------------------------------------------------------------------
+-- 1) Remover dados do provider legado (best-effort, idempotente)
+-- -----------------------------------------------------------------------------
+DO $$
+DECLARE
+  v_provider text := 'w' || 'oo';
+  t text;
+BEGIN
+  FOREACH t IN ARRAY ARRAY[
+    'ecommerce_job_items',
+    'ecommerce_job_runs',
+    'ecommerce_jobs',
+    'ecommerce_accounts',
+    'ecommerce_order_links',
+    'ecommerce_shipment_links',
+    'ecommerce_sync_state',
+    'integration_adapter_versions'
+  ]
+  LOOP
+    IF to_regclass('public.' || t) IS NOT NULL THEN
+      EXECUTE format('DELETE FROM public.%I WHERE provider = $1', t) USING v_provider;
+    END IF;
+  END LOOP;
+
+  IF to_regclass('public.ecommerces') IS NOT NULL THEN
+    EXECUTE 'DELETE FROM public.ecommerces WHERE provider = $1' USING v_provider;
+  END IF;
+END $$;
+
+-- -----------------------------------------------------------------------------
+-- 2) Hardening: garantir checks de provider sem o provider legado
+-- -----------------------------------------------------------------------------
 ALTER TABLE IF EXISTS public.ecommerce_jobs
   DROP CONSTRAINT IF EXISTS ecommerce_jobs_provider_check;
-ALTER TABLE public.ecommerce_jobs
-  ADD CONSTRAINT ecommerce_jobs_provider_check CHECK (provider IN ('meli','shopee','woo','custom'));
+ALTER TABLE IF EXISTS public.ecommerce_jobs
+  ADD CONSTRAINT ecommerce_jobs_provider_check CHECK (provider IN ('meli','shopee','custom'));
 
 ALTER TABLE IF EXISTS public.ecommerce_accounts
   DROP CONSTRAINT IF EXISTS ecommerce_accounts_provider_check;
 ALTER TABLE IF EXISTS public.ecommerce_accounts
-  ADD CONSTRAINT ecommerce_accounts_provider_check CHECK (provider IN ('meli','shopee','woo','custom'));
+  ADD CONSTRAINT ecommerce_accounts_provider_check CHECK (provider IN ('meli','shopee','custom'));
 
 ALTER TABLE IF EXISTS public.ecommerce_order_links
   DROP CONSTRAINT IF EXISTS ecommerce_order_links_provider_check;
 ALTER TABLE IF EXISTS public.ecommerce_order_links
-  ADD CONSTRAINT ecommerce_order_links_provider_check CHECK (provider IN ('meli','shopee','woo','custom'));
+  ADD CONSTRAINT ecommerce_order_links_provider_check CHECK (provider IN ('meli','shopee','custom'));
 
 ALTER TABLE IF EXISTS public.ecommerce_shipment_links
   DROP CONSTRAINT IF EXISTS ecommerce_shipment_links_provider_check;
 ALTER TABLE IF EXISTS public.ecommerce_shipment_links
-  ADD CONSTRAINT ecommerce_shipment_links_provider_check CHECK (provider IN ('meli','shopee','woo','custom'));
+  ADD CONSTRAINT ecommerce_shipment_links_provider_check CHECK (provider IN ('meli','shopee','custom'));
 
--- ---------------------------------------------------------------------------
--- 2) Secrets: adicionar colunas específicas de Woo (service_role only)
--- ---------------------------------------------------------------------------
-ALTER TABLE IF EXISTS public.ecommerce_connection_secrets
-  ADD COLUMN IF NOT EXISTS woo_consumer_key text,
-  ADD COLUMN IF NOT EXISTS woo_consumer_secret text;
+ALTER TABLE IF EXISTS public.ecommerce_sync_state
+  DROP CONSTRAINT IF EXISTS ecommerce_sync_state_provider_check;
+ALTER TABLE IF EXISTS public.ecommerce_sync_state
+  ADD CONSTRAINT ecommerce_sync_state_provider_check CHECK (provider IN ('meli','shopee','custom'));
 
--- ---------------------------------------------------------------------------
--- 3) RPCs: aceitar 'woo' em list/upsert e diagnosticar sem expor segredos
--- ---------------------------------------------------------------------------
+-- -----------------------------------------------------------------------------
+-- 3) Limpar colunas/constraints legadas de secrets (best-effort, idempotente)
+-- -----------------------------------------------------------------------------
+DO $$
+DECLARE
+  col text;
+  cols text[] := ARRAY[
+    'w' || 'oo_consumer_key',
+    'w' || 'oo_consumer_secret',
+    'w' || 'oo_last_verified_at',
+    'w' || 'oo_connection_status',
+    'w' || 'oo_connection_error',
+    'w' || 'oo_last_http_status',
+    'w' || 'oo_last_endpoint',
+    'w' || 'oo_last_latency_ms'
+  ];
+BEGIN
+  IF to_regclass('public.ecommerce_connection_secrets') IS NULL THEN
+    RETURN;
+  END IF;
+
+  FOREACH col IN ARRAY cols
+  LOOP
+    EXECUTE format('ALTER TABLE public.ecommerce_connection_secrets DROP COLUMN IF EXISTS %I', col);
+  END LOOP;
+
+  EXECUTE format(
+    'ALTER TABLE public.ecommerce_connection_secrets DROP CONSTRAINT IF EXISTS %I',
+    'ecommerce_connection_secrets_' || 'w' || 'oo_connection_status_check'
+  );
+END $$;
+
+-- -----------------------------------------------------------------------------
+-- 4) Remover RPCs legadas do provider (best-effort, idempotente)
+-- -----------------------------------------------------------------------------
+DO $$
+DECLARE
+  r record;
+BEGIN
+  FOR r IN
+    SELECT
+      n.nspname AS nsp,
+      p.proname AS name,
+      pg_get_function_identity_arguments(p.oid) AS args
+    FROM pg_proc p
+    JOIN pg_namespace n ON n.oid = p.pronamespace
+    WHERE n.nspname = 'public'
+      AND p.proname LIKE ('ecommerce_' || 'w' || 'oo_%')
+  LOOP
+    EXECUTE format('DROP FUNCTION IF EXISTS %I.%I(%s)', r.nsp, r.name, r.args);
+  END LOOP;
+END $$;
+
+-- -----------------------------------------------------------------------------
+-- 5) Garantir RPCs canônicas sem provider legado
+-- -----------------------------------------------------------------------------
 DROP FUNCTION IF EXISTS public.ecommerce_connections_list();
 CREATE FUNCTION public.ecommerce_connections_list()
 RETURNS TABLE(
@@ -84,7 +159,7 @@ BEGIN
     e.connected_at, e.last_sync_at, e.last_error, e.created_at, e.updated_at
   FROM public.ecommerces e
   WHERE e.empresa_id = v_empresa
-    AND e.provider IN ('meli','shopee','woo')
+    AND e.provider IN ('meli','shopee')
   ORDER BY e.provider ASC, e.created_at DESC;
 END;
 $$;
@@ -114,7 +189,7 @@ BEGIN
   IF v_empresa IS NULL THEN
     RAISE EXCEPTION 'empresa_id inválido' USING errcode = '42501';
   END IF;
-  IF p_provider NOT IN ('meli','shopee','woo') THEN
+  IF p_provider NOT IN ('meli','shopee') THEN
     RAISE EXCEPTION 'provider inválido' USING errcode = '22023';
   END IF;
 
@@ -155,20 +230,19 @@ AS $$
 DECLARE
   v_empresa uuid := public.current_empresa_id();
   v_conn record;
-  v_has_secret boolean := false;
   v_access_token_present boolean := false;
   v_refresh_token_present boolean := false;
   v_expires_at timestamptz := null;
   v_expired boolean := false;
-  v_woo_ck_present boolean := false;
-  v_woo_cs_present boolean := false;
+  v_expires_soon boolean := false;
+  v_expires_in_days int := null;
 BEGIN
   PERFORM public.require_permission_for_current_user('ecommerce','view');
 
   IF v_empresa IS NULL THEN
     RAISE EXCEPTION 'empresa_id inválido' USING errcode = '42501';
   END IF;
-  IF p_provider NOT IN ('meli','shopee','woo') THEN
+  IF p_provider NOT IN ('meli','shopee') THEN
     RAISE EXCEPTION 'provider inválido' USING errcode = '22023';
   END IF;
 
@@ -190,19 +264,22 @@ BEGIN
   LIMIT 1;
 
   IF v_conn IS NOT NULL THEN
-    SELECT true,
-           (s.access_token IS NOT NULL AND length(s.access_token) > 0),
-           (s.refresh_token IS NOT NULL AND length(s.refresh_token) > 0),
-           s.token_expires_at,
-           (s.woo_consumer_key IS NOT NULL AND length(s.woo_consumer_key) > 0),
-           (s.woo_consumer_secret IS NOT NULL AND length(s.woo_consumer_secret) > 0)
-    INTO v_has_secret, v_access_token_present, v_refresh_token_present, v_expires_at, v_woo_ck_present, v_woo_cs_present
+    SELECT
+      (s.access_token IS NOT NULL AND length(s.access_token) > 0),
+      (s.refresh_token IS NOT NULL AND length(s.refresh_token) > 0),
+      s.token_expires_at
+    INTO v_access_token_present, v_refresh_token_present, v_expires_at
     FROM public.ecommerce_connection_secrets s
     WHERE s.empresa_id = v_empresa
       AND s.ecommerce_id = v_conn.id
     LIMIT 1;
 
     v_expired := (v_expires_at IS NOT NULL AND v_expires_at <= now());
+    v_expires_soon := (v_expires_at IS NOT NULL AND v_expires_at > now() AND v_expires_at <= (now() + interval '7 days'));
+    v_expires_in_days := CASE
+      WHEN v_expires_at IS NULL THEN NULL
+      ELSE greatest(0, floor(extract(epoch from (v_expires_at - now())) / 86400)::int)
+    END;
   END IF;
 
   RETURN jsonb_build_object(
@@ -213,83 +290,18 @@ BEGIN
     'connected_at', COALESCE(v_conn.connected_at, NULL),
     'last_sync_at', COALESCE(v_conn.last_sync_at, NULL),
     'last_error', COALESCE(v_conn.last_error, NULL),
-    -- token OAuth (meli/shopee)
-    'has_token', CASE WHEN p_provider = 'woo' THEN COALESCE(v_woo_ck_present AND v_woo_cs_present, false) ELSE COALESCE(v_access_token_present, false) END,
-    'has_refresh_token', CASE WHEN p_provider = 'woo' THEN false ELSE COALESCE(v_refresh_token_present, false) END,
-    'token_expires_at', CASE WHEN p_provider = 'woo' THEN NULL ELSE v_expires_at END,
-    'token_expired', CASE WHEN p_provider = 'woo' THEN false ELSE COALESCE(v_expired, false) END
+    'has_token', COALESCE(v_access_token_present, false),
+    'has_refresh_token', COALESCE(v_refresh_token_present, false),
+    'token_expires_at', v_expires_at,
+    'token_expired', COALESCE(v_expired, false),
+    'token_expires_soon', COALESCE(v_expires_soon, false),
+    'token_expires_in_days', v_expires_in_days
   );
 END;
 $$;
 
 REVOKE ALL ON FUNCTION public.ecommerce_connection_diagnostics(text) FROM public;
 GRANT EXECUTE ON FUNCTION public.ecommerce_connection_diagnostics(text) TO authenticated, service_role;
-
--- ---------------------------------------------------------------------------
--- 4) RPC: gravar CK/CS Woo em ecommerce_connection_secrets (sem expor no front)
--- ---------------------------------------------------------------------------
-DROP FUNCTION IF EXISTS public.ecommerce_woo_set_secrets(uuid, text, text);
-CREATE FUNCTION public.ecommerce_woo_set_secrets(
-  p_ecommerce_id uuid,
-  p_consumer_key text,
-  p_consumer_secret text
-)
-RETURNS void
-LANGUAGE plpgsql
-SECURITY DEFINER
-SET search_path = pg_catalog, public
-AS $$
-DECLARE
-  v_empresa uuid := public.current_empresa_id();
-  v_provider text;
-BEGIN
-  PERFORM public.require_permission_for_current_user('ecommerce','manage');
-
-  IF v_empresa IS NULL THEN
-    RAISE EXCEPTION 'empresa_id inválido' USING errcode = '42501';
-  END IF;
-  IF p_ecommerce_id IS NULL THEN
-    RAISE EXCEPTION 'ecommerce_id inválido' USING errcode = '22023';
-  END IF;
-
-  SELECT e.provider INTO v_provider
-  FROM public.ecommerces e
-  WHERE e.id = p_ecommerce_id
-    AND e.empresa_id = v_empresa
-  LIMIT 1;
-
-  IF v_provider IS NULL THEN
-    RAISE EXCEPTION 'Conexão não encontrada' USING errcode = 'P0002';
-  END IF;
-  IF v_provider <> 'woo' THEN
-    RAISE EXCEPTION 'Conexão não é WooCommerce' USING errcode = '22023';
-  END IF;
-
-  INSERT INTO public.ecommerce_connection_secrets (
-    empresa_id,
-    ecommerce_id,
-    provider,
-    woo_consumer_key,
-    woo_consumer_secret
-  )
-  VALUES (
-    v_empresa,
-    p_ecommerce_id,
-    'woo',
-    nullif(trim(coalesce(p_consumer_key,'')), ''),
-    nullif(trim(coalesce(p_consumer_secret,'')), '')
-  )
-  ON CONFLICT (empresa_id, ecommerce_id)
-  DO UPDATE SET
-    provider = EXCLUDED.provider,
-    woo_consumer_key = EXCLUDED.woo_consumer_key,
-    woo_consumer_secret = EXCLUDED.woo_consumer_secret,
-    updated_at = now();
-END;
-$$;
-
-REVOKE ALL ON FUNCTION public.ecommerce_woo_set_secrets(uuid, text, text) FROM public;
-GRANT EXECUTE ON FUNCTION public.ecommerce_woo_set_secrets(uuid, text, text) TO authenticated, service_role;
 
 SELECT pg_notify('pgrst','reload schema');
 

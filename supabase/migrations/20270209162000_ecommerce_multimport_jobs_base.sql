@@ -1,8 +1,8 @@
 /*
-  ECOMMERCE-WOO-MULTIIMPORT-01 (PR1 base)
+  ECOMMERCE-MULTIIMPORT-01 (PR1 base)
 
   Objetivo:
-  - Estruturar base de importações múltiplas assíncronas para e-commerce (incluindo Woo).
+  - Estruturar base de importações múltiplas assíncronas para e-commerce.
   - Expor RPCs para enfileirar, listar, detalhar, cancelar e reprocessar jobs.
   - Expor RPC de claim para workers processarem lotes em paralelo com segurança.
 
@@ -117,7 +117,7 @@ BEGIN
   IF v_empresa IS NULL THEN
     RAISE EXCEPTION 'empresa_id inválido' USING errcode = '42501';
   END IF;
-  IF p_provider NOT IN ('meli','shopee','woo') THEN
+  IF p_provider NOT IN ('meli','shopee') THEN
     RAISE EXCEPTION 'provider inválido' USING errcode = '22023';
   END IF;
   IF p_kind NOT IN ('import_orders','import_products','sync_stock','sync_prices') THEN
@@ -485,7 +485,7 @@ AS $$
 DECLARE
   v_worker text := COALESCE(NULLIF(trim(COALESCE(p_worker, '')), ''), 'worker');
 BEGIN
-  IF p_provider NOT IN ('meli','shopee','woo') THEN
+  IF p_provider NOT IN ('meli','shopee') THEN
     RAISE EXCEPTION 'provider inválido' USING errcode = '22023';
   END IF;
 

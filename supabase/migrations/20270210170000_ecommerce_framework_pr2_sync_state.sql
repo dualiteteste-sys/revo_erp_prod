@@ -26,7 +26,7 @@ CREATE TABLE IF NOT EXISTS public.ecommerce_sync_state (
   last_error text NULL,
   created_at timestamptz NOT NULL DEFAULT now(),
   updated_at timestamptz NOT NULL DEFAULT now(),
-  CONSTRAINT ecommerce_sync_state_provider_check CHECK (provider IN ('meli','shopee','woo','custom')),
+  CONSTRAINT ecommerce_sync_state_provider_check CHECK (provider IN ('meli','shopee','custom')),
   CONSTRAINT ecommerce_sync_state_direction_check CHECK (direction IN ('erp_to_marketplace','marketplace_to_erp','bidirectional')),
   CONSTRAINT ecommerce_sync_state_conflict_policy_check CHECK (conflict_policy IN ('erp_wins','marketplace_wins','last_write_wins','manual_review')),
   CONSTRAINT ecommerce_sync_state_interval_check CHECK (sync_interval_minutes >= 5 AND sync_interval_minutes <= 1440),
@@ -95,7 +95,7 @@ BEGIN
   IF v_empresa IS NULL THEN
     RAISE EXCEPTION 'empresa_id inválido' USING errcode = '42501';
   END IF;
-  IF p_provider IS NOT NULL AND p_provider NOT IN ('meli','shopee','woo') THEN
+  IF p_provider IS NOT NULL AND p_provider NOT IN ('meli','shopee') THEN
     RAISE EXCEPTION 'provider inválido' USING errcode = '22023';
   END IF;
 

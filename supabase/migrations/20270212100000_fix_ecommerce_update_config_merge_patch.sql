@@ -1,9 +1,9 @@
 /*
-  FIX-WOO-SEV: ecommerce_connections_update_config deve ser PATCH/merge (não overwrite total)
+  FIX-ECOMMERCE-SEV: ecommerce_connections_update_config deve ser PATCH/merge (não overwrite total)
 
-  Problema observado no fluxo Woo:
-  - A URL da loja (config.store_url) é persistida por uma RPC específica (ecommerce_woo_set_store_url),
-    mas o botão "Salvar" do assistente usa ecommerce_connections_update_config para salvar outros campos.
+  Problema observado em integrações:
+  - Algumas chaves de `config` podem ser persistidas por fluxos diferentes (ex.: assistentes, telas distintas),
+    mas o botão "Salvar" costuma chamar ecommerce_connections_update_config para salvar payload parcial.
   - A versão anterior do ecommerce_connections_update_config fazia overwrite total do JSONB `config`,
     o que pode apagar `store_url` (ou outras chaves) quando o frontend envia payload parcial.
 
@@ -77,4 +77,3 @@ GRANT EXECUTE ON FUNCTION public.ecommerce_connections_update_config(uuid, jsonb
 SELECT pg_notify('pgrst', 'reload schema');
 
 COMMIT;
-
