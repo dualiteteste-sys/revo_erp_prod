@@ -137,6 +137,26 @@ export const HELP_CATALOG: HelpEntry[] = [
     commonMistakes: ['Reprocessar em massa sem entender a causa raiz.', 'Tratar DLQ como “lixeira” e ignorar por dias.'],
   },
   {
+    match: '/app/desenvolvedor/woocommerce',
+    title: 'Guia Rápido — Painel de Controle WooCommerce',
+    whatIs:
+      'Painel interno para operar cada loja Woo: status consolidado, webhooks, fila/DLQ, mapa de SKU, replay de pedido e sync forçado por SKU.',
+    steps: [
+      'Abra a lista de lojas e entre no painel da store desejada.',
+      'No Overview, valide health/fila/webhooks e siga recomendações.',
+      'Em Sync Tools, rode replay por order_id, rebuild map ou force sync por SKU.',
+      'Use Logs para confirmar resultado sem expor segredos (dados sensíveis redigidos).',
+    ],
+    dependsOn: ['Permissão: Ops/Desenvolvedor (view)', 'Store Woo cadastrada'],
+    connectsWith: ['Desenvolvedor → Saúde', 'Configurações → E-commerce', 'Logs'],
+    fillPerfectly: ['Atuar por store específica.', 'Resolver DLQ com replay idempotente.', 'Pausar store quando houver 401/403 recorrente.'],
+    commonMistakes: ['Rodar sync sem SKU mapeado.', 'Forçar replay sem validar order_id.', 'Expor prints com dados sensíveis.'],
+    links: [
+      { label: 'Abrir Saúde (Ops)', href: '/app/desenvolvedor/saude', kind: 'internal' },
+      { label: 'Configurações de E-commerce', href: '/app/configuracoes/ecommerce/marketplaces', kind: 'internal' },
+    ],
+  },
+  {
     match: '/app/desenvolvedor/entitlements',
     title: 'Guia Rápido — Entitlements por plano (Ultria)',
     whatIs:

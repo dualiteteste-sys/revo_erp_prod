@@ -13,12 +13,24 @@ Este documento descreve a integração WooCommerce ↔ Revo ERP com foco em:
   - `woocommerce-admin`: onboarding/healthcheck/register webhooks/build map/enqueue sync/status
   - `woocommerce-webhook`: receiver público (verify_jwt=false) para eventos de pedido
   - `woocommerce-worker`: worker (verify_jwt=false) com `x-woocommerce-worker-key` (processa jobs)
+  - `woocommerce-scheduler`: scheduler para drenar fila em batches (verify_jwt=false)
 
 ## Segredos e variáveis de ambiente
 
 Obrigatórias (Supabase Edge Functions):
 - `INTEGRATIONS_MASTER_KEY`: chave mestra para criptografia AES-GCM (não versionar; definir como secret).
 - `WOOCOMMERCE_WORKER_KEY`: chave para invocar o worker com segurança (não versionar).
+- `WOOCOMMERCE_SCHEDULER_KEY`: chave para invocar scheduler (se ausente, usa `WOOCOMMERCE_WORKER_KEY`).
+- `WOOCOMMERCE_WEBHOOK_MAX_BYTES`: limite de tamanho do webhook (default 262144).
+- `WOOCOMMERCE_WEBHOOK_RATE_LIMIT_PER_MINUTE`: limite por loja/minuto (default 120).
+- `WOOCOMMERCE_WEBHOOK_RETENTION_DAYS`: retenção de payloads de webhook (default 14 dias).
+
+## Anti-spoof estrito (tenant)
+
+- Se `x-empresa-id` for enviado e o usuário JWT não pertencer à empresa, o admin retorna:
+  - `403`
+  - `error = EMPRESA_CONTEXT_FORBIDDEN`
+  - sem fallback para empresa ativa.
 
 ## Onboarding (store)
 
@@ -103,10 +115,45 @@ Retorna:
 - últimos webhooks (process_status, erro)
 - últimos jobs (status, attempts, next_run_at)
 - últimos logs estruturados (`woocommerce_sync_log`)
+- `health` (queue lag, contadores, frescor de webhook)
+- `map_quality` (missing map e duplicidade de SKU)
+- `recommendations` (hints acionáveis)
+
+## Scheduler (autônomo)
+
+Dispare:
+
+`POST {SUPABASE_URL}/functions/v1/woocommerce-scheduler`
+
+Headers:
+- `x-woocommerce-scheduler-key: <WOOCOMMERCE_SCHEDULER_KEY>`
+
+Body exemplo:
+```json
+{ "limit": 10, "max_batches": 25 }
+```
+
+Isso aciona o `woocommerce-worker` em modo `scheduler=true`, permitindo drenar fila sem depender do `stores.*`.
+
+Agendamento real no GitHub Actions:
+- workflow `.github/workflows/woocommerce-scheduler.yml`
+- cron `*/5 * * * *`
+- concurrency habilitada para evitar sobreposição.
+
+## Docs relacionadas
+
+- `docs/integrations/woocommerce-hardening-notes.md`
+- `docs/integrations/woocommerce-retry-policy.md`
+- `docs/integrations/woocommerce-webhook-security.md`
+- `docs/integrations/woocommerce-status-contract.md`
+- `docs/integrations/woocommerce-status-examples.md`
+- `docs/integrations/woocommerce-error-codes.md`
+- `docs/integrations/woocommerce-control-panel.md`
+- `docs/integrations/woocommerce-health-checks.md`
+- `docs/integrations/woocommerce-scheduler.md`
 
 ## Notas de segurança
 
 - **Nunca** exponha CK/CS no front-end. O front apenas envia as credenciais ao backend durante o onboarding.
 - O sistema **não** loga segredos; payloads são sanitizados.
 - Webhook valida assinatura (HMAC SHA-256 base64) usando secret criptografado por store.
-

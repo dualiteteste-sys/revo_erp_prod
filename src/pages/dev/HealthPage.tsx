@@ -41,8 +41,10 @@ import {
 } from '@/services/opsHealth';
 import { useHasPermission } from '@/hooks/useHasPermission';
 import { getEcommerceHealthSummary, type EcommerceHealthSummary } from '@/services/ecommerceIntegrations';
+import { getWooStoreStatus, listWooStores } from '@/services/woocommerceControlPanel';
 import { callRpc } from '@/lib/api';
 import { useAppContext } from '@/contexts/AppContextProvider';
+import { evaluateWooStoreHealthChecks, healthSeverityRank, type WooStoreHealthCheck } from '@/lib/integrations/woocommerce/healthChecks';
 import {
   getEmpresaContextDiagnostics,
   opsDebugProdutosEmpresaDetails,
@@ -71,6 +73,7 @@ export default function HealthPage() {
   const [productMetrics, setProductMetrics] = useState<ProductMetricsSummary | null>(null);
   const [businessKpis, setBusinessKpis] = useState<BusinessKpisFunnelSummary | null>(null);
   const [ecommerceHealth, setEcommerceHealth] = useState<EcommerceHealthSummary | null>(null);
+  const [wooHealthChecks, setWooHealthChecks] = useState<WooStoreHealthCheck[]>([]);
   const [recent, setRecent] = useState<OpsRecentFailure[]>([]);
   const [nfeRows, setNfeRows] = useState<NfeWebhookRow[]>([]);
   const [financeDlqRows, setFinanceDlqRows] = useState<FinanceDlqRow[]>([]);
@@ -176,6 +179,30 @@ export default function HealthPage() {
       setBusinessKpis(k);
       setRecent(r ?? []);
       setEcommerceHealth(eh);
+      if (permEcommerceView.data && activeEmpresaId) {
+        try {
+          const stores = await listWooStores(activeEmpresaId);
+          const statuses = await Promise.all(
+            stores.map(async (store) => {
+              try {
+                const status = await getWooStoreStatus(activeEmpresaId, store.id);
+                return evaluateWooStoreHealthChecks({
+                  storeId: store.id,
+                  storeUrl: store.base_url,
+                  status,
+                });
+              } catch {
+                return [];
+              }
+            }),
+          );
+          setWooHealthChecks(statuses.flat());
+        } catch {
+          setWooHealthChecks([]);
+        }
+      } else {
+        setWooHealthChecks([]);
+      }
 
       // "Ops Health" detalhado: depende de permissão interna (ops/manage).
       if (!permManage.data) {
@@ -205,6 +232,7 @@ export default function HealthPage() {
       setProductMetrics(null);
       setBusinessKpis(null);
       setEcommerceHealth(null);
+      setWooHealthChecks([]);
       setRecent([]);
       setNfeRows([]);
       setFinanceDlqRows([]);
@@ -213,7 +241,7 @@ export default function HealthPage() {
     } finally {
       setLoading(false);
     }
-  }, [addToast, permEcommerceView.data, permManage.data]);
+  }, [activeEmpresaId, addToast, permEcommerceView.data, permManage.data]);
 
   useEffect(() => {
     void fetchAll();
@@ -336,6 +364,28 @@ export default function HealthPage() {
       { id: 'error', type: 'string', getValue: (r: EcommerceDlqRow) => r.last_error ?? '' },
     ] as const
   );
+
+  const wooChecksSorted = useMemo(() => {
+    return [...wooHealthChecks].sort((a, b) => {
+      const severityDiff = healthSeverityRank(b.severity) - healthSeverityRank(a.severity);
+      if (severityDiff !== 0) return severityDiff;
+      const codeDiff = a.code.localeCompare(b.code);
+      if (codeDiff !== 0) return codeDiff;
+      return a.store_url.localeCompare(b.store_url);
+    });
+  }, [wooHealthChecks]);
+
+  const wooChecksSummary = useMemo(() => {
+    return wooHealthChecks.reduce(
+      (acc, check) => {
+        if (check.severity === 'critical') acc.critical += 1;
+        else if (check.severity === 'warning') acc.warning += 1;
+        else acc.info += 1;
+        return acc;
+      },
+      { critical: 0, warning: 0, info: 0 },
+    );
+  }, [wooHealthChecks]);
 
   const openPreview = (
     title: string,
@@ -831,6 +881,80 @@ export default function HealthPage() {
           <div className="mt-1 text-xs text-gray-500">{canSeeEcommerce ? 'conexões meli/shopee' : 'sem permissão ecommerce:view'}</div>
         </GlassCard>
       </div>
+
+      <GlassCard className="p-4">
+        <div className="flex items-center justify-between mb-3">
+          <div className="text-lg font-semibold text-gray-900">WooCommerce — Checks por store</div>
+          <div className="text-xs text-gray-500">
+            {canSeeEcommerce ? `${wooHealthChecks.length} checks` : 'sem permissão ecommerce:view'}
+          </div>
+        </div>
+
+        {!canSeeEcommerce ? (
+          <div className="text-sm text-gray-600">Sem permissão para visualizar checks WooCommerce.</div>
+        ) : wooHealthChecks.length === 0 ? (
+          <div className="text-sm text-gray-600">Sem dados de checks Woo no momento.</div>
+        ) : (
+          <div className="space-y-3">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+              <div className="rounded-lg border border-red-200 bg-red-50 p-3">
+                <div className="text-xs text-red-700">Críticos</div>
+                <div className="text-2xl font-semibold text-red-800">{wooChecksSummary.critical}</div>
+              </div>
+              <div className="rounded-lg border border-amber-200 bg-amber-50 p-3">
+                <div className="text-xs text-amber-700">Avisos</div>
+                <div className="text-2xl font-semibold text-amber-800">{wooChecksSummary.warning}</div>
+              </div>
+              <div className="rounded-lg border border-sky-200 bg-sky-50 p-3">
+                <div className="text-xs text-sky-700">Info</div>
+                <div className="text-2xl font-semibold text-sky-800">{wooChecksSummary.info}</div>
+              </div>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="min-w-full divide-y divide-gray-200">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="px-3 py-2 text-left text-xs font-semibold text-gray-600">Severidade</th>
+                    <th className="px-3 py-2 text-left text-xs font-semibold text-gray-600">Check</th>
+                    <th className="px-3 py-2 text-left text-xs font-semibold text-gray-600">Store</th>
+                    <th className="px-3 py-2 text-left text-xs font-semibold text-gray-600">Mensagem</th>
+                    <th className="px-3 py-2 text-left text-xs font-semibold text-gray-600">Próxima ação</th>
+                    <th className="px-3 py-2 text-right text-xs font-semibold text-gray-600">Painel</th>
+                  </tr>
+                </thead>
+                <tbody className="bg-white divide-y divide-gray-200">
+                  {wooChecksSorted.map((check, idx) => {
+                    const badgeClass =
+                      check.severity === 'critical'
+                        ? 'bg-red-100 text-red-700'
+                        : check.severity === 'warning'
+                          ? 'bg-amber-100 text-amber-700'
+                          : 'bg-sky-100 text-sky-700';
+                    return (
+                      <tr key={`${check.store_id}-${check.code}-${idx}`} className="hover:bg-gray-50">
+                        <td className="px-3 py-2 text-sm">
+                          <span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-semibold ${badgeClass}`}>
+                            {check.severity.toUpperCase()}
+                          </span>
+                        </td>
+                        <td className="px-3 py-2 text-sm font-medium text-gray-800">{check.code}</td>
+                        <td className="px-3 py-2 text-sm text-gray-700">{check.store_url}</td>
+                        <td className="px-3 py-2 text-sm text-gray-700">{check.message}</td>
+                        <td className="px-3 py-2 text-sm text-gray-700">{check.next_action}</td>
+                        <td className="px-3 py-2 text-right">
+                          <a href={check.panel_link} className="text-sm font-medium text-blue-700 hover:underline">
+                            Abrir store
+                          </a>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+      </GlassCard>
 
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
         <GlassCard className="p-4">
