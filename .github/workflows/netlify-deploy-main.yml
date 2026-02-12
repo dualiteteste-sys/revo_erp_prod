@@ -1,13 +1,10 @@
 name: Deploy Netlify (PROD)
 
 on:
-  workflow_run:
-    workflows:
-      - "CI/CD Pipeline"
+  push:
     branches:
       - main
-    types:
-      - completed
+  workflow_dispatch:
 
 concurrency:
   group: netlify-deploy-prod
@@ -16,7 +13,6 @@ concurrency:
 jobs:
   deploy:
     name: Deploy Netlify (PROD)
-    if: ${{ github.event.workflow_run.conclusion == 'success' }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
 
@@ -27,45 +23,6 @@ jobs:
           ref: main
           fetch-depth: 0
 
-      - name: Detect app/runtime changes (PROD)
-        id: app_changes
-        env:
-          TRIGGER_SHA: ${{ github.event.workflow_run.head_sha }}
-        run: |
-          set -euo pipefail
-          sha="${TRIGGER_SHA:-}"
-
-          if [[ -n "$sha" ]] && git cat-file -e "${sha}^{commit}" 2>/dev/null; then
-            files="$(git show --name-only --pretty='' "$sha" || true)"
-          else
-            files="$(git diff --name-only HEAD~1 HEAD || true)"
-          fi
-
-          if [[ -z "$files" ]]; then
-            echo "should_deploy_app=false" >> "$GITHUB_OUTPUT"
-            echo "[NETLIFY][PROD] No file changes detected for trigger."
-            exit 0
-          fi
-
-          should_deploy=0
-          while IFS= read -r file; do
-            [[ -z "$file" ]] && continue
-            case "$file" in
-              src/*|src/**|public/*|public/**|index.html|vite.config.ts|tailwind.config.js|postcss.config.js|package.json|yarn.lock|.yarnrc.yml|.yarn/*|.yarn/**|netlify.toml)
-                should_deploy=1
-                break
-                ;;
-            esac
-          done <<< "$files"
-
-          if [[ "$should_deploy" == "1" ]]; then
-            echo "should_deploy_app=true" >> "$GITHUB_OUTPUT"
-            echo "[NETLIFY][PROD] Frontend/runtime changes detected. Deploy enabled."
-          else
-            echo "should_deploy_app=false" >> "$GITHUB_OUTPUT"
-            echo "[NETLIFY][PROD] No frontend/runtime changes. Skipping deploy."
-          fi
-
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
@@ -73,10 +30,6 @@ jobs:
 
       - name: Enable Corepack (Yarn)
         run: corepack enable
-
-      - name: Install dependencies
-        if: steps.app_changes.outputs.should_deploy_app == 'true'
-        run: yarn install --immutable
 
       - name: Validate required secrets (PROD)
         id: precheck
@@ -101,8 +54,12 @@ jobs:
 
           echo "should_deploy=true" >> "$GITHUB_OUTPUT"
 
+      - name: Install dependencies
+        if: steps.precheck.outputs.should_deploy == 'true'
+        run: yarn install --immutable
+
       - name: Build (PROD)
-        if: steps.app_changes.outputs.should_deploy_app == 'true' && steps.precheck.outputs.should_deploy == 'true'
+        if: steps.precheck.outputs.should_deploy == 'true'
         env:
           CI: true
           VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL_PROD }}
@@ -113,7 +70,7 @@ jobs:
         run: yarn build
 
       - name: Deploy to Netlify (PROD)
-        if: steps.app_changes.outputs.should_deploy_app == 'true' && steps.precheck.outputs.should_deploy == 'true'
+        if: steps.precheck.outputs.should_deploy == 'true'
         env:
           NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
           NETLIFY_SITE_ID: ${{ secrets.NETLIFY_SITE_ID_PROD }}
