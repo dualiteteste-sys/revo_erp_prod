@@ -95,6 +95,20 @@ function statusBadge(status?: string | null) {
   return <span className={`${base} bg-gray-100 text-gray-700`}>Desconectado</span>;
 }
 
+function wooUiStatus(params: {
+  connectionStatus?: string | null;
+  connectionRowStatus?: string | null;
+}): 'connected' | 'pending' | 'error' | 'disconnected' {
+  const diag = String(params.connectionStatus ?? '').toLowerCase();
+  if (diag === 'connected') return 'connected';
+  if (diag === 'error') return 'error';
+  if (diag === 'pending') return 'pending';
+
+  const row = String(params.connectionRowStatus ?? '').toLowerCase();
+  if (row === 'connected' || row === 'error' || row === 'pending' || row === 'disconnected') return row as any;
+  return 'pending';
+}
+
 function defaultConfig() {
   return {
     import_orders: true,
@@ -988,6 +1002,13 @@ export default function MarketplaceIntegrationsPage() {
           const isDisconnected = String(conn?.status ?? '').toLowerCase() === 'disconnected';
           const hasConnection = !!conn && !isDisconnected;
           const busy = busyProvider === provider;
+          const uiStatus =
+            provider === 'woo'
+              ? wooUiStatus({
+                  connectionStatus: wooDiag?.connection_status ?? null,
+                  connectionRowStatus: conn?.status ?? null,
+                })
+              : (String(conn?.status ?? 'disconnected').toLowerCase() as any);
           const pendingReason =
             provider === 'woo' ? wooPendingReason(conn ?? null, (wooDiag ?? (wooSecretsStoredSnapshot as any) ?? null) as any, wooDiagUnavailable) : null;
           const wooLastVerification = provider === 'woo' ? (wooDiag?.last_verified_at ?? null) : null;
@@ -998,7 +1019,7 @@ export default function MarketplaceIntegrationsPage() {
                 <div className="min-w-0">
                   <div className="flex items-center gap-2">
                     <div className="text-lg font-semibold text-gray-900">{providerLabels[provider]}</div>
-                    {statusBadge(conn?.status)}
+                    {provider === 'woo' ? statusBadge(uiStatus) : statusBadge(conn?.status)}
                   </div>
                   <div className="mt-1 text-xs text-gray-500">
                     {conn?.external_account_id ? `Conta: ${conn.external_account_id}` : 'Sem conta vinculada'}
@@ -1007,7 +1028,7 @@ export default function MarketplaceIntegrationsPage() {
                   <div className="mt-1 text-xs text-gray-500">
                     Estratégia de sync: <span className="font-medium text-gray-700">{syncSummaryLabel(provider)}</span>
                   </div>
-                  {provider === 'woo' && pendingReason && String(conn?.status ?? '').toLowerCase() === 'pending' ? (
+                  {provider === 'woo' && pendingReason && uiStatus === 'pending' ? (
                     <div className="mt-2 inline-flex items-center gap-2 text-xs text-amber-800 bg-amber-50 border border-amber-100 rounded-lg px-2 py-1">
                       <AlertTriangle size={14} />
                       <span>{pendingReason}</span>
