@@ -25,10 +25,14 @@ import PageCard from '@/components/ui/PageCard';
 import EmptyState from '@/components/ui/EmptyState';
 import { uiMessages } from '@/lib/ui/messages';
 import { useAuth } from '@/contexts/AuthProvider';
-import { useSearchParams } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
+import { listWooStores } from '@/services/woocommerceControlPanel';
+import { listWooListingsByProducts } from '@/services/woocommerceCatalog';
+import WooBulkCatalogWizard, { type WooBulkWizardMode } from '@/components/products/woocommerce/WooBulkCatalogWizard';
 
 const ProductsPage: React.FC = () => {
   const { loading: authLoading, activeEmpresaId, activeEmpresa } = useAuth();
+  const navigate = useNavigate();
   const enableSeed = isSeedEnabled();
   const permCreate = useHasPermission('produtos', 'create');
   const permUpdate = useHasPermission('produtos', 'update');
@@ -70,6 +74,11 @@ const ProductsPage: React.FC = () => {
   const [isImportOpen, setIsImportOpen] = useState(false);
   const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false);
   const [bulkLoading, setBulkLoading] = useState(false);
+  const [wooStores, setWooStores] = useState<Array<{ id: string; base_url: string; status: string }>>([]);
+  const [wooStoreId, setWooStoreId] = useState('');
+  const [wooListingByProductId, setWooListingByProductId] = useState<Map<string, any>>(new Map());
+  const [wooWizardMode, setWooWizardMode] = useState<WooBulkWizardMode>('export');
+  const [wooWizardOpen, setWooWizardOpen] = useState(false);
   const [searchParams, setSearchParams] = useSearchParams();
 
   const lastEmpresaIdRef = useRef<string | null>(activeEmpresaId);
@@ -87,6 +96,39 @@ const ProductsPage: React.FC = () => {
     () => effectiveParents.filter((p) => bulk.selectedIds.has(p.id)),
     [effectiveParents, bulk.selectedIds]
   );
+  const parentIds = useMemo(() => effectiveParents.map((row) => row.id), [effectiveParents]);
+  const parentIdsKey = useMemo(() => parentIds.join('|'), [parentIds]);
+
+  useEffect(() => {
+    if (!activeEmpresaId) return;
+    listWooStores(activeEmpresaId)
+      .then((stores) => {
+        setWooStores(stores as any);
+        if (!wooStoreId && stores.length > 0) setWooStoreId(String(stores[0].id));
+      })
+      .catch(() => {
+        setWooStores([]);
+        setWooStoreId('');
+      });
+  }, [activeEmpresaId]);
+
+  useEffect(() => {
+    if (!activeEmpresaId || !wooStoreId || parentIds.length === 0) {
+      setWooListingByProductId((prev) => (prev.size === 0 ? prev : new Map()));
+      return;
+    }
+    listWooListingsByProducts({
+      empresaId: activeEmpresaId,
+      storeId: wooStoreId,
+      revoProductIds: parentIds,
+    })
+      .then((rows) => {
+        const map = new Map<string, any>();
+        for (const row of rows) map.set(String(row.revo_product_id), row);
+        setWooListingByProductId(map);
+      })
+      .catch(() => setWooListingByProductId((prev) => (prev.size === 0 ? prev : new Map())));
+  }, [activeEmpresaId, wooStoreId, parentIdsKey]);
 
   useEffect(() => {
     const prevEmpresaId = lastEmpresaIdRef.current;
@@ -310,6 +352,34 @@ const ProductsPage: React.FC = () => {
       icon={<Package size={20} />}
       actions={
         <div className="flex items-center gap-2 flex-wrap">
+          <Select
+            value={wooStoreId}
+            onChange={(event) => setWooStoreId(event.target.value)}
+            className="w-[280px]"
+          >
+            <option value="">Loja Woo (coluna/status)</option>
+            {wooStores.map((store) => (
+              <option key={store.id} value={store.id}>
+                {store.base_url} ({store.status})
+              </option>
+            ))}
+          </Select>
+
+          <Button
+            onClick={() => {
+              if (!wooStoreId) {
+                addToast('Selecione uma loja Woo para importar catálogo.', 'warning');
+                return;
+              }
+              navigate(`/app/products/woocommerce/catalog?store=${encodeURIComponent(wooStoreId)}`);
+            }}
+            variant="secondary"
+            className="gap-2"
+            disabled={!wooStoreId || effectiveLoading}
+          >
+            Catálogo Woo
+          </Button>
+
           <Button
             onClick={() => {
               downloadCsv({
@@ -451,6 +521,45 @@ const ProductsPage: React.FC = () => {
                   variant: 'destructive',
                   disabled: bulkLoading || permsLoading || !canDelete,
                 },
+                {
+                  key: 'woo-export',
+                  label: 'Woo: Exportar',
+                  onClick: () => {
+                    if (!wooStoreId) {
+                      addToast('Selecione uma loja Woo antes da ação em massa.', 'warning');
+                      return;
+                    }
+                    setWooWizardMode('export');
+                    setWooWizardOpen(true);
+                  },
+                  disabled: !wooStoreId,
+                },
+                {
+                  key: 'woo-price',
+                  label: 'Woo: Sincronizar preço',
+                  onClick: () => {
+                    if (!wooStoreId) {
+                      addToast('Selecione uma loja Woo antes da ação em massa.', 'warning');
+                      return;
+                    }
+                    setWooWizardMode('sync_price');
+                    setWooWizardOpen(true);
+                  },
+                  disabled: !wooStoreId,
+                },
+                {
+                  key: 'woo-stock',
+                  label: 'Woo: Sincronizar estoque',
+                  onClick: () => {
+                    if (!wooStoreId) {
+                      addToast('Selecione uma loja Woo antes da ação em massa.', 'warning');
+                      return;
+                    }
+                    setWooWizardMode('sync_stock');
+                    setWooWizardOpen(true);
+                  },
+                  disabled: !wooStoreId,
+                },
               ]}
             />
             <div className="flex-1 min-h-0 overflow-auto">
@@ -474,6 +583,7 @@ const ProductsPage: React.FC = () => {
                     someSelected={bulk.someSelected}
                     onToggleSelect={(id) => bulk.toggle(id)}
                     onToggleSelectAll={() => bulk.toggleAll(bulk.allIds)}
+                    wooListingByProductId={wooListingByProductId}
                   />
                 }
                 renderMobileCard={(product) => (
@@ -546,6 +656,19 @@ const ProductsPage: React.FC = () => {
         confirmText="Sim, Excluir"
         isLoading={bulkLoading}
         variant="danger"
+      />
+
+      <WooBulkCatalogWizard
+        isOpen={wooWizardOpen}
+        onClose={() => setWooWizardOpen(false)}
+        empresaId={activeEmpresaId || ''}
+        storeId={wooStoreId}
+        selectedRevoProductIds={selectedProducts.map((product) => product.id)}
+        initialMode={wooWizardMode}
+        onRunCreated={(runId) => {
+          setWooWizardOpen(false);
+          navigate(`/app/products/woocommerce/runs/${runId}?store=${encodeURIComponent(wooStoreId)}`);
+        }}
       />
     </PageShell>
   );
