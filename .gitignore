@@ -119,6 +119,9 @@ dist
 # macOS
 .DS_Store
 
+# Git worktrees (multi-agentes)
+.worktrees/
+
 # Local artifacts / ad-hoc diffs
 diff_dev_prod_para_consertar_prod/
 
