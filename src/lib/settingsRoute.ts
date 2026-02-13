@@ -5,6 +5,8 @@ const legacySettingsParamRouteMap: Record<string, string> = {
   onboarding: '/app/configuracoes/geral/empresa',
   billing: '/app/configuracoes/geral/assinatura',
   users: '/app/configuracoes/geral/users',
+  integrations: '/app/configuracoes/ecommerce/marketplaces',
+  marketplaces: '/app/configuracoes/ecommerce/marketplaces',
 };
 
 export function resolveSettingsRouteFromLegacyParam(param: string | null | undefined): string {
