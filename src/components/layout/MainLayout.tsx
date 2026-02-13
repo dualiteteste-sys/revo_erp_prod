@@ -1,8 +1,6 @@
 import React, { useMemo, useState, useEffect } from 'react';
-import { AnimatePresence } from 'framer-motion';
 import { Outlet, useLocation, useNavigate } from 'react-router-dom';
 import Sidebar from './Sidebar';
-import SettingsPanel from '../../pages/settings/SettingsPanel';
 import { SubscriptionProvider } from '../../contexts/SubscriptionProvider';
 import { AppContextProvider } from '@/contexts/AppContextProvider';
 import SubscriptionGuard from './SubscriptionGuard';
@@ -22,6 +20,7 @@ import PostInviteWelcomeModal from '@/components/onboarding/PostInviteWelcomeMod
 import { useIsMobile } from '@/hooks/useIsMobile';
 import MobileBottomNav from './MobileBottomNav';
 import MobileTopBar from './MobileTopBar';
+import { getDefaultSettingsRoute, resolveSettingsRouteFromLegacyParam } from '@/lib/settingsRoute';
 
 const LayoutDebugOverlay = import.meta.env.DEV
   ? React.lazy(() => import('@/components/dev/LayoutDebugOverlay'))
@@ -48,7 +47,6 @@ const STORAGE_SIDEBAR_COLLAPSED = 'ui:sidebarCollapsed';
 const MainLayout: React.FC = () => {
   const { activeEmpresa, loading: authLoading } = useAuth();
   const isMobile = useIsMobile();
-  const [isSettingsPanelOpen, setIsSettingsPanelOpen] = useState(false);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(() => {
     try {
       const raw = localStorage.getItem(STORAGE_SIDEBAR_COLLAPSED);
@@ -58,14 +56,6 @@ const MainLayout: React.FC = () => {
       return false;
     }
   });
-  const [wasSidebarExpandedBeforeSettings, setWasSidebarExpandedBeforeSettings] = useState(false);
-
-  // Settings Panel Control
-  const [settingsCanClose, setSettingsCanClose] = useState(true);
-  const [settingsInitialTab, setSettingsInitialTab] = useState('Geral');
-  const [settingsInitialItem, setSettingsInitialItem] = useState('Empresa');
-  const forcedSettingsOpenRef = React.useRef(false);
-
   const location = useLocation();
   const navigate = useNavigate();
   const [activeItem, setActiveItem] = useState(() => findActiveHref(location.pathname));
@@ -117,8 +107,8 @@ const MainLayout: React.FC = () => {
     }
   }, [isSidebarCollapsed]);
 
-  // Gate suave: abre o assistente automaticamente quando vindo do onboarding inicial (query param),
-  // e permite abrir o SettingsPanel via query param sem travar o app inteiro.
+  // Gate suave: abre o assistente automaticamente quando vindo do onboarding inicial (query param)
+  // e mantém compatibilidade com links antigos /app?settings=...
   useEffect(() => {
     if (authLoading || !activeEmpresa) return;
 
@@ -128,27 +118,10 @@ const MainLayout: React.FC = () => {
       navigate(location.pathname, { replace: true });
     }
 
-    if (settingsParam && !isSettingsPanelOpen) {
-      // Ex.: /app?settings=empresa
-      setWasSidebarExpandedBeforeSettings(!isSidebarCollapsed);
-      setIsSidebarCollapsed(true);
-      setSettingsCanClose(true);
-      setIsSettingsPanelOpen(true);
-      forcedSettingsOpenRef.current = false;
-      if (settingsParam === 'empresa') {
-        setSettingsInitialTab('Geral');
-        setSettingsInitialItem('Empresa');
-      } else if (settingsParam === 'onboarding') {
-        setSettingsInitialTab('Geral');
-        setSettingsInitialItem('Onboarding (Checklist)');
-      } else if (settingsParam === 'billing') {
-        setSettingsInitialTab('Geral');
-        setSettingsInitialItem('Minha Assinatura');
-      } else if (settingsParam === 'users') {
-        setSettingsInitialTab('Geral');
-        setSettingsInitialItem('Usuários');
-      }
-      navigate(location.pathname, { replace: true });
+    if (settingsParam) {
+      const destination = resolveSettingsRouteFromLegacyParam(settingsParam);
+      navigate(destination, { replace: true });
+      return;
     }
 
     if (onboardingAutoOpenPending && !isOnboardingWizardOpen) {
@@ -158,10 +131,7 @@ const MainLayout: React.FC = () => {
   }, [
     activeEmpresa,
     authLoading,
-    isSettingsPanelOpen,
     isSidebarCollapsed,
-    settingsCanClose,
-    wasSidebarExpandedBeforeSettings,
     onboardingAutoOpenPending,
     onboardingParam,
     settingsParam,
@@ -171,16 +141,7 @@ const MainLayout: React.FC = () => {
   ]);
 
   const handleOpenSettings = () => {
-    setWasSidebarExpandedBeforeSettings(!isSidebarCollapsed);
-    setIsSidebarCollapsed(true);
-    setSettingsCanClose(true); // Default behavior
-    setIsSettingsPanelOpen(true);
-  };
-
-  const handleCloseSettings = () => {
-    if (!settingsCanClose) return;
-    setIsSettingsPanelOpen(false);
-    setIsSidebarCollapsed(!wasSidebarExpandedBeforeSettings);
+    navigate(getDefaultSettingsRoute());
   };
 
   const handleSetActiveItem = (href: string) => {
@@ -274,18 +235,6 @@ const MainLayout: React.FC = () => {
 
               {/* Mobile: Bottom Navigation (fixo no bottom) */}
               {isMobile && <MobileBottomNav onOpenSettings={handleOpenSettings} />}
-
-              {/* Settings Panel (ambos) */}
-              <AnimatePresence>
-                {isSettingsPanelOpen && (
-                  <SettingsPanel
-                    onClose={handleCloseSettings}
-                    canClose={settingsCanClose}
-                    initialTab={settingsInitialTab}
-                    initialItem={settingsInitialItem}
-                  />
-                )}
-              </AnimatePresence>
             </div>
           </RoadmapProvider>
         </OnboardingGateProvider>
