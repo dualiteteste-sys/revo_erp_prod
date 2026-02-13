@@ -23,6 +23,15 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      - name: Detect DB migration changes
+        id: filter
+        uses: dorny/paths-filter@v3
+        with:
+          filters: |
+            db:
+              - 'supabase/migrations/**'
+              - '.github/workflows/supabase-migrations-dev.yml'
+
       - name: Install PostgreSQL client (psql)
         run: |
           set -euo pipefail
@@ -45,7 +54,7 @@ jobs:
           python3 scripts/check_edge_functions_coverage.py
 
       - name: Apply migrations to DEV (remote)
-        if: github.event_name == 'workflow_dispatch' || github.event_name == 'push'
+        if: github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && steps.filter.outputs.db == 'true')
         env:
           SUPABASE_DB_URL_DEV: ${{ secrets.SUPABASE_DB_URL_DEV }}
         run: |
@@ -65,7 +74,7 @@ jobs:
           echo "[DEV] Migrations applied successfully."
 
       - name: Reload PostgREST schema cache (DEV)
-        if: github.event_name == 'workflow_dispatch' || github.event_name == 'push'
+        if: github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && steps.filter.outputs.db == 'true')
         env:
           SUPABASE_DB_URL_DEV: ${{ secrets.SUPABASE_DB_URL_DEV }}
         run: |
@@ -73,7 +82,7 @@ jobs:
           psql "$SUPABASE_DB_URL_DEV" -v ON_ERROR_STOP=1 -X -qAt -c "notify pgrst, 'reload schema';"
 
       - name: Verify Financeiro is RPC-first (DEV remote)
-        if: github.event_name == 'workflow_dispatch' || github.event_name == 'push'
+        if: github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && steps.filter.outputs.db == 'true')
         env:
           SUPABASE_DB_URL_DEV: ${{ secrets.SUPABASE_DB_URL_DEV }}
         run: |
@@ -81,7 +90,7 @@ jobs:
           psql "$SUPABASE_DB_URL_DEV" -v ON_ERROR_STOP=1 -X -qAt -f scripts/verify_financeiro_rpc_first.sql
 
       - name: Snapshot current schema (public) from DEV (remote)
-        if: github.event_name == 'workflow_dispatch' || github.event_name == 'push'
+        if: github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && steps.filter.outputs.db == 'true')
         env:
           SUPABASE_DB_URL_DEV: ${{ secrets.SUPABASE_DB_URL_DEV }}
         run: |
@@ -89,7 +98,7 @@ jobs:
           psql "$SUPABASE_DB_URL_DEV" -v ON_ERROR_STOP=1 -X -qAt -f scripts/public_schema_snapshot.sql > dev_public_schema.txt
 
       - name: Snapshot current schema (storage) from DEV (remote)
-        if: github.event_name == 'workflow_dispatch' || github.event_name == 'push'
+        if: github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && steps.filter.outputs.db == 'true')
         env:
           SUPABASE_DB_URL_DEV: ${{ secrets.SUPABASE_DB_URL_DEV }}
         run: |
