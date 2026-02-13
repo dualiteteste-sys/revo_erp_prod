@@ -11,7 +11,6 @@ concurrency:
 
 jobs:
   tick:
-    if: ${{ secrets.SUPABASE_URL != '' && secrets.WOOCOMMERCE_SCHEDULER_KEY != '' }}
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
