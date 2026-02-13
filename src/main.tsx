@@ -13,6 +13,7 @@ import * as Sentry from "@sentry/react";
 import { ConfirmProvider } from "./contexts/ConfirmProvider";
 import { setupGlobalErrorHandlers } from "./lib/global-error-handlers";
 import { initRouteSnapshot } from "./lib/telemetry/routeSnapshot";
+import { OpsOverlayProvider } from "./contexts/OpsOverlayProvider";
 
 Sentry.init({
   dsn: import.meta.env.VITE_SENTRY_DSN,
@@ -44,7 +45,9 @@ ReactDOM.createRoot(root).render(
           <ToastProvider>
             <ConfirmProvider>
               <AuthProvider>
-                <RouterProvider router={router} />
+                <OpsOverlayProvider>
+                  <RouterProvider router={router} />
+                </OpsOverlayProvider>
               </AuthProvider>
             </ConfirmProvider>
           </ToastProvider>
