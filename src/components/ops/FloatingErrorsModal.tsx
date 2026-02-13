@@ -4,6 +4,7 @@ import { Copy, Eraser, ExternalLink, Pause, Play, X } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { clearConsoleRedEvents, getConsoleRedEventsSnapshot, type ConsoleRedEvent } from "@/lib/telemetry/consoleRedBuffer";
+import { buildIncidentPrompt, getErrorIncidentsSnapshot } from "@/lib/telemetry/errorBus";
 
 type Props = {
   open: boolean;
@@ -192,6 +193,11 @@ export function FloatingErrorsModal({ open, onClose }: Props) {
 
   const handleCopy = async () => {
     if (!selected) return;
+    const incident = getErrorIncidentsSnapshot().find((item) => item.fingerprint === selected.fingerprint);
+    if (incident) {
+      await navigator.clipboard.writeText(buildIncidentPrompt(incident));
+      return;
+    }
     await navigator.clipboard.writeText(JSON.stringify(selected, null, 2));
   };
 
