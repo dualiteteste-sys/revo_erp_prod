@@ -33,7 +33,9 @@
 
 ## Correção aplicada neste PR
 - Inclusão da aba/item **Integrações** no menu de Configurações.
-- Mapeamento de conteúdo para renderizar `MarketplaceIntegrationsPage`.
+- Mapeamento de conteúdo para uma central leve com atalhos para:
+  - painel WooCommerce (`/app/desenvolvedor/woocommerce`)
+  - monitor de saúde (`/app/desenvolvedor/saude`)
 - Compatibilidade de links legados via `?settings=integrations|marketplaces`.
 
 ## Plano recomendado (próximos lotes, sem big-bang)
