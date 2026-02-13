@@ -19,8 +19,14 @@ export function getKeyboardPlatform(): "mac" | "other" {
   return /mac/i.test(platform) ? "mac" : "other";
 }
 
-export function isFloatingErrorsHotkey(event: Pick<KeyboardEvent, "key" | "metaKey" | "ctrlKey" | "shiftKey" | "altKey">, platform: "mac" | "other") {
-  if ((event.key || "").toLowerCase() !== "e") return false;
+export function isFloatingErrorsHotkey(
+  event: Pick<KeyboardEvent, "key" | "code" | "metaKey" | "ctrlKey" | "shiftKey" | "altKey">,
+  platform: "mac" | "other",
+) {
+  const key = (event.key || "").toLowerCase();
+  const code = event.code || "";
+  const isE = key === "e" || code === "KeyE";
+  if (!isE) return false;
   if (!event.shiftKey) return false;
   if (event.altKey) return false;
 
