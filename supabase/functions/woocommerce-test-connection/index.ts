@@ -5,6 +5,74 @@ type TestRequest = {
   ecommerce_id?: string;
 };
 
+type PersistCheckParams = {
+  ecommerceId: string;
+  empresaId: string;
+  status: "pending" | "connected" | "error";
+  error: string | null;
+  httpStatus: number | null;
+  endpoint: string | null;
+  latencyMs: number | null;
+};
+
+async function persistConnectionCheck(
+  adminClient: ReturnType<typeof createClient>,
+  params: PersistCheckParams,
+): Promise<{ ok: true; fallbackUsed: boolean } | { ok: false; reason: string }> {
+  const { error: rpcErr } = await adminClient.rpc("ecommerce_woo_record_connection_check", {
+    p_ecommerce_id: params.ecommerceId,
+    p_status: params.status,
+    p_error: params.error,
+    p_http_status: params.httpStatus,
+    p_endpoint: params.endpoint,
+    p_latency_ms: params.latencyMs,
+  });
+  if (!rpcErr) return { ok: true, fallbackUsed: false };
+
+  console.error("[woo-test-connection] ecommerce_woo_record_connection_check failed, using fallback", {
+    ecommerce_id: params.ecommerceId,
+    status: params.status,
+    rpc_error: rpcErr.message,
+  });
+
+  const nowIso = new Date().toISOString();
+  const normalizedStatus = params.status === "connected" ? "connected" : params.status === "error" ? "error" : "pending";
+  const ecommercesPatch: Record<string, unknown> = {
+    status: normalizedStatus,
+    last_error: params.status === "connected" ? null : params.error,
+    updated_at: nowIso,
+  };
+  if (params.status === "connected") ecommercesPatch.connected_at = nowIso;
+  const { error: ecommercesErr } = await adminClient
+    .from("ecommerces")
+    .update(ecommercesPatch)
+    .eq("id", params.ecommerceId)
+    .eq("empresa_id", params.empresaId)
+    .eq("provider", "woo");
+  if (ecommercesErr) {
+    return { ok: false, reason: `rpc_error=${rpcErr.message}; fallback_ecommerces_error=${ecommercesErr.message}` };
+  }
+
+  const { error: secretsErr } = await adminClient
+    .from("ecommerce_connection_secrets")
+    .upsert({
+      empresa_id: params.empresaId,
+      ecommerce_id: params.ecommerceId,
+      woo_last_verified_at: nowIso,
+      woo_connection_status: params.status,
+      woo_connection_error: params.status === "connected" ? null : params.error,
+      woo_last_http_status: params.httpStatus,
+      woo_last_endpoint: params.endpoint,
+      woo_last_latency_ms: params.latencyMs,
+      updated_at: nowIso,
+    }, { onConflict: "ecommerce_id" });
+  if (secretsErr) {
+    return { ok: false, reason: `rpc_error=${rpcErr.message}; fallback_secrets_error=${secretsErr.message}` };
+  }
+
+  return { ok: true, fallbackUsed: true };
+}
+
 function normalizeStoreUrl(input: string): string {
   const raw = (input || "").trim();
   if (!raw) throw new Error("store_url_required");
@@ -167,14 +235,24 @@ Deno.serve(async (req) => {
       // Some sites may protect wp-json with auth; in that case we still try Woo endpoints below.
       if (!wpRes.ok && wpRes.status !== 401 && wpRes.status !== 403) {
         const latencyMs = Date.now() - wpStartedAt;
-        await adminClient.rpc("ecommerce_woo_record_connection_check", {
-          p_ecommerce_id: context.ecommerce_id,
-          p_status: "error",
-          p_error: "WordPress/WooCommerce não detectado na URL informada (wp-json indisponível).",
-          p_http_status: wpRes.status,
-          p_endpoint: "/wp-json/",
-          p_latency_ms: latencyMs,
+        const persistResult = await persistConnectionCheck(adminClient, {
+          ecommerceId: String(context.ecommerce_id),
+          empresaId: String(context.empresa_id),
+          status: "error",
+          error: "WordPress/WooCommerce não detectado na URL informada (wp-json indisponível).",
+          httpStatus: wpRes.status,
+          endpoint: "/wp-json/",
+          latencyMs,
         });
+        if (!persistResult.ok) {
+          return errorJson(
+            "status_persistence_failed",
+            "Falha ao persistir diagnóstico da conexão Woo no ERP.",
+            cors,
+            500,
+            { persistence_error: persistResult.reason },
+          );
+        }
         return errorJson(
           "wordpress_not_detected",
           "Não foi possível detectar WordPress/WooCommerce na URL informada. Verifique se a URL está correta e se o site responde em /wp-json/.",
@@ -212,14 +290,24 @@ Deno.serve(async (req) => {
         }
 
         const latencyMs = Date.now() - startedAt;
-        await adminClient.rpc("ecommerce_woo_record_connection_check", {
-          p_ecommerce_id: context.ecommerce_id,
-          p_status: "connected",
-          p_error: null,
-          p_http_status: res.status,
-          p_endpoint: path,
-          p_latency_ms: latencyMs,
+        const persistResult = await persistConnectionCheck(adminClient, {
+          ecommerceId: String(context.ecommerce_id),
+          empresaId: String(context.empresa_id),
+          status: "connected",
+          error: null,
+          httpStatus: res.status,
+          endpoint: path,
+          latencyMs,
         });
+        if (!persistResult.ok) {
+          return errorJson(
+            "status_persistence_failed",
+            "Conexão Woo validada, mas o ERP não conseguiu salvar o status. Verifique logs da função e permissões/RPC.",
+            cors,
+            500,
+            { persistence_error: persistResult.reason },
+          );
+        }
 
         return okJson(
           {
@@ -231,6 +319,7 @@ Deno.serve(async (req) => {
             endpoint: path,
             last_verified_at: new Date().toISOString(),
             latency_ms: latencyMs,
+            persistence_fallback: persistResult.fallbackUsed,
           },
           cors,
         );
@@ -246,21 +335,31 @@ Deno.serve(async (req) => {
         : finalHttpStatus === 404
           ? "WooCommerce não detectado (endpoint da API REST não encontrado). Verifique se o WooCommerce está ativo e se a API REST está habilitada."
           : "Não foi possível validar a conexão com o WooCommerce. Verifique URL/credenciais e permissões da chave.";
-    await adminClient.rpc("ecommerce_woo_record_connection_check", {
-      p_ecommerce_id: context.ecommerce_id,
-      p_status: "error",
-      p_error: finalMessage,
-      p_http_status: finalHttpStatus,
-      p_endpoint: null,
-      p_latency_ms: Date.now() - startedAt,
+    const persistResult = await persistConnectionCheck(adminClient, {
+      ecommerceId: String(context.ecommerce_id),
+      empresaId: String(context.empresa_id),
+      status: "error",
+      error: finalMessage,
+      httpStatus: finalHttpStatus,
+      endpoint: null,
+      latencyMs: Date.now() - startedAt,
     });
+    if (!persistResult.ok) {
+      return errorJson(
+        "status_persistence_failed",
+        "Falha ao persistir erro de conexão Woo no ERP.",
+        cors,
+        500,
+        { persistence_error: persistResult.reason, lastError },
+      );
+    }
 
     return errorJson(
       "woo_connection_failed",
       finalMessage,
       cors,
       400,
-      lastError,
+      { ...((lastError && typeof lastError === "object") ? lastError as Record<string, unknown> : { lastError }), persistence_fallback: persistResult.fallbackUsed },
     );
   } catch (e) {
     const msg = (e instanceof Error ? e.message : String(e || "")).trim();
