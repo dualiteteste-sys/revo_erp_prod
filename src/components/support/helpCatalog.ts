@@ -249,9 +249,11 @@ export const HELP_CATALOG: HelpEntry[] = [
     match: '/app/desenvolvedor/erros',
     title: 'Guia Rápido de “Erros no Sistema”',
     whatIs:
-      'Esta tela captura erros reais do navegador/RPC (console vermelho + Network) e transforma em itens triáveis: novo → investigando → corrigido/ignorado. O objetivo é manter console limpo e reduzir regressões.',
+      'Esta tela captura erros reais do navegador/RPC e agrega por incidente (fingerprint), com severidade P0/P1/P2 e prompt técnico pronto para investigação rápida.',
     steps: [
       'Use filtros por status, texto e origem (source).',
+      'Priorize incidentes P0 na seção “Incidentes em tempo real (agregados)”.',
+      'Clique em “Copiar prompt” para gerar um relato técnico completo para o agente.',
       'Se precisar filtrar por período: use “De/Até” (data).',
       'Para limpar ruído: selecione múltiplos itens (checkbox) e use “Ignorar em lote”.',
       'Para abrir um reporte bem formatado: clique em “Enviar p/ Dev”, descreva o que estava tentando fazer e copie o texto/abra o e-mail.',
@@ -260,6 +262,7 @@ export const HELP_CATALOG: HelpEntry[] = [
     connectsWith: ['Suporte (Tickets)', 'Logs', 'Saúde (Ops)', 'Diagnóstico'],
     fillPerfectly: [
       'Marcar como “Investigando” assim que iniciar análise (evita duplicar esforço).',
+      'Sempre anexar request_id + HTTP status + code no prompt enviado.',
       'Usar “Ignorado” apenas para erro de uso/validação (não bug).',
       'Garantir request_id e response_text (quando houver) para debug rápido.',
     ],
