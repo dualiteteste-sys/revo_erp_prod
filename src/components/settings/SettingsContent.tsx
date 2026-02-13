@@ -7,7 +7,6 @@ import RolesPage from '@/pages/settings/roles/RolesPage';
 import UsersPage from '@/pages/settings/general/UsersPage';
 import PrivacyLgpdPage from '@/pages/settings/general/PrivacyLgpdPage';
 import UnidadesPage from '@/pages/settings/general/UnidadesPage';
-import NfeEmissaoSettings from '@/components/settings/fiscal/NfeEmissaoSettings';
 import AuditLogsPage from '@/components/settings/audit/AuditLogsPage';
 import OnboardingChecklistPage from '@/components/settings/onboarding/OnboardingChecklistPage';
 import FeatureFlagsPage from '@/components/settings/feature-flags/FeatureFlagsPage';
@@ -37,8 +36,6 @@ const SettingsContent: React.FC<SettingsContentProps> = ({ activeItem }) => {
         return <PrivacyLgpdPage />;
       case 'Minha Assinatura':
         return <SubscriptionPage />;
-      case 'NF-e (Emissão)':
-        return <NfeEmissaoSettings />;
       case 'Limpeza de Dados':
         return <DataManagementContent />;
       case 'Feature Flags':

@@ -1,4 +1,4 @@
-import { Building, Users, UserCog, CreditCard, Trash2, ShieldCheck, Receipt, ListChecks, ToggleLeft, Plug, FileDown } from 'lucide-react';
+import { Building, Users, UserCog, CreditCard, Trash2, ShieldCheck, ListChecks, ToggleLeft, Plug, FileDown } from 'lucide-react';
 
 export interface SettingsTab {
   name: string;
@@ -32,32 +32,6 @@ export const settingsMenuConfig: SettingsTab[] = [
       { name: 'Feature Flags', icon: ToggleLeft, href: '/app/configuracoes/avancado/feature-flags' },
       { name: 'Auditoria', icon: ShieldCheck, href: '/app/configuracoes/avancado/auditoria' },
     ],
-  },
-  {
-    name: 'Cadastros',
-    menu: [],
-  },
-  {
-    name: 'Suprimentos',
-    menu: [],
-  },
-  {
-    name: 'Vendas',
-    menu: [],
-  },
-  {
-    name: 'Serviços',
-    menu: [],
-  },
-  {
-    name: 'Notas Fiscais',
-    menu: [
-      { name: 'NF-e (Emissão)', icon: Receipt },
-    ],
-  },
-  {
-    name: 'Financeiro',
-    menu: [],
   },
   {
     name: 'E-Commerce',
