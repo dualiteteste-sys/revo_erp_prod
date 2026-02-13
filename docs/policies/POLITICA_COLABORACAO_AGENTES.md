@@ -79,6 +79,27 @@ concurrency:
 - Evitar “push em rajada” no mesmo PR: agrupe commits e empurre menos vezes.
 - Se o time estiver “apertando” `dev` demais, defina uma janela rápida de **freeze** (ex.: 30–60 min) para deixar `dev` estabilizar e permitir o PR `dev→main` concluir.
 
+## 5.1) Worktrees dedicados (obrigatório) — limpeza ao concluir
+
+Regra: ao concluir uma tarefa (PR mergeado e checks verdes), o agente deve **remover o worktree** para evitar acúmulo local e degradação de performance/disco.
+
+Checklist antes de remover:
+- O worktree é realmente do agente (dentro de `.worktrees/<agent-id>`).
+- `git status -sb` está limpo **ou** as mudanças foram stashed/descartadas conscientemente.
+- Nenhum PR aberto depende daquele worktree (branch pode existir sem worktree).
+
+Comandos padrão:
+
+```bash
+# dentro do repo (não precisa estar dentro do worktree)
+git worktree remove .worktrees/<agent-id>
+git worktree prune
+```
+
+Observações:
+- `git worktree remove` remove apenas a cópia de trabalho (diretório). **Não** deleta a branch.
+- Worktrees “fantasmas” (pasta já apagada) devem ser limpos com `git worktree prune`.
+
 ## 6) Checklist mínimo (para PR → `dev`)
 
 - [ ] Branch no padrão `ai/<agent-id>/<tipo>-<slug>`
