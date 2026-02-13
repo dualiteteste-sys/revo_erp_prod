@@ -189,6 +189,93 @@ async function mapQualitySnapshot(svc: any, empresaId: string, storeId: string) 
   };
 }
 
+function mapLegacyWooStatusToStoreStatus(value: unknown): "active" | "paused" | "error" {
+  const normalized = String(value ?? "").trim().toLowerCase();
+  if (normalized === "error") return "error";
+  if (normalized === "paused") return "paused";
+  return "active";
+}
+
+async function bootstrapStoresFromLegacyConnections(params: {
+  svc: any;
+  empresaId: string;
+  masterKey: string;
+  requestId: string;
+}): Promise<number> {
+  const { svc, empresaId, masterKey, requestId } = params;
+  const { data: legacyRows, error: legacyErr } = await svc
+    .from("ecommerces")
+    .select("id,config,status,updated_at")
+    .eq("empresa_id", empresaId)
+    .eq("provider", "woo")
+    .order("updated_at", { ascending: false })
+    .limit(20);
+  if (legacyErr || !Array.isArray(legacyRows) || legacyRows.length === 0) return 0;
+
+  const legacyIds = legacyRows.map((row: any) => String(row?.id ?? "").trim()).filter(Boolean);
+  if (legacyIds.length === 0) return 0;
+
+  const { data: secretRows } = await svc
+    .from("ecommerce_connection_secrets")
+    .select("ecommerce_id,woo_consumer_key,woo_consumer_secret")
+    .eq("empresa_id", empresaId)
+    .in("ecommerce_id", legacyIds);
+
+  const secretsByEcommerce = new Map<string, { key: string; secret: string }>();
+  for (const row of Array.isArray(secretRows) ? secretRows : []) {
+    const ecommerceId = String((row as any)?.ecommerce_id ?? "").trim();
+    const key = String((row as any)?.woo_consumer_key ?? "").trim();
+    const secret = String((row as any)?.woo_consumer_secret ?? "").trim();
+    if (!ecommerceId || !key || !secret) continue;
+    secretsByEcommerce.set(ecommerceId, { key, secret });
+  }
+
+  let imported = 0;
+  for (const row of legacyRows) {
+    const ecommerceId = String((row as any)?.id ?? "").trim();
+    const secrets = secretsByEcommerce.get(ecommerceId);
+    if (!secrets) continue;
+
+    const rawStoreUrl = String((row as any)?.config?.store_url ?? "").trim();
+    let baseUrl = "";
+    try {
+      baseUrl = normalizeWooStoreUrl(rawStoreUrl);
+    } catch {
+      continue;
+    }
+
+    const storeId = crypto.randomUUID();
+    const aad = `${empresaId}:${storeId}`;
+    const consumerKeyEnc = await aesGcmEncryptToString({ masterKey, plaintext: secrets.key, aad });
+    const consumerSecretEnc = await aesGcmEncryptToString({ masterKey, plaintext: secrets.secret, aad });
+    const { error } = await svc.from("integrations_woocommerce_store").upsert({
+      id: storeId,
+      empresa_id: empresaId,
+      base_url: baseUrl,
+      auth_mode: "basic_https",
+      status: mapLegacyWooStatusToStoreStatus((row as any)?.status),
+      consumer_key_enc: consumerKeyEnc,
+      consumer_secret_enc: consumerSecretEnc,
+      updated_at: new Date().toISOString(),
+    }, { onConflict: "empresa_id,base_url" });
+    if (!error) imported += 1;
+  }
+
+  if (imported > 0) {
+    await svc.from("woocommerce_sync_log").insert({
+      empresa_id: empresaId,
+      store_id: null,
+      level: "info",
+      message: "legacy_woo_stores_bootstrapped",
+      meta: sanitizeForLog({
+        request_id: requestId,
+        imported,
+      }),
+    }).catch(() => null);
+  }
+  return imported;
+}
+
 async function countOrderMap(svc: any, empresaId: string, storeId: string): Promise<number> {
   const { count } = await svc
     .from("woocommerce_order_map")
@@ -682,7 +769,7 @@ Deno.serve(async (req) => {
 
   try {
     if (action === "stores.list") {
-      const { data, error } = await svc
+      let { data, error } = await svc
         .from("integrations_woocommerce_store")
         .select("id,base_url,auth_mode,status,last_healthcheck_at,created_at,updated_at")
         .eq("empresa_id", empresaId)
@@ -700,6 +787,24 @@ Deno.serve(async (req) => {
           }),
         }).catch(() => null);
         throw error;
+      }
+      if ((data?.length ?? 0) === 0) {
+        const imported = await bootstrapStoresFromLegacyConnections({
+          svc,
+          empresaId,
+          masterKey,
+          requestId,
+        });
+        if (imported > 0) {
+          const refresh = await svc
+            .from("integrations_woocommerce_store")
+            .select("id,base_url,auth_mode,status,last_healthcheck_at,created_at,updated_at")
+            .eq("empresa_id", empresaId)
+            .order("updated_at", { ascending: false });
+          data = refresh.data ?? [];
+          error = refresh.error;
+          if (error) throw error;
+        }
       }
       return json(200, { ok: true, stores: data ?? [] }, cors);
     }
