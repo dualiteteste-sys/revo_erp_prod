@@ -3,6 +3,7 @@ import { buildOpsAppErrorFingerprint } from "@/lib/telemetry/opsAppErrorsFingerp
 import { getRoutePathname } from "@/lib/telemetry/routeSnapshot";
 import { getModalContextStackSnapshot } from "@/lib/telemetry/modalContextStack";
 import { triageErrorLike, type ErrorTriageCategory, type ErrorTriageResult } from "@/lib/telemetry/errorTriage";
+import { recordErrorIncident } from "@/lib/telemetry/errorBus";
 
 export type ConsoleRedLevel = "error" | "warn";
 
@@ -13,6 +14,10 @@ export type ConsoleRedEvent = {
   source: string;
   message: string;
   stack: string | null;
+  request_id: string | null;
+  http_status: number | null;
+  code: string | null;
+  url: string | null;
   route_base: string | null;
   modal_context_stack: unknown[];
   fingerprint: string;
@@ -45,6 +50,7 @@ export function recordConsoleRedEvent(input: {
   source: string;
   message: unknown;
   stack?: unknown;
+  request_id?: string | null;
   http_status?: number | null;
   code?: string | null;
   url?: string | null;
@@ -87,6 +93,10 @@ export function recordConsoleRedEvent(input: {
     source: input.source,
     message,
     stack,
+    request_id: input.request_id ?? null,
+    http_status: input.http_status ?? null,
+    code: input.code ?? null,
+    url: input.url ?? null,
     route_base: routeBase,
     modal_context_stack: modalStack as unknown[],
     fingerprint,
@@ -101,6 +111,17 @@ export function recordConsoleRedEvent(input: {
   } catch {
     // ignore
   }
+
+  recordErrorIncident({
+    source: ev.source,
+    message: ev.message,
+    stack: ev.stack,
+    route: ev.route_base,
+    request_id: ev.request_id,
+    http_status: ev.http_status,
+    code: ev.code,
+    url: ev.url,
+  });
 }
 
 export function getConsoleRedEventsSnapshot(): ConsoleRedEvent[] {

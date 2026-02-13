@@ -8,6 +8,7 @@ import { buildOpsAppErrorFingerprint } from "@/lib/telemetry/opsAppErrorsFingerp
 import { getRoutePathname } from "@/lib/telemetry/routeSnapshot";
 import { getModalContextStackSnapshot } from "@/lib/telemetry/modalContextStack";
 import { recordConsoleRedEvent } from "@/lib/telemetry/consoleRedBuffer";
+import { isKnownExternalNoise } from "@/lib/telemetry/errorBus";
 
 type AnyFunction = (...args: unknown[]) => unknown;
 
@@ -39,6 +40,10 @@ function safeToString(value: unknown) {
   } catch {
     return String(value);
   }
+}
+
+function shouldIgnoreNoise(input: { message: unknown; source?: string | null; url?: string | null }) {
+  return isKnownExternalNoise(input.message, input.source, input.url);
 }
 
 let lastOpsCollectorOkAt: number | null = null;
@@ -209,34 +214,46 @@ export function setupGlobalErrorHandlers() {
   };
 
   window.addEventListener("error", (event) => {
+    const resourceTarget = event.target as (EventTarget & { src?: string; href?: string; outerHTML?: string }) | null;
+    const resourceUrl = resourceTarget?.src || resourceTarget?.href || null;
+    const resourceMessage =
+      resourceUrl && !(event as ErrorEvent).error
+        ? `resource-load-failed: ${resourceUrl}`
+        : safeToString((event as ErrorEvent).error || (event as ErrorEvent).message);
+    if (shouldIgnoreNoise({ message: resourceMessage, source: "window.error", url: resourceUrl })) return;
+
     recordConsoleRedEvent({
       level: "error",
       source: "window.error",
-      message: event.error || event.message,
-      stack: event?.error instanceof Error ? event.error.stack ?? event.error.message : null,
+      message: resourceMessage,
+      stack: (event as ErrorEvent)?.error instanceof Error ? (event as ErrorEvent).error.stack ?? (event as ErrorEvent).error.message : null,
+      url: resourceUrl,
     });
     trySendOpsSystemError({
       source: "window.error",
-      message: safeToString(event.error || event.message),
-      stack: event?.error instanceof Error ? event.error.stack ?? event.error.message : null,
+      message: resourceMessage,
+      stack: (event as ErrorEvent)?.error instanceof Error ? (event as ErrorEvent).error.stack ?? (event as ErrorEvent).error.message : null,
     });
     trySendAppLog({
       event: "window.error",
-      message: safeToString(event.error || event.message),
+      message: resourceMessage,
       context: {
-        filename: event.filename,
-        lineno: event.lineno,
-        colno: event.colno,
+        filename: (event as ErrorEvent).filename,
+        lineno: (event as ErrorEvent).lineno,
+        colno: (event as ErrorEvent).colno,
+        resource_url: resourceUrl,
       },
     });
-    logger.error("[GLOBAL][window.error]", event.error || event.message, {
-      filename: event.filename,
-      lineno: event.lineno,
-      colno: event.colno,
+    logger.error("[GLOBAL][window.error]", (event as ErrorEvent).error || (event as ErrorEvent).message, {
+      filename: (event as ErrorEvent).filename,
+      lineno: (event as ErrorEvent).lineno,
+      colno: (event as ErrorEvent).colno,
+      resource_url: resourceUrl,
     });
   });
 
   window.addEventListener("unhandledrejection", (event) => {
+    if (shouldIgnoreNoise({ message: event.reason, source: "unhandledrejection" })) return;
     recordConsoleRedEvent({
       level: "error",
       source: "unhandledrejection",
@@ -271,6 +288,7 @@ export function setupGlobalErrorHandlers() {
     }
     inConsoleOverride = true;
     try {
+      if (shouldIgnoreNoise({ message: args[0], source: "console.error" })) return;
       const safeArgs = sanitizeLogData(args);
       recordConsoleRedEvent({
         level: "error",
@@ -301,6 +319,10 @@ export function setupGlobalErrorHandlers() {
   }) as AnyFunction;
 
   console.warn = ((...args: unknown[]) => {
+    if (shouldIgnoreNoise({ message: args[0], source: "console.warn" })) {
+      if (!isProd) originalConsoleWarn(...args);
+      return;
+    }
     recordConsoleRedEvent({
       level: "warn",
       source: "console.warn",

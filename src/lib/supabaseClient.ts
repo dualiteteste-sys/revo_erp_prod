@@ -319,6 +319,7 @@ export const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey, {
                   source: isRpc ? "network.rpc" : "network.edge",
                   message: msg,
                   stack: responseText,
+                  request_id: requestId,
                   http_status: res.status,
                   code,
                   url,

@@ -22,6 +22,12 @@ import { getOpsContextSnapshot } from "@/services/opsContext";
 import { getConsoleRedEventsSnapshot, countConsoleRedByCategory, type ConsoleRedEvent } from "@/lib/telemetry/consoleRedBuffer";
 import { triageErrorLike, type ErrorTriageCategory } from "@/lib/telemetry/errorTriage";
 import { getOpsCollectorStatusSnapshot } from "@/lib/global-error-handlers";
+import {
+  buildIncidentPrompt,
+  countErrorIncidentsBySeverity,
+  getErrorIncidentsSnapshot,
+  type ErrorIncident,
+} from "@/lib/telemetry/errorBus";
 
 function formatDateTimeBR(value?: string | null) {
   if (!value) return "—";
@@ -64,17 +70,39 @@ function buildDevMessage(row: OpsAppErrorRow, extra?: { userEmail?: string; user
       : "—";
   const response = row.response_text ?? "—";
 
+  const triage = triageErrorLike({
+    message: row.message,
+    stack: row.response_text ?? null,
+    http_status: row.http_status ?? null,
+    code: row.code ?? null,
+    url: row.url ?? null,
+    source: row.source,
+  });
+
   const blocks: string[] = [];
-  blocks.push(`Ao acessar ${where} (última ação: ${action}) estou com console: ${consoleMsg}`);
+  blocks.push("### Resumo executivo");
+  blocks.push(`- Impacto: ${consoleMsg}`);
+  blocks.push(`- Categoria: ${triage.category} (${triage.reason})`);
+  blocks.push(`- Rota: ${where}`);
   blocks.push("");
-  blocks.push(`Network -> Response: (${networkLine}) ${response}`);
+  blocks.push("### Evidências técnicas");
+  blocks.push(`- source: ${row.source}`);
+  blocks.push(`- network: ${networkLine}`);
+  blocks.push(`- response: ${response}`);
+  if (origin) blocks.push(`- origin: ${origin}`);
+  if (row.request_id) blocks.push(`- request_id: ${row.request_id}`);
+  if (row.code) blocks.push(`- code: ${row.code}`);
   blocks.push("");
-  blocks.push(`source: ${row.source}`);
-  if (origin) blocks.push(`origin: ${origin}`);
-  if (row.request_id) blocks.push(`request_id: ${row.request_id}`);
-  if (row.code) blocks.push(`code: ${row.code}`);
-  if (extra?.userEmail) blocks.push(`email (opcional): ${extra.userEmail}`);
-  if (extra?.userNote) blocks.push(`o que eu estava tentando fazer: ${extra.userNote}`);
+  blocks.push("### Passos para reproduzir");
+  blocks.push(`- Abrir ${where}`);
+  blocks.push(`- Repetir ação: ${action}`);
+  blocks.push("- Observar console/network e comparar request_id.");
+  if (extra?.userNote) blocks.push(`- Observação do usuário: ${extra.userNote}`);
+  if (extra?.userEmail) blocks.push(`- Contato: ${extra.userEmail}`);
+  blocks.push("");
+  blocks.push("### Critério de pronto");
+  blocks.push("- Corrigir causa raiz.");
+  blocks.push("- Confirmar fluxo sem erro em console/network.");
   return blocks.join("\n");
 }
 
@@ -85,6 +113,7 @@ export default function SystemErrorsPage() {
   const [bulkSaving, setBulkSaving] = useState(false);
   const [rows, setRows] = useState<OpsAppErrorRow[]>([]);
   const [consoleEvents, setConsoleEvents] = useState<ConsoleRedEvent[]>(() => getConsoleRedEventsSnapshot());
+  const [incidents, setIncidents] = useState<ErrorIncident[]>(() => getErrorIncidentsSnapshot());
   const [triageTab, setTriageTab] = useState<ErrorTriageCategory>("SYSTEM");
   const [error, setError] = useState<string | null>(null);
   const [q, setQ] = useState("");
@@ -158,6 +187,7 @@ export default function SystemErrorsPage() {
   }, [sorted, triageById, triageTab]);
 
   const consoleCounts = useMemo(() => countConsoleRedByCategory(), [consoleEvents]);
+  const incidentSeverityCounts = useMemo(() => countErrorIncidentsBySeverity(), [incidents]);
   const systemCounts = useMemo(() => {
     const out: Record<ErrorTriageCategory, number> = { CLIENT: 0, SYSTEM: 0, UNKNOWN: 0 };
     for (const t of triageById.values()) out[t.category] += 1;
@@ -184,6 +214,12 @@ export default function SystemErrorsPage() {
     const onConsole = () => setConsoleEvents(getConsoleRedEventsSnapshot());
     window.addEventListener("revo:console_red_event", onConsole as any);
     return () => window.removeEventListener("revo:console_red_event", onConsole as any);
+  }, []);
+
+  useEffect(() => {
+    const onIncident = () => setIncidents(getErrorIncidentsSnapshot());
+    window.addEventListener("revo:error_incident", onIncident as any);
+    return () => window.removeEventListener("revo:error_incident", onIncident as any);
   }, []);
 
   const load = async () => {
@@ -476,6 +512,92 @@ export default function SystemErrorsPage() {
           <Button variant={triageTab === "UNKNOWN" ? "default" : "outline"} size="sm" onClick={() => setTriageTab("UNKNOWN")}>
             Indeterminado ({combinedCounts.UNKNOWN})
           </Button>
+        </div>
+      </PageCard>
+
+      <PageCard className="space-y-3">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div className="text-sm font-semibold text-slate-800">Incidentes em tempo real (agregados)</div>
+          <div className="text-xs text-slate-600">
+            P0: <span className="font-semibold text-red-700">{incidentSeverityCounts.P0}</span>{" "}
+            <span className="mx-1 text-slate-300">|</span>
+            P1: <span className="font-semibold text-amber-700">{incidentSeverityCounts.P1}</span>{" "}
+            <span className="mx-1 text-slate-300">|</span>
+            P2: <span className="font-semibold text-slate-700">{incidentSeverityCounts.P2}</span>
+          </div>
+        </div>
+        <div className="text-xs text-slate-600">
+          Agrupamos erros por fingerprint para remover ruído e gerar prompt técnico objetivo para diagnóstico.
+        </div>
+
+        <div className="rounded-xl border border-gray-200 bg-white overflow-hidden">
+          <div className="max-h-[320px] overflow-auto">
+            <table className="min-w-full text-sm">
+              <thead className="bg-gray-50 text-gray-600 sticky top-0">
+                <tr>
+                  <th className="p-3 text-left w-[90px]">Sev.</th>
+                  <th className="p-3 text-left w-[120px]">Tipo</th>
+                  <th className="p-3 text-left w-[100px]">Ocorr.</th>
+                  <th className="p-3 text-left">Mensagem</th>
+                  <th className="p-3 text-left w-[260px]">Contexto</th>
+                  <th className="p-3 text-left w-[150px]">Ações</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100">
+                {incidents.map((incident) => (
+                  <tr key={incident.fingerprint} className="hover:bg-gray-50">
+                    <td className="p-3">
+                      <span
+                        className={`inline-flex rounded-full px-2 py-1 text-[11px] font-semibold ${
+                          incident.severity === "P0"
+                            ? "bg-red-100 text-red-700"
+                            : incident.severity === "P1"
+                              ? "bg-amber-100 text-amber-700"
+                              : "bg-slate-100 text-slate-700"
+                        }`}
+                      >
+                        {incident.severity}
+                      </span>
+                    </td>
+                    <td className="p-3 text-xs text-slate-700">{incident.kind}</td>
+                    <td className="p-3 text-xs text-slate-700">{incident.occurrences}</td>
+                    <td className="p-3 text-slate-900">
+                      <div className="line-clamp-2">{incident.message}</div>
+                      <div className="mt-1 text-[11px] text-slate-500">{incident.source}</div>
+                    </td>
+                    <td className="p-3 text-[11px] text-slate-600">
+                      <div>Rota: {incident.route ?? "—"}</div>
+                      <div>request_id: {incident.request_id ?? "—"}</div>
+                      <div>HTTP: {incident.http_status ?? "—"} • code: {incident.code ?? "—"}</div>
+                      <div className="line-clamp-1">Último: {formatDateTimeBR(incident.last_seen_at)}</div>
+                    </td>
+                    <td className="p-3">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="gap-2"
+                        onClick={async () => {
+                          const text = buildIncidentPrompt(incident);
+                          await navigator.clipboard.writeText(text);
+                          addToast("Prompt técnico do incidente copiado.", "success");
+                        }}
+                      >
+                        <Copy size={14} />
+                        Copiar prompt
+                      </Button>
+                    </td>
+                  </tr>
+                ))}
+                {incidents.length === 0 ? (
+                  <tr>
+                    <td className="p-6 text-center text-slate-500" colSpan={6}>
+                      Nenhum incidente agregado nesta sessão.
+                    </td>
+                  </tr>
+                ) : null}
+              </tbody>
+            </table>
+          </div>
         </div>
       </PageCard>
 
