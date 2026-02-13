@@ -11,6 +11,7 @@ concurrency:
 
 jobs:
   tick:
+    if: ${{ secrets.SUPABASE_URL != '' && secrets.WOOCOMMERCE_SCHEDULER_KEY != '' }}
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
@@ -20,8 +21,10 @@ jobs:
           WOOCOMMERCE_SCHEDULER_KEY: ${{ secrets.WOOCOMMERCE_SCHEDULER_KEY }}
         run: |
           set -euo pipefail
-          : "${SUPABASE_URL:?SUPABASE_URL secret is required}"
-          : "${WOOCOMMERCE_SCHEDULER_KEY:?WOOCOMMERCE_SCHEDULER_KEY secret is required}"
+          if [[ -z "${SUPABASE_URL:-}" ]] || [[ -z "${WOOCOMMERCE_SCHEDULER_KEY:-}" ]]; then
+            echo "::warning::Missing SUPABASE_URL/WOOCOMMERCE_SCHEDULER_KEY secrets (skipping scheduler tick)"
+            exit 0
+          fi
           curl --fail-with-body --show-error --silent \
             --connect-timeout 10 \
             --max-time 30 \

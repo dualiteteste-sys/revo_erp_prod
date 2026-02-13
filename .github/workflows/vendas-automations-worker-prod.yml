@@ -44,5 +44,13 @@ jobs:
           fi
 
           echo "[PROD] Processing vendas automations queue (limit=$limit)"
-          psql "$SUPABASE_DB_URL_PROD" -v ON_ERROR_STOP=1 -X -qAt -c "select public.vendas_automacao_process_queue_admin(${limit});"
-
+          export PGCONNECT_TIMEOUT=10
+          for attempt in 1 2 3; do
+            if psql "$SUPABASE_DB_URL_PROD" -v ON_ERROR_STOP=1 -X -qAt -c "select public.vendas_automacao_process_queue_admin(${limit});"; then
+              exit 0
+            fi
+            echo "::warning::Failed to connect/process vendas automations queue (attempt=$attempt/3). Retrying..."
+            sleep $((attempt * 10))
+          done
+          echo "::error::Failed to process vendas automations queue after 3 attempts (PROD)."
+          exit 1
