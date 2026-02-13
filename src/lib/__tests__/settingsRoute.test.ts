@@ -11,6 +11,8 @@ describe('settingsRoute', () => {
     expect(resolveSettingsRouteFromLegacyParam('billing')).toBe('/app/configuracoes/geral/assinatura');
     expect(resolveSettingsRouteFromLegacyParam('users')).toBe('/app/configuracoes/geral/users');
     expect(resolveSettingsRouteFromLegacyParam('onboarding')).toBe('/app/configuracoes/geral/empresa');
+    expect(resolveSettingsRouteFromLegacyParam('integrations')).toBe('/app/configuracoes/ecommerce/marketplaces');
+    expect(resolveSettingsRouteFromLegacyParam('marketplaces')).toBe('/app/configuracoes/ecommerce/marketplaces');
   });
 
   it('usa rota padrão para parâmetros desconhecidos', () => {

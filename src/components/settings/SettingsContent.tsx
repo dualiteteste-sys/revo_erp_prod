@@ -1,5 +1,6 @@
 import React from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
+import { Link } from 'react-router-dom';
 import CompanySettingsForm from './company/CompanySettingsForm';
 import SubscriptionPage from '../../pages/billing/SubscriptionPage';
 import RolesPage from '@/pages/settings/roles/RolesPage';
@@ -29,6 +30,29 @@ const SettingsContent: React.FC<SettingsContentProps> = ({ activeItem }) => {
         return <SubscriptionPage />;
       case 'Feature Flags':
         return <FeatureFlagsPage />;
+      case 'Integrações':
+        return (
+          <div className="space-y-4">
+            <h1 className="text-2xl font-bold text-gray-800">Integrações</h1>
+            <p className="text-sm text-gray-600">
+              Centralize conexões de canais e monitore saúde/sincronização sem sair do fluxo operacional.
+            </p>
+            <div className="flex flex-wrap gap-3">
+              <Link
+                to="/app/desenvolvedor/woocommerce"
+                className="inline-flex items-center rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+              >
+                Abrir painel WooCommerce
+              </Link>
+              <Link
+                to="/app/desenvolvedor/saude"
+                className="inline-flex items-center rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+              >
+                Ver monitor de saúde
+              </Link>
+            </div>
+          </div>
+        );
       default:
         return (
           <div>

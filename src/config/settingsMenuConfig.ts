@@ -1,4 +1,4 @@
-import { Building, Users, UserCog, CreditCard, ShieldCheck, ToggleLeft } from 'lucide-react';
+import { Building, Users, UserCog, CreditCard, ShieldCheck, ToggleLeft, Plug } from 'lucide-react';
 
 export interface SettingsTab {
   name: string;
@@ -21,6 +21,12 @@ export const settingsMenuConfig: SettingsTab[] = [
       { name: 'Papéis e Permissões', icon: ShieldCheck, href: '/app/configuracoes/geral/papeis' },
       { name: 'Perfil de Usuário', icon: UserCog, href: '/app/configuracoes/geral/perfil' },
       { name: 'Minha Assinatura', icon: CreditCard, href: '/app/configuracoes/geral/assinatura' },
+    ],
+  },
+  {
+    name: 'Integrações',
+    menu: [
+      { name: 'Integrações', icon: Plug, href: '/app/configuracoes/ecommerce/marketplaces' },
     ],
   },
   {
