@@ -7,7 +7,8 @@ import UsersPage from '@/pages/settings/general/UsersPage';
 import UnidadesPage from '@/pages/settings/general/UnidadesPage';
 import UserProfilePage from '@/components/settings/user-profile/UserProfilePage';
 import FeatureFlagsPage from '@/components/settings/feature-flags/FeatureFlagsPage';
-import MarketplaceIntegrationsPage from '@/components/settings/ecommerce/MarketplaceIntegrationsPage';
+
+const MarketplaceIntegrationsPage = React.lazy(() => import('@/components/settings/ecommerce/MarketplaceIntegrationsPage'));
 
 interface SettingsContentProps {
   activeItem: string;
@@ -31,7 +32,11 @@ const SettingsContent: React.FC<SettingsContentProps> = ({ activeItem }) => {
       case 'Feature Flags':
         return <FeatureFlagsPage />;
       case 'Integrações':
-        return <MarketplaceIntegrationsPage />;
+        return (
+          <React.Suspense fallback={<div className="text-sm text-gray-500">Carregando integrações…</div>}>
+            <MarketplaceIntegrationsPage />
+          </React.Suspense>
+        );
       default:
         return (
           <div>
