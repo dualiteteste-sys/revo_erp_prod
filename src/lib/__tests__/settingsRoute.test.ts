@@ -10,7 +10,7 @@ describe('settingsRoute', () => {
   it('mapeia parâmetros legados conhecidos', () => {
     expect(resolveSettingsRouteFromLegacyParam('billing')).toBe('/app/configuracoes/geral/assinatura');
     expect(resolveSettingsRouteFromLegacyParam('users')).toBe('/app/configuracoes/geral/users');
-    expect(resolveSettingsRouteFromLegacyParam('onboarding')).toBe('/app/configuracoes/geral/onboarding');
+    expect(resolveSettingsRouteFromLegacyParam('onboarding')).toBe('/app/configuracoes/geral/empresa');
   });
 
   it('usa rota padrão para parâmetros desconhecidos', () => {

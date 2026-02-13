@@ -2,7 +2,7 @@ const DEFAULT_SETTINGS_ROUTE = '/app/configuracoes/geral/empresa';
 
 const legacySettingsParamRouteMap: Record<string, string> = {
   empresa: '/app/configuracoes/geral/empresa',
-  onboarding: '/app/configuracoes/geral/onboarding',
+  onboarding: '/app/configuracoes/geral/empresa',
   billing: '/app/configuracoes/geral/assinatura',
   users: '/app/configuracoes/geral/users',
 };

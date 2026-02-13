@@ -2,16 +2,11 @@ import React from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import CompanySettingsForm from './company/CompanySettingsForm';
 import SubscriptionPage from '../../pages/billing/SubscriptionPage';
-import DataManagementContent from './data-management/DataManagementContent';
 import RolesPage from '@/pages/settings/roles/RolesPage';
 import UsersPage from '@/pages/settings/general/UsersPage';
-import PrivacyLgpdPage from '@/pages/settings/general/PrivacyLgpdPage';
 import UnidadesPage from '@/pages/settings/general/UnidadesPage';
-import AuditLogsPage from '@/components/settings/audit/AuditLogsPage';
-import OnboardingChecklistPage from '@/components/settings/onboarding/OnboardingChecklistPage';
-import FeatureFlagsPage from '@/components/settings/feature-flags/FeatureFlagsPage';
-import MarketplaceIntegrationsPage from '@/components/settings/ecommerce/MarketplaceIntegrationsPage';
 import UserProfilePage from '@/components/settings/user-profile/UserProfilePage';
+import FeatureFlagsPage from '@/components/settings/feature-flags/FeatureFlagsPage';
 
 interface SettingsContentProps {
   activeItem: string;
@@ -24,26 +19,16 @@ const SettingsContent: React.FC<SettingsContentProps> = ({ activeItem }) => {
         return <CompanySettingsForm />;
       case 'Unidades / Filiais':
         return <UnidadesPage />;
-      case 'Onboarding (Checklist)':
-        return <OnboardingChecklistPage />;
       case 'Usuários':
         return <UsersPage />;
       case 'Papéis e Permissões':
         return <RolesPage />;
       case 'Perfil de Usuário':
         return <UserProfilePage />;
-      case 'Privacidade (LGPD)':
-        return <PrivacyLgpdPage />;
       case 'Minha Assinatura':
         return <SubscriptionPage />;
-      case 'Limpeza de Dados':
-        return <DataManagementContent />;
       case 'Feature Flags':
         return <FeatureFlagsPage />;
-      case 'Auditoria':
-        return <AuditLogsPage />;
-      case 'Integrações (Marketplaces)':
-        return <MarketplaceIntegrationsPage />;
       default:
         return (
           <div>
