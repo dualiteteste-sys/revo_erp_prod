@@ -169,6 +169,32 @@ function wooPendingReason(
   return null;
 }
 
+function normalizeWooStatus(value: unknown): 'connected' | 'pending' | 'error' | null {
+  const normalized = String(value ?? '').trim().toLowerCase();
+  if (normalized === 'connected' || normalized === 'pending' || normalized === 'error') return normalized;
+  return null;
+}
+
+function resolveWooConfigModalStatus(params: {
+  diagnostics: Record<string, any> | null;
+  wooDiag: EcommerceConnectionDiagnostics | null;
+  activeConnection: EcommerceConnection | null;
+}): 'connected' | 'pending' | 'error' | null {
+  const localDiagnosticsStatus = normalizeWooStatus(params.diagnostics?.status);
+  if (localDiagnosticsStatus) return localDiagnosticsStatus;
+
+  const localDiagnosticsConnectionStatus = normalizeWooStatus(params.diagnostics?.connection_status);
+  if (localDiagnosticsConnectionStatus) return localDiagnosticsConnectionStatus;
+
+  const persistedConnectionStatus = normalizeWooStatus(params.wooDiag?.connection_status);
+  if (persistedConnectionStatus) return persistedConnectionStatus;
+
+  const persistedStatus = normalizeWooStatus(params.wooDiag?.status);
+  if (persistedStatus) return persistedStatus;
+
+  return normalizeWooStatus(params.activeConnection?.status);
+}
+
 export default function MarketplaceIntegrationsPage() {
   const { addToast } = useToast();
   const { activeEmpresaId } = useAuth();
@@ -634,6 +660,17 @@ export default function MarketplaceIntegrationsPage() {
           // ecommerce_woo_record_connection_check. Reflect immediately in local
           // state so the UI shows "Conectado" without waiting for fetchAll.
           setActiveConnection((prev) => prev ? { ...prev, status: 'connected' } : prev);
+          setWooDiag((prev) =>
+            prev
+              ? {
+                  ...prev,
+                  status: 'connected',
+                  connection_status: 'connected',
+                  error_message: null,
+                  last_verified_at: (data as any)?.last_verified_at ?? prev.last_verified_at ?? null,
+                }
+              : prev,
+          );
         }
         await fetchAll();
         addToast(
@@ -1410,7 +1447,7 @@ export default function MarketplaceIntegrationsPage() {
                       <div className="text-xs text-gray-500">
                         Status atual:{' '}
                         <span className="font-medium text-gray-700">
-                          {(wooDiag?.connection_status ?? diagnostics?.status ?? activeConnection.status) || '—'}
+                          {resolveWooConfigModalStatus({ diagnostics, wooDiag, activeConnection }) || '—'}
                         </span>
                       </div>
                     </div>
