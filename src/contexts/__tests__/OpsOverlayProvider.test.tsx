@@ -29,6 +29,19 @@ describe("OpsOverlayProvider hotkey", () => {
     expect(isFloatingErrorsHotkey(event, "other")).toBe(true);
   });
 
+  it("aceita Meta+Shift+E fora do mac (fallback cross-browser)", () => {
+    const event = {
+      key: "e",
+      code: "KeyE",
+      metaKey: true,
+      ctrlKey: false,
+      shiftKey: true,
+      altKey: false,
+    };
+
+    expect(isFloatingErrorsHotkey(event, "other")).toBe(true);
+  });
+
   it("não aceita combinações conflitantes", () => {
     expect(
       isFloatingErrorsHotkey(
