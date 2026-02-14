@@ -1,8 +1,9 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { Copy, Eraser, ExternalLink, Pause, Play, X } from "lucide-react";
+import { Copy, Eraser, ExternalLink, Pause, Play, Send, X } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import { useToast } from "@/contexts/ToastProvider";
 import { clearConsoleRedEvents, getConsoleRedEventsSnapshot, type ConsoleRedEvent } from "@/lib/telemetry/consoleRedBuffer";
 import { buildIncidentPrompt, getErrorIncidentsSnapshot } from "@/lib/telemetry/errorBus";
 
@@ -16,24 +17,28 @@ type Size = { w: number; h: number };
 
 type Viewport = { w: number; h: number };
 
-const STORAGE_KEY = "revo_errors_floating_modal_pos";
+const POS_STORAGE_KEY = "revo_errors_floating_modal_pos";
+const SIZE_STORAGE_KEY = "revo_errors_floating_modal_size";
+const MODAL_MIN_W = 640;
+const MODAL_MIN_H = 420;
+const MODAL_GAP = 8;
 
 function clamp(n: number, min: number, max: number) {
   return Math.max(min, Math.min(max, n));
 }
 
 export function clampModalPosition(next: Pos, viewport: Viewport, size: Size): Pos {
-  const maxX = Math.max(8, viewport.w - size.w - 8);
-  const maxY = Math.max(8, viewport.h - size.h - 8);
+  const maxX = Math.max(MODAL_GAP, viewport.w - size.w - MODAL_GAP);
+  const maxY = Math.max(MODAL_GAP, viewport.h - size.h - MODAL_GAP);
   return {
-    x: clamp(next.x, 8, maxX),
-    y: clamp(next.y, 8, maxY),
+    x: clamp(next.x, MODAL_GAP, maxX),
+    y: clamp(next.y, MODAL_GAP, maxY),
   };
 }
 
 function readPos(): Pos | null {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
+    const raw = localStorage.getItem(POS_STORAGE_KEY);
     if (!raw) return null;
     const parsed = JSON.parse(raw);
     const x = typeof parsed?.x === "number" ? parsed.x : null;
@@ -47,7 +52,36 @@ function readPos(): Pos | null {
 
 function writePos(pos: Pos) {
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(pos));
+    localStorage.setItem(POS_STORAGE_KEY, JSON.stringify(pos));
+  } catch {
+    // noop
+  }
+}
+
+function normalizeSize(input: Size, viewport: Viewport): Size {
+  return {
+    w: clamp(input.w, MODAL_MIN_W, Math.max(MODAL_MIN_W, viewport.w - MODAL_GAP * 2)),
+    h: clamp(input.h, MODAL_MIN_H, Math.max(MODAL_MIN_H, viewport.h - MODAL_GAP * 2)),
+  };
+}
+
+function readSize(viewport: Viewport): Size | null {
+  try {
+    const raw = localStorage.getItem(SIZE_STORAGE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    const w = typeof parsed?.w === "number" ? parsed.w : null;
+    const h = typeof parsed?.h === "number" ? parsed.h : null;
+    if (w == null || h == null) return null;
+    return normalizeSize({ w, h }, viewport);
+  } catch {
+    return null;
+  }
+}
+
+function writeSize(size: Size) {
+  try {
+    localStorage.setItem(SIZE_STORAGE_KEY, JSON.stringify(size));
   } catch {
     // noop
   }
@@ -56,6 +90,11 @@ function writePos(pos: Pos) {
 function formatDateTimeBR(iso: string) {
   const d = new Date(iso);
   return Number.isNaN(d.getTime()) ? iso : d.toLocaleString("pt-BR");
+}
+
+export function shouldStartModalDrag(target: EventTarget | null) {
+  if (!(target instanceof HTMLElement)) return true;
+  return !target.closest("button, a, input, select, textarea, [role='button'], [data-no-modal-drag]");
 }
 
 function useConsoleErrors(paused: boolean) {
@@ -80,6 +119,7 @@ function useConsoleErrors(paused: boolean) {
 }
 
 export function FloatingErrorsModal({ open, onClose }: Props) {
+  const { addToast } = useToast();
   const [paused, setPaused] = useState(false);
   const [filter, setFilter] = useState("");
   const [level, setLevel] = useState<"all" | "error" | "warn">("all");
@@ -109,7 +149,12 @@ export function FloatingErrorsModal({ open, onClose }: Props) {
   } | null>(null);
 
   const [pos, setPos] = useState<Pos>(() => readPos() ?? { x: 24, y: 24 });
-  const [size, setSize] = useState<Size>({ w: 560, h: 420 });
+  const [size, setSize] = useState<Size>(() => {
+    if (typeof window === "undefined") return { w: 960, h: 620 };
+    const viewport = { w: window.innerWidth, h: window.innerHeight };
+    const defaultSize = normalizeSize({ w: Math.round(viewport.w * 0.78), h: Math.round(viewport.h * 0.76) }, viewport);
+    return readSize(viewport) ?? defaultSize;
+  });
 
   useEffect(() => {
     if (!open) return;
@@ -123,18 +168,45 @@ export function FloatingErrorsModal({ open, onClose }: Props) {
     if (!el) return;
     const rect = el.getBoundingClientRect();
     if (!rect.width || !rect.height) return;
-    setSize({ w: rect.width, h: rect.height });
-    setPos((current) => clampModalPosition(current, { w: window.innerWidth, h: window.innerHeight }, { w: rect.width, h: rect.height }));
+    const viewport = { w: window.innerWidth, h: window.innerHeight };
+    const normalized = normalizeSize({ w: rect.width, h: rect.height }, viewport);
+    setSize(normalized);
+    setPos((current) => clampModalPosition(current, viewport, normalized));
   }, [open]);
 
   useEffect(() => {
     if (!open) return;
     const onResize = () => {
-      setPos((current) => clampModalPosition(current, { w: window.innerWidth, h: window.innerHeight }, size));
+      const viewport = { w: window.innerWidth, h: window.innerHeight };
+      setSize((current) => normalizeSize(current, viewport));
+      setPos((current) => clampModalPosition(current, viewport, size));
     };
     window.addEventListener("resize", onResize);
     return () => window.removeEventListener("resize", onResize);
   }, [open, size]);
+
+  useEffect(() => {
+    if (!open) return;
+    const element = containerRef.current;
+    if (!element || typeof window === "undefined" || typeof ResizeObserver === "undefined") return;
+    const observer = new ResizeObserver((entries) => {
+      const entry = entries[0];
+      if (!entry) return;
+      const viewport = { w: window.innerWidth, h: window.innerHeight };
+      const nextSize = normalizeSize(
+        {
+          w: Math.round(entry.contentRect.width),
+          h: Math.round(entry.contentRect.height),
+        },
+        viewport,
+      );
+      setSize((current) => (current.w === nextSize.w && current.h === nextSize.h ? current : nextSize));
+      setPos((current) => clampModalPosition(current, viewport, nextSize));
+      writeSize(nextSize);
+    });
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, [open]);
 
   const applyClamped = (nextPos: Pos) => {
     setPos(clampModalPosition(nextPos, { w: window.innerWidth, h: window.innerHeight }, size));
@@ -143,6 +215,7 @@ export function FloatingErrorsModal({ open, onClose }: Props) {
   const onPointerDownHeader = (event: React.PointerEvent) => {
     if (!open) return;
     if (event.button !== 0) return;
+    if (!shouldStartModalDrag(event.target)) return;
     const element = containerRef.current;
     if (!element) return;
 
@@ -201,6 +274,14 @@ export function FloatingErrorsModal({ open, onClose }: Props) {
     await navigator.clipboard.writeText(JSON.stringify(selected, null, 2));
   };
 
+  const handleSendToDev = async () => {
+    if (!selected) return;
+    const incident = getErrorIncidentsSnapshot().find((item) => item.fingerprint === selected.fingerprint);
+    const prompt = incident ? buildIncidentPrompt(incident) : JSON.stringify(selected, null, 2);
+    await navigator.clipboard.writeText(prompt);
+    addToast("Prompt copiado. Cole no chat do agente para análise.", "success");
+  };
+
   if (!open) return null;
 
   return createPortal(
@@ -210,8 +291,13 @@ export function FloatingErrorsModal({ open, onClose }: Props) {
         position: "fixed",
         left: pos.x,
         top: pos.y,
-        width: 560,
-        height: 420,
+        width: size.w,
+        height: size.h,
+        minWidth: MODAL_MIN_W,
+        minHeight: MODAL_MIN_H,
+        maxWidth: `calc(100vw - ${MODAL_GAP * 2}px)`,
+        maxHeight: `calc(100vh - ${MODAL_GAP * 2}px)`,
+        resize: "both",
         zIndex: 2147483647,
         pointerEvents: "auto",
       }}
@@ -220,14 +306,14 @@ export function FloatingErrorsModal({ open, onClose }: Props) {
       role="dialog"
       aria-modal="false"
     >
-      <div
-        className="flex cursor-grab select-none items-center justify-between gap-2 border-b border-slate-200 bg-slate-50 px-3 py-2 active:cursor-grabbing"
-        onPointerDown={onPointerDownHeader}
-        onPointerMove={onPointerMoveHeader}
-        onPointerUp={endDrag}
-        onPointerCancel={endDrag}
-      >
-        <div className="flex items-center gap-2">
+      <div className="flex items-center justify-between gap-2 border-b border-slate-200 bg-slate-50 px-3 py-2">
+        <div
+          className="flex cursor-grab select-none items-center gap-2 active:cursor-grabbing"
+          onPointerDown={onPointerDownHeader}
+          onPointerMove={onPointerMoveHeader}
+          onPointerUp={endDrag}
+          onPointerCancel={endDrag}
+        >
           <div className="text-sm font-semibold text-slate-800">Erros (Realtime)</div>
           <div className="text-xs text-slate-500">{filtered.length} item(ns)</div>
         </div>
@@ -244,6 +330,10 @@ export function FloatingErrorsModal({ open, onClose }: Props) {
           <Button variant="outline" size="sm" className="gap-2" onClick={() => window.open("/app/desenvolvedor/erros", "_blank", "noopener,noreferrer")}>
             <ExternalLink size={14} />
             Página
+          </Button>
+          <Button variant="outline" size="sm" className="gap-2" disabled={!selected} onClick={handleSendToDev}>
+            <Send size={14} />
+            Enviar p/ Dev
           </Button>
           <Button size="sm" className="gap-2" onClick={onClose}>
             <X size={14} />
@@ -277,7 +367,7 @@ export function FloatingErrorsModal({ open, onClose }: Props) {
         </div>
       </div>
 
-      <div className="grid h-[calc(420px-104px)] grid-cols-1 md:grid-cols-2">
+      <div className="grid grid-cols-1 md:grid-cols-2" style={{ height: size.h - 104 }}>
         <div className="overflow-auto border-r border-slate-200">
           {filtered.length === 0 ? (
             <div className="p-4 text-sm text-slate-500">Nenhum erro no buffer.</div>

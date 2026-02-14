@@ -656,28 +656,34 @@ export default function MarketplaceIntegrationsPage() {
         setDiagnostics((data as any) ?? null);
         await refreshWooDiag();
         if (ok) {
+          const nextStatus = String((data as any)?.status ?? 'connected').toLowerCase();
+          const normalizedStatus = nextStatus === 'pending' ? 'pending' : 'connected';
           // The edge function already updated ecommerces.status in the DB via
           // ecommerce_woo_record_connection_check. Reflect immediately in local
-          // state so the UI shows "Conectado" without waiting for fetchAll.
-          setActiveConnection((prev) => prev ? { ...prev, status: 'connected' } : prev);
+          // state so the UI reflects the latest handshake without waiting for fetchAll.
+          setActiveConnection((prev) => prev ? { ...prev, status: normalizedStatus } : prev);
           setWooDiag((prev) =>
             prev
               ? {
                   ...prev,
-                  status: 'connected',
-                  connection_status: 'connected',
-                  error_message: null,
+                  status: normalizedStatus,
+                  connection_status: normalizedStatus,
+                  error_message: normalizedStatus === 'pending'
+                    ? 'Authorization bloqueado no servidor/proxy; use fallback querystring e ajuste infraestrutura.'
+                    : null,
                   last_verified_at: (data as any)?.last_verified_at ?? prev.last_verified_at ?? null,
                 }
               : prev,
           );
         }
         await fetchAll();
+        const responseStatus = String((data as any)?.status ?? '').toLowerCase();
+        const responseMessage = String((data as any)?.message ?? '').trim();
         addToast(
           ok
-            ? 'Conexão WooCommerce validada com sucesso! ✅'
-            : `Conexão WooCommerce falhou. ${(data as any)?.message || 'Veja os detalhes.'}`,
-          ok ? 'success' : 'error',
+            ? (responseMessage || 'Conexão WooCommerce validada com sucesso! ✅')
+            : `Conexão WooCommerce falhou. ${responseMessage || 'Veja os detalhes.'}`,
+          ok ? (responseStatus === 'pending' ? 'warning' : 'success') : 'error',
         );
         return;
       }
