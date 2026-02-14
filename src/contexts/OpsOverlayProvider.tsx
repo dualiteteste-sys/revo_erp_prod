@@ -31,10 +31,10 @@ export function isFloatingErrorsHotkey(
   if (event.altKey) return false;
 
   if (platform === "mac") {
-    return Boolean(event.metaKey) && !event.ctrlKey;
+    return Boolean(event.metaKey || event.ctrlKey);
   }
 
-  return Boolean(event.ctrlKey) && !event.metaKey;
+  return Boolean(event.ctrlKey || event.metaKey);
 }
 
 export function isDebounced(lastTriggeredAt: number, now: number, debounceMs = HOTKEY_DEBOUNCE_MS) {
