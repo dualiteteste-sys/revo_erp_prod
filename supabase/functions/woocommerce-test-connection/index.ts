@@ -1,5 +1,13 @@
 import { createClient } from "jsr:@supabase/supabase-js@2";
 import { buildCorsHeaders } from "../_shared/cors.ts";
+import {
+  buildWooApiUrl,
+  type WooAuthMode,
+} from "../_shared/woocommerceHardening.ts";
+import {
+  classifyWooConnectionFailure,
+  type WooConnectionAttempt,
+} from "../_shared/woocommerceConnectionDiagnosis.ts";
 
 type TestRequest = {
   ecommerce_id?: string;
@@ -92,13 +100,6 @@ function normalizeStoreUrl(input: string): string {
   // remove trailing slash for consistent requests
   url.pathname = url.pathname.replace(/\/+$/, "");
   return url.toString();
-}
-
-function basicAuthHeader(consumerKey: string, consumerSecret: string): string {
-  const ck = (consumerKey || "").trim();
-  const cs = (consumerSecret || "").trim();
-  if (!ck || !cs) throw new Error("credentials_required");
-  return `Basic ${btoa(`${ck}:${cs}`)}`;
 }
 
 function okJson(body: Record<string, unknown>, cors: Record<string, string>) {
@@ -218,11 +219,16 @@ Deno.serve(async (req) => {
       return errorJson("secrets_unavailable", "Falha ao carregar credenciais salvas para teste.", cors, 500, secretErr.message);
     }
 
-    const consumerKey = String((secretRow as any)?.woo_consumer_key || "");
-    const consumerSecret = String((secretRow as any)?.woo_consumer_secret || "");
-    const auth = basicAuthHeader(consumerKey, consumerSecret);
+    const consumerKey = String((secretRow as any)?.woo_consumer_key || "").trim();
+    const consumerSecret = String((secretRow as any)?.woo_consumer_secret || "").trim();
+    if (!consumerKey || !consumerSecret) throw new Error("credentials_required");
 
-    // 1) Detect WordPress (without auth). This avoids confusing "credentials" errors when the URL isn't WP.
+    let wpDetected = false;
+    let wpCheck: { status: number | null; latency_ms: number | null; error: string | null } = {
+      status: null,
+      latency_ms: null,
+      error: null,
+    };
     try {
       const wpStartedAt = Date.now();
       const wpRes = await fetch(`${storeUrl}/wp-json/`, {
@@ -232,116 +238,122 @@ Deno.serve(async (req) => {
           "User-Agent": "UltriaERP/woocommerce-test-connection",
         },
       });
-      // Some sites may protect wp-json with auth; in that case we still try Woo endpoints below.
-      if (!wpRes.ok && wpRes.status !== 401 && wpRes.status !== 403) {
-        const latencyMs = Date.now() - wpStartedAt;
-        const persistResult = await persistConnectionCheck(adminClient, {
-          ecommerceId: String(context.ecommerce_id),
-          empresaId: String(context.empresa_id),
-          status: "error",
-          error: "WordPress/WooCommerce não detectado na URL informada (wp-json indisponível).",
-          httpStatus: wpRes.status,
-          endpoint: "/wp-json/",
-          latencyMs,
-        });
-        if (!persistResult.ok) {
-          return errorJson(
-            "status_persistence_failed",
-            "Falha ao persistir diagnóstico da conexão Woo no ERP.",
-            cors,
-            500,
-            { persistence_error: persistResult.reason },
-          );
-        }
-        return errorJson(
-          "wordpress_not_detected",
-          "Não foi possível detectar WordPress/WooCommerce na URL informada. Verifique se a URL está correta e se o site responde em /wp-json/.",
-          cors,
-          400,
-          { status: wpRes.status, endpoint: "/wp-json/" },
-        );
-      }
-    } catch {
-      // Best-effort: if /wp-json/ is blocked by network rules we still try Woo endpoints below.
+      wpCheck = {
+        status: wpRes.status,
+        latency_ms: Date.now() - wpStartedAt,
+        error: null,
+      };
+      wpDetected = wpRes.ok || wpRes.status === 401 || wpRes.status === 403;
+    } catch (error) {
+      wpCheck = {
+        status: null,
+        latency_ms: null,
+        error: error instanceof Error ? error.message : String(error || ""),
+      };
     }
 
-    // Prefer a lightweight endpoint that doesn't leak data.
-    const endpoints = [
-      "/wp-json/wc/v3/system_status",
-      "/wp-json/wc/v3/products?per_page=1",
-    ];
-
-    let lastError: unknown = null;
+    const attempts: WooConnectionAttempt[] = [];
+    const authModes: WooAuthMode[] = ["basic_https", "querystring_fallback"];
+    const endpoints = ["system_status", "products"];
     const startedAt = Date.now();
-    for (const path of endpoints) {
-      try {
-        const res = await fetch(`${storeUrl}${path}`, {
-          method: "GET",
-          headers: {
-            "Authorization": auth,
-            "Accept": "application/json",
-            "User-Agent": "UltriaERP/woocommerce-test-connection",
-          },
-        });
+    for (const authMode of authModes) {
+      for (const path of endpoints) {
+        const endpoint = `/wp-json/wc/v3/${path === "products" ? "products?per_page=1" : "system_status"}`;
+        const startedAttemptAt = Date.now();
+        try {
+          const { url, headers } = buildWooApiUrl({
+            baseUrl: storeUrl,
+            path,
+            authMode,
+            consumerKey,
+            consumerSecret,
+            query: path === "products" ? { per_page: "1" } : undefined,
+            userAgent: "UltriaERP/woocommerce-test-connection",
+          });
+          const res = await fetch(url, {
+            method: "GET",
+            headers,
+          });
+          const body = await res.json().catch(() => null);
+          const bodyCode = typeof (body as any)?.code === "string" ? String((body as any).code) : null;
+          const bodyMessage = typeof (body as any)?.message === "string" ? String((body as any).message).slice(0, 240) : null;
 
-        if (!res.ok) {
-          lastError = { status: res.status, endpoint: path };
-          continue;
-        }
+          attempts.push({
+            auth_mode: authMode,
+            endpoint,
+            status: res.status,
+            latency_ms: Date.now() - startedAttemptAt,
+            body_code: bodyCode,
+            body_message: bodyMessage,
+            error: null,
+          });
 
-        const latencyMs = Date.now() - startedAt;
-        const persistResult = await persistConnectionCheck(adminClient, {
-          ecommerceId: String(context.ecommerce_id),
-          empresaId: String(context.empresa_id),
-          status: "connected",
-          error: null,
-          httpStatus: res.status,
-          endpoint: path,
-          latencyMs,
-        });
-        if (!persistResult.ok) {
-          return errorJson(
-            "status_persistence_failed",
-            "Conexão Woo validada, mas o ERP não conseguiu salvar o status. Verifique logs da função e permissões/RPC.",
+          if (!res.ok) continue;
+
+          const latencyMs = Date.now() - startedAt;
+          const fallbackUsed = authMode === "querystring_fallback";
+          const successMessage = fallbackUsed
+            ? "Conexão WooCommerce validada com fallback querystring (Authorization possivelmente bloqueado no servidor/proxy)."
+            : "Conexão com WooCommerce validada com sucesso.";
+          const persistResult = await persistConnectionCheck(adminClient, {
+            ecommerceId: String(context.ecommerce_id),
+            empresaId: String(context.empresa_id),
+            status: fallbackUsed ? "pending" : "connected",
+            error: fallbackUsed ? "Authorization bloqueado no servidor/proxy; usando fallback querystring." : null,
+            httpStatus: res.status,
+            endpoint,
+            latencyMs,
+          });
+          if (!persistResult.ok) {
+            return errorJson(
+              "status_persistence_failed",
+              "Conexão Woo validada, mas o ERP não conseguiu salvar o status. Verifique logs da função e permissões/RPC.",
+              cors,
+              500,
+              { persistence_error: persistResult.reason },
+            );
+          }
+
+          return okJson(
+            {
+              ok: true,
+              status: fallbackUsed ? "pending" : "connected",
+              store_url: storeUrl,
+              message: successMessage,
+              http_status: res.status,
+              endpoint,
+              auth_mode: authMode,
+              fallback_querystring: fallbackUsed,
+              warning_code: fallbackUsed ? "AUTH_HEADER_BLOCKED" : null,
+              last_verified_at: new Date().toISOString(),
+              latency_ms: latencyMs,
+              persistence_fallback: persistResult.fallbackUsed,
+              wp_check: wpCheck,
+            },
             cors,
-            500,
-            { persistence_error: persistResult.reason },
           );
+        } catch (error) {
+          attempts.push({
+            auth_mode: authMode,
+            endpoint,
+            status: null,
+            latency_ms: Date.now() - startedAttemptAt,
+            body_code: null,
+            body_message: null,
+            error: error instanceof Error ? error.message : String(error || ""),
+          });
         }
-
-        return okJson(
-          {
-            ok: true,
-            status: "connected",
-            store_url: storeUrl,
-            message: "Conexão com WooCommerce validada com sucesso.",
-            http_status: res.status,
-            endpoint: path,
-            last_verified_at: new Date().toISOString(),
-            latency_ms: latencyMs,
-            persistence_fallback: persistResult.fallbackUsed,
-          },
-          cors,
-        );
-      } catch (e) {
-        lastError = { error: e instanceof Error ? e.message : String(e || "") };
       }
     }
 
-    const finalHttpStatus = typeof (lastError as any)?.status === "number" ? (lastError as any).status : null;
-    const finalMessage =
-      finalHttpStatus === 401 || finalHttpStatus === 403
-        ? "Credenciais inválidas ou sem permissão. Gere uma Consumer Key/Secret com acesso de leitura (ou leitura/escrita) e tente novamente."
-        : finalHttpStatus === 404
-          ? "WooCommerce não detectado (endpoint da API REST não encontrado). Verifique se o WooCommerce está ativo e se a API REST está habilitada."
-          : "Não foi possível validar a conexão com o WooCommerce. Verifique URL/credenciais e permissões da chave.";
+    const diagnosis = classifyWooConnectionFailure({ wpDetected, attempts });
     const persistResult = await persistConnectionCheck(adminClient, {
       ecommerceId: String(context.ecommerce_id),
       empresaId: String(context.empresa_id),
       status: "error",
-      error: finalMessage,
-      httpStatus: finalHttpStatus,
-      endpoint: null,
+      error: diagnosis.message,
+      httpStatus: diagnosis.http_status,
+      endpoint: diagnosis.endpoint,
       latencyMs: Date.now() - startedAt,
     });
     if (!persistResult.ok) {
@@ -350,16 +362,21 @@ Deno.serve(async (req) => {
         "Falha ao persistir erro de conexão Woo no ERP.",
         cors,
         500,
-        { persistence_error: persistResult.reason, lastError },
+        { persistence_error: persistResult.reason, diagnosis, attempts, wp_check: wpCheck },
       );
     }
 
     return errorJson(
       "woo_connection_failed",
-      finalMessage,
+      diagnosis.message,
       cors,
       400,
-      { ...((lastError && typeof lastError === "object") ? lastError as Record<string, unknown> : { lastError }), persistence_fallback: persistResult.fallbackUsed },
+      {
+        diagnosis,
+        wp_check: wpCheck,
+        attempts,
+        persistence_fallback: persistResult.fallbackUsed,
+      },
     );
   } catch (e) {
     const msg = (e instanceof Error ? e.message : String(e || "")).trim();

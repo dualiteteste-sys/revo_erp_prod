@@ -68,3 +68,10 @@
 - WooCommerce REST API keys/permissions (UI): <https://woocommerce.com/document/woocommerce-rest-api/>
 - WooCommerce Webhooks docs: <https://woocommerce.com/document/webhooks/>
 - Webhook retries and auto-disable after failures: <https://developer.woocommerce.com/docs/best-practices/urls-and-routing/webhooks/>
+
+## Atualização prática (2026-02-14)
+- Fluxo operacional de conexão movido para `Configurações > Integrações` (sem depender de rota técnica do módulo Desenvolvedor).
+- Teste Woo reforçado com:
+  - tentativa padrão `Basic Auth` em `wp-json/wc/v3`;
+  - fallback `querystring` quando `Authorization` é bloqueado por proxy/WAF;
+  - diagnóstico classificado para erros de permalinks/rota, credenciais, permissões e bloqueio de header.
