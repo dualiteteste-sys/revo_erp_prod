@@ -7,6 +7,8 @@ import PageHeader from '@/components/ui/PageHeader';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/contexts/AuthProvider';
 import { useToast } from '@/contexts/ToastProvider';
+import { normalizeWooStoreUrl } from '@/lib/ecommerce/wooStoreUrl';
+import { listEcommerceConnections } from '@/services/ecommerceIntegrations';
 import { listWooStores, type WooStore } from '@/services/woocommerceControlPanel';
 
 function statusBadge(status?: string | null) {
@@ -32,8 +34,28 @@ export default function WooCommerceStoresPage() {
     }
     setLoading(true);
     try {
-      const rows = await listWooStores(activeEmpresaId);
-      setStores(rows);
+      const [storesRows, connectionsRows] = await Promise.all([
+        listWooStores(activeEmpresaId),
+        listEcommerceConnections(),
+      ]);
+
+      const activeWooUrls = new Set(
+        connectionsRows
+          .filter((connection) => connection.provider === 'woo' && String(connection.status ?? '').toLowerCase() !== 'disconnected')
+          .map((connection) => String(connection.config?.store_url ?? '').trim())
+          .filter(Boolean)
+          .map((url) => {
+            const normalized = normalizeWooStoreUrl(url);
+            return normalized.ok ? normalized.normalized : url;
+          }),
+      );
+
+      const filteredStores = storesRows.filter((store) => {
+        const normalized = normalizeWooStoreUrl(store.base_url);
+        const storeUrl = normalized.ok ? normalized.normalized : store.base_url;
+        return activeWooUrls.has(storeUrl);
+      });
+      setStores(filteredStores);
     } catch (error: any) {
       addToast(error?.message || 'Falha ao carregar lojas WooCommerce.', 'error');
       setStores([]);
