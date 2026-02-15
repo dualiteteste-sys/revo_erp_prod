@@ -267,6 +267,9 @@ export default function MarketplaceIntegrationsPage() {
   const jobsStatusFilterRef = useRef<Record<Provider, JobStatusFilter>>({ meli: 'all', shopee: 'all', woo: 'all' });
   const rpcGuardRef = useRef(createRpcBurstGuard());
   const guardToastShownRef = useRef<Record<string, boolean>>({});
+  const wooSecretsStoredSnapshotRef = useRef<WooSecretsSaveResult | null>(null);
+  // Keep the ref in sync with state so callbacks can access the latest value.
+  useEffect(() => { wooSecretsStoredSnapshotRef.current = wooSecretsStoredSnapshot; }, [wooSecretsStoredSnapshot]);
 
   const mappingsColumns: TableColumnWidthDef[] = [
     { id: 'produto', defaultWidth: 320, minWidth: 220 },
@@ -316,6 +319,18 @@ export default function MarketplaceIntegrationsPage() {
     guardToastShownRef.current['ecommerce_connection_diagnostics:woo'] = false;
     try {
       const diag = await getEcommerceConnectionDiagnostics('woo');
+      // FIX: When the save RPC confirmed credentials are stored but diagnostics
+      // still returns false (migration lag / stale function), preserve the local truth.
+      const snapshot = wooSecretsStoredSnapshotRef.current;
+      if (
+        snapshot &&
+        snapshot.has_consumer_key === true &&
+        snapshot.has_consumer_secret === true &&
+        (diag.has_consumer_key !== true || diag.has_consumer_secret !== true)
+      ) {
+        diag.has_consumer_key = true;
+        diag.has_consumer_secret = true;
+      }
       setWooDiag(diag);
       setWooDiagUnavailable(false);
       if (diag.has_consumer_key === true && diag.has_consumer_secret === true) {
@@ -821,16 +836,15 @@ export default function MarketplaceIntegrationsPage() {
       setWooDiag((prev) =>
         prev
           ? {
-              ...prev,
-              has_consumer_key: true,
-              has_consumer_secret: true,
-              connection_status: 'pending',
-              last_verified_at: null,
-              error_message: null,
-            }
+            ...prev,
+            has_consumer_key: true,
+            has_consumer_secret: true,
+            connection_status: 'pending',
+            last_verified_at: null,
+            error_message: null,
+          }
           : prev,
       );
-      void refreshWooDiag();
       addToast('Credenciais salvas com sucesso! Clique em "Testar conexão" para validar.', 'success');
       await fetchAll();
     } catch (e: any) {
@@ -1048,9 +1062,9 @@ export default function MarketplaceIntegrationsPage() {
           const uiStatus =
             provider === 'woo'
               ? wooUiStatus({
-                  connectionStatus: wooDiag?.connection_status ?? null,
-                  connectionRowStatus: conn?.status ?? null,
-                })
+                connectionStatus: wooDiag?.connection_status ?? null,
+                connectionRowStatus: conn?.status ?? null,
+              })
               : (String(conn?.status ?? 'disconnected').toLowerCase() as any);
           const pendingReason =
             provider === 'woo' ? wooPendingReason(conn ?? null, (wooDiag ?? (wooSecretsStoredSnapshot as any) ?? null) as any, wooDiagUnavailable) : null;
