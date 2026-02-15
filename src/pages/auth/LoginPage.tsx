@@ -5,6 +5,8 @@ import { Loader2, Mail, Lock } from 'lucide-react';
 import { useToast } from '@/contexts/ToastProvider';
 import { supabase } from '@/lib/supabaseClient';
 import Input from '@/components/ui/forms/Input';
+import { logger } from '@/lib/logger';
+import { getLoginFailureMessage, isExpectedLoginFailure } from '@/lib/auth/loginError';
 
 const LoginPage: React.FC = () => {
   const [email, setEmail] = useState('');
@@ -41,11 +43,16 @@ const LoginPage: React.FC = () => {
 
       navigate(from, { replace: true });
     } catch (err: any) {
-      console.error('[AUTH][LOGIN][ERROR]', err);
-      const message =
-        err?.message === 'Invalid login credentials' 
-        ? 'Credenciais inválidas. Verifique seu e-mail e senha.'
-        : err?.message || 'Falha no login.';
+      if (isExpectedLoginFailure(err)) {
+        logger.warn('[AUTH][LOGIN][EXPECTED_FAILURE]', {
+          code: err?.code ?? null,
+          status: err?.status ?? null,
+          message: err?.message ?? null,
+        });
+      } else {
+        logger.error('[AUTH][LOGIN][ERROR]', err);
+      }
+      const message = getLoginFailureMessage(err);
       addToast(message, 'error');
     } finally {
       setLoading(false);
