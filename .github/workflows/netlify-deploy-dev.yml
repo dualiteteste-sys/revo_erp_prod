@@ -1,13 +1,19 @@
 name: Deploy Netlify (DEV)
 
 on:
-  workflow_run:
-    workflows:
-      - "Release Gate (dev) — unit + e2e + migrations"
+  push:
     branches:
       - dev
-    types:
-      - completed
+  workflow_dispatch:
+    inputs:
+      force_deploy:
+        description: Força build/deploy do site DEV mesmo sem diff de app/runtime no commit atual
+        required: false
+        default: "false"
+        type: choice
+        options:
+          - "false"
+          - "true"
 
 concurrency:
   group: netlify-deploy-dev
@@ -16,7 +22,6 @@ concurrency:
 jobs:
   deploy:
     name: Deploy Netlify (DEV)
-    if: ${{ github.event.workflow_run.conclusion == 'success' }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
 
@@ -30,10 +35,18 @@ jobs:
       - name: Detect app/runtime changes (DEV)
         id: app_changes
         env:
-          TRIGGER_SHA: ${{ github.event.workflow_run.head_sha }}
+          TRIGGER_SHA: ${{ github.sha }}
+          FORCE_DEPLOY: ${{ github.event.inputs.force_deploy }}
         run: |
           set -euo pipefail
           sha="${TRIGGER_SHA:-}"
+          force_deploy="$(printf '%s' "${FORCE_DEPLOY:-false}" | tr '[:upper:]' '[:lower:]')"
+
+          if [[ "$force_deploy" == "true" ]]; then
+            echo "should_deploy_app=true" >> "$GITHUB_OUTPUT"
+            echo "[NETLIFY][DEV] Forced deploy enabled via workflow_dispatch input."
+            exit 0
+          fi
 
           if [[ -n "$sha" ]] && git cat-file -e "${sha}^{commit}" 2>/dev/null; then
             files="$(git show --name-only --pretty='' "$sha" || true)"
@@ -119,4 +132,4 @@ jobs:
           NETLIFY_SITE_ID: ${{ secrets.NETLIFY_SITE_ID_DEV }}
         run: |
           set -euo pipefail
-          npx -y netlify-cli@17 deploy --dir dist --site "$NETLIFY_SITE_ID" --message "deploy(dev) ${GITHUB_SHA}"
+          npx -y netlify-cli@17 deploy --prod --dir dist --site "$NETLIFY_SITE_ID" --message "deploy(dev) ${GITHUB_SHA}"

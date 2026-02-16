@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button';
 import { useAuth } from '@/contexts/AuthProvider';
 import { useToast } from '@/contexts/ToastProvider';
 import { normalizeWooStoreUrl } from '@/lib/ecommerce/wooStoreUrl';
+import { pickPreferredEcommerceConnection } from '@/lib/ecommerce/wooConnectionState';
 import { listEcommerceConnections } from '@/services/ecommerceIntegrations';
 import { listWooStores, type WooStore } from '@/services/woocommerceControlPanel';
 
@@ -39,18 +40,18 @@ export default function WooCommerceStoresPage() {
         listEcommerceConnections(),
       ]);
 
+      const preferredWooConnection = pickPreferredEcommerceConnection(connectionsRows, 'woo');
+      const preferredWooUrl = String(preferredWooConnection?.config?.store_url ?? '').trim();
       const activeWooUrls = new Set(
-        connectionsRows
-          .filter((connection) => connection.provider === 'woo' && String(connection.status ?? '').toLowerCase() !== 'disconnected')
-          .map((connection) => String(connection.config?.store_url ?? '').trim())
-          .filter(Boolean)
-          .map((url) => {
+        preferredWooUrl
+          ? [preferredWooUrl].map((url) => {
             const normalized = normalizeWooStoreUrl(url);
             return normalized.ok ? normalized.normalized : url;
-          }),
+          })
+          : [],
       );
 
-      const filteredStores = storesRows.filter((store) => {
+      const filteredStores = activeWooUrls.size === 0 ? storesRows : storesRows.filter((store) => {
         const normalized = normalizeWooStoreUrl(store.base_url);
         const storeUrl = normalized.ok ? normalized.normalized : store.base_url;
         return activeWooUrls.has(storeUrl);
