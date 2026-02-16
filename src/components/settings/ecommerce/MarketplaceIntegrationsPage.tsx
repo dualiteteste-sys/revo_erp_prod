@@ -60,6 +60,10 @@ import { listDepositos } from '@/services/suprimentos';
 import { listTabelasPreco } from '@/services/pricing';
 import { createRpcBurstGuard } from '@/components/settings/ecommerce/rpcBurstGuard';
 import { normalizeWooStoreUrl } from '@/lib/ecommerce/wooStoreUrl';
+import {
+  buildPreferredEcommerceConnectionsMap,
+  mergeWooDiagnosticsWithSnapshot,
+} from '@/lib/ecommerce/wooConnectionState';
 
 type Provider = MarketplaceProvider;
 type CatalogProvider = Exclude<Provider, 'woo'>;
@@ -319,24 +323,16 @@ export default function MarketplaceIntegrationsPage() {
     guardToastShownRef.current['ecommerce_connection_diagnostics:woo'] = false;
     try {
       const diag = await getEcommerceConnectionDiagnostics('woo');
-      // FIX: When the save RPC confirmed credentials are stored but diagnostics
-      // still returns false (migration lag / stale function), preserve the local truth.
-      const snapshot = wooSecretsStoredSnapshotRef.current;
-      if (
-        snapshot &&
-        snapshot.has_consumer_key === true &&
-        snapshot.has_consumer_secret === true &&
-        (diag.has_consumer_key !== true || diag.has_consumer_secret !== true)
-      ) {
-        diag.has_consumer_key = true;
-        diag.has_consumer_secret = true;
-      }
-      setWooDiag(diag);
+      const merged = mergeWooDiagnosticsWithSnapshot({
+        diagnostics: diag,
+        snapshot: wooSecretsStoredSnapshotRef.current,
+      });
+      setWooDiag(merged.diagnostics);
       setWooDiagUnavailable(false);
-      if (diag.has_consumer_key === true && diag.has_consumer_secret === true) {
+      if (merged.backendConfirmsCredentials) {
         setWooSecretsStoredSnapshot(null);
       }
-      return diag;
+      return merged.diagnostics;
     } catch {
       setWooDiagUnavailable(true);
       return null;
@@ -531,10 +527,12 @@ export default function MarketplaceIntegrationsPage() {
   }, [activeConnection, addToast, configOpen]);
 
   const byProvider = useMemo(() => {
-    const map = new Map<string, EcommerceConnection>();
-    for (const c of connections) map.set(c.provider, c);
+    const preferredByProvider: Partial<Record<Provider, string | null>> | undefined = activeConnection
+      ? { [activeConnection.provider as Provider]: activeConnection.id }
+      : undefined;
+    const map = buildPreferredEcommerceConnectionsMap(connections, MARKETPLACE_PROVIDER_IDS, preferredByProvider);
     return map;
-  }, [connections]);
+  }, [activeConnection, connections]);
 
   const syncSummaryLabel = useCallback((provider: Provider) => {
     const row = syncStateByProvider[provider];
