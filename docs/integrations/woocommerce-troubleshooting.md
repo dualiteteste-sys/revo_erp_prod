@@ -36,3 +36,25 @@ Checklist:
 
 - Use `stores.sync.stock` / `stores.sync.price` com SKUs específicos para corrigir divergências pontuais.
 - Recomenda-se rodar `stores.product_map.build` após mudanças grandes de catálogo.
+
+## Credenciais “salvam”, mas a UI volta para “não armazenada”
+
+Sintoma:
+- Após clicar **Salvar credenciais**, aparece toast verde, mas em ~1s os sinalizadores voltam para:
+  - “Consumer Key não armazenada”
+  - “Consumer Secret não armazenada”
+
+Causa raiz típica:
+- O front salva via `ecommerce_woo_set_secrets_v2`, mas logo em seguida consulta `ecommerce_connection_diagnostics('woo')`.
+- Se o banco estiver com uma versão antiga/bugada de `ecommerce_connection_diagnostics`, ela pode retornar `has_consumer_key/has_consumer_secret=false`,
+  e o React interpreta isso como “não armazenado”.
+
+Como validar (sem expor segredos):
+- Confirme que a migration de correção foi aplicada e que a função usa `woo_consumer_key/woo_consumer_secret` como fonte de verdade.
+- Migrations relevantes:
+  - `supabase/migrations/20270215100000_fix_woo_diagnostics_credentials_visibility.sql`
+  - `supabase/migrations/20270216190000_fix_woo_diagnostics_secrets_source_of_truth.sql`
+
+Observação importante:
+- Falha em **Testar conexão** (ex.: rate limit/546/timeout) não deve fazer `has_consumer_key/has_consumer_secret` virar `false`.
+  Esses flags devem refletir apenas “secrets stored?” (estado no DB), enquanto `connection_status` reflete o resultado do teste.

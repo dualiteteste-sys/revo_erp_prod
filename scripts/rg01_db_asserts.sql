@@ -75,3 +75,25 @@ BEGIN
   END IF;
 END;
 $$;
+
+-- RG01 (ecommerce): diagnostics deve usar colunas de secrets Woo (anti-regressão do bug "pendente").
+DO $$
+DECLARE
+  v_def text;
+BEGIN
+  SELECT pg_get_functiondef(p.oid) INTO v_def
+  FROM pg_proc p
+  JOIN pg_namespace n ON n.oid = p.pronamespace
+  WHERE n.nspname = 'public'
+    AND p.proname = 'ecommerce_connection_diagnostics'
+  LIMIT 1;
+
+  IF v_def IS NULL THEN
+    RAISE EXCEPTION 'RG01 fail: missing function public.ecommerce_connection_diagnostics(text)';
+  END IF;
+
+  IF position('woo_consumer_key' in v_def) = 0 OR position('woo_consumer_secret' in v_def) = 0 THEN
+    RAISE EXCEPTION 'RG01 fail: ecommerce_connection_diagnostics must check woo_consumer_key/woo_consumer_secret (stored secrets)';
+  END IF;
+END;
+$$;
