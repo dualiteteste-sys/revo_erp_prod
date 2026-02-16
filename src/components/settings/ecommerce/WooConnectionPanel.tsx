@@ -10,6 +10,7 @@ import { useAuth } from '@/contexts/AuthProvider';
 import { useToast } from '@/contexts/ToastProvider';
 import { supabase } from '@/lib/supabaseClient';
 import { normalizeWooStoreUrl } from '@/lib/ecommerce/wooStoreUrl';
+import { pickPreferredEcommerceConnection } from '@/lib/ecommerce/wooConnectionState';
 import {
   disconnectEcommerceConnection,
   getEcommerceConnectionDiagnostics,
@@ -44,40 +45,6 @@ function toWooConfigDraft(connection: EcommerceConnection | null): WooConfigDraf
     sync_interval_minutes: Number(config.sync_interval_minutes ?? 15),
     price_percent_default: Number(config.price_percent_default ?? 0),
   };
-}
-
-function pickPreferredWooConnection(rows: EcommerceConnection[], currentConnectionId?: string | null): EcommerceConnection | null {
-  const wooRows = rows.filter((row) => row.provider === 'woo');
-  if (wooRows.length === 0) return null;
-
-  if (currentConnectionId) {
-    const same = wooRows.find((row) => row.id === currentConnectionId);
-    if (same) return same;
-  }
-
-  const sorted = [...wooRows].sort((a, b) => {
-    const statusScore = (status: string | null | undefined) => {
-      const normalized = String(status ?? '').toLowerCase();
-      if (normalized === 'connected') return 0;
-      if (normalized === 'pending') return 1;
-      if (normalized === 'error') return 2;
-      if (normalized === 'disconnected') return 4;
-      return 3;
-    };
-    const urlScore = (row: EcommerceConnection) => (String(row?.config?.store_url ?? '').trim() ? 0 : 1);
-    const updatedA = new Date(a.updated_at).getTime();
-    const updatedB = new Date(b.updated_at).getTime();
-
-    const statusDiff = statusScore(a.status) - statusScore(b.status);
-    if (statusDiff !== 0) return statusDiff;
-
-    const storeUrlDiff = urlScore(a) - urlScore(b);
-    if (storeUrlDiff !== 0) return storeUrlDiff;
-
-    return updatedB - updatedA;
-  });
-
-  return sorted[0] ?? null;
 }
 
 function statusBadge(status?: string | null) {
@@ -118,7 +85,7 @@ export default function WooConnectionPanel() {
     setLoading(true);
     try {
       const rows = await listEcommerceConnections();
-      const woo = pickPreferredWooConnection(rows, connection?.id ?? null);
+      const woo = pickPreferredEcommerceConnection(rows, 'woo', connection?.id ?? null);
       setConnection(woo);
       setStoreUrl(String(woo?.config?.store_url ?? ''));
       setConfigDraft(toWooConfigDraft(woo));
