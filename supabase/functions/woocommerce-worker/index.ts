@@ -11,6 +11,7 @@ import {
   normalizeWooStoreUrl,
   parsePositiveIntEnv,
   pickUniqueByStoreType,
+  resolveWooInfraKeys,
   type ClassifiedWooError,
   type WooAuthMode,
 } from "../_shared/woocommerceHardening.ts";
@@ -1333,8 +1334,12 @@ Deno.serve(async (req) => {
   const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
   const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
   const masterKey = Deno.env.get("INTEGRATIONS_MASTER_KEY") ?? "";
-  const workerKey = Deno.env.get("WOOCOMMERCE_WORKER_KEY") ?? "";
-  if (!supabaseUrl || !serviceKey) return json(500, { ok: false, error: "ENV_NOT_CONFIGURED" }, cors);
+  const { workerKey } = resolveWooInfraKeys((key) => Deno.env.get(key));
+  const missing: string[] = [];
+  if (!supabaseUrl) missing.push("SUPABASE_URL");
+  if (!serviceKey) missing.push("SUPABASE_SERVICE_ROLE_KEY");
+  if (!workerKey) missing.push("WOOCOMMERCE_WORKER_KEY");
+  if (missing.length) return json(500, { ok: false, error: "ENV_NOT_CONFIGURED", missing }, cors);
   if (!masterKey) return json(500, { ok: false, error: "MASTER_KEY_MISSING" }, cors);
 
   const headerKey = (req.headers.get("x-woocommerce-worker-key") ?? "").trim();
