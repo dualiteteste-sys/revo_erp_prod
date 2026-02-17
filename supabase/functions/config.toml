@@ -4,6 +4,15 @@
 [functions.focusnfe-webhook]
   verify_jwt = false
 
+[functions.woocommerce-webhook]
+  verify_jwt = false
+
+[functions.woocommerce-worker]
+  verify_jwt = false
+
+[functions.woocommerce-scheduler]
+  verify_jwt = false
+
 [functions.manual-create-user]
   cors_origins = ["http://localhost:5173"]
   cors_methods = ["POST", "OPTIONS"]
