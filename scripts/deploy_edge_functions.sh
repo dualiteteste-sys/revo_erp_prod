@@ -21,6 +21,10 @@ no_verify_jwt=(
   "stripe-webhook"
   "billing-webhook"
   "focusnfe-webhook"
+  # WooCommerce: endpoints públicos/infra usam auth via keys próprios (não JWT).
+  "woocommerce-webhook"
+  "woocommerce-worker"
+  "woocommerce-scheduler"
 )
 
 is_no_verify() {
