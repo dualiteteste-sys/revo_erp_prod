@@ -203,7 +203,6 @@ async function findProductIdBySku(svc: any, empresaId: string, sku: string): Pro
     .select("id")
     .eq("empresa_id", empresaId)
     .eq("sku", s)
-    .is("deleted_at", null)
     .maybeSingle();
   return data?.id ? String(data.id) : null;
 }
@@ -319,7 +318,6 @@ async function createOrUpdateRevoProductFromWoo(params: {
     .select("id")
     .eq("empresa_id", params.empresaId)
     .eq("sku", sku)
-    .is("deleted_at", null)
     .maybeSingle();
 
   if (existing?.id) {
@@ -607,8 +605,7 @@ async function syncBySkus(params: {
     .from("produtos")
     .select("id,sku,estoque_atual,preco_venda")
     .eq("empresa_id", secrets.empresaId)
-    .in("sku", skus)
-    .is("deleted_at", null);
+    .in("sku", skus);
   if (prodErr) throw prodErr;
   const productsBySku = new Map<string, any>();
   for (const p of (Array.isArray(products) ? products : [])) {
@@ -1010,7 +1007,6 @@ async function runWorkerBatch(params: {
             .select("id,nome,descricao,status,preco_venda,estoque_atual")
             .eq("empresa_id", secrets.empresaId)
             .eq("id", revoProductId)
-            .is("deleted_at", null)
             .maybeSingle();
           if (!revoProduct?.id) {
             await updateRunItemStatus({

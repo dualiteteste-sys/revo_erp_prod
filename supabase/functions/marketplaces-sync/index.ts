@@ -322,7 +322,6 @@ async function loadProdutosForWooSync(params: {
     .select("id,nome,sku,estoque_atual,preco_venda,ativo,controlar_estoque")
     .eq("empresa_id", params.empresaId)
     .eq("ativo", true)
-    .is("deleted_at", null)
     .not("sku", "is", null);
 
   if (params.kind === "sync_stock") {
@@ -377,7 +376,6 @@ async function findProductForWooItem(admin: any, empresaId: string, item: any): 
     .select("id")
     .eq("empresa_id", empresaId)
     .eq("sku", sku)
-    .is("deleted_at", null)
     .maybeSingle();
   return data?.id ? String(data.id) : null;
 }
