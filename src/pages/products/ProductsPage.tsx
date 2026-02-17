@@ -392,16 +392,6 @@ const ProductsPage: React.FC = () => {
             ))}
           </Select>
 
-          {!wooStoreId && (
-            <Button
-              variant="outline"
-              onClick={() => navigate('/app/configuracoes/ecommerce/marketplaces')}
-              disabled={effectiveLoading}
-            >
-              Configurar
-            </Button>
-          )}
-
           <Button
             onClick={() => {
               if (!wooStoreId) {
