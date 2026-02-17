@@ -5,6 +5,24 @@
 
 do $$
 begin
+  -- 0) Woo diagnostics deve ler secrets corretamente (evita "salva e volta a não armazenada")
+  -- Guardrails:
+  -- - deve usar FOUND (v_conn_found) e NÃO depender de null-check ambíguo em record/rowtype
+  -- - deve referenciar woo_consumer_key/woo_consumer_secret no cálculo
+  if to_regprocedure('public.ecommerce_connection_diagnostics(text)') is not null then
+    if position('v_conn_found' in (select pg_get_functiondef('public.ecommerce_connection_diagnostics(text)'::regprocedure))) = 0 then
+      raise exception 'RG-03: public.ecommerce_connection_diagnostics não usa v_conn_found/FOUND (risco de false negative em has_consumer_key).';
+    end if;
+    if position('woo_consumer_key' in (select pg_get_functiondef('public.ecommerce_connection_diagnostics(text)'::regprocedure))) = 0
+       or position('woo_consumer_secret' in (select pg_get_functiondef('public.ecommerce_connection_diagnostics(text)'::regprocedure))) = 0
+    then
+      raise exception 'RG-03: public.ecommerce_connection_diagnostics não referencia woo_consumer_key/woo_consumer_secret.';
+    end if;
+    if position('public.ecommerces%rowtype' in lower((select pg_get_functiondef('public.ecommerce_connection_diagnostics(text)'::regprocedure)))) > 0 then
+      raise exception 'RG-03: public.ecommerce_connection_diagnostics usa %%ROWTYPE + SELECT explícito (risco de desalinhamento por ordem de colunas).';
+    end if;
+  end if;
+
   -- 1) Evita PostgREST HTTP_300 por overload ambíguo
   if exists (
     select 1
