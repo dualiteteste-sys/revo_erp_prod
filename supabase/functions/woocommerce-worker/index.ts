@@ -1328,67 +1328,108 @@ async function runWorkerBatch(params: {
 
 Deno.serve(async (req) => {
   const cors = buildCorsHeaders(req);
-  if (req.method === "OPTIONS") return new Response(null, { status: 204, headers: cors });
-  if (req.method !== "POST") return json(405, { ok: false, error: "METHOD_NOT_ALLOWED" }, cors);
-
-  const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
-  const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
-  const masterKey = Deno.env.get("INTEGRATIONS_MASTER_KEY") ?? "";
-  const { workerKey } = resolveWooInfraKeys((key) => Deno.env.get(key));
-  const missing: string[] = [];
-  if (!supabaseUrl) missing.push("SUPABASE_URL");
-  if (!serviceKey) missing.push("SUPABASE_SERVICE_ROLE_KEY");
-  if (!workerKey) missing.push("WOOCOMMERCE_WORKER_KEY");
-  if (missing.length) return json(500, { ok: false, error: "ENV_NOT_CONFIGURED", missing }, cors);
-  if (!masterKey) return json(500, { ok: false, error: "MASTER_KEY_MISSING" }, cors);
-
-  const headerKey = (req.headers.get("x-woocommerce-worker-key") ?? "").trim();
-  if (!workerKey || !headerKey || !timingSafeEqual(workerKey, headerKey)) {
-    return json(401, { ok: false, error: "UNAUTHORIZED_WORKER" }, cors);
-  }
-
   const requestId = getRequestId(req);
-  const svc = createClient(supabaseUrl, serviceKey, {
-    auth: { persistSession: false, autoRefreshToken: false },
-    global: { headers: { "x-revo-request-id": requestId } },
-  });
 
-  const body = (await req.json().catch(() => ({}))) as any;
-  const storeId = body?.store_id ? String(body.store_id) : null;
-  const limit = body?.limit != null ? Math.max(1, Math.min(20, Number(body.limit))) : 5;
-  const runScheduler = !!body?.scheduler;
-  const maxBatches = parsePositiveIntEnv(String(body?.max_batches ?? ""), 20);
-  const schedulerRetentionDays = parsePositiveIntEnv(Deno.env.get("WOOCOMMERCE_WEBHOOK_RETENTION_DAYS"), 14);
-  const lockOwner = `woocommerce-worker:${requestId}`.slice(0, 60);
+  let svc: any = null;
+  let storeId: string | null = null;
+  let empresaId: string | null = null;
 
-  const mergedResults: any[] = [];
-  let processedJobs = 0;
+  try {
+    if (req.method === "OPTIONS") return new Response(null, { status: 204, headers: cors });
+    if (req.method !== "POST") return json(405, { ok: false, error: "METHOD_NOT_ALLOWED" }, cors);
 
-  for (let i = 0; i < (runScheduler ? maxBatches : 1); i++) {
-    const batch = await runWorkerBatch({
-      svc,
-      masterKey,
-      storeId,
-      limit,
-      lockOwner,
+    const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
+    const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
+    const masterKey = Deno.env.get("INTEGRATIONS_MASTER_KEY") ?? "";
+    const { workerKey } = resolveWooInfraKeys((key) => Deno.env.get(key));
+    const missing: string[] = [];
+    if (!supabaseUrl) missing.push("SUPABASE_URL");
+    if (!serviceKey) missing.push("SUPABASE_SERVICE_ROLE_KEY");
+    if (!workerKey) missing.push("WOOCOMMERCE_WORKER_KEY");
+    if (missing.length) return json(500, { ok: false, error: "ENV_NOT_CONFIGURED", missing }, cors);
+    if (!masterKey) return json(500, { ok: false, error: "MASTER_KEY_MISSING" }, cors);
+
+    const headerKey = (req.headers.get("x-woocommerce-worker-key") ?? "").trim();
+    if (!workerKey || !headerKey || !timingSafeEqual(workerKey, headerKey)) {
+      return json(401, { ok: false, error: "UNAUTHORIZED_WORKER" }, cors);
+    }
+
+    svc = createClient(supabaseUrl, serviceKey, {
+      auth: { persistSession: false, autoRefreshToken: false },
+      global: { headers: { "x-revo-request-id": requestId } },
     });
-    if (batch.processed === 0) break;
-    processedJobs += batch.processed;
-    mergedResults.push(...batch.results);
-  }
 
-  if (runScheduler) {
-    await svc.rpc("woocommerce_webhook_event_cleanup", {
-      p_store_id: storeId,
-      p_keep_days: schedulerRetentionDays,
-      p_limit: 200,
-    }).catch(() => null);
-  }
+    const body = (await req.json().catch(() => ({}))) as any;
+    storeId = body?.store_id ? String(body.store_id) : null;
+    const limit = body?.limit != null ? Math.max(1, Math.min(20, Number(body.limit))) : 5;
+    const runScheduler = !!body?.scheduler;
+    const maxBatches = parsePositiveIntEnv(String(body?.max_batches ?? ""), 20);
+    const schedulerRetentionDays = parsePositiveIntEnv(Deno.env.get("WOOCOMMERCE_WEBHOOK_RETENTION_DAYS"), 14);
+    const lockOwner = `woocommerce-worker:${requestId}`.slice(0, 60);
 
-  return json(200, {
-    ok: true,
-    processed_jobs: processedJobs,
-    scheduler: runScheduler ? { max_batches: maxBatches } : undefined,
-    results: mergedResults,
-  }, cors);
+    if (storeId) {
+      const { data: storeRow } = await svc
+        .from("integrations_woocommerce_store")
+        .select("empresa_id")
+        .eq("id", storeId)
+        .maybeSingle();
+      empresaId = storeRow?.empresa_id ? String(storeRow.empresa_id) : null;
+    }
+
+    const mergedResults: any[] = [];
+    let processedJobs = 0;
+
+    for (let i = 0; i < (runScheduler ? maxBatches : 1); i++) {
+      const batch = await runWorkerBatch({
+        svc,
+        masterKey,
+        storeId,
+        limit,
+        lockOwner,
+      });
+      if (batch.processed === 0) break;
+      processedJobs += batch.processed;
+      mergedResults.push(...batch.results);
+    }
+
+    if (runScheduler) {
+      await svc.rpc("woocommerce_webhook_event_cleanup", {
+        p_store_id: storeId,
+        p_keep_days: schedulerRetentionDays,
+        p_limit: 200,
+      }).catch(() => null);
+    }
+
+    return json(200, {
+      ok: true,
+      processed_jobs: processedJobs,
+      scheduler: runScheduler ? { max_batches: maxBatches } : undefined,
+      results: mergedResults,
+    }, cors);
+  } catch (e: any) {
+    const message = String(e?.message ?? "UNEXPECTED_ERROR");
+    const code = detectWooErrorCode(message);
+    const resolved = resolveWooError(code);
+    if (svc && storeId && empresaId) {
+      await svc.from("woocommerce_sync_log").insert({
+        empresa_id: empresaId,
+        store_id: storeId,
+        level: "error",
+        message: "worker_unhandled_error",
+        meta: sanitizeForLog({
+          request_id: requestId,
+          error: message,
+          error_code: resolved.code,
+          hint: resolved.hint,
+        }),
+      }).catch(() => null);
+    }
+    return json(500, {
+      ok: false,
+      error: message,
+      error_code: resolved.code,
+      hint: resolved.hint,
+      request_id: requestId,
+    }, cors);
+  }
 });
