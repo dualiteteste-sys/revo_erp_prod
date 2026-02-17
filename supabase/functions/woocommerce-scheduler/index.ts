@@ -3,7 +3,7 @@ import { buildCorsHeaders } from "../_shared/cors.ts";
 import { timingSafeEqual } from "../_shared/crypto.ts";
 import { sanitizeForLog } from "../_shared/sanitize.ts";
 import { resolveWooError } from "../_shared/woocommerceErrors.ts";
-import { parsePositiveIntEnv, validateSchedulerKey } from "../_shared/woocommerceHardening.ts";
+import { parsePositiveIntEnv, resolveWooInfraKeys, validateSchedulerKey } from "../_shared/woocommerceHardening.ts";
 
 function json(status: number, body: Record<string, unknown>, cors: Record<string, string>) {
   return new Response(JSON.stringify(body), {
@@ -19,9 +19,13 @@ Deno.serve(async (req) => {
 
   const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
   const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
-  const workerKey = Deno.env.get("WOOCOMMERCE_WORKER_KEY") ?? "";
-  const schedulerKey = Deno.env.get("WOOCOMMERCE_SCHEDULER_KEY") ?? workerKey;
-  if (!supabaseUrl || !workerKey || !serviceKey) return json(500, { ok: false, error: "ENV_NOT_CONFIGURED" }, cors);
+  const { workerKey, schedulerKey } = resolveWooInfraKeys((key) => Deno.env.get(key));
+  const missing: string[] = [];
+  if (!supabaseUrl) missing.push("SUPABASE_URL");
+  if (!serviceKey) missing.push("SUPABASE_SERVICE_ROLE_KEY");
+  if (!workerKey) missing.push("WOOCOMMERCE_WORKER_KEY");
+  if (!schedulerKey) missing.push("WOOCOMMERCE_SCHEDULER_KEY");
+  if (missing.length) return json(500, { ok: false, error: "ENV_NOT_CONFIGURED", missing }, cors);
 
   const headerKey = (req.headers.get("x-woocommerce-scheduler-key") ?? "").trim();
   const auth = validateSchedulerKey({

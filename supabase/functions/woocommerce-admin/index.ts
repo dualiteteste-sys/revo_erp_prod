@@ -5,7 +5,7 @@ import { getRequestId } from "../_shared/request.ts";
 import { hasPermissionOrOwnerAdmin } from "../_shared/rbac.ts";
 import { sanitizeForLog } from "../_shared/sanitize.ts";
 import { detectWooErrorCode, resolveWooError } from "../_shared/woocommerceErrors.ts";
-import { buildWooApiUrl, classifyWooHttpStatus, isEmpresaContextAllowed, normalizeWooStoreUrl, shouldFallbackToActiveEmpresa } from "../_shared/woocommerceHardening.ts";
+import { buildWooApiUrl, classifyWooHttpStatus, isEmpresaContextAllowed, normalizeWooStoreUrl, resolveWooInfraKeys, shouldFallbackToActiveEmpresa } from "../_shared/woocommerceHardening.ts";
 import { buildWooStoreStatusContract } from "../_shared/woocommerceStatusContract.ts";
 
 type Action =
@@ -727,7 +727,7 @@ Deno.serve(async (req) => {
   const anonKey = Deno.env.get("SUPABASE_ANON_KEY") ?? "";
   const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
   const masterKey = Deno.env.get("INTEGRATIONS_MASTER_KEY") ?? "";
-  const workerKey = Deno.env.get("WOOCOMMERCE_WORKER_KEY") ?? "";
+  const { workerKey } = resolveWooInfraKeys((key) => Deno.env.get(key));
   if (!supabaseUrl || !anonKey || !serviceKey) return json(500, { ok: false, error: "ENV_NOT_CONFIGURED" }, cors);
 
   const authHeader = req.headers.get("Authorization") ?? "";
