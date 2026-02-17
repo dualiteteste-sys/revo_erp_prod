@@ -4,10 +4,19 @@ type LastUserAction = {
   at: number;
   route: string | null;
   label: string;
+  correlation_id: string;
 };
 
 let lastAction: LastUserAction | null = null;
 let initialized = false;
+
+function newCorrelationId() {
+  try {
+    return crypto.randomUUID();
+  } catch {
+    return `corr_${Date.now().toString(16)}_${Math.random().toString(16).slice(2)}`;
+  }
+}
 
 function safeText(text: string) {
   return text.replace(/\s+/g, " ").trim().slice(0, 140);
@@ -55,8 +64,9 @@ export function setupLastUserActionTracking() {
         at: Date.now(),
         route: window.location?.pathname ?? null,
         label,
+        correlation_id: newCorrelationId(),
       };
-      recordBreadcrumb({ type: "click", message: label, data: { route: lastAction.route } });
+      recordBreadcrumb({ type: "click", message: label, data: { route: lastAction.route, correlation_id: lastAction.correlation_id } });
     },
     { capture: true }
   );
@@ -69,4 +79,11 @@ export function getLastUserAction(): { route: string | null; label: string; ageM
     label: lastAction.label,
     ageMs: Date.now() - lastAction.at,
   };
+}
+
+export function getActiveCorrelationId(opts?: { maxAgeMs?: number }): string | null {
+  const maxAgeMs = opts?.maxAgeMs ?? 30_000;
+  if (!lastAction) return null;
+  if (Date.now() - lastAction.at > maxAgeMs) return null;
+  return lastAction.correlation_id;
 }

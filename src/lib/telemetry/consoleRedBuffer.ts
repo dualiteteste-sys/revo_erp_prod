@@ -15,6 +15,9 @@ export type ConsoleRedEvent = {
   message: string;
   stack: string | null;
   request_id: string | null;
+  correlation_id: string | null;
+  action: string | null;
+  request_meta: unknown | null;
   http_status: number | null;
   code: string | null;
   url: string | null;
@@ -51,9 +54,12 @@ export function recordConsoleRedEvent(input: {
   message: unknown;
   stack?: unknown;
   request_id?: string | null;
+  correlation_id?: string | null;
   http_status?: number | null;
   code?: string | null;
   url?: string | null;
+  action?: string | null;
+  request_meta?: unknown | null;
 }) {
   if (typeof window === "undefined") return;
 
@@ -94,6 +100,9 @@ export function recordConsoleRedEvent(input: {
     message,
     stack,
     request_id: input.request_id ?? null,
+    correlation_id: input.correlation_id ?? null,
+    action: input.action ?? null,
+    request_meta: input.request_meta ?? null,
     http_status: input.http_status ?? null,
     code: input.code ?? null,
     url: input.url ?? null,
@@ -118,9 +127,12 @@ export function recordConsoleRedEvent(input: {
     stack: ev.stack,
     route: ev.route_base,
     request_id: ev.request_id,
+    correlation_id: ev.correlation_id,
     http_status: ev.http_status,
     code: ev.code,
     url: ev.url,
+    action: ev.action,
+    request_meta: ev.request_meta,
   });
 }
 

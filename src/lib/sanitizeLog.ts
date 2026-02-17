@@ -11,11 +11,13 @@ const MAX_ARRAY_LEN = 50;
 const MAX_DEPTH = 5;
 
 const SENSITIVE_KEY_RE =
-  /(^|_)(password|passwd|secret|token|access_token|refresh_token|id_token|authorization|api(_)?key|stripe(_)?signature|cookie|set-cookie)(_|$)/i;
+  /(^|_)(password|passwd|secret|token|access_token|refresh_token|id_token|authorization|api(_)?key|consumer_key|consumersecret|consumer_secret|stripe(_)?signature|cookie|set-cookie)(_|$)/i;
 
 const EMAIL_RE = /\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/i;
 const JWT_RE = /^[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/;
 const STRIPE_KEY_RE = /\b([rs]k_(live|test)_[A-Za-z0-9]+)\b/;
+const WOO_CONSUMER_KEY_RE = /\b(ck_[a-f0-9]{20,})\b/i;
+const WOO_CONSUMER_SECRET_RE = /\b(cs_[a-f0-9]{20,})\b/i;
 const PHONE_RE = /\b(?:\+?55\s?)?(?:\(?\d{2}\)?\s?)?\d{4,5}-?\d{4}\b/;
 const CPF_CNPJ_RE = /\b\d{11}\b|\b\d{14}\b/;
 const BEARER_RE = /\b(bearer)\s+[A-Za-z0-9._-]{10,}\b/i;
@@ -30,6 +32,8 @@ function sanitizeString(raw: string) {
   let s = raw;
   if (JWT_RE.test(s)) return '[REDACTED_JWT]';
   if (STRIPE_KEY_RE.test(s)) s = s.replace(STRIPE_KEY_RE, '[REDACTED_STRIPE_KEY]');
+  if (WOO_CONSUMER_KEY_RE.test(s)) s = s.replace(WOO_CONSUMER_KEY_RE, '[REDACTED_WOO_CK]');
+  if (WOO_CONSUMER_SECRET_RE.test(s)) s = s.replace(WOO_CONSUMER_SECRET_RE, '[REDACTED_WOO_CS]');
   if (BEARER_RE.test(s)) s = s.replace(BEARER_RE, '$1 [REDACTED_BEARER]');
   if (SENSITIVE_PARAM_RE.test(s)) s = s.replace(SENSITIVE_PARAM_RE, '$1[REDACTED_PARAM]');
   if (EMAIL_RE.test(s)) s = s.replace(EMAIL_RE, '[REDACTED_EMAIL]');
