@@ -143,6 +143,41 @@ export function shouldFallbackToActiveEmpresa(input: {
   return String(input.errorCode ?? "").trim() !== "EMPRESA_CONTEXT_FORBIDDEN";
 }
 
+function firstNonEmptyEnv(
+  getEnv: (key: string) => string | null | undefined,
+  keys: string[],
+): string {
+  for (const key of keys) {
+    const value = String(getEnv(key) ?? "").trim();
+    if (value) return value;
+  }
+  return "";
+}
+
+export function resolveWooInfraKeys(getEnv: (key: string) => string | null | undefined): {
+  workerKey: string;
+  schedulerKey: string;
+} {
+  const workerKey = firstNonEmptyEnv(getEnv, [
+    "WOOCOMMERCE_WORKER_KEY",
+    // legacy aliases (keep compatibility with previously-configured secrets)
+    "WOOCOMMERCE_WORKER",
+    "WOOCOMMERCE_SCHEDULER_KEY",
+    "WOOCOMMERCE_SCHEDULE",
+  ]);
+
+  const schedulerKey = firstNonEmptyEnv(getEnv, [
+    "WOOCOMMERCE_SCHEDULER_KEY",
+    // legacy aliases (keep compatibility with previously-configured secrets)
+    "WOOCOMMERCE_SCHEDULE",
+    // allow single-key setups (scheduler key omitted)
+    "WOOCOMMERCE_WORKER_KEY",
+    "WOOCOMMERCE_WORKER",
+  ]);
+
+  return { workerKey, schedulerKey };
+}
+
 export function validateSchedulerKey(input: {
   providedKey: string | null | undefined;
   expectedKey: string | null | undefined;

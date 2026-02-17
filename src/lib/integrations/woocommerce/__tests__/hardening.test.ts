@@ -7,6 +7,7 @@ import {
   isEmpresaContextAllowed,
   normalizeWooStoreUrl,
   pickUniqueByStoreType,
+  resolveWooInfraKeys,
   shouldFallbackToActiveEmpresa,
   validateSchedulerKey,
 } from "../../../../../supabase/functions/_shared/woocommerceHardening.ts";
@@ -89,6 +90,17 @@ describe("woocommerce hardening", () => {
       status: null,
       error: null,
     });
+  });
+
+  it("resolves infra keys with legacy aliases (scheduler/worker)", () => {
+    const envA: Record<string, string> = { WOOCOMMERCE_SCHEDULE: "k1" };
+    expect(resolveWooInfraKeys((k) => envA[k])).toEqual({ workerKey: "k1", schedulerKey: "k1" });
+
+    const envB: Record<string, string> = { WOOCOMMERCE_WORKER_KEY: "wk" };
+    expect(resolveWooInfraKeys((k) => envB[k])).toEqual({ workerKey: "wk", schedulerKey: "wk" });
+
+    const envC: Record<string, string> = { WOOCOMMERCE_WORKER_KEY: "wk", WOOCOMMERCE_SCHEDULER_KEY: "sk" };
+    expect(resolveWooInfraKeys((k) => envC[k])).toEqual({ workerKey: "wk", schedulerKey: "sk" });
   });
 
   it("computes exponential backoff with floor and cap", () => {
