@@ -29,6 +29,9 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { listWooStores } from '@/services/woocommerceControlPanel';
 import { listWooListingsByProducts } from '@/services/woocommerceCatalog';
 import WooBulkCatalogWizard, { type WooBulkWizardMode } from '@/components/products/woocommerce/WooBulkCatalogWizard';
+import { listEcommerceConnections } from '@/services/ecommerceIntegrations';
+import { pickPreferredEcommerceConnection } from '@/lib/ecommerce/wooConnectionState';
+import { normalizeWooBaseUrl, selectPreferredWooStoreId } from '@/lib/ecommerce/wooStoreSelection';
 
 const ProductsPage: React.FC = () => {
   const { loading: authLoading, activeEmpresaId, activeEmpresa } = useAuth();
@@ -76,6 +79,7 @@ const ProductsPage: React.FC = () => {
   const [bulkLoading, setBulkLoading] = useState(false);
   const [wooStores, setWooStores] = useState<Array<{ id: string; base_url: string; status: string }>>([]);
   const [wooStoreId, setWooStoreId] = useState('');
+  const [wooPreferredBaseUrl, setWooPreferredBaseUrl] = useState<string | null>(null);
   const [wooListingByProductId, setWooListingByProductId] = useState<Map<string, any>>(new Map());
   const [wooWizardMode, setWooWizardMode] = useState<WooBulkWizardMode>('export');
   const [wooWizardOpen, setWooWizardOpen] = useState(false);
@@ -100,16 +104,39 @@ const ProductsPage: React.FC = () => {
   const parentIdsKey = useMemo(() => parentIds.join('|'), [parentIds]);
 
   useEffect(() => {
-    if (!activeEmpresaId) return;
-    listWooStores(activeEmpresaId)
-      .then((stores) => {
+    if (!activeEmpresaId) {
+      setWooStores([]);
+      setWooStoreId('');
+      setWooPreferredBaseUrl(null);
+      return;
+    }
+
+    void (async () => {
+      try {
+        const [stores, connections] = await Promise.all([
+          listWooStores(activeEmpresaId),
+          listEcommerceConnections(),
+        ]);
         setWooStores(stores as any);
-        if (!wooStoreId && stores.length > 0) setWooStoreId(String(stores[0].id));
-      })
-      .catch(() => {
+
+        const preferred = pickPreferredEcommerceConnection(connections, 'woo');
+        const preferredUrl = String(preferred?.config?.store_url ?? '').trim() || null;
+        setWooPreferredBaseUrl(preferredUrl ? normalizeWooBaseUrl(preferredUrl) : null);
+
+        const nextId = selectPreferredWooStoreId({
+          stores: stores as any,
+          preferredStoreUrl: preferredUrl,
+        });
+        setWooStoreId((current) => {
+          if (current && (stores as any[]).some((s) => String((s as any)?.id) === String(current))) return current;
+          return nextId;
+        });
+      } catch {
         setWooStores([]);
         setWooStoreId('');
-      });
+        setWooPreferredBaseUrl(null);
+      }
+    })();
   }, [activeEmpresaId]);
 
   useEffect(() => {
@@ -360,10 +387,22 @@ const ProductsPage: React.FC = () => {
             <option value="">Loja Woo (coluna/status)</option>
             {wooStores.map((store) => (
               <option key={store.id} value={store.id}>
-                {store.base_url} ({store.status})
+                {store.base_url}
+                {wooPreferredBaseUrl && normalizeWooBaseUrl(store.base_url) === wooPreferredBaseUrl ? ' (preferida)' : ''} ({store.status})
               </option>
             ))}
           </Select>
+
+          {!wooStoreId && (
+            <Button
+              variant="outline"
+              onClick={() => navigate('/app/configuracoes/ecommerce/marketplaces')}
+              disabled={effectiveLoading}
+              title="Configurar integrações com marketplaces"
+            >
+              Configurar e-commerce
+            </Button>
+          )}
 
           <Button
             onClick={() => {
