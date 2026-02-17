@@ -69,11 +69,77 @@ jobs:
           VITE_SENTRY_DSN: ${{ secrets.VITE_SENTRY_DSN_PROD }}
         run: yarn build
 
+      - name: Resolve Netlify site id (PROD)
+        if: steps.precheck.outputs.should_deploy == 'true'
+        id: site
+        env:
+          NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
+          NETLIFY_SITE_ID: ${{ secrets.NETLIFY_SITE_ID_PROD }}
+          VITE_SITE_URL: ${{ secrets.VITE_SITE_URL_PROD }}
+        run: |
+          set -euo pipefail
+
+          desired_domain=""
+          if [[ -n "${VITE_SITE_URL:-}" ]]; then
+            desired_domain="$(node -e 'try{console.log(new URL(process.env.VITE_SITE_URL).hostname)}catch(e){process.exit(0)}')"
+          fi
+
+          validate_site_id() {
+            local site_id="$1"
+            [[ -z "$site_id" ]] && return 1
+            curl --silent --show-error --fail \
+              -H "Authorization: Bearer ${NETLIFY_AUTH_TOKEN}" \
+              "https://api.netlify.com/api/v1/sites/${site_id}" >/dev/null
+          }
+
+          resolve_site_id_by_domain() {
+            local domain="$1"
+            [[ -z "$domain" ]] && return 1
+            curl --silent --show-error --fail \
+              -H "Authorization: Bearer ${NETLIFY_AUTH_TOKEN}" \
+              "https://api.netlify.com/api/v1/sites?per_page=200" \
+              | jq -r --arg domain "$domain" '
+                  [ .[]
+                    | select(
+                        (.custom_domain == $domain)
+                        or ((.ssl_url // "") | contains($domain))
+                        or ((.url // "") | contains($domain))
+                      )
+                    | .id
+                  ][0] // empty
+                '
+          }
+
+          site_id="${NETLIFY_SITE_ID:-}"
+          if validate_site_id "$site_id"; then
+            echo "site_id=$site_id" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          if [[ -n "$site_id" ]]; then
+            echo "::warning::NETLIFY_SITE_ID_PROD não está acessível com o NETLIFY_AUTH_TOKEN atual (ou está incorreto). Tentando resolver por domínio."
+          fi
+
+          resolved=""
+          if [[ -n "$desired_domain" ]]; then
+            resolved="$(resolve_site_id_by_domain "$desired_domain" || true)"
+          fi
+
+          if [[ -z "$resolved" ]]; then
+            echo "::error::Não foi possível resolver o site do Netlify para deploy em PROD."
+            echo "::error::Verifique NETLIFY_SITE_ID_PROD e NETLIFY_AUTH_TOKEN (precisam ter acesso ao mesmo site)."
+            echo "::error::VITE_SITE_URL_PROD(host) usado para tentativa automática: ${desired_domain:-<vazio>}"
+            exit 1
+          fi
+
+          echo "::notice::Usando site_id resolvido automaticamente via domínio: ${desired_domain}"
+          echo "site_id=$resolved" >> "$GITHUB_OUTPUT"
+
       - name: Deploy to Netlify (PROD)
         if: steps.precheck.outputs.should_deploy == 'true'
         env:
           NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
-          NETLIFY_SITE_ID: ${{ secrets.NETLIFY_SITE_ID_PROD }}
+          NETLIFY_SITE_ID: ${{ steps.site.outputs.site_id }}
         run: |
           set -euo pipefail
           npx -y netlify-cli@17 deploy --dir dist --prod --site "$NETLIFY_SITE_ID" --message "deploy(prod) ${GITHUB_SHA}"
