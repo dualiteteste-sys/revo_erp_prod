@@ -201,8 +201,10 @@ async function bootstrapStoresFromLegacyConnections(params: {
   empresaId: string;
   masterKey: string;
   requestId: string;
+  processedBaseUrls?: Set<string>;
 }): Promise<number> {
   const { svc, empresaId, masterKey, requestId } = params;
+  const processedBaseUrls = params.processedBaseUrls ?? new Set<string>();
   const { data: legacyRows, error: legacyErr } = await svc
     .from("ecommerces")
     .select("id,config,status,updated_at")
@@ -244,21 +246,53 @@ async function bootstrapStoresFromLegacyConnections(params: {
       continue;
     }
 
-    const storeId = crypto.randomUUID();
+    if (processedBaseUrls.has(baseUrl)) continue;
+
+    const { data: existing } = await svc
+      .from("integrations_woocommerce_store")
+      .select("id")
+      .eq("empresa_id", empresaId)
+      .eq("base_url", baseUrl)
+      .maybeSingle();
+
+    const storeId = String(existing?.id ?? "").trim() || crypto.randomUUID();
     const aad = `${empresaId}:${storeId}`;
     const consumerKeyEnc = await aesGcmEncryptToString({ masterKey, plaintext: secrets.key, aad });
     const consumerSecretEnc = await aesGcmEncryptToString({ masterKey, plaintext: secrets.secret, aad });
-    const { error } = await svc.from("integrations_woocommerce_store").upsert({
+    const status = mapLegacyWooStatusToStoreStatus((row as any)?.status);
+
+    if (existing?.id) {
+      const { error } = await svc
+        .from("integrations_woocommerce_store")
+        .update({
+          auth_mode: "basic_https",
+          status,
+          consumer_key_enc: consumerKeyEnc,
+          consumer_secret_enc: consumerSecretEnc,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", storeId)
+        .eq("empresa_id", empresaId);
+      if (!error) {
+        imported += 1;
+        processedBaseUrls.add(baseUrl);
+      }
+      continue;
+    }
+
+    const { error } = await svc.from("integrations_woocommerce_store").insert({
       id: storeId,
       empresa_id: empresaId,
       base_url: baseUrl,
       auth_mode: "basic_https",
-      status: mapLegacyWooStatusToStoreStatus((row as any)?.status),
+      status,
       consumer_key_enc: consumerKeyEnc,
       consumer_secret_enc: consumerSecretEnc,
-      updated_at: new Date().toISOString(),
-    }, { onConflict: "empresa_id,base_url" });
-    if (!error) imported += 1;
+    });
+    if (!error) {
+      imported += 1;
+      processedBaseUrls.add(baseUrl);
+    }
   }
 
   if (imported > 0) {
@@ -787,12 +821,37 @@ Deno.serve(async (req) => {
         }).catch(() => null);
         throw error;
       }
-      if ((data?.length ?? 0) === 0) {
+      const existingBaseUrls = new Set<string>(
+        (Array.isArray(data) ? data : []).map((row: any) => String(row?.base_url ?? "").trim()).filter(Boolean),
+      );
+      let needsBootstrap = (data?.length ?? 0) === 0;
+      if (!needsBootstrap) {
+        const { data: preferred } = await svc
+          .from("ecommerces")
+          .select("config,updated_at")
+          .eq("empresa_id", empresaId)
+          .eq("provider", "woo")
+          .order("updated_at", { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        const rawStoreUrl = String((preferred as any)?.config?.store_url ?? "").trim();
+        if (rawStoreUrl) {
+          try {
+            const preferredBaseUrl = normalizeWooStoreUrl(rawStoreUrl);
+            if (!existingBaseUrls.has(preferredBaseUrl)) needsBootstrap = true;
+          } catch {
+            // ignore invalid URL, diagnostics flow will surface this in the settings UI
+          }
+        }
+      }
+
+      if (needsBootstrap) {
         const imported = await bootstrapStoresFromLegacyConnections({
           svc,
           empresaId,
           masterKey,
           requestId,
+          processedBaseUrls: new Set<string>(),
         });
         if (imported > 0) {
           const refresh = await svc

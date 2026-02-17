@@ -29,6 +29,8 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { listWooStores } from '@/services/woocommerceControlPanel';
 import { listWooListingsByProducts } from '@/services/woocommerceCatalog';
 import WooBulkCatalogWizard, { type WooBulkWizardMode } from '@/components/products/woocommerce/WooBulkCatalogWizard';
+import { listEcommerceConnections } from '@/services/ecommerceIntegrations';
+import { pickPreferredEcommerceConnection, selectPreferredWooStoreId } from '@/lib/ecommerce/wooConnectionState';
 
 const ProductsPage: React.FC = () => {
   const { loading: authLoading, activeEmpresaId, activeEmpresa } = useAuth();
@@ -100,16 +102,36 @@ const ProductsPage: React.FC = () => {
   const parentIdsKey = useMemo(() => parentIds.join('|'), [parentIds]);
 
   useEffect(() => {
-    if (!activeEmpresaId) return;
-    listWooStores(activeEmpresaId)
-      .then((stores) => {
+    if (!activeEmpresaId) {
+      setWooStores([]);
+      setWooStoreId('');
+      return;
+    }
+
+    void (async () => {
+      try {
+        const [stores, connections] = await Promise.all([
+          listWooStores(activeEmpresaId),
+          listEcommerceConnections(),
+        ]);
         setWooStores(stores as any);
-        if (!wooStoreId && stores.length > 0) setWooStoreId(String(stores[0].id));
-      })
-      .catch(() => {
+
+        const preferred = pickPreferredEcommerceConnection(connections, 'woo');
+        const preferredUrl = String(preferred?.config?.store_url ?? '').trim() || null;
+
+        const nextId = selectPreferredWooStoreId({
+          stores: stores as any,
+          preferredStoreUrl: preferredUrl,
+        });
+        setWooStoreId((current) => {
+          if (current && (stores as any[]).some((s) => String((s as any)?.id) === String(current))) return current;
+          return nextId;
+        });
+      } catch {
         setWooStores([]);
         setWooStoreId('');
-      });
+      }
+    })();
   }, [activeEmpresaId]);
 
   useEffect(() => {

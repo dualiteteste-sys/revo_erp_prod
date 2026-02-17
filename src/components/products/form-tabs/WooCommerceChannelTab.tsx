@@ -6,6 +6,8 @@ import { getWooListingByProduct, linkWooListingBySku, unlinkWooListing } from '@
 import { forceWooPriceSync, forceWooStockSync } from '@/services/woocommerceControlPanel';
 import type { ProductFormData } from '@/components/products/ProductFormPanel';
 import { Button } from '@/components/ui/button';
+import { listEcommerceConnections } from '@/services/ecommerceIntegrations';
+import { pickPreferredEcommerceConnection, selectPreferredWooStoreId } from '@/lib/ecommerce/wooConnectionState';
 
 type Props = {
   data: ProductFormData;
@@ -25,16 +27,39 @@ export default function WooCommerceChannelTab({ data }: Props) {
   }, [data.sku]);
 
   useEffect(() => {
-    if (!activeEmpresaId) return;
+    if (!activeEmpresaId) {
+      setStores([]);
+      setStoreId('');
+      return;
+    }
+
     setLoading(true);
-    listWooStores(activeEmpresaId)
-      .then((rows) => {
+    void (async () => {
+      try {
+        const [rows, connections] = await Promise.all([
+          listWooStores(activeEmpresaId),
+          listEcommerceConnections(),
+        ]);
         setStores(rows as any);
-        if (!storeId && rows.length > 0) setStoreId(String(rows[0].id));
-      })
-      .catch((error: any) => addToast(error?.message || 'Falha ao carregar lojas Woo.', 'error'))
-      .finally(() => setLoading(false));
-  }, [activeEmpresaId]);
+        const preferred = pickPreferredEcommerceConnection(connections, 'woo');
+        const preferredUrl = String(preferred?.config?.store_url ?? '').trim() || null;
+        const nextId = selectPreferredWooStoreId({
+          stores: rows as any,
+          preferredStoreUrl: preferredUrl,
+        });
+        setStoreId((current) => {
+          if (current && (rows as any[]).some((s) => String((s as any)?.id) === String(current))) return current;
+          return nextId;
+        });
+      } catch (error: any) {
+        addToast(error?.message || 'Falha ao carregar lojas Woo.', 'error');
+        setStores([]);
+        setStoreId('');
+      } finally {
+        setLoading(false);
+      }
+    })();
+  }, [activeEmpresaId, addToast]);
 
   const canUse = !!activeEmpresaId && !!storeId && !!data.id;
 
