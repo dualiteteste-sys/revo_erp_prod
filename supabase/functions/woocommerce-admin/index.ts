@@ -386,7 +386,6 @@ async function loadRevoProductsForCatalog(params: {
     .from("produtos")
     .select("id,nome,sku,status,preco_venda,estoque_atual,descricao,updated_at,produto_pai_id")
     .eq("empresa_id", params.empresaId)
-    .is("deleted_at", null)
     .limit(1000);
 
   if (ids.length > 0) query = query.in("id", ids);
