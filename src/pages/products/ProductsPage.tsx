@@ -30,8 +30,7 @@ import { listWooStores } from '@/services/woocommerceControlPanel';
 import { listWooListingsByProducts } from '@/services/woocommerceCatalog';
 import WooBulkCatalogWizard, { type WooBulkWizardMode } from '@/components/products/woocommerce/WooBulkCatalogWizard';
 import { listEcommerceConnections } from '@/services/ecommerceIntegrations';
-import { pickPreferredEcommerceConnection } from '@/lib/ecommerce/wooConnectionState';
-import { normalizeWooBaseUrl, selectPreferredWooStoreId } from '@/lib/ecommerce/wooStoreSelection';
+import { normalizeWooBaseUrl, pickPreferredEcommerceConnection, selectPreferredWooStoreId } from '@/lib/ecommerce/wooConnectionState';
 
 const ProductsPage: React.FC = () => {
   const { loading: authLoading, activeEmpresaId, activeEmpresa } = useAuth();

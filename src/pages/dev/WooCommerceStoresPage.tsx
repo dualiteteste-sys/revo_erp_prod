@@ -7,8 +7,7 @@ import PageHeader from '@/components/ui/PageHeader';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/contexts/AuthProvider';
 import { useToast } from '@/contexts/ToastProvider';
-import { pickPreferredEcommerceConnection } from '@/lib/ecommerce/wooConnectionState';
-import { normalizeWooBaseUrl } from '@/lib/ecommerce/wooStoreSelection';
+import { normalizeWooBaseUrl, pickPreferredEcommerceConnection } from '@/lib/ecommerce/wooConnectionState';
 import { listEcommerceConnections } from '@/services/ecommerceIntegrations';
 import { listWooStores, type WooStore } from '@/services/woocommerceControlPanel';
 

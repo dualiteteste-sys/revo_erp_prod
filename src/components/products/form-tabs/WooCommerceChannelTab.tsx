@@ -7,8 +7,7 @@ import { forceWooPriceSync, forceWooStockSync } from '@/services/woocommerceCont
 import type { ProductFormData } from '@/components/products/ProductFormPanel';
 import { Button } from '@/components/ui/button';
 import { listEcommerceConnections } from '@/services/ecommerceIntegrations';
-import { pickPreferredEcommerceConnection } from '@/lib/ecommerce/wooConnectionState';
-import { selectPreferredWooStoreId } from '@/lib/ecommerce/wooStoreSelection';
+import { pickPreferredEcommerceConnection, selectPreferredWooStoreId } from '@/lib/ecommerce/wooConnectionState';
 
 type Props = {
   data: ProductFormData;
