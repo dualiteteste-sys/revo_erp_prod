@@ -354,17 +354,25 @@ async function logWooEvent(params: {
   });
 }
 
-async function workerInvoke(params: { supabaseUrl: string; workerKey: string; storeId: string; limit?: number }) {
+async function workerInvoke(params: { supabaseUrl: string; workerKey: string; storeId: string; limit?: number; requestId?: string }) {
   const url = `${params.supabaseUrl}/functions/v1/woocommerce-worker`;
   const resp = await fetch(url, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
       "x-woocommerce-worker-key": params.workerKey,
+      ...(params.requestId ? { "x-revo-request-id": params.requestId } : {}),
     },
     body: JSON.stringify({ store_id: params.storeId, limit: params.limit ?? 10 }),
   });
-  const data = await resp.json().catch(() => ({}));
+  const raw = await resp.text().catch(() => "");
+  const data = (() => {
+    try {
+      return raw ? JSON.parse(raw) : {};
+    } catch {
+      return raw ? { raw: raw.slice(0, 2000) } : {};
+    }
+  })();
   return { ok: resp.ok, status: resp.status, data };
 }
 
@@ -1064,7 +1072,7 @@ Deno.serve(async (req) => {
       }).then((r: any) => r.data as string).catch(() => null);
 
       let worker: any = null;
-      if (workerKey) worker = await workerInvoke({ supabaseUrl, workerKey, storeId, limit: 10 });
+      if (workerKey) worker = await workerInvoke({ supabaseUrl, workerKey, storeId, limit: 10, requestId });
       return json(200, { ok: true, enqueued_job_id: jobId, worker }, cors);
     }
 
@@ -1202,7 +1210,7 @@ Deno.serve(async (req) => {
       if (error) throw error;
 
       let worker: any = null;
-      if (workerKey) worker = await workerInvoke({ supabaseUrl, workerKey, storeId, limit: 10 });
+      if (workerKey) worker = await workerInvoke({ supabaseUrl, workerKey, storeId, limit: 10, requestId });
       return json(200, { ok: true, enqueued_job_id: jobId, worker }, cors);
     }
 
@@ -1222,7 +1230,7 @@ Deno.serve(async (req) => {
       if (error) throw error;
 
       let worker: any = null;
-      if (workerKey) worker = await workerInvoke({ supabaseUrl, workerKey, storeId, limit: 10 });
+      if (workerKey) worker = await workerInvoke({ supabaseUrl, workerKey, storeId, limit: 10, requestId });
       return json(200, { ok: true, enqueued_job_id: jobId, worker }, cors);
     }
 
@@ -1329,7 +1337,7 @@ Deno.serve(async (req) => {
       }
 
       let worker: any = null;
-      if (workerKey && runnable.length > 0) worker = await workerInvoke({ supabaseUrl, workerKey, storeId, limit: 20 });
+      if (workerKey && runnable.length > 0) worker = await workerInvoke({ supabaseUrl, workerKey, storeId, limit: 20, requestId });
       return json(200, {
         ok: true,
         run_id: runId,
@@ -1461,7 +1469,7 @@ Deno.serve(async (req) => {
         : null;
 
       let worker: any = null;
-      if (workerKey && runnableWooIds.length > 0) worker = await workerInvoke({ supabaseUrl, workerKey, storeId, limit: 20 });
+      if (workerKey && runnableWooIds.length > 0) worker = await workerInvoke({ supabaseUrl, workerKey, storeId, limit: 20, requestId });
       return json(200, {
         ok: true,
         run_id: runId,
@@ -1594,7 +1602,7 @@ Deno.serve(async (req) => {
       const enqueuedJobId = await enqueueRunJob({ user, storeId, runType: retryRunType, payload: runPayload });
 
       let worker: any = null;
-      if (workerKey) worker = await workerInvoke({ supabaseUrl, workerKey, storeId, limit: 20 });
+      if (workerKey) worker = await workerInvoke({ supabaseUrl, workerKey, storeId, limit: 20, requestId });
       return json(200, {
         ok: true,
         run_id: newRunId,
@@ -1630,7 +1638,7 @@ Deno.serve(async (req) => {
         return json(400, { ok: false, error: "WORKER_KEY_NOT_CONFIGURED" }, cors);
       }
       const limit = Math.min(Math.max(Number(body?.limit ?? 25), 1), 100);
-      const worker = await workerInvoke({ supabaseUrl, workerKey, storeId, limit });
+      const worker = await workerInvoke({ supabaseUrl, workerKey, storeId, limit, requestId });
       if (!worker?.ok) {
         await logWooEvent({
           svc,
@@ -1694,7 +1702,7 @@ Deno.serve(async (req) => {
       });
 
       let worker: any = null;
-      if (workerKey) worker = await workerInvoke({ supabaseUrl, workerKey, storeId, limit: 10 });
+      if (workerKey) worker = await workerInvoke({ supabaseUrl, workerKey, storeId, limit: 10, requestId });
       return json(200, { ok: true, job_id: jobId, status: "queued", worker }, cors);
     }
 
