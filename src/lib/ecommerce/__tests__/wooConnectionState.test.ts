@@ -3,7 +3,9 @@ import { describe, expect, it } from 'vitest';
 import {
   buildPreferredEcommerceConnectionsMap,
   mergeWooDiagnosticsWithSnapshot,
+  normalizeWooBaseUrl,
   pickPreferredEcommerceConnection,
+  selectPreferredWooStoreId,
 } from '@/lib/ecommerce/wooConnectionState';
 import { type EcommerceConnection, type EcommerceConnectionDiagnostics, type WooSecretsSaveResult } from '@/services/ecommerceIntegrations';
 
@@ -134,5 +136,17 @@ describe('wooConnectionState', () => {
     expect(merged.backendConfirmsCredentials).toBe(true);
     expect(merged.diagnostics.has_consumer_key).toBe(true);
     expect(merged.diagnostics.has_consumer_secret).toBe(true);
+  });
+
+  it('normaliza store_url e encontra store preferida', () => {
+    const id = selectPreferredWooStoreId({
+      stores: [
+        { id: '1', base_url: 'https://old.example.com', status: 'active' },
+        { id: '2', base_url: 'https://tudoparatatuagem.com.br', status: 'active' },
+      ],
+      preferredStoreUrl: 'https://tudoparatatuagem.com.br/',
+    });
+    expect(id).toBe('2');
+    expect(normalizeWooBaseUrl('https://tudoparatatuagem.com.br/')).toBe('https://tudoparatatuagem.com.br');
   });
 });

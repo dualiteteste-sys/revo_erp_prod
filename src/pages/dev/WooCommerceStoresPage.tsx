@@ -7,8 +7,7 @@ import PageHeader from '@/components/ui/PageHeader';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/contexts/AuthProvider';
 import { useToast } from '@/contexts/ToastProvider';
-import { normalizeWooStoreUrl } from '@/lib/ecommerce/wooStoreUrl';
-import { pickPreferredEcommerceConnection } from '@/lib/ecommerce/wooConnectionState';
+import { normalizeWooBaseUrl, pickPreferredEcommerceConnection } from '@/lib/ecommerce/wooConnectionState';
 import { listEcommerceConnections } from '@/services/ecommerceIntegrations';
 import { listWooStores, type WooStore } from '@/services/woocommerceControlPanel';
 
@@ -26,10 +25,12 @@ export default function WooCommerceStoresPage() {
   const { addToast } = useToast();
   const [loading, setLoading] = useState(true);
   const [stores, setStores] = useState<WooStore[]>([]);
+  const [preferredBaseUrl, setPreferredBaseUrl] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     if (!activeEmpresaId) {
       setStores([]);
+      setPreferredBaseUrl(null);
       setLoading(false);
       return;
     }
@@ -42,24 +43,12 @@ export default function WooCommerceStoresPage() {
 
       const preferredWooConnection = pickPreferredEcommerceConnection(connectionsRows, 'woo');
       const preferredWooUrl = String(preferredWooConnection?.config?.store_url ?? '').trim();
-      const activeWooUrls = new Set(
-        preferredWooUrl
-          ? [preferredWooUrl].map((url) => {
-            const normalized = normalizeWooStoreUrl(url);
-            return normalized.ok ? normalized.normalized : url;
-          })
-          : [],
-      );
-
-      const filteredStores = activeWooUrls.size === 0 ? storesRows : storesRows.filter((store) => {
-        const normalized = normalizeWooStoreUrl(store.base_url);
-        const storeUrl = normalized.ok ? normalized.normalized : store.base_url;
-        return activeWooUrls.has(storeUrl);
-      });
-      setStores(filteredStores);
+      setPreferredBaseUrl(normalizeWooBaseUrl(preferredWooUrl));
+      setStores(storesRows);
     } catch (error: any) {
       addToast(error?.message || 'Falha ao carregar lojas WooCommerce.', 'error');
       setStores([]);
+      setPreferredBaseUrl(null);
     } finally {
       setLoading(false);
     }
@@ -91,7 +80,14 @@ export default function WooCommerceStoresPage() {
 
       {activeEmpresaId && !loading && stores.length === 0 && (
         <GlassCard className="p-6 text-sm text-slate-600">
-          Nenhuma loja WooCommerce cadastrada para a empresa ativa.
+          <p>Nenhuma loja WooCommerce cadastrada para a empresa ativa.</p>
+          <div className="mt-4">
+            <Button asChild size="sm" variant="outline">
+              <Link to="/app/configuracoes/ecommerce/marketplaces">
+                Abrir configurações
+              </Link>
+            </Button>
+          </div>
         </GlassCard>
       )}
 
@@ -100,7 +96,12 @@ export default function WooCommerceStoresPage() {
           <GlassCard key={store.id} className="space-y-3 p-4">
             <div className="flex items-start justify-between gap-2">
               <div className="min-w-0">
-                <p className="truncate text-sm font-semibold text-slate-900">{store.base_url}</p>
+                <p className="truncate text-sm font-semibold text-slate-900">
+                  {store.base_url}
+                  {preferredBaseUrl && normalizeWooBaseUrl(store.base_url) === preferredBaseUrl && (
+                    <span className="ml-2 inline-flex items-center rounded-full bg-blue-100 px-2 py-0.5 text-[10px] font-semibold text-blue-700">★</span>
+                  )}
+                </p>
                 <p className="mt-1 text-xs text-slate-500">{store.id}</p>
               </div>
               {statusBadge(store.status)}
