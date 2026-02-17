@@ -30,7 +30,7 @@ import { listWooStores } from '@/services/woocommerceControlPanel';
 import { listWooListingsByProducts } from '@/services/woocommerceCatalog';
 import WooBulkCatalogWizard, { type WooBulkWizardMode } from '@/components/products/woocommerce/WooBulkCatalogWizard';
 import { listEcommerceConnections } from '@/services/ecommerceIntegrations';
-import { normalizeWooBaseUrl, pickPreferredEcommerceConnection, selectPreferredWooStoreId } from '@/lib/ecommerce/wooConnectionState';
+import { pickPreferredEcommerceConnection, selectPreferredWooStoreId } from '@/lib/ecommerce/wooConnectionState';
 
 const ProductsPage: React.FC = () => {
   const { loading: authLoading, activeEmpresaId, activeEmpresa } = useAuth();
@@ -78,7 +78,6 @@ const ProductsPage: React.FC = () => {
   const [bulkLoading, setBulkLoading] = useState(false);
   const [wooStores, setWooStores] = useState<Array<{ id: string; base_url: string; status: string }>>([]);
   const [wooStoreId, setWooStoreId] = useState('');
-  const [wooPreferredBaseUrl, setWooPreferredBaseUrl] = useState<string | null>(null);
   const [wooListingByProductId, setWooListingByProductId] = useState<Map<string, any>>(new Map());
   const [wooWizardMode, setWooWizardMode] = useState<WooBulkWizardMode>('export');
   const [wooWizardOpen, setWooWizardOpen] = useState(false);
@@ -106,7 +105,6 @@ const ProductsPage: React.FC = () => {
     if (!activeEmpresaId) {
       setWooStores([]);
       setWooStoreId('');
-      setWooPreferredBaseUrl(null);
       return;
     }
 
@@ -120,7 +118,6 @@ const ProductsPage: React.FC = () => {
 
         const preferred = pickPreferredEcommerceConnection(connections, 'woo');
         const preferredUrl = String(preferred?.config?.store_url ?? '').trim() || null;
-        setWooPreferredBaseUrl(preferredUrl ? normalizeWooBaseUrl(preferredUrl) : null);
 
         const nextId = selectPreferredWooStoreId({
           stores: stores as any,
@@ -133,7 +130,6 @@ const ProductsPage: React.FC = () => {
       } catch {
         setWooStores([]);
         setWooStoreId('');
-        setWooPreferredBaseUrl(null);
       }
     })();
   }, [activeEmpresaId]);
@@ -386,7 +382,6 @@ const ProductsPage: React.FC = () => {
             <option value="">Loja Woo (coluna/status)</option>
             {wooStores.map((store) => (
               <option key={store.id} value={store.id}>
-                {wooPreferredBaseUrl && normalizeWooBaseUrl(store.base_url) === wooPreferredBaseUrl ? '★ ' : ''}
                 {store.base_url} ({store.status})
               </option>
             ))}
