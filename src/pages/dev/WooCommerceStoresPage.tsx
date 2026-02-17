@@ -81,12 +81,6 @@ export default function WooCommerceStoresPage() {
       {activeEmpresaId && !loading && stores.length === 0 && (
         <GlassCard className="p-6 text-sm text-slate-600">
           <p>Nenhuma loja WooCommerce cadastrada para a empresa ativa.</p>
-          {preferredBaseUrl && (
-            <p className="mt-2 text-xs text-slate-500">
-              Existe uma URL de loja preferida configurada (<span className="font-medium">{preferredBaseUrl}</span>), mas ela ainda não foi materializada
-              como loja interna. Clique em <span className="font-medium">Atualizar</span> para forçar a sincronização da loja.
-            </p>
-          )}
           <div className="mt-4">
             <Button asChild size="sm" variant="outline">
               <Link to="/app/configuracoes/ecommerce/marketplaces">
@@ -105,9 +99,7 @@ export default function WooCommerceStoresPage() {
                 <p className="truncate text-sm font-semibold text-slate-900">
                   {store.base_url}
                   {preferredBaseUrl && normalizeWooBaseUrl(store.base_url) === preferredBaseUrl && (
-                    <span className="ml-2 inline-flex items-center rounded-full bg-blue-100 px-2 py-0.5 text-[10px] font-semibold text-blue-700">
-                      Preferida
-                    </span>
+                    <span className="ml-2 inline-flex items-center rounded-full bg-blue-100 px-2 py-0.5 text-[10px] font-semibold text-blue-700">★</span>
                   )}
                 </p>
                 <p className="mt-1 text-xs text-slate-500">{store.id}</p>

@@ -386,8 +386,8 @@ const ProductsPage: React.FC = () => {
             <option value="">Loja Woo (coluna/status)</option>
             {wooStores.map((store) => (
               <option key={store.id} value={store.id}>
-                {store.base_url}
-                {wooPreferredBaseUrl && normalizeWooBaseUrl(store.base_url) === wooPreferredBaseUrl ? ' (preferida)' : ''} ({store.status})
+                {wooPreferredBaseUrl && normalizeWooBaseUrl(store.base_url) === wooPreferredBaseUrl ? '★ ' : ''}
+                {store.base_url} ({store.status})
               </option>
             ))}
           </Select>
@@ -397,9 +397,8 @@ const ProductsPage: React.FC = () => {
               variant="outline"
               onClick={() => navigate('/app/configuracoes/ecommerce/marketplaces')}
               disabled={effectiveLoading}
-              title="Configurar integrações com marketplaces"
             >
-              Configurar e-commerce
+              Configurar
             </Button>
           )}
 
