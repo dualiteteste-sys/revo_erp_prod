@@ -3,7 +3,7 @@ import type { Database } from "@/types/database.types";
 import { logger } from "@/lib/logger";
 import { newRequestId } from "@/lib/requestId";
 import { recordNetworkError } from "@/lib/telemetry/networkErrors";
-import { getLastUserAction } from "@/lib/telemetry/lastUserAction";
+import { getActiveCorrelationId, getLastUserAction } from "@/lib/telemetry/lastUserAction";
 import { buildOpsAppErrorFingerprint } from "@/lib/telemetry/opsAppErrorsFingerprint";
 import { getRoutePathname } from "@/lib/telemetry/routeSnapshot";
 import { getModalContextStackSnapshot } from "@/lib/telemetry/modalContextStack";
@@ -105,6 +105,7 @@ async function logOps403FetchBestEffort(input: {
 
 async function logOpsAppErrorFetchBestEffort(input: {
   requestId: string;
+  correlationId: string | null;
   url: string;
   route: string | null;
   lastAction: string | null;
@@ -114,6 +115,8 @@ async function logOpsAppErrorFetchBestEffort(input: {
   code: string | null;
   message: string;
   responseText: string | null;
+  action: string | null;
+  requestMeta: unknown | null;
   headers: Headers;
 }) {
   try {
@@ -150,6 +153,9 @@ async function logOpsAppErrorFetchBestEffort(input: {
       p_fingerprint: key,
       p_context: {
         route_base: routeBase,
+        correlation_id: input.correlationId,
+        request_action: input.action,
+        request_meta: input.requestMeta,
         modal_context_stack: modalStack.map((m) => ({
           kind: m.kind,
           name: m.name,
@@ -212,12 +218,33 @@ export const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey, {
       const isEdgeFn = /\/functions\/v1\//.test(url);
       const isRest = /\/rest\/v1\//.test(url);
       const subject = getNetworkSubject(url, isRpc, isEdgeFn);
+      const correlationId = getActiveCorrelationId({ maxAgeMs: 30_000 });
       const timeoutMs = method === "GET" || method === "HEAD"
         ? 30000
         : isRpc || isEdgeFn
           ? 60000
           : 45000;
       const startedAtMs = Date.now();
+
+      const extractEdgeAction = () => {
+        if (!isEdgeFn) return { action: null as string | null, requestMeta: null as unknown | null };
+        const body = init?.body;
+        if (!body || typeof body !== "string") return { action: null, requestMeta: null };
+        try {
+          const parsed = JSON.parse(body);
+          const action = typeof parsed?.action === "string" ? parsed.action : null;
+          if (!action) return { action: null, requestMeta: null };
+          const meta: Record<string, unknown> = {};
+          if (typeof parsed?.store_id === "string") meta.store_id = parsed.store_id;
+          if (typeof parsed?.run_id === "string") meta.run_id = parsed.run_id;
+          if (Array.isArray(parsed?.skus)) meta.skus_len = parsed.skus.length;
+          if (Array.isArray(parsed?.revo_product_ids)) meta.revo_product_ids_len = parsed.revo_product_ids.length;
+          if (Array.isArray(parsed?.woo_product_ids)) meta.woo_product_ids_len = parsed.woo_product_ids.length;
+          return { action, requestMeta: meta };
+        } catch {
+          return { action: null, requestMeta: null };
+        }
+      };
 
       try {
         const headers = new Headers(init?.headers ?? (input instanceof Request ? input.headers : undefined));
@@ -232,6 +259,7 @@ export const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey, {
         }
 
         if (!headers.has("x-revo-request-id")) headers.set("x-revo-request-id", requestId);
+        if (correlationId && !headers.has("x-correlation-id")) headers.set("x-correlation-id", correlationId);
         const controller = new AbortController();
         const timeout = setTimeout(() => controller.abort(), timeoutMs);
         const originalSignal = init?.signal ?? (input instanceof Request ? input.signal : undefined);
@@ -246,6 +274,7 @@ export const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey, {
           if ((isRpc || isEdgeFn) && res.ok && subject) {
             recordNetworkTrace({
               request_id: requestId,
+              correlation_id: correlationId,
               kind: subject.kind,
               name: subject.name,
               method,
@@ -274,7 +303,7 @@ export const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey, {
               recordBreadcrumb({
                 type: "network",
                 message: `${subject?.label ?? "network"} → ${res.status}`,
-                data: { request_id: requestId, status_code: res.status },
+                data: { request_id: requestId, correlation_id: correlationId, status_code: res.status },
               });
 
               // Erros de rede (RPC/Edge) aparecem em vermelho no console do navegador,
@@ -296,12 +325,14 @@ export const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey, {
 
                 const route = typeof window !== "undefined" ? (window.location?.pathname ?? null) : null;
                 const lastAction = getLastUserAction();
+                const edgeAction = extractEdgeAction();
 
                 const msg = `${subject?.label ?? "network"}: ${msgRaw}`;
 
                 if (subject) {
                   recordNetworkTrace({
                     request_id: requestId,
+                    correlation_id: correlationId,
                     kind: subject.kind,
                     name: subject.name,
                     method,
@@ -320,13 +351,17 @@ export const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey, {
                   message: msg,
                   stack: responseText,
                   request_id: requestId,
+                  correlation_id: correlationId,
                   http_status: res.status,
                   code,
                   url,
+                  action: edgeAction.action,
+                  request_meta: edgeAction.requestMeta,
                 });
 
                 await logOpsAppErrorFetchBestEffort({
                   requestId,
+                  correlationId,
                   url,
                   route,
                   lastAction: lastAction?.label ?? null,
@@ -336,6 +371,8 @@ export const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey, {
                   code,
                   message: msg,
                   responseText: responseText && responseText.length < 4000 ? responseText : responseText.slice(0, 4000),
+                  action: edgeAction.action,
+                  requestMeta: edgeAction.requestMeta,
                   headers,
                 });
               } catch {

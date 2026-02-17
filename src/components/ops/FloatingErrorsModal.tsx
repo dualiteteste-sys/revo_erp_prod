@@ -152,7 +152,8 @@ export function FloatingErrorsModal({ open, onClose }: Props) {
   const [size, setSize] = useState<Size>(() => {
     if (typeof window === "undefined") return { w: 960, h: 620 };
     const viewport = { w: window.innerWidth, h: window.innerHeight };
-    const defaultSize = normalizeSize({ w: Math.round(viewport.w * 0.78), h: Math.round(viewport.h * 0.76) }, viewport);
+    // Default: ~30% do viewport (mas respeita mínimos para manter usabilidade).
+    const defaultSize = normalizeSize({ w: Math.round(viewport.w * 0.3), h: Math.round(viewport.h * 0.6) }, viewport);
     return readSize(viewport) ?? defaultSize;
   });
 
@@ -166,10 +167,11 @@ export function FloatingErrorsModal({ open, onClose }: Props) {
     if (!open) return;
     const el = containerRef.current;
     if (!el) return;
-    const rect = el.getBoundingClientRect();
-    if (!rect.width || !rect.height) return;
+    const w = el.clientWidth;
+    const h = el.clientHeight;
+    if (!w || !h) return;
     const viewport = { w: window.innerWidth, h: window.innerHeight };
-    const normalized = normalizeSize({ w: rect.width, h: rect.height }, viewport);
+    const normalized = normalizeSize({ w, h }, viewport);
     setSize(normalized);
     setPos((current) => clampModalPosition(current, viewport, normalized));
   }, [open]);
@@ -178,12 +180,15 @@ export function FloatingErrorsModal({ open, onClose }: Props) {
     if (!open) return;
     const onResize = () => {
       const viewport = { w: window.innerWidth, h: window.innerHeight };
-      setSize((current) => normalizeSize(current, viewport));
-      setPos((current) => clampModalPosition(current, viewport, size));
+      setSize((current) => {
+        const next = normalizeSize(current, viewport);
+        setPos((pos) => clampModalPosition(pos, viewport, next));
+        return next;
+      });
     };
     window.addEventListener("resize", onResize);
     return () => window.removeEventListener("resize", onResize);
-  }, [open, size]);
+  }, [open]);
 
   useEffect(() => {
     if (!open) return;
@@ -193,13 +198,10 @@ export function FloatingErrorsModal({ open, onClose }: Props) {
       const entry = entries[0];
       if (!entry) return;
       const viewport = { w: window.innerWidth, h: window.innerHeight };
-      const nextSize = normalizeSize(
-        {
-          w: Math.round(entry.contentRect.width),
-          h: Math.round(entry.contentRect.height),
-        },
-        viewport,
-      );
+      // Use client sizes (inteiros e estáveis). contentRect pode variar 1px e causar "shrinking" em loop.
+      const w = element.clientWidth;
+      const h = element.clientHeight;
+      const nextSize = normalizeSize({ w, h }, viewport);
       setSize((current) => (current.w === nextSize.w && current.h === nextSize.h ? current : nextSize));
       setPos((current) => clampModalPosition(current, viewport, nextSize));
       writeSize(nextSize);
@@ -387,6 +389,9 @@ export function FloatingErrorsModal({ open, onClose }: Props) {
                   <div className="mt-1 text-[11px] text-slate-500">
                     {event.triage.category} - {event.triage.reason}
                   </div>
+                  {event.action ? (
+                    <div className="mt-1 line-clamp-1 font-mono text-[11px] text-slate-500">{event.action}</div>
+                  ) : null}
                   <div className="mt-1 line-clamp-1 font-mono text-[11px] text-slate-500">{event.route_base ?? "-"}</div>
                 </li>
               ))}
@@ -401,6 +406,13 @@ export function FloatingErrorsModal({ open, onClose }: Props) {
               <div className="text-sm font-semibold text-slate-900">{selected.message}</div>
               <div className="text-xs text-slate-600">
                 {selected.source} - {selected.level} - {selected.triage.category}
+              </div>
+              <div className="mt-1 grid grid-cols-1 gap-1 text-[11px] text-slate-600">
+                <div className="font-mono">request_id: {selected.request_id ?? "—"}</div>
+                <div className="font-mono">correlation_id: {selected.correlation_id ?? "—"}</div>
+                <div className="font-mono">http: {selected.http_status ?? "—"} | code: {selected.code ?? "—"}</div>
+                <div className="font-mono">action: {selected.action ?? "—"}</div>
+                {selected.request_meta ? <div className="font-mono">meta: {JSON.stringify(selected.request_meta)}</div> : null}
               </div>
               <div className="break-all font-mono text-xs text-slate-600">{selected.route_base ?? "-"}</div>
               <div className="break-all font-mono text-xs text-slate-500">{selected.fingerprint}</div>

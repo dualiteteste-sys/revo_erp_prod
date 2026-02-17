@@ -15,9 +15,12 @@ export type ErrorIncidentEvent = {
   stack?: string | null;
   route: string | null;
   request_id?: string | null;
+  correlation_id?: string | null;
   http_status?: number | null;
   code?: string | null;
   url?: string | null;
+  action?: string | null;
+  request_meta?: unknown | null;
   severity: ErrorIncidentSeverity;
   kind: ErrorIncidentKind;
   fingerprint: string;
@@ -32,6 +35,9 @@ export type ErrorIncident = {
   message: string;
   route: string | null;
   request_id: string | null;
+  correlation_id: string | null;
+  action: string | null;
+  request_meta: unknown | null;
   url: string | null;
   http_status: number | null;
   code: string | null;
@@ -47,9 +53,12 @@ type IncidentInput = {
   stack?: unknown;
   route?: string | null;
   request_id?: string | null;
+  correlation_id?: string | null;
   http_status?: number | null;
   code?: string | null;
   url?: string | null;
+  action?: string | null;
+  request_meta?: unknown | null;
 };
 
 const NOISE_PATTERNS: RegExp[] = [
@@ -139,9 +148,12 @@ function eventFromInput(input: IncidentInput): ErrorIncidentEvent {
     stack,
     route,
     request_id: input.request_id ?? null,
+    correlation_id: input.correlation_id ?? null,
     http_status: input.http_status ?? null,
     code: input.code ?? null,
     url: input.url ?? null,
+    action: input.action ?? null,
+    request_meta: input.request_meta ?? null,
     severity,
     kind,
     fingerprint,
@@ -197,6 +209,9 @@ export function recordErrorIncident(input: IncidentInput) {
       message: event.message,
       route: event.route ?? null,
       request_id: event.request_id ?? null,
+      correlation_id: event.correlation_id ?? null,
+      action: event.action ?? null,
+      request_meta: event.request_meta ?? null,
       url: event.url ?? null,
       http_status: event.http_status ?? null,
       code: event.code ?? null,
@@ -213,6 +228,9 @@ export function recordErrorIncident(input: IncidentInput) {
     prev.code = event.code ?? prev.code;
     prev.url = event.url ?? prev.url;
     prev.route = event.route ?? prev.route;
+    prev.correlation_id = event.correlation_id ?? prev.correlation_id;
+    prev.action = event.action ?? prev.action;
+    prev.request_meta = event.request_meta ?? prev.request_meta;
     prev.message = event.message || prev.message;
     prev.stack_sample = event.stack ?? prev.stack_sample;
     if (event.severity === "P0" || (event.severity === "P1" && prev.severity === "P2")) prev.severity = event.severity;
@@ -279,8 +297,11 @@ export function buildIncidentPrompt(incident: ErrorIncident, opts?: { userNote?:
     `- Fonte: ${incident.source}`,
     `- Rota: ${incident.route ?? "—"}`,
     `- request_id: ${incident.request_id ?? "—"}`,
+    `- correlation_id: ${incident.correlation_id ?? "—"}`,
     `- HTTP: ${incident.http_status ?? "—"} | code: ${incident.code ?? "—"}`,
     `- URL: ${incident.url ?? "—"}`,
+    `- Action: ${incident.action ?? "—"}`,
+    incident.request_meta ? `- Request meta: ${JSON.stringify(sanitizeLogData(incident.request_meta))}` : null,
     `- Modal stack: ${modalLine}`,
     `- Primeira ocorrência: ${formatWhen(incident.first_seen_at)}`,
     `- Última ocorrência: ${formatWhen(incident.last_seen_at)}`,

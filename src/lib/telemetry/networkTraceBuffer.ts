@@ -5,6 +5,7 @@ export type NetworkTraceKind = "rpc" | "edge";
 export type NetworkTraceItem = {
   at: string;
   request_id: string;
+  correlation_id?: string | null;
   kind: NetworkTraceKind;
   name: string;
   method: string;
@@ -81,6 +82,7 @@ export function recordNetworkTrace(input: Omit<NetworkTraceItem, "at" | "url"> &
     push({
       at: input.at ?? new Date().toISOString(),
       request_id: String(safe.request_id),
+      correlation_id: typeof (safe as any).correlation_id === "string" ? String((safe as any).correlation_id) : null,
       kind: safe.kind,
       name: String(safe.name).slice(0, 140),
       method: String(safe.method).slice(0, 12),
