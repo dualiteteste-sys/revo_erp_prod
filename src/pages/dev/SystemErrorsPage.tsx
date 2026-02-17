@@ -64,6 +64,9 @@ function buildDevMessage(row: OpsAppErrorRow, extra?: { userEmail?: string; user
   const action = row.last_action ? row.last_action : "—";
   const origin = typeof window !== "undefined" ? window.location?.origin ?? "" : "";
   const consoleMsg = row.message ?? "—";
+  const correlationId = typeof row.context?.correlation_id === "string" ? row.context.correlation_id : null;
+  const requestAction = typeof row.context?.request_action === "string" ? row.context.request_action : null;
+  const requestMeta = row.context?.request_meta ?? null;
   const networkLine =
     row.url || row.http_status || row.response_text
       ? `${row.method ?? "GET"} ${row.url ?? "—"} → ${row.http_status ?? "—"}`
@@ -91,11 +94,14 @@ function buildDevMessage(row: OpsAppErrorRow, extra?: { userEmail?: string; user
   blocks.push(`- response: ${response}`);
   if (origin) blocks.push(`- origin: ${origin}`);
   if (row.request_id) blocks.push(`- request_id: ${row.request_id}`);
+  if (correlationId) blocks.push(`- correlation_id: ${correlationId}`);
   if (row.code) blocks.push(`- code: ${row.code}`);
+  if (requestAction) blocks.push(`- action: ${requestAction}`);
+  if (requestMeta) blocks.push(`- request_meta: ${JSON.stringify(requestMeta)}`);
   blocks.push("");
   blocks.push("### Passos para reproduzir");
   blocks.push(`- Abrir ${where}`);
-  blocks.push(`- Repetir ação: ${action}`);
+  blocks.push(`- Repetir ação: ${action}${requestAction ? ` (edge action: ${requestAction})` : ""}`);
   blocks.push("- Observar console/network e comparar request_id.");
   if (extra?.userNote) blocks.push(`- Observação do usuário: ${extra.userNote}`);
   if (extra?.userEmail) blocks.push(`- Contato: ${extra.userEmail}`);
