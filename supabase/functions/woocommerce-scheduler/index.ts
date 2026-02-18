@@ -43,8 +43,8 @@ Deno.serve(async (req) => {
   });
 
   const body = (await req.json().catch(() => ({}))) as Record<string, unknown>;
-  const limit = parsePositiveIntEnv(String(body?.limit ?? ""), 10);
-  const maxBatches = parsePositiveIntEnv(String(body?.max_batches ?? ""), 25);
+  const limit = Math.min(parsePositiveIntEnv(String(body?.limit ?? ""), 10), 10);
+  const maxBatches = Math.min(parsePositiveIntEnv(String(body?.max_batches ?? ""), 25), 25);
   const storeId = body?.store_id ? String(body.store_id) : null;
   const startedAt = Date.now();
 

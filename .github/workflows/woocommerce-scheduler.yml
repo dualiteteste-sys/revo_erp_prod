@@ -26,8 +26,8 @@ jobs:
           fi
           curl --fail-with-body --show-error --silent \
             --connect-timeout 10 \
-            --max-time 30 \
+            --max-time 180 \
             -X POST "${SUPABASE_URL}/functions/v1/woocommerce-scheduler" \
             -H "Content-Type: application/json" \
             -H "x-woocommerce-scheduler-key: ${WOOCOMMERCE_SCHEDULER_KEY}" \
-            --data '{"limit":10,"max_batches":25}'
+            --data '{"limit":5,"max_batches":5}'
