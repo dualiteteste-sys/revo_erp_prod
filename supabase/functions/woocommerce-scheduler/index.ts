@@ -45,6 +45,8 @@ Deno.serve(async (req) => {
   const body = (await req.json().catch(() => ({}))) as Record<string, unknown>;
   const limit = Math.min(parsePositiveIntEnv(String(body?.limit ?? ""), 10), 10);
   const maxBatches = Math.min(parsePositiveIntEnv(String(body?.max_batches ?? ""), 25), 25);
+  const deadlineMsRaw = body?.deadline_ms != null ? Number(body.deadline_ms) : NaN;
+  const deadlineMs = Number.isFinite(deadlineMsRaw) ? Math.min(120_000, Math.max(0, Math.trunc(deadlineMsRaw))) : 0;
   const storeId = body?.store_id ? String(body.store_id) : null;
   const startedAt = Date.now();
 
@@ -59,6 +61,7 @@ Deno.serve(async (req) => {
       limit,
       max_batches: maxBatches,
       store_id: storeId,
+      deadline_ms: deadlineMs || undefined,
     }),
   });
   const workerData = await workerResp.json().catch(() => ({}));

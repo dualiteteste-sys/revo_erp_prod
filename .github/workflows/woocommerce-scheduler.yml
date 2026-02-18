@@ -30,4 +30,4 @@ jobs:
             -X POST "${SUPABASE_URL}/functions/v1/woocommerce-scheduler" \
             -H "Content-Type: application/json" \
             -H "x-woocommerce-scheduler-key: ${WOOCOMMERCE_SCHEDULER_KEY}" \
-            --data '{"limit":5,"max_batches":5}'
+            --data '{"limit":2,"max_batches":1,"deadline_ms":25000}'
