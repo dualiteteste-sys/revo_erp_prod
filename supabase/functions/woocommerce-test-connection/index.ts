@@ -8,6 +8,7 @@ import {
   classifyWooConnectionFailure,
   type WooConnectionAttempt,
 } from "../_shared/woocommerceConnectionDiagnosis.ts";
+import { maybeHandleWooMockRequest } from "../_shared/wooMock.ts";
 
 type TestRequest = {
   ecommerce_id?: string;
@@ -107,6 +108,27 @@ function okJson(body: Record<string, unknown>, cors: Record<string, string>) {
     status: 200,
     headers: { "Content-Type": "application/json", ...cors },
   });
+}
+
+async function wooFetch(
+  url: string,
+  init?: RequestInit,
+): Promise<{ ok: boolean; status: number; json: () => Promise<any> }> {
+  const mock = maybeHandleWooMockRequest({ url, init, getEnv: (k) => Deno.env.get(k) });
+  if (mock) {
+    return {
+      ok: mock.ok,
+      status: mock.status,
+      json: async () => mock.data,
+    };
+  }
+
+  const resp = await fetch(url, init);
+  return {
+    ok: resp.ok,
+    status: resp.status,
+    json: async () => await resp.json().catch(() => null),
+  };
 }
 
 function errorJson(
@@ -231,7 +253,7 @@ Deno.serve(async (req) => {
     };
     try {
       const wpStartedAt = Date.now();
-      const wpRes = await fetch(`${storeUrl}/wp-json/`, {
+      const wpRes = await wooFetch(`${storeUrl}/wp-json/`, {
         method: "GET",
         headers: {
           "Accept": "application/json",
@@ -270,11 +292,11 @@ Deno.serve(async (req) => {
             query: path === "products" ? { per_page: "1" } : undefined,
             userAgent: "UltriaERP/woocommerce-test-connection",
           });
-          const res = await fetch(url, {
+          const res = await wooFetch(url, {
             method: "GET",
             headers,
           });
-          const body = await res.json().catch(() => null);
+          const body = await res.json();
           const bodyCode = typeof (body as any)?.code === "string" ? String((body as any).code) : null;
           const bodyMessage = typeof (body as any)?.message === "string" ? String((body as any).message).slice(0, 240) : null;
 

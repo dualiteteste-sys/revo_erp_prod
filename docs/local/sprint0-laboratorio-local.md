@@ -37,6 +37,8 @@ Executar:
 Use a URL:
 - `https://woo-mock.ultria.invalid`
 
+Na UI, o botão **“Testar conexão”** funciona offline quando a URL acima é usada (o endpoint `woocommerce-test-connection` também respeita o mock).
+
 Observações:
 - O mock é ativado automaticamente **em ambiente local** quando a URL da loja for `https://woo-mock.ultria.invalid` (sem depender de env/secrets).
 - As variáveis “custom” do Edge Runtime (ex.: `INTEGRATIONS_MASTER_KEY`) podem não ser injetadas automaticamente pelo Supabase local. Para isso, o backend aplica um **fallback local seguro** (somente quando `SUPABASE_URL` é `http://kong:*`/`127.0.0.1`) para destravar desenvolvimento offline.
