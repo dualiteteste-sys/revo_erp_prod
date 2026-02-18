@@ -4,7 +4,7 @@ import { aesGcmDecryptFromString, hmacSha256Base64, timingSafeEqual } from "../_
 import { getRequestId } from "../_shared/request.ts";
 import { sanitizeForLog } from "../_shared/sanitize.ts";
 import { detectWooErrorCode, resolveWooError } from "../_shared/woocommerceErrors.ts";
-import { dedupeKeyForWebhook, dropReconcileDedupeKey, parsePositiveIntEnv } from "../_shared/woocommerceHardening.ts";
+import { dedupeKeyForWebhook, dropReconcileDedupeKey, parsePositiveIntEnv, resolveIntegrationsMasterKey } from "../_shared/woocommerceHardening.ts";
 
 type WebhookHeaders = {
   topic: string;
@@ -187,7 +187,7 @@ Deno.serve(async (req) => {
 
   const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
   const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
-  const masterKey = Deno.env.get("INTEGRATIONS_MASTER_KEY") ?? "";
+  const masterKey = resolveIntegrationsMasterKey((key) => Deno.env.get(key));
   const webhookMaxBytes = parsePositiveIntEnv(Deno.env.get("WOOCOMMERCE_WEBHOOK_MAX_BYTES"), 262_144);
   const webhookRateLimitPerMinute = parsePositiveIntEnv(Deno.env.get("WOOCOMMERCE_WEBHOOK_RATE_LIMIT_PER_MINUTE"), 120);
   const webhookRetentionDays = parsePositiveIntEnv(Deno.env.get("WOOCOMMERCE_WEBHOOK_RETENTION_DAYS"), 14);
