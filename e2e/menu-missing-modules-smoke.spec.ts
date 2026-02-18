@@ -201,7 +201,8 @@ test('Menu missing modules: rotas principais abrem (MVP)', async ({ page }) => {
 
   for (const c of cases) {
     await page.goto(c.path);
-    await expect(page.getByRole('heading', { name: c.heading })).toBeVisible();
+    // As rotas fazem boot de várias queries; em dev (não-CI) o expect default é 5s e pode flakar.
+    await expect(page.getByRole('heading', { name: c.heading })).toBeVisible({ timeout: 20_000 });
   }
 });
 
