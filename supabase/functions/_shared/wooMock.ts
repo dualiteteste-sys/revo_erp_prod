@@ -110,6 +110,19 @@ export function maybeHandleWooMockRequest(input: {
   if (u.origin !== baseOrigin) return null;
 
   const path = u.pathname;
+  if ((path === "/wp-json" || path === "/wp-json/") && (input.init?.method ?? "GET").toUpperCase() === "GET") {
+    const headers = new Headers({ "content-type": "application/json" });
+    return {
+      ok: true,
+      status: 200,
+      data: {
+        name: "Ultria Woo Mock",
+        namespaces: ["wc/v3", "wp/v2"],
+      },
+      headers,
+    };
+  }
+
   const v3Prefix = "/wp-json/wc/v3/";
   const idx = path.indexOf(v3Prefix);
   if (idx === -1) return { ok: false, status: 404, data: { message: "mock: not wc/v3" }, headers: new Headers() };
@@ -118,6 +131,20 @@ export function maybeHandleWooMockRequest(input: {
   const parts = resource.split("/").filter(Boolean);
 
   const headers = new Headers({ "content-type": "application/json" });
+
+  // GET system_status
+  if (parts[0] === "system_status" && parts.length === 1 && (input.init?.method ?? "GET").toUpperCase() === "GET") {
+    return {
+      ok: true,
+      status: 200,
+      data: {
+        environment: { version: "9.9.9-mock" },
+        settings: {},
+        database: {},
+      },
+      headers,
+    };
+  }
 
   // GET products
   if (parts[0] === "products" && parts.length === 1 && (input.init?.method ?? "GET").toUpperCase() === "GET") {
