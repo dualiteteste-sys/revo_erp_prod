@@ -63,6 +63,12 @@ function sleep(ms: number) {
   return new Promise((r) => setTimeout(r, ms));
 }
 
+function clampInt(value: unknown, fallback: number, min: number, max: number): number {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return fallback;
+  return Math.min(max, Math.max(min, Math.trunc(n)));
+}
+
 function toWooPrice(value: unknown): string {
   const n = Number(value);
   if (!Number.isFinite(n)) return "0.00";
@@ -95,16 +101,31 @@ function chooseNextPedidoStatus(current: string | null, desired: string): string
 }
 
 async function wooFetchJson(url: string, init?: RequestInit): Promise<{ ok: boolean; status: number; data: any; headers: Headers }> {
-  const resp = await fetch(url, {
-    ...(init ?? {}),
-    headers: {
-      ...(init?.headers ?? {}),
-      Accept: "application/json",
-      "User-Agent": "UltriaERP/woocommerce-worker",
-    },
-  });
-  const data = await resp.json().catch(() => ({}));
-  return { ok: resp.ok, status: resp.status, data, headers: resp.headers };
+  const timeoutMs = clampInt(Deno.env.get("WOOCOMMERCE_HTTP_TIMEOUT_MS"), 15_000, 1_000, 60_000);
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const resp = await fetch(url, {
+      ...(init ?? {}),
+      signal: controller.signal,
+      headers: {
+        ...(init?.headers ?? {}),
+        Accept: "application/json",
+        "User-Agent": "UltriaERP/woocommerce-worker",
+      },
+    });
+    const data = await resp.json().catch(() => ({}));
+    return { ok: resp.ok, status: resp.status, data, headers: resp.headers };
+  } catch (e: any) {
+    const name = String(e?.name ?? "");
+    if (name === "AbortError") {
+      const classified = resolveWooError("WOO_REMOTE_UNAVAILABLE");
+      throw new WooRequestError(0, classified);
+    }
+    throw e;
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 async function withRetry<T>(fn: () => Promise<T>, maxAttempts = 3): Promise<T> {
@@ -887,6 +908,7 @@ async function runWorkerBatch(params: {
   storeId: string | null;
   limit: number;
   lockOwner: string;
+  deadlineAtMs: number | null;
 }) {
   const { data: claimed, error: claimErr } = await params.svc.rpc("woocommerce_sync_jobs_claim", {
     p_limit: params.limit,
@@ -903,6 +925,7 @@ async function runWorkerBatch(params: {
   const results: any[] = [];
 
   for (const j of runnableJobs) {
+    if (params.deadlineAtMs != null && Date.now() >= params.deadlineAtMs) break;
     const jobId = String(j.id);
     try {
       const secrets = await loadStoreSecrets({ svc: params.svc, masterKey: params.masterKey, storeId: String(j.store_id) });
@@ -976,16 +999,23 @@ async function runWorkerBatch(params: {
           .eq("empresa_id", secrets.empresaId)
           .eq("store_id", secrets.storeId);
 
+        const maxItemsPerJob = clampInt(Deno.env.get("WOOCOMMERCE_CATALOG_ITEMS_PER_TICK"), 10, 1, 50);
+        const yieldDelayMs = clampInt(Deno.env.get("WOOCOMMERCE_CATALOG_YIELD_DELAY_MS"), 30_000, 1_000, 10 * 60_000);
         const { data: runItems } = await params.svc
           .from("woocommerce_sync_run_item")
           .select("id,sku,revo_product_id,woo_product_id,woo_variation_id,action,status")
           .eq("run_id", runId)
           .eq("empresa_id", secrets.empresaId)
           .eq("store_id", secrets.storeId)
-          .in("status", ["QUEUED", "RUNNING"]);
+          .in("status", ["QUEUED", "RUNNING"])
+          .order("id", { ascending: true })
+          .limit(maxItemsPerJob + 1);
         const items = Array.isArray(runItems) ? runItems : [];
+        const hasMore = items.length > maxItemsPerJob;
+        const chunk = hasMore ? items.slice(0, maxItemsPerJob) : items;
 
-        for (const item of items) {
+        for (const item of chunk) {
+          if (params.deadlineAtMs != null && Date.now() >= params.deadlineAtMs) break;
           const itemId = String(item.id);
           const revoProductId = String(item?.revo_product_id ?? "").trim();
           const sku = String(item?.sku ?? "").trim();
@@ -1143,9 +1173,21 @@ async function runWorkerBatch(params: {
         }
 
         await refreshRunSummary({ svc: params.svc, runId, empresaId: secrets.empresaId, storeId: secrets.storeId });
-        await params.svc.rpc("woocommerce_sync_job_complete", { p_job_id: jobId, p_ok: true, p_error: null, p_next_run_at: null });
-        processed += 1;
-        results.push({ job_id: jobId, store_id: secrets.storeId, type: j.type, ok: true, run_id: runId });
+        if (hasMore || (params.deadlineAtMs != null && Date.now() >= params.deadlineAtMs)) {
+          await params.svc.from("woocommerce_sync_job").update({
+            status: "queued",
+            locked_at: null,
+            lock_owner: null,
+            next_run_at: new Date(Date.now() + yieldDelayMs).toISOString(),
+            updated_at: new Date().toISOString(),
+          }).eq("id", jobId);
+          processed += 1;
+          results.push({ job_id: jobId, store_id: secrets.storeId, type: j.type, ok: true, yielded: true, run_id: runId });
+        } else {
+          await params.svc.rpc("woocommerce_sync_job_complete", { p_job_id: jobId, p_ok: true, p_error: null, p_next_run_at: null });
+          processed += 1;
+          results.push({ job_id: jobId, store_id: secrets.storeId, type: j.type, ok: true, run_id: runId });
+        }
         continue;
       }
 
@@ -1159,16 +1201,23 @@ async function runWorkerBatch(params: {
           .eq("empresa_id", secrets.empresaId)
           .eq("store_id", secrets.storeId);
 
+        const maxItemsPerJob = clampInt(Deno.env.get("WOOCOMMERCE_CATALOG_ITEMS_PER_TICK"), 10, 1, 50);
+        const yieldDelayMs = clampInt(Deno.env.get("WOOCOMMERCE_CATALOG_YIELD_DELAY_MS"), 30_000, 1_000, 10 * 60_000);
         const { data: runItems } = await params.svc
           .from("woocommerce_sync_run_item")
           .select("id,sku,revo_product_id,woo_product_id,action,status")
           .eq("run_id", runId)
           .eq("empresa_id", secrets.empresaId)
           .eq("store_id", secrets.storeId)
-          .in("status", ["QUEUED", "RUNNING"]);
+          .in("status", ["QUEUED", "RUNNING"])
+          .order("id", { ascending: true })
+          .limit(maxItemsPerJob + 1);
         const items = Array.isArray(runItems) ? runItems : [];
+        const hasMore = items.length > maxItemsPerJob;
+        const chunk = hasMore ? items.slice(0, maxItemsPerJob) : items;
 
-        for (const item of items) {
+        for (const item of chunk) {
+          if (params.deadlineAtMs != null && Date.now() >= params.deadlineAtMs) break;
           const itemId = String(item.id);
           const wooProductId = Number(item?.woo_product_id ?? 0) || 0;
           if (!wooProductId) {
@@ -1247,9 +1296,21 @@ async function runWorkerBatch(params: {
         }
 
         await refreshRunSummary({ svc: params.svc, runId, empresaId: secrets.empresaId, storeId: secrets.storeId });
-        await params.svc.rpc("woocommerce_sync_job_complete", { p_job_id: jobId, p_ok: true, p_error: null, p_next_run_at: null });
-        processed += 1;
-        results.push({ job_id: jobId, store_id: secrets.storeId, type: j.type, ok: true, run_id: runId });
+        if (hasMore || (params.deadlineAtMs != null && Date.now() >= params.deadlineAtMs)) {
+          await params.svc.from("woocommerce_sync_job").update({
+            status: "queued",
+            locked_at: null,
+            lock_owner: null,
+            next_run_at: new Date(Date.now() + yieldDelayMs).toISOString(),
+            updated_at: new Date().toISOString(),
+          }).eq("id", jobId);
+          processed += 1;
+          results.push({ job_id: jobId, store_id: secrets.storeId, type: j.type, ok: true, yielded: true, run_id: runId });
+        } else {
+          await params.svc.rpc("woocommerce_sync_job_complete", { p_job_id: jobId, p_ok: true, p_error: null, p_next_run_at: null });
+          processed += 1;
+          results.push({ job_id: jobId, store_id: secrets.storeId, type: j.type, ok: true, run_id: runId });
+        }
         continue;
       }
 
@@ -1277,7 +1338,7 @@ async function runWorkerBatch(params: {
       throw new Error("JOB_TYPE_NOT_SUPPORTED");
     } catch (e: any) {
       const message = String(e?.message ?? "JOB_FAILED");
-      const attempt = Number(j.attempts ?? 1);
+      const attempt = Number(j.attempts ?? 0) + 1;
       const nextRunAt = backoffNextRun(attempt);
       const classification = e instanceof WooRequestError
         ? { code: e.code, hint: e.hint, pauseStore: e.pauseStore }
@@ -1365,6 +1426,8 @@ Deno.serve(async (req) => {
     const runScheduler = !!body?.scheduler;
     const maxBatches = parsePositiveIntEnv(String(body?.max_batches ?? ""), 20);
     const schedulerRetentionDays = parsePositiveIntEnv(Deno.env.get("WOOCOMMERCE_WEBHOOK_RETENTION_DAYS"), 14);
+    const deadlineMs = body?.deadline_ms != null ? clampInt(body.deadline_ms, 0, 0, 120_000) : 0;
+    const deadlineAtMs = deadlineMs > 0 ? Date.now() + deadlineMs : null;
     const lockOwner = `woocommerce-worker:${requestId}`.slice(0, 60);
 
     if (storeId) {
@@ -1380,12 +1443,14 @@ Deno.serve(async (req) => {
     let processedJobs = 0;
 
     for (let i = 0; i < (runScheduler ? maxBatches : 1); i++) {
+      if (deadlineAtMs != null && Date.now() >= deadlineAtMs) break;
       const batch = await runWorkerBatch({
         svc,
         masterKey,
         storeId,
         limit,
         lockOwner,
+        deadlineAtMs,
       });
       if (batch.processed === 0) break;
       processedJobs += batch.processed;
