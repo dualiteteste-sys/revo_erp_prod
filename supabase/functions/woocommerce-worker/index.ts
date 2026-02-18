@@ -1458,11 +1458,15 @@ Deno.serve(async (req) => {
     }
 
     if (runScheduler) {
-      await svc.rpc("woocommerce_webhook_event_cleanup", {
-        p_store_id: storeId,
-        p_keep_days: schedulerRetentionDays,
-        p_limit: 200,
-      }).catch(() => null);
+      try {
+        await svc.rpc("woocommerce_webhook_event_cleanup", {
+          p_store_id: storeId,
+          p_keep_days: schedulerRetentionDays,
+          p_limit: 200,
+        });
+      } catch {
+        // best-effort cleanup; never fail the tick due to retention
+      }
     }
 
     return json(200, {
