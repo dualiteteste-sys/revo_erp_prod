@@ -5,6 +5,12 @@ function getEnvFactory(vars: Record<string, string>) {
   return (key: string) => vars[key] ?? null;
 }
 
+type WooMockResponse = NonNullable<ReturnType<typeof maybeHandleWooMockRequest>>;
+
+function getData(resp: WooMockResponse): unknown {
+  return (resp as unknown as { data: unknown }).data;
+}
+
 describe("woo mock", () => {
   it("does not intercept non-mock origins", () => {
     const mock = maybeHandleWooMockRequest({
@@ -23,7 +29,11 @@ describe("woo mock", () => {
     });
     expect(mock?.status).toBe(200);
     expect(mock?.ok).toBe(true);
-    expect(Array.isArray((mock as any)?.data?.namespaces)).toBe(true);
+    const data = getData(mock as WooMockResponse);
+    const namespaces = typeof data === "object" && data !== null
+      ? (data as { namespaces?: unknown }).namespaces
+      : null;
+    expect(Array.isArray(namespaces)).toBe(true);
   });
 
   it("responds to wc/v3 system_status", () => {
@@ -34,7 +44,14 @@ describe("woo mock", () => {
     });
     expect(mock?.status).toBe(200);
     expect(mock?.ok).toBe(true);
-    expect((mock as any)?.data?.environment?.version).toBeTruthy();
+    const data = getData(mock as WooMockResponse);
+    const environment = typeof data === "object" && data !== null
+      ? (data as { environment?: unknown }).environment
+      : null;
+    const version = typeof environment === "object" && environment !== null
+      ? (environment as { version?: unknown }).version
+      : null;
+    expect(Boolean(version)).toBe(true);
   });
 
   it("responds to wc/v3 products list", () => {
@@ -45,7 +62,7 @@ describe("woo mock", () => {
     });
     expect(mock?.status).toBe(200);
     expect(mock?.ok).toBe(true);
-    expect(Array.isArray((mock as any)?.data)).toBe(true);
+    const data = getData(mock as WooMockResponse);
+    expect(Array.isArray(data)).toBe(true);
   });
 });
-
