@@ -175,7 +175,53 @@ export function resolveWooInfraKeys(getEnv: (key: string) => string | null | und
     "WOOCOMMERCE_WORKER",
   ]);
 
+  // Local dev convenience: Supabase local Edge Runtime doesn't automatically inject custom env vars.
+  // Fall back to a stable per-project secret that exists only in local docker runtime.
+  const localFallback = resolveLocalFallbackSecret(getEnv);
+  if (localFallback) {
+    return {
+      workerKey: workerKey || `${localFallback}:woo-worker`,
+      schedulerKey: schedulerKey || workerKey || `${localFallback}:woo-scheduler`,
+    };
+  }
+
   return { workerKey, schedulerKey };
+}
+
+export function resolveIntegrationsMasterKey(getEnv: (key: string) => string | null | undefined): string {
+  const masterKey = firstNonEmptyEnv(getEnv, [
+    "INTEGRATIONS_MASTER_KEY",
+    // legacy aliases (keep compatibility with previously-configured secrets)
+    "INTEGRATIONS_MASTER",
+    "INTEGRATIONS_KEY",
+  ]);
+  if (masterKey) return masterKey;
+
+  // Local dev convenience: use a stable per-project secret that exists only in local docker runtime.
+  const localFallback = resolveLocalFallbackSecret(getEnv);
+  if (localFallback) return localFallback;
+
+  return "";
+}
+
+function resolveLocalFallbackSecret(getEnv: (key: string) => string | null | undefined): string {
+  const internalHostPort = String(getEnv("SUPABASE_INTERNAL_HOST_PORT") ?? "").trim();
+  const supabaseUrl = String(getEnv("SUPABASE_URL") ?? "").trim();
+  const isLocal = Boolean(internalHostPort) || supabaseUrl.startsWith("http://kong:") || supabaseUrl.includes("127.0.0.1");
+  if (!isLocal) return "";
+
+  // Present in Supabase local Edge Runtime docker container; not expected in hosted environments.
+  const internalJwt = String(getEnv("SUPABASE_INTERNAL_JWT_SECRET") ?? "").trim();
+  if (internalJwt) return internalJwt;
+
+  // Some local runtimes only expose the standard Supabase vars to user functions.
+  const serviceRole = String(getEnv("SUPABASE_SERVICE_ROLE_KEY") ?? "").trim();
+  if (serviceRole) return serviceRole;
+
+  const anon = String(getEnv("SUPABASE_ANON_KEY") ?? "").trim();
+  if (anon) return anon;
+
+  return "";
 }
 
 export function validateSchedulerKey(input: {

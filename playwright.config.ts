@@ -41,7 +41,10 @@ const viteEnvPrefix = shouldInjectViteSupabaseEnv
   ? 'VITE_SUPABASE_URL=http://127.0.0.1:54321 VITE_SUPABASE_ANON_KEY=e2e_dummy '
   : '';
 
-const webServerCommand = `${viteEnvPrefix}yarn dev --host 127.0.0.1 --port ${portFromBaseUrl(baseURL)}`;
+// Prefer `preview` for e2e stability (no HMR websocket / file watching flake).
+// Build uses injected VITE_* placeholders when local env isn't configured.
+const port = portFromBaseUrl(baseURL);
+const webServerCommand = `${viteEnvPrefix}yarn build && ${viteEnvPrefix}yarn preview --host 127.0.0.1 --port ${port} --strictPort`;
 
 export default defineConfig({
     testDir: './e2e',
