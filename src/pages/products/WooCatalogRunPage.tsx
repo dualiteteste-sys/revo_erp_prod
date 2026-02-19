@@ -88,13 +88,13 @@ export default function WooCatalogRunPage() {
             <div className="flex items-center gap-2">
               <Button variant="secondary" onClick={() => navigate(-1)}>Voltar</Button>
               <Button variant="secondary" className="gap-2" onClick={() => void load()} disabled={loading}>
-                {loading ? 'Atualizando...' : 'Atualizar'}
+                {loading ? '...' : 'Atualizar'}
               </Button>
               <Button variant="secondary" className="gap-2" onClick={runWorkerNow} disabled={loading}>
                 Processar
               </Button>
               <Button className="gap-2" onClick={retryFailed} disabled={loading || !shouldAllowRetryFailed(data?.items ?? [])}>
-                Reexecutar falhas
+                Reexecutar
               </Button>
             </div>
           )}
@@ -117,7 +117,7 @@ export default function WooCatalogRunPage() {
               <Metric label="Falhas" value={counts.failed} tone="danger" />
             </div>
             <div className="rounded-lg border px-3 py-2 text-sm">
-              Status do run: <span className="font-semibold">{String(data?.run?.status ?? '-')}</span>
+              Status: <span className="font-semibold">{String(data?.run?.status ?? '-')}</span>
             </div>
             <div className="max-h-[62vh] overflow-auto rounded-md border border-slate-200">
               {(data?.items ?? []).map((item) => (
