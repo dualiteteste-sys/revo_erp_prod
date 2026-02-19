@@ -169,7 +169,11 @@ async function loadStoreSecrets(params: {
     .eq("id", storeId)
     .maybeSingle();
   if (error || !store?.id || !store?.empresa_id) throw new Error("STORE_NOT_FOUND");
-  if (String(store.status) !== "active") throw new Error("STORE_NOT_ACTIVE");
+  // Store status semantics:
+  // - "paused": operator intervention required (auth failing or manual pause)
+  // - "error": transient health/infra errors; worker should still be allowed to retry
+  const status = String(store.status ?? "").trim().toLowerCase();
+  if (status === "paused") throw new Error("STORE_PAUSED");
 
   const empresaId = String(store.empresa_id);
   const baseUrl = normalizeWooStoreUrl(String(store.base_url));
