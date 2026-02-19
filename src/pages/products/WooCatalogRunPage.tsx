@@ -116,7 +116,7 @@ export default function WooCatalogRunPage() {
               <Metric label="Ignorados" value={counts.skipped} />
               <Metric label="Falhas" value={counts.failed} tone="danger" />
             </div>
-            <div className="rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-700">
+            <div className="rounded-lg border px-3 py-2 text-sm">
               Status do run: <span className="font-semibold">{String(data?.run?.status ?? '-')}</span>
             </div>
             <div className="max-h-[62vh] overflow-auto rounded-md border border-slate-200">
@@ -124,8 +124,8 @@ export default function WooCatalogRunPage() {
                 <div key={item.id} className="border-b border-slate-100 px-3 py-2 text-sm last:border-b-0">
                   <div className="flex items-center gap-2">
                     <span className="font-medium text-slate-800">{item.sku || 'SEM SKU'}</span>
-                    <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-700">{item.action}</span>
-                    <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-700">{item.status}</span>
+                    <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-semibold">{item.action}</span>
+                    <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-semibold">{item.status}</span>
                   </div>
                   {item.error_code ? <div className="text-xs text-red-600">Código: {item.error_code}</div> : null}
                   {item.hint ? <div className="text-xs text-slate-600">{item.hint}</div> : null}
@@ -144,8 +144,8 @@ export default function WooCatalogRunPage() {
 
 function Metric(props: { label: string; value: number; tone?: 'default' | 'danger' }) {
   return (
-    <div className={`rounded-lg border px-3 py-2 ${props.tone === 'danger' ? 'border-red-200 bg-red-50 text-red-700' : 'border-slate-200 bg-white text-slate-700'}`}>
-      <div className="text-xs uppercase tracking-wide opacity-80">{props.label}</div>
+    <div className={`rounded-lg border px-3 py-2 ${props.tone === 'danger' ? 'bg-red-50 text-red-700' : 'text-slate-700'}`}>
+      <div className="text-xs uppercase">{props.label}</div>
       <div className="text-lg font-semibold">{props.value}</div>
     </div>
   );
