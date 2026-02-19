@@ -30,7 +30,7 @@ import { listWooStores } from '@/services/woocommerceControlPanel';
 import { listWooListingsByProducts } from '@/services/woocommerceCatalog';
 import WooBulkCatalogWizard, { type WooBulkWizardMode } from '@/components/products/woocommerce/WooBulkCatalogWizard';
 import { listEcommerceConnections } from '@/services/ecommerceIntegrations';
-import { filterWooStoresByConnections, pickPreferredEcommerceConnection, selectPreferredWooStoreId } from '@/lib/ecommerce/wooConnectionState';
+import { pickPreferredEcommerceConnection, selectPreferredWooStoreId } from '@/lib/ecommerce/wooConnectionState';
 import { type WooStore } from '@/services/woocommerceControlPanel';
 
 const ProductsPage: React.FC = () => {
@@ -115,18 +115,17 @@ const ProductsPage: React.FC = () => {
           listWooStores(activeEmpresaId),
           listEcommerceConnections(),
         ]);
-        const filteredStores = filterWooStoresByConnections({ stores, connections }) as WooStore[];
-        setWooStores(filteredStores);
+        setWooStores(stores);
 
         const preferred = pickPreferredEcommerceConnection(connections, 'woo');
         const preferredUrl = String(preferred?.config?.store_url ?? '').trim() || null;
 
         const nextId = selectPreferredWooStoreId({
-          stores: filteredStores,
+          stores,
           preferredStoreUrl: preferredUrl,
         });
         setWooStoreId((current) => {
-          if (current && filteredStores.some((s) => String(s?.id) === String(current))) return current;
+          if (current && stores.some((s) => String(s?.id) === String(current))) return current;
           return nextId;
         });
       } catch {

@@ -110,33 +110,6 @@ export function normalizeWooBaseUrl(value: string): string | null {
   return normalized.ok ? normalized.normalized : null;
 }
 
-export function filterWooStoresByConnections(params: {
-  stores: WooStoreOption[];
-  connections: EcommerceConnection[];
-}): WooStoreOption[] {
-  const stores = Array.isArray(params.stores) ? params.stores : [];
-  const connections = Array.isArray(params.connections) ? params.connections : [];
-
-  const wooStoreUrls = new Set(
-    connections
-      .filter((row) => row.provider === 'woo')
-      .map((row) => normalizeWooBaseUrl(String(row.config?.store_url ?? '')))
-      .filter((value): value is string => Boolean(value)),
-  );
-
-  if (wooStoreUrls.size === 0) return stores;
-
-  const filtered = stores.filter((store) => {
-    const baseUrl = normalizeWooBaseUrl(store.base_url);
-    if (!baseUrl) return false;
-    return wooStoreUrls.has(baseUrl);
-  });
-
-  // Guard rail: se há conexões Woo mas nenhuma bate com as stores retornadas,
-  // não deixe a UI “quebrar” sem opções.
-  return filtered.length > 0 ? filtered : stores;
-}
-
 export function selectPreferredWooStoreId(params: {
   stores: WooStoreOption[];
   preferredStoreUrl?: string | null;

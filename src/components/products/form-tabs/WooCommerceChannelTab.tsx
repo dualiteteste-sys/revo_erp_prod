@@ -7,7 +7,7 @@ import { forceWooPriceSync, forceWooStockSync } from '@/services/woocommerceCont
 import type { ProductFormData } from '@/components/products/ProductFormPanel';
 import { Button } from '@/components/ui/button';
 import { listEcommerceConnections } from '@/services/ecommerceIntegrations';
-import { filterWooStoresByConnections, pickPreferredEcommerceConnection, selectPreferredWooStoreId } from '@/lib/ecommerce/wooConnectionState';
+import { pickPreferredEcommerceConnection, selectPreferredWooStoreId } from '@/lib/ecommerce/wooConnectionState';
 import { type WooStore } from '@/services/woocommerceControlPanel';
 
 type Props = {
@@ -41,16 +41,15 @@ export default function WooCommerceChannelTab({ data }: Props) {
           listWooStores(activeEmpresaId),
           listEcommerceConnections(),
         ]);
-        const filteredStores = filterWooStoresByConnections({ stores: rows, connections }) as WooStore[];
-        setStores(filteredStores);
+        setStores(rows);
         const preferred = pickPreferredEcommerceConnection(connections, 'woo');
         const preferredUrl = String(preferred?.config?.store_url ?? '').trim() || null;
         const nextId = selectPreferredWooStoreId({
-          stores: filteredStores,
+          stores: rows,
           preferredStoreUrl: preferredUrl,
         });
         setStoreId((current) => {
-          if (current && filteredStores.some((s) => String(s?.id) === String(current))) return current;
+          if (current && rows.some((s) => String(s?.id) === String(current))) return current;
           return nextId;
         });
       } catch (error: any) {
