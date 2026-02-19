@@ -1662,7 +1662,30 @@ Deno.serve(async (req) => {
         });
         return json(502, { ok: false, error: "WORKER_RUN_FAILED", worker }, cors);
       }
-      return json(200, { ok: true, worker }, cors);
+      const processedJobs = Number((worker as any)?.data?.processed_jobs ?? 0) || 0;
+      if (processedJobs === 0) {
+        await logWooEvent({
+          svc,
+          empresaId,
+          storeId,
+          code: "WOO_QUEUE_EMPTY",
+          context: "worker_run_no_jobs",
+          level: "warn",
+          meta: {
+            store_status: String(store.status ?? ""),
+            worker_status: worker.status,
+            worker_data: sanitizeForLog((worker as any)?.data ?? {}),
+          },
+        });
+      }
+      return json(200, {
+        ok: true,
+        worker,
+        processed_jobs: processedJobs,
+        hint: processedJobs === 0
+          ? "Nenhum job pronto para processar (store pode estar pausada, sem jobs na fila, ou com next_run_at futuro)."
+          : null,
+      }, cors);
     }
 
     if (action === "stores.jobs.requeue") {
