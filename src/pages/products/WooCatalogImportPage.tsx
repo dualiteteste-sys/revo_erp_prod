@@ -65,7 +65,7 @@ export default function WooCatalogImportPage() {
         storeId,
         wooProductIds: selectedWooIds,
       });
-      addToast('Importação iniciada com sucesso.', 'success');
+      addToast('Importação enfileirada com sucesso.', 'success');
       navigate(`/app/products/woocommerce/runs/${response.run_id}?store=${storeId}`);
     } catch (error: any) {
       addToast(error?.message || 'Falha ao iniciar importação.', 'error');

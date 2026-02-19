@@ -6,7 +6,7 @@ import PageHeader from '@/components/ui/PageHeader';
 import PageShell from '@/components/ui/PageShell';
 import PageCard from '@/components/ui/PageCard';
 import { Button } from '@/components/ui/button';
-import { getWooRun, retryWooRunFailed } from '@/services/woocommerceCatalog';
+import { getWooRun, retryWooRunFailed, runWooWorkerNow } from '@/services/woocommerceCatalog';
 import { computeCatalogRunCounts, shouldAllowRetryFailed } from '@/lib/integrations/woocommerce/catalogRuns';
 
 export default function WooCatalogRunPage() {
@@ -26,7 +26,7 @@ export default function WooCatalogRunPage() {
       const response = await getWooRun({ empresaId: activeEmpresaId, storeId, runId });
       setData({ run: response.run, items: response.items ?? [] });
     } catch (error: any) {
-      addToast(error?.message || 'Falha ao carregar execução Woo.', 'error');
+      addToast(error?.message || 'Falha ao carregar run.', 'error');
     } finally {
       setLoading(false);
     }
@@ -64,20 +64,37 @@ export default function WooCatalogRunPage() {
     }
   };
 
+  const runWorkerNow = async () => {
+    if (!activeEmpresaId || !storeId) return;
+    setLoading(true);
+    try {
+      await runWooWorkerNow({ empresaId: activeEmpresaId, storeId });
+      addToast('Worker OK.', 'success');
+      await load();
+    } catch (error: any) {
+      addToast(error?.message || 'Falha ao executar worker.', 'error');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <PageShell
       header={(
         <PageHeader
           title="Execução WooCommerce"
-          description="Acompanhe progresso, falhas e reexecução por item."
+          description="Acompanhe progresso e falhas."
           actions={(
             <div className="flex items-center gap-2">
               <Button variant="secondary" onClick={() => navigate(-1)}>Voltar</Button>
               <Button variant="secondary" className="gap-2" onClick={() => void load()} disabled={loading}>
-                {loading ? 'Atualizando...' : 'Atualizar'}
+                {loading ? '...' : 'Atualizar'}
+              </Button>
+              <Button variant="secondary" className="gap-2" onClick={runWorkerNow} disabled={loading}>
+                Processar
               </Button>
               <Button className="gap-2" onClick={retryFailed} disabled={loading || !shouldAllowRetryFailed(data?.items ?? [])}>
-                Reexecutar falhas
+                Reexecutar
               </Button>
             </div>
           )}
@@ -86,10 +103,10 @@ export default function WooCatalogRunPage() {
     >
       <PageCard className="space-y-4 p-4">
         {!activeEmpresaId || !storeId || !runId ? (
-          <div className="text-sm text-slate-600">Informe loja e execução para visualizar este relatório.</div>
+          <div className="text-sm text-slate-600">Informe loja e execução.</div>
         ) : loading && !data ? (
           <div className="flex h-40 items-center justify-center">
-            <span className="text-sm text-slate-600">Carregando execução...</span>
+            <span className="text-sm text-slate-600">Carregando...</span>
           </div>
         ) : (
           <>
@@ -99,16 +116,16 @@ export default function WooCatalogRunPage() {
               <Metric label="Ignorados" value={counts.skipped} />
               <Metric label="Falhas" value={counts.failed} tone="danger" />
             </div>
-            <div className="rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-700">
-              Status do run: <span className="font-semibold">{String(data?.run?.status ?? '-')}</span>
+            <div className="rounded-lg border px-3 py-2 text-sm">
+              Status: <span className="font-semibold">{String(data?.run?.status ?? '-')}</span>
             </div>
             <div className="max-h-[62vh] overflow-auto rounded-md border border-slate-200">
               {(data?.items ?? []).map((item) => (
                 <div key={item.id} className="border-b border-slate-100 px-3 py-2 text-sm last:border-b-0">
                   <div className="flex items-center gap-2">
                     <span className="font-medium text-slate-800">{item.sku || 'SEM SKU'}</span>
-                    <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-700">{item.action}</span>
-                    <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-700">{item.status}</span>
+                    <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-semibold">{item.action}</span>
+                    <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-semibold">{item.status}</span>
                   </div>
                   {item.error_code ? <div className="text-xs text-red-600">Código: {item.error_code}</div> : null}
                   {item.hint ? <div className="text-xs text-slate-600">{item.hint}</div> : null}
@@ -127,8 +144,8 @@ export default function WooCatalogRunPage() {
 
 function Metric(props: { label: string; value: number; tone?: 'default' | 'danger' }) {
   return (
-    <div className={`rounded-lg border px-3 py-2 ${props.tone === 'danger' ? 'border-red-200 bg-red-50 text-red-700' : 'border-slate-200 bg-white text-slate-700'}`}>
-      <div className="text-xs uppercase tracking-wide opacity-80">{props.label}</div>
+    <div className={`rounded-lg border px-3 py-2 ${props.tone === 'danger' ? 'bg-red-50 text-red-700' : 'text-slate-700'}`}>
+      <div className="text-xs uppercase">{props.label}</div>
       <div className="text-lg font-semibold">{props.value}</div>
     </div>
   );

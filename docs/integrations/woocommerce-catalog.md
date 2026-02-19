@@ -71,3 +71,9 @@ Base: `${base_url}/wp-json/wc/v3`
 - Erros por item ficam em `woocommerce_sync_run_item` com `error_code` e `hint`.
 - Worker mantém logs em `woocommerce_sync_log`.
 
+## Processamento (worker/scheduler)
+
+- Em **produção/dev online**, a fila é drenada automaticamente pelo scheduler.
+- Em **ambiente local**, se a execução ficar em `queued`, use:
+  - o botão **“Processar”** na tela `/app/products/woocommerce/runs/:runId`, ou
+  - o painel de desenvolvedor de WooCommerce (quando disponível).
