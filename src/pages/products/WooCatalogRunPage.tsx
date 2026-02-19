@@ -69,7 +69,7 @@ export default function WooCatalogRunPage() {
     setLoading(true);
     try {
       await runWooWorkerNow({ empresaId: activeEmpresaId, storeId, limit: 25 });
-      addToast('Worker executado. Atualizando execução...', 'success');
+      addToast('Worker executado.', 'success');
       await load();
     } catch (error: any) {
       addToast(error?.message || 'Falha ao executar worker agora.', 'error');
@@ -119,11 +119,6 @@ export default function WooCatalogRunPage() {
             <div className="rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-700">
               Status do run: <span className="font-semibold">{String(data?.run?.status ?? '-')}</span>
             </div>
-            {String(data?.run?.status ?? '') === 'queued' ? (
-              <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
-                Execução em fila. Em local, clique em <span className="font-semibold">Processar agora</span>.
-              </div>
-            ) : null}
             <div className="max-h-[62vh] overflow-auto rounded-md border border-slate-200">
               {(data?.items ?? []).map((item) => (
                 <div key={item.id} className="border-b border-slate-100 px-3 py-2 text-sm last:border-b-0">
