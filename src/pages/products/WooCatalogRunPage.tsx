@@ -121,7 +121,7 @@ export default function WooCatalogRunPage() {
             </div>
             {String(data?.run?.status ?? '') === 'queued' ? (
               <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
-                Esta execução está na fila. Se estiver em ambiente local (ou se o scheduler estiver pausado), clique em <span className="font-semibold">Processar agora</span>.
+                Execução em fila. Em local, clique em <span className="font-semibold">Processar agora</span>.
               </div>
             ) : null}
             <div className="max-h-[62vh] overflow-auto rounded-md border border-slate-200">
