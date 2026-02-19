@@ -12,6 +12,7 @@ import {
   runWooImport,
   runWooSyncPrice,
   runWooSyncStock,
+  runWooWorkerNow,
   searchWooCatalogProducts,
 } from '@/services/woocommerceCatalog';
 
@@ -166,7 +167,12 @@ export default function WooBulkCatalogWizard(props: Props) {
           wooProductIds: Array.from(selectedWooIds.values()),
         });
 
-      addToast('Execução criada com sucesso.', 'success');
+      addToast('Execução criada e enfileirada com sucesso.', 'success');
+      try {
+        await runWooWorkerNow({ empresaId: props.empresaId, storeId: props.storeId, limit: 25 });
+      } catch {
+        // best-effort: em local/dev pode não estar configurado; não bloqueia o fluxo
+      }
       props.onRunCreated(response.run_id);
       setStep(3);
     } catch (error: any) {
@@ -286,8 +292,8 @@ export default function WooBulkCatalogWizard(props: Props) {
 
         {step === 3 ? (
           <div className="flex flex-1 flex-col items-center justify-center gap-3 rounded-lg border border-emerald-200 bg-emerald-50 p-6 text-center">
-            <h3 className="text-lg font-semibold text-emerald-800">Execução iniciada</h3>
-            <p className="text-sm text-emerald-700">Acompanhe o progresso na tela de execução.</p>
+            <h3 className="text-lg font-semibold text-emerald-800">Execução enfileirada</h3>
+            <p className="text-sm text-emerald-700">Acompanhe o progresso na tela de execução e use “Processar agora” se ficar em fila.</p>
           </div>
         ) : null}
 

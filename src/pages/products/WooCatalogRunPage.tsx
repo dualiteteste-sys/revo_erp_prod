@@ -6,7 +6,7 @@ import PageHeader from '@/components/ui/PageHeader';
 import PageShell from '@/components/ui/PageShell';
 import PageCard from '@/components/ui/PageCard';
 import { Button } from '@/components/ui/button';
-import { getWooRun, retryWooRunFailed } from '@/services/woocommerceCatalog';
+import { getWooRun, retryWooRunFailed, runWooWorkerNow } from '@/services/woocommerceCatalog';
 import { computeCatalogRunCounts, shouldAllowRetryFailed } from '@/lib/integrations/woocommerce/catalogRuns';
 
 export default function WooCatalogRunPage() {
@@ -64,6 +64,20 @@ export default function WooCatalogRunPage() {
     }
   };
 
+  const runWorkerNow = async () => {
+    if (!activeEmpresaId || !storeId) return;
+    setLoading(true);
+    try {
+      await runWooWorkerNow({ empresaId: activeEmpresaId, storeId, limit: 25 });
+      addToast('Worker executado. Atualizando execução...', 'success');
+      await load();
+    } catch (error: any) {
+      addToast(error?.message || 'Falha ao executar worker agora.', 'error');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <PageShell
       header={(
@@ -75,6 +89,9 @@ export default function WooCatalogRunPage() {
               <Button variant="secondary" onClick={() => navigate(-1)}>Voltar</Button>
               <Button variant="secondary" className="gap-2" onClick={() => void load()} disabled={loading}>
                 {loading ? 'Atualizando...' : 'Atualizar'}
+              </Button>
+              <Button variant="secondary" className="gap-2" onClick={runWorkerNow} disabled={loading}>
+                Processar agora
               </Button>
               <Button className="gap-2" onClick={retryFailed} disabled={loading || !shouldAllowRetryFailed(data?.items ?? [])}>
                 Reexecutar falhas
@@ -102,6 +119,11 @@ export default function WooCatalogRunPage() {
             <div className="rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-700">
               Status do run: <span className="font-semibold">{String(data?.run?.status ?? '-')}</span>
             </div>
+            {String(data?.run?.status ?? '') === 'queued' ? (
+              <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+                Esta execução está na fila. Se estiver em ambiente local (ou se o scheduler estiver pausado), clique em <span className="font-semibold">Processar agora</span>.
+              </div>
+            ) : null}
             <div className="max-h-[62vh] overflow-auto rounded-md border border-slate-200">
               {(data?.items ?? []).map((item) => (
                 <div key={item.id} className="border-b border-slate-100 px-3 py-2 text-sm last:border-b-0">

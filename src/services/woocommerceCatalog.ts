@@ -13,6 +13,7 @@ type WooCatalogAction =
   | 'stores.runs.get'
   | 'stores.runs.list'
   | 'stores.runs.retry_failed'
+  | 'stores.worker.run'
   | 'stores.listings.by_products'
   | 'stores.listings.by_product'
   | 'stores.listings.link_by_sku'
@@ -85,6 +86,11 @@ export type WooCatalogRunItem = {
   diff: Record<string, unknown>;
   created_at: string;
   updated_at: string;
+};
+
+export type WooWorkerRunResponse = {
+  ok: true;
+  worker: unknown;
 };
 
 function sanitizeError(error: unknown) {
@@ -212,7 +218,7 @@ export function runWooExport(params: {
   revoProductIds: string[];
   options?: Record<string, unknown>;
 }) {
-  return invoke<{ ok: true; run_id: string; enqueued_job_id: string | null; summary: WooCatalogPreviewResponse['summary'] }>('stores.catalog.run.export', {
+  return invoke<{ ok: true; run_id: string; enqueued_job_id: string | null; summary: WooCatalogPreviewResponse['summary']; worker?: unknown | null }>('stores.catalog.run.export', {
     empresaId: params.empresaId,
     storeId: params.storeId,
     payload: {
@@ -227,7 +233,7 @@ export function runWooSyncPrice(params: {
   storeId: string;
   revoProductIds: string[];
 }) {
-  return invoke<{ ok: true; run_id: string; enqueued_job_id: string | null; summary: WooCatalogPreviewResponse['summary'] }>('stores.catalog.run.sync_price', {
+  return invoke<{ ok: true; run_id: string; enqueued_job_id: string | null; summary: WooCatalogPreviewResponse['summary']; worker?: unknown | null }>('stores.catalog.run.sync_price', {
     empresaId: params.empresaId,
     storeId: params.storeId,
     payload: { revo_product_ids: params.revoProductIds },
@@ -239,7 +245,7 @@ export function runWooSyncStock(params: {
   storeId: string;
   revoProductIds: string[];
 }) {
-  return invoke<{ ok: true; run_id: string; enqueued_job_id: string | null; summary: WooCatalogPreviewResponse['summary'] }>('stores.catalog.run.sync_stock', {
+  return invoke<{ ok: true; run_id: string; enqueued_job_id: string | null; summary: WooCatalogPreviewResponse['summary']; worker?: unknown | null }>('stores.catalog.run.sync_stock', {
     empresaId: params.empresaId,
     storeId: params.storeId,
     payload: { revo_product_ids: params.revoProductIds },
@@ -281,10 +287,22 @@ export function runWooImport(params: {
   storeId: string;
   wooProductIds: number[];
 }) {
-  return invoke<{ ok: true; run_id: string; enqueued_job_id: string | null; summary: WooCatalogPreviewResponse['summary'] }>('stores.catalog.run.import', {
+  return invoke<{ ok: true; run_id: string; enqueued_job_id: string | null; summary: WooCatalogPreviewResponse['summary']; worker?: unknown | null }>('stores.catalog.run.import', {
     empresaId: params.empresaId,
     storeId: params.storeId,
     payload: { woo_product_ids: params.wooProductIds },
+  });
+}
+
+export function runWooWorkerNow(params: {
+  empresaId: string;
+  storeId: string;
+  limit?: number;
+}) {
+  return invoke<WooWorkerRunResponse>('stores.worker.run', {
+    empresaId: params.empresaId,
+    storeId: params.storeId,
+    payload: { limit: params.limit ?? 25 },
   });
 }
 
