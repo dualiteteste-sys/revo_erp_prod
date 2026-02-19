@@ -171,7 +171,12 @@ test('não reaproveita cache de dados entre empresas (produtos)', async ({ page 
   await expect(page).toHaveURL(/\/app/);
 
   await page.goto('/app/products');
-  await expect(page.getByText('Produto A')).toBeVisible();
+  // A lista de produtos depende de RPCs reais (fallback) e pode levar alguns segundos no CI.
+  await page.waitForResponse(
+    (resp) => resp.url().includes('/rest/v1/rpc/produtos_parents_list_for_current_user') && resp.status() === 200,
+    { timeout: 20000 },
+  );
+  await expect(page.getByText('Produto A')).toBeVisible({ timeout: 20000 });
   await expect(page.getByText('Produto B')).not.toBeVisible();
 
   // Troca de empresa (menu superior/sidebar). Fallback: usa o seletor de empresa no sidebar/header.

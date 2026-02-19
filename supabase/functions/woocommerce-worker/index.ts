@@ -4,6 +4,7 @@ import { aesGcmDecryptFromString, timingSafeEqual } from "../_shared/crypto.ts";
 import { getRequestId } from "../_shared/request.ts";
 import { sanitizeForLog } from "../_shared/sanitize.ts";
 import { detectWooErrorCode, resolveWooError } from "../_shared/woocommerceErrors.ts";
+import { maybeHandleWooMockRequest } from "../_shared/wooMock.ts";
 import {
   buildWooApiUrl,
   classifyWooHttpStatus,
@@ -11,6 +12,7 @@ import {
   normalizeWooStoreUrl,
   parsePositiveIntEnv,
   pickUniqueByStoreType,
+  resolveIntegrationsMasterKey,
   resolveWooInfraKeys,
   type ClassifiedWooError,
   type WooAuthMode,
@@ -101,6 +103,9 @@ function chooseNextPedidoStatus(current: string | null, desired: string): string
 }
 
 async function wooFetchJson(url: string, init?: RequestInit): Promise<{ ok: boolean; status: number; data: any; headers: Headers }> {
+  const mock = maybeHandleWooMockRequest({ url, init, getEnv: (k) => Deno.env.get(k) });
+  if (mock) return { ok: mock.ok, status: mock.status, data: mock.data, headers: mock.headers ?? new Headers() };
+
   const timeoutMs = clampInt(Deno.env.get("WOOCOMMERCE_HTTP_TIMEOUT_MS"), 15_000, 1_000, 60_000);
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
@@ -1401,7 +1406,7 @@ Deno.serve(async (req) => {
 
     const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
     const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
-    const masterKey = Deno.env.get("INTEGRATIONS_MASTER_KEY") ?? "";
+    const masterKey = resolveIntegrationsMasterKey((key) => Deno.env.get(key));
     const { workerKey } = resolveWooInfraKeys((key) => Deno.env.get(key));
     const missing: string[] = [];
     if (!supabaseUrl) missing.push("SUPABASE_URL");

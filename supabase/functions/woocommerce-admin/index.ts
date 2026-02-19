@@ -5,7 +5,16 @@ import { getRequestId } from "../_shared/request.ts";
 import { hasPermissionOrOwnerAdmin } from "../_shared/rbac.ts";
 import { sanitizeForLog } from "../_shared/sanitize.ts";
 import { detectWooErrorCode, resolveWooError } from "../_shared/woocommerceErrors.ts";
-import { buildWooApiUrl, classifyWooHttpStatus, isEmpresaContextAllowed, normalizeWooStoreUrl, resolveWooInfraKeys, shouldFallbackToActiveEmpresa } from "../_shared/woocommerceHardening.ts";
+import {
+  buildWooApiUrl,
+  classifyWooHttpStatus,
+  isEmpresaContextAllowed,
+  normalizeWooStoreUrl,
+  resolveIntegrationsMasterKey,
+  resolveWooInfraKeys,
+  shouldFallbackToActiveEmpresa,
+} from "../_shared/woocommerceHardening.ts";
+import { maybeHandleWooMockRequest } from "../_shared/wooMock.ts";
 import { buildWooStoreStatusContract } from "../_shared/woocommerceStatusContract.ts";
 
 type Action =
@@ -69,6 +78,9 @@ function randomSecretBase64(bytes = 32): string {
 }
 
 async function wooFetchJson(url: string, init?: RequestInit): Promise<{ ok: boolean; status: number; data: any }> {
+  const mock = maybeHandleWooMockRequest({ url, init, getEnv: (k) => Deno.env.get(k) });
+  if (mock) return { ok: mock.ok, status: mock.status, data: mock.data };
+
   const resp = await fetch(url, init);
   const data = await resp.json().catch(() => ({}));
   return { ok: resp.ok, status: resp.status, data };
@@ -734,7 +746,7 @@ Deno.serve(async (req) => {
   const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
   const anonKey = Deno.env.get("SUPABASE_ANON_KEY") ?? "";
   const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
-  const masterKey = Deno.env.get("INTEGRATIONS_MASTER_KEY") ?? "";
+  const masterKey = resolveIntegrationsMasterKey((key) => Deno.env.get(key));
   const { workerKey } = resolveWooInfraKeys((key) => Deno.env.get(key));
   if (!supabaseUrl || !anonKey || !serviceKey) return json(500, { ok: false, error: "ENV_NOT_CONFIGURED" }, cors);
 

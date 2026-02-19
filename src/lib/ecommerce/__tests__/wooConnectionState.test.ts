@@ -149,4 +149,5 @@ describe('wooConnectionState', () => {
     expect(id).toBe('2');
     expect(normalizeWooBaseUrl('https://tudoparatatuagem.com.br/')).toBe('https://tudoparatatuagem.com.br');
   });
+
 });

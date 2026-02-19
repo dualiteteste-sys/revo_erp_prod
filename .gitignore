@@ -136,3 +136,7 @@ test-results/
 
 # Supabase CLI temp files
 supabase/.temp/
+
+# Supabase local env (Sprint 0)
+supabase/.env
+supabase/.env.*

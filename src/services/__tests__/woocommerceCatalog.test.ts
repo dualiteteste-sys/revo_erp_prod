@@ -12,7 +12,7 @@ vi.mock('@/lib/supabaseClient', () => ({
   },
 }));
 
-import { listWooListingsByProducts, runWooExport } from '@/services/woocommerceCatalog';
+import { listWooListingsByProducts, runWooExport, runWooWorkerNow } from '@/services/woocommerceCatalog';
 
 describe('woocommerceCatalog service', () => {
   beforeEach(() => {
@@ -60,6 +60,23 @@ describe('woocommerceCatalog service', () => {
         store_id: 'store-1',
         revo_product_ids: ['prod-1'],
         options: { image_mode: 'none' },
+      },
+      headers: { 'x-empresa-id': 'empresa-1' },
+    });
+  });
+
+  it('runs worker now with a limit', async () => {
+    invokeMock.mockResolvedValue({
+      data: { ok: true, worker: { ok: true } },
+      error: null,
+    });
+
+    await runWooWorkerNow({ empresaId: 'empresa-1', storeId: 'store-1' });
+
+    expect(invokeMock).toHaveBeenCalledWith('woocommerce-admin', {
+      body: {
+        action: 'stores.worker.run',
+        store_id: 'store-1',
       },
       headers: { 'x-empresa-id': 'empresa-1' },
     });

@@ -275,7 +275,9 @@ test('Vendas: pedido (VEN-01/02) happy path (CRUD + itens + impostos básicos + 
     .toBeGreaterThan(0);
   // Alguns selects usam onMouseDown para selecionar (evita blur/re-render).
   await hitButton.dispatchEvent('mousedown');
-  await hitButton.click({ force: true });
+  // Evitar flake: `locator.click()` pode ficar aguardando "actionability" em portais/renders rápidos.
+  // Como já garantimos que existe no DOM, disparamos o evento diretamente.
+  await hitButton.dispatchEvent('click');
   await expect(page.getByText('Item adicionado.')).toBeVisible({ timeout: 20000 });
 
   // Aprovar
