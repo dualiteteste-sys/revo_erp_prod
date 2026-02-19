@@ -7,6 +7,7 @@ export type WooErrorCode =
   | "WOO_RESOURCE_NOT_FOUND"
   | "WOO_VALIDATION_FAILED"
   | "WOO_UNEXPECTED"
+  | "WOO_QUEUE_EMPTY"
   | "STORE_URL_REQUIRED"
   | "STORE_URL_MUST_USE_HTTPS"
   | "STORE_URL_CREDENTIALS_NOT_ALLOWED"
@@ -80,6 +81,12 @@ export const WOO_ERROR_CATALOG: Record<WooErrorCode, Omit<WooErrorMeta, "code">>
     retryable: true,
     pauseStore: false,
     severity: "error",
+  },
+  WOO_QUEUE_EMPTY: {
+    hint: "Nenhum job pronto para processar (fila vazia, store pausada, ou next_run_at futuro).",
+    retryable: true,
+    pauseStore: false,
+    severity: "warn",
   },
   STORE_URL_REQUIRED: {
     hint: "Informe a URL base da loja Woo.",

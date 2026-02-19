@@ -91,6 +91,8 @@ export type WooCatalogRunItem = {
 export type WooWorkerRunResponse = {
   ok: true;
   worker: unknown;
+  processed_jobs?: number;
+  hint?: string | null;
 };
 
 function sanitizeError(error: unknown) {

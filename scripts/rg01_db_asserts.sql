@@ -97,3 +97,29 @@ BEGIN
   END IF;
 END;
 $$;
+
+-- RG01 (woocommerce queue): jobs_claim deve considerar store status=error (transiente) e tratar next_run_at NULL.
+DO $$
+DECLARE
+  v_def text;
+BEGIN
+  SELECT pg_get_functiondef(p.oid) INTO v_def
+  FROM pg_proc p
+  JOIN pg_namespace n ON n.oid = p.pronamespace
+  WHERE n.nspname = 'public'
+    AND p.proname = 'woocommerce_sync_jobs_claim'
+  LIMIT 1;
+
+  IF v_def IS NULL THEN
+    RAISE EXCEPTION 'RG01 fail: missing function public.woocommerce_sync_jobs_claim(int, uuid, text)';
+  END IF;
+
+  IF position('s.status IN (''active'',''error'')' in v_def) = 0 THEN
+    RAISE EXCEPTION 'RG01 fail: woocommerce_sync_jobs_claim must allow store status=error (transient)';
+  END IF;
+
+  IF position('COALESCE(j.next_run_at' in v_def) = 0 THEN
+    RAISE EXCEPTION 'RG01 fail: woocommerce_sync_jobs_claim must treat NULL next_run_at safely via COALESCE';
+  END IF;
+END;
+$$;
