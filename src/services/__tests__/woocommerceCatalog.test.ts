@@ -71,17 +71,12 @@ describe('woocommerceCatalog service', () => {
       error: null,
     });
 
-    await runWooWorkerNow({
-      empresaId: 'empresa-1',
-      storeId: 'store-1',
-      limit: 10,
-    });
+    await runWooWorkerNow({ empresaId: 'empresa-1', storeId: 'store-1' });
 
     expect(invokeMock).toHaveBeenCalledWith('woocommerce-admin', {
       body: {
         action: 'stores.worker.run',
         store_id: 'store-1',
-        limit: 10,
       },
       headers: { 'x-empresa-id': 'empresa-1' },
     });

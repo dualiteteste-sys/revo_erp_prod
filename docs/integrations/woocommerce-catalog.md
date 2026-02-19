@@ -75,5 +75,5 @@ Base: `${base_url}/wp-json/wc/v3`
 
 - Em **produção/dev online**, a fila é drenada automaticamente pelo scheduler.
 - Em **ambiente local**, se a execução ficar em `queued`, use:
-  - o botão **“Processar agora”** na tela `/app/products/woocommerce/runs/:runId`, ou
+  - o botão **“Processar”** na tela `/app/products/woocommerce/runs/:runId`, ou
   - o painel de desenvolvedor de WooCommerce (quando disponível).

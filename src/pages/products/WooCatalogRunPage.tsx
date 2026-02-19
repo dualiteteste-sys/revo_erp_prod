@@ -26,7 +26,7 @@ export default function WooCatalogRunPage() {
       const response = await getWooRun({ empresaId: activeEmpresaId, storeId, runId });
       setData({ run: response.run, items: response.items ?? [] });
     } catch (error: any) {
-      addToast(error?.message || 'Falha ao carregar execução Woo.', 'error');
+      addToast(error?.message || 'Falha ao carregar run.', 'error');
     } finally {
       setLoading(false);
     }
@@ -68,11 +68,11 @@ export default function WooCatalogRunPage() {
     if (!activeEmpresaId || !storeId) return;
     setLoading(true);
     try {
-      await runWooWorkerNow({ empresaId: activeEmpresaId, storeId, limit: 25 });
-      addToast('Worker executado.', 'success');
+      await runWooWorkerNow({ empresaId: activeEmpresaId, storeId });
+      addToast('Worker OK.', 'success');
       await load();
     } catch (error: any) {
-      addToast(error?.message || 'Falha ao executar worker agora.', 'error');
+      addToast(error?.message || 'Falha ao executar worker.', 'error');
     } finally {
       setLoading(false);
     }
@@ -83,7 +83,7 @@ export default function WooCatalogRunPage() {
       header={(
         <PageHeader
           title="Execução WooCommerce"
-          description="Acompanhe progresso, falhas e reexecução por item."
+          description="Acompanhe progresso e falhas."
           actions={(
             <div className="flex items-center gap-2">
               <Button variant="secondary" onClick={() => navigate(-1)}>Voltar</Button>
@@ -91,7 +91,7 @@ export default function WooCatalogRunPage() {
                 {loading ? 'Atualizando...' : 'Atualizar'}
               </Button>
               <Button variant="secondary" className="gap-2" onClick={runWorkerNow} disabled={loading}>
-                Processar agora
+                Processar
               </Button>
               <Button className="gap-2" onClick={retryFailed} disabled={loading || !shouldAllowRetryFailed(data?.items ?? [])}>
                 Reexecutar falhas
@@ -103,10 +103,10 @@ export default function WooCatalogRunPage() {
     >
       <PageCard className="space-y-4 p-4">
         {!activeEmpresaId || !storeId || !runId ? (
-          <div className="text-sm text-slate-600">Informe loja e execução para visualizar este relatório.</div>
+          <div className="text-sm text-slate-600">Informe loja e execução.</div>
         ) : loading && !data ? (
           <div className="flex h-40 items-center justify-center">
-            <span className="text-sm text-slate-600">Carregando execução...</span>
+            <span className="text-sm text-slate-600">Carregando...</span>
           </div>
         ) : (
           <>

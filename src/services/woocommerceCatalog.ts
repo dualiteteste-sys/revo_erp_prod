@@ -294,15 +294,11 @@ export function runWooImport(params: {
   });
 }
 
-export function runWooWorkerNow(params: {
-  empresaId: string;
-  storeId: string;
-  limit?: number;
-}) {
+export function runWooWorkerNow(params: { empresaId: string; storeId: string }) {
   return invoke<WooWorkerRunResponse>('stores.worker.run', {
     empresaId: params.empresaId,
     storeId: params.storeId,
-    payload: { limit: params.limit ?? 25 },
+    payload: {},
   });
 }
 
