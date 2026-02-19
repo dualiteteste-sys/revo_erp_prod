@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
   buildPreferredEcommerceConnectionsMap,
+  filterWooStoresByConnections,
   mergeWooDiagnosticsWithSnapshot,
   normalizeWooBaseUrl,
   pickPreferredEcommerceConnection,
@@ -148,5 +149,45 @@ describe('wooConnectionState', () => {
     });
     expect(id).toBe('2');
     expect(normalizeWooBaseUrl('https://tudoparatatuagem.com.br/')).toBe('https://tudoparatatuagem.com.br');
+  });
+
+  it('filtra stores Woo por store_url das conexões (evita sugerir loja antiga)', () => {
+    const connections: EcommerceConnection[] = [
+      makeConnection({
+        id: 'woo-a',
+        provider: 'woo',
+        status: 'connected',
+        config: { store_url: 'https://new.example.com/' },
+      }),
+    ];
+
+    const filtered = filterWooStoresByConnections({
+      connections,
+      stores: [
+        { id: 'old', base_url: 'https://old.example.com', status: 'active' },
+        { id: 'new', base_url: 'https://new.example.com', status: 'active' },
+      ],
+    });
+
+    expect(filtered.map((s) => s.id)).toEqual(['new']);
+  });
+
+  it('quando não há store_url nas conexões, mantém lista original', () => {
+    const connections: EcommerceConnection[] = [
+      makeConnection({
+        id: 'woo-a',
+        provider: 'woo',
+        status: 'pending',
+        config: { store_url: '' },
+      }),
+    ];
+
+    const stores = [
+      { id: '1', base_url: 'https://a.example.com', status: 'active' },
+      { id: '2', base_url: 'https://b.example.com', status: 'active' },
+    ];
+
+    const filtered = filterWooStoresByConnections({ connections, stores });
+    expect(filtered).toEqual(stores);
   });
 });
