@@ -64,6 +64,7 @@ import {
   buildPreferredEcommerceConnectionsMap,
   mergeWooDiagnosticsWithSnapshot,
 } from '@/lib/ecommerce/wooConnectionState';
+import { bootstrapWooStoresBestEffort } from '@/services/woocommerceControlPanel';
 
 type Provider = MarketplaceProvider;
 type CatalogProvider = Exclude<Provider, 'woo'>;
@@ -663,6 +664,7 @@ export default function MarketplaceIntegrationsPage() {
           setDiagnostics(parsed ?? null);
           await refreshWooDiag();
           await fetchAll();
+          if (activeEmpresaId) void bootstrapWooStoresBestEffort(activeEmpresaId);
           return;
         }
         const ok = (data as any)?.ok === true;
@@ -690,6 +692,7 @@ export default function MarketplaceIntegrationsPage() {
           );
         }
         await fetchAll();
+        if (activeEmpresaId) void bootstrapWooStoresBestEffort(activeEmpresaId);
         const responseStatus = String((data as any)?.status ?? '').toLowerCase();
         const responseMessage = String((data as any)?.message ?? '').trim();
         addToast(
@@ -845,6 +848,7 @@ export default function MarketplaceIntegrationsPage() {
       );
       addToast('Credenciais salvas com sucesso! Clique em "Testar conexão" para validar.', 'success');
       await fetchAll();
+      if (activeEmpresaId) void bootstrapWooStoresBestEffort(activeEmpresaId);
     } catch (e: any) {
       addToast(e?.message || 'Falha ao salvar credenciais.', 'error');
     } finally {

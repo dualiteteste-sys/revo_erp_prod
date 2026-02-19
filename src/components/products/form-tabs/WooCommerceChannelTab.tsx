@@ -7,7 +7,8 @@ import { forceWooPriceSync, forceWooStockSync } from '@/services/woocommerceCont
 import type { ProductFormData } from '@/components/products/ProductFormPanel';
 import { Button } from '@/components/ui/button';
 import { listEcommerceConnections } from '@/services/ecommerceIntegrations';
-import { pickPreferredEcommerceConnection, selectPreferredWooStoreId } from '@/lib/ecommerce/wooConnectionState';
+import { filterWooStoresByConnections, pickPreferredEcommerceConnection, selectPreferredWooStoreId } from '@/lib/ecommerce/wooConnectionState';
+import { type WooStore } from '@/services/woocommerceControlPanel';
 
 type Props = {
   data: ProductFormData;
@@ -17,7 +18,7 @@ export default function WooCommerceChannelTab({ data }: Props) {
   const { activeEmpresaId } = useAuth();
   const { addToast } = useToast();
   const [storeId, setStoreId] = useState('');
-  const [stores, setStores] = useState<Array<{ id: string; base_url: string; status: string }>>([]);
+  const [stores, setStores] = useState<WooStore[]>([]);
   const [loading, setLoading] = useState(false);
   const [listing, setListing] = useState<any>(null);
   const [skuInput, setSkuInput] = useState(String(data.sku ?? '').trim());
@@ -40,15 +41,16 @@ export default function WooCommerceChannelTab({ data }: Props) {
           listWooStores(activeEmpresaId),
           listEcommerceConnections(),
         ]);
-        setStores(rows as any);
+        const filteredStores = filterWooStoresByConnections({ stores: rows, connections }) as WooStore[];
+        setStores(filteredStores);
         const preferred = pickPreferredEcommerceConnection(connections, 'woo');
         const preferredUrl = String(preferred?.config?.store_url ?? '').trim() || null;
         const nextId = selectPreferredWooStoreId({
-          stores: rows as any,
+          stores: filteredStores,
           preferredStoreUrl: preferredUrl,
         });
         setStoreId((current) => {
-          if (current && (rows as any[]).some((s) => String((s as any)?.id) === String(current))) return current;
+          if (current && filteredStores.some((s) => String(s?.id) === String(current))) return current;
           return nextId;
         });
       } catch (error: any) {

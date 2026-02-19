@@ -30,7 +30,8 @@ import { listWooStores } from '@/services/woocommerceControlPanel';
 import { listWooListingsByProducts } from '@/services/woocommerceCatalog';
 import WooBulkCatalogWizard, { type WooBulkWizardMode } from '@/components/products/woocommerce/WooBulkCatalogWizard';
 import { listEcommerceConnections } from '@/services/ecommerceIntegrations';
-import { pickPreferredEcommerceConnection, selectPreferredWooStoreId } from '@/lib/ecommerce/wooConnectionState';
+import { filterWooStoresByConnections, pickPreferredEcommerceConnection, selectPreferredWooStoreId } from '@/lib/ecommerce/wooConnectionState';
+import { type WooStore } from '@/services/woocommerceControlPanel';
 
 const ProductsPage: React.FC = () => {
   const { loading: authLoading, activeEmpresaId, activeEmpresa } = useAuth();
@@ -76,7 +77,7 @@ const ProductsPage: React.FC = () => {
   const [isImportOpen, setIsImportOpen] = useState(false);
   const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false);
   const [bulkLoading, setBulkLoading] = useState(false);
-  const [wooStores, setWooStores] = useState<Array<{ id: string; base_url: string; status: string }>>([]);
+  const [wooStores, setWooStores] = useState<WooStore[]>([]);
   const [wooStoreId, setWooStoreId] = useState('');
   const [wooListingByProductId, setWooListingByProductId] = useState<Map<string, any>>(new Map());
   const [wooWizardMode, setWooWizardMode] = useState<WooBulkWizardMode>('export');
@@ -114,17 +115,18 @@ const ProductsPage: React.FC = () => {
           listWooStores(activeEmpresaId),
           listEcommerceConnections(),
         ]);
-        setWooStores(stores as any);
+        const filteredStores = filterWooStoresByConnections({ stores, connections }) as WooStore[];
+        setWooStores(filteredStores);
 
         const preferred = pickPreferredEcommerceConnection(connections, 'woo');
         const preferredUrl = String(preferred?.config?.store_url ?? '').trim() || null;
 
         const nextId = selectPreferredWooStoreId({
-          stores: stores as any,
+          stores: filteredStores,
           preferredStoreUrl: preferredUrl,
         });
         setWooStoreId((current) => {
-          if (current && (stores as any[]).some((s) => String((s as any)?.id) === String(current))) return current;
+          if (current && filteredStores.some((s) => String(s?.id) === String(current))) return current;
           return nextId;
         });
       } catch {

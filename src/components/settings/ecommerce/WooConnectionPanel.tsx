@@ -11,6 +11,7 @@ import { useToast } from '@/contexts/ToastProvider';
 import { supabase } from '@/lib/supabaseClient';
 import { normalizeWooStoreUrl } from '@/lib/ecommerce/wooStoreUrl';
 import { pickPreferredEcommerceConnection } from '@/lib/ecommerce/wooConnectionState';
+import { bootstrapWooStoresBestEffort } from '@/services/woocommerceControlPanel';
 import {
   disconnectEcommerceConnection,
   getEcommerceConnectionDiagnostics,
@@ -189,6 +190,7 @@ export default function WooConnectionPanel() {
       setLastVerifiedAt(saved.last_verified_at ?? null);
       setStatusMessage(saved.error_message ?? 'Credenciais salvas. Execute “Testar conexão” para validar.');
       addToast('Credenciais salvas com sucesso.', 'success');
+      if (activeEmpresaId) void bootstrapWooStoresBestEffort(activeEmpresaId);
       setTimeout(() => {
         void load();
       }, 450);
@@ -247,6 +249,7 @@ export default function WooConnectionPanel() {
         setConnection((prev) => (prev ? { ...prev, status: status === 'pending' ? 'pending' : 'connected', last_error: null } : prev));
         addToast(String(payload.message ?? 'Conexão validada com sucesso.'), status === 'pending' ? 'warning' : 'success');
       }
+      if (activeEmpresaId) void bootstrapWooStoresBestEffort(activeEmpresaId);
       setTimeout(() => {
         void load();
       }, 650);

@@ -136,6 +136,17 @@ export async function listWooStores(empresaId: string): Promise<WooStore[]> {
   return Array.isArray(data.stores) ? data.stores : [];
 }
 
+export async function bootstrapWooStoresBestEffort(empresaId: string): Promise<void> {
+  try {
+    await listWooStores(empresaId);
+  } catch (e) {
+    if (import.meta.env.DEV) {
+      const message = e instanceof Error ? e.message : String(e);
+      console.debug('[Woo][bootstrapWooStoresBestEffort] failed', { message });
+    }
+  }
+}
+
 export function getWooStoreStatus(empresaId: string, storeId: string): Promise<WooStatusResponse> {
   return invokeWooAdmin<WooStatusResponse>('stores.status', { empresaId, storeId });
 }
