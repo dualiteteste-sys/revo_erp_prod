@@ -159,7 +159,7 @@ export default function Pricing() {
     setActiveSlug(slug);
     if (isAuthenticated) {
       // usuário já logado: ir para app
-      nav("/app", { replace: false });
+      nav("/app/dashboard", { replace: false });
       return;
     }
     // anônimo: levar para a rota de signup (sem tocar no Supabase aqui)

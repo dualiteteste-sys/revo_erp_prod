@@ -82,7 +82,7 @@ export default function ForceChangePasswordPage() {
       await bootstrapEmpresaParaUsuarioAtual();
 
       setOkMsg("Senha atualizada! Redirecionando…");
-      setTimeout(() => navigate("/app", { replace: true }), 900);
+      setTimeout(() => navigate("/app/dashboard", { replace: true }), 900);
     } catch (e: any) {
       console.error("[AUTH][FORCE_CHANGE] error", e);
       setError(e?.message ?? "Falha ao atualizar senha.");

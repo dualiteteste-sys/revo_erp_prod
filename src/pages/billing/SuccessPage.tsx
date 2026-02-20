@@ -122,7 +122,7 @@ const SuccessPage: React.FC = () => {
             <p className="text-gray-600 mb-6">
               Sua assinatura foi ativada com sucesso.
             </p>
-            <Link to="/app" className="inline-block bg-blue-600 text-white font-bold py-2 px-6 rounded-lg hover:bg-blue-700 transition-colors">
+            <Link to="/app/dashboard" className="inline-block bg-blue-600 text-white font-bold py-2 px-6 rounded-lg hover:bg-blue-700 transition-colors">
               Ir para o Dashboard
             </Link>
           </>
