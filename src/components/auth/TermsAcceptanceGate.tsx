@@ -2,7 +2,6 @@ import React, { useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import GlassCard from '@/components/ui/GlassCard';
 import { Button } from '@/components/ui/button';
-import { CheckCircle2, LogOut } from 'lucide-react';
 import { acceptCurrentTerms, getCurrentTermsDocument, getTermsAcceptanceStatus } from '@/services/termsAcceptance';
 import { logger } from '@/lib/logger';
 
@@ -120,7 +119,6 @@ export default function TermsAcceptanceGate({
             </p>
           </div>
           <div className="flex items-center gap-2 text-xs text-slate-500">
-            <CheckCircle2 size={16} />
             Versão vigente: {docQuery.data.version}
           </div>
         </div>
@@ -142,19 +140,15 @@ export default function TermsAcceptanceGate({
         <div className="mt-6 flex flex-col sm:flex-row gap-3 sm:items-center sm:justify-end">
           <Button
             variant="outline"
-            className="gap-2"
             onClick={() => onDecline()}
             disabled={acceptMutation.isPending}
           >
-            <LogOut size={16} />
             Não aceito / Sair
           </Button>
           <Button
-            className="gap-2"
             onClick={() => acceptMutation.mutate()}
             disabled={acceptMutation.isPending}
           >
-            <CheckCircle2 size={16} />
             {acceptMutation.isPending ? 'Registrando…' : 'Aceitar'}
           </Button>
         </div>
@@ -162,4 +156,3 @@ export default function TermsAcceptanceGate({
     </div>
   );
 }
-
