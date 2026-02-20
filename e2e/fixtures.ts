@@ -203,10 +203,18 @@ export const test = base.extend({
     };
 
     await page.route('**/rest/v1/rpc/terms_document_current_get', async (route) => {
+      if (route.request().method() === 'OPTIONS') {
+        await route.fulfill({ status: 204, body: '' });
+        return;
+      }
       await route.fulfill({ json: [termsDoc] });
     });
 
     await page.route('**/rest/v1/rpc/terms_acceptance_status_get', async (route) => {
+      if (route.request().method() === 'OPTIONS') {
+        await route.fulfill({ status: 204, body: '' });
+        return;
+      }
       await route.fulfill({
         json: [
           {
@@ -221,6 +229,10 @@ export const test = base.extend({
     });
 
     await page.route('**/rest/v1/rpc/terms_accept_current', async (route) => {
+      if (route.request().method() === 'OPTIONS') {
+        await route.fulfill({ status: 204, body: '' });
+        return;
+      }
       await route.fulfill({
         json: [
           {

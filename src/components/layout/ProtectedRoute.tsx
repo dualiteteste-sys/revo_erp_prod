@@ -4,6 +4,7 @@ import { useAuth } from '../../contexts/AuthProvider';
 import GlassCard from '../ui/GlassCard';
 import { Button } from '@/components/ui/button';
 import { Building2, RefreshCcw } from 'lucide-react';
+import TermsAcceptanceGate from '@/components/auth/TermsAcceptanceGate';
 
 const FullscreenLoading = ({ label }: { label?: string }) => (
   <div className="w-full h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50">
@@ -64,7 +65,7 @@ const SelectEmpresaGate = ({
 };
 
 const ProtectedRoute = ({ children }: { children: JSX.Element }) => {
-  const { session, loading, mustChangePassword, pendingEmpresaId, empresas, activeEmpresaId, setActiveEmpresa, refreshEmpresas } =
+  const { session, userId, loading, mustChangePassword, pendingEmpresaId, empresas, activeEmpresaId, setActiveEmpresa, refreshEmpresas, signOut } =
     useAuth();
   const location = useLocation();
   const [autoSelectAttempted, setAutoSelectAttempted] = useState(false);
@@ -118,7 +119,16 @@ const ProtectedRoute = ({ children }: { children: JSX.Element }) => {
     );
   }
 
-  return children;
+  const effectiveUserId = userId ?? session.user?.id ?? null;
+  if (!effectiveUserId) {
+    return <FullscreenLoading label="Carregando usuário…" />;
+  }
+
+  return (
+    <TermsAcceptanceGate userId={effectiveUserId} empresaId={activeEmpresaId} onDecline={signOut}>
+      {children}
+    </TermsAcceptanceGate>
+  );
 };
 
 const AutoSelectEmpresa = ({
