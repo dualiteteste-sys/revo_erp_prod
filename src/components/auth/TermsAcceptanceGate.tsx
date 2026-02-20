@@ -1,6 +1,7 @@
 import React from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { acceptCurrentTerms, getCurrentTermsDocument, getTermsAcceptanceStatus } from '@/services/termsAcceptance';
+import { isRpcMissingError } from '@/lib/api';
 
 const FullscreenLoading = ({ label }: { label: string }) => (
   <div className="w-full h-screen flex items-center justify-center bg-slate-50 p-6">
@@ -53,7 +54,7 @@ export default function TermsAcceptanceGate({
     queryFn: getCurrentTermsDocument,
     enabled: Boolean(userId && empresaId),
     staleTime: 60 * 60 * 1000, // 1h
-    retry: 1,
+    retry: 0,
   });
 
   const statusQuery = useQuery({
@@ -85,6 +86,13 @@ export default function TermsAcceptanceGate({
 
   if (docQuery.isLoading || statusQuery.isLoading) {
     return <FullscreenLoading label="Verificando Termo de Aceite…" />;
+  }
+
+  const missingTermsRpc =
+    isRpcMissingError(docQuery.error) ||
+    isRpcMissingError(statusQuery.error);
+  if (missingTermsRpc) {
+    return <>{children}</>;
   }
 
   if (docQuery.error || !docQuery.data) {
