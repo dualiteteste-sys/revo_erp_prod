@@ -22,8 +22,10 @@ type Action =
   | "stores.create"
   | "stores.healthcheck"
   | "stores.webhooks.register"
+  | "stores.webhooks.list_remote"
   | "stores.product_map.build"
   | "stores.product_map.list"
+  | "stores.logs.list"
   | "stores.sync.stock"
   | "stores.sync.price"
   | "stores.reconcile.orders"
@@ -204,6 +206,7 @@ async function mapQualitySnapshot(svc: any, empresaId: string, storeId: string) 
 function mapLegacyWooStatusToStoreStatus(value: unknown): "active" | "paused" | "error" {
   const normalized = String(value ?? "").trim().toLowerCase();
   if (normalized === "error") return "error";
+  if (normalized === "disconnected") return "paused";
   if (normalized === "paused") return "paused";
   return "active";
 }
@@ -229,19 +232,65 @@ async function bootstrapStoresFromLegacyConnections(params: {
   const legacyIds = legacyRows.map((row: any) => String(row?.id ?? "").trim()).filter(Boolean);
   if (legacyIds.length === 0) return 0;
 
+  const legacyById = new Map<string, { status: string; updated_at: string }>();
+  for (const row of legacyRows) {
+    const id = String((row as any)?.id ?? "").trim();
+    if (!id) continue;
+    legacyById.set(id, {
+      status: String((row as any)?.status ?? "").trim().toLowerCase(),
+      updated_at: String((row as any)?.updated_at ?? "").trim(),
+    });
+  }
+
   const { data: secretRows } = await svc
     .from("ecommerce_connection_secrets")
-    .select("ecommerce_id,woo_consumer_key,woo_consumer_secret")
+    .select("ecommerce_id,woo_consumer_key,woo_consumer_secret,updated_at")
     .eq("empresa_id", empresaId)
     .in("ecommerce_id", legacyIds);
 
-  const secretsByEcommerce = new Map<string, { key: string; secret: string }>();
+  const secretsByEcommerce = new Map<string, { key: string; secret: string; updatedAt: string }>();
   for (const row of Array.isArray(secretRows) ? secretRows : []) {
     const ecommerceId = String((row as any)?.ecommerce_id ?? "").trim();
     const key = String((row as any)?.woo_consumer_key ?? "").trim();
     const secret = String((row as any)?.woo_consumer_secret ?? "").trim();
-    if (!ecommerceId || !key || !secret) continue;
-    secretsByEcommerce.set(ecommerceId, { key, secret });
+    const updatedAt = String((row as any)?.updated_at ?? "").trim();
+    if (!ecommerceId || !key || !secret || !updatedAt) continue;
+    secretsByEcommerce.set(ecommerceId, { key, secret, updatedAt });
+  }
+
+  // Cleanup: if a legacy connection was disconnected OR its secrets were deleted, ensure the new store
+  // is paused and has no encrypted credentials, to avoid confusing UX (store appears "active" but cannot run).
+  const { data: legacyStores } = await svc
+    .from("integrations_woocommerce_store")
+    .select("id,base_url,legacy_ecommerce_id,consumer_key_enc,consumer_secret_enc,status")
+    .eq("empresa_id", empresaId)
+    .in("legacy_ecommerce_id", legacyIds);
+  const nowIso = new Date().toISOString();
+  for (const store of Array.isArray(legacyStores) ? legacyStores : []) {
+    const legacyId = String((store as any)?.legacy_ecommerce_id ?? "").trim();
+    if (!legacyId) continue;
+    const legacyStatus = legacyById.get(legacyId)?.status ?? "";
+    const hasLegacySecrets = secretsByEcommerce.has(legacyId);
+    const shouldClear = legacyStatus === "disconnected" || !hasLegacySecrets;
+    if (!shouldClear) continue;
+
+    const keyEnc = String((store as any)?.consumer_key_enc ?? "").trim();
+    const secretEnc = String((store as any)?.consumer_secret_enc ?? "").trim();
+    const alreadyCleared = keyEnc.length < 12 && secretEnc.length < 12 && String((store as any)?.status ?? "") === "paused";
+    if (alreadyCleared) continue;
+
+    await svc
+      .from("integrations_woocommerce_store")
+      .update({
+        status: "paused",
+        consumer_key_enc: "",
+        consumer_secret_enc: "",
+        legacy_secrets_updated_at: null,
+        updated_at: nowIso,
+      })
+      .eq("id", String((store as any)?.id ?? ""))
+      .eq("empresa_id", empresaId)
+      .catch(() => null);
   }
 
   let imported = 0;
@@ -262,7 +311,7 @@ async function bootstrapStoresFromLegacyConnections(params: {
 
     const { data: existing } = await svc
       .from("integrations_woocommerce_store")
-      .select("id")
+      .select("id,legacy_ecommerce_id,legacy_secrets_updated_at,consumer_key_enc,consumer_secret_enc,auth_mode,status")
       .eq("empresa_id", empresaId)
       .eq("base_url", baseUrl)
       .maybeSingle();
@@ -272,15 +321,35 @@ async function bootstrapStoresFromLegacyConnections(params: {
     const consumerKeyEnc = await aesGcmEncryptToString({ masterKey, plaintext: secrets.key, aad });
     const consumerSecretEnc = await aesGcmEncryptToString({ masterKey, plaintext: secrets.secret, aad });
     const status = mapLegacyWooStatusToStoreStatus((row as any)?.status);
+    const legacyUpdatedAt = secrets.updatedAt;
+
+    const existingLegacyEcommerceId = String((existing as any)?.legacy_ecommerce_id ?? "").trim();
+    const existingLegacyUpdatedAt = String((existing as any)?.legacy_secrets_updated_at ?? "").trim();
+    const existingKeyEnc = String((existing as any)?.consumer_key_enc ?? "").trim();
+    const existingSecretEnc = String((existing as any)?.consumer_secret_enc ?? "").trim();
+    const alreadySynced =
+      existing?.id &&
+      existingLegacyEcommerceId === ecommerceId &&
+      existingLegacyUpdatedAt &&
+      legacyUpdatedAt &&
+      new Date(existingLegacyUpdatedAt).getTime() >= new Date(legacyUpdatedAt).getTime() &&
+      existingKeyEnc.length > 12 &&
+      existingSecretEnc.length > 12;
 
     if (existing?.id) {
+      if (alreadySynced) {
+        processedBaseUrls.add(baseUrl);
+        continue;
+      }
       const { error } = await svc
         .from("integrations_woocommerce_store")
         .update({
-          auth_mode: "basic_https",
+          auth_mode: String((existing as any)?.auth_mode ?? "").trim() || "basic_https",
           status,
           consumer_key_enc: consumerKeyEnc,
           consumer_secret_enc: consumerSecretEnc,
+          legacy_ecommerce_id: ecommerceId,
+          legacy_secrets_updated_at: legacyUpdatedAt,
           updated_at: new Date().toISOString(),
         })
         .eq("id", storeId)
@@ -300,6 +369,8 @@ async function bootstrapStoresFromLegacyConnections(params: {
       status,
       consumer_key_enc: consumerKeyEnc,
       consumer_secret_enc: consumerSecretEnc,
+      legacy_ecommerce_id: ecommerceId,
+      legacy_secrets_updated_at: legacyUpdatedAt,
     });
     if (!error) {
       imported += 1;
@@ -824,7 +895,7 @@ Deno.serve(async (req) => {
     if (action === "stores.list") {
       let { data, error } = await svc
         .from("integrations_woocommerce_store")
-        .select("id,base_url,auth_mode,status,last_healthcheck_at,created_at,updated_at")
+        .select("id,base_url,auth_mode,status,last_healthcheck_at,created_at,updated_at,legacy_ecommerce_id,legacy_secrets_updated_at,consumer_key_enc,consumer_secret_enc")
         .eq("empresa_id", empresaId)
         .order("updated_at", { ascending: false });
       if (error) {
@@ -841,50 +912,43 @@ Deno.serve(async (req) => {
         }).catch(() => null);
         throw error;
       }
-      const existingBaseUrls = new Set<string>(
-        (Array.isArray(data) ? data : []).map((row: any) => String(row?.base_url ?? "").trim()).filter(Boolean),
-      );
-      let needsBootstrap = (data?.length ?? 0) === 0;
-      if (!needsBootstrap) {
-        const { data: preferred } = await svc
-          .from("ecommerces")
-          .select("config,updated_at")
+      // Sempre tenta sincronizar com "Configurações → Marketplaces" (ecommerces + ecommerce_connection_secrets),
+      // para evitar drift entre as credenciais legadas (plaintext no secrets table) e as stores criptografadas
+      // usadas pelo worker/painel dev.
+      const imported = await bootstrapStoresFromLegacyConnections({
+        svc,
+        empresaId,
+        masterKey,
+        requestId,
+        processedBaseUrls: new Set<string>(),
+      });
+      if (imported > 0) {
+        const refresh = await svc
+          .from("integrations_woocommerce_store")
+          .select("id,base_url,auth_mode,status,last_healthcheck_at,created_at,updated_at,legacy_ecommerce_id,legacy_secrets_updated_at,consumer_key_enc,consumer_secret_enc")
           .eq("empresa_id", empresaId)
-          .eq("provider", "woo")
-          .order("updated_at", { ascending: false })
-          .limit(1)
-          .maybeSingle();
-        const rawStoreUrl = String((preferred as any)?.config?.store_url ?? "").trim();
-        if (rawStoreUrl) {
-          try {
-            const preferredBaseUrl = normalizeWooStoreUrl(rawStoreUrl);
-            if (!existingBaseUrls.has(preferredBaseUrl)) needsBootstrap = true;
-          } catch {
-            // ignore invalid URL, diagnostics flow will surface this in the settings UI
-          }
-        }
+          .order("updated_at", { ascending: false });
+        data = refresh.data ?? [];
+        error = refresh.error;
+        if (error) throw error;
       }
-
-      if (needsBootstrap) {
-        const imported = await bootstrapStoresFromLegacyConnections({
-          svc,
-          empresaId,
-          masterKey,
-          requestId,
-          processedBaseUrls: new Set<string>(),
-        });
-        if (imported > 0) {
-          const refresh = await svc
-            .from("integrations_woocommerce_store")
-            .select("id,base_url,auth_mode,status,last_healthcheck_at,created_at,updated_at")
-            .eq("empresa_id", empresaId)
-            .order("updated_at", { ascending: false });
-          data = refresh.data ?? [];
-          error = refresh.error;
-          if (error) throw error;
-        }
-      }
-      return json(200, { ok: true, stores: data ?? [] }, cors);
+      const sanitized = (Array.isArray(data) ? data : []).map((row: any) => {
+        const keyEnc = String(row?.consumer_key_enc ?? "").trim();
+        const secretEnc = String(row?.consumer_secret_enc ?? "").trim();
+        return {
+          id: row?.id,
+          base_url: row?.base_url,
+          auth_mode: row?.auth_mode,
+          status: row?.status,
+          last_healthcheck_at: row?.last_healthcheck_at ?? null,
+          created_at: row?.created_at ?? null,
+          updated_at: row?.updated_at ?? null,
+          legacy_ecommerce_id: row?.legacy_ecommerce_id ?? null,
+          legacy_secrets_updated_at: row?.legacy_secrets_updated_at ?? null,
+          has_credentials: keyEnc.length > 12 && secretEnc.length > 12,
+        };
+      });
+      return json(200, { ok: true, stores: sanitized }, cors);
     }
 
     if (action === "stores.create") {
@@ -931,50 +995,127 @@ Deno.serve(async (req) => {
     let consumerSecret = "";
     const needsWooCredentials = action === "stores.healthcheck" ||
       action === "stores.webhooks.register" ||
+      action === "stores.webhooks.list_remote" ||
       action === "stores.products.search" ||
       action === "stores.catalog.preview.import" ||
       action === "stores.catalog.run.import";
     if (needsWooCredentials) {
+      const keyEnc = String(store.consumer_key_enc ?? "").trim();
+      const secretEnc = String(store.consumer_secret_enc ?? "").trim();
+      if (keyEnc.length < 12 || secretEnc.length < 12) {
+        await logWooEvent({
+          svc,
+          empresaId,
+          storeId,
+          code: "WOO_CREDENTIALS_MISSING",
+          context: "credentials_missing_for_action",
+          level: "warn",
+          meta: { action },
+        }).catch(() => null);
+        return json(400, { ok: false, error: "CREDENTIALS_REQUIRED" }, cors);
+      }
       consumerKey = await aesGcmDecryptFromString({ masterKey, ciphertext: String(store.consumer_key_enc), aad });
       consumerSecret = await aesGcmDecryptFromString({ masterKey, ciphertext: String(store.consumer_secret_enc), aad });
     }
 
     if (action === "stores.healthcheck") {
-      const { url, headers } = buildWooApiUrl({
-        baseUrl,
-        path: "products",
-        authMode,
-        consumerKey,
-        consumerSecret,
-        query: { per_page: "1", page: "1" },
-        userAgent: "UltriaERP/woocommerce-admin",
-      });
-      const resp = await wooFetchJson(url, { headers });
-      const ok = resp.ok;
-      const classification = classifyWooHttpStatus(resp.status);
+      const authModesToTry: Array<"basic_https" | "querystring_fallback"> = authMode === "querystring_fallback"
+        ? ["querystring_fallback", "basic_https"]
+        : ["basic_https", "querystring_fallback"];
+
+      let readOk = false;
+      let writeOk: boolean | null = null;
+      let chosenAuthMode: "basic_https" | "querystring_fallback" = authMode === "querystring_fallback"
+        ? "querystring_fallback"
+        : "basic_https";
+      let lastStatus = 0;
+      let lastData: any = null;
+      let lastEndpoint = "/wp-json/wc/v3/products";
+
+      for (const candidate of authModesToTry) {
+        const readReq = buildWooApiUrl({
+          baseUrl,
+          path: "products",
+          authMode: candidate,
+          consumerKey,
+          consumerSecret,
+          query: { per_page: "1", page: "1" },
+          userAgent: "UltriaERP/woocommerce-admin",
+        });
+        const readResp = await wooFetchJson(readReq.url, { headers: readReq.headers, method: "GET" });
+        lastStatus = readResp.status;
+        lastData = readResp.data;
+        lastEndpoint = "/wp-json/wc/v3/products?per_page=1&page=1";
+        if (!readResp.ok) continue;
+
+        // Write access probe (safe no-op): requires "read/write" keys, but does not create anything.
+        const writeReq = buildWooApiUrl({
+          baseUrl,
+          path: "products/batch",
+          authMode: candidate,
+          consumerKey,
+          consumerSecret,
+          userAgent: "UltriaERP/woocommerce-admin",
+        });
+        const writeResp = await wooFetchJson(writeReq.url, {
+          method: "POST",
+          headers: { ...writeReq.headers, "Content-Type": "application/json" },
+          body: JSON.stringify({ create: [], update: [], delete: [] }),
+        });
+
+        readOk = true;
+        chosenAuthMode = candidate;
+        writeOk = writeResp.ok;
+        lastStatus = writeResp.ok ? readResp.status : writeResp.status;
+        lastData = writeResp.ok ? readResp.data : writeResp.data;
+        lastEndpoint = writeResp.ok ? lastEndpoint : "/wp-json/wc/v3/products/batch";
+        break;
+      }
+
+      const classification = classifyWooHttpStatus(lastStatus);
+      const nowIso = new Date().toISOString();
+
+      const effectiveStatus = readOk && writeOk === true
+        ? "active"
+        : readOk && writeOk === false
+        ? "paused"
+        : classification.pauseStore
+        ? "paused"
+        : "error";
+
       await svc.from("integrations_woocommerce_store").update({
-        last_healthcheck_at: new Date().toISOString(),
-        status: ok ? "active" : classification.pauseStore ? "paused" : "error",
+        last_healthcheck_at: nowIso,
+        status: effectiveStatus,
+        auth_mode: chosenAuthMode,
       }).eq("id", storeId).eq("empresa_id", empresaId);
 
-      if (!ok) {
+      if (!(readOk && writeOk === true)) {
+        const code = readOk && writeOk === false ? "WOO_WRITE_FORBIDDEN" : classification.code;
+        const hint = readOk && writeOk === false ? "Leitura OK, mas escrita falhou. Confirme que a chave WooCommerce é Read/Write e que o servidor/proxy não bloqueia POST." : classification.hint;
         await logWooEvent({
           svc,
           empresaId,
           storeId,
-          code: classification.code,
+          code,
           context: "healthcheck_failed",
-          meta: { http_status: resp.status, details: sanitizeForLog(resp.data) },
+          meta: { http_status: lastStatus, endpoint: lastEndpoint, auth_mode: chosenAuthMode, details: sanitizeForLog(lastData), write_ok: writeOk },
         });
       }
 
       return json(200, {
         ok: true,
-        status: ok ? "ok" : "error",
-        http_status: resp.status,
-        error_code: ok ? null : classification.code,
-        hint: ok ? null : classification.hint,
-        details: ok ? null : sanitizeForLog(resp.data),
+        status: readOk && writeOk === true ? "ok" : "error",
+        http_status: lastStatus,
+        auth_mode: chosenAuthMode,
+        read_ok: readOk,
+        write_ok: writeOk,
+        error_code: readOk && writeOk === true ? null : (readOk && writeOk === false ? "WOO_WRITE_FORBIDDEN" : classification.code),
+        hint: readOk && writeOk === true
+          ? null
+          : readOk && writeOk === false
+          ? "Chave Woo precisa ser Read/Write (exportação exige escrita). Revise também proxy/WAF."
+          : classification.hint,
+        details: readOk && writeOk === true ? null : sanitizeForLog(lastData),
       }, cors);
     }
 
@@ -1023,6 +1164,53 @@ Deno.serve(async (req) => {
       }
 
       return json(200, { ok: true, delivery_url: deliveryUrl, topics: created }, cors);
+    }
+
+    if (action === "stores.webhooks.list_remote") {
+      const perPage = Math.max(1, Math.min(Number(body?.per_page ?? 100), 100));
+      const page = Math.max(1, Math.min(Number(body?.page ?? 1), 10));
+      const status = String(body?.status ?? "").trim() || null; // active|paused|disabled|all
+
+      const query: Record<string, string> = {
+        per_page: String(perPage),
+        page: String(page),
+      };
+      if (status && status !== "all") query.status = status;
+
+      const { url, headers } = buildWooApiUrl({
+        baseUrl,
+        path: "webhooks",
+        authMode,
+        consumerKey,
+        consumerSecret,
+        query,
+        userAgent: "UltriaERP/woocommerce-admin",
+      });
+      const resp = await wooFetchJson(url, { method: "GET", headers });
+      if (!resp.ok) {
+        const classification = classifyWooHttpStatus(resp.status);
+        await logWooEvent({
+          svc,
+          empresaId,
+          storeId,
+          code: classification.code,
+          context: "webhooks_list_remote_failed",
+          meta: { http_status: resp.status, details: sanitizeForLog(resp.data) },
+        });
+        return json(502, { ok: false, error: "WEBHOOKS_LIST_REMOTE_FAILED", status: resp.status, details: sanitizeForLog(resp.data) }, cors);
+      }
+
+      const rows = Array.isArray(resp.data) ? resp.data : [];
+      const normalized = rows.map((row: any) => ({
+        id: row?.id != null ? Number(row.id) : null,
+        name: String(row?.name ?? "").trim() || null,
+        topic: String(row?.topic ?? "").trim() || null,
+        status: String(row?.status ?? "").trim() || null,
+        delivery_url: String(row?.delivery_url ?? "").trim() || null,
+        created_at: row?.date_created_gmt ?? row?.date_created ?? null,
+        updated_at: row?.date_modified_gmt ?? row?.date_modified ?? null,
+      }));
+      return json(200, { ok: true, webhooks: normalized }, cors);
     }
 
     if (action === "stores.products.search") {
@@ -1513,6 +1701,8 @@ Deno.serve(async (req) => {
           base_url: baseUrl,
           auth_mode: authMode,
           last_healthcheck_at: store.last_healthcheck_at ?? null,
+          consumer_key_enc: store.consumer_key_enc ?? null,
+          consumer_secret_enc: store.consumer_secret_enc ?? null,
         },
         queueCounts: { queued, running, error: errored, dead },
         mapQuality,
@@ -1539,6 +1729,24 @@ Deno.serve(async (req) => {
         status_contract: statusContract,
         recent_runs: recentRuns.data ?? [],
       }, cors);
+    }
+
+    if (action === "stores.logs.list") {
+      const limit = Math.max(1, Math.min(Number(body?.limit ?? 200), 500));
+      const fromIso = String(body?.from ?? "").trim() || null;
+      const toIso = String(body?.to ?? "").trim() || null;
+      let query = svc
+        .from("woocommerce_sync_log")
+        .select("id,level,message,meta,created_at,job_id")
+        .eq("empresa_id", empresaId)
+        .eq("store_id", storeId)
+        .order("created_at", { ascending: false })
+        .limit(limit);
+      if (fromIso) query = query.gte("created_at", fromIso);
+      if (toIso) query = query.lte("created_at", toIso);
+      const { data, error } = await query;
+      if (error) throw error;
+      return json(200, { ok: true, logs: data ?? [] }, cors);
     }
 
     if (action === "stores.runs.list") {

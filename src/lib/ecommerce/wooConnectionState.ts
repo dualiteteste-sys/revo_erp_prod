@@ -101,7 +101,7 @@ export function mergeWooDiagnosticsWithSnapshot(params: {
   };
 }
 
-export type WooStoreOption = { id: string; base_url: string; status?: string | null };
+export type WooStoreOption = { id: string; base_url: string; status?: string | null; has_credentials?: boolean | null };
 
 export function normalizeWooBaseUrl(value: string): string | null {
   const raw = String(value ?? '').trim();
@@ -115,14 +115,18 @@ export function selectPreferredWooStoreId(params: {
   preferredStoreUrl?: string | null;
 }): string {
   const preferred = normalizeWooBaseUrl(String(params.preferredStoreUrl ?? '').trim());
-  const stores = Array.isArray(params.stores) ? params.stores : [];
+  const stores = (Array.isArray(params.stores) ? params.stores : []).filter((store) => Boolean(store?.id));
+  const credentialed = stores.filter((store) => store.has_credentials !== false);
   if (preferred) {
-    const match = stores.find((store) => normalizeWooBaseUrl(store.base_url) === preferred);
+    const match = credentialed.find((store) => normalizeWooBaseUrl(store.base_url) === preferred);
     if (match?.id) return String(match.id);
   }
 
-  const firstActive = stores.find((store) => String(store.status ?? '').toLowerCase() === 'active');
+  const firstActive = credentialed.find((store) => String(store.status ?? '').toLowerCase() === 'active');
   if (firstActive?.id) return String(firstActive.id);
+
+  const anyCredentialed = credentialed[0]?.id ? String(credentialed[0].id) : '';
+  if (anyCredentialed) return anyCredentialed;
 
   return stores[0]?.id ? String(stores[0].id) : '';
 }

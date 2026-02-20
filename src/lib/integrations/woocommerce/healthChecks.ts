@@ -78,7 +78,12 @@ function minutesBetween(nowMs: number, iso?: string | null): number | null {
 function hasAuthError(status: WooStatusResponse): boolean {
   return (status.recent_errors ?? []).some((item) => {
     const code = String(item.code ?? '');
-    return code === 'WOO_AUTH_INVALID' || code === 'WOO_AUTH_FORBIDDEN' || code === 'WOO_AUTH_FAILED';
+    return (
+      code === 'WOO_AUTH_INVALID' ||
+      code === 'WOO_AUTH_FORBIDDEN' ||
+      code === 'WOO_WRITE_FORBIDDEN' ||
+      code === 'WOO_AUTH_FAILED'
+    );
   });
 }
 

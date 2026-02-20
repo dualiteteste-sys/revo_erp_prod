@@ -188,7 +188,7 @@ export default function UpdatePasswordPage() {
       }
 
       setOkMsg("Senha atualizada com sucesso! Redirecionando para o painel...");
-      setTimeout(() => navigate("/app"), 900);
+      setTimeout(() => navigate("/app/dashboard"), 900);
     } catch (e: any) {
       console.error("[AUTH] update/accept error", e);
       setError(e?.message ?? "Falha ao atualizar a senha.");

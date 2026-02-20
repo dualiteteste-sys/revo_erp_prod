@@ -16,7 +16,8 @@ const LoginPage: React.FC = () => {
   const location = useLocation();
   const { addToast } = useToast();
 
-  const from = (location.state as any)?.from?.pathname || '/app';
+  const rawFrom = (location.state as any)?.from?.pathname || '/app/dashboard';
+  const from = rawFrom === '/app' ? '/app/dashboard' : rawFrom;
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();

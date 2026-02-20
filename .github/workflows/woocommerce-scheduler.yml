@@ -17,11 +17,11 @@ jobs:
       - name: Invoke Woo scheduler
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
-          WOOCOMMERCE_SCHEDULER_KEY: ${{ secrets.WOOCOMMERCE_SCHEDULER_KEY }}
+          WOOCOMMERCE_SCHEDULER_KEY: ${{ secrets.WOOCOMMERCE_SCHEDULER_KEY || secrets.WOOCOMMERCE_SCHEDULE }}
         run: |
           set -euo pipefail
           if [[ -z "${SUPABASE_URL:-}" ]] || [[ -z "${WOOCOMMERCE_SCHEDULER_KEY:-}" ]]; then
-            echo "::warning::Missing SUPABASE_URL/WOOCOMMERCE_SCHEDULER_KEY secrets (skipping scheduler tick)"
+            echo "::warning::Missing SUPABASE_URL/WOOCOMMERCE_SCHEDULER_KEY (or WOOCOMMERCE_SCHEDULE) secrets (skipping scheduler tick)"
             exit 0
           fi
           curl --fail-with-body --show-error --silent \
