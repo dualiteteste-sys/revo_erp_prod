@@ -68,8 +68,11 @@ export default function WooCatalogRunPage() {
     if (!activeEmpresaId || !storeId) return;
     setLoading(true);
     try {
-      await runWooWorkerNow({ empresaId: activeEmpresaId, storeId });
-      addToast('Worker OK.', 'success');
+      const resp = await runWooWorkerNow({ empresaId: activeEmpresaId, storeId });
+      const processed = Number((resp as any)?.processed_jobs ?? 0);
+      const hint = String((resp as any)?.hint ?? '').trim();
+      if (processed > 0) addToast('Worker OK.', 'success');
+      else addToast(hint || 'Nenhum job pronto para processar.', hint ? 'warning' : 'info');
       await load();
     } catch (error: any) {
       addToast(error?.message || 'Falha ao executar worker.', 'error');

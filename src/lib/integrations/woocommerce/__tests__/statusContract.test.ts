@@ -47,7 +47,7 @@ describe("woocommerce status contract", () => {
     expect(Array.isArray(contract.recommendations)).toBe(true);
     expect(contract.recent_errors[0]?.code).toBe("WOO_AUTH_FORBIDDEN");
     expect(contract.recommendations).toEqual(expect.arrayContaining([
-      "Store pausada. Corrija credenciais e rode healthcheck.",
+      "Store pausada: faltam credenciais criptografadas na store (sincronize credenciais e rode healthcheck).",
       "Falha de autenticação/autorização Woo detectada. Revise credenciais e proxy/WAF.",
       "Webhooks descartados por limite. Reconcile automático foi enfileirado.",
     ]));

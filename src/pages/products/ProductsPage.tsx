@@ -102,6 +102,47 @@ const ProductsPage: React.FC = () => {
   const parentIds = useMemo(() => effectiveParents.map((row) => row.id), [effectiveParents]);
   const parentIdsKey = useMemo(() => parentIds.join('|'), [parentIds]);
 
+  const wooStoreOptions = useMemo(() => {
+    const stores = Array.isArray(wooStores) ? wooStores : [];
+    return [...stores].sort((a, b) => {
+      const aActive = String(a.status ?? '').toLowerCase() === 'active';
+      const bActive = String(b.status ?? '').toLowerCase() === 'active';
+      if (aActive !== bActive) return aActive ? -1 : 1;
+      const aCred = a.has_credentials !== false;
+      const bCred = b.has_credentials !== false;
+      if (aCred !== bCred) return aCred ? -1 : 1;
+      const aUpdated = new Date(a.updated_at ?? a.created_at ?? 0).getTime();
+      const bUpdated = new Date(b.updated_at ?? b.created_at ?? 0).getTime();
+      return bUpdated - aUpdated;
+    });
+  }, [wooStores]);
+
+  const selectedWooStore = useMemo(() => {
+    if (!wooStoreId) return null;
+    return wooStores.find((s) => String(s.id) === String(wooStoreId)) ?? null;
+  }, [wooStoreId, wooStores]);
+
+  const ensureWooStoreOperable = useCallback(() => {
+    if (!selectedWooStore) {
+      addToast('Selecione uma loja WooCommerce antes de continuar.', 'warning');
+      return false;
+    }
+    if (selectedWooStore.has_credentials === false) {
+      addToast('Loja selecionada está sem credenciais. Salve Consumer Key/Secret em Configurações → Integrações.', 'warning');
+      return false;
+    }
+    const status = String(selectedWooStore.status ?? '').toLowerCase();
+    if (status === 'paused') {
+      addToast('Loja WooCommerce está pausada. Rode Testar conexão e faça Unpause para processar filas.', 'warning');
+      return false;
+    }
+    if (status === 'error') {
+      addToast('Loja WooCommerce está em erro. Verifique Monitor de Saúde / Painel WooCommerce.', 'warning');
+      return false;
+    }
+    return true;
+  }, [addToast, selectedWooStore]);
+
   useEffect(() => {
     if (!activeEmpresaId) {
       setWooStores([]);
@@ -381,19 +422,16 @@ const ProductsPage: React.FC = () => {
             className="w-[280px]"
           >
             <option value="">Loja Woo (coluna/status)</option>
-            {wooStores.map((store) => (
+            {wooStoreOptions.map((store) => (
               <option key={store.id} value={store.id}>
-                {store.base_url} ({store.status})
+                {store.base_url} ({store.status}{store.has_credentials === false ? ', sem credenciais' : ''})
               </option>
             ))}
           </Select>
 
           <Button
             onClick={() => {
-              if (!wooStoreId) {
-                addToast('Selecione uma loja Woo para importar catálogo.', 'warning');
-                return;
-              }
+              if (!ensureWooStoreOperable()) return;
               navigate(`/app/products/woocommerce/catalog?store=${encodeURIComponent(wooStoreId)}`);
             }}
             variant="secondary"
@@ -548,10 +586,7 @@ const ProductsPage: React.FC = () => {
                   key: 'woo-export',
                   label: 'Woo: Exportar',
                   onClick: () => {
-                    if (!wooStoreId) {
-                      addToast('Selecione uma loja Woo antes da ação em massa.', 'warning');
-                      return;
-                    }
+                    if (!ensureWooStoreOperable()) return;
                     setWooWizardMode('export');
                     setWooWizardOpen(true);
                   },
@@ -561,10 +596,7 @@ const ProductsPage: React.FC = () => {
                   key: 'woo-price',
                   label: 'Woo: Sincronizar preço',
                   onClick: () => {
-                    if (!wooStoreId) {
-                      addToast('Selecione uma loja Woo antes da ação em massa.', 'warning');
-                      return;
-                    }
+                    if (!ensureWooStoreOperable()) return;
                     setWooWizardMode('sync_price');
                     setWooWizardOpen(true);
                   },
@@ -574,10 +606,7 @@ const ProductsPage: React.FC = () => {
                   key: 'woo-stock',
                   label: 'Woo: Sincronizar estoque',
                   onClick: () => {
-                    if (!wooStoreId) {
-                      addToast('Selecione uma loja Woo antes da ação em massa.', 'warning');
-                      return;
-                    }
+                    if (!ensureWooStoreOperable()) return;
                     setWooWizardMode('sync_stock');
                     setWooWizardOpen(true);
                   },
