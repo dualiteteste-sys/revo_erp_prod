@@ -111,7 +111,7 @@ export default function Callback() {
           // ignore
         }
 
-        if (!cancelled) navigate("/app", { replace: true });
+        if (!cancelled) navigate("/app/dashboard", { replace: true });
       } catch (e: any) {
         console.error("[AUTH][CALLBACK][ERROR]", e);
         if (!cancelled)

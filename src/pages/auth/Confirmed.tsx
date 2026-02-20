@@ -127,7 +127,7 @@ export default function AuthConfirmed() {
         setMessage('Tudo pronto! Redirecionando...');
         const timer = setTimeout(() => {
           // O MainLayout força a abertura de Configurações → Empresa quando o perfil está incompleto
-          navigate('/app', { replace: true });
+          navigate('/app/dashboard', { replace: true });
         }, 1500);
         return () => clearTimeout(timer);
       } catch (err: any) {
@@ -172,7 +172,7 @@ export default function AuthConfirmed() {
               Tentar novamente
             </button>
             <button
-              onClick={() => navigate('/app', { replace: true })}
+              onClick={() => navigate('/app/dashboard', { replace: true })}
               className="bg-white text-gray-800 font-semibold py-2 px-4 rounded-lg border border-gray-200 hover:bg-gray-50"
             >
               Continuar para o sistema
