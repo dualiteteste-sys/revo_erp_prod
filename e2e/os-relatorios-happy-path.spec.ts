@@ -157,6 +157,15 @@ test('OS-02: concluir OS e ver refletir nos relatórios', async ({ page }) => {
   await page.route('**/rest/v1/**', async (route) => {
     const req = route.request();
     const url = req.url();
+    if (
+      url.includes('/rest/v1/rpc/terms_document_current_get') ||
+      url.includes('/rest/v1/rpc/terms_acceptance_status_get') ||
+      url.includes('/rest/v1/rpc/terms_accept_current')
+    ) {
+      await route.fallback();
+      return;
+    }
+
 
     if (req.method() === 'OPTIONS') {
       await route.fulfill({ status: 204, body: '' });

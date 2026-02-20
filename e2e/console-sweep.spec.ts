@@ -12,6 +12,15 @@ async function mockAuthAndEmpresa(page: Page, opts?: { role?: 'member' | 'admin'
     }
     const url = req.url();
     if (
+      url.includes('/rest/v1/rpc/terms_document_current_get') ||
+      url.includes('/rest/v1/rpc/terms_acceptance_status_get') ||
+      url.includes('/rest/v1/rpc/terms_accept_current')
+    ) {
+      await route.fallback();
+      return;
+    }
+
+    if (
       url.includes('/rest/v1/rpc/empresas_list_for_current_user') ||
       url.includes('/rest/v1/rpc/active_empresa_get_for_current_user')
     ) {
