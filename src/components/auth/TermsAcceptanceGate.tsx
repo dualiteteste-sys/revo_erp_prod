@@ -1,9 +1,8 @@
-import React, { useMemo, useState } from 'react';
+import React from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import GlassCard from '@/components/ui/GlassCard';
 import { Button } from '@/components/ui/button';
 import { acceptCurrentTerms, getCurrentTermsDocument, getTermsAcceptanceStatus } from '@/services/termsAcceptance';
-import { logger } from '@/lib/logger';
 
 const FullscreenLoading = ({ label }: { label: string }) => (
   <div className="w-full h-screen flex items-center justify-center bg-slate-50 p-6">
@@ -23,10 +22,9 @@ export default function TermsAcceptanceGate({
   children: React.ReactNode;
 }) {
   const queryClient = useQueryClient();
-  const [ackError, setAckError] = useState<string | null>(null);
 
-  const docQueryKey = useMemo(() => ['terms_document_current', 'ultria_erp_terms'], []);
-  const statusQueryKey = useMemo(() => ['terms_acceptance_status', 'ultria_erp_terms', empresaId, userId], [empresaId, userId]);
+  const docQueryKey = ['terms_document_current', 'ultria_erp_terms'] as const;
+  const statusQueryKey = ['terms_acceptance_status', 'ultria_erp_terms', empresaId, userId] as const;
 
   const docQuery = useQuery({
     queryKey: docQueryKey,
@@ -46,7 +44,6 @@ export default function TermsAcceptanceGate({
 
   const acceptMutation = useMutation({
     mutationFn: async () => {
-      setAckError(null);
       const userAgent = typeof navigator !== 'undefined' ? navigator.userAgent : null;
       return acceptCurrentTerms({ origin: 'web', userAgent });
     },
@@ -54,8 +51,13 @@ export default function TermsAcceptanceGate({
       await queryClient.invalidateQueries({ queryKey: statusQueryKey });
     },
     onError: (err) => {
-      logger.warn('[TERMS][ACCEPT][ERROR]', err);
-      setAckError('Não foi possível registrar seu aceite. Recarregue a página e tente novamente.');
+      // Best-effort: no logs com detalhes (evita ruído / loops).
+      void err;
+      try {
+        window.alert('Não foi possível registrar o aceite. Recarregue e tente novamente.');
+      } catch {
+        // ignore
+      }
     },
   });
 
@@ -121,10 +123,6 @@ export default function TermsAcceptanceGate({
             </pre>
           </div>
         </div>
-
-        {ackError && (
-          <div className="mt-4 text-sm text-red-700">{ackError}</div>
-        )}
 
         <div className="mt-6 flex flex-col sm:flex-row gap-3 sm:items-center sm:justify-end">
           <Button
