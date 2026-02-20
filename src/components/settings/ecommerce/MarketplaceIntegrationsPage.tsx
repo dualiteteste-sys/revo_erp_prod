@@ -64,7 +64,7 @@ import {
   buildPreferredEcommerceConnectionsMap,
   mergeWooDiagnosticsWithSnapshot,
 } from '@/lib/ecommerce/wooConnectionState';
-import { listWooStores } from '@/services/woocommerceControlPanel';
+import { listWooStores, type WooStore } from '@/services/woocommerceControlPanel';
 
 type Provider = MarketplaceProvider;
 type CatalogProvider = Exclude<Provider, 'woo'>;
@@ -260,6 +260,8 @@ export default function MarketplaceIntegrationsPage() {
   const [wooOptionsLoading, setWooOptionsLoading] = useState(false);
   const [wooDiag, setWooDiag] = useState<EcommerceConnectionDiagnostics | null>(null);
   const [wooDiagUnavailable, setWooDiagUnavailable] = useState(false);
+  const [wooStores, setWooStores] = useState<WooStore[]>([]);
+  const [wooStoresLoading, setWooStoresLoading] = useState(false);
   const [syncStateByProvider, setSyncStateByProvider] = useState<Record<Provider, EcommerceSyncState | null>>({
     meli: null,
     shopee: null,
@@ -339,6 +341,27 @@ export default function MarketplaceIntegrationsPage() {
       return null;
     }
   }, [addToast, canView]);
+
+  const refreshWooStores = useCallback(async () => {
+    if (!canView) return [];
+    if (!activeEmpresaId) {
+      setWooStores([]);
+      return [];
+    }
+    const guard = rpcGuardRef.current.check('woo_stores_list');
+    if (!guard.allowed) return [];
+    setWooStoresLoading(true);
+    try {
+      const stores = await listWooStores(activeEmpresaId);
+      setWooStores(stores);
+      return stores;
+    } catch {
+      setWooStores([]);
+      return [];
+    } finally {
+      setWooStoresLoading(false);
+    }
+  }, [activeEmpresaId, canView]);
 
   const loadProviderJobs = useCallback(
     async (
@@ -427,13 +450,14 @@ export default function MarketplaceIntegrationsPage() {
       const [c, h] = await Promise.all([listEcommerceConnections(), getEcommerceHealthSummary()]);
       setConnections(c);
       setHealth(h);
-      await Promise.all([refreshWooDiag(), loadAllProviderJobs(), loadSyncState()]);
+      await Promise.all([refreshWooDiag(), refreshWooStores(), loadAllProviderJobs(), loadSyncState()]);
     } catch (e: any) {
       addToast(e?.message || 'Falha ao carregar integrações.', 'error');
       setConnections([]);
       setHealth(null);
       setWooDiag(null);
       setWooDiagUnavailable(false);
+      setWooStores([]);
       setSyncStateByProvider({ meli: null, shopee: null, woo: null });
       setJobsByProvider({ meli: [], shopee: [], woo: [] });
       setJobsHasMoreByProvider({ meli: false, shopee: false, woo: false });
@@ -441,7 +465,7 @@ export default function MarketplaceIntegrationsPage() {
     } finally {
       setLoading(false);
     }
-  }, [addToast, canView, loadAllProviderJobs, loadSyncState, refreshWooDiag]);
+  }, [addToast, canView, loadAllProviderJobs, loadSyncState, refreshWooDiag, refreshWooStores]);
 
   useEffect(() => {
     void fetchAll();
@@ -460,6 +484,7 @@ export default function MarketplaceIntegrationsPage() {
     setWooEditingConsumerSecret(false);
     setWooStoreUrlError(null);
     setWooSecretsStoredSnapshot(null);
+    setWooStores([]);
     rpcGuardRef.current = createRpcBurstGuard();
     void fetchAll();
   }, [activeEmpresaId, fetchAll]);
@@ -505,6 +530,7 @@ export default function MarketplaceIntegrationsPage() {
 
     let cancelled = false;
     setWooOptionsLoading(true);
+    void refreshWooStores();
     void Promise.all([listDepositos({ onlyActive: true }), listTabelasPreco({ q: null })])
       .then(([deps, tabs]) => {
         if (cancelled) return;
@@ -525,7 +551,7 @@ export default function MarketplaceIntegrationsPage() {
     return () => {
       cancelled = true;
     };
-  }, [activeConnection, addToast, configOpen]);
+  }, [activeConnection, addToast, configOpen, refreshWooStores]);
 
   const byProvider = useMemo(() => {
     const preferredByProvider: Partial<Record<Provider, string | null>> | undefined = activeConnection
@@ -614,6 +640,26 @@ export default function MarketplaceIntegrationsPage() {
   const wooHasConsumerKey = wooDiag?.has_consumer_key === true || wooSecretsStoredSnapshot?.has_consumer_key === true;
   const wooHasConsumerSecret = wooDiag?.has_consumer_secret === true || wooSecretsStoredSnapshot?.has_consumer_secret === true;
 
+  const activeWooStore = useMemo(() => {
+    if (!activeConnection || activeConnection.provider !== 'woo') return null;
+    const ecommerceId = String(activeConnection.id ?? '').trim();
+    const rawUrl = String(activeConnection.config?.store_url ?? '').trim();
+    const normalized = normalizeWooStoreUrl(rawUrl);
+    const normalizedUrl = normalized.ok ? normalized.normalized : null;
+
+    const byLegacy = ecommerceId ? wooStores.find((s) => String(s.legacy_ecommerce_id ?? '').trim() === ecommerceId) : null;
+    if (byLegacy) return byLegacy;
+
+    if (normalizedUrl) {
+      const byUrl = wooStores.find((s) => {
+        const n = normalizeWooStoreUrl(String(s.base_url ?? ''));
+        return n.ok ? n.normalized === normalizedUrl : false;
+      });
+      if (byUrl) return byUrl;
+    }
+    return null;
+  }, [activeConnection, wooStores]);
+
   const handleTestConnection = async () => {
     if (!activeConnection) return;
     const provider = activeConnection.provider as Provider;
@@ -664,7 +710,7 @@ export default function MarketplaceIntegrationsPage() {
           setDiagnostics(parsed ?? null);
           await refreshWooDiag();
           await fetchAll();
-          if (activeEmpresaId) void listWooStores(activeEmpresaId).catch(() => {});
+          await refreshWooStores();
           return;
         }
         const ok = (data as any)?.ok === true;
@@ -692,7 +738,7 @@ export default function MarketplaceIntegrationsPage() {
           );
         }
         await fetchAll();
-        if (activeEmpresaId) void listWooStores(activeEmpresaId).catch(() => {});
+        await refreshWooStores();
         const responseStatus = String((data as any)?.status ?? '').toLowerCase();
         const responseMessage = String((data as any)?.message ?? '').trim();
         addToast(
@@ -848,7 +894,7 @@ export default function MarketplaceIntegrationsPage() {
       );
       addToast('Credenciais salvas com sucesso! Clique em "Testar conexão" para validar.', 'success');
       await fetchAll();
-      if (activeEmpresaId) void listWooStores(activeEmpresaId).catch(() => {});
+      await refreshWooStores();
     } catch (e: any) {
       addToast(e?.message || 'Falha ao salvar credenciais.', 'error');
     } finally {
@@ -1472,6 +1518,63 @@ export default function MarketplaceIntegrationsPage() {
                           {resolveWooConfigModalStatus({ diagnostics, wooDiag, activeConnection }) || '—'}
                         </span>
                       </div>
+                    </div>
+
+                    <div className="mt-3 rounded-lg bg-white/70 border border-gray-100 p-2 text-xs">
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="font-medium text-gray-800">Operação (worker)</div>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-7 px-2"
+                          onClick={() => void refreshWooStores()}
+                          disabled={wooStoresLoading}
+                        >
+                          {wooStoresLoading ? 'Atualizando…' : 'Atualizar'}
+                        </Button>
+                      </div>
+                      {!activeWooStore ? (
+                        <div className="mt-1 text-gray-600">
+                          Ainda não há uma store operacional vinculada a esta integração. Salve credenciais e clique em “Testar conexão” para sincronizar.
+                        </div>
+                      ) : (
+                        <div className="mt-2 grid grid-cols-1 sm:grid-cols-2 gap-2">
+                          <div className="rounded-md bg-white border border-gray-100 p-2">
+                            <div className="text-gray-500">Status do worker</div>
+                            <div className="font-medium text-gray-800">
+                              {String(activeWooStore.status ?? '').toLowerCase() === 'active'
+                                ? 'Ativa'
+                                : String(activeWooStore.status ?? '').toLowerCase() === 'paused'
+                                ? 'Pausada'
+                                : String(activeWooStore.status ?? '') || '—'}
+                              {activeWooStore.has_credentials === false ? (
+                                <span className="ml-2 text-amber-700">• sem credenciais</span>
+                              ) : null}
+                            </div>
+                          </div>
+                          <div className="rounded-md bg-white border border-gray-100 p-2">
+                            <div className="text-gray-500">Auth mode efetivo</div>
+                            <div className="font-medium text-gray-800">
+                              {String((diagnostics as any)?.auth_mode ?? activeWooStore.auth_mode ?? '—')}
+                            </div>
+                          </div>
+                          <div className="rounded-md bg-white border border-gray-100 p-2">
+                            <div className="text-gray-500">Último healthcheck</div>
+                            <div className="font-medium text-gray-800">
+                              {activeWooStore.last_healthcheck_at ? new Date(activeWooStore.last_healthcheck_at).toLocaleString() : '—'}
+                            </div>
+                          </div>
+                          <div className="rounded-md bg-white border border-gray-100 p-2">
+                            <div className="text-gray-500">Teste de escrita</div>
+                            <div className="font-medium text-gray-800">
+                              {(diagnostics as any)?.write_access === true ? 'OK (Read/Write)' : (diagnostics as any)?.write_access === false ? 'Falhou' : '—'}
+                            </div>
+                          </div>
+                          <div className="sm:col-span-2 text-gray-600">
+                            Dica: se “Teste de escrita” falhar, a chave Woo precisa ser <span className="font-medium">Read/Write</span> (exportação exige escrita).
+                          </div>
+                        </div>
+                      )}
                     </div>
 
                     {diagnostics ? (

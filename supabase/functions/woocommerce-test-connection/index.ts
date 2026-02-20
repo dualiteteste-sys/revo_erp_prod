@@ -110,6 +110,50 @@ function okJson(body: Record<string, unknown>, cors: Record<string, string>) {
   });
 }
 
+async function syncStoreRuntimeStatus(params: {
+  adminClient: ReturnType<typeof createClient>;
+  empresaId: string;
+  storeUrl: string;
+  authMode: WooAuthMode;
+  status: "active" | "paused" | "error";
+  requestId: string;
+  note?: string | null;
+}) {
+  const baseUrl = params.storeUrl.replace(/\/+$/, "");
+  const nowIso = new Date().toISOString();
+  const { data: store } = await params.adminClient
+    .from("integrations_woocommerce_store")
+    .select("id,status,auth_mode")
+    .eq("empresa_id", params.empresaId)
+    .eq("base_url", baseUrl)
+    .maybeSingle();
+  if (!store?.id) return;
+
+  await params.adminClient
+    .from("integrations_woocommerce_store")
+    .update({
+      status: params.status,
+      auth_mode: params.authMode,
+      last_healthcheck_at: nowIso,
+      updated_at: nowIso,
+    })
+    .eq("id", store.id)
+    .eq("empresa_id", params.empresaId);
+
+  await params.adminClient.from("woocommerce_sync_log").insert({
+    empresa_id: params.empresaId,
+    store_id: store.id,
+    level: "info",
+    message: "legacy_test_connection_synced_store",
+    meta: {
+      request_id: params.requestId || null,
+      status: params.status,
+      auth_mode: params.authMode,
+      note: params.note || null,
+    },
+  }).catch(() => null);
+}
+
 async function wooFetch(
   url: string,
   init?: RequestInit,
@@ -312,6 +356,51 @@ Deno.serve(async (req) => {
 
           if (!res.ok) continue;
 
+          // Write access probe (safe no-op). Export/sync requires write permission.
+          const writeProbe = buildWooApiUrl({
+            baseUrl: storeUrl,
+            path: "products/batch",
+            authMode,
+            consumerKey,
+            consumerSecret,
+            userAgent: "UltriaERP/woocommerce-test-connection",
+          });
+          const writeRes = await wooFetch(writeProbe.url, {
+            method: "POST",
+            headers: { ...writeProbe.headers, "Content-Type": "application/json" },
+            body: JSON.stringify({ create: [], update: [], delete: [] }),
+          });
+          if (!writeRes.ok) {
+            const latencyMs = Date.now() - startedAt;
+            const body = await writeRes.json();
+            const details = { status: writeRes.status, endpoint: "/wp-json/wc/v3/products/batch", body };
+            await persistConnectionCheck(adminClient, {
+              ecommerceId: String(context.ecommerce_id),
+              empresaId: String(context.empresa_id),
+              status: "error",
+              error: "Leitura OK, mas escrita falhou (chave precisa ser Read/Write ou POST está bloqueado).",
+              httpStatus: writeRes.status,
+              endpoint: "/wp-json/wc/v3/products/batch",
+              latencyMs,
+            });
+            await syncStoreRuntimeStatus({
+              adminClient,
+              empresaId: String(context.empresa_id),
+              storeUrl,
+              authMode,
+              status: "paused",
+              requestId,
+              note: "write_probe_failed",
+            });
+            return errorJson(
+              "woo_connection_failed",
+              "Leitura OK, mas escrita falhou. Sua Consumer Key deve ser Read/Write (e o servidor/proxy não pode bloquear POST).",
+              cors,
+              400,
+              { diagnosis: { code: "WRITE_FORBIDDEN", category: "auth", http_status: writeRes.status, endpoint: "/wp-json/wc/v3/products/batch" }, wp_check: wpCheck, attempts, details },
+            );
+          }
+
           const latencyMs = Date.now() - startedAt;
           const fallbackUsed = authMode === "querystring_fallback";
           const successMessage = fallbackUsed
@@ -336,6 +425,19 @@ Deno.serve(async (req) => {
             );
           }
 
+          // Keep worker/painel dev store runtime status aligned with test result:
+          // - basic_https ok => active/basic_https
+          // - querystring_fallback ok => active/querystring_fallback (legacy status stays "pending" to keep warning visible)
+          await syncStoreRuntimeStatus({
+            adminClient,
+            empresaId: String(context.empresa_id),
+            storeUrl,
+            authMode,
+            status: "active",
+            requestId,
+            note: fallbackUsed ? "auth_header_blocked_using_querystring" : "connected",
+          });
+
           return okJson(
             {
               ok: true,
@@ -351,6 +453,7 @@ Deno.serve(async (req) => {
               latency_ms: latencyMs,
               persistence_fallback: persistResult.fallbackUsed,
               wp_check: wpCheck,
+              write_access: true,
             },
             cors,
           );

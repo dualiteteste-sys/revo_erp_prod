@@ -189,6 +189,51 @@ export const test = base.extend({
     });
 
     // ---------------------------------------------------------------------
+    // P0 (Termo de Aceite) — por padrão, os E2E assumem "termo já aceito"
+    // para não transformar o gate em um novo requisito em TODOS os specs.
+    //
+    // Specs que precisam validar o comportamento do termo podem sobrescrever
+    // estes handlers com `page.route()` (Playwright: último wins).
+    // ---------------------------------------------------------------------
+    const termsDoc = {
+      key: 'ultria_erp_terms',
+      version: '1.0',
+      body: 'Termos de Aceite Versão: 1.0\n(Data de teste E2E — conteúdo omitido aqui)\n',
+      body_sha256: 'e2e_dummy_sha256',
+    };
+
+    await page.route('**/rest/v1/rpc/terms_document_current_get', async (route) => {
+      await route.fulfill({ json: [termsDoc] });
+    });
+
+    await page.route('**/rest/v1/rpc/terms_acceptance_status_get', async (route) => {
+      await route.fulfill({
+        json: [
+          {
+            is_accepted: true,
+            acceptance_id: 'acceptance-e2e-1',
+            accepted_at: new Date().toISOString(),
+            version: '1.0',
+            document_sha256: termsDoc.body_sha256,
+          },
+        ],
+      });
+    });
+
+    await page.route('**/rest/v1/rpc/terms_accept_current', async (route) => {
+      await route.fulfill({
+        json: [
+          {
+            acceptance_id: 'acceptance-e2e-1',
+            accepted_at: new Date().toISOString(),
+            version: '1.0',
+            document_sha256: termsDoc.body_sha256,
+          },
+        ],
+      });
+    });
+
+    // ---------------------------------------------------------------------
     // P0 (empresa ativa/contexto) — mocks globais para boot determinístico.
     // Muitos specs instalam um fallback genérico `**/rest/v1/**` e precisam
     // chamar `route.fallback()` para chegar aqui.

@@ -67,6 +67,12 @@ describe('woocommerce health checks', () => {
     expect(getSeverity(status, 'AUTH_FAILING')).toBe('critical');
   });
 
+  it('treats WOO_WRITE_FORBIDDEN as AUTH_FAILING (read ok, write blocked)', () => {
+    const status = baseStatus();
+    status.recent_errors = [{ code: 'WOO_WRITE_FORBIDDEN', hint: 'read/write required', message: '403', at: '2026-02-12T10:59:00.000Z' }];
+    expect(getSeverity(status, 'AUTH_FAILING')).toBe('critical');
+  });
+
   it('marks ERROR_RATE as warning when failures are above threshold', () => {
     const status = baseStatus();
     status.jobs = [

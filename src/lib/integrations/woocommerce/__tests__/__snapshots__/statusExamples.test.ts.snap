@@ -35,6 +35,7 @@ exports[`woocommerce status examples > creates deterministic snapshots for scena
     "store": {
       "auth_mode": "basic_https",
       "base_url": "https://woo.example.com",
+      "has_credentials": false,
       "id": "store-1",
       "last_healthcheck_at": "2026-02-12T11:55:00.000Z",
       "status": "active",
@@ -87,12 +88,13 @@ exports[`woocommerce status examples > creates deterministic snapshots for scena
       },
     ],
     "recommendations": [
-      "Store pausada. Corrija credenciais e rode healthcheck.",
+      "Store pausada: faltam credenciais criptografadas na store (sincronize credenciais e rode healthcheck).",
       "Falha de autenticação/autorização Woo detectada. Revise credenciais e proxy/WAF.",
     ],
     "store": {
       "auth_mode": "basic_https",
       "base_url": "https://woo.example.com",
+      "has_credentials": false,
       "id": "store-1",
       "last_healthcheck_at": "2026-02-12T11:55:00.000Z",
       "status": "paused",
@@ -142,6 +144,7 @@ exports[`woocommerce status examples > creates deterministic snapshots for scena
     "store": {
       "auth_mode": "basic_https",
       "base_url": "https://woo.example.com",
+      "has_credentials": false,
       "id": "store-1",
       "last_healthcheck_at": "2026-02-12T11:55:00.000Z",
       "status": "active",
@@ -191,6 +194,7 @@ exports[`woocommerce status examples > creates deterministic snapshots for scena
     "store": {
       "auth_mode": "basic_https",
       "base_url": "https://woo.example.com",
+      "has_credentials": false,
       "id": "store-1",
       "last_healthcheck_at": "2026-02-12T11:55:00.000Z",
       "status": "active",
