@@ -17,6 +17,7 @@ function normalizeErrorCode(raw: unknown): string {
 
 function recommendationsFromStatus(input: {
   storeStatus: string;
+  hasCredentials: boolean;
   deadJobs: number;
   invalidWebhooks: number;
   droppedWebhooks: number;
@@ -25,7 +26,11 @@ function recommendationsFromStatus(input: {
   authFailing: boolean;
 }): string[] {
   const hints: string[] = [];
-  if (input.storeStatus === "paused") hints.push("Store pausada. Corrija credenciais e rode healthcheck.");
+  if (input.storeStatus === "paused") {
+    if (!input.hasCredentials) hints.push("Store pausada: faltam credenciais criptografadas na store (sincronize credenciais e rode healthcheck).");
+    else if (input.authFailing) hints.push("Store pausada por autenticação/autorização. Revise credenciais e proxy/WAF e rode healthcheck.");
+    else hints.push("Store pausada manualmente. Rode healthcheck e unpause quando estabilizar.");
+  }
   if (input.authFailing) hints.push("Falha de autenticação/autorização Woo detectada. Revise credenciais e proxy/WAF.");
   if (input.deadJobs > 0) hints.push("Existem jobs em dead-letter. Reprocessar apos correcao.");
   if (input.invalidWebhooks > 0) hints.push("Webhooks com assinatura invalida detectados.");
@@ -72,7 +77,11 @@ export function buildWooStoreStatusContract(params: {
       hint: (row?.meta as Record<string, unknown> | undefined)?.hint ?? null,
       job_id: row?.job_id ?? null,
     }));
-  const authFailing = recentErrors.some((row) => ["WOO_AUTH_INVALID", "WOO_AUTH_FORBIDDEN", "WOO_AUTH_FAILED"].includes(String(row.code ?? "")));
+  const authFailing = recentErrors.some((row) =>
+    ["WOO_AUTH_INVALID", "WOO_AUTH_FORBIDDEN", "WOO_AUTH_FAILED", "WOO_WRITE_FORBIDDEN", "WOO_CREDENTIALS_MISSING"].includes(String(row.code ?? "")),
+  );
+  const hasCredentials = String((params.store as any)?.consumer_key_enc ?? "").trim().length > 12 &&
+    String((params.store as any)?.consumer_secret_enc ?? "").trim().length > 12;
 
   const health = {
     store_status: String(params.store?.status ?? "unknown"),
@@ -92,6 +101,7 @@ export function buildWooStoreStatusContract(params: {
       base_url: params.store?.base_url ?? null,
       auth_mode: params.store?.auth_mode ?? null,
       last_healthcheck_at: params.store?.last_healthcheck_at ?? null,
+      has_credentials: hasCredentials,
     },
     health,
     queue: {
@@ -115,6 +125,7 @@ export function buildWooStoreStatusContract(params: {
     map_quality: params.mapQuality,
     recommendations: recommendationsFromStatus({
       storeStatus: String(params.store?.status ?? "unknown"),
+      hasCredentials,
       deadJobs: params.queueCounts.dead,
       invalidWebhooks,
       droppedWebhooks,
