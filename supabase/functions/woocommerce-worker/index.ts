@@ -6,6 +6,13 @@ import { sanitizeForLog } from "../_shared/sanitize.ts";
 import { detectWooErrorCode, resolveWooError } from "../_shared/woocommerceErrors.ts";
 import { maybeHandleWooMockRequest } from "../_shared/wooMock.ts";
 import {
+  applyPercentAdjustment,
+  computeEffectiveStock,
+  deriveWooStoreSettingsV1FromEcommerceConfig,
+  normalizeWooStoreSettingsV1,
+  type WooStoreSettingsV1,
+} from "../_shared/woocommerceStoreSettings.ts";
+import {
   buildWooApiUrl,
   classifyWooHttpStatus,
   computeBackoffMs,
@@ -35,6 +42,7 @@ type StoreSecrets = {
   authMode: WooAuthMode;
   consumerKey: string;
   consumerSecret: string;
+  settings: WooStoreSettingsV1;
 };
 
 class WooRequestError extends Error {
@@ -165,7 +173,7 @@ async function loadStoreSecrets(params: {
   const { svc, masterKey, storeId } = params;
   const { data: store, error } = await svc
     .from("integrations_woocommerce_store")
-    .select("id,empresa_id,base_url,auth_mode,consumer_key_enc,consumer_secret_enc,status")
+    .select("id,empresa_id,base_url,auth_mode,consumer_key_enc,consumer_secret_enc,status,legacy_ecommerce_id,settings")
     .eq("id", storeId)
     .maybeSingle();
   if (error || !store?.id || !store?.empresa_id) throw new Error("STORE_NOT_FOUND");
@@ -181,6 +189,38 @@ async function loadStoreSecrets(params: {
   const consumerKey = await aesGcmDecryptFromString({ masterKey, ciphertext: String(store.consumer_key_enc), aad });
   const consumerSecret = await aesGcmDecryptFromString({ masterKey, ciphertext: String(store.consumer_secret_enc), aad });
 
+  const legacyEcommerceId = String((store as any)?.legacy_ecommerce_id ?? "").trim() || null;
+  const storeSettings = (store as any)?.settings ?? null;
+
+  let legacyConfig: unknown | null = null;
+  if (legacyEcommerceId) {
+    const { data: legacy } = await svc
+      .from("ecommerces")
+      .select("config")
+      .eq("empresa_id", empresaId)
+      .eq("id", legacyEcommerceId)
+      .maybeSingle();
+    legacyConfig = (legacy as any)?.config ?? null;
+  }
+
+  const settings = legacyConfig
+    ? deriveWooStoreSettingsV1FromEcommerceConfig(legacyConfig)
+    : normalizeWooStoreSettingsV1(storeSettings ?? {});
+
+  // Keep runtime store.settings aligned with legacy config (source of truth for UI),
+  // to avoid previews/worker using stale rules after config changes.
+  if (legacyConfig) {
+    const normalizedDb = normalizeWooStoreSettingsV1(storeSettings ?? {});
+    if (JSON.stringify(normalizedDb) !== JSON.stringify(settings)) {
+      await svc
+        .from("integrations_woocommerce_store")
+        .update({ settings, updated_at: new Date().toISOString() })
+        .eq("id", storeId)
+        .eq("empresa_id", empresaId)
+        .catch(() => null);
+    }
+  }
+
   return {
     empresaId,
     storeId,
@@ -188,7 +228,63 @@ async function loadStoreSecrets(params: {
     authMode: (String(store.auth_mode ?? "basic_https") as WooAuthMode) || "basic_https",
     consumerKey,
     consumerSecret,
+    settings,
   };
+}
+
+async function loadDepositStocksByProductId(params: {
+  svc: any;
+  empresaId: string;
+  depositoId: string;
+  productIds: string[];
+}): Promise<Map<string, number>> {
+  const ids = Array.from(new Set(params.productIds.map((v) => String(v ?? "").trim()).filter(Boolean)));
+  const out = new Map<string, number>();
+  if (!params.depositoId || ids.length === 0) return out;
+  const { data, error } = await params.svc
+    .from("estoque_saldos_depositos")
+    .select("produto_id,saldo")
+    .eq("empresa_id", params.empresaId)
+    .eq("deposito_id", params.depositoId)
+    .in("produto_id", ids);
+  if (error) throw error;
+  for (const row of Array.isArray(data) ? data : []) {
+    const pid = String((row as any)?.produto_id ?? "").trim();
+    if (!pid) continue;
+    const saldo = Number((row as any)?.saldo ?? 0);
+    out.set(pid, Number.isFinite(saldo) ? saldo : 0);
+  }
+  return out;
+}
+
+async function loadUnitPricesByProductIdForQty1(params: {
+  svc: any;
+  empresaId: string;
+  tabelaPrecoId: string;
+  productIds: string[];
+}): Promise<Map<string, number>> {
+  const ids = Array.from(new Set(params.productIds.map((v) => String(v ?? "").trim()).filter(Boolean)));
+  const out = new Map<string, number>();
+  if (!params.tabelaPrecoId || ids.length === 0) return out;
+
+  const { data, error } = await params.svc
+    .from("tabelas_preco_faixas")
+    .select("produto_id,min_qtd,max_qtd,preco_unitario")
+    .eq("empresa_id", params.empresaId)
+    .eq("tabela_preco_id", params.tabelaPrecoId)
+    .in("produto_id", ids)
+    .lte("min_qtd", 1)
+    .or("max_qtd.is.null,max_qtd.gte.1")
+    .order("min_qtd", { ascending: false });
+  if (error) throw error;
+
+  for (const row of Array.isArray(data) ? data : []) {
+    const pid = String((row as any)?.produto_id ?? "").trim();
+    if (!pid || out.has(pid)) continue;
+    const price = Number((row as any)?.preco_unitario ?? 0);
+    out.set(pid, Number.isFinite(price) ? price : 0);
+  }
+  return out;
 }
 
 async function ensureWooBuyerAsPartner(svc: any, empresaId: string, order: any): Promise<string> {
@@ -614,11 +710,12 @@ async function buildProductMap(params: { svc: any; secrets: StoreSecrets; }): Pr
 async function syncBySkus(params: {
   svc: any;
   secrets: StoreSecrets;
+  settings: WooStoreSettingsV1;
   kind: "PRICE_SYNC" | "STOCK_SYNC";
   skus: string[];
   runId?: string | null;
 }): Promise<{ updated: number; skipped: number; failed: number; perSku: Array<{ sku: string; status: "updated" | "skipped" | "failed"; error_code?: string | null; hint?: string | null; revo_product_id?: string | null; woo_product_id?: number | null; woo_variation_id?: number | null }> }> {
-  const { svc, secrets, kind } = params;
+  const { svc, secrets, kind, settings } = params;
   const skus = Array.from(new Set(params.skus.map((s) => String(s ?? "").trim()).filter(Boolean)));
   if (skus.length === 0) return { updated: 0, skipped: 0, failed: 0, perSku: [] };
 
@@ -639,10 +736,22 @@ async function syncBySkus(params: {
     .in("sku", skus);
   if (prodErr) throw prodErr;
   const productsBySku = new Map<string, any>();
+  const productIds: string[] = [];
   for (const p of (Array.isArray(products) ? products : [])) {
     const sku = String(p?.sku ?? "").trim();
-    if (sku) productsBySku.set(sku, p);
+    if (!sku) continue;
+    productsBySku.set(sku, p);
+    if (p?.id) productIds.push(String(p.id));
   }
+
+  const depositStocksByProductId =
+    settings.stock_source === "deposit" && settings.deposito_id
+      ? await loadDepositStocksByProductId({ svc, empresaId: secrets.empresaId, depositoId: settings.deposito_id, productIds })
+      : new Map<string, number>();
+  const unitPricesByProductId =
+    settings.price_source === "price_table" && settings.base_tabela_preco_id
+      ? await loadUnitPricesByProductIdForQty1({ svc, empresaId: secrets.empresaId, tabelaPrecoId: settings.base_tabela_preco_id, productIds })
+      : new Map<string, number>();
 
   let updated = 0;
   let skipped = 0;
@@ -667,7 +776,12 @@ async function syncBySkus(params: {
     }
 
     if (kind === "STOCK_SYNC") {
-      const stockQuantity = toWooStockQuantity(revo?.estoque_atual);
+      const rawStock =
+        settings.stock_source === "deposit" && settings.deposito_id
+          ? (depositStocksByProductId.get(String(revo?.id ?? "")) ?? 0)
+          : Number(revo?.estoque_atual ?? 0);
+      const effectiveStock = computeEffectiveStock({ rawStock, stockSafetyQty: settings.stock_safety_qty });
+      const stockQuantity = toWooStockQuantity(effectiveStock);
       if (variationId) {
         const list = variationsByProduct.get(productId) ?? [];
         list.push({ id: variationId, manage_stock: true, stock_quantity: stockQuantity });
@@ -676,7 +790,12 @@ async function syncBySkus(params: {
         simpleUpdates.push({ id: productId, manage_stock: true, stock_quantity: stockQuantity });
       }
     } else {
-      const regularPrice = toWooPrice(revo?.preco_venda);
+      const basePrice =
+        settings.price_source === "price_table" && settings.base_tabela_preco_id
+          ? (unitPricesByProductId.get(String(revo?.id ?? "")) ?? Number(revo?.preco_venda ?? 0))
+          : Number(revo?.preco_venda ?? 0);
+      const adjusted = applyPercentAdjustment({ basePrice, percent: settings.price_percent_default });
+      const regularPrice = toWooPrice(adjusted);
       if (variationId) {
         const list = variationsByProduct.get(productId) ?? [];
         list.push({ id: variationId, regular_price: regularPrice });
@@ -1023,6 +1142,43 @@ async function runWorkerBatch(params: {
         const hasMore = items.length > maxItemsPerJob;
         const chunk = hasMore ? items.slice(0, maxItemsPerJob) : items;
 
+        const revoIds = Array.from(
+          new Set(
+            chunk.map((item) => String(item?.revo_product_id ?? "").trim()).filter(Boolean),
+          ),
+        );
+        const { data: revoRows, error: revoErr } = await params.svc
+          .from("produtos")
+          .select("id,nome,descricao,status,preco_venda,estoque_atual")
+          .eq("empresa_id", secrets.empresaId)
+          .in("id", revoIds);
+        if (revoErr) throw revoErr;
+        const revoById = new Map<string, any>();
+        for (const row of Array.isArray(revoRows) ? revoRows : []) {
+          const id = String((row as any)?.id ?? "").trim();
+          if (id) revoById.set(id, row);
+        }
+
+        const depositStocksByProductId =
+          secrets.settings.stock_source === "deposit" && secrets.settings.deposito_id
+            ? await loadDepositStocksByProductId({
+              svc: params.svc,
+              empresaId: secrets.empresaId,
+              depositoId: secrets.settings.deposito_id,
+              productIds: revoIds,
+            })
+            : new Map<string, number>();
+
+        const unitPricesByProductId =
+          secrets.settings.price_source === "price_table" && secrets.settings.base_tabela_preco_id
+            ? await loadUnitPricesByProductIdForQty1({
+              svc: params.svc,
+              empresaId: secrets.empresaId,
+              tabelaPrecoId: secrets.settings.base_tabela_preco_id,
+              productIds: revoIds,
+            })
+            : new Map<string, number>();
+
         for (const item of chunk) {
           if (params.deadlineAtMs != null && Date.now() >= params.deadlineAtMs) break;
           const itemId = String(item.id);
@@ -1042,12 +1198,7 @@ async function runWorkerBatch(params: {
             continue;
           }
 
-          const { data: revoProduct } = await params.svc
-            .from("produtos")
-            .select("id,nome,descricao,status,preco_venda,estoque_atual")
-            .eq("empresa_id", secrets.empresaId)
-            .eq("id", revoProductId)
-            .maybeSingle();
+          const revoProduct = revoById.get(revoProductId) ?? null;
           if (!revoProduct?.id) {
             await updateRunItemStatus({
               svc: params.svc,
@@ -1062,13 +1213,34 @@ async function runWorkerBatch(params: {
             continue;
           }
 
+          const rawStock =
+            secrets.settings.stock_source === "deposit" && secrets.settings.deposito_id
+              ? (depositStocksByProductId.get(revoProductId) ?? 0)
+              : Number(revoProduct.estoque_atual ?? 0);
+          const effectiveStock = computeEffectiveStock({
+            rawStock,
+            stockSafetyQty: secrets.settings.stock_safety_qty,
+          });
+          const stockQuantity = toWooStockQuantity(effectiveStock);
+          const stockStatus = stockQuantity > 0 ? "instock" : "outofstock";
+
+          const basePrice =
+            secrets.settings.price_source === "price_table" && secrets.settings.base_tabela_preco_id
+              ? (unitPricesByProductId.get(revoProductId) ?? Number(revoProduct.preco_venda ?? 0))
+              : Number(revoProduct.preco_venda ?? 0);
+          const adjustedPrice = applyPercentAdjustment({
+            basePrice,
+            percent: secrets.settings.price_percent_default,
+          });
+          const regularPrice = toWooPrice(adjustedPrice);
+
           const basePayload = {
             name: String(revoProduct.nome ?? "").trim() || `Produto ${sku}`,
             sku,
-            regular_price: toWooPrice(revoProduct.preco_venda),
+            regular_price: regularPrice,
             manage_stock: true,
-            stock_quantity: toWooStockQuantity(revoProduct.estoque_atual),
-            stock_status: toWooStockQuantity(revoProduct.estoque_atual) > 0 ? "instock" : "outofstock",
+            stock_quantity: stockQuantity,
+            stock_status: stockStatus,
             status: toWooStatusFromRevo(String(revoProduct.status ?? "")),
             short_description: String(revoProduct.descricao ?? "").slice(0, 500) || undefined,
           } as Record<string, unknown>;
@@ -1334,7 +1506,7 @@ async function runWorkerBatch(params: {
             .eq("empresa_id", secrets.empresaId)
             .eq("store_id", secrets.storeId);
         }
-        const r = await syncBySkus({ svc: params.svc, secrets, kind: j.type, skus, runId });
+        const r = await syncBySkus({ svc: params.svc, secrets, settings: secrets.settings, kind: j.type, skus, runId });
         if (runId) {
           await refreshRunSummary({ svc: params.svc, runId, empresaId: secrets.empresaId, storeId: secrets.storeId });
         }
