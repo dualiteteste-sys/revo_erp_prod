@@ -13,11 +13,11 @@ async function mockAuthAndEmpresa(page: Page, opts?: { role?: 'member' | 'admin'
       return;
     }
     const url = route.request().url();
-    if (
+    if (route.request().method() !== 'OPTIONS' && (
       url.includes('/rest/v1/rpc/terms_document_current_get') ||
       url.includes('/rest/v1/rpc/terms_acceptance_status_get') ||
       url.includes('/rest/v1/rpc/terms_accept_current')
-    ) {
+    )) {
       await route.fallback();
       return;
     }
