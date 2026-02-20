@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import * as svc from '@/services/termsAcceptance';
+import { RpcError } from '@/lib/api';
 import TermsAcceptanceGate from '../TermsAcceptanceGate';
 
 vi.mock('@/services/termsAcceptance', async () => {
@@ -122,5 +123,22 @@ describe('TermsAcceptanceGate', () => {
     fireEvent.click(screen.getByRole('button', { name: /Não aceito/i }));
 
     expect(onDecline).toHaveBeenCalledTimes(1);
+  });
+
+  it('fails open when terms RPC is missing in schema cache (compat mode)', async () => {
+    const missingRpc = new RpcError('HTTP_404: Could not find the function public.terms_acceptance_status_get(p_key) in the schema cache');
+    missingRpc.code = 'PGRST202';
+
+    vi.mocked(svc.getCurrentTermsDocument).mockRejectedValue(missingRpc);
+    vi.mocked(svc.getTermsAcceptanceStatus).mockRejectedValue(missingRpc);
+
+    renderWithQuery(
+      <TermsAcceptanceGate userId="user-1" empresaId="empresa-1" onDecline={() => {}}>
+        <div>APP_OK</div>
+      </TermsAcceptanceGate>,
+    );
+
+    expect(await screen.findByText('APP_OK')).toBeInTheDocument();
+    expect(screen.queryByText('Termo indisponível')).not.toBeInTheDocument();
   });
 });
