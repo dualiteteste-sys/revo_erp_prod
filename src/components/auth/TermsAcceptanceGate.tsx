@@ -6,11 +6,8 @@ import { acceptCurrentTerms, getCurrentTermsDocument, getTermsAcceptanceStatus }
 import { logger } from '@/lib/logger';
 
 const FullscreenLoading = ({ label }: { label: string }) => (
-  <div className="w-full h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50">
-    <div className="flex flex-col items-center gap-4">
-      <div className="w-16 h-16 border-4 border-blue-500 border-dashed rounded-full animate-spin" />
-      <div className="text-sm text-slate-600">{label}</div>
-    </div>
+  <div className="w-full h-screen flex items-center justify-center bg-slate-50 p-6">
+    <div className="text-sm text-slate-600">{label}</div>
   </div>
 );
 
@@ -68,12 +65,10 @@ export default function TermsAcceptanceGate({
 
   if (docQuery.error || !docQuery.data) {
     return (
-      <div className="w-full h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 p-6">
+      <div className="w-full h-screen flex items-center justify-center bg-slate-50 p-6">
         <GlassCard className="w-full max-w-xl p-6">
-          <h2 className="text-xl font-semibold text-slate-900">Termo de Aceite indisponível</h2>
-          <p className="text-sm text-slate-600 mt-2">
-            Não conseguimos carregar o termo vigente. Isso bloqueia o acesso por segurança.
-          </p>
+          <h2 className="text-xl font-semibold text-slate-900">Termo indisponível</h2>
+          <p className="text-sm text-slate-600 mt-2">Acesso bloqueado por segurança.</p>
           <div className="mt-6 flex gap-3">
             <Button onClick={() => window.location.reload()}>Recarregar</Button>
             <Button variant="outline" onClick={() => onDecline()}>
@@ -87,12 +82,10 @@ export default function TermsAcceptanceGate({
 
   if (statusQuery.error || !statusQuery.data) {
     return (
-      <div className="w-full h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 p-6">
+      <div className="w-full h-screen flex items-center justify-center bg-slate-50 p-6">
         <GlassCard className="w-full max-w-xl p-6">
-          <h2 className="text-xl font-semibold text-slate-900">Não foi possível validar seu aceite</h2>
-          <p className="text-sm text-slate-600 mt-2">
-            O sistema não conseguiu confirmar sua empresa ativa (tenant) para este acesso. Por segurança, o acesso foi bloqueado.
-          </p>
+          <h2 className="text-xl font-semibold text-slate-900">Não foi possível validar</h2>
+          <p className="text-sm text-slate-600 mt-2">Acesso bloqueado por segurança.</p>
           <div className="mt-6 flex gap-3">
             <Button onClick={() => window.location.reload()}>Recarregar</Button>
             <Button variant="outline" onClick={() => onDecline()}>
@@ -109,7 +102,7 @@ export default function TermsAcceptanceGate({
   }
 
   return (
-    <div className="w-full h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 p-6">
+    <div className="w-full h-screen flex items-center justify-center bg-slate-50 p-6">
       <GlassCard className="w-full max-w-4xl p-6">
         <div className="flex items-start justify-between gap-4">
           <div>
@@ -118,12 +111,10 @@ export default function TermsAcceptanceGate({
               Para continuar, você precisa aceitar os termos vigentes desta empresa.
             </p>
           </div>
-          <div className="flex items-center gap-2 text-xs text-slate-500">
-            Versão vigente: {docQuery.data.version}
-          </div>
+          <div className="text-xs text-slate-500">Versão: {docQuery.data.version}</div>
         </div>
 
-        <div className="mt-5 rounded-xl border border-slate-200 bg-white/60 overflow-hidden">
+        <div className="mt-5 rounded-xl border border-slate-200 bg-white overflow-hidden">
           <div className="max-h-[55vh] overflow-auto p-4">
             <pre className="whitespace-pre-wrap text-sm text-slate-800 leading-relaxed font-sans">
               {docQuery.data.body}
@@ -132,9 +123,7 @@ export default function TermsAcceptanceGate({
         </div>
 
         {ackError && (
-          <div className="mt-4 rounded-xl border border-red-200 bg-red-50 text-red-700 text-sm px-4 py-3">
-            {ackError}
-          </div>
+          <div className="mt-4 text-sm text-red-700">{ackError}</div>
         )}
 
         <div className="mt-6 flex flex-col sm:flex-row gap-3 sm:items-center sm:justify-end">
