@@ -74,6 +74,7 @@ export default function HealthPage() {
   const [businessKpis, setBusinessKpis] = useState<BusinessKpisFunnelSummary | null>(null);
   const [ecommerceHealth, setEcommerceHealth] = useState<EcommerceHealthSummary | null>(null);
   const [wooHealthChecks, setWooHealthChecks] = useState<WooStoreHealthCheck[]>([]);
+  const [wooOpsSummary, setWooOpsSummary] = useState<{ pending: number; failed: number; last_activity_at: string | null } | null>(null);
   const [recent, setRecent] = useState<OpsRecentFailure[]>([]);
   const [nfeRows, setNfeRows] = useState<NfeWebhookRow[]>([]);
   const [financeDlqRows, setFinanceDlqRows] = useState<FinanceDlqRow[]>([]);
@@ -186,22 +187,33 @@ export default function HealthPage() {
             stores.map(async (store) => {
               try {
                 const status = await getWooStoreStatus(activeEmpresaId, store.id);
-                return evaluateWooStoreHealthChecks({
+                const checks = evaluateWooStoreHealthChecks({
                   storeId: store.id,
                   storeUrl: store.base_url,
                   status,
                 });
+                return { status, checks };
               } catch {
-                return [];
+                return { status: null, checks: [] as WooStoreHealthCheck[] };
               }
             }),
           );
-          setWooHealthChecks(statuses.flat());
+          setWooHealthChecks(statuses.flatMap((row) => row.checks));
+          const pending = statuses.reduce((sum, row) => sum + Number((row.status as any)?.queue?.pending_total ?? 0), 0);
+          const failed = statuses.reduce((sum, row) => sum + Number((row.status as any)?.queue?.error ?? 0) + Number((row.status as any)?.queue?.dead ?? 0), 0);
+          const sortedActivities = statuses
+            .map((row) => String((row.status as any)?.orders?.last_imported_at ?? (row.status as any)?.health?.last_healthcheck_at ?? ''))
+            .filter(Boolean)
+            .sort();
+          const lastActivityAt = sortedActivities.length ? sortedActivities[sortedActivities.length - 1] : null;
+          setWooOpsSummary({ pending, failed, last_activity_at: lastActivityAt || null });
         } catch {
           setWooHealthChecks([]);
+          setWooOpsSummary(null);
         }
       } else {
         setWooHealthChecks([]);
+        setWooOpsSummary(null);
       }
 
       // "Ops Health" detalhado: depende de permissão interna (ops/manage).
@@ -233,6 +245,7 @@ export default function HealthPage() {
       setBusinessKpis(null);
       setEcommerceHealth(null);
       setWooHealthChecks([]);
+      setWooOpsSummary(null);
       setRecent([]);
       setNfeRows([]);
       setFinanceDlqRows([]);
@@ -865,20 +878,33 @@ export default function HealthPage() {
       <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
         <GlassCard className="p-4">
           <div className="text-sm font-medium text-gray-700">Marketplaces (fila)</div>
-          <div className="mt-2 text-2xl font-bold text-gray-900">{ecommerceHealth?.pending ?? '—'}</div>
-          <div className="mt-1 text-xs text-gray-500">pendentes/processando</div>
+          <div className="mt-2 text-2xl font-bold text-gray-900">
+            {typeof ecommerceHealth?.pending === 'number' || typeof wooOpsSummary?.pending === 'number'
+              ? Number(ecommerceHealth?.pending ?? 0) + Number(wooOpsSummary?.pending ?? 0)
+              : '—'}
+          </div>
+          <div className="mt-1 text-xs text-gray-500">pendentes/processando (inclui Woo)</div>
         </GlassCard>
         <GlassCard className="p-4">
           <div className="text-sm font-medium text-gray-700">Marketplaces (falhas 24h)</div>
-          <div className="mt-2 text-2xl font-bold text-gray-900">{ecommerceHealth?.failed_24h ?? '—'}</div>
-          <div className="mt-1 text-xs text-gray-500">últimas 24h</div>
+          <div className="mt-2 text-2xl font-bold text-gray-900">
+            {typeof ecommerceHealth?.failed_24h === 'number' || typeof wooOpsSummary?.failed === 'number'
+              ? Number(ecommerceHealth?.failed_24h ?? 0) + Number(wooOpsSummary?.failed ?? 0)
+              : '—'}
+          </div>
+          <div className="mt-1 text-xs text-gray-500">últimas 24h (inclui Woo)</div>
         </GlassCard>
         <GlassCard className="p-4">
           <div className="text-sm font-medium text-gray-700">Marketplaces (último sync)</div>
           <div className="mt-2 text-sm font-semibold text-gray-900">
-            {ecommerceHealth?.last_sync_at ? formatDateTimeBR(ecommerceHealth.last_sync_at) : '—'}
+            {(() => {
+              const candidates = [ecommerceHealth?.last_sync_at ?? null, wooOpsSummary?.last_activity_at ?? null].filter(Boolean) as string[];
+              const sorted = candidates.sort();
+              const best = sorted.length ? sorted[sorted.length - 1] : null;
+              return best ? formatDateTimeBR(best) : '—';
+            })()}
           </div>
-          <div className="mt-1 text-xs text-gray-500">{canSeeEcommerce ? 'conexões meli/shopee' : 'sem permissão ecommerce:view'}</div>
+          <div className="mt-1 text-xs text-gray-500">{canSeeEcommerce ? 'conexões + Woo (atividade recente)' : 'sem permissão ecommerce:view'}</div>
         </GlassCard>
       </div>
 

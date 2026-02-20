@@ -17,13 +17,17 @@ import {
   listWooProductMap,
   pauseWooStore,
   registerWooWebhooks,
+  listWooRemoteWebhooks,
   replayWooOrder,
   requeueWooDeadJob,
   runWooHealthcheck,
   runWooWorkerNow,
   type WooProductMapRow,
+  type WooLogRow,
+  type WooRemoteWebhookRow,
   type WooStatusResponse,
   unpauseWooStore,
+  listWooLogs,
 } from '@/services/woocommerceControlPanel';
 
 type PanelSection = 'overview' | 'webhooks' | 'jobs' | 'map' | 'sync' | 'logs';
@@ -86,6 +90,12 @@ export default function WooCommerceStoreDetailPage() {
   const [busyAction, setBusyAction] = useState<string | null>(null);
   const [replayOrderId, setReplayOrderId] = useState('');
   const [syncSkusText, setSyncSkusText] = useState('');
+  const [logsFrom, setLogsFrom] = useState('');
+  const [logsTo, setLogsTo] = useState('');
+  const [logsRows, setLogsRows] = useState<WooLogRow[] | null>(null);
+  const [logsLoading, setLogsLoading] = useState(false);
+  const [remoteWebhooks, setRemoteWebhooks] = useState<WooRemoteWebhookRow[] | null>(null);
+  const [remoteWebhooksLoading, setRemoteWebhooksLoading] = useState(false);
 
   const storeStatus = status?.store?.status ?? null;
   const isPaused = String(storeStatus ?? '').toLowerCase() === 'paused';
@@ -105,6 +115,8 @@ export default function WooCommerceStoreDetailPage() {
       ]);
       setStatus(statusData);
       setMapRows(mapData);
+      setLogsRows(null);
+      setRemoteWebhooks(null);
     } catch (error: any) {
       addToast(error?.message || 'Falha ao carregar painel da loja WooCommerce.', 'error');
     } finally {
@@ -174,6 +186,62 @@ export default function WooCommerceStoreDetailPage() {
     },
     [activeEmpresaId, storeId, syncSkusText, runAction, addToast],
   );
+
+  const loadLogs = useCallback(async () => {
+    if (!activeEmpresaId || !storeId) return;
+    setLogsLoading(true);
+    try {
+      const fromIso = logsFrom ? new Date(`${logsFrom}T00:00:00.000Z`).toISOString() : null;
+      const toIso = logsTo ? new Date(`${logsTo}T23:59:59.999Z`).toISOString() : null;
+      const res = await listWooLogs(activeEmpresaId, storeId, { from: fromIso, to: toIso, limit: 500 });
+      setLogsRows(res.logs ?? []);
+    } catch (error: any) {
+      addToast(error?.message || 'Falha ao carregar logs.', 'error');
+      setLogsRows([]);
+    } finally {
+      setLogsLoading(false);
+    }
+  }, [activeEmpresaId, storeId, logsFrom, logsTo, addToast]);
+
+  const loadRemoteWebhooks = useCallback(async () => {
+    if (!activeEmpresaId || !storeId) return;
+    setRemoteWebhooksLoading(true);
+    try {
+      const res = await listWooRemoteWebhooks(activeEmpresaId, storeId, { per_page: 100, page: 1, status: 'all' });
+      setRemoteWebhooks(Array.isArray(res.webhooks) ? res.webhooks : []);
+    } catch (error: any) {
+      addToast(error?.message || 'Falha ao listar webhooks no Woo (remoto).', 'error');
+      setRemoteWebhooks([]);
+    } finally {
+      setRemoteWebhooksLoading(false);
+    }
+  }, [activeEmpresaId, storeId, addToast]);
+
+  const downloadJson = useCallback((filename: string, payload: unknown) => {
+    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    a.click();
+    URL.revokeObjectURL(url);
+  }, []);
+
+  const handleExportLogs = useCallback(() => {
+    const rows = logsRows ?? status?.logs ?? [];
+    const sanitized = rows.map((row) => ({
+      ...row,
+      meta: row.meta ? sanitizeValue(row.meta) : null,
+    }));
+    downloadJson(`woo-logs-${storeId.slice(0, 8)}.json`, sanitized);
+    addToast('Logs exportados (JSON).', 'success');
+  }, [logsRows, status?.logs, storeId, downloadJson, addToast]);
+
+  const handleCopyLog = useCallback(async (row: WooLogRow) => {
+    const sanitized = { ...row, meta: row.meta ? sanitizeValue(row.meta) : null };
+    await navigator.clipboard.writeText(JSON.stringify(sanitized, null, 2));
+    addToast('Log copiado.', 'success');
+  }, [addToast]);
 
   const tabButton = (value: PanelSection, label: string) => (
     <button
@@ -326,7 +394,69 @@ export default function WooCommerceStoreDetailPage() {
 
       {section === 'webhooks' && (
         <GlassCard className="space-y-3 p-4">
-          <h3 className="text-sm font-semibold text-slate-900">Eventos recentes</h3>
+          <div className="space-y-1">
+            <h3 className="text-sm font-semibold text-slate-900">Webhooks</h3>
+            <p className="text-xs text-slate-600">
+              Para evitar ambiguidade: esta aba mostra (1) webhooks configurados no Woo (remoto) e (2) eventos recebidos pelo Ultria (inbound).
+            </p>
+          </div>
+
+          <div className="rounded-lg border border-slate-200 bg-white p-3">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div>
+                <p className="text-xs font-semibold uppercase text-slate-600">Webhooks no Woo (remoto)</p>
+                <p className="mt-1 text-xs text-slate-500">Lista lida via API Woo (`/wp-json/wc/v3/webhooks`).</p>
+              </div>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => void loadRemoteWebhooks()}
+                disabled={remoteWebhooksLoading || !!busyAction}
+              >
+                <RefreshCw className={`mr-2 h-4 w-4 ${remoteWebhooksLoading ? 'animate-spin' : ''}`} />
+                {remoteWebhooksLoading ? 'Carregando…' : 'Carregar'}
+              </Button>
+            </div>
+
+            {remoteWebhooks == null ? (
+              <div className="mt-2 text-sm text-slate-600">
+                Clique em <span className="font-medium">Carregar</span> para listar os webhooks existentes no Woo.
+              </div>
+            ) : remoteWebhooks.length === 0 ? (
+              <div className="mt-2 text-sm text-slate-600">Nenhum webhook encontrado no Woo.</div>
+            ) : (
+              <div className="mt-3 overflow-x-auto">
+                <table className="min-w-full text-sm">
+                  <thead className="bg-slate-50 text-left text-xs uppercase text-slate-500">
+                    <tr>
+                      <th className="px-3 py-2">Topic</th>
+                      <th className="px-3 py-2">Status</th>
+                      <th className="px-3 py-2">Delivery URL</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {remoteWebhooks.map((row) => (
+                      <tr key={String(row.id ?? row.delivery_url ?? Math.random())} className="border-t border-slate-100">
+                        <td className="px-3 py-2">{row.topic || '—'}</td>
+                        <td className="px-3 py-2">{row.status || '—'}</td>
+                        <td className="px-3 py-2 max-w-[520px] truncate" title={row.delivery_url || ''}>
+                          {row.delivery_url || '—'}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+
+          <div className="rounded-lg border border-slate-200 bg-white p-3">
+            <p className="text-xs font-semibold uppercase text-slate-600">Eventos recebidos no Ultria (inbound)</p>
+            <p className="mt-1 text-xs text-slate-500">
+              Estes são eventos que chegaram no endpoint público do Ultria. Se estiver vazio, o Woo pode não estar enviando (ou a URL/assinatura estão incorretas).
+            </p>
+          </div>
           <div className="overflow-x-auto">
             <table className="min-w-full text-sm">
               <thead className="bg-slate-50 text-left text-xs uppercase text-slate-500">
@@ -481,14 +611,55 @@ export default function WooCommerceStoreDetailPage() {
 
       {section === 'logs' && (
         <GlassCard className="space-y-3 p-4">
-          <h3 className="text-sm font-semibold text-slate-900">Logs recentes</h3>
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <h3 className="text-sm font-semibold text-slate-900">Logs</h3>
+            <div className="flex flex-wrap items-center gap-2">
+              <Button type="button" variant="outline" size="sm" onClick={() => void loadLogs()} disabled={logsLoading}>
+                {logsLoading ? 'Carregando…' : 'Carregar período'}
+              </Button>
+              <Button type="button" variant="outline" size="sm" onClick={handleExportLogs}>
+                Exportar JSON
+              </Button>
+            </div>
+          </div>
+          <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
+            <Input
+              name="logs-from"
+              label="De (YYYY-MM-DD)"
+              value={logsFrom}
+              onChange={(event) => setLogsFrom(event.target.value)}
+              placeholder="2026-02-01"
+            />
+            <Input
+              name="logs-to"
+              label="Até (YYYY-MM-DD)"
+              value={logsTo}
+              onChange={(event) => setLogsTo(event.target.value)}
+              placeholder="2026-02-20"
+            />
+          </div>
           <div className="space-y-2">
-            {(status?.logs ?? []).map((item) => (
+            {(logsRows ?? status?.logs ?? []).map((item) => (
               <div key={item.id} className="rounded-lg border border-slate-200 bg-white p-3">
-                <div className="flex flex-wrap items-center gap-2 text-xs text-slate-500">
-                  <span className="font-semibold uppercase text-slate-700">{item.level}</span>
-                  <span>{formatDate(item.created_at)}</span>
-                  {item.job_id && <span>job: {item.job_id}</span>}
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div className="flex flex-wrap items-center gap-2 text-xs text-slate-500">
+                    <span className="font-semibold uppercase text-slate-700">{item.level}</span>
+                    <span>{formatDate(item.created_at)}</span>
+                    {item.job_id && <span>job: {item.job_id}</span>}
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Button type="button" variant="ghost" size="sm" onClick={() => void handleCopyLog(item)}>
+                      Copiar
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => downloadJson(`woo-log-${item.id}.json`, { ...item, meta: item.meta ? sanitizeValue(item.meta) : null })}
+                    >
+                      Baixar
+                    </Button>
+                  </div>
                 </div>
                 <p className="mt-1 text-sm text-slate-900">{item.message}</p>
                 {item.meta && (

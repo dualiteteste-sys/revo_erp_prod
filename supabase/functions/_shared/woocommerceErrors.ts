@@ -1,7 +1,9 @@
 export type WooErrorCode =
   | "WOO_AUTH_INVALID"
   | "WOO_AUTH_FORBIDDEN"
+  | "WOO_WRITE_FORBIDDEN"
   | "WOO_AUTH_FAILED"
+  | "WOO_CREDENTIALS_MISSING"
   | "WOO_RATE_LIMIT"
   | "WOO_REMOTE_UNAVAILABLE"
   | "WOO_RESOURCE_NOT_FOUND"
@@ -46,8 +48,20 @@ export const WOO_ERROR_CATALOG: Record<WooErrorCode, Omit<WooErrorMeta, "code">>
     pauseStore: true,
     severity: "error",
   },
+  WOO_WRITE_FORBIDDEN: {
+    hint: "Leitura OK, mas escrita falhou. Confirme que a chave WooCommerce é Read/Write e que o servidor/proxy não bloqueia POST.",
+    retryable: false,
+    pauseStore: true,
+    severity: "error",
+  },
   WOO_AUTH_FAILED: {
     hint: "Falha de autenticação/autorização no Woo. Verifique credenciais e proxy/WAF.",
+    retryable: false,
+    pauseStore: true,
+    severity: "error",
+  },
+  WOO_CREDENTIALS_MISSING: {
+    hint: "Credenciais não configuradas para esta loja. Salve Consumer Key/Secret e valide a conexão antes de operar.",
     retryable: false,
     pauseStore: true,
     severity: "error",

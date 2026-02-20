@@ -3,8 +3,10 @@ import { supabase } from '@/lib/supabaseClient';
 type WooAdminAction =
   | 'stores.list'
   | 'stores.status'
+  | 'stores.logs.list'
   | 'stores.healthcheck'
   | 'stores.webhooks.register'
+  | 'stores.webhooks.list_remote'
   | 'stores.product_map.build'
   | 'stores.product_map.list'
   | 'stores.sync.stock'
@@ -20,7 +22,12 @@ export type WooStore = {
   base_url: string;
   auth_mode: string;
   status: 'active' | 'paused' | 'error' | string;
+  last_healthcheck_at?: string | null;
+  legacy_ecommerce_id?: string | null;
+  legacy_secrets_updated_at?: string | null;
+  has_credentials?: boolean;
   created_at?: string | null;
+  updated_at?: string | null;
 };
 
 export type WooStatusResponse = {
@@ -93,6 +100,8 @@ export type WooStatusResponse = {
   status_contract: Record<string, unknown>;
 };
 
+export type WooLogRow = WooStatusResponse['logs'][number];
+
 export type WooProductMapRow = {
   id: string;
   sku: string | null;
@@ -154,6 +163,32 @@ export function registerWooWebhooks(empresaId: string, storeId: string) {
   );
 }
 
+export type WooRemoteWebhookRow = {
+  id: number | null;
+  name: string | null;
+  topic: string | null;
+  status: string | null;
+  delivery_url: string | null;
+  created_at: string | null;
+  updated_at: string | null;
+};
+
+export function listWooRemoteWebhooks(
+  empresaId: string,
+  storeId: string,
+  params?: { per_page?: number; page?: number; status?: string | null },
+) {
+  return invokeWooAdmin<{ ok: true; webhooks: WooRemoteWebhookRow[] }>('stores.webhooks.list_remote', {
+    empresaId,
+    storeId,
+    payload: {
+      per_page: params?.per_page ?? 100,
+      page: params?.page ?? 1,
+      status: params?.status ?? null,
+    },
+  });
+}
+
 export function buildWooProductMap(empresaId: string, storeId: string) {
   return invokeWooAdmin<{ ok: true; enqueued_job_id: string | null }>('stores.product_map.build', { empresaId, storeId });
 }
@@ -180,6 +215,18 @@ export function runWooWorkerNow(empresaId: string, storeId: string, limit = 25) 
     empresaId,
     storeId,
     payload: { limit },
+  });
+}
+
+export function listWooLogs(empresaId: string, storeId: string, params?: { from?: string | null; to?: string | null; limit?: number }) {
+  return invokeWooAdmin<{ ok: true; logs: WooLogRow[] }>('stores.logs.list', {
+    empresaId,
+    storeId,
+    payload: {
+      from: params?.from ?? null,
+      to: params?.to ?? null,
+      limit: params?.limit ?? 200,
+    },
   });
 }
 
