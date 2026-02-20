@@ -54,6 +54,29 @@ Todos os fluxos geram uma execução rastreável em `/app/products/woocommerce/r
 - `woocommerce_listing`: shape amigável para UX do vínculo por produto.
 - `woocommerce_sync_job` foi estendida com `run_id` e `run_item_id`.
 
+## Regras de estoque e preço (por loja Woo)
+
+As operações **EXPORT / SYNC_STOCK / SYNC_PRICE** usam regras por **store** (loja Woo) definidas em:
+
+- **Configurações → E‑commerce → Integrações → WooCommerce → 1.1) Configuração Woo**
+
+Campos principais:
+
+- **Fonte do estoque**
+  - `product`: usa `produtos.estoque_atual` (saldo geral).
+  - `deposit`: usa `estoque_saldos_depositos.saldo` do depósito selecionado.
+- **Estoque de segurança**
+  - Subtrai do saldo antes de publicar no Woo (nunca publica negativo).
+- **Fonte do preço**
+  - `product`: usa `produtos.preco_venda`.
+  - `price_table`: usa `tabelas_preco_faixas.preco_unitario` (melhor faixa para `qtd=1`) da tabela selecionada.
+- **Ajuste padrão de preço (%)**
+  - Aplica um multiplicador no preço base antes de publicar no Woo.
+
+Importante:
+- O **preview** usa as mesmas regras do worker (evita “preview mentiroso”).
+- Falha de “Teste de conexão” não altera o estado de “credenciais armazenadas” nem muda essas regras.
+
 ## Endpoints Woo usados
 
 Base: `${base_url}/wp-json/wc/v3`
