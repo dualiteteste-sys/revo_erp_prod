@@ -52,6 +52,7 @@ import {
 import Input from '@/components/ui/forms/Input';
 import Select from '@/components/ui/forms/Select';
 import RoadmapButton from '@/components/roadmap/RoadmapButton';
+import WizardStepper from '@/components/ui/WizardStepper';
 import ResizableSortableTh, { type SortState } from '@/components/ui/table/ResizableSortableTh';
 import TableColGroup from '@/components/ui/table/TableColGroup';
 import { useTableColumnWidths, type TableColumnWidthDef } from '@/components/ui/table/useTableColumnWidths';
@@ -258,6 +259,7 @@ export default function MarketplaceIntegrationsPage() {
   const [wooDepositos, setWooDepositos] = useState<Array<{ id: string; nome: string }>>([]);
   const [wooTabelasPreco, setWooTabelasPreco] = useState<Array<{ id: string; nome: string }>>([]);
   const [wooOptionsLoading, setWooOptionsLoading] = useState(false);
+  const [wooSetupStep, setWooSetupStep] = useState<0 | 1 | 2>(0);
   const [wooDiag, setWooDiag] = useState<EcommerceConnectionDiagnostics | null>(null);
   const [wooDiagUnavailable, setWooDiagUnavailable] = useState(false);
   const [wooStores, setWooStores] = useState<WooStore[]>([]);
@@ -311,6 +313,12 @@ export default function MarketplaceIntegrationsPage() {
   useEffect(() => {
     jobsStatusFilterRef.current = jobsStatusFilterByProvider;
   }, [jobsStatusFilterByProvider]);
+
+  useEffect(() => {
+    if (!configOpen) return;
+    if (activeConnection?.provider !== 'woo') return;
+    setWooSetupStep(0);
+  }, [activeConnection?.provider, configOpen]);
 
   const refreshWooDiag = useCallback(async () => {
     if (!canView) return null;
@@ -1376,7 +1384,39 @@ export default function MarketplaceIntegrationsPage() {
                 {providerLabels[activeConnection.provider as Provider]} — <span className="text-gray-500">passo a passo + recursos</span>
               </div>
 
-              <GlassCard className="p-3">
+              {activeConnection.provider === 'woo' ? (
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                  <WizardStepper
+                    steps={[
+                      { label: 'Conexão' },
+                      { label: 'Produtos' },
+                      { label: 'Recursos' },
+                    ]}
+                    activeIndex={wooSetupStep}
+                    maxCompletedIndex={wooSetupStep - 1}
+                    className="flex-wrap"
+                  />
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant="outline"
+                      disabled={wooSetupStep === 0}
+                      onClick={() => setWooSetupStep((s) => (s > 0 ? ((s - 1) as any) : s))}
+                    >
+                      Anterior
+                    </Button>
+                    <Button
+                      variant="outline"
+                      disabled={wooSetupStep === 2}
+                      onClick={() => setWooSetupStep((s) => (s < 2 ? ((s + 1) as any) : s))}
+                    >
+                      Próximo
+                    </Button>
+                  </div>
+                </div>
+              ) : null}
+
+              {activeConnection.provider !== 'woo' || wooSetupStep === 0 ? (
+                <GlassCard className="p-3">
                 <div className="text-sm font-medium text-gray-900">1) Conectar</div>
                 {activeConnection.provider === 'woo' ? (
                   <>
@@ -1662,9 +1702,10 @@ export default function MarketplaceIntegrationsPage() {
                     ) : null}
                   </>
                 )}
-              </GlassCard>
+                </GlassCard>
+              ) : null}
 
-              {activeConnection.provider === 'woo' ? (
+              {activeConnection.provider === 'woo' && wooSetupStep === 1 ? (
                 <GlassCard className="p-3">
                   <div className="text-sm font-medium text-gray-900">1.1) Configuração Woo</div>
                   <div className="mt-1 text-xs text-gray-600">
@@ -1673,10 +1714,49 @@ export default function MarketplaceIntegrationsPage() {
 
                   <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <Select
+                      label="Fonte do estoque"
+                      name="woo_stock_source"
+                      value={String((activeConnection.config as any)?.stock_source ?? (activeConnection.config?.deposito_id ? 'deposit' : 'product'))}
+                      onChange={(e) =>
+                        setActiveConnection((prev) =>
+                          prev
+                            ? { ...prev, config: { ...(prev.config ?? {}), stock_source: (e.target as HTMLSelectElement).value || undefined } as any }
+                            : prev,
+                        )
+                      }
+                    >
+                      <option value="product">Saldo do produto (geral)</option>
+                      <option value="deposit">Saldo por depósito</option>
+                    </Select>
+
+                    <Input
+                      label="Estoque de segurança"
+                      type="number"
+                      inputMode="numeric"
+                      value={String((activeConnection.config as any)?.stock_safety_qty ?? '')}
+                      placeholder="Ex.: 2"
+                      onChange={(e) =>
+                        setActiveConnection((prev) =>
+                          prev
+                            ? {
+                              ...prev,
+                              config: {
+                                ...(prev.config ?? {}),
+                                stock_safety_qty: (e.target as HTMLInputElement).value === ''
+                                  ? undefined
+                                  : Number((e.target as HTMLInputElement).value),
+                              } as any,
+                            }
+                            : prev,
+                        )
+                      }
+                    />
+
+                    <Select
                       label="Depósito (estoque)"
                       name="woo_deposito_id"
                       value={String(activeConnection.config?.deposito_id ?? '')}
-                      disabled={wooOptionsLoading}
+                      disabled={wooOptionsLoading || String((activeConnection.config as any)?.stock_source ?? (activeConnection.config?.deposito_id ? 'deposit' : 'product')) !== 'deposit'}
                       onChange={(e) =>
                         setActiveConnection((prev) =>
                           prev
@@ -1694,10 +1774,26 @@ export default function MarketplaceIntegrationsPage() {
                     </Select>
 
                     <Select
+                      label="Fonte do preço"
+                      name="woo_price_source"
+                      value={String((activeConnection.config as any)?.price_source ?? (activeConnection.config?.base_tabela_preco_id ? 'price_table' : 'product'))}
+                      onChange={(e) =>
+                        setActiveConnection((prev) =>
+                          prev
+                            ? { ...prev, config: { ...(prev.config ?? {}), price_source: (e.target as HTMLSelectElement).value || undefined } as any }
+                            : prev,
+                        )
+                      }
+                    >
+                      <option value="product">Preço do produto (preço de venda)</option>
+                      <option value="price_table">Tabela de preço (base)</option>
+                    </Select>
+
+                    <Select
                       label="Tabela de preço (base)"
                       name="woo_base_tabela_preco_id"
                       value={String(activeConnection.config?.base_tabela_preco_id ?? '')}
-                      disabled={wooOptionsLoading}
+                      disabled={wooOptionsLoading || String((activeConnection.config as any)?.price_source ?? (activeConnection.config?.base_tabela_preco_id ? 'price_table' : 'product')) !== 'price_table'}
                       onChange={(e) =>
                         setActiveConnection((prev) =>
                           prev
@@ -1743,7 +1839,8 @@ export default function MarketplaceIntegrationsPage() {
                 </GlassCard>
               ) : null}
 
-              <GlassCard className="p-3">
+              {activeConnection.provider !== 'woo' || wooSetupStep === 2 ? (
+                <GlassCard className="p-3">
                 <div className="text-sm font-medium text-gray-900">2) Ativar recursos</div>
                 <div className="flex items-center justify-between gap-3">
                   <div>
@@ -1811,7 +1908,8 @@ export default function MarketplaceIntegrationsPage() {
                     }
                   />
                 </div>
-              </GlassCard>
+                </GlassCard>
+              ) : null}
 
               <GlassCard className="p-3">
                 <div className="text-sm font-medium text-gray-900">3) Estratégia de sincronização</div>

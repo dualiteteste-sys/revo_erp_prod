@@ -16,6 +16,13 @@ import {
 } from "../_shared/woocommerceHardening.ts";
 import { maybeHandleWooMockRequest } from "../_shared/wooMock.ts";
 import { buildWooStoreStatusContract } from "../_shared/woocommerceStatusContract.ts";
+import {
+  applyPercentAdjustment,
+  computeEffectiveStock,
+  deriveWooStoreSettingsV1FromEcommerceConfig,
+  normalizeWooStoreSettingsV1,
+  type WooStoreSettingsV1,
+} from "../_shared/woocommerceStoreSettings.ts";
 
 type Action =
   | "stores.list"
@@ -311,7 +318,7 @@ async function bootstrapStoresFromLegacyConnections(params: {
 
     const { data: existing } = await svc
       .from("integrations_woocommerce_store")
-      .select("id,legacy_ecommerce_id,legacy_secrets_updated_at,consumer_key_enc,consumer_secret_enc,auth_mode,status")
+      .select("id,legacy_ecommerce_id,legacy_secrets_updated_at,consumer_key_enc,consumer_secret_enc,auth_mode,status,settings")
       .eq("empresa_id", empresaId)
       .eq("base_url", baseUrl)
       .maybeSingle();
@@ -322,11 +329,14 @@ async function bootstrapStoresFromLegacyConnections(params: {
     const consumerSecretEnc = await aesGcmEncryptToString({ masterKey, plaintext: secrets.secret, aad });
     const status = mapLegacyWooStatusToStoreStatus((row as any)?.status);
     const legacyUpdatedAt = secrets.updatedAt;
+    const nextSettings = deriveWooStoreSettingsV1FromEcommerceConfig((row as any)?.config);
 
     const existingLegacyEcommerceId = String((existing as any)?.legacy_ecommerce_id ?? "").trim();
     const existingLegacyUpdatedAt = String((existing as any)?.legacy_secrets_updated_at ?? "").trim();
     const existingKeyEnc = String((existing as any)?.consumer_key_enc ?? "").trim();
     const existingSecretEnc = String((existing as any)?.consumer_secret_enc ?? "").trim();
+    const existingSettings = normalizeWooStoreSettingsV1((existing as any)?.settings ?? {});
+    const settingsSynced = JSON.stringify(existingSettings) === JSON.stringify(nextSettings);
     const alreadySynced =
       existing?.id &&
       existingLegacyEcommerceId === ecommerceId &&
@@ -337,7 +347,7 @@ async function bootstrapStoresFromLegacyConnections(params: {
       existingSecretEnc.length > 12;
 
     if (existing?.id) {
-      if (alreadySynced) {
+      if (alreadySynced && settingsSynced && String((existing as any)?.status ?? "") === status) {
         processedBaseUrls.add(baseUrl);
         continue;
       }
@@ -350,6 +360,7 @@ async function bootstrapStoresFromLegacyConnections(params: {
           consumer_secret_enc: consumerSecretEnc,
           legacy_ecommerce_id: ecommerceId,
           legacy_secrets_updated_at: legacyUpdatedAt,
+          settings: nextSettings,
           updated_at: new Date().toISOString(),
         })
         .eq("id", storeId)
@@ -371,6 +382,7 @@ async function bootstrapStoresFromLegacyConnections(params: {
       consumer_secret_enc: consumerSecretEnc,
       legacy_ecommerce_id: ecommerceId,
       legacy_secrets_updated_at: legacyUpdatedAt,
+      settings: nextSettings,
     });
     if (!error) {
       imported += 1;
@@ -539,6 +551,155 @@ async function loadStoreMapBySku(params: {
   return Array.isArray(data) ? data : [];
 }
 
+async function resolveWooStoreSettingsForCatalog(params: {
+  svc: any;
+  empresaId: string;
+  store: any;
+}): Promise<WooStoreSettingsV1> {
+  const legacyEcommerceId = String(params.store?.legacy_ecommerce_id ?? "").trim() || null;
+  const storeSettings = params.store?.settings ?? null;
+  let legacyConfig: unknown | null = null;
+  if (legacyEcommerceId) {
+    const { data: legacy } = await params.svc
+      .from("ecommerces")
+      .select("config")
+      .eq("empresa_id", params.empresaId)
+      .eq("id", legacyEcommerceId)
+      .maybeSingle();
+    legacyConfig = (legacy as any)?.config ?? null;
+  }
+
+  const settings = legacyConfig
+    ? deriveWooStoreSettingsV1FromEcommerceConfig(legacyConfig)
+    : normalizeWooStoreSettingsV1(storeSettings ?? {});
+
+  // Sync runtime store.settings with legacy config when applicable (source of truth for UI).
+  if (legacyConfig) {
+    const normalizedDb = normalizeWooStoreSettingsV1(storeSettings ?? {});
+    if (JSON.stringify(normalizedDb) !== JSON.stringify(settings)) {
+      await params.svc
+        .from("integrations_woocommerce_store")
+        .update({ settings, updated_at: new Date().toISOString() })
+        .eq("id", String(params.store?.id ?? ""))
+        .eq("empresa_id", params.empresaId)
+        .catch(() => null);
+    }
+  }
+
+  return settings;
+}
+
+async function loadDepositStocksByProductId(params: {
+  svc: any;
+  empresaId: string;
+  depositoId: string;
+  productIds: string[];
+}): Promise<Map<string, number>> {
+  const ids = Array.from(new Set(params.productIds.map((v) => String(v ?? "").trim()).filter(Boolean)));
+  const out = new Map<string, number>();
+  if (!params.depositoId || ids.length === 0) return out;
+  const { data, error } = await params.svc
+    .from("estoque_saldos_depositos")
+    .select("produto_id,saldo")
+    .eq("empresa_id", params.empresaId)
+    .eq("deposito_id", params.depositoId)
+    .in("produto_id", ids);
+  if (error) throw error;
+  for (const row of Array.isArray(data) ? data : []) {
+    const pid = String((row as any)?.produto_id ?? "").trim();
+    if (!pid) continue;
+    const saldo = Number((row as any)?.saldo ?? 0);
+    out.set(pid, Number.isFinite(saldo) ? saldo : 0);
+  }
+  return out;
+}
+
+async function loadUnitPricesByProductIdForQty1(params: {
+  svc: any;
+  empresaId: string;
+  tabelaPrecoId: string;
+  productIds: string[];
+}): Promise<Map<string, number>> {
+  const ids = Array.from(new Set(params.productIds.map((v) => String(v ?? "").trim()).filter(Boolean)));
+  const out = new Map<string, number>();
+  if (!params.tabelaPrecoId || ids.length === 0) return out;
+
+  const { data, error } = await params.svc
+    .from("tabelas_preco_faixas")
+    .select("produto_id,min_qtd,max_qtd,preco_unitario")
+    .eq("empresa_id", params.empresaId)
+    .eq("tabela_preco_id", params.tabelaPrecoId)
+    .in("produto_id", ids)
+    .lte("min_qtd", 1)
+    .or("max_qtd.is.null,max_qtd.gte.1")
+    .order("min_qtd", { ascending: false });
+  if (error) throw error;
+
+  for (const row of Array.isArray(data) ? data : []) {
+    const pid = String((row as any)?.produto_id ?? "").trim();
+    if (!pid || out.has(pid)) continue;
+    const price = Number((row as any)?.preco_unitario ?? 0);
+    out.set(pid, Number.isFinite(price) ? price : 0);
+  }
+  return out;
+}
+
+async function applyWooCatalogRulesToRevoProducts(params: {
+  svc: any;
+  empresaId: string;
+  products: any[];
+  settings: WooStoreSettingsV1;
+}) {
+  const ids = Array.from(
+    new Set(params.products.map((p) => String(p?.id ?? "").trim()).filter(Boolean)),
+  );
+  const depositStocksByProductId =
+    params.settings.stock_source === "deposit" && params.settings.deposito_id
+      ? await loadDepositStocksByProductId({
+        svc: params.svc,
+        empresaId: params.empresaId,
+        depositoId: params.settings.deposito_id,
+        productIds: ids,
+      })
+      : new Map<string, number>();
+  const unitPricesByProductId =
+    params.settings.price_source === "price_table" && params.settings.base_tabela_preco_id
+      ? await loadUnitPricesByProductIdForQty1({
+        svc: params.svc,
+        empresaId: params.empresaId,
+        tabelaPrecoId: params.settings.base_tabela_preco_id,
+        productIds: ids,
+      })
+      : new Map<string, number>();
+
+  return params.products.map((product) => {
+    const id = String(product?.id ?? "").trim();
+    const rawStock =
+      params.settings.stock_source === "deposit" && params.settings.deposito_id
+        ? (depositStocksByProductId.get(id) ?? 0)
+        : Number(product?.estoque_atual ?? 0);
+    const effectiveStock = computeEffectiveStock({
+      rawStock,
+      stockSafetyQty: params.settings.stock_safety_qty,
+    });
+
+    const basePrice =
+      params.settings.price_source === "price_table" && params.settings.base_tabela_preco_id
+        ? (unitPricesByProductId.get(id) ?? Number(product?.preco_venda ?? 0))
+        : Number(product?.preco_venda ?? 0);
+    const adjustedPrice = applyPercentAdjustment({
+      basePrice,
+      percent: params.settings.price_percent_default,
+    });
+
+    return {
+      ...product,
+      __woo_desired_stock_quantity: effectiveStock,
+      __woo_desired_regular_price: adjustedPrice,
+    };
+  });
+}
+
 function buildExportPreview(params: {
   products: any[];
   mapRows: any[];
@@ -569,8 +730,8 @@ function buildExportPreview(params: {
     const wooProductId = map ? Number(map.woo_product_id ?? 0) || null : null;
     const wooVariationId = map ? Number(map.woo_variation_id ?? 0) || null : null;
 
-    const wantedPrice = toWooPriceString(product?.preco_venda);
-    const wantedStock = toWooStockInt(product?.estoque_atual);
+    const wantedPrice = toWooPriceString((product as any)?.__woo_desired_regular_price ?? product?.preco_venda);
+    const wantedStock = toWooStockInt((product as any)?.__woo_desired_stock_quantity ?? product?.estoque_atual);
     if (params.mode !== "SYNC_STOCK") {
       const d = diffValue(null, wantedPrice);
       if (d) diff.regular_price = d;
@@ -982,7 +1143,7 @@ Deno.serve(async (req) => {
 
     const { data: store, error: storeErr } = await svc
       .from("integrations_woocommerce_store")
-      .select("id,empresa_id,base_url,auth_mode,consumer_key_enc,consumer_secret_enc,webhook_secret_enc,status,last_healthcheck_at")
+      .select("id,empresa_id,base_url,auth_mode,consumer_key_enc,consumer_secret_enc,webhook_secret_enc,status,last_healthcheck_at,legacy_ecommerce_id,settings")
       .eq("id", storeId)
       .eq("empresa_id", empresaId)
       .maybeSingle();
@@ -1447,8 +1608,10 @@ Deno.serve(async (req) => {
         revoProductIds,
         skus,
       });
+      const settings = await resolveWooStoreSettingsForCatalog({ svc, empresaId, store });
+      const productsWithRules = await applyWooCatalogRulesToRevoProducts({ svc, empresaId, products, settings });
 
-      const productSkus = products.map((p: any) => normalizeSku(p?.sku)).filter(Boolean);
+      const productSkus = productsWithRules.map((p: any) => normalizeSku(p?.sku)).filter(Boolean);
       const mapRows = await loadStoreMapBySku({
         svc,
         empresaId,
@@ -1460,7 +1623,7 @@ Deno.serve(async (req) => {
         : action === "stores.catalog.preview.sync_price"
         ? "SYNC_PRICE"
         : "SYNC_STOCK";
-      const items = buildExportPreview({ products, mapRows, mode });
+      const items = buildExportPreview({ products: productsWithRules, mapRows, mode });
       return json(200, {
         ok: true,
         mode,
@@ -1487,10 +1650,12 @@ Deno.serve(async (req) => {
       const revoProductIds = Array.isArray(body?.revo_product_ids) ? body.revo_product_ids : [];
       const skus = Array.isArray(body?.skus) ? body.skus : [];
       const products = await loadRevoProductsForCatalog({ svc, empresaId, revoProductIds, skus });
-      const productSkus = products.map((p: any) => normalizeSku(p?.sku)).filter(Boolean);
+      const settings = await resolveWooStoreSettingsForCatalog({ svc, empresaId, store });
+      const productsWithRules = await applyWooCatalogRulesToRevoProducts({ svc, empresaId, products, settings });
+      const productSkus = productsWithRules.map((p: any) => normalizeSku(p?.sku)).filter(Boolean);
       const mapRows = await loadStoreMapBySku({ svc, empresaId, storeId, skus: productSkus });
       const previewItems = buildExportPreview({
-        products,
+        products: productsWithRules,
         mapRows,
         mode: mode === "EXPORT" ? "EXPORT" : mode === "SYNC_PRICE" ? "SYNC_PRICE" : "SYNC_STOCK",
       });
