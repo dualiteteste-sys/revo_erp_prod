@@ -43,7 +43,7 @@ describe('TermsAcceptanceGate', () => {
     });
 
     renderWithQuery(
-      <TermsAcceptanceGate userId="user-1" empresaId="empresa-1" onDecline={() => {}}>
+      <TermsAcceptanceGate userId="user-1" empresaId="empresa-1" currentPath="/app/products" onDecline={() => {}}>
         <div>APP_OK</div>
       </TermsAcceptanceGate>,
     );
@@ -82,7 +82,7 @@ describe('TermsAcceptanceGate', () => {
     });
 
     renderWithQuery(
-      <TermsAcceptanceGate userId="user-1" empresaId="empresa-1" onDecline={() => {}}>
+      <TermsAcceptanceGate userId="user-1" empresaId="empresa-1" currentPath="/app/products" onDecline={() => {}}>
         <div>APP_OK</div>
       </TermsAcceptanceGate>,
     );
@@ -90,6 +90,7 @@ describe('TermsAcceptanceGate', () => {
     expect(await screen.findByText('Termo de Aceite')).toBeInTheDocument();
     expect(screen.queryByText('APP_OK')).not.toBeInTheDocument();
 
+    fireEvent.click(screen.getByRole('checkbox'));
     fireEvent.click(screen.getByRole('button', { name: 'Aceitar' }));
 
     await waitFor(() => expect(screen.getByText('APP_OK')).toBeInTheDocument());
@@ -113,7 +114,7 @@ describe('TermsAcceptanceGate', () => {
     const onDecline = vi.fn();
 
     renderWithQuery(
-      <TermsAcceptanceGate userId="user-1" empresaId="empresa-1" onDecline={onDecline}>
+      <TermsAcceptanceGate userId="user-1" empresaId="empresa-1" currentPath="/app/products" onDecline={onDecline}>
         <div>APP_OK</div>
       </TermsAcceptanceGate>,
     );
@@ -125,6 +126,31 @@ describe('TermsAcceptanceGate', () => {
     expect(onDecline).toHaveBeenCalledTimes(1);
   });
 
+  it('does not block terms route while not accepted', async () => {
+    vi.mocked(svc.getCurrentTermsDocument).mockResolvedValue({
+      key: 'ultria_erp_terms',
+      version: '1.0',
+      body: 'Termos…',
+      body_sha256: 'hash',
+    });
+    vi.mocked(svc.getTermsAcceptanceStatus).mockResolvedValue({
+      is_accepted: false,
+      acceptance_id: null,
+      accepted_at: null,
+      version: '1.0',
+      document_sha256: 'hash',
+    });
+
+    renderWithQuery(
+      <TermsAcceptanceGate userId="user-1" empresaId="empresa-1" currentPath="/app/termos-de-uso" onDecline={() => {}}>
+        <div>TERMS_PAGE_OK</div>
+      </TermsAcceptanceGate>,
+    );
+
+    expect(await screen.findByText('TERMS_PAGE_OK')).toBeInTheDocument();
+    expect(screen.queryByText('Termo de Aceite')).not.toBeInTheDocument();
+  });
+
   it('fails open when terms RPC is missing in schema cache (compat mode)', async () => {
     const missingRpc = new RpcError('HTTP_404: Could not find the function public.terms_acceptance_status_get(p_key) in the schema cache');
     missingRpc.code = 'PGRST202';
@@ -133,7 +159,7 @@ describe('TermsAcceptanceGate', () => {
     vi.mocked(svc.getTermsAcceptanceStatus).mockRejectedValue(missingRpc);
 
     renderWithQuery(
-      <TermsAcceptanceGate userId="user-1" empresaId="empresa-1" onDecline={() => {}}>
+      <TermsAcceptanceGate userId="user-1" empresaId="empresa-1" currentPath="/app/products" onDecline={() => {}}>
         <div>APP_OK</div>
       </TermsAcceptanceGate>,
     );

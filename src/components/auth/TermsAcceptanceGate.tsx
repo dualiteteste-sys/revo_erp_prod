@@ -36,15 +36,18 @@ const Btn = ({
 export default function TermsAcceptanceGate({
   userId,
   empresaId,
+  currentPath,
   onDecline,
   children,
 }: {
   userId: string;
   empresaId: string;
+  currentPath: string;
   onDecline: () => void | Promise<void>;
   children: React.ReactNode;
 }) {
   const queryClient = useQueryClient();
+  const [ackChecked, setAckChecked] = React.useState(false);
 
   const docQueryKey = ['terms_document_current', 'ultria_erp_terms'] as const;
   const statusQueryKey = ['terms_acceptance_status', 'ultria_erp_terms', empresaId, userId] as const;
@@ -84,7 +87,15 @@ export default function TermsAcceptanceGate({
     },
   });
 
-  if (docQuery.isLoading || statusQuery.isLoading) {
+  const isTermsRoute = currentPath.replace(/\/+$/, '') === '/app/termos-de-uso';
+  const statusData = statusQuery.data;
+  const shouldWaitFreshStatus =
+    statusData != null &&
+    !statusData.is_accepted &&
+    !statusQuery.isFetchedAfterMount &&
+    statusQuery.isFetching;
+
+  if (docQuery.isLoading || statusQuery.isLoading || shouldWaitFreshStatus) {
     return <FullscreenLoading label="Verificando Termo de Aceite…" />;
   }
 
@@ -92,6 +103,10 @@ export default function TermsAcceptanceGate({
     isRpcMissingError(docQuery.error) ||
     isRpcMissingError(statusQuery.error);
   if (missingTermsRpc) {
+    return <>{children}</>;
+  }
+
+  if (isTermsRoute) {
     return <>{children}</>;
   }
 
@@ -135,22 +150,38 @@ export default function TermsAcceptanceGate({
 
   return (
     <div className="w-full h-screen flex items-center justify-center bg-slate-50 p-6">
-      <div className="w-full max-w-4xl p-6 rounded-2xl border border-slate-200 bg-white shadow-sm">
+      <div className="w-full max-w-2xl p-6 rounded-2xl border border-slate-200 bg-white shadow-sm">
         <div className="flex items-start justify-between gap-4">
           <div>
             <h1 className="text-2xl font-semibold text-slate-900">Termo de Aceite</h1>
             <p className="text-sm text-slate-600 mt-1">
-              Aceite os termos para continuar.
+              Para continuar no ERP, confirme a leitura e o aceite da versão vigente.
             </p>
           </div>
           <div className="text-xs text-slate-500">Versão: {docQuery.data.version}</div>
         </div>
 
-        <div className="mt-5 rounded-xl border border-slate-200 bg-white overflow-hidden">
-          <div className="max-h-[55vh] overflow-auto p-4">
-            <pre className="whitespace-pre-wrap text-sm text-slate-800 leading-relaxed font-sans">
-              {docQuery.data.body}
-            </pre>
+        <div className="mt-5 rounded-xl border border-slate-200 bg-slate-50 p-4">
+          <label className="flex items-start gap-3">
+            <input
+              type="checkbox"
+              className="mt-1 h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+              checked={ackChecked}
+              onChange={(event) => setAckChecked(event.target.checked)}
+            />
+            <span className="text-sm text-slate-700">
+              Eu declaro que li e aceito os termos de uso do sistema Utria ERP.
+            </span>
+          </label>
+          <div className="mt-3 text-sm">
+            <a
+              href="/app/termos-de-uso"
+              target="_blank"
+              rel="noreferrer noopener"
+              className="font-medium text-blue-700 hover:underline"
+            >
+              Ler termo completo em página dedicada
+            </a>
           </div>
         </div>
 
@@ -164,7 +195,7 @@ export default function TermsAcceptanceGate({
           </Btn>
           <Btn
             onClick={() => acceptMutation.mutate()}
-            disabled={acceptMutation.isPending}
+            disabled={acceptMutation.isPending || !ackChecked}
           >
             {acceptMutation.isPending ? 'Registrando…' : 'Aceitar'}
           </Btn>

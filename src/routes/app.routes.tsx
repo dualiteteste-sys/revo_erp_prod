@@ -53,6 +53,7 @@ const WooCommerceStoresPage = lazyImport(() => import("../pages/dev/WooCommerceS
 const WooCommerceStoreDetailPage = lazyImport(() => import("../pages/dev/WooCommerceStoreDetailPage"));
 const SupabaseDemoPage = lazyImport(() => import("../pages/tools/SupabaseDemoPage"));
 const SettingsPage = lazyImport(() => import("../pages/settings/SettingsPage"));
+const TermsOfUsePage = lazyImport(() => import("../pages/legal/TermsOfUsePage"));
 
 // Fiscal Pages
 const NfeEmissoesPage = lazyImport(() => import("../pages/fiscal/NfeEmissoesPage"));
@@ -138,6 +139,7 @@ export const appRoutes: RouteObject[] = [
             // Configurações (painel)
             { path: "configuracoes", element: <Navigate to="/app/configuracoes/geral/empresa" replace /> },
             { path: "configuracoes/:section/:page", element: <Suspense fallback={<PageLoader />}><SettingsPage /></Suspense> },
+            { path: "termos-de-uso", element: <Suspense fallback={<PageLoader />}><TermsOfUsePage /></Suspense> },
 
             // Cadastros
             {
