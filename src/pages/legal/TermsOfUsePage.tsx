@@ -1,6 +1,5 @@
 import React, { useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { ChevronDown } from 'lucide-react';
 import { getCurrentTermsDocument } from '@/services/termsAcceptance';
 import { parseTermsSections } from '@/lib/termsDocument';
 
@@ -22,10 +21,7 @@ const DisclosureSection = ({
       onClick={onToggle}
     >
       <span className="font-semibold text-slate-900">{title}</span>
-      <ChevronDown
-        size={18}
-        className={`text-slate-500 transition-transform ${isOpen ? 'rotate-180' : ''}`}
-      />
+      <span className={`text-slate-500 transition-transform ${isOpen ? 'rotate-180' : ''}`}>⌄</span>
     </button>
     {isOpen ? (
       <div className="px-4 pb-4 pt-1">
