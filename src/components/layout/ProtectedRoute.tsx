@@ -125,7 +125,7 @@ const ProtectedRoute = ({ children }: { children: JSX.Element }) => {
   }
 
   return (
-    <TermsAcceptanceGate userId={effectiveUserId} empresaId={activeEmpresaId} onDecline={signOut}>
+    <TermsAcceptanceGate userId={effectiveUserId} empresaId={activeEmpresaId} currentPath={location.pathname} onDecline={signOut}>
       {children}
     </TermsAcceptanceGate>
   );
