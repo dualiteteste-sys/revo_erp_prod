@@ -1,30 +1,8 @@
-import React, { useMemo } from 'react';
+import React from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Loader2, RefreshCw } from 'lucide-react';
-import { callRpc } from '@/lib/api';
-import { listAuditLogsForTables, type AuditLogRow } from '@/services/auditLogs';
+import { listUserPermissionOverrideHistory, type UserPermissionOverrideHistoryRow } from '@/services/userPermissionHistory';
 import { useAuth } from '@/contexts/AuthProvider';
-
-type PermissionRow = {
-  id: string;
-  module: string;
-  action: 'view' | 'create' | 'update' | 'delete' | 'manage' | 'export';
-};
-
-type HistoryRow = {
-  id: string;
-  changed_at: string;
-  changed_by: string | null;
-  module: string;
-  action: string;
-  before: boolean | null;
-  after: boolean | null;
-};
-
-function parseBoolean(value: unknown): boolean | null {
-  if (typeof value === 'boolean') return value;
-  return null;
-}
 
 function normalizeOverrideLabel(value: boolean | null): string {
   if (value === true) return 'Permitir';
@@ -38,63 +16,38 @@ function getBadgeClass(value: boolean | null): string {
   return 'border-gray-300 bg-gray-50 text-gray-700';
 }
 
-function buildHistoryRows(logs: AuditLogRow[], permissionsById: Map<string, PermissionRow>, userId: string): HistoryRow[] {
-  const rows: HistoryRow[] = [];
+function normalizeOperationLabel(value: string): string {
+  const op = String(value || '').toUpperCase();
+  if (op === 'INSERT') return 'Criado';
+  if (op === 'UPDATE') return 'Atualizado';
+  if (op === 'DELETE') return 'Removido';
+  return op || '—';
+}
 
-  for (const log of logs) {
-    const oldData = (log.old_data || {}) as Record<string, unknown>;
-    const newData = (log.new_data || {}) as Record<string, unknown>;
-    const oldUserId = typeof oldData.user_id === 'string' ? oldData.user_id : null;
-    const newUserId = typeof newData.user_id === 'string' ? newData.user_id : null;
-    if (oldUserId !== userId && newUserId !== userId) continue;
+function normalizePermissionLabel(row: UserPermissionOverrideHistoryRow): string {
+  const moduleName = row.permission_module || 'desconhecido';
+  const actionName = row.permission_action || 'desconhecido';
+  return `${moduleName}:${actionName}`;
+}
 
-    const permissionId =
-      (typeof newData.permission_id === 'string' ? newData.permission_id : null) ||
-      (typeof oldData.permission_id === 'string' ? oldData.permission_id : null);
-    if (!permissionId) continue;
-
-    const permission = permissionsById.get(permissionId);
-    rows.push({
-      id: log.id,
-      changed_at: log.changed_at,
-      changed_by: log.changed_by,
-      module: permission?.module || 'desconhecido',
-      action: permission?.action || 'desconhecido',
-      before: parseBoolean(oldData.allow),
-      after: parseBoolean(newData.allow),
-    });
-  }
-
-  return rows.sort((a, b) => new Date(b.changed_at).getTime() - new Date(a.changed_at).getTime());
+function normalizeChangedByLabel(row: UserPermissionOverrideHistoryRow, currentUserId: string): string {
+  if (row.changed_by === currentUserId) return 'Você';
+  if (!row.changed_by) return 'Sistema';
+  return `${row.changed_by.slice(0, 8)}…`;
 }
 
 export default function UserPermissionHistory({ userId }: { userId: string }) {
-  const { activeEmpresaId } = useAuth();
-
-  const permissionsQuery = useQuery({
-    queryKey: ['rbac', 'permissions', activeEmpresaId],
-    enabled: !!activeEmpresaId,
-    queryFn: async () => {
-      const rows = await callRpc<PermissionRow[]>('roles_permissions_list');
-      return (rows || []) as PermissionRow[];
-    },
-  });
+  const { activeEmpresaId, userId: currentUserId } = useAuth();
 
   const historyQuery = useQuery({
     queryKey: ['settings', 'user-profile', 'permission-history', activeEmpresaId, userId],
     enabled: !!activeEmpresaId && !!userId,
-    queryFn: async () => {
-      const logs = await listAuditLogsForTables(['user_permission_overrides'], 200);
-      return (logs || []) as AuditLogRow[];
-    },
+    queryFn: async () => listUserPermissionOverrideHistory(userId, 50),
   });
 
-  const historyRows = useMemo(() => {
-    const permissionsById = new Map((permissionsQuery.data || []).map((permission) => [permission.id, permission]));
-    return buildHistoryRows(historyQuery.data || [], permissionsById, userId).slice(0, 30);
-  }, [historyQuery.data, permissionsQuery.data, userId]);
+  const historyRows = historyQuery.data || [];
 
-  if (permissionsQuery.isLoading || historyQuery.isLoading) {
+  if (historyQuery.isLoading) {
     return (
       <div className="flex items-center justify-center py-6 text-sm text-gray-600">
         <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -103,7 +56,7 @@ export default function UserPermissionHistory({ userId }: { userId: string }) {
     );
   }
 
-  if (permissionsQuery.isError || historyQuery.isError) {
+  if (historyQuery.isError) {
     return (
       <div className="rounded-xl bg-red-50 border border-red-200 p-4 text-sm text-red-700">
         Não foi possível carregar o histórico de alterações de permissões.
@@ -147,19 +100,25 @@ export default function UserPermissionHistory({ userId }: { userId: string }) {
               {historyRows.map((row) => (
                 <tr key={row.id} className="hover:bg-gray-50/50">
                   <td className="p-3 whitespace-nowrap">{new Date(row.changed_at).toLocaleString('pt-BR')}</td>
-                  <td className="p-3 font-medium text-gray-800">{row.module}</td>
-                  <td className="p-3">{row.action}</td>
+                  <td className="p-3 font-medium text-gray-800">{row.permission_module || 'desconhecido'}</td>
+                  <td className="p-3">{row.permission_action || 'desconhecido'}</td>
                   <td className="p-3">
-                    <span className={`inline-flex rounded-full border px-2 py-1 text-xs font-semibold ${getBadgeClass(row.before)}`}>
-                      {normalizeOverrideLabel(row.before)}
+                    <span className={`inline-flex rounded-full border px-2 py-1 text-xs font-semibold ${getBadgeClass(row.before_allow)}`}>
+                      {normalizeOverrideLabel(row.before_allow)}
                     </span>
                   </td>
                   <td className="p-3">
-                    <span className={`inline-flex rounded-full border px-2 py-1 text-xs font-semibold ${getBadgeClass(row.after)}`}>
-                      {normalizeOverrideLabel(row.after)}
+                    <span className={`inline-flex rounded-full border px-2 py-1 text-xs font-semibold ${getBadgeClass(row.after_allow)}`}>
+                      {normalizeOverrideLabel(row.after_allow)}
                     </span>
                   </td>
-                  <td className="p-3 font-mono text-xs text-gray-600">{row.changed_by || '—'}</td>
+                  <td className="p-3">
+                    <div className="flex flex-col gap-1">
+                      <span className="text-xs font-semibold text-gray-700">{normalizeChangedByLabel(row, currentUserId || '')}</span>
+                      <span className="text-[11px] text-gray-500">{normalizeOperationLabel(row.operation)}</span>
+                      <span className="text-[11px] text-gray-500">{normalizePermissionLabel(row)}</span>
+                    </div>
+                  </td>
                 </tr>
               ))}
             </tbody>
