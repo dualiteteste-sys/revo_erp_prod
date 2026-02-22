@@ -90,6 +90,14 @@ function isLocalOrigin(origin: string): boolean {
     || o === "http://127.0.0.1:4173";
 }
 
+function isProdOrigin(origin: string): boolean {
+  const o = origin.trim().toLowerCase();
+  return o === "https://ultria.com.br"
+    || o.endsWith(".ultria.com.br")
+    || o === "https://erprevo.com"
+    || o.endsWith(".erprevo.com");
+}
+
 function pickSiteUrl(req: Request, stripeSecretKey: string): string | null {
   const envUrl = (Deno.env.get("SITE_URL") ?? "").trim();
 
@@ -97,6 +105,9 @@ function pickSiteUrl(req: Request, stripeSecretKey: string): string | null {
   const origin = (req.headers.get("origin") ?? "").trim();
 
   const allowedExact = new Set<string>([
+    "https://ultria.com.br",
+    "https://www.ultria.com.br",
+    "https://ultriadev.com.br",
     "https://erprevo.com",
     "https://erprevodev.com",
   ]);
@@ -145,12 +156,12 @@ Deno.serve(async (req) => {
         { status: 500, headers: { "Content-Type": "application/json", ...corsHeaders } },
       );
     }
-    if (origin === "https://erprevo.com" && stripeSecretKey.startsWith("sk_test_")) {
+    if (isProdOrigin(origin) && stripeSecretKey.startsWith("sk_test_")) {
       return new Response(
         JSON.stringify({
           error: "config_error",
           message:
-            "Você está em https://erprevo.com mas a STRIPE_SECRET_KEY parece ser de TESTE (sk_test_*). Configure a chave LIVE (sk_live_*) para a produção.",
+            "A origem é de produção, mas a STRIPE_SECRET_KEY parece ser de TESTE (sk_test_*). Configure a chave LIVE (sk_live_*) para produção.",
         }),
         { status: 500, headers: { "Content-Type": "application/json", ...corsHeaders } },
       );

@@ -7,6 +7,9 @@ export function buildCorsHeaders(req: Request) {
   // Fallback seguro: domínios oficiais do Revo (evita CORS quebrar por env mal configurada).
   // Obs: para ambientes adicionais (staging/preview), preferir configurar ALLOWED_ORIGINS.
   const defaultExacts = [
+    "https://ultria.com.br",
+    "https://www.ultria.com.br",
+    "https://ultriadev.com.br",
     "https://erprevo.com",
     "https://erprevodev.com",
     "https://erpreveoprod.netlify.app",

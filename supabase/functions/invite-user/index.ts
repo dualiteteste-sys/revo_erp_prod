@@ -53,6 +53,9 @@ async function findUserIdByEmail(svc: any, email: string): Promise<string | null
 function pickSiteUrl(req: Request): string {
   const origin = (req.headers.get("origin") ?? "").trim();
   const allowedExact = new Set<string>([
+    "https://ultria.com.br",
+    "https://www.ultria.com.br",
+    "https://ultriadev.com.br",
     "https://erprevo.com",
     "https://erprevodev.com",
     "http://localhost:5173",

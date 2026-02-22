@@ -22,8 +22,14 @@ function resolveStripeSecretKey(req: Request): string {
 
   if (!primary && !test && !live) return "";
 
-  const isProdOrigin = origin === "https://erprevo.com" || origin.endsWith(".erprevo.com");
-  const isDevOrigin = origin === "https://erprevodev.com" || origin.endsWith(".erprevodev.com")
+  const isProdOrigin = origin === "https://ultria.com.br"
+    || origin.endsWith(".ultria.com.br")
+    || origin === "https://erprevo.com"
+    || origin.endsWith(".erprevo.com");
+  const isDevOrigin = origin === "https://ultriadev.com.br"
+    || origin.endsWith(".ultriadev.com.br")
+    || origin === "https://erprevodev.com"
+    || origin.endsWith(".erprevodev.com")
     || origin.startsWith("http://localhost") || origin.startsWith("http://127.0.0.1");
 
   if (isProdOrigin && live) return live;
