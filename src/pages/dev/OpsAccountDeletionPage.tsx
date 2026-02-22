@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { AlertTriangle, RefreshCw, Trash2 } from 'lucide-react';
+import { RefreshCw, Trash2 } from 'lucide-react';
 
 import PageHeader from '@/components/ui/PageHeader';
 import PageShell from '@/components/ui/PageShell';
@@ -9,23 +9,14 @@ import { useToast } from '@/contexts/ToastProvider';
 import {
   executeOpsAccountDeletion,
   getOpsAccountDeletionPreview,
-  listOpsAccountDeletionAudit,
-  type OpsAccountDeletionAuditRow,
   type OpsAccountDeletionPreview,
 } from '@/services/opsAccountDeletion';
 import { supabase } from '@/lib/supabaseClient';
-
-function formatDateTimeBR(value?: string | null) {
-  if (!value) return '—';
-  const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? String(value) : date.toLocaleString('pt-BR');
-}
 
 export default function OpsAccountDeletionPage() {
   const { addToast } = useToast();
   const [loading, setLoading] = useState(true);
   const [preview, setPreview] = useState<OpsAccountDeletionPreview | null>(null);
-  const [auditRows, setAuditRows] = useState<OpsAccountDeletionAuditRow[]>([]);
   const [confirmation, setConfirmation] = useState('');
   const [reason, setReason] = useState('');
   const [executing, setExecuting] = useState(false);
@@ -38,15 +29,10 @@ export default function OpsAccountDeletionPage() {
     setLoading(true);
     setError(null);
     try {
-      const [previewData, auditData] = await Promise.all([
-        getOpsAccountDeletionPreview(),
-        listOpsAccountDeletionAudit(12),
-      ]);
+      const previewData = await getOpsAccountDeletionPreview();
       setPreview(previewData);
-      setAuditRows(auditData ?? []);
     } catch (e: any) {
       setPreview(null);
-      setAuditRows([]);
       setError(e?.message || 'Falha ao carregar o diagnóstico de exclusão de conta.');
     } finally {
       setLoading(false);
@@ -101,15 +87,9 @@ export default function OpsAccountDeletionPage() {
     >
       <PageCard className="space-y-4">
         <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-red-900">
-          <div className="flex items-start gap-3">
-            <AlertTriangle size={18} className="mt-0.5" />
-            <div className="space-y-1 text-sm">
-              <p className="font-semibold">Ação destrutiva e irreversível.</p>
-              <p>
-                Esta operação remove a conta inteira da empresa ativa. Use somente para cleanup de ambientes de teste ou cenários
-                autorizados.
-              </p>
-            </div>
+          <div className="space-y-1 text-sm">
+            <p className="font-semibold">Ação destrutiva e irreversível.</p>
+            <p>Remova a empresa ativa apenas em cenários autorizados de suporte/teste.</p>
           </div>
         </div>
 
@@ -199,7 +179,7 @@ export default function OpsAccountDeletionPage() {
                   Confirmação obrigatória
                 </label>
                 <p className="mb-2 text-xs text-slate-600">
-                  Digite exatamente: <span className="font-mono font-semibold">{requiredConfirmation}</span>
+                  Digite: <span className="font-mono font-semibold">{requiredConfirmation}</span>
                 </p>
                 <input
                   id="ops-delete-confirmation"
@@ -226,57 +206,6 @@ export default function OpsAccountDeletionPage() {
         ) : (
           <p className="text-sm text-slate-600">Nenhum dado disponível para o diagnóstico.</p>
         )}
-      </PageCard>
-
-      <PageCard className="space-y-3">
-        <div className="flex items-center justify-between">
-          <h3 className="text-base font-semibold text-slate-900">Histórico recente (auditoria)</h3>
-          <span className="text-xs text-slate-500">{auditRows.length} registros</span>
-        </div>
-        <div className="rounded-xl border border-gray-200 overflow-hidden">
-          <table className="min-w-full text-sm">
-            <thead className="bg-gray-50 text-slate-600 text-left">
-              <tr>
-                <th className="px-3 py-2">Quando</th>
-                <th className="px-3 py-2">Empresa</th>
-                <th className="px-3 py-2">Status</th>
-                <th className="px-3 py-2">Motivo</th>
-                <th className="px-3 py-2">Erro</th>
-              </tr>
-            </thead>
-            <tbody>
-              {auditRows.length === 0 ? (
-                <tr>
-                  <td className="px-3 py-3 text-slate-500" colSpan={5}>
-                    Sem execuções registradas.
-                  </td>
-                </tr>
-              ) : (
-                auditRows.map((row) => (
-                  <tr key={row.id} className="border-t border-gray-100">
-                    <td className="px-3 py-2 text-slate-700">{formatDateTimeBR(row.created_at)}</td>
-                    <td className="px-3 py-2 font-mono text-xs text-slate-700">{row.target_empresa_id}</td>
-                    <td className="px-3 py-2">
-                      <span
-                        className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${
-                          row.status === 'success'
-                            ? 'bg-emerald-100 text-emerald-700'
-                            : row.status === 'failed'
-                              ? 'bg-red-100 text-red-700'
-                              : 'bg-amber-100 text-amber-700'
-                        }`}
-                      >
-                        {row.status}
-                      </span>
-                    </td>
-                    <td className="px-3 py-2 text-slate-700">{row.reason || '—'}</td>
-                    <td className="px-3 py-2 text-red-700">{row.error_message || '—'}</td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
       </PageCard>
     </PageShell>
   );
