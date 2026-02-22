@@ -47,6 +47,7 @@ const SystemErrorsPage = lazyImport(() => import("../pages/dev/SystemErrorsPage"
 const OpsRlsInventoryPage = lazyImport(() => import("../pages/dev/OpsRlsInventoryPage"));
 const OpsBackupsPage = lazyImport(() => import("../pages/dev/OpsBackupsPage"));
 const OpsTenantBackupsPage = lazyImport(() => import("../pages/dev/OpsTenantBackupsPage"));
+const OpsAccountDeletionPage = lazyImport(() => import("../pages/dev/OpsAccountDeletionPage"));
 const OpsStripeDedupePage = lazyImport(() => import("../pages/dev/OpsStripeDedupePage"));
 const OpsEntitlementsPage = lazyImport(() => import("../pages/dev/OpsEntitlementsPage"));
 const WooCommerceStoresPage = lazyImport(() => import("../pages/dev/WooCommerceStoresPage"));
@@ -598,6 +599,14 @@ export const appRoutes: RouteObject[] = [
               element: (
                 <RequirePermission permission={{ domain: "ops", action: "view" }}>
                   <Suspense fallback={<PageLoader />}><OpsTenantBackupsPage /></Suspense>
+                </RequirePermission>
+              ),
+            },
+            {
+              path: "desenvolvedor/exclusao-conta",
+              element: (
+                <RequirePermission permission={{ domain: "ops", action: "manage" }}>
+                  <Suspense fallback={<PageLoader />}><OpsAccountDeletionPage /></Suspense>
                 </RequirePermission>
               ),
             },
