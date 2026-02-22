@@ -15,6 +15,25 @@ const supabaseAdmin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
 type BillingCycle = "monthly" | "yearly";
 type Kind = "plan" | "addon";
 
+function pickSiteUrl(req: Request): string | null {
+  const origin = (req.headers.get("origin") ?? "").trim();
+  const envUrl = (SITE_URL ?? "").trim();
+  const allowedExact = new Set<string>([
+    "https://ultria.com.br",
+    "https://www.ultria.com.br",
+    "https://ultriadev.com.br",
+    "https://erprevo.com",
+    "https://erprevodev.com",
+    "http://localhost:5173",
+    "http://127.0.0.1:5173",
+    "http://localhost:4173",
+    "http://127.0.0.1:4173",
+  ]);
+  const candidate = allowedExact.has(origin) ? origin : envUrl;
+  if (allowedExact.has(candidate)) return candidate;
+  return candidate || null;
+}
+
 function parseTrialDays(): number {
   const raw = (Deno.env.get("BILLING_TRIAL_DAYS") ?? "").trim();
   const fallback = 60;
@@ -203,10 +222,15 @@ Deno.serve(async (req) => {
       ? Math.max(0, Math.min(3650, Number(addonTrialDays)))
       : parseTrialDays();
 
+    const siteUrl = pickSiteUrl(req);
+    if (!siteUrl) {
+      return cors(req, 500, { error: "config_error", message: "SITE_URL não configurada para redirect de checkout." });
+    }
+
     const session = await stripe.checkout.sessions.create({
       mode: "subscription",
-      success_url: `${SITE_URL}/app/billing/success?session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `${SITE_URL}/app/settings`,
+      success_url: `${siteUrl}/app/billing/success?session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: `${siteUrl}/app/settings`,
       customer: customerId,
       payment_method_collection: trialDays > 0 ? "always" : "if_required",
       line_items: [{ price: stripePriceId, quantity: 1 }],

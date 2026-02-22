@@ -49,8 +49,11 @@ function resolveStripeSecretKey(req: Request): string {
 
   if (!primary && !test && !live) return "";
 
-  const looksLikeProd = origin.includes("erprevo.com");
-  const looksLikeDev = origin.includes("erprevodev.com") || origin.includes("localhost") || origin.includes("127.0.0.1");
+  const looksLikeProd = origin.includes("ultria.com.br") || origin.includes("erprevo.com");
+  const looksLikeDev = origin.includes("ultriadev.com.br")
+    || origin.includes("erprevodev.com")
+    || origin.includes("localhost")
+    || origin.includes("127.0.0.1");
 
   if (looksLikeProd) return live || primary;
   if (looksLikeDev) return test || primary;

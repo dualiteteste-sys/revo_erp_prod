@@ -3,9 +3,8 @@ import { logger } from './logger';
 
 function authSiteUrl(): string {
   const origin = window.location.origin;
-  const envSite = (import.meta as any)?.env?.VITE_SITE_URL;
   if (/localhost|127\.0\.0\.1/i.test(origin)) return origin;
-  return envSite || origin;
+  return origin;
 }
 
 function emailConfirmRedirect(opts?: { plan?: string | null; cycle?: string | null }): string {
