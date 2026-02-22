@@ -51,7 +51,7 @@ Supabase Dashboard → Authentication → Settings → SMTP (ou Email)
 Preencha (exemplo genérico):
 - Host/Port/User/Pass do provedor
 - `Sender name` (ex.: `REVO`)
-- `Admin email / From` (ex.: `no-reply@erprevo.com`)
+- `Admin email / From` (ex.: `no-reply@ultria.com.br`)
 
 ### 3.2 Ajustar DNS do domínio (evita spam)
 No provedor de DNS do seu domínio:
@@ -65,17 +65,16 @@ Sem SPF/DKIM/DMARC corretos, e-mails de confirmação/convite têm alta chance d
 
 1) Signup com Gmail (novo e-mail):
    - deve receber confirmação
-   - ao clicar, deve cair em `https://erprevo.com/auth/confirmed`
+   - ao clicar, deve cair em `https://ultria.com.br/auth/confirmed`
 2) Invite de usuário (Gmail novo):
    - deve receber convite
-   - ao clicar, deve cair em `https://erprevo.com/auth/update-password?...`
+   - ao clicar, deve cair em `https://ultria.com.br/auth/update-password?...`
 3) Reset de senha:
    - deve receber reset
-   - ao clicar, deve cair em `https://erprevo.com/auth/update-password`
+   - ao clicar, deve cair em `https://ultria.com.br/auth/update-password`
 
 ## 5) Plano B (sem depender de e-mail) — apenas para convites
 
 Se o provedor estiver bloqueando e-mails **temporariamente**, o admin consegue copiar um link de convite pela UI (fallback) e enviar via WhatsApp/Slack.
 
 Observação: não existe fallback seguro equivalente para signup sem e-mail (isso quebraria a prova de posse do e-mail).
-

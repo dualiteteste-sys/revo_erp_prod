@@ -9,8 +9,8 @@ Objetivo: ter uma lista que você consegue seguir periodicamente para reduzir bu
 - `main` é a única fonte de deploy em PROD (sem hotfix manual sem virar migration).
 - Regra: qualquer alteração no Supabase (por mínima que seja) vira migration em `supabase/migrations/*` (sem “ajuste manual no dashboard”).
 - Redirect URLs no Supabase (Auth → URL Configuration) incluem, no mínimo:
-  - `https://erprevo.com/auth/update-password`
-  - `https://erprevo.com/auth/force-change-password`
+  - `https://ultria.com.br/auth/update-password`
+  - `https://ultria.com.br/auth/force-change-password`
   - (DEV/local conforme necessário)
 - Edge Functions deployadas e sincronizadas com o front (`supabase/functions/*`).
 
