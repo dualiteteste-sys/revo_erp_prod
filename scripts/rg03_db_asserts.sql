@@ -23,6 +23,22 @@ begin
     end if;
   end if;
 
+  -- 0.1) RPC de preview da exclusão OPS precisa ser VOLATILE
+  -- (usa CREATE TEMP TABLE/INSERT; STABLE quebra em runtime com 0A000)
+  if to_regprocedure('public.ops_account_delete_preview_current_empresa()') is not null then
+    if not exists (
+      select 1
+      from pg_proc p
+      join pg_namespace n on n.oid = p.pronamespace
+      where n.nspname = 'public'
+        and p.proname = 'ops_account_delete_preview_current_empresa'
+        and p.pronargs = 0
+        and p.provolatile = 'v'
+    ) then
+      raise exception 'RG-03: public.ops_account_delete_preview_current_empresa() deve ser VOLATILE (usa TEMP TABLE).';
+    end if;
+  end if;
+
   -- 1) Evita PostgREST HTTP_300 por overload ambíguo
   if exists (
     select 1
