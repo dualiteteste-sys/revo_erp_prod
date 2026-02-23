@@ -1,4 +1,5 @@
 import { callRpc } from '@/lib/api';
+import { supabase } from '@/lib/supabaseClient';
 
 export type OpsAccountDeletionPreviewUser = {
   user_id: string;
@@ -58,10 +59,20 @@ export async function getOpsAccountDeletionPreview() {
 }
 
 export async function executeOpsAccountDeletion(params: { confirmation: string; reason?: string }) {
-  return callRpc<OpsAccountDeletionResult>('ops_account_delete_current_empresa', {
-    p_confirmation: params.confirmation,
-    p_reason: params.reason?.trim() || null,
+  const { data, error } = await supabase.functions.invoke('ops-account-delete', {
+    body: {
+      confirmation: params.confirmation,
+      reason: params.reason?.trim() || null,
+    },
   });
+  if (error) throw error;
+
+  const payload = data as { ok?: boolean; result?: OpsAccountDeletionResult; message?: string } | null;
+  if (!payload?.ok || !payload.result) {
+    throw new Error(payload?.message || 'Falha ao executar exclusão completa da conta.');
+  }
+
+  return payload.result;
 }
 
 export async function listOpsAccountDeletionAudit(limit = 10) {
