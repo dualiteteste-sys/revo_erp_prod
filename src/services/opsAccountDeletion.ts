@@ -30,6 +30,8 @@ export type OpsAccountDeletionResult = {
   empresa_id: string;
   deleted_tables: Record<string, number>;
   deleted_storage_objects: number;
+  storage_cleanup_status?: 'pending_storage_api_cleanup' | string;
+  storage_objects_pending?: number;
   deleted_empresas_rows: number;
   deleted_memberships_candidates: number;
   deleted_profiles_rows: number;

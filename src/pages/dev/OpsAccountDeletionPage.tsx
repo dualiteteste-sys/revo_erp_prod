@@ -53,8 +53,13 @@ export default function OpsAccountDeletionPage() {
     setExecuting(true);
     setError(null);
     try {
-      await executeOpsAccountDeletion({ confirmation: confirmation.trim(), reason });
-      addToast('Conta removida com sucesso. Sessão será encerrada.', 'success');
+      const result = await executeOpsAccountDeletion({ confirmation: confirmation.trim(), reason });
+      const pendingStorage = Number(result?.storage_objects_pending || 0);
+      if (pendingStorage > 0) {
+        addToast(`Conta removida. ${pendingStorage} objeto(s) de storage em limpeza via API.`, 'warning');
+      } else {
+        addToast('Conta removida com sucesso. Sessão será encerrada.', 'success');
+      }
       setConfirmation('');
       await load();
       await supabase.auth.signOut();
@@ -74,7 +79,7 @@ export default function OpsAccountDeletionPage() {
       header={
         <PageHeader
           title="Exclusão Completa de Conta (Hard Delete)"
-          description="Remove definitivamente a empresa ativa, dados do tenant, objetos no storage e usuários auth órfãos."
+          description="Remove definitivamente a empresa ativa, dados do tenant e usuários auth órfãos. Limpeza de storage segue via API."
           icon={<Trash2 size={20} />}
           actions={
             <Button variant="outline" onClick={load} className="gap-2" disabled={loading || executing}>
