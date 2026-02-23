@@ -39,6 +39,14 @@ begin
     end if;
   end if;
 
+  -- 0.2) Hard delete OPS não pode apagar storage.objects diretamente via SQL
+  -- (Storage exige Storage API para evitar perda acidental de objetos)
+  if to_regprocedure('public.ops_account_delete_current_empresa(text,text)') is not null then
+    if position('delete from storage.objects' in lower((select pg_get_functiondef('public.ops_account_delete_current_empresa(text,text)'::regprocedure)))) > 0 then
+      raise exception 'RG-03: public.ops_account_delete_current_empresa() não pode executar DELETE direto em storage.objects; use Storage API.';
+    end if;
+  end if;
+
   -- 1) Evita PostgREST HTTP_300 por overload ambíguo
   if exists (
     select 1
