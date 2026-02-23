@@ -9,6 +9,10 @@ on:
       - main
   workflow_dispatch:
 
+permissions:
+  contents: read
+  pull-requests: read
+
 concurrency:
   group: cicd-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
@@ -23,10 +27,13 @@ jobs:
       landing_only: ${{ steps.landing_only.outputs.landing_only }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - name: Paths filter
         id: filter
         uses: dorny/paths-filter@v3
         with:
+          token: ${{ github.token }}
           filters: |
             db:
               - 'supabase/migrations/**'
@@ -83,7 +90,6 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 35
     needs: [changes]
-    if: needs.changes.outputs.db == 'true'
 
     steps:
       - name: Checkout repository
@@ -194,10 +200,16 @@ jobs:
     runs-on: ubuntu-latest
     # If DB changed, run verify-migrations first so we "fail fast" and don't spend 1h in E2E.
     needs: [changes, verify-migrations]
-    if: needs.changes.outputs.app == 'true' && (needs.changes.outputs.db != 'true' || needs.verify-migrations.result == 'success')
+    if: ${{ always() }}
 
     steps:
       - uses: actions/checkout@v4
+
+      - name: Fail fast if migrations verify failed
+        if: ${{ needs.verify-migrations.result != 'success' }}
+        run: |
+          echo "::error::Verify Migrations (Clean Slate) falhou. Abortando Release Gate para evitar falso-positivo em PR para main."
+          exit 1
 
       - name: Setup Node
         uses: actions/setup-node@v4
