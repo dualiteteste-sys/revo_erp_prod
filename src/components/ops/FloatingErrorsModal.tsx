@@ -19,8 +19,9 @@ type Viewport = { w: number; h: number };
 
 const POS_STORAGE_KEY = "revo_errors_floating_modal_pos";
 const SIZE_STORAGE_KEY = "revo_errors_floating_modal_size";
+const SIZE_STORAGE_VERSION = 2;
 const MODAL_MIN_W = 640;
-const MODAL_MIN_H = 420;
+const MODAL_MIN_H = 240;
 const MODAL_GAP = 8;
 
 function clamp(n: number, min: number, max: number) {
@@ -70,6 +71,7 @@ function readSize(viewport: Viewport): Size | null {
     const raw = localStorage.getItem(SIZE_STORAGE_KEY);
     if (!raw) return null;
     const parsed = JSON.parse(raw);
+    if (parsed?.v !== SIZE_STORAGE_VERSION) return null;
     const w = typeof parsed?.w === "number" ? parsed.w : null;
     const h = typeof parsed?.h === "number" ? parsed.h : null;
     if (w == null || h == null) return null;
@@ -81,7 +83,7 @@ function readSize(viewport: Viewport): Size | null {
 
 function writeSize(size: Size) {
   try {
-    localStorage.setItem(SIZE_STORAGE_KEY, JSON.stringify(size));
+    localStorage.setItem(SIZE_STORAGE_KEY, JSON.stringify({ v: SIZE_STORAGE_VERSION, ...size }));
   } catch {
     // noop
   }
@@ -152,8 +154,8 @@ export function FloatingErrorsModal({ open, onClose }: Props) {
   const [size, setSize] = useState<Size>(() => {
     if (typeof window === "undefined") return { w: 960, h: 620 };
     const viewport = { w: window.innerWidth, h: window.innerHeight };
-    // Default: ~30% do viewport (mas respeita mínimos para manter usabilidade).
-    const defaultSize = normalizeSize({ w: Math.round(viewport.w * 0.3), h: Math.round(viewport.h * 0.6) }, viewport);
+    // Default: 45% largura / 30% altura do viewport (respeitando mínimos para manter usabilidade).
+    const defaultSize = normalizeSize({ w: Math.round(viewport.w * 0.45), h: Math.round(viewport.h * 0.3) }, viewport);
     return readSize(viewport) ?? defaultSize;
   });
 
