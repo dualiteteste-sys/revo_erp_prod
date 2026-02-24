@@ -43,33 +43,14 @@ type WooConfigDraft = {
   base_tabela_preco_id: string;
 };
 
-function clampNumber(value: unknown, fallback: number, min: number, max: number) {
-  const n = Number(value);
-  if (!Number.isFinite(n)) return fallback;
-  return Math.min(max, Math.max(min, n));
-}
-
-function normalizeStockSource(value: unknown): 'product' | 'deposit' | null {
-  const v = String(value ?? '').trim().toLowerCase();
-  if (v === 'deposit' || v === 'deposito') return 'deposit';
-  if (v === 'product' || v === 'produto') return 'product';
-  return null;
-}
-
-function normalizePriceSource(value: unknown): 'product' | 'price_table' | null {
-  const v = String(value ?? '').trim().toLowerCase();
-  if (v === 'price_table' || v === 'tabela_preco' || v === 'tabela' || v === 'table') return 'price_table';
-  if (v === 'product' || v === 'produto') return 'product';
-  return null;
-}
-
 function toWooConfigDraft(connection: EcommerceConnection | null): WooConfigDraft {
   const config = normalizeEcommerceConfig(connection?.config ?? {});
-  const raw = (connection?.config ?? {}) as Record<string, unknown>;
   const deposito_id = String(config.deposito_id ?? '').trim();
   const base_tabela_preco_id = String(config.base_tabela_preco_id ?? '').trim();
-  const stock_source = normalizeStockSource(raw.stock_source) ?? (deposito_id ? 'deposit' : 'product');
-  const price_source = normalizePriceSource(raw.price_source) ?? (base_tabela_preco_id ? 'price_table' : 'product');
+  const stock_source = String((config as any).stock_source ?? '').toLowerCase() === 'deposit' ? 'deposit' : deposito_id ? 'deposit' : 'product';
+  const price_source =
+    String((config as any).price_source ?? '').toLowerCase() === 'price_table' ? 'price_table' : base_tabela_preco_id ? 'price_table' : 'product';
+  const stock_safety_qty = Math.max(0, Math.min(1_000_000, Number((config as any).stock_safety_qty) || 0));
   return {
     import_orders: config.import_orders !== false,
     sync_stock: config.sync_stock === true,
@@ -79,7 +60,7 @@ function toWooConfigDraft(connection: EcommerceConnection | null): WooConfigDraf
     price_percent_default: Number(config.price_percent_default ?? 0),
     stock_source,
     deposito_id,
-    stock_safety_qty: clampNumber(raw.stock_safety_qty, 0, 0, 1_000_000),
+    stock_safety_qty,
     price_source,
     base_tabela_preco_id,
   };
@@ -201,26 +182,22 @@ export default function WooConnectionPanel() {
     if (!activeEmpresaId) return;
     setSaving(true);
     try {
-        const created = await upsertEcommerceConnection({
-          provider: 'woo',
-          nome: 'WooCommerce',
-          status: 'pending',
-          config: {
-            import_orders: true,
-            sync_stock: false,
-            sync_prices: false,
-            push_tracking: false,
-            safe_mode: true,
-            sync_direction: 'bidirectional',
-            conflict_policy: 'erp_wins',
-            auto_sync_enabled: false,
-            sync_interval_minutes: 15,
-            stock_source: 'product',
-            stock_safety_qty: 0,
-            price_source: 'product',
-            price_percent_default: 0,
-          },
-        });
+      const created = await upsertEcommerceConnection({
+        provider: 'woo',
+        nome: 'WooCommerce',
+        status: 'pending',
+        config: {
+          import_orders: true,
+          sync_stock: false,
+          sync_prices: false,
+          push_tracking: false,
+          safe_mode: true,
+          sync_direction: 'bidirectional',
+          conflict_policy: 'erp_wins',
+          auto_sync_enabled: false,
+          sync_interval_minutes: 15,
+        },
+      });
       setConnection(created);
       setConfigDraft(toWooConfigDraft(created));
       setStatusValue('pending');
@@ -521,7 +498,7 @@ export default function WooConnectionPanel() {
                     onChange={(e) =>
                       setConfigDraft((prev) => ({
                         ...prev,
-                        stock_safety_qty: clampNumber((e.target as HTMLInputElement).value, 0, 0, 1_000_000),
+                        stock_safety_qty: Math.max(0, Math.min(1_000_000, Number((e.target as HTMLInputElement).value) || 0)),
                       }))
                     }
                     helperText="Subtrai este valor do saldo antes de enviar para o Woo (nunca envia negativo)."
