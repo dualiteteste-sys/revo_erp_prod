@@ -56,7 +56,6 @@ const SupabaseDemoPage = lazyImport(() => import("../pages/tools/SupabaseDemoPag
 const SettingsPage = lazyImport(() => import("../pages/settings/SettingsPage"));
 const TermsOfUsePage = lazyImport(() => import("../pages/legal/TermsOfUsePage"));
 const BillingSuccessPage = lazyImport(() => import("../pages/billing/SuccessPage"));
-const BillingCancelPage = lazyImport(() => import("../pages/billing/CancelPage"));
 
 // Fiscal Pages
 const NfeEmissoesPage = lazyImport(() => import("../pages/fiscal/NfeEmissoesPage"));
@@ -146,7 +145,7 @@ export const appRoutes: RouteObject[] = [
 
             // Billing / Stripe redirects
             { path: "billing/success", element: <Suspense fallback={<PageLoader />}><BillingSuccessPage /></Suspense> },
-            { path: "billing/cancel", element: <Suspense fallback={<PageLoader />}><BillingCancelPage /></Suspense> },
+            { path: "billing/cancel", element: <Navigate to="/app/configuracoes/geral/assinatura" replace /> },
 
             // Cadastros
             {
