@@ -79,6 +79,12 @@ function parseSkus(raw: string): string[] {
     .filter(Boolean);
 }
 
+function toCsvValue(value: unknown): string {
+  const text = value == null ? '' : String(value);
+  const escaped = text.replace(/"/g, '""');
+  return `"${escaped}"`;
+}
+
 export default function WooCommerceStoreDetailPage() {
   const { storeId = '' } = useParams<{ storeId: string }>();
   const { activeEmpresaId } = useAuth();
@@ -236,6 +242,33 @@ export default function WooCommerceStoreDetailPage() {
     downloadJson(`woo-logs-${storeId.slice(0, 8)}.json`, sanitized);
     addToast('Logs exportados (JSON).', 'success');
   }, [logsRows, status?.logs, storeId, downloadJson, addToast]);
+
+  const handleExportLogsCsv = useCallback(() => {
+    const rows = logsRows ?? status?.logs ?? [];
+    const sanitized = rows.map((row) => ({
+      ...row,
+      meta: row.meta ? sanitizeValue(row.meta) : null,
+    }));
+    const header = ['created_at', 'level', 'message', 'job_id', 'meta_json'];
+    const lines = [
+      header.map(toCsvValue).join(','),
+      ...sanitized.map((row) => ([
+        row.created_at,
+        row.level,
+        row.message,
+        row.job_id ?? '',
+        row.meta ? JSON.stringify(row.meta) : '',
+      ]).map(toCsvValue).join(',')),
+    ];
+    const blob = new Blob([lines.join('\n')], { type: 'text/csv;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `woo-logs-${storeId.slice(0, 8)}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+    addToast('Logs exportados (CSV).', 'success');
+  }, [logsRows, status?.logs, storeId, addToast]);
 
   const handleCopyLog = useCallback(async (row: WooLogRow) => {
     const sanitized = { ...row, meta: row.meta ? sanitizeValue(row.meta) : null };
@@ -619,6 +652,9 @@ export default function WooCommerceStoreDetailPage() {
               </Button>
               <Button type="button" variant="outline" size="sm" onClick={handleExportLogs}>
                 Exportar JSON
+              </Button>
+              <Button type="button" variant="outline" size="sm" onClick={handleExportLogsCsv}>
+                Exportar CSV
               </Button>
             </div>
           </div>
