@@ -1,23 +1,13 @@
 import React, { useEffect, useState } from 'react';
-import { CheckCircle, Loader2, AlertTriangle } from 'lucide-react';
 import { Link, useSearchParams } from 'react-router-dom';
-import { useToast } from '../../contexts/ToastProvider';
 import { useSupabase } from '@/providers/SupabaseProvider';
 import { useAuth } from '../../contexts/AuthProvider';
-
-type SuccessData = {
-  company: any;
-  subscription: any;
-  plan: any;
-};
 
 const SuccessPage: React.FC = () => {
   const [searchParams] = useSearchParams();
   const supabase = useSupabase();
   const { session } = useAuth();
-  const { addToast } = useToast();
   const [status, setStatus] = useState<'loading' | 'polling' | 'success' | 'error'>('loading');
-  const [data, setData] = useState<SuccessData | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [pollCount, setPollCount] = useState(0);
 
@@ -28,6 +18,15 @@ const SuccessPage: React.FC = () => {
       setStatus('error');
       setError('ID da sessão inválido ou sessão de usuário não encontrada.');
       return;
+    }
+
+    // Anti-loop (estado da arte): se chegamos em /app/billing/success, o checkout do Stripe já foi concluído.
+    // Então limpamos imediatamente o intent do pricing para evitar reabertura do modal de CNPJ ao navegar (back/refresh).
+    try {
+      localStorage.removeItem('pending_plan_slug');
+      localStorage.removeItem('pending_plan_cycle');
+    } catch {
+      // ignore
     }
 
     const fetchSessionData = async () => {
@@ -48,9 +47,7 @@ const SuccessPage: React.FC = () => {
           setStatus('polling');
           setTimeout(() => setPollCount(prev => prev + 1), 3000);
         } else {
-          setData(responseData);
           setStatus('success');
-          addToast('Assinatura confirmada com sucesso!', 'success');
 
           // Estado da arte: garantir que a assinatura/entitlements já estejam sincronizados
           // sem exigir clique manual em "Sincronizar com Stripe".
@@ -66,19 +63,10 @@ const SuccessPage: React.FC = () => {
           } catch {
             // best-effort: não bloquear sucesso do usuário
           }
-
-          // Limpar intent do pricing/landing (evita autosync/fluxos inconsistentes).
-          try {
-            localStorage.removeItem('pending_plan_slug');
-            localStorage.removeItem('pending_plan_cycle');
-          } catch {
-            // ignore
-          }
         }
       } catch (e: any) {
         setStatus('error');
         setError(e.message || 'Ocorreu um erro ao verificar sua assinatura.');
-        addToast(e.message || 'Ocorreu um erro ao verificar sua assinatura.', 'error');
       }
     };
 
@@ -86,73 +74,41 @@ const SuccessPage: React.FC = () => {
       fetchSessionData();
     }
 
-  }, [sessionId, session, pollCount, addToast, status, supabase]);
-
-  const renderContent = () => {
-    switch (status) {
-      case 'loading':
-      case 'polling':
-        return (
-          <>
-            <div className="flex justify-center mb-6">
-              <div className="w-20 h-20 bg-blue-100 rounded-full flex items-center justify-center">
-                <Loader2 className="w-12 h-12 text-blue-600 animate-spin" />
-              </div>
-            </div>
-            <h1 className="text-2xl font-bold text-gray-800 mb-4">Finalizando sua assinatura...</h1>
-            <p className="text-gray-600 mb-6">
-              Estamos confirmando os detalhes do seu pagamento. Isso pode levar alguns segundos.
-            </p>
-          </>
-        );
-      case 'success':
-        return (
-          <>
-            <div className="flex justify-center mb-6">
-              <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center">
-                <CheckCircle className="w-12 h-12 text-green-600" />
-              </div>
-            </div>
-            <h1 className="text-2xl font-bold text-gray-800 mb-4">Pagamento Concluído!</h1>
-            <div className="text-left bg-gray-50 p-4 rounded-lg border mb-6">
-              <p><strong>Plano:</strong> {data?.plan?.name} ({data?.plan?.billing_cycle === 'monthly' ? 'Mensal' : 'Anual'})</p>
-              <p><strong>Status:</strong> <span className="font-semibold capitalize">{data?.subscription?.status}</span></p>
-              <p><strong>{data?.subscription?.status === 'trialing' ? 'Término do Teste:' : 'Próxima Cobrança:'}</strong> {new Date(data?.subscription?.current_period_end).toLocaleDateString('pt-BR')}</p>
-            </div>
-            <p className="text-gray-600 mb-6">
-              Sua assinatura foi ativada com sucesso.
-            </p>
-            <Link to="/app/dashboard" className="inline-block bg-blue-600 text-white font-bold py-2 px-6 rounded-lg hover:bg-blue-700 transition-colors">
-              Ir para o Dashboard
-            </Link>
-          </>
-        );
-      case 'error':
-        return (
-          <>
-            <div className="flex justify-center mb-6">
-              <div className="w-20 h-20 bg-red-100 rounded-full flex items-center justify-center">
-                <AlertTriangle className="w-12 h-12 text-red-600" />
-              </div>
-            </div>
-            <h1 className="text-2xl font-bold text-gray-800 mb-4">Ocorreu um Erro</h1>
-            <p className="text-gray-600 mb-6">
-              {error || 'Não foi possível processar sua solicitação.'}
-            </p>
-            <Link to="/app/settings" className="inline-block bg-blue-600 text-white font-bold py-2 px-6 rounded-lg hover:bg-blue-700 transition-colors">
-              Voltar para Configurações
-            </Link>
-          </>
-        );
-    }
-  };
+  }, [sessionId, session, pollCount, status, supabase]);
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-4 bg-gradient-to-br from-blue-50 via-gray-50 to-blue-100">
-      <div className="w-full max-w-md text-center">
-        <div className="bg-glass-200 backdrop-blur-xl border border-white/30 rounded-3xl shadow-glass-lg p-8">
-          {renderContent()}
-        </div>
+    <div className="min-h-screen flex items-center justify-center p-6">
+      <div className="w-full max-w-md rounded-xl border bg-white p-6 text-center">
+        {status === 'error' ? (
+          <>
+            <h1 className="text-lg font-semibold text-gray-900">Não foi possível confirmar sua assinatura</h1>
+            <p className="mt-2 text-sm text-gray-600">{error || 'Tente novamente em alguns instantes.'}</p>
+            <Link
+              to="/app/configuracoes/geral/assinatura"
+              className="mt-4 inline-block rounded-lg bg-blue-600 px-5 py-2 text-sm font-semibold text-white hover:bg-blue-700"
+            >
+              Ir para Minha Assinatura
+            </Link>
+          </>
+        ) : (
+          <>
+            <div className="mx-auto mb-4 h-10 w-10 rounded-full border-4 border-blue-500 border-dashed animate-spin" />
+            <h1 className="text-lg font-semibold text-gray-900">
+              {status === 'success' ? 'Assinatura confirmada' : 'Confirmando assinatura…'}
+            </h1>
+            <p className="mt-2 text-sm text-gray-600">
+              {status === 'success' ? 'Tudo certo. Você já pode acessar o sistema.' : 'Isso costuma levar alguns segundos.'}
+            </p>
+            {status === 'success' ? (
+              <Link
+                to="/app/dashboard"
+                className="mt-4 inline-block rounded-lg bg-blue-600 px-5 py-2 text-sm font-semibold text-white hover:bg-blue-700"
+              >
+                Entrar no sistema
+              </Link>
+            ) : null}
+          </>
+        )}
       </div>
     </div>
   );
