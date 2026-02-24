@@ -14,45 +14,50 @@ import { ConfirmProvider } from "./contexts/ConfirmProvider";
 import { setupGlobalErrorHandlers } from "./lib/global-error-handlers";
 import { initRouteSnapshot } from "./lib/telemetry/routeSnapshot";
 import { OpsOverlayProvider } from "./contexts/OpsOverlayProvider";
+import { maybeRedirectToCanonicalSiteUrl } from "./lib/siteUrl";
 
-Sentry.init({
-  dsn: import.meta.env.VITE_SENTRY_DSN,
-  integrations: [
-    Sentry.browserTracingIntegration(),
-    Sentry.replayIntegration({
-      maskAllText: true,
-      blockAllMedia: true,
-    }),
-  ],
-  // Tracing
-  tracesSampleRate: 1.0, // Capture 100% of the transactions, reduce in production!
-  // Session Replay
-  replaysSessionSampleRate: 0.1, // This sets the sample rate at 10%. You may want to change it to 100% while in development and then sample at a lower rate in production.
-  replaysOnErrorSampleRate: 1.0, // If you're not already sampling the entire session, change the sample rate to 100% when sampling sessions where errors occur.
-});
+const redirectedToCanonical = maybeRedirectToCanonicalSiteUrl();
 
-initRouteSnapshot(router);
-setupGlobalErrorHandlers();
+if (!redirectedToCanonical) {
+  Sentry.init({
+    dsn: import.meta.env.VITE_SENTRY_DSN,
+    integrations: [
+      Sentry.browserTracingIntegration(),
+      Sentry.replayIntegration({
+        maskAllText: true,
+        blockAllMedia: true,
+      }),
+    ],
+    // Tracing
+    tracesSampleRate: 1.0, // Capture 100% of the transactions, reduce in production!
+    // Session Replay
+    replaysSessionSampleRate: 0.1, // This sets the sample rate at 10%. You may want to change it to 100% while in development and then sample at a lower rate in production.
+    replaysOnErrorSampleRate: 1.0, // If you're not already sampling the entire session, change the sample rate to 100% when sampling sessions where errors occur.
+  });
 
-const queryClient = new QueryClient();
-const root = document.getElementById("root")!;
+  initRouteSnapshot(router);
+  setupGlobalErrorHandlers();
 
-ReactDOM.createRoot(root).render(
-  <React.StrictMode>
-    <GlobalErrorBoundary>
-      <QueryClientProvider client={queryClient}>
-        <SupabaseProvider>
-          <ToastProvider>
-            <ConfirmProvider>
-              <AuthProvider>
-                <OpsOverlayProvider>
-                  <RouterProvider router={router} />
-                </OpsOverlayProvider>
-              </AuthProvider>
-            </ConfirmProvider>
-          </ToastProvider>
-        </SupabaseProvider>
-      </QueryClientProvider>
-    </GlobalErrorBoundary>
-  </React.StrictMode>
-);
+  const queryClient = new QueryClient();
+  const root = document.getElementById("root")!;
+
+  ReactDOM.createRoot(root).render(
+    <React.StrictMode>
+      <GlobalErrorBoundary>
+        <QueryClientProvider client={queryClient}>
+          <SupabaseProvider>
+            <ToastProvider>
+              <ConfirmProvider>
+                <AuthProvider>
+                  <OpsOverlayProvider>
+                    <RouterProvider router={router} />
+                  </OpsOverlayProvider>
+                </AuthProvider>
+              </ConfirmProvider>
+            </ToastProvider>
+          </SupabaseProvider>
+        </QueryClientProvider>
+      </GlobalErrorBoundary>
+    </React.StrictMode>
+  );
+}
