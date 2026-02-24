@@ -1,5 +1,5 @@
 import React, { Suspense } from "react";
-import { RouteObject, Navigate, useNavigate } from "react-router-dom";
+import { RouteObject, Navigate } from "react-router-dom";
 import MainLayout from '../components/layout/MainLayout';
 import ProtectedRoute from '../components/layout/ProtectedRoute';
 import OnboardingGuard from "../components/auth/OnboardingGuard";
@@ -55,24 +55,6 @@ const WooCommerceStoreDetailPage = lazyImport(() => import("../pages/dev/WooComm
 const SupabaseDemoPage = lazyImport(() => import("../pages/tools/SupabaseDemoPage"));
 const SettingsPage = lazyImport(() => import("../pages/settings/SettingsPage"));
 const TermsOfUsePage = lazyImport(() => import("../pages/legal/TermsOfUsePage"));
-
-const BillingSuccessLanding = () => {
-  const navigate = useNavigate();
-
-  React.useEffect(() => {
-    try {
-      localStorage.removeItem("pending_plan_slug");
-      localStorage.removeItem("pending_plan_cycle");
-    } catch {
-      // ignore
-    }
-
-    window.dispatchEvent(new Event("empresa-features-refresh"));
-    navigate("/app/dashboard", { replace: true });
-  }, [navigate]);
-
-  return <PageLoader />;
-};
 
 // Fiscal Pages
 const NfeEmissoesPage = lazyImport(() => import("../pages/fiscal/NfeEmissoesPage"));
@@ -137,6 +119,17 @@ const CobrancasServicosPage = lazyImport(() => import("../pages/servicos/Cobranc
 // Suporte
 const SuportePage = lazyImport(() => import("../pages/support/SuportePage"));
 const SupportConsolePage = lazyImport(() => import("../pages/support/SupportConsolePage"));
+
+const BillingSuccessLanding = () => {
+  try {
+    localStorage.removeItem("pending_plan_slug");
+    localStorage.removeItem("pending_plan_cycle");
+  } catch {
+    // ignore
+  }
+
+  return <Navigate to="/app/dashboard" replace />;
+};
 
 export const appRoutes: RouteObject[] = [
     {
