@@ -55,6 +55,8 @@ const WooCommerceStoreDetailPage = lazyImport(() => import("../pages/dev/WooComm
 const SupabaseDemoPage = lazyImport(() => import("../pages/tools/SupabaseDemoPage"));
 const SettingsPage = lazyImport(() => import("../pages/settings/SettingsPage"));
 const TermsOfUsePage = lazyImport(() => import("../pages/legal/TermsOfUsePage"));
+const BillingSuccessPage = lazyImport(() => import("../pages/billing/SuccessPage"));
+const BillingCancelPage = lazyImport(() => import("../pages/billing/CancelPage"));
 
 // Fiscal Pages
 const NfeEmissoesPage = lazyImport(() => import("../pages/fiscal/NfeEmissoesPage"));
@@ -141,6 +143,10 @@ export const appRoutes: RouteObject[] = [
             { path: "configuracoes", element: <Navigate to="/app/configuracoes/geral/empresa" replace /> },
             { path: "configuracoes/:section/:page", element: <Suspense fallback={<PageLoader />}><SettingsPage /></Suspense> },
             { path: "termos-de-uso", element: <Suspense fallback={<PageLoader />}><TermsOfUsePage /></Suspense> },
+
+            // Billing / Stripe redirects
+            { path: "billing/success", element: <Suspense fallback={<PageLoader />}><BillingSuccessPage /></Suspense> },
+            { path: "billing/cancel", element: <Suspense fallback={<PageLoader />}><BillingCancelPage /></Suspense> },
 
             // Cadastros
             {

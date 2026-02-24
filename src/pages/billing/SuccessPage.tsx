@@ -30,6 +30,15 @@ const SuccessPage: React.FC = () => {
       return;
     }
 
+    // Anti-loop (estado da arte): se chegamos em /app/billing/success, o checkout do Stripe já foi concluído.
+    // Então limpamos imediatamente o intent do pricing para evitar reabertura do modal de CNPJ ao navegar (back/refresh).
+    try {
+      localStorage.removeItem('pending_plan_slug');
+      localStorage.removeItem('pending_plan_cycle');
+    } catch {
+      // ignore
+    }
+
     const fetchSessionData = async () => {
       if (pollCount > 10) { // Limit polling to ~30 seconds
         setStatus('error');
@@ -65,14 +74,6 @@ const SuccessPage: React.FC = () => {
             }
           } catch {
             // best-effort: não bloquear sucesso do usuário
-          }
-
-          // Limpar intent do pricing/landing (evita autosync/fluxos inconsistentes).
-          try {
-            localStorage.removeItem('pending_plan_slug');
-            localStorage.removeItem('pending_plan_cycle');
-          } catch {
-            // ignore
           }
         }
       } catch (e: any) {
@@ -139,7 +140,7 @@ const SuccessPage: React.FC = () => {
             <p className="text-gray-600 mb-6">
               {error || 'Não foi possível processar sua solicitação.'}
             </p>
-            <Link to="/app/settings" className="inline-block bg-blue-600 text-white font-bold py-2 px-6 rounded-lg hover:bg-blue-700 transition-colors">
+            <Link to="/app/configuracoes/geral/assinatura" className="inline-block bg-blue-600 text-white font-bold py-2 px-6 rounded-lg hover:bg-blue-700 transition-colors">
               Voltar para Configurações
             </Link>
           </>

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Loader2 } from "lucide-react";
@@ -9,6 +9,7 @@ import { supabase } from "@/lib/supabaseClient";
 import { logger } from "@/lib/logger";
 import { fetchCnpjData } from "@/services/externalApis";
 import { cnpjMask } from "@/lib/masks";
+import { useLocation } from "react-router-dom";
 
 type PendingPlanSlug = "ESSENCIAL" | "PRO" | "MAX" | "INDUSTRIA" | "SCALE";
 type PendingBillingCycle = "monthly" | "yearly";
@@ -85,7 +86,9 @@ export function PlanIntentCheckoutModal() {
   const { subscription, loadingSubscription, refetchSubscription } = useSubscription();
   const { addToast } = useToast();
 
-  const intent = useMemo(() => readPendingPlanIntent(), []);
+  const location = useLocation();
+  const isBillingReturnRoute = location.pathname.startsWith("/app/billing/");
+  const [intent, setIntent] = useState(() => readPendingPlanIntent());
   const [open, setOpen] = useState(false);
   const [starting, setStarting] = useState(false);
   const [inlineError, setInlineError] = useState<string | null>(null);
@@ -96,6 +99,10 @@ export function PlanIntentCheckoutModal() {
   const requestTokenRef = useRef(0);
   const lastEmpresaIdRef = useRef<string | null>(activeEmpresaId ?? null);
   const empresaChanged = lastEmpresaIdRef.current !== (activeEmpresaId ?? null);
+
+  useEffect(() => {
+    setIntent(readPendingPlanIntent());
+  }, [location.pathname]);
 
   useEffect(() => {
     const prevEmpresaId = lastEmpresaIdRef.current;
@@ -115,11 +122,12 @@ export function PlanIntentCheckoutModal() {
 
   useEffect(() => {
     if (!intent) return;
+    if (isBillingReturnRoute) return;
     if (authLoading || !session || !activeEmpresaId || empresaChanged) return;
     if (loadingSubscription) return;
     if (subscription) return; // já tem assinatura
     setOpen(true);
-  }, [authLoading, empresaChanged, intent, session, activeEmpresaId, loadingSubscription, subscription]);
+  }, [authLoading, empresaChanged, intent, session, activeEmpresaId, loadingSubscription, subscription, isBillingReturnRoute]);
 
   // Se o usuário concluiu o checkout por outro caminho (ex.: retorno direto sem passar pelo SuccessPage),
   // limpamos o intent para não reabrir o modal em visitas futuras.
@@ -129,6 +137,7 @@ export function PlanIntentCheckoutModal() {
     if (loadingSubscription) return;
     if (!subscription) return;
     clearPendingPlanIntent();
+    setIntent(null);
   }, [activeEmpresaId, authLoading, empresaChanged, intent, loadingSubscription, session, subscription]);
 
   useEffect(() => {
@@ -136,6 +145,12 @@ export function PlanIntentCheckoutModal() {
     if (!subscription) return;
     setOpen(false);
   }, [open, subscription]);
+
+  useEffect(() => {
+    if (!open) return;
+    if (!isBillingReturnRoute) return;
+    setOpen(false);
+  }, [isBillingReturnRoute, open]);
 
   useEffect(() => {
     if (!open) return;
@@ -241,6 +256,7 @@ export function PlanIntentCheckoutModal() {
 
   const dismiss = () => {
     clearPendingPlanIntent();
+    setIntent(null);
     setOpen(false);
     // Garante que a UI reflita o estado atual (ex.: se algo mudou por outro device/tab)
     refetchSubscription();
