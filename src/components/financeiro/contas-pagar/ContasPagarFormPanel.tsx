@@ -16,7 +16,7 @@ import Input from '@/components/ui/forms/Input';
 import Select from '@/components/ui/forms/Select';
 import TextArea from '@/components/ui/forms/TextArea';
 import { useNumericField } from '@/hooks/useNumericField';
-import ClientAutocomplete from '@/components/common/ClientAutocomplete';
+import SupplierAutocomplete from '@/components/common/SupplierAutocomplete';
 import CentroDeCustoDropdown from '@/components/common/CentroDeCustoDropdown';
 import MeioPagamentoDropdown from '@/components/common/MeioPagamentoDropdown';
 import { Switch } from '@/components/ui/switch';
@@ -347,7 +347,7 @@ const ContasPagarFormPanel: React.FC<ContasPagarFormPanelProps> = ({ conta, onSa
           
           <div className="sm:col-span-3">
             <label className="block text-sm font-medium text-gray-700 mb-1">Fornecedor</label>
-            <ClientAutocomplete
+            <SupplierAutocomplete
               value={formData.fornecedor_id || null}
               initialName={fornecedorName}
               onChange={(id, name) => {
