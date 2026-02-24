@@ -5,6 +5,7 @@ import { Link } from 'react-router-dom';
 import GlassCard from '@/components/ui/GlassCard';
 import { Button } from '@/components/ui/button';
 import Input from '@/components/ui/forms/Input';
+import Select from '@/components/ui/forms/Select';
 import { Switch } from '@/components/ui/switch';
 import { useAuth } from '@/contexts/AuthProvider';
 import { useToast } from '@/contexts/ToastProvider';
@@ -22,6 +23,8 @@ import {
   upsertEcommerceConnection,
   type EcommerceConnection,
 } from '@/services/ecommerceIntegrations';
+import { listTabelasPreco, type TabelaPrecoRow } from '@/services/pricing';
+import { listDepositos, type EstoqueDeposito } from '@/services/suprimentos';
 
 const WOO_MASK = '••••••••••••••••';
 const DEFAULT_WOO_CONFIG = normalizeEcommerceConfig({});
@@ -33,10 +36,40 @@ type WooConfigDraft = {
   auto_sync_enabled: boolean;
   sync_interval_minutes: number;
   price_percent_default: number;
+  stock_source: 'product' | 'deposit';
+  deposito_id: string;
+  stock_safety_qty: number;
+  price_source: 'product' | 'price_table';
+  base_tabela_preco_id: string;
 };
+
+function clampNumber(value: unknown, fallback: number, min: number, max: number) {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return fallback;
+  return Math.min(max, Math.max(min, n));
+}
+
+function normalizeStockSource(value: unknown): 'product' | 'deposit' | null {
+  const v = String(value ?? '').trim().toLowerCase();
+  if (v === 'deposit' || v === 'deposito') return 'deposit';
+  if (v === 'product' || v === 'produto') return 'product';
+  return null;
+}
+
+function normalizePriceSource(value: unknown): 'product' | 'price_table' | null {
+  const v = String(value ?? '').trim().toLowerCase();
+  if (v === 'price_table' || v === 'tabela_preco' || v === 'tabela' || v === 'table') return 'price_table';
+  if (v === 'product' || v === 'produto') return 'product';
+  return null;
+}
 
 function toWooConfigDraft(connection: EcommerceConnection | null): WooConfigDraft {
   const config = normalizeEcommerceConfig(connection?.config ?? {});
+  const raw = (connection?.config ?? {}) as Record<string, unknown>;
+  const deposito_id = String(config.deposito_id ?? '').trim();
+  const base_tabela_preco_id = String(config.base_tabela_preco_id ?? '').trim();
+  const stock_source = normalizeStockSource(raw.stock_source) ?? (deposito_id ? 'deposit' : 'product');
+  const price_source = normalizePriceSource(raw.price_source) ?? (base_tabela_preco_id ? 'price_table' : 'product');
   return {
     import_orders: config.import_orders !== false,
     sync_stock: config.sync_stock === true,
@@ -44,6 +77,11 @@ function toWooConfigDraft(connection: EcommerceConnection | null): WooConfigDraf
     auto_sync_enabled: config.auto_sync_enabled === true,
     sync_interval_minutes: Number(config.sync_interval_minutes ?? 15),
     price_percent_default: Number(config.price_percent_default ?? 0),
+    stock_source,
+    deposito_id,
+    stock_safety_qty: clampNumber(raw.stock_safety_qty, 0, 0, 1_000_000),
+    price_source,
+    base_tabela_preco_id,
   };
 }
 
@@ -75,6 +113,9 @@ export default function WooConnectionPanel() {
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [statusValue, setStatusValue] = useState<string>('disconnected');
   const [lastVerifiedAt, setLastVerifiedAt] = useState<string | null>(null);
+  const [depositos, setDepositos] = useState<EstoqueDeposito[]>([]);
+  const [tabelasPreco, setTabelasPreco] = useState<TabelaPrecoRow[]>([]);
+  const [loadingSupportLists, setLoadingSupportLists] = useState(false);
 
   const load = useCallback(async () => {
     if (!activeEmpresaId) {
@@ -123,6 +164,35 @@ export default function WooConnectionPanel() {
     void load();
   }, [load]);
 
+  useEffect(() => {
+    if (!activeEmpresaId || !connection?.id) {
+      setDepositos([]);
+      setTabelasPreco([]);
+      return;
+    }
+    let alive = true;
+    setLoadingSupportLists(true);
+    Promise.allSettled([listDepositos({ onlyActive: true }), listTabelasPreco({})])
+      .then((results) => {
+        if (!alive) return;
+        const [deps, tables] = results;
+        setDepositos(deps.status === 'fulfilled' ? deps.value : []);
+        setTabelasPreco(tables.status === 'fulfilled' ? tables.value : []);
+      })
+      .catch(() => {
+        if (!alive) return;
+        setDepositos([]);
+        setTabelasPreco([]);
+      })
+      .finally(() => {
+        if (!alive) return;
+        setLoadingSupportLists(false);
+      });
+    return () => {
+      alive = false;
+    };
+  }, [activeEmpresaId, connection?.id]);
+
   const canSaveSecrets = useMemo(() => {
     return consumerKey.trim().length > 0 && consumerSecret.trim().length > 0;
   }, [consumerKey, consumerSecret]);
@@ -131,22 +201,26 @@ export default function WooConnectionPanel() {
     if (!activeEmpresaId) return;
     setSaving(true);
     try {
-      const created = await upsertEcommerceConnection({
-        provider: 'woo',
-        nome: 'WooCommerce',
-        status: 'pending',
-        config: {
-          import_orders: true,
-          sync_stock: false,
-          sync_prices: false,
-          push_tracking: false,
-          safe_mode: true,
-          sync_direction: 'bidirectional',
-          conflict_policy: 'erp_wins',
-          auto_sync_enabled: false,
-          sync_interval_minutes: 15,
-        },
-      });
+        const created = await upsertEcommerceConnection({
+          provider: 'woo',
+          nome: 'WooCommerce',
+          status: 'pending',
+          config: {
+            import_orders: true,
+            sync_stock: false,
+            sync_prices: false,
+            push_tracking: false,
+            safe_mode: true,
+            sync_direction: 'bidirectional',
+            conflict_policy: 'erp_wins',
+            auto_sync_enabled: false,
+            sync_interval_minutes: 15,
+            stock_source: 'product',
+            stock_safety_qty: 0,
+            price_source: 'product',
+            price_percent_default: 0,
+          },
+        });
       setConnection(created);
       setConfigDraft(toWooConfigDraft(created));
       setStatusValue('pending');
@@ -211,6 +285,11 @@ export default function WooConnectionPanel() {
         auto_sync_enabled: configDraft.auto_sync_enabled,
         sync_interval_minutes: configDraft.sync_interval_minutes,
         price_percent_default: configDraft.price_percent_default,
+        stock_source: configDraft.stock_source,
+        stock_safety_qty: configDraft.stock_safety_qty,
+        deposito_id: configDraft.deposito_id || undefined,
+        price_source: configDraft.price_source,
+        base_tabela_preco_id: configDraft.base_tabela_preco_id || undefined,
       });
       await updateEcommerceConnectionConfig(connection.id, mergedConfig);
       setConnection((prev) => (prev ? { ...prev, config: mergedConfig } : prev));
@@ -357,9 +436,9 @@ export default function WooConnectionPanel() {
               </Button>
             </div>
 
-            <div className="rounded-lg border border-slate-200 bg-slate-50/60 p-3 space-y-3">
-              <div className="text-sm font-medium text-slate-800">Sincronização</div>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <div className="rounded-lg border border-slate-200 bg-slate-50/60 p-3 space-y-3">
+                <div className="text-sm font-medium text-slate-800">Sincronização</div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 <label className="flex items-center justify-between rounded-md border border-slate-200 bg-white px-3 py-2">
                   <span className="text-sm text-slate-700">Importar pedidos</span>
                   <Switch
@@ -401,23 +480,78 @@ export default function WooConnectionPanel() {
                     }))
                   }
                 />
-                <Input
-                  label="Margem padrão (%)"
-                  type="number"
-                  step="0.01"
-                  value={String(configDraft.price_percent_default)}
-                  onChange={(e) =>
-                    setConfigDraft((prev) => ({
-                      ...prev,
-                      price_percent_default: Number((e.target as HTMLInputElement).value || 0),
-                    }))
-                  }
-                />
-              </div>
-              <div className="flex justify-end">
-                <Button variant="outline" onClick={() => void handleSaveConfig()} disabled={savingConfig}>
-                  {savingConfig ? 'Salvando configurações…' : 'Salvar configurações de sync'}
-                </Button>
+                  <Input
+                    label="Margem padrão (%)"
+                    type="number"
+                    step="0.01"
+                    value={String(configDraft.price_percent_default)}
+                    onChange={(e) =>
+                      setConfigDraft((prev) => ({
+                        ...prev,
+                        price_percent_default: Number((e.target as HTMLInputElement).value || 0),
+                      }))
+                    }
+                  />
+                  <Select
+                    name="woo-stock-source"
+                    label="Fonte do estoque"
+                    value={configDraft.stock_source}
+                    onChange={(e) => setConfigDraft((prev) => ({ ...prev, stock_source: (e.target as HTMLSelectElement).value as any }))}
+                  >
+                    <option value="product">Usar estoque do produto</option>
+                    <option value="deposit">Usar estoque de um depósito</option>
+                  </Select>
+                  <Select
+                    name="woo-deposito-id"
+                    label={loadingSupportLists ? 'Depósito (carregando...)' : 'Depósito (estoque)'}
+                    value={configDraft.deposito_id}
+                    disabled={configDraft.stock_source !== 'deposit'}
+                    onChange={(e) => setConfigDraft((prev) => ({ ...prev, deposito_id: (e.target as HTMLSelectElement).value }))}
+                  >
+                    <option value="">{depositos.length ? 'Selecione…' : 'Nenhum depósito disponível'}</option>
+                    {depositos.map((row) => (
+                      <option key={row.id} value={row.id}>{row.nome}</option>
+                    ))}
+                  </Select>
+                  <Input
+                    label="Estoque de segurança"
+                    type="number"
+                    min={0}
+                    value={String(configDraft.stock_safety_qty)}
+                    onChange={(e) =>
+                      setConfigDraft((prev) => ({
+                        ...prev,
+                        stock_safety_qty: clampNumber((e.target as HTMLInputElement).value, 0, 0, 1_000_000),
+                      }))
+                    }
+                    helperText="Subtrai este valor do saldo antes de enviar para o Woo (nunca envia negativo)."
+                  />
+                  <Select
+                    name="woo-price-source"
+                    label="Fonte do preço"
+                    value={configDraft.price_source}
+                    onChange={(e) => setConfigDraft((prev) => ({ ...prev, price_source: (e.target as HTMLSelectElement).value as any }))}
+                  >
+                    <option value="product">Usar preço do produto</option>
+                    <option value="price_table">Usar tabela de preço</option>
+                  </Select>
+                  <Select
+                    name="woo-base-tabela-preco-id"
+                    label={loadingSupportLists ? 'Tabela de preço (carregando...)' : 'Tabela de preço'}
+                    value={configDraft.base_tabela_preco_id}
+                    disabled={configDraft.price_source !== 'price_table'}
+                    onChange={(e) => setConfigDraft((prev) => ({ ...prev, base_tabela_preco_id: (e.target as HTMLSelectElement).value }))}
+                  >
+                    <option value="">{tabelasPreco.length ? 'Selecione…' : 'Nenhuma tabela disponível'}</option>
+                    {tabelasPreco.map((row) => (
+                      <option key={row.id} value={row.id}>{row.nome}</option>
+                    ))}
+                  </Select>
+                </div>
+                <div className="flex justify-end">
+                  <Button variant="outline" onClick={() => void handleSaveConfig()} disabled={savingConfig}>
+                    {savingConfig ? 'Salvando configurações…' : 'Salvar configurações de sync'}
+                  </Button>
               </div>
             </div>
 
