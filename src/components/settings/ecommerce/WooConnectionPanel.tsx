@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 
 import GlassCard from '@/components/ui/GlassCard';
@@ -123,7 +123,7 @@ export default function WooConnectionPanel() {
           }
           if (diagnostics.error_message) setStatusMessage(diagnostics.error_message);
         } catch {
-          setStatusMessage((prev) => prev ?? 'Diagnóstico indisponível no momento. Use “Testar conexão” para atualizar o estado.');
+          setStatusMessage((prev) => prev ?? 'Diagnóstico indisponível. Use “Testar conexão”.');
         }
       } else {
         setHasConsumerKey(false);
@@ -175,9 +175,7 @@ export default function WooConnectionPanel() {
     };
   }, [activeEmpresaId, connection?.id]);
 
-  const canSaveSecrets = useMemo(() => {
-    return consumerKey.trim().length > 0 && consumerSecret.trim().length > 0;
-  }, [consumerKey, consumerSecret]);
+  const canSaveSecrets = consumerKey.trim().length > 0 && consumerSecret.trim().length > 0;
 
   const handleCreateConnection = async () => {
     if (!activeEmpresaId) return;
@@ -202,7 +200,7 @@ export default function WooConnectionPanel() {
       setConnection(created);
       setConfigDraft(toWooConfigDraft(created));
       setStatusValue('pending');
-      addToast('Conexão WooCommerce criada. Informe URL/credenciais e teste.', 'success');
+      addToast('Conexão criada. Salve credenciais e teste.', 'success');
       await load();
     } catch (error: any) {
       addToast(error?.message || 'Falha ao criar conexão WooCommerce.', 'error');
@@ -239,7 +237,7 @@ export default function WooConnectionPanel() {
       setHasConsumerSecret(true);
       setStatusValue(String(saved.connection_status ?? 'pending').toLowerCase());
       setLastVerifiedAt(saved.last_verified_at ?? null);
-      setStatusMessage(saved.error_message ?? 'Credenciais salvas. Execute “Testar conexão” para validar.');
+      setStatusMessage(saved.error_message ?? 'Credenciais salvas. Teste a conexão.');
       addToast('Credenciais salvas com sucesso.', 'success');
       setTimeout(() => {
         void load();
@@ -271,7 +269,7 @@ export default function WooConnectionPanel() {
       });
       await updateEcommerceConnectionConfig(connection.id, mergedConfig);
       setConnection((prev) => (prev ? { ...prev, config: mergedConfig } : prev));
-      addToast('Configurações de sincronização salvas.', 'success');
+      addToast('Configurações salvas.', 'success');
     } catch (error: any) {
       addToast(error?.message || 'Falha ao salvar configurações de sincronização.', 'error');
     } finally {
@@ -338,7 +336,6 @@ export default function WooConnectionPanel() {
     <div className="space-y-4">
       <div>
         <h1 className="text-2xl font-bold text-gray-800">Integrações</h1>
-        <p className="text-sm text-gray-600 mt-1">Conecte/desconecte WooCommerce e valide conexão com diagnóstico classificado.</p>
       </div>
 
       <GlassCard className="p-4 space-y-4">
@@ -348,9 +345,9 @@ export default function WooConnectionPanel() {
         </div>
 
         {!activeEmpresaId ? (
-          <div className="text-sm text-amber-700">Selecione uma empresa ativa para configurar a integração.</div>
+          <div className="text-sm text-amber-700">Selecione uma empresa ativa.</div>
         ) : loading ? (
-          <div className="text-sm text-gray-600">Carregando integração…</div>
+          <div className="text-sm text-gray-600">Carregando…</div>
         ) : !connection ? (
           <Button onClick={() => void handleCreateConnection()} disabled={saving} className="gap-2">
             {saving ? 'Criando…' : 'Conectar WooCommerce'}
@@ -500,7 +497,6 @@ export default function WooConnectionPanel() {
                         stock_safety_qty: Math.max(0, Number((e.target as HTMLInputElement).value) || 0),
                       }))
                     }
-                    helperText="Reserva de segurança (subtrai do saldo enviado)."
                   />
                   <Select
                     name="woo-price-source"
