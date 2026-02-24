@@ -120,6 +120,17 @@ const CobrancasServicosPage = lazyImport(() => import("../pages/servicos/Cobranc
 const SuportePage = lazyImport(() => import("../pages/support/SuportePage"));
 const SupportConsolePage = lazyImport(() => import("../pages/support/SupportConsolePage"));
 
+const BillingSuccessLanding = () => {
+  try {
+    localStorage.removeItem("pending_plan_slug");
+    localStorage.removeItem("pending_plan_cycle");
+  } catch {
+    // ignore
+  }
+
+  return <Navigate to="/app/dashboard" replace />;
+};
+
 export const appRoutes: RouteObject[] = [
     {
         path: "/app",
@@ -141,6 +152,10 @@ export const appRoutes: RouteObject[] = [
             { path: "configuracoes", element: <Navigate to="/app/configuracoes/geral/empresa" replace /> },
             { path: "configuracoes/:section/:page", element: <Suspense fallback={<PageLoader />}><SettingsPage /></Suspense> },
             { path: "termos-de-uso", element: <Suspense fallback={<PageLoader />}><TermsOfUsePage /></Suspense> },
+
+            // Billing / Stripe redirects
+            { path: "billing/success", element: <BillingSuccessLanding /> },
+            { path: "billing/cancel", element: <Navigate to="/app/configuracoes/geral/assinatura" replace /> },
 
             // Cadastros
             {

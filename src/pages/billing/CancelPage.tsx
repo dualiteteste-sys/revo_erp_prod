@@ -16,7 +16,7 @@ const BillingCancelPage: React.FC = () => {
           <p className="text-gray-600 mb-6">
             O processo de pagamento foi cancelado. Sua assinatura não foi alterada.
           </p>
-          <Link to="/app/settings" className="inline-block bg-blue-600 text-white font-bold py-2 px-6 rounded-lg hover:bg-blue-700 transition-colors">
+          <Link to="/app/configuracoes/geral/assinatura" className="inline-block bg-blue-600 text-white font-bold py-2 px-6 rounded-lg hover:bg-blue-700 transition-colors">
             Voltar para Configurações
           </Link>
         </div>
