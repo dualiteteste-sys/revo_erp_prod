@@ -121,6 +121,22 @@ export function PlanIntentCheckoutModal() {
     setOpen(true);
   }, [authLoading, empresaChanged, intent, session, activeEmpresaId, loadingSubscription, subscription]);
 
+  // Se o usuário concluiu o checkout por outro caminho (ex.: retorno direto sem passar pelo SuccessPage),
+  // limpamos o intent para não reabrir o modal em visitas futuras.
+  useEffect(() => {
+    if (!intent) return;
+    if (authLoading || !session || !activeEmpresaId || empresaChanged) return;
+    if (loadingSubscription) return;
+    if (!subscription) return;
+    clearPendingPlanIntent();
+  }, [activeEmpresaId, authLoading, empresaChanged, intent, loadingSubscription, session, subscription]);
+
+  useEffect(() => {
+    if (!open) return;
+    if (!subscription) return;
+    setOpen(false);
+  }, [open, subscription]);
+
   useEffect(() => {
     if (!open) return;
     // Prefill com dados atuais da empresa (se existirem).
@@ -208,7 +224,6 @@ export function PlanIntentCheckoutModal() {
       if (token !== requestTokenRef.current) return;
       if (empresaSnapshot !== lastEmpresaIdRef.current) return;
 
-      clearPendingPlanIntent();
       window.location.href = data.url;
     } catch (error: any) {
       if (token !== requestTokenRef.current) return;

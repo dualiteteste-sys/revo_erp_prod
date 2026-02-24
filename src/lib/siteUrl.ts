@@ -81,3 +81,49 @@ export function maybeRedirectToCanonicalSiteUrl(): boolean {
   window.location.replace(target);
   return true;
 }
+
+function hasAuthCallbackParams(url: URL): boolean {
+  const code = (url.searchParams.get("code") ?? "").trim();
+  const tokenHash = (url.searchParams.get("token_hash") ?? "").trim();
+  if (code || tokenHash) return true;
+
+  const rawHash = url.hash?.startsWith("#") ? url.hash.slice(1) : url.hash;
+  const sp = new URLSearchParams(rawHash);
+  const accessToken = (sp.get("access_token") ?? "").trim();
+  const refreshToken = (sp.get("refresh_token") ?? "").trim();
+  return Boolean(accessToken && refreshToken);
+}
+
+export function computeAuthCallbackRedirectToConfirmedFrom(input: { currentHref: string }): string | null {
+  const currentRaw = String(input?.currentHref ?? "").trim();
+  if (!currentRaw) return null;
+
+  let url: URL;
+  try {
+    url = new URL(currentRaw);
+  } catch {
+    return null;
+  }
+
+  // Só faz essa correção no root, porque é onde o Supabase costuma cair quando redirect_to não está allowlisted.
+  if (url.pathname !== "/" && url.pathname !== "/index.html") return null;
+  if (!hasAuthCallbackParams(url)) return null;
+
+  return `${url.origin}/auth/confirmed${url.search}${url.hash}`;
+}
+
+/**
+ * Se o usuário caiu no root (`/`) com parâmetros de callback do Supabase Auth,
+ * reescreve para `/auth/confirmed` para concluir a criação de sessão e bootstrap.
+ *
+ * Retorna `true` quando disparou redirect.
+ */
+export function maybeRedirectAuthCallbackToConfirmed(): boolean {
+  if (typeof window === "undefined") return false;
+
+  const target = computeAuthCallbackRedirectToConfirmedFrom({ currentHref: window.location.href });
+  if (!target) return false;
+
+  window.location.replace(target);
+  return true;
+}

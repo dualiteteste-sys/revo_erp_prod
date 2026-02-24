@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { computeCanonicalRedirectUrlFrom, getConfiguredSiteUrlFrom } from "../siteUrl";
+import { computeAuthCallbackRedirectToConfirmedFrom, computeCanonicalRedirectUrlFrom, getConfiguredSiteUrlFrom } from "../siteUrl";
 
 describe("getConfiguredSiteUrlFrom", () => {
   it("prefers envUrl when provided", () => {
@@ -37,6 +37,40 @@ describe("computeCanonicalRedirectUrlFrom", () => {
         canonicalSiteUrl: "https://ultria.com.br",
         currentHref: "https://example.com/auth/confirmed?code=abc",
       })
+    ).toBeNull();
+  });
+});
+
+describe("computeAuthCallbackRedirectToConfirmedFrom", () => {
+  it("rewrites root callbacks (code) to /auth/confirmed", () => {
+    expect(
+      computeAuthCallbackRedirectToConfirmedFrom({
+        currentHref: "https://ultria.com.br/?code=abc&plan=pro#x",
+      }),
+    ).toBe("https://ultria.com.br/auth/confirmed?code=abc&plan=pro#x");
+  });
+
+  it("rewrites root callbacks (token_hash) to /auth/confirmed", () => {
+    expect(
+      computeAuthCallbackRedirectToConfirmedFrom({
+        currentHref: "https://ultria.com.br/?token_hash=th&type=signup",
+      }),
+    ).toBe("https://ultria.com.br/auth/confirmed?token_hash=th&type=signup");
+  });
+
+  it("does nothing when no callback params exist", () => {
+    expect(
+      computeAuthCallbackRedirectToConfirmedFrom({
+        currentHref: "https://ultria.com.br/",
+      }),
+    ).toBeNull();
+  });
+
+  it("does nothing outside root", () => {
+    expect(
+      computeAuthCallbackRedirectToConfirmedFrom({
+        currentHref: "https://ultria.com.br/auth/login?code=abc",
+      }),
     ).toBeNull();
   });
 });

@@ -14,11 +14,12 @@ import { ConfirmProvider } from "./contexts/ConfirmProvider";
 import { setupGlobalErrorHandlers } from "./lib/global-error-handlers";
 import { initRouteSnapshot } from "./lib/telemetry/routeSnapshot";
 import { OpsOverlayProvider } from "./contexts/OpsOverlayProvider";
-import { maybeRedirectToCanonicalSiteUrl } from "./lib/siteUrl";
+import { maybeRedirectAuthCallbackToConfirmed, maybeRedirectToCanonicalSiteUrl } from "./lib/siteUrl";
 
 const redirectedToCanonical = maybeRedirectToCanonicalSiteUrl();
+const redirectedAuthCallback = !redirectedToCanonical && maybeRedirectAuthCallbackToConfirmed();
 
-if (!redirectedToCanonical) {
+if (!redirectedToCanonical && !redirectedAuthCallback) {
   Sentry.init({
     dsn: import.meta.env.VITE_SENTRY_DSN,
     integrations: [
