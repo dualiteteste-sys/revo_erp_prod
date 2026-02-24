@@ -10,6 +10,7 @@ import { roleAtLeast, useEmpresaRole } from '@/hooks/useEmpresaRole';
 import { useEmpresaFeatures } from '@/hooks/useEmpresaFeatures';
 import Modal from '@/components/ui/Modal';
 import { callRpc } from '@/lib/api';
+import { resolveBillingSyncRecovery } from '@/lib/billingSyncRecovery';
 
 type EmpresaAddon = Database['public']['Tables']['empresa_addons']['Row'];
 type PlanoMvp = 'ambos' | 'servicos' | 'industria';
@@ -483,18 +484,43 @@ const SubscriptionSettings: React.FC<SubscriptionSettingsProps> = ({ onSwitchToP
             }
             return body;
           })();
-        if (raw?.error === 'missing_customer') {
+        const outcome = resolveBillingSyncRecovery({ raw });
+        if (outcome.kind === 'link_customer') {
           addToast('Sem cliente Stripe vinculado para esta empresa. Vincule o customer (cus_...) e tente novamente.', 'warning');
           setIsLinkCustomerOpen(true);
           return;
         }
+        if (outcome.kind === 'resume_checkout') {
+          addToast(outcome.message, 'info');
+          window.location.replace(outcome.checkoutUrl);
+          return;
+        }
+        if (outcome.kind === 'choose_plan') {
+          addToast(outcome.message, 'warning');
+          onSwitchToPlans();
+          return;
+        }
         throw error;
       }
-      if (!data?.synced) {
-        throw new Error(data?.message || 'Não foi possível sincronizar a assinatura.');
+
+      const outcome = resolveBillingSyncRecovery({ data });
+      if (outcome.kind === 'synced') {
+        addToast('Assinatura sincronizada com o Stripe.', 'success');
+        refetchSubscription();
+        return;
       }
-      addToast('Assinatura sincronizada com o Stripe.', 'success');
-      refetchSubscription();
+      if (outcome.kind === 'resume_checkout') {
+        addToast(outcome.message, 'info');
+        window.location.replace(outcome.checkoutUrl);
+        return;
+      }
+      if (outcome.kind === 'choose_plan') {
+        addToast(outcome.message, 'warning');
+        onSwitchToPlans();
+        return;
+      }
+
+      throw new Error(data?.message || 'Não foi possível sincronizar a assinatura.');
     } catch (e: any) {
       addToast(e.message || 'Erro ao sincronizar assinatura com o Stripe.', 'error');
     } finally {
