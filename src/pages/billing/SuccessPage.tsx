@@ -1,15 +1,8 @@
 import React, { useEffect, useState } from 'react';
-import { CheckCircle, Loader2, AlertTriangle } from 'lucide-react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { useToast } from '../../contexts/ToastProvider';
 import { useSupabase } from '@/providers/SupabaseProvider';
 import { useAuth } from '../../contexts/AuthProvider';
-
-type SuccessData = {
-  company: any;
-  subscription: any;
-  plan: any;
-};
 
 const SuccessPage: React.FC = () => {
   const [searchParams] = useSearchParams();
@@ -17,7 +10,6 @@ const SuccessPage: React.FC = () => {
   const { session } = useAuth();
   const { addToast } = useToast();
   const [status, setStatus] = useState<'loading' | 'polling' | 'success' | 'error'>('loading');
-  const [data, setData] = useState<SuccessData | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [pollCount, setPollCount] = useState(0);
 
@@ -57,7 +49,6 @@ const SuccessPage: React.FC = () => {
           setStatus('polling');
           setTimeout(() => setPollCount(prev => prev + 1), 3000);
         } else {
-          setData(responseData);
           setStatus('success');
           addToast('Assinatura confirmada com sucesso!', 'success');
 
@@ -96,9 +87,7 @@ const SuccessPage: React.FC = () => {
         return (
           <>
             <div className="flex justify-center mb-6">
-              <div className="w-20 h-20 bg-blue-100 rounded-full flex items-center justify-center">
-                <Loader2 className="w-12 h-12 text-blue-600 animate-spin" />
-              </div>
+              <div className="w-16 h-16 border-4 border-blue-500 border-dashed rounded-full animate-spin" />
             </div>
             <h1 className="text-2xl font-bold text-gray-800 mb-4">Finalizando sua assinatura...</h1>
             <p className="text-gray-600 mb-6">
@@ -110,21 +99,16 @@ const SuccessPage: React.FC = () => {
         return (
           <>
             <div className="flex justify-center mb-6">
-              <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center">
-                <CheckCircle className="w-12 h-12 text-green-600" />
+              <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center text-3xl font-bold text-green-700">
+                ✓
               </div>
             </div>
             <h1 className="text-2xl font-bold text-gray-800 mb-4">Pagamento Concluído!</h1>
-            <div className="text-left bg-gray-50 p-4 rounded-lg border mb-6">
-              <p><strong>Plano:</strong> {data?.plan?.name} ({data?.plan?.billing_cycle === 'monthly' ? 'Mensal' : 'Anual'})</p>
-              <p><strong>Status:</strong> <span className="font-semibold capitalize">{data?.subscription?.status}</span></p>
-              <p><strong>{data?.subscription?.status === 'trialing' ? 'Término do Teste:' : 'Próxima Cobrança:'}</strong> {new Date(data?.subscription?.current_period_end).toLocaleDateString('pt-BR')}</p>
-            </div>
             <p className="text-gray-600 mb-6">
-              Sua assinatura foi ativada com sucesso.
+              Sua assinatura foi ativada com sucesso. Você já pode acessar o sistema.
             </p>
             <Link to="/app/dashboard" className="inline-block bg-blue-600 text-white font-bold py-2 px-6 rounded-lg hover:bg-blue-700 transition-colors">
-              Ir para o Dashboard
+              Entrar no sistema
             </Link>
           </>
         );
@@ -132,8 +116,8 @@ const SuccessPage: React.FC = () => {
         return (
           <>
             <div className="flex justify-center mb-6">
-              <div className="w-20 h-20 bg-red-100 rounded-full flex items-center justify-center">
-                <AlertTriangle className="w-12 h-12 text-red-600" />
+              <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center text-3xl font-bold text-red-700">
+                !
               </div>
             </div>
             <h1 className="text-2xl font-bold text-gray-800 mb-4">Ocorreu um Erro</h1>
