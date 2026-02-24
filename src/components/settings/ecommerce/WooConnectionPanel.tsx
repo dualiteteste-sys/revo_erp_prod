@@ -1,5 +1,4 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { AlertTriangle, CheckCircle2, Link2, RefreshCw, Unlink } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
 import GlassCard from '@/components/ui/GlassCard';
@@ -23,8 +22,9 @@ import {
   upsertEcommerceConnection,
   type EcommerceConnection,
 } from '@/services/ecommerceIntegrations';
-import { listTabelasPreco, type TabelaPrecoRow } from '@/services/pricing';
-import { listDepositos, type EstoqueDeposito } from '@/services/suprimentos';
+
+type DepositoOption = { id: string; nome: string };
+type TabelaPrecoOption = { id: string; nome: string };
 
 const WOO_MASK = '••••••••••••••••';
 const DEFAULT_WOO_CONFIG = normalizeEcommerceConfig({});
@@ -45,12 +45,11 @@ type WooConfigDraft = {
 
 function toWooConfigDraft(connection: EcommerceConnection | null): WooConfigDraft {
   const config = normalizeEcommerceConfig(connection?.config ?? {});
-  const deposito_id = String(config.deposito_id ?? '').trim();
-  const base_tabela_preco_id = String(config.base_tabela_preco_id ?? '').trim();
-  const stock_source = String((config as any).stock_source ?? '').toLowerCase() === 'deposit' ? 'deposit' : deposito_id ? 'deposit' : 'product';
-  const price_source =
-    String((config as any).price_source ?? '').toLowerCase() === 'price_table' ? 'price_table' : base_tabela_preco_id ? 'price_table' : 'product';
-  const stock_safety_qty = Math.max(0, Math.min(1_000_000, Number((config as any).stock_safety_qty) || 0));
+  const deposito_id = String(config.deposito_id ?? '');
+  const base_tabela_preco_id = String(config.base_tabela_preco_id ?? '');
+  const stock_source = (config as any).stock_source === 'deposit' ? 'deposit' : deposito_id ? 'deposit' : 'product';
+  const price_source = (config as any).price_source === 'price_table' ? 'price_table' : base_tabela_preco_id ? 'price_table' : 'product';
+  const stock_safety_qty = Math.max(0, Number((config as any).stock_safety_qty) || 0);
   return {
     import_orders: config.import_orders !== false,
     sync_stock: config.sync_stock === true,
@@ -94,9 +93,8 @@ export default function WooConnectionPanel() {
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [statusValue, setStatusValue] = useState<string>('disconnected');
   const [lastVerifiedAt, setLastVerifiedAt] = useState<string | null>(null);
-  const [depositos, setDepositos] = useState<EstoqueDeposito[]>([]);
-  const [tabelasPreco, setTabelasPreco] = useState<TabelaPrecoRow[]>([]);
-  const [loadingSupportLists, setLoadingSupportLists] = useState(false);
+  const [depositos, setDepositos] = useState<DepositoOption[]>([]);
+  const [tabelasPreco, setTabelasPreco] = useState<TabelaPrecoOption[]>([]);
 
   const load = useCallback(async () => {
     if (!activeEmpresaId) {
@@ -151,26 +149,29 @@ export default function WooConnectionPanel() {
       setTabelasPreco([]);
       return;
     }
-    let alive = true;
-    setLoadingSupportLists(true);
-    Promise.allSettled([listDepositos({ onlyActive: true }), listTabelasPreco({})])
-      .then((results) => {
-        if (!alive) return;
-        const [deps, tables] = results;
-        setDepositos(deps.status === 'fulfilled' ? deps.value : []);
-        setTabelasPreco(tables.status === 'fulfilled' ? tables.value : []);
-      })
-      .catch(() => {
-        if (!alive) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const [depsRes, tablesRes] = await Promise.all([
+          (supabase as any).rpc('suprimentos_depositos_list', { p_only_active: true }),
+          (supabase as any).rpc('tabelas_preco_list_for_current_user', { p_q: null }),
+        ]);
+        if (cancelled) return;
+        if (depsRes?.error || tablesRes?.error) throw (depsRes?.error || tablesRes?.error) as any;
+        const depsRaw = depsRes?.data;
+        const tablesRaw = tablesRes?.data;
+        const deps = Array.isArray(depsRaw) ? (depsRaw as any[]).map((r) => ({ id: String(r.id), nome: String(r.nome ?? '') })) : [];
+        const tables = Array.isArray(tablesRaw) ? (tablesRaw as any[]).map((r) => ({ id: String(r.id), nome: String(r.nome ?? '') })) : [];
+        setDepositos(deps);
+        setTabelasPreco(tables);
+      } catch {
+        if (cancelled) return;
         setDepositos([]);
         setTabelasPreco([]);
-      })
-      .finally(() => {
-        if (!alive) return;
-        setLoadingSupportLists(false);
-      });
+      }
+    })();
     return () => {
-      alive = false;
+      cancelled = true;
     };
   }, [activeEmpresaId, connection?.id]);
 
@@ -352,7 +353,6 @@ export default function WooConnectionPanel() {
           <div className="text-sm text-gray-600">Carregando integração…</div>
         ) : !connection ? (
           <Button onClick={() => void handleCreateConnection()} disabled={saving} className="gap-2">
-            <Link2 size={16} />
             {saving ? 'Criando…' : 'Conectar WooCommerce'}
           </Button>
         ) : (
@@ -382,27 +382,26 @@ export default function WooConnectionPanel() {
                 helperText={hasConsumerSecret && !consumerSecret ? WOO_MASK : undefined}
               />
             </div>
-            <div className="flex flex-wrap gap-2">
-              <span className={`inline-flex items-center gap-1 rounded-full px-2 py-1 text-xs ${hasConsumerKey ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-600'}`}>
-                <CheckCircle2 size={13} />
-                {hasConsumerKey ? 'Consumer Key armazenada' : 'Consumer Key não armazenada'}
-              </span>
-              <span className={`inline-flex items-center gap-1 rounded-full px-2 py-1 text-xs ${hasConsumerSecret ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-600'}`}>
-                <CheckCircle2 size={13} />
-                {hasConsumerSecret ? 'Consumer Secret armazenada' : 'Consumer Secret não armazenada'}
-              </span>
-            </div>
+	            <div className="flex flex-wrap gap-2">
+	              <span className={`inline-flex items-center gap-1 rounded-full px-2 py-1 text-xs ${hasConsumerKey ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-600'}`}>
+	                <span aria-hidden className="font-semibold">{hasConsumerKey ? '✓' : '•'}</span>
+	                {hasConsumerKey ? 'Consumer Key armazenada' : 'Consumer Key não armazenada'}
+	              </span>
+	              <span className={`inline-flex items-center gap-1 rounded-full px-2 py-1 text-xs ${hasConsumerSecret ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-600'}`}>
+	                <span aria-hidden className="font-semibold">{hasConsumerSecret ? '✓' : '•'}</span>
+	                {hasConsumerSecret ? 'Consumer Secret armazenada' : 'Consumer Secret não armazenada'}
+	              </span>
+	            </div>
 
             <div className="flex flex-wrap gap-2">
               <Button variant="outline" onClick={() => void handleSaveCredentials()} disabled={saving || !canSaveSecrets}>
                 {saving ? 'Salvando…' : 'Salvar credenciais'}
-              </Button>
-              <Button variant="outline" className="gap-2" onClick={() => void handleTestConnection()} disabled={testing}>
-                <RefreshCw size={16} className={testing ? 'animate-spin' : ''} />
-                {testing ? 'Testando…' : 'Testar conexão'}
-              </Button>
+	              </Button>
+	              <Button variant="outline" className="gap-2" onClick={() => void handleTestConnection()} disabled={testing}>
+	                <span aria-hidden className={testing ? 'animate-spin' : ''}>⟳</span>
+	                {testing ? 'Testando…' : 'Testar conexão'}
+	              </Button>
               <Button variant="outline" className="gap-2" onClick={() => void handleDisconnect()} disabled={disconnecting}>
-                <Unlink size={16} />
                 {disconnecting ? 'Desconectando…' : 'Desconectar'}
               </Button>
               <Button asChild variant="ghost">
@@ -475,17 +474,17 @@ export default function WooConnectionPanel() {
                     value={configDraft.stock_source}
                     onChange={(e) => setConfigDraft((prev) => ({ ...prev, stock_source: (e.target as HTMLSelectElement).value as any }))}
                   >
-                    <option value="product">Usar estoque do produto</option>
-                    <option value="deposit">Usar estoque de um depósito</option>
+                    <option value="product">Produto</option>
+                    <option value="deposit">Depósito</option>
                   </Select>
                   <Select
                     name="woo-deposito-id"
-                    label={loadingSupportLists ? 'Depósito (carregando...)' : 'Depósito (estoque)'}
+                    label="Depósito (estoque)"
                     value={configDraft.deposito_id}
                     disabled={configDraft.stock_source !== 'deposit'}
                     onChange={(e) => setConfigDraft((prev) => ({ ...prev, deposito_id: (e.target as HTMLSelectElement).value }))}
                   >
-                    <option value="">{depositos.length ? 'Selecione…' : 'Nenhum depósito disponível'}</option>
+                    <option value="">{depositos.length ? 'Selecione…' : 'Sem depósitos'}</option>
                     {depositos.map((row) => (
                       <option key={row.id} value={row.id}>{row.nome}</option>
                     ))}
@@ -498,10 +497,10 @@ export default function WooConnectionPanel() {
                     onChange={(e) =>
                       setConfigDraft((prev) => ({
                         ...prev,
-                        stock_safety_qty: Math.max(0, Math.min(1_000_000, Number((e.target as HTMLInputElement).value) || 0)),
+                        stock_safety_qty: Math.max(0, Number((e.target as HTMLInputElement).value) || 0),
                       }))
                     }
-                    helperText="Subtrai este valor do saldo antes de enviar para o Woo (nunca envia negativo)."
+                    helperText="Reserva de segurança (subtrai do saldo enviado)."
                   />
                   <Select
                     name="woo-price-source"
@@ -509,17 +508,17 @@ export default function WooConnectionPanel() {
                     value={configDraft.price_source}
                     onChange={(e) => setConfigDraft((prev) => ({ ...prev, price_source: (e.target as HTMLSelectElement).value as any }))}
                   >
-                    <option value="product">Usar preço do produto</option>
-                    <option value="price_table">Usar tabela de preço</option>
+                    <option value="product">Produto</option>
+                    <option value="price_table">Tabela</option>
                   </Select>
                   <Select
                     name="woo-base-tabela-preco-id"
-                    label={loadingSupportLists ? 'Tabela de preço (carregando...)' : 'Tabela de preço'}
+                    label="Tabela de preço"
                     value={configDraft.base_tabela_preco_id}
                     disabled={configDraft.price_source !== 'price_table'}
                     onChange={(e) => setConfigDraft((prev) => ({ ...prev, base_tabela_preco_id: (e.target as HTMLSelectElement).value }))}
                   >
-                    <option value="">{tabelasPreco.length ? 'Selecione…' : 'Nenhuma tabela disponível'}</option>
+                    <option value="">{tabelasPreco.length ? 'Selecione…' : 'Sem tabelas'}</option>
                     {tabelasPreco.map((row) => (
                       <option key={row.id} value={row.id}>{row.nome}</option>
                     ))}
@@ -535,12 +534,12 @@ export default function WooConnectionPanel() {
             {lastVerifiedAt ? (
               <div className="text-xs text-gray-500">Última verificação: {new Date(lastVerifiedAt).toLocaleString('pt-BR')}</div>
             ) : null}
-            {statusMessage ? (
-              <div className="inline-flex items-start gap-2 text-xs text-amber-800 bg-amber-50 border border-amber-100 rounded-lg px-2 py-1">
-                <AlertTriangle size={14} className="mt-[1px]" />
-                <span>{statusMessage}</span>
-              </div>
-            ) : null}
+	            {statusMessage ? (
+	              <div className="inline-flex items-start gap-2 text-xs text-amber-800 bg-amber-50 border border-amber-100 rounded-lg px-2 py-1">
+	                <span aria-hidden className="mt-[1px] font-semibold">!</span>
+	                <span>{statusMessage}</span>
+	              </div>
+	            ) : null}
           </>
         )}
       </GlassCard>
