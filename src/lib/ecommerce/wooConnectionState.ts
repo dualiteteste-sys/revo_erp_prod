@@ -116,7 +116,10 @@ export function selectPreferredWooStoreId(params: {
 }): string {
   const preferred = normalizeWooBaseUrl(String(params.preferredStoreUrl ?? '').trim());
   const stores = (Array.isArray(params.stores) ? params.stores : []).filter((store) => Boolean(store?.id));
-  const credentialed = stores.filter((store) => store.has_credentials !== false);
+  const hasExplicitCredentialsFlag = stores.some((store) => store.has_credentials === true || store.has_credentials === false);
+  const credentialed = hasExplicitCredentialsFlag
+    ? stores.filter((store) => store.has_credentials === true)
+    : stores.filter((store) => store.has_credentials !== false);
   if (preferred) {
     const match = credentialed.find((store) => normalizeWooBaseUrl(store.base_url) === preferred);
     if (match?.id) return String(match.id);

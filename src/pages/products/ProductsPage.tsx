@@ -104,12 +104,16 @@ const ProductsPage: React.FC = () => {
 
   const wooStoreOptions = useMemo(() => {
     const stores = Array.isArray(wooStores) ? wooStores : [];
-    return [...stores].sort((a, b) => {
+    const hasExplicitCredentialsFlag = stores.some((store) => store.has_credentials === true || store.has_credentials === false);
+    const visible = hasExplicitCredentialsFlag
+      ? stores.filter((store) => store.has_credentials === true)
+      : stores;
+    return [...visible].sort((a, b) => {
       const aActive = String(a.status ?? '').toLowerCase() === 'active';
       const bActive = String(b.status ?? '').toLowerCase() === 'active';
       if (aActive !== bActive) return aActive ? -1 : 1;
-      const aCred = a.has_credentials !== false;
-      const bCred = b.has_credentials !== false;
+      const aCred = a.has_credentials === true;
+      const bCred = b.has_credentials === true;
       if (aCred !== bCred) return aCred ? -1 : 1;
       const aUpdated = new Date(a.updated_at ?? a.created_at ?? 0).getTime();
       const bUpdated = new Date(b.updated_at ?? b.created_at ?? 0).getTime();
