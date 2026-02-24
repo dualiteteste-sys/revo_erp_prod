@@ -26,7 +26,6 @@ import {
 type DepositoOption = { id: string; nome: string };
 type TabelaPrecoOption = { id: string; nome: string };
 
-const WOO_MASK = '••••••••••••••••';
 const DEFAULT_WOO_CONFIG = normalizeEcommerceConfig({});
 
 type WooConfigDraft = {
@@ -362,22 +361,20 @@ export default function WooConnectionPanel() {
                 onChange={(e) => setStoreUrl((e.target as HTMLInputElement).value)}
               />
               <div />
-              <Input
-                label="Consumer Key"
-                value={consumerKey}
-                type="password"
-                placeholder={hasConsumerKey ? 'Salva (mascarada)' : 'ck_...'}
-                onChange={(e) => setConsumerKey((e.target as HTMLInputElement).value)}
-                helperText={hasConsumerKey && !consumerKey ? WOO_MASK : undefined}
-              />
-              <Input
-                label="Consumer Secret"
-                value={consumerSecret}
-                type="password"
-                placeholder={hasConsumerSecret ? 'Salva (mascarada)' : 'cs_...'}
-                onChange={(e) => setConsumerSecret((e.target as HTMLInputElement).value)}
-                helperText={hasConsumerSecret && !consumerSecret ? WOO_MASK : undefined}
-              />
+	              <Input
+	                label="Consumer Key"
+	                value={consumerKey}
+	                type="password"
+	                placeholder={hasConsumerKey ? 'Salva (mascarada)' : 'ck_...'}
+	                onChange={(e) => setConsumerKey((e.target as HTMLInputElement).value)}
+	              />
+	              <Input
+	                label="Consumer Secret"
+	                value={consumerSecret}
+	                type="password"
+	                placeholder={hasConsumerSecret ? 'Salva (mascarada)' : 'cs_...'}
+	                onChange={(e) => setConsumerSecret((e.target as HTMLInputElement).value)}
+	              />
             </div>
 	            <div className="flex flex-wrap gap-2">
 	              <span className={`inline-flex items-center gap-1 rounded-full px-2 py-1 text-xs ${hasConsumerKey ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-600'}`}>
