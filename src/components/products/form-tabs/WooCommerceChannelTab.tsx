@@ -41,15 +41,19 @@ export default function WooCommerceChannelTab({ data }: Props) {
           listWooStores(activeEmpresaId),
           listEcommerceConnections(),
         ]);
-        setStores(rows);
+        // UX: em telas de operação do produto, priorizar stores operáveis (com credenciais).
+        const credentialed = rows.some((row) => row.has_credentials === true || row.has_credentials === false)
+          ? rows.filter((row) => row.has_credentials === true)
+          : rows;
+        setStores(credentialed);
         const preferred = pickPreferredEcommerceConnection(connections, 'woo');
         const preferredUrl = String(preferred?.config?.store_url ?? '').trim() || null;
         const nextId = selectPreferredWooStoreId({
-          stores: rows,
+          stores: credentialed,
           preferredStoreUrl: preferredUrl,
         });
         setStoreId((current) => {
-          if (current && rows.some((s) => String(s?.id) === String(current))) return current;
+          if (current && credentialed.some((s) => String(s?.id) === String(current))) return current;
           return nextId;
         });
       } catch (error: any) {
