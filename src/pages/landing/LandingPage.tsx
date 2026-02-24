@@ -9,9 +9,17 @@ import Features from '../../components/landing/Features';
 import Pricing from '../../components/landing/Pricing';
 import FAQ from '../../components/landing/FAQ';
 import Footer from '../../components/landing/Footer';
+import { useAuth } from '@/contexts/AuthProvider';
 
 const LandingPage: React.FC = () => {
   const navigate = useNavigate();
+  const { session, loading } = useAuth();
+
+  React.useEffect(() => {
+    if (loading) return;
+    if (!session) return;
+    navigate('/app/dashboard', { replace: true });
+  }, [loading, navigate, session]);
 
   return (
     <div className="bg-slate-50 text-gray-900">

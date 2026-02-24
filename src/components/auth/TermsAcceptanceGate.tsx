@@ -2,6 +2,7 @@ import React from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { acceptCurrentTerms, getCurrentTermsDocument, getTermsAcceptanceStatus } from '@/services/termsAcceptance';
 import { isRpcMissingError } from '@/lib/api';
+import { getConfiguredSiteUrl } from '@/lib/siteUrl';
 
 const FullscreenLoading = ({ label }: { label: string }) => (
   <div className="w-full h-screen flex items-center justify-center bg-slate-50 p-6">
@@ -148,6 +149,8 @@ export default function TermsAcceptanceGate({
     return <>{children}</>;
   }
 
+  const termsUrl = `${getConfiguredSiteUrl()}/app/termos-de-uso`;
+
   return (
     <div className="w-full h-screen flex items-center justify-center bg-slate-50 p-6">
       <div className="w-full max-w-2xl p-6 rounded-2xl border border-slate-200 bg-white shadow-sm">
@@ -175,10 +178,20 @@ export default function TermsAcceptanceGate({
           </label>
           <div className="mt-3 text-sm">
             <a
-              href="/app/termos-de-uso"
+              href={termsUrl}
               target="_blank"
               rel="noreferrer noopener"
               className="font-medium text-blue-700 hover:underline"
+              onClick={(event) => {
+                // Hardening: alguns ambientes in-app/embeds podem bloquear o target=_blank.
+                // Mantemos href (acessível) e tentamos window.open de forma síncrona ao clique.
+                event.preventDefault();
+                try {
+                  window.open(termsUrl, "_blank", "noopener,noreferrer");
+                } catch {
+                  window.location.href = termsUrl;
+                }
+              }}
             >
               Ler termo completo em página dedicada
             </a>
