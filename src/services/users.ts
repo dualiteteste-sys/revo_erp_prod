@@ -7,6 +7,7 @@
 import { supabase } from "@/lib/supabaseClient";
 import type { UsersFilters, UserRole, UserStatus } from "@/features/users/types";
 import { callRpc } from "@/lib/api";
+import { getConfiguredSiteUrl } from "@/lib/siteUrl";
 
 /** Modelo exibido na UI */
 export type ListedUser = {
@@ -24,7 +25,7 @@ function arrOrNull<T>(v?: T[] | null): T[] | null {
   return v && v.length ? v : null;
 }
 function siteUrl(): string {
-  return (import.meta as any)?.env?.VITE_SITE_URL || window.location.origin;
+  return getConfiguredSiteUrl();
 }
 async function getCurrentEmpresaId(): Promise<string> {
   const data = await callRpc<any>("current_empresa_id", {});
