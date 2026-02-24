@@ -3,6 +3,7 @@ import { createClient } from "jsr:@supabase/supabase-js@2";
 import { buildCorsHeaders } from "../_shared/cors.ts";
 
 type StripeSubscription = Stripe.Subscription;
+type StripeCheckoutSession = Stripe.Checkout.Session;
 
 type Cycle = "monthly" | "yearly";
 type PlanKey = `${"ESSENCIAL" | "PRO" | "MAX" | "INDUSTRIA" | "SCALE"}/${Cycle}`;
@@ -37,6 +38,44 @@ function resolveStripeSecretKey(req: Request): string {
   return primary || live || test;
 }
 
+function isLocalOrigin(origin: string): boolean {
+  const o = origin.trim().toLowerCase();
+  return o === "http://localhost:5173"
+    || o === "http://127.0.0.1:5173"
+    || o === "http://localhost:4173"
+    || o === "http://127.0.0.1:4173";
+}
+
+function isProdOrigin(origin: string): boolean {
+  const o = origin.trim().toLowerCase();
+  return o === "https://ultria.com.br"
+    || o.endsWith(".ultria.com.br")
+    || o === "https://erprevo.com"
+    || o.endsWith(".erprevo.com");
+}
+
+function pickSiteUrl(req: Request, stripeSecretKey: string): string | null {
+  const envUrl = (Deno.env.get("SITE_URL") ?? "").trim();
+  const origin = (req.headers.get("origin") ?? "").trim();
+
+  const allowedExact = new Set<string>([
+    "https://ultria.com.br",
+    "https://www.ultria.com.br",
+    "https://ultriadev.com.br",
+    "https://erprevo.com",
+    "https://erprevodev.com",
+  ]);
+
+  const isLive = stripeSecretKey.startsWith("sk_live_") || stripeSecretKey.startsWith("rk_live_");
+  const allowLocal = !isLive && isLocalOrigin(origin);
+
+  const candidate = (allowedExact.has(origin) || allowLocal) ? origin : envUrl;
+
+  if (allowedExact.has(candidate) || allowLocal) return candidate;
+  if (candidate) return candidate;
+  return null;
+}
+
 function getDefaultPriceMap(stripeSecretKey: string): Partial<Record<PlanKey, string>> {
   const isLive = stripeSecretKey.startsWith("sk_live_") || stripeSecretKey.startsWith("rk_live_");
   return isLive
@@ -68,6 +107,26 @@ function getDefaultPriceMap(stripeSecretKey: string): Partial<Record<PlanKey, st
       };
 }
 
+function normalizePlanSlug(raw: string | null | undefined): string | null {
+  const slug = String(raw ?? "").trim().toUpperCase();
+  const allowed = new Set(["ESSENCIAL", "PRO", "MAX", "INDUSTRIA", "SCALE"]);
+  return allowed.has(slug) ? slug : null;
+}
+
+function normalizeBillingCycle(raw: string | null | undefined): Cycle | null {
+  const cycle = String(raw ?? "").trim().toLowerCase();
+  if (cycle === "monthly" || cycle === "yearly") return cycle as Cycle;
+  return null;
+}
+
+function parseTrialDays(): number {
+  const raw = (Deno.env.get("BILLING_TRIAL_DAYS") ?? "").trim();
+  const fallback = 60;
+  const n = raw ? Number.parseInt(raw, 10) : fallback;
+  if (!Number.isFinite(n) || Number.isNaN(n)) return fallback;
+  return Math.max(0, Math.min(3650, n));
+}
+
 function inferPlanSlugFromPriceId(stripeSecretKey: string, stripePriceId: string): { slug: string; billing_cycle: Cycle } | null {
   const entries = Object.entries(getDefaultPriceMap(stripeSecretKey));
   const found = entries.find(([, v]) => String(v) === String(stripePriceId));
@@ -76,6 +135,24 @@ function inferPlanSlugFromPriceId(stripeSecretKey: string, stripePriceId: string
   const [slug, cycle] = key.split("/");
   if (!slug || (cycle !== "monthly" && cycle !== "yearly")) return null;
   return { slug, billing_cycle: cycle as Cycle };
+}
+
+function pickBestOpenCheckoutSession(sessions: StripeCheckoutSession[]): StripeCheckoutSession | null {
+  const opened = sessions
+    .filter((s) => s?.mode === "subscription" && s?.status === "open" && typeof s?.url === "string" && s.url);
+  if (opened.length === 0) return null;
+  return [...opened].sort((a, b) => (b.created ?? 0) - (a.created ?? 0))[0]!;
+}
+
+function pickBestSessionWithPlanMetadata(sessions: StripeCheckoutSession[]): { planSlug: string; billingCycle: Cycle } | null {
+  const sorted = [...sessions].sort((a, b) => (b.created ?? 0) - (a.created ?? 0));
+  for (const s of sorted) {
+    if (s?.mode !== "subscription") continue;
+    const planSlug = normalizePlanSlug((s as any)?.metadata?.plan_slug);
+    const billingCycle = normalizeBillingCycle((s as any)?.metadata?.billing_cycle);
+    if (planSlug && billingCycle) return { planSlug, billingCycle };
+  }
+  return null;
 }
 
 function pickBestSubscription(subs: StripeSubscription[]): StripeSubscription | null {
@@ -283,7 +360,121 @@ Deno.serve(async (req) => {
 
     const best = pickBestSubscription(listed.data as StripeSubscription[]);
     if (!best) {
-      return json(corsHeaders, 404, { error: "no_subscription", message: "Nenhuma assinatura encontrada no Stripe para este cliente." });
+      // Estado da arte: em casos de checkout incompleto/cancelado, a empresa pode existir no Stripe
+      // (customer criado), mas ainda não há subscription.
+      //
+      // O botão "Sincronizar com Stripe" deve funcionar como mecanismo de recuperação:
+      // - se houver checkout aberto, devolvemos a URL para retomar;
+      // - se não houver checkout aberto, tentamos recriar uma sessão a partir do último intent registrado no Stripe;
+      // - se ainda não for possível, orientamos o usuário a voltar para seleção de planos (sem travar).
+      let sessions: StripeCheckoutSession[] = [];
+      try {
+        const res = await stripe.checkout.sessions.list({ customer: effectiveCustomerId, limit: 20 });
+        sessions = (res?.data ?? []) as StripeCheckoutSession[];
+      } catch {
+        sessions = [];
+      }
+
+      const open = pickBestOpenCheckoutSession(sessions);
+      if (open?.url) {
+        return json(corsHeaders, 200, {
+          synced: false,
+          error: "no_subscription",
+          next_action: "resume_checkout",
+          checkout_url: open.url,
+          message: "Checkout pendente. Vamos retomar o check-in no Stripe.",
+        });
+      }
+
+      const planIntent = pickBestSessionWithPlanMetadata(sessions);
+      if (planIntent) {
+        const { planSlug, billingCycle } = planIntent;
+        const siteUrl = pickSiteUrl(req, stripeSecretKey);
+        if (!siteUrl) {
+          return json(corsHeaders, 200, {
+            synced: false,
+            error: "no_subscription",
+            next_action: "choose_plan",
+            message: "Checkout pendente, mas não foi possível resolver a URL do site. Volte e selecione o plano novamente.",
+          });
+        }
+
+        // Resolve price_id (DB é fonte de verdade, com fallback para map padrão do ambiente).
+        let priceId: string | null = null;
+        try {
+          const { data: planRow2 } = await admin
+            .from("plans")
+            .select("stripe_price_id")
+            .eq("slug", planSlug)
+            .eq("billing_cycle", billingCycle)
+            .eq("active", true)
+            .maybeSingle();
+          priceId = (planRow2 as any)?.stripe_price_id ? String((planRow2 as any).stripe_price_id) : null;
+        } catch {
+          priceId = null;
+        }
+        if (!priceId) {
+          const key = `${planSlug}/${billingCycle}` as PlanKey;
+          const fallback = getDefaultPriceMap(stripeSecretKey)[key] ?? null;
+          priceId = fallback ? String(fallback) : null;
+        }
+
+        if (!priceId) {
+          return json(corsHeaders, 200, {
+            synced: false,
+            error: "no_subscription",
+            next_action: "choose_plan",
+            message: "Não foi possível identificar o plano no Stripe para retomar o checkout. Selecione o plano novamente.",
+          });
+        }
+
+        // Trial best-effort (mesma lógica de billing-checkout, sem bloquear recuperação).
+        const trialDays = parseTrialDays();
+        let allowTrial = trialDays > 0;
+        if (allowTrial) {
+          try {
+            const existing = await stripe.subscriptions.list({ customer: effectiveCustomerId, status: "all", limit: 1 });
+            if ((existing?.data?.length ?? 0) > 0) allowTrial = false;
+          } catch {
+            // best-effort
+          }
+        }
+
+        const newSession = await stripe.checkout.sessions.create({
+          mode: "subscription",
+          customer: effectiveCustomerId,
+          payment_method_collection: allowTrial ? "always" : "if_required",
+          line_items: [{ price: priceId, quantity: 1 }],
+          allow_promotion_codes: true,
+          success_url: `${siteUrl}/app/billing/success?session_id={CHECKOUT_SESSION_ID}`,
+          cancel_url: `${siteUrl}/app/billing/cancel`,
+          metadata: { empresa_id, plan_slug: planSlug, billing_cycle: billingCycle, kind: "subscription" },
+          subscription_data: {
+            ...(allowTrial ? { trial_period_days: trialDays } : {}),
+            ...(allowTrial
+              ? { trial_settings: { end_behavior: { missing_payment_method: "cancel" } } }
+              : {}),
+            metadata: { empresa_id, plan_slug: planSlug, billing_cycle: billingCycle },
+          },
+        });
+
+        if (newSession?.url) {
+          return json(corsHeaders, 200, {
+            synced: false,
+            error: "no_subscription",
+            next_action: "resume_checkout",
+            checkout_url: newSession.url,
+            message: "Checkout anterior não estava mais disponível. Criamos um novo check-in no Stripe.",
+          });
+        }
+      }
+
+      return json(corsHeaders, 200, {
+        synced: false,
+        error: "no_subscription",
+        next_action: "choose_plan",
+        message: "Nenhuma assinatura encontrada no Stripe. Selecione um plano para iniciar o checkout.",
+      });
     }
 
     const price = best.items?.data?.[0]?.price as Stripe.Price | undefined;
