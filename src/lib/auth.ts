@@ -1,10 +1,9 @@
 import { supabase } from './supabaseClient';
 import { logger } from './logger';
+import { getConfiguredSiteUrl } from './siteUrl';
 
 function authSiteUrl(): string {
-  const origin = window.location.origin;
-  if (/localhost|127\.0\.0\.1/i.test(origin)) return origin;
-  return origin;
+  return getConfiguredSiteUrl();
 }
 
 function emailConfirmRedirect(opts?: { plan?: string | null; cycle?: string | null }): string {
