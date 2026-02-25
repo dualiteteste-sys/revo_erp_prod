@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { searchClients, ClientHit } from '@/services/clients';
+import { searchSuppliers, type SupplierHit } from '@/services/compras';
 import { useDebounce } from '@/hooks/useDebounce';
 import { Loader2 } from 'lucide-react';
 import Modal from '@/components/ui/Modal';
@@ -8,6 +9,9 @@ import { useToast } from '@/contexts/ToastProvider';
 import { logger } from '@/lib/logger';
 import { useAuth } from '@/contexts/AuthProvider';
 
+type Entity = 'client' | 'supplier';
+type Hit = ClientHit | SupplierHit;
+
 type Props = {
   value: string | null;
   onChange: (id: string | null, name?: string) => void;
@@ -15,18 +19,39 @@ type Props = {
   disabled?: boolean;
   className?: string;
   initialName?: string;
+  entity?: Entity;
 };
 
-export default function ClientAutocomplete({ value, onChange, placeholder, disabled, className, initialName }: Props) {
+function getCopy(entity: Entity) {
+  if (entity === 'supplier') {
+    return {
+      empty: 'Nenhum fornecedor encontrado.',
+      modalTitle: 'Novo Fornecedor',
+      createdToast: 'Fornecedor criado e selecionado!',
+      newLabelFallback: 'Novo Fornecedor',
+      createTooltip: 'Criar um novo fornecedor. Para fornecedor já cadastrado, digite no campo de busca ao lado.',
+    };
+  }
+  return {
+    empty: 'Nenhum cliente encontrado.',
+    modalTitle: 'Novo Cliente',
+    createdToast: 'Cliente criado e selecionado!',
+    newLabelFallback: 'Novo Cliente',
+    createTooltip: 'Criar um novo cadastro. Para cliente já cadastrado, digite no campo de busca ao lado.',
+  };
+}
+
+export default function ClientAutocomplete({ value, onChange, placeholder, disabled, className, initialName, entity = 'client' }: Props) {
   const { loading: authLoading, activeEmpresaId } = useAuth();
   const [query, setQuery] = useState('');
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [hits, setHits] = useState<ClientHit[]>([]);
+  const [hits, setHits] = useState<Hit[]>([]);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const { addToast } = useToast();
   const ref = useRef<HTMLDivElement>(null);
   const searchSeqRef = useRef(0);
+  const copy = getCopy(entity);
 
   const debouncedQuery = useDebounce(query, 300);
 
@@ -65,22 +90,22 @@ export default function ClientAutocomplete({ value, onChange, placeholder, disab
       const seq = ++searchSeqRef.current;
       setLoading(true);
       try {
-        const res = await searchClients(debouncedQuery, 20);
+        const res = entity === 'supplier' ? await searchSuppliers(debouncedQuery) : await searchClients(debouncedQuery, 20);
         if (seq !== searchSeqRef.current) return;
         setHits(res);
         setOpen(true);
       } catch (e) {
         if (seq !== searchSeqRef.current) return;
         const msg = e instanceof Error ? e.message : String(e);
-        logger.warn('[RPC][ERROR] search_clients_for_current_user', { error: msg });
+        logger.warn(`[RPC][ERROR] ${entity === 'supplier' ? 'search_suppliers_for_current_user' : 'search_clients_for_current_user'}`, { error: msg });
       } finally {
         if (seq === searchSeqRef.current) setLoading(false);
       }
     };
     search();
-  }, [debouncedQuery, value, initialName, authLoading, activeEmpresaId]);
+  }, [debouncedQuery, value, initialName, authLoading, activeEmpresaId, entity]);
 
-  const handleSelect = (hit: ClientHit) => {
+  const handleSelect = (hit: Hit) => {
     setQuery(hit.label);
     onChange(hit.id, hit.label);
     setOpen(false);
@@ -95,18 +120,19 @@ export default function ClientAutocomplete({ value, onChange, placeholder, disab
     }
   };
 
-	  const handleCreateSuccess = (savedPartner: any) => {
-	    const newHit: ClientHit = {
-	      id: savedPartner.id,
-	      label: savedPartner.nome || 'Novo Cliente',
-	      nome: savedPartner.nome || 'Novo Cliente',
-	      doc_unico: savedPartner.doc_unico || '',
-	    };
+  const handleCreateSuccess = (savedPartner: any) => {
+    const label = savedPartner?.nome || copy.newLabelFallback;
+    const newHit: Hit = {
+      id: savedPartner.id,
+      label,
+      nome: label,
+      doc_unico: savedPartner.doc_unico || '',
+    };
 
-	    handleSelect(newHit);
-	    setIsCreateModalOpen(false);
-	    addToast('Cliente criado e selecionado!', 'success');
-	  };
+    handleSelect(newHit);
+    setIsCreateModalOpen(false);
+    addToast(copy.createdToast, 'success');
+  };
 
   return (
     <div className={`relative flex gap-2 ${className || ''}`} ref={ref}>
@@ -140,7 +166,7 @@ export default function ClientAutocomplete({ value, onChange, placeholder, disab
         )}
         {open && !loading && hits.length === 0 && query.length >= 2 && (
           <div className="absolute z-10 mt-1 w-full bg-white border rounded-lg shadow px-4 py-3 text-sm text-gray-500">
-            Nenhum cliente encontrado.
+            {copy.empty}
           </div>
         )}
       </div>
@@ -149,7 +175,7 @@ export default function ClientAutocomplete({ value, onChange, placeholder, disab
         type="button"
         onClick={() => setIsCreateModalOpen(true)}
         className="flex-shrink-0 px-4 py-3 bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200 transition-colors text-sm font-semibold whitespace-nowrap"
-        title="Criar um novo cadastro. Para cliente já cadastrado, digite no campo de busca ao lado."
+        title={copy.createTooltip}
         disabled={disabled || authLoading || !activeEmpresaId}
       >
         Criar Novo
@@ -158,7 +184,7 @@ export default function ClientAutocomplete({ value, onChange, placeholder, disab
       <Modal
         isOpen={isCreateModalOpen}
         onClose={() => setIsCreateModalOpen(false)}
-        title="Novo Cliente"
+        title={copy.modalTitle}
         size="4xl"
       >
         <PartnerFormPanel
