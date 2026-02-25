@@ -50,6 +50,25 @@ Chame a Edge Function `woocommerce-admin` com JWT do usuário e header `x-empres
 
 Resposta inclui `store.id` (UUID). Esse `store_id` identifica a loja e deve ser usado em webhooks e jobs.
 
+## Assistente no Front-end (Configurações → E-commerce)
+
+No Ultria, o onboarding “normal” para usuários é pela UI:
+
+`Configurações → E‑commerce → Integrações (Marketplaces) → WooCommerce → Configurar`
+
+O assistente é dividido em etapas:
+1) **Conexão** (URL + CK/CS + Testar conexão)
+2) **Estoque** (fonte + depósito + estoque de segurança)
+3) **Preços** (fonte + tabela base + ajuste %)
+4) **Produtos** (ativar sync + estratégia + onde operar preview/runs)
+5) **Pedidos** (habilitar importação + registrar webhooks)
+6) **Notificações** (reservado para sprint posterior)
+7) **Mapeamentos (SKU)** (rebuild map + guias de correção)
+
+Importante:
+- “Credenciais armazenadas” e “Teste de conexão” são sinais diferentes.
+- Catálogo (import/export/preview/runs) é operado no módulo **Produtos**.
+
 ### 2) Healthcheck
 
 ```json
