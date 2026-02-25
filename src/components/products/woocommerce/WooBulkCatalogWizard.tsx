@@ -12,6 +12,7 @@ import {
   runWooImport,
   runWooSyncPrice,
   runWooSyncStock,
+  runWooWorkerNow,
   searchWooCatalogProducts,
 } from '@/services/woocommerceCatalog';
 
@@ -169,6 +170,13 @@ export default function WooBulkCatalogWizard(props: Props) {
       addToast('Execução criada e enfileirada com sucesso.', 'success');
       props.onRunCreated(response.run_id);
       setStep(3);
+
+      // UX Tiny-like: tenta processar automaticamente para o usuário não ficar preso em "queued".
+      try {
+        await runWooWorkerNow({ empresaId: props.empresaId, storeId: props.storeId });
+      } catch (error: any) {
+        addToast(error?.message || 'Não foi possível processar automaticamente. Use “Processar”.', 'warning');
+      }
     } catch (error: any) {
       addToast(error?.message || 'Falha ao iniciar execução.', 'error');
     } finally {
