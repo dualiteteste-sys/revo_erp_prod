@@ -233,7 +233,9 @@ test('UI: modal stack — Criar Novo Produto dentro de BOM não corta footer', a
   const bomDialog = page.getByRole('dialog', { name: 'Nova Ficha Técnica' });
   await expect(bomDialog).toBeVisible();
 
-  await bomDialog.getByRole('button', { name: 'Criar Novo' }).click();
+  await bomDialog.getByPlaceholder('Buscar produto ou serviço...').fill('produto-nao-existe-123');
+  await expect(page.getByText('Nenhum item encontrado')).toBeVisible();
+  await page.getByRole('button', { name: '+ Criar novo produto' }).click();
 
   const productDialog = page.getByRole('dialog', { name: 'Novo Produto' });
   await expect(productDialog).toBeVisible();

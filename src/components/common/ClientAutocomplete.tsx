@@ -1,13 +1,14 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { searchClients, ClientHit } from '@/services/clients';
 import { searchSuppliers, type SupplierHit } from '@/services/compras';
 import { useDebounce } from '@/hooks/useDebounce';
-import { Loader2 } from 'lucide-react';
+import { Loader2, Plus } from 'lucide-react';
 import Modal from '@/components/ui/Modal';
 import PartnerFormPanel from '@/components/partners/PartnerFormPanel';
 import { useToast } from '@/contexts/ToastProvider';
 import { logger } from '@/lib/logger';
 import { useAuth } from '@/contexts/AuthProvider';
+import type { PartnerDetails } from '@/services/partners';
 
 type Entity = 'client' | 'supplier';
 type Hit = ClientHit | SupplierHit;
@@ -20,9 +21,19 @@ type Props = {
   className?: string;
   initialName?: string;
   entity?: Entity;
+  allowCreate?: boolean;
 };
 
-export default function ClientAutocomplete({ value, onChange, placeholder, disabled, className, initialName, entity = 'client' }: Props) {
+export default function ClientAutocomplete({
+  value,
+  onChange,
+  placeholder,
+  disabled,
+  className,
+  initialName,
+  entity = 'client',
+  allowCreate = true,
+}: Props) {
   const { loading: authLoading, activeEmpresaId } = useAuth();
   const [query, setQuery] = useState('');
   const [open, setOpen] = useState(false);
@@ -35,6 +46,16 @@ export default function ClientAutocomplete({ value, onChange, placeholder, disab
   const isSupplier = entity === 'supplier';
 
   const debouncedQuery = useDebounce(query, 300);
+
+  const createCtaLabel = useMemo(() => {
+    if (isSupplier) return '+ Criar novo fornecedor';
+    return '+ Criar novo cliente';
+  }, [isSupplier]);
+
+  const emptyLabel = useMemo(() => {
+    if (isSupplier) return 'Nenhum fornecedor encontrado.';
+    return 'Nenhum cliente encontrado.';
+  }, [isSupplier]);
 
   useEffect(() => {
     if (value && initialName) {
@@ -101,8 +122,8 @@ export default function ClientAutocomplete({ value, onChange, placeholder, disab
     }
   };
 
-  const handleCreateSuccess = (savedPartner: any) => {
-    const label = savedPartner?.nome || 'Novo Cliente';
+  const handleCreateSuccess = (savedPartner: PartnerDetails) => {
+    const label = savedPartner?.nome || (isSupplier ? 'Novo Fornecedor' : 'Novo Cliente');
     const newHit: Hit = {
       id: savedPartner.id,
       label,
@@ -112,11 +133,11 @@ export default function ClientAutocomplete({ value, onChange, placeholder, disab
 
     handleSelect(newHit);
     setIsCreateModalOpen(false);
-    addToast('Cliente criado e selecionado!', 'success');
+    addToast(isSupplier ? 'Fornecedor criado e selecionado!' : 'Cliente criado e selecionado!', 'success');
   };
 
   return (
-    <div className={`relative flex gap-2 ${className || ''}`} ref={ref}>
+    <div className={`relative flex ${className || ''}`} ref={ref}>
       <div className="relative flex-grow">
         <input
           className="w-full p-3 bg-white/80 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition shadow-sm"
@@ -146,21 +167,26 @@ export default function ClientAutocomplete({ value, onChange, placeholder, disab
           </div>
         )}
         {open && !loading && hits.length === 0 && query.length >= 2 && (
-          <div className="absolute z-10 mt-1 w-full bg-white border rounded-lg shadow px-4 py-3 text-sm text-gray-500">
-            {isSupplier ? 'Nenhum fornecedor encontrado.' : 'Nenhum cliente encontrado.'}
+          <div className="absolute z-10 mt-1 w-full bg-white border rounded-lg shadow-lg overflow-hidden">
+            <div className="px-4 py-3 text-sm text-gray-500">{emptyLabel}</div>
+            {allowCreate && (
+              <button
+                type="button"
+                className="w-full px-4 py-3 text-left text-sm font-semibold text-blue-700 hover:bg-blue-50 flex items-center gap-2"
+                onMouseDown={(e) => {
+                  e.preventDefault();
+                  setIsCreateModalOpen(true);
+                  setOpen(false);
+                }}
+                disabled={disabled || authLoading || !activeEmpresaId}
+              >
+                <Plus size={16} />
+                {createCtaLabel}
+              </button>
+            )}
           </div>
         )}
       </div>
-
-      <button
-        type="button"
-        onClick={() => setIsCreateModalOpen(true)}
-        className="flex-shrink-0 px-4 py-3 bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200 transition-colors text-sm font-semibold whitespace-nowrap"
-        title="Criar um novo cadastro. Para cliente já cadastrado, digite no campo de busca ao lado."
-        disabled={disabled || authLoading || !activeEmpresaId}
-      >
-        Criar Novo
-      </button>
 
       <Modal
         isOpen={isCreateModalOpen}
@@ -170,6 +196,7 @@ export default function ClientAutocomplete({ value, onChange, placeholder, disab
       >
         <PartnerFormPanel
           partner={null}
+          initialValues={{ tipo: isSupplier ? 'fornecedor' : 'cliente' }}
           onSaveSuccess={handleCreateSuccess}
           onClose={() => setIsCreateModalOpen(false)}
         />
