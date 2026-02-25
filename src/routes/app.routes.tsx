@@ -55,15 +55,23 @@ const WooCommerceStoreDetailPage = lazyImport(() => import("../pages/dev/WooComm
 const SupabaseDemoPage = lazyImport(() => import("../pages/tools/SupabaseDemoPage"));
 const SettingsPage = lazyImport(() => import("../pages/settings/SettingsPage"));
 const TermsOfUsePage = lazyImport(() => import("../pages/legal/TermsOfUsePage"));
-const BillingSuccessPage = lazyImport(() => import("../pages/billing/SuccessPage"));
 
-const BillingCancelLanding = () => {
+const clearPendingPlanIntent = () => {
   try {
     localStorage.removeItem("pending_plan_slug");
     localStorage.removeItem("pending_plan_cycle");
   } catch {
     // ignore
   }
+};
+
+const BillingSuccessLanding = () => {
+  clearPendingPlanIntent();
+  return <Navigate to="/app/dashboard" replace />;
+};
+
+const BillingCancelLanding = () => {
+  clearPendingPlanIntent();
   return <Navigate to="/app/configuracoes/geral/assinatura" replace />;
 };
 
@@ -154,7 +162,7 @@ export const appRoutes: RouteObject[] = [
             { path: "termos-de-uso", element: <Suspense fallback={<PageLoader />}><TermsOfUsePage /></Suspense> },
 
             // Billing / Stripe redirects
-            { path: "billing/success", element: <Suspense fallback={<PageLoader />}><BillingSuccessPage /></Suspense> },
+            { path: "billing/success", element: <BillingSuccessLanding /> },
             { path: "billing/cancel", element: <BillingCancelLanding /> },
 
             // Cadastros
