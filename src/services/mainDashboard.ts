@@ -28,6 +28,7 @@ export type FinanceiroFluxoCaixaCenteredItem = {
   is_past: boolean;
   is_current: boolean;
   saldo_inicial_cc?: number;  // Saldo no início da janela (apenas no primeiro registro)
+  saldo_atual_cc?: number; // Saldo atual total (apenas no primeiro registro) — âncora do saldo acumulado
 };
 
 
