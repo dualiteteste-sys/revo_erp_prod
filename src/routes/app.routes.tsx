@@ -56,6 +56,25 @@ const SupabaseDemoPage = lazyImport(() => import("../pages/tools/SupabaseDemoPag
 const SettingsPage = lazyImport(() => import("../pages/settings/SettingsPage"));
 const TermsOfUsePage = lazyImport(() => import("../pages/legal/TermsOfUsePage"));
 
+const clearPendingPlanIntent = () => {
+  try {
+    localStorage.removeItem("pending_plan_slug");
+    localStorage.removeItem("pending_plan_cycle");
+  } catch {
+    // ignore
+  }
+};
+
+const BillingSuccessLanding = () => {
+  clearPendingPlanIntent();
+  return <Navigate to="/app/dashboard" replace />;
+};
+
+const BillingCancelLanding = () => {
+  clearPendingPlanIntent();
+  return <Navigate to="/app/configuracoes/geral/assinatura" replace />;
+};
+
 // Fiscal Pages
 const NfeEmissoesPage = lazyImport(() => import("../pages/fiscal/NfeEmissoesPage"));
 const NfeSettingsPage = lazyImport(() => import("../pages/fiscal/NfeSettingsPage"));
@@ -120,17 +139,6 @@ const CobrancasServicosPage = lazyImport(() => import("../pages/servicos/Cobranc
 const SuportePage = lazyImport(() => import("../pages/support/SuportePage"));
 const SupportConsolePage = lazyImport(() => import("../pages/support/SupportConsolePage"));
 
-const BillingSuccessLanding = () => {
-  try {
-    localStorage.removeItem("pending_plan_slug");
-    localStorage.removeItem("pending_plan_cycle");
-  } catch {
-    // ignore
-  }
-
-  return <Navigate to="/app/dashboard" replace />;
-};
-
 export const appRoutes: RouteObject[] = [
     {
         path: "/app",
@@ -155,7 +163,7 @@ export const appRoutes: RouteObject[] = [
 
             // Billing / Stripe redirects
             { path: "billing/success", element: <BillingSuccessLanding /> },
-            { path: "billing/cancel", element: <Navigate to="/app/configuracoes/geral/assinatura" replace /> },
+            { path: "billing/cancel", element: <BillingCancelLanding /> },
 
             // Cadastros
             {
