@@ -152,7 +152,12 @@ test('Financeiro: criar conta a pagar recorrente (mensal) sem erros', async ({ p
       return;
     }
 
-    if (url.includes('/rest/v1/rpc/search_clients_for_current_user')) {
+    // Contas a pagar: fornecedor deve buscar fornecedores (RPC `search_suppliers_for_current_user`).
+    // Mantém compatibilidade com mocks antigos que ainda stubam `search_clients_for_current_user`.
+    if (
+      url.includes('/rest/v1/rpc/search_suppliers_for_current_user') ||
+      url.includes('/rest/v1/rpc/search_clients_for_current_user')
+    ) {
       await route.fulfill({
         json: [
           { id: 'for-1', label: 'Fornecedor E2E', nome: 'Fornecedor E2E', doc_unico: '00000000000191' },
