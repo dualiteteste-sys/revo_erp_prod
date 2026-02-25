@@ -27,6 +27,11 @@ export function buildDashboardFluxoCaixaChartData(rows: FinanceiroFluxoCaixaCent
     ?? rows[0]?.saldo_inicial_cc
     ?? 0;
 
+  const saldoAtual =
+    rows.find((r) => (r.saldo_atual_cc || 0) !== 0)?.saldo_atual_cc
+    ?? rows[0]?.saldo_atual_cc
+    ?? 0;
+
   const enrichedBase: Omit<DashboardFluxoCaixaChartDataItem, 'saldo'>[] = rows.map((item) => {
     const receberRealizado = Number(item.receber_realizado || 0);
     const receberPrevisto = Number(item.receber_previsto || 0);
@@ -56,12 +61,26 @@ export function buildDashboardFluxoCaixaChartData(rows: FinanceiroFluxoCaixaCent
 
   const idxCurrent = enrichedBase.findIndex((r) => r.is_current);
 
-  let saldoAcumulado = Number(saldoInicialJanela || 0);
+  const hasAnchor = idxCurrent >= 0 && Number(saldoAtual || 0) !== 0;
+
+  // Calcula saldo relativo (base=0) e depois aplica shift:
+  // - Com âncora: shift para bater saldo_atual_cc no mês atual.
+  // - Sem âncora: shift = saldo_inicial_cc (início da janela).
+  let saldoRel = 0;
   const chartData = enrichedBase.map((item) => {
-    saldoAcumulado += item.receber - item.pagar;
-    return { ...item, saldo: saldoAcumulado };
+    saldoRel += item.receber - item.pagar;
+    return { ...item, saldo: saldoRel };
   });
+
+  const shift = hasAnchor
+    ? Number(saldoAtual || 0) - Number(chartData[idxCurrent]?.saldo || 0)
+    : Number(saldoInicialJanela || 0);
+
+  if (shift !== 0) {
+    for (const item of chartData) {
+      item.saldo += shift;
+    }
+  }
 
   return { chartData, currentMonthIndex: idxCurrent };
 }
-
