@@ -432,37 +432,37 @@ const FinancialChartWidget: React.FC<WidgetProps> = ({ loading }) => {
                 <div className="space-y-2">
                     <div className="flex items-center justify-between gap-4">
                         <span className="text-sm font-semibold text-emerald-700">Receitas</span>
-                        <span className="font-semibold text-slate-900">{formatCurrency(dataPoint.receber)}</span>
+                        <span className="font-semibold text-slate-900">{formatMoney(dataPoint.receber)}</span>
                     </div>
                     <div className="flex items-center justify-between gap-4 text-xs text-slate-600">
                         <span>Realizado</span>
-                        <span className="font-medium">{formatCurrency(dataPoint.receber_realizado)}</span>
+                        <span className="font-medium">{formatMoney(dataPoint.receber_realizado)}</span>
                     </div>
                     {showPrevisto && (
                         <div className="flex items-center justify-between gap-4 text-xs text-slate-600">
                             <span>Previsto</span>
-                            <span className="font-medium">{formatCurrency(dataPoint.receber_previsto)}</span>
+                            <span className="font-medium">{formatMoney(dataPoint.receber_previsto)}</span>
                         </div>
                     )}
 
                     <div className="pt-2 border-t border-slate-100 flex items-center justify-between gap-4">
                         <span className="text-sm font-semibold text-rose-700">Despesas</span>
-                        <span className="font-semibold text-slate-900">{formatCurrency(dataPoint.pagar)}</span>
+                        <span className="font-semibold text-slate-900">{formatMoney(dataPoint.pagar)}</span>
                     </div>
                     <div className="flex items-center justify-between gap-4 text-xs text-slate-600">
                         <span>Realizado</span>
-                        <span className="font-medium">{formatCurrency(dataPoint.pagar_realizado)}</span>
+                        <span className="font-medium">{formatMoney(dataPoint.pagar_realizado)}</span>
                     </div>
                     {showPrevisto && (
                         <div className="flex items-center justify-between gap-4 text-xs text-slate-600">
                             <span>Previsto</span>
-                            <span className="font-medium">{formatCurrency(dataPoint.pagar_previsto)}</span>
+                            <span className="font-medium">{formatMoney(dataPoint.pagar_previsto)}</span>
                         </div>
                     )}
 
                     <div className="pt-2 border-t border-slate-100 flex items-center justify-between gap-4">
                         <span className="text-sm font-semibold text-indigo-700">Saldo acumulado</span>
-                        <span className="font-semibold text-slate-900">{formatCurrency(dataPoint.saldo)}</span>
+                        <span className="font-semibold text-slate-900">{formatMoney(dataPoint.saldo)}</span>
                     </div>
                 </div>
             </div>

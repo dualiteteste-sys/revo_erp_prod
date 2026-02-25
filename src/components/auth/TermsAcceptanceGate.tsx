@@ -182,16 +182,6 @@ export default function TermsAcceptanceGate({
               target="_blank"
               rel="noreferrer noopener"
               className="font-medium text-blue-700 hover:underline"
-              onClick={(event) => {
-                // Hardening: alguns ambientes in-app/embeds podem bloquear o target=_blank.
-                // Mantemos href (acessível) e tentamos window.open de forma síncrona ao clique.
-                event.preventDefault();
-                try {
-                  window.open(termsUrl, "_blank", "noopener,noreferrer");
-                } catch {
-                  window.location.href = termsUrl;
-                }
-              }}
             >
               Ler termo completo em página dedicada
             </a>
