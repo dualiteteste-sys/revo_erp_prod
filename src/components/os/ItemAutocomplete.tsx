@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { searchItemsForOs, OsItemSearchResult } from '@/services/os';
 import { useDebounce } from '@/hooks/useDebounce';
-import { Loader2, Search, Wrench, Package } from 'lucide-react';
+import { Loader2, Plus, Search, Wrench, Package } from 'lucide-react';
 import Modal from '@/components/ui/Modal';
 import ProductFormPanel from '@/components/products/ProductFormPanel';
 import { saveProduct } from '@/services/products';
@@ -164,9 +164,25 @@ export default function ItemAutocomplete({ onSelect, disabled, onlySales = true,
           ))
         ) : (
           !loading && query.length >= 2 && (
-            <div className="px-4 py-8 text-center text-gray-500">
-              <p className="font-medium">Nenhum item encontrado</p>
-              <p className="text-xs mt-1">Tente outro termo de busca</p>
+            <div className="px-4 py-6 text-gray-500">
+              <div className="text-center">
+                <p className="font-medium">Nenhum item encontrado</p>
+                <p className="text-xs mt-1">Tente outro termo de busca</p>
+              </div>
+              {!disabled && (
+                <button
+                  type="button"
+                  className="mt-4 w-full px-4 py-3 text-left text-sm font-semibold text-blue-700 hover:bg-blue-50 rounded-lg flex items-center gap-2"
+                  onMouseDown={(e) => {
+                    e.preventDefault();
+                    setIsCreateModalOpen(true);
+                    setOpen(false);
+                  }}
+                >
+                  <Plus size={16} />
+                  + Criar novo produto
+                </button>
+              )}
             </div>
           )
         )}
@@ -177,7 +193,7 @@ export default function ItemAutocomplete({ onSelect, disabled, onlySales = true,
   };
 
   return (
-    <div className="relative flex gap-2">
+    <div className="relative">
       <div className="relative flex-grow">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={20} />
         <input
@@ -195,16 +211,6 @@ export default function ItemAutocomplete({ onSelect, disabled, onlySales = true,
           </div>
         )}
       </div>
-
-      <button
-        type="button"
-        onClick={() => setIsCreateModalOpen(true)}
-        className="flex-shrink-0 px-4 py-3 bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200 transition-colors text-sm font-semibold whitespace-nowrap"
-        title="Criar um novo cadastro. Para cliente já cadastrado, digite no campo de busca ao lado."
-        disabled={disabled}
-      >
-        Criar Novo
-      </button>
 
       {renderDropdown()}
 

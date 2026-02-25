@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { listServices, Service } from '@/services/services';
 import { useDebounce } from '@/hooks/useDebounce';
-import { Loader2, Search, Wrench } from 'lucide-react';
+import { Loader2, Plus, Search, Wrench } from 'lucide-react';
 import Modal from '@/components/ui/Modal';
 import ProductFormPanel from '@/components/products/ProductFormPanel';
 import { saveProduct } from '@/services/products';
@@ -136,7 +136,7 @@ export default function ServiceAutocomplete({
 
   return (
     <div className={`relative ${className || ''}`} ref={ref}>
-      <div className="relative flex gap-1">
+      <div className="relative">
         <div className="relative flex-grow">
           <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
             {loading ? <Loader2 className="animate-spin text-blue-500" size={18} /> : <Search className="text-gray-400" size={18} />}
@@ -151,16 +151,6 @@ export default function ServiceAutocomplete({
             disabled={disabled || authLoading || !activeEmpresaId}
           />
         </div>
-        {!disabled && !authLoading && !!activeEmpresaId && (
-          <button
-            onClick={() => setIsCreateModalOpen(true)}
-            className="px-4 py-3 bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200 transition-colors flex-shrink-0 text-sm font-semibold whitespace-nowrap"
-            title="Criar um novo cadastro. Para cliente já cadastrado, digite no campo de busca ao lado."
-            type="button"
-          >
-            Criar Novo
-          </button>
-        )}
       </div>
 
       {open && results.length > 0 && (
@@ -195,8 +185,22 @@ export default function ServiceAutocomplete({
       )}
 
       {open && !loading && results.length === 0 && query.length >= 2 && (
-        <div className="absolute z-10 mt-1 w-full bg-white border rounded-lg shadow px-4 py-3 text-sm text-gray-500">
-          Nenhum serviço encontrado.
+        <div className="absolute z-10 mt-1 w-full bg-white border rounded-lg shadow-lg overflow-hidden">
+          <div className="px-4 py-3 text-sm text-gray-500">Nenhum serviço encontrado.</div>
+          {!disabled && !authLoading && !!activeEmpresaId && (
+            <button
+              type="button"
+              className="w-full px-4 py-3 text-left text-sm font-semibold text-blue-700 hover:bg-blue-50 flex items-center gap-2"
+              onMouseDown={(e) => {
+                e.preventDefault();
+                setIsCreateModalOpen(true);
+                setOpen(false);
+              }}
+            >
+              <Plus size={16} />
+              + Criar novo serviço
+            </button>
+          )}
         </div>
       )}
 
