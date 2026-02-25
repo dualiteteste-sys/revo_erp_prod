@@ -151,6 +151,34 @@ describe('TermsAcceptanceGate', () => {
     expect(screen.queryByText('Termo de Aceite')).not.toBeInTheDocument();
   });
 
+  it('exposes terms link as external (new tab) without intercepting click', async () => {
+    vi.mocked(svc.getCurrentTermsDocument).mockResolvedValue({
+      key: 'ultria_erp_terms',
+      version: '1.0',
+      body: 'Termos…',
+      body_sha256: 'hash',
+    });
+    vi.mocked(svc.getTermsAcceptanceStatus).mockResolvedValue({
+      is_accepted: false,
+      acceptance_id: null,
+      accepted_at: null,
+      version: '1.0',
+      document_sha256: 'hash',
+    });
+
+    renderWithQuery(
+      <TermsAcceptanceGate userId="user-1" empresaId="empresa-1" currentPath="/app/products" onDecline={() => {}}>
+        <div>APP_OK</div>
+      </TermsAcceptanceGate>,
+    );
+
+    const link = await screen.findByRole('link', { name: /Ler termo completo/i });
+    expect(link).toHaveAttribute('target', '_blank');
+    expect(link).toHaveAttribute('rel');
+    expect(link.getAttribute('rel') || '').toMatch(/noopener/i);
+    expect(link.getAttribute('href') || '').toMatch(/\/app\/termos-de-uso$/);
+  });
+
   it('fails open when terms RPC is missing in schema cache (compat mode)', async () => {
     const missingRpc = new RpcError('HTTP_404: Could not find the function public.terms_acceptance_status_get(p_key) in the schema cache');
     missingRpc.code = 'PGRST202';
