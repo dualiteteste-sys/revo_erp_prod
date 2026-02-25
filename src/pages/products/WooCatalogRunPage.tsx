@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthProvider';
 import { useToast } from '@/contexts/ToastProvider';
@@ -7,7 +7,7 @@ import PageShell from '@/components/ui/PageShell';
 import PageCard from '@/components/ui/PageCard';
 import { Button } from '@/components/ui/button';
 import { getWooRun, retryWooRunFailed, runWooWorkerNow } from '@/services/woocommerceCatalog';
-import { computeCatalogRunCounts, shouldAllowRetryFailed } from '@/lib/integrations/woocommerce/catalogRuns';
+import { computeCatalogRunCounts, isTerminalWooRunStatus, shouldAllowRetryFailed } from '@/lib/integrations/woocommerce/catalogRuns';
 
 export default function WooCatalogRunPage() {
   const { activeEmpresaId } = useAuth();
@@ -19,7 +19,7 @@ export default function WooCatalogRunPage() {
   const [loading, setLoading] = useState(false);
   const [data, setData] = useState<{ run: any; items: any[] } | null>(null);
 
-  const load = async () => {
+  const load = useCallback(async () => {
     if (!activeEmpresaId || !runId || !storeId) return;
     setLoading(true);
     try {
@@ -30,17 +30,18 @@ export default function WooCatalogRunPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [activeEmpresaId, addToast, runId, storeId]);
 
   useEffect(() => {
     void load();
-    const timer = window.setInterval(() => {
-      if (!data?.run) return;
-      if (String(data.run.status) === 'done' || String(data.run.status) === 'error' || String(data.run.status) === 'partial') return;
-      void load();
-    }, 8000);
+  }, [load]);
+
+  useEffect(() => {
+    if (!activeEmpresaId || !runId || !storeId) return;
+    if (isTerminalWooRunStatus(data?.run?.status)) return;
+    const timer = window.setInterval(() => void load(), 8000);
     return () => window.clearInterval(timer);
-  }, [activeEmpresaId, runId, storeId]);
+  }, [activeEmpresaId, data?.run?.status, load, runId, storeId]);
 
   const counts = useMemo(() => {
     return computeCatalogRunCounts(data?.items ?? []);
