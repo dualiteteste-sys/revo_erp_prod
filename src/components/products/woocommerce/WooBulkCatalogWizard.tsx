@@ -179,7 +179,7 @@ export default function WooBulkCatalogWizard(props: Props) {
         if (processed > 0) addToast('Processamento iniciado.', 'success');
         else if (hint) addToast(hint, 'warning');
       } catch (error: any) {
-        addToast(error?.message || 'Falha ao iniciar processamento automático. Você pode processar manualmente no run.', 'warning');
+        addToast(error?.message || 'Falha ao iniciar processamento. Use “Processar” na execução.', 'warning');
       }
     } catch (error: any) {
       addToast(error?.message || 'Falha ao iniciar execução.', 'error');

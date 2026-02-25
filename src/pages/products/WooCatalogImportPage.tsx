@@ -75,7 +75,7 @@ export default function WooCatalogImportPage() {
         if (processed > 0) addToast('Processamento iniciado.', 'success');
         else if (hint) addToast(hint, 'warning');
       } catch (error: any) {
-        addToast(error?.message || 'Falha ao iniciar processamento automático. Use “Processar” na tela de execução.', 'warning');
+        addToast(error?.message || 'Falha ao iniciar processamento. Use “Processar” na execução.', 'warning');
       }
     } catch (error: any) {
       addToast(error?.message || 'Falha ao iniciar importação.', 'error');
