@@ -6,7 +6,7 @@ import PageHeader from '@/components/ui/PageHeader';
 import PageShell from '@/components/ui/PageShell';
 import PageCard from '@/components/ui/PageCard';
 import { Button } from '@/components/ui/button';
-import { previewWooImport, runWooImport, searchWooCatalogProducts } from '@/services/woocommerceCatalog';
+import { previewWooImport, runWooImport, runWooWorkerNow, searchWooCatalogProducts } from '@/services/woocommerceCatalog';
 
 export default function WooCatalogImportPage() {
   const { activeEmpresaId } = useAuth();
@@ -67,6 +67,16 @@ export default function WooCatalogImportPage() {
       });
       addToast('Importação enfileirada com sucesso.', 'success');
       navigate(`/app/products/woocommerce/runs/${response.run_id}?store=${storeId}`);
+
+      try {
+        const worker = await runWooWorkerNow({ empresaId: activeEmpresaId, storeId });
+        const processed = Number((worker as any)?.processed_jobs ?? 0);
+        const hint = String((worker as any)?.hint ?? '').trim();
+        if (processed > 0) addToast('Processamento iniciado.', 'success');
+        else if (hint) addToast(hint, 'warning');
+      } catch (error: any) {
+        addToast(error?.message || 'Falha ao iniciar processamento automático. Use “Processar” na tela de execução.', 'warning');
+      }
     } catch (error: any) {
       addToast(error?.message || 'Falha ao iniciar importação.', 'error');
     } finally {
