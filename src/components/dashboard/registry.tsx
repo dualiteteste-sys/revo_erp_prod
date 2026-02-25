@@ -12,6 +12,7 @@ import AtividadesRecentes from './AtividadesRecentes';
 import GraficoVendas from './GraficoVendas';
 import RankingCategorias from './RankingCategorias';
 import GraficoPagarReceber from './GraficoPagarReceber';
+import { buildDashboardFluxoCaixaChartData, type DashboardFluxoCaixaChartDataItem as ChartDataItem } from './fluxoCaixa';
 import { getMainDashboardData, getFinanceiroFluxoCaixaCentered } from '@/services/mainDashboard';
 import { formatCurrency } from '@/lib/utils';
 import { Layout } from 'react-grid-layout';
@@ -382,16 +383,6 @@ const CalendarWidget: React.FC<WidgetProps> = () => {
     );
 };
 
-type ChartDataItem = {
-    mes: string;
-    mes_iso: string;
-    receber: number;
-    pagar: number;
-    saldo: number;
-    is_past: boolean;
-    is_current: boolean;
-};
-
 const FinancialChartWidget: React.FC<WidgetProps> = ({ loading }) => {
     const [period, setPeriod] = useState(6);
     const [chartData, setChartData] = useState<ChartDataItem[]>([]);
@@ -405,38 +396,9 @@ const FinancialChartWidget: React.FC<WidgetProps> = ({ loading }) => {
         getFinanceiroFluxoCaixaCentered(period)
             .then(res => {
                 if (!active) return;
-                if (res && res.length > 0) {
-                    // Saldo inicial vem do primeiro registro (soma dos saldos das contas correntes)
-                    const saldoInicialCC = res[0]?.saldo_inicial_cc || 0;
-                    let saldoAcumulado = saldoInicialCC;
-
-                    const enriched = res.map((item, idx) => {
-                        const receber = item.is_past
-                            ? (item.receber_realizado || 0)
-                            : (item.receber_realizado || 0) + (item.receber_previsto || 0);
-                        const pagar = item.is_past
-                            ? (item.pagar_realizado || 0)
-                            : (item.pagar_realizado || 0) + (item.pagar_previsto || 0);
-                        const liquido = receber - pagar;
-                        saldoAcumulado += liquido;
-
-                        if (item.is_current) setCurrentMonthIndex(idx);
-
-                        return {
-                            mes: item.mes,
-                            mes_iso: item.mes_iso,
-                            receber,
-                            pagar,
-                            saldo: saldoAcumulado,
-                            is_past: item.is_past,
-                            is_current: item.is_current,
-                        };
-
-                    });
-                    setChartData(enriched);
-                } else {
-                    setChartData([]);
-                }
+                const { chartData: computed, currentMonthIndex: idx } = buildDashboardFluxoCaixaChartData(res ?? []);
+                setChartData(computed);
+                setCurrentMonthIndex(idx);
             })
             .catch(() => {
                 if (active) setChartData([]);
@@ -454,6 +416,8 @@ const FinancialChartWidget: React.FC<WidgetProps> = ({ loading }) => {
         const isPast = dataPoint?.is_past;
         const isCurrent = dataPoint?.is_current;
 
+        const showPrevisto = !isPast;
+
         return (
             <div className="bg-white/95 backdrop-blur-xl rounded-2xl shadow-2xl border border-slate-100 p-4 min-w-[220px]">
                 <div className="flex items-center justify-between mb-3 pb-2 border-b border-slate-100">
@@ -465,15 +429,42 @@ const FinancialChartWidget: React.FC<WidgetProps> = ({ loading }) => {
                         {isPast ? 'Realizado' : isCurrent ? 'Atual' : 'Previsto'}
                     </span>
                 </div>
-                {payload.map((p: any, i: number) => (
-                    <div key={i} className="flex items-center justify-between gap-4 py-1">
-                        <span className="flex items-center gap-2 text-sm text-slate-600">
-                            <span className="w-3 h-3 rounded-full" style={{ backgroundColor: p.color }} />
-                            {p.name}
-                        </span>
-                        <span className="font-semibold text-slate-900">{formatCurrency(p.value)}</span>
+                <div className="space-y-2">
+                    <div className="flex items-center justify-between gap-4">
+                        <span className="text-sm font-semibold text-emerald-700">Receitas</span>
+                        <span className="font-semibold text-slate-900">{formatCurrency(dataPoint.receber)}</span>
                     </div>
-                ))}
+                    <div className="flex items-center justify-between gap-4 text-xs text-slate-600">
+                        <span>Realizado</span>
+                        <span className="font-medium">{formatCurrency(dataPoint.receber_realizado)}</span>
+                    </div>
+                    {showPrevisto && (
+                        <div className="flex items-center justify-between gap-4 text-xs text-slate-600">
+                            <span>Previsto</span>
+                            <span className="font-medium">{formatCurrency(dataPoint.receber_previsto)}</span>
+                        </div>
+                    )}
+
+                    <div className="pt-2 border-t border-slate-100 flex items-center justify-between gap-4">
+                        <span className="text-sm font-semibold text-rose-700">Despesas</span>
+                        <span className="font-semibold text-slate-900">{formatCurrency(dataPoint.pagar)}</span>
+                    </div>
+                    <div className="flex items-center justify-between gap-4 text-xs text-slate-600">
+                        <span>Realizado</span>
+                        <span className="font-medium">{formatCurrency(dataPoint.pagar_realizado)}</span>
+                    </div>
+                    {showPrevisto && (
+                        <div className="flex items-center justify-between gap-4 text-xs text-slate-600">
+                            <span>Previsto</span>
+                            <span className="font-medium">{formatCurrency(dataPoint.pagar_previsto)}</span>
+                        </div>
+                    )}
+
+                    <div className="pt-2 border-t border-slate-100 flex items-center justify-between gap-4">
+                        <span className="text-sm font-semibold text-indigo-700">Saldo acumulado</span>
+                        <span className="font-semibold text-slate-900">{formatCurrency(dataPoint.saldo)}</span>
+                    </div>
+                </div>
             </div>
         );
     };
