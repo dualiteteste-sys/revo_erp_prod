@@ -486,6 +486,20 @@ export function getRoadmaps(): RoadmapGroup[] {
           },
         },
         {
+          key: 'integracoes.woo',
+          title: 'Conecte o WooCommerce',
+          description: 'Informe URL + Consumer Key/Secret e valide “Testar conexão”.',
+          actionLabel: 'Abrir Marketplaces',
+          actionHref: '/app/configuracoes/ecommerce/marketplaces',
+          check: async (supabase) => {
+            const rows = await safeRpcList<any>(supabase, 'ecommerce_connections_list', {});
+            const has = requireKnown(rows, 'Não foi possível validar conexão WooCommerce agora.').some(
+              (r) => r?.provider === 'woo' && r?.status === 'connected'
+            );
+            return has;
+          },
+        },
+        {
           key: 'integracoes.saude',
           title: 'Verifique o painel de saúde',
           description: 'Veja contadores e reprocessamento (DLQ) para reduzir suporte e retrabalho.',

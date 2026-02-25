@@ -1662,11 +1662,13 @@ export const HELP_CATALOG: HelpEntry[] = [
     match: '/app/configuracoes/ecommerce/marketplaces',
     title: 'Guia Rápido de Integrações (Marketplaces)',
     whatIs:
-      'Integrações conectam o ERP ao canal (Mercado Livre/Shopee). A meta é simples: importar pedidos sem duplicar, com logs e reprocesso seguro (quando algo falhar).',
+      'Integrações conectam o ERP ao canal (WooCommerce/Mercado Livre/Shopee). A meta é simples: operar pedidos e catálogo com previsibilidade (preview), reprocesso seguro (idempotente) e diagnóstico claro.',
     steps: [
-      'Conecte o provider (OAuth) e confirme que o status fica “Saudável”.',
-      'Rode uma importação inicial (pedidos) e valide o mapeamento em Vendas.',
-      'Se algo falhar: verifique a DLQ em Desenvolvedor → Saúde e reprocessar com segurança.',
+      'Abra “Configurar” no card do provider e siga o assistente por etapas.',
+      'WooCommerce: salve credenciais (CK/CS) e valide “Testar conexão”.',
+      'Defina regras base (estoque/preço) e ative os recursos desejados.',
+      'Catálogo (import/export + preview + execução): opere no módulo Produtos.',
+      'Se algo falhar: verifique Saúde (Ops) e, se necessário, o Painel Woo (Desenvolvedor) para logs/DLQ por store.',
     ],
     dependsOn: ['Permissão: Integrações (manage)', 'Conexão OAuth ativa', 'Produtos/estoque (para mapeamento)'],
     connectsWith: ['Vendas (pedidos)', 'Suprimentos (estoque)', 'Desenvolvedor (Saúde/DLQ)', 'Logs (auditoria)'],
