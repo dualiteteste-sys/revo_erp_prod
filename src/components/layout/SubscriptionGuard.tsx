@@ -27,6 +27,8 @@ const SubscriptionGuard: React.FC<SubscriptionGuardProps> = ({ children }) => {
     const allowNoSub =
       // Permite acessar a tela de assinatura e demais configurações para corrigir o estado.
       path.startsWith('/app/configuracoes') ||
+      // Retorno do Stripe precisa ser acessível sem assinatura local (self-heal acontece aqui).
+      path.startsWith('/app/billing') ||
       // Mantém ferramentas internas acessíveis (triagem/recuperação).
       path.startsWith('/app/desenvolvedor');
 
