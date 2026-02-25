@@ -1,5 +1,10 @@
 export type CatalogRunItemStatus = 'QUEUED' | 'RUNNING' | 'DONE' | 'ERROR' | 'DEAD' | 'SKIPPED';
 
+export function isTerminalWooRunStatus(status: unknown) {
+  const raw = String(status ?? '').toLowerCase();
+  return raw === 'done' || raw === 'error' || raw === 'partial';
+}
+
 export function computeCatalogRunCounts(items: Array<{ status: CatalogRunItemStatus | string }>) {
   const planned = items.length;
   const done = items.filter((item) => String(item.status) === 'DONE').length;
