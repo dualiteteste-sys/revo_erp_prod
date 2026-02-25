@@ -22,25 +22,6 @@ type Props = {
   entity?: Entity;
 };
 
-function getCopy(entity: Entity) {
-  if (entity === 'supplier') {
-    return {
-      empty: 'Nenhum fornecedor encontrado.',
-      modalTitle: 'Novo Fornecedor',
-      createdToast: 'Fornecedor criado e selecionado!',
-      newLabelFallback: 'Novo Fornecedor',
-      createTooltip: 'Criar um novo fornecedor. Para fornecedor já cadastrado, digite no campo de busca ao lado.',
-    };
-  }
-  return {
-    empty: 'Nenhum cliente encontrado.',
-    modalTitle: 'Novo Cliente',
-    createdToast: 'Cliente criado e selecionado!',
-    newLabelFallback: 'Novo Cliente',
-    createTooltip: 'Criar um novo cadastro. Para cliente já cadastrado, digite no campo de busca ao lado.',
-  };
-}
-
 export default function ClientAutocomplete({ value, onChange, placeholder, disabled, className, initialName, entity = 'client' }: Props) {
   const { loading: authLoading, activeEmpresaId } = useAuth();
   const [query, setQuery] = useState('');
@@ -51,7 +32,7 @@ export default function ClientAutocomplete({ value, onChange, placeholder, disab
   const { addToast } = useToast();
   const ref = useRef<HTMLDivElement>(null);
   const searchSeqRef = useRef(0);
-  const copy = getCopy(entity);
+  const isSupplier = entity === 'supplier';
 
   const debouncedQuery = useDebounce(query, 300);
 
@@ -121,7 +102,7 @@ export default function ClientAutocomplete({ value, onChange, placeholder, disab
   };
 
   const handleCreateSuccess = (savedPartner: any) => {
-    const label = savedPartner?.nome || copy.newLabelFallback;
+    const label = savedPartner?.nome || 'Novo Cliente';
     const newHit: Hit = {
       id: savedPartner.id,
       label,
@@ -131,7 +112,7 @@ export default function ClientAutocomplete({ value, onChange, placeholder, disab
 
     handleSelect(newHit);
     setIsCreateModalOpen(false);
-    addToast(copy.createdToast, 'success');
+    addToast('Cliente criado e selecionado!', 'success');
   };
 
   return (
@@ -166,7 +147,7 @@ export default function ClientAutocomplete({ value, onChange, placeholder, disab
         )}
         {open && !loading && hits.length === 0 && query.length >= 2 && (
           <div className="absolute z-10 mt-1 w-full bg-white border rounded-lg shadow px-4 py-3 text-sm text-gray-500">
-            {copy.empty}
+            {isSupplier ? 'Nenhum fornecedor encontrado.' : 'Nenhum cliente encontrado.'}
           </div>
         )}
       </div>
@@ -175,7 +156,7 @@ export default function ClientAutocomplete({ value, onChange, placeholder, disab
         type="button"
         onClick={() => setIsCreateModalOpen(true)}
         className="flex-shrink-0 px-4 py-3 bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200 transition-colors text-sm font-semibold whitespace-nowrap"
-        title={copy.createTooltip}
+        title="Criar um novo cadastro. Para cliente já cadastrado, digite no campo de busca ao lado."
         disabled={disabled || authLoading || !activeEmpresaId}
       >
         Criar Novo
@@ -184,7 +165,7 @@ export default function ClientAutocomplete({ value, onChange, placeholder, disab
       <Modal
         isOpen={isCreateModalOpen}
         onClose={() => setIsCreateModalOpen(false)}
-        title={copy.modalTitle}
+        title={isSupplier ? 'Novo Fornecedor' : 'Novo Cliente'}
         size="4xl"
       >
         <PartnerFormPanel
