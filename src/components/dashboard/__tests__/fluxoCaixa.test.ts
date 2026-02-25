@@ -93,5 +93,52 @@ describe('buildDashboardFluxoCaixaChartData', () => {
     expect(chartData).toEqual([]);
     expect(currentMonthIndex).toBe(-1);
   });
-});
 
+  it('ancora o saldo no mês atual quando saldo_atual_cc existir', () => {
+    const rows: FinanceiroFluxoCaixaCenteredItem[] = [
+      {
+        mes: 'Jan/26',
+        mes_iso: '2026-01',
+        receber_realizado: 100,
+        receber_previsto: 0,
+        pagar_realizado: 20,
+        pagar_previsto: 0,
+        is_past: true,
+        is_current: false,
+        saldo_inicial_cc: 0,
+        saldo_atual_cc: 22000,
+      },
+      {
+        mes: 'Fev/26',
+        mes_iso: '2026-02',
+        receber_realizado: 50,
+        receber_previsto: 0,
+        pagar_realizado: 10,
+        pagar_previsto: 0,
+        is_past: false,
+        is_current: true,
+        saldo_inicial_cc: 0,
+      },
+      {
+        mes: 'Mar/26',
+        mes_iso: '2026-03',
+        receber_realizado: 0,
+        receber_previsto: 200,
+        pagar_realizado: 0,
+        pagar_previsto: 20,
+        is_past: false,
+        is_current: false,
+        saldo_inicial_cc: 0,
+      },
+    ];
+
+    const { chartData, currentMonthIndex } = buildDashboardFluxoCaixaChartData(rows);
+    expect(currentMonthIndex).toBe(1);
+
+    // saldo no mês atual deve bater exatamente com o saldo_atual_cc.
+    expect(chartData[1]?.saldo).toBeCloseTo(22000, 6);
+
+    // mês seguinte deve ser saldo_atual + (receber - pagar) do mês seguinte (inclui previsto).
+    expect(chartData[2]?.saldo).toBeCloseTo(22000 + (200 - 20), 6);
+  });
+});

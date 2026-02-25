@@ -27,6 +27,11 @@ export function buildDashboardFluxoCaixaChartData(rows: FinanceiroFluxoCaixaCent
     ?? rows[0]?.saldo_inicial_cc
     ?? 0;
 
+  const saldoAtual =
+    rows.find((r) => (r.saldo_atual_cc || 0) !== 0)?.saldo_atual_cc
+    ?? rows[0]?.saldo_atual_cc
+    ?? 0;
+
   const enrichedBase: Omit<DashboardFluxoCaixaChartDataItem, 'saldo'>[] = rows.map((item) => {
     const receberRealizado = Number(item.receber_realizado || 0);
     const receberPrevisto = Number(item.receber_previsto || 0);
@@ -56,7 +61,17 @@ export function buildDashboardFluxoCaixaChartData(rows: FinanceiroFluxoCaixaCent
 
   const idxCurrent = enrichedBase.findIndex((r) => r.is_current);
 
-  let saldoAcumulado = Number(saldoInicialJanela || 0);
+  // Âncora de saldo (estado-da-arte): a linha precisa bater com o saldo real no "mês atual".
+  // Caso `saldo_atual_cc` exista, ajusta o saldo inicial para que o ponto do mês atual coincida.
+  const anchorEnabled = idxCurrent >= 0 && Number(saldoAtual || 0) !== 0;
+  const cumulativeNetToCurrent = anchorEnabled
+    ? enrichedBase.slice(0, idxCurrent + 1).reduce((acc, item) => acc + (item.receber - item.pagar), 0)
+    : 0;
+  const saldoInicialParaGrafico = anchorEnabled
+    ? Number(saldoAtual || 0) - cumulativeNetToCurrent
+    : Number(saldoInicialJanela || 0);
+
+  let saldoAcumulado = saldoInicialParaGrafico;
   const chartData = enrichedBase.map((item) => {
     saldoAcumulado += item.receber - item.pagar;
     return { ...item, saldo: saldoAcumulado };
@@ -64,4 +79,3 @@ export function buildDashboardFluxoCaixaChartData(rows: FinanceiroFluxoCaixaCent
 
   return { chartData, currentMonthIndex: idxCurrent };
 }
-
