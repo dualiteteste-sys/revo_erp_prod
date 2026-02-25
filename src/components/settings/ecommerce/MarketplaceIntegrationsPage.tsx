@@ -1,9 +1,11 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Plug, RefreshCw, Settings as SettingsIcon, Unlink, Link2, AlertTriangle } from 'lucide-react';
+import { Link } from 'react-router-dom';
 
 import PageHeader from '@/components/ui/PageHeader';
 import GlassCard from '@/components/ui/GlassCard';
 import { Button } from '@/components/ui/button';
+import { cn } from '@/lib/utils';
 import { useToast } from '@/contexts/ToastProvider';
 import { useAuth } from '@/contexts/AuthProvider';
 import { useHasPermission } from '@/hooks/useHasPermission';
@@ -65,7 +67,7 @@ import {
   buildPreferredEcommerceConnectionsMap,
   mergeWooDiagnosticsWithSnapshot,
 } from '@/lib/ecommerce/wooConnectionState';
-import { listWooStores, type WooStore } from '@/services/woocommerceControlPanel';
+import { buildWooProductMap, listWooStores, registerWooWebhooks, runWooWorkerNow, type WooStore, unpauseWooStore } from '@/services/woocommerceControlPanel';
 
 type Provider = MarketplaceProvider;
 type CatalogProvider = Exclude<Provider, 'woo'>;
@@ -259,7 +261,7 @@ export default function MarketplaceIntegrationsPage() {
   const [wooDepositos, setWooDepositos] = useState<Array<{ id: string; nome: string }>>([]);
   const [wooTabelasPreco, setWooTabelasPreco] = useState<Array<{ id: string; nome: string }>>([]);
   const [wooOptionsLoading, setWooOptionsLoading] = useState(false);
-  const [wooSetupStep, setWooSetupStep] = useState<0 | 1 | 2>(0);
+  const [wooSetupStep, setWooSetupStep] = useState<0 | 1 | 2 | 3 | 4 | 5 | 6>(0);
   const [wooDiag, setWooDiag] = useState<EcommerceConnectionDiagnostics | null>(null);
   const [wooDiagUnavailable, setWooDiagUnavailable] = useState(false);
   const [wooStores, setWooStores] = useState<WooStore[]>([]);
@@ -807,7 +809,7 @@ export default function MarketplaceIntegrationsPage() {
     }
   };
 
-  const handleSaveConfig = async () => {
+  const handleSaveConfig = async (options?: { close?: boolean }) => {
     if (!activeConnection) return;
     if (!canManage) {
       addToast('Sem permissão para gerenciar integrações.', 'warning');
@@ -829,9 +831,11 @@ export default function MarketplaceIntegrationsPage() {
       });
       await loadSyncState(activeConnection.provider as Provider);
       addToast('Configurações salvas.', 'success');
-      setConfigOpen(false);
-      setActiveConnection(null);
       await fetchAll();
+      if (options?.close !== false) {
+        setConfigOpen(false);
+        setActiveConnection(null);
+      }
     } catch (e: any) {
       addToast(e?.message || 'Falha ao salvar configurações.', 'error');
     } finally {
@@ -909,6 +913,116 @@ export default function MarketplaceIntegrationsPage() {
       setWooSavingSecrets(false);
     }
   };
+
+  const wooWizard = useMemo(() => {
+    return {
+      steps: [
+        { key: 'connection', label: 'Conexão' },
+        { key: 'stock', label: 'Estoque' },
+        { key: 'prices', label: 'Preços' },
+        { key: 'products', label: 'Produtos' },
+        { key: 'orders', label: 'Pedidos' },
+        { key: 'notifications', label: 'Notificações' },
+        { key: 'mappings', label: 'Mapeamentos' },
+      ] as const,
+      maxIndex: 6 as const,
+    };
+  }, []);
+
+  const goWooWizard = useCallback(
+    (next: number) => {
+      setWooSetupStep(() => {
+        const bounded = Math.max(0, Math.min(wooWizard.maxIndex, next));
+        return bounded as any;
+      });
+    },
+    [wooWizard.maxIndex],
+  );
+
+  const persistWooStoreUrlIfValid = useCallback(async () => {
+    if (!activeConnection || activeConnection.provider !== 'woo') return;
+    const rawStoreUrl = String(activeConnection.config?.store_url ?? '');
+    const normalized = normalizeWooStoreUrl(rawStoreUrl);
+    if (!normalized.ok) {
+      setWooStoreUrlError(normalized.message);
+      addToast(normalized.message, 'warning');
+      throw new Error(normalized.message);
+    }
+    setWooStoreUrlError(null);
+    const { store_url } = await setWooStoreUrl({ ecommerceId: activeConnection.id, storeUrl: normalized.normalized });
+    setActiveConnection((prev) => (prev ? { ...prev, config: { ...(prev.config ?? {}), store_url: store_url } } : prev));
+  }, [activeConnection, addToast]);
+
+  const handleWooWizardSaveAndNext = useCallback(async () => {
+    if (!activeConnection || activeConnection.provider !== 'woo') return;
+    const step = wooSetupStep;
+    if (step === 0) {
+      await persistWooStoreUrlIfValid();
+      goWooWizard(1);
+      return;
+    }
+    if (step >= 1 && step <= wooWizard.maxIndex) {
+      await handleSaveConfig({ close: false });
+      goWooWizard(step + 1);
+    }
+  }, [activeConnection, goWooWizard, handleSaveConfig, persistWooStoreUrlIfValid, wooSetupStep, wooWizard.maxIndex]);
+
+  const handleWooWizardBack = useCallback(() => {
+    if (wooSetupStep <= 0) return;
+    goWooWizard(wooSetupStep - 1);
+  }, [goWooWizard, wooSetupStep]);
+
+  const handleWooWizardNext = useCallback(() => {
+    if (wooSetupStep >= wooWizard.maxIndex) return;
+    goWooWizard(wooSetupStep + 1);
+  }, [goWooWizard, wooSetupStep, wooWizard.maxIndex]);
+
+  const wooAdvancedActionsEnabled = useMemo(() => {
+    if (!activeConnection || activeConnection.provider !== 'woo') return false;
+    return !!activeWooStore && !!activeEmpresaId;
+  }, [activeConnection, activeEmpresaId, activeWooStore]);
+
+  const handleWooAdvancedRegisterWebhooks = useCallback(async () => {
+    if (!activeEmpresaId || !activeWooStore) return;
+    try {
+      await registerWooWebhooks(activeEmpresaId, activeWooStore.id);
+      addToast('Webhooks registrados/atualizados no WooCommerce.', 'success');
+    } catch (e: any) {
+      addToast(e?.message || 'Falha ao registrar webhooks.', 'error');
+    }
+  }, [activeEmpresaId, activeWooStore, addToast]);
+
+  const handleWooAdvancedBuildMap = useCallback(async () => {
+    if (!activeEmpresaId || !activeWooStore) return;
+    try {
+      await buildWooProductMap(activeEmpresaId, activeWooStore.id);
+      addToast('Reconciliação do catálogo enfileirada (map por SKU).', 'success');
+      await refreshWooStores();
+    } catch (e: any) {
+      addToast(e?.message || 'Falha ao enfileirar rebuild do product map.', 'error');
+    }
+  }, [activeEmpresaId, activeWooStore, addToast, refreshWooStores]);
+
+  const handleWooAdvancedUnpause = useCallback(async () => {
+    if (!activeEmpresaId || !activeWooStore) return;
+    try {
+      await unpauseWooStore(activeEmpresaId, activeWooStore.id);
+      addToast('Store reativada.', 'success');
+      await refreshWooStores();
+    } catch (e: any) {
+      addToast(e?.message || 'Falha ao reativar store.', 'error');
+    }
+  }, [activeEmpresaId, activeWooStore, addToast, refreshWooStores]);
+
+  const handleWooAdvancedRunWorkerNow = useCallback(async () => {
+    if (!activeEmpresaId || !activeWooStore) return;
+    try {
+      await runWooWorkerNow(activeEmpresaId, activeWooStore.id, 30);
+      addToast('Worker acionado. Aguarde alguns segundos e atualize a tela.', 'success');
+    } catch (e: any) {
+      addToast(e?.message || 'Falha ao acionar worker.', 'error');
+    }
+  }, [activeEmpresaId, activeWooStore, addToast]);
 
   const loadMappings = useCallback(
     async (provider: CatalogProvider, q?: string) => {
@@ -1385,32 +1499,15 @@ export default function MarketplaceIntegrationsPage() {
               </div>
 
               {activeConnection.provider === 'woo' ? (
-                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                <div className="rounded-lg border border-gray-100 bg-white/60 p-3">
                   <WizardStepper
-                    steps={[
-                      { label: 'Conexão' },
-                      { label: 'Produtos' },
-                      { label: 'Recursos' },
-                    ]}
+                    steps={wooWizard.steps.map((s) => ({ label: s.label }))}
                     activeIndex={wooSetupStep}
                     maxCompletedIndex={wooSetupStep - 1}
                     className="flex-wrap"
                   />
-                  <div className="flex items-center gap-2">
-                    <Button
-                      variant="outline"
-                      disabled={wooSetupStep === 0}
-                      onClick={() => setWooSetupStep((s) => (s > 0 ? ((s - 1) as any) : s))}
-                    >
-                      Anterior
-                    </Button>
-                    <Button
-                      variant="outline"
-                      disabled={wooSetupStep === 2}
-                      onClick={() => setWooSetupStep((s) => (s < 2 ? ((s + 1) as any) : s))}
-                    >
-                      Próximo
-                    </Button>
+                  <div className="mt-2 text-xs text-gray-500">
+                    Salve por etapa para evitar “meio configurado”. Você pode continuar depois sem perder progresso.
                   </div>
                 </div>
               ) : null}
@@ -1707,9 +1804,9 @@ export default function MarketplaceIntegrationsPage() {
 
               {activeConnection.provider === 'woo' && wooSetupStep === 1 ? (
                 <GlassCard className="p-3">
-                  <div className="text-sm font-medium text-gray-900">1.1) Configuração Woo</div>
+                  <div className="text-sm font-medium text-gray-900">2) Regras de estoque</div>
                   <div className="mt-1 text-xs text-gray-600">
-                    Defina a base do estoque e da precificação para publicação no WooCommerce. Você pode ajustar manualmente por produto/lote depois (fase posterior).
+                    Defina de onde vem o saldo publicado no WooCommerce. Se você trabalha com depósitos, selecione um depósito base e use estoque de segurança.
                   </div>
 
                   <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -1772,7 +1869,18 @@ export default function MarketplaceIntegrationsPage() {
                         </option>
                       ))}
                     </Select>
+                  </div>
+                </GlassCard>
+              ) : null}
 
+              {activeConnection.provider === 'woo' && wooSetupStep === 2 ? (
+                <GlassCard className="p-3">
+                  <div className="text-sm font-medium text-gray-900">3) Regras de preços</div>
+                  <div className="mt-1 text-xs text-gray-600">
+                    Defina qual preço o Ultria publica no WooCommerce e qual ajuste padrão será aplicado (ex.: margem de +10%).
+                  </div>
+
+                  <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <Select
                       label="Fonte do preço"
                       name="woo_price_source"
@@ -1839,209 +1947,490 @@ export default function MarketplaceIntegrationsPage() {
                 </GlassCard>
               ) : null}
 
-              {activeConnection.provider !== 'woo' || wooSetupStep === 2 ? (
-                <GlassCard className="p-3">
-                <div className="text-sm font-medium text-gray-900">2) Ativar recursos</div>
-                <div className="flex items-center justify-between gap-3">
-                  <div>
-                    <div className="text-sm font-medium text-gray-800">Importar pedidos</div>
-                    <div className="text-xs text-gray-500">Cria pedidos no Ultria ERP com canal=marketplace.</div>
-                  </div>
-                  <Switch
-                    checked={!!activeConnection.config?.import_orders}
-                    onCheckedChange={(checked) =>
-                      setActiveConnection((prev) => (prev ? { ...prev, config: { ...(prev.config ?? {}), import_orders: checked } } : prev))
-                    }
-                  />
-                </div>
-
-                <div className="flex items-center justify-between gap-3">
-                  <div>
-                    <div className="text-sm font-medium text-gray-800">Sincronizar estoque</div>
-                    <div className="text-xs text-gray-500">Envia saldo disponível por SKU (respeita limites).</div>
-                  </div>
-                  <Switch
-                    checked={!!activeConnection.config?.sync_stock}
-                    onCheckedChange={(checked) =>
-                      setActiveConnection((prev) => (prev ? { ...prev, config: { ...(prev.config ?? {}), sync_stock: checked } } : prev))
-                    }
-                  />
-                </div>
-
-                <div className="flex items-center justify-between gap-3">
-                  <div>
-                    <div className="text-sm font-medium text-gray-800">
-                      {activeConnection.provider === 'woo' ? 'Sincronizar preços' : 'Atualizar rastreio/status'}
-                    </div>
-                    <div className="text-xs text-gray-500">
-                      {activeConnection.provider === 'woo'
-                        ? 'Atualiza preço do WooCommerce pelo preço de venda no Ultria (por SKU).'
-                        : 'Reflete expedição (tracking/status) no canal.'}
-                    </div>
-                  </div>
-                  <Switch
-                    checked={activeConnection.provider === 'woo'
-                      ? !!(activeConnection.config as any)?.sync_prices
-                      : !!activeConnection.config?.push_tracking}
-                    onCheckedChange={(checked) =>
-                      setActiveConnection((prev) => (prev
-                        ? {
-                          ...prev,
-                          config: prev.provider === 'woo'
-                            ? { ...(prev.config ?? {}), sync_prices: checked }
-                            : { ...(prev.config ?? {}), push_tracking: checked },
+              {activeConnection.provider !== 'woo' ? (
+                <>
+                  <GlassCard className="p-3">
+                    <div className="text-sm font-medium text-gray-900">2) Ativar recursos</div>
+                    <div className="flex items-center justify-between gap-3">
+                      <div>
+                        <div className="text-sm font-medium text-gray-800">Importar pedidos</div>
+                        <div className="text-xs text-gray-500">Cria pedidos no Ultria ERP com canal=marketplace.</div>
+                      </div>
+                      <Switch
+                        checked={!!activeConnection.config?.import_orders}
+                        onCheckedChange={(checked) =>
+                          setActiveConnection((prev) => (prev ? { ...prev, config: { ...(prev.config ?? {}), import_orders: checked } } : prev))
                         }
-                        : prev))
-                    }
-                  />
-                </div>
-
-                <div className="flex items-center justify-between gap-3 border-t pt-3">
-                  <div>
-                    <div className="text-sm font-medium text-gray-800">Modo seguro (recomendado)</div>
-                    <div className="text-xs text-gray-500">Evita ações perigosas (guardrails + simulação quando possível).</div>
-                  </div>
-                  <Switch
-                    checked={activeConnection.config?.safe_mode !== false}
-                    onCheckedChange={(checked) =>
-                      setActiveConnection((prev) => (prev ? { ...prev, config: { ...(prev.config ?? {}), safe_mode: checked } } : prev))
-                    }
-                  />
-                </div>
-                </GlassCard>
-              ) : null}
-
-              <GlassCard className="p-3">
-                <div className="text-sm font-medium text-gray-900">3) Estratégia de sincronização</div>
-                <div className="mt-1 text-xs text-gray-600">
-                  Esta configuração prepara o comportamento padrão do conector para produtos/preço/estoque.
-                </div>
-                <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <Select
-                    label="Direção"
-                    name="sync_direction"
-                    value={String(activeConnection.config?.sync_direction ?? 'bidirectional')}
-                    onChange={(e) =>
-                      setActiveConnection((prev) =>
-                        prev
-                          ? { ...prev, config: { ...(prev.config ?? {}), sync_direction: (e.target as HTMLSelectElement).value as MarketplaceSyncDirection } }
-                          : prev,
-                      )
-                    }
-                  >
-                    {syncDirectionOptions.map((option) => (
-                      <option key={option.value} value={option.value}>
-                        {option.label}
-                      </option>
-                    ))}
-                  </Select>
-
-                  <Select
-                    label="Conflito de atualização"
-                    name="conflict_policy"
-                    value={String(activeConnection.config?.conflict_policy ?? 'erp_wins')}
-                    onChange={(e) =>
-                      setActiveConnection((prev) =>
-                        prev
-                          ? { ...prev, config: { ...(prev.config ?? {}), conflict_policy: (e.target as HTMLSelectElement).value as MarketplaceConflictPolicy } }
-                          : prev,
-                      )
-                    }
-                  >
-                    {conflictPolicyOptions.map((option) => (
-                      <option key={option.value} value={option.value}>
-                        {option.label}
-                      </option>
-                    ))}
-                  </Select>
-                </div>
-
-                <div className="mt-3 flex items-center justify-between gap-3">
-                  <div>
-                    <div className="text-sm font-medium text-gray-800">Sincronização automática</div>
-                    <div className="text-xs text-gray-500">Quando desativado, a operação é apenas manual por job.</div>
-                  </div>
-                  <Switch
-                    checked={activeConnection.config?.auto_sync_enabled === true}
-                    onCheckedChange={(checked) =>
-                      setActiveConnection((prev) => (prev ? { ...prev, config: { ...(prev.config ?? {}), auto_sync_enabled: checked } } : prev))
-                    }
-                  />
-                </div>
-
-                <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <Input
-                    label="Intervalo automático (minutos)"
-                    type="number"
-                    inputMode="numeric"
-                    min={5}
-                    max={1440}
-                    value={String(activeConnection.config?.sync_interval_minutes ?? 15)}
-                    onChange={(e) =>
-                      setActiveConnection((prev) =>
-                        prev
-                          ? {
-                            ...prev,
-                            config: {
-                              ...(prev.config ?? {}),
-                              sync_interval_minutes: Math.min(1440, Math.max(5, Number((e.target as HTMLInputElement).value || 15))),
-                            },
-                          }
-                          : prev,
-                      )
-                    }
-                    disabled={activeConnection.config?.auto_sync_enabled !== true}
-                  />
-                  <div className="text-xs text-gray-500 leading-relaxed self-end">
-                    Último sync efetivo: {syncStateByProvider[activeConnection.provider as Provider]?.last_success_at
-                      ? new Date(syncStateByProvider[activeConnection.provider as Provider]!.last_success_at as string).toLocaleString('pt-BR')
-                      : '—'}
-                  </div>
-                </div>
-              </GlassCard>
-
-              <GlassCard className="p-3">
-                <div className="text-sm font-medium text-gray-900">4) Mapear produtos (recomendado)</div>
-                <div className="mt-1 text-xs text-gray-600">
-                  Para importar itens corretamente, mapeie cada produto do Ultria ERP com o ID do anúncio no canal.
-                </div>
-                {activeConnection.provider === 'woo' ? (
-                  <div className="mt-2 rounded-lg bg-gray-50 border border-gray-100 p-3 text-xs text-gray-600">
-                    <div className="font-medium text-gray-800">Regra para WooCommerce</div>
-                    <div className="mt-1">
-                      A sincronização usa SKU como chave. Garanta que o SKU do produto no Ultria seja igual ao SKU do produto no WooCommerce.
+                      />
                     </div>
-                  </div>
-                ) : (
-                  <div className="mt-3 flex justify-end">
-                    <Button
-                      variant="outline"
-                      className="gap-2"
-                      disabled={!canManage || String(activeConnection.status ?? '').toLowerCase() !== 'connected'}
-                      onClick={() => void openMappings(activeConnection.provider as CatalogProvider)}
-                      title={
-                        !canManage
-                          ? 'Sem permissão'
-                          : String(activeConnection.status ?? '').toLowerCase() !== 'connected'
-                            ? 'Conecte a integração para liberar o mapeamento'
-                            : 'Abrir mapeamento'
-                      }
-                    >
-                      <SettingsIcon size={16} />
-                      Abrir mapeamento
+
+                    <div className="flex items-center justify-between gap-3">
+                      <div>
+                        <div className="text-sm font-medium text-gray-800">Sincronizar estoque</div>
+                        <div className="text-xs text-gray-500">Envia saldo disponível por SKU (respeita limites).</div>
+                      </div>
+                      <Switch
+                        checked={!!activeConnection.config?.sync_stock}
+                        onCheckedChange={(checked) =>
+                          setActiveConnection((prev) => (prev ? { ...prev, config: { ...(prev.config ?? {}), sync_stock: checked } } : prev))
+                        }
+                      />
+                    </div>
+
+                    <div className="flex items-center justify-between gap-3">
+                      <div>
+                        <div className="text-sm font-medium text-gray-800">Atualizar rastreio/status</div>
+                        <div className="text-xs text-gray-500">Reflete expedição (tracking/status) no canal.</div>
+                      </div>
+                      <Switch
+                        checked={!!activeConnection.config?.push_tracking}
+                        onCheckedChange={(checked) =>
+                          setActiveConnection((prev) => (prev ? { ...prev, config: { ...(prev.config ?? {}), push_tracking: checked } } : prev))
+                        }
+                      />
+                    </div>
+
+                    <div className="flex items-center justify-between gap-3 border-t pt-3">
+                      <div>
+                        <div className="text-sm font-medium text-gray-800">Modo seguro (recomendado)</div>
+                        <div className="text-xs text-gray-500">Evita ações perigosas (guardrails + simulação quando possível).</div>
+                      </div>
+                      <Switch
+                        checked={activeConnection.config?.safe_mode !== false}
+                        onCheckedChange={(checked) =>
+                          setActiveConnection((prev) => (prev ? { ...prev, config: { ...(prev.config ?? {}), safe_mode: checked } } : prev))
+                        }
+                      />
+                    </div>
+                  </GlassCard>
+
+                  <GlassCard className="p-3">
+                    <div className="text-sm font-medium text-gray-900">3) Estratégia de sincronização</div>
+                    <div className="mt-1 text-xs text-gray-600">
+                      Esta configuração prepara o comportamento padrão do conector para produtos/preço/estoque.
+                    </div>
+                    <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <Select
+                        label="Direção"
+                        name="sync_direction"
+                        value={String(activeConnection.config?.sync_direction ?? 'bidirectional')}
+                        onChange={(e) =>
+                          setActiveConnection((prev) =>
+                            prev
+                              ? { ...prev, config: { ...(prev.config ?? {}), sync_direction: (e.target as HTMLSelectElement).value as MarketplaceSyncDirection } }
+                              : prev,
+                          )
+                        }
+                      >
+                        {syncDirectionOptions.map((option) => (
+                          <option key={option.value} value={option.value}>
+                            {option.label}
+                          </option>
+                        ))}
+                      </Select>
+
+                      <Select
+                        label="Conflito de atualização"
+                        name="conflict_policy"
+                        value={String(activeConnection.config?.conflict_policy ?? 'erp_wins')}
+                        onChange={(e) =>
+                          setActiveConnection((prev) =>
+                            prev
+                              ? { ...prev, config: { ...(prev.config ?? {}), conflict_policy: (e.target as HTMLSelectElement).value as MarketplaceConflictPolicy } }
+                              : prev,
+                          )
+                        }
+                      >
+                        {conflictPolicyOptions.map((option) => (
+                          <option key={option.value} value={option.value}>
+                            {option.label}
+                          </option>
+                        ))}
+                      </Select>
+                    </div>
+
+                    <div className="mt-3 flex items-center justify-between gap-3">
+                      <div>
+                        <div className="text-sm font-medium text-gray-800">Sincronização automática</div>
+                        <div className="text-xs text-gray-500">Quando desativado, a operação é apenas manual por job.</div>
+                      </div>
+                      <Switch
+                        checked={activeConnection.config?.auto_sync_enabled === true}
+                        onCheckedChange={(checked) =>
+                          setActiveConnection((prev) => (prev ? { ...prev, config: { ...(prev.config ?? {}), auto_sync_enabled: checked } } : prev))
+                        }
+                      />
+                    </div>
+
+                    <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <Input
+                        label="Intervalo automático (minutos)"
+                        type="number"
+                        inputMode="numeric"
+                        min={5}
+                        max={1440}
+                        value={String(activeConnection.config?.sync_interval_minutes ?? 15)}
+                        onChange={(e) =>
+                          setActiveConnection((prev) =>
+                            prev
+                              ? {
+                                ...prev,
+                                config: {
+                                  ...(prev.config ?? {}),
+                                  sync_interval_minutes: Math.min(1440, Math.max(5, Number((e.target as HTMLInputElement).value || 15))),
+                                },
+                              }
+                              : prev,
+                          )
+                        }
+                        disabled={activeConnection.config?.auto_sync_enabled !== true}
+                      />
+                      <div className="text-xs text-gray-500 leading-relaxed self-end">
+                        Último sync efetivo: {syncStateByProvider[activeConnection.provider as Provider]?.last_success_at
+                          ? new Date(syncStateByProvider[activeConnection.provider as Provider]!.last_success_at as string).toLocaleString('pt-BR')
+                          : '—'}
+                      </div>
+                    </div>
+                  </GlassCard>
+
+                  <GlassCard className="p-3">
+                    <div className="text-sm font-medium text-gray-900">4) Mapear produtos (recomendado)</div>
+                    <div className="mt-1 text-xs text-gray-600">
+                      Para importar itens corretamente, mapeie cada produto do Ultria ERP com o ID do anúncio no canal.
+                    </div>
+                    <div className="mt-3 flex justify-end">
+                      <Button
+                        variant="outline"
+                        className="gap-2"
+                        disabled={!canManage || String(activeConnection.status ?? '').toLowerCase() !== 'connected'}
+                        onClick={() => void openMappings(activeConnection.provider as CatalogProvider)}
+                        title={
+                          !canManage
+                            ? 'Sem permissão'
+                            : String(activeConnection.status ?? '').toLowerCase() !== 'connected'
+                              ? 'Conecte a integração para liberar o mapeamento'
+                              : 'Abrir mapeamento'
+                        }
+                      >
+                        <SettingsIcon size={16} />
+                        Abrir mapeamento
+                      </Button>
+                    </div>
+                  </GlassCard>
+
+                  <div className="flex justify-end gap-2 pt-2">
+                    <Button variant="outline" onClick={() => setConfigOpen(false)}>
+                      Cancelar
+                    </Button>
+                    <Button onClick={() => void handleSaveConfig()} disabled={!canManage || savingConfig} className="gap-2">
+                      {savingConfig ? 'Salvando…' : 'Salvar'}
                     </Button>
                   </div>
-                )}
-              </GlassCard>
+                </>
+              ) : (
+                <>
+                  {wooSetupStep === 3 ? (
+                    <>
+                      <GlassCard className="p-3">
+                        <div className="text-sm font-medium text-gray-900">4) Produtos (catálogo)</div>
+                        <div className="mt-1 text-xs text-gray-600">
+                          Aqui você define o padrão. A importação/exportação e a execução (preview + run) acontecem no módulo de Produtos.
+                        </div>
 
-              <div className="flex justify-end gap-2 pt-2">
-                <Button variant="outline" onClick={() => setConfigOpen(false)}>
-                  Cancelar
-                </Button>
-                <Button onClick={() => void handleSaveConfig()} disabled={!canManage || savingConfig} className="gap-2">
-                  {savingConfig ? 'Salvando…' : 'Salvar'}
-                </Button>
-              </div>
+                        <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-3">
+                          <div className="flex items-center justify-between gap-3 rounded-lg border border-gray-100 bg-white px-3 py-2">
+                            <div>
+                              <div className="text-sm font-medium text-gray-800">Sincronizar estoque</div>
+                              <div className="text-xs text-gray-500">Publica saldo conforme regra de estoque (por SKU).</div>
+                            </div>
+                            <Switch
+                              checked={!!activeConnection.config?.sync_stock}
+                              onCheckedChange={(checked) =>
+                                setActiveConnection((prev) => (prev ? { ...prev, config: { ...(prev.config ?? {}), sync_stock: checked } } : prev))
+                              }
+                            />
+                          </div>
+
+                          <div className="flex items-center justify-between gap-3 rounded-lg border border-gray-100 bg-white px-3 py-2">
+                            <div>
+                              <div className="text-sm font-medium text-gray-800">Sincronizar preços</div>
+                              <div className="text-xs text-gray-500">Publica preço conforme regra de preço (por SKU).</div>
+                            </div>
+                            <Switch
+                              checked={!!(activeConnection.config as any)?.sync_prices}
+                              onCheckedChange={(checked) =>
+                                setActiveConnection((prev) => (prev ? { ...prev, config: { ...(prev.config ?? {}), sync_prices: checked } } : prev))
+                              }
+                            />
+                          </div>
+                        </div>
+
+                        <div className="mt-3 flex items-center justify-between gap-3 rounded-lg border border-gray-100 bg-white px-3 py-2">
+                          <div>
+                            <div className="text-sm font-medium text-gray-800">Modo seguro (recomendado)</div>
+                            <div className="text-xs text-gray-500">Guardrails para evitar ações perigosas.</div>
+                          </div>
+                          <Switch
+                            checked={activeConnection.config?.safe_mode !== false}
+                            onCheckedChange={(checked) =>
+                              setActiveConnection((prev) => (prev ? { ...prev, config: { ...(prev.config ?? {}), safe_mode: checked } } : prev))
+                            }
+                          />
+                        </div>
+
+                        <div className="mt-3 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-gray-100 bg-white px-3 py-2">
+                          <div>
+                            <div className="text-sm font-medium text-gray-800">Processamento (fila)</div>
+                            <div className="text-xs text-gray-500">Em produção, o scheduler drena a fila automaticamente. Local: use “Processar”.</div>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              disabled={!wooAdvancedActionsEnabled || !canManage}
+                              onClick={() => void handleWooAdvancedRunWorkerNow()}
+                              title={wooAdvancedActionsEnabled ? 'Acionar worker agora' : 'Indisponível sem store vinculada'}
+                            >
+                              Processar agora
+                            </Button>
+                          </div>
+                        </div>
+
+                        <div className="mt-3 flex flex-wrap items-center gap-2">
+                          <Button asChild variant="outline" className="gap-2">
+                            <Link to="/app/products">Abrir Produtos</Link>
+                          </Button>
+                          {activeWooStore ? (
+                            <Button asChild variant="outline" className="gap-2">
+                              <Link to={`/app/products/woocommerce/catalog?store=${encodeURIComponent(activeWooStore.id)}`}>Catálogo Woo (importar)</Link>
+                            </Button>
+                          ) : null}
+                        </div>
+                      </GlassCard>
+
+                      <GlassCard className="p-3">
+                        <div className="text-sm font-medium text-gray-900">Estratégia de sincronização</div>
+                        <div className="mt-1 text-xs text-gray-600">
+                          Direção e política de conflito afetam como o conector decide “quem vence”.
+                        </div>
+                        <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-3">
+                          <Select
+                            label="Direção"
+                            name="sync_direction"
+                            value={String(activeConnection.config?.sync_direction ?? 'bidirectional')}
+                            onChange={(e) =>
+                              setActiveConnection((prev) =>
+                                prev
+                                  ? { ...prev, config: { ...(prev.config ?? {}), sync_direction: (e.target as HTMLSelectElement).value as MarketplaceSyncDirection } }
+                                  : prev,
+                              )
+                            }
+                          >
+                            {syncDirectionOptions.map((option) => (
+                              <option key={option.value} value={option.value}>
+                                {option.label}
+                              </option>
+                            ))}
+                          </Select>
+
+                          <Select
+                            label="Conflito de atualização"
+                            name="conflict_policy"
+                            value={String(activeConnection.config?.conflict_policy ?? 'erp_wins')}
+                            onChange={(e) =>
+                              setActiveConnection((prev) =>
+                                prev
+                                  ? { ...prev, config: { ...(prev.config ?? {}), conflict_policy: (e.target as HTMLSelectElement).value as MarketplaceConflictPolicy } }
+                                  : prev,
+                              )
+                            }
+                          >
+                            {conflictPolicyOptions.map((option) => (
+                              <option key={option.value} value={option.value}>
+                                {option.label}
+                              </option>
+                            ))}
+                          </Select>
+                        </div>
+
+                        <div className="mt-3 flex items-center justify-between gap-3">
+                          <div>
+                            <div className="text-sm font-medium text-gray-800">Sincronização automática</div>
+                            <div className="text-xs text-gray-500">Quando desativado, a operação é manual (runs/jobs).</div>
+                          </div>
+                          <Switch
+                            checked={activeConnection.config?.auto_sync_enabled === true}
+                            onCheckedChange={(checked) =>
+                              setActiveConnection((prev) => (prev ? { ...prev, config: { ...(prev.config ?? {}), auto_sync_enabled: checked } } : prev))
+                            }
+                          />
+                        </div>
+
+                        <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-3">
+                          <Input
+                            label="Intervalo automático (minutos)"
+                            type="number"
+                            inputMode="numeric"
+                            min={5}
+                            max={1440}
+                            value={String(activeConnection.config?.sync_interval_minutes ?? 15)}
+                            onChange={(e) =>
+                              setActiveConnection((prev) =>
+                                prev
+                                  ? {
+                                    ...prev,
+                                    config: {
+                                      ...(prev.config ?? {}),
+                                      sync_interval_minutes: Math.min(1440, Math.max(5, Number((e.target as HTMLInputElement).value || 15))),
+                                    },
+                                  }
+                                  : prev,
+                              )
+                            }
+                            disabled={activeConnection.config?.auto_sync_enabled !== true}
+                          />
+                          <div className="text-xs text-gray-500 leading-relaxed self-end">
+                            Último sync efetivo: {syncStateByProvider[activeConnection.provider as Provider]?.last_success_at
+                              ? new Date(syncStateByProvider[activeConnection.provider as Provider]!.last_success_at as string).toLocaleString('pt-BR')
+                              : '—'}
+                          </div>
+                        </div>
+                      </GlassCard>
+                    </>
+                  ) : null}
+
+                  {wooSetupStep === 4 ? (
+                    <GlassCard className="p-3">
+                      <div className="text-sm font-medium text-gray-900">5) Pedidos</div>
+                      <div className="mt-1 text-xs text-gray-600">
+                        Ative importação de pedidos e garanta que os webhooks estejam registrados para reduzir polling.
+                      </div>
+
+                      <div className="mt-3 flex items-center justify-between gap-3 rounded-lg border border-gray-100 bg-white px-3 py-2">
+                        <div>
+                          <div className="text-sm font-medium text-gray-800">Importar pedidos</div>
+                          <div className="text-xs text-gray-500">Cria pedidos no Ultria ERP com canal=marketplace.</div>
+                        </div>
+                        <Switch
+                          checked={!!activeConnection.config?.import_orders}
+                          onCheckedChange={(checked) =>
+                            setActiveConnection((prev) => (prev ? { ...prev, config: { ...(prev.config ?? {}), import_orders: checked } } : prev))
+                          }
+                        />
+                      </div>
+
+                      <div className="mt-3 flex flex-wrap items-center gap-2">
+                        <Button
+                          variant="outline"
+                          className="gap-2"
+                          disabled={!canManage || !!jobsActionId}
+                          onClick={() => void handleQueueJobNow('woo', 'import_orders')}
+                        >
+                          Importar pedidos agora
+                        </Button>
+
+                        <Button
+                          variant="outline"
+                          className="gap-2"
+                          disabled={!canManage || !wooAdvancedActionsEnabled}
+                          onClick={() => void handleWooAdvancedRegisterWebhooks()}
+                          title={wooAdvancedActionsEnabled ? 'Registrar webhooks no Woo' : 'Indisponível sem store vinculada'}
+                        >
+                          Registrar webhooks
+                        </Button>
+
+                        <Button
+                          variant="outline"
+                          className="gap-2"
+                          disabled={!canManage || !wooAdvancedActionsEnabled}
+                          onClick={() => void handleWooAdvancedUnpause()}
+                          title={wooAdvancedActionsEnabled ? 'Reativar store' : 'Indisponível sem store vinculada'}
+                        >
+                          Reativar store
+                        </Button>
+                      </div>
+                    </GlassCard>
+                  ) : null}
+
+                  {wooSetupStep === 5 ? (
+                    <GlassCard className="p-3">
+                      <div className="text-sm font-medium text-gray-900">6) Notificações (em breve)</div>
+                      <div className="mt-1 text-xs text-gray-600">
+                        Próximo sprint: e-mails de rastreio/entrega e notificações operacionais (falhas, DLQ, credenciais).
+                      </div>
+                      <div className="mt-3 rounded-lg border border-gray-100 bg-white p-3 text-xs text-gray-600">
+                        Nada para configurar agora. Use Saúde (Ops) e o Painel Woo (Desenvolvedor) para monitorar.
+                      </div>
+                    </GlassCard>
+                  ) : null}
+
+                  {wooSetupStep === 6 ? (
+                    <GlassCard className="p-3">
+                      <div className="text-sm font-medium text-gray-900">7) Mapeamentos (SKU)</div>
+                      <div className="mt-1 text-xs text-gray-600">
+                        A sincronização usa SKU como chave. Se houver SKUs duplicados/ausentes no Woo, corrija antes de publicar em massa.
+                      </div>
+
+                      <div className="mt-3 flex flex-wrap items-center gap-2">
+                        <Button
+                          variant="outline"
+                          className="gap-2"
+                          disabled={!canManage || !wooAdvancedActionsEnabled}
+                          onClick={() => void handleWooAdvancedBuildMap()}
+                          title={wooAdvancedActionsEnabled ? 'Enfileirar rebuild do product map' : 'Indisponível sem store vinculada'}
+                        >
+                          Construir mapa por SKU
+                        </Button>
+                        <Button
+                          variant="outline"
+                          className="gap-2"
+                          disabled={!canManage || !wooAdvancedActionsEnabled}
+                          onClick={() => void handleWooAdvancedRunWorkerNow()}
+                        >
+                          Processar agora
+                        </Button>
+                      </div>
+
+                      {activeWooStore ? (
+                        <div className="mt-3 flex flex-wrap items-center gap-2">
+                          <Button asChild variant="outline" className="gap-2">
+                            <Link to={`/app/products/woocommerce/catalog?store=${encodeURIComponent(activeWooStore.id)}`}>Importar catálogo</Link>
+                          </Button>
+                        </div>
+                      ) : null}
+                    </GlassCard>
+                  ) : null}
+
+                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 pt-2">
+                    <Button variant="outline" onClick={() => setConfigOpen(false)}>
+                      Continuar depois
+                    </Button>
+                    <div className="flex flex-wrap items-center justify-end gap-2">
+                      <Button variant="outline" onClick={() => void handleWooWizardBack()} disabled={wooSetupStep === 0}>
+                        Anterior
+                      </Button>
+                      <Button variant="outline" onClick={() => void handleWooWizardNext()} disabled={wooSetupStep >= wooWizard.maxIndex}>
+                        Próximo
+                      </Button>
+                      <Button
+                        className={cn(wooSetupStep >= wooWizard.maxIndex && 'hidden')}
+                        onClick={() => void handleWooWizardSaveAndNext()}
+                        disabled={!canManage || savingConfig || (wooSetupStep === 0 && !String(activeConnection.config?.store_url ?? '').trim())}
+                        title={!canManage ? 'Sem permissão' : 'Salvar e avançar'}
+                      >
+                        {savingConfig ? 'Salvando…' : 'Salvar e avançar'}
+                      </Button>
+                      <Button
+                        className={cn(wooSetupStep < wooWizard.maxIndex && 'hidden')}
+                        onClick={() => void handleSaveConfig()}
+                        disabled={!canManage || savingConfig}
+                      >
+                        {savingConfig ? 'Concluindo…' : 'Concluir'}
+                      </Button>
+                    </div>
+                  </div>
+                </>
+              )}
             </div>
           )}
         </DialogContent>
