@@ -1,13 +1,14 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { searchClients, type ClientHit } from '@/services/clients';
 import { searchSuppliers, type SupplierHit } from '@/services/compras';
 import { useDebounce } from '@/hooks/useDebounce';
-import { Loader2 } from 'lucide-react';
+import { Loader2, Plus } from 'lucide-react';
 import Modal from '@/components/ui/Modal';
 import PartnerFormPanel from '@/components/partners/PartnerFormPanel';
 import { useToast } from '@/contexts/ToastProvider';
 import { logger } from '@/lib/logger';
 import { useAuth } from '@/contexts/AuthProvider';
+import type { PartnerDetails } from '@/services/partners';
 
 type PartnerHit = { id: string; label: string; nome: string; doc_unico: string | null };
 
@@ -56,6 +57,8 @@ export default function ClienteFornecedorAutocomplete({
   const searchSeqRef = useRef(0);
 
   const debouncedQuery = useDebounce(query, 300);
+
+  const createCtaLabel = useMemo(() => '+ Criar novo parceiro', []);
 
   useEffect(() => {
     if (value && initialName) {
@@ -125,7 +128,7 @@ export default function ClienteFornecedorAutocomplete({
     if (value) onChange(null);
   };
 
-  const handleCreateSuccess = (savedPartner: any) => {
+  const handleCreateSuccess = (savedPartner: PartnerDetails) => {
     const newHit: PartnerHit = {
       id: savedPartner.id,
       label: savedPartner.nome || 'Novo cadastro',
@@ -138,7 +141,7 @@ export default function ClienteFornecedorAutocomplete({
   };
 
   return (
-    <div className={`relative flex gap-2 ${className || ''}`} ref={ref}>
+    <div className={`relative flex ${className || ''}`} ref={ref}>
       <div className="relative flex-grow">
         <input
           className="w-full p-3 bg-white/80 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition shadow-sm"
@@ -176,25 +179,29 @@ export default function ClienteFornecedorAutocomplete({
         )}
 
         {open && !loading && hits.length === 0 && query.length >= 2 && (
-          <div className="absolute z-10 mt-1 w-full bg-white border rounded-lg shadow px-4 py-3 text-sm text-gray-500">
-            Nenhum cliente/fornecedor encontrado.
+          <div className="absolute z-10 mt-1 w-full bg-white border rounded-lg shadow-lg overflow-hidden">
+            <div className="px-4 py-3 text-sm text-gray-500">Nenhum cliente/fornecedor encontrado.</div>
+            <button
+              type="button"
+              className="w-full px-4 py-3 text-left text-sm font-semibold text-blue-700 hover:bg-blue-50 flex items-center gap-2"
+              onMouseDown={(e) => {
+                e.preventDefault();
+                setIsCreateModalOpen(true);
+                setOpen(false);
+              }}
+              disabled={disabled || authLoading || !activeEmpresaId}
+            >
+              <Plus size={16} />
+              {createCtaLabel}
+            </button>
           </div>
         )}
       </div>
 
-      <button
-        type="button"
-        onClick={() => setIsCreateModalOpen(true)}
-        className="flex-shrink-0 px-4 py-3 bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200 transition-colors text-sm font-semibold whitespace-nowrap"
-        title="Criar um novo cadastro. Para registro já cadastrado, digite no campo de busca ao lado."
-        disabled={disabled || authLoading || !activeEmpresaId}
-      >
-        Criar Novo
-      </button>
-
       <Modal isOpen={isCreateModalOpen} onClose={() => setIsCreateModalOpen(false)} title="Novo Cliente/Fornecedor" size="4xl">
         <PartnerFormPanel
           partner={null}
+          initialValues={{ tipo: 'ambos' }}
           onSaveSuccess={handleCreateSuccess}
           onClose={() => setIsCreateModalOpen(false)}
         />
