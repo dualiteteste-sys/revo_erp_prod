@@ -350,6 +350,7 @@ const ContasPagarFormPanel: React.FC<ContasPagarFormPanelProps> = ({ conta, onSa
             <ClientAutocomplete
               value={formData.fornecedor_id || null}
               initialName={fornecedorName}
+              entity="supplier"
               onChange={(id, name) => {
                 handleFormChange('fornecedor_id', id);
                 if (name) setFornecedorName(name);
