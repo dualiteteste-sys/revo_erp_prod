@@ -1,13 +1,18 @@
--- Fix crítico: Fluxo de Caixa (dashboard)
--- - Realizado: baseado em movimentações (entrada/saída) por mês (caixa), excluindo transferências internas
--- - Previsto: baseado em títulos em aberto (A/R e A/P) por vencimento; vencidos são "puxados" para o mês atual
+-- Fix crítico: Fluxo de Caixa (dashboard) — valores e saldo acumulado corretos
+-- Baseado nas diretrizes:
+-- - Realizado: movimentações (entradas/saídas) por mês (caixa), excluindo transferências internas
+-- - Previsto: títulos em aberto (A/R e A/P) por vencimento; vencidos são "puxados" para o mês atual
 -- - Saldo inicial: saldo das contas correntes ativas no início da janela (primeiro mês retornado)
 --
--- Objetivo: barras/tooltip/linha de saldo refletirem valores reais (sem duplicidade/omissão por mês).
+-- Importante: esta migration roda após `20270128185600_fluxo_caixa_saldo_atual.sql` para evitar
+-- "cannot change return type" ao redefinir o retorno da função.
 
 begin;
 
-create or replace function public.financeiro_fluxo_caixa_centered(p_months int)
+-- Mudamos o retorno (inclui `saldo_inicial_cc`) e a semântica; precisa drop primeiro.
+drop function if exists public.financeiro_fluxo_caixa_centered(int);
+
+create function public.financeiro_fluxo_caixa_centered(p_months int)
 returns table (
   mes text,
   mes_iso text,
@@ -36,10 +41,11 @@ begin
     raise exception 'Empresa não identificada';
   end if;
 
-  -- Guards (SECURITY DEFINER)
+  -- Guard obrigatório (SECURITY DEFINER)
   perform public.require_permission_for_current_user('tesouraria', 'view');
   perform public.require_permission_for_current_user('contas_a_receber', 'view');
   perform public.require_permission_for_current_user('contas_a_pagar', 'view');
+  perform public.require_permission_for_current_user('contas_correntes', 'view');
 
   v_months_before := p_months / 2;
   v_months_after := p_months - v_months_before - 1;
@@ -148,5 +154,7 @@ $$;
 comment on function public.financeiro_fluxo_caixa_centered(int) is
 'Fluxo de caixa centralizado no mês atual. Realizado por movimentações (exclui transferências internas); previsto por títulos em aberto (vencidos são puxados para o mês atual). saldo_inicial_cc retorna o saldo das contas correntes ativas no início da janela (primeiro registro).';
 
-commit;
+revoke all on function public.financeiro_fluxo_caixa_centered(int) from public, anon;
+grant execute on function public.financeiro_fluxo_caixa_centered(int) to authenticated, service_role;
 
+commit;
