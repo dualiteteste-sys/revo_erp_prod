@@ -55,6 +55,8 @@ const WooCommerceStoreDetailPage = lazyImport(() => import("../pages/dev/WooComm
 const SupabaseDemoPage = lazyImport(() => import("../pages/tools/SupabaseDemoPage"));
 const SettingsPage = lazyImport(() => import("../pages/settings/SettingsPage"));
 const TermsOfUsePage = lazyImport(() => import("../pages/legal/TermsOfUsePage"));
+const BillingSuccessPage = lazyImport(() => import("../pages/billing/SuccessPage"));
+const BillingCancelPage = lazyImport(() => import("../pages/billing/CancelPage"));
 
 // Fiscal Pages
 const NfeEmissoesPage = lazyImport(() => import("../pages/fiscal/NfeEmissoesPage"));
@@ -120,17 +122,6 @@ const CobrancasServicosPage = lazyImport(() => import("../pages/servicos/Cobranc
 const SuportePage = lazyImport(() => import("../pages/support/SuportePage"));
 const SupportConsolePage = lazyImport(() => import("../pages/support/SupportConsolePage"));
 
-const BillingSuccessLanding = () => {
-  try {
-    localStorage.removeItem("pending_plan_slug");
-    localStorage.removeItem("pending_plan_cycle");
-  } catch {
-    // ignore
-  }
-
-  return <Navigate to="/app/dashboard" replace />;
-};
-
 export const appRoutes: RouteObject[] = [
     {
         path: "/app",
@@ -154,8 +145,8 @@ export const appRoutes: RouteObject[] = [
             { path: "termos-de-uso", element: <Suspense fallback={<PageLoader />}><TermsOfUsePage /></Suspense> },
 
             // Billing / Stripe redirects
-            { path: "billing/success", element: <BillingSuccessLanding /> },
-            { path: "billing/cancel", element: <Navigate to="/app/configuracoes/geral/assinatura" replace /> },
+            { path: "billing/success", element: <Suspense fallback={<PageLoader />}><BillingSuccessPage /></Suspense> },
+            { path: "billing/cancel", element: <Suspense fallback={<PageLoader />}><BillingCancelPage /></Suspense> },
 
             // Cadastros
             {
