@@ -69,13 +69,9 @@ export default function WooCatalogImportPage() {
       navigate(`/app/products/woocommerce/runs/${response.run_id}?store=${storeId}`);
 
       try {
-        const worker = await runWooWorkerNow({ empresaId: activeEmpresaId, storeId });
-        const processed = Number((worker as any)?.processed_jobs ?? 0);
-        const hint = String((worker as any)?.hint ?? '').trim();
-        if (processed > 0) addToast('Processamento iniciado.', 'success');
-        else if (hint) addToast(hint, 'warning');
+        await runWooWorkerNow({ empresaId: activeEmpresaId, storeId });
       } catch (error: any) {
-        addToast(error?.message || 'Falha ao iniciar processamento. Use “Processar” na execução.', 'warning');
+        addToast(error?.message || 'Não foi possível processar automaticamente. Use “Processar”.', 'warning');
       }
     } catch (error: any) {
       addToast(error?.message || 'Falha ao iniciar importação.', 'error');
