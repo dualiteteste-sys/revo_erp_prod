@@ -61,21 +61,26 @@ export function buildDashboardFluxoCaixaChartData(rows: FinanceiroFluxoCaixaCent
 
   const idxCurrent = enrichedBase.findIndex((r) => r.is_current);
 
-  // Âncora de saldo (estado-da-arte): a linha precisa bater com o saldo real no "mês atual".
-  // Caso `saldo_atual_cc` exista, ajusta o saldo inicial para que o ponto do mês atual coincida.
-  const anchorEnabled = idxCurrent >= 0 && Number(saldoAtual || 0) !== 0;
-  const cumulativeNetToCurrent = anchorEnabled
-    ? enrichedBase.slice(0, idxCurrent + 1).reduce((acc, item) => acc + (item.receber - item.pagar), 0)
-    : 0;
-  const saldoInicialParaGrafico = anchorEnabled
-    ? Number(saldoAtual || 0) - cumulativeNetToCurrent
+  const hasAnchor = idxCurrent >= 0 && Number(saldoAtual || 0) !== 0;
+
+  // Calcula saldo relativo (base=0) e depois aplica shift:
+  // - Com âncora: shift para bater saldo_atual_cc no mês atual.
+  // - Sem âncora: shift = saldo_inicial_cc (início da janela).
+  let saldoRel = 0;
+  const chartData = enrichedBase.map((item) => {
+    saldoRel += item.receber - item.pagar;
+    return { ...item, saldo: saldoRel };
+  });
+
+  const shift = hasAnchor
+    ? Number(saldoAtual || 0) - Number(chartData[idxCurrent]?.saldo || 0)
     : Number(saldoInicialJanela || 0);
 
-  let saldoAcumulado = saldoInicialParaGrafico;
-  const chartData = enrichedBase.map((item) => {
-    saldoAcumulado += item.receber - item.pagar;
-    return { ...item, saldo: saldoAcumulado };
-  });
+  if (shift !== 0) {
+    for (const item of chartData) {
+      item.saldo += shift;
+    }
+  }
 
   return { chartData, currentMonthIndex: idxCurrent };
 }
