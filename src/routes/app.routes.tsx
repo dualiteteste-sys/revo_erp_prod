@@ -32,6 +32,7 @@ const TesourariaPage = lazyImport(() => import("../pages/financeiro/TesourariaPa
 const CobrancasBancariasPage = lazyImport(() => import("../pages/financeiro/CobrancasBancariasPage"));
 const ExtratoPage = lazyImport(() => import("../pages/financeiro/ExtratoPage"));
 const RelatoriosFinanceiroPage = lazyImport(() => import("../pages/financeiro/RelatoriosFinanceiroPage"));
+const DreFinanceiroPage = lazyImport(() => import("../pages/financeiro/DreFinanceiroPage"));
 const RelatoriosHubPage = lazyImport(() => import("../pages/relatorios/RelatoriosHubPage"));
 const CepSearchPage = lazyImport(() => import("../pages/tools/CepSearchPage"));
 const CnpjSearchPage = lazyImport(() => import("../pages/tools/CnpjSearchPage"));
@@ -486,6 +487,14 @@ export const appRoutes: RouteObject[] = [
               element: (
                 <RequirePermission permission={{ domain: "relatorios_financeiro", action: "view" }}>
                   <Suspense fallback={<PageLoader />}><RelatoriosFinanceiroPage /></Suspense>
+                </RequirePermission>
+              ),
+            },
+            {
+              path: "financeiro/dre",
+              element: (
+                <RequirePermission permission={{ domain: "relatorios_financeiro", action: "view" }}>
+                  <Suspense fallback={<PageLoader />}><DreFinanceiroPage /></Suspense>
                 </RequirePermission>
               ),
             },
