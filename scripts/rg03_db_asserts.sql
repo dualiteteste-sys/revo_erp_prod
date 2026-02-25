@@ -47,6 +47,17 @@ begin
     end if;
   end if;
 
+  -- 0.3) Fluxo de Caixa (centered): contas a receber deve incluir status "parcial" no previsto
+  -- Evita regressão: títulos parcialmente pagos sumirem do gráfico.
+  if to_regprocedure('public.financeiro_fluxo_caixa_centered(int)') is not null then
+    if position(
+      '''parcial''::public.status_conta_receber' in
+      (select pg_get_functiondef('public.financeiro_fluxo_caixa_centered(int)'::regprocedure))
+    ) = 0 then
+      raise exception 'RG-03: public.financeiro_fluxo_caixa_centered(int) deve incluir status_conta_receber=parcial no previsto (receber_previsto).';
+    end if;
+  end if;
+
   -- 1) Evita PostgREST HTTP_300 por overload ambíguo
   if exists (
     select 1
