@@ -37,6 +37,16 @@ export type ContasAReceberSummary = {
     total_vencido: number;
 };
 
+function toSafeInt(value: unknown): number {
+  const n = typeof value === 'number' ? value : Number(value);
+  return Number.isFinite(n) && n >= 0 ? Math.round(n) : 0;
+}
+
+function toSafeNumber(value: unknown): number {
+  const n = typeof value === 'number' ? value : Number(value);
+  return Number.isFinite(n) ? n : 0;
+}
+
 function getErrorMessage(error: unknown): string | null {
   if (error instanceof Error) return error.message;
   if (!error || typeof error !== 'object') return null;
@@ -144,7 +154,8 @@ export async function listContasAReceber(options: {
 	            p_end_date: endDate ? endDate.toISOString().split('T')[0] : null,
 	        });
 
-        if (Number(count) === 0) {
+        const safeCount = toSafeInt(count);
+        if (safeCount === 0) {
             return { data: [], count: 0 };
         }
 
@@ -159,7 +170,7 @@ export async function listContasAReceber(options: {
 	            p_order_dir: sortBy.ascending ? 'asc' : 'desc',
 	        });
 
-        return { data: data ?? [], count: Number(count) };
+        return { data: data ?? [], count: safeCount };
     } catch (error) {
         console.error('[SERVICE][LIST_CONTAS_A_RECEBER]', error);
         throw new Error('Não foi possível listar as contas a receber.');
@@ -195,12 +206,12 @@ export async function getContasAReceberSelectionTotals(params: {
       p_end_date: params.endDateISO,
     });
     return {
-      selected_count: Number(data?.selected_count ?? 0),
-      total_valor: Number(data?.total_valor ?? 0),
-      total_recebido: Number(data?.total_recebido ?? 0),
-      total_saldo: Number(data?.total_saldo ?? 0),
-      total_vencido: Number(data?.total_vencido ?? 0),
-      total_a_vencer: Number(data?.total_a_vencer ?? 0),
+      selected_count: toSafeInt(data?.selected_count),
+      total_valor: toSafeNumber(data?.total_valor),
+      total_recebido: toSafeNumber(data?.total_recebido),
+      total_saldo: toSafeNumber(data?.total_saldo),
+      total_vencido: toSafeNumber(data?.total_vencido),
+      total_a_vencer: toSafeNumber(data?.total_a_vencer),
     };
   } catch (error: unknown) {
     console.error('[SERVICE][CONTAS_RECEBER_SELECTION_TOTALS]', error);

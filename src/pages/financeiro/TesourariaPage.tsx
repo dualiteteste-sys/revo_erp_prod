@@ -625,10 +625,7 @@ export default function TesourariaPage() {
         if (!cancelled) {
           setTransferAssistByExtratoId((prev) => (isSameTransferAssistMap(prev, assistMap) ? prev : assistMap));
         }
-      } catch (error) {
-        if (import.meta.env.DEV) {
-          console.error('[Tesouraria][TransferAssist] erro ao detectar correspondências internas.', error);
-        }
+      } catch {
         if (!cancelled) {
           setTransferAssistByExtratoId((prev) => (Object.keys(prev).length === 0 ? prev : {}));
         }
@@ -713,9 +710,6 @@ export default function TesourariaPage() {
                     )
                 );
             if (movValor === null) {
-              if (import.meta.env.DEV) {
-                console.error('[Tesouraria][AutoConciliacao] movimentação sem valor válido', { mov, extratoId: extratoItem.id });
-              }
               continue;
             }
             const { score } = scoreExtratoToMovimentacao({
