@@ -43,6 +43,8 @@ Para cada risco identificado, documentar:
 - Não usar `0` como fallback para valor desconhecido em financeiro.
 - Se dado essencial estiver ausente, sinalizar claramente e bloquear ação insegura.
 - A origem de valor exibida na UI deve ser compatível com a origem usada no cálculo/validação.
+- Mudou fluxo/UI? **Atualizar o Guia rápido do módulo** em `src/components/support/helpCatalog.ts` (evita módulo “meia-boca” e suporte caro).
+- Em erro de UI: **toast palatável + ação** (para usuário) e detalhes técnicos somente em log/captura (ex.: `request_id`, `code`, `rpc_fn`).
 
 ## 5) Gate antes do merge
 

@@ -1148,6 +1148,37 @@ export const HELP_CATALOG: HelpEntry[] = [
     roadmapKey: 'financeiro',
   },
   {
+    match: '/app/financeiro/dre',
+    title: 'Guia Rápido do DRE (Demonstrativo de Resultados)',
+    whatIs:
+      'O DRE é o “resultado” da empresa no período: ele consolida receitas e despesas e mostra o lucro/prejuízo. Aqui, ele é calculado a partir das movimentações financeiras e do mapeamento por categoria → linha do DRE.',
+    steps: [
+      'Escolha o período e o regime (Competência/Caixa).',
+      'Gere o relatório e observe a linha “Não mapeado”.',
+      'Se existir “Não mapeado”, use o painel de mapeamento para classificar as categorias com maior impacto.',
+      'Atualize o relatório e confira se os valores migraram para as linhas corretas.',
+      'Quando algo ficar “zero” ou incoerente: valide se existem movimentações no período e se as categorias estão preenchidas.',
+    ],
+    dependsOn: ['Movimentações na Tesouraria', 'Permissão: Relatórios Financeiro (view)'],
+    connectsWith: ['Tesouraria', 'Relatórios Financeiros', 'Centros de custo (quando ativo)'],
+    fillPerfectly: [
+      'Conciliação feita (movimentações completas) antes de “fechar” o período.',
+      'Categorias consistentes (evita “Não mapeado” alto).',
+      'Definir um padrão por categoria (receita vs despesa) para manter o DRE estável.',
+    ],
+    commonMistakes: [
+      'Tentar usar DRE sem movimentações no período.',
+      'Mapear categoria errada (ex.: tarifa bancária como receita).',
+      'Ignorar “Não mapeado” e usar o DRE como “oficial”.',
+    ],
+    links: [
+      { label: 'Abrir Tesouraria', href: '/app/financeiro/tesouraria', kind: 'internal' },
+      { label: 'Abrir Relatórios Financeiros', href: '/app/financeiro/relatorios', kind: 'internal' },
+      { label: 'Abrir Centros de custo', href: '/app/financeiro/centros-de-custo', kind: 'internal' },
+    ],
+    roadmapKey: 'financeiro',
+  },
+  {
     match: '/app/servicos/os',
     title: 'Guia Rápido de Ordem de Serviço',
     whatIs:
