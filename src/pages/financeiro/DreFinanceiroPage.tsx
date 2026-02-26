@@ -9,6 +9,8 @@ import { Button } from '@/components/ui/button';
 import { useToast } from '@/contexts/ToastProvider';
 import { useAuth } from '@/contexts/AuthProvider';
 import CentroDeCustoDropdown from '@/components/common/CentroDeCustoDropdown';
+import { logger } from '@/lib/logger';
+import { getLastRequestId } from '@/lib/requestId';
 import {
   deleteFinanceiroDreMapeamentoV1,
   getFinanceiroDreReportV1,
@@ -70,6 +72,7 @@ export default function DreFinanceiroPage() {
   const { loading: authLoading, activeEmpresaId } = useAuth();
 
   const [loading, setLoading] = useState(true);
+  const [loadIssue, setLoadIssue] = useState<string | null>(null);
   const [startDate, setStartDate] = useState<string>('');
   const [endDate, setEndDate] = useState<string>('');
   const [regime, setRegime] = useState<RegimeDre>('competencia');
@@ -97,6 +100,7 @@ export default function DreFinanceiroPage() {
     setMappings([]);
     setUnmapped([]);
     setSavingKey(null);
+    setLoadIssue(null);
     setLoading(true);
     fetchTokenRef.current += 1;
 
@@ -118,6 +122,7 @@ export default function DreFinanceiroPage() {
     const token = ++fetchTokenRef.current;
     const empresaSnapshot = activeEmpresaId;
     setLoading(true);
+    setLoadIssue(null);
     try {
       const start = toDateOrNull(startDate);
       const end = toDateOrNull(endDate);
@@ -130,21 +135,42 @@ export default function DreFinanceiroPage() {
       if (token !== fetchTokenRef.current) return;
       if (empresaSnapshot !== lastEmpresaIdRef.current) return;
 
-      if (reportRes.status === 'fulfilled') setReport(reportRes.value);
-      else setReport(null);
+      if (reportRes.status === 'fulfilled') {
+        setReport(reportRes.value);
+      } else {
+        const requestId = getLastRequestId();
+        logger.error('[DRE][LOAD][REPORT_FAILED]', reportRes.reason, { requestId });
+        setReport(null);
+        setLoadIssue('Não foi possível carregar o relatório agora. Tente “Atualizar”.');
+      }
 
       if (mappingsRes.status === 'fulfilled') setMappings(mappingsRes.value ?? []);
-      else setMappings([]);
+      else {
+        const requestId = getLastRequestId();
+        logger.error('[DRE][LOAD][MAPPINGS_FAILED]', mappingsRes.reason, { requestId });
+        setMappings([]);
+        setLoadIssue((prev) => prev ?? 'Não foi possível carregar o DRE agora. Tente “Atualizar”.');
+      }
 
       if (unmappedRes.status === 'fulfilled') setUnmapped(unmappedRes.value ?? []);
-      else setUnmapped([]);
+      else {
+        const requestId = getLastRequestId();
+        logger.error('[DRE][LOAD][UNMAPPED_FAILED]', unmappedRes.reason, { requestId });
+        setUnmapped([]);
+        setLoadIssue((prev) => prev ?? 'Não foi possível carregar o DRE agora. Tente “Atualizar”.');
+      }
     } catch (e: any) {
       if (token !== fetchTokenRef.current) return;
       if (empresaSnapshot !== lastEmpresaIdRef.current) return;
-      addToast(e?.message || 'Falha ao carregar o DRE.', 'error');
+      const requestId = getLastRequestId();
+      logger.error('[DRE][LOAD][FAILED]', e, { requestId });
+      addToast('Não foi possível carregar o DRE agora. Tente novamente.', 'error', {
+        title: 'Falha ao carregar',
+      });
       setReport(null);
       setMappings([]);
       setUnmapped([]);
+      setLoadIssue('Não foi possível carregar o DRE agora. Tente “Atualizar”.');
     } finally {
       if (token !== fetchTokenRef.current) return;
       if (empresaSnapshot !== lastEmpresaIdRef.current) return;
@@ -161,10 +187,14 @@ export default function DreFinanceiroPage() {
     setSavingKey(categoria);
     try {
       await setFinanceiroDreMapeamentoV1({ origemValor: categoria, dreLinhaKey: dreKey });
-      addToast('Mapeamento salvo.', 'success');
+      addToast('Mapeamento salvo e aplicado no relatório.', 'success');
       await fetchAll();
     } catch (e: any) {
-      addToast(e?.message || 'Falha ao salvar mapeamento.', 'error');
+      const requestId = getLastRequestId();
+      logger.error('[DRE][MAP][SAVE_FAILED]', e, { requestId, categoria, dreKey });
+      addToast('Não foi possível salvar o mapeamento. Tente novamente.', 'error', {
+        title: 'Falha ao salvar',
+      });
     } finally {
       setSavingKey(null);
     }
@@ -177,7 +207,11 @@ export default function DreFinanceiroPage() {
       addToast('Mapeamento removido.', 'success');
       await fetchAll();
     } catch (e: any) {
-      addToast(e?.message || 'Falha ao remover mapeamento.', 'error');
+      const requestId = getLastRequestId();
+      logger.error('[DRE][MAP][DELETE_FAILED]', e, { requestId, id });
+      addToast('Não foi possível remover o mapeamento. Tente novamente.', 'error', {
+        title: 'Falha ao remover',
+      });
     } finally {
       setSavingKey(null);
     }
@@ -243,10 +277,19 @@ export default function DreFinanceiroPage() {
           <div className="flex items-center justify-between">
             <div>
               <h3 className="text-lg font-semibold">Relatório</h3>
-              <div className="text-sm text-muted-foreground">Subtotal conferível (v1). “Não mapeado” deve ficar zerado.</div>
+              <div className="text-sm text-muted-foreground">Subtotal conferível (v1). “Não mapeado” indica lançamentos sem classificação no DRE.</div>
             </div>
             {loading ? <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /> : null}
           </div>
+
+          {loadIssue && !loading ? (
+            <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
+              {loadIssue}
+              <div className="mt-1 text-xs text-amber-900/70">
+                Se persistir, abra <strong>Suporte → Diagnóstico guiado</strong> e envie o request-id do erro.
+              </div>
+            </div>
+          ) : null}
 
           <div className="mt-4 overflow-x-auto">
             <table className="w-full text-sm">
@@ -272,7 +315,7 @@ export default function DreFinanceiroPage() {
                 {!report && !loading ? (
                   <tr>
                     <td colSpan={2} className="py-3 text-muted-foreground">
-                      DRE indisponível. Verifique se as migrations estão aplicadas e se você tem permissão de relatórios.
+                      Não foi possível carregar o DRE para os filtros atuais.
                     </td>
                   </tr>
                 ) : null}
