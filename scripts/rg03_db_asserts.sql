@@ -119,6 +119,21 @@ begin
     raise exception 'RG-03: tabela public.vendedores ainda possui grants diretos para authenticated (deve ser RPC-first).';
   end if;
 
+  -- 4.0d) DRE v1: guardrails de RPC (evita console vermelho + UX "indisponível")
+  -- - report_v1 deve ter `FROM mapped` (senão quebra com 42703 "dre_key does not exist")
+  -- - set_v1 deve usar `ON CONSTRAINT` (evita 42702 por ambiguidade de variável vs coluna)
+  if to_regprocedure('public.financeiro_dre_report_v1(date,date,text,uuid)') is not null then
+    if position('from mapped' in lower((select pg_get_functiondef('public.financeiro_dre_report_v1(date,date,text,uuid)'::regprocedure)))) = 0 then
+      raise exception 'RG-03: public.financeiro_dre_report_v1() sem `FROM mapped` (causa 42703 dre_key).';
+    end if;
+  end if;
+
+  if to_regprocedure('public.financeiro_dre_mapeamentos_set_v1(text,text,text)') is not null then
+    if position('on conflict on constraint' in lower((select pg_get_functiondef('public.financeiro_dre_mapeamentos_set_v1(text,text,text)'::regprocedure)))) = 0 then
+      raise exception 'RG-03: public.financeiro_dre_mapeamentos_set_v1() deve usar `ON CONSTRAINT` (evita 42702 origem_tipo ambíguo).';
+    end if;
+  end if;
+
   -- 4.0) Recebimentos devem ser RPC-first (evita bypass/instabilidade por acesso direto via PostgREST)
   if has_table_privilege('authenticated', 'public.recebimentos', 'select')
      or has_table_privilege('authenticated', 'public.recebimentos', 'insert')
