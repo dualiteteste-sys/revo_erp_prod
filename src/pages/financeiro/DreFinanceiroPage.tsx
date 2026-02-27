@@ -47,6 +47,18 @@ const MAPPABLE_LINES: { key: string; label: string }[] = [
   { key: 'irpj_csll', label: 'IRPJ/CSLL' },
 ];
 
+// Linhas de despesa: o backend retorna valores negativos (convenção de sinal para cálculo),
+// mas a exibição padrão de DRE mostra o valor absoluto e o label já tem "(-)" indicando subtração.
+const EXPENSE_DISPLAY_LINES = new Set([
+  'deducoes_impostos',
+  'cmv_cpv_csp',
+  'despesas_operacionais_adm',
+  'despesas_operacionais_comerciais',
+  'despesas_operacionais_gerais',
+  'depreciacao_amortizacao',
+  'irpj_csll',
+]);
+
 const DRE_VIEW_LINES: { key: string; label: string; kind?: 'subtotal' | 'info' }[] = [
   { key: 'receita_bruta', label: 'Receita Bruta' },
   { key: 'deducoes_impostos', label: '(-) Deduções/Impostos sobre vendas' },
@@ -109,10 +121,12 @@ export default function DreFinanceiroPage() {
 
   const dreRows = useMemo(() => {
     const linhas = report?.linhas ?? {};
-    return DRE_VIEW_LINES.map((line) => ({
-      ...line,
-      value: typeof linhas?.[line.key] === 'number' ? Number(linhas[line.key]) : 0,
-    }));
+    return DRE_VIEW_LINES.map((line) => {
+      const raw = typeof linhas?.[line.key] === 'number' ? Number(linhas[line.key]) : 0;
+      // Linhas de despesa: negamos para exibir o valor absoluto (o label já carrega o "(-)")
+      const value = EXPENSE_DISPLAY_LINES.has(line.key) ? -raw : raw;
+      return { ...line, value };
+    });
   }, [report]);
 
   const fetchAll = useCallback(async () => {
