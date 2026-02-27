@@ -219,8 +219,8 @@ export default function DreFinanceiroPage() {
     if (!report) return;
     printDreReport({
       rows: dreRows,
-      startDate: report.meta.start_date ?? startDate || null,
-      endDate: report.meta.end_date ?? endDate || null,
+      startDate: (report.meta.start_date ?? startDate) || null,
+      endDate: (report.meta.end_date ?? endDate) || null,
       regime: report.meta.regime,
       centroNome: centroName || null,
       empresaNome: activeEmpresa?.nome_fantasia ?? activeEmpresa?.nome_razao_social ?? 'Empresa',
