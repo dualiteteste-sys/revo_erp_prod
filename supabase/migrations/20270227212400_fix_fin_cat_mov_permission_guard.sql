@@ -8,9 +8,17 @@
     3) search_path fixo    ✓ (já existia)
 
   Também revoga grant de authenticated no seed (só trigger/service_role usa).
+  Revoga grants diretos na tabela (RPC-first: acesso só via RPCs SECURITY DEFINER).
 */
 
 begin;
+
+-- -----------------------------------------------------------------------------
+-- 0) Revogar grants diretos na tabela (RPC-first pattern)
+-- -----------------------------------------------------------------------------
+
+revoke all on table public.financeiro_categorias_mov from authenticated, anon, public;
+grant all on table public.financeiro_categorias_mov to service_role;
 
 -- -----------------------------------------------------------------------------
 -- 1) financeiro_categorias_mov_list — adicionar permission guard
