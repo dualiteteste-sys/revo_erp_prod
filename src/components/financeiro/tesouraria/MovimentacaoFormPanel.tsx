@@ -9,6 +9,7 @@ import TextArea from '@/components/ui/forms/TextArea';
 import { useNumericField } from '@/hooks/useNumericField';
 import { Button } from '@/components/ui/button';
 import CentroDeCustoDropdown from '@/components/common/CentroDeCustoDropdown';
+import CategoriaMovimentacaoDropdown from '@/components/common/CategoriaMovimentacaoDropdown';
 
 interface Props {
   movimentacao: Movimentacao | null;
@@ -130,15 +131,15 @@ export default function MovimentacaoFormPanel({ movimentacao, contaCorrenteId, r
             disabled={readOnly}
           />
 
-          <Input 
-            label="Categoria" 
-            name="cat" 
-            value={formData.categoria || ''} 
-            onChange={e => handleChange('categoria', e.target.value)} 
-            className="sm:col-span-3" 
-            placeholder="Ex: Tarifas, Ajustes, Suprimentos"
-            disabled={readOnly}
-          />
+          <div className="sm:col-span-3">
+            <label className="block text-sm font-medium text-gray-700 mb-1">Categoria (opcional)</label>
+            <CategoriaMovimentacaoDropdown
+              value={formData.categoria ?? null}
+              onChange={nome => handleChange('categoria', nome)}
+              tipo={formData.tipo_mov === 'entrada' ? 'entrada' : 'saida'}
+              disabled={readOnly}
+            />
+          </div>
 
           <div className="sm:col-span-3">
             <label className="block text-sm font-medium text-gray-700 mb-1">Centro de Custo (opcional)</label>
