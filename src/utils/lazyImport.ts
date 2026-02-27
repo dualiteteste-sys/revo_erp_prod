@@ -23,7 +23,8 @@ export function lazyImport<T extends ComponentType<any>>(
                 const lastReload = sessionStorage.getItem(storageKey);
                 const now = Date.now();
 
-                if (!lastReload || now - parseInt(lastReload) > 10000) {
+                const lastReloadTs = lastReload ? parseInt(lastReload, 10) : NaN;
+                if (isNaN(lastReloadTs) || now - lastReloadTs > 10000) {
                     sessionStorage.setItem(storageKey, now.toString());
                     window.location.reload();
                     // Return a never-resolving promise to wait for reload
