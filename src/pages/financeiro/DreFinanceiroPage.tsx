@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { FileText, Loader2, RefreshCw } from 'lucide-react';
+import { FileText, Loader2, Printer, RefreshCw } from 'lucide-react';
 
 import PageHeader from '@/components/ui/PageHeader';
 import GlassCard from '@/components/ui/GlassCard';
@@ -11,6 +11,7 @@ import { useAuth } from '@/contexts/AuthProvider';
 import CentroDeCustoDropdown from '@/components/common/CentroDeCustoDropdown';
 import { logger } from '@/lib/logger';
 import { getLastRequestId } from '@/lib/requestId';
+import { printDreReport } from '@/lib/financeiro/printDre';
 import {
   deleteFinanceiroDreMapeamentoV1,
   getFinanceiroDreReportV1,
@@ -47,6 +48,18 @@ const MAPPABLE_LINES: { key: string; label: string }[] = [
   { key: 'irpj_csll', label: 'IRPJ/CSLL' },
 ];
 
+// Linhas de despesa: o backend retorna valores negativos (convenção de sinal para cálculo),
+// mas a exibição padrão de DRE mostra o valor absoluto e o label já tem "(-)" indicando subtração.
+const EXPENSE_DISPLAY_LINES = new Set([
+  'deducoes_impostos',
+  'cmv_cpv_csp',
+  'despesas_operacionais_adm',
+  'despesas_operacionais_comerciais',
+  'despesas_operacionais_gerais',
+  'depreciacao_amortizacao',
+  'irpj_csll',
+]);
+
 const DRE_VIEW_LINES: { key: string; label: string; kind?: 'subtotal' | 'info' }[] = [
   { key: 'receita_bruta', label: 'Receita Bruta' },
   { key: 'deducoes_impostos', label: '(-) Deduções/Impostos sobre vendas' },
@@ -69,7 +82,7 @@ const DRE_VIEW_LINES: { key: string; label: string; kind?: 'subtotal' | 'info' }
 
 export default function DreFinanceiroPage() {
   const { addToast } = useToast();
-  const { loading: authLoading, activeEmpresaId } = useAuth();
+  const { loading: authLoading, activeEmpresaId, activeEmpresa } = useAuth();
 
   const [loading, setLoading] = useState(true);
   const [loadIssue, setLoadIssue] = useState<string | null>(null);
@@ -109,10 +122,12 @@ export default function DreFinanceiroPage() {
 
   const dreRows = useMemo(() => {
     const linhas = report?.linhas ?? {};
-    return DRE_VIEW_LINES.map((line) => ({
-      ...line,
-      value: typeof linhas?.[line.key] === 'number' ? Number(linhas[line.key]) : 0,
-    }));
+    return DRE_VIEW_LINES.map((line) => {
+      const raw = typeof linhas?.[line.key] === 'number' ? Number(linhas[line.key]) : 0;
+      // Linhas de despesa: negamos para exibir o valor absoluto (o label já carrega o "(-)")
+      const value = EXPENSE_DISPLAY_LINES.has(line.key) ? -raw : raw;
+      return { ...line, value };
+    });
   }, [report]);
 
   const fetchAll = useCallback(async () => {
@@ -200,6 +215,19 @@ export default function DreFinanceiroPage() {
     }
   }, [addToast, fetchAll]);
 
+  const handlePrint = useCallback(() => {
+    if (!report) return;
+    printDreReport({
+      rows: dreRows,
+      startDate: (report.meta.start_date ?? startDate) || null,
+      endDate: (report.meta.end_date ?? endDate) || null,
+      regime: report.meta.regime,
+      centroNome: centroName || null,
+      empresaNome: activeEmpresa?.nome_fantasia ?? activeEmpresa?.nome_razao_social ?? 'Empresa',
+      cnpj: activeEmpresa?.cnpj ?? null,
+    });
+  }, [activeEmpresa, dreRows, endDate, centroName, report, startDate]);
+
   const handleDeleteMap = useCallback(async (id: string) => {
     setSavingKey(id);
     try {
@@ -265,6 +293,10 @@ export default function DreFinanceiroPage() {
           <Button variant="outline" onClick={() => void fetchAll()} disabled={loading || authLoading || !activeEmpresaId}>
             {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <RefreshCw className="mr-2 h-4 w-4" />}
             Atualizar
+          </Button>
+          <Button variant="outline" onClick={handlePrint} disabled={!report || loading}>
+            <Printer className="mr-2 h-4 w-4" />
+            Imprimir / PDF
           </Button>
           <div className="text-sm text-muted-foreground">
             Comparativos, drill-down e export serão adicionados nos próximos lotes.
