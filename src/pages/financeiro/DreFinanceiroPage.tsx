@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { FileText, Loader2, RefreshCw } from 'lucide-react';
+import { FileText, Loader2, Printer, RefreshCw } from 'lucide-react';
 
 import PageHeader from '@/components/ui/PageHeader';
 import GlassCard from '@/components/ui/GlassCard';
@@ -11,6 +11,7 @@ import { useAuth } from '@/contexts/AuthProvider';
 import CentroDeCustoDropdown from '@/components/common/CentroDeCustoDropdown';
 import { logger } from '@/lib/logger';
 import { getLastRequestId } from '@/lib/requestId';
+import { printDreReport } from '@/lib/financeiro/printDre';
 import {
   deleteFinanceiroDreMapeamentoV1,
   getFinanceiroDreReportV1,
@@ -81,7 +82,7 @@ const DRE_VIEW_LINES: { key: string; label: string; kind?: 'subtotal' | 'info' }
 
 export default function DreFinanceiroPage() {
   const { addToast } = useToast();
-  const { loading: authLoading, activeEmpresaId } = useAuth();
+  const { loading: authLoading, activeEmpresaId, activeEmpresa } = useAuth();
 
   const [loading, setLoading] = useState(true);
   const [loadIssue, setLoadIssue] = useState<string | null>(null);
@@ -214,6 +215,19 @@ export default function DreFinanceiroPage() {
     }
   }, [addToast, fetchAll]);
 
+  const handlePrint = useCallback(() => {
+    if (!report) return;
+    printDreReport({
+      rows: dreRows,
+      startDate: report.meta.start_date ?? startDate || null,
+      endDate: report.meta.end_date ?? endDate || null,
+      regime: report.meta.regime,
+      centroNome: centroName || null,
+      empresaNome: activeEmpresa?.nome_fantasia ?? activeEmpresa?.nome_razao_social ?? 'Empresa',
+      cnpj: activeEmpresa?.cnpj ?? null,
+    });
+  }, [activeEmpresa, dreRows, endDate, centroName, report, startDate]);
+
   const handleDeleteMap = useCallback(async (id: string) => {
     setSavingKey(id);
     try {
@@ -279,6 +293,10 @@ export default function DreFinanceiroPage() {
           <Button variant="outline" onClick={() => void fetchAll()} disabled={loading || authLoading || !activeEmpresaId}>
             {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <RefreshCw className="mr-2 h-4 w-4" />}
             Atualizar
+          </Button>
+          <Button variant="outline" onClick={handlePrint} disabled={!report || loading}>
+            <Printer className="mr-2 h-4 w-4" />
+            Imprimir / PDF
           </Button>
           <div className="text-sm text-muted-foreground">
             Comparativos, drill-down e export serão adicionados nos próximos lotes.
