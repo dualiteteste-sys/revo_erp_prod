@@ -1,9 +1,13 @@
 name: Deploy Netlify (PROD)
 
+# Deploy PROD frontend AFTER the CI/CD Pipeline completes successfully.
+# This prevents deploying frontend code that depends on migrations
+# that haven't been applied yet.
 on:
-  push:
-    branches:
-      - main
+  workflow_run:
+    workflows: ["CI/CD Pipeline"]
+    branches: [main]
+    types: [completed]
   workflow_dispatch:
 
 concurrency:
@@ -15,6 +19,8 @@ jobs:
     name: Deploy Netlify (PROD)
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    # Only deploy if CI/CD Pipeline succeeded (or manual trigger)
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
 
     steps:
       - name: Checkout (main)
