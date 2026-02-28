@@ -1,7 +1,7 @@
 name: Auto-promote dev to main
 
-# After dev CI passes on a push to dev, automatically create/update
-# a dev->main PR and enable auto-merge.
+# After dev CI passes on a push to dev, automatically create a dev->main PR.
+# The PR is NOT auto-merged — the team validates in dev first, then merges manually.
 # NOTE: workflow_run triggers only work when this file exists on the default branch (main).
 # First promotion must be manual to bootstrap the workflow.
 
@@ -72,12 +72,7 @@ jobs:
             echo "number=$pr_number" >> "$GITHUB_OUTPUT"
           fi
 
-      - name: Enable auto-merge
+      - name: Summary
         if: ${{ steps.diff.outputs.ahead != '0' && steps.pr.outputs.number != '' }}
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          set -euo pipefail
-          pr="${{ steps.pr.outputs.number }}"
-          echo "Enabling auto-merge on PR #${pr}..."
-          gh pr merge "$pr" --auto --merge || echo "::warning::Could not enable auto-merge. Check branch protection rules."
+          echo "::notice::PR #${{ steps.pr.outputs.number }} ready for review. Validate in dev, then merge to main when ready."
