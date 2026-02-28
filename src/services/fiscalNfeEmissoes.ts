@@ -1,4 +1,5 @@
 import { callRpc } from '@/lib/api';
+import { supabase } from '@/lib/supabaseClient';
 
 export type AmbienteNfe = 'homologacao' | 'producao';
 
@@ -95,5 +96,35 @@ export async function fiscalNfeEmissaoDraftUpsert(input: {
     p_payload: input.payload ?? {},
     p_items: input.items ?? [],
   });
+}
+
+export type NfeSubmitResult = {
+  ok: boolean;
+  status?: string;
+  error?: string;
+  detail?: string;
+  focus_response?: any;
+};
+
+export async function fiscalNfeSubmit(emissaoId: string): Promise<NfeSubmitResult> {
+  const { data, error } = await supabase.functions.invoke('focusnfe-emit', {
+    body: { emissao_id: emissaoId },
+  });
+  if (error) {
+    const msg = (error as any)?.message || String(error);
+    return { ok: false, error: 'EDGE_ERROR', detail: msg };
+  }
+  return data as NfeSubmitResult;
+}
+
+export async function fiscalNfeConsultaStatus(emissaoId: string): Promise<NfeSubmitResult> {
+  const { data, error } = await supabase.functions.invoke('focusnfe-status', {
+    body: { emissao_id: emissaoId },
+  });
+  if (error) {
+    const msg = (error as any)?.message || String(error);
+    return { ok: false, error: 'EDGE_ERROR', detail: msg };
+  }
+  return data as NfeSubmitResult;
 }
 
