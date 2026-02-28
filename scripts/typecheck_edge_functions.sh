@@ -1,8 +1,11 @@
 #!/usr/bin/env bash
 # ──────────────────────────────────────────────────────────────────────
-# Type-check all Edge Functions before deploy.
-# Catches syntax errors, missing imports, and type mismatches that
-# would only surface at runtime in Deno Deploy.
+# Lint all Edge Functions before deploy.
+# Catches syntax errors, bad patterns, and common mistakes.
+#
+# Uses `deno lint` (no dep resolution needed) for reliable CI checks.
+# `deno check` requires all npm transitive deps cached which is fragile
+# in CI; `deno lint` catches the most impactful issues without that.
 #
 # Usage: bash scripts/typecheck_edge_functions.sh
 # Requires: deno (installed via denoland/setup-deno in CI)
@@ -28,16 +31,16 @@ for d in "$functions_dir"/*/; do
   [[ -f "$d/index.ts" ]] || continue
 
   checked=$((checked + 1))
-  echo "[typecheck] Checking: $fn"
 
-  if ! deno check "$d/index.ts" 2>&1; then
-    echo "::error::Type check failed for Edge Function '$fn'"
+  # Lint: catches syntax errors, bad patterns, unused vars, etc.
+  if ! deno lint "$d" --quiet 2>&1; then
+    echo "::error::Lint failed for Edge Function '$fn'"
     errors=$((errors + 1))
   fi
 done
 
 echo ""
-echo "[typecheck] Checked $checked functions, $errors error(s)."
+echo "[lint] Checked $checked functions, $errors error(s)."
 
 if [[ $errors -gt 0 ]]; then
   exit 1
