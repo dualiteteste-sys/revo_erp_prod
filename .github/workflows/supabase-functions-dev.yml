@@ -22,6 +22,14 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      - name: Install Deno
+        uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+
+      - name: Type-check Edge Functions
+        run: bash scripts/typecheck_edge_functions.sh
+
       - name: Install Supabase CLI
         uses: supabase/setup-cli@v1
         with:
