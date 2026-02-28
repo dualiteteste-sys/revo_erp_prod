@@ -1,0 +1,78 @@
+name: Auto-promote dev to main
+
+# After dev CI passes on a push to dev, automatically create a dev->main PR.
+# The PR is NOT auto-merged — the team validates in dev first, then merges manually.
+# NOTE: workflow_run triggers only work when this file exists on the default branch (main).
+# First promotion must be manual to bootstrap the workflow.
+
+on:
+  workflow_run:
+    workflows: ["Release Gate (dev) — unit + e2e + migrations"]
+    branches: [dev]
+    types: [completed]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: auto-promote-dev-main
+  cancel-in-progress: true
+
+jobs:
+  promote:
+    name: Promote dev to main
+    runs-on: ubuntu-latest
+    if: >-
+      ${{ github.event_name == 'workflow_dispatch' ||
+      (github.event.workflow_run.conclusion == 'success' &&
+       github.event.workflow_run.event == 'push') }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: dev
+          fetch-depth: 0
+
+      - name: Check if dev is ahead of main
+        id: diff
+        run: |
+          set -euo pipefail
+          git fetch origin main
+          ahead=$(git rev-list --count origin/main..origin/dev)
+          echo "ahead=$ahead" >> "$GITHUB_OUTPUT"
+          if [[ "$ahead" == "0" ]]; then
+            echo "::notice::dev is in sync with main, nothing to promote."
+          else
+            echo "::notice::dev is $ahead commit(s) ahead of main."
+          fi
+
+      - name: Find or create PR
+        if: ${{ steps.diff.outputs.ahead != '0' }}
+        id: pr
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          existing=$(gh pr list --base main --head dev --state open --json number --jq '.[0].number // empty' 2>/dev/null || echo "")
+
+          if [[ -n "$existing" ]]; then
+            echo "::notice::Using existing PR #${existing}"
+            echo "number=$existing" >> "$GITHUB_OUTPUT"
+          else
+            echo "::notice::Creating new dev to main PR..."
+            pr_url=$(gh pr create \
+              --base main \
+              --head dev \
+              --title "chore: promote dev to main" \
+              --body "Auto-promote: dev CI passed. Changes validated by Release Gate (dev).")
+            pr_number=$(echo "$pr_url" | grep -o '[0-9]*$')
+            echo "number=$pr_number" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Summary
+        if: ${{ steps.diff.outputs.ahead != '0' && steps.pr.outputs.number != '' }}
+        run: |
+          echo "::notice::PR #${{ steps.pr.outputs.number }} ready for review. Validate in dev, then merge to main when ready."

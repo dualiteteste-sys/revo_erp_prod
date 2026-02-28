@@ -219,22 +219,40 @@ jobs:
       - name: Enable Corepack (Yarn)
         run: corepack enable
 
+      - name: Cache Yarn
+        uses: actions/cache@v4
+        with:
+          path: |
+            .yarn/cache
+            .yarn/unplugged
+            .yarn/install-state.gz
+            .yarn/build-state.yml
+          key: ${{ runner.os }}-yarn-${{ hashFiles('yarn.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-yarn-
+
       - name: Install dependencies
         run: yarn install --immutable
 
-      - name: Determine risk level
+      - name: Determine gate level
         id: risk
-        if: github.event_name == 'pull_request'
         env:
           LABELS_JSON: ${{ toJson(github.event.pull_request.labels.*.name) }}
+          HEAD_REF: ${{ github.head_ref }}
         run: |
           set -euo pipefail
-          # Default is "auto" (paths-based). Labels can override:
-          # - risk:low  -> fast gate allowed (when landing_only)
-          # - risk:high -> force full gate even for landing-only
           labels="${LABELS_JSON:-[]}"
+          head="${HEAD_REF:-}"
+
+          # PR from dev → fast gate (E2E already ran on dev CI)
+          # risk:high label → force full gate
+          # risk:low label → fast gate
+          # Default → auto (paths-based)
           if echo "$labels" | grep -q '"risk:high"'; then
             echo "level=high" >> "$GITHUB_OUTPUT"
+          elif [[ "$head" == "dev" ]]; then
+            echo "level=dev-fast" >> "$GITHUB_OUTPUT"
+            echo "::notice::PR from dev branch — skipping E2E (already validated on dev CI). Running build + unit only."
           elif echo "$labels" | grep -q '"risk:low"'; then
             echo "level=low" >> "$GITHUB_OUTPUT"
           else
@@ -242,7 +260,7 @@ jobs:
           fi
 
       - name: Cache Playwright browsers
-        if: needs.changes.outputs.landing_only != 'true' || steps.risk.outputs.level == 'high'
+        if: steps.risk.outputs.level != 'dev-fast' && (needs.changes.outputs.landing_only != 'true' || steps.risk.outputs.level == 'high')
         uses: actions/cache@v4
         with:
           path: ~/.cache/ms-playwright
@@ -251,21 +269,19 @@ jobs:
             ${{ runner.os }}-playwright-
 
       - name: Install Playwright (Chromium)
-        if: needs.changes.outputs.landing_only != 'true' || steps.risk.outputs.level == 'high'
+        if: steps.risk.outputs.level != 'dev-fast' && (needs.changes.outputs.landing_only != 'true' || steps.risk.outputs.level == 'high')
         run: npx playwright install --with-deps chromium
 
-      - name: Release check (CI) — full
-        if: needs.changes.outputs.landing_only != 'true' || steps.risk.outputs.level == 'high'
+      - name: Release check (CI) — full E2E
+        if: steps.risk.outputs.level != 'dev-fast' && (needs.changes.outputs.landing_only != 'true' || steps.risk.outputs.level == 'high')
         env:
           CI: true
-          # Evita crash do app em runtime (supabaseClient lança erro quando env está ausente).
-          # Preferimos DEV para PRs (não apontar testes para PROD).
           VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL_DEV || secrets.VITE_SUPABASE_URL_PROD || 'https://example.com' }}
           VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY_DEV || secrets.VITE_SUPABASE_ANON_KEY_PROD || 'ci_dummy_anon_key' }}
         run: yarn release:check:ci
 
-      - name: Release check (CI) — landing fast gate
-        if: needs.changes.outputs.landing_only == 'true' && steps.risk.outputs.level != 'high'
+      - name: Release check (CI) — fast gate (dev PR or landing-only)
+        if: steps.risk.outputs.level == 'dev-fast' || (needs.changes.outputs.landing_only == 'true' && steps.risk.outputs.level != 'high')
         env:
           CI: true
           VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL_DEV || secrets.VITE_SUPABASE_URL_PROD || 'https://example.com' }}
