@@ -1,6 +1,6 @@
 import React from 'react';
 import { motion } from 'framer-motion';
-import { Edit, Eye, MoreVertical, ShoppingCart, Calendar, User } from 'lucide-react';
+import { Edit, Eye, FileText, MoreVertical, ShoppingCart, Calendar, User } from 'lucide-react';
 import { VendaPedido } from '@/services/vendas';
 import { cn } from '@/lib/utils';
 import {
@@ -13,6 +13,7 @@ import {
 interface PedidoVendaMobileCardProps {
     order: VendaPedido;
     onEdit: (order: VendaPedido) => void;
+    onGerarNfe?: (order: VendaPedido) => void;
 }
 
 const statusColors: Record<string, string> = {
@@ -41,6 +42,7 @@ function formatDate(value?: string | null): string {
 export function PedidoVendaMobileCard({
     order,
     onEdit,
+    onGerarNfe,
 }: PedidoVendaMobileCardProps): React.ReactElement {
     const isEditable = order.status === 'orcamento';
 
@@ -80,11 +82,17 @@ export function PedidoVendaMobileCard({
                                     <MoreVertical className="w-4 h-4 text-gray-400" />
                                 </button>
                             </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end" className="w-40">
+                            <DropdownMenuContent align="end" className="w-48">
                                 <DropdownMenuItem onClick={() => onEdit(order)}>
                                     {isEditable ? <Edit className="w-4 h-4 mr-2" /> : <Eye className="w-4 h-4 mr-2" />}
                                     {isEditable ? 'Editar' : 'Visualizar'}
                                 </DropdownMenuItem>
+                                {onGerarNfe && ['aprovado', 'concluido'].includes(order.status) && (
+                                    <DropdownMenuItem onClick={() => onGerarNfe(order)}>
+                                        <FileText className="w-4 h-4 mr-2" />
+                                        Gerar NF-e
+                                    </DropdownMenuItem>
+                                )}
                             </DropdownMenuContent>
                         </DropdownMenu>
                     </div>

@@ -20,6 +20,7 @@ import PageCard from '@/components/ui/PageCard';
 import { useConfirm } from '@/contexts/ConfirmProvider';
 import { useEditLock } from '@/components/ui/hooks/useEditLock';
 import { useAuth } from '@/contexts/AuthProvider';
+import { fiscalNfeGerarDePedido } from '@/services/fiscalNfeEmissoes';
 
 export default function PedidosVendasPage() {
   const { loading: authLoading, activeEmpresaId } = useAuth();
@@ -58,6 +59,30 @@ export default function PedidosVendasPage() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [isSeeding, setIsSeeding] = useState(false);
+  const [gerandoNfeId, setGerandoNfeId] = useState<string | null>(null);
+
+  const handleGerarNfe = async (order: VendaPedido) => {
+    const ok = await confirm({
+      title: 'Gerar NF-e',
+      description: `Deseja gerar uma Nota Fiscal Eletrônica para o pedido #${order.numero}?`,
+      confirmText: 'Gerar NF-e',
+      cancelText: 'Cancelar',
+      variant: 'primary',
+    });
+    if (!ok) return;
+
+    setGerandoNfeId(order.id);
+    try {
+      const emissaoId = await fiscalNfeGerarDePedido(order.id);
+      addToast(`NF-e criada com sucesso! Redirecionando...`, 'success');
+      navigate(`/app/fiscal/nfe-emissoes?open=${encodeURIComponent(emissaoId)}`);
+    } catch (e: any) {
+      const msg = e?.message || 'Erro ao gerar NF-e';
+      addToast(msg, 'error');
+    } finally {
+      setGerandoNfeId(null);
+    }
+  };
 
   const clearOpenParam = useCallback(() => {
     const params = new URLSearchParams(location.search);
@@ -275,12 +300,13 @@ export default function PedidosVendasPage() {
               data={effectiveOrders}
               getItemId={(o) => o.id}
               loading={effectiveLoading}
-              tableComponent={<PedidosVendasTable orders={effectiveOrders} onEdit={handleEdit} />}
+              tableComponent={<PedidosVendasTable orders={effectiveOrders} onEdit={handleEdit} onGerarNfe={handleGerarNfe} gerandoNfeId={gerandoNfeId} />}
               renderMobileCard={(order) => (
                 <PedidoVendaMobileCard
                   key={order.id}
                   order={order}
                   onEdit={() => handleEdit(order)}
+                  onGerarNfe={() => handleGerarNfe(order)}
                 />
               )}
             />
