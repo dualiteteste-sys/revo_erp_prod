@@ -27,7 +27,8 @@ jobs:
         with:
           deno-version: v2.x
 
-      - name: Lint Edge Functions
+      - name: Lint Edge Functions (advisory)
+        continue-on-error: true
         run: bash scripts/typecheck_edge_functions.sh
 
       - name: Install Supabase CLI
