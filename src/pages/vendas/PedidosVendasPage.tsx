@@ -165,8 +165,9 @@ export default function PedidosVendasPage() {
     closeForm();
   };
 
-  const handleSuccess = () => {
+  const handleSuccess = (opts?: { keepOpen?: boolean }) => {
     refresh();
+    if (opts?.keepOpen) return;
     if (!selectedId) handleClose();
   };
 
