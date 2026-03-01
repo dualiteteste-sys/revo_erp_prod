@@ -23,6 +23,9 @@ export type NfeEmissaoRow = {
   last_error: string | null;
   created_at: string;
   updated_at: string;
+  pedido_origem_id: string | null;
+  danfe_url: string | null;
+  xml_url: string | null;
 };
 
 export type NfeItemRow = {
@@ -115,6 +118,13 @@ export async function fiscalNfeSubmit(emissaoId: string): Promise<NfeSubmitResul
     return { ok: false, error: 'EDGE_ERROR', detail: msg };
   }
   return data as NfeSubmitResult;
+}
+
+export async function fiscalNfeGerarDePedido(pedidoId: string, ambiente?: AmbienteNfe): Promise<string> {
+  return callRpc<string>('fiscal_nfe_gerar_de_pedido', {
+    p_pedido_id: pedidoId,
+    p_ambiente: ambiente ?? null,
+  });
 }
 
 export async function fiscalNfeConsultaStatus(emissaoId: string): Promise<NfeSubmitResult> {

@@ -10,7 +10,7 @@ begin;
 -- Ops: listas internas (HealthPage)
 -- -----------------------------------------------------------------------------
 
-drop function if exists public.ops_finance_dlq_list(int);
+drop function if exists public.ops_finance_dlq_list(int) cascade;
 create or replace function public.ops_finance_dlq_list(
   p_limit int default 30
 )
@@ -50,7 +50,7 @@ revoke all on function public.ops_finance_dlq_list(int) from public, anon;
 grant execute on function public.ops_finance_dlq_list(int) to authenticated, service_role;
 
 
-drop function if exists public.ops_ecommerce_dlq_list(int);
+drop function if exists public.ops_ecommerce_dlq_list(int) cascade;
 create or replace function public.ops_ecommerce_dlq_list(
   p_limit int default 30
 )
@@ -92,7 +92,7 @@ revoke all on function public.ops_ecommerce_dlq_list(int) from public, anon;
 grant execute on function public.ops_ecommerce_dlq_list(int) to authenticated, service_role;
 
 
-drop function if exists public.ops_fiscal_nfe_webhook_errors_list(int);
+drop function if exists public.ops_fiscal_nfe_webhook_errors_list(int) cascade;
 create or replace function public.ops_fiscal_nfe_webhook_errors_list(
   p_limit int default 30
 )
@@ -142,7 +142,7 @@ revoke all on function public.ops_fiscal_nfe_webhook_errors_list(int) from publi
 grant execute on function public.ops_fiscal_nfe_webhook_errors_list(int) to authenticated, service_role;
 
 
-drop function if exists public.ops_billing_stripe_webhook_errors_list(int);
+drop function if exists public.ops_billing_stripe_webhook_errors_list(int) cascade;
 create or replace function public.ops_billing_stripe_webhook_errors_list(
   p_limit int default 30
 )
