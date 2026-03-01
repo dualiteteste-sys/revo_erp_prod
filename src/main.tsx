@@ -51,7 +51,7 @@ if (!redirectedToCanonical && !redirectedAuthCallback) {
               <ConfirmProvider>
                 <AuthProvider>
                   <OpsOverlayProvider>
-                    <RouterProvider router={router} />
+                    <RouterProvider router={router} future={{ v7_startTransition: true }} />
                   </OpsOverlayProvider>
                 </AuthProvider>
               </ConfirmProvider>
