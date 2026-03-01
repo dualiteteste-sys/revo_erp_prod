@@ -266,10 +266,7 @@ test('Vendas: pedido (VEN-01/02) happy path (CRUD + itens + impostos básicos + 
   await page.getByRole('button', { name: 'Salvar' }).click();
   await expect(page.getByText('Pedido criado! Agora adicione os itens.')).toBeVisible({ timeout: 20000 });
 
-  // O fluxo atual fecha o modal ao criar (novo). Reabrir o pedido para adicionar itens.
-  // O botão é icon-only; o atributo "title" vira nome acessível.
-  await page.getByRole('button', { name: 'Editar' }).click();
-  await expect(page.getByText('Dados do Pedido')).toBeVisible({ timeout: 20000 });
+  // O formulário permanece aberto após criar (keepOpen), sem necessidade de reabrir.
 
   // Adicionar item via autocomplete
   const itemSearch = page.getByPlaceholder(/Buscar produto ou servi[cç]o/);

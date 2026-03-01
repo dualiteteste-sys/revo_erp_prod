@@ -172,10 +172,12 @@ Deno.serve(async (req) => {
         updated_at: new Date().toISOString(),
       }).eq("id", emissao_id);
 
-      // Update provider link
+      // Update provider link with DANFE/XML URLs
       await admin.from("fiscal_nfe_nfeio_emissoes").update({
         provider_status: "autorizado",
         response_payload: focusData,
+        danfe_url: focusData?.caminho_danfe || null,
+        xml_url: focusData?.caminho_xml_nota_fiscal || null,
         last_sync_at: new Date().toISOString(),
       }).eq("emissao_id", emissao_id);
 

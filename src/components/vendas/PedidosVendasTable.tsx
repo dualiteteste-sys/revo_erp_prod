@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { VendaPedido } from '@/services/vendas';
-import { Edit, Eye } from 'lucide-react';
+import { Edit, Eye, FileText } from 'lucide-react';
 import ResizableSortableTh, { type SortState } from '@/components/ui/table/ResizableSortableTh';
 import TableColGroup from '@/components/ui/table/TableColGroup';
 import { useTableColumnWidths, type TableColumnWidthDef } from '@/components/ui/table/useTableColumnWidths';
@@ -12,6 +12,8 @@ import { useDeferredAction } from '@/components/ui/hooks/useDeferredAction';
 interface Props {
   orders: VendaPedido[];
   onEdit: (order: VendaPedido) => void;
+  onGerarNfe?: (order: VendaPedido) => void;
+  gerandoNfeId?: string | null;
   basePath?: string;
 }
 
@@ -22,7 +24,7 @@ const statusColors: Record<string, string> = {
   cancelado: 'bg-red-100 text-red-800',
 };
 
-export default function PedidosVendasTable({ orders, onEdit, basePath = '/app/vendas/pedidos' }: Props) {
+export default function PedidosVendasTable({ orders, onEdit, onGerarNfe, gerandoNfeId, basePath = '/app/vendas/pedidos' }: Props) {
   const { schedule: scheduleEdit, cancel: cancelScheduledEdit } = useDeferredAction(180);
 
   const columns: TableColumnWidthDef[] = [
@@ -144,9 +146,19 @@ export default function PedidosVendasTable({ orders, onEdit, basePath = '/app/ve
                   {order.status}
                 </span>
               </td>
-              <td className="px-6 py-4 text-right">
-                <button 
-                    onClick={() => onEdit(order)} 
+              <td className="px-6 py-4 text-right flex items-center justify-end gap-1">
+                {onGerarNfe && ['aprovado', 'concluido'].includes(order.status) && (
+                  <button
+                    onClick={() => onGerarNfe(order)}
+                    disabled={gerandoNfeId === order.id}
+                    className="text-emerald-600 hover:text-emerald-800 p-2 hover:bg-emerald-50 rounded-full transition-colors disabled:opacity-50"
+                    title="Gerar NF-e"
+                  >
+                    <FileText size={18} />
+                  </button>
+                )}
+                <button
+                    onClick={() => onEdit(order)}
                     className="text-blue-600 hover:text-blue-800 p-2 hover:bg-blue-50 rounded-full transition-colors"
                     title={order.status === 'orcamento' ? "Editar" : "Visualizar"}
                 >

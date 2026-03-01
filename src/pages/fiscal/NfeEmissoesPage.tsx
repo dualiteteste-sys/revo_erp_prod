@@ -8,7 +8,7 @@ import { useSupabase } from '@/providers/SupabaseProvider';
 import { useAuth } from '@/contexts/AuthProvider';
 import { useToast } from '@/contexts/ToastProvider';
 import { useEmpresaFeatures } from '@/hooks/useEmpresaFeatures';
-import { Copy, Eye, Loader2, Plus, Receipt, Search, Send, Settings } from 'lucide-react';
+import { Copy, Download, Eye, FileText, Loader2, Plus, Receipt, Search, Send, Settings } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import ClientAutocomplete from '@/components/common/ClientAutocomplete';
 import ProductAutocomplete from '@/components/common/ProductAutocomplete';
@@ -48,6 +48,9 @@ type NfeEmissao = {
   last_error: string | null;
   created_at: string;
   updated_at: string;
+  pedido_origem_id?: string | null;
+  danfe_url?: string | null;
+  xml_url?: string | null;
 };
 
 type NfeItemForm = {
@@ -727,6 +730,30 @@ export default function NfeEmissoesPage() {
                             <Copy size={16} />
                             Chave
                           </button>
+                        ) : null}
+                        {row.danfe_url ? (
+                          <a
+                            href={row.danfe_url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-2 px-3 py-2 rounded-lg font-semibold bg-indigo-100 text-indigo-800 hover:bg-indigo-200"
+                            title="Download DANFE (PDF)"
+                          >
+                            <FileText size={16} />
+                            DANFE
+                          </a>
+                        ) : null}
+                        {row.xml_url ? (
+                          <a
+                            href={row.xml_url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-2 px-3 py-2 rounded-lg font-semibold bg-gray-100 text-gray-800 hover:bg-gray-200"
+                            title="Download XML"
+                          >
+                            <Download size={16} />
+                            XML
+                          </a>
                         ) : null}
                       </div>
                     </td>

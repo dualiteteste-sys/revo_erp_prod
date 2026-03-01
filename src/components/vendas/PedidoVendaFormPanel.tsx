@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { CheckCircle, Loader2, Save, ShieldAlert, Trash2, Ban, PackageCheck, ScanBarcode } from 'lucide-react';
+import { CheckCircle, Loader2, Save, ShieldAlert, Trash2, Ban, PackageCheck, ScanBarcode, FileText, Wallet } from 'lucide-react';
 import { VendaDetails, VendaPayload, saveVenda, manageVendaItem, fetchVendaDetails, getVendaDetails, aprovarVenda, concluirVendaPedido } from '@/services/vendas';
 import { useToast } from '@/contexts/ToastProvider';
 import { useConfirm } from '@/contexts/ConfirmProvider';
@@ -31,6 +31,7 @@ import { searchClients } from '@/services/clients';
 import { saveProduct } from '@/services/products';
 import { useAuth } from '@/contexts/AuthProvider';
 import { failOperation, startOperation, succeedOperation } from '@/lib/operationTelemetry';
+import { fiscalNfeGerarDePedido } from '@/services/fiscalNfeEmissoes';
 
 interface Props {
   vendaId: string | null;
@@ -828,6 +829,34 @@ export default function PedidoVendaFormPanel({ vendaId, onSaveSuccess, onClose, 
     return !!formData.id && formData.status === 'aprovado';
   }, [formData.id, formData.status]);
 
+  const canGerarNfe = useMemo(() => {
+    return !!formData.id && ['aprovado', 'concluido'].includes(formData.status ?? '');
+  }, [formData.id, formData.status]);
+
+  const [gerandoNfe, setGerandoNfe] = useState(false);
+
+  const handleGerarNfeFromForm = async () => {
+    if (!formData.id) return;
+    const ok = await confirm({
+      title: 'Gerar NF-e',
+      description: `Deseja gerar uma Nota Fiscal Eletrônica para o pedido #${formData.numero}?`,
+      confirmText: 'Gerar NF-e',
+      cancelText: 'Cancelar',
+      variant: 'primary',
+    });
+    if (!ok) return;
+    setGerandoNfe(true);
+    try {
+      const emissaoId = await fiscalNfeGerarDePedido(formData.id);
+      addToast('NF-e criada com sucesso! Redirecionando...', 'success');
+      navigate(`/app/fiscal/nfe-emissoes?open=${encodeURIComponent(emissaoId)}`);
+    } catch (e: any) {
+      addToast(e?.message || 'Erro ao gerar NF-e.', 'error');
+    } finally {
+      setGerandoNfe(false);
+    }
+  };
+
   const showLoadingBanner = loading;
 
   const handleConcluir = async () => {
@@ -856,7 +885,7 @@ export default function PedidoVendaFormPanel({ vendaId, onSaveSuccess, onClose, 
       await loadDetails();
       if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
       addToast('Pedido concluído e estoque baixado.', 'success');
-      onSaveSuccess();
+      onSaveSuccess({ keepOpen: true });
       succeedOperation(concludeSession, { pedido_id: formData.id, status: 'concluido' });
 
 	      const wantTitles = await confirm({
@@ -866,7 +895,9 @@ export default function PedidoVendaFormPanel({ vendaId, onSaveSuccess, onClose, 
 	        cancelText: 'Agora não',
 	        variant: 'primary',
 	      });
-      if (wantTitles) setParcelamentoOpen(true);
+      if (wantTitles) {
+        setParcelamentoOpen(true);
+      }
     } catch (e: any) {
       if (token !== actionTokenRef.current || empresaSnapshot !== lastEmpresaIdRef.current) return;
       failOperation(concludeSession, e, { pedido_id: formData.id }, '[VENDAS][PEDIDO][CONCLUIR][ERROR]');
@@ -1099,19 +1130,19 @@ export default function PedidoVendaFormPanel({ vendaId, onSaveSuccess, onClose, 
             <Select
               label="Condição de Pagamento"
               name="condicao_pagamento_preset"
-              value={condicoesPagamento.some((c) => (c.condicao || '').trim() === (formData.condicao_pagamento || '').trim()) ? (formData.condicao_pagamento || '').trim() : ''}
-              onChange={(e) => handleHeaderChange('condicao_pagamento', e.target.value)}
+              value={condicoesPagamento.some((c) => (c.condicao || '').trim() === (formData.condicao_pagamento || '').trim()) ? (formData.condicao_pagamento || '').trim() : '_custom'}
+              onChange={(e) => handleHeaderChange('condicao_pagamento', e.target.value === '_custom' ? '' : e.target.value)}
               disabled={isLocked}
             >
-              <option value="">Personalizada</option>
               {condicoesPagamento.map((c) => (
                 <option key={c.id} value={c.condicao}>
                   {c.nome} • {c.condicao}
                 </option>
               ))}
+              <option value="_custom">Outra (digitar ao lado)</option>
             </Select>
             <Input
-              label="Personalizada (opcional)"
+              label="Condição manual"
               name="condicao_pagamento"
               value={
                 condicoesPagamento.some((c) => (c.condicao || '').trim() === (formData.condicao_pagamento || '').trim())
@@ -1530,7 +1561,26 @@ export default function PedidoVendaFormPanel({ vendaId, onSaveSuccess, onClose, 
               <PackageCheck size={20} /> Concluir (baixa estoque)
             </button>
           )}
-          {formData.id && formData.status !== 'cancelado' && (
+          {mode !== 'pdv' && formData.status === 'concluido' && (
+            <button
+              onClick={() => setParcelamentoOpen(true)}
+              disabled={isSaving || authLoading || !activeEmpresaId || empresaChanged}
+              className="flex items-center gap-2 bg-purple-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-purple-700 disabled:opacity-50"
+            >
+              <Wallet size={20} /> Gerar Financeiro
+            </button>
+          )}
+          {mode !== 'pdv' && canGerarNfe && (
+            <button
+              onClick={handleGerarNfeFromForm}
+              disabled={isSaving || gerandoNfe || authLoading || !activeEmpresaId || empresaChanged}
+              className="flex items-center gap-2 bg-emerald-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-emerald-700 disabled:opacity-50"
+            >
+              {gerandoNfe ? <Loader2 className="animate-spin" size={20} /> : <FileText size={20} />}
+              Gerar NF-e
+            </button>
+          )}
+          {formData.id && formData.status !== 'cancelado' && formData.status !== 'concluido' && (
             <button
               onClick={handleCancel}
               disabled={isSaving || authLoading || !activeEmpresaId || empresaChanged}
@@ -1539,9 +1589,9 @@ export default function PedidoVendaFormPanel({ vendaId, onSaveSuccess, onClose, 
               <Ban size={20} /> Cancelar
             </button>
           )}
-          {formData.status !== 'cancelado' && (
-            <button 
-              onClick={handleAprovar} 
+          {formData.status === 'orcamento' && (
+            <button
+              onClick={handleAprovar}
               aria-label="Aprovar Venda"
               disabled={isSaving || empresaChanged}
               className="flex items-center gap-2 bg-green-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-green-700 disabled:opacity-50"
