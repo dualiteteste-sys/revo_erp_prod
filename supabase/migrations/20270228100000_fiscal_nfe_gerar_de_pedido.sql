@@ -245,6 +245,8 @@ GRANT EXECUTE ON FUNCTION public.fiscal_nfe_gerar_de_pedido(uuid, text) TO authe
 -- ============================================================
 -- 4. Update fiscal_nfe_emissoes_list to include pedido_origem_id
 -- ============================================================
+DROP FUNCTION IF EXISTS public.fiscal_nfe_emissoes_list(text, text, int) CASCADE;
+
 CREATE OR REPLACE FUNCTION public.fiscal_nfe_emissoes_list(
   p_status text DEFAULT NULL,
   p_q text DEFAULT NULL,
