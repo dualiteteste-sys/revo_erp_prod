@@ -114,6 +114,16 @@ export async function fiscalNfeSubmit(emissaoId: string): Promise<NfeSubmitResul
     body: { emissao_id: emissaoId },
   });
   if (error) {
+    // Supabase wraps non-2xx responses as FunctionsHttpError — try to parse the JSON body
+    try {
+      const ctx = (error as any)?.context;
+      if (ctx && typeof ctx.json === 'function') {
+        const body = await ctx.json();
+        if (body && typeof body === 'object') {
+          return body as NfeSubmitResult;
+        }
+      }
+    } catch { /* ignore parse failure */ }
     const msg = (error as any)?.message || String(error);
     return { ok: false, error: 'EDGE_ERROR', detail: msg };
   }

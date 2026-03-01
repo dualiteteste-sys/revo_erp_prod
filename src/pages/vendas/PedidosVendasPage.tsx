@@ -75,7 +75,7 @@ export default function PedidosVendasPage() {
     try {
       const emissaoId = await fiscalNfeGerarDePedido(order.id);
       addToast(`NF-e criada com sucesso! Redirecionando...`, 'success');
-      navigate(`/app/fiscal/nfe-emissoes?open=${encodeURIComponent(emissaoId)}`);
+      navigate(`/app/fiscal/nfe?open=${encodeURIComponent(emissaoId)}`);
     } catch (e: any) {
       const msg = e?.message || 'Erro ao gerar NF-e';
       addToast(msg, 'error');
