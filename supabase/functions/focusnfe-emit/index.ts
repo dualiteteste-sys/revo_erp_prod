@@ -147,12 +147,12 @@ function buildFocusPayload(
     }),
   };
 
-  // Destinatario CPF ou CNPJ
-  const cpfCnpj = (dest.cpf || dest.cnpj || dest.cpf_cnpj || "").replace(/\D/g, "");
+  // Destinatario CPF ou CNPJ (from dest.cpf_cnpj normalized above)
+  const cpfCnpj = (dest.cpf_cnpj || dest.doc_unico || "").replace(/\D/g, "");
   if (cpfCnpj.length === 14) {
     payload.cnpj_destinatario = cpfCnpj;
     payload.indicador_inscricao_estadual_destinatario = "1"; // contribuinte
-    payload.inscricao_estadual_destinatario = dest.ie || dest.inscricao_estadual || "";
+    payload.inscricao_estadual_destinatario = dest.ie || "";
   } else if (cpfCnpj.length === 11) {
     payload.cpf_destinatario = cpfCnpj;
     payload.indicador_inscricao_estadual_destinatario = "9"; // nao contribuinte
@@ -282,6 +282,16 @@ Deno.serve(async (req) => {
       return json(422, { ok: false, error: "DESTINATARIO_NOT_FOUND" }, cors);
     }
 
+    // 3a. Read destinatario address (pessoa_enderecos — same pattern as preview RPC)
+    const { data: destEndereco } = await admin
+      .from("pessoa_enderecos")
+      .select("*")
+      .eq("pessoa_id", emissao.destinatario_pessoa_id)
+      .eq("empresa_id", empresaId)
+      .order("created_at", { ascending: true })
+      .limit(1)
+      .maybeSingle();
+
     // Also try to get fiscal data
     const { data: destFiscal } = await admin
       .from("fiscal_nfe_cliente_cadastro")
@@ -290,23 +300,34 @@ Deno.serve(async (req) => {
       .eq("empresa_id", empresaId)
       .maybeSingle();
 
-    const dest = { ...destPessoa, ...(destFiscal || {}) };
+    // Merge: pessoa + endereco + fiscal (endereco fields normalized for buildFocusPayload)
+    const dest: Record<string, any> = {
+      ...destPessoa,
+      ...(destFiscal || {}),
+      // Map pessoa_enderecos columns → names expected by buildFocusPayload
+      logradouro: destEndereco?.logradouro || "",
+      numero: destEndereco?.numero || "S/N",
+      complemento: destEndereco?.complemento || "",
+      bairro: destEndereco?.bairro || "",
+      municipio: destEndereco?.cidade || "",  // pessoa_enderecos uses "cidade"
+      uf: destEndereco?.uf || "",
+      cep: destEndereco?.cep || "",
+      cidade_codigo: destEndereco?.cidade_codigo || "",
+      // CPF/CNPJ: pessoas uses doc_unico
+      cpf_cnpj: destPessoa.doc_unico || "",
+      // IE: pessoas uses inscr_estadual
+      ie: destPessoa.inscr_estadual || "",
+    };
 
     // 3b. Pre-flight: validate required address fields before calling Focus API
     const missingFields: string[] = [];
-    const logradouro = dest.endereco_logradouro || dest.logradouro || "";
-    const bairro = dest.endereco_bairro || dest.bairro || "";
-    const municipio = dest.endereco_municipio || dest.municipio || "";
-    const uf = dest.endereco_uf || dest.uf || "";
-    const cep = (dest.endereco_cep || dest.cep || "").replace(/\D/g, "");
-    const cpfCnpj = (dest.cpf || dest.cnpj || dest.cpf_cnpj || "").replace(/\D/g, "");
-
-    if (!logradouro) missingFields.push("Logradouro");
-    if (!bairro) missingFields.push("Bairro");
-    if (!municipio) missingFields.push("Município");
-    if (!uf) missingFields.push("UF");
-    if (!cep) missingFields.push("CEP");
-    if (!cpfCnpj) missingFields.push("CPF/CNPJ");
+    if (!dest.logradouro) missingFields.push("Logradouro");
+    if (!dest.bairro) missingFields.push("Bairro");
+    if (!dest.municipio) missingFields.push("Município");
+    if (!dest.uf) missingFields.push("UF");
+    if (!(dest.cep || "").replace(/\D/g, "")) missingFields.push("CEP");
+    if (!(dest.cpf_cnpj || "").replace(/\D/g, "")) missingFields.push("CPF/CNPJ");
+    if (!destEndereco) missingFields.push("Endereço (nenhum endereço cadastrado)");
 
     if (missingFields.length > 0) {
       const detail = `Dados incompletos no cadastro do destinatário "${dest.nome || ""}": ${missingFields.join(", ")}. Atualize o cadastro do cliente antes de emitir a NF-e.`;

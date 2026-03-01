@@ -113,20 +113,34 @@ export async function fiscalNfeSubmit(emissaoId: string): Promise<NfeSubmitResul
   const { data, error } = await supabase.functions.invoke('focusnfe-emit', {
     body: { emissao_id: emissaoId },
   });
+
+  // supabase.functions.invoke returns error for non-2xx responses.
+  // The response body is in error.context (a Response object).
   if (error) {
-    // Supabase wraps non-2xx responses as FunctionsHttpError — try to parse the JSON body
     try {
       const ctx = (error as any)?.context;
-      if (ctx && typeof ctx.json === 'function') {
+      if (ctx instanceof Response) {
         const body = await ctx.json();
-        if (body && typeof body === 'object') {
-          return body as NfeSubmitResult;
-        }
+        if (body && typeof body === 'object') return body as NfeSubmitResult;
       }
-    } catch { /* ignore parse failure */ }
-    const msg = (error as any)?.message || String(error);
-    return { ok: false, error: 'EDGE_ERROR', detail: msg };
+    } catch { /* response body already consumed or not JSON */ }
+
+    // Fallback: try to parse the error message itself as JSON
+    try {
+      const msg = (error as any)?.message;
+      if (msg && msg.startsWith('{')) {
+        const parsed = JSON.parse(msg);
+        if (parsed && typeof parsed === 'object') return parsed as NfeSubmitResult;
+      }
+    } catch { /* not JSON */ }
+
+    return {
+      ok: false,
+      error: 'EDGE_ERROR',
+      detail: (error as any)?.message || String(error),
+    };
   }
+
   return data as NfeSubmitResult;
 }
 
