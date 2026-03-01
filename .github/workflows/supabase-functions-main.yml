@@ -44,6 +44,8 @@ jobs:
           STRIPE_WEBHOOK_SECRET_PROD: ${{ secrets.STRIPE_WEBHOOK_SECRET_PROD }}
           FOCUSNFE_WEBHOOK_SECRET_HML: ${{ secrets.FOCUSNFE_WEBHOOK_SECRET_HML }}
           FOCUSNFE_WEBHOOK_SECRET_PROD: ${{ secrets.FOCUSNFE_WEBHOOK_SECRET_PROD }}
+          FOCUSNFE_API_TOKEN_HML: ${{ secrets.FOCUSNFE_API_TOKEN_HML }}
+          FOCUSNFE_API_TOKEN_PROD: ${{ secrets.FOCUSNFE_API_TOKEN_PROD }}
         run: |
           set -euo pipefail
 
@@ -78,6 +80,14 @@ jobs:
             supabase secrets set --project-ref "$PROJECT_REF" FOCUSNFE_WEBHOOK_SECRET_PROD="$FOCUSNFE_WEBHOOK_SECRET_PROD"
           else
             echo "::warning::Missing secret FOCUSNFE_WEBHOOK_SECRET_PROD (produção webhook calls will be rejected)."
+          fi
+
+          # Focus NF-e API tokens (used by focusnfe-emit)
+          if [[ -n "${FOCUSNFE_API_TOKEN_HML:-}" ]]; then
+            supabase secrets set --project-ref "$PROJECT_REF" FOCUSNFE_API_TOKEN_HML="$FOCUSNFE_API_TOKEN_HML"
+          fi
+          if [[ -n "${FOCUSNFE_API_TOKEN_PROD:-}" ]]; then
+            supabase secrets set --project-ref "$PROJECT_REF" FOCUSNFE_API_TOKEN_PROD="$FOCUSNFE_API_TOKEN_PROD"
           fi
 
           echo "[PROD] Deploying Edge Functions..."

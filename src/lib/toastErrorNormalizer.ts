@@ -116,8 +116,8 @@ function normalizeByPatterns(text: string): NormalizedToastError | null {
 
   if (/pgrst202/i.test(t) || /could not find the function/i.test(t) || /schema cache/i.test(t)) {
     return {
-      title: "Atualização em andamento",
-      message: "O servidor ainda não reconheceu uma atualização. Aguarde alguns instantes e tente novamente.",
+      title: "Recurso ainda não disponível",
+      message: "Esta funcionalidade requer uma atualização do servidor que ainda não foi aplicada. Tente novamente mais tarde ou contate o suporte.",
     };
   }
 

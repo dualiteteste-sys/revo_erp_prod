@@ -17,13 +17,10 @@ function headersToJson(headers: Headers): Record<string, string> {
 }
 
 function getExpectedSecrets(): string[] {
-  // Lê os secrets em runtime (não em module-load) porque o Supabase Edge pode manter o isolate
-  // "quente" por algum tempo; assim mudanças em secrets passam a valer imediatamente.
   const WEBHOOK_SECRET = (Deno.env.get("FOCUSNFE_WEBHOOK_SECRET") ?? "").trim();
   const WEBHOOK_SECRET_HML = (Deno.env.get("FOCUSNFE_WEBHOOK_SECRET_HML") ?? "").trim();
   const WEBHOOK_SECRET_PROD = (Deno.env.get("FOCUSNFE_WEBHOOK_SECRET_PROD") ?? "").trim();
 
-  // Normaliza também segredos salvos com prefixo "Bearer " (erro comum ao configurar webhooks).
   const secrets = [WEBHOOK_SECRET, WEBHOOK_SECRET_HML, WEBHOOK_SECRET_PROD]
     .map((s) => extractBearerToken(s))
     .map((s) => s.trim())
@@ -65,6 +62,100 @@ function extractMeta(payload: any): { eventType: string | null; focusRef: string
   };
 }
 
+/**
+ * Process the Focus NFe webhook event inline:
+ * - Look up the emissão by ref (emissao_id)
+ * - Update status + DANFE/XML URLs
+ */
+async function processEvent(
+  admin: ReturnType<typeof createClient>,
+  meta: { eventType: string | null; focusRef: string | null },
+  payload: any,
+  requestId: string,
+): Promise<{ processed: boolean; empresa_id: string | null }> {
+  const ref = meta.focusRef;
+  if (!ref) return { processed: false, empresa_id: null };
+
+  // Try to find the emissão by id (ref = emissao_id in our system)
+  const { data: emissao } = await admin
+    .from("fiscal_nfe_emissoes")
+    .select("id, empresa_id, status")
+    .eq("id", ref)
+    .maybeSingle();
+
+  if (!emissao) return { processed: false, empresa_id: null };
+
+  const empresaId = emissao.empresa_id;
+  const focusStatus = payload?.status || meta.eventType || "";
+
+  // Log the event
+  await admin.from("fiscal_nfe_provider_logs").insert({
+    empresa_id: empresaId,
+    emissao_id: emissao.id,
+    provider: "focusnfe",
+    level: "info",
+    message: `Webhook: ${focusStatus}`,
+    payload: { event_type: meta.eventType, focus_status: focusStatus, request_id: requestId },
+  });
+
+  // Skip if already in terminal state
+  if (["autorizada", "cancelada"].includes(emissao.status)) {
+    return { processed: true, empresa_id: empresaId };
+  }
+
+  // Map Focus NFe status to our internal status
+  if (focusStatus === "autorizado") {
+    const chaveAcesso = payload?.chave_nfe || null;
+    const numero = payload?.numero ? parseInt(payload.numero) : null;
+    const danfeUrl = payload?.caminho_danfe || null;
+    const xmlUrl = payload?.caminho_xml_nota_fiscal || null;
+
+    await admin.from("fiscal_nfe_emissoes").update({
+      status: "autorizada",
+      chave_acesso: chaveAcesso,
+      numero,
+      last_error: null,
+      updated_at: new Date().toISOString(),
+    }).eq("id", emissao.id);
+
+    // Update provider link with URLs
+    await admin.from("fiscal_nfe_nfeio_emissoes").update({
+      provider_status: "autorizado",
+      response_payload: payload,
+      danfe_url: danfeUrl,
+      xml_url: xmlUrl,
+      last_sync_at: new Date().toISOString(),
+    }).eq("emissao_id", emissao.id);
+
+    return { processed: true, empresa_id: empresaId };
+  }
+
+  if (focusStatus === "erro_autorizacao" || focusStatus === "rejeitado") {
+    const errorMsg = payload?.mensagem || payload?.mensagem_sefaz || "";
+
+    await admin.from("fiscal_nfe_emissoes").update({
+      status: "rejeitada",
+      last_error: errorMsg,
+      updated_at: new Date().toISOString(),
+    }).eq("id", emissao.id);
+
+    return { processed: true, empresa_id: empresaId };
+  }
+
+  if (focusStatus === "cancelado") {
+    await admin.from("fiscal_nfe_emissoes").update({
+      status: "cancelada",
+      last_error: null,
+      updated_at: new Date().toISOString(),
+    }).eq("id", emissao.id);
+
+    return { processed: true, empresa_id: empresaId };
+  }
+
+  // Unknown status — just log, don't update
+  return { processed: true, empresa_id: empresaId };
+}
+
 serve(async (req) => {
   const cors = buildCorsHeaders(req);
 
@@ -97,14 +188,16 @@ serve(async (req) => {
     auth: { persistSession: false, autoRefreshToken: false },
   });
 
-  // Quando a integração estiver completa, vamos inferir empresa_id por "ref" (vínculo provider↔emissão).
-  // Por enquanto, armazenamos sem empresa_id e processamos depois via worker/reprocessamento.
+  // Process the event inline — update emissão status + DANFE/XML URLs
+  const { empresa_id } = await processEvent(admin, meta, payload, requestId);
+
+  // Store raw event for audit trail
   await admin.from("fiscal_nfe_webhook_events").upsert(
     {
-      empresa_id: null,
+      empresa_id: empresa_id,
       provider: "focusnfe",
       event_type: meta.eventType,
-      nfeio_id: meta.focusRef, // coluna legado; usamos como "provider_ref"
+      nfeio_id: meta.focusRef,
       dedupe_key: dedupeKey,
       request_id: requestId,
       headers: headersToJson(req.headers),

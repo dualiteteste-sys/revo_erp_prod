@@ -8,7 +8,7 @@ import { useSupabase } from '@/providers/SupabaseProvider';
 import { useAuth } from '@/contexts/AuthProvider';
 import { useToast } from '@/contexts/ToastProvider';
 import { useEmpresaFeatures } from '@/hooks/useEmpresaFeatures';
-import { Copy, Eye, Loader2, Plus, Receipt, Search, Settings } from 'lucide-react';
+import { Copy, Download, Eye, FileText, Loader2, Plus, Receipt, Search, Send, Settings } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import ClientAutocomplete from '@/components/common/ClientAutocomplete';
 import ProductAutocomplete from '@/components/common/ProductAutocomplete';
@@ -22,6 +22,7 @@ import {
   fiscalNfeEmissaoDraftUpsert,
   fiscalNfeEmissaoItensList,
   fiscalNfeEmissoesList,
+  fiscalNfeSubmit,
 } from '@/services/fiscalNfeEmissoes';
 import { callRpc } from '@/lib/api';
 
@@ -47,6 +48,9 @@ type NfeEmissao = {
   last_error: string | null;
   created_at: string;
   updated_at: string;
+  pedido_origem_id?: string | null;
+  danfe_url?: string | null;
+  xml_url?: string | null;
 };
 
 type NfeItemForm = {
@@ -97,6 +101,7 @@ export default function NfeEmissoesPage() {
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [submitting, setSubmitting] = useState<string | null>(null);
   const [rows, setRows] = useState<NfeEmissao[]>([]);
   const [previewOpen, setPreviewOpen] = useState(false);
   const [previewLoading, setPreviewLoading] = useState(false);
@@ -506,6 +511,27 @@ export default function NfeEmissoesPage() {
     }
   };
 
+  const handleSubmitNfe = async (emissaoId: string) => {
+    if (!features.nfe_emissao_enabled) {
+      addToast('Emissao de NF-e esta desativada. Ative nas Configuracoes.', 'error');
+      return;
+    }
+    setSubmitting(emissaoId);
+    try {
+      const result = await fiscalNfeSubmit(emissaoId);
+      if (result.ok) {
+        addToast(`NF-e enviada com sucesso. Status: ${result.status || 'processando'}`, 'success');
+      } else {
+        addToast(`Erro ao enviar NF-e: ${result.detail || result.error || 'Erro desconhecido'}`, 'error');
+      }
+      void fetchList();
+    } catch (e: any) {
+      addToast(e?.message || 'Erro ao enviar NF-e.', 'error');
+    } finally {
+      setSubmitting(null);
+    }
+  };
+
   const copyChave = async (value: string) => {
     try {
       await navigator.clipboard.writeText(value);
@@ -665,9 +691,28 @@ export default function NfeEmissoesPage() {
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{formatDate(row.updated_at)}</td>
                     <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                       <div className="flex items-center justify-end gap-3">
-                        <button className="text-blue-600 hover:text-blue-900" onClick={() => void openEdit(row)} title="Abrir rascunho">
-                          Abrir
-                        </button>
+                        {['rascunho', 'erro', 'rejeitada'].includes(row.status) ? (
+                          <button className="text-blue-600 hover:text-blue-900" onClick={() => void openEdit(row)} title="Abrir rascunho">
+                            Abrir
+                          </button>
+                        ) : null}
+                        {['rascunho', 'erro', 'rejeitada'].includes(row.status) && features.nfe_emissao_enabled ? (
+                          <button
+                            className="inline-flex items-center gap-2 px-3 py-2 rounded-lg font-semibold bg-emerald-100 text-emerald-800 hover:bg-emerald-200 disabled:opacity-50"
+                            onClick={() => void handleSubmitNfe(row.id)}
+                            disabled={submitting === row.id}
+                            title="Enviar para SEFAZ via Focus NF-e"
+                          >
+                            {submitting === row.id ? <Loader2 size={16} className="animate-spin" /> : <Send size={16} />}
+                            Enviar SEFAZ
+                          </button>
+                        ) : null}
+                        {row.status === 'processando' ? (
+                          <span className="inline-flex items-center gap-2 px-3 py-2 rounded-lg font-semibold bg-amber-100 text-amber-800">
+                            <Loader2 size={16} className="animate-spin" />
+                            Processando
+                          </span>
+                        ) : null}
                         <button
                           className="inline-flex items-center gap-2 px-3 py-2 rounded-lg font-semibold bg-slate-100 text-slate-800 hover:bg-slate-200"
                           onClick={() => void openAudit(row.id)}
@@ -685,6 +730,30 @@ export default function NfeEmissoesPage() {
                             <Copy size={16} />
                             Chave
                           </button>
+                        ) : null}
+                        {row.danfe_url ? (
+                          <a
+                            href={row.danfe_url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-2 px-3 py-2 rounded-lg font-semibold bg-indigo-100 text-indigo-800 hover:bg-indigo-200"
+                            title="Download DANFE (PDF)"
+                          >
+                            <FileText size={16} />
+                            DANFE
+                          </a>
+                        ) : null}
+                        {row.xml_url ? (
+                          <a
+                            href={row.xml_url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-2 px-3 py-2 rounded-lg font-semibold bg-gray-100 text-gray-800 hover:bg-gray-200"
+                            title="Download XML"
+                          >
+                            <Download size={16} />
+                            XML
+                          </a>
                         ) : null}
                       </div>
                     </td>
