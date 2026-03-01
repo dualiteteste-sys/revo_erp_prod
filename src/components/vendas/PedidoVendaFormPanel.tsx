@@ -849,7 +849,7 @@ export default function PedidoVendaFormPanel({ vendaId, onSaveSuccess, onClose, 
     try {
       const emissaoId = await fiscalNfeGerarDePedido(formData.id);
       addToast('NF-e criada com sucesso! Redirecionando...', 'success');
-      navigate(`/app/fiscal/nfe-emissoes?open=${encodeURIComponent(emissaoId)}`);
+      navigate(`/app/fiscal/nfe?open=${encodeURIComponent(emissaoId)}`);
     } catch (e: any) {
       addToast(e?.message || 'Erro ao gerar NF-e.', 'error');
     } finally {

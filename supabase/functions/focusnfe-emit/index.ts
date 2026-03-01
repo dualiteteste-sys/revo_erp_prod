@@ -292,6 +292,33 @@ Deno.serve(async (req) => {
 
     const dest = { ...destPessoa, ...(destFiscal || {}) };
 
+    // 3b. Pre-flight: validate required address fields before calling Focus API
+    const missingFields: string[] = [];
+    const logradouro = dest.endereco_logradouro || dest.logradouro || "";
+    const bairro = dest.endereco_bairro || dest.bairro || "";
+    const municipio = dest.endereco_municipio || dest.municipio || "";
+    const uf = dest.endereco_uf || dest.uf || "";
+    const cep = (dest.endereco_cep || dest.cep || "").replace(/\D/g, "");
+    const cpfCnpj = (dest.cpf || dest.cnpj || dest.cpf_cnpj || "").replace(/\D/g, "");
+
+    if (!logradouro) missingFields.push("Logradouro");
+    if (!bairro) missingFields.push("Bairro");
+    if (!municipio) missingFields.push("Município");
+    if (!uf) missingFields.push("UF");
+    if (!cep) missingFields.push("CEP");
+    if (!cpfCnpj) missingFields.push("CPF/CNPJ");
+
+    if (missingFields.length > 0) {
+      const detail = `Dados incompletos no cadastro do destinatário "${dest.nome || ""}": ${missingFields.join(", ")}. Atualize o cadastro do cliente antes de emitir a NF-e.`;
+      await admin.from("fiscal_nfe_emissoes").update({
+        status: "erro",
+        last_error: detail,
+        updated_at: new Date().toISOString(),
+      }).eq("id", emissao_id);
+
+      return json(422, { ok: false, error: "DESTINATARIO_INCOMPLETO", detail, missing_fields: missingFields }, cors);
+    }
+
     // 4. Read items
     const { data: itens } = await admin
       .from("fiscal_nfe_emissao_itens")
@@ -413,8 +440,14 @@ Deno.serve(async (req) => {
         ref,
       }, cors);
     } else {
-      // API error
-      const errorMsg = focusData?.mensagem || focusData?.message || `HTTP ${focusResponse.status}`;
+      // API error — build detailed message including field-level errors
+      let errorMsg = focusData?.mensagem || focusData?.message || `HTTP ${focusResponse.status}`;
+      const erros = Array.isArray(focusData?.erros) ? focusData.erros : [];
+      if (erros.length > 0) {
+        const details = erros.map((e: any) => `${e.campo}: ${e.mensagem}`).join("; ");
+        errorMsg = `${errorMsg} | ${details}`;
+      }
+
       await admin.from("fiscal_nfe_emissoes").update({
         status: "erro",
         last_error: errorMsg,
