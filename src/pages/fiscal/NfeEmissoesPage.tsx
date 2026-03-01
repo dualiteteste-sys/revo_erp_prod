@@ -9,7 +9,7 @@ import { useAuth } from '@/contexts/AuthProvider';
 import { useToast } from '@/contexts/ToastProvider';
 import { useEmpresaFeatures } from '@/hooks/useEmpresaFeatures';
 import { Copy, Download, Eye, FileText, Loader2, Plus, Receipt, Search, Send, Settings } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import ClientAutocomplete from '@/components/common/ClientAutocomplete';
 import ProductAutocomplete from '@/components/common/ProductAutocomplete';
 import UnidadeMedidaSelect from '@/components/common/UnidadeMedidaSelect';
@@ -96,6 +96,8 @@ export default function NfeEmissoesPage() {
   const { activeEmpresa } = useAuth();
   const { addToast } = useToast();
   const features = useEmpresaFeatures();
+  const location = useLocation();
+  const navigate = useNavigate();
 
   const empresaId = activeEmpresa?.id;
 
@@ -186,6 +188,22 @@ export default function NfeEmissoesPage() {
     if (!empresaId) return;
     void fetchList();
   }, [empresaId, fetchList]);
+
+  // Auto-open NF-e from ?open= query parameter (e.g. after "Gerar NF-e" redirect)
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const openId = params.get('open');
+    if (!openId || loading || rows.length === 0) return;
+    const row = rows.find((r) => r.id === openId);
+    if (row) {
+      void openEdit(row);
+    }
+    // Clear the param to avoid re-opening on every re-render
+    params.delete('open');
+    const newSearch = params.toString();
+    navigate(newSearch ? `${location.pathname}?${newSearch}` : location.pathname, { replace: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [rows, loading, location.search]);
 
   const totals = useMemo(() => {
     const total = rows.length;
@@ -522,7 +540,16 @@ export default function NfeEmissoesPage() {
       if (result.ok) {
         addToast(`NF-e enviada com sucesso. Status: ${result.status || 'processando'}`, 'success');
       } else {
-        addToast(`Erro ao enviar NF-e: ${result.detail || result.error || 'Erro desconhecido'}`, 'error');
+        // Parse field-level errors from Focus response
+        const erros = result.focus_response?.erros;
+        if (result.error === 'DESTINATARIO_INCOMPLETO') {
+          addToast(result.detail || 'Cadastro do destinatário incompleto.', 'error');
+        } else if (Array.isArray(erros) && erros.length > 0) {
+          const lines = erros.map((e: any) => `• ${e.campo}: ${e.mensagem}`).join('\n');
+          addToast(`Erro de validação NF-e:\n${lines}`, 'error');
+        } else {
+          addToast(`Erro ao enviar NF-e: ${result.detail || result.error || 'Erro desconhecido'}`, 'error');
+        }
       }
       void fetchList();
     } catch (e: any) {
@@ -673,7 +700,18 @@ export default function NfeEmissoesPage() {
                   <tr key={row.id} className="hover:bg-gray-50">
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
                       <span className="font-semibold">{STATUS_LABEL[row.status] || row.status}</span>
-                      {row.last_error ? <div className="text-xs text-red-600 mt-1">{row.last_error}</div> : null}
+                      {row.last_error ? (
+                        <div className="text-xs text-red-600 mt-1">
+                          {row.last_error.includes(' | ')
+                            ? row.last_error.split(' | ').map((part, i) =>
+                                i === 0
+                                  ? <div key={i} className="font-semibold">{part}</div>
+                                  : <div key={i} className="ml-2">{part.split('; ').map((field, j) => <div key={j}>• {field}</div>)}</div>
+                              )
+                            : row.last_error
+                          }
+                        </div>
+                      ) : null}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
                       {row.numero != null ? row.numero : '—'} / {row.serie != null ? row.serie : '—'}

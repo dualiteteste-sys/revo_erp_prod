@@ -112,7 +112,7 @@ export const menuConfig: MenuItem[] = [
     href: '#',
     gradient: 'from-sky-500 to-sky-600',
     children: [
-      { name: 'NF-e (Rascunhos)', icon: Receipt, href: '/app/fiscal/nfe' },
+      { name: 'NF-e', icon: Receipt, href: '/app/fiscal/nfe' },
       { name: 'Configurações NF-e', icon: Settings, href: '/app/fiscal/nfe/configuracoes' },
     ],
   },
