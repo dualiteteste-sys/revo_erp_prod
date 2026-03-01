@@ -4,7 +4,6 @@ import GlassCard from '@/components/ui/GlassCard';
 import Modal from '@/components/ui/Modal';
 import { Button } from '@/components/ui/button';
 import Select from '@/components/ui/forms/Select';
-import { useSupabase } from '@/providers/SupabaseProvider';
 import { useAuth } from '@/contexts/AuthProvider';
 import { useToast } from '@/contexts/ToastProvider';
 import { useEmpresaFeatures } from '@/hooks/useEmpresaFeatures';
@@ -92,7 +91,6 @@ function formatDate(value: string | null | undefined) {
 }
 
 export default function NfeEmissoesPage() {
-  const supabase = useSupabase() as any;
   const { activeEmpresa } = useAuth();
   const { addToast } = useToast();
   const features = useEmpresaFeatures();
@@ -504,19 +502,22 @@ export default function NfeEmissoesPage() {
 
     try {
       const emissaoId = await persistDraft();
-      const { data, error } = await supabase.rpc('fiscal_nfe_preview_xml', { p_emissao_id: emissaoId });
-      if (error) throw error;
+      const results = await callRpc<any[]>('fiscal_nfe_preview_xml', { p_emissao_id: emissaoId });
 
-      const row = Array.isArray(data) ? data[0] : data;
+      const row = Array.isArray(results) ? results[0] : results;
       const ok = !!row?.ok;
-      const errs = (row?.errors || []) as string[];
-      const warns = (row?.warnings || []) as string[];
+      const errs: string[] = Array.isArray(row?.errors) ? row.errors : [];
+      const warns: string[] = Array.isArray(row?.warnings) ? row.warnings : [];
       setPreviewErrors(errs);
       setPreviewWarnings(warns);
       setPreviewXml((row?.xml || '').toString());
 
       if (!ok) {
-        addToast('Preview não gerado: corrija os erros e tente novamente.', 'error');
+        if (errs.length > 0) {
+          addToast(`Preview não gerado:\n${errs.map(e => `• ${e}`).join('\n')}`, 'error');
+        } else {
+          addToast('Preview não gerado: corrija os erros e tente novamente.', 'error');
+        }
       } else {
         addToast('Preview gerado (XML).', 'success');
       }
