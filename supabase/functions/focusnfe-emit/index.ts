@@ -469,6 +469,13 @@ Deno.serve(async (req) => {
         errorMsg = `${errorMsg} | ${details}`;
       }
 
+      // Enrich emitente-related errors with the CNPJ sent for diagnostics
+      const cnpjSent = (emitente.cnpj || "").replace(/\D/g, "");
+      const isEmitenteError = /emitente|cnpj.*n[aã]o.*autoriz/i.test(errorMsg);
+      if (isEmitenteError && cnpjSent) {
+        errorMsg = `${errorMsg} | CNPJ enviado: ${cnpjSent} (ambiente: ${ambiente}). Verifique se este CNPJ está habilitado no painel Focus NFe para o ambiente "${ambiente}".`;
+      }
+
       await admin.from("fiscal_nfe_emissoes").update({
         status: "erro",
         last_error: errorMsg,
