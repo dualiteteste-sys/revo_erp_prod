@@ -154,9 +154,11 @@ export function FloatingErrorsModal({ open, onClose }: Props) {
   const [size, setSize] = useState<Size>(() => {
     if (typeof window === "undefined") return { w: 960, h: 620 };
     const viewport = { w: window.innerWidth, h: window.innerHeight };
-    // Default: 45% largura / 30% altura do viewport (respeitando mínimos para manter usabilidade).
     const defaultSize = normalizeSize({ w: Math.round(viewport.w * 0.45), h: Math.round(viewport.h * 0.3) }, viewport);
-    return readSize(viewport) ?? defaultSize;
+    const saved = readSize(viewport);
+    // Discard corrupted sizes from the old shrinking bug
+    if (saved && saved.w >= MODAL_MIN_W && saved.h >= MODAL_MIN_H) return saved;
+    return defaultSize;
   });
 
   useEffect(() => {
@@ -167,15 +169,14 @@ export function FloatingErrorsModal({ open, onClose }: Props) {
 
   useEffect(() => {
     if (!open) return;
-    const el = containerRef.current;
-    if (!el) return;
-    const w = el.clientWidth;
-    const h = el.clientHeight;
-    if (!w || !h) return;
+    // Re-clamp size and position to current viewport without reading clientWidth/Height.
+    // Reading clientWidth on first render caused a feedback loop with ResizeObserver (shrinking bug).
     const viewport = { w: window.innerWidth, h: window.innerHeight };
-    const normalized = normalizeSize({ w, h }, viewport);
-    setSize(normalized);
-    setPos((current) => clampModalPosition(current, viewport, normalized));
+    setSize((current) => {
+      const clamped = normalizeSize(current, viewport);
+      setPos((p) => clampModalPosition(p, viewport, clamped));
+      return clamped;
+    });
   }, [open]);
 
   useEffect(() => {
@@ -200,13 +201,16 @@ export function FloatingErrorsModal({ open, onClose }: Props) {
       const entry = entries[0];
       if (!entry) return;
       const viewport = { w: window.innerWidth, h: window.innerHeight };
-      // Use client sizes (inteiros e estáveis). contentRect pode variar 1px e causar "shrinking" em loop.
       const w = element.clientWidth;
       const h = element.clientHeight;
       const nextSize = normalizeSize({ w, h }, viewport);
-      setSize((current) => (current.w === nextSize.w && current.h === nextSize.h ? current : nextSize));
+      // Ignore jitter < 2px to prevent shrinking feedback loop
+      setSize((current) => {
+        if (Math.abs(current.w - nextSize.w) < 2 && Math.abs(current.h - nextSize.h) < 2) return current;
+        writeSize(nextSize);
+        return nextSize;
+      });
       setPos((current) => clampModalPosition(current, viewport, nextSize));
-      writeSize(nextSize);
     });
     observer.observe(element);
     return () => observer.disconnect();
@@ -284,6 +288,28 @@ export function FloatingErrorsModal({ open, onClose }: Props) {
     const prompt = incident ? buildIncidentPrompt(incident) : JSON.stringify(selected, null, 2);
     await navigator.clipboard.writeText(prompt);
     addToast("Prompt copiado. Cole no chat do agente para análise.", "success");
+  };
+
+  const handleCopyAll = async () => {
+    const incidents = getErrorIncidentsSnapshot();
+    const visibleFingerprints = new Set(filtered.map((e) => e.fingerprint));
+    const matching = incidents.filter((inc) => visibleFingerprints.has(inc.fingerprint));
+
+    if (matching.length === 0) {
+      addToast("Nenhum erro para copiar.", "info");
+      return;
+    }
+
+    const header = [
+      `## Relatório de erros — ${new Date().toLocaleString("pt-BR")}`,
+      `Total: ${matching.length} incidente(s)`,
+      `Rota atual: ${window.location.pathname}`,
+      "",
+    ].join("\n");
+
+    const body = matching.map((inc) => buildIncidentPrompt(inc)).join("\n\n---\n\n");
+    await navigator.clipboard.writeText(`${header}\n${body}`);
+    addToast(`${matching.length} erro(s) copiado(s) para clipboard.`, "success");
   };
 
   if (!open) return null;
@@ -367,6 +393,10 @@ export function FloatingErrorsModal({ open, onClose }: Props) {
           <Button variant="secondary" size="sm" className="gap-2" disabled={!selected} onClick={handleCopy}>
             <Copy size={14} />
             Copiar
+          </Button>
+          <Button variant="secondary" size="sm" className="gap-2" disabled={filtered.length === 0} onClick={handleCopyAll}>
+            <Copy size={14} />
+            Copiar Todos ({filtered.length})
           </Button>
         </div>
       </div>
