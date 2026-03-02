@@ -36,7 +36,13 @@ Documento canônico: `docs/supabase-from-policy.md`.
 
 - Qualquer alteração em tabelas, views, enums, functions/RPCs, triggers, grants e RLS:
   - **apenas por migration** em `supabase/migrations/*`.
+- **Data fixes (UPDATE/INSERT) também são migrations** — não há exceção para “só um UPDATE rápido”.
 - Mudança feita no dashboard deve ser “convertida” para migration **no mesmo dia**.
+- Fluxo obrigatório, mesmo em P1/SEV0:
+  1. Escrever migration idempotente em `supabase/migrations/`
+  2. PR → CI verde → merge em dev
+  3. Só então: se urgente, rodar o SQL da própria migration manualmente em prod
+  - **Nunca** inverter essa ordem (rodar em prod antes da migration existir).
 
 Documento canônico: `docs/deploy.md` + `docs/supabase-prod-alignment.md`.
 
@@ -57,7 +63,7 @@ Gates: `docs/release-gate.md` + `.github/pull_request_template.md`.
 - Produção: `main`
 - **Nunca deletar a branch `dev`**.
 - **Nunca** mergear em `main` se `dev` estiver vermelho ou divergente por migrations.
-
+- **Nunca** mergear em `main` sem autorização de um humano.
 Runbook de drift DEV/PROD: `docs/supabase-prod-alignment.md`.
 
 ## 4) Provas mínimas (anti-regressão)
