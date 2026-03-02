@@ -271,6 +271,30 @@ Deno.serve(async (req) => {
       return json(422, { ok: false, error: "EMITENTE_NOT_CONFIGURED" }, cors);
     }
 
+    // 2a. Read empresa — source of truth for identity fields (cnpj, razao_social, nome_fantasia)
+    // and address fallback when fiscal_nfe_emitente fields are not filled via UI.
+    const { data: empresa } = await admin
+      .from("empresas")
+      .select("cnpj, nome_razao_social, nome_fantasia, endereco_cep, endereco_logradouro, endereco_numero, endereco_complemento, endereco_bairro, endereco_cidade, endereco_uf")
+      .eq("id", empresaId)
+      .maybeSingle();
+
+    const emitenteFull = {
+      ...emitente,
+      // Identity: always from empresas (single source of truth — avoids stale copies in emitente table)
+      cnpj: empresa?.cnpj || emitente.cnpj,
+      razao_social: emitente.razao_social || empresa?.nome_razao_social || "",
+      nome_fantasia: emitente.nome_fantasia || empresa?.nome_fantasia || "",
+      // Address: prefer fiscal_nfe_emitente (can be customized), fall back to empresas
+      endereco_logradouro: emitente.endereco_logradouro || empresa?.endereco_logradouro || "",
+      endereco_numero: emitente.endereco_numero || empresa?.endereco_numero || "S/N",
+      endereco_complemento: emitente.endereco_complemento || empresa?.endereco_complemento || "",
+      endereco_bairro: emitente.endereco_bairro || empresa?.endereco_bairro || "",
+      endereco_municipio: emitente.endereco_municipio || empresa?.endereco_cidade || "",
+      endereco_uf: emitente.endereco_uf || empresa?.endereco_uf || "",
+      endereco_cep: emitente.endereco_cep || empresa?.endereco_cep || "",
+    };
+
     // 3. Read destinatario (pessoa)
     const { data: destPessoa } = await admin
       .from("pessoas")
@@ -359,7 +383,7 @@ Deno.serve(async (req) => {
     }
 
     // 6. Build Focus NFe payload
-    const focusPayload = buildFocusPayload(emitente, dest, emissao, itens);
+    const focusPayload = buildFocusPayload(emitenteFull, dest, emissao, itens);
 
     // 7. Generate idempotency ref (use emissao UUID)
     const ref = emissao_id;
@@ -470,7 +494,7 @@ Deno.serve(async (req) => {
       }
 
       // Enrich emitente-related errors with the CNPJ sent for diagnostics
-      const cnpjSent = (emitente.cnpj || "").replace(/\D/g, "");
+      const cnpjSent = (emitenteFull.cnpj || "").replace(/\D/g, "");
       const isEmitenteError = /emitente|cnpj.*n[aã]o.*autoriz/i.test(errorMsg);
       if (isEmitenteError && cnpjSent) {
         errorMsg = `${errorMsg} | CNPJ enviado: ${cnpjSent} (ambiente: ${ambiente}). Verifique se este CNPJ está habilitado no painel Focus NFe para o ambiente "${ambiente}".`;
