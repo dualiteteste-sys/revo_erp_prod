@@ -271,6 +271,25 @@ Deno.serve(async (req) => {
       return json(422, { ok: false, error: "EMITENTE_NOT_CONFIGURED" }, cors);
     }
 
+    // 2a. Fallback: fill missing address fields from empresas table
+    // (fiscal_nfe_emitente address fields may be null when not filled via UI)
+    const { data: empresaAddr } = await admin
+      .from("empresas")
+      .select("endereco_cep, endereco_logradouro, endereco_numero, endereco_complemento, endereco_bairro, endereco_cidade, endereco_uf")
+      .eq("id", empresaId)
+      .maybeSingle();
+
+    const emitenteFull = {
+      ...emitente,
+      endereco_logradouro: emitente.endereco_logradouro || empresaAddr?.endereco_logradouro || "",
+      endereco_numero: emitente.endereco_numero || empresaAddr?.endereco_numero || "S/N",
+      endereco_complemento: emitente.endereco_complemento || empresaAddr?.endereco_complemento || "",
+      endereco_bairro: emitente.endereco_bairro || empresaAddr?.endereco_bairro || "",
+      endereco_municipio: emitente.endereco_municipio || empresaAddr?.endereco_cidade || "",
+      endereco_uf: emitente.endereco_uf || empresaAddr?.endereco_uf || "",
+      endereco_cep: emitente.endereco_cep || empresaAddr?.endereco_cep || "",
+    };
+
     // 3. Read destinatario (pessoa)
     const { data: destPessoa } = await admin
       .from("pessoas")
@@ -359,7 +378,7 @@ Deno.serve(async (req) => {
     }
 
     // 6. Build Focus NFe payload
-    const focusPayload = buildFocusPayload(emitente, dest, emissao, itens);
+    const focusPayload = buildFocusPayload(emitenteFull, dest, emissao, itens);
 
     // 7. Generate idempotency ref (use emissao UUID)
     const ref = emissao_id;
@@ -470,7 +489,7 @@ Deno.serve(async (req) => {
       }
 
       // Enrich emitente-related errors with the CNPJ sent for diagnostics
-      const cnpjSent = (emitente.cnpj || "").replace(/\D/g, "");
+      const cnpjSent = (emitenteFull.cnpj || "").replace(/\D/g, "");
       const isEmitenteError = /emitente|cnpj.*n[aã]o.*autoriz/i.test(errorMsg);
       if (isEmitenteError && cnpjSent) {
         errorMsg = `${errorMsg} | CNPJ enviado: ${cnpjSent} (ambiente: ${ambiente}). Verifique se este CNPJ está habilitado no painel Focus NFe para o ambiente "${ambiente}".`;
