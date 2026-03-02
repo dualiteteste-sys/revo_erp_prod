@@ -271,23 +271,28 @@ Deno.serve(async (req) => {
       return json(422, { ok: false, error: "EMITENTE_NOT_CONFIGURED" }, cors);
     }
 
-    // 2a. Fallback: fill missing address fields from empresas table
-    // (fiscal_nfe_emitente address fields may be null when not filled via UI)
-    const { data: empresaAddr } = await admin
+    // 2a. Read empresa — source of truth for identity fields (cnpj, razao_social, nome_fantasia)
+    // and address fallback when fiscal_nfe_emitente fields are not filled via UI.
+    const { data: empresa } = await admin
       .from("empresas")
-      .select("endereco_cep, endereco_logradouro, endereco_numero, endereco_complemento, endereco_bairro, endereco_cidade, endereco_uf")
+      .select("cnpj, nome_razao_social, nome_fantasia, endereco_cep, endereco_logradouro, endereco_numero, endereco_complemento, endereco_bairro, endereco_cidade, endereco_uf")
       .eq("id", empresaId)
       .maybeSingle();
 
     const emitenteFull = {
       ...emitente,
-      endereco_logradouro: emitente.endereco_logradouro || empresaAddr?.endereco_logradouro || "",
-      endereco_numero: emitente.endereco_numero || empresaAddr?.endereco_numero || "S/N",
-      endereco_complemento: emitente.endereco_complemento || empresaAddr?.endereco_complemento || "",
-      endereco_bairro: emitente.endereco_bairro || empresaAddr?.endereco_bairro || "",
-      endereco_municipio: emitente.endereco_municipio || empresaAddr?.endereco_cidade || "",
-      endereco_uf: emitente.endereco_uf || empresaAddr?.endereco_uf || "",
-      endereco_cep: emitente.endereco_cep || empresaAddr?.endereco_cep || "",
+      // Identity: always from empresas (single source of truth — avoids stale copies in emitente table)
+      cnpj: empresa?.cnpj || emitente.cnpj,
+      razao_social: emitente.razao_social || empresa?.nome_razao_social || "",
+      nome_fantasia: emitente.nome_fantasia || empresa?.nome_fantasia || "",
+      // Address: prefer fiscal_nfe_emitente (can be customized), fall back to empresas
+      endereco_logradouro: emitente.endereco_logradouro || empresa?.endereco_logradouro || "",
+      endereco_numero: emitente.endereco_numero || empresa?.endereco_numero || "S/N",
+      endereco_complemento: emitente.endereco_complemento || empresa?.endereco_complemento || "",
+      endereco_bairro: emitente.endereco_bairro || empresa?.endereco_bairro || "",
+      endereco_municipio: emitente.endereco_municipio || empresa?.endereco_cidade || "",
+      endereco_uf: emitente.endereco_uf || empresa?.endereco_uf || "",
+      endereco_cep: emitente.endereco_cep || empresa?.endereco_cep || "",
     };
 
     // 3. Read destinatario (pessoa)
