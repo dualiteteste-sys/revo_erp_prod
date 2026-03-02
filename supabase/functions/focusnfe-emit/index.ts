@@ -261,38 +261,37 @@ Deno.serve(async (req) => {
       );
     }
 
-    // 2. Read emitente
+    // 2. Read emitente joined with empresa (FK: fiscal_nfe_emitente.empresa_id → empresas.id)
+    // empresas is the source of truth for identity (cnpj, razao_social, nome_fantasia)
+    // and the address fallback when fiscal_nfe_emitente fields are not filled via UI.
     const { data: emitente } = await admin
       .from("fiscal_nfe_emitente")
-      .select("*")
-      .eq("empresa_id", empresaId)
+      .select(`*, empresa:empresas!fiscal_nfe_emitente_empresa_id_fkey(
+        cnpj, nome_razao_social, nome_fantasia,
+        endereco_cep, endereco_logradouro, endereco_numero,
+        endereco_complemento, endereco_bairro, endereco_cidade, endereco_uf
+      )`)
+      .eq("empresa_id", empresaId.trim())
       .single();
     if (!emitente) {
       return json(422, { ok: false, error: "EMITENTE_NOT_CONFIGURED" }, cors);
     }
 
-    // 2a. Read empresa — source of truth for identity fields (cnpj, razao_social, nome_fantasia)
-    // and address fallback when fiscal_nfe_emitente fields are not filled via UI.
-    const { data: empresa } = await admin
-      .from("empresas")
-      .select("cnpj, nome_razao_social, nome_fantasia, endereco_cep, endereco_logradouro, endereco_numero, endereco_complemento, endereco_bairro, endereco_cidade, endereco_uf")
-      .eq("id", empresaId)
-      .maybeSingle();
-
+    const emp = (emitente as any).empresa;
     const emitenteFull = {
       ...emitente,
-      // Identity: always from empresas (single source of truth — avoids stale copies in emitente table)
-      cnpj: empresa?.cnpj || emitente.cnpj,
-      razao_social: emitente.razao_social || empresa?.nome_razao_social || "",
-      nome_fantasia: emitente.nome_fantasia || empresa?.nome_fantasia || "",
+      // Identity: always from empresas (single source of truth)
+      cnpj: emp?.cnpj || emitente.cnpj,
+      razao_social: emitente.razao_social || emp?.nome_razao_social || "",
+      nome_fantasia: emitente.nome_fantasia || emp?.nome_fantasia || "",
       // Address: prefer fiscal_nfe_emitente (can be customized), fall back to empresas
-      endereco_logradouro: emitente.endereco_logradouro || empresa?.endereco_logradouro || "",
-      endereco_numero: emitente.endereco_numero || empresa?.endereco_numero || "S/N",
-      endereco_complemento: emitente.endereco_complemento || empresa?.endereco_complemento || "",
-      endereco_bairro: emitente.endereco_bairro || empresa?.endereco_bairro || "",
-      endereco_municipio: emitente.endereco_municipio || empresa?.endereco_cidade || "",
-      endereco_uf: emitente.endereco_uf || empresa?.endereco_uf || "",
-      endereco_cep: emitente.endereco_cep || empresa?.endereco_cep || "",
+      endereco_logradouro: emitente.endereco_logradouro || emp?.endereco_logradouro || "",
+      endereco_numero: emitente.endereco_numero || emp?.endereco_numero || "S/N",
+      endereco_complemento: emitente.endereco_complemento || emp?.endereco_complemento || "",
+      endereco_bairro: emitente.endereco_bairro || emp?.endereco_bairro || "",
+      endereco_municipio: emitente.endereco_municipio || emp?.endereco_cidade || "",
+      endereco_uf: emitente.endereco_uf || emp?.endereco_uf || "",
+      endereco_cep: emitente.endereco_cep || emp?.endereco_cep || "",
     };
 
     // 3. Read destinatario (pessoa)
