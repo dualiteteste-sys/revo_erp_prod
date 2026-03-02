@@ -243,6 +243,10 @@ const ContasAReceberFormPanel: React.FC<ContasAReceberFormPanelProps> = ({ conta
       addToast('Descrição, Data de Vencimento e Valor são obrigatórios.', 'error');
       return;
     }
+    if (!formData.cliente_id) {
+      addToast('Cliente é obrigatório para criar uma conta a receber.', 'error');
+      return;
+    }
 
     try {
       const token = ++actionTokenRef.current;
