@@ -149,10 +149,24 @@ function buildFocusPayload(
 
   // Destinatario CPF ou CNPJ (from dest.cpf_cnpj normalized above)
   const cpfCnpj = (dest.cpf_cnpj || dest.doc_unico || "").replace(/\D/g, "");
+  // contribuinte_icms enum: '1'=Contribuinte, '2'=Isento, '9'=Não Contribuinte (default)
+  const contribuinte = dest.contribuinte_icms ?? "9";
+  const ieValue = (dest.ie || "").trim();
+
   if (cpfCnpj.length === 14) {
     payload.cnpj_destinatario = cpfCnpj;
-    payload.indicador_inscricao_estadual_destinatario = "1"; // contribuinte
-    payload.inscricao_estadual_destinatario = dest.ie || "";
+    if (contribuinte === "1" && ieValue) {
+      // Contribuinte ICMS com IE preenchida
+      payload.indicador_inscricao_estadual_destinatario = "1";
+      payload.inscricao_estadual_destinatario = ieValue;
+    } else if (contribuinte === "2" || dest.isento_ie === true) {
+      // Isento de inscrição estadual
+      payload.indicador_inscricao_estadual_destinatario = "2";
+      payload.inscricao_estadual_destinatario = "ISENTO";
+    } else {
+      // Não contribuinte (padrão, ou contribuinte sem IE preenchida)
+      payload.indicador_inscricao_estadual_destinatario = "9";
+    }
   } else if (cpfCnpj.length === 11) {
     payload.cpf_destinatario = cpfCnpj;
     payload.indicador_inscricao_estadual_destinatario = "9"; // nao contribuinte
