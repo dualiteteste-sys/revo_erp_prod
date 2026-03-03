@@ -76,6 +76,9 @@ function buildFocusPayload(
     municipio_destinatario: dest.endereco_municipio || dest.municipio || "",
     uf_destinatario: dest.endereco_uf || dest.uf || "",
     cep_destinatario: (dest.endereco_cep || dest.cep || "").replace(/\D/g, ""),
+    ...(dest.cidade_codigo ? { codigo_municipio_destinatario: dest.cidade_codigo } : {}),
+    ...(dest.email ? { email_destinatario: dest.email } : {}),
+    ...(dest.telefone ? { telefone_destinatario: (dest.telefone || "").replace(/\D/g, "") } : {}),
 
     // Operacao
     natureza_operacao: emissao.natureza_operacao || "Venda de mercadoria",
@@ -172,6 +175,9 @@ function buildFocusPayload(
     payload.cpf_destinatario = cpfCnpj;
     payload.indicador_inscricao_estadual_destinatario = "9"; // nao contribuinte
   }
+
+  // Consumidor final: CPF → sempre consumidor final (B2C); CNPJ → B2B por padrão
+  payload.consumidor_final = cpfCnpj.length === 11 ? "1" : "0";
 
   // UF destino = mesmo que emitente -> operacao interna
   if (
@@ -276,37 +282,50 @@ Deno.serve(async (req) => {
       );
     }
 
-    // 2. Read emitente joined with empresa (FK: fiscal_nfe_emitente.empresa_id → empresas.id)
-    // empresas is the source of truth for identity (cnpj, razao_social, nome_fantasia)
-    // and the address fallback when fiscal_nfe_emitente fields are not filled via UI.
-    const { data: emitente } = await admin
+    // 2. Read emitente (two independent queries — avoids silent FK join failures)
+    const { data: emitente, error: emitErr } = await admin
       .from("fiscal_nfe_emitente")
-      .select(`*, empresa:empresas!fiscal_nfe_emitente_empresa_id_fkey(
-        cnpj, nome_razao_social, nome_fantasia,
-        endereco_cep, endereco_logradouro, endereco_numero,
-        endereco_complemento, endereco_bairro, endereco_cidade, endereco_uf
-      )`)
+      .select("*")
       .eq("empresa_id", empresaId.trim())
       .single();
-    if (!emitente) {
-      return json(422, { ok: false, error: "EMITENTE_NOT_CONFIGURED" }, cors);
+    if (emitErr || !emitente) {
+      // Log the actual error so we can diagnose "row not found" vs "query failed"
+      await admin.from("fiscal_nfe_provider_logs").insert({
+        empresa_id: empresaId,
+        emissao_id,
+        provider: "focusnfe",
+        level: "error",
+        message: `EMITENTE_NOT_CONFIGURED: ${emitErr?.message || "row not found"}`,
+        payload: { error_code: emitErr?.code, hint: emitErr?.hint, request_id: requestId },
+      }).catch(() => {});
+      return json(422, {
+        ok: false,
+        error: "EMITENTE_NOT_CONFIGURED",
+        detail: "Acesse Fiscal → Configurações e preencha os dados do emitente (CNPJ, Razão Social, IE, endereço).",
+      }, cors);
     }
 
-    const emp = (emitente as any).empresa;
+    // Fallback: enrich with empresas data for fields not yet filled in the emitente form
+    const { data: empresa } = await admin
+      .from("empresas")
+      .select("cnpj, nome_razao_social, nome_fantasia, endereco_cep, endereco_logradouro, endereco_numero, endereco_complemento, endereco_bairro, endereco_cidade, endereco_uf")
+      .eq("id", emitente.empresa_id)
+      .single();
+
     const emitenteFull = {
       ...emitente,
-      // Identity: always from empresas (single source of truth)
-      cnpj: emp?.cnpj || emitente.cnpj,
-      razao_social: emitente.razao_social || emp?.nome_razao_social || "",
-      nome_fantasia: emitente.nome_fantasia || emp?.nome_fantasia || "",
-      // Address: prefer fiscal_nfe_emitente (can be customized), fall back to empresas
-      endereco_logradouro: emitente.endereco_logradouro || emp?.endereco_logradouro || "",
-      endereco_numero: emitente.endereco_numero || emp?.endereco_numero || "S/N",
-      endereco_complemento: emitente.endereco_complemento || emp?.endereco_complemento || "",
-      endereco_bairro: emitente.endereco_bairro || emp?.endereco_bairro || "",
-      endereco_municipio: emitente.endereco_municipio || emp?.endereco_cidade || "",
-      endereco_uf: emitente.endereco_uf || emp?.endereco_uf || "",
-      endereco_cep: emitente.endereco_cep || emp?.endereco_cep || "",
+      // Identity: fiscal_nfe_emitente is source of truth; fall back to empresas
+      cnpj: emitente.cnpj || empresa?.cnpj || "",
+      razao_social: emitente.razao_social || empresa?.nome_razao_social || "",
+      nome_fantasia: emitente.nome_fantasia || empresa?.nome_fantasia || "",
+      // Address: prefer fiscal_nfe_emitente (customizable), fall back to empresas
+      endereco_logradouro: emitente.endereco_logradouro || empresa?.endereco_logradouro || "",
+      endereco_numero: emitente.endereco_numero || empresa?.endereco_numero || "S/N",
+      endereco_complemento: emitente.endereco_complemento || empresa?.endereco_complemento || "",
+      endereco_bairro: emitente.endereco_bairro || empresa?.endereco_bairro || "",
+      endereco_municipio: emitente.endereco_municipio || empresa?.endereco_cidade || "",
+      endereco_uf: emitente.endereco_uf || empresa?.endereco_uf || "",
+      endereco_cep: emitente.endereco_cep || empresa?.endereco_cep || "",
     };
 
     // 3. Read destinatario (pessoa)
@@ -355,6 +374,9 @@ Deno.serve(async (req) => {
       cpf_cnpj: destPessoa.doc_unico || "",
       // IE: pessoas uses inscr_estadual
       ie: destPessoa.inscr_estadual || "",
+      // Contato: pessoas.email / pessoas.telefone
+      email: destPessoa.email || destFiscal?.email || "",
+      telefone: destPessoa.telefone || destPessoa.celular || "",
     };
 
     // 3b. Pre-flight: validate required address fields before calling Focus API

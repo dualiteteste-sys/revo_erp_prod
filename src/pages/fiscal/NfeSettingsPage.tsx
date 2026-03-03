@@ -7,8 +7,9 @@ import { useSupabase } from '@/providers/SupabaseProvider';
 import { useAuth } from '@/contexts/AuthProvider';
 import { useToast } from '@/contexts/ToastProvider';
 import { useEmpresaFeatures } from '@/hooks/useEmpresaFeatures';
-import { Loader2, Receipt, Save, ShieldCheck, Upload, FileKey, Trash2 } from 'lucide-react';
+import { Loader2, Receipt, Save, ShieldCheck, Upload, FileKey, Trash2, MapPin } from 'lucide-react';
 import { roleAtLeast, useEmpresaRole } from '@/hooks/useEmpresaRole';
+import { cnpjMask, cepMask } from '@/lib/masks';
 import RoadmapButton from '@/components/roadmap/RoadmapButton';
 import {
   getFiscalFeatureFlags,
@@ -417,6 +418,7 @@ export default function NfeSettingsPage({ onEmitenteSaved, onNumeracaoSaved }: P
               </Button>
             </div>
 
+            {/* ── Identificação ── */}
             <div className="mt-6 grid grid-cols-1 md:grid-cols-3 gap-6">
               <div className="md:col-span-2">
                 <label className="block text-sm font-semibold text-slate-700 mb-2">Razão social</label>
@@ -442,20 +444,64 @@ export default function NfeSettingsPage({ onEmitenteSaved, onNumeracaoSaved }: P
               <div>
                 <label className="block text-sm font-semibold text-slate-700 mb-2">CNPJ</label>
                 <input
-                  value={emitente?.cnpj ?? ''}
-                  onChange={(e) => setEmitente((prev) => (prev ? { ...prev, cnpj: e.target.value } : prev))}
+                  value={cnpjMask(emitente?.cnpj ?? '')}
+                  onChange={(e) => setEmitente((prev) => (prev ? { ...prev, cnpj: e.target.value.replace(/\D/g, '') } : prev))}
                   disabled={!canAdmin}
                   className="w-full p-3 border border-gray-300 rounded-xl shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                  placeholder="Somente números"
+                  placeholder="00.000.000/0000-00"
+                  maxLength={18}
                 />
               </div>
               <div>
-                <label className="block text-sm font-semibold text-slate-700 mb-2">IE</label>
+                <label className="block text-sm font-semibold text-slate-700 mb-2">IE (Inscrição Estadual)</label>
                 <input
                   value={emitente?.ie ?? ''}
                   onChange={(e) => setEmitente((prev) => (prev ? { ...prev, ie: e.target.value || null } : prev))}
                   disabled={!canAdmin}
                   className="w-full p-3 border border-gray-300 rounded-xl shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  placeholder="Somente dígitos"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-semibold text-slate-700 mb-2">IM (Inscrição Municipal)</label>
+                <input
+                  value={emitente?.im ?? ''}
+                  onChange={(e) => setEmitente((prev) => (prev ? { ...prev, im: e.target.value || null } : prev))}
+                  disabled={!canAdmin}
+                  className="w-full p-3 border border-gray-300 rounded-xl shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  placeholder="Opcional"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-semibold text-slate-700 mb-2">CNAE</label>
+                <input
+                  value={emitente?.cnae ?? ''}
+                  onChange={(e) => setEmitente((prev) => (prev ? { ...prev, cnae: e.target.value || null } : prev))}
+                  disabled={!canAdmin}
+                  className="w-full p-3 border border-gray-300 rounded-xl shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  placeholder="Ex.: 6201501"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-semibold text-slate-700 mb-2">Telefone</label>
+                <input
+                  value={emitente?.telefone ?? ''}
+                  onChange={(e) => setEmitente((prev) => (prev ? { ...prev, telefone: e.target.value || null } : prev))}
+                  disabled={!canAdmin}
+                  className="w-full p-3 border border-gray-300 rounded-xl shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  placeholder="Ex.: 11999998888"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-semibold text-slate-700 mb-2">E-mail</label>
+                <input
+                  type="email"
+                  value={emitente?.email ?? ''}
+                  onChange={(e) => setEmitente((prev) => (prev ? { ...prev, email: e.target.value || null } : prev))}
+                  disabled={!canAdmin}
+                  className="w-full p-3 border border-gray-300 rounded-xl shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  placeholder="fiscal@empresa.com.br"
                 />
               </div>
               <div>
@@ -471,7 +517,101 @@ export default function NfeSettingsPage({ onEmitenteSaved, onNumeracaoSaved }: P
                   <option value="3">3 — Regime Normal</option>
                 </Select>
               </div>
+            </div>
 
+            {/* ── Endereço ── */}
+            <div className="mt-6">
+              <div className="flex items-center gap-2 mb-4">
+                <MapPin size={16} className="text-slate-600" />
+                <h3 className="text-sm font-semibold text-slate-700">Endereço do emitente</h3>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div className="md:col-span-2">
+                  <label className="block text-sm font-semibold text-slate-700 mb-2">Logradouro</label>
+                  <input
+                    value={emitente?.endereco_logradouro ?? ''}
+                    onChange={(e) => setEmitente((prev) => (prev ? { ...prev, endereco_logradouro: e.target.value || null } : prev))}
+                    disabled={!canAdmin}
+                    className="w-full p-3 border border-gray-300 rounded-xl shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    placeholder="Rua, Av., Travessa…"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-semibold text-slate-700 mb-2">Número</label>
+                  <input
+                    value={emitente?.endereco_numero ?? ''}
+                    onChange={(e) => setEmitente((prev) => (prev ? { ...prev, endereco_numero: e.target.value || null } : prev))}
+                    disabled={!canAdmin}
+                    className="w-full p-3 border border-gray-300 rounded-xl shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    placeholder="123"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-semibold text-slate-700 mb-2">Complemento</label>
+                  <input
+                    value={emitente?.endereco_complemento ?? ''}
+                    onChange={(e) => setEmitente((prev) => (prev ? { ...prev, endereco_complemento: e.target.value || null } : prev))}
+                    disabled={!canAdmin}
+                    className="w-full p-3 border border-gray-300 rounded-xl shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    placeholder="Sala, Andar…"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-semibold text-slate-700 mb-2">Bairro</label>
+                  <input
+                    value={emitente?.endereco_bairro ?? ''}
+                    onChange={(e) => setEmitente((prev) => (prev ? { ...prev, endereco_bairro: e.target.value || null } : prev))}
+                    disabled={!canAdmin}
+                    className="w-full p-3 border border-gray-300 rounded-xl shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    placeholder="Centro"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-semibold text-slate-700 mb-2">CEP</label>
+                  <input
+                    value={cepMask(emitente?.endereco_cep ?? '')}
+                    onChange={(e) => setEmitente((prev) => (prev ? { ...prev, endereco_cep: e.target.value.replace(/\D/g, '') } : prev))}
+                    disabled={!canAdmin}
+                    className="w-full p-3 border border-gray-300 rounded-xl shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    placeholder="00000-000"
+                    maxLength={9}
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-semibold text-slate-700 mb-2">Município</label>
+                  <input
+                    value={emitente?.endereco_municipio ?? ''}
+                    onChange={(e) => setEmitente((prev) => (prev ? { ...prev, endereco_municipio: e.target.value || null } : prev))}
+                    disabled={!canAdmin}
+                    className="w-full p-3 border border-gray-300 rounded-xl shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    placeholder="São Paulo"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-semibold text-slate-700 mb-2">Cód. IBGE do Município</label>
+                  <input
+                    value={emitente?.endereco_municipio_codigo ?? ''}
+                    onChange={(e) => setEmitente((prev) => (prev ? { ...prev, endereco_municipio_codigo: e.target.value || null } : prev))}
+                    disabled={!canAdmin}
+                    className="w-full p-3 border border-gray-300 rounded-xl shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    placeholder="Ex.: 3550308"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-semibold text-slate-700 mb-2">UF</label>
+                  <input
+                    value={emitente?.endereco_uf ?? ''}
+                    onChange={(e) => setEmitente((prev) => (prev ? { ...prev, endereco_uf: (e.target.value || '').toUpperCase().slice(0, 2) || null } : prev))}
+                    disabled={!canAdmin}
+                    className="w-full p-3 border border-gray-300 rounded-xl shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    placeholder="SP"
+                    maxLength={2}
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div className="mt-6">
               <div className="md:col-span-3">
                 <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
                   <div className="flex items-start justify-between gap-4">
