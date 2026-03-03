@@ -145,7 +145,22 @@ const IdentificationSection: React.FC<IdentificationSectionProps> = ({ data, onC
             transition={{ duration: 0.3, ease: 'easeInOut' }}
             style={{ overflow: 'hidden' }}
           >
-            <Input label="Inscrição Estadual" name="inscr_estadual" value={data.inscr_estadual || ''} onChange={e => onChange('inscr_estadual', e.target.value)} className="sm:col-span-3" />
+            <Input
+              label="Inscrição Estadual"
+              name="inscr_estadual"
+              value={data.inscr_estadual || ''}
+              onChange={e => {
+                const ie = e.target.value;
+                onChange('inscr_estadual', ie);
+                // IE preenchida → contribuinte ICMS por definição; IE removida → volta a não contribuinte
+                if (ie.trim() && data.contribuinte_icms !== '1' && data.contribuinte_icms !== '2') {
+                  onChange('contribuinte_icms', '1');
+                } else if (!ie.trim() && data.contribuinte_icms === '1') {
+                  onChange('contribuinte_icms', '9');
+                }
+              }}
+              className="sm:col-span-3"
+            />
             <Input label="Inscrição Municipal" name="inscr_municipal" value={data.inscr_municipal || ''} onChange={e => onChange('inscr_municipal', e.target.value)} className="sm:col-span-3" />
           </motion.div>
         )}
