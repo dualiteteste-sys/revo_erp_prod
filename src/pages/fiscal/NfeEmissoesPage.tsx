@@ -187,6 +187,14 @@ export default function NfeEmissoesPage() {
     void fetchList();
   }, [empresaId, fetchList]);
 
+  // Poll every 5 s while any NF-e is still being processed by SEFAZ
+  useEffect(() => {
+    const hasProcessing = rows.some((r) => r.status === 'processando');
+    if (!hasProcessing) return;
+    const interval = setInterval(() => void fetchList(), 5000);
+    return () => clearInterval(interval);
+  }, [rows, fetchList]);
+
   // Auto-open NF-e from ?open= query parameter (e.g. after "Gerar NF-e" redirect)
   useEffect(() => {
     const params = new URLSearchParams(location.search);
