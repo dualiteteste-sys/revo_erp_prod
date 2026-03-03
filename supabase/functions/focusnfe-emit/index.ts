@@ -155,8 +155,9 @@ function buildFocusPayload(
 
   if (cpfCnpj.length === 14) {
     payload.cnpj_destinatario = cpfCnpj;
-    if (contribuinte === "1" && ieValue) {
-      // Contribuinte ICMS com IE preenchida
+    if (ieValue && contribuinte !== "2" && dest.isento_ie !== true) {
+      // IE preenchida → sempre contribuinte ICMS (indicador "1"), independente do campo contribuinte_icms.
+      // Ter IE cadastrada implica ser contribuinte por definição.
       payload.indicador_inscricao_estadual_destinatario = "1";
       payload.inscricao_estadual_destinatario = ieValue;
     } else if (contribuinte === "2" || dest.isento_ie === true) {
@@ -164,7 +165,7 @@ function buildFocusPayload(
       payload.indicador_inscricao_estadual_destinatario = "2";
       payload.inscricao_estadual_destinatario = "ISENTO";
     } else {
-      // Não contribuinte (padrão, ou contribuinte sem IE preenchida)
+      // Não contribuinte (sem IE, sem indicação de contribuinte)
       payload.indicador_inscricao_estadual_destinatario = "9";
     }
   } else if (cpfCnpj.length === 11) {

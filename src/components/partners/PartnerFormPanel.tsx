@@ -94,6 +94,8 @@ const PartnerFormPanel: React.FC<PartnerFormPanelProps> = ({ partner, initialVal
         telefone: data.telefone || undefined,
         inscr_estadual: data.inscr_estadual || undefined,
         inscr_municipal: data.inscr_municipal || undefined,
+        // Se o lookup retornou IE, o destinatário é contribuinte ICMS por definição
+        ...(data.inscr_estadual ? { contribuinte_icms: '1' as const } : {}),
       };
 
       const enderecoPatch: Partial<EnderecoPayload> | null = data.endereco
