@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Search, Loader2, Building, AlertTriangle } from 'lucide-react';
+import { Search, Loader2, Building, AlertTriangle, FileText } from 'lucide-react';
 import { cnpjMask } from '@/lib/masks';
 import { fetchCnpjData } from '@/services/externalApis';
+import { extractIeFromCnpjWs } from '@/services/companyLookup';
 import GlassCard from '@/components/ui/GlassCard';
 
 interface CnpjResult {
@@ -19,6 +20,19 @@ interface CnpjResult {
   cnae_fiscal_descricao?: string;
   descricao_situacao_cadastral?: string;
   data_situacao_cadastral?: string;
+  inscr_estadual?: string | null;
+}
+
+async function fetchIeFromCnpjWs(cnpjDigits: string): Promise<string | null> {
+  try {
+    const res = await fetch(`https://publica.cnpj.ws/cnpj/${cnpjDigits}`);
+    if (!res.ok) return null;
+    const data = await res.json();
+    const { inscr_estadual } = extractIeFromCnpjWs(data, null);
+    return inscr_estadual;
+  } catch {
+    return null;
+  }
 }
 
 const CnpjSearchPage: React.FC = () => {
@@ -33,7 +47,8 @@ const CnpjSearchPage: React.FC = () => {
 
   const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (cnpj.replace(/\D/g, '').length !== 14) {
+    const cnpjDigits = cnpj.replace(/\D/g, '');
+    if (cnpjDigits.length !== 14) {
       setError('Por favor, insira um CNPJ válido com 14 dígitos.');
       setResult(null);
       return;
@@ -44,8 +59,11 @@ const CnpjSearchPage: React.FC = () => {
     setResult(null);
 
     try {
-      const data = await fetchCnpjData(cnpj);
-      setResult(data);
+      const [rawData, inscr_estadual] = await Promise.all([
+        fetchCnpjData(cnpjDigits),
+        fetchIeFromCnpjWs(cnpjDigits),
+      ]);
+      setResult({ ...rawData, inscr_estadual });
     } catch (err: any) {
       setError(err.message || 'Ocorreu um erro ao buscar o CNPJ.');
     } finally {
@@ -119,38 +137,58 @@ const CnpjSearchPage: React.FC = () => {
                 className="w-full bg-white/50 p-6 rounded-xl border border-gray-200 space-y-6"
               >
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6">
-                    <ResultItem label="Razão Social" value={result.razao_social} />
-                    <ResultItem label="Nome Fantasia" value={result.nome_fantasia} />
+                  <ResultItem label="Razão Social" value={result.razao_social} />
+                  <ResultItem label="Nome Fantasia" value={result.nome_fantasia} />
                 </div>
+
                 <div className="border-t border-gray-200 pt-6 grid grid-cols-1 md:grid-cols-3 gap-x-8 gap-y-6">
-                    <ResultItem label="Situação Cadastral" value={`${result.descricao_situacao_cadastral} (desde ${result.data_situacao_cadastral})`} />
-                    <ResultItem label="Atividade Principal (CNAE)" value={result.cnae_fiscal_descricao} />
-                    <ResultItem label="Telefone" value={result.ddd_telefone_1} />
+                  <ResultItem label="Situação Cadastral" value={`${result.descricao_situacao_cadastral} (desde ${result.data_situacao_cadastral})`} />
+                  <ResultItem label="Atividade Principal (CNAE)" value={result.cnae_fiscal_descricao} />
+                  <ResultItem label="Telefone" value={result.ddd_telefone_1} />
                 </div>
+
                 <div className="border-t border-gray-200 pt-6">
-                    <h3 className="text-md font-semibold text-gray-600 mb-4">Endereço</h3>
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-x-8 gap-y-6">
-                        <ResultItem label="Logradouro" value={`${result.logradouro}, ${result.numero}`} />
-                        <ResultItem label="Bairro" value={result.bairro} />
-                        <ResultItem label="CEP" value={result.cep} />
-                        <ResultItem label="Município" value={result.municipio} />
-                        <ResultItem label="UF" value={result.uf} />
-                        <ResultItem label="Complemento" value={result.complemento} />
-                    </div>
+                  <h3 className="text-md font-semibold text-gray-600 mb-4 flex items-center gap-2">
+                    <FileText size={16} />
+                    Dados Fiscais
+                  </h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6">
+                    {result.inscr_estadual ? (
+                      <ResultItem label="Inscrição Estadual (IE)" value={result.inscr_estadual} />
+                    ) : (
+                      <div>
+                        <p className="text-sm text-gray-500">Inscrição Estadual (IE)</p>
+                        <p className="text-sm text-gray-400 italic">Não localizada ou empresa não contribuinte ICMS</p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                <div className="border-t border-gray-200 pt-6">
+                  <h3 className="text-md font-semibold text-gray-600 mb-4">Endereço</h3>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-x-8 gap-y-6">
+                    <ResultItem label="Logradouro" value={`${result.logradouro}, ${result.numero}`} />
+                    <ResultItem label="Bairro" value={result.bairro} />
+                    <ResultItem label="CEP" value={result.cep} />
+                    <ResultItem label="Município" value={result.municipio} />
+                    <ResultItem label="UF" value={result.uf} />
+                    <ResultItem label="Complemento" value={result.complemento} />
+                  </div>
                 </div>
               </motion.div>
             )}
 
             {!result && !loading && !error && (
-                <motion.div
-                    key="initial"
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    exit={{ opacity: 0 }}
-                    className="text-center text-gray-500"
-                >
-                    <p>Insira um CNPJ para iniciar a consulta.</p>
-                </motion.div>
+              <motion.div
+                key="initial"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                className="text-center text-gray-500"
+              >
+                <p>Insira um CNPJ para iniciar a consulta.</p>
+                <p className="text-sm mt-2 text-gray-400">Retorna razão social, situação cadastral, CNAE e Inscrição Estadual (IE) quando disponível.</p>
+              </motion.div>
             )}
           </AnimatePresence>
         </div>
