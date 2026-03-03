@@ -557,7 +557,10 @@ export default function NfeEmissoesPage() {
       } else {
         // Parse field-level errors from Focus response
         const erros = result.focus_response?.erros;
-        if (result.error === 'DESTINATARIO_INCOMPLETO') {
+        if (result.error === 'EMITENTE_NOT_CONFIGURED') {
+          addToast('Emitente não configurado. Configure em Fiscal → Configurações antes de emitir.', 'error');
+          navigate('/app/fiscal/nfe/configuracoes');
+        } else if (result.error === 'DESTINATARIO_INCOMPLETO') {
           addToast(result.detail || 'Cadastro do destinatário incompleto.', 'error');
         } else if (Array.isArray(erros) && erros.length > 0) {
           const lines = erros.map((e: any) => `• ${e.campo}: ${e.mensagem}`).join('\n');
