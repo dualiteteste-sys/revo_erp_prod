@@ -7,13 +7,13 @@
 --
 -- Fix: INSERT a minimal row (cnpj + razao_social + address from empresas)
 --   for any empresa that has a CNPJ but no emitente row yet.
+--   nome_fantasia omitted (nullable, user fills via settings page).
 --   Existing rows are NOT touched (ON CONFLICT DO NOTHING).
 -- ============================================================================
 
 INSERT INTO public.fiscal_nfe_emitente (
   empresa_id,
   razao_social,
-  nome_fantasia,
   cnpj,
   crt,
   endereco_logradouro,
@@ -25,16 +25,15 @@ INSERT INTO public.fiscal_nfe_emitente (
   endereco_cep
 )
 SELECT
-  e.id                   AS empresa_id,
-  e.nome_razao_social    AS razao_social,
-  e.nome_fantasia        AS nome_fantasia,
-  e.cnpj                 AS cnpj,
-  1                      AS crt,  -- default: Simples Nacional
+  e.id                                AS empresa_id,
+  COALESCE(e.nome, '')               AS razao_social,
+  e.cnpj                             AS cnpj,
+  1                                  AS crt,  -- default: Simples Nacional
   e.endereco_logradouro,
   e.endereco_numero,
   e.endereco_complemento,
   e.endereco_bairro,
-  e.endereco_cidade      AS endereco_municipio,
+  e.endereco_cidade                  AS endereco_municipio,
   e.endereco_uf,
   e.endereco_cep
 FROM public.empresas e
