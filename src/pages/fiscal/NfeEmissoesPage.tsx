@@ -18,6 +18,7 @@ import { useTableColumnWidths, type TableColumnWidthDef } from '@/components/ui/
 import { sortRows, toggleSort } from '@/components/ui/table/sortUtils';
 import {
   fiscalNfeAuditTimelineList,
+  fiscalNfeConsultaStatus,
   fiscalNfeEmissaoDraftUpsert,
   fiscalNfeEmissaoItensList,
   fiscalNfeEmissoesList,
@@ -187,11 +188,16 @@ export default function NfeEmissoesPage() {
     void fetchList();
   }, [empresaId, fetchList]);
 
-  // Poll every 5 s while any NF-e is still being processed by SEFAZ
+  // Poll every 5 s while any NF-e is still being processed by SEFAZ.
+  // Calls focusnfe-status for each processando NF-e to sync the real status
+  // from the Focus NFe API into the DB, then refreshes the list.
   useEffect(() => {
-    const hasProcessing = rows.some((r) => r.status === 'processando');
-    if (!hasProcessing) return;
-    const interval = setInterval(() => void fetchList(), 5000);
+    const processingRows = rows.filter((r) => r.status === 'processando');
+    if (processingRows.length === 0) return;
+    const interval = setInterval(async () => {
+      await Promise.all(processingRows.map((r) => fiscalNfeConsultaStatus(r.id)));
+      void fetchList();
+    }, 5000);
     return () => clearInterval(interval);
   }, [rows, fetchList]);
 
