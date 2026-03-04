@@ -383,20 +383,32 @@ export default function NfeInputPage({ embedded, onRecebimentoReady, autoFinaliz
       let det = infNFe.det;
       if (!Array.isArray(det)) det = [det];
 
-      const itemsPayload = det.map((d: any) => ({
-        n_item: parseInt(d['@_nItem']),
-        cprod: get(d, 'prod.cProd'),
-        ean: get(d, 'prod.cEAN'),
-        xprod: get(d, 'prod.xProd'),
-        ncm: get(d, 'prod.NCM'),
-        cfop: get(d, 'prod.CFOP'),
-        ucom: get(d, 'prod.uCom'),
-        qcom: parseFloat(get(d, 'prod.qCom')),
-        vuncom: parseFloat(get(d, 'prod.vUnCom')),
-        vprod: parseFloat(get(d, 'prod.vProd')),
-        // Tributos básicos (simplificado)
-        cst: get(d, 'imposto.ICMS.ICMS00.CST') || get(d, 'imposto.ICMS.ICMSSN101.CSOSN'),
-      }));
+      const itemsPayload = det.map((d: any) => {
+        // Extrai <rastro> (lote rastreável — SEFAZ opcional em prod com rastreabilidade)
+        const rastro = d?.prod?.rastro;
+        const nLote = rastro ? String(rastro.nLote ?? '').trim() : undefined;
+        const dFab  = rastro?.dFab  ? String(rastro.dFab).trim()  : undefined;
+        const dVal  = rastro?.dVal  ? String(rastro.dVal).trim()  : undefined;
+
+        return {
+          n_item: parseInt(d['@_nItem']),
+          cprod: get(d, 'prod.cProd'),
+          ean: get(d, 'prod.cEAN'),
+          xprod: get(d, 'prod.xProd'),
+          ncm: get(d, 'prod.NCM'),
+          cfop: get(d, 'prod.CFOP'),
+          ucom: get(d, 'prod.uCom'),
+          qcom: parseFloat(get(d, 'prod.qCom')),
+          vuncom: parseFloat(get(d, 'prod.vUnCom')),
+          vprod: parseFloat(get(d, 'prod.vProd')),
+          // Tributos básicos (simplificado)
+          cst: get(d, 'imposto.ICMS.ICMS00.CST') || get(d, 'imposto.ICMS.ICMSSN101.CSOSN'),
+          // Rastreabilidade de lote (NF-e <rastro>)
+          ...(nLote ? { n_lote: nLote } : {}),
+          ...(dFab  ? { d_fab:  dFab  } : {}),
+          ...(dVal  ? { d_val:  dVal  } : {}),
+        };
+      });
 
       const payload: NfeImportPayload = {
         chave_acesso: (infNFe['@_Id'] || '').replace('NFe', ''),

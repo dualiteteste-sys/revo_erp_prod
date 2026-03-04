@@ -32,6 +32,7 @@ export type EstoqueMovimento = {
   usuario_email: string | null;
   deposito_id?: string | null;
   deposito_nome?: string | null;
+  lote?: string | null;
 };
 
 export type RegistrarMovimentoPayload = {

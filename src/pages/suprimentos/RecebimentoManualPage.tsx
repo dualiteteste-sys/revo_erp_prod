@@ -19,6 +19,8 @@ type ManualItem = {
   quantidade: number;
   unidade: string;
   valor_unitario: number;
+  lote?: string;
+  data_validade?: string;
   produto_interno_id?: string;
   produto_interno_nome?: string;
 };
@@ -107,6 +109,8 @@ export default function RecebimentoManualPage() {
           ucom: item.unidade,
           vuncom: item.valor_unitario,
           vprod: item.quantidade * item.valor_unitario,
+          ...(item.lote?.trim() ? { n_lote: item.lote.trim() } : {}),
+          ...(item.data_validade ? { d_val: item.data_validade } : {}),
         }))
       };
 
@@ -262,14 +266,32 @@ export default function RecebimentoManualPage() {
                   </div>
                   <div className="md:col-span-2">
                     <label className="block text-xs font-medium text-gray-500 mb-1">Valor Unit.</label>
-                    <input 
+                    <input
                       type="number"
                       className="w-full p-2 border rounded-md text-sm"
                       value={item.valor_unitario}
                       onChange={e => handleUpdateItem(item.id, 'valor_unitario', parseFloat(e.target.value))}
                     />
                   </div>
-                  
+                  <div className="md:col-span-2">
+                    <label className="block text-xs font-medium text-gray-500 mb-1">Lote</label>
+                    <input
+                      className="w-full p-2 border rounded-md text-sm"
+                      value={item.lote ?? ''}
+                      onChange={e => handleUpdateItem(item.id, 'lote', e.target.value)}
+                      placeholder="Ex: LOT-2024-001"
+                    />
+                  </div>
+                  <div className="md:col-span-2">
+                    <label className="block text-xs font-medium text-gray-500 mb-1">Validade</label>
+                    <input
+                      type="date"
+                      className="w-full p-2 border rounded-md text-sm"
+                      value={item.data_validade ?? ''}
+                      onChange={e => handleUpdateItem(item.id, 'data_validade', e.target.value)}
+                    />
+                  </div>
+
                   {/* Linha 2: Vínculo Interno */}
                   <div className="md:col-span-1 flex justify-center pt-8">
                     <div className="w-px h-8 bg-gray-300"></div>

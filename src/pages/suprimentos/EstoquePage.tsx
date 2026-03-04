@@ -227,11 +227,12 @@ export default function EstoquePage() {
     }
     downloadCsv({
       filename: `kardex_${selectedProduto.nome}_${new Date().toISOString().slice(0, 10)}`,
-      headers: ['deposito', 'data', 'tipo', 'qtd', 'saldo_anterior', 'saldo_novo', 'ref', 'usuario'],
+      headers: ['deposito', 'data', 'tipo', 'lote', 'qtd', 'saldo_anterior', 'saldo_novo', 'ref', 'usuario'],
       rows: kardexData.map((m) => [
         m.deposito_nome ?? selectedDeposito?.nome ?? '',
         new Date(m.created_at).toLocaleString('pt-BR'),
         m.tipo,
+        m.lote ?? '',
         m.quantidade,
         m.saldo_anterior,
         m.saldo_novo,
@@ -523,6 +524,7 @@ export default function EstoquePage() {
                             <tr>
                                 <th className="p-3 text-left">Data</th>
                                 <th className="p-3 text-left">Tipo</th>
+                                <th className="p-3 text-left">Lote</th>
                                 <th className="p-3 text-right">Qtd.</th>
                                 <th className="p-3 text-right">Saldo Anterior</th>
                                 <th className="p-3 text-right">Novo Saldo</th>
@@ -535,13 +537,16 @@ export default function EstoquePage() {
                                 <tr key={mov.id}>
                                     <td className="p-3">{new Date(mov.created_at).toLocaleString('pt-BR')}</td>
                                     <td className="p-3 capitalize">
-                                        {mov.tipo === 'entrada_beneficiamento' 
-                                            ? 'Entrada Benef.' 
+                                        {mov.tipo === 'entrada_beneficiamento'
+                                            ? 'Entrada Benef.'
                                             : mov.tipo === 'transfer_in'
                                               ? 'Transferência (Entrada)'
                                               : mov.tipo === 'transfer_out'
                                                 ? 'Transferência (Saída)'
                                             : mov.tipo.replace(/_/g, ' ')}
+                                    </td>
+                                    <td className="p-3 text-xs font-mono text-slate-600">
+                                        {mov.lote && mov.lote !== 'SEM_LOTE' ? mov.lote : '—'}
                                     </td>
                                     <td className={`p-3 text-right font-bold ${entryTypes.includes(mov.tipo) ? 'text-green-600' : 'text-red-600'}`}>
                                         {entryTypes.includes(mov.tipo) ? '+' : '-'}{mov.quantidade}
