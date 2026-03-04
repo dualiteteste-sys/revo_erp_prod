@@ -129,9 +129,12 @@ REVOKE ALL ON FUNCTION public.fiscal_nfe_import_register FROM public;
 GRANT EXECUTE ON FUNCTION public.fiscal_nfe_import_register TO authenticated, service_role;
 
 -- ============================================================================
--- 4. create_recebimento_from_xml — copia lote do import para recebimento_itens
+-- 4. _create_recebimento_from_xml — copia lote do import para recebimento_itens
+--    NOTA: a função pública create_recebimento_from_xml é um thin wrapper criado
+--    por _sec_mt02_wrap_guard em 20270102200000 que adiciona permission guard.
+--    Aqui atualizamos a implementação subjacente (_create_recebimento_from_xml).
 -- ============================================================================
-CREATE OR REPLACE FUNCTION public.create_recebimento_from_xml(
+CREATE OR REPLACE FUNCTION public._create_recebimento_from_xml(
   p_import_id uuid
 )
 RETURNS jsonb
@@ -183,8 +186,8 @@ BEGIN
 END;
 $$;
 
-REVOKE ALL ON FUNCTION public.create_recebimento_from_xml(uuid) FROM public;
-GRANT EXECUTE ON FUNCTION public.create_recebimento_from_xml(uuid) TO authenticated, service_role;
+REVOKE ALL ON FUNCTION public._create_recebimento_from_xml(uuid) FROM public, authenticated;
+GRANT EXECUTE ON FUNCTION public._create_recebimento_from_xml(uuid) TO service_role;
 
 -- ============================================================================
 -- 5. beneficiamento_process_from_import — propaga lote → estoque
