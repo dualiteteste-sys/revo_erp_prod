@@ -87,6 +87,13 @@ Resumo do mínimo aceitável:
 
 Use esta seção para não “perder o fio” em novas janelas e para orientar outros agentes.
 
+> **Regra de economia de contexto:** ler apenas os docs ativados pelo gatilho do trabalho atual.
+> Para tarefas grandes, ler `docs/context/<domínio>.md` antes de qualquer arquivo de código.
+
+### 5.0 Sempre leia ao iniciar qualquer sessão de código
+
+- `docs/context/code-patterns.md` — camadas, tipos, nomes, React Query, tratamento de erros
+
 ### 5.1 Mexeu em Supabase / migrations / RLS / RPC
 
 Leia nesta ordem:
@@ -96,6 +103,11 @@ Leia nesta ordem:
 4) `docs/deploy.md`
 5) `docs/release-gate.md`
 
+### 5.1.1 Mexeu em operações críticas (financeiro, estoque, fiscal, vendas)
+
+Leia também:
+- `docs/context/resilience-patterns.md` — idempotência, double-submit, retry, timeout
+
 ### 5.2 Mexeu em Billing / Stripe / Assinaturas
 
 Leia:
@@ -103,66 +115,113 @@ Leia:
 - `docs/billing-step1.md`
 - `CHECKLIST-STRIPE-ASSINATURAS.md`
 
-### 5.2 Mexeu em Auth / Convites / E-mails
+### 5.3 Mexeu em Auth / Convites / E-mails
 
 Leia:
 - `docs/checklist-estado-da-arte-gaps.md` (seção convites/usuários)
 - `docs/runbook-auth-emails.md`
 
-### 5.3 Mexeu em Frontend / UX / componentes globais
+### 5.4 Mexeu em Frontend / UX / componentes globais
 
 Leia:
 - `MANUAL-CONTEXTO-CODEX.md` (padrões de UI/UX e decisões de produto)
-- `docs/checklist-estado-da-arte-gaps.md` (pontos recorrentes de UX/React Hooks)
+- `docs/context/code-patterns.md` (padrões React, hooks, componentes)
 
-### 5.3.1 Mexeu em campos de valores (moeda/preço)
+### 5.4.1 Mexeu em campos de valores (moeda/preço)
 
 Leia:
 - `docs/frontend/inputs-monetarios.md` (padrão “digita sem vírgula” via `useNumericField`)
 
-### 5.4 Mexeu em E2E / gates
+### 5.5 Mexeu em E2E / gates / workflows CI
 
 Leia:
+- `docs/context/ci-pipeline.md` — visão geral dos pipelines, tempos, gates
 - `docs/e2e-release-gates.md`
 - `docs/e2e_checklist.md`
 - `docs/release-gate.md`
 
-### 5.5 Mexeu em LGPD / PII / Exportação/Retention
+### 5.6 Mexeu em NF-e XML / recebimento / suprimentos
+
+Leia:
+- `docs/context/nfe-input-flow.md` — fluxo 5-step, RPCs, bugs históricos, armadilhas
+
+### 5.7 Mexeu em integrações externas (Stripe, WooCommerce, Focus NF-e, marketplaces)
+
+Leia:
+- `docs/context/integrations-testing.md` — como testar em dev sem afetar prod
+- `docs/policies/POLITICA_DE_APIS_EXTERNAS.md`
+
+### 5.8 Mexeu em LGPD / PII / Exportação/Retention
 
 Leia:
 - `docs/lgpd-01-inventario-dados-pessoais.md`
+- `docs/lgpd-02-procedimento-titular.md`
 
-### 5.6 Mexeu em backup/restore/DR
+### 5.9 Mexeu em backup/restore/DR
 
 Leia:
-- `docs/backups.md`
-- `docs/backup-restore.md`
+- `docs/backups.md` (fonte de verdade — R2, GitHub Actions, restore, drill)
 - `docs/supabase-prod-alignment.md`
 
-### 5.7 Mexeu em API externa / SDK / lib nova (nova dependência)
-
-Leia:
-- `docs/policies/POLITICA_DE_APIS_EXTERNAS.md`
-
-### 5.8 Mexeu em fluxo de branches/PR/CI com múltiplos agentes
+### 5.10 Mexeu em fluxo de branches/PR/CI com múltiplos agentes
 
 Leia:
 - `docs/policies/POLITICA_COLABORACAO_AGENTES.md`
 - `docs/policies/PREFLIGHT_EFEITOS_COLATERAIS.md`
 
+### 5.11 Protocolo de handoff (ao CONCLUIR tarefa significativa)
+
+Ao finalizar qualquer tarefa que toque um domínio específico, atualizar o arquivo de contexto correspondente:
+
+```
+docs/context/code-patterns.md       → mudanças em padrões de código
+docs/context/resilience-patterns.md → mudanças em operações críticas
+docs/context/nfe-input-flow.md      → mudanças no fluxo de NF-e
+docs/context/ci-pipeline.md         → mudanças em workflows CI/CD
+docs/context/integrations-testing.md → mudanças em integrações externas
+```
+
+Formato da atualização (10-20 linhas no final do arquivo):
+```markdown
+## Última atualização — YYYY-MM-DD
+- O que mudou: <1-2 linhas>
+- PRs: #NNN
+- Armadilhas encontradas: <se houver>
+- Estado atual: <o que é verdade agora>
+```
+
 ## 6) Índice de documentos (não duplicar)
 
+### Core (leitura obrigatória por gatilho)
 - Regras de ouro / ambientes / branches: `docs/contexto-projeto-excelencia.md`
 - Gates / DoD / checklist de PR: `docs/release-gate.md` + `.github/pull_request_template.md`
 - RPC-first + allowlist: `docs/supabase-from-policy.md`
 - Deploy/migrations: `docs/deploy.md`
 - Alinhamento DEV↔PROD: `docs/supabase-prod-alignment.md`
+
+### Memória semântica por domínio (docs/context/)
+- Padrões de código: `docs/context/code-patterns.md`
+- Resiliência/idempotência: `docs/context/resilience-patterns.md`
+- NF-e input flow: `docs/context/nfe-input-flow.md`
+- CI/CD pipeline: `docs/context/ci-pipeline.md`
+- Testes de integração: `docs/context/integrations-testing.md`
+
+### Checklists e rastreamento
+- Tracker "Estado da Arte" (master): `docs/checklist-estado-da-arte-completo.md`
+- Roadmap de execução (waves): `docs/ordem-estado-da-arte-execucao.md`
+- Gaps operacionais (auth, UX, hooks): `docs/checklist-estado-da-arte-gaps.md`
+- Marketplaces (itens pendentes): `docs/checklist-marketplaces-estado-da-arte.md`
+- Go-live: `docs/go-live-checklist.md`
+
+### Políticas e compliance
 - Sanitização periódica: `docs/checklist-estado-da-arte-gaps.md`
-- Política de APIs externas (nova dependência): `docs/policies/POLITICA_DE_APIS_EXTERNAS.md`
+- Política de APIs externas: `docs/policies/POLITICA_DE_APIS_EXTERNAS.md`
 - Política de colaboração (múltiplos agentes): `docs/policies/POLITICA_COLABORACAO_AGENTES.md`
 - Preflight anti-efeitos colaterais: `docs/policies/PREFLIGHT_EFEITOS_COLATERAIS.md`
-- Roadmap de excelência (9/10): `CHECKLIST-ESTADO-DA-ARTE-9-10.md`
- - Manual do projeto (contexto amplo, UI/UX, produto): `MANUAL-CONTEXTO-CODEX.md`
+- LGPD inventário: `docs/lgpd-01-inventario-dados-pessoais.md`
+- LGPD procedimento titular: `docs/lgpd-02-procedimento-titular.md`
+- Backup/restore/DR: `docs/backups.md`
+- Manual do projeto (UI/UX, produto): `MANUAL-CONTEXTO-CODEX.md`
 
 ## 7) Transfer + Repo Hardening Pack
 

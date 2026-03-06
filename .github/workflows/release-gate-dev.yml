@@ -99,6 +99,14 @@ jobs:
             echo "level=auto" >> "$GITHUB_OUTPUT"
           fi
 
+      - name: Secret scanning (TruffleHog)
+        uses: trufflesecurity/trufflehog@main
+        with:
+          path: ./
+          base: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || 'HEAD~1' }}
+          head: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || 'HEAD' }}
+          extra_args: --only-verified --fail
+
       - name: Build + bundle budget
         env:
           CI: true
