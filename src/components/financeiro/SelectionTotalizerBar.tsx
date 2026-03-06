@@ -23,6 +23,7 @@ export default function SelectionTotalizerBar(props: {
   loading?: boolean;
   onSelectAllMatching?: () => void;
   onClear: () => void;
+  actions?: React.ReactNode;
 }) {
   if (props.selectedCount <= 0) return null;
 
@@ -68,6 +69,7 @@ export default function SelectionTotalizerBar(props: {
               Selecionar todos os {props.totalMatchingCount}
             </Button>
           ) : null}
+          {props.actions}
           <Button variant="ghost" onClick={props.onClear}>
             Limpar
           </Button>
