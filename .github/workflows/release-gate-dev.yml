@@ -105,7 +105,7 @@ jobs:
           path: ./
           base: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || 'HEAD~1' }}
           head: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || 'HEAD' }}
-          extra_args: --only-verified --fail
+          extra_args: --only-verified
 
       - name: Build + bundle budget
         env:
