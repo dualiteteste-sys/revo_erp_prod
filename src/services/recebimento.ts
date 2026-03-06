@@ -165,6 +165,13 @@ export async function updateRecebimentoItemProduct(itemId: string, productId: st
     });
 }
 
+export async function updateRecebimentoItemLote(itemId: string, lote: string | null): Promise<void> {
+    await callRpc('suprimentos_recebimento_item_set_lote', {
+        p_recebimento_item_id: itemId,
+        p_lote: lote ?? null,
+    });
+}
+
 export async function updateRecebimentoCustos(
     recebimentoId: string,
     patch: {
