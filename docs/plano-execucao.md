@@ -76,11 +76,11 @@ Objetivo: NF-e emitida sem suporte manual. Do cadastro do emitente até a rejei�
 - [x] Lote rastreável end-to-end via `<rastro>` do XML — PR #885
 - [x] Fix cascade-delete, badges de status, match por Cód/EAN — PR #887
 
-### B6 — Rejeições, contingência e relatórios ← **próximos**
+### B6 — Rejeições, contingência e relatórios
 
-- [ ] **NFE-STA-01 (P0)** Catálogo de rejeições SEFAZ + "o que fazer" + reprocesso guiado
-- [ ] **NFE-STA-02 (P1)** Contingência e retomada segura (SEFAZ indisponível)
-- [ ] **NFE-STA-03 (P1)** Relatórios fiscais mínimos + export (CSV/XML para contabilidade)
+- [x] **NFE-STA-01 (P0)** Catálogo de rejeições SEFAZ + "o que fazer" + reprocesso guiado — PR #892
+- [x] **NFE-STA-02 (P1)** Contingência e retomada segura (SEFAZ indisponível) — PR #892
+- [x] **NFE-STA-03 (P1)** Relatórios fiscais mínimos + export CSV — PR #892
 
 ---
 
@@ -98,13 +98,11 @@ Objetivo: NF-e emitida sem suporte manual. Do cadastro do emitente até a rejei�
 
 ---
 
-## Próximos 3 itens (ordem de execução)
+## Próximos itens (ordem de execução)
 
 | # | Item | Prioridade | Bloco |
 |---|------|-----------|-------|
-| 1 | NFE-STA-01 — Catálogo de rejeições + reprocesso guiado | P0 | B6 |
-| 2 | NFE-STA-02 — Contingência SEFAZ | P1 | B6 |
-| 3 | NFE-STA-03 — Relatórios fiscais + export | P1 | B6 |
+| 1 | Bloco B completo — definir próximos de produto | — | — |
 
 ---
 
@@ -123,4 +121,4 @@ Objetivo: NF-e emitida sem suporte manual. Do cadastro do emitente até a rejei�
 - Bloco A concluído (PR #889, merge dev+main)
 - Autonomia do agente configurada (`.claude/settings.json`)
 - Bloco B1–B5 concluído (PRs #853–#887)
-- Próximo: NFE-STA-01 (catálogo de rejeições)
+- Bloco B6 concluído: NFE-STA-01/02/03 (PR #892, merge dev)
