@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { useContasAReceber } from '@/hooks/useContasAReceber';
 import { useToast } from '@/contexts/ToastProvider';
 import * as contasAReceberService from '@/services/contasAReceber';
-import { Loader2, PlusCircle, Search, TrendingUp, DatabaseBackup, X } from 'lucide-react';
+import { CheckCheck, Loader2, PlusCircle, Search, TrendingUp, DatabaseBackup, X } from 'lucide-react';
 import Pagination from '@/components/ui/Pagination';
 import ListPaginationBar from '@/components/ui/ListPaginationBar';
 import ConfirmationModal from '@/components/ui/ConfirmationModal';
@@ -13,6 +13,7 @@ import { ResponsiveTable } from '@/components/ui/ResponsiveTable';
 import ContasAReceberFormPanel from '@/components/financeiro/contas-a-receber/ContasAReceberFormPanel';
 import ContasAReceberSummary from '@/components/financeiro/contas-a-receber/ContasAReceberSummary';
 import BaixaRapidaModal from '@/components/financeiro/common/BaixaRapidaModal';
+import BaixaEmLoteModal from '@/components/financeiro/common/BaixaEmLoteModal';
 import MotivoModal from '@/components/financeiro/common/MotivoModal';
 import EstornoRecebimentoModal from '@/components/financeiro/common/EstornoRecebimentoModal';
 import Select from '@/components/ui/forms/Select';
@@ -67,6 +68,7 @@ const ContasAReceberPage: React.FC = () => {
   const [isCanceling, setIsCanceling] = useState(false);
   const [isEstornoOpen, setIsEstornoOpen] = useState(false);
   const [contaToReverse, setContaToReverse] = useState<contasAReceberService.ContaAReceber | null>(null);
+  const [isBaixaLoteOpen, setIsBaixaLoteOpen] = useState(false);
 
   const lastEmpresaIdRef = useRef<string | null>(activeEmpresaId);
   const empresaChanged = lastEmpresaIdRef.current !== activeEmpresaId;
@@ -90,6 +92,7 @@ const ContasAReceberPage: React.FC = () => {
     setIsCanceling(false);
     setIsEstornoOpen(false);
     setContaToReverse(null);
+    setIsBaixaLoteOpen(false);
 
     const contaId = searchParams.get('contaId');
     if (contaId) {
@@ -238,6 +241,32 @@ const ContasAReceberPage: React.FC = () => {
   const clearDateFilters = () => {
     setFilterStartDate(null);
     setFilterEndDate(null);
+  };
+
+  const handleBaixaLoteReceber = async ({
+    contaCorrenteId,
+    dataISO,
+  }: {
+    contaCorrenteId: string | null;
+    dataISO: string;
+  }) => {
+    const ids = Array.from(selection.selectedIds);
+    const result = await contasAReceberService.receberContasAReceberLote({
+      ids,
+      dataPagamento: dataISO,
+      contaCorrenteId,
+    });
+    setIsBaixaLoteOpen(false);
+    selection.clear();
+    refresh();
+    if (result.skipped > 0) {
+      addToast(
+        `${result.settled} recebimento(s) registrado(s). ${result.skipped} pulado(s) (já recebidos ou com erro).`,
+        'warning',
+      );
+    } else {
+      addToast(`${result.settled} recebimento(s) registrado(s) com sucesso!`, 'success');
+    }
   };
 
   const handleSeed = async () => {
@@ -432,6 +461,14 @@ const ContasAReceberPage: React.FC = () => {
             ]}
             onSelectAllMatching={() => selection.selectAllMatching()}
             onClear={() => selection.clear()}
+            actions={
+              selection.mode === 'explicit' && selection.selectedCount > 0 ? (
+                <Button size="sm" onClick={() => setIsBaixaLoteOpen(true)} className="gap-1">
+                  <CheckCheck size={14} />
+                  Baixar selecionados
+                </Button>
+              ) : undefined
+            }
           />
           {effectiveLoading && effectiveContas.length === 0 ? (
             <div className="h-96 flex items-center justify-center">
@@ -603,6 +640,15 @@ const ContasAReceberPage: React.FC = () => {
         confirmText="Sim, Excluir"
         isLoading={isDeleting}
         variant="danger"
+      />
+
+      <BaixaEmLoteModal
+        isOpen={isBaixaLoteOpen}
+        onClose={() => setIsBaixaLoteOpen(false)}
+        tipo="receber"
+        selectedCount={selection.selectedCount}
+        totalSaldo={totalsState.data?.total_saldo ?? null}
+        onConfirm={handleBaixaLoteReceber}
       />
     </div>
   );

@@ -361,3 +361,26 @@ export async function seedContasPagar(): Promise<void> {
   });
   await Promise.all(promises);
 }
+
+// ============================================================
+// Baixa em lote
+// ============================================================
+
+export type BaixaLoteResult = {
+  ok: boolean;
+  settled: number;
+  skipped: number;
+  errors: Array<{ id: string; error: string }>;
+};
+
+export async function pagarContasPagarLote(params: {
+  ids: string[];
+  dataPagamento?: string;
+  contaCorrenteId?: string | null;
+}): Promise<BaixaLoteResult> {
+  return callRpc<BaixaLoteResult>('financeiro_contas_pagar_pagar_lote', {
+    p_ids: params.ids,
+    p_data_pagamento: params.dataPagamento ?? null,
+    p_conta_corrente_id: params.contaCorrenteId ?? null,
+  });
+}

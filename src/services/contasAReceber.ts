@@ -368,3 +368,19 @@ export async function seedContasAReceber(): Promise<void> {
   });
   await Promise.all(promises);
 }
+
+// ============================================================
+// Baixa em lote
+// ============================================================
+
+export async function receberContasAReceberLote(params: {
+  ids: string[];
+  dataPagamento?: string;
+  contaCorrenteId?: string | null;
+}): Promise<import('./financeiro').BaixaLoteResult> {
+  return callRpc<import('./financeiro').BaixaLoteResult>('financeiro_contas_a_receber_receber_lote', {
+    p_ids: params.ids,
+    p_data_pagamento: params.dataPagamento ?? null,
+    p_conta_corrente_id: params.contaCorrenteId ?? null,
+  });
+}
